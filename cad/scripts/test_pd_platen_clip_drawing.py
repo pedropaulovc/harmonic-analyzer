@@ -137,6 +137,25 @@ def test_plan_rows_stack_smallest_nearest():
     assert columns[2] < draw.FRONT_KEEP["SpringRailWidth"][0] < draw.LEFT_EDGE_X
 
 
+def test_hole_row_text_clears_the_near_hole_station_line():
+    # r7 audit: the near hole station's dimension line (2.8 mm under its
+    # text, its outside arrow running left of the plan's near end) crossed
+    # the hole row's 3.5 mm tall text by 2.7 mm.
+    station_line_y = draw.FRONT_KEEP["LeftX"][1] - 0.0028
+    hole_row_text_top = draw.FRONT_KEEP["LeftZ"][1] + 0.00175
+    assert hole_row_text_top < station_line_y - 0.001
+
+
+def test_plan_length_says_formed_without_numbers():
+    # r7 review: the plan's length and outline are the formed clip, not the
+    # blank; the blank's fingers are the profile's developed length.
+    assert set(draw.DIMENSION_CALLOUTS_ABOVE) == {"Length"}
+    text = draw.DIMENSION_CALLOUTS_ABOVE["Length"]
+    assert text.startswith("FORMED")
+    assert not any(char.isdigit() for char in text)
+    assert "DEVELOPED" in draw.DIMENSION_CALLOUTS["FlatFinger"]
+
+
 def test_profile_station_rows_stack_smallest_nearest_between_the_views():
     rows = [draw.TOP_KEEP[name][1] for name, _x, _d in clip.DRAWN_TANGENT_STATIONS]
     xs = [x for _name, x, _d in clip.DRAWN_TANGENT_STATIONS]

@@ -3,9 +3,11 @@ r"""Create the curated machinist drawing for the platen clip (MHA-PD-003).
 The clip is one 0.8 brass sheet, 83.5 long: a flat screw rail carrying the two
 #2 loose screw holes, an open-ended slit from each end, and a spring rail
 joined to the screw rail only at the centre bridge, formed into two shallow
-bows.  The sheet runs at 3:1: the plan (front view) carries the blank (the
-length, the bridge's two ends from the near end, the hole row, the screw
-rail's and the overall width from the outer edge, the slit, the corner radii,
+bows.  The sheet runs at 3:1: the plan (front view) is the formed part seen
+square to its screw rail (the length, called FORMED since forming draws the
+spring tips back flush with the rail ends, the bridge's two ends
+from the near end, the hole row, the screw rail's and the overall width
+from the outer edge, the slit, the corner radii,
 the hole stations), the profile (top view) above it the bows' rise and, as
 references, the four stations where the bows leave and rejoin the flat, their
 radius, the developed finger and the sheet stock; a 2:1 isometric shows the
@@ -151,6 +153,8 @@ HOLE_FAR_X = CLIP_LENGTH - HOLE_INSET
 # dimension line on a shoulder that runs from the line to the text's far end
 # (r5: the hole row's "2X 3.300" spans 21 mm), so each column is its text's
 # right end: the hole row's shoulder ends right of the screw rail's line, the
+# hole row's text stands under the near hole station's outside-arrow line (r7
+# audit: at 0.112 that line, y ~0.1132, ran 2.7 mm into it), the
 # spring rail's right of the overall width's text, and the overall width's
 # inside the border.  The outer and the slit-side corner radii stand off the
 # right end.
@@ -166,7 +170,7 @@ FRONT_KEEP = {
     "BridgeX0": (_plan_x(BRIDGE_X0 / 2.0), _ABOVE_PLAN_ROWS[0]),
     "BridgeX1": (_plan_x(BRIDGE_X1 / 2.0), _ABOVE_PLAN_ROWS[1]),
     "Length": (FRONT_CENTER[0], _ABOVE_PLAN_ROWS[2]),
-    "LeftZ": (_HOLE_ROW_COLUMN, 0.1120),
+    "LeftZ": (_HOLE_ROW_COLUMN, 0.1095),
     "RailWidth": (_RAIL_COLUMN, 0.0900),
     "SpringRailWidth": (_SPRING_RAIL_COLUMN, 0.1652),
     "OverallWidth": (_OVERALL_COLUMN, 0.1625),
@@ -257,6 +261,10 @@ DIMENSION_CALLOUTS = {
     "FlatFinger": "DEVELOPED FINGER LENGTH\nBRIDGE TO TIP, ALONG BOWS",
     "CrestRise": "BOW RISE",
 }
+# The plan is the formed clip, not the blank (r7 review): the length says so,
+# and that the spring tips stand flush with the rail ends there; the blank's
+# fingers are the profile's developed length.
+DIMENSION_CALLOUTS_ABOVE = {"Length": "FORMED, SPRING TIPS FLUSH WITH RAIL ENDS"}
 # The bend radius's arrow stands outside its arc with no line on to the
 # centre, which lies below the views: drawn to it, the leader crossed every
 # station and the plan (r2).
@@ -375,9 +383,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # seen edge-on needs no hidden lines.
     for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
-    # The plan is the blank: the bows' tangent lines and the split between
-    # the bridge web and the spring rail read as cuts there (r2); the profile
-    # locates the tangents.
+    # The plan reads as one flat outline: the bows' tangent lines and the
+    # split between the bridge web and the spring rail read as cuts there
+    # (r2); the profile locates the tangents.
     front.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
     if int(front.GetDisplayTangentEdges2()) != 0:
         raise RuntimeError("failed to hide the plan's tangent edges")
@@ -404,6 +412,9 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_affixes(adapter, annotations, DIMENSION_AFFIXES)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
     _radius_leader_outside(adapter, annotations, RADIUS_LEADER_OUTSIDE)
     offset_dimension_text(adapter, annotations, OFFSET_TEXT)
 

@@ -77,6 +77,8 @@ from pd_platen_spec import (
     PLATE_HEIGHT,
     PLATE_THICKNESS,
     PLATE_WIDTH,
+    SOCKET_BOSS_FILLET_R,
+    SOCKET_BOSS_FILLET_TOL_TYPE,
     SOCKET_BOSS_H,
     SOCKET_SPEC,
     SOCKET_XY,
@@ -192,7 +194,8 @@ _SOCKET_LOW_Y, _SOCKET_HIGH_Y = sorted({y for _, y in SOCKET_XY})
 # height stand right of it.  The upper left boss carries the bosses' Ø up-left
 # over the plate's corner.  The enlarged right view carries the plate's
 # thickness above it and the boss height beside the lower boss (the dimension
-# attaches there, so its extension lines stay on the boss); section A-A the
+# attaches there, so its extension lines stay on the boss), the bosses' root
+# round beside the upper one; section A-A the
 # counterbore floor (SECTION_TEXT_MODEL_MM, placed by projection once the cut
 # stands).
 _ROW_Y = (0.1485, 0.141, 0.1335, 0.126, 0.1185, 0.111, 0.1035, 0.096)
@@ -213,15 +216,22 @@ FRONT_KEEP = {
     "Height": (0.272, FRONT_CENTER[1]),
     "Boss2Dia": (0.035, 0.238),
 }
+# The upper near boss's root round prints its single limit up-left of its
+# root silhouette, under the thickness's outside arrow (r7 sheet: that
+# arrow's tail at y ~0.2458 from x ~0.2925) and left of the boss's end
+# face; its 28 mm text ends 2.7 mm short of the boss.
 RIGHT_KEEP = {
     "Depth": (_right_x(PLATE_THICKNESS / 2.0), 0.251),
     "BossH": (0.284, _right_y(_SOCKET_LOW_Y)),
+    "BossFilletR": (0.2805, 0.2405),
 }
 SECTION_KEEP_NAMES = frozenset(SECTION_TEXT_MODEL_MM)
-# The thickness states what its .XXX is spent on; the floor is a reference
-# dimension (the user-accepted exception) that also states its printed worst
-# case (pd_platen_spec.CBORE_FLOOR_CALLOUT); the bosses say what they are.
-DIMENSION_CALLOUTS_ABOVE = {"Depth": "SETS DISC-TO-PLATEN AIR"}
+# The thickness states what its .XXX is spent on (the air to the reducer
+# disc, by number: r7 review); the floor is a reference dimension (the
+# user-accepted exception) that also states its printed worst case
+# (pd_platen_spec.CBORE_FLOOR_CALLOUT); the bosses say what they are.
+DISC_NUMBER = "MHA-PD-006"
+DIMENSION_CALLOUTS_ABOVE = {"Depth": f"SETS AIR TO {DISC_NUMBER} DISC"}
 DIMENSION_CALLOUTS_BELOW = {
     "CboreFloor": CBORE_FLOOR_CALLOUT,
     "Boss2Dia": "BOSS",
@@ -244,6 +254,7 @@ DIMENSION_PREFIXES = {
     "Guide1Y": "5X ",
     "Guide6Y": "5X ",
     "Boss2Dia": "4X Ø",
+    "BossFilletR": "4X R",
 }
 
 # The guide-hole callout rides the top row's first hole, its leader up to
@@ -305,6 +316,44 @@ def _set_dimension_prefixes(
             raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
     if remaining:
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+
+
+def _dress_boss_fillet_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Prove the right view's imported BossFilletR prints the part's R MAX
+    and stop its leader at the root (draw_pn_pen_rod ``_dress_shoulder_radius``).
+
+    Read back: radial, measuring SOCKET_BOSS_FILLET_R, the native swTolMAX
+    the part set.  The text stands up-left of the root, outside the arc's
+    quadrant, so ``ArcExtensionLineOrOppositeSide`` False keeps the leader
+    from running on through the arc centre into the boss.
+    """
+    found = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "BossFilletR"
+    ]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"expected one BossFilletR on the right view, found {len(found)}"
+        )
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("the imported boss root radius is not radial")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != SOCKET_BOSS_FILLET_TOL_TYPE:
+        raise RuntimeError(
+            f"BossFilletR lost its native MAX type: {int(tolerance.Type)}"
+        )
+    if not math.isclose(
+        float(dimension.SystemValue), SOCKET_BOSS_FILLET_R / 1000.0, abs_tol=1e-9
+    ):
+        raise RuntimeError("BossFilletR does not measure the boss root round")
+    display.ArcExtensionLineOrOppositeSide = False
+    if display.ArcExtensionLineOrOppositeSide is not False:
+        raise RuntimeError("BossFilletR leader still runs to the opposite side")
+    _telemetry.info(f"boss root radius: text {display.GetText(1)!r}, MAX type")
 
 
 def _socket_tap_edge(adapter: Any, view: Any) -> Any:
@@ -520,6 +569,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *right_annotations, *section_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    _dress_boss_fillet_radius(adapter, right_annotations)
     floor = [
         a
         for a in section_annotations

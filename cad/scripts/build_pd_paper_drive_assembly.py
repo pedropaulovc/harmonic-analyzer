@@ -203,6 +203,7 @@ from pd_platen_spec import (  # noqa: E402
     PLATE_THICKNESS,
     PLATE_WIDTH,
     SOCKET_BOSS_DIA as PLATEN_SOCKET_BOSS_DIA,
+    SOCKET_BOSS_FILLET_R as PLATEN_BOSS_FILLET_R,
     SOCKET_BOSS_H as PLATEN_BOSS_H,
     SOCKET_SPEC as PLATEN_SOCKET_SPEC,
     SOCKET_THREAD_ENGAGEMENT as PLATEN_SOCKET_ENGAGEMENT,
@@ -1505,10 +1506,11 @@ def _assert_lock_station_sweep() -> None:
         ]
     # The clip-screw socket bosses ride the platen back too, SOCKET_BOSS_H
     # proud of it, their screw tips flush in them; the thinnest bar carries
-    # the back rearward. Each boss takes its printed Ø (on the radius) and
-    # station sideways, and rearward the tallest boss, or the tip left proud
-    # of the shortest one by a thin plate.
-    boss_r = PLATEN_SOCKET_BOSS_DIA / 2.0
+    # the back rearward. Each boss takes its printed Ø (on the radius), the
+    # root round's foot on the back face beyond it, and its station sideways,
+    # and rearward the tallest boss, or the tip left proud of the shortest one
+    # by a thin plate.
+    boss_r = PLATEN_SOCKET_BOSS_DIA / 2.0 + PLATEN_BOSS_FILLET_R
     boss_dy = printed_band_mm(PLATEN_PRECISION["Boss2Dia"]) / 2.0 + printed_band_mm(
         PLATEN_PRECISION["Socket2Y"]
     )

@@ -276,10 +276,11 @@ _CORNER_LOSS = (
 # --- Drawing contract: feature -> the parametric dimension NAMES the print
 # shows.  The build marks exactly these and authors their places;
 # ``draw_pd_platen_clip`` keeps exactly their union across its views.  The plan
-# carries the blank: the overall length, the bridge's two ends (the slits'
-# rounded ends) from the near end, the hole row, the screw rail's width and
-# the overall width from the outer edge, the slit, the corner radii and the
-# hole stations; the spring rail's width is what they leave, a reference.  The
+# shows the formed clip square to its screw rail: the overall (FORMED) length,
+# the bridge's two ends (the slits' rounded ends) from the near end, the hole
+# row, the screw rail's width and the overall width from the outer edge, the
+# slit, the corner radii and the hole stations; the spring rail's width is
+# what they leave, a reference.  The
 # formed profile carries the bows' rise and, as references, the four stations
 # where the bows leave and rejoin the flat, their radius, the developed finger
 # and the sheet stock.  Hidden reference sketches own the overall width, the
