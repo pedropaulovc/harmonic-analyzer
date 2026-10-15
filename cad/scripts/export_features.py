@@ -396,6 +396,47 @@ def bundle_paths(stem: str, out: Path = OUT) -> tuple[Path, Path]:
     return directory / "features.toml", directory / f"{stem.replace('_', '-')}.STEP"
 
 
+@lru_cache(maxsize=256)
+def step_configurations(stem: str) -> tuple[str, ...]:
+    """The configurations a multi-configuration part also exports, one STEP each.
+
+    Opt-in: the part's spec declares ``FEATURE_STEP_CONFIGURATIONS`` as a
+    literal tuple of configuration names, read statically so dodo never
+    imports a spec. A part that declares nothing (or has no spec module)
+    exports only its bundle STEP (the saved, active configuration).
+    """
+    stem = _stem(stem)
+    path = Path(__file__).resolve().parent / f"{stem}_spec.py"
+    if not path.is_file():
+        return ()
+    for node in source_tree(path).body:
+        target = node.target if isinstance(node, ast.AnnAssign) else (
+            node.targets[0] if isinstance(node, ast.Assign) and len(node.targets) == 1 else None
+        )
+        if not (isinstance(target, ast.Name) and target.id == "FEATURE_STEP_CONFIGURATIONS"):
+            continue
+        names = ast.literal_eval(node.value)
+        if (
+            not isinstance(names, tuple) or not names or len(set(names)) != len(names)
+            or not all(isinstance(name, str) and name.isalnum() for name in names)
+        ):
+            raise ValueError(
+                f"{stem}: FEATURE_STEP_CONFIGURATIONS must be a non-empty tuple of "
+                f"distinct alphanumeric configuration names, found {names!r}"
+            )
+        return names
+    return ()
+
+
+def configuration_step_paths(stem: str, out: Path = OUT) -> dict[str, Path]:
+    """Each declared configuration's STEP beside the bundle STEP, named by configuration."""
+    _manifest, step = bundle_paths(stem, out)
+    return {
+        name: step.with_name(f"{step.stem}-{name}{step.suffix}")
+        for name in step_configurations(stem)
+    }
+
+
 def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     """Bind all labelled STEP faces and write the adjacent requirements TOML."""
     from prechips.model import Features

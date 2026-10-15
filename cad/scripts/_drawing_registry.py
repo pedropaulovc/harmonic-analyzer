@@ -782,6 +782,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_riser_block",
+        part="ch_rocker_arm_tl_riser_block",
+        artifact_stem="ch-rocker-arm-tl-riser-block",
+        script_name="draw_ch_rocker_arm_tl_riser_block.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_cone_pivot_post_tl_soft_jaw",
         part="dt_cone_pivot_post_tl_soft_jaw",
         artifact_stem="dt-cone-pivot-post-tl-soft-jaw",

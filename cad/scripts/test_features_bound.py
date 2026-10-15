@@ -68,6 +68,9 @@ def bound_output(tmp_path: Path, *, pivot_bore_faces: int = 2) -> Path:
         full = out / "step" / name
         full.parent.mkdir(parents=True, exist_ok=True)
         full.write_bytes(step.read_bytes())
+        for cfg_step in export_features.configuration_step_paths(stem, out).values():
+            cfg_step.write_bytes(step.read_bytes())
+            (out / "step" / cfg_step.name).write_bytes(step.read_bytes())
         export_features.write_manifest(stem, step, revision="v38")
     return out
 
@@ -108,12 +111,28 @@ def test_copied_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path, monkey
         for relative, content in _tree(out).items()
         if relative.startswith("features/")
     }
-    assert len(checked) == len(staged) == len(expected) == 2 * len(export_features.SUPPORTED_PARTS)
+    configured = {
+        stem: export_features.configuration_step_paths(stem, out)
+        for stem in export_features.SUPPORTED_PARTS
+    }
+    assert configured["ch_rocker_arm_tl_riser_block"]
+    files = 2 * len(export_features.SUPPORTED_PARTS) + sum(map(len, configured.values()))
+    assert len(checked) == len(staged) == len(expected) == files
     assert _tree(stage) == expected
     for stem in export_features.SUPPORTED_PARTS:
         assert {path.name for path in (stage / "features" / stem).iterdir()} == {
             f"{stem.replace('_', '-')}.STEP", "features.toml",
+            *(path.name for path in configured[stem].values()),
         }
+
+
+def test_missing_configuration_step_never_stages(tmp_path: Path) -> None:
+    out = bound_output(tmp_path)
+    missing = export_features.configuration_step_paths("ch_rocker_arm_tl_riser_block", out)["L045"]
+    missing.unlink()
+    with pytest.raises(features_bound.FeaturesBoundError, match="cannot read required file"):
+        features_bound.stage_bound_features(out, tmp_path / "stage")
+    assert not (tmp_path / "stage").exists()
 
 
 @pytest.mark.parametrize("member", [0, 1], ids=["manifest", "step"])
