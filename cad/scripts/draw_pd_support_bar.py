@@ -115,13 +115,14 @@ _S = FACE_SCALE[0] / FACE_SCALE[1] / 1000.0  # sheet metres per model mm
 
 # The back face above, the front face below, both at 1:2 with their ends
 # aligned; section A-A right of the back face's end, the isometric under it
-# (its 1:4 diagonal runs down-right, under the section's caption and above
-# the title block), its scale note clear of it to the lower left.
+# (its 1:4 diagonal runs down-right, under the section's caption and clear
+# of the title block), its scale note under its left half, right of the
+# front view's end extension lines.
 FACE_CENTER = (0.170, 0.222)
 BACK_CENTER = (0.170, 0.122)
 SECTION_CENTER = (0.385, 0.200)
-ISO_CENTER = (0.372, 0.093)
-ISO_NOTE_XY = (0.262, 0.076)
+ISO_CENTER = (0.368, 0.097)
+ISO_NOTE_XY = (0.300, 0.076)
 
 LEFT_END = FACE_CENTER[0] - BAR_LENGTH * _S / 2.0
 RIGHT_END = FACE_CENTER[0] + BAR_LENGTH * _S / 2.0
@@ -131,9 +132,10 @@ BACK_TOP = BACK_CENTER[1] + BAR_HEIGHT * _S / 2.0
 BACK_BOTTOM = BACK_CENTER[1] - BAR_HEIGHT * _S / 2.0
 # The -X end every station runs from, named beside it in both views: left of
 # the back face's left end, right of the front face's right end (inside the
-# bar height's extension lines, left of its dimension line).
+# bar height's extension lines, midway between the clamp stations' end
+# extension lines and its dimension line).
 FACE_END_LABEL_TOP = (LEFT_END - 0.012, FACE_CENTER[1] + 0.002)
-BACK_END_LABEL_TOP = (RIGHT_END + 0.008, BACK_CENTER[1] + 0.002)
+BACK_END_LABEL_TOP = (RIGHT_END + 0.011, BACK_CENTER[1] + 0.002)
 
 
 def _face_x(model_x: float) -> float:
