@@ -32,12 +32,11 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = set(drawing.TOP_KEEP) | set(drawing.FACE_KEEP)
     assert kept == marked
     # A callout can only annotate a dimension the print actually shows.
     annotated = (
         set(drawing.DIMENSION_CALLOUTS)
-        | set(drawing.ABOVE_CALLOUTS)
         | set(drawing.DIMENSION_PREFIXES)
         | set(drawing.REFERENCE_DIMENSIONS)
     )
@@ -62,9 +61,19 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 1)" in source  # the isometric override
-    assert "for view in (right, iso):" in source
+    assert "for view in (top, face, iso):" in source
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+
+
+def test_split_face_view_projects_beside_the_plan() -> None:
+    # Third-angle left-side projection of the plan: level with it, to its
+    # left (the split face is the plan's left edge), the 48 running up both.
+    assert drawing.FACE_CENTER[1] == drawing.TOP_CENTER[1]
+    assert drawing.FACE_CENTER[0] < drawing.TOP_CENTER[0]
+    ear_1 = drawing._face_xy(0.0, spec.EAR_HOLE_Z)
+    assert ear_1[0] == drawing.FACE_CENTER[0]
+    assert ear_1[1] < drawing.FACE_CENTER[1]  # +Z runs down, as in the plan
 
 
 def test_bore_prints_the_grip_budget_on_the_column() -> None:
@@ -74,8 +83,7 @@ def test_bore_prints_the_grip_budget_on_the_column() -> None:
     assert "DIAMETRAL" in bore and "MHA-FR-003" in bore
     assert f"{spec.BORE_DIAMETRAL_CLEARANCE[1]:.2f}" in bore
     assert spec.BORE_DIAMETRAL_CLEARANCE[1] <= 0.30
-    assert "MHA-SH-002" in drawing.ABOVE_CALLOUTS["EarHole1Z"]
-    assert "\n" not in drawing.ABOVE_CALLOUTS["EarHole1Z"]
+    assert "MHA-SH-002" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
     assert min(spec.WALLS_WORST.values()) >= spec.WALL_TARGET
 
 
