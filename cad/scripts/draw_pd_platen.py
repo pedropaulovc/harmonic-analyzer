@@ -4,10 +4,11 @@ The platen is a 269.64 x 134.82 brass plate, 3.85 thick, with four Ø7 bosses
 standing proud of its back face round the #2-56 clip-screw through taps and
 ten counterbored #4 loose through holes for the guide screws.  The sheet runs
 at 1:2: the front view carries the outline, the bosses and every hole
-coordinate from the plate's bottom-left corner, an enlarged 1:1 right view
-(hidden lines shown) the thickness, the boss height and the user-accepted
-counterbore floor as a reference dimension with its worst case, and a 1:4
-isometric the form.  The counterbores' far side is named in their callout.
+coordinate from the plate's bottom-left corner, an enlarged 1:1 right view the
+thickness and the boss height, a 4:1 partial section A-A through one
+counterbore the user-accepted counterbore floor as a reference dimension with
+its worst case, and a 1:4 isometric the form.  The counterbores' far side is
+named in their callout.
 
 Every printed dimension is an associative model dimension whose places the
 part authors (``pd_platen_spec.DRAWING_PRECISION``); the hole sizes ship as
@@ -25,6 +26,7 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
@@ -38,6 +40,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -49,15 +52,21 @@ from _drawing_dimensions import (
 import _drawing_hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
+from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from pd_platen_spec import (
+    CBORE_DEPTH,
     CBORE_FLOOR_CALLOUT,
-    CBORE_FLOOR_REFERENCE_Y,
+    CBORE_SECTION_HOLE_Y,
+    CBORE_SECTION_X,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     GUIDE_CALLOUT_PRECISION,
@@ -96,12 +105,39 @@ _RIGHT_S = 1.0 / 1000.0  # enlarged right view, 1:1
 # Sheet layout (meters; the B-size field is x 0.0127..0.4191, y 0.0127..0.2667
 # and the title block holds x >= 0.216, y <= 0.066).  The front view's hole
 # coordinates stack below it (smallest nearest) and at its sides; the enlarged
-# right view and the isometric stand right of the front view.
+# right view and the isometric stand right of the front view, section A-A
+# under the isometric, right of the right view's note: its floor reference
+# below it, its caption between it and the isometric's note.
 FRONT_CENTER = (0.140, 0.190)
 RIGHT_CENTER = (0.300, 0.175)
-ISO_CENTER = (0.370, 0.190)
-ISO_NOTE_XY = (0.338, 0.150)
+ISO_CENTER = (0.370, 0.202)
+ISO_NOTE_XY = (0.338, 0.168)
 RIGHT_NOTE_XY = (0.262, 0.100)
+# Section A-A: a partial cut down the top row's middle guide hole (x =
+# CBORE_SECTION_X, its cutting plane the part's CBORE_SECTION_PLANE) from
+# SECTION_SPAN below the hole's centre to as far above, past the 6.5
+# counterbore's rim, at 4:1 (36 mm tall), +Y up.  The floor reference stands
+# mid-annulus below the hole (pd_platen_spec), so its value hangs below the
+# cut's lower end; the native caption's top centre stands above the cut.
+SECTION_SCALE = (4, 1)
+_SECTION_S = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
+SECTION_SPAN = 4.5
+SECTION_CENTER = (0.380, 0.114)
+SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.157)
+# Model mm, in the cutting plane: the cut's ends, its centre (the hole's axis
+# at mid-thickness) and the floor value's text, 2.5 below the cut.
+SECTION_LINE_MODEL_MM = (
+    (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y - SECTION_SPAN, 0.0),
+    (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y + SECTION_SPAN, 0.0),
+)
+_SECTION_ANCHOR_MM = (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y, PLATE_THICKNESS / 2.0)
+SECTION_TEXT_MODEL_MM = {
+    "CboreFloor": (
+        CBORE_SECTION_X,
+        CBORE_SECTION_HOLE_Y - SECTION_SPAN - 2.5,
+        (PLATE_THICKNESS + CBORE_DEPTH) / 2.0,
+    ),
+}
 # The right view's bbox spans the plate and the bosses behind it (model Z).
 _DEPTH_SPAN = PLATE_THICKNESS + SOCKET_BOSS_H
 
@@ -143,9 +179,10 @@ _SOCKET_LOW_Y, _SOCKET_HIGH_Y = sorted({y for _, y in SOCKET_XY})
 # on its own line clear of the other's; the sockets' Y coordinates and the
 # height stand right of it.  The upper left boss carries the bosses' Ø up-left
 # over the plate's corner.  The enlarged right view carries the plate's
-# thickness above it, the boss height beside the lower boss (the dimension
-# attaches there, so its extension lines stay on the boss), and the counterbore
-# floor beside the bottom guide row.
+# thickness above it and the boss height beside the lower boss (the dimension
+# attaches there, so its extension lines stay on the boss); section A-A the
+# counterbore floor (SECTION_TEXT_MODEL_MM, placed by projection once the cut
+# stands).
 _ROW_Y = (0.1485, 0.141, 0.1335, 0.126, 0.1185, 0.111, 0.1035, 0.096)
 _OUTBOARD_X = 0.040
 FRONT_KEEP = {
@@ -167,8 +204,8 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (_right_x(PLATE_THICKNESS / 2.0), 0.251),
     "BossH": (0.284, _right_y(_SOCKET_LOW_Y)),
-    "CboreFloor": (0.270, _right_y(CBORE_FLOOR_REFERENCE_Y)),
 }
+SECTION_KEEP_NAMES = frozenset(SECTION_TEXT_MODEL_MM)
 # The thickness states what its .XXX is spent on; the floor is a reference
 # dimension (the user-accepted exception) that also states its printed worst
 # case (pd_platen_spec.CBORE_FLOOR_CALLOUT); the bosses say what they are.
@@ -210,9 +247,9 @@ GUIDE_EDGE_XY = (
     _front_y(_GUIDE_PICK_HOLE[1]) + GUIDE_HOLE_DIA / 2.0 * _S * _DIAG,
 )
 GUIDE_CALLOUT_XY = (0.128, 0.248)
-GUIDE_CALLOUT_PROCESS = (
-    "PATTERN MATCHES MHA-PD-011\nC'BORE FAR SIDE\nMHA-VN-006 HEADS SUB-FLUSH\n"
-)
+# Four rows at most (r4 tall-block): the far-side counterbore and the screw
+# whose heads it sinks share one.
+GUIDE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-011\nC'BORE FAR SIDE FOR MHA-VN-006\n"
 SOCKET_DRILL_DIA = blind_cut_dia_mm(SOCKET_SPEC)
 SOCKET_DRILL_R_SHEET = SOCKET_DRILL_DIA / 2.0 * _S
 SOCKET_EDGE_XY = (
@@ -229,7 +266,11 @@ CENTER_MARKS_PER_VIEW = len(SOCKET_XY) + len(GUIDE_HOLE_XY)
 # The socket's native callout drops one automatic "Tapped Hole" note.
 REDUNDANT_NOTE = "Tapped Hole"
 
-_VIEW_KEEPS = {"front": FRONT_KEEP, "right": RIGHT_KEEP}
+_VIEW_KEEPS = {
+    "front": FRONT_KEEP,
+    "right": RIGHT_KEEP,
+    "section A-A": dict.fromkeys(SECTION_KEEP_NAMES),
+}
 if set().union(*_VIEW_KEEPS.values()) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("the platen views must keep exactly the marked dimensions")
 
@@ -278,11 +319,130 @@ def _socket_tap_edge(adapter: Any, view: Any) -> Any:
     return max(rims, key=lambda rim: rim[0])[1]
 
 
+def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
+    return tuple(value / 1000.0 for value in point_mm)
+
+
+def _orient_section(adapter: Any, section: Any) -> None:
+    """Turn section A-A until model +Y runs up the sheet, as in the right view.
+
+    Which way the cut looks along X only mirrors the symmetric counterbore,
+    so the cut direction is left as SolidWorks takes it.
+    """
+    native = _early_bound(section, "IView")
+    for attempt in range(3):
+        origin = model_point_in_view(
+            adapter, native, _metres(_SECTION_ANCHOR_MM), label="section A-A axis"
+        )
+        above = model_point_in_view(
+            adapter,
+            native,
+            _metres(
+                (
+                    _SECTION_ANCHOR_MM[0],
+                    _SECTION_ANCHOR_MM[1] + 1.0,
+                    _SECTION_ANCHOR_MM[2],
+                )
+            ),
+            label="section A-A +Y",
+        )
+        dx, dy = above[0] - origin[0], above[1] - origin[1]
+        if dy > 0.0 and abs(dx) <= 1e-7:
+            _telemetry.info(
+                f"section A-A +Y up after {attempt} turn(s), "
+                f"angle={float(native.Angle):.6f} rad"
+            )
+            return
+        native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(dy, dx)
+        rebuild_drawing(adapter, label="platen section A-A turned")
+    raise RuntimeError(f"section A-A does not run +Y up: ({dx:g}, {dy:g})")
+
+
+def _centre_section(adapter: Any, section: Any) -> None:
+    """Land the cut's centre (the hole's axis at mid-thickness) on
+    SECTION_CENTER; a section's Position is its cut-plane origin, not its
+    outline's centre (draw_pn_pen_v_block ``_centre_section``)."""
+    native = _early_bound(section, "IView")
+    for attempt in range(4):
+        native.UpdateViewDisplayGeometry()
+        projected = model_point_in_view(
+            adapter,
+            native,
+            _metres(_SECTION_ANCHOR_MM),
+            label=f"section A-A centre, pass {attempt}",
+        )
+        if math.dist(projected, SECTION_CENTER) <= 1e-4:
+            return
+        position = tuple(float(value) for value in native.Position)
+        moved = [
+            position[axis] + SECTION_CENTER[axis] - projected[axis] for axis in (0, 1)
+        ]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to re-centre platen section A-A")
+        rebuild_drawing(adapter, label="platen section A-A re-centred")
+    raise RuntimeError(
+        f"section A-A centre stands at {projected}, not {SECTION_CENTER}"
+    )
+
+
+def _floor_section(adapter: Any, source_model: Any, front: Any) -> list[Any]:
+    """Section A-A through one counterbore, carrying the floor reference.
+
+    The floor's hidden owner sketch lies in the cutting plane; a derived view
+    takes it from the part as it stands when cut and selects it through its
+    base view, so the section is cut and curated while the part shows it
+    (draw_pn_pen_v_block's recipe).  A section shows no hidden lines.
+    """
+    line = [
+        model_point_in_view(adapter, front, _metres(point), label="section A-A line")
+        for point in SECTION_LINE_MODEL_MM
+    ]
+    with _drawing_hidden_sketches.part_sketches_shown(
+        adapter,
+        source_model,
+        ("CboreFloorReference",),
+        label="section A-A floor reference",
+        base_view=front,
+    ):
+        section = create_section_view(
+            adapter,
+            front,
+            line_start=line[0],
+            line_end=line[1],
+            view_xy=SECTION_CENTER,
+            section_label="A",
+            scale=SECTION_SCALE,
+            partial=True,
+            label="counterbore floor section",
+        )
+        _orient_section(adapter, section)
+        set_hidden_lines_removed(adapter, section)
+        _centre_section(adapter, section)
+        keep = {
+            name: model_point_in_view(
+                adapter, section, _metres(point), label=f"section A-A {name} text"
+            )
+            for name, point in SECTION_TEXT_MODEL_MM.items()
+        }
+        annotations = _drawing_hidden_sketches.curate_view_dimensions(
+            adapter,
+            section,
+            keep=keep,
+            view_label="section A-A",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
+    position_section_caption(
+        adapter, section, SECTION_CAPTION_XY, label="platen section A-A"
+    )
+    return annotations
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open platen source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     read_required_properties(
         adapter.currentModel,
         (
@@ -323,12 +483,10 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=RIGHT_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    # The holes are fully defined by their callouts; only the enlarged right
-    # view shows hidden lines, so the counterbore profile its floor reference
-    # dimension measures reads behind the plate's edge.
-    for view in (front, iso):
+    # The holes are fully defined by their callouts and section A-A draws the
+    # counterbore, so no view shows hidden lines (r4).
+    for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, right)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -337,21 +495,20 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The floor's owner sketch is saved hidden (build_pd_platen); this view
-    # shows it to import the dimension.
-    right_annotations = _drawing_hidden_sketches.curate_view_dimensions(
+    right_annotations = curate_view_dimensions(
         adapter,
         right,
         keep=RIGHT_KEEP,
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*front_annotations, *right_annotations]
+    section_annotations = _floor_section(adapter, source_model, front)
+    annotations = [*front_annotations, *right_annotations, *section_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
     floor = [
         a
-        for a in right_annotations
+        for a in section_annotations
         if dimension_name(adapter, a) == REFERENCE_DIMENSION
     ]
     if len(floor) != 1:
@@ -384,7 +541,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_precision(
         guide_callout, GUIDE_CALLOUT_PRECISION, label="guide-screw counterbored holes"
     )
-    add_native_hole_callout(
+    socket_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=SOCKET_EDGE_XY,
@@ -393,6 +550,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="clip-screw through taps",
         process=SOCKET_CALLOUT_PROCESS,
     )
+    # The title block's THREADS row owns the general thread class (r4).
+    omit_title_block_thread_class(socket_callout, label="clip-screw through taps")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     add_property_linked_note(adapter, "Right View Note", *RIGHT_NOTE_XY)
     _telemetry.info("platen sheet: views, dimensions and callouts placed")

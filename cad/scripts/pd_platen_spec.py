@@ -76,12 +76,18 @@ CBORE_DEPTH = FILLISTER_HEAD_H + HEAD_RECESS
 # the printed worst case, under the 1.5 floor.  The plate is brass and the #4
 # guide screws are hand-tight: the floor's shear ring under the head
 # (pi x 3.658 x 0.67, about 7.7 mm^2) carries only that clamp.  The sheet prints
-# the floor as a reference dimension (the hidden CboreFloorReference sketch,
-# mid-annulus on the bottom row), and test_pd_platen_drawing pins the worst case
-# at or above the accepted value, so no later change can thin it further.
+# the floor as a reference dimension in section A-A, a partial section through
+# the top row's middle hole (r4 asked for a cut, not hidden lines): the hidden
+# CboreFloorReference sketch lies in the cutting plane (CBORE_SECTION_PLANE,
+# x = CBORE_SECTION_X), mid-annulus below that hole.  test_pd_platen_drawing
+# pins the worst case at or above the accepted value, so no later change can
+# thin it further.
 CBORE_FLOOR = PLATE_THICKNESS - CBORE_DEPTH
 CBORE_FLOOR_ACCEPTED_MIN = 0.67
-CBORE_FLOOR_REFERENCE_Y = GUIDE_HOLE_Y[0] + (GUIDE_HOLE_DIA + CBORE_DIA) / 4.0
+CBORE_SECTION_X = GUIDE_HOLE_X[2]
+CBORE_SECTION_HOLE_Y = GUIDE_HOLE_Y[1]
+CBORE_SECTION_PLANE = "CboreSectionPlane"
+CBORE_FLOOR_REFERENCE_Y = CBORE_SECTION_HOLE_Y - (GUIDE_HOLE_DIA + CBORE_DIA) / 4.0
 
 # --- Drawing contract.  ``build_pd_platen`` marks exactly these dimensions and
 # authors their places; ``draw_pd_platen`` keeps exactly their union across its
@@ -176,6 +182,6 @@ if SOCKET_BOSS_WALL_MIN < 2.0:
     )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
-# The right view keeps its hidden lines for one reason, which the note states
-# (r2 rule 9): they draw the counterbore the floor reference measures.
-RIGHT_VIEW_NOTE = "ENLARGED RIGHT VIEW SCALE 1:1\nHIDDEN LINES SHOW C'BORE FLOOR"
+# The right view shows no hidden lines (r4): section A-A draws the counterbore
+# the floor reference measures.
+RIGHT_VIEW_NOTE = "ENLARGED RIGHT VIEW SCALE 1:1"

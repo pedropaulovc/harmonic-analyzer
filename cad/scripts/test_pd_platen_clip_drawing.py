@@ -138,9 +138,19 @@ def test_plan_rows_stack_smallest_nearest():
 
 
 def test_profile_station_rows_stack_smallest_nearest_between_the_views():
-    rows = [draw.TOP_KEEP[name][1] for name, _x, _d in clip.TANGENT_STATIONS]
-    xs = [x for _name, x, _d in clip.TANGENT_STATIONS]
+    rows = [draw.TOP_KEEP[name][1] for name, _x, _d in clip.DRAWN_TANGENT_STATIONS]
+    xs = [x for _name, x, _d in clip.DRAWN_TANGENT_STATIONS]
     assert xs == sorted(xs)
+    # Only where the bows leave and rejoin the flat: the hole and bridge
+    # stations (r4 read the quarter-run joins as body-line crossings).
+    assert xs == pytest.approx(
+        [
+            clip.HOLE_INSET,
+            clip.BRIDGE_X0,
+            clip.BRIDGE_X1,
+            clip.CLIP_LENGTH - clip.HOLE_INSET,
+        ]
+    )
     assert draw.PROFILE_BOTTOM_Y > rows[0]
     assert rows == sorted(rows, reverse=True)
     assert rows[-1] > draw.FRONT_KEEP["Length"][1]

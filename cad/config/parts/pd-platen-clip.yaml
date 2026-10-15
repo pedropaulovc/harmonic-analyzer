@@ -1,6 +1,6 @@
 pd-platen-clip:
   number: MHA-PD-003
-  material: Brass
+  material: C26000 brass, half-hard
   material_specification: C26000 half-hard brass sheet, 0.032 in (0.8 mm)
   finish: bright brass
   quantity: 2

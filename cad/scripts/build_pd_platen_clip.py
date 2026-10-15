@@ -232,6 +232,15 @@ TANGENT_STATIONS = (
     ("TangentX7", BRIDGE_X1 + 3.0 * BOW_RUN / 4.0, '"HoleFarX" - "BowRun" / 4'),
     ("TangentX8", CLIP_LENGTH - HOLE_INSET, '"HoleFarX"'),
 )
+# The stations the profile prints, as references: where each bow leaves and
+# rejoins the flat (the hole and bridge stations).  The quarter-run joins
+# between the lift and crown arcs follow from the rise and the radius, and
+# printed they read as the finger crossing the body line (r4 rule 10).
+DRAWN_TANGENT_STATIONS = tuple(
+    station
+    for station in TANGENT_STATIONS
+    if station[0] in {"TangentX1", "TangentX4", "TangentX5", "TangentX8"}
+)
 # The far bow's crest station, where the drawing's rise reference stands.
 FAR_CREST_X = BRIDGE_X1 + BOW_RUN / 2.0
 
@@ -271,11 +280,11 @@ _CORNER_LOSS = (
 # rounded ends) from the near end, the hole row, the screw rail's width and
 # the overall width from the outer edge, the slit, the corner radii and the
 # hole stations; the spring rail's width is what they leave, a reference.  The
-# formed profile carries the bows' rise and, as references, their eight tangent
-# stations from the near end, their radius, the developed finger and the sheet
-# stock.  Hidden reference sketches own the overall width, the rise, the
-# stations and the developed finger.  The hole size ships as a native Hole
-# Wizard callout. ---
+# formed profile carries the bows' rise and, as references, the four stations
+# where the bows leave and rejoin the flat, their radius, the developed finger
+# and the sheet stock.  Hidden reference sketches own the overall width, the
+# rise, the stations and the developed finger.  The hole size ships as a
+# native Hole Wizard callout. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FlatSheetProfile": {
         "Length",
@@ -292,7 +301,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ScrewHoles": {"LeftX", "RightX", "LeftZ"},
     "PlanReference": {"OverallWidth"},
     "ProfileReference": {
-        *(name for name, _x, _drive in TANGENT_STATIONS),
+        *(name for name, _x, _drive in DRAWN_TANGENT_STATIONS),
         "CrestRise",
         "FlatFinger",
     },
@@ -321,7 +330,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewHoles": {name: POSITION_PLACES for name in ("LeftX", "RightX", "LeftZ")},
     "PlanReference": {"OverallWidth": WIDTH_PLACES},
     "ProfileReference": {
-        **{name: _TANGENT_PLACES.get(name, 1) for name, _x, _d in TANGENT_STATIONS},
+        **{
+            name: _TANGENT_PLACES.get(name, 1)
+            for name, _x, _d in DRAWN_TANGENT_STATIONS
+        },
         "CrestRise": 1,
         "FlatFinger": 1,
     },
@@ -338,15 +350,15 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     raise AssertionError("every marked platen-clip dimension needs authored places")
 # Printed as references (parenthesised): the sheet stock, the spring rail's
 # width (what the overall width, the screw rail and the slit leave), the bows'
-# tangent stations and radius (the rise and the plan's hole and bridge
-# stations fix them), and the developed finger.
+# drawn stations and radius (the rise and the plan's hole and bridge stations
+# fix them), and the developed finger.
 REFERENCE_DIMENSIONS = frozenset(
     {
         "SheetDepth",
         "SpringRailWidth",
         "BendR5",
         "FlatFinger",
-        *(name for name, _x, _drive in TANGENT_STATIONS),
+        *(name for name, _x, _drive in DRAWN_TANGENT_STATIONS),
     }
 )
 # Construction-only reference sketches the part saves hidden; the drawing
@@ -777,8 +789,9 @@ async def _profile_reference(adapter) -> SketchDims:
     sheet spans s = -SHEET_T..0 and the bows rise toward +s, so the face the
     bows rise from is s = 0 and their crest on it s = ARCH_RISE.  All
     construction: a chain along the sheet's back face (s = -SHEET_T) whose
-    joins stand at the eight tangent stations, each dimensioned from the near
-    end; a riser up from the far end's face, whose span is the rise, and a
+    joins stand at the drawn stations (DRAWN_TANGENT_STATIONS), each
+    dimensioned from the near end; a riser up from the far end's face, whose
+    span is the rise, and a
     level from its top back to the far bow's crest (outside the part, as the
     rise's extension lines would run); and a line along the near finger's face
     from the bridge end, as long as the finger's developed (flat) length.
@@ -788,7 +801,7 @@ async def _profile_reference(adapter) -> SketchDims:
     set_sketch_direct_db(adapter, True)
     chain: list[str] = []
     x_prev = 0.0
-    for name, x, _drive in TANGENT_STATIONS:
+    for name, x, _drive in DRAWN_TANGENT_STATIONS:
         chain.append(
             check(f"{name} station line", await adapter.add_line(x_prev, -t, x, -t))
         )
@@ -823,7 +836,7 @@ async def _profile_reference(adapter) -> SketchDims:
         adapter, f"{chain[0]}.start", 0.0, -t, "stations on the back face"
     )
     dims.record(None, '"SheetT"')
-    for (name, x, drive), segment in zip(TANGENT_STATIONS, chain):
+    for (name, x, drive), segment in zip(DRAWN_TANGENT_STATIONS, chain):
         await dimension_between(
             adapter,
             f"{chain[0]}.start",
