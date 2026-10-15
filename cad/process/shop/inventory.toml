@@ -4936,13 +4936,6 @@ name = "1/4 in drive torque wrench"
 kind = "torque_wrench"
 note = "illustrative example item: 1/4 in square-drive click torque wrench, 2-24 N·m (example range, not measured), with 10 mm and 9/16 in sockets"
 
-# A thin outline template the rocker's top edge and bottom arc are scribed from: it
-# drops over the ground shoulder-screw head (coaxial with bore A) in the S4 fixture.
-# It is a layout template only, distinct from the rocker-profile-template inspection
-# gauge (whose blades sit 1.00 outside the outline). AUTHOR'S CHOICE: made to order by
-# an outside wire-EDM shop to the outline dimensions printed at S4 op 10 (from the bore
-# A axis), because no machine here holds an R800 line to 0.02; the shop bonds in the bush.
-
 # A 6 in horizontal rotary table for arcs cut by turning the work under a fixed cutter.
 # Local frame: table top Z0 on its axis; one hole of a 6 in table T-slot pattern along X.
 [fixtures.rotary-table-6]
