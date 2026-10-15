@@ -423,7 +423,8 @@ def test_callouts_name_the_mates() -> None:
     assert callouts["PivotTapDrillDia"] == "TAP #8-32 UNC THRU"
     assert "2B" not in "".join(callouts.values())
     assert drawing._THREAD_CLASS_TOKEN == " <hw-threadclass>"
-    assert callouts["PivotCskDia"].startswith("2X 90\u00b0 CSK BOTH FACES")
+    # "2X" counts holes only: the one pivot hole is countersunk on both faces.
+    assert callouts["PivotCskDia"].startswith("90\u00b0 CSK BOTH FACES")
     # The latch-hook taps' leader passes just right of the pivot's text.
     assert max(map(len, callouts["PivotCskDia"].splitlines())) <= 24
     assert callouts["BracketCskDia"].startswith("2X 90\u00b0 CSK")
