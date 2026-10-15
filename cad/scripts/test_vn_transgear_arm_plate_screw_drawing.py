@@ -414,12 +414,12 @@ def test_sheet_states_the_cut_and_no_size_in_the_registry_names() -> None:
     assert all(len(line) <= 70 for line in lines), lines
     assert "1 IN" in screw.PURCHASED_STOCK_NOTE
     assert f"{screw.STOCK_LENGTH:.2f}" in screw.PURCHASED_STOCK_NOTE
-    assert "CUT TO FIT" in screw.PURCHASED_STOCK_NOTE
+    assert "CUT LENGTH AT ASSEMBLY" in screw.PURCHASED_STOCK_NOTE
     flat = " ".join(screw.PURCHASED_STOCK_NOTE.splitlines())
     proud = joints.PLATE_SCREW_CUT_PROUD_MAX
     assert f"FLUSH OR PROUD {proud:g} MAX" in flat
     assert f"CUT-END BREAK {screw.CUT_END_BREAK_TEXT}" in flat
-    assert "CUT TO FIT OFF THE MECHANISM BEFORE THE GUIDE-LOCK SWEEP" in flat
+    assert "AT ASSEMBLY (MHA-PD-000, BEFORE THE GUIDE-LOCK SWEEP)" in flat
     # The trim limit names the face it is measured from (machinist review).
     assert f"PROUD {proud:g} MAX OF THE MHA-PD-018 ARM FRONT FACE" in flat
 

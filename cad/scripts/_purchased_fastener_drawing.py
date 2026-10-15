@@ -275,6 +275,33 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> dict[str, tuple[int
     return scales
 
 
+@_telemetry.traced("drawing.purchased_center_marks")
+def _center_marks_without_lines(views: list[Any], cells: tuple) -> int:
+    """Drop the extension lines of every template-inserted centre mark.
+
+    The template auto-inserts a centre mark on each view of a circle, its arms
+    scaled with the view (8:1 washers: arms ~11 mm past the rim, outside the
+    view outline the cells fit). Captions sit on the view's vertical axis, so
+    those arms struck the FRONT caption and the TOP caption above it (r3
+    review, rule 14). The centre cross stays; the reference views need no
+    more. Returns the number of marks changed.
+    """
+    count = 0
+    for view, (name, _, _) in zip(views, cells, strict=True):
+        mark = view.GetFirstCenterMark2()
+        while mark is not None:
+            mark = _early_bound(mark, "ICenterMark")
+            mark.UseDocDisplaySettings = False
+            mark.ShowLines = False
+            if mark.UseDocDisplaySettings or mark.ShowLines:
+                raise RuntimeError(
+                    f"{name}: centre mark still shows its extension lines"
+                )
+            count += 1
+            mark = mark.GetNext()
+    return count
+
+
 @_telemetry.traced("drawing.purchased_note")
 def _literal_note(adapter: Any, text: str, x: float, y: float) -> Any:
     note = add_note(adapter, text, x, y)
@@ -559,6 +586,7 @@ async def _build_reference_sheet(
             view.UseSheetScale = 0
             view.ScaleRatio = double_array([1.0, 1.0])
     scales = _fit_views(draw, views, cells)
+    _center_marks_without_lines(views, cells)
     scale = scales["*Front"]
 
     with _telemetry.span("drawing.purchased_property_link"):

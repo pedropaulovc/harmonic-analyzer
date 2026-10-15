@@ -70,6 +70,9 @@ class _View:
         x, y = self._center
         return (x - 0.001, y - 0.001, x + 0.001, y + 0.001)
 
+    def GetFirstCenterMark2(self):
+        return None
+
 
 class _Note:
     def __init__(
@@ -265,8 +268,6 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     ) in calls
 
 
-
-
 def test_scale_fitting_does_not_scale_fixed_native_padding(monkeypatch, tmp_path):
     """A fitting 2:1 view must not be rejected by scaling its fixed sheet padding."""
 
@@ -346,3 +347,42 @@ def test_footer_notes_hold_rule_seven_budget():
     assert purchased.view_band_bottom("A\nB\nC", label="t") > purchased.footer_top(
         "A\nB\nC", label="t"
     )
+
+
+def test_center_marks_lose_their_extension_lines(monkeypatch):
+    class Mark:
+        def __init__(self, following=None):
+            self.UseDocDisplaySettings = True
+            self.ShowLines = True
+            self._following = following
+
+        def GetNext(self):
+            return self._following
+
+    class MarkedView:
+        def __init__(self, first):
+            self._first = first
+
+        def GetFirstCenterMark2(self):
+            return self._first
+
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _kind: value)
+    second = Mark()
+    first = Mark(second)
+    cells = purchased.fastener_view_cells(0.073)
+    views = [MarkedView(first), MarkedView(None), MarkedView(None), MarkedView(None)]
+    assert purchased._center_marks_without_lines(views, cells) == 2
+    assert not any(m.ShowLines or m.UseDocDisplaySettings for m in (first, second))
+
+    class StuckMark(Mark):
+        @property
+        def ShowLines(self):
+            return True
+
+        @ShowLines.setter
+        def ShowLines(self, _value):
+            pass
+
+    views[0] = MarkedView(StuckMark())
+    with pytest.raises(RuntimeError, match="extension lines"):
+        purchased._center_marks_without_lines(views, cells)
