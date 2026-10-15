@@ -61,6 +61,7 @@ resolution_mm = { value = 0.005, measured = { status = "measured", by = "placeho
 # A manual mill moves one handwheel at a time: arcs are cut by the manual-arc methods
 # (stairs or chain drill then filing, chords, rotary table; docs/plan.md "Manual arcs").
 note = "Manual mill with DRO; envelope and travel below are illustrative example values (vendor numbers relabelled)."
+cite = ["PM-30MV manual v3 2020-10 p.5 (https://macclab.com/wp-content/uploads/2022/01/PM-30MV-v3-2020-10.pdf): 2 HP (1.5 kW) brushless DC motor, spindle 50-1500 rpm low range and 1400-3000 rpm high range, R8"]
 
 [machines.PM-30MV.envelope]
 # Basis: machines.PM-30MV.envelope.spindle_to_table_max_in: catalogue-valued placeholder; source nominal 17 in, offset +0 in = 17 in. Source b757b5a76 cad/process/shop/inventory.toml:36 (machines.PM-30MV.envelope.spindle_to_table_max_in); retained item source https://www.precisionmatthews.com/products/pm-30mv. No invented catalogue deviation or actual installed-machine/gauge metrology is claimed.
@@ -97,6 +98,7 @@ drill = 1.25
 end_mill = 0.75
 face_mill = 3.5
 
+# The shop's installed lathe (Pedro 2026-10-15; it replaced the JET BD-920N).
 [machines.PM-1127VF-LB]
 kind = "lathe"
 make = "Precision Matthews"
@@ -109,7 +111,7 @@ compound_travel_in = 3
 weight_lb = 575
 standard_accessories = ["chuck-3jaw-6-d1-4", "chuck-4jaw-6-d1-4", "faceplate-d1-4", "steady_rest", "follow_rest", "thread_dial", "dead_centre_headstock", "dead_centre_tailstock_mt3"]
 # --- pivot-shaft additions ---
-control = "manual; illustrative example item (plausible, not on hand): Electronica EL400 two-axis lathe DRO, X scale on the cross slide, Z scale on the bed"
+control = "manual; Electronica EL400 two-axis lathe DRO, X scale on the cross slide, Z scale on the bed (DRO identity is a #1413 placeholder: confirm the fitted readout)"
 # The DRO grid the sheet prints and the kernel checks (docs/rules-coordinates.md), one step
 # for both axes. With 5 um scales the EL400 shows Z in 0.005 steps but X in diameter mode
 # in 0.01 steps (each cross-slide count is doubled), so the grid is the coarser 0.01: every
@@ -182,6 +184,7 @@ kind = "dividing_head"
 make = "Precision Matthews"
 sku = "DIVIDINGHEAD-BS-0"
 source = "https://www.precisionmatthews.com/products/dividinghead-bs-0"
+note = "installed and usable on the PM-30MV: delivered and commissioned (https://github.com/pedropaulovc/harmonic-analyzer/issues/465)"
 worm_ratio = 40
 centre_height_in = 3.9375
 swing_in = 7.875
@@ -4834,6 +4837,171 @@ kind = "file"
 purchase = "Nicholson 10 in mill second-cut file, 08673 (purchase approved by Pedro 2026-10-11)"
 source = "KBC Tools 1-552-08673, $18.38 (https://www.kbctools.com/itemdetail/1-552-08673)"
 
+# General bench and hand tools a small home machine shop keeps (Pedro 2026-10-15, #1550:
+# the break-out chisel and hammer, plus common hand tools that plan steps imply but do not
+# name). Every size is the named catalogue size, recorded as a #1413 placeholder.
+# Cuts the chain-drill webs free (break-out); struck with tools.ball-peen-hammer-16oz.
+[tools.cold-chisel-1-2in]
+name = "Mayhew 10205 cold chisel, 1/2 in x 6 in"
+kind = "cold_chisel"
+make = "Mayhew"
+sku = 10205
+source = "https://mayhew.com/products/cold_chisels_10204 (10205 - Cold Chisel 1/2\"-13mm x 6\"), read 2026-10-15"
+width_in = { value = 0.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "digital calipers across the cutting edge" } }
+length_in = { value = 6.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule" } }
+
+# Strikes the cold chisel and the punches.
+[tools.ball-peen-hammer-16oz]
+name = "Estwing E3-16BP 16 oz ball peen hammer"
+kind = "hammer"
+make = "Estwing"
+sku = "E3-16BP"
+source = "https://www.estwing.com/product/ball-peen-hammer/ (E3-16BP, 16 oz / 453.6 g), read 2026-10-15"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "kitchen scale"; weight_lb is a plain number in the schema.
+weight_lb = 1.0
+
+# Seats work down on parallels and taps parts into fixtures without marking them.
+[tools.dead-blow-hammer-16oz]
+name = "TEKTON 16 oz soft-face dead blow hammer"
+kind = "hammer"
+make = "TEKTON"
+source = "https://www.tekton.com/hammers/dead-blow-hammers (soft face, 8-88 oz range), read 2026-10-15"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "kitchen scale"; weight_lb is a plain number in the schema.
+weight_lb = 1.0
+
+# Drives pins and studs in and out of reamed and drilled holes.
+[tools.pin-punch-set-starrett-s565pc]
+name = "Starrett S565PC 8-piece drive pin punch set, 1/16-5/16 in"
+kind = "pin_punch_set"
+make = "Starrett"
+sku = "S565PC"
+pieces = 8.0
+source = "https://www.starrett.com/products/precision-shop-tools/punches-and-sets/S565PC (4 in long, 1/16, 3/32, 1/8, 5/32, 3/16, 7/32, 1/4, 5/16 in), read 2026-10-15"
+length_in = { value = 4.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule" } }
+
+# Deepens a prick or automatic-punch mark before spotting or hand drilling.
+[tools.centre-punch-starrett-117]
+name = "Starrett 117 centre punch, 4 in"
+kind = "centre_punch"
+make = "Starrett"
+sku = 117
+source = "https://www.starrett.com/products/precision-shop-tools/punches-and-sets (117 centre punch, round shank, 4 in length), read 2026-10-15"
+length_in = { value = 4.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule" } }
+
+# Breaks sawn, milled and drilled edges to the title-block edge break (every setup's deburr_mm).
+[tools.deburring-tool-noga-ng8150]
+name = "Noga NG8150 hand deburring set (swivel handle, 10 S10 HSS blades)"
+kind = "deburring_tool"
+make = "Noga"
+sku = "NG8150"
+source = "https://www.mscdirect.com/product/details/85424562 (MSC 85424562, Mfr NG8150, S10 blades); 6.65 in packaged length per https://www.amazon.com/clp/B001O62V56, read 2026-10-15"
+length_mm = { value = 169.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule, handle and blade" } }
+
+# Clears file teeth between strokes (the fitting bench's file card).
+[tools.file-card-nicholson-21467]
+name = "Nicholson 21467 10 in file card and brush"
+kind = "file_card"
+make = "Nicholson"
+sku = 21467
+source = "https://www.crescenttool.com/all-tools/cutting-material-removal/files-material-removal/accessories-handles/21467-10-file-card-and-brush, read 2026-10-15"
+length_in = { value = 10.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule" } }
+
+# Finishes a filed line after the second-cut file (the fitting bench's smooth file).
+[tools.file-nicholson-8-mill-smooth]
+name = "Nicholson 8 in mill smooth-cut file"
+kind = "file"
+make = "Nicholson"
+sku = "1-552-08560"
+source = "KBC Tools 1-552-08560 (https://www.kbctools.com/itemdetail/1-552-08560), read 2026-10-15"
+length_in = { value = 8.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule" } }
+
+# Files concave arcs and inside corners the flat files cannot follow.
+[tools.file-nicholson-10-half-round-second]
+name = "Crescent Nicholson 05026N 10 in half-round second-cut file"
+kind = "file"
+make = "Nicholson"
+sku = "05026N"
+source = "https://www.crescenttool.com/all-tools/cutting-material-removal/files-material-removal/american-pattern-files/05026n-10-half-round-double-cut-second-file-boxed, read 2026-10-15"
+length_in = { value = 10.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule" } }
+
+# Small radii, slots and hole edges too small for the hand files.
+[tools.needle-files-grobet-12pc]
+name = "Grobet 12-piece Swiss pattern needle file set, 5-1/2 in, cut 2"
+kind = "file_set"
+make = "Grobet"
+pieces = 12.0
+source = "https://www.amazon.com/Grobet-Needle-File-Swiss-Pattern/dp/B07FS64D99 (set of 12, 5-1/2 in, cut 2), read 2026-10-15"
+length_in = { value = 5.5, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule" } }
+
+# Steps off and scribes arcs and spacings from a punch mark (the fitting bench's dividers).
+[tools.spring-dividers-starrett-277-6]
+name = "Starrett 277-6 toolmakers' spring dividers, 6 in"
+kind = "dividers"
+make = "Starrett"
+sku = "277-6"
+source = "https://www.starrett.com/products/precision-measuring-tools/precision-hand-tools/calipers,-dividers-and-trammels/calipers-and-dividers/277-6, read 2026-10-15"
+length_in = { value = 6.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule" } }
+
+# Squares a hacksaw cut or a scribed line to an edge; sets a vise jaw or angle plate by eye.
+[tools.combination-square-starrett-c11h-12]
+name = "Starrett C11H-12-4R 12 in combination square"
+kind = "square"
+make = "Starrett"
+sku = "C11H-12-4R"
+source = "https://www.mansontool.com/PROD/C11H-12-4R.html, read 2026-10-15"
+length_in = { value = 12.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule against the blade" } }
+
+# The "steel rule" the placeholder records name: rough lengths, stickouts and blank cuts.
+[tools.steel-rule-starrett-c604r-6]
+name = "Starrett C604R-6 6 in spring-tempered steel rule, 4R"
+kind = "rule"
+make = "Starrett"
+sku = "C604R-6"
+source = "https://www.starrett.com/products/precision-measuring-tools/precision-hand-tools/precision-rules--straight-edges-and-parallels/precision-rules, read 2026-10-15"
+length_in = { value = 6.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "against the 12 in combination square blade" } }
+
+# Vise, toolpost, boring-head and set-screw hex sockets.
+[tools.hex-keys-bondhus-10937]
+name = "Bondhus 10937 13-piece ball-end hex L-wrench set, 0.050-3/8 in"
+kind = "hex_key_set"
+make = "Bondhus"
+sku = 10937
+pieces = 13.0
+source = "https://bondhus.com/ball-end (10937, BLX13, 0.050-3/8 in), read 2026-10-15"
+width_in = { value = 0.375, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "digital calipers across the largest key's flats" } }
+
+# Strap-clamp flange nuts, vise and table bolts, chuck and toolpost nuts.
+[tools.combination-wrenches-tekton-wcb90302]
+name = "TEKTON WCB90302 34-piece combination wrench set, 1/4-1 in and 6-24 mm"
+kind = "wrench_set"
+make = "TEKTON"
+sku = "WCB90302"
+pieces = 34.0
+source = "https://www.tekton.com/combination-wrench-set-wcb90302, read 2026-10-15"
+opening_in = { value = 1.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "digital calipers across the largest SAE opening" } }
+
+# Eye protection for chiselling, hacksawing, filing and every spindle operation.
+[tools.safety-glasses-3m-securefit-400]
+name = "3M SecureFit 400 safety glasses, clear anti-fog (SF401AF), ANSI Z87.1"
+kind = "safety_glasses"
+make = "3M"
+sku = "SF401AF"
+source = "https://www.3m.com/3M/en_US/p/d/b00050518/, read 2026-10-15"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "visual count"; pieces is a plain number in the schema.
+pieces = 2.0
+
+# The touch-off paper every paper Z touch names (0.05 mm sheet, measured ten sheets / 10).
+[consumables.cigarette-paper]
+name = "cigarette rolling paper, 1-1/4 size, for paper touch-offs"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10"; the consumable schema holds no numbers.
+products = ["Zig-Zag 1-1/4 rolling papers, any shop (https://zigzag.com/blogs/learn/your-complete-guide-to-rolling-paper-sizes-2022)"]
+
+# Polishes filed edges and lifts burrs and rust; strips cut to length.
+[consumables.abrasive-cloth-norton-k225]
+name = "Norton Metalite K225 aluminium-oxide cloth roll, 1 in x 50 yd, P180 and P320"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule, roll width"; the consumable schema holds no numbers.
+products = ["Norton K225 Metalite cloth roll 1 in x 50 yd (https://www.amazon.com/Norton-Metalite-Abrasive-Backing-Aluminum/dp/B0002FSRM6)"]
+
 # PROPOSED, not approved (Pedro 2026-10-11: not owned). Feeler gauges are dropped: the
 # template is accepted by DTI null and the light-gap check needs none.
 [tools.tap-10-24-spiral-point]
@@ -5684,3 +5852,94 @@ length_mm = 304.8
 on_hand = true
 cite = ["McMaster-Carr brass rods https://www.mcmaster.com/products/brass-rods/", "MH 27th p.1236"]
 # --- end r7 shop kit ---
+
+# General-purpose stock a small home shop keeps on the rack (Pedro 2026-10-15, #1550): common
+# sizes for fixtures, soft jaws, spacers and test cuts, not bought for any one part. Sizes
+# are the vendor's nominal; each is a #1413 placeholder until the bar on the rack is miked.
+# 1018 CF 1/4 x 2 flat: clamp pads, spacers, small brackets.
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "general stock: 1/4 x 2 in 1018 cold-finish flat, 3 ft"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "digital calipers across the bar section; steel tape for length"; scalar/vector-only stock schema.
+section_mm = [50.8, 6.35]
+length_mm = 914.4
+on_hand = true
+cite = ["Online Metals pid 7469 https://www.onlinemetals.com/en/buy/carbon-steel/0-25-x-2-carbon-steel-rectangle-bar-1018-cold-finish/pid/7469"]
+
+# 1018 CF 1/2 x 1 flat: parallels, step blocks, soft-jaw blanks.
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "general stock: 1/2 x 1 in 1018 cold-finish flat, 3 ft"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "digital calipers across the bar section; steel tape for length"; scalar/vector-only stock schema.
+section_mm = [25.4, 12.7]
+length_mm = 914.4
+on_hand = true
+cite = ["Online Metals pid 7501 https://www.onlinemetals.com/en/buy/carbon-steel/0-5-x-1-carbon-steel-rectangle-bar-1018-cold-finish/pid/7501"]
+
+# 1018 CF Ø1/4 round: pins, set-up gauge pins, small studs.
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "general stock: Ø1/4 in 1018 cold-finish round, 3 ft"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "outside micrometer at both ends; steel tape for length"; scalar-only stock schema.
+dia_mm = 6.35
+length_mm = 914.4
+on_hand = true
+cite = ["Online Metals pid 4791 https://www.onlinemetals.com/en/buy/carbon-steel/0-25-carbon-steel-round-bar-1018-cold-finish/pid/4791"]
+
+# 1018 CF Ø1/2 round: studs, shafts, bushings.
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "general stock: Ø1/2 in 1018 cold-finish round, 3 ft"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "outside micrometer at both ends; steel tape for length"; scalar-only stock schema.
+dia_mm = 12.7
+length_mm = 914.4
+on_hand = true
+cite = ["Online Metals pid 4793 https://www.onlinemetals.com/en/buy/carbon-steel/0-5-carbon-steel-round-bar-1018-cold-finish/pid/4793"]
+
+# 1018 CF Ø3/4 round: collars, spacers, lathe test pieces.
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "general stock: Ø3/4 in 1018 cold-finish round, 3 ft"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "outside micrometer at both ends; steel tape for length"; scalar-only stock schema.
+dia_mm = 19.05
+length_mm = 914.4
+on_hand = true
+cite = ["Online Metals pid 4795 https://www.onlinemetals.com/en/buy/carbon-steel/0-75-carbon-steel-round-bar-1018-cold-finish/pid/4795"]
+
+# 1018 CF Ø1 round: arbors, mandrels, larger bushings.
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "general stock: Ø1 in 1018 cold-finish round, 2 ft"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "outside micrometer at both ends; steel tape for length"; scalar-only stock schema.
+dia_mm = 25.4
+length_mm = 609.6
+on_hand = true
+cite = ["Online Metals pid 4797 https://www.onlinemetals.com/en/buy/carbon-steel/1-carbon-steel-round-bar-1018-cold-finish/pid/4797"]
+
+# 6061-T651 1/4 plate: fixture plates, soft jaws, covers.
+[[stock]]
+form = "rectangular_blank"
+material = "6061-T651 aluminium"
+note = "general stock: 1/4 in 6061-T651 plate, 12 x 12 in"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "micrometer for thickness; steel rule for width and length"; scalar/vector-only stock schema.
+section_mm = [304.8, 6.35]
+length_mm = 304.8
+on_hand = true
+cite = ["Online Metals pid 1248 https://www.onlinemetals.com/en/buy/aluminum/0-25-aluminum-plate-6061-t651/pid/1248"]
+
+# 6061-T651 1/2 plate: fixture bases, sub-plates, larger soft jaws.
+[[stock]]
+form = "rectangular_blank"
+material = "6061-T651 aluminium"
+note = "general stock: 1/2 in 6061-T651 plate, 12 x 12 in"
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "micrometer for thickness; steel rule for width and length"; scalar/vector-only stock schema.
+section_mm = [304.8, 12.7]
+length_mm = 304.8
+on_hand = true
+cite = ["Online Metals pid 24273 https://www.onlinemetals.com/en/buy/aluminum/0-5-aluminum-plate-6061-t651-domestic/pid/24273"]

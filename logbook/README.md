@@ -60,11 +60,9 @@ All in [`references/`](../references/), which is a git submodule:
 
 ## Machines
 
-| | |
-|---|---|
-| Mill | PM-30MV (1 HP, R8, 4000 RPM) |
-| Lathe | JET BD-920N (9″ × 20″) |
-| Dividing head | Precision Matthews BS-0, delivered, installed and usable ([#465](https://github.com/pedropaulovc/harmonic-analyzer/issues/465)) |
+The authoritative list of installed shop equipment, from the mill, lathe and dividing
+head down to the bench tools and the stock on the rack, is
+[`cad/process/shop/inventory.toml`](../cad/process/shop/inventory.toml).
 
 ## The honest note
 

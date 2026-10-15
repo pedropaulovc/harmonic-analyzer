@@ -89,7 +89,7 @@ being measured:
 | campaign assets, costs and copy maturity | the relevant file under `kickstarter/` |
 | website implementation coverage | `web/src/` + `web/DESIGN.md` |
 | AI-story structure, post maturity and evidence | `ai-story/outline.md` + `ai-story/posts/` + `ai-story/evidence/` |
-| installed shop equipment | `logbook/README.md` |
+| installed shop equipment | `cad/process/shop/inventory.toml` |
 
 When work changes a domain fact, update its repository source first. Then update
 the issue or project item and link the commit, entry or source file. A project
