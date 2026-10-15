@@ -39,19 +39,22 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked == expected
     assert drawing.DIMENSION_CALLOUTS == {
-        "WinWidth": "SQ POCKET",
+        "WinWidth": "SQ POCKET BOTH SIDES",
         "PocketRadius": "8X",
         "CavityRadius": "4X",
         "CavWidth": "SQ CAVITY THRU",
         "RimChamferSize": RIM_CHAMFER_CALLOUT,
     }
     assert drawing.DIMENSION_PRECISION == {
-        **dict.fromkeys(expected - {"PocketRadius", "RimChamferSize"}, 1),
+        **dict.fromkeys(expected - {"PocketRadius"}, 1),
         "PocketRadius": 2,
-        "RimChamferSize": 2,
         "WebThickness": 2,
         "FootThickness": 2,
     }
+    # The chamfer leg rounds to one place: 1.27 prints as 1.3 (rule 3).
+    assert (
+        f"{support.CHAMFER:.{drawing.DIMENSION_PRECISION['RimChamferSize']}f}" == "1.3"
+    )
 
 
 def test_pocket_and_cavity_reliefs_are_distinct() -> None:
@@ -449,7 +452,7 @@ def test_window_is_the_source_square_with_rails_as_deep_as_the_foot() -> None:
     source's 165.1 square again, so the top rail, side posts and foot are all
     one 6.35 frame member, and the print calls the pocket square."""
     assert support.HALF_Y - support.BIG == pytest.approx(section.FOOT_THICKNESS)
-    assert drawing.DIMENSION_CALLOUTS["WinWidth"] == "SQ POCKET"
+    assert drawing.DIMENSION_CALLOUTS["WinWidth"] == "SQ POCKET BOTH SIDES"
     assert {abs(edge[1]) for edge in support.POCKET_FILLET_EDGES} == {support.BIG}
 
 
@@ -622,17 +625,13 @@ def _boxes_clear(a: tuple[float, ...], b: tuple[float, ...], gap: float) -> bool
 # outside chamfers drawn with no size contradict the title block's 0.25 MAX
 # edge break (machinist review, MHA-FR-005 blocker).
 RIM_CHAMFER_CALLOUT = " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS"
-RIM_CHAMFER_TEXT = "1.27\n" + RIM_CHAMFER_CALLOUT.strip()
+RIM_CHAMFER_TEXT = "1.3\n" + RIM_CHAMFER_CALLOUT.strip()
 
 
 def _rim_chamfer_box() -> tuple[float, ...]:
-    """The chamfer's text box, which hangs LEFT of its anchor: the layout audit
-    of farm run 20261015T015928596Z measured the old block at 144.5..164.8 mm
-    for an anchor at x 165 mm, centred on the anchor's y."""
-    anchor = drawing.RIGHT_KEEP["RimChamferSize"]
-    centred = _text_box(RIM_CHAMFER_TEXT, anchor)
-    width = centred[2] - centred[0]
-    return (anchor[0] - width, centred[1], anchor[0], centred[3])
+    """The chamfer's text box: on its OffsetText leader the text centres on
+    RIM_CHAMFER_TEXT_XY."""
+    return _text_box(RIM_CHAMFER_TEXT, drawing.RIM_CHAMFER_TEXT_XY)
 
 
 def test_rim_chamfer_callout_names_every_edge_the_feature_breaks() -> None:
@@ -656,23 +655,71 @@ def test_rim_chamfer_callout_sits_between_the_front_view_and_the_section() -> No
     chamfer = _rim_chamfer_box()
     front_right = drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2 * scale
     assert chamfer[0] > front_right + 0.003
-    # The dimension line drops at the anchor's x to the cavity rim at the web
-    # and its arrow tail runs on (to y 146.3 mm on the audited render): it
-    # stays outside the section's slant wall over that whole run...
+    # The caption's rows stay clear of the section's slant wall...
+    for y in (chamfer[1], chamfer[3]):
+        local_y = (y - drawing.RIGHT_CENTER[1]) / scale
+        wall_x = drawing.RIGHT_CENTER[0] - support._wall_half_z_at(local_y) * scale
+        assert chamfer[2] < wall_x - 0.002
+    # ...and of the foot's 6.35 text, which hangs left of its anchor.
+    foot = _text_box(f"{support.HALF_Y - support.BIG:.2f}", drawing.FOOT_TEXT_XY)
+    foot = (
+        foot[0] - (foot[2] - foot[0]) / 2.0,
+        foot[1],
+        drawing.FOOT_TEXT_XY[0],
+        foot[3],
+    )
+    assert _boxes_clear(chamfer, foot, 0.003)
+
+
+def test_rim_chamfer_dimension_line_stands_beside_its_rim() -> None:
+    """r4 machinist review (rule 14): the extension lines ran from the cavity
+    rim on the web out past the slant wall. The dimension line now stands just
+    left of the web face, inside the pocket void, and only the leader runs out
+    to the text."""
+    scale = drawing.VIEW_SCALE / 1000
+    line_x, line_y = drawing.RIGHT_KEEP["RimChamferSize"]
+    web_face_x = drawing.RIGHT_CENTER[0] - support.WEB * scale
     rim_y = drawing.RIGHT_CENTER[1] - support.CAV * scale
-    tail_y = rim_y - 0.0064
-    lowest_local_y = (tail_y - drawing.RIGHT_CENTER[1]) / scale
-    wall_x = drawing.RIGHT_CENTER[0] - support._wall_half_z_at(lowest_local_y) * scale
-    assert chamfer[2] < wall_x - 0.002
-    # ...and the caption's own rows stay clear of the wall too.
-    top_local_y = (chamfer[3] - drawing.RIGHT_CENTER[1]) / scale
-    top_wall_x = drawing.RIGHT_CENTER[0] - support._wall_half_z_at(top_local_y) * scale
-    assert chamfer[2] < top_wall_x - 0.002
-    assert chamfer[1] > rim_y + 0.020
-    # The line misses the foot's 6.35 text, which sits over that tail and,
-    # like this caption, hangs left of its anchor (audited at 168.4..180.0 mm
-    # for an anchor at x 180 mm).
-    assert chamfer[2] > drawing.FOOT_TEXT_XY[0] + 0.003
+    assert 0.0 < web_face_x - line_x <= 0.003
+    assert rim_y - support.CHAMFER * scale < line_y < rim_y
+    wall_x = (
+        drawing.RIGHT_CENTER[0]
+        - support._wall_half_z_at((line_y - drawing.RIGHT_CENTER[1]) / scale) * scale
+    )
+    assert line_x > wall_x + 0.003
+    # The line stays above the foot, whose top bounds the pocket void.
+    assert line_y > drawing.RIGHT_CENTER[1] - support.BIG * scale + 0.005
+
+
+# Measured on the pc-pivot-r6 layout audit (run 20261015T064814104Z): the
+# 9.53 line ran 2.8 mm under its text, its left arrow reached 6.3 mm left of
+# the web face, and the chamfer leader left its text 14.8 mm right of and
+# 16.7 mm under the text point, landing on the chamfer's dimension line.
+WEB_LINE_DROP = 0.0028
+WEB_ARROW_REACH = 0.0063
+CHAMFER_LEADER_START = (0.0148, -0.0167)
+
+
+def test_web_thickness_line_clears_the_chamfer_dimension_and_leader() -> None:
+    """r6 machinist review (rule 14): the chamfer leader crossed the 9.53
+    line beside its arrowhead, and the two dimensions' arrows crowded the web
+    at the cavity rim. The 9.53 line runs well above the chamfer's arrows and
+    passes right of the leader."""
+    scale = drawing.VIEW_SCALE / 1000
+    web_line_y = drawing.WEB_TEXT_XY[1] - WEB_LINE_DROP
+    rim_y = drawing.RIGHT_CENTER[1] - support.CAV * scale
+    assert web_line_y > rim_y + 0.012
+    start = (
+        drawing.RIM_CHAMFER_TEXT_XY[0] + CHAMFER_LEADER_START[0],
+        drawing.RIM_CHAMFER_TEXT_XY[1] + CHAMFER_LEADER_START[1],
+    )
+    end = drawing.RIGHT_KEEP["RimChamferSize"]
+    assert end[1] < web_line_y < start[1]
+    leader_x = start[0] + (end[0] - start[0]) * (start[1] - web_line_y) / (
+        start[1] - end[1]
+    )
+    arrow_tail_x = drawing.RIGHT_CENTER[0] - support.WEB * scale - WEB_ARROW_REACH
+    assert leader_x < arrow_tail_x - 0.003
 
 
 def test_web_thickness_text_clears_the_wall_and_the_height_dimension() -> None:
@@ -739,7 +786,7 @@ def test_stacked_pocket_widths_keep_separate_bands() -> None:
     pass), so the lower text clears the upper dimension by a full line pitch,
     and its own line still stays above the bottom view."""
     cavity = _text_box("127.0\nSQ CAVITY THRU", drawing.FRONT_KEEP["CavWidth"])
-    pocket = _text_box("165.1\nSQ POCKET", drawing.FRONT_KEEP["WinWidth"])
+    pocket = _text_box("165.1\nSQ POCKET BOTH SIDES", drawing.FRONT_KEEP["WinWidth"])
     assert pocket[3] + NOTE_LINE_PITCH <= cavity[1]
     bottom_top = drawing.BOTTOM_CENTER[1] + support.WIDE * drawing.VIEW_SCALE / 1000
     assert pocket[1] - NOTE_LINE_PITCH > bottom_top + 0.005
