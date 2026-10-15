@@ -46,6 +46,7 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_dimensions import set_arc_endpoints_to_center, set_reference_dimension
+from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import _edge_endpoint_key
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
@@ -97,8 +98,16 @@ PNG = OUTPUTS.png
 
 # Step 9 sets MHA-FR-004 before its base seats are spotted through it (#628):
 # the plate's lower edge as lettered (plate y = 0) lies at machine x =
-# MOUNT_POS[0], parallel to the deck's MHA-FR-004 end at DECK_HALF_X.
+# MOUNT_POS[0], parallel to the deck's MHA-FR-004 end at DECK_HALF_X. Section
+# B-B looks down on both edges and dimensions the inset between them; step 9
+# points to that dimension instead of repeating its value.
 NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
+# Machine z of the inset dimension line: on the plate's lower edge, clear of
+# its corner screw heads (z +/-42) and the deck's centre hidden lines (z +/-5).
+NAMEPLATE_INSET_LINE_Z_M = 0.025
+# Sheet distance of the inset text beyond the deck end, short of the top
+# frame's hatched west rail (~10 mm beyond it at 1:3).
+NAMEPLATE_INSET_TEXT_OFFSET_M = 0.005
 
 # The controlling setup height names itself on its own native dimension, not
 # in a free note the reader must pair with it.
@@ -249,11 +258,10 @@ ASSEMBLY_STEPS = "\n".join(
         "   INSIDE SEAT.",
         "8. SEAT MHA-FR-005 ON DECK, WINDOWS FACING THE SHORT ENDS; INSTALL FOUR",
         "   MHA-VN-009 TOP-DOWN AND DRAW DOWN EVENLY UNTIL ALL HEADS SEAT.",
-        "9. SET MHA-FR-004 DECORATED FACE UP, CENTRED FRONT TO REAR, ITS LOWER",
-        f"   EDGE AS LETTERED {NAMEPLATE_END_INSET:.1f} INSIDE THE DECK'S "
-        "MHA-FR-004 END, PARALLEL;",
-        "   CLAMP. SPOT MHA-FR-001 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH",
-        "   PER ITS MHA-FR-001 TRANSFER CALLOUT. SEAT ALL FOUR MHA-VN-006 HEADS.",
+        "9. SET MHA-FR-004 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL TO",
+        "   AND INSET FROM THE NEAR DECK END PER SECTION B-B, SHEET 1; CLAMP.",
+        "   SPOT MHA-FR-001 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH PER ITS",
+        "   MHA-FR-001 TRANSFER CALLOUT. SEAT ALL FOUR MHA-VN-006 HEADS.",
         "10. START MHA-VN-023 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
     )
 )
@@ -658,6 +666,88 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
         apply_view_configuration(adapter, section, label=f"joint section {cut_y:.3f}")
         sections.append(section)
     return sections[0], sections[1]
+
+
+def _visible_z_line_at_x(
+    adapter: Any, view: Any, *, component_stem: str, x_mm: float, label: str
+) -> Any:
+    """The highest visible straight edge of ``component_stem`` running along
+    machine Z at machine x = ``x_mm``: the one a plan view prints there."""
+    candidates = []
+    for component, full in _frame_visible_components(view).get(component_stem, ()):
+        transform = None
+        for edge in visible_component_entities(view, component, 1):
+            curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
+            if curve is None or not curve.IsLine():
+                continue
+            key = _edge_endpoint_key(adapter, edge)
+            if key is None:
+                continue
+            if transform is None:
+                transform = _component_transform(full)
+            start = _transform_point(transform, key[:3])
+            end = _transform_point(transform, key[3:6])
+            if (
+                max(abs(point[0] * 1000.0 - x_mm) for point in (start, end)) > 1e-4
+                or abs(start[1] - end[1]) > 1e-9
+                or abs(start[2] - end[2]) < 0.001
+            ):
+                continue
+            candidates.append(((start[1], abs(start[2] - end[2]), *key), edge))
+    if not candidates:
+        raise RuntimeError(
+            f"{label}: no visible {component_stem!r} edge along Z at x {x_mm:g} mm"
+        )
+    return max(candidates, key=lambda row: row[0])[1]
+
+
+def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
+    """Dimension step 9's nameplate inset from the deck end in plan section B-B."""
+    plate_edge = _visible_z_line_at_x(
+        adapter,
+        section,
+        component_stem="fr-nameplate",
+        x_mm=NAMEPLATE_MOUNT_POS[0],
+        label="nameplate lower edge as lettered",
+    )
+    deck_end = _visible_z_line_at_x(
+        adapter,
+        section,
+        component_stem="fr-harmonic-base",
+        x_mm=DECK_HALF_X,
+        label="deck MHA-FR-004 end",
+    )
+    plate_xy, deck_xy = model_points_in_view(
+        adapter,
+        section,
+        [
+            (x_mm / 1000.0, NAMEPLATE_MOUNT_POS[1] / 1000.0, NAMEPLATE_INSET_LINE_Z_M)
+            for x_mm in (NAMEPLATE_MOUNT_POS[0], DECK_HALF_X)
+        ],
+        label="nameplate inset stations",
+        names=("nameplate lower edge", "deck end"),
+    )
+    gap = math.hypot(deck_xy[0] - plate_xy[0], deck_xy[1] - plate_xy[1])
+    if gap <= 0.0:
+        raise RuntimeError("nameplate inset edges coincide on the sheet")
+    # Text beyond the deck end, on the dimension line: the 1:3 gap is too
+    # narrow to hold it between the edges.
+    text_xy = tuple(
+        deck + (deck - plate) / gap * NAMEPLATE_INSET_TEXT_OFFSET_M
+        for plate, deck in zip(plate_xy, deck_xy)
+    )
+    display = add_edge_dimension(
+        adapter,
+        section,
+        p0=plate_xy,
+        p1=deck_xy,
+        text_xy=(text_xy[0], text_xy[1]),
+        label="nameplate end inset",
+        entities=(plate_edge, deck_end),
+    )
+    return _checked_linear_dimension(
+        adapter, display, expected_mm=NAMEPLATE_END_INSET, label="nameplate end inset"
+    )
 
 
 def _component_stem(component: Any) -> str:
@@ -1504,7 +1594,8 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     # teeth/thread-free configuration, and the A-A/B-B sections follow it.
     _configure_view(adapter, front, exploded=False, label="working front")
     _add_frame_height_dimensions(adapter, front)
-    _create_joint_sections(adapter, front)
+    _, top_section = _create_joint_sections(adapter, front)
+    _add_nameplate_inset_dimension(adapter, top_section)
 
     _add_note_block(
         adapter,
