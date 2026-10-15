@@ -22,6 +22,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -32,6 +33,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -54,12 +56,15 @@ import ch_channel_assembly_steps as steps
 from ch_fulcrum_keeper_spec import (
     BORE_PAIR_CALLOUT,
     CBORE_DIA_MM,
+    CORNER_R_MAX,
+    CORNER_R_TOL_TYPE,
     CROWN_ABOUT_BORE_CALLOUT,
     DRAWING_DIMENSIONS,
     FOOT_SCREW_SIDE_CALLOUT,
     FOOT_TIP_X,
     KEEPER_WIDTH,
     LUG_HALF_T,
+    LUG_THICKNESS_CALLOUT,
     REFERENCE_DIMENSIONS,
     SCREW_X,
     SET_SCREW_HOLE_SPEC,
@@ -121,11 +126,11 @@ FOOT_HOLE_CALLOUT_XY = (0.126, 0.202)
 # callout says so ahead of the native size row.  Machinist review r13: as two
 # 86 mm rows centred at x 50 the block ran 5.7 mm past the left inner border
 # (x 12.7).  Three rows of at most 24 characters (~61 mm printed, 2.56 mm a
-# character in r13) centred at x 58 start at x ~27, ~15 mm in from it, and end
-# left of the plan's lower-left corner (93.5, 214) and above the 3.000 tap
-# station and its function rows (top ~177); the leader still rises from the
-# shoulder's right end to the tap's lower rim, ~10 mm left of the foot-hole
-# shoulder.
+# character in r13) centred at x 58 start at x ~27, ~14 mm in from it, and end
+# ~4 mm left of the plan's inner face (x 93.5), in the band between the front
+# view and the plan.  The tap's station prints above the plan (MR-fleet r1,
+# 991a56e: in the front view its text sat 1 mm under this block's shoulder
+# and the two read as one), so nothing else stands in that band.
 SET_SCREW_PROCESS = (
     "TAP TO BORE; STAKE MOUTH\n"
     "2 PLACES AT ASSEMBLY PER\n"
@@ -143,37 +148,41 @@ DIMENSION_CALLOUTS = {
 }
 # Each three-place size states the function that holds it there (rule 4,
 # machinist review baseline: 6.000 / 3.000 / 7.000 printed with neither a
-# band nor a reason): the lug thickness and the tap's station off the outer
-# lug face put the set screw on its shaft flat from the DRO-set inner face;
-# the foot hole's side station centres the transferred frame tap in its web.
-FRONT_CALLOUTS = {
+# band nor a reason): the tap's station off the DRO-set inner lug face puts
+# the set screw on its shaft flat; the lug thickness holds the tap's outer
+# web (MR-fleet r1: chained with the station it read as doing no work); the
+# foot hole's side station centres the transferred frame tap in its web.
+FRONT_CALLOUTS = {"LugThickness": LUG_THICKNESS_CALLOUT}
+TOP_CALLOUTS = {
     "SetScrewLocation": SET_SCREW_STATION_CALLOUT,
-    "LugThickness": SET_SCREW_STATION_CALLOUT,
+    "ScrewFromSide": FOOT_SCREW_SIDE_CALLOUT,
 }
-TOP_CALLOUTS = {"ScrewFromSide": FOOT_SCREW_SIDE_CALLOUT}
 
 # Per-view survivors of the marked-dimension import: parametric name ->
-# sheet position.  The front view carries the crown tap's station off the
-# outer lug face above the crown, its text and function out to the left
-# under the tap callout (baseline review: centred in its 6 mm span, the
-# 3.000 text was struck by both extension lines; right of the lug its rows
-# would meet the end view's crown callout); the lug thickness chained left
-# of the foot length below the seat, its text and function out to the left
-# over the notes; the overall height (a reference) between the two, left of
-# the lug; the foot height right of the foot tip.  The plan carries the foot
-# screw's station off the foot tip (above the plan) and off the -Z side
-# face, the latter's text and function under its extension lines right of
-# the foot tip, clear of the foot-hole callout.  The end view carries the
-# width plus the shaft-axis / crown stack, the reamed bore and the bore's
-# place off a side face (a reference) above it.
+# sheet position.  The front view carries the lug thickness chained left of
+# the foot length below the seat, its text and function out to the left
+# over the notes; the overall height (a reference) left of the lug; the foot
+# height right of the foot tip; the foot-to-lug corner's R MAX up in the open
+# corner, ~16 mm along the foot and up the lug (the ch_pivot_bracket
+# placement), so its leader runs through the round's centre onto the arc.
+# The plan carries the crown tap's station off the inner lug face above the
+# plan, its text and function out to the left under the sheet border
+# (MR-fleet r1: in the front view its extension line off the tap axis ended
+# in mid-air; the plan sees the tap end-on), the foot screw's station off the
+# foot tip (above the plan) and off the -Z side face, the latter's text and
+# function under its extension lines right of the foot tip, clear of the
+# foot-hole callout.  The end view carries the width plus the shaft-axis /
+# crown stack, the reamed bore and the bore's place off a side face (a
+# reference) above it.
 FRONT_KEEP = {
-    "SetScrewLocation": (0.054, 0.1745),
     "LugThickness": (0.066, 0.086),
     "FootLength": (_front_x(SCREW_X), 0.086),
     "FootRise": (0.140, 0.106),
     "OverallHeight": (0.080, FRONT_CENTER[1]),
+    "CornerRadius": (0.122, 0.130),
 }
 TOP_KEEP = {
+    "SetScrewLocation": (0.068, 0.2535),
     "ScrewFromTip": (_front_x((FOOT_TIP_X + SCREW_X) / 2.0), 0.252),
     "ScrewFromSide": (0.178, 0.214),
 }
@@ -191,13 +200,14 @@ TOP_KEEP = {
 # - CrownDia: above-left, between the front view's crown stack (x <= 112)
 #   and the end view; the leader lands on the crown arc at ~124 deg, clear of
 #   every other line, the block ~9 mm under the foot-hole callout.
-# - BoreDia: below-right, under the isometric note (>= 5 mm air); the leader
-#   leaves the bore at ~-55 deg and crosses only the lug's right edge.
+# - BoreDia: below-right, under the isometric note (>= 4 mm air; MR-fleet r1's
+#   supply-condition row made it a row taller, so it sits 1.5 mm lower); the
+#   leader leaves the bore at ~-55 deg and crosses only the lug's right edge.
 RIGHT_KEEP = {
     "Depth": (0.225, 0.090),
     "LugRise": (0.196, 0.126),
     "CrownDia": (0.168, 0.180),
-    "BoreDia": (0.304, 0.124),
+    "BoreDia": (0.304, 0.1225),
     # Above the crown, between the bore axis and the sheet-right side face
     # (the Right plane's +u): clear of the crown leader, which leaves the
     # arc up-left.
@@ -214,6 +224,33 @@ def _one(adapter: Any, annotations: list[Any], name: str) -> Any:
     if len(matches) != 1:
         raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
     return matches[0]
+
+
+@_telemetry.traced("drawing.fulcrum_keeper.corner_radius")
+def _dress_corner_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Prove the front view's CornerRadius prints the part's R MAX and stop
+    its leader at the arc (draw_ch_pivot_bracket's corner radius).
+
+    Read back: measuring CORNER_R_MAX, the native swTolMAX the part set.
+    ``ArcExtensionLineOrOppositeSide`` False keeps the leader from running on
+    through the arc into the part.
+    """
+    annotation = _early_bound(_one(adapter, annotations, "CornerRadius"), "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != CORNER_R_TOL_TYPE:
+        raise RuntimeError(
+            f"CornerRadius lost its native MAX type: {int(tolerance.Type)}"
+        )
+    if not math.isclose(
+        float(dimension.SystemValue), CORNER_R_MAX / 1000.0, abs_tol=1e-9
+    ):
+        raise RuntimeError("CornerRadius does not measure the corner fillet")
+    display.ArcExtensionLineOrOppositeSide = False
+    if bool(display.ArcExtensionLineOrOppositeSide):
+        raise RuntimeError("CornerRadius leader still runs to the opposite side")
+    _telemetry.info(f"corner radius: text {display.GetText(1)!r}, MAX type")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -294,6 +331,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_near_side_diameter(_one(adapter, right_annotations, name), f"keeper {name}")
     set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
+    _dress_corner_radius(adapter, front_annotations)
     set_dimension_callouts(adapter, top_annotations, TOP_CALLOUTS)
     kept = [*front_annotations, *right_annotations]
     for name in REFERENCE_DIMENSIONS:

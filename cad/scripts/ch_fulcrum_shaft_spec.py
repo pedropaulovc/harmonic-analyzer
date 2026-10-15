@@ -184,8 +184,10 @@ DIMENSION_PREFIXES = {
 # --- Flat stations, at the worst case of every printed band and of the
 # MHA-CH-000 fit-up (drawing-guidelines.md rule 19 (absorb stacks at fit-up, not with tighter bands)). The keepers go on the frame with their
 # lug inner faces DRO-set (KEEPER_FITUP_LOCATION_BAND_MM each); each tap
-# stands SetScrewLocation off its lug's outer face, the lug LugThickness
-# thick. The shaft is free to slide until both screws bite, so it needs ONE
+# stands SetScrewLocation off its lug's inner face (the window below still
+# chains it through the outer face and LugThickness, a conservative extra
+# band), the lug LugThickness thick. The shaft is free to slide until both
+# screws bite, so it needs ONE
 # axial place where at once: each cup lies wholly on its flat; each flat's
 # inner edge stays inside its lug (no lever hub rides a flat); and the
 # cylinder runs out past both lug outer faces (the domes never bear in a

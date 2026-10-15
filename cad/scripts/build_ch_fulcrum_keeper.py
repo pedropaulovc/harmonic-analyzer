@@ -8,7 +8,8 @@ bore, the shaft's domed end proud of its outer face; a #1-72 cup-point set
 screw (MHA-VN-055) in the crown tap bears on the shaft's flat and fixes it.
 The short straight foot points OUTBOARD and is screwed down into the
 top-frame rail top face by one slotted #2-56 fillister frame-side
-screw (MHA-VN-022) seated flush in a counterbore.
+screw (MHA-VN-022) seated flush in a counterbore; the foot-to-lug inside
+corner is filleted at its MAX radius (``CornerFillet``).
 
 Layout (part frame): +X along the shaft, OUTBOARD (away from the lever
 bank; the lug mid-plane / set-screw axis is x = 0); +Y up from the seat
@@ -51,7 +52,7 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -70,6 +71,9 @@ from ch_fulcrum_keeper_spec import (
     BORE_DIA_BAND,
     CBORE_DEPTH_MM,
     CBORE_DIA_MM,
+    CORNER_R_BAND,
+    CORNER_R_MAX,
+    CORNER_R_TOL_TYPE,
     CROWN_DIA,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
@@ -116,13 +120,18 @@ if CBORE_DEPTH_MM >= FOOT_H:
 # volume below (a full crown cylinder across the drill) does not hold.
 if blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) >= LUG_T:
     raise AssertionError("crown tap drill breaks out of the lug faces")
+# The foot-to-lug inside corner's fillet adds its spandrel, (1 - pi/4) R^2,
+# along the keeper's width.
+V_CORNER = (1.0 - math.pi / 4.0) * CORNER_R_MAX**2 * KEEPER_WIDTH
 
 # The drawing-reference lines (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES):
 # (sketch, plane, dimension, start, end, orientation, value, drives), the
 # dt_arbor_pedestal pattern. Each line starts on the feature it is measured
-# from (drawing-guidelines.md rule 10 (dimension from a real feature)): the set-screw tap's runs along the crown-top outline
-# from the outer lug face to the tap axis; the foot screw's two run on the
-# seat (Top plane: sketch u = model X, v = -model Z) from the foot-tip/-Z
+# from (drawing-guidelines.md rule 10 (dimension from a real feature)): the
+# set-screw tap's runs on the seat (Top plane: sketch u = model X, v = -model
+# Z) along the lug mid-width from the inner lug face -- the face the fit-up
+# sets -- to the tap axis, so the plan dimensions it from the inner face's
+# edge; the foot screw's two run on the seat from the foot-tip/-Z
 # side corner along the side face to the screw station and down the tip
 # face to the screw axis, so their extension lines leave the plan's outline
 # without crossing; the bore's runs on the Right plane (the end view's
@@ -133,13 +142,13 @@ if blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) >= LUG_T:
 REFERENCE_LINES = (
     (
         "SetScrewReference",
-        "Front",
+        "Top",
         "SetScrewLocation",
-        (LUG_HALF_T, CROWN_TOP_Y),
-        (0.0, CROWN_TOP_Y),
+        (-LUG_HALF_T, 0.0),
+        (0.0, 0.0),
         "horizontal",
         LUG_HALF_T,
-        ('"LugT" / 2', '"LugT" / 2', '"ShaftAxisH" + "CrownDia" / 2'),
+        ('"LugT" / 2', '"LugT" / 2'),
     ),
     (
         "FootScrewReference",
@@ -254,6 +263,34 @@ def _hide_reference_sketches(adapter) -> None:
         raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
 
 
+def _corner_radius_max_limit(adapter) -> None:
+    """CornerRadius as the single limit "R1.0 MAX" carrying the band's
+    deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
+    lower, upper = deviations(CORNER_R_BAND)
+    _, dimension = _named_dimension(adapter, "CornerFillet", "CornerRadius")
+    label = "CornerRadius@CornerFillet"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, CORNER_R_MAX / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {CORNER_R_MAX}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = CORNER_R_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != CORNER_R_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {CORNER_R_MAX:g} MAX")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -268,6 +305,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ShaftAxisH", f"{SHAFT_AXIS_H}mm")
     await set_global(adapter, "CrownDia", f"{CROWN_DIA}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    await set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -344,6 +382,23 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [(depth_dim[0], '"KeeperWidth"')]
     v_foot = FOOT_L * FOOT_H * KEEPER_WIDTH
     volume = await volume_check(adapter, "foot", volume + v_foot, 0.005 * v_foot)
+
+    # Foot-to-lug inside corner (drawing-guidelines.md rule 16): the edge where
+    # the foot top meets the lug's outer face, filleted AT the largest radius
+    # whose tangent line stays off the counterbore (CORNER_R_MAX), the radius
+    # the print gives as a single MAX limit.
+    check(
+        "fillet foot-to-lug corner",
+        await adapter.add_fillet(
+            CORNER_R_MAX, [[LUG_HALF_T, FOOT_H, 0.0]], propagate=False
+        ),
+    )
+    name_last_feature(adapter, "CornerFillet")
+    corner_dim = name_dimensions(adapter, "CornerFillet", ["CornerRadius"])
+    drive_jobs.append((corner_dim[0], '"CornerR"'))
+    volume = await volume_check(
+        adapter, "foot-to-lug corner fillet", volume + V_CORNER, 0.1 * V_CORNER
+    )
 
     # --- Crown: full-round lug top, concentric with the shaft axis --------
     crown = SketchDims()
@@ -471,6 +526,7 @@ async def build(adapter) -> dict[str, str]:
     # Decimal places are the tolerance statement, so the PART carries them;
     # the reamed bore's running band (BORE_DIA_BAND) is a native model tolerance.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _corner_radius_max_limit(adapter)
     set_dimension_bilateral_tolerance(
         adapter, "ShaftBoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
