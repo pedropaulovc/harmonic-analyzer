@@ -36,9 +36,19 @@ SOCKET_BOSS_DIA = 7.0  # 2.41 wall around the #2-56 major (drawing-guidelines.md
 # build_pd_platen_clip asserts the closure against the live screw and sheet.
 SOCKET_BOSS_H = 1.70
 SOCKET_THREAD_ENGAGEMENT = PLATE_THICKNESS + SOCKET_BOSS_H
+# Each socket's distance in from its side edge, on both sides.  The 6.6 clip
+# screw rail (user ruling 2026-10-14) puts the clip's inboard edge at
+# SOCKET_X - HOLE_Y + CLIP_WIDTH; with the recording paper's 14.6 left inset
+# (paper_drive_geom) the photographed 5.3928 left that edge 1.15 off the
+# paper.  This is the largest 0.1-grid station that holds the 2.0 nominal
+# clip-to-paper gap (test_pd_platen_refit asserts the gap, the grid optimum
+# and the worst-case tap ligament, clip and plate edges).
+SOCKET_X = 4.5
 SOCKET_XY = (
-    (5.3928, 58.5104), (5.3928, 127.6296),
-    (264.2472, 58.5104), (264.2472, 127.6296),
+    (SOCKET_X, 58.5104),
+    (SOCKET_X, 127.6296),
+    (PLATE_WIDTH - SOCKET_X, 58.5104),
+    (PLATE_WIDTH - SOCKET_X, 127.6296),
 )
 
 # Guide-screw through-holes: 2 rows of 5 (heads on the front face, shanks

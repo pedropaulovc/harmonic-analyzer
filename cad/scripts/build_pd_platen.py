@@ -7,7 +7,7 @@ separate parts (build_pd_platen_rack.py / build_pd_platen_clip.py /
 build_pd_platen_guide.py). Fastener holes:
 
 * four clip-screw #2-56 through receivers at the resized plate's extreme
-  left/right edges (x 5.3928/264.2472), matching the resized clips'
+  left/right edges (x 4.5/265.14), matching the resized clips'
   7.1904-inset end holes at local y 29.6604/127.6296, each tapped on
   through a Ø7 x 1.70 boss on the back face for >= 1.5D engagement;
 * ten #4 loose (Ø3.658) counterbored guide-screw through-holes in two rows
@@ -91,10 +91,10 @@ MATERIAL = "Brass"  # see _appearance.apply_material docstring
 # relation to those.  Guide holes: y-major, the bottom row's five X and each
 # row's first Y.
 SOCKET_ORDER = (
-    SOCKET_XY[2],  # (264.2472, 58.5104)
-    SOCKET_XY[3],  # (264.2472, 127.6296)
-    SOCKET_XY[0],  # (5.3928, 58.5104)
-    SOCKET_XY[1],  # (5.3928, 127.6296)
+    SOCKET_XY[2],  # (265.14, 58.5104)
+    SOCKET_XY[3],  # (265.14, 127.6296)
+    SOCKET_XY[0],  # (4.5, 58.5104)
+    SOCKET_XY[1],  # (4.5, 127.6296)
 )
 SOCKET_PLACEMENT = [
     (("Socket1X", '"SocketX2"'), ("Socket1Y", '"SocketY1"')),
