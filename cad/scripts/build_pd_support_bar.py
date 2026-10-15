@@ -90,7 +90,6 @@ from pd_support_bar_spec import (
 from pd_support_bar_drawing_spec import (
     CLAMP_STATION_NAMES,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     HANGER_STATION_NAMES,
     ISOMETRIC_VIEW_NOTE,
     SHEET_PRECISION,
@@ -604,7 +603,6 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

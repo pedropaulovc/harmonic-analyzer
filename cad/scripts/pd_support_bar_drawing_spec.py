@@ -95,18 +95,21 @@ _HOOK_TAPS = "MHA-PD-014 HOOK TAPS"
 DIMENSION_CALLOUTS = {
     "Height": "MHA-PD-011\nHANGS ON IT",
     "Depth": "PIVOT TAP FLOOR AND\nMHA-VN-043 SCREW TIPS",
-    "HangerRowHeight": f"MHA-VN-041 PIVOT AND\n{_HOOK_TAPS}",
+    # Both rows print on one line at 1:2; the third line parts them.
+    "HangerRowHeight": f"MHA-VN-041 PIVOT AND\n{_HOOK_TAPS},\nBELOW THE CLAMP ROW",
     "PivotTapStation": "MHA-VN-041 PIVOT",
     "BracketTapStation1": _HOOK_TAPS,
     "BracketTapStation2": _HOOK_TAPS,
-    "PivotTapDrillDia": f"TAP {PIVOT_TAP_THREAD} UNC-2B",
+    # The thread class is the title block's (rule 2).
+    "PivotTapDrillDia": f"TAP {PIVOT_TAP_THREAD} UNC",
     "DrillDepth": "FLAT BOTTOM",
     "ThreadMin": "FULL THREAD",
     "PivotCskDia": f"{_CSK}, MHA-VN-041\nSHOULDER BEARS OUTSIDE",
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
 }
-# Under the counterbores' native callout: the screws whose heads they sink.
-CLAMP_CBORE_CALLOUT = "MHA-VN-021 CLAMP SCREWS"
+# Under the counterbores' native callout: the screws whose heads they sink,
+# and why the depth is held (.XXX, the heads' worst case stays sub-flush).
+CLAMP_CBORE_CALLOUT = "MHA-VN-021 HEADS BELOW SLIDE FACE"
 
 # The platen hangs by its top rail's underside on the top face and slides
 # across the front face (build_pd_support_bar; pd_platen_guide_spec's own
@@ -123,5 +126,8 @@ SURFACE_FINISHES = (
 
 FACE_VIEW_CAPTION = "VIEW ON BACK FACE"
 BACK_VIEW_CAPTION = "VIEW ON FRONT FACE"
-DRAWING_NOTES = "THE PLATEN HANGS ON THE TOP FACE AND SLIDES ACROSS THE FRONT FACE."
+# Each slide grade's reason, beside its symbol (rule 7: flagged where it
+# applies), so the sheet carries no general note.
+TOP_FINISH_REASON = "PLATEN HANGS HERE"
+FRONT_FINISH_REASON = "PLATEN SLIDES HERE"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:6"

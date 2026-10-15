@@ -142,14 +142,22 @@ def test_rows_stack_shortest_nearest_the_bar() -> None:
     )
 
 
-def test_notes_carry_no_dimensions_and_stay_short() -> None:
-    notes = sheet_spec.DRAWING_NOTES
-    lines = notes.splitlines()
-    assert 1 <= len(lines) <= 4
-    assert all(len(line) <= 80 for line in lines)
-    assert re.search(r"\d", notes) is None
-    for token in ("Ø", "±", "+/-", "MIN", "MAX", "DATUM"):
-        assert token not in notes
+def test_sheet_texts_carry_no_dimensions_and_stay_short() -> None:
+    # No general note: each slide grade's reason sits by its symbol.
+    assert not hasattr(sheet_spec, "DRAWING_NOTES")
+    for module in (part, drawing):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "Manufacturing Notes" not in source
+    for text in (
+        sheet_spec.TOP_FINISH_REASON,
+        sheet_spec.FRONT_FINISH_REASON,
+        sheet_spec.FACE_VIEW_CAPTION,
+        sheet_spec.BACK_VIEW_CAPTION,
+    ):
+        assert len(text.splitlines()) == 1
+        assert re.search(r"\d", text) is None
+        for token in ("Ø", "±", "+/-", "MIN", "MAX", "DATUM"):
+            assert token not in text
     assert sheet_spec.ISOMETRIC_VIEW_NOTE.endswith(
         f"{drawing.ISO_SCALE[0]}:{drawing.ISO_SCALE[1]}"
     )
@@ -167,15 +175,17 @@ def test_callouts_name_the_mates() -> None:
     assert "MHA-VN-041" in callouts["PivotTapStation"]
     assert "MHA-PD-014" in callouts["BracketTapStation1"]
     assert "MHA-PD-014" in callouts["BracketTapStation2"]
-    assert callouts["PivotTapDrillDia"] == "TAP #8-32 UNC-2B"
+    # The thread class is the title block's (rule 2), native callout too.
+    assert callouts["PivotTapDrillDia"] == "TAP #8-32 UNC"
+    assert "2B" not in "".join(callouts.values())
+    assert drawing._THREAD_CLASS_TOKEN == " <hw-threadclass>"
     assert callouts["DrillDepth"] == "FLAT BOTTOM"
     assert callouts["ThreadMin"] == "FULL THREAD"
     assert callouts["BracketCskDia"].startswith("2X 90\u00b0 CSK")
     for text in callouts.values():
-        assert len(text.splitlines()) <= 2
+        assert len(text.splitlines()) <= 3
     assert "MHA-VN-021" in sheet_spec.CLAMP_CBORE_CALLOUT
-    for caption in (sheet_spec.FACE_VIEW_CAPTION, sheet_spec.BACK_VIEW_CAPTION):
-        assert re.search(r"\d", caption) is None
+    assert "SLIDE FACE" in sheet_spec.CLAMP_CBORE_CALLOUT
 
 
 def test_slide_faces_carry_the_slide_grade() -> None:
