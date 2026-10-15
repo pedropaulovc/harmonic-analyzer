@@ -70,10 +70,11 @@ Z = wall thickness):
   lines, each end face to its seat's centre, whose dimensions VIEW B prints as
   REF (the transfer stays the method; the REF says where the seats land).
 
-Like the 71 tracked parts, this is **equation-driven and self-naming**: six
+Like the 71 tracked parts, this is **equation-driven and self-naming**: eight
 equation-manager globals (``FootHalf``/``TopHalf``/``HalfHeight``/``CavHalf``/
-``WindowOuter``/``WallWidth``, all ``mm``) drive every profile sketch's
-dimensions (named e.g.
+``WindowOuter``/``WallWidth``, plus the seats' ``SeatEastX``/``SeatWestX``,
+all ``mm``) drive every profile sketch's dimensions, the seats' Hole Wizard
+placements and their REF stations (named e.g.
 ``WallHeight@WallProfile``, ``WinWidth@WindowProfile``), the sketches and
 features carry stable names, and the drive equations are applied in one deferred
 batch after a rebuild. A final "equations neutral" ``volume_check`` proves the
@@ -89,6 +90,7 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import NamedTuple
 
 from _appearance import CASTING_GREEN, apply_color, apply_material
 from _check import check
@@ -282,12 +284,57 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # Top plane (sketch x = model X, sketch y = model -Z), on the centreline, each
 # from an end face to its seat's centre, so VIEW B shows the end-wall stock
 # the seat leaves. The part saves the sketch blanked; VIEW B shows it through
-# the hidden-owner import. Rows: (dimension, end face X, seat X).
+# the hidden-owner import.
+#
+# Both ends of each line follow the model (PR #1469 round-3 review: with an
+# undriven length, 178.8 -> 180.8 on WallWidth kept the east REF at 4.95
+# while the seat stood 5.95 in). The end face is "WallWidth" / 2 off the
+# centre plane; the seat is its own global, the one its BracketSeats
+# placement dimension is driven by; the station is their difference. Both
+# globals are unsigned, as the placement distance is: each point keeps the
+# side it was authored on, and each station measures from the end face on
+# that same side.
 REFERENCE_SKETCHES = ("SeatStationReference",)
+
+
+class SeatStation(NamedTuple):
+    """One REF station: its sketch dimension, the end face's and the seat's
+    model X, the seat's global and the placement dimension it drives."""
+
+    dimension: str
+    end_x: float
+    seat_x: float
+    seat_global: str
+    placement: str
+
+
 SEAT_STATION_LINES = (
-    ("SeatEastStation", BOSS_DEPTH / 2.0, max(SEAT_LOCAL_X)),
-    ("SeatWestStation", -BOSS_DEPTH / 2.0, min(SEAT_LOCAL_X)),
+    SeatStation(
+        "SeatEastStation",
+        BOSS_DEPTH / 2.0,
+        max(SEAT_LOCAL_X),
+        "SeatEastX",
+        "SeatEastCx",
+    ),
+    SeatStation(
+        "SeatWestStation",
+        -BOSS_DEPTH / 2.0,
+        min(SEAT_LOCAL_X),
+        "SeatWestX",
+        "SeatWestCx",
+    ),
 )
+if any(
+    row.end_x * row.seat_x <= 0.0 or abs(row.seat_x) >= abs(row.end_x)
+    for row in SEAT_STATION_LINES
+):
+    raise AssertionError("a seat REF station's drive needs the seat inboard of its end")
+END_FACE_DRIVE = '"WallWidth" / 2'
+SEAT_GLOBALS = {row.seat_global: abs(row.seat_x) for row in SEAT_STATION_LINES}
+SEAT_STATION_DRIVES = {
+    row.dimension: f'{END_FACE_DRIVE} - "{row.seat_global}"'
+    for row in SEAT_STATION_LINES
+}
 
 # PocketFloorFillet volume minus four through clearance drills.
 FOOT_HOLED_VOLUME = (
@@ -305,6 +352,17 @@ RIM_CHAMFER_VOLUME = FOOT_HOLED_VOLUME - SQUARE_RIM_CHAMFER_REMOVAL
 # solid iron for its whole length: the post outboard of the window edge, the
 # web column (wider than the drill) inboard of it.
 SEAT_POINTS = [[x, HALF_Y, 0.0] for x in SEAT_LOCAL_X]
+# Each seat's placement, in SEAT_POINTS order: sketch x is model X on the +Y
+# top face (harmonic-base's +Y deck seats map the same way) and the seats sit
+# on the centreline (Z = 0), so the y coordinate takes the origin relation.
+_SEAT_STATION_AT = {row.seat_x: row for row in SEAT_STATION_LINES}
+SEAT_PLACEMENT_DIMS = [
+    (
+        (_SEAT_STATION_AT[x].placement, f'"{_SEAT_STATION_AT[x].seat_global}"'),
+        (None, None),
+    )
+    for x, _y, _z in SEAT_POINTS
+]
 BRACKET_SEATS_VOLUME = RIM_CHAMFER_VOLUME - len(SEAT_POINTS) * blind_hole_volume_mm3(
     blind_cut_dia_mm(SEAT_SPEC), SEAT_SPEC.depth_mm
 )
@@ -372,17 +430,21 @@ def _pocket_floor_radius_max_limit(adapter) -> None:
 async def _seat_station_reference(adapter) -> list[tuple[str, str]]:
     """The blanked REF sketch: per seat, a construction line on the Top
     plane's x axis from the end face to the seat centre, its length the
-    station; returns the anchors' drive jobs (the end faces follow
-    WallWidth). The seats are Hole Wizard points with no global, so the
-    stations themselves stay undriven: a REF reports, it does not control."""
+    station; returns the drive jobs. The start follows the end face
+    (END_FACE_DRIVE) and the length is the end face less the seat's global
+    (SEAT_STATION_DRIVES), so the line ends on the seat for any WallWidth or
+    seat edit: a REF reports, it does not control."""
     sketch = REFERENCE_SKETCHES[0]
     dims = SketchDims()
     check(f"create_sketch {sketch}", await adapter.create_sketch("Top"))
-    for name, end_x, seat_x in SEAT_STATION_LINES:
+    for row in SEAT_STATION_LINES:
+        name = row.dimension
         # Direct-to-DB: both lines lie on the sketch's x axis, so creation-
         # time inference would snap in the relations added below.
         set_sketch_direct_db(adapter, True)
-        line = check(f"{name} line", await adapter.add_line(end_x, 0.0, seat_x, 0.0))
+        line = check(
+            f"{name} line", await adapter.add_line(row.end_x, 0.0, row.seat_x, 0.0)
+        )
         set_sketch_direct_db(adapter, False)
         segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
         segment.ConstructionGeometry = True
@@ -393,18 +455,18 @@ async def _seat_station_reference(adapter) -> list[tuple[str, str]]:
             await adapter.add_sketch_constraint(line, None, "horizontal"),
         )
         await anchor_point_to_origin(
-            adapter, f"{line}.start", end_x, 0.0, f"{name} end face"
+            adapter, f"{line}.start", row.end_x, 0.0, f"{name} end face"
         )
-        dims.record(f"{name}Anchor", '"WallWidth" / 2')
+        dims.record(f"{name}Anchor", END_FACE_DRIVE)
         await dimension_between(
             adapter,
             f"{line}.start",
             f"{line}.end",
             "horizontal_distance",
-            abs(end_x - seat_x),
+            abs(row.end_x - row.seat_x),
             f"{name} from the end face",
         )
-        dims.record(name)
+        dims.record(name, SEAT_STATION_DRIVES[name])
     await ensure_fully_defined(adapter, f"{sketch} sketch")
     check(f"exit_sketch {sketch}", await adapter.exit_sketch())
     name_last_feature(adapter, sketch)
@@ -538,6 +600,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(
         adapter, "WallWidth", f"{BOSS_DEPTH}mm"
     )  # mid-plane extrude span (X)
+    # The seats' stations off the centre plane (X): their Hole Wizard
+    # placements and the REF stations both read them.
+    for seat_global, station in SEAT_GLOBALS.items():
+        await set_global(adapter, seat_global, f"{station}mm")
 
     # Each sketch records its dim names + drive equations inline as it is drawn
     # (per-sketch SketchDims); the (dim@feature, expr) jobs are collected here and
@@ -732,14 +798,16 @@ async def build(adapter) -> dict[str, str]:
     # 9. BracketSeats: the rocker brackets' two #8-32 bottoming-tapped seats,
     #    down from the top face over the window's side edges. Located at their
     #    nominal stations; the print says TRANSFER FROM MHA-CH-008 AT ASSEMBLY.
-    wizard_holes(
+    bracket_seats = wizard_holes(
         adapter,
         SEAT_SPEC,
         SEAT_POINTS,
         (0.0, 1.0, 0.0),
         "rocker-bracket hold-down bottoming-tapped seats (#8-32)",
         name="BracketSeats",
+        placement_dims=SEAT_PLACEMENT_DIMS,
     )
+    drive_jobs += bracket_seats.placement_drive_jobs
     await volume_check(adapter, "BracketSeats", BRACKET_SEATS_VOLUME, 200)
 
     # 10. SeatStationReference: the seats' REF stations for VIEW B.
