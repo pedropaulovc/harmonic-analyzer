@@ -107,7 +107,7 @@ TOP_KEEP = {
 # the pinch depth and, outside it, the stock height right of the view (the
 # pivot block's).
 FRONT_KEEP = {
-    "BlockHeight": SHEET.front(part_spec.BLOCK_X1 + 10.5, -14.5),
+    "BlockHeight": SHEET.front(part_spec.BLOCK_X1 + 10.0, -14.5),
     "PinchX1": SHEET.front(0.5 * part_spec.PINCH_X[0], -29.0),
     "PinchX2": SHEET.front(0.5 * part_spec.PINCH_X[1], -24.85),
     "PinchDepth": SHEET.front(part_spec.BLOCK_X1 + 5.5, -7.0),

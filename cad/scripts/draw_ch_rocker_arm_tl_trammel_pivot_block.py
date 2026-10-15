@@ -110,7 +110,7 @@ TOP_KEEP = {
 # of the view ran its extension lines the block's length, across the pinch
 # clearance callout's leader.
 FRONT_KEEP = {
-    "BlockHeight": SHEET.front(part_spec.BLOCK_X1 + 10.5, -14.5),
+    "BlockHeight": SHEET.front(part_spec.BLOCK_X1 + 10.0, -14.5),
     "PinchX": SHEET.front(0.5 * part_spec.PINCH_X[0], -29.0),
     "PinchDepth": SHEET.front(part_spec.BLOCK_X1 + 5.5, -7.0),
 }
