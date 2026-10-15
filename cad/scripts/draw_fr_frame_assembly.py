@@ -33,8 +33,6 @@ from _drawing_balloons import (
     BalloonLanding,
     _balloon_item_number,
     _spread_balloons,
-    _stems_matching,
-    _view_component_leaves,
     add_component_bom_balloons,
     assert_balloon_landings,
     drawing_viewport_pixel_size,
@@ -670,88 +668,17 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
     return sections[0], sections[1]
 
 
-def _visible_z_line_at_x(
-    adapter: Any, view: Any, *, component_stem: str, x_mm: float, label: str
-) -> Any:
-    """The highest visible straight edge of ``component_stem`` running along
-    machine Z at machine x = ``x_mm``: the one a plan view prints there.
-
-    The instances come from the view's drawing-component tree, not
-    ``IView::GetVisibleComponents``: on assembly section B-B that call returned
-    no component at all (r4, run 20261015T024651004Z) while the sheet printed
-    the plate and the deck. The tree lists every instance with its shown
-    state, and ``GetVisibleEntities2`` takes the tree's component directly,
-    as the balloon anchors do.
-    """
-    candidates = []
-    leaves = _view_component_leaves(adapter, view, label=label)
-    matching = [
-        leaf
-        for leaf in leaves
-        if leaf.visible
-        and leaf.component is not None
-        and _stems_matching(leaf.identities, frozenset({component_stem}))
-    ]
-    seen: list[tuple[float, ...]] = []
-    edge_count = 0
-    for leaf in matching:
-        transform = None
-        for edge in visible_component_entities(view, leaf.component, 1) or ():
-            edge_count += 1
-            curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
-            if curve is None or not curve.IsLine():
-                continue
-            key = _edge_endpoint_key(adapter, edge)
-            if key is None:
-                continue
-            if transform is None:
-                transform = _component_transform(leaf.component)
-            start = _transform_point(transform, key[:3])
-            end = _transform_point(transform, key[3:6])
-            seen.append(tuple(round(v * 1000.0, 3) for v in (*start, *end)))
-            if (
-                max(abs(point[0] * 1000.0 - x_mm) for point in (start, end)) > 0.01
-                or abs(start[1] - end[1]) > 1e-6
-                or abs(start[2] - end[2]) < 0.001
-            ):
-                continue
-            candidates.append(((start[1], abs(start[2] - end[2]), *key), edge))
-    if not candidates:
-        # The nearest lines by x, so a miss names what the view did offer.
-        nearest = sorted(seen, key=lambda row: abs(row[0] - x_mm) + abs(row[3] - x_mm))
-        shown = sorted(
-            {
-                identity
-                for leaf in leaves
-                if leaf.visible
-                for identity in leaf.identities
-            }
-        )
-        raise RuntimeError(
-            f"{label}: no visible {component_stem!r} edge along Z at x {x_mm:g} mm; "
-            f"{len(leaves)} leaf component(s), {len(matching)} shown {component_stem!r}, "
-            f"{edge_count} visible edge(s), {len(seen)} line(s), nearest (machine mm) "
-            f"{nearest[:8]}; shown identities {shown[:24]}"
-        )
-    return max(candidates, key=lambda row: row[0])[1]
-
-
 def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
-    """Dimension step 9's nameplate inset from the deck end in plan section B-B."""
-    plate_edge = _visible_z_line_at_x(
-        adapter,
-        section,
-        component_stem="fr-nameplate",
-        x_mm=NAMEPLATE_MOUNT_POS[0],
-        label="nameplate lower edge as lettered",
-    )
-    deck_end = _visible_z_line_at_x(
-        adapter,
-        section,
-        component_stem="fr-harmonic-base",
-        x_mm=DECK_HALF_X,
-        label="deck MHA-FR-004 end",
-    )
+    """Dimension step 9's nameplate inset from the deck end in plan section B-B.
+
+    Both edges are picked at their projected sheet stations, not as entities:
+    on this assembly section the API lists nothing. ``IView::GetVisibleComponents``
+    returned no component (r4, run 20261015T024651004Z), and
+    ``GetVisibleEntities2`` gave no edge for the drawing-component tree's shown
+    plate (r5, run 20261015T042140629Z), while the sheet prints both edges.
+    The measured value is checked against ``NAMEPLATE_END_INSET``, so a pick
+    that lands on any other line fails the sheet.
+    """
     plate_xy, deck_xy = model_points_in_view(
         adapter,
         section,
@@ -778,7 +705,6 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
         p1=deck_xy,
         text_xy=(text_xy[0], text_xy[1]),
         label="nameplate end inset",
-        entities=(plate_edge, deck_end),
     )
     return _checked_linear_dimension(
         adapter, display, expected_mm=NAMEPLATE_END_INSET, label="nameplate end inset"
