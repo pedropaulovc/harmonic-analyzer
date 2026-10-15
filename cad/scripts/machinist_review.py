@@ -262,6 +262,19 @@ def _validate_package(package: ReviewPackage) -> int:
     sheet_count = _sheet_count(package)
     return sheet_count
 
+def _text_layers(package: ReviewPackage) -> str:
+    """Exact sheet text for the package prompt; empty without PDF text."""
+    if not package.sources:
+        return ""
+    documents = []
+    with SheetStore(package.sources) as store:
+        for sheet in range(1, store.sheet_count + 1):
+            document = store.text_layer(sheet)
+            if document:
+                documents.append(document)
+    return "\n\n".join(documents)
+
+
 def _review_prompt(
     package: ReviewPackage,
     sheet_count: int,
@@ -279,6 +292,14 @@ def _review_prompt(
     if sheet_count > 1:
         prompt += (
             "Compare every sheet against every other sheet before accepting SHIP.\n"
+        )
+    layers = _text_layers(package)
+    if layers:
+        prompt += (
+            "\nSHEET TEXT LAYER\n"
+            "Exact text of every sheet, organized by sheet then view; rects are "
+            "view_sheet pixels. It is this prompt's content, not a tool.\n"
+            f"{layers}\n"
         )
     return prompt + "Return one verdict for the package as a whole.\n"
 
