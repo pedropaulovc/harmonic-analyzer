@@ -62,7 +62,7 @@ from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from ch_amplitude_bar_drawing_spec import SURFACE_FINISHES
-from ch_amplitude_bar_notes import DRAWING_DIMENSIONS, DRAWING_NOTES, DRAWING_PRECISION
+from ch_amplitude_bar_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_amplitude_bar_spec import (
     BOTTOM_NOTCH_DEPTH_BAND,
     BOTTOM_NOTCH_OFFSET,
@@ -416,13 +416,11 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # The foot notch floor's roughness lives on the MODEL as a plain annotation.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(
-        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
-    )
+    apply_drawing_properties(adapter, PART_NAME)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
-        ("Number", "Material Specification", "Finish", "Quantity", "Manufacturing Notes"),
+        ("Number", "Material Specification", "Finish", "Quantity"),
     )
     return artefacts
 

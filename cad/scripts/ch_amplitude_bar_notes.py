@@ -1,5 +1,5 @@
 r"""Amplitude bar (MHA-CH-001) drawing-only data: the marked-dimension and
-precision contract, the manufacturing note and the dimension callouts.
+precision contract and the dimension callouts.
 
 Split OUT of ``ch_amplitude_bar_spec`` (the ``ch_rocker_arm_notes`` treatment,
 codex #354): the channel kinematics, the rocker-bank layout, the rocker arm
@@ -138,7 +138,7 @@ DIMENSION_CALLOUTS: dict[str, str] = {
 if not set(DIMENSION_CALLOUTS) <= set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("a callout names a dimension the sheet does not print")
 
-# The one thing no single view states: both notches lie in one plane, cut
-# through the full depth (they share one profile sketch, so it IS the model).
-# The title-block QTY owns the count and the FINISH field the plating.
-DRAWING_NOTES = "1. BOTH END NOTCHES THRU THE FULL DEPTH,\n    IN ONE COMMON PLANE."
+# No general note: the title-block QTY owns the count, the FINISH field the
+# plating, and the views both notches' depth and common plane (machinist
+# round 2, #1293: "BOTH END NOTCHES THRU THE FULL DEPTH, IN ONE COMMON PLANE"
+# repeated what the front view and the isometrics show).

@@ -35,6 +35,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -98,6 +99,30 @@ FRONT_KEEP = {
     "PinLen": (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_DIA - 0.016),
     "BlankLen": (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_DIA - 0.036),
 }
+# The installed length's arrows stand inside its span (swDimensionArrowsSide_e
+# swDimArrowsInside, read back as draw_mg_magnifying_wheel does): left to the
+# document's smart arrows, r2 drew them outside, across the blank's extension
+# lines 3.25 mm beyond each pin end.
+ARROWS_INSIDE = ("PinLen",)
+_DIM_ARROWS_INSIDE = 0
+
+
+def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
+    remaining = set(ARROWS_INSIDE)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        remaining.discard(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = _DIM_ARROWS_INSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError(f"pin {name} did not keep its arrows inside")
+    if remaining:
+        raise RuntimeError(
+            f"no pin dimension to set arrows inside: {sorted(remaining)}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -168,6 +193,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one pin {name} reference dimension")
         set_reference_dimension(adapter, matches[0], label=f"pin {name}")
+    _set_arrows_inside(adapter, front_annotations)
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin end view")
     add_view_centerline(

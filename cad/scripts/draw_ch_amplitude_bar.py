@@ -50,7 +50,6 @@ from _drawing_dimensions import (
 )
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
-from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -94,9 +93,6 @@ FRONT_CENTER = (0.065, 0.140)
 FRONT_KEEP = {
     "BarLength": (FRONT_CENTER[0] - 0.035, FRONT_CENTER[1]),
 }
-# Top-left of the property-linked note: right of the top end's side view,
-# under the diameter callout and the top isometric's label.
-NOTES_XY = (0.300, 0.150)
 
 
 @dataclass(frozen=True)
@@ -268,16 +264,20 @@ DETAIL_B_DEPTH_TEXT_GAP = 0.022
 # The foot depth's text stands this far over the notch floor, outside its
 # 9.5 mm span: inside it, the ROOTS line sat on the floor's witness (r1).
 DETAIL_A_DEPTH_TEXT_RISE = 0.008
-_DETAIL_A_TEXT_X = (
-    DETAIL_A.centre[0] - DETAIL_A.radius_mm * DETAIL_A.mm - DETAIL_A_FENCE_TEXT_GAP
-)
+# Text set outside a vertical span hangs WEST of its dimension line, right
+# end on it (r2: the ~40 mm ROOTS block centred 20 mm west of the x asked for
+# and printed over the front view's bar). So the foot depth's line stands
+# just west of the fence and the block hangs from it.
+DETAIL_A_DEPTH_LINE_GAP = 0.002
+_DETAIL_A_FENCE_X = DETAIL_A.centre[0] - DETAIL_A.radius_mm * DETAIL_A.mm
+_DETAIL_A_TEXT_X = _DETAIL_A_FENCE_X - DETAIL_A_FENCE_TEXT_GAP
 _DETAIL_A_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_ROW_GAP
 _DETAIL_A_WIDTH_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_A_WIDTH_ROW_GAP
 DETAIL_A_KEEP = {
     # Left of the fence, over the notch floor: the depth and its band, the
-    # ROOTS callout above it.
+    # ROOTS callout above it, hanging west of the dimension line.
     "BottomNotchHeight": (
-        _DETAIL_A_TEXT_X,
+        _DETAIL_A_FENCE_X - DETAIL_A_DEPTH_LINE_GAP,
         DETAIL_A.sheet_xy(0.0, BOTTOM_NOTCH_HEIGHT)[1] + DETAIL_A_DEPTH_TEXT_RISE,
     ),
     # One row under the open end: the centring ledge, its text left of the
@@ -321,7 +321,7 @@ TOP_SIDE_KEEP = {
     ),
     "BarSection": (
         TOP_SIDE.sheet_xy(0.0, 0.0, BAR_DEPTH / 2.0)[0],
-        _TOP_SIDE_END_Y + 0.022,
+        _TOP_SIDE_END_Y + 0.026,
     ),
     "TopPinDrop": (
         _TOP_SIDE_BACK_X + DETAIL_ROW_GAP,
@@ -719,14 +719,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -832,8 +830,6 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=FLOOR_FINISH_ATTACH,
         char_height=FINISH_CHAR_HEIGHT,
     )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,

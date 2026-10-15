@@ -192,6 +192,52 @@ def test_sheet_runs_at_10_to_1_and_lands_clear_of_the_title_block() -> None:
     )
 
 
+class _Display:
+    def __init__(self, keeps: bool) -> None:
+        self.keeps = keeps
+        self._side = 2  # swDimArrowsSmart
+
+    @property
+    def ArrowSide(self) -> int:  # noqa: N802 - the COM member name
+        return self._side
+
+    @ArrowSide.setter
+    def ArrowSide(self, value: int) -> None:  # noqa: N802 - the COM member name
+        if self.keeps:
+            self._side = value
+
+
+class _Annotation:
+    def __init__(self, name: str, keeps: bool = True) -> None:
+        self.name = name
+        self.display = _Display(keeps)
+
+    def GetSpecificAnnotation(self) -> _Display:  # noqa: N802 - the COM member name
+        return self.display
+
+
+def test_installed_length_holds_its_arrows_inside(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """r2 layout audit: the installed length's smart arrows stood outside its
+    span and crossed the blank's extension lines 3.25 mm beyond each end."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, a: a.name)
+    assert drawing.ARROWS_INSIDE == ("PinLen",)
+    annotations = [
+        _Annotation("PinDia"),
+        _Annotation("PinLen"),
+        _Annotation("BlankLen"),
+    ]
+    drawing._set_arrows_inside(None, annotations)
+    assert [a.display.ArrowSide for a in annotations] == [2, 0, 2]
+    with pytest.raises(RuntimeError, match="did not keep its arrows inside"):
+        drawing._set_arrows_inside(None, [_Annotation("PinLen", keeps=False)])
+    with pytest.raises(RuntimeError, match="no pin dimension"):
+        drawing._set_arrows_inside(None, [_Annotation("PinDia")])
+    assert "_set_arrows_inside(adapter, front_annotations)" in _source()
+
+
 def test_part_registry_row() -> None:
     config = _config.parts("ch-bar-pivot-pin")
     assert config["number"] == "MHA-CH-011"

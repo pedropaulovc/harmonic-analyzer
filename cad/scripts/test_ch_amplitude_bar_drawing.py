@@ -219,13 +219,7 @@ def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:
         "*deviations(BOTTOM_NOTCH_DEPTH_BAND)"
     )
     assert "BottomNotchHeight" in drawing.DETAIL_A_KEEP
-    notes = " ".join(
-        line.strip() for line in ch_amplitude_bar_notes.DRAWING_NOTES.splitlines()
-    )
-    assert "DEEP" not in notes
-    assert "+0/" not in notes
-    assert "3.18" not in notes and "2.38" not in notes and "12.70" not in notes
-    assert bar.DRAWING_NOTES is ch_amplitude_bar_notes.DRAWING_NOTES
+    assert not hasattr(ch_amplitude_bar_notes, "DRAWING_NOTES")
 
 
 # Each printed dimension's two sketch references, in the part (x, y, z) mm: a
@@ -303,11 +297,18 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
     callouts = ch_amplitude_bar_notes.DIMENSION_CALLOUTS
     # Each west text block (its widest callout line) ends short of the bar's
     # edge, where the ledge's and the depth's witnesses stand (r1: both ran
-    # through their own text).
+    # through their own text). The depth's text, outside its vertical span,
+    # hangs west of its dimension line (r2): that line stands short of the
+    # bar and the block clears the front view's bar (r2: ROOTS printed on it).
     bar_left = a.sheet_xy(0.0, 0.0)[0]
+    front_bar_right = drawing.FRONT_CENTER[0] + spec.BAR_WIDTH / 4000.0
     for name, (x, _y) in drawing.DETAIL_A_KEEP.items():
-        half = max(map(len, callouts[name].splitlines())) * _CHAR / 2
-        assert x + half + 0.002 < bar_left, name
+        width = max(map(len, callouts[name].splitlines())) * _CHAR
+        if name == "BottomNotchHeight":
+            assert x + 0.002 < bar_left, name
+            assert x - width > front_bar_right + 0.004, name
+        else:
+            assert x + width / 2 + 0.002 < bar_left, name
     assert ledge_x < bar_left
     # The width's right witness runs down to its row; DETAIL A's label stands
     # east of it (r1: the centred label stood in its path).
@@ -340,7 +341,9 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
     wall_half = len(ch_amplitude_bar_notes.DIMENSION_CALLOUTS["TopPinX"]) * _CHAR / 2
     assert keep["TopPinX"][0] - wall_half > back_x + 0.002
     assert pin_x < back_x
-    assert end_y < keep["TopPinX"][1] < keep["BarSection"][1] - 0.007
+    # The section's arrows run 5.6 mm under its text point; the HOLE WALL
+    # line tops 4.5 mm over TopPinX's. r2 left 2.0 mm between them.
+    assert end_y < keep["TopPinX"][1] < keep["BarSection"][1] - 0.015
     assert keep["TopPinDrop"][0] > back_x and pin_y < keep["TopPinDrop"][1] < end_y
     assert keep["TopPinDia"][0] > back_x and keep["TopPinDia"][1] < pin_y
 
@@ -362,7 +365,7 @@ _LINE = 0.0052
 
 
 def test_views_labels_and_notes_stay_on_the_sheet_and_apart() -> None:
-    """Each crop circle with its label, and the notes block, stand on the
+    """Each crop circle with its label stands on the
     sheet (border 0.0127..0.419 x 0.0127..0.2667), clear of the title block
     (x >= 0.216 below y 0.065) and of one another."""
     boxes = {}
@@ -376,14 +379,6 @@ def test_views_labels_and_notes_stay_on_the_sheet_and_apart() -> None:
             max(view.centre[0] + r, view.centre[0] + label_w / 2),
             view.centre[1] + r,
         )
-    lines = ch_amplitude_bar_notes.DRAWING_NOTES.splitlines()
-    nx, ny = drawing.NOTES_XY
-    boxes["notes"] = (
-        nx,
-        ny - len(lines) * _LINE,
-        nx + max(map(len, lines)) * _CHAR,
-        ny,
-    )
     title_block = (0.216, 0.0, 0.419, 0.065)
     for name, box in boxes.items():
         assert 0.0127 < box[0] and box[2] < 0.419, name
@@ -455,20 +450,20 @@ def test_notch_centring_bands_ride_each_details_ledge_not_a_note() -> None:
         assert bands[("BarProfile", name)] == "NOTCH_OFFSET_TOLERANCE_MM"
         assert name in keep
         assert ch_amplitude_bar_notes.DRAWING_PRECISION["BarProfile"][name] == 2
-    notes = " ".join(
-        line.strip() for line in ch_amplitude_bar_notes.DRAWING_NOTES.splitlines()
-    )
-    assert "CENTRED" not in notes and "WITHIN" not in notes
 
 
-def test_notes_keep_only_what_no_view_states() -> None:
+def test_sheet_carries_no_general_note() -> None:
     """Machinist round 1 (#1293): the section, the hole, the roots and the
-    plating left the notes for their dimensions and the FINISH field. What
-    remains is the one fact no single view states."""
-    assert ch_amplitude_bar_notes.DRAWING_NOTES.splitlines() == [
-        "1. BOTH END NOTCHES THRU THE FULL DEPTH,",
-        "    IN ONE COMMON PLANE.",
-    ]
+    plating left the notes for their dimensions and the FINISH field. Round 2:
+    the last line (both notches through, in one plane) repeated what the
+    front view and the isometrics show, so the sheet has no note block."""
+    assert not hasattr(ch_amplitude_bar_notes, "DRAWING_NOTES")
+    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    part_source = Path(bar.__file__).read_text(encoding="utf-8")
+    assert "add_property_linked_note" not in draw_source
+    assert "Manufacturing Notes" not in draw_source
+    assert "Manufacturing Notes" not in part_source
+    assert "apply_drawing_properties(adapter, PART_NAME)" in part_source
 
 
 def test_functional_notch_finish_is_a_native_symbol_on_the_floor() -> None:
@@ -486,7 +481,6 @@ def test_functional_notch_finish_is_a_native_symbol_on_the_floor() -> None:
         (0, -1, 0), -ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT
     )
     assert len(finish_spec.SURFACE_FINISHES) == 1
-    assert "Ra" not in ch_amplitude_bar_notes.DRAWING_NOTES
     part_source = Path(bar.__file__).read_text(encoding="utf-8")
     assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -555,11 +549,11 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     spec = _config.parts("ch-amplitude-bar")
     assert spec["material_specification"] == "AISI 1018 cold-rolled steel, 6.35 sq"
-    # One line in the FINISH field (r1 wrapped at 50 characters).
-    assert spec["finish"] == "bright chrome; dims after plating; mask pin hole"
+    # One line in the FINISH field (r1 wrapped at 50 characters). Round 2:
+    # the unplated press bore states its protection.
+    assert spec["finish"] == "bright chrome, dims plated; pin hole bare, oiled"
     assert len(spec["finish"]) < 50
     assert int(spec["quantity"]) == 20
-    assert "PLATING" not in ch_amplitude_bar_notes.DRAWING_NOTES
 
 
 def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
