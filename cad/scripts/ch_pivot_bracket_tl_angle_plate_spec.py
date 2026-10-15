@@ -69,15 +69,15 @@ _LEDGE_BAND = _LEDGE_HEIGHT_FLOOR - round(
     _LEDGE_HEIGHT_FLOOR + printed_deviations(_LEDGE_HEIGHT_FLOOR, 1)[0], 12
 )
 _LEDGE_HEIGHT = math.ceil(round((_LEDGE_HEIGHT_FLOOR + _LEDGE_BAND) * 10.0, 6)) / 10.0
-LEDGE_TOP_Y = round(BLOCK_HEIGHT + _LEDGE_HEIGHT, 6)  # 77.7
-PART_PROUD = LEDGE_TOP_Y + sides.FOOT_LEN - PLATE_HEIGHT  # 5.24
+LEDGE_TOP_Y = round(BLOCK_HEIGHT + _LEDGE_HEIGHT, 6)  # 77.6
+PART_PROUD = LEDGE_TOP_Y + sides.FOOT_LEN - PLATE_HEIGHT  # 5.64
 PART_PROUD_WORST = (
     BLOCK_HEIGHT
     + round(_LEDGE_HEIGHT + printed_deviations(_LEDGE_HEIGHT, 1)[0], 12)
     + sides.FOOT_LEN
     - bracket.FOOT_LEN_BAND
     - (PLATE_HEIGHT + PLATE_HEIGHT_ALLOWANCE)
-)  # 4.09
+)  # 4.08
 if PART_PROUD_WORST < PART_PROUD_MIN:
     raise AssertionError("the ledge must stand the bracket 4 mm proud at worst case")
 
