@@ -112,25 +112,50 @@ if printed_band_mm(END_PLACES) > 0.26 * printed_band_mm(2):
     )
 
 # Pivot locating hole: the rocker's Ø6.5 bore, reamed to H7 (+0.015/0) so
-# a 0.2550 in class ZZ minus pin gauge (6.472-6.477) locates it in the arm's
-# bore. The play it leaves stays inside the apex acceptance.
+# one bought 0.2558 in Class X minus pin gauge (inventory
+# gauges.vermont-class-x-2558-minus: 0.25576-0.25580 in, 6.4963-6.4973)
+# locates it in the arm's bore. The shop's 0.001 in Class ZZ set stops at
+# 0.2550, whose play alone is 0.0505; auto-selected 2026-10-15 after review
+# timeout, Pedro may revisit.
 PIVOT_HOLE_DIA = rocker.PIVOT_HOLE_DIA
 PIVOT_HOLE_BAND = (0.015, 0.0)
 PIVOT_PLACES = 3
+PIN_GAUGE_IN = 0.2558
+PIN_GAUGE_CLASS_X_IN = 0.00004  # Class X tolerance, minus direction
+PIN_GAUGE_MIN = (PIN_GAUGE_IN - PIN_GAUGE_CLASS_X_IN) * 25.4  # 6.4963
+PIN_GAUGE_MAX = PIN_GAUGE_IN * 25.4  # 6.4973
 # The fit and its mate are named on the bore's own callout.
-PIVOT_CALLOUT = "REAM, SLIP FIT ON PIN GAUGE"
+PIVOT_CALLOUT = f"REAM, SLIP FIT ON PIN GAUGE\n{PIN_GAUGE_IN:.4f} IN, CLASS X MINUS"
 # Both arcs' shared centre lies on the pivot bore's vertical centreline,
 # CENTER_Y above the bore: off any sheet, so the radius callouts say so.
 ARC_CENTER_CALLOUT = "CENTER ON PIVOT CL"
-PIN_GAUGE_MIN = round((0.2550 - 0.0002) * 25.4, 3)  # 6.472
-PIN_GAUGE_MAX = round(0.2550 * 25.4, 3)  # 6.477
+_ROCKER_BORE_LOW = rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[1]
+_ROCKER_BORE_HIGH = rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[0]
 if PIN_GAUGE_MAX >= PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]:
     raise AssertionError("pin gauge does not enter the template hole")
-if PIN_GAUGE_MAX >= rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[1]:
+if PIN_GAUGE_MAX >= _ROCKER_BORE_LOW:
     raise AssertionError("pin gauge does not enter the rocker's pivot bore")
-PIN_PLAY_MAX = round((PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0] - PIN_GAUGE_MIN) / 2.0, 4)
-if PIN_PLAY_MAX >= APEX_BAND[0]:
-    raise AssertionError("pin-gauge play in the template hole eats the whole apex band")
+# Two budgets. APEX_BAND is the template's own edge acceptance about its hole
+# (what the DTI record checks). Laid on the arm, the pin's worst-case play in
+# both bores (each at its largest, the pin at its smallest) moves the edges
+# further: edge band plus that registration stays inside the quarter of the
+# rocker's arc zone the gauge may spend, centred on the aim.
+LOCATOR_REGISTRATION_MAX = (
+    math.ceil(
+        1e4
+        * (
+            (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0] - PIN_GAUGE_MIN) / 2.0
+            + (_ROCKER_BORE_HIGH - PIN_GAUGE_MIN) / 2.0
+        )
+    )
+    / 1e4
+)  # 0.0262 = 0.0094 template + 0.0169 rocker, rounded up
+_ROCKER_ZONE = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
+if APEX_BAND[0] + LOCATOR_REGISTRATION_MAX > 0.25 * _ROCKER_ZONE / 2.0 + 1e-9:
+    raise AssertionError(
+        "pin-gauge play in both bores plus the apex band spends more than a"
+        " quarter of the rocker zone"
+    )
 
 # Plate: O1 ground flat stock, 1/8 in, thickness as supplied.
 THICK = 3.175

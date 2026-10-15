@@ -108,12 +108,40 @@ def test_outline_corners_lie_on_their_arcs() -> None:
     assert spec.BOT_END_X < spec.TIP_X and spec.BOT_END_Y < spec.TIP_Y
 
 
-def test_pin_gauge_locates_both_bores_inside_the_apex_band() -> None:
+def test_locator_play_and_edge_band_fit_a_quarter_of_the_rocker_zone() -> None:
+    """The pin's worst-case play in BOTH bores (template and rocker, each at
+    its largest, the pin at its smallest) moves the template off the arm's
+    pivot; with the edge acceptance about the template's own hole it stays
+    inside the quarter of the rocker's arc zone the gauge may spend, centred
+    on the aim: half of that quarter either side."""
     hole = _features()["pivot_hole"]
     assert hole["dia"] == [6.5, 6.515]
+    rocker_bore = (
+        rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[1],
+        rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[0],
+    )
     assert spec.PIN_GAUGE_MAX < hole["dia"][0]
-    assert spec.PIN_GAUGE_MAX < rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[1]
-    assert (hole["dia"][1] - spec.PIN_GAUGE_MIN) / 2.0 < spec.APEX_BAND[0]
+    assert spec.PIN_GAUGE_MAX < rocker_bore[0]
+    registration = (hole["dia"][1] - spec.PIN_GAUGE_MIN) / 2.0 + (
+        rocker_bore[1] - spec.PIN_GAUGE_MIN
+    ) / 2.0
+    zone = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
+    assert spec.APEX_BAND[0] + registration <= 0.25 * zone / 2.0 + 1e-9
+    assert spec.LOCATOR_REGISTRATION_MAX >= registration
+
+
+def test_pivot_callout_names_the_bought_locating_pin() -> None:
+    inches = f"{spec.PIN_GAUGE_IN:.4f}"
+    assert spec.PIN_GAUGE_MAX == pytest.approx(float(inches) * 25.4)
+    assert f"{inches} IN, CLASS X MINUS" in spec.PIVOT_CALLOUT
+    assert "PIN GAUGE" in spec.PIVOT_CALLOUT
+    inventory = tomllib.loads(
+        (CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    )
+    pin = inventory["gauges"]["vermont-class-x-2558-minus"]
+    assert pin["kind"] == "pin_gauge" and pin["make"] == "Vermont Gage"
+    assert pin["dia_in"]["value"] == spec.PIN_GAUGE_IN
+    assert "Class X minus" in pin["name"] + pin["note"]
 
 
 def test_prechips_envelope_is_the_outline_extents_with_the_pivot_void() -> None:
