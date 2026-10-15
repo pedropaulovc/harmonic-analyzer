@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import _drawing_leaders
 import ch_connecting_rod_notes
 import ch_connecting_rod_spec
 import draw_ch_connecting_rod as drawing
@@ -253,10 +254,11 @@ def test_every_tight_band_names_its_mate() -> None:
         in ream
     )
     assert drawing.ARM_NUMBER in drawing.DETAIL_CALLOUTS["SlotWidth"]
-    # The tine's band holds the gap to the next channel's rod, the same part.
+    # The tine's band locates the slot from the datum face and holds the gap
+    # to the next channel's rod, the same part (#982 review r2).
     assert drawing.ROD_NUMBER == "MHA-CH-003"
     assert drawing.ROD_NUMBER in drawing.DETAIL_CALLOUTS["TineNear"]
-    assert drawing.DETAIL_CALLOUTS["TineNear"].startswith("2X;")
+    assert drawing.DETAIL_CALLOUTS["TineNear"].startswith("2X; LOCATES SLOT;")
     assert drawing.CAM_NUMBER in drawing.DETAIL_CALLOUTS["RingFaceNear"]
     assert drawing.CAM_NUMBER in drawing.LEFT_CALLOUTS["RingThick"]
     assert drawing.LEFT_CALLOUTS["RingThick"].startswith("RING AND SHANK")
@@ -328,7 +330,12 @@ def test_plate_locates_from_the_fork_face_and_prints_its_thickness() -> None:
     assert spec.RING_THICKNESS + spec.RING_THICKNESS_BAND[1] >= 2.0  # rule 17
     build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
     assert 'set_global(adapter,"RingFaceNear",\'("ForkThickness"-"RingThickness")/2\')' in build
-    assert 'name_dimensions(adapter,"RingDisc",["RingThick"])' in build
+    assert 'name_dimensions(adapter,"Plate",["RingThick"])' in build
+    # #982 review r2: two coplanar bosses left the shank's flanks as seams
+    # across the ring's faces; ring and shank are one outline, one extrusion.
+    assert 'name_last_feature(adapter,"PlateProfile")' in build
+    assert '"Shank"' not in build and "ShankProfile" not in build
+    assert build.count("create_extrusion(") == 2  # plate, fork boss
     assert "(ring_thick_dim[0],'\"RingThickness\"')" in build
     assert "RingFaceFar" not in build
     assert set(drawing.LEFT_KEEP) == {"RingThick"}
@@ -336,6 +343,10 @@ def test_plate_locates_from_the_fork_face_and_prints_its_thickness() -> None:
     ring_bottom = drawing._left_xy(0.0, spec.RING_BOTTOM_Y)
     text_x, text_y = drawing.LEFT_KEEP["RingThick"]
     assert text_y < ring_bottom[1] and text_x < ring_bottom[0] - 0.020
+    # r2: two long lines ran into the sheet border; centred on the keep at
+    # ~2.5 mm a character, the widest line stays 5 mm inside it (x 0.013).
+    widest = max(len(line) for line in drawing.LEFT_CALLOUTS["RingThick"].splitlines())
+    assert text_x - widest * 0.0025 / 2.0 > 0.013 + 0.005
 
 
 def test_inside_corners_are_one_modelled_radius_printed_max() -> None:
@@ -405,18 +416,33 @@ def test_overall_length_is_a_side_view_reference() -> None:
 
 def test_datum_a_tag_stands_clear_of_the_centre_distance_witness() -> None:
     """#982 review r1: at 9 o'clock datum A's leader lay on the 158.37's
-    witness line. At 5:30 its tag stands inside the bore, its box clear of
-    the bore's wall and right of the vertical centre line."""
+    witness line; inside the bore (r2) its tag crowded both diameters'
+    leaders. At 5 o'clock the tag stands below the ring on the pick's ray,
+    clear of the outer diameter's leader (-55 deg) and the vertical centre
+    line, above the border and left of the title block."""
     spec = ch_connecting_rod_spec
     centre = drawing._sheet_xy(0.0, 0.0)
     edge_x, edge_y = drawing.DATUM_A_EDGE
     assert math.dist((edge_x, edge_y), centre) == pytest.approx(spec.RING_BORE_DIA / 2000.0)
-    assert edge_x > centre[0] + 0.003 and edge_y < centre[1]
     symbol_x, symbol_y = drawing.DATUM_A_SYMBOL
-    half_box = 0.003
-    far_corner = (abs(symbol_x - centre[0]) + half_box, abs(symbol_y - centre[1]) + half_box)
-    assert math.hypot(*far_corner) < spec.RING_BORE_DIA / 2000.0 - 0.001
-    assert symbol_x - half_box > centre[0] + 0.002
+    ray = math.degrees(math.atan2(symbol_y - centre[1], symbol_x - centre[0]))
+    edge = math.degrees(math.atan2(edge_y - centre[1], edge_x - centre[0]))
+    assert ray == pytest.approx(edge)
+    assert -90.0 + 10.0 < ray < -55.0 - 10.0
+    half_box = 0.0035
+    assert symbol_y + half_box < drawing._sheet_xy(0.0, spec.RING_BOTTOM_Y)[1]
+    assert symbol_y - half_box > 0.015
+    assert symbol_x + half_box < 0.216
+
+
+def test_ring_diameters_keep_one_arrow_on_the_near_rim() -> None:
+    """#982 review r2: both diameters ran rim to rim through the bore's
+    centre and crossed there."""
+    assert drawing.set_near_side_diameter is _drawing_leaders.set_near_side_diameter
+    assert drawing.NEAR_SIDE_DIAMETERS == ("RingOuterDia", "StrapBoreDia")
+    assert set(drawing.NEAR_SIDE_DIAMETERS) <= set(drawing.FRONT_KEEP)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'set_near_side_diameter(matches[0], f"ring {name}")' in source
 
 
 def test_fork_print_is_three_place_and_model_owned() -> None:
@@ -429,11 +455,12 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
         "SlotDepth",
         "ForkBossLength",
     }
-    assert marked["RingDisc"] == {"RingThick"}
+    assert marked["Plate"] == {"RingThick"}
+    assert marked["PlateProfile"] == {"RingOuterDia", "ShankWidthDim"}
     assert marked["ForkProfile"] == {"ForkWidthDim"}
     assert rod.DRAWING_PRECISION is ch_connecting_rod_notes.DRAWING_PRECISION
     assert ch_connecting_rod_notes.DRAWING_PRECISION == {
-        "RingDisc": {"RingThick": 3},
+        "Plate": {"RingThick": 3},
         "ForkBoss": {"ForkThick": 3},
         "ForkSlotProfile": {
             "TineNear": 3,
@@ -618,7 +645,7 @@ def test_model_bands_are_owned_by_named_model_dimensions() -> None:
         ("ForkSlotProfile", "TineNear"): "tine_upper",
         ("ForkSlotProfile", "SlotWidth"): "slot_upper",
         ("ForkSlotProfile", "RingFaceNear"): "face_upper",
-        ("RingDisc", "RingThick"): "thick_upper",
+        ("Plate", "RingThick"): "thick_upper",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_BAND)",
     }
 
@@ -630,6 +657,14 @@ def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:
     assert symbol_y > edge_y
     assert symbol_y > drawing.FRONT_KEEP["StrapBoreDia"][1] + 0.010
     assert symbol_x < 0.250
+    # r1/r2: at the default 5 mm text the "Ra 1.6" ran into the detail's
+    # plate-face callout; 2.5 mm text ends well left of it.
+    assert drawing.BORE_FINISH_CHAR_HEIGHT == 0.0025
+    ra_end = symbol_x + 0.006 + 6 * drawing.BORE_FINISH_CHAR_HEIGHT
+    face_callout_left = drawing.DETAIL_KEEP["RingFaceNear"][0] - 0.030
+    assert ra_end < face_callout_left - 0.005
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "char_height=BORE_FINISH_CHAR_HEIGHT," in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

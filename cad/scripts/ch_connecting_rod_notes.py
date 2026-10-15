@@ -21,10 +21,9 @@ from ch_connecting_rod_spec import TINE_MIN
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_ch_connecting_rod marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "RingDiscProfile": {"RingOuterDia"},
-    "RingDisc": {"RingThick"},
+    "PlateProfile": {"RingOuterDia", "ShankWidthDim"},
+    "Plate": {"RingThick"},
     "StrapBoreProfile": {"StrapBoreDia"},
-    "ShankProfile": {"ShankWidthDim"},
     "ForkProfile": {"ForkWidthDim"},
     "ForkBoss": {"ForkThick"},
     "ForkSlotProfile": {
@@ -44,7 +43,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # same places. The reamed press hole's band is written at three places too;
 # the inside corners' single-limit radius at one.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "RingDisc": {"RingThick": 3},
+    "Plate": {"RingThick": 3},
     "ForkBoss": {"ForkThick": 3},
     "ForkSlotProfile": {
         "TineNear": 3,

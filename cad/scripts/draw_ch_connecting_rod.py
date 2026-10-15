@@ -39,6 +39,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -52,6 +53,7 @@ from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measur
 from _drawing_edges import face_silhouettes_through
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -152,6 +154,8 @@ FRONT_KEEP = {
     # field right of the shank, above the bore's finish symbol.
     "InsideCornerR": (0.225, 0.106),
 }
+# One arrow on the rim nearest each text (set_near_side_diameter).
+NEAR_SIDE_DIAMETERS = ("RingOuterDia", "StrapBoreDia")
 # Descriptive text beneath each native value/band: the strap bore and its
 # cam; the fork's crown, a full round on the pin tangent to its sides; the
 # reamed press hole and its pin (drawing-guidelines.md rule 12 (hole and slot
@@ -176,10 +180,11 @@ FRONT_CALLOUTS = {
 # its value out to the left below the ring so its witnesses drop from the
 # ring's bottom corners.
 LEFT_KEEP = {
-    "RingThick": (0.042, _left_xy(0.0, RING_BOTTOM_Y)[1] - 0.007),
+    "RingThick": (0.045, _left_xy(0.0, RING_BOTTOM_Y)[1] - 0.007),
 }
+# Three short lines: two long ones ran into the sheet border (r2).
 LEFT_CALLOUTS = {
-    "RingThick": f"RING AND SHANK; RUNS IN\nCAM SLOT OF {CAM_NUMBER}",
+    "RingThick": f"RING AND SHANK;\nRUNS IN CAM SLOT\nOF {CAM_NUMBER}",
 }
 # The overall length, ring bottom to crown top, as a reference: the side
 # view's ring-bottom silhouette and the far tine's crown-top silhouette,
@@ -239,7 +244,7 @@ DETAIL_KEEP = {
     # Over the tines, nearest first: the near tine (text wholly left of the
     # datum face's witness), the slot (text right of the far face), the
     # reference thickness centred over the fork.
-    "TineNear": (_FACE_X - 0.030, _TINE_TOP_Y + 0.010),
+    "TineNear": (_FACE_X - 0.030, _TINE_TOP_Y + 0.012),
     "SlotWidth": (_FAR_X + 0.030, _TINE_TOP_Y + 0.016),
     "ForkThick": (DETAIL_CENTER[0], _TINE_TOP_Y + 0.028),
     # Down the right-hand side from the crown top: the slot depth inside, the
@@ -250,24 +255,36 @@ DETAIL_KEEP = {
     # of the datum face).
     "RingFaceNear": (_FACE_X - 0.030, _REF_END_Y - 0.010),
 }
+# The near tine's band locates the slot from the datum face (the channel's
+# axial budget) and, with the far tine's, holds the gap to the next channel's
+# rod (#982 review r2: a clearance alone would not need it).
 DETAIL_CALLOUTS = {
-    "TineNear": f"2X; CLEARS NEXT\nROD {ROD_NUMBER}",
+    "TineNear": f"2X; LOCATES SLOT;\nCLEARS NEXT ROD\n{ROD_NUMBER}",
     "SlotWidth": f"RUNS ON ARM\n{ARM_NUMBER}",
     "RingFaceNear": f"PLATE FACE; RING IN\nCAM SLOT OF {CAM_NUMBER}",
 }
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
-BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.025, BORE_FINISH_EDGE[1] + 0.015)
-# Datum A on the strap bore at 5:30, its tag inside the bore: at 9 o'clock its
-# leader lay on the centre distance's witness (r1); inside the bore the leader
-# crosses no outline and stands clear of both diameters' leaders and of the
-# centre mark.
-_DATUM_A_ANGLE = math.radians(-75.0)
+# At the plate's 2.5 mm character height (the default printed 5 mm and its
+# "Ra 1.6" ran into the detail's plate-face callout, r1 and r2).
+BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.020, BORE_FINISH_EDGE[1] + 0.015)
+BORE_FINISH_CHAR_HEIGHT = 0.0025
+# Datum A on the strap bore at 5 o'clock, its tag below the ring: at 9
+# o'clock its leader lay on the centre distance's witness (r1); inside the
+# bore (r2) the tag crowded the two diameters' leaders and the centre lines.
+# The edge attachment lands where the tag's leader meets the bore, so the
+# tag stands on the pick's ray, between the outer diameter's leader (-55
+# deg) and the vertical centre line.
+_DATUM_A_ANGLE = math.radians(-72.0)
 DATUM_A_EDGE = _sheet_xy(
     RING_BORE_DIA / 2.0 * math.cos(_DATUM_A_ANGLE),
     RING_BORE_DIA / 2.0 * math.sin(_DATUM_A_ANGLE),
 )
-DATUM_A_SYMBOL = (DATUM_A_EDGE[0] + 0.003, DATUM_A_EDGE[1] + 0.008)
+_DATUM_A_TAG_R = 34.0
+DATUM_A_SYMBOL = _sheet_xy(
+    _DATUM_A_TAG_R * math.cos(_DATUM_A_ANGLE),
+    _DATUM_A_TAG_R * math.sin(_DATUM_A_ANGLE),
+)
 # Datum B on the shank's left flank. The tag's edge attachment re-solves
 # square to the flank, so its leader runs level at the tag's height, 4.5 mm
 # above the shank width's dimension line (its text stands right of the shank).
@@ -440,7 +457,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front_annotations,
         {**DRAWING_PRECISION["PinHoleProfile"], **DRAWING_PRECISION["InsideCorners"]},
     )
-    assert_imported_precision(adapter, left_annotations, DRAWING_PRECISION["RingDisc"])
+    assert_imported_precision(adapter, left_annotations, DRAWING_PRECISION["Plate"])
     assert_imported_precision(
         adapter,
         detail_annotations,
@@ -449,6 +466,19 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
     set_dimension_callouts(adapter, left_annotations, LEFT_CALLOUTS)
     set_dimension_callouts(adapter, detail_annotations, DETAIL_CALLOUTS)
+    # Native, both ring diameters ran rim to rim through the bore's centre and
+    # crossed there, under datum A's leader (#982 review r2): one arrow each on
+    # the rim nearest its text keeps the bore clear.
+    for name in NEAR_SIDE_DIAMETERS:
+        matches = [
+            annotation
+            for annotation in front_annotations
+            if dimension_name(adapter, annotation) == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+        set_near_side_diameter(matches[0], f"ring {name}")
+    rebuild_drawing(adapter, label="ring diameters' near-side leaders")
     # Two tines and the slot set the fork over the tines: it prints as a
     # reference.
     fork_thick = [
@@ -564,6 +594,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=BORE_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "strap_bore"),
         label="strap bore finish",
+        char_height=BORE_FINISH_CHAR_HEIGHT,
     )
     # The position FCF attaches at the reamed pin hole's 3-o'clock rim with a
     # level leader, above the Ø callout's lane.
