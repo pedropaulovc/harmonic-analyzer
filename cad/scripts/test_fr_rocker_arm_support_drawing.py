@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
+import re
+from collections import defaultdict
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -721,7 +724,9 @@ def test_seat_stations_print_as_ref_from_the_real_end_faces() -> None:
     """r7 machinist review (blocker): the seats printed with no location and
     read as crowding the end wall. Main's r8 ruling: REF stations from the
     end faces in VIEW B, the transfer staying the method."""
-    lines = {name: (end, seat) for name, end, seat in support.SEAT_STATION_LINES}
+    lines = {
+        row.dimension: (row.end_x, row.seat_x) for row in support.SEAT_STATION_LINES
+    }
     assert lines == {
         "SeatEastStation": (support.BOSS_DEPTH / 2.0, max(seats.SEAT_LOCAL_X)),
         "SeatWestStation": (-support.BOSS_DEPTH / 2.0, min(seats.SEAT_LOCAL_X)),
@@ -736,6 +741,101 @@ def test_seat_stations_print_as_ref_from_the_real_end_faces() -> None:
     assert set(drawing.VIEW_B_KEEP) == set(lines)
     # The transfer instruction stays on the seat callout.
     assert "AT ASSEMBLY;" in drawing.SEAT_CALLOUT_PROCESS
+
+
+def _evaluate_equation(expression: str, values: dict[str, float]) -> float:
+    """An equation-manager expression of quoted names and arithmetic, in mm."""
+    numeric = re.sub(r'"(\w+)"', lambda match: repr(values[match[1]]), expression)
+    return float(eval(numeric, {"__builtins__": {}}))
+
+
+def test_seat_station_drives_end_on_the_seats_for_any_wall_width_or_seat_edit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PR #1469 round-3 review: the REF lines started at "WallWidth" / 2 but
+    their lengths were undriven, so 178.8 -> 180.8 left the east REF at 4.95
+    while the seat stood 5.95 in. Record the sketch's real drive jobs
+    offline, evaluate them as the equation manager would, and check each line
+    still ends on the seat the Hole Wizard drills (SEAT_POINTS)."""
+    import _sketch
+
+    rows = support.SEAT_STATION_LINES
+    monkeypatch.setattr(_sketch, "_feature_by_name", lambda _adapter, name: name)
+    monkeypatch.setattr(
+        _sketch, "_display_dimensions", lambda *_: [None] * (2 * len(rows))
+    )
+    monkeypatch.setattr(_sketch, "_rename_dimensions", lambda *_: None)
+    monkeypatch.setattr(support, "_early_bound", lambda obj, _interface: obj)
+    for name in ("set_sketch_direct_db", "name_last_feature"):
+        monkeypatch.setattr(support, name, lambda *_: None)
+
+    async def nothing(*_args: object) -> None:
+        return None
+
+    for name in ("anchor_point_to_origin", "dimension_between", "ensure_fully_defined"):
+        monkeypatch.setattr(support, name, nothing)
+    ok = SimpleNamespace(is_success=True, data=None)
+    lines = iter(row.dimension for row in rows)
+
+    class Adapter:
+        _sketch_entities = defaultdict(
+            lambda: SimpleNamespace(ConstructionGeometry=False)
+        )
+
+        async def create_sketch(self, _plane: str) -> SimpleNamespace:
+            return ok
+
+        async def add_line(self, *_xy: float) -> SimpleNamespace:
+            return SimpleNamespace(is_success=True, data=next(lines))
+
+        async def add_sketch_constraint(self, *_args: object) -> SimpleNamespace:
+            return ok
+
+        async def exit_sketch(self) -> SimpleNamespace:
+            return ok
+
+    jobs = dict(asyncio.run(support._seat_station_reference(Adapter())))
+    sketch = support.REFERENCE_SKETCHES[0]
+    seat_x = [x for x, _y, _z in support.SEAT_POINTS]
+    assert all(z == 0.0 for _x, _y, z in support.SEAT_POINTS)
+    assert [y for _x, y in support.SEAT_PLACEMENT_DIMS] == [(None, None)] * 2
+    nominal = dict(support.SEAT_GLOBALS)
+    edits = [
+        (support.BOSS_DEPTH, nominal),
+        (180.8, nominal),
+        (175.0, nominal),
+        (support.BOSS_DEPTH, {**nominal, "SeatEastX": nominal["SeatEastX"] - 1.5}),
+        (180.8, {**nominal, "SeatWestX": nominal["SeatWestX"] + 0.7}),
+    ]
+    for wall_width, seat_globals in edits:
+        values = {"WallWidth": wall_width, **seat_globals}
+        # Each seat stands at its driven placement, on its authored side.
+        drilled = [
+            math.copysign(_evaluate_equation(drive, values), x)
+            for ((_name, drive), _y), x in zip(
+                support.SEAT_PLACEMENT_DIMS, seat_x, strict=True
+            )
+        ]
+        if seat_globals is nominal:
+            assert drilled == pytest.approx(seat_x)
+        seat_on = {1.0: max(drilled), -1.0: min(drilled)}
+        expected = {
+            "SeatEastStation": wall_width / 2.0 - seat_on[1.0],
+            "SeatWestStation": seat_on[-1.0] + wall_width / 2.0,
+        }
+        for row in rows:
+            side = math.copysign(1.0, row.end_x)
+            anchor = _evaluate_equation(jobs[f"{row.dimension}Anchor@{sketch}"], values)
+            station = _evaluate_equation(jobs[f"{row.dimension}@{sketch}"], values)
+            assert anchor == pytest.approx(wall_width / 2.0)
+            assert station == pytest.approx(expected[row.dimension])
+            # The line runs inboard from its end face and ends on its seat.
+            assert side * (anchor - station) == pytest.approx(seat_on[side])
+    # The finding's case: the REF tracks the 2.0 longer wall.
+    values = {"WallWidth": 180.8, **nominal}
+    assert f"{_evaluate_equation(jobs[f'SeatEastStation@{sketch}'], values):.2f}" == (
+        "5.95"
+    )
 
 
 def test_seat_station_texts_stand_above_view_b_outboard_of_its_ends() -> None:
