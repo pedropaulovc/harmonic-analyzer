@@ -13,58 +13,85 @@ import spring_mount_geom as mounts
 import sm_summing_lever_spec as lever
 from _hole_spec import TAP_DRILL_MM
 from stock_anchor_geom import ANCHOR_9489T111 as anchor
+import ch_anchor_jam_nut_spec as jam_nut
+from _interference_contracts import CHANNEL_ANCHOR_NUT_THREAD
+from _hole_spec import THREAD_MAJOR_MM
 
 
-def test_finished_end_recesses_inside_the_coefficient_plate():
+def test_cut_end_crosses_the_plate_and_carries_the_jam_nut():
     cut_end = anchor.eye_od_mm / 2 - spec.FINISHED_OVERALL_MM
     assert cut_end == pytest.approx(spec.TRIM.shank_end_y_mm)
-    # Installed, the Ø3.175 neck shoulders on the plate's top face, so the
-    # thread starts there and the cut end stops one recess above the underside.
+    # Installed and seated, the Ø3.175 neck shoulders on the plate's top face,
+    # so the thread starts there, engages the whole plate, and the cut end
+    # hangs below the underside far enough to carry the jam nut.
     installed_end = mounts.CHANNEL_ANCHOR_XY[1] + spec.TRIM.shank_end_y_mm
     underside = mounts.PLATE_TOP_Y - lever.PLATE_T
-    assert installed_end - underside == pytest.approx(spec.PLATE_RECESS_MM)
-    assert spec.PLATE_RECESS_MM == pytest.approx(25.4 / 16)
-    assert mounts.PLATE_TOP_Y - installed_end == pytest.approx(
-        spec.THREAD_ENGAGEMENT_MM
+    assert spec.THREAD_ENGAGEMENT_MM == lever.PLATE_T
+    thread_start = (
+        mounts.CHANNEL_ANCHOR_XY[1]
+        + spec.TRIM.shank_end_y_mm
+        + (spec.SHANK_LENGTH_MM - anchor.unthreaded_shank_length_mm)
     )
-    assert spec.TRIM.removed_length_mm == pytest.approx(12.3825)
+    assert thread_start == pytest.approx(mounts.PLATE_TOP_Y)
+    protrusion = underside - installed_end
+    assert protrusion == pytest.approx(
+        spec.PROTRUSION_MAX_MM - spec.LENGTH_BAND_WORST_MM
+    )
+    assert protrusion > jam_nut.THICKNESS_MAX + spec.ADJUSTMENT_TRAVEL_MM
 
 
-def test_trim_band_cannot_reach_the_plate_underside_or_lose_the_threads():
-    band = spec.FINISHED_OVERALL_TOLERANCE_MM
-    assert band > 0.0
-    # Long limit: the cut end still sits inside the plate.
-    assert spec.PLATE_RECESS_MM - band > 0.5
-    # Short limit, including the adverse angular corner of the deburr, not only
-    # the nominal 45-degree leg: keep at least the two full turns that
-    # stock_anchor_geom.min_shank_length_mm treats as expressible thread. The
-    # spring pulls 4.49 N, so this is a practice floor, not a strength one.
+def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
+    # Calibration unscrews the anchor, lifting the cut end; the short-limit
+    # part, its deburr at the adverse corner of its band, sets the floor.
+    band = spec.LENGTH_BAND_WORST_MM
+    assert band >= spec.FINISHED_OVERALL_TOLERANCE_MM
+    assert band == pytest.approx(0.8)
     maximum_axial = (
         spec.CHAMFER_WIDTH_MM + spec.CHAMFER_WIDTH_TOLERANCE_MM
     ) / math.tan(
         math.radians(spec.CHAMFER_ANGLE_DEG - spec.CHAMFER_ANGLE_TOLERANCE_DEG)
     )
-    short_thread = spec.THREAD_ENGAGEMENT_MM - band - maximum_axial
-    assert short_thread > 2.0 * anchor.thread_pitch_mm
+    assert spec.CHAMFER_AXIAL_MAX_MM == pytest.approx(maximum_axial)
+    floor = spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm
+    assert spec.FULL_THREADS_PAST_NUT == 2
+    worst = spec.full_threads_past_nut_mm(spec.ADJUSTMENT_TRAVEL_MM, -band)
+    assert worst >= floor
+    # The trim is sized to that floor, not past it: only the round-up that
+    # puts the printed one-place overall on the model's own number.
+    assert worst - floor < 0.1
+    assert spec.FINISHED_OVERALL_MM == pytest.approx(round(spec.FINISHED_OVERALL_MM, 1))
+    # Hand-checked: thread below the seated neck, less plate, nut and deburr.
+    short_part = spec.SHANK_LENGTH_MM - band - anchor.unthreaded_shank_length_mm
+    assert worst == pytest.approx(
+        short_part
+        - spec.ADJUSTMENT_TRAVEL_MM
+        - lever.PLATE_T
+        - jam_nut.THICKNESS_MAX
+        - maximum_axial
+    )
+    # A nominal part, seated, keeps the band and the budget as extra thread.
+    assert spec.full_threads_past_nut_mm(0.0, 0.0) == pytest.approx(
+        worst + band + spec.ADJUSTMENT_TRAVEL_MM
+    )
 
 
-def test_backing_out_for_preload_keeps_the_thread_floor():
-    # Calibration unscrews the anchor, so the worst-case (short-limit) part
-    # sets the travel: it may give up engagement only down to the two full
-    # turns min_shank_length_mm holds the cut to.
-    short_engagement = spec.THREAD_ENGAGEMENT_MM - spec.FINISHED_OVERALL_TOLERANCE_MM
-    assert spec.MIN_THREAD_ENGAGEMENT_MM == 2.0 * anchor.thread_pitch_mm
-    assert spec.ADJUSTMENT_TRAVEL_MM == pytest.approx(
-        short_engagement - spec.MIN_THREAD_ENGAGEMENT_MM
-    )
-    # Backing the full budget out of the shortest part lands ON the floor; a
-    # nominal part keeps the whole band as extra thread.
-    assert short_engagement - spec.ADJUSTMENT_TRAVEL_MM == pytest.approx(
-        spec.MIN_THREAD_ENGAGEMENT_MM
-    )
-    assert spec.THREAD_ENGAGEMENT_MM - spec.ADJUSTMENT_TRAVEL_MM == pytest.approx(
-        spec.MIN_THREAD_ENGAGEMENT_MM + spec.FINISHED_OVERALL_TOLERANCE_MM
-    )
+def test_install_step_locks_the_anchor_with_its_jam_nut():
+    nut = _config.parts("ch-anchor-jam-nut")["number"]
+    step = " ".join(spec.ANCHOR_INSTALL_STEP.split())
+    assert f"RUN ONE {nut} UP" in step
+    assert "FORKED DRIVER" in step
+    assert "JAM IT AGAINST THE PLATE UNDERSIDE" in step
+    assert f"NO MORE THAN {spec.ADJUSTMENT_TURNS} TURN" in step
+    assert nut in spec.ANCHOR_INSTALL_CHECK
+    assert f"{nut} LOCKS THIS ANCHOR" in spec.DRAWING_NOTES
+    assert "NO NUT IS INSTALLED" not in spec.DRAWING_NOTES
+    for text in (
+        spec.ANCHOR_INSTALL_STEP,
+        spec.ANCHOR_INSTALL_CHECK,
+        spec.DRAWING_NOTES,
+    ):
+        for banned in ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC", "PATCH"):
+            assert banned not in text.upper()
 
 
 def test_printed_back_out_limit_matches_the_computed_budget():
@@ -138,7 +165,7 @@ def test_drawing_requires_every_cutting_control(monkeypatch, fault):
         annotations[0].dimension.Tolerance.Type = 4
     elif fault == "widened":
         annotations[0].dimension.Tolerance.GetMaxValue = lambda: (
-            spec.PLATE_RECESS_MM / 1000
+            2 * spec.FINISHED_OVERALL_TOLERANCE_MM / 1000
         )
     elif fault == "precision":
         annotations[0].display.GetPrimaryPrecision2 = lambda: (
@@ -151,3 +178,14 @@ def test_drawing_requires_every_cutting_control(monkeypatch, fault):
         return
     with pytest.raises(RuntimeError):
         drawing._verify_controls(None, annotations)
+
+
+def test_nut_thread_interference_literal_matches_the_specs():
+    assert CHANNEL_ANCHOR_NUT_THREAD == pytest.approx(
+        (
+            THREAD_MAJOR_MM[anchor.thread_size],
+            TAP_DRILL_MM[anchor.thread_size],
+            jam_nut.THICKNESS,
+        )
+    )
+    assert jam_nut.THREAD == anchor.thread_size

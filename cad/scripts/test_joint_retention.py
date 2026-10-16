@@ -601,14 +601,39 @@ def test_per_channel_joints_follow_the_built_channel_count(monkeypatch) -> None:
     # channel anchors; the report must count what the build places.
     built = jr._config.active_count()
     before = jr.report([])["per_assembly"]["ha_harmonic_analyzer"]["instances"]
+    per_channel = sum(
+        j.quantity
+        for j in jr.JOINTS
+        if j.assembly == "ha_harmonic_analyzer" and j.per_channel
+    )
+    # Each channel anchor and its jam nut.
+    assert per_channel == 2
     monkeypatch.setattr(jr._config, "active_count", lambda: 5)
     data = jr.report([])
     assert data["per_assembly"]["ha_harmonic_analyzer"]["instances"] == before - (
-        built - 5
+        per_channel * (built - 5)
     )
-    anchors = next(
-        j
-        for j in data["joints"]
-        if j["id"] == "ha-harmonic-analyzer/channel-anchor-in-summing-plate"
-    )
-    assert anchors["instances"] == 5
+    for joint_id in (
+        "ha-harmonic-analyzer/channel-anchor-in-summing-plate",
+        "ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor",
+    ):
+        row = next(j for j in data["joints"] if j["id"] == joint_id)
+        assert row["instances"] == 5
+
+
+def test_channel_anchors_are_locked_by_their_jam_nuts() -> None:
+    rows = {j.id: j for j in jr.JOINTS}
+    anchor = rows["ha-harmonic-analyzer/channel-anchor-in-summing-plate"]
+    assert anchor.exposure is Exposure.ADJUSTER
+    assert anchor.lock is Lock.JAM_NUT
+    assert anchor.lock_part == "ch_anchor_jam_nut"
+    assert set(anchor.lock_binds) == {"vn_spring_hook", "sm_summing_lever"}
+    assert anchor.exception == ""
+    nut = rows["ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor"]
+    assert nut.member == "ch_anchor_jam_nut"
+    assert nut.receiver == "vn_spring_hook"
+    assert nut.exposure is Exposure.STATIC_CLAMP
+    for row in (anchor, nut):
+        text = " ".join((row.axial_capture, row.evidence, row.exposure_reason))
+        for banned in ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC"):
+            assert banned not in text.upper()
