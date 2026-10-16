@@ -122,6 +122,7 @@ ROD = "ch-connecting-rod"
 BAR = "ch-amplitude-bar"
 BAR_PIN = "ch-bar-pivot-pin"
 HOOK = "vn-spring-hook"
+ANCHOR_NUT = "ch-anchor-jam-nut"
 
 Side = Literal["south", "north"]
 
@@ -158,7 +159,12 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick);
     # 50 east put bar 3 over the bank spring (r4 balloon pick, shared edge).
     ExplodeStep("bars up", (BAR, BAR_PIN), "y", 50.0),
-    ExplodeStep("anchors down", (HOOK,), "y", -40.0),
+    # Each anchor's MHA-CH-012 jam nut goes down with it, then a further 30
+    # off the shank's bottom. On the shank, the 6.66-diameter nut is under 1 mm
+    # at 1:7 and shares the anchor's outline. 30 (3.5 mm on the sheet) orders
+    # its balloon round the ring clear of the anchor's (ring replay).
+    ExplodeStep("anchors down", (HOOK, ANCHOR_NUT), "y", -40.0),
+    ExplodeStep("anchor nuts off the shank", (ANCHOR_NUT,), "y", -30.0),
     # Withdrawn past a keeper: in place only its 10 mm tips stand clear of the
     # lever hubs, under 1.5 mm at 1:7, and its balloon landed on lever 20's
     # ink (r4 balloon pick, shared edge). South, not north: withdrawn north its
@@ -232,4 +238,5 @@ BOM_DESCRIPTIONS = {
     BAR_PIN: "BAR PIVOT PIN",
     "vn-channel-spring-installed": "EXTENSION SPRING",
     HOOK: "#6-32 EYEBOLT SPRING ANCHOR",
+    ANCHOR_NUT: "#6-32 ROUND ANCHOR JAM NUT",
 }

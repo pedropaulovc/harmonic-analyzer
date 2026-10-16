@@ -225,15 +225,6 @@ RULINGS: dict[str, Ruling] = {
             "flange sweeps r ~23 inside the chain band (plates' inner edge r 21.2)"
         ),
     ),
-    "U-MHA-VN-034-channel-threadlocker": Ruling(
-        joint="ch-channel/pivot-bracket-apex-set-screw",
-        granted=(
-            "user, 2026-10-10, joint-specific drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) ruling relayed on PR #1317's Codex review: "
-            "waived; light spring preload and small hub drag; Loctite 222. Each MHA-VN-034 goes "
-            "in snug on its flat with Loctite 222 (removable threadlocker), as the MHA-VN-041 "
-            "pivot screw keeps its low-strength threadlocker"
-        ),
-    ),
     "U-MHA-VN-023-no-lock": Ruling(
         joint="ha-harmonic-analyzer/gooseneck-set-screw-in-top-frame",
         granted=(
@@ -1295,12 +1286,17 @@ JOINTS: tuple[Joint, ...] = (
             "which reverses each stroke, reaches the screw through the flat it bears on"
         ),
         axial_capture="cup point snugged on a flat milled on MHA-CH-005 under the ear's apex tap; screw rides only its own #4-40 thread in the R8 arch wall",
-        lock=Lock.THREADLOCKER_ONLY,
+        # Staked, not threadlocked: ruling U-MHA-VN-034-channel-threadlocker
+        # (Loctite 222) was retired, superseded by the user's standing
+        # no-threadlocker rule; coordinator ruling after the user's ask timed
+        # out, 2026-10-16. Mirrors the keeper set screws' stake below.
+        lock=Lock.STAKED,
+        lock_part="ch_pivot_bracket:staked tap mouth",
+        lock_binds=("vn_arbor_set_screw", "ch_pivot_bracket"),
         lock_step="set-screws-driven",
-        exception="U-MHA-VN-034-channel-threadlocker",
         evidence=(
             "draw_ch_channel_assembly.py _fitup_steps 'set-screws-driven' ('RUN ONE MHA-VN-034 DOWN EACH APEX TAP "
-            "ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG.'); build_ch_channel_assembly.py apex set screw "
+            "ONTO ITS FLAT, NORTH FIRST; SNUG, AND STAKE EACH TAP MOUTH AT 2 POINTS.'); build_ch_channel_assembly.py apex set screw "
             "placement (SET_SCREW_TIP_Y); ch_pivot_bracket_spec.SET_SCREW_HOLE_SPEC (#4-40 tapped, through_next) "
             "and SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT; ch_pivot_shaft_spec flats (FLAT_DEPTH, FLAT_LENGTH)"
         ),

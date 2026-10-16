@@ -149,16 +149,20 @@ ASSEMBLED_CAPTION = "\n".join(
 )
 
 # --- sheet 2: exploded isometric, BOM, balloons ------------------------------
-EXPLODED_ISO_CENTER = (0.100, 0.150)
+# 10 mm below the sheet's middle, so the ring can grow at the top.
+EXPLODED_ISO_CENTER = (0.100, 0.140)
 # The lever balloon's leader runs along the bank axis, and the exploded fulcrum
 # shaft lies on that axis's south extension. The shaft has no hit-testable
 # edge, so SolidWorks picks where its leader lands (listed-edge), and that
-# landing moved 15 mm between r8 and r9. At 14 mm the ring's push-apart swung
-# balloon 14 down over the shaft, and a south-end landing crossed leader 2
-# (r9 audit). With 20 mm, a ring replay over every landing on the visible
-# shaft (balloon radius 5.0-5.5 mm) keeps leader 14 2-4 mm off the shaft, and
-# the ring top stays 3.6 mm inside the border.
-BALLOON_MARGIN = 0.020
+# landing moved 15 mm between r8 and r9. The view is tall and narrow, so 8 of
+# the 19 balloons crowd its top. At 14 mm the ring's push-apart swung balloon
+# 14 down over the shaft, and a south-end landing crossed leader 2 (r9 audit).
+# A replay of the ring with the anchor-nut balloon added covers every landing
+# on the visible shaft, nut attachments at least 3.5 mm below the anchor's,
+# and balloon radius 5.0-5.6 mm. At 28 mm it crosses nothing and keeps
+# leader 14 2.1-4.4 mm off the shaft, with the ring 5 mm inside the border at
+# the top and 6 mm at the bottom.
+BALLOON_MARGIN = 0.028
 BOM_ANCHOR = (0.205, 0.262)
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
@@ -170,7 +174,8 @@ BOM_COLUMN_WIDTHS = {
 BOM_SKU_TITLE = "VENDOR SKU"
 MADE_PART_SKU = "-"
 BOM_ROW_HEIGHT = 0.006
-EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.130)
+# Below the BOM's 19 rows (bottom ~0.129 m), above the title block.
+EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.124)
 EXPLODED_CAPTION = "\n".join(
     (
         f"EXPLODED: ALL {COUNT} CHANNELS ALIKE; ONE BALLOON PER BOM ROW,",
@@ -219,6 +224,7 @@ BOM_QUANTITIES = {
     asm.BAR_PIN: CHANNELS,
     SPRING_STEM: CHANNELS,
     asm.HOOK: CHANNELS,
+    asm.ANCHOR_NUT: CHANNELS,
 }
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 # Literal stems, so the config-dependency analysis reads exactly these rows.
@@ -241,6 +247,7 @@ PART_ROWS = {
     "ch-bar-pivot-pin": _config.parts("ch-bar-pivot-pin"),
     SPRING_STEM: _config.parts("vn-channel-spring-installed"),
     "vn-spring-hook": _config.parts("vn-spring-hook"),
+    "ch-anchor-jam-nut": _config.parts("ch-anchor-jam-nut"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the assembly families")
@@ -581,6 +588,7 @@ def _fitup_notes() -> tuple[str, str]:
     bar_pin = _config.parts("ch-bar-pivot-pin")["number"]
     channel_spring = _config.parts("vn-channel-spring-installed")["number"]
     anchor = _config.parts("vn-spring-hook")["number"]
+    anchor_nut = _config.parts("ch-anchor-jam-nut")["number"]
     last = COUNT - 1
     set_step = steps.step_number("south-bracket-spring-set")
     # The pivot shaft comes finished, domed both ends to its overall length
@@ -637,11 +645,13 @@ def _fitup_notes() -> tuple[str, str]:
             f"SLIDE THE {shaft} SHAFT UNTIL ITS NORTH TIP STANDS "
             f"{tip_low:.2f} TO {tip_high:.2f} PROUD OF THE NORTH EAR'S OUTER FACE."
         ),
-        # drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) waived for this joint only (joint_retention RULINGS
-        # "U-MHA-VN-034-channel-threadlocker", user 2026-10-10).
+        # drawing-guidelines.md rule 23: staked like the keeper set screws
+        # (fulcrum-set-screws-staked). The Loctite waiver was retired on
+        # 2026-10-16 under the user's standing no-threadlocker rule.
         "set-screws-driven": (
             f"SHAFT HELD AS SET, FLATS UP: RUN ONE {pivot_set_screw} DOWN EACH "
-            "APEX TAP ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG. "
+            "APEX TAP ONTO ITS FLAT, NORTH FIRST; SNUG, AND STAKE EACH TAP "
+            "MOUTH AT 2 POINTS. "
             # The bracket's engagement fact; the lifted arch meets rule 18
             # (ch_pivot_bracket_spec), so no exception is declared for it.
             f"{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
@@ -685,13 +695,15 @@ def _fitup_notes() -> tuple[str, str]:
             f"EACH FLAT LIES UNDER ITS CROWN TAP; TIGHTEN ONE {fulcrum_set_screw} SET "
             "SCREW ONTO EACH FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS."
         ),
-        # The anchors thread into the summing plate (MHA-HA-000 owns that
-        # joint, its lock and its setting); this sheet only hooks the spring.
-        # The pointer is steps.HA_ANCHORS_SET_REF.
+        # The anchors thread into the summing plate and are jammed by their
+        # nuts at MHA-HA-000, which owns that joint, its lock and its
+        # setting. This sheet only hooks the spring; the pointer is
+        # steps.HA_ANCHORS_SET_REF.
         steps.SPRINGS_HOOKED_KEY: (
             f"HOOK EACH {channel_spring} SPRING'S TOP LOOP THROUGH ITS {lever} "
             f"LEVER'S SPRING HOLE. ITS BOTTOM LOOP TAKES ITS {anchor} ANCHOR, "
-            f"THREADED, LOCKED AND SET PER {steps.HA_ANCHORS_SET_REF}."
+            f"THREADED AND JAMMED BY ITS {anchor_nut} PER "
+            f"{steps.HA_ANCHORS_SET_REF}."
         ),
     }
     return (
