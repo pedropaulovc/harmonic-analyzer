@@ -147,8 +147,8 @@ SHEET_NAMES = ("Lever Geometry", "Bracket Receiver")
 # none of the rib or web outline (the R15.24 rib arc, 7.6 sheet mm out).
 # Centred on the axis, the hexagon prints at DETAIL_CENTER, its fence 30 mm
 # round it; the label hangs below the width's dimension line, clear of
-# section C-C's caption.  D, not A: datum feature A is the -Z trunnion
-# (machinist review r5: one letter named both).
+# section C-C's caption.  D, not A: A is the datum letter (machinist review
+# r5: one letter named both).
 DETAIL_LETTER = "D"
 DETAIL_CENTER = (0.075, 0.222)
 DETAIL_SCALE = (4.0, 1.0)
@@ -584,6 +584,49 @@ def _knife_ridge_angle(adapter: Any, ridge_detail: Any) -> Any:
     return angle
 
 
+# Datum A's box over the vertex in Detail E, clear of the angle's arc stubs
+# (9 mm out along the flanks) and inside E's 15 mm fence.
+RIDGE_DATUM_RISE = 0.008
+
+
+def _ridge_datum(adapter: Any, ridge_detail: Any) -> Any:
+    """Datum A on the knife-edge ridge itself, seen end-on in Detail E: the
+    tag stands on the R0.1 round's arc at the vertex.  In the plan, A hung
+    on the -Z ridge's tangent line down the stub's middle, which machinist
+    review r9 read as a flat face, leaving no basic from A to the 20 holes;
+    end-on it can only be the ridge line, the knife-edge pivot axis that the
+    39.85 basic and the web arcs' "AXIS A" both name."""
+    z_mm = PLATE_L / 2.0 + HEX_DEPTH
+    half = math.radians(RIDGE_ANGLE_DEG) / 2.0
+    centre_y = HEX_H / 2.0 - KNIFE_RIDGE_R / math.sin(half)
+    edges = scan_view_edges(ridge_detail, label="ridge detail datum")
+    ridge_round = edges.circle_at(
+        (0.0, centre_y, z_mm),
+        KNIFE_RIDGE_R,
+        axis=(0.0, 0.0, 1.0),
+        label="+Z knife-edge ridge round",
+    )
+    crest, vertex = model_points_in_view(
+        adapter,
+        ridge_detail,
+        [
+            _metres((0.0, centre_y + KNIFE_RIDGE_R, z_mm)),
+            _metres((0.0, HEX_H / 2.0, z_mm)),
+        ],
+        label="knife ridge datum",
+        names=("crest", "vertex"),
+    )
+    return add_datum_feature(
+        adapter,
+        ridge_detail,
+        edge_entity=ridge_round.edge,
+        leader_attach_xy=crest,
+        symbol_xy=(vertex[0], vertex[1] + RIDGE_DATUM_RISE),
+        datum="A",
+        label="knife-edge pivot axis",
+    )
+
+
 # The ridge centreline runs the +Z stub's length and 2 model mm past its
 # outboard face: 1 sheet mm, ending 1.5 mm above 44.45's dimension line.
 RIDGE_AXIS_OVERRUN_MM = 2.0
@@ -850,7 +893,7 @@ TOP_KEEP = {
     # a loose line (machinist review r8).
     "SummationArcRadius": (0.2096, 0.162),
     # Left of the -Z stub, under the 20X frame, its text centred on its line:
-    # 2.8 mm left of datum A's arrow (at x 0.226 they touched, farm r6), its
+    # 2.8 mm left of the stub (at x 0.226 it touched datum A's old arrow, r6), its
     # lower arrow 2.5 mm right of the R138.85.
     "HexKnifeBackDepth": (0.2235, 0.1735),
     # Left of the +Z end rib, above its span: below it the finish symbol and
@@ -988,6 +1031,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ridge_detail = _ridge_detail(adapter, detail)
     set_hidden_lines_removed(adapter, ridge_detail)
     _knife_ridge_angle(adapter, ridge_detail)
+    _ridge_datum(adapter, ridge_detail)
     _apply_callouts(
         adapter,
         [*front_annotations, *top_annotations, *detail_annotations],
@@ -1010,39 +1054,18 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor tap",
     )
 
-    # Datum A is the actual knife-edge pivot ridge, not the merged cylinder
-    # silhouette hidden by the ribs in the front view.  A SolidWorks Top view
-    # reverses model Z on the sheet: the positive sheet offset selects the -Z
-    # ridge, while the negative offset selects the part-owned +Z finish face.
-    # Keep datum and finish on opposite ridges so their leaders stay distinct.
-    # One sweep of the plan's visible edges serves every named pick below.
-    # The ridge is the hexagon's top vertex line, y = HEX_H/2 (vertex-up
-    # sketch centred on the pivot axis, build_summing_lever._hex_collar),
-    # rounded at R0.1 MAX: the plan shows the round's two tangent lines 0.05
-    # sheet mm either side of it, and every pick names the +X one (the edge
-    # of the upper-right face the finish controls) by entity.
+    # Datum A is the knife-edge pivot ridge, tagged on its round in Detail E
+    # (_ridge_datum).  One sweep of the plan's visible edges serves every
+    # named pick below.  The ridge is the hexagon's top vertex line, y =
+    # HEX_H/2 (vertex-up sketch centred on the pivot axis,
+    # build_summing_lever._hex_collar), rounded at R0.1 MAX: the plan shows
+    # the round's two tangent lines 0.05 sheet mm either side of it, and the
+    # finish names the +X one (the edge of the upper-right face it controls)
+    # by entity.  A SolidWorks Top view reverses model Z on the sheet: the
+    # negative sheet offset selects the +Z ridge.
     top_edges = scan_view_edges(top, label="summing lever top plan")
     ridge_x, ridge_y = KNIFE_RIDGE_TANGENT_XY
     stub_mid_z = PLATE_L / 2.0 + HEX_DEPTH / 2.0
-    datum_ridge = top_edges.exact_line_through(
-        (ridge_x, ridge_y, -stub_mid_z), label="-Z knife-edge ridge round"
-    )
-    knife_edge_datum = _top_xy(ridge_x, stub_mid_z)
-    add_datum_feature(
-        adapter,
-        top,
-        edge_entity=datum_ridge.edge,
-        leader_attach_xy=knife_edge_datum,
-        # An edge-attached datum tag re-solves its triangle to the symbol's
-        # perpendicular foot on the edge, clamped to the edge's span: a tag
-        # 12 mm below the stub mid landed on the stub's inboard end at the
-        # plate end (farm r2, 5.4 mm off). Level with the stub mid, the
-        # leader runs straight right over the stub's +X half; the box ends
-        # ~7 mm short of the 20X frame's leader dropping at x 0.2545.
-        symbol_xy=(knife_edge_datum[0] + 0.007, knife_edge_datum[1]),
-        datum="A",
-        label="knife-edge pivot axis",
-    )
     finish_ridge = top_edges.exact_line_through(
         (ridge_x, ridge_y, stub_mid_z), label="+Z knife-edge ridge round"
     )
@@ -1050,12 +1073,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # the 76.20/39.85 dimension line (below) and the plate (above); the default
     # 43 mm body cannot fit, so the 2.5 mm body sits inside it (layout audit:
     # the old leader crossed 76.20's extension line and datum B's leader).
+    # Its V stands 4 mm right of the 5.08 rib thickness's lower arrow (at
+    # 0.208 it overprinted it, machinist review r9), the text ending 2.4 mm
+    # short of the stub.
     add_surface_finish(
         adapter,
         top,
         edge_entity=finish_ridge.edge,
         leader_attach_xy=_top_xy(ridge_x, -stub_mid_z),
-        symbol_xy=(0.208, 0.084),
+        symbol_xy=(0.216, 0.084),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
         char_height=0.0025,
@@ -1283,15 +1309,24 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
     # the TOP of the column. The frame sits above the +Z trunnion stub with
-    # its right stub ending over the rim, so the leader drops vertically
-    # just past the receiver rib's end, right of datum A's tag, and runs
-    # only ~5 mm over the plate (the diagonal from 0.175 crossed the stub and
-    # flange: leader-over-part, 24 mm).
-    seed_rim_left = _top_xy(HOLE_X - HOLE_DIA / 2.0, -HOLE_Z_FIRST)
+    # its right stub ending over the rim, so the leader drops just past the
+    # receiver rib's end and runs only ~5 mm over the plate (the diagonal
+    # from 0.175 crossed the stub and flange: leader-over-part, 24 mm).  The
+    # seed rim is named by entity and the arrow set on its upper-left
+    # quadrant: a hit-test at its left quadrant landed the arrow on the
+    # rib's end corner 1 mm left of the hole (machinist review r9).
+    seed_rim = top_edges.circle_at(
+        (HOLE_X, PLATE_T / 2.0, HOLE_Z_FIRST),
+        HOLE_DIA / 2.0,
+        axis=(0.0, 1.0, 0.0),
+        label="spring-hole seed rim",
+    )
+    rim_step = HOLE_DIA / 2.0 * math.sqrt(0.5)
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=seed_rim_left,
+        edge_entity=seed_rim.edge,
+        leader_attach_xy=_top_xy(HOLE_X - rim_step, -HOLE_Z_FIRST + rim_step),
         frame_xy=(0.2133, 0.199),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
