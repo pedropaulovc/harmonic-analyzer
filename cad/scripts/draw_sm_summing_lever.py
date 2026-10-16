@@ -10,9 +10,12 @@ bore): a coefficients plate on the +X arm carrying the 20 channel-spring anchor
 taps, a solid pivot cylinder (152.4 long, along Z), and a summation arm
 reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
 anchors are purchased eyebolts that thread straight into those taps, so the
-print controls thread identity and position, never a seat bore.  The print
-shows a 1:2 front profile (pivot Ø), a 1:2 top plan (plate width/length +
-anchor boss), and a 1:4 isometric.  The sheet runs at 1:2.
+print controls thread identity and position, never a seat bore.  Sheet 1
+shows a 1:2 front profile (the cylinder, boss, web and the rib outline every
+rib shares), a 4:1 detail of the trunnion envelope, a 1:2 top plan (plate,
+ribs, summation web, trunnion length, the anchor taps and their pattern
+control) and a 1:4 isometric; sheet 2 shows the 1:2 back view of the two
+bracket receiver taps and the plate wall they sit in.  The sheet runs at 1:2.
 
 Run with SolidWorks open::
 
@@ -22,15 +25,19 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
-from typing import Any
+from typing import Any, Iterable
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -39,13 +46,18 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_basic_dimension
+from _drawing_dimensions import set_basic_dimension, set_dimension_callouts
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_dimensions,
+    part_sketches_shown,
+)
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
@@ -61,6 +73,12 @@ from magnifying_bracket_joint_layout import (
     TAP_DRILL_DIA,
     THREAD_DEPTH,
     THREAD_DEPTH_BAND,
+)
+from sm_summing_lever_notes import (
+    BRACKET_TAP_CALLOUT_PROCESS,
+    DIMENSION_CALLOUTS_ABOVE,
+    DIMENSION_CALLOUTS_BELOW,
+    DRAWING_DIMENSIONS,
 )
 from sm_summing_lever_spec import (
     ANCHOR_H,
@@ -113,33 +131,27 @@ ISO_CENTER = (0.350, 0.225)
 BACK_CENTER = (0.225, 0.190)
 SHEET_NAMES = ("Lever Geometry", "Bracket Receiver")
 
+# Detail A: the trunnion envelope at 4:1, in the open field left of the front
+# profile.  The fence (7.5 model mm) holds the hexagon (5.13 half-height) and
+# none of the rib or web outline (the R15.24 rib arc, 7.6 sheet mm out).
+DETAIL_CENTER = (0.075, 0.222)
+DETAIL_SCALE = (4.0, 1.0)
+DETAIL_RADIUS_MM = 7.5
+DETAIL_LABEL_XY = (0.075, 0.160)
+# The parent circle's letter, straight below the rib arc (its bottom prints at
+# sheet y 0.2275), between the rib-arc and cylinder leaders.
+DETAIL_LETTER_OFFSET = (0.0, -0.011)
+KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
 
-def _back_xy(mx: float, my: float) -> tuple[float, float]:
-    """Back view reverses X and looks at the blind taps' -Z entry face."""
-    return (
-        BACK_CENTER[0] - (mx - _BBOX_CX) * _S / 1000.0,
-        BACK_CENTER[1] + my * _S / 1000.0,
-    )
-
-def _mounting_rims(back: Any) -> list[Any]:
-    """Back looks from -Z directly onto the blind taps' entry circles."""
-    edges = scan_view_edges(back, label="bracket receiver face")
-    return [
-        edges.circle_at(
-            point, TAP_DRILL_DIA / 2.0, axis=(0.0, 0.0, 1.0),
-            label=f"bracket receiver {index}",
-        )
-        for index, point in enumerate(LEVER_HOLE_POINTS)
-    ]
-
-
-
-def _front_xy(mx: float, my: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (X, Y) point in the front profile view (1:2)."""
-    return (
-        FRONT_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
-        FRONT_CENTER[1] + my * _S / 1000.0,
-    )
+# The -Z end rib's banded depth and the plate's banded wall are named by
+# build_sm_summing_lever._receiver_model_bands, and the receiver stations by
+# its hidden coordinate sketch, outside the marked-dimension contract.
+DIMENSIONS_BY_FEATURE: dict[str, set[str]] = {
+    **DRAWING_DIMENSIONS,
+    "CoefficientsPlate": {"PlateThickness"},
+    "EdgeRibBack": {"RibDepth"},
+    "ReceiverCoordinates": {"ReceiverX0", "ReceiverX1", "ReceiverY0"},
+}
 
 
 def _top_xy(mx: float, mz: float) -> tuple[float, float]:
@@ -178,9 +190,163 @@ def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
     return matches[0]
 
 
+def _knife_detail(adapter: Any, front: Any) -> Any:
+    """A native 4:1 detail of the trunnion end in the front profile."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(front, "IView")
+    if not drawing.ActivateView(view_name(adapter, front)):
+        raise RuntimeError("failed to activate knife-detail parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter, front, (0.0, 0.0, 0.0), label="knife-detail centre"
+    )
+    # The fence is drawn in sheet space on the 1:2 parent.
+    radius = DETAIL_RADIUS_MM * _S / 1000.0
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create knife-detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        "A",
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create knife detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError(f"knife detail has invalid bounds: {outline!r}")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position knife detail")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position knife detail label")
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"expected one knife-detail circle, found {len(circles)}")
+    circle = _early_bound(circles[0], "IDetailCircle")
+    letter = tuple(center[i] + DETAIL_LETTER_OFFSET[i] for i in range(2))
+    circle.SetLabelPosition(*letter)  # VT_VOID: the read-back is the proof
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"knife detail label position did not persist: {actual}")
+    placed = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(placed) != 2 or math.dist(placed, letter) > 1e-8:
+        raise RuntimeError(f"knife-detail letter position did not persist: {placed}")
+    return detail
+
+
+def _attach_radial_leaders(
+    adapter: Any, annotations: Iterable[Any], names: Iterable[str], *, label: str
+) -> None:
+    """Stop each radial leader at its own arc.
+
+    ``ArcExtensionLineOrOppositeSide`` defaults to True, which sweeps the
+    R138.8 summation arc through the top view and trails the R15.24 rib leader
+    across the front view; ``SolidLeader`` defaults to True on this template
+    and rules the leader on to the arc centre, off the view for R138.8 (both
+    seen on the 2026-10 summing-lever renders).  Both are bool properties, so
+    each assignment is proven only by reading it back.
+    """
+    wanted = set(names)
+    seen = set()
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in wanted:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArcExtensionLineOrOppositeSide = False
+        if bool(display.ArcExtensionLineOrOppositeSide):
+            raise RuntimeError(f"{label}: {name} leader still rides the arc extension")
+        display.SolidLeader = False
+        if bool(display.SolidLeader):
+            raise RuntimeError(f"{label}: {name} leader still runs to the arc centre")
+        seen.add(name)
+    missing = sorted(wanted - seen)
+    if missing:
+        raise RuntimeError(f"{label}: radial dimensions missing: {missing}")
+
+
+def _apply_callouts(adapter: Any, annotations: list[Any], *, label: str) -> None:
+    """Write the notes module's callout text onto the dimensions this sheet
+    kept, above or below the value."""
+    present = {dimension_name(adapter, annotation) for annotation in annotations}
+    for location, callouts in (
+        ("above", DIMENSION_CALLOUTS_ABOVE),
+        ("below", DIMENSION_CALLOUTS_BELOW),
+    ):
+        wanted = {name: text for name, text in callouts.items() if name in present}
+        set_dimension_callouts(adapter, annotations, wanted, location=location)
+    _telemetry.info(f"{label}: callouts on {sorted(present)}")
+
+
+def _mounting_rims(back: Any) -> list[Any]:
+    """Back looks from -Z directly onto the blind taps' entry circles."""
+    edges = scan_view_edges(back, label="bracket receiver face")
+    return [
+        edges.circle_at(
+            point, TAP_DRILL_DIA / 2.0, axis=(0.0, 0.0, 1.0),
+            label=f"bracket receiver {index}",
+        )
+        for index, point in enumerate(LEVER_HOLE_POINTS)
+    ]
+
+
+# Front profile at 1:2 (2026-10-15 baseline render): the pivot axis prints at
+# (0.2352, 0.2352), the boss spans x 0.1925..0.2021, the end rib's R15.24 arc
+# 7.6 mm round the axis, the web bar y 0.2338..0.2363 from the boss to that
+# arc, the plate tip x 0.2535..0.2575.  Every rib shares the +Z end rib's
+# outline, so its dimensions sit here once: the 35.75 reach above the view,
+# the rib-end height right of the plate tip, the rib arc and the hidden
+# cylinder taking leaders from below on either side of the detail letter, the
+# boss height left of the boss, and the web thickness standing above the web.
 FRONT_KEEP = {
-    "CylDia": (0.145, 0.260),
-    "PlateThickness": (0.320, 0.240),
+    "CylDia": (0.290, 0.214),
+    "AnchorHeight": (0.183, 0.235),
+    "WebThickness": (0.215, 0.247),
+    "EdgeRibFrontArcR": (0.210, 0.222),
+    "EdgeRibFrontEndTopX": (0.2443, 0.254),
+    "EdgeRibFrontEndTopY": (0.268, 0.244),
+}
+# Detail A at 4:1: the hexagon's centre prints at DETAIL_CENTER.  The width
+# hangs below the fence; the vertex height stands right of it, its text level
+# with the centre and VERTEX UP below the value.
+DETAIL_KEEP = {
+    "HexWidth": (DETAIL_CENTER[0], 0.186),
+    "HexHeight": (0.118, DETAIL_CENTER[1]),
 }
 TOP_KEEP = {
     # Below the plate end, its witness lines 14 mm long: at 0.160 they ran
@@ -193,8 +359,33 @@ TOP_KEEP = {
     "PlateLength": (0.395, TOP_CENTER[1]),
     "RibDepth": (0.325, 0.160),  # -Z receiver rib: Top prints model +Z down
     "AnchorOuterDia": (0.145, 0.175),
+    # Plan geometry (baseline render): the cylinder band x 0.2286..0.2417,
+    # the -Z plate end at y 0.1681 with its stub to 0.179, the +Z end at
+    # 0.0922, the summation web's arcs from the boss (x 0.2021) to the
+    # cylinder ends.
+    # Up-left of the web's upper arc, left of the trunnion stub.
+    "SummationArcRadius": (0.200, 0.168),
+    # Left of the -Z stub, under the 20X frame and right of the R138.80.
+    "HexKnifeBackDepth": (0.218, 0.1735),
+    # Left of the +Z end rib, above its span: below it the finish symbol and
+    # the 76.20/39.85 row leave no room, and the web's lower arc reaches the
+    # cylinder at x 0.226 there.
+    "EdgeRibThickness": (0.205, 0.098),
+    # Above the mid rib between the boss and the cylinder, under the web's
+    # upper arc.
+    "MiddleRibThickness": (0.224, 0.135),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+# Sheet 2, back view at 1:2 (model X reversed: the plate's free edge prints at
+# sheet x 0.1925, the taps at 0.2067 and 0.1998 on y 0.190, the plate between
+# y 0.1887 and 0.1913).  The receiver stations stand above the view, their
+# text right of the spans (the 2026-10-09 positions); the row height and then
+# the plate wall stand left of the free edge.
+BACK_KEEP = {
+    "PlateThickness": (0.165, 0.200),
+    "ReceiverX0": (0.225, 0.220),
+    "ReceiverX1": (0.225, 0.229),
+    "ReceiverY0": (0.182, 0.185),
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -202,6 +393,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open summing-lever source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     read_required_properties(
         adapter.currentModel,
         (
@@ -213,6 +405,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "Back View Note",
             "Bracket Receiver Note",
         ),
         required=(
@@ -222,6 +415,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "Back View Note",
             "Bracket Receiver Note",
         ),
     )
@@ -250,8 +444,51 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    front_annotations = curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DIMENSIONS_BY_FEATURE,
+    )
+    top_annotations = curate_view_dimensions(
+        adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="top",
+        dimensions_by_feature=DIMENSIONS_BY_FEATURE,
+    )
+    # The trunnion width and vertex height live in a reference sketch the
+    # part saves hidden (no single hexagon dimension is either).  The detail
+    # is cut and dimensioned while the part shows it; the front view shows it
+    # too, because the detail's items select through it.
+    with part_sketches_shown(
+        adapter,
+        source_model,
+        KNIFE_SKETCHES,
+        label="knife envelope",
+        base_view=front,
+    ):
+        detail = _knife_detail(adapter, front)
+        set_hidden_lines_removed(adapter, detail)
+        detail_annotations = curate_hidden_dimensions(
+            adapter,
+            detail,
+            keep=DETAIL_KEEP,
+            view_label="knife detail",
+            dimensions_by_feature=DIMENSIONS_BY_FEATURE,
+        )
+    _attach_radial_leaders(
+        adapter, front_annotations, ("EdgeRibFrontArcR",), label="front"
+    )
+    _attach_radial_leaders(
+        adapter, top_annotations, ("SummationArcRadius",), label="top"
+    )
+    _apply_callouts(
+        adapter,
+        [*front_annotations, *top_annotations, *detail_annotations],
+        label="lever geometry",
+    )
 
     # Counter-anchor tap native callout (thread + depth) in the top plan.  Pick
     # a point on the hole rim (not its centre) so SolidWorks catches the
@@ -305,34 +542,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="knife-edge ridge finish",
         char_height=0.0025,
     )
-    # Land the position frame on the tap rim's 3-o'clock point, opposite the
-    # hole callout, which SolidWorks lands up-left of the 12-o'clock pick. From
-    # the 9-o'clock point, with the frame up-left, the two leaders met 0.6 mm
-    # apart and crossed (leader-crosses-leader). The frame now stands up-right
-    # (x ~0.201..0.231, y ~0.176..0.183, 3 mm under the 20X frame's "20X") and
-    # its leader drops almost vertically at x ~0.198, right of RD1's leader.
-    # At +6 mm its right end sat on the pivot stud's top-left corner (x
-    # ~0.2333); +3 mm leaves about 2 mm of air.
-    anchor_tap_fcf_edge = _top_xy(TIP_X + COUNTER_R, 0.0)
-    add_feature_control_frame(
-        adapter,
-        top,
-        edge_xy=anchor_tap_fcf_edge,
-        frame_xy=(
-            anchor_tap_fcf_edge[0] + 0.003,
-            anchor_tap_fcf_edge[1] + 0.053,
-        ),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["summation anchor position"],
-        datums=("A",),
-        diameter=True,
-        label="summation anchor position",
-    )
-    # BASIC X coordinate backing the anchor position frame: knife-edge pivot
-    # axis (the +Z trunnion ridge, the finish's) to the anchor tap. Both
-    # endpoints are named: the ridge line through a mid-stub point, the tap's
+    # X location of the anchor tap from the knife-edge pivot axis (the +Z
+    # trunnion ridge, the finish's): a plain title-block dimension, both
+    # endpoints named -- the ridge line through a mid-stub point, the tap's
     # rim on the boss top (centre (TIP_X, ANCHOR_H/2, 0), the hole wizard's
-    # placement in build_summing_lever._counter_anchor_tap).
+    # placement in build_sm_summing_lever._counter_anchor_tap).  The mid rib's
+    # apex shares this station (its 76.20 in the front profile).
     ridge_dim_edge = _top_xy(0.0, -(PLATE_L / 2.0 + 0.3 * HEX_DEPTH))
     anchor_tap_bottom = _top_xy(TIP_X, -COUNTER_R)
     dim_ridge = top_edges.exact_line_through(
@@ -362,7 +577,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor tap X location",
         entities=(dim_ridge.edge, anchor_rim.edge),
     )
-    set_basic_dimension(adapter, anchor_location, label="anchor tap X location")
 
     # Anchor-tap pattern control: datum B on the plate end the seed hole is
     # located from, BASIC row-X / start-Z / pitch coordinates off A|B, a
@@ -470,6 +684,16 @@ async def build(adapter: Any) -> dict[str, str]:
         entities=(seed_rim.edge, second_rim.edge),
     )
     set_basic_dimension(adapter, pitch, label="spring-hole pitch")
+    # Twenty taps are nineteen pitches: the count rides the BASIC pitch as
+    # its prefix, read back because SetText reports nothing.
+    pitch_display = _early_bound(pitch, "IDisplayDimension")
+    pitch_prefix = f"{HOLE_COUNT - 1}X "
+    pitch_display.SetText(1, pitch_prefix)  # swDimensionTextPrefix
+    if str(pitch_display.GetText(1) or "") != pitch_prefix:
+        raise RuntimeError(
+            f"spring-hole pitch count {pitch_prefix!r} did not persist: "
+            f"{pitch_display.GetText(1)!r}"
+        )
     # The 20X callout hangs on the middle hole, text in the open field right
     # of the column: with 44.45 below the plate end, 0.100..0.185 there
     # holds nothing. Every callout on the end hole had to leave it downward
@@ -511,8 +735,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole pattern position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.120)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.185)
+    # Under the 20X callout whose taps it qualifies; the iso's label under it.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.268, 0.121)
+    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
 
     if not drawing.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate bracket receiver sheet")
@@ -522,12 +747,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (back, receiver_iso):
         set_hidden_lines_removed(adapter, view)
-    curate_view_dimensions(adapter, back, keep={}, view_label="bracket receiver")
     mounting_rims = _mounting_rims(back)
+    # Right of the view, where the 2026-10-09 render seated it.
     mounting_callout = add_native_hole_callout(
         adapter, back, edge=mounting_rims[0].edge,
         callout_xy=(0.292, 0.155), label="two blind bracket mounting taps",
-        process="BOTTOMING TAP - FULL THREAD DEPTH / TAP DRILL DEPTH",
+        process=BRACKET_TAP_CALLOUT_PROCESS,
     )
     from win32com.client.dynamic import Dispatch as dynamic_dispatch
     required_depths = {
@@ -574,20 +799,17 @@ async def build(adapter: Any) -> dict[str, str]:
             )
     if required_depths:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
-    from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
-    curate_hidden_dimensions(
-        adapter, back,
-        keep={
-            "ReceiverX0": (0.225, 0.220),
-            "ReceiverX1": (0.225, 0.229),
-            "ReceiverY0": (0.182, 0.185),
-        },
-        view_label="bracket receiver coordinates",
-        dimensions_by_feature={
-            "ReceiverCoordinates": ("ReceiverX0", "ReceiverX1", "ReceiverY0"),
-        },
+    back_annotations = curate_hidden_dimensions(
+        adapter,
+        back,
+        keep=BACK_KEEP,
+        view_label="bracket receiver",
+        dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
-    add_property_linked_note(adapter, "Bracket Receiver Note", 0.020, 0.120)
+    _apply_callouts(adapter, back_annotations, label="bracket receiver")
+    # Under the receiver callout it qualifies; the view label under the view.
+    add_property_linked_note(adapter, "Bracket Receiver Note", 0.292, 0.120)
+    add_property_linked_note(adapter, "Back View Note", 0.205, 0.172)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

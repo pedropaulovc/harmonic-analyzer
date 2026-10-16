@@ -67,7 +67,7 @@ import _telemetry
 from _appearance import CASTING_GREEN, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _dimensions import drive_dimension, set_global
+from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -96,7 +96,6 @@ from magnifying_bracket_joint_layout import (
     DRILL_DEPTH_BAND,
     THREAD_DEPTH_BAND,
     RECEIVER_DIMENSION_BANDS,
-    DRILL_LATERAL_WALL_MIN,
 )
 from _drawing_marks import (
     apply_drawing_properties,
@@ -105,9 +104,13 @@ from _drawing_marks import (
 )
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _drawing_precision import set_dimension_display_precision
+from _drawing_prefix import set_dimension_prefix
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from sm_summing_lever_notes import (
+    BACK_VIEW_NOTE,
+    BRACKET_RECEIVER_NOTE,
+    DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
@@ -476,6 +479,12 @@ async def _hex_collar(
     drive_jobs += hexd.apply(adapter, f"{stem}Profile")
     extrude_at_offset(adapter, HEX_Z_OUTER - HEX_Z_INNER, HEX_Z_INNER, flip=flip)
     name_last_feature(adapter, stem)
+    if stem == "HexKnifeBack":
+        # Both trunnions share one length; the print sizes it once (2X), on
+        # the -Z stub: its plan-view left side is open (datum A's tag stands
+        # to its right; the +Z stub carries the finish and datum B).
+        [depth] = name_dimensions(adapter, stem, [f"{stem}Depth"])
+        drive_jobs.append((depth, '"HexDepth"'))
 
 
 async def _edge_rib(
@@ -540,6 +549,11 @@ async def _edge_rib(
     drive_jobs += rib.apply(adapter, f"{stem}Profile")
     extrude_at_offset(adapter, RIB_T, RIB_OFFSET, flip=flip)
     name_last_feature(adapter, stem)
+    if stem == "EdgeRibFront":
+        # The -Z rib's depth is the receiver's banded RibDepth
+        # (_receiver_model_bands); only the +Z rib takes a plain name here.
+        [thickness] = name_dimensions(adapter, stem, ["EdgeRibThickness"])
+        drive_jobs.append((thickness, '"RibT"'))
 
 
 async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -558,7 +572,7 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
     set_sketch_direct_db(adapter, True)
     base = check("summation base edge", await adapter.add_line(*p1, *p2))
-    top_arc, top_c, _ = await _three_point_arc(
+    top_arc, _top_c, top_r = await _three_point_arc(
         adapter, p2, p3, top_int, "summation top"
     )
     tip = check("summation tip edge", await adapter.add_line(*p3, *p4))
@@ -603,16 +617,17 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         "summation tip",
     )
     sd.record("SumTipHeight", '2 * "AnchorR"')
-    # The base/tip lines pin all four corners; each curved side is then defined
-    # by anchoring its (circumcentre) centre -- endpoints already lie on the arc,
-    # so the radius is implied and a radial dim would over-define (cf. the
-    # magnifying-lever dome caps). Both centres are general points (x, y both
-    # nonzero) -> two dims each, no clean global knob, left auto-named.
-    await anchor_point_to_origin(
-        adapter, f"{top_arc}.center", *top_c, "summation top centre"
+    # The base/tip lines pin all four corners.  The top side is controlled by
+    # its own radius -- the size the pattern maker lays out and the drawing
+    # prints (2X R) -- with its endpoints already fixed; the mirrored lower
+    # side keeps its circumcentre anchor (two dims, no clean global knob,
+    # left auto-named).  Both values are the as-sketched geometry, so the
+    # profile does not move.
+    check(
+        "summation side profile radius",
+        await adapter.add_sketch_dimension(top_arc, None, "radial", top_r),
     )
-    sd.record(None, None)
-    sd.record(None, None)
+    sd.record("SummationArcRadius")
     await anchor_point_to_origin(
         adapter, f"{bot_arc}.center", *bot_c, "summation bottom centre"
     )
@@ -629,6 +644,8 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "SummationPlate")
+    [web] = name_dimensions(adapter, "SummationPlate", ["WebThickness"])
+    drive_jobs.append((web, '"PlateT"'))
 
 
 async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -665,6 +682,8 @@ async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "SummationAnchor")
+    [height] = name_dimensions(adapter, "SummationAnchor", ["AnchorHeight"])
+    drive_jobs.append((height, '"AnchorH"'))
 
 
 async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -749,6 +768,8 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "MiddleRib")
+    [thickness] = name_dimensions(adapter, "MiddleRib", ["MiddleRibThickness"])
+    drive_jobs.append((thickness, '"RibT"'))
 
 
 async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -901,6 +922,101 @@ def _band_held_dimension(display, dimension, band: float, label: str) -> None:
     if int(display.GetPrimaryPrecision2()) != 2:
         raise RuntimeError(f"{label}: display precision did not persist")
     _telemetry.success(f"toleranced {label}: +/-{band:g} mm (2 decimals)")
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry (declared on the
+    base ISketchSegment, not the derived ISketchLine the registry binds)."""
+    from _com import _early_bound
+
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+    """Hidden Front-plane reference: the trunnion's width and vertex height.
+
+    The hexagon sketch is driven by halves and quarters of HexW/HexH, so no
+    single dimension of the solid IS the across-flats width or the vertex
+    height the knife-edge seat needs.  Two construction lines across the
+    envelope carry them as driving dimensions off the same globals; the part
+    saves the sketch hidden and the drawing shows it only in Detail A."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    knife = SketchDims()
+    check("create knife-envelope reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    width = check(
+        "knife-envelope width reference",
+        await adapter.add_line(-HEX_W / 2.0, 0.0, HEX_W / 2.0, 0.0),
+    )
+    height = check(
+        "knife-envelope height reference",
+        await adapter.add_line(0.0, -HEX_H / 2.0, 0.0, HEX_H / 2.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for entity in (width, height):
+        _as_construction(adapter, entity)
+    check(
+        "knife-envelope width horizontal",
+        await adapter.add_sketch_constraint(width, None, "horizontal"),
+    )
+    check(
+        "knife-envelope height vertical",
+        await adapter.add_sketch_constraint(height, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{width}.start",
+        f"{width}.end",
+        "horizontal_distance",
+        HEX_W,
+        "knife-envelope width",
+    )
+    knife.record("HexWidth", '"HexW"')
+    await anchor_point_to_origin(
+        adapter, f"{width}.start", -HEX_W / 2.0, 0.0, "knife-envelope width start"
+    )
+    knife.record("HexWidthHalf", '"HexW" / 2')
+    await dimension_between(
+        adapter,
+        f"{height}.start",
+        f"{height}.end",
+        "vertical_distance",
+        HEX_H,
+        "knife-envelope height",
+    )
+    knife.record("HexHeight", '"HexH"')
+    await anchor_point_to_origin(
+        adapter, f"{height}.start", 0.0, -HEX_H / 2.0, "knife-envelope height start"
+    )
+    knife.record("HexHeightHalf", '"HexH" / 2')
+    await ensure_fully_defined(adapter, "knife-envelope reference sketch")
+    check("exit knife-envelope reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "KnifeEnvelopeReference")
+    drive_jobs += knife.apply(adapter, "KnifeEnvelopeReference")
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "KnifeEnvelopeReference", "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("cannot hide knife-envelope reference sketch")
+    model.BlankSketch()
+    model.ClearSelection2(True)
+
+
+def _drawing_dimension_contract(adapter) -> None:
+    """Size and mark every dimension the print imports (DRAWING_DIMENSIONS)."""
+    # The trunnion envelope is the knife-edge size: three places carry the
+    # title block's .XXX band (spec HEX_BAND) the free-rock check assumes.
+    for name in ("HexWidth", "HexHeight"):
+        set_dimension_display_precision(adapter, "KnifeEnvelopeReference", name, 3)
+    for (feature_name, name), prefix in DIMENSION_PREFIXES.items():
+        set_dimension_prefix(adapter, feature_name, name, prefix)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
 
 async def _receiver_coordinate_dimensions(adapter) -> None:
@@ -1066,6 +1182,7 @@ async def build(adapter) -> dict[str, str]:
     await _middle_rib(adapter, drive_jobs)
     await _counter_anchor_tap(adapter, drive_jobs)
     await _bracket_mounting_taps(adapter)
+    await _knife_envelope_reference(adapter, drive_jobs)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -1107,8 +1224,7 @@ async def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
     clear_dimensions_for_drawing(adapter)
-    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
-        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    _drawing_dimension_contract(adapter)
     _receiver_model_bands(adapter)
     await _receiver_coordinate_dimensions(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
@@ -1118,8 +1234,8 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            # Pending exception ruling: MHA-SM-003 bracket tap-drill wall 1.501 MIN (#1295).
-            "Bracket Receiver Note": f"BRACKET TAP DRILL LATERAL WALL {DRILL_LATERAL_WALL_MIN:.3f} MIN.",
+            "Back View Note": BACK_VIEW_NOTE,
+            "Bracket Receiver Note": BRACKET_RECEIVER_NOTE,
         },
     )
     # Native dimension metadata must not erase the already-verified blind taps.
@@ -1137,6 +1253,7 @@ async def build(adapter) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "Back View Note",
             "Bracket Receiver Note",
         ),
     )

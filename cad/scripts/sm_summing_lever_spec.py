@@ -110,6 +110,5 @@ HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92
 
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "summation anchor position": "0.30",
     "spring-hole pattern position": "0.30",
 }
