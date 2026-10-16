@@ -492,13 +492,15 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Counter-anchor tap native callout (thread + depth) in the top plan.  Pick
     # a point on the hole rim (not its centre) so SolidWorks catches the
-    # circular edge.
-    anchor_tap_edge = _top_xy(TIP_X, COUNTER_R)
+    # circular edge: its left quadrant, the leader then running down-left to
+    # text below the Ø19.05's -- up-left it ran through the mid rib's
+    # two-line callout (farm r1 2026-10-16, leader-through-text).
+    anchor_tap_edge = _top_xy(TIP_X - COUNTER_R, 0.0)
     add_native_hole_callout(
         adapter,
         top,
         edge_xy=anchor_tap_edge,
-        callout_xy=(0.145, 0.155),
+        callout_xy=(0.145, 0.112),
         label="anchor tap",
     )
 
@@ -641,16 +643,19 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, row_x, label="spring-hole row X")
     seed_rim_top = _top_xy(HOLE_X, -HOLE_Z_LAST + HOLE_DIA / 2.0)
-    # The start Z (12.76) spans 6.4 mm of sheet (0.0919..0.0983); text between
+    # The start Z (12.75) spans 6.4 mm of sheet (0.0919..0.0983); text between
     # the arrows would sit on its own line (3.35 there stood on 7.06's extension
-    # line and 152.40's), so it hangs above the span, right of the 7.06 text
-    # (0.275..0.284, up to seed_y + 0.0074) and left of the 152.40 line (0.396).
+    # line and 152.40's), so it hangs above the span.  Each of these vertical
+    # dimensions draws its line at its text's right end (farm r1 2026-10-16:
+    # the 19X 7.06 text 0.275..0.2958 with its line there), so the 12.75 text
+    # starts 4 mm right of that line -- at 0.292 its shoulder crossed it -- and
+    # stays left of the 152.40 line (0.396).
     start_z = add_edge_dimension(
         adapter,
         top,
         p0=plate_end_edge,
         p1=seed_rim_top,
-        text_xy=(0.292, seed_y + 0.0099),
+        text_xy=(0.300, seed_y + 0.0099),
         label="spring-hole start Z",
         orientation="vertical",
         entities=(end_edge.edge, seed_rim.edge),
@@ -809,7 +814,10 @@ async def build(adapter: Any) -> dict[str, str]:
     _apply_callouts(adapter, back_annotations, label="bracket receiver")
     # Under the receiver callout it qualifies; the view label under the view.
     add_property_linked_note(adapter, "Bracket Receiver Note", 0.292, 0.120)
-    add_property_linked_note(adapter, "Back View Note", 0.205, 0.172)
+    # The view label below the pad's width callout and left of the receiver
+    # callout's leader: at (0.205, 0.172) that leader ran through it (farm r1
+    # 2026-10-16, leader-through-text).  The point is the label's top left.
+    add_property_linked_note(adapter, "Back View Note", 0.160, 0.155)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
