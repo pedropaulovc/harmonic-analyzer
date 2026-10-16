@@ -798,9 +798,12 @@ FRONT_KEEP = {
     "EdgeRibFrontArcR": (0.1948, 0.2120),
     "EdgeRibFrontEndTopX": (0.2443, 0.254),
     # Right of the plate tip, its three lines under the value (machinist
-    # review r8: from what, and why the end stands proud of the plate)
-    # starting 3 mm right of the dimension line (~0.263).
-    "EdgeRibFrontEndTopY": (0.282, 0.246),
+    # review r8: from what, and why the end stands proud of the plate).  The
+    # keep centres the 21 mm block: at 0.246 its bottom line sat on the
+    # lower extension line, the shelf underlining it and the upper arrow in
+    # its text (farm r12); at 0.253 the shelf runs over the upper arrow and
+    # the top line stands under the border.
+    "EdgeRibFrontEndTopY": (0.284, 0.253),
 }
 # Detail D at 4:1: the hexagon's centre prints at DETAIL_CENTER, its flats at
 # x 0.0588/0.0912, its vertices at y 0.2015/0.2425, the fence 0.030 round it.
