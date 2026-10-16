@@ -15,9 +15,17 @@ import mg_magnifying_vertical_rod_spec as spec
 import mg_rod_clamp_joint as joint
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED_UM
+from _printed_tolerance import printed_band_mm
 
-_MARKED = {"RodDia", "BodyLength", "DomeR", "ThreadLength", "ReliefWidth", "ReliefDia"}
+_MARKED = {
+    "RodDia",
+    "BodyLength",
+    "OverallLength",
+    "DomeR",
+    "ThreadLength",
+    "ReliefWidth",
+    "ReliefDia",
+}
 
 
 def test_required_drawing_paths() -> None:
@@ -35,19 +43,24 @@ def test_rod_is_the_threaded_bar_of_the_joint_contract() -> None:
     assert spec.BODY_LENGTH == 125.0
     assert spec.SHOULDER_X == spec.ROD_THREAD_LEN == joint.ROD_THREAD_LEN == 7.50
     assert spec.ROD_THREAD_LEN_BAND == joint.ROD_THREAD_LEN_BAND == (0.25, -0.25)
-    assert (spec.RELIEF_WIDTH, spec.RELIEF_WIDTH_BAND) == (1.40, (0.20, -0.20))
-    assert (spec.RELIEF_DIA, spec.RELIEF_DIA_BAND) == (1.75, (0.10, -0.10))
+    # The relief mates with nothing (r1): its width at the title block's .XX
+    # band, its Ø as the single limit MAX (the model value is the limit).
+    assert (spec.RELIEF_WIDTH, joint.RELIEF_WIDTH_PLACES) == (1.50, 2)
+    assert joint.PRINTED_XX_BAND == printed_band_mm(joint.RELIEF_WIDTH_PLACES)
+    assert (joint.RELIEF_WIDTH_MIN, joint.RELIEF_WIDTH_MAX) == pytest.approx((0.99, 2.01))
+    assert spec.RELIEF_DIA == joint.RELIEF_DIA_MAX == 1.85
+    assert spec.RELIEF_DIA_TOL_TYPE == 6  # swTolType_e.swTolMAX
     assert spec.THREAD == "#4-40" and spec.THREAD_CALLOUT == "#4-40 UNC"
     assert spec.THREAD_MAJOR == pytest.approx(2.845, abs=1e-3)
     assert spec.TIP_CHAMFER == pytest.approx(
         (spec.THREAD_MAJOR - spec.THREAD_BASIC_MINOR) / 2.0
     )
-    assert spec.RELIEF_START_X == pytest.approx(7.50 - 1.40)
+    assert spec.RELIEF_START_X == pytest.approx(7.50 - 1.50)
     # Full thread only (rule 18): one pitch at the tip, the run-out in the
     # relief; the worst-case engagement holds 1.5D.
     assert spec.FULL_THREAD_START_X == pytest.approx(0.635)
     assert spec.FULL_THREAD_END_X == pytest.approx(spec.RELIEF_START_X)
-    assert joint.ENGAGEMENT_WORST == pytest.approx(5.015)
+    assert joint.ENGAGEMENT_WORST == pytest.approx(7.25 - 2.01 - 0.635)
     assert joint.ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN == pytest.approx(4.2675)
     assert joint.RELIEF_WIDTH_MIN >= joint.DIE_RUNOUT
     assert joint.RELIEF_DIA_MAX <= joint.THREAD_ROOT_2A_MIN
@@ -95,14 +108,9 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_tolerances_are_native_on_the_model() -> None:
     assert model_toleranced_dimensions(part) == {
         ("RodProfile", "ThreadLength"): "*deviations(ROD_THREAD_LEN_BAND)",
-        ("RodProfile", "ReliefWidth"): "*deviations(RELIEF_WIDTH_BAND)",
-        ("RodProfile", "ReliefDia"): "*deviations(RELIEF_DIA_BAND)",
     }
-    assert set(spec.DRAWING_BANDS) == {
-        ("RodProfile", "ThreadLength"),
-        ("RodProfile", "ReliefWidth"),
-        ("RodProfile", "ReliefDia"),
-    }
+    assert set(spec.DRAWING_BANDS) == {("RodProfile", "ThreadLength")}
+    assert spec.SINGLE_LIMITS == {("RodProfile", "ReliefDia"): (1.85, 6)}
     precision = spec.DRAWING_PRECISION["RodProfile"]
     assert (precision["ThreadLength"], precision["ReliefWidth"], precision["ReliefDia"]) == (
         2,
@@ -111,42 +119,55 @@ def test_tolerances_are_native_on_the_model() -> None:
     )
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
-    # Both lengths read from the shoulder, the seating face (rule 10).
+    assert "_single_limits(adapter)" in source
+    # Both lengths read from the shoulder, the seating face (rule 10); the
+    # banded thread length names the seat it guards at its callout.
     assert drawing.ORIGIN_DIMENSIONS == ("BodyLength", "ThreadLength")
     assert drawing.DIMENSION_CALLOUTS == {
         "BodyLength": "FROM SHOULDER",
-        "ThreadLength": "FROM SHOULDER",
+        "ThreadLength": "FROM SHOULDER\nSEATS ON MHA-MG-002;\nTIP CLEARS ITS TAP",
+        "RodDia": "STOCK OK",
+        "DomeR": "TANGENT HEMISPHERE",
     }
+    for callout in drawing.DIMENSION_CALLOUTS.values():
+        lines = callout.splitlines()
+        assert len(lines) <= 4 and all(len(line) <= 20 for line in lines), callout
+        assert not any(ch.isdigit() for ch in callout.replace("MHA-MG-002", ""))
 
 
-def test_notes_are_few_and_flagged() -> None:
-    notes = spec.DRAWING_NOTES
-    assert 1 <= len(notes.splitlines()) <= 4
-    flat = " ".join(notes.splitlines())
-    assert "Ø5 ROUND BAR" in flat
-    assert "(132.5) REF" in flat
-    assert "MHA-MG-002" in flat and "SEATS ON THE SHOULDER" in flat
-    assert "BOTTOM END A FULL HEMISPHERE" in flat
-    assert "BOTH ENDS" not in flat and "150" not in flat
-    assert "BRASS" not in notes and "DEBURR" not in notes and "X.XX" not in notes
-    assert "LOCTITE" not in notes and "SET SCREW" not in notes
-    assert all(len(line) <= 80 for line in notes.splitlines())
+def test_overall_is_a_driven_reference_dimension() -> None:
+    assert spec.REFERENCE_DIMENSIONS == (("RodProfile", "OverallLength"),)
+    assert spec.DRAWING_PRECISION["RodProfile"]["OverallLength"] == 1
+    assert "OverallLength" in drawing.SIDE_KEEP
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    # Made before the body length (never over-defining), then driven at once.
+    made = source.index('"overall length",')
+    assert made < source.index('_make_driven(adapter, overall, "overall length")')
+    assert made < source.index('"body length",')
+    assert re.search(r'profile\.record\("OverallLength"\)\n', source)
+    assert "_author_reference_dimensions(adapter)" in source
+
+
+def test_no_general_notes() -> None:
+    assert not hasattr(spec, "DRAWING_NOTES")
+    for module in (part, drawing):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "Manufacturing Notes" not in source, module.__name__
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "NOTES_XY =" not in source
     assert drawing.THREAD_NOTE_TEXT.startswith("#4-40 UNC")
     assert source.count("add_attached_note(") == 1
 
 
-def test_od_finish_and_no_gdt() -> None:
-    assert [(c.key, c.roughness_um) for c in spec.SURFACE_FINISHES] == [
-        ("mg_vrod_slide", MACHINED_UM)
-    ]
+def test_stock_od_carries_no_finish_and_no_gdt() -> None:
+    assert not hasattr(spec, "SURFACE_FINISHES")
+    assert "author_part_pmi" not in Path(part.__file__).read_text(encoding="utf-8")
     for module in (part, drawing):
         source = Path(module.__file__).read_text(encoding="utf-8")
         for token in ("add_feature_control_frame(", "add_datum_feature("):
             assert token not in source, (module.__name__, token)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_surface_finish(") == 1
+    assert "add_surface_finish(" not in source
 
 
 def test_view_scales_are_explicit() -> None:

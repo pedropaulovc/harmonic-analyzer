@@ -15,8 +15,9 @@ SHOULDER_X, Ø5 body to the dome's tip at ROD_LENGTH.
 Built as ONE Front-plane revolve (RodProfile -> Rod): every printed diameter
 and length is a named dimension in that sketch, the thread length and the
 body length both from the shoulder, so the drawing inserts them as model
-items (mg_magnifying_vertical_rod_spec.DRAWING_DIMENSIONS). The #4-40 end
-carries a cosmetic thread so the pictorial matches the callout.
+items (mg_magnifying_vertical_rod_spec.DRAWING_DIMENSIONS). The overall is a
+driven reference dimension shown "(132.5)". The #4-40 end carries a cosmetic
+thread so the pictorial matches the callout.
 
 Run (SolidWorks already open)::
 
@@ -30,6 +31,7 @@ import sys
 
 from _appearance import apply_material
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -49,27 +51,25 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
-from _part_pmi import author_part_pmi
+import _telemetry
 from mg_magnifying_vertical_rod_spec import (
     BODY_LENGTH,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     ISO_VIEW_NOTE,
+    REFERENCE_DIMENSIONS,
     RELIEF_DIA,
-    RELIEF_DIA_BAND,
     RELIEF_START_X,
     RELIEF_WIDTH,
-    RELIEF_WIDTH_BAND,
     ROD_DIA,
     ROD_LENGTH,
     ROD_THREAD_LEN,
     ROD_THREAD_LEN_BAND,
     SHOULDER_X,
-    SURFACE_FINISHES,
+    SINGLE_LIMITS,
     THREAD,
     THREAD_BASIC_MINOR,
     THREAD_MAJOR,
@@ -90,6 +90,57 @@ V_RELIEF = math.pi * RELIEF_R**2 * RELIEF_WIDTH
 V_BODY = math.pi * R**2 * (BODY_LENGTH - R)
 V_DOME = 2.0 / 3.0 * math.pi * R**3
 V_TOTAL = V_CHAMFER + V_THREAD + V_RELIEF + V_BODY + V_DOME
+
+
+def _make_driven(adapter, dimension_id: str, label: str) -> None:
+    """Turn a just-made sketch dimension into a DRIVEN (reference) one
+    (build_pn_pen_v_block._make_driven)."""
+    display = _early_bound(adapter._sketch_entities[dimension_id], "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
+    if int(dimension.DrivenState) != 1:
+        raise RuntimeError(f"{label}: dimension did not become driven")
+
+
+def _single_limits(adapter) -> None:
+    """Each SINGLE_LIMITS dimension printed as a single MIN or MAX limit
+    (build_pd_support_bar._single_limit): SOLIDWORKS prints the nominal then
+    the limit word, so the model value is the limit itself."""
+    for (feature, name), (limit, tol_type) in SINGLE_LIMITS.items():
+        label = f"{name}@{feature}"
+        _, dimension = _named_dimension(adapter, feature, name)
+        value = float(dimension.SystemValue)
+        if not math.isclose(value, limit / 1000.0, abs_tol=1e-9):
+            raise RuntimeError(
+                f"{label}: nominal {value * 1000.0:.7f} is not the limit {limit:.7f}"
+            )
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = tol_type
+        if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != tol_type:
+            raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
+        _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
+
+
+def _author_reference_dimensions(adapter) -> None:
+    """Show each driven dimension as a reference: no tolerance, "(132.5)"
+    (build_pn_pen_v_block._author_reference_dimensions)."""
+    for feature_name, dimension_name in REFERENCE_DIMENSIONS:
+        display, dimension = _named_dimension(adapter, feature_name, dimension_name)
+        label = f"{dimension_name}@{feature_name}"
+        if int(dimension.DrivenState) != 1:
+            raise RuntimeError(f"{label}: a reference dimension must be driven")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 0  # swTolType_e.swTolNONE; property put, no success retval
+        # The native prefix/suffix channel around the live model value.
+        display.SetText(1, "(")
+        display.SetText(2, ")")
+        if (
+            int(tolerance.Type) != 0
+            or (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+            != ("(", ")")
+            or not bool(display.ShowDimensionValue)
+        ):
+            raise RuntimeError(f"{label}: reference display did not persist")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -210,6 +261,18 @@ async def build(adapter) -> dict[str, str]:
         adapter, axis, body, (ROD_LENGTH / 2.0, R + 4.0), "RodDia"
     )
     profile.record("RodDia", '"RodDia"')
+    # The overall, tip to dome tip: made before the body length (so it never
+    # over-defines) and turned driven at once, a "(132.5)" reference.
+    overall = await dimension_between(
+        adapter,
+        f"{chamfer}.start",
+        f"{dome}.start",
+        "horizontal_distance",
+        ROD_LENGTH,
+        "overall length",
+    )
+    _make_driven(adapter, overall, "overall length")
+    profile.record("OverallLength")
     # The body from the shoulder to the dome's tip: the hanging length.
     await dimension_between(
         adapter,
@@ -266,25 +329,13 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "RodProfile", "ThreadLength", *deviations(ROD_THREAD_LEN_BAND)
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "RodProfile", "ReliefWidth", *deviations(RELIEF_WIDTH_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "RodProfile", "ReliefDia", *deviations(RELIEF_DIA_BAND)
-    )
+    _single_limits(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Iso View Note": ISO_VIEW_NOTE,
-        },
-    )
+    _author_reference_dimensions(adapter)
+    apply_drawing_properties(adapter, PART_NAME, {"Iso View Note": ISO_VIEW_NOTE})
     return await save_part_and_images(adapter, PART_NAME)
 
 
