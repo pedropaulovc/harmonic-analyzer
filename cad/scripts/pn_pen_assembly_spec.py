@@ -136,13 +136,20 @@ SOURCE_CONFIGURATION = "Default"
 # (-1, +1, -1) the face and the tap's axis come toward the reader.
 EXPLODED_OCTANT = (-1, 1, -1)
 _CARRIAGE = (V_BLOCK, ROD_SET_SCREW, FRAME, THUMB_SCREW, MARKER)
+# The wire's sideways explode, each of X and -Z: 35 mm on the sheet at 1:2.
+WIRE_ASIDE = 50.0
 EXPLODE_STEPS = (
     ("hanger jam nut off", (HANGER_JAM_NUT,), "z", -26.0),
     ("hanger nut off", (HANGER_NUT,), "z", -14.0),
     ("hanger screw out behind", (HANGER_SCREW,), "z", 22.0),
-    # Lifted clear above the hanger nuts: at 26 the wire's straight run read
-    # through nut 13 in the exploded view (machinist review r3).
-    ("wire off the stud eye", (WIRE,), "y", 60.0),
+    # Up off the eye, then an equal +X/-Z pair: straight to the reader's left
+    # in the REAR-TOP-LEFT view, clear of the rod and stud. Left in place, its
+    # run read through hanger nut 13 (machinist review r3); lifted 60 instead,
+    # its balloons crossed the sheet's top border and its leader lay on the
+    # stud's ray and crossed balloon 8's.
+    ("wire off the stud eye", (WIRE,), "y", 26.0),
+    ("wire aside x", (WIRE,), "x", WIRE_ASIDE),
+    ("wire aside z", (WIRE,), "z", -WIRE_ASIDE),
     ("rod out of the guides", (ROD, STUD, STUD_NUT, *_CARRIAGE), "z", -48.0),
     ("stud out of the rod", (STUD, STUD_NUT), "y", 12.0),
     ("jam nut off the stud", (STUD,), "y", 10.0),
