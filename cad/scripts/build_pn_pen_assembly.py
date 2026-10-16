@@ -95,6 +95,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _assembly_patterns import ensure_global_pattern_axis
+from _named_views import name_octant_views, octant_key
 from _simplified_names import simplified_name
 from _assembly import (
     activate_assembly_contract,
@@ -793,6 +794,13 @@ async def build(adapter) -> dict[str, str]:
     # the explode is authored in both drawing configurations.
     author_in_drawing_configurations(
         adapter, ASM_NAME, lambda configuration: _create_pn_explode(adapter, configuration)
+    )
+    # The exploded view looks from the octant that sees the v-block's front
+    # face and the set screw's tap in it (spec.EXPLODED_OCTANT).
+    name_octant_views(
+        adapter,
+        octants={octant_key(*spec.EXPLODED_OCTANT): spec.EXPLODED_OCTANT},
+        label=ASM_NAME,
     )
     return await save_assembly_and_images(adapter, ASM_NAME)
 

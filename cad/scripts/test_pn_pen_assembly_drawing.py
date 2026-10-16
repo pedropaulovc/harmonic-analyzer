@@ -5,7 +5,11 @@ from pathlib import Path
 import build_pn_pen_assembly as builder
 import draw_pn_pen_assembly as drawing
 import pn_pen_assembly_spec as spec
+import pn_pen_carriage_geom as carriage
+import pn_pen_v_block_spec as v_block
+import vn_pen_rod_set_screw_spec as rod_set_screw
 from _drawing_registry import DRAWINGS_BY_NAME
+from _named_views import octant_axes, octant_view_name
 from _simplified_names import simplified_name
 
 
@@ -62,7 +66,24 @@ def test_explode_names_match_the_builder() -> None:
         assert builder.pn_exploded_view_name(configuration) == name
 
 
-def test_every_setting_is_printed_with_a_callout_inside_its_detail() -> None:
+def test_exploded_octant_faces_the_set_screw_tap_and_explodes_along_it() -> None:
+    assert drawing.EXPLODED_ORIENTATION == octant_view_name(*spec.EXPLODED_OCTANT)
+    # The tap opens on the block's front face (local -Z, BODY_Z0).
+    rows = carriage.BLOCK_ROWS
+    normal = tuple(-rows[2][axis] for axis in range(3))
+    viewer = octant_axes(*spec.EXPLODED_OCTANT)[2]
+    assert sum(n * v for n, v in zip(normal, viewer)) > 0.5
+    moves = [0.0, 0.0, 0.0]
+    for _label, stems, key, distance in spec.EXPLODE_STEPS:
+        if stems == (spec.ROD_SET_SCREW,):
+            moves["xyz".index(key)] += distance
+    length = sum(value * value for value in moves) ** 0.5
+    # Straight out of the tap, and past the screw's own recess in it.
+    assert all(abs(m / length - n) < 1e-9 for m, n in zip(moves, normal))
+    assert length > v_block.SET_SCREW_TAP_LENGTH + 2 * rod_set_screw.LENGTH
+
+
+def test_every_setting_is_printed_with_a_callout_beside_its_detail() -> None:
     printed = {
         name for points in drawing.DIMENSION_TEXT_POINTS.values() for name in points
     }
@@ -74,9 +95,11 @@ def test_every_setting_is_printed_with_a_callout_inside_its_detail() -> None:
         assert detail.feature is not None
         for xyz in points.values():
             # The plan detail projects Y away; the front detail projects Z.
+            # A text may stand outside the crop circle (the nib preset's sits
+            # beyond the nib tip), but beside it, not across the sheet.
             axes = (0, 2) if detail.orientation == "*Top" else (0, 1)
             offset = [xyz[axis] - detail.model_centre[axis] for axis in axes]
-            assert sum(value * value for value in offset) ** 0.5 < detail.radius_mm
+            assert sum(value * value for value in offset) ** 0.5 < 2 * detail.radius_mm
 
 
 def test_text_blocks_respect_the_measured_note_width() -> None:
