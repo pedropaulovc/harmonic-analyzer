@@ -34,12 +34,19 @@ Cross-subassembly fits proven by the top-level interference check:
 * rocker-arm connecting-rod rings (channel) ride the cam lobes integral
   to the drive-train's cylinder gears;
 * the measuring stick (ms-measuring-stick.SLDASM, stop clamped at the 2.0
-  mark) is parked on the base top (y 50.8), the stop's thumbscrew head just
-  above the deck. The spare T18
+  mark) is parked on the base's green land (y 47.8) east of the deck, the
+  stop's thumbscrew head just above the land. The spare T18
   transgear-removable, a swap part for the platen drive, rides inside
   paper-drive (a flat sibling of its mounted T24) rather than floating here --
   at the top level its leaf name would collide with the T12/T24 instances
   nested in drive-train / paper-drive.
+
+The fitter package (draw_ha_harmonic_analyzer_assembly.py, MHA-HA-000) reads
+two things this build authors from ha_harmonic_analyzer_assembly_spec: the
+hidden ``IntegrationSettings`` sketch, whose two driving dimensions are the
+settings only the complete machine makes (wheel-bar top above the deck, pen
+stud head below the bar top), and the named ``HA_EXPLODED`` presentation,
+authored in Default and in Default Simplified and collapsed again before save.
 
 Run (SolidWorks already open)::
 
@@ -49,20 +56,35 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+from typing import Any
 
 import fr_harmonic_base_spec
+import ha_harmonic_analyzer_assembly_spec as spec
 import ms_measuring_stick_assembly_spec as ms
 from _check import check
 from _custom_properties import apply_custom_properties
 from _paths import OUT_PNG, OUT_SLDASM
 from _session import run_build
-from _drawing_marks import DRAWN_BY
+from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
+from _drawing_precision import apply_drawing_precision
+from _feature_tree import name_last_feature
+from _ha_harmonic_analyzer_explode import create_harmonic_analyzer_explode
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
+from _com import _early_bound
 from _assembly import (
     activate_assembly_contract,
     _discard_copy_source,
     assembly_title_properties,
     assert_component_placed,
     assert_components_fully_defined,
+    author_in_drawing_configurations,
     check_no_interference,
     remap_front_to_machine_front,
     save_assembly_and_images,
@@ -84,16 +106,19 @@ SUBASSEMBLIES = (
     "pn-pen",
     "pd-paper-drive",
 )
+if (*SUBASSEMBLIES, spec.MEASURING_STICK) != spec.BOM_ORDER:
+    raise AssertionError("the drawing's BOM order is the insertion order")
 
 # The measuring stick and its clamped stop -- a generic tool, not part of any
-# mechanism -- parked on the base's green land just INBOARD of the west
+# mechanism -- parked on the base's green land just INBOARD of the east
 # columns, the stick along Z, GRADUATIONS UP (ms_measuring_stick_assembly_spec:
 # the bar's graduated face bears on the stop's roof, +Y of the stop frame). The
 # user ruling of 2026-10-09 (#1310) took away the raised rim and set a black
 # deck at x -167..167, 3.0 above the land, so the whole stop sits in the land
-# corridor between the deck's east edge and the column east face (x -184.3).
+# corridor between the deck's east edge and the east columns' inboard faces
+# (x -184.3).
 # The column pair leaves only 198.6 along Z for the 200 bar, so the bar stays
-# east of the column band, clear of the crank column (x >= -150.7) and the front
+# inboard of the column band, clear of the crank column (x >= -150.7) and the front
 # rocker-support band (z <= -118).
 #
 # The stop frame maps X (along the stick) -> machine +Z, Y (thumbscrew axis,
@@ -109,7 +134,7 @@ assert all(
 
 LAND_TOP_Y = fr_harmonic_base_spec.GREEN_TOP  # the green land the stop rests on
 STOP_LAND_GAP = 0.25  # thumbscrew head bottom above the land (sliver margin)
-PARK_WEST_LIMIT_X = -184.3  # column east face
+PARK_WEST_LIMIT_X = -184.3  # east columns' inboard faces
 PARK_EAST_LIMIT_X = -fr_harmonic_base_spec.DECK_HALF_X  # the deck's east edge
 PARK_FRONT_LIMIT_Z = -118.0  # front rocker-support band (z <= -118)
 
@@ -147,6 +172,59 @@ def _subassembly(name: str) -> str:
             f"missing subassembly {path}; run build_{name.replace('-', '_')}_assembly.py first"
         )
     return str(path)
+
+
+async def _author_integration_settings(adapter: Any) -> None:
+    """No solid/pose edits: one vertical construction line per setting, its
+    low end anchored to the origin and its length the driving dimension the
+    drawing imports (ha_harmonic_analyzer_assembly_spec.SETTING_LINES)."""
+    dims = SketchDims()
+    check("create integration settings sketch", await adapter.create_sketch("Front"))
+    for line_spec in spec.SETTING_LINES:
+        label = line_spec.dimension
+        # Direct to the database: inference would snap the line ends to the
+        # component edges around them, or tie the two lines' common top.
+        set_sketch_direct_db(adapter, True)
+        line = check(
+            f"{label} line",
+            await adapter.add_line(
+                line_spec.x, line_spec.y_low, line_spec.x, line_spec.y_high
+            ),
+        )
+        set_sketch_direct_db(adapter, False)
+        segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{label} line is not construction")
+        check(
+            f"{label} vertical",
+            await adapter.add_sketch_constraint(line, None, "vertical"),
+        )
+        await anchor_point_to_origin(
+            adapter, f"{line}.start", line_spec.x, line_spec.y_low, f"{label} low end"
+        )
+        dims.record(f"{label}X")
+        dims.record(f"{label}Y")
+        await dimension_between(
+            adapter,
+            f"{line}.start",
+            f"{line}.end",
+            "vertical_distance",
+            line_spec.length,
+            label,
+        )
+        dims.record(label)
+    await ensure_fully_defined(adapter, "integration settings")
+    check("exit integration settings sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, spec.SETTING_FEATURE)
+    dims.apply(adapter, spec.SETTING_FEATURE)
+    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    mark_dimensions_for_drawing(
+        adapter,
+        spec.SETTING_FEATURE,
+        set(spec.DRAWING_DIMENSIONS[spec.SETTING_FEATURE]),
+    )
+    blank_sketch(adapter, spec.SETTING_FEATURE)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -203,6 +281,7 @@ async def build(adapter) -> dict[str, str]:
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
         chain_mounts=mounted_wheels(),
     )
+    await _author_integration_settings(adapter)
 
     # Title-block identity for the top assembly drawing
     # (draw_ha_harmonic_analyzer_assembly.py): assembly_title_properties supplies
@@ -226,6 +305,13 @@ async def build(adapter) -> dict[str, str]:
     # eight-views gallery below, which goes through ShowNamedView2) shows the
     # machine front, and the file opens on it. Geometry is untouched.
     remap_front_to_machine_front(adapter)
+    # Both drawing configurations own the explode: the exploded sheet's 1:10
+    # view references Default Simplified.
+    author_in_drawing_configurations(
+        adapter,
+        ASM_NAME,
+        lambda configuration: create_harmonic_analyzer_explode(adapter, configuration),
+    )
     artefacts = await save_assembly_and_images(adapter, ASM_NAME)
     # save_assembly_and_images deliberately discards the dirty anonymous source
     # after its SaveAsCopy.  Reopen the clean copy for the top-only gallery/BOM;
