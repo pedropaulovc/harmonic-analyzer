@@ -171,8 +171,8 @@ PEN_WIRE_WRAP_DEG = 360.0 + _wheel.TIE2_CLOCK_DEG  # 317
 PEN_WIRE_WRAP_LEFT_DEG = PEN_WIRE_WRAP_DEG - CW_MAX_DEG  # 270.2
 # Lever wire: from its drum tangent clockwise down to TIE 1 at 6 o'clock.
 # Turning counter-clockwise (pen up: the lever pulls) unwinds it.
-LEVER_WIRE_WRAP_DEG = _lever.TANGENT_CLOCK_DEG - _wheel.TIE1_CLOCK_DEG  # 105.9
-LEVER_WIRE_WRAP_LEFT_DEG = LEVER_WIRE_WRAP_DEG - CCW_MAX_DEG  # 58.9
+LEVER_WIRE_WRAP_DEG = _lever.TANGENT_CLOCK_DEG - _wheel.TIE1_CLOCK_DEG  # 105.8
+LEVER_WIRE_WRAP_LEFT_DEG = LEVER_WIRE_WRAP_DEG - CCW_MAX_DEG  # 58.8
 for _label, _left in (
     ("pen wire", PEN_WIRE_WRAP_LEFT_DEG),
     ("lever wire", LEVER_WIRE_WRAP_LEFT_DEG),

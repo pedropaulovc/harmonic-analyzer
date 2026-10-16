@@ -39,7 +39,10 @@ allowed_free_stems:
 # The steel collar/lever joint is light pressed and bonded with Loctite 638;
 # press the collar onto the rod held near its end, never column-load the lever.
 # vn-thumb-screw instances ride this chain: clamp first, output fixture second.
-# The fixture's hex body carries the front-tangent wire groove and axial tap.
+# The clamp's thumb screw pinches the lever; the vertical rod screws into the
+# clamp's bottom tap and seats on its shoulder (#1559). Lever, thumb screw,
+# rod, fixture hook and drum wire lane share one plumb plane (option A1).
+# The fixture's hex body carries the wire groove and axial tap.
 required_free_stems:
   - mg-magnifying-lever
   - mg-magnifying-wheel

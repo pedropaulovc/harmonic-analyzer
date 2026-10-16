@@ -102,7 +102,11 @@ COLLAR_OD = 12.0  # rod collar (low)
 COLLAR_HALF_LEN = LEVER_COLLAR_HALF_LEN
 ARM_HALF_X = 5.0  # arm 10 wide (x), y -3..+4.5 (low)
 ARM_Y = (-3.0, 4.5)
-ARM_Z = (4.0, 58.3)
+# The arm's end stands this far past the flange's mounting face (ArmPastSeat),
+# so its length follows the joint layout's seat station: the A1 pose (#1559)
+# moved the collar 45.21 forward of the plate, 58.30 -> 103.51 from the axis.
+ARM_PAST_SEAT = 3.11
+ARM_Z = (4.0, round(FLANGE_Z[1] + ARM_PAST_SEAT, 2))
 
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()

@@ -456,8 +456,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 4.35,
             ),
             frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1")): _annulus_limit(
-                2.8448, 2.261, 3.9
+                2.8448, 2.261, 5.9
             ),
+            # #1559: the vertical rod's #4-40 end (2.845 major) in the clamp's
+            # bottom tap drill, tip to relief.
+            frozenset(
+                ("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")
+            ): _annulus_limit(2.845, 2.261, 6.1),
             # MHA-MG-007 3/16 drill-rod pin pressed through the wheel bar's
             # reamed .1865 bore, the bar's 9.0 depth.
             frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _annulus_limit(
@@ -773,6 +778,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     for pair in (
         frozenset(("vn-thumb-screw-2", "mg-output-fixture-1")),
         frozenset(("mg-magnifying-lever-1", "mg-magnifying-bracket-1")),
+        frozenset(("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")),
     ):
         qualified = frozenset(f"mg-magnifier-1/{part}" for part in pair)
         threaded_by_assembly["ha-harmonic-analyzer"][qualified] = (

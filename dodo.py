@@ -3633,6 +3633,11 @@ def task_check():
         SCRIPTS_DIR / "test_ch_pivot_bracket_spec.py",
         SCRIPTS_DIR / "test_magnifying_bracket_joint_layout.py",
         SCRIPTS_DIR / "test_sm_gooseneck_spring_joint.py",
+        # #1559: the MHA-MG-004 rod's threaded seat in the MHA-MG-002 hex clamp.
+        SCRIPTS_DIR / "test_mg_rod_clamp_joint.py",
+        # ... and the A1 bracket arm's stiffness/joint check (the arm grew to
+        # reach the plumb plane at the drum wire lane).
+        SCRIPTS_DIR / "test_mg_magnifying_bracket_arm_check.py",
         # The amplitude bar's pressed MHA-CH-011 pin: its worst-case press,
         # running fit and flush-end gap budget, pinned to their sources.
         SCRIPTS_DIR / "test_ch_bar_pivot_fit.py",
