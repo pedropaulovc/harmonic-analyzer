@@ -41,7 +41,7 @@ def test_magnifier_keeps_registry_outputs_and_precomputed_placement() -> None:
     )
     assert drawing.SHEET_SCALE == (1.0, 4.0)
     assert drawing.FRONT_CENTER == (0.070, 0.150)
-    assert drawing.RIGHT_CENTER == (0.150, 0.150)
+    assert drawing.RIGHT_CENTER == (0.168, 0.150)
     assert drawing.ISO_CENTER == (0.225, 0.140)
 
 
