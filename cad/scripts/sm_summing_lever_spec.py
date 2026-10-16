@@ -15,6 +15,7 @@ Values MUST match build_sm_summing_lever.py.
 from __future__ import annotations
 
 import math
+import _config
 from _hole_spec import HoleSpec
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
@@ -37,7 +38,8 @@ ANCHOR_H = 0.75 * MM_PER_IN  # 19.05 summation-anchor boss height (Y)
 # narrowed to 8.080 (115.1 deg ridge) so the trunnion still rocks >= 5.0 deg
 # inside the sm-knife-mount Ø12 close bore at the worst case of BOTH parts'
 # bands (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``).  Both section
-# sizes print .XXX, so the title block holds them to HEX_BAND.
+# sizes print .XXX, so the title block holds them to HEX_BAND; the ridge angle
+# prints toleranced at the title block's angular band (below).
 HEX_W = 8.080
 HEX_H = 10.268
 HEX_BAND = 0.13  # title-block .XXX band on HEX_W and HEX_H
@@ -59,6 +61,17 @@ KNIFE_RIDGE_TANGENT_XY = (
     _RIDGE_SETBACK * math.sin(_RIDGE_HALF),
     HEX_H / 2.0 - _RIDGE_SETBACK * math.cos(_RIDGE_HALF),
 )
+# Detail D tolerances the ridge angle at the title block's angular band
+# (machinist review r7: HEX_W and HEX_H alone leave the flanks, so the
+# shoulders' height, free).  Nothing holds the two flanks symmetric, so one
+# flank may take the whole band: at the widest .XXX section its shoulder then
+# rises KNIFE_SHOULDER_RISE (0.0994) over the nominal angle's, and the
+# free-rock worst case folds that rise in with the section and bore bands.
+RIDGE_ANGLE_TOL_DEG = float(_config.title_block("angular")["value_deg"])
+_HEX_HALF_W_MAX = (HEX_W + HEX_BAND) / 2.0
+KNIFE_SHOULDER_RISE = _HEX_HALF_W_MAX / math.tan(
+    _RIDGE_HALF
+) - _HEX_HALF_W_MAX / math.tan(_RIDGE_HALF + math.radians(RIDGE_ANGLE_TOL_DEG))
 
 # Outward normal and plane offset of the upper-right sloping face of the
 # vertex-up hexagon. Its upper endpoint is the +Y knife-edge ridge.
