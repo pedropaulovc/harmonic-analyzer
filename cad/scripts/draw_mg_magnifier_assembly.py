@@ -52,6 +52,8 @@ import mg_magnifier_assembly_spec as stack
 import mg_magnifier_explode_spec as explode
 import vn_lever_wire_geom
 import vn_lever_wire_spec
+import vn_wheel_axle_front_washer_spec as front_washer
+import vn_wheel_axle_nut_spec as axle_nut
 from _check import check
 from _com import _early_bound
 from _drawing_balloon_display import rendered_balloon_circle
@@ -88,7 +90,6 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
 )
 from _drawing_view_display import set_hidden_lines_removed
-from _mg_magnifier_explode import exploded_view_name
 from _session import run_build
 from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
@@ -239,16 +240,26 @@ BOM_REFERENCE_FIELD = (
 )
 BOM_REFERENCE_SCALE_LADDER = ((1.0, 8.0), (1.0, 10.0), (1.0, 12.0), (1.0, 16.0))
 BOM_REFERENCE_LABEL = "BOM reference"
-# Sheet 3: the lever group's exploded view over the full width above the
-# title block; its caption left of the title block.
+# Sheet 3: the lever group's exploded view left of the title block, over the
+# sheet's full height; its caption right of it, a line above the title block.
+# Machinist review r6 (run 20261016T150215480Z) found the group too small at
+# 1:3 over the full width: its ring, 116.1 mm tall at 1:3 on that run, needs
+# 208 mm at 1:2, more than the 193 mm above the title block, so the field
+# trades the empty right half for the height left of it.
 LEVER_FIELD = (
     INNER_BORDER[0] + _PAD,
-    TITLE_BLOCK[3] + _PAD,
-    INNER_BORDER[2] - _PAD,
+    INNER_BORDER[1] + _PAD,
+    TITLE_BLOCK[0] - _PAD,
     INNER_BORDER[3] - _PAD,
 )
+LEVER_SCALE_LADDER = ((1.0, 2.0), (1.0, 2.5), (1.0, 3.0), (1.0, 4.0))
+if any(
+    view_configuration(scale, _SW_SHADED_EDGES) != SIMPLIFIED_VIEW_CONFIGURATION
+    for scale in LEVER_SCALE_LADDER
+):
+    raise AssertionError("a rescale on the lever ladder would switch configuration")
 LEVER_GROUP = "LEVER GROUP"
-LEVER_CAPTION_XY = (INNER_BORDER[0] + _PAD + 0.002, TITLE_BLOCK[3] - _PAD)
+LEVER_CAPTION_XY = (TITLE_BLOCK[0] + _PAD, TITLE_BLOCK[3] + 2.0 * _PAD + 0.0046)
 LEVER_LABEL = "lever group exploded"
 # Sheet 4: the sequence and checks down the left, the finished assembly right
 # of them above the title block, its caption centred over it. The lever wire's
@@ -386,6 +397,32 @@ BOM_NORMALIZED_ALIASES = {
 #     the lever once the explode drops it, at normal machine (1, 0, 1)/sqrt2.
 _LEVER_R = LEVER_ROD_DIA / 2.0
 _VROD_R = VROD_DIA / 2.0
+# Machinist review r6 (run 20261016T150215480Z): on the wheel sheet the front
+# washer, nut and locknut explode in a row up and right along the axle, which
+# runs nearly along the rays from the view centre, so walked anchors (washer
+# rim, first nut) left 17's leader through both nuts onto 18's arrowhead.
+# Washer and nuts are Ry(180) in the assembly (local x = -X, y = +Y, z = -Z),
+# so their local z = 0 faces the *Isometric viewer, and a local polar angle
+# phi draws at screen (-cos(phi)/sqrt2, (cos(phi) + 2 sin(phi))/sqrt6): the
+# major-axis ends square to the axle's 30 deg sheet direction are phi 45
+# (up-left) and 225 (down-right). 17 takes the washer rim's up-left end, so its
+# leader passes above the nuts; 18 the locknut's (instance 2, the outermost)
+# down-right flat, clear of everything (the nut's corners sit on its local
+# +-Y meridian, so phi 225 falls on the flat facing 240, at the apothem over
+# cos 15). Ring order then keeps 17 above 18.
+_WASHER_R = front_washer.OD / 2.0
+_NUT_FLAT_R = axle_nut.ACROSS_FLATS / 2.0 / math.cos(math.radians(15.0))
+FRONT_WASHER_BALLOON_POINT_MM = (
+    _WASHER_R * math.cos(math.radians(45.0)),
+    _WASHER_R * math.sin(math.radians(45.0)),
+    0.0,
+)
+LOCKNUT_BALLOON_POINT_MM = (
+    _NUT_FLAT_R * math.cos(math.radians(225.0)),
+    _NUT_FLAT_R * math.sin(math.radians(225.0)),
+    0.0,
+)
+LOCKNUT_INSTANCE = "vn-wheel-axle-nut-2"
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     "mg-magnifying-lever": BalloonAnchor(
         point_mm=(_LEVER_R, _LEVER_R / math.sqrt(2.0), -_LEVER_R / math.sqrt(2.0))
@@ -393,12 +430,18 @@ BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     "mg-magnifying-vertical-rod": BalloonAnchor(
         point_mm=(_VROD_R, -_VROD_R / math.sqrt(2.0), -_VROD_R / math.sqrt(2.0))
     ),
+    "vn-wheel-axle-front-washer": BalloonAnchor(point_mm=FRONT_WASHER_BALLOON_POINT_MM),
+    "vn-wheel-axle-nut": BalloonAnchor(
+        point_mm=LOCKNUT_BALLOON_POINT_MM, instance=LOCKNUT_INSTANCE
+    ),
     explode.WIRE_STEM: BalloonAnchor(point_mm=WIRE_BALLOON_POINT_MM),
 }
 
 EXPLODED_VIEW_NAMES = {
-    ASSEMBLY_VIEW_CONFIGURATION: exploded_view_name(ASSEMBLY_VIEW_CONFIGURATION),
-    SIMPLIFIED_VIEW_CONFIGURATION: exploded_view_name(SIMPLIFIED_VIEW_CONFIGURATION),
+    ASSEMBLY_VIEW_CONFIGURATION: explode.exploded_view_name(ASSEMBLY_VIEW_CONFIGURATION),
+    SIMPLIFIED_VIEW_CONFIGURATION: explode.exploded_view_name(
+        SIMPLIFIED_VIEW_CONFIGURATION
+    ),
 }
 if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the magnifier explode is authored in Default")
@@ -1547,7 +1590,7 @@ async def build(adapter: Any) -> dict[str, str]:
         (
             SHEET_NAMES[2],
             lever,
-            EXPLODED_SCALE_LADDER,
+            LEVER_SCALE_LADDER,
             LEVER_FIELD,
             explode.LEVER_GROUP_STEMS,
             LEVER_LABEL,

@@ -23,8 +23,26 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Sequence
 
+from _simplified_names import simplified_name
+
 EXPLODED_VIEW_NAME = "MG_MAGNIFIER_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
+
+
+def exploded_view_name(configuration: str) -> str:
+    """The named explode ``configuration`` owns: exploded-view names are unique
+    per document, so ``Default Simplified``'s copy carries the suffix too.
+
+    Here, not in ``_mg_magnifier_explode``, so the drawing reads it without
+    importing the builder's COM chain (``_assembly_patterns`` -> ``_assembly``),
+    whose part/assembly config reads would key the sheet on every part YAML."""
+    if configuration == SOURCE_CONFIGURATION:
+        return EXPLODED_VIEW_NAME
+    if configuration == simplified_name(SOURCE_CONFIGURATION):
+        return simplified_name(EXPLODED_VIEW_NAME)
+    raise ValueError(
+        f"{EXPLODED_VIEW_NAME}: no explode is authored in {configuration!r}"
+    )
 
 
 @dataclass(frozen=True)
