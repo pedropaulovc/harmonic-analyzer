@@ -85,6 +85,8 @@ from _drawing_view_configuration import (
 from _drawing_view_display import set_hidden_lines_removed
 from _mg_magnifier_explode import exploded_view_name
 from _session import run_build
+from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA
+from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_wheel_axle_spec import TIP_Y
 from mg_wheel_bar_geom import BORE_ROW_HEIGHT
 
@@ -277,8 +279,32 @@ BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
 # One balloon per family (row); each walks its family's lowest-named shown
-# instance for a visible edge.
-BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
+# instance for a visible edge, except the two capsule rods.
+#
+# MHA-MG-003 and MHA-MG-004 are revolved capsules (a hemispherical dome at
+# each end): no flat face, no end circle. Their only model edges are the two
+# dome-to-cylinder tangent circles at x = R from each tip, which IView's
+# visible-entity list does not report (0 listed, tangent edges shown), and
+# every body extreme point sits on a dome silhouette, which no EDGE hit test
+# picks (r1/r2, runs 20261016T062016526Z-f9642112ccea4d2ab63c137a71a668ea and
+# 20261016T065610791Z-790156178d0b4378a1fd0680e77ece6b: the lever walked 12
+# extremes, no ink). So each is pinned to the point of a tangent circle that
+# faces the *Isometric viewer (+X+Y+Z, mg_magnifier_explode_spec): its part
+# normal is the view direction projected square to the rod axis.
+#   lever, Ry(180) in the assembly (local y = +Y, z = -Z): the west junction
+#     (x = R, 50 clear of the clamp) at normal machine (0, 1, 1)/sqrt2;
+#   vertical rod (local x = -Y, y = -X, z = -Z): the top junction, 37 below
+#     the lever once the explode drops it, at normal machine (1, 0, 1)/sqrt2.
+_LEVER_R = LEVER_ROD_DIA / 2.0
+_VROD_R = VROD_DIA / 2.0
+BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
+    "mg-magnifying-lever": BalloonAnchor(
+        point_mm=(_LEVER_R, _LEVER_R / math.sqrt(2.0), -_LEVER_R / math.sqrt(2.0))
+    ),
+    "mg-magnifying-vertical-rod": BalloonAnchor(
+        point_mm=(_VROD_R, -_VROD_R / math.sqrt(2.0), -_VROD_R / math.sqrt(2.0))
+    ),
+}
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: exploded_view_name(ASSEMBLY_VIEW_CONFIGURATION),
@@ -1181,12 +1207,12 @@ _TANGENT_EDGES_VISIBLE = 2  # swDisplayTangentEdges_e.swTangentEdgesVisible
 def _show_tangent_edges(adapter: Any, view: Any, *, label: str) -> None:
     """Draw the view's tangent edges and read the mode back.
 
-    The MHA-MG-003 lever is a capsule: a revolved rod with a hemispherical
-    dome at each end, so its only model edges are tangent ones (the dome
-    junctions and the press-zone land). With tangent edges hidden the view
-    lists none of its edges as drawn and its balloon finds no ink (r1, run
-    20261016T062016526Z-f9642112ccea4d2ab63c137a71a668ea: 0 listed visible
-    edges, no hit on its 12 body extremes).
+    The lever and vertical rod balloons are pinned to their capsules' dome
+    tangent circles (:data:`BALLOON_ANCHORS`), which a hit test can only
+    select while the view draws tangent edges. The mode read 2 (visible)
+    before any change on r2 (run
+    20261016T065610791Z-790156178d0b4378a1fd0680e77ece6b); the read-back keeps
+    a template change from silently hiding the anchors' edges.
     """
     bound = _early_bound(view, "IView")
     before = int(bound.GetDisplayTangentEdges2())
