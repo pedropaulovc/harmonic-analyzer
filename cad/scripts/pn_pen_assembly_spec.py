@@ -140,7 +140,9 @@ EXPLODE_STEPS = (
     ("hanger jam nut off", (HANGER_JAM_NUT,), "z", -26.0),
     ("hanger nut off", (HANGER_NUT,), "z", -14.0),
     ("hanger screw out behind", (HANGER_SCREW,), "z", 22.0),
-    ("wire off the stud eye", (WIRE,), "y", 26.0),
+    # Lifted clear above the hanger nuts: at 26 the wire's straight run read
+    # through nut 13 in the exploded view (machinist review r3).
+    ("wire off the stud eye", (WIRE,), "y", 60.0),
     ("rod out of the guides", (ROD, STUD, STUD_NUT, *_CARRIAGE), "z", -48.0),
     ("stud out of the rod", (STUD, STUD_NUT), "y", 12.0),
     ("jam nut off the stud", (STUD,), "y", 10.0),
@@ -275,10 +277,14 @@ CARRIAGE_DETAIL_RADIUS = 20.0
 # The two points whose sheet direction the turned detail lays along +X.
 CARRIAGE_AXIS_POINTS = (carriage.MARKER_POS, _END_MACHINE)
 
+# A and B are drawn in FRONT's and RIGHT's own directions and are bounded
+# there; C is the turned plan, so its title names its viewing direction.
+DETAIL_LETTERS = {"stud": "A", "hanger": "B", "carriage": "C"}
 SHEET_TITLES = {
-    "carriage": "DETAIL C\nPEN YAW + NIB PRESET\nSCALE 2 : 1",
-    "stud": "DETAIL A\nSTUD HEIGHT + LOCK\nSCALE 2 : 1",
-    "hanger": "DETAIL B\nHANGER SCREW LOCK\nSCALE 2 : 1",
+    "carriage": f"DETAIL {DETAIL_LETTERS['carriage']} - FROM ABOVE\n"
+    "PEN YAW + NIB PRESET\nSCALE 2 : 1",
+    "stud": f"DETAIL {DETAIL_LETTERS['stud']}\nSTUD HEIGHT + LOCK\nSCALE 2 : 1",
+    "hanger": f"DETAIL {DETAIL_LETTERS['hanger']}\nHANGER SCREW LOCK\nSCALE 2 : 1",
 }
 VIEW_TITLES = {
     "front": "FRONT\nSCALE 1 : 2",
