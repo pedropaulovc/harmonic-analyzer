@@ -38,6 +38,7 @@ The crank also drives the paper sideways, through a reduction, a chain, and a ra
 | `pd-transgear-pin` | TODO | TODO | TODO |
 | `vn-chain-inner-link` | TODO | TODO | TODO |
 | `vn-chain-outer-link` | TODO | TODO | TODO |
+| `vn-chain-connecting-link` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

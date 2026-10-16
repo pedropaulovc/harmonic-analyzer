@@ -294,6 +294,7 @@ BOM_PART_NUMBERS = {
     "vn-guide-lock-screw": _config.parts("vn-guide-lock-screw")["number"],
     "vn-chain-inner-link": _config.parts("vn-chain-inner-link")["number"],
     "vn-chain-outer-link": _config.parts("vn-chain-outer-link")["number"],
+    "vn-chain-connecting-link": _config.parts("vn-chain-connecting-link")["number"],
     "pd-transgear-removable": _config.parts("pd-transgear-removable")["number"],
     "pd-transgear-arm": _config.parts("pd-transgear-arm")["number"],
     "pd-transgear-arm-plate": _config.parts("pd-transgear-arm-plate")["number"],
@@ -331,6 +332,9 @@ _SKU = {
     "vn-guide-lock-screw": _config.parts("vn-guide-lock-screw")["supplier_skus"][0],
     "vn-chain-inner-link": _config.parts("vn-chain-inner-link")["supplier_skus"][0],
     "vn-chain-outer-link": _config.parts("vn-chain-outer-link")["supplier_skus"][0],
+    "vn-chain-connecting-link": _config.parts("vn-chain-connecting-link")[
+        "supplier_skus"
+    ][0],
     "vn-transgear-arm-plate-screw": _config.parts("vn-transgear-arm-plate-screw")[
         "supplier_skus"
     ][0],
@@ -378,6 +382,9 @@ BOM_DESCRIPTIONS = {
     "vn-guide-lock-screw": f"PAN HEAD SCREW, MCMASTER {_SKU['vn-guide-lock-screw']}",
     "vn-chain-inner-link": f"ANSI #25 INNER LINK, MCMASTER {_SKU['vn-chain-inner-link']}",
     "vn-chain-outer-link": f"ANSI #25 OUTER LINK, MCMASTER {_SKU['vn-chain-outer-link']}",
+    "vn-chain-connecting-link": (
+        f"ANSI #25 CONN. LINK, MCMASTER {_SKU['vn-chain-connecting-link']}"
+    ),
     # Grouped: its configurations' BOM description wins over a written cell,
     # so the row prints the registry description the builder stamps.
     "pd-transgear-removable": str(_config.parts("pd-transgear-removable")["description"]),
@@ -481,11 +488,13 @@ TRANSGEAR_QUANTITIES = {
     "pd-transgear-knob-cup": 1,
     "vn-transgear-knob-cup-pin": 1,
 }
-# One assembled inner or outer link spans one pitch; the connecting link
-# replaces an outer link, rather than adding a pitch to the closed loop.
+# One assembled inner or outer link spans one pitch. The chain is cut with an
+# inner link at each end, and the connecting link closes the loop as its last
+# outer link.
 CHAIN_QUANTITIES = {
     "vn-chain-inner-link": chain.LINK_COUNT // 2,
-    "vn-chain-outer-link": chain.LINK_COUNT // 2,
+    "vn-chain-outer-link": chain.LINK_COUNT // 2 - 1,
+    "vn-chain-connecting-link": 1,
 }
 if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
     raise AssertionError("every transgear family is a BOM row")
@@ -766,6 +775,7 @@ SPARE_INSTANCE = "pd-transgear-removable-3"
 ASSEMBLED_BALLOON_ANCHORS = {
     "vn-chain-inner-link": BalloonAnchor(),
     "vn-chain-outer-link": BalloonAnchor(),
+    "vn-chain-connecting-link": BalloonAnchor(),
     "pd-transgear-removable": BalloonAnchor(instance=SPARE_INSTANCE),
 }
 # Sheet 3's exploded view balloons every family it shows.
@@ -1237,12 +1247,12 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "chain-closed": (
             f"LOOP {chain.LINK_COUNT} PITCHES OF ANSI #25 CHAIN, "
-            f"{_N['vn-chain-inner-link']} INNER AND {_N['vn-chain-outer-link']} OUTER "
-            f"LINKS, OVER THE {sprocket.KNOB_CONFIG} AND THE {sprocket.CRANK_CONFIG}; "
-            "JOIN THE ENDS WITH A #25 CONNECTING LINK, MCMASTER "
-            f"{_config.parts('vn-chain-outer-link')['supplier_skus'][1]}, "
-            "AS ONE OUTER LINK, ITS CLIP'S CLOSED END LEADING "
-            "IN THE DIRECTION OF TRAVEL. THE CENTRES ARE FIXED: NO TENSIONING, "
+            f"{CHAIN_QUANTITIES['vn-chain-inner-link']} {_N['vn-chain-inner-link']} INNER "
+            f"AND {CHAIN_QUANTITIES['vn-chain-outer-link']} {_N['vn-chain-outer-link']} "
+            f"OUTER LINKS, OVER THE {sprocket.KNOB_CONFIG} AND THE {sprocket.CRANK_CONFIG}; "
+            f"JOIN THE ENDS WITH THE {_N['vn-chain-connecting-link']} #25 CONNECTING "
+            f"LINK, MCMASTER {_SKU['vn-chain-connecting-link']}, ITS CLIP'S CLOSED END "
+            "LEADING IN THE DIRECTION OF TRAVEL. THE CENTRES ARE FIXED: NO TENSIONING, "
             "THE SLACK RUN HANGS FREE."
         ),
         "chain-run-accepted": (

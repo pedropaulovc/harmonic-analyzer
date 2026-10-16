@@ -793,9 +793,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         frozenset(("vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")),
         frozenset(("vn-transgear-knob-cup-pin-1", "pd-transgear-knob-cup-1")),
     }
+    # MHA-VN-068's chain mesh on the T24 at the closing station (#1457).
+    connecting_link_pair = frozenset(
+        ("pd-transgear-removable-1", "vn-chain-connecting-link-1")
+    )
     special_pairs = {
         "dt-drive-train": crank_pairs,
-        "pd-paper-drive": cup_pin_pairs,
+        "pd-paper-drive": cup_pin_pairs | {connecting_link_pair},
     }
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)

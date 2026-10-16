@@ -411,6 +411,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_chain_connecting_link",
+        part="vn_chain_connecting_link",
+        artifact_stem="vn-chain-connecting-link",
+        script_name="draw_vn_chain_connecting_link.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_chain_inner_link",
         part="vn_chain_inner_link",
         artifact_stem="vn-chain-inner-link",
