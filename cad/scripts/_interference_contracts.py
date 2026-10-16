@@ -296,11 +296,11 @@ _MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 10.1)
 # Ø2.261 drill from the top face to the lever-bore top (THUMB_TAP_LENGTH 5.9).
 _MG_CLAMP_THUMB_TRIPLE_MM = (2.8448, 2.261, 5.9)
 # The vertical rod's #4-40 end (modelled at the 2.845 major) in the clamp's
-# bottom-face Ø2.261 tap drill. Envelope 6.1 = ROD_THREAD_LEN - RELIEF_WIDTH:
+# bottom-face Ø2.261 tap drill. Envelope 6.0 = ROD_THREAD_LEN - RELIEF_WIDTH:
 # the full-major section from the tip to the relief, which also covers the tip
-# chamfer (its cone lies inside that cylinder); the Ø1.75 relief is smaller than
-# the drill and overlaps nothing.
-_MG_ROD_THREAD_TRIPLE_MM = (2.845, 2.261, 6.1)
+# chamfer (its cone lies inside that cylinder); the Ø1.85 MAX relief is smaller
+# than the drill and overlaps nothing.
+_MG_ROD_THREAD_TRIPLE_MM = (2.845, 2.261, 6.0)
 
 # Bound the press annulus over that whole conservative contact envelope (the
 # straight cylinder plus the partial dome: the triple's third value).

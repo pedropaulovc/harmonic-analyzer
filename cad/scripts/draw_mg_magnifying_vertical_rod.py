@@ -5,12 +5,14 @@ relief at the shoulder that seats on MHA-MG-002, a full hemisphere at the
 bottom. The rod axis is local +X, so the *Front view is the long side
 elevation, thread tip left.
 
-Sheet: the side view at 2:1 (the rod 265 mm long) carries the Ø5, the body
-length from the shoulder (origin circle on the shoulder), the dome R and the
-OD's finish; detail A, a cropped 8:1 *Front model view (draw_pd_transgear_knob_
-shaft's detail-B recipe), carries the 7.5 threaded end: the thread length
-from the shoulder (origin circle), the relief's width and Ø, and the thread
-callout. A 1:1 shaded isometric shows the cosmetic thread.
+Sheet: the side view at 2:1 (the rod 265 mm long) carries the Ø5 (stock
+as supplied), the body length from the shoulder (origin circle on the
+shoulder), the overall "(132.5)" reference and the dome R; detail A, a
+cropped 8:1 *Front model view (draw_pd_transgear_knob_shaft's detail-B
+recipe), carries the 7.5 threaded end: the thread length from the shoulder
+(origin circle) with the seat it guards, the relief's width and its Ø MAX,
+and the thread callout. A 1:1 shaded isometric shows the cosmetic thread.
+No general notes: every requirement rides its own callout.
 
 Run with SolidWorks open::
 
@@ -46,7 +48,6 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_finish import add_surface_finish
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -54,16 +55,13 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _telemetry
 from mg_magnifying_vertical_rod_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     RELIEF_START_X,
-    ROD_DIA,
     ROD_LENGTH,
     SHOULDER_X,
-    SURFACE_FINISHES,
     THREAD_CALLOUT,
     THREAD_MAJOR,
     TIP_CHAMFER,
@@ -90,7 +88,6 @@ VIEW_SCALE = (2, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 SIDE_CENTER = (0.190, 0.105)
 _MID_X = ROD_LENGTH / 2.0
-R = ROD_DIA / 2.0
 ISO_SCALE = (1, 1)
 ISO_CENTER = (0.330, 0.200)
 
@@ -101,21 +98,21 @@ def _sheet_x(model_x_mm: float) -> float:
     return SIDE_CENTER[0] + (model_x_mm - _MID_X) * _S / 1000.0
 
 
-def _sheet_y(model_y_mm: float) -> float:
-    return SIDE_CENTER[1] + model_y_mm * _S / 1000.0
-
-
 TIP_X = _sheet_x(0.0)
 SHOULDER_SHEET_X = _sheet_x(SHOULDER_X)
 DOME_TIP_X = _sheet_x(ROD_LENGTH)
 
 # Side view (drawing-guidelines.md rule 11, turned parts read like the lathe):
 # the body length baselines from the shoulder, its origin circle on the
-# shoulder's extension line, on one row under the rod over the title block.
+# shoulder's extension line, on the row under the rod; the overall reference
+# runs outermost under it, left of the body length's text and clear of the
+# title block (top 0.066 right of 0.216).
 SIDE_KEEP = {
-    "BodyLength": ((SHOULDER_SHEET_X + DOME_TIP_X) / 2.0, SIDE_CENTER[1] - 0.025),
-    # The Ø line crosses the body a third of the way along, text above it.
-    "RodDia": (_sheet_x(0.33 * ROD_LENGTH), SIDE_CENTER[1] + 0.020),
+    "BodyLength": ((SHOULDER_SHEET_X + DOME_TIP_X) / 2.0, SIDE_CENTER[1] - 0.012),
+    "OverallLength": (_sheet_x(0.25 * ROD_LENGTH), SIDE_CENTER[1] - 0.027),
+    # The Ø line crosses the body three quarters along, its two-line block
+    # above the rod, clear of detail A's rows and of the body length's text.
+    "RodDia": (_sheet_x(0.75 * ROD_LENGTH), SIDE_CENTER[1] + 0.020),
     # Above-right of the dome: the leader lands on its upper quarter.
     "DomeR": (DOME_TIP_X + 0.012, SIDE_CENTER[1] + 0.017),
 }
@@ -159,8 +156,10 @@ DETAIL_SHOULDER_X = _detail_xy(SHOULDER_X, 0.0)[0]
 DETAIL_KEEP = {
     # Its line rises through the relief's air to text over the crop.
     "ReliefDia": (_detail_xy(_RELIEF_MID_X, 0.0)[0], _DETAIL_TOP + 0.008),
-    # Under the crop, nearest the part: the relief's width.
-    "ReliefWidth": (_detail_xy(_RELIEF_MID_X, 0.0)[0], _DETAIL_BOTTOM - 0.007),
+    # Under the crop, nearest the part, its text right of the shoulder's
+    # extension line (outside both of its own) and over the thread length's
+    # block, which it no longer shares a column with.
+    "ReliefWidth": (DETAIL_SHOULDER_X + 0.013, _DETAIL_BOTTOM - 0.003),
     # The next row down: the thread end from the shoulder to the tip.
     "ThreadLength": (_detail_xy(SHOULDER_X / 2.0, 0.0)[0], _DETAIL_BOTTOM - 0.020),
 }
@@ -169,7 +168,9 @@ DETAIL_KEEP = {
 THREAD_PICK = _detail_xy((TIP_CHAMFER + RELIEF_START_X) / 2.0, THREAD_MAJOR / 2.0)
 THREAD_NOTE_XY = (0.030, DETAIL_CENTER[1] + 0.036)
 THREAD_NOTE_TEXT = f"{THREAD_CALLOUT}\nTIP 45° CHAMFER TO MINOR Ø"
-DETAIL_LABEL_XY = (0.020, DETAIL_CENTER[1] - 0.020)
+# Under detail A's lower-left, left of the thread length's tip extension
+# line (sheet x 0.090), so the label reads with its view.
+DETAIL_LABEL_XY = (0.050, _DETAIL_BOTTOM + 0.008)
 # The mark's letter, up-left of the mark circle round the side view's tip.
 PARENT_LETTER_XY = (TIP_X - 0.010, SIDE_CENTER[1] + 0.014)
 
@@ -178,25 +179,23 @@ DRAWING_PRECISION_BY_NAME = {
     for names in DRAWING_PRECISION.values()
     for name, places in names.items()
 }
-# Each length names the face it reads from (drawing-guidelines.md rule 4).
+# Each length names the face it reads from (drawing-guidelines.md rule 4);
+# the thread length's band names its mate at the callout: it keeps the tip
+# off the bottom of MHA-MG-002's tap so the shoulder, not the tip, seats.
 DIMENSION_CALLOUTS = {
     "BodyLength": "FROM SHOULDER",
-    "ThreadLength": "FROM SHOULDER",
+    "ThreadLength": "FROM SHOULDER\nSEATS ON MHA-MG-002;\nTIP CLEARS ITS TAP",
+    # drawing-guidelines.md rule 4: the bar's own OD, no finishing pass.
+    "RodDia": "STOCK OK",
+    "DomeR": "TANGENT HEMISPHERE",
 }
 # ASME Y14.5 dimension origin (swArrowStyle_e): both lengths read from the
 # shoulder, the seating face that plumbs the rod.
 ORIGIN_DIMENSIONS = ("BodyLength", "ThreadLength")
 _ORIGIN_ARROWHEAD = 4  # swArrowStyle_e.swORIGIN_ARROWHEAD
 _CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
-# drawing-guidelines.md rule 6: the output fixture slides on the Ø5 OD; the
-# symbol lands on the body's top silhouette two-thirds along, right of the Ø.
-OD_FINISH_PICK = (_sheet_x(0.6 * ROD_LENGTH), _sheet_y(R))
-OD_FINISH_SYMBOL = (_sheet_x(0.6 * ROD_LENGTH) + 0.004, SIDE_CENTER[1] + 0.015)
-FINISH_CHAR_HEIGHT = 0.0025
 # A point on the body face, clear of the Ø dimension line.
 CENTERLINE_PICK = (_sheet_x(0.2 * ROD_LENGTH), SIDE_CENTER[1] + 0.002)
-# Bottom-left, left of the title block, under the body-length row.
-NOTES_XY = (0.020, 0.060)
 ISO_NOTE_XY = (0.290, 0.160)
 
 
@@ -503,7 +502,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Iso View Note",
         ),
         required=(
@@ -511,7 +509,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Iso View Note",
         ),
     )
@@ -582,23 +579,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="vertical rod thread callout",
         entity_type="SILHOUETTE",
     )
-    add_surface_finish(
-        adapter,
-        side,
-        edge_xy=spt(*OD_FINISH_PICK),
-        entity_type="SILHOUETTE",
-        symbol_xy=spt(*OD_FINISH_SYMBOL),
-        leader_attach_xy=spt(*OD_FINISH_PICK),
-        control=surface_finish_by_key(SURFACE_FINISHES, "mg_vrod_slide"),
-        label="vertical rod OD finish",
-        char_height=FINISH_CHAR_HEIGHT,
-    )
     # The mark and the labels go on once every pick is done, so no
     # coordinate pick in the side view meets the mark circle.
     _mark_detail_on_side(adapter, side)
     _label_detail(adapter, detail, side, spt(*PARENT_LETTER_XY))
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Iso View Note", *ISO_NOTE_XY)
     # The shaded isometric shows the #4-40 the callout names; imported before
     # finalize's note cleanup (draw_mg_wheel_axle).

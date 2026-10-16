@@ -58,23 +58,29 @@ DIE_RUNOUT = 1.5 * THREAD_PITCH  # 0.9525
 TIP_INCOMPLETE = THREAD_PITCH  # 0.635
 
 # --- the rod's threaded end, read from the shoulder (the seating face) -------
+# The title block's .XX band as a literal (pinned to _printed_tolerance by
+# test_mg_rod_clamp_joint): the rod and output-fixture geometry import this
+# module, and a title-block edit must not re-key them.
+PRINTED_XX_BAND = 0.51
 # Length from the shoulder to the thread tip, with its own printed band.
 ROD_THREAD_LEN = 7.50
 ROD_THREAD_LEN_BAND = (0.25, -0.25)
-# The relief groove at the shoulder: wide enough to take the die's run-out at
-# its narrowest, its diameter under the die's root at its largest, so the die
-# cuts full thread right up to the relief and nothing past it.
-RELIEF_WIDTH = 1.40
-RELIEF_WIDTH_BAND = (0.20, -0.20)
-RELIEF_DIA = 1.75
-RELIEF_DIA_BAND = (0.10, -0.10)
+# The relief groove at the shoulder mates with nothing (r1 machinist review),
+# so it carries no tight band: its diameter prints as the single limit
+# "Ø1.85 MAX" (swTolMAX prints the model value, so the model IS the limit),
+# under the die's root so the die cuts full thread right up to the relief; its
+# width prints at the title block's .XX band, wide enough at its narrowest to
+# take the die's run-out, its widest setting the worst-case engagement below.
+RELIEF_DIA = 1.85
+RELIEF_DIA_MAX = RELIEF_DIA
+RELIEF_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX
+RELIEF_WIDTH = 1.50
+RELIEF_WIDTH_PLACES = 2
 
 ROD_THREAD_LEN_MIN = ROD_THREAD_LEN + ROD_THREAD_LEN_BAND[1]
 ROD_THREAD_LEN_MAX = ROD_THREAD_LEN + ROD_THREAD_LEN_BAND[0]
-RELIEF_WIDTH_MIN = RELIEF_WIDTH + RELIEF_WIDTH_BAND[1]
-RELIEF_WIDTH_MAX = RELIEF_WIDTH + RELIEF_WIDTH_BAND[0]
-RELIEF_DIA_MAX = RELIEF_DIA + RELIEF_DIA_BAND[0]
-RELIEF_DIA_MIN = RELIEF_DIA + RELIEF_DIA_BAND[1]
+RELIEF_WIDTH_MIN = RELIEF_WIDTH - PRINTED_XX_BAND
+RELIEF_WIDTH_MAX = RELIEF_WIDTH + PRINTED_XX_BAND
 
 # Full thread on the rod: from the relief's far edge to a pitch short of the
 # tip. All of it lies inside the tap's full thread (checked below), so this is
@@ -89,10 +95,7 @@ ENGAGEMENT_WORST = ROD_FULL_THREAD_MIN
 # past the rod's longest thread at its shallowest print, and the plug tap's
 # five-pitch lead fits under its deepest print above the shallowest drill.
 HOLE_DEPTH_PLACES = 2
-# The title block's .XX band as a literal (pinned to _printed_tolerance by
-# test_mg_rod_clamp_joint): the rod and output-fixture geometry import this
-# module, and a title-block edit must not re-key them.
-HOLE_DEPTH_BAND = 0.51
+HOLE_DEPTH_BAND = PRINTED_XX_BAND
 SEAT_TIP_RESERVE = 0.25
 PLUG_TAP_LEAD = 5.0 * THREAD_PITCH  # 3.175
 _DEPTH_STEP = 0.05  # derived depths round UP to a shop-friendly step
