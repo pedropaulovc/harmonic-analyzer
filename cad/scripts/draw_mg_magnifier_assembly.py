@@ -240,26 +240,28 @@ BOM_REFERENCE_FIELD = (
 )
 BOM_REFERENCE_SCALE_LADDER = ((1.0, 8.0), (1.0, 10.0), (1.0, 12.0), (1.0, 16.0))
 BOM_REFERENCE_LABEL = "BOM reference"
-# Sheet 3: the lever group's exploded view left of the title block, over the
-# sheet's full height; its caption right of it, a line above the title block.
+# Sheet 3: the lever group's exploded view over the full width above the
+# title block, its caption centred under it (lever_caption_xy).
 # Machinist review r6 (run 20261016T150215480Z) found the group too small at
-# 1:3 over the full width: its ring, 116.1 mm tall at 1:3 on that run, needs
-# 208 mm at 1:2, more than the 193 mm above the title block, so the field
-# trades the empty right half for the height left of it.
+# 1:3; r7 (run 20261016T162927333Z) took 1:2 left of the title block as
+# unbalanced, the right half empty and the caption far from the view. The
+# group's outline measured 82.6 x 116.1 mm at 1:3 and 118.3 x 168.6 at 1:2
+# (11.1 mm of it fixed padding), so its ring needs 202.6 mm at 1:2, more
+# than the 192.7 above the title block, and 171 at 1:2.5, which fits centred
+# with room for the caption under it.
 LEVER_FIELD = (
     INNER_BORDER[0] + _PAD,
-    INNER_BORDER[1] + _PAD,
-    TITLE_BLOCK[0] - _PAD,
+    TITLE_BLOCK[3] + _PAD,
+    INNER_BORDER[2] - _PAD,
     INNER_BORDER[3] - _PAD,
 )
-LEVER_SCALE_LADDER = ((1.0, 2.0), (1.0, 2.5), (1.0, 3.0), (1.0, 4.0))
+LEVER_SCALE_LADDER = ((1.0, 2.5), (1.0, 3.0), (1.0, 4.0))
 if any(
     view_configuration(scale, _SW_SHADED_EDGES) != SIMPLIFIED_VIEW_CONFIGURATION
     for scale in LEVER_SCALE_LADDER
 ):
     raise AssertionError("a rescale on the lever ladder would switch configuration")
 LEVER_GROUP = "LEVER GROUP"
-LEVER_CAPTION_XY = (TITLE_BLOCK[0] + _PAD, TITLE_BLOCK[3] + 2.0 * _PAD + 0.0046)
 LEVER_LABEL = "lever group exploded"
 # Sheet 4: the sequence and checks down the left, the finished assembly right
 # of them above the title block, its caption centred over it. The lever wire's
@@ -1112,6 +1114,48 @@ def _create_sheets(adapter: Any) -> None:
         numerator, denominator = SHEET_SCALES[name]
         if not sheet.SetScale(float(numerator), float(denominator), False, False):
             raise RuntimeError(f"failed to set magnifier sheet scale: {name}")
+    _draw_construction_as_chain(adapter)
+
+
+# swconst.tlb (SOLIDWORKS 2026): swUserPreferenceIntegerValue_e
+# swLineFontConstructionCurvesStyle 66 / ...Thickness 65; swLineStyles_e
+# swLineCHAIN 3; swLineWeights_e swLW_THIN 0; swDetailingNoOptionSpecified 0.
+_PREF_CONSTRUCTION_STYLE = 66
+_PREF_CONSTRUCTION_THICKNESS = 65
+_LINE_CHAIN = 3
+_LINE_THIN = 0
+
+
+def _draw_construction_as_chain(adapter: Any) -> None:
+    """Print the setting chains (construction lines on the lever, vertical-rod
+    and axle axes) as thin dash-dot centrelines.
+
+    Machinist review r7 (run 20261016T162927333Z) read the lever chain on the
+    back view, drawn in the document's long-short construction font down the
+    vertical rod, as hidden lines, though the view is hidden-lines-removed.
+    The chains must stay shown or their dimensions hide with them
+    (_drawing_hidden_sketches, r21), so they print as the axes they lie on.
+    A document property, read back: a rejected write raises.
+    """
+    extension = adapter.currentModel.Extension
+    for pref, value in (
+        (_PREF_CONSTRUCTION_STYLE, _LINE_CHAIN),
+        (_PREF_CONSTRUCTION_THICKNESS, _LINE_THIN),
+    ):
+        before = int(extension.GetUserPreferenceInteger(pref, 0))
+        ok = extension.SetUserPreferenceInteger(pref, 0, value)
+        after = int(extension.GetUserPreferenceInteger(pref, 0))
+        _telemetry.info(
+            f"construction line font pref {pref}: {before} -> {after}",
+            pref=pref,
+            before=before,
+            after=after,
+        )
+        if not ok or after != value:
+            raise RuntimeError(
+                f"construction line font pref {pref} reads {after} after setting "
+                f"{value} (set returned {ok!r})"
+            )
 
 
 _INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After
@@ -1370,6 +1414,17 @@ def caption_under(outline: Box, text: str) -> tuple[float, float]:
     """Top-left of a one-line caption centred under ``outline``."""
     width = len(text) * CAPTION_CHAR_WIDTH
     return (outline[0] + outline[2] - width) / 2.0, outline[1] - CAPTION_GAP
+
+
+def lever_caption_xy(outline: Box, text: str) -> tuple[float, float]:
+    """``caption_under`` the lever view, proved clear of the title block."""
+    left, top = caption_under(outline, text)
+    if top - NOTE_LINE_PITCH < TITLE_BLOCK[3] + _PAD:
+        raise ValueError(
+            f"lever caption at {(left, top)!r} reaches the title block: the view "
+            f"outline {outline!r} sits too low"
+        )
+    return left, top
 
 
 def caption_over(outline: Box, text: str) -> tuple[float, float]:
@@ -1639,11 +1694,12 @@ async def build(adapter: Any) -> dict[str, str]:
         WHEEL_CAPTION_XY,
         label="wheel caption",
     )
+    lever_caption = exploded_caption(LEVER_GROUP, scales[LEVER_LABEL])
     _add_note_block(
         adapter,
         SHEET_NAMES[2],
-        exploded_caption(LEVER_GROUP, scales[LEVER_LABEL]),
-        LEVER_CAPTION_XY,
+        lever_caption,
+        lever_caption_xy(_view_outline(lever, label=LEVER_LABEL), lever_caption),
         label="lever caption",
     )
     finished_caption = f"{FINISHED_CAPTION} (SCALE {scale_text(scales[FINISHED_LABEL])})"
