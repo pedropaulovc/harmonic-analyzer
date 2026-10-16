@@ -18,7 +18,6 @@ to the fixture axis. They print at the title block's general tolerance.
 from __future__ import annotations
 
 import magnifying_bracket_joint_layout as _bracket
-import mg_lever_press_fit_geom as _press
 import mg_magnifier_assembly_steps as _steps
 import mg_magnifying_lever_geom as _lever
 import mg_output_fixture_geom as _fixture
@@ -196,9 +195,11 @@ for _length_mm, _inches in (
 
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 4"
 
-_PRESS_KN = _press.PRESS_FORCE_MAX_KN
 # One line per step key (mg_magnifier_assembly_steps.SEQUENCE). Settings are
 # named, never valued: their values print as the model dimensions on sheet 1.
+# Ends and sides are named by features the fitter can see (the lever's PRESS
+# ZONE on MHA-MG-003, the bracket), not compass words no view defines
+# (machinist review r1).
 STEP_TEXT = {
     _steps.AXLE_PRESSED_KEY: (
         "PRESS THE MHA-MG-007 WHEEL AXLE INTO THE MHA-MG-008 WHEEL BAR FROM ITS "
@@ -228,22 +229,21 @@ STEP_TEXT = {
         "THE ENDSHAKE."
     ),
     "collar-pressed": (
-        "LIGHT-PRESS THE MHA-MG-001 BRACKET'S COLLAR ONTO THE EAST END OF THE "
-        "MHA-MG-003 LEVER, LEVER END FLUSH WITH THE COLLAR'S OUTER FACE, "
-        f"{_PRESS_KN:.1f} kN MAX. RETAIN WITH LOCTITE 638; ALTERNATIVE: SOFT "
-        "SOLDER OR BRAZE. THE TWO MHA-VN-050 SCREWS GO WITH THE LEVER: "
-        "MHA-HA-000 DRIVES THEM INTO THE SUMMING LEVER."
+        "LIGHT-PRESS THE MHA-MG-001 BRACKET'S COLLAR ONTO THE PRESS-ZONE END OF "
+        "THE MHA-MG-003 LEVER, LEVER END FLUSH WITH THE COLLAR'S OUTER FACE. "
+        "RETAIN WITH LOCTITE 638; ALTERNATIVE: SOFT SOLDER OR BRAZE. THE TWO "
+        "MHA-VN-050 SCREWS GO WITH THE LEVER: MHA-HA-000 DRIVES THEM INTO THE "
+        "SUMMING LEVER."
     ),
     _steps.CLAMP_SET_KEY: (
-        "SLIDE THE MHA-MG-002 CLAMP ONTO THE LEVER FROM ITS WEST END, SCREW "
+        "SLIDE THE MHA-MG-002 CLAMP ONTO THE LEVER FROM ITS FREE END, SCREW "
         "HOLE UP, TO THE CLAMP STATION (SHEET 1); TIGHTEN ITS MHA-VN-011 THUMB "
         "SCREW BY HAND."
     ),
     _steps.FIXTURE_SET_KEY: (
         "PASS THE MHA-MG-004 ROD UP THROUGH THE MHA-MG-006 FIXTURE INTO THE "
         "CLAMP'S ROD BORE. SET THE FIXTURE AT THE FIXTURE DROP (SHEET 1), "
-        "SPIGOT EAST TOWARD THE BRACKET; TIGHTEN ITS MHA-VN-011 THUMB SCREW BY "
-        "HAND."
+        "SPIGOT TOWARD THE BRACKET; TIGHTEN ITS MHA-VN-011 THUMB SCREW BY HAND."
     ),
     _steps.WIRE_HOOKED_KEY: (
         "AFTER MHA-HA-000 HAS CLAMPED THE BAR AND SCREWED THE BRACKET TO THE "
@@ -253,7 +253,8 @@ STEP_TEXT = {
     _steps.WIRE_TIED_KEY: (
         "LEAD THE WIRE DOWN TO THE DRUM'S RIGHT SIDE, SEEN FROM THE FRONT; WRAP "
         "IT CLOCKWISE DOWN THE DRUM TO TIE 1, THE AXIAL HOLE AT 6 O'CLOCK IN "
-        "THE WHEEL BOSS; PASS IT THROUGH AND SECURE THE TAIL WITH THE WIRE TAUT."
+        "THE WHEEL BOSS; PASS IT THROUGH WITH THE WIRE TAUT AND TWIST THE TAIL "
+        "BACK ON ITSELF, AT LEAST THREE TURNS."
     ),
 }
 if tuple(STEP_TEXT) != _steps.SEQUENCE:
