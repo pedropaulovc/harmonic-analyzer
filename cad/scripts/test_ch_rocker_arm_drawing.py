@@ -696,7 +696,11 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         assert kwargs["attach_xy"] == pytest.approx(_front_xy(sign * drawing.TOP_END_X, drawing.TOP_END_Y))
         dx, dy = drawing.BETWEEN_POINT_OFFSET[letter]
         assert kwargs["text_xy"] == pytest.approx((kwargs["attach_xy"][0] + dx, kwargs["attach_xy"][1] + dy))
-        assert math.copysign(1.0, dx) == sign  # each letter sits outboard of its corner
+    # J sits outboard of its corner; K's outboard side holds view F's arrow
+    # letter, so K rises above its corner with its text left of the corner.
+    assert drawing.BETWEEN_POINT_OFFSET["J"][0] < 0.0
+    k_dx, k_dy = drawing.BETWEEN_POINT_OFFSET["K"]
+    assert k_dx + 0.0025 < 0.0 < k_dy  # K's ~2.2 mm glyph ends left of its corner
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
     for (args, kwargs), name, radius, model_x, frame_xy, outside, quantity in zip(
         frames,
@@ -2136,7 +2140,7 @@ def test_detail_d_leaders_use_four_separate_quadrants(bound, monkeypatch) -> Non
     assert math.dist(rim, _PIVOT_CENTRE) == pytest.approx(_DETAIL_BORE_R)
     assert symbol[0] > rim[0] and symbol[1] < rim[1]
     assert drawing.HUB_KEEP["PivotDia"] == (0.120, 0.086)
-    assert drawing.HUB_KEEP["HubDia"] == (0.210, 0.122)
+    assert drawing.HUB_KEEP["HubDia"] == (0.212, 0.108)
 
 
 def test_both_bores_are_picked_by_diameter_not_by_a_rim_coordinate() -> None:

@@ -274,10 +274,12 @@ ARC_RADIUS_NAMES = ("TopRadius", "BottomRadius")
 # (J), down the land and taper, along R816, and up to the top-arc end at +X (K).
 # Both letters point at their corners in the front view, the frame's view.
 # Sheet offsets from the projected corner (v43 render): J sits left of the
-# (292.51) witness; K sits right of the E circle, above view F's arrow letter
-# (level with the land's midpoint) and clear of the 8.46 dim line.
+# (292.51) witness. K's outboard side is view F's arrow letter: any K text right
+# of its corner puts K's leader box over F's (main-r1 farm audit, 0.9 mm), so K
+# sits above its corner, centred between the 133.07 and (292.51) extension
+# lines (2.2 mm each side) and 2 mm above the E circle.
 PROFILE_BETWEEN = ("J", "K")
-BETWEEN_POINT_OFFSET = {"J": (-0.007, 0.002), "K": (0.009, 0.008)}
+BETWEEN_POINT_OFFSET = {"J": (-0.007, 0.002), "K": (-0.0039, 0.008)}
 LAND_LABEL = "LAND"
 # Sheet-layout clearance, NOT a manufacturing tolerance. SIDE_SMART may put
 # the native junction on either frame edge; prove its rebuilt route, not a
@@ -1911,9 +1913,13 @@ HUB_OD = requirement(
         "position_datums": (["A"], (("draw_ch_rocker_arm", "_hub_position_frame"),)),
     }, precision={"dia": _P, "coaxiality_dia": _P},
 )
+# The Ø10.20's attached position frame takes its leader shoulder and lifts the
+# value ~11 mm above the requested point (main-r1 farm screen: from 0.122 onto
+# the 132.76 R816/TAPER row). Requested lower, the stack lands in the free
+# band right of D's crop and under that dimension line (~0.131) either way.
 HUB_KEEP = {
     "PivotDia": (0.120, 0.086),
-    "HubDia": (0.210, 0.122),
+    "HubDia": (0.212, 0.108),
 }
 END_KEEP = {"RodTipLen": (0.377, 0.130)}
 # View F at 3:1 (RIGHT_CENTER; strap faces x 0.0713/0.0788, hub ends
