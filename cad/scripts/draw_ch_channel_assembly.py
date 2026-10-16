@@ -125,6 +125,7 @@ def _fitup_notes() -> tuple[str, str]:
     spring = _config.parts("vn-rocker-bank-spring")["number"]
     pivot_set_screw = _config.parts("vn-arbor-set-screw")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]
+    hold_down = _config.parts("vn-bracket-hold-down-screw")["number"]
     keeper = _config.parts("ch-fulcrum-keeper")["number"]
     fulcrum_shaft = _config.parts("ch-fulcrum-shaft")["number"]
     fulcrum_set_screw = _config.parts("vn-fulcrum-set-screw")["number"]
@@ -177,8 +178,8 @@ def _fitup_notes() -> tuple[str, str]:
             f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS. "
             f"FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
             f"{ROCKER_SPRING_SET:.2f} BLADE BESIDE THE SPRING, BANK PUSHED NORTH. "
-            f"CLAMP, TRANSFER ITS SEAT INTO THE {support} RAIL, SCREW DOWN, "
-            "PULL THE BLADE."
+            f"CLAMP, TRANSFER ITS SEAT INTO THE {support} RAIL, TAP AS {support}, "
+            f"SCREW DOWN ONE {hold_down}, PULL THE BLADE."
         ),
         "shaft-set": (
             f"SLIDE THE {shaft} SHAFT UNTIL ITS NORTH TIP STANDS "

@@ -307,8 +307,10 @@ FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
 # 177.8, which moves out to clear it. The top flat's two edges print off the
 # web's centre plane (WebLocationReference, blanked in the part; owner
 # Q13-B), both on the row above the section: each span is only 4.2 mm of
-# sheet, so each text stands outboard of its own edge, and the right one's
-# reason rows hang below it, above the R0.8 MAX's block. The 63.5 prints
+# sheet, so each text stands outboard of its own edge (the right one at
+# least 2 mm clear of the left span's outboard arrow, the audit's arrow
+# clearance; r3 render: 1.91 at 0.2375), and the right one's reason rows
+# hang below it, above the R0.8 MAX's block. The 63.5 prints
 # right of the web face's extension line WebFaceStation runs down to just
 # above it, its row no lower than r8's (r10 review: 1 mm lower, its left
 # extension line's overshoot struck the SECTION A-A label's E).
@@ -318,7 +320,7 @@ RIGHT_KEEP = {
     "WallHeight": (0.256, 0.185),
     "FootSpan": (0.2125, 0.133),
     "TopFlatMinusZStation": (0.191, 0.2475),
-    "TopFlatPlusZStation": (0.2375, 0.2475),
+    "TopFlatPlusZStation": (0.2385, 0.2475),
     "WebFaceStation": (0.1958, 0.1375),
     "PocketFloorRadius": (0.2335, 0.2195),
 }
