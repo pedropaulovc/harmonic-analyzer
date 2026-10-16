@@ -284,13 +284,14 @@ CARRIAGE_DETAIL_RADIUS = 20.0
 # The two points whose sheet direction the turned detail lays along +X.
 CARRIAGE_AXIS_POINTS = (carriage.MARKER_POS, _END_MACHINE)
 
-# A and B are drawn in FRONT's and RIGHT's own directions and are bounded
-# there; C is the turned plan, so its title names its viewing direction.
+# A and B are bounded on RIGHT; A is drawn from the front and C is the
+# turned plan, so each of those titles names its viewing direction.
 DETAIL_LETTERS = {"stud": "A", "hanger": "B", "carriage": "C"}
 SHEET_TITLES = {
     "carriage": f"DETAIL {DETAIL_LETTERS['carriage']} - FROM ABOVE\n"
     "PEN YAW + NIB PRESET\nSCALE 2 : 1",
-    "stud": f"DETAIL {DETAIL_LETTERS['stud']}\nSTUD HEIGHT + LOCK\nSCALE 2 : 1",
+    "stud": f"DETAIL {DETAIL_LETTERS['stud']} - FROM FRONT\n"
+    "STUD HEIGHT + LOCK\nSCALE 2 : 1",
     "hanger": f"DETAIL {DETAIL_LETTERS['hanger']}\nHANGER SCREW LOCK\nSCALE 2 : 1",
 }
 VIEW_TITLES = {
