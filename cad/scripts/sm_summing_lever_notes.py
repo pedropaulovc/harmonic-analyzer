@@ -43,12 +43,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # Model-owned text the part writes onto its own dimensions (prefix compartment).
-# The summation web's two sides share one radius; both trunnions one length
-# and one knife-edge radius.
+# The summation web's two sides share one radius; both trunnions one length,
+# one knife-edge radius and one hexagon (Detail A shows the +Z one).  A radial
+# prefix replaces the native R, so a radius prefix carries its own.
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("SummationPlateProfile", "SummationArcRadius"): "2X R",
     ("HexKnifeBack", "HexKnifeBackDepth"): "2X ",
-    ("KnifeRidgeFillet", "KnifeRidgeRadius"): "2X ",
+    ("KnifeRidgeFillet", "KnifeRidgeRadius"): "2X R",
+    ("KnifeEnvelopeReference", "HexWidth"): "2X ",
+    ("KnifeEnvelopeReference", "HexHeight"): "2X ",
 }
 
 KNIFE_MOUNT_NUMBER = "MHA-SM-002"  # sm-knife-mount: the knife-edge seat
@@ -62,24 +65,25 @@ BRACKET_SCREW_NUMBER = "MHA-VN-050"  # vn-magnifying-bracket-screw
 # the value, one whose text hangs below takes it below, so the dimension line
 # never runs through its own callout.
 # The mid rib runs tangent from the boss axis to the rib arc; the boss axis is
-# already located by the 76.20 in the plan, so its apex takes words, not a
-# second 76.20.  The spring-anchor pad is on the underside, which no view
-# shows full length, so its width says it runs the plate's length.
+# located by the 76.20s in the plan, so the rib arc's callout in the front
+# profile, where those tangents show, gives its apex words, not a third 76.20.
+# Each summation-web side arc rises from the boss's quadrant (visible in the
+# plan) and meets axis A at the plate end inside the cylinder, so its radius
+# names that end.  The three receiver coordinates are one bracket hole pattern:
+# the outer station names the mate once.  The spring-anchor pad is on the
+# underside, which no view shows full length, so its width says it runs the
+# plate's length.
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "EdgeRibFrontEndTopX": "ALL RIBS",
     "EdgeRibFrontEndTopY": "END RIBS",
-    "EdgeRibThickness": "DATUM B END RIB",
-    "MiddleRibThickness": "MID RIB\nAPEX AT BOSS AXIS",
-    "ReceiverX0": f"MATCHES {BRACKET_NUMBER}",
-    "ReceiverX1": f"MATCHES {BRACKET_NUMBER}",
+    "SummationArcRadius": "TO AXIS A\nAT PLATE END",
+    "ReceiverX0": f"MATCHES HOLES IN\nBRACKET {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
-    "HexWidth": f"BOTH TRUNNIONS\nKNIFE-EDGE SEAT IN {KNIFE_MOUNT_NUMBER}",
-    "HexHeight": "VERTEX UP",
-    "EdgeRibFrontArcR": "ALL RIBS",
+    "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
+    "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "RibDepth": f"TAPPED END RIB\nCONTAINS {BRACKET_SCREW_NUMBER} TAP DRILL",
     "SpringPadWidth": "UNDERSIDE PAD\nFULL LENGTH",
-    "ReceiverY0": f"MATCHES {BRACKET_NUMBER}",
 }
 
 # Leads the 2-56 receiver callout: what its two depth bands hold.
@@ -106,4 +110,4 @@ if SPRING_TAP_ENGAGEMENT_MIN < 1.5 * SPRING_TAP_MAJOR_DIA:
     )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
-BACK_VIEW_NOTE = "BACK VIEW SCALE 1:2"
+BACK_VIEW_NOTE = "BACK VIEW SCALE 1:1"
