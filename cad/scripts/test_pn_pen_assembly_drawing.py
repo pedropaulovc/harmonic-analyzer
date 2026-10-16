@@ -83,6 +83,20 @@ def test_exploded_octant_faces_the_set_screw_tap_and_explodes_along_it() -> None
     assert length > v_block.SET_SCREW_TAP_LENGTH + 2 * rod_set_screw.LENGTH
 
 
+def test_rod_set_screw_trail_runs_up_the_tap_axis_to_its_mouth() -> None:
+    moves = [0.0, 0.0, 0.0]
+    for _label, stems, key, distance in spec.EXPLODE_STEPS:
+        if stems == (spec.ROD_SET_SCREW,):
+            moves["xyz".index(key)] += distance
+    cup, mouth = spec.ROD_SET_SCREW_TRAIL
+    trail = [b - a for a, b in zip(cup, mouth)]
+    out = sum(value * value for value in moves) ** 0.5
+    length = sum(value * value for value in trail) ** 0.5
+    # Back along the screw's own way out, short of it by the tap's depth.
+    assert all(abs(t + m * length / out) < 1e-9 for t, m in zip(trail, moves))
+    assert abs(length - (out - v_block.SET_SCREW_TAP_LENGTH)) < 1e-6
+
+
 def test_wire_explodes_up_then_straight_to_the_sheet_left() -> None:
     moves = [0.0, 0.0, 0.0]
     for _label, stems, key, distance in spec.EXPLODE_STEPS:
