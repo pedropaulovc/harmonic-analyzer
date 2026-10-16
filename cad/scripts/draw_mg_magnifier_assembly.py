@@ -132,7 +132,10 @@ SHEET_SCALES = {
     SHEET_NAMES[3]: SHEET_SCALE,
 }
 FRONT_CENTER = (0.070, 0.150)
-RIGHT_CENTER = (0.150, 0.150)
+# Right sits 18 mm further right than r5's 0.150 so the fixture drop's
+# text block (left-justified at FIXTURE_DROP_RUN, ~42 mm wide) clears it:
+# r5's audit had "60.0" printing 4.0 mm over Drawing View2.
+RIGHT_CENTER = (0.168, 0.150)
 ISO_CENTER = (0.225, 0.140)
 
 # Sheet geometry, metres: the template's inner border and the title block in
@@ -158,7 +161,7 @@ _PAD = 0.004
 # block reached down through the lower one and its left end over the rod
 # (machinist review r1).
 CLAMP_STATION_RISE = 0.012
-FIXTURE_DROP_RUN = 0.030
+FIXTURE_DROP_RUN = 0.018
 FIXTURE_DROP_BELOW = 0.006
 LEVER_CALLOUT_LOCATION = {
     stack.CLAMP_STATION_DIMENSION: "above",
