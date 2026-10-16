@@ -23,6 +23,7 @@ TC = (x - LEDGE_WIDTH/2, -z, y + BLOCK_HEIGHT - (PLATE_HEIGHT + PART_PROUD)).
 
 from __future__ import annotations
 
+import _config
 import ch_pivot_bracket_spec as bracket
 import ch_pivot_bracket_tl_angle_plate_spec as plate
 from _hole_spec import blind_cut_dia_mm
@@ -93,6 +94,18 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked ledge dimension needs authored places")
 
 SURFACE_FINISHES = ()
-DRAWING_NOTES = "SPOT THE ANGLE PLATE TAPS THROUGH THESE HOLES."
+# The upright's taps are spotted through the two screw holes, so that transfer
+# rides the holes' 2X callout, naming the mate by its part number (rule 7:
+# flag it where it applies; rule 4: name the mate), not a floating note. The
+# callout's own drill row follows these lines.
+ANGLE_PLATE_NUMBER = _config.parts("ch-pivot-bracket-tl-angle-plate")["number"]
+SPOT_TAPS_LINES = (
+    "SPOT TAPS IN ANGLE PLATE",
+    f"{ANGLE_PLATE_NUMBER} THROUGH",
+    "THESE HOLES AT ASSEMBLY;",
+)
+SPOT_TAPS_NOTE = " ".join(SPOT_TAPS_LINES)
+# No general note: the one fact the views cannot carry is on the hole callout.
+DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 

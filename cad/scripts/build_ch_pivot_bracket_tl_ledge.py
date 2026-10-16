@@ -40,7 +40,6 @@ from _saved_part_guard import require_saved_drawing_properties
 from ch_pivot_bracket_tl_ledge_spec import (
     CLEARANCE_SPEC,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     HOLE_DIA,
     HOLE_X,
@@ -58,7 +57,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
     "Isometric View Note",
 )
 
@@ -146,7 +144,6 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

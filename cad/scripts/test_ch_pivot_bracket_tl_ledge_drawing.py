@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import _config
 import ch_pivot_bracket_sides as sides
@@ -18,15 +19,17 @@ from _hole_spec import THREAD_MAJOR_MM
 # follow-on 67237b9, examples/inventory/pedro-shop.toml [fixtures.angle-plate]
 # and examples/pivot-bracket/plan.toml [setups.hold]), in Setup frame TC: Z0
 # is the bracket's faced outer face (in the plane of the ear's inboard face,
-# the hold-down station's datum), 5.24 proud of the plate top. The 2026-10-10
+# the hold-down station's datum), 5.64 proud of the plate top. The 2026-10-10
 # 8-thick ears and two thrust washers moved the ledge rows, and the
 # worst-case 4 mm floor (CodeRabbit on 3d649fd90) raised the ledge and
-# lowered the studs; the prechips plan follows these.
-PRECHIPS_PART_PROUD = 5.24
-PRECHIPS_TABLE_Z = -94.14  # base box bottom
-PRECHIPS_LEDGE_Z = (-43.34, -16.44)  # bolted foot-end ledge box, 26.9 high
-PRECHIPS_SCREW_Z = -26.94  # ledge screws, clearance and tapped holes
-PRECHIPS_STUD_Z = -13.44  # bridge stud holes (the bridge's Setup Z)
+# lowered the studs; the 2026-10-14 longer foot at its title-block band
+# (user ruling, #954) lowered the ledge and its screw row 0.1. The prechips
+# plan follows these.
+PRECHIPS_PART_PROUD = 5.64
+PRECHIPS_TABLE_Z = -94.54  # base box bottom
+PRECHIPS_LEDGE_Z = (-43.74, -16.94)  # bolted foot-end ledge box, 26.8 high
+PRECHIPS_SCREW_Z = -27.44  # ledge screws, clearance and tapped holes
+PRECHIPS_STUD_Z = -13.84  # bridge stud holes (the bridge's Setup Z)
 
 
 def _features() -> dict:
@@ -35,7 +38,7 @@ def _features() -> dict:
 
 def test_ledge_and_plate_stations_are_the_prechips_s4_stack() -> None:
     """BR-B1 (#1262): the part stands at least 4 mm proud at the stack's worst
-    case, so the ledge is 26.9 high with its holes 16.4 off its bottom, and the plate's taps and studs sit at
+    case, so the ledge is 26.8 high with its holes 16.3 off its bottom, and the plate's taps and studs sit at
     the prechips hold's Z rows. Each printed value is held here, independently
     of the specs, and checked with its one-place band."""
     assert round(plate.PART_PROUD, 2) == PRECHIPS_PART_PROUD
@@ -47,7 +50,7 @@ def test_ledge_and_plate_stations_are_the_prechips_s4_stack() -> None:
     hole_y = round(PRECHIPS_SCREW_Z - PRECHIPS_LEDGE_Z[0], 1)
     tap_y = round(PRECHIPS_SCREW_Z - PRECHIPS_TABLE_Z, 1)
     stud_y = round(PRECHIPS_STUD_Z - PRECHIPS_TABLE_Z, 1)
-    assert (height, hole_y, tap_y, stud_y) == (26.9, 16.4, 67.2, 80.7)
+    assert (height, hole_y, tap_y, stud_y) == (26.8, 16.3, 67.1, 80.7)
     rest = ledge["foot_rest"]
     assert (rest["height_nominal"], rest["height"]) == (height, limits(height, 1))
     for side in ("left", "right"):
@@ -120,8 +123,33 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
 
 
-def test_notes_follow_the_simplicity_policy() -> None:
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert 1 <= len(lines) <= 4
-    assert not re.search(r"\d", spec.DRAWING_NOTES)
-    assert "GROUND" not in spec.DRAWING_NOTES.upper()
+def test_spot_transfer_rides_the_hole_callout_and_names_the_angle_plate() -> None:
+    """Machinist review: the floating 'SPOT THE ANGLE PLATE TAPS THROUGH
+    THESE HOLES.' named its mate only as 'the angle plate' and pointed at
+    nothing. The words ride the 2X #5 callout now, naming the plate by part
+    number, and the sheet carries no general note."""
+    angle_plate = _config.parts("ch-pivot-bracket-tl-angle-plate")["number"]
+    assert spec.ANGLE_PLATE_NUMBER == angle_plate == "MHA-CH-008-TL-02"
+    assert spec.SPOT_TAPS_LINES == (
+        "SPOT TAPS IN ANGLE PLATE",
+        "MHA-CH-008-TL-02 THROUGH",
+        "THESE HOLES AT ASSEMBLY;",
+    )
+    assert drawing.HOLE_CALLOUT_PROCESS == (
+        "SPOT TAPS IN ANGLE PLATE\nMHA-CH-008-TL-02 THROUGH\n"
+        "THESE HOLES AT ASSEMBLY;\n#5 DRILL"
+    )
+    # Digit-free apart from the mate's part number; never a method beyond the
+    # transfer, and no wider than the native drill row under it.
+    words = spec.SPOT_TAPS_NOTE.replace(angle_plate, "")
+    assert not re.search(r"\d", words)
+    assert "GROUND" not in words.upper()
+    assert max(map(len, spec.SPOT_TAPS_LINES)) <= len("#5 DRILL 2X Ø5.22 THRU ALL")
+    assert spec.DRAWING_NOTES == ""
+    for side in ("left", "right"):
+        assert _features()[f"screw_hole_{side}"]["note"] == spec.SPOT_TAPS_NOTE
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    build = Path(drawing.__file__).with_name("build_ch_pivot_bracket_tl_ledge.py")
+    assert "Manufacturing Notes" not in source
+    assert "Manufacturing Notes" not in build.read_text(encoding="utf-8")
+    assert "NOTES_XY" not in source

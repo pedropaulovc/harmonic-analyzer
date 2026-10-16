@@ -88,15 +88,19 @@ def test_seat_thread_keeps_the_web_wall_at_the_printed_worst_case() -> None:
 
 
 def test_seats_run_in_solid_iron_on_the_support() -> None:
-    """Each seat sits over the window's side edge, clear of the through cavity
-    (so the web column runs on under its drill point) and on the support's top
-    face short of its end-face edge break."""
+    """Each seat sits outboard of the through cavity (so the web column, or
+    the side post past the window's side edge, runs on under its drill point)
+    and on the support's top face short of its end-face edge break. The
+    south seat now lies wholly in the post; the north one over the window's
+    side edge."""
     radius = seats.SEAT_DRILL_DIA / 2.0
     for x in seats.SEAT_LOCAL_X:
         assert abs(x) - radius > support.CAV
-        assert abs(x) - radius < support.BIG < abs(x) + radius
-        assert abs(x) + radius <= support.HALF_Y - seats.EDGE_BREAK
-    assert [round(abs(x), 2) for x in seats.SEAT_LOCAL_X] == [84.2, 82.59]
+        assert abs(x) + radius <= support_spec.SUPPORT_HALF_MACHINE_Z - seats.EDGE_BREAK
+    south, north = (abs(x) for x in seats.SEAT_LOCAL_X)
+    assert south - radius > support.BIG
+    assert north - radius < support.BIG < north + radius
+    assert [round(abs(x), 2) for x in seats.SEAT_LOCAL_X] == [84.45, 82.84]
 
 
 def test_seat_thread_keeps_the_end_wall_at_the_worst_transferred_position() -> None:
@@ -105,10 +109,11 @@ def test_seat_thread_keeps_the_end_wall_at_the_worst_transferred_position() -> N
     transferred from the bracket's hole, whose station is given from the
     fit-up-set ear face (user, 2026-10-10, option ii), so only the station's
     band moves it -- not the foot length's -- and the end face moves by half
-    the 177.8's .X band."""
+    the support length's .X band. The end face is the casting's LENGTH end
+    (SUPPORT_HALF_MACHINE_Z off its centre), not its height."""
     for x, wall in zip(seats.SEAT_LOCAL_X, seats.END_WALL_MIN, strict=True):
         assert wall == pytest.approx(
-            (support.HALF_Y - abs(x))
+            (support_spec.SUPPORT_HALF_MACHINE_Z - abs(x))
             - seats.SCREW_MAJOR_DIA / 2.0
             - bracket.STATION_BAND
             - seats.LINEAR_1PL / 2.0
@@ -146,28 +151,29 @@ def test_bracket_hole_ligaments_keep_the_floor_at_worst_case() -> None:
         - bracket.STATION_BAND
         - bracket.DRILL_GROWTH / 2.0
     )
-    # Each term at its own band: along the foot the three +/-0.10 lengths,
-    # across it the foot's sides at the .XX band the seat stack carries this
-    # foot at, the drilled hole at the title block's +0.10/0.
+    # Each term at its own band: along the foot the station's +/-0.10 and
+    # the foot length's title-block .XX, across it the foot's sides at the
+    # .XX band the seat stack carries this foot at, the drilled hole at the
+    # title block's +0.10/0.
     assert bracket.EDGE_BAND == bracket.HOLE_X_BAND == seats.LINEAR_2PL
     drilled = _config.title_block("drilled_hole")
     assert (drilled["minus_mm"], drilled["plus_mm"]) == (0.0, bracket.DRILL_GROWTH)
 
 
 def test_bracket_lengths_along_the_foot_carry_their_bands_on_the_model() -> None:
-    """No in-repo sheet prints MHA-CH-008: the S4 fixture plan and any later
-    drawing take the +/-0.10 lengths from the saved model's dimensions."""
+    """The S4 fixture plan and the MHA-CH-008 sheet take the +/-0.10 lengths
+    from the saved model's dimensions; the tap station and the reamed bore
+    carry the drawing contract's bands beside them. The foot length rides the
+    title block's .XX (user ruling 2026-10-14: the foot grew instead)."""
     from _drawing_contract import model_toleranced_dimensions
 
-    assert (bracket.FOOT_LEN_BAND, bracket.EAR_T_BAND, bracket.STATION_BAND) == (
-        0.10,
-        0.10,
-        0.10,
-    )
+    assert (bracket.EAR_T_BAND, bracket.STATION_BAND) == (0.10, 0.10)
+    assert bracket.FOOT_LEN_BAND == seats.LINEAR_2PL
     assert model_toleranced_dimensions(bracket_build) == {
-        ("FootProfile", "FootLen"): "FOOT_LEN_BAND",
         ("Ear", "EarThick"): "EAR_T_BAND",
         ("HoleProfile", "HoleStation"): "STATION_BAND",
+        ("SetScrewReference", "SetScrewLocation"): "SET_SCREW_STATION_BAND",
+        ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(BORE_DIA_BAND)",
     }
 
 
@@ -201,7 +207,20 @@ def test_one_foot_fits_both_ends_of_the_support_and_places_its_hole() -> None:
     assert round(support_end["N"] - foot_end["N"], 2) == 1.61
     assert sides.HOLE_Z_MIN <= sides.HOLE_Z <= sides.HOLE_Z_MAX
     assert sides.HOLE_Z == pytest.approx((sides.HOLE_Z_MIN + sides.HOLE_Z_MAX) / 2.0)
-    assert (round(sides.FOOT_LEN, 2), round(sides.HOLE_STATION, 2)) == (16.44, 11.74)
+    assert (round(sides.FOOT_LEN, 2), round(sides.HOLE_STATION, 2)) == (16.94, 11.99)
+
+
+def test_support_is_the_shortest_length_keeping_the_foot_end_wall() -> None:
+    """User ruling 2026-10-14 (#954 machinist review): the foot length rides
+    the title block and the foot grew to keep its hole's 2.0 end wall; the
+    support widened with it so the foot stays flush with its south end."""
+    assert (
+        2.0 * support_spec.SUPPORT_HALF_MACHINE_Z == sides.SUPPORT_LENGTH_MIN == 178.8
+    )
+    assert support.BOSS_DEPTH == pytest.approx(sides.SUPPORT_LENGTH_MIN)
+    assert sides.HOLE_LIGAMENTS_MIN["foot end"] >= bracket.LIGAMENT_TARGET
+    shorter = sides.SUPPORT_LENGTH_MIN - 0.1
+    assert sides._foot_end_wall_min(shorter) < bracket.LIGAMENT_TARGET
 
 
 def test_screw_heads_keep_air_to_the_ear_and_the_foot_end() -> None:
