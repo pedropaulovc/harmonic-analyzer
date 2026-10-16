@@ -131,6 +131,7 @@ DETAIL_POSITION_TOL_M = 1e-4
 DETAIL_LETTER_GAP = 0.001
 BOUNDARY_COLOR = 0  # COLORREF black, the outline's colour.
 BOUNDED_ON_RIGHT = frozenset(("stud", "hanger"))
+TRAIL_LINE_STYLE = 2  # swLineStyles_e.swLinePHANTOM: the explode trail
 
 _CARRIAGE_STEMS = frozenset(
     (
@@ -652,6 +653,41 @@ def _placed_detail(adapter: Any, detail: Detail) -> Any:
     return view
 
 
+def _sketch_in_view(
+    adapter: Any,
+    view: Any,
+    sheet_points: tuple[tuple[float, float], tuple[float, float]],
+    kind: str,
+    *,
+    label: str,
+) -> Any:
+    """A ``kind`` ("circle": centre, rim point; "line": ends) at two sheet
+    points (metres) in ``view``'s own sketch, left selected."""
+    view = _early_bound(view, "IView")
+    _activate_view(adapter, view, label=label)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_points:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    create = {"circle": manager.CreateCircle, "line": manager.CreateLine}[kind]
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = False
+    try:
+        segment = create(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous
+    if segment is None:
+        raise RuntimeError(f"failed to sketch the {label} {kind}")
+    return segment
+
+
 def _sketch_view_circle(
     adapter: Any,
     view: Any,
@@ -661,27 +697,41 @@ def _sketch_view_circle(
     label: str,
 ) -> None:
     """A circle (sheet metres) in ``view``'s own sketch, left selected."""
-    view = _early_bound(view, "IView")
-    _activate_view(adapter, view, label=label)
-    sketch = _early_bound(view.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (centre, (centre[0] + radius, centre[1])):
-        point = _early_bound(
-            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+    _sketch_in_view(
+        adapter,
+        view,
+        (centre, (centre[0] + radius, centre[1])),
+        "circle",
+        label=label,
+    )
+
+
+def _add_explode_trail(
+    adapter: Any,
+    view: Any,
+    trail: tuple[tuple[float, ...], tuple[float, ...]],
+    *,
+    label: str,
+) -> None:
+    """A black phantom line on the exploded ``view`` between two exploded
+    model points (machine mm), read back as styled."""
+    ends = tuple(
+        model_point_in_view(
+            adapter, view, tuple(value / 1000.0 for value in point), label=label
         )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
-    previous = bool(manager.AddToDB)
-    manager.AddToDB = False
-    try:
-        circle = manager.CreateCircle(*points[0], *points[1])
-    finally:
-        manager.AddToDB = previous
-    if circle is None:
-        raise RuntimeError(f"failed to sketch the {label} circle")
+        for point in trail
+    )
+    segment = _early_bound(
+        _sketch_in_view(adapter, view, ends, "line", label=label), "ISketchSegment"
+    )
+    segment.Style = TRAIL_LINE_STYLE
+    segment.Color = BOUNDARY_COLOR
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+    style, color = int(segment.Style), int(segment.Color)
+    if (style, color) != (TRAIL_LINE_STYLE, BOUNDARY_COLOR):
+        raise RuntimeError(f"{label}: trail reads style {style}, colour {color}")
+    _telemetry.info(f"{label}: {ends[0]!r} -> {ends[1]!r}")
 
 
 def _mark_detail_boundary(adapter: Any, parent: Any, detail: Detail) -> None:
@@ -1155,6 +1205,12 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
             f"pen exploded view carries {len(landings)} balloons, expected one per "
             f"component ({sum(BOM_QUANTITIES.values())})"
         )
+    _add_explode_trail(
+        adapter,
+        exploded,
+        spec.ROD_SET_SCREW_TRAIL,
+        label="pen rod set screw explode trail",
+    )
     _add_note_block(
         adapter,
         SHEET_NAMES[1],
