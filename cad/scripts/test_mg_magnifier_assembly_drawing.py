@@ -611,8 +611,40 @@ def test_the_package_fields_stay_inside_the_border_and_off_the_title_block() -> 
     assert not _overlap(drawing.WHEEL_FIELD, bom)
     assert not _overlap(drawing.WHEEL_FIELD, drawing.TITLE_BLOCK)
     assert not _overlap(drawing.BOM_REFERENCE_FIELD, bom)
-    assert drawing.BOM_REFERENCE_FIELD[3] < drawing.BOM_REFERENCE_CAPTION_XY[1]
+    assert drawing.BOM_REFERENCE_FIELD[3] < drawing.BOM_BOTTOM
     assert drawing.FINISHED_FIELD[0] > drawing.STEPS_RIGHT
+
+
+def test_the_finished_caption_centres_over_its_view() -> None:
+    outline = (0.257, 0.080, 0.311, 0.214)
+    text = "FINISHED ASSEMBLY (SCALE 1:4)"
+    left, top = drawing.caption_over(outline, text)
+    width = len(text) * drawing.CAPTION_CHAR_WIDTH
+    assert left + width / 2.0 == pytest.approx((outline[0] + outline[2]) / 2.0)
+    # r6 printed this caption 68.8 mm wide.
+    assert width == pytest.approx(0.0688, abs=0.0005)
+    assert left > drawing.STEPS_RIGHT
+    assert top - drawing.NOTE_LINE_PITCH > outline[3]
+    assert top < drawing.INNER_BORDER[3]
+
+
+def test_the_wire_balloon_stands_right_of_the_view_on_its_rising_leader() -> None:
+    import math
+
+    landing = (0.282, 0.120)
+    outline = (0.257, 0.080, 0.311, 0.214)
+    x, y = drawing.wire_balloon_centre(
+        landing,
+        outline,
+        rise_deg=drawing.FINISHED_WIRE_BALLOON_RISE_DEG,
+        reach=drawing.BALLOON_MARGIN,
+    )
+    assert x == pytest.approx(outline[2] + drawing.BALLOON_MARGIN)
+    assert math.degrees(math.atan2(y - landing[1], x - landing[0])) == pytest.approx(
+        drawing.FINISHED_WIRE_BALLOON_RISE_DEG
+    )
+    assert x < drawing.INNER_BORDER[2] - drawing._PAD
+    assert drawing.TITLE_BLOCK[3] < y < drawing.FINISHED_FIELD[3]
 
 
 def test_the_steps_and_checks_fit_their_column() -> None:
