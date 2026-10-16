@@ -50,6 +50,8 @@ import _config
 import _telemetry
 import mg_magnifier_assembly_spec as stack
 import mg_magnifier_explode_spec as explode
+import vn_lever_wire_geom
+import vn_lever_wire_spec
 from _check import check
 from _com import _early_bound
 from _drawing_balloon_display import rendered_balloon_circle
@@ -276,14 +278,55 @@ FINISHED_CENTER = (
 FINISHED_SCALE_LADDER = (SHEET_SCALE, (1.0, 5.0), (1.0, 6.0))
 FINISHED_LABEL = "finished assembly"
 FINISHED_CAPTION = "FINISHED ASSEMBLY"
-# The wire's only model edges are its two end circles: the hook end sits under
-# the fixture's spigot, so its balloon lands on the drum end inside the wheel.
-# Ringed about the view's centre, that balloon dropped below the view and its
-# leader rose through the wheel bar, the rim and the spokes (machinist review
-# r2). It is moved right of the view instead, rising at this angle from its
-# landing so the leader leaves the wheel above the bar through the upper-right
-# spoke gap.
-FINISHED_WIRE_BALLOON_RISE_DEG = 35.0
+# Machinist review r4 (run 20261016T123712799Z-1710842d83c44076818f6a515121cce5):
+# the wire's only model edges were its two end circles, so balloon 19 landed
+# on the drum end inside the wheel and read as pointing at a spoke. MHA-VN-066
+# now carries a shape-neutral split ring at BALLOON_RING_FRACTION of its run
+# (build_vn_lever_wire.BalloonRingSplit), and the balloon is frozen to the
+# ring's point facing the *Isometric viewer (wire_facing_point). The balloon
+# then stands right of the view, its leader dropping this little from the
+# ring so it passes under the vertical rod's lower end, the one part right of
+# the run.
+FINISHED_WIRE_BALLOON_RISE_DEG = -10.0
+ISOMETRIC_VIEWER = (1.0, 1.0, 1.0)  # *Isometric looks from +X+Y+Z
+
+
+def wire_facing_point(
+    hook: tuple[float, float, float],
+    drum: tuple[float, float, float],
+    *,
+    radius: float,
+    station: float,
+) -> tuple[float, float, float]:
+    """Part-frame point (mm) on the wire's ring at ``station`` that faces the
+    *Isometric viewer.
+
+    The frame is ``build_mg_magnifier_assembly._lever_wire_rows``': part +Y
+    onto drum->hook, +X the horizontal perpendicular (d_y, -d_x, 0), +Z = X x Y.
+    The viewer direction, projected square to the axis, gives the ring point.
+    """
+    delta = [h - d for h, d in zip(hook, drum, strict=True)]
+    length = math.hypot(*delta)
+    axis = [v / length for v in delta]
+    horizontal = math.hypot(axis[0], axis[1])
+    x = (axis[1] / horizontal, -axis[0] / horizontal, 0.0)
+    z = (
+        x[1] * axis[2] - x[2] * axis[1],
+        x[2] * axis[0] - x[0] * axis[2],
+        x[0] * axis[1] - x[1] * axis[0],
+    )
+    along_x = sum(a * b for a, b in zip(ISOMETRIC_VIEWER, x))
+    along_z = sum(a * b for a, b in zip(ISOMETRIC_VIEWER, z))
+    scale = radius / math.hypot(along_x, along_z)
+    return along_x * scale, station, along_z * scale
+
+
+WIRE_BALLOON_POINT_MM = wire_facing_point(
+    vn_lever_wire_geom.WIRE_START,
+    vn_lever_wire_geom.WIRE_END,
+    radius=vn_lever_wire_geom.WIRE_DIA / 2.0,
+    station=vn_lever_wire_spec.BALLOON_RING_FRACTION * vn_lever_wire_geom.WIRE_LEN,
+)
 
 BOM_QUANTITIES = {stem: stack.QUANTITIES[stem] for stem in stack.BOM_ORDER}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
@@ -350,6 +393,7 @@ BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     "mg-magnifying-vertical-rod": BalloonAnchor(
         point_mm=(_VROD_R, -_VROD_R / math.sqrt(2.0), -_VROD_R / math.sqrt(2.0))
     ),
+    explode.WIRE_STEM: BalloonAnchor(point_mm=WIRE_BALLOON_POINT_MM),
 }
 
 EXPLODED_VIEW_NAMES = {
@@ -1219,19 +1263,19 @@ def _move_wire_balloon(
     ``SetPosition`` moves the annotation's anchor, a constant offset from the
     circle the sheet draws (``_drawing_balloons._spread_balloons``), so the
     offset is carried and the circle's centre read back. The landing is the
-    leader's attachment, the LAST point of ``GetLeaderPointsAtIndex(0)`` (as
-    ``_spread_balloons`` reads it): run
-    20261016T114112897Z-cf1b751ae93e49429fa94f02d50ed634 showed the wire's
-    landing carries no hit-tested ``sheet_xy``, SolidWorks choosing the point
-    on the listed edge.
+    frozen balloon ring's hit-tested point; the leader's attachment, the LAST
+    point of ``GetLeaderPointsAtIndex(0)`` (as ``_spread_balloons`` reads
+    it), must end there.
     """
+    if landing.sheet_xy is None:
+        raise RuntimeError(f"{label}: the wire balloon's ring landing was not proven")
     note = _early_bound(landing.note, "INote")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     leader = annotation.GetLeaderPointsAtIndex(0)
     if not leader or len(leader) < 6:
         raise RuntimeError(f"{label}: the wire balloon has no readable leader")
     attach = (float(leader[-3]), float(leader[-2]))
-    if landing.sheet_xy is not None and math.dist(attach, landing.sheet_xy) > 0.0005:
+    if math.dist(attach, landing.sheet_xy) > 0.0005:
         miss = math.dist(attach, landing.sheet_xy) * 1000.0
         raise RuntimeError(
             f"{label}: the wire balloon's leader ends {miss:.2f} mm from its proven landing"
