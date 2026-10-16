@@ -6,6 +6,8 @@ import pytest
 
 import build_ha_harmonic_analyzer_assembly as builder
 import draw_ha_harmonic_analyzer_assembly as drawing
+import fr_top_frame_spec
+import fr_tube_frame_spec
 import ha_harmonic_analyzer_assembly_notes as notes
 import ha_harmonic_analyzer_assembly_spec as spec
 import ha_harmonic_analyzer_assembly_steps as steps
@@ -96,6 +98,15 @@ def test_settings_are_derived_from_the_pose_sources() -> None:
     }
 
 
+def test_stud_drop_text_stands_east_of_the_east_column() -> None:
+    # East is -x; the text's west end (half its ~80 mm of model width at 1:5)
+    # must clear the column's outer face.
+    column_face = -(fr_top_frame_spec.COLUMN_X + fr_tube_frame_spec.OUTER_DIA / 2.0)
+    assert column_face == pytest.approx(-209.7)
+    half_width = len(notes.SETTING_CALLOUTS[spec.STUD_DROP_DIMENSION]) * 2.3 * 5 / 2
+    assert drawing.STUD_DIMENSION_TEXT_MODEL_X_MM + half_width < column_face - 10.0
+
+
 def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
     assert len(notes.ASSEMBLY_STEPS) == len(steps.SEQUENCE)
     for number, line in enumerate(notes.ASSEMBLY_STEPS, 1):
@@ -106,7 +117,7 @@ def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
     # The settings live on the associative sheet-1 dimensions only.
     for value in (spec.BAR_HEIGHT_MM, spec.STUD_DROP_MM):
         assert f"{value:.1f}" not in printed
-    assert "PER MHA-MG-000 (SHEET 4)" in printed
+    assert "PER MHA-MG-000 SHEET 4." in printed
     for bad in ("TBD", "TODO"):
         assert bad not in printed
 
