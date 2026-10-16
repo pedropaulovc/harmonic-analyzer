@@ -40,24 +40,42 @@ def test_sheet_prints_exactly_the_marked_dimensions() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
 
 
-def test_every_explicit_band_is_on_a_printed_dimension() -> None:
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(spec.SYMMETRIC_BANDS) <= marked
-    for name, (feature, _tolerance) in spec.SYMMETRIC_BANDS.items():
-        assert name in spec.DRAWING_DIMENSIONS[feature], name
-    upper, lower = spec.ROD_BORE_DIA_BAND
-    assert upper > lower == 0.0  # a reamed slip bore never undersize
+def test_no_printed_dimension_carries_its_own_band() -> None:
+    # r1 review: every explicit ±0.05 was a band the part's function never
+    # asked for.  The places carry the title block's band (rule 3); the
+    # groove's radius is a single MAX limit (rule 16); the drilled bore's
+    # band is the DRILLED HOLES row.
+    for retired in ("SYMMETRIC_BANDS", "ROD_BORE_DIA_BAND", "POSITION_TOLERANCE", "SIZE_TOLERANCE"):
+        assert not hasattr(spec, retired), retired
+    assert {
+        name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2
+    } == {"HexAf": 3, "GrooveRadius": 1, "RodBoreDia": 1}
+    assert spec.SINGLE_LIMITS == {"GrooveRadius": ("GrooveProfile", 6)}
+    assert part.SINGLE_LIMITS is spec.SINGLE_LIMITS
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "_single_limit(adapter, feature_name, dimension_name, tol_type)" in source
+    assert "_drawing_tolerances" not in source and "_fit_deviations" not in source
+    assert printed_band_mm(2) == 0.51
+    assert 2.0 * spec.ROD_BORE_R_MAX == pytest.approx(5.3)
+    assert spec.ROD_BORE_CALLOUT == "DRILL THRU"
 
 
-def test_flats_print_as_an_unbanded_stock_reference() -> None:
+def test_flats_and_overall_length_print_as_unbanded_references() -> None:
     # Machinist review: 9.525 at .XXX asked for a size the bar is bought at.
-    assert spec.REFERENCE_DIMENSIONS == {"HexAf"}
+    # r1: the overall length closed a loop with the bore's two stations.
+    assert spec.REFERENCE_DIMENSIONS == {"HexAf", "OverallLength"}
     assert spec.DRAWING_DIMENSIONS["HexProfile"] == {"HexAf"}
-    assert "HexAf" not in spec.SYMMETRIC_BANDS
     assert spec.DRAWING_PRECISION_BY_NAME["HexAf"] == 3  # the exact 3/8 in
+    assert geom.OVERALL_LENGTH == pytest.approx(geom.ROD_STATION + spec.BORE_STATION)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "for name in sorted(REFERENCE_DIMENSIONS):" in source
     assert "set_reference_dimension(" in source
+    assert "by_name = {**side_by_name, **end_by_name}" in source
+    turned = ast.unparse(
+        _function(ast.parse(Path(part.__file__).read_text(encoding="utf-8")), "_turned_profile")
+    )
+    # Driven in the part, so the sheet's (17.70) is the model's own sum.
+    assert "_make_driven(adapter, overall, 'overall length')" in turned
     assert spec.STOCK_NOTE == "3/8 HEX BAR, FLATS AS SUPPLIED."
 
 
@@ -135,10 +153,27 @@ def test_groove_runs_on_the_spigot_with_both_lips() -> None:
     assert geom.GROOVE_ROOT_DIA < geom.SPIGOT_DIA < geom.HEX_AF
 
 
-def test_walls_hold_the_target_at_the_printed_worst_case() -> None:
+def test_every_wall_holds_the_floor_and_each_under_the_target_is_stated() -> None:
+    assert (spec.WALL_TARGET, spec.WALL_FLOOR) == (2.0, 1.5)
     for name, (nominal, worst) in spec.WALLS.items():
         assert worst <= nominal, name
-        assert worst >= spec.WALL_TARGET - 1e-9, (name, worst)
+        assert worst >= spec.WALL_FLOOR - 1e-9, (name, worst)
+        if worst < spec.WALL_TARGET - 1e-9:
+            stated = spec.STATED_WALL_MINS[name]
+            assert spec.WALL_FLOOR <= stated <= spec.floor_2(worst), name
+    assert {name: worst for name, (_n, worst) in spec.WALLS.items()} == pytest.approx({
+        "rod bore to a flat": 2.0475,
+        "rod bore to the free end": 1.7112,
+        "rod bore to the shoulder": 2.2012,
+        "groove lip to the spigot face": 1.64,
+        "groove root over the thread major": 1.6710,
+    }, abs=1e-4)
+    assert spec.STATED_WALL_MINS == {
+        "rod bore to a flat": 1.97,
+        "rod bore to the free end": 1.71,
+        "groove lip to the spigot face": 1.64,
+        "groove root over the thread major": 1.67,
+    }
 
 
 def test_floor_2_never_rounds_a_min_up() -> None:
@@ -151,30 +186,39 @@ def test_floor_2_never_rounds_a_min_up() -> None:
 
 def test_bore_is_centred_and_the_stated_wall_is_the_named_shortfall() -> None:
     # Independent of the spec's arithmetic: the bore centred on the thinnest
-    # stock (3/8 in less the 0.13 stock assumption) at its largest reamed Ø.
+    # stock (3/8 in less the 0.13 stock assumption) at its largest drilled Ø
+    # (the title block's DRILLED HOLES +0.10/0).
     assert spec.HEX_STOCK_AF_BAND == 0.13
     smallest_af = 0.375 * 25.4 - 0.13
-    largest_bore_r = (5.2 + 0.03) / 2.0
+    largest_bore_r = (5.2 + 0.10) / 2.0
     worst = smallest_af / 2.0 - largest_bore_r
-    assert worst == pytest.approx(2.0825, abs=1e-9)
+    assert worst == pytest.approx(2.0475, abs=1e-9)
     assert spec.WALLS[spec.BORE_WALL_NAME] == pytest.approx((2.1625, worst), abs=1e-9)
-    assert spec.BORE_WALL_WORST_PRINTED == 2.08
-    # The authorized 1.97 stays: under the target (the named shortfall), over
-    # the floor, and never above the derived worst wall.
+    # The 1.97 pending #1433 stays: under the target, over the floor, under
+    # the centred worst wall by the centring it accepts.
     assert spec.BORE_WALL_STATED_MIN == 1.97
     assert spec.WALL_FLOOR <= spec.BORE_WALL_STATED_MIN < spec.WALL_TARGET
-    assert spec.BORE_WALL_STATED_MIN <= spec.BORE_WALL_WORST_PRINTED <= worst
+    assert spec.BORE_CENTRING_ACCEPTED == pytest.approx(worst - 1.97, abs=1e-9)
     # What it accepts off centre: the widest stock, the smallest bore.
     assert spec.BORE_OFFSET_MAX == pytest.approx(
         (0.375 * 25.4 + 0.13) / 2.0 - 2.6 - 1.97, abs=1e-9
     )
     assert spec.BORE_OFFSET_MAX == pytest.approx(0.2575, abs=1e-9)
-    stated = f"{spec.BORE_WALL_STATED_MIN:.2f}"
+    # The drill's run-off at the exit corner (0.10 start, 0.3 deg over the
+    # corner radius) exceeds that centring: the MIN rejects such a part, for
+    # the owner's ruling (#1433).
+    wander = 0.10 + geom.HEX_CORNER_RADIUS * math.tan(math.radians(0.3))
+    assert spec.BORE_WANDER == pytest.approx(wander, abs=1e-12)
+    assert spec.BORE_WANDER > spec.BORE_CENTRING_ACCEPTED
+    # The free-end wall: one .XX station, the drilled Ø, the run-off.
+    assert spec.WALLS["rod bore to the free end"][1] == pytest.approx(
+        5.00 - 0.51 - largest_bore_r - wander, abs=1e-9
+    )
     assert spec.DRAWING_NOTES.splitlines() == [
         "3/8 HEX BAR, FLATS AS SUPPLIED.",
-        f"ROD BORE THROUGH CORNERS, CENTRED; BORE TO FLAT WALL {stated} MIN",
-        "HOLD ON FLATS; CENTRE-DRILL ON CORNER BEFORE DRILL/REAM.",
-        "4-40: PLUG TAP, 3-5 THREAD CHAMFER. THREAD ENDS AT ROD BORE.",
+        "BORE TO FLAT WALL 1.97 MIN; BORE TO FREE END WALL 1.71 MIN.",
+        "GROOVE TO FACE WALL 1.64 MIN; GROOVE ROOT TO THREAD WALL 1.67 MIN.",
+        "FULL THREAD TO ROD BORE.",
     ]
     # Nothing locates the bore from a flat any longer: the hex sketch centres
     # it by equal flats.
@@ -208,39 +252,119 @@ def test_thumb_screw_tap_runs_axially_into_the_rod_bore() -> None:
     assert spec.TAP_CALLOUT_PRECISION == {"hw-tapdrldepth": 1, "hw-threaddepth": 1}
 
 
-def test_a_plug_tap_reaches_full_thread_through_the_wall_and_stops_short() -> None:
-    # Morse Cutting Tools #4-40 plug tap (catalogue 552474, item 30000): a
-    # 3-5 thread chamfer, usable length LU 9/16 in on a 0.141 in shank (over
-    # the 0.112 in major, so the shank stops at the spigot face and LU is the
-    # tap's whole reach).
+def test_a_bottoming_tap_reaches_full_thread_through_the_wall_and_stops_short() -> None:
+    # Morse Cutting Tools #4-40 hand tap (catalogue 552474): usable length
+    # LU 9/16 in on a 0.141 in shank (over the 0.112 in major, so the shank
+    # stops at the spigot face and LU is the tap's whole reach); ICS gives
+    # the bottoming chamfer as 1-2 threads.
     reach = 9.0 / 16.0 * 25.4
-    assert spec.PLUG_TAP_USABLE_LENGTH == pytest.approx(14.2875, abs=1e-9)
-    assert spec.PLUG_TAP_SHANK_DIA == pytest.approx(3.5814, abs=1e-9)
-    assert spec.PLUG_TAP_CHAMFER_THREADS == (3, 5)
     pitch = 25.4 / 40.0
-    # The longest chamfer the sheet allows is the lead to the first full thread.
-    assert spec.PLUG_TAP_LEAD == pytest.approx(5.0 * pitch, abs=1e-9)
-    # Face to bore axis at the printed worst case: 17.70 +0.05 less 5.00 -0.05.
-    face_to_axis_max, face_to_axis_min = 12.8, 12.6
-    # The thread's widest reach off the bore axis: the library's conservative
-    # metric basic major Ø2.845 (rather than the vendor's exact 0.112 in),
-    # tap oversize and all the off-centre the stated wall accepts.
+    assert spec.TAP_USABLE_LENGTH == pytest.approx(14.2875, abs=1e-9)
+    assert spec.TAP_SHANK_DIA == pytest.approx(3.5814, abs=1e-9)
+    assert spec.BOTTOMING_TAP_CHAMFER_THREADS == (1, 2)
+    assert spec.BOTTOMING_TAP_LEAD == pytest.approx(2.0 * pitch, abs=1e-9)
+    # Face to bore axis at the printed worst case: one .XX station, 12.70.
+    face_to_axis_max, face_to_axis_min = 12.70 + 0.51, 12.70 - 0.51
+    assert (spec.FACE_TO_BORE_AXIS_MAX, spec.FACE_TO_BORE_AXIS_MIN) == pytest.approx(
+        (face_to_axis_max, face_to_axis_min), abs=1e-9
+    )
+    # The thread's widest reach off the bore axis: the library's metric basic
+    # major Ø2.845, tap oversize and all the off-centre the stated wall accepts.
     assert spec.THREAD_MAJOR == 2.845
     reach_off_axis = 2.845 / 2.0 + 0.025 + 0.2575
     half_chord = math.sqrt(2.6**2 - reach_off_axis**2)
     deepest_wall = face_to_axis_max - half_chord
     assert spec.TAP_WALL_DEEPEST == pytest.approx(deepest_wall, abs=1e-9)
-    assert spec.TAP_WALL_DEEPEST == pytest.approx(10.837, abs=5e-4)
-    assert spec.TAP_REACH_NEEDED == pytest.approx(deepest_wall + 5.0 * pitch, abs=1e-9)
-    assert reach - spec.TAP_REACH_NEEDED == pytest.approx(0.2755, abs=5e-4)
-    # The far wall's nearest point is past the shank stop: the tap's end
-    # never reaches it.
+    assert spec.TAP_WALL_DEEPEST == pytest.approx(11.2471, abs=5e-4)
+    assert spec.TAP_REACH_NEEDED == pytest.approx(deepest_wall + 2.0 * pitch, abs=1e-9)
+    assert reach - spec.TAP_REACH_NEEDED == pytest.approx(1.7704, abs=5e-4)
+    # On one part both walls move together: the tap stops anywhere in the
+    # bore's chord less its lead.
     assert spec.FAR_WALL_NEAREST == pytest.approx(face_to_axis_min + half_chord, abs=1e-9)
-    assert spec.FAR_WALL_NEAREST - reach == pytest.approx(0.2755, abs=5e-4)
-    # A 6-thread plug chamfer (the long end of ICS's 3-6) would leave the
-    # deepest flank under-cut at the worst case: hence the sheet's 3-5.
-    assert deepest_wall + 6.0 * pitch > reach
-    assert f"{spec.TAP_TOOL_NOTE} {spec.TAP_EXTENT_NOTE}" in spec.DRAWING_NOTES.splitlines()
+    assert spec.TAP_STOP_WINDOW == pytest.approx(2.0 * half_chord - 2.0 * pitch, abs=1e-9)
+    assert spec.TAP_STOP_WINDOW > 0.0
+    # The plug tap the sheet asked for before (3-5 thread chamfer) cannot
+    # reach full thread at the worst case: 11.247 + 3.175 = 14.42 > 14.29.
+    assert deepest_wall + 5.0 * pitch > reach
+    assert spec.TAP_EXTENT_NOTE in spec.DRAWING_NOTES.splitlines()
+    for retired in ("PLUG_TAP_USABLE_LENGTH", "PLUG_TAP_LEAD", "TAP_TOOL_NOTE"):
+        assert not hasattr(spec, retired), retired
+    # The tap drill's full Ø clears the near wall; its point stops short of
+    # the far one.
+    assert spec.TAP_DRILL_NEAR_CLEAR > 0.0 and spec.TAP_DRILL_FAR_CLEAR > 0.0
+
+
+def test_the_bore_datum_holds_the_screw_reach_and_the_rejected_datums_fail() -> None:
+    from _mcmaster_91882a221 import PITCH, SHANK_DIA, SHANK_LEN
+    from mg_magnifying_vertical_rod_geom import ROD_STOCK_DIA_LOW
+
+    rod_min = geom.VROD_DIA - ROD_STOCK_DIA_LOW
+    bore_r_max = (5.2 + 0.10) / 2.0
+    # One .XX band from the spigot face to the bore axis.
+    reach = (12.70 + 0.51) + bore_r_max - rod_min
+    assert spec.SCREW_REACH_NEEDED == pytest.approx(reach, abs=1e-9)
+    assert spec.SCREW_REACH_NEEDED == pytest.approx(10.91, abs=5e-3)
+    assert SHANK_LEN == pytest.approx(7.0 / 16.0 * 25.4)
+    assert spec.SCREW_REACH_MARGIN == pytest.approx(SHANK_LEN - reach, abs=1e-9)
+    assert spec.SCREW_REACH_MARGIN > 0.0
+    # r1's datums: the overall length from the free end less the rod station,
+    # two .XX bands to the bore: the screw bottoms before it clamps the rod.
+    stacked = (17.70 + 0.51) - (5.00 - 0.51) + bore_r_max - rod_min
+    assert stacked == pytest.approx(11.42, abs=5e-3)
+    assert stacked > SHANK_LEN
+    # The bore from the face with the overall from the free end (the rod
+    # station a reference) leaves the free-end wall under the floor.
+    free_end_wall = (17.70 - 0.51) - (12.70 + 0.51) - bore_r_max
+    assert free_end_wall == pytest.approx(1.33, abs=1e-9)
+    assert free_end_wall < spec.WALL_FLOOR
+    # Engagement at the shallowest bore: at least 1.5 D.
+    engagement = (12.70 - 0.51) - bore_r_max - PITCH
+    assert spec.ENGAGEMENT_WORST == pytest.approx(engagement, abs=1e-9)
+    assert engagement >= 1.5 * SHANK_DIA
+
+
+def test_the_groove_station_from_the_face_holds_the_face_lip() -> None:
+    # One .XX band from the face to the groove centre, and the MAX radius.
+    face_lip = (3.35 - 0.51) - 1.2
+    assert spec.GROOVE_STATION == pytest.approx(3.35)
+    assert spec.WALLS["groove lip to the spigot face"][1] == pytest.approx(face_lip, abs=1e-9)
+    assert face_lip >= spec.WALL_FLOOR
+    # From the free end instead (r1's 14.35) with the overall a reference:
+    # three .XX bands to the face put the lip far under the floor.
+    via_free_end = (12.70 - 0.51) + (5.00 - 0.51) - (14.35 + 0.51) - 1.2
+    assert via_free_end < spec.WALL_FLOOR
+    # The groove stays on the spigot: its shoulder-side mouth clears the hex
+    # shoulder at the worst case (a step up to the hex, not a wall).
+    clearance = (12.70 - 0.51) + (5.00 - 0.51) - (11.00 + 0.51) - (3.35 + 0.51 + 1.2)
+    assert spec.GROOVE_SHOULDER_CLEARANCE == pytest.approx(clearance, abs=1e-9)
+    assert clearance > 0.0
+    # The wire stays in it at the smallest OD over the largest root.
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx(((9.00 - 0.51) - (7.00 + 0.51)) / 2.0)
+    assert spec.GROOVE_DEPTH_MIN > geom.WIRE_DIA / 2.0
+
+
+def test_the_groove_radius_is_a_max_and_the_title_block_x_row_would_thin_the_face_lip() -> None:
+    assert spec.GROOVE_RADIUS_PLACES == 1 and spec.GROOVE_RADIUS_TOL_TYPE == 6
+    assert spec.GROOVE_RADIUS_MAX == geom.GROOVE_RADIUS
+    assert spec.GROOVE_HALF_OPENING_MAX == geom.GROOVE_RADIUS
+    assert drawing.RADIUS_GLYPHS == len("R1.2 MAX")
+    # A bare R1.2 at the title block's .X admits R2.0: across the printed
+    # root and OD the mouth opens past 1.9 and the face lip falls under the
+    # floor.
+    r = 1.2 + printed_band_mm(1)
+    half = max(
+        spec.groove_half_opening(r, root, od)
+        for root in (7.00 - 0.51, 7.00 + 0.51)
+        for od in (9.00 - 0.51, 9.00 + 0.51)
+    )
+    assert (3.35 - 0.51) - half < spec.WALL_FLOOR
+    assert (3.35 - 0.51) - r == pytest.approx(0.84)
+
+
+def test_the_spigot_cleans_up_inside_the_thinnest_flats() -> None:
+    # A route check, not a band: the shop turns Ø9.00 inside 9.395 flats.
+    assert geom.SPIGOT_DIA < geom.HEX_AF - spec.HEX_STOCK_AF_BAND
+    assert geom.HEX_AF - spec.HEX_STOCK_AF_BAND - geom.SPIGOT_DIA == pytest.approx(0.395)
 
 
 def _code_strings(tree: ast.Module) -> list[str]:
@@ -267,9 +391,9 @@ def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
     # callout brackets it as REF, so no .X band (10.1 +/-0.8 would admit 9.3)
     # governs the thread's extent: the rod bore does (the note).  Review09:
     # a bare 10.1 in the callout read as controlling while the note said REF.
-    assert spec.TAP_EXTENT_NOTE == "THREAD ENDS AT ROD BORE."
+    assert spec.TAP_EXTENT_NOTE == "FULL THREAD TO ROD BORE."
     assert "REF" not in spec.DRAWING_NOTES
-    assert f"{spec.TAP_TOOL_NOTE} {spec.TAP_EXTENT_NOTE}" in spec.DRAWING_NOTES.splitlines()
+    assert spec.TAP_EXTENT_NOTE in spec.DRAWING_NOTES.splitlines()
     assert geom.TAP_SPEC.overrides_mm["ThreadDepth"] == geom.TAP_LENGTH
     assert geom.TAP_LENGTH == pytest.approx(geom.SPIGOT_FACE_X - geom.ROD_BORE_DIA / 2.0)
     assert set(spec.TAP_CALLOUT_PRECISION) == {
@@ -534,95 +658,6 @@ def test_final_sheet_census_expects_no_tapped_hole_note_from_the_blind_tap() -> 
     assert note not in native_callout.lower()
 
 
-# The groove lips, the spigot's clean-up inside the thinnest flats and the
-# tap's reach, with each band at its half-width: the kept +/-0.05 everywhere,
-# or one dimension opened to the title block's .XX row it prints at.
-_KEPT_BAND = 0.05
-
-
-def _stacks(relaxed: str | None) -> dict[str, float]:
-    band = {name: _KEPT_BAND for name in spec.SYMMETRIC_BANDS}
-    if relaxed is not None:
-        band[relaxed] = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME[relaxed])
-    radius = geom.GROOVE_RADIUS + band["GrooveRadius"]
-    centre = (geom.GROOVE_ROOT_DIA - band["GrooveRootDia"]) / 2.0 + radius
-    od_lo = (geom.SPIGOT_DIA - band["SpigotDia"]) / 2.0
-    od_hi = (geom.SPIGOT_DIA + band["SpigotDia"]) / 2.0
-    # The widest mouth: the radius itself once the arc's centre can sit on
-    # the OD, else the OD nearest the centre.
-    above = 0.0 if od_lo <= centre <= od_hi else min(abs(centre - od_lo), abs(centre - od_hi))
-    half = math.sqrt(radius**2 - above**2)
-    station = spec.GROOVE_STATION
-    face_to_axis = (
-        geom.OVERALL_LENGTH + band["OverallLength"] - (geom.ROD_STATION - band["RodStation"])
-    )
-    reach_off_axis = geom.THREAD_MAJOR / 2.0 + 0.025 + spec.BORE_OFFSET_MAX
-    return {
-        "shoulder lip": station - band["GrooveStation"] - half
-        - (geom.HEX_LENGTH + band["HexLength"]),
-        "face lip": geom.OVERALL_LENGTH - band["OverallLength"]
-        - (station + band["GrooveStation"]) - half,
-        "spigot clean-up": geom.HEX_AF - spec.HEX_STOCK_AF_BAND
-        - (geom.SPIGOT_DIA + band["SpigotDia"]),
-        "tap reach": spec.PLUG_TAP_USABLE_LENGTH
-        - (face_to_axis - math.sqrt(2.6**2 - reach_off_axis**2) + spec.PLUG_TAP_LEAD),
-    }
-
-
-def _failures(stacks: dict[str, float]) -> set[str]:
-    failed = {name for name in ("shoulder lip", "face lip") if stacks[name] < 2.0 - 1e-9}
-    failed |= {name for name in ("spigot clean-up", "tap reach") if stacks[name] <= 0.0}
-    return failed
-
-
-def test_the_kept_bands_hold_every_stack() -> None:
-    assert {name: tol for name, (_f, tol) in spec.SYMMETRIC_BANDS.items()} == {
-        "RodStation": 0.05,
-        "HexLength": 0.05,
-        "GrooveStation": 0.05,
-        "OverallLength": 0.05,
-        "SpigotDia": 0.05,
-        "GrooveRootDia": 0.05,
-        "GrooveRadius": 0.05,
-    }
-    stacks = _stacks(None)
-    assert not _failures(stacks)
-    assert stacks["shoulder lip"] == pytest.approx(2.0161, abs=5e-5)
-    assert stacks["face lip"] == pytest.approx(2.0161, abs=5e-5)
-    assert stacks["spigot clean-up"] == pytest.approx(0.345, abs=1e-9)
-    assert stacks["tap reach"] == pytest.approx(0.2755, abs=5e-4)
-    # The spec's own walls agree.
-    assert spec.WALLS["groove lip to the shoulder"][1] == pytest.approx(
-        stacks["shoulder lip"], abs=1e-9
-    )
-    assert spec.WALLS["groove lip to the spigot face"][1] == pytest.approx(
-        stacks["face lip"], abs=1e-9
-    )
-
-
-@pytest.mark.parametrize(
-    ("relaxed", "fails", "evidence"),
-    [
-        # 17.70 at .XX (+/-0.51): face lip 1.556, tap reach short by 0.18.
-        ("OverallLength", {"face lip", "tap reach"}, {"face lip": 1.5561, "tap reach": -0.1845}),
-        # 11.00 at .XX: shoulder lip 1.556.
-        ("HexLength", {"shoulder lip"}, {"shoulder lip": 1.5561}),
-        # R1.20 at .XX: the mouth widens to 2 x 1.5775, both lips 1.6725.
-        ("GrooveRadius", {"shoulder lip", "face lip"}, {"shoulder lip": 1.6725, "face lip": 1.6725}),
-        # Ø9.00 at .XX: the lips hold at 2.000 (the mouth caps at the radius),
-        # but a 9.51 spigot is past the 9.395 flats: it would not turn round.
-        ("SpigotDia", {"spigot clean-up"}, {"shoulder lip": 2.0, "spigot clean-up": -0.115}),
-    ],
-)
-def test_each_band_the_review_questioned_fails_when_opened(
-    relaxed: str, fails: set[str], evidence: dict[str, float]
-) -> None:
-    stacks = _stacks(relaxed)
-    assert _failures(stacks) == fails
-    for name, value in evidence.items():
-        assert stacks[name] == pytest.approx(value, abs=5e-4), name
-
-
 def _slice_area(x: float) -> float:
     """The part's cross-section at axial station ``x``, from the shapes alone."""
     af, corner = geom.HEX_AF, geom.HEX_CORNER_RADIUS
@@ -672,11 +707,13 @@ def test_analytic_volume_matches_the_part_sliced_along_its_axis() -> None:
     assert smallest_feature > 0.005 * part.V_TOTAL
 
 
-def test_sheet_reads_places_and_bands_from_the_part() -> None:
+def test_sheet_reads_places_and_limits_from_the_part() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "assert_imported_precision" in source
     assert "set_dimension_precision" not in source
-    assert "tolerance" not in source.lower()
+    # The sheet reads the part's single limit back; it never writes a band.
+    for write in ("SetValues(", "Tolerance.Type =", "tolerance.Type =", "_drawing_tolerances"):
+        assert write not in source, write
     for gdt in ("gtol", "datum"):
         assert gdt not in source.lower(), gdt
 
@@ -706,8 +743,8 @@ def test_turned_diameters_stack_right_of_the_face_smaller_inside() -> None:
     root_x, root_y = drawing.SIDE_KEEP["GrooveRootDia"]
     spigot_x, spigot_y = drawing.SIDE_KEEP["SpigotDia"]
     root_box, spigot_box = _dia_text_box("GrooveRootDia"), _dia_text_box("SpigotDia")
-    # Both clear the overall length's witness down the face; the smaller
-    # stands inside, so its extension lines end short of the larger's line.
+    # Both clear the face's witnesses; the smaller stands inside, so its
+    # extension lines end short of the larger's line.
     assert root_box[0] > face_x + 0.003
     assert face_x < root_x < spigot_x
     # Each text breaks its own dimension line between the arrows: the root's
@@ -729,8 +766,8 @@ def test_turned_diameters_stack_right_of_the_face_smaller_inside() -> None:
     assert spigot_box[1] - root_box[3] >= _TEXT_HEIGHT
     # The spigot's text clears the rotated end view's left-standing AF line.
     assert spigot_box[2] < drawing.END_KEEP["HexAf"][0] - 0.005
-    # Overall length stays under the view.  The radius shoulder is below the
-    # spigot mouth, but its text sits above the Ø's top witness.
+    # Overall length stays under the view.  The radius text reads low, right
+    # of the face, its shoulder under the spigot mouth.
     assert drawing.SIDE_KEEP["OverallLength"][1] < drawing._SIDE_BOTTOM
     assert drawing.SIDE_KEEP["GrooveRadius"] == drawing.RADIUS_TEXT_XY
     assert drawing.RADIUS_TEXT_XY[1] - drawing.RADIUS_SHOULDER_DROP < od_high
@@ -957,8 +994,16 @@ def test_bore_callout_reads_over_the_hex_between_its_witnesses() -> None:
     assert y - half_height > drawing._SIDE_TOP + 0.003
     hex_line = drawing.SIDE_KEEP["HexLength"][1] - _TEXT_OVER_LINE
     assert hex_line > y + half_height + _TEXT_HEIGHT
-    hex_y = drawing.SIDE_KEEP["HexLength"][1]
-    assert drawing.SIDE_KEEP["GrooveStation"][1] - hex_y > 0.0099
+    # The groove's station, from the spigot face, reads over the spigot,
+    # clear of the hex length's span; the bore's two stations share a row
+    # under the view.
+    station_x = drawing.SIDE_KEEP["GrooveStation"][0]
+    assert station_x - 0.005 > drawing._side_x(geom.SHOULDER_X) + 0.003
+    assert station_x == pytest.approx(
+        drawing._side_x((geom.GROOVE_X + geom.SPIGOT_FACE_X) / 2.0)
+    )
+    assert drawing.SIDE_KEEP["RodStation"][1] == drawing.SIDE_KEEP["BoreStation"][1]
+    assert drawing.SIDE_KEEP["OverallLength"][1] < drawing.SIDE_KEEP["BoreStation"][1] - 0.010
 
 
 def test_end_view_flats_read_vertically_left_of_the_hex_clear_of_the_tap() -> None:
@@ -1252,10 +1297,9 @@ def test_tap_centre_mark_unmeasured_fails(
 
 def test_notes_are_short() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
-    assert 1 <= len(lines) <= 4
     assert len(lines) == 4
     assert max(map(len, lines)) <= 68
-    assert spec.BORE_TOOL_NOTE in lines
+    assert spec.TAP_EXTENT_NOTE in lines
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
@@ -1274,17 +1318,22 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_corner_bore_notes_are_model_owned_and_preserve_the_tap_facts() -> None:
+def test_wall_notes_are_model_owned_and_state_each_min_as_a_fact() -> None:
     assert part.DRAWING_NOTES is spec.DRAWING_NOTES
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '{"Manufacturing Notes": DRAWING_NOTES}' in source
     assert spec.BORE_WALL_NOTE == (
-        f"ROD BORE THROUGH CORNERS, CENTRED; BORE TO FLAT WALL "
-        f"{spec.BORE_WALL_STATED_MIN:.2f} MIN"
+        "BORE TO FLAT WALL 1.97 MIN; BORE TO FREE END WALL 1.71 MIN."
     )
-    assert spec.BORE_TOOL_NOTE == (
-        "HOLD ON FLATS; CENTRE-DRILL ON CORNER BEFORE DRILL/REAM."
+    assert spec.GROOVE_WALL_NOTE == (
+        "GROOVE TO FACE WALL 1.64 MIN; GROOVE ROOT TO THREAD WALL 1.67 MIN."
     )
+    # r1: the corner-to-corner bore is drawn (the end view's centreline
+    # through the corners), never noted; no note names a method.
+    for word in ("CENTRED", "CORNER", "REAM", "DRILL", "HOLD ON", "PLUG"):
+        assert word not in spec.DRAWING_NOTES, word
+    for retired in ("BORE_TOOL_NOTE", "TAP_TOOL_NOTE"):
+        assert not hasattr(spec, retired), retired
 
 
 def test_projection_precedes_import_and_all_native_ink_proofs_follow_rebuild() -> None:
@@ -1438,17 +1487,19 @@ class _NativeDisplay:
 
     def __init__(
         self, name: str, feature: str, value_mm: float, *, kind: int = 5,
-        diametric: bool = False, arc_persists: bool = True, gap_result: object = True,
+        diametric: bool = False, arc_persists: bool = True,
+        gap_results: dict[int, object] | None = None, tol_type: int = 6,
     ) -> None:
         self.dimension = SimpleNamespace(
             FullName=f"{name}@{feature}@mg-output-fixture.SLDPRT",
             SystemValue=value_mm / 1000.0,
+            Tolerance=SimpleNamespace(Type=tol_type),
         )
         self.Type2 = kind
         self.Diametric = diametric
         self._arc = True
         self.arc_persists = arc_persists
-        self.gap_result = gap_result
+        self.gap_results = {0: True, 1: True, **(gap_results or {})}
         self.gaps: list[tuple[int, bool, float]] = []
         self.data: object | None = None
 
@@ -1467,11 +1518,11 @@ class _NativeDisplay:
         return self.dimension
 
     def SetWitnessLineGap(self, index: int, use_doc: bool, gap: float) -> object:
-        assert type(index) is int and index == 1
+        assert type(index) is int and index in (0, 1)
         assert use_doc is False
         assert type(gap) is float
         self.gaps.append((index, use_doc, gap))
-        return self.gap_result
+        return self.gap_results[index]
 
     def GetDisplayData(self) -> object | None:
         return self.data
@@ -1485,9 +1536,9 @@ def _station_display(**options) -> _NativeDisplay:
     return _NativeDisplay("GrooveStation", "GrooveProfile", spec.GROOVE_STATION, **options)
 
 
-def _overall_display(**options) -> _NativeDisplay:
-    return _NativeDisplay(
-        "OverallLength", "TurnedProfile", geom.OVERALL_LENGTH, kind=2, **options
+def _place(display: _NativeDisplay, station: _NativeDisplay | None = None) -> None:
+    drawing._place_groove_radius(
+        object(), _RootAnnotation(display), _RootAnnotation(station or _station_display())
     )
 
 
@@ -1495,29 +1546,32 @@ def test_native_radius_style_and_only_named_witness_gaps_are_written(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     rebuilds = _projection_fakes(monkeypatch)
-    radius, station, overall = _radial_display(), _station_display(), _overall_display()
-    drawing._place_groove_radius(
-        object(), _RootAnnotation(radius), _RootAnnotation(station), _RootAnnotation(overall)
-    )
+    radius, station = _radial_display(), _station_display()
+    _place(radius, station)
     assert radius.ArcExtensionLineOrOppositeSide is False
     assert radius.gaps == []
-    assert station.gaps == [(1, False, drawing.GROOVE_STATION_GAP)]
-    assert overall.gaps == [(1, False, drawing.OVERALL_FACE_WITNESS_GAP)]
+    # The centre-side witness 3 mm off the arc centre; the face-side one
+    # (dimensioned from the face's point on the axis) from 1 mm above the
+    # face's top corner, so it never runs down the face.
+    assert station.gaps == [
+        (1, False, drawing.GROOVE_STATION_GAP),
+        (0, False, drawing.GROOVE_STATION_FACE_GAP),
+    ]
+    assert drawing.GROOVE_STATION_FACE_GAP == pytest.approx(
+        geom.SPIGOT_DIA / 2.0 * drawing._S / 1000.0 + drawing.EXTENSION_START_GAP
+    )
     assert drawing.EXTENSION_START_GAP == 0.001
     assert rebuilds == ["place fixture material-arc radius"]
 
 
 @pytest.mark.parametrize("result", [False, None, 1])
-def test_station_witness_gap_requires_native_bool_success(
-    monkeypatch: pytest.MonkeyPatch, result: object
+@pytest.mark.parametrize(("index", "side"), [(1, "centre-side"), (0, "face-side")])
+def test_station_witness_gaps_require_native_bool_success(
+    monkeypatch: pytest.MonkeyPatch, result: object, index: int, side: str
 ) -> None:
     _projection_fakes(monkeypatch)
-    with pytest.raises(RuntimeError, match="refused its centre-side witness gap"):
-        drawing._place_groove_radius(
-            object(), _RootAnnotation(_radial_display()),
-            _RootAnnotation(_station_display(gap_result=result)),
-            _RootAnnotation(_overall_display()),
-        )
+    with pytest.raises(RuntimeError, match=f"refused its {side} witness gap"):
+        _place(_radial_display(), _station_display(gap_results={index: result}))
 
 
 @pytest.mark.parametrize("options", [{"kind": 6}, {"diametric": True}, {"arc_persists": False}])
@@ -1526,10 +1580,7 @@ def test_native_radius_style_refuses_nonradius_or_ignored_false_property(
 ) -> None:
     _projection_fakes(monkeypatch)
     with pytest.raises(RuntimeError):
-        drawing._place_groove_radius(
-            object(), _RootAnnotation(_radial_display(**options)),
-            _RootAnnotation(_station_display()), _RootAnnotation(_overall_display()),
-        )
+        _place(_radial_display(**options))
 
 
 @pytest.mark.parametrize(
@@ -1549,67 +1600,42 @@ def test_native_radius_identity_refuses_equal_ink_from_another_model_dimension(
         drawing._model_display(annotation, "GrooveRadius", "GrooveProfile", geom.GROOVE_RADIUS)
 
 
-@pytest.mark.parametrize("result", [False, None, 1])
-def test_overall_face_witness_gap_requires_native_bool_success(
-    monkeypatch: pytest.MonkeyPatch, result: object,
-) -> None:
-    _projection_fakes(monkeypatch)
-    with pytest.raises(RuntimeError, match="refused its face-side witness gap"):
-        drawing._place_groove_radius(
-            object(), _RootAnnotation(_radial_display()), _RootAnnotation(_station_display()),
-            _RootAnnotation(_overall_display(gap_result=result)),
-        )
-
-
-# Actual native14 task.log: the full 29 mm shoulder, not the old test's
-# 1.6 mm elbow stub, crosses the face witness at (160.4, 196.0) mm.
-_NATIVE14_RADIUS_SHOULDER = ((0.1571, 0.1960), (0.1861, 0.1960))
-_NATIVE14_OVERALL_FACE_WITNESS = ((0.1604, 0.1970), (0.1604, 0.1252))
-_NATIVE14_RADIUS_TIP = (0.1516288709508015, 0.19752974314855273)
+def test_station_witness_ids_follow_the_builders_reference_order() -> None:
+    # Witness 0 is the dimension's first reference (the face on the axis),
+    # witness 1 its second (the arc centre).
+    profile = ast.unparse(
+        _function(ast.parse(Path(part.__file__).read_text(encoding="utf-8")), "_groove_profile")
+    )
+    assert "dimension_between(adapter, f'{axis}.end', f'{toward_free_end}.center'" in profile
 
 
 # Native15 audit (20261013T091530503Z): printed glyphs, not the wider COM row.
+# "R1.20 ±0.05" (11 glyphs) printed 24.16 mm wide, centred on its keep, from
+# 1.84 mm under to 1.72 mm over it; the full shoulder ran from 15.28 mm left
+# of and 2.78 mm under the keep to 1.50 mm past the text's right end.
 _NATIVE15_RADIUS_KEEP = (0.1724, 0.1988)
+# What the part's single limit prints (the sheet only sizes it).
+_RADIUS_TEXT = "R1.2 MAX"
 _NATIVE15_RADIUS_TEXT_BOX = Box(0.1604289, 0.1969558, 0.1845905, 0.2005212)
 _NATIVE15_SPIGOT_TOP_WITNESS = ((0.1614, 0.198), (0.2003, 0.198))
-# Every native extension line on the sheet.  The bore/tap radial leaders
-# and radius shoulder are not extensions; no dimension's extension is omitted.
-_NATIVE15_EXTENSION_LINES = {
-    "RodStation": [
-        ((0.0896, 0.179), (0.0896, 0.1471719)),
-        ((0.1096, 0.179), (0.1096, 0.1471719)),
-    ],
-    "HexLength": [
-        ((0.0896, 0.181), (0.0896, 0.2222719)),
-        ((0.1336, 0.199), (0.1336, 0.2222719)),
-    ],
-    "OverallLength": [
-        ((0.0896, 0.179), (0.0896, 0.1251719)),
-        ((0.1604, 0.1936), (0.1604, 0.1251719)),
-    ],
-    "GrooveStation": [
-        ((0.0896, 0.181), (0.0896, 0.2322719)),
-        ((0.147, 0.2018), (0.147, 0.2322719)),
-    ],
-    "GrooveRootDia": [
-        ((0.148, 0.166), (0.1803, 0.166)),
-        ((0.148, 0.194), (0.1803, 0.194)),
-    ],
-    "SpigotDia": [
-        ((0.1614, 0.162), (0.2003, 0.162)),
-        _NATIVE15_SPIGOT_TOP_WITNESS,
-    ],
-    "HexAf": [
-        ((0.2500015, 0.19905), (0.226003, 0.19905)),
-        ((0.2719985, 0.16095), (0.226003, 0.16095)),
-    ],
-}
+_NATIVE15_GLYPH = (_NATIVE15_RADIUS_TEXT_BOX.xmax - _NATIVE15_RADIUS_TEXT_BOX.xmin) / 11
+_NATIVE15_SHOULDER_OVERRUN = 0.1860889 - _NATIVE15_RADIUS_TEXT_BOX.xmax
+_GROOVE_CENTRE = (drawing._side_x(geom.GROOVE_X), drawing._side_y(geom.GROOVE_CENTRE_R))
+_FACE_ON_AXIS = (drawing._side_x(geom.SPIGOT_FACE_X), drawing.SIDE_CENTER[1])
+_SHEET_RADIUS = geom.GROOVE_RADIUS * drawing._S / 1000.0
 
 
 def _proposed_radius_text_box() -> Box:
-    dx, dy = (drawing.RADIUS_TEXT_XY[i] - _NATIVE15_RADIUS_KEEP[i] for i in range(2))
+    """R1.2 MAX at native15's glyph pitch and height, centred on the keep."""
+    x, y = drawing.RADIUS_TEXT_XY
+    half = len(_RADIUS_TEXT) * _NATIVE15_GLYPH / 2.0
     old = _NATIVE15_RADIUS_TEXT_BOX
-    return Box(old.xmin + dx, old.ymin + dy, old.xmax + dx, old.ymax + dy)
+    return Box(
+        x - half,
+        y + old.ymin - _NATIVE15_RADIUS_KEEP[1],
+        x + half,
+        y + old.ymax - _NATIVE15_RADIUS_KEEP[1],
+    )
 
 
 def _audit_line(stroke: tuple) -> AuditSegment:
@@ -1617,39 +1643,258 @@ def _audit_line(stroke: tuple) -> AuditSegment:
     return AuditSegment(x0, y0, x1, y1, "ext-line")
 
 
-def test_radius_text_clears_every_native15_sheet_extension_at_the_new_keep() -> None:
+def _proposed_extension_lines() -> dict[str, list]:
+    """Every extension line the proposed side view draws near the radius
+    text, from the model and the keeps (1 mm start gaps, 1 mm overrun)."""
+    face_x, axis_y = _FACE_ON_AXIS
+    od_low, od_high = drawing._side_y(-geom.SPIGOT_DIA / 2.0), drawing._side_y(geom.SPIGOT_DIA / 2.0)
+    root_low, root_high = drawing.GROOVE_ROOT_SHEET_YS
+    root_x = drawing.SIDE_KEEP["GrooveRootDia"][0]
+    spigot_x = drawing.SIDE_KEEP["SpigotDia"][0]
+    station_y = drawing.SIDE_KEEP["GrooveStation"][1] - _TEXT_OVER_LINE + 0.001
+    under_y = drawing.SIDE_KEEP["BoreStation"][1] - _TEXT_OVER_LINE - 0.001
+    overall_y = drawing.SIDE_KEEP["OverallLength"][1] - _TEXT_OVER_LINE - 0.001
+    gap = drawing.EXTENSION_START_GAP
+    return {
+        "SpigotDia": [
+            ((face_x + gap, od_low), (spigot_x + gap, od_low)),
+            ((face_x + gap, od_high), (spigot_x + gap, od_high)),
+        ],
+        "GrooveRootDia": [
+            ((_GROOVE_CENTRE[0] + gap, root_low), (root_x + gap, root_low)),
+            ((_GROOVE_CENTRE[0] + gap, root_high), (root_x + gap, root_high)),
+        ],
+        "GrooveStation": [
+            ((face_x, axis_y + drawing.GROOVE_STATION_FACE_GAP), (face_x, station_y)),
+            (
+                (_GROOVE_CENTRE[0], _GROOVE_CENTRE[1] + drawing.GROOVE_STATION_GAP),
+                (_GROOVE_CENTRE[0], station_y),
+            ),
+        ],
+        "BoreStation": [((face_x, axis_y - gap), (face_x, under_y))],
+        "OverallLength": [((face_x, axis_y - gap), (face_x, overall_y))],
+    }
+
+
+def test_radius_text_reads_low_in_open_air_between_the_face_and_the_root_dia() -> None:
+    # r1 review: the shelf ran along the spigot Ø's extension at the OD.
     box = _proposed_radius_text_box()
-    assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx((
-        0.154952880015449, 0.1985339, 0.179114480015449, 0.2020993,
-    ))
-    extensions = {name: list(strokes) for name, strokes in _NATIVE15_EXTENSION_LINES.items()}
-    extensions["OverallLength"] = _overall_witness_ink()
+    face_x, axis_y = _FACE_ON_AXIS
+    assert drawing.RADIUS_GLYPHS == len(_RADIUS_TEXT)
+    assert drawing.SIDE_KEEP["GrooveRadius"] == drawing.RADIUS_TEXT_XY
+    # Right of the face, under the root Ø's upper extension, over the axis,
+    # left of the root Ø's dimension line.
+    assert box.xmin > face_x + 0.003
+    assert box.ymax < drawing.GROOVE_ROOT_SHEET_YS[1] - 0.003
+    assert box.ymin > axis_y + 0.005
+    assert box.xmax < drawing.SIDE_KEEP["GrooveRootDia"][0] - 0.005
+    # The estimate the layout used is the wider of the two glyph pitches.
+    assert drawing.RADIUS_TEXT_HALF_WIDTH >= (box.xmax - box.xmin) / 2.0
+    extensions = _proposed_extension_lines()
     distances = {
         name: min(segment_box_distance(_audit_line(stroke), box) for stroke in strokes)
         for name, strokes in extensions.items()
     }
-    assert sum(len(strokes) for strokes in extensions.values()) == 14
-    assert all(distance > 0.0 for distance in distances.values())
-    assert min(distances.values()) == pytest.approx(0.0005339)
-    assert distances["SpigotDia"] == pytest.approx(0.0005339)
-    assert distances["GrooveRootDia"] == pytest.approx(0.0045339)
-    assert distances["GrooveStation"] == pytest.approx(0.007952880015449)
-    assert distances["OverallLength"] == pytest.approx(0.0033339)
-    # In this native shoulder convention, a material-arc elbow must stay
-    # below the mouth.  Even at the mouth, the glyph-to-witness gap is under
-    # 2 mm; the ≥2 mm requirement remains strict for the actual leader ink.
-    glyph_above_shoulder = _NATIVE15_RADIUS_TEXT_BOX.ymin - 0.1960219
-    assert glyph_above_shoulder == pytest.approx(0.0009339)
-    assert glyph_above_shoulder < drawing.RADIUS_STATION_CLEARANCE
+    assert min(distances.values()) >= 0.003
+    assert min(distances, key=distances.get) == "GrooveRootDia"
+
+
+def _radius_ink(
+    elbow: tuple[float, float], *, overrun: float = _NATIVE15_SHOULDER_OVERRUN
+) -> tuple[list, tuple[float, float]]:
+    """Native-style radius ink for an elbow: the radial line from the arc
+    centre to the tip, on to the elbow, and the full shoulder from the elbow
+    to past the text's right end."""
+    run = math.dist(elbow, _GROOVE_CENTRE)
+    tip = tuple(
+        c + (e - c) * _SHEET_RADIUS / run for e, c in zip(elbow, _GROOVE_CENTRE)
+    )
+    box = _proposed_radius_text_box()
+    shoulder = (elbow, (box.xmax + overrun, elbow[1]))
+    return [(_GROOVE_CENTRE, tip), (tip, elbow), shoulder], tip
+
+
+def _station_ink() -> list:
+    top = drawing.SIDE_KEEP["GrooveStation"][1] - _TEXT_OVER_LINE + 0.001
+    return [
+        (
+            (_GROOVE_CENTRE[0], _GROOVE_CENTRE[1] + drawing.GROOVE_STATION_GAP),
+            (_GROOVE_CENTRE[0], top),
+        ),
+        (
+            (_FACE_ON_AXIS[0], _FACE_ON_AXIS[1] + drawing.GROOVE_STATION_FACE_GAP),
+            (_FACE_ON_AXIS[0], top),
+        ),
+        ((_FACE_ON_AXIS[0], top - 0.001), (_GROOVE_CENTRE[0], top - 0.001)),
+    ]
+
+
+def _material_radius_ink() -> tuple[list, tuple[float, float], list, tuple[float, float]]:
+    ink, tip = _radius_ink(drawing.RADIUS_ELBOW_XY)
+    return ink, tip, _station_ink(), _GROOVE_CENTRE
+
+
+def _root_line_x() -> float:
+    return drawing.SIDE_KEEP["GrooveRootDia"][0]
+
+
+def test_predicted_radius_leader_lands_on_the_face_side_material_arc() -> None:
+    ink, tip, station, centre = _material_radius_ink()
+    assert tip == pytest.approx(drawing.RADIUS_PREDICTED_TIP_XY)
+    assert math.dist(tip, centre) == pytest.approx(_SHEET_RADIUS)
+    assert centre[0] < tip[0] < centre[0] + geom.GROOVE_HALF_OPENING * drawing._S / 1000.0
+    assert drawing.GROOVE_ROOT_SHEET_YS[1] < tip[1] < drawing._side_y(geom.SPIGOT_DIA / 2.0)
+    # The elbow is 2 mm right of the face, 5.5 mm over the axis; the shoulder
+    # sits between the axis and the root Ø's upper extension line.
+    assert drawing.RADIUS_ELBOW_XY == pytest.approx(
+        (_FACE_ON_AXIS[0] + 0.002, _FACE_ON_AXIS[1] + 0.0055)
+    )
+    assert drawing._groove_radius_ink_problem(ink, tip, station, centre, _FACE_ON_AXIS) is None
+    assert drawing._radius_leader_ink_problem(ink, tip, centre, _root_line_x()) is None
+    assert drawing.GROOVE_STATION_GAP == 0.003
+    assert drawing.RADIUS_STATION_CLEARANCE == 0.002
+    assert drawing.RADIUS_INK_SLOP == 0.0004
+
+
+@pytest.mark.parametrize("dx_mm", [-3.0, -1.4, 0.0, 3.4, 5.0])
+def test_radius_leader_holds_wherever_solidworks_runs_the_elbow(dx_mm: float) -> None:
+    # The run-in is an estimate for R1.2 MAX: at native15's 15.28 mm the
+    # elbow lands 3.4 mm right of the prediction, and the leader still lands
+    # on the material arc, radial, short of the root Ø's line.
+    elbow = (drawing.RADIUS_ELBOW_XY[0] + dx_mm / 1000.0, drawing.RADIUS_ELBOW_XY[1])
+    ink, tip = _radius_ink(elbow)
+    centre = _GROOVE_CENTRE
+    assert drawing._groove_radius_ink_problem(
+        ink, tip, _station_ink(), centre, _FACE_ON_AXIS
+    ) is None
+    assert drawing._radius_leader_ink_problem(ink, tip, centre, _root_line_x()) is None
+
+
+def test_radius_leader_accepts_a_leader_drawn_from_the_elbow_alone() -> None:
+    ink, tip, _station, centre = _material_radius_ink()
+    assert drawing._radius_leader_ink_problem(ink[1:], tip, centre, _root_line_x()) is None
+    reversed_ink = [stroke[::-1] for stroke in reversed(ink)]
+    assert drawing._radius_leader_ink_problem(reversed_ink, tip, centre, _root_line_x()) is None
+    # Zero-length records print nothing.
+    assert drawing._radius_leader_ink_problem(
+        [*ink, ((0.0, 0.0), (0.0, 0.0))], tip, centre, _root_line_x()
+    ) is None
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    [
+        ("no-shoulder", "no unique horizontal shoulder"),
+        ("two-shoulders", "no unique horizontal shoulder"),
+        ("no-leader", "no radial leader"),
+        ("jogged-leader", "not on the radial line"),
+        ("detached-shoulder", "does not run right"),
+        ("shoulder-runs-left", "does not run right"),
+        # r1's shelf: along the spigot Ø's extension at the OD.
+        ("shelf-at-the-od", "not between the axis and the root"),
+        ("shoulder-on-the-axis", "not between the axis and the root"),
+        ("into-the-root-dia-line", "reaches the root Ø's dimension line"),
+    ],
+)
+def test_radius_leader_refuses_bent_detached_or_crowded_ink(case: str, message: str) -> None:
+    ink, tip, _station, centre = _material_radius_ink()
+    elbow = ink[1][1]
+    if case == "no-shoulder":
+        ink.pop()
+    elif case == "two-shoulders":
+        ink.append(((elbow[0], elbow[1] + 0.001), (elbow[0] + 0.01, elbow[1] + 0.001)))
+    elif case == "no-leader":
+        ink = ink[2:]
+    elif case == "jogged-leader":
+        joint = (elbow[0] - 0.0007, elbow[1])
+        ink[1] = (tip, joint)
+        ink.insert(2, (joint, (elbow[0], elbow[1] + 0.0007)))
+    elif case == "detached-shoulder":
+        ink[2] = ((elbow[0] + 0.001, elbow[1]), ink[2][1])
+    elif case == "shoulder-runs-left":
+        ink[2] = (elbow, (elbow[0] - 0.02, elbow[1]))
+    elif case == "shelf-at-the-od":
+        ink, tip = _radius_ink((elbow[0], drawing._side_y(geom.SPIGOT_DIA / 2.0)))
+    elif case == "shoulder-on-the-axis":
+        ink, tip = _radius_ink((elbow[0] + 0.004, _FACE_ON_AXIS[1] + 0.001))
+    else:
+        ink, tip = _radius_ink(elbow, overrun=0.008)
+    problem = drawing._radius_leader_ink_problem(ink, tip, centre, _root_line_x())
+    assert problem is not None and message in problem
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    [
+        ("retry12-arrow", "not on the face-side material arc"),
+        ("opposite-arc", "not on the face-side material arc"),
+        ("off-circle", "not on the face-side material arc"),
+        ("empty", "no attached leader ink"),
+        ("disconnected", "no attached leader ink"),
+        ("missing-centre-witness", "no unique witness at the groove arc centre"),
+        ("stale-centre-gap", "groove arc centre witness gap did not reach"),
+        ("near-foot", "not clear of the station's groove arc centre witness"),
+        ("crossing", "not clear of the station's groove arc centre witness"),
+        ("missing-face-witness", "no unique witness at the spigot face"),
+        ("face-witness-down-the-face", "spigot face witness gap did not reach"),
+        ("crossing-face-witness", "not clear of the station's spigot face witness"),
+    ],
+)
+def test_radius_ink_refuses_extension_air_detachment_and_station_ambiguity(
+    case: str, message: str
+) -> None:
+    ink, tip, station, centre = _material_radius_ink()
+    if case == "retry12-arrow":
+        tip = (centre[0] + 0.00454, centre[1] + 0.00156)  # native12: past the mouth
+    elif case == "opposite-arc":
+        tip = (2.0 * centre[0] - tip[0], tip[1])
+    elif case == "off-circle":
+        tip = (tip[0] + 0.001, tip[1])
+    elif case == "empty":
+        ink = []
+    elif case == "disconnected":
+        ink = [((0.170, 0.185), (0.180, 0.185))]
+    elif case == "missing-centre-witness":
+        station.pop(0)
+    elif case == "stale-centre-gap":
+        station[0] = ((centre[0], centre[1] + 0.001), station[0][1])
+    elif case == "near-foot":
+        ink.append((centre, (centre[0], centre[1] + 0.0015)))
+    elif case == "crossing":
+        ink.append((centre, (centre[0], centre[1] + 0.004)))
+    elif case == "missing-face-witness":
+        station.pop(1)
+    elif case == "face-witness-down-the-face":
+        station[1] = (
+            (_FACE_ON_AXIS[0], _FACE_ON_AXIS[1] + drawing.EXTENSION_START_GAP),
+            station[1][1],
+        )
+    else:
+        y = _FACE_ON_AXIS[1] + drawing.GROOVE_STATION_FACE_GAP + 0.003
+        ink.append(((_FACE_ON_AXIS[0] - 0.002, y), (_FACE_ON_AXIS[0] + 0.002, y)))
+    problem = drawing._groove_radius_ink_problem(ink, tip, station, centre, _FACE_ON_AXIS)
+    assert problem is not None and message in problem
 
 
 def _native15_radius_spigot_dump(*, proposed: bool = False) -> dict:
-    """Replay the actual COM row, PDF glyph box and both Ø9 witnesses."""
-    keep = drawing.RADIUS_TEXT_XY if proposed else _NATIVE15_RADIUS_KEEP
-    dx, dy = (keep[i] - _NATIVE15_RADIUS_KEEP[i] for i in range(2))
+    """Replay native15's actual COM rows, PDF glyph boxes and both Ø9
+    witnesses, or the proposed layout's, built from the model and keeps."""
+
+    def line(stroke: tuple, *, z: float = 0.0004) -> list:
+        (x0, y0), (x1, y1) = stroke
+        return [0.0, 0.0, 0.0, 0.0, x0, y0, z, x1, y1, z]
+
     if proposed:
+        keep = drawing.RADIUS_TEXT_XY
         radius_ink, tip, _station, centre = _material_radius_ink()
+        box = _proposed_radius_text_box()
+        radius_text, radius_glyphs = f" {_RADIUS_TEXT} ", _RADIUS_TEXT.replace(" ", "")
+        spigot_x = drawing.SIDE_KEEP["SpigotDia"][0]
+        spigot_y = drawing.SIDE_KEEP["SpigotDia"][1]
+        spigot_extensions = _proposed_extension_lines()["SpigotDia"]
+        spigot_value = " 9.00 "
     else:
+        keep = _NATIVE15_RADIUS_KEEP
         centre = (0.147, 0.1988)
         tip = (0.1516289, 0.1975297)
         radius_ink = [
@@ -1657,11 +1902,12 @@ def _native15_radius_spigot_dump(*, proposed: bool = False) -> dict:
             (centre, tip),
             ((0.1571236, 0.1960219), (0.1860889, 0.1960219)),
         ]
-
-    def line(stroke: tuple, *, z: float = 0.0004) -> list:
-        (x0, y0), (x1, y1) = stroke
-        return [0.0, 0.0, 0.0, 0.0, x0, y0, z, x1, y1, z]
-
+        box = _NATIVE15_RADIUS_TEXT_BOX
+        radius_text, radius_glyphs = " R1.20 ±0.05 ", "R1.20±0.05"
+        spigot_x, spigot_y = 0.1993, 0.185
+        spigot_extensions = [((0.1614, 0.162), (0.2003, 0.162)), _NATIVE15_SPIGOT_TOP_WITNESS]
+        spigot_value = "9.00 ±0.05 "
+    od_low, od_high = spigot_extensions[0][0][1], spigot_extensions[1][0][1]
     direction = tuple((tip[i] - centre[i]) / math.dist(tip, centre) for i in range(2))
     radius = {
         "type": 4, "name": "GrooveRadius", "visible": 1, "owner_type": 0,
@@ -1670,34 +1916,38 @@ def _native15_radius_spigot_dump(*, proposed: bool = False) -> dict:
             "lines": [line(stroke) for stroke in radius_ink],
             "arrows": [[*tip, 0.0004, *direction, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, -1.0]],
             "texts": [{
-                "t": " R1.20 ±0.05 ", "pos": [0.1587111 + dx, 0.1960219 + dy, 0.0004],
-                "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.0273778,
+                "t": radius_text, "pos": [box.xmin - 0.0015, radius_ink[-1][0][1], 0.0004],
+                "h": 0.0035, "ref": 1, "ang": 0.0, "w": box.xmax - box.xmin + 0.003,
             }],
         },
         "dim": {"hole_callout": False},
     }
     spigot = {
         "type": 4, "name": "SpigotDia", "visible": 1, "owner_type": 0,
-        "pos": [0.1993, 0.185, -0.0004],
+        "pos": [spigot_x, spigot_y, -0.0004],
         "display": {
             "lines": [line(stroke, z=-0.0004) for stroke in [
-                *_NATIVE15_EXTENSION_LINES["SpigotDia"],
-                ((0.1993, 0.162), (0.1993, 0.1821951)),
-                ((0.1993, 0.198), (0.1993, 0.1878049)),
+                *spigot_extensions,
+                ((spigot_x, od_low), (spigot_x, spigot_y - 0.0028)),
+                ((spigot_x, od_high), (spigot_x, spigot_y + 0.0028)),
             ]],
             "arrows": [
-                [0.1993, 0.162, -0.0004, 0.0, 1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
-                [0.1993, 0.198, -0.0004, 0.0, -1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+                [spigot_x, od_low, -0.0004, 0.0, 1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+                [spigot_x, od_high, -0.0004, 0.0, -1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
             ],
             "texts": [
-                {"t": " ", "pos": [0.1843889, 0.1822486, -0.0004], "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.0012931},
-                {"t": "<MOD-DIAM>", "pos": [0.185682, 0.1821951, -0.0004], "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.0052784},
-                {"t": "9.00 ±0.05 ", "pos": [0.1909604, 0.1822486, -0.0004], "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.0232507},
+                {"t": " ", "pos": [spigot_x - 0.0149, spigot_y - 0.0027514, -0.0004], "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.0012931},
+                {"t": "<MOD-DIAM>", "pos": [spigot_x - 0.013618, spigot_y - 0.0028049, -0.0004], "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.0052784},
+                {"t": spigot_value, "pos": [spigot_x - 0.0083396, spigot_y - 0.0027514, -0.0004], "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.0232507},
             ],
         },
         "dim": {"hole_callout": False},
     }
-    old = _NATIVE15_RADIUS_TEXT_BOX
+    spigot_glyphs = (
+        ["9.00", spigot_x - 0.0045, spigot_y - 0.0018175, spigot_x + 0.0045, spigot_y + 0.0017479]
+        if proposed
+        else ["9.00±0.05", 0.1911891, 0.1831825, 0.2127127, 0.1867479]
+    )
     return {
         "schema": 1, "stem": drawing.PART_STEM, "sheet": "Sheet1",
         "width": 0.4318, "height": 0.2794,
@@ -1710,8 +1960,8 @@ def _native15_radius_spigot_dump(*, proposed: bool = False) -> dict:
         }],
         "sheet_annotations": [], "tables": [], "read_errors": {},
         "ink": {"spans": [
-            ["R1.20±0.05", old.xmin + dx, old.ymin + dy, old.xmax + dx, old.ymax + dy],
-            ["9.00±0.05", 0.1911891, 0.1831825, 0.2127127, 0.1867479],
+            [radius_glyphs, box.xmin, box.ymin, box.xmax, box.ymax],
+            spigot_glyphs,
         ], "strokes": []},
     }
 
@@ -1853,204 +2103,6 @@ def test_local_text_gate_consumes_the_completed_finalizer_report_once() -> None:
     assert "audit_dump(" not in source and "collect_sheet_dumps(" not in source
 
 
-def _material_radius_ink() -> tuple[list, tuple[float, float], list, tuple[float, float]]:
-    """A complete 29 mm native-style shoulder at the new keep, not an elbow stub."""
-    centre = (drawing._side_x(geom.GROOVE_X), drawing._side_y(geom.GROOVE_CENTRE_R))
-    x, y = drawing.RADIUS_TEXT_XY
-    elbow = (x - drawing.RADIUS_SHOULDER_RUN_IN, y - drawing.RADIUS_SHOULDER_DROP)
-    radius = geom.GROOVE_RADIUS * drawing._S / 1000.0
-    assert math.dist(centre, elbow) == pytest.approx(radius)
-    tip = elbow
-    assert tip == pytest.approx(drawing.RADIUS_MATERIAL_TIP_XY)
-    shoulder = (elbow, (elbow[0] + math.dist(*_NATIVE14_RADIUS_SHOULDER), elbow[1]))
-    ink = [(centre, tip), shoulder]
-    station = [
-        (
-            (centre[0], centre[1] + drawing.GROOVE_STATION_GAP),
-            (centre[0], drawing.SIDE_KEEP["GrooveStation"][1] - _TEXT_OVER_LINE),
-        )
-    ]
-    return ink, tip, station, centre
-
-
-def _overall_witness_ink() -> list:
-    """Keep native14's lower endpoint; derive the two starts from the model."""
-    end_y = _NATIVE14_OVERALL_FACE_WITNESS[1][1]
-    free_x = drawing._side_x(geom.FREE_END_X)
-    face_x = drawing._side_x(geom.SPIGOT_FACE_X)
-    return [
-        (
-            (free_x, drawing.SIDE_CENTER[1] - drawing.EXTENSION_START_GAP),
-            (free_x, end_y),
-        ),
-        (
-            (
-                face_x,
-                drawing._side_y(geom.SPIGOT_DIA / 2.0) - drawing.OVERALL_FACE_WITNESS_GAP,
-            ),
-            (face_x, end_y),
-        ),
-    ]
-
-
-def test_full_radius_shoulder_clears_both_overall_witnesses_at_the_new_keep() -> None:
-    ink, tip, station, centre = _material_radius_ink()
-    shoulder = ink[-1]
-    old = _NATIVE14_OVERALL_FACE_WITNESS
-    assert drawing.segments_cross(_NATIVE14_RADIUS_SHOULDER, old)
-    assert not drawing.segments_cross(shoulder, old)
-    assert shoulder[0][1] > max(point[1] for point in old)
-    # Both endpoints are outside x160.4: an elbow-only assertion missed it.
-    assert shoulder[0][0] < old[0][0] < shoulder[1][0]
-    assert math.dist(*shoulder) == pytest.approx(0.029)
-    assert shoulder[0][1] == pytest.approx(
-        drawing.SIDE_KEEP["GrooveRadius"][1] - drawing.RADIUS_SHOULDER_DROP
-    )
-    assert old[0] == pytest.approx((
-        drawing._side_x(geom.SPIGOT_FACE_X),
-        drawing._side_y(geom.SPIGOT_DIA / 2.0) - drawing.EXTENSION_START_GAP,
-    ))
-    witnesses = _overall_witness_ink()
-    face = witnesses[1]
-    assert drawing.OVERALL_FACE_WITNESS_GAP == pytest.approx(0.0028)
-    assert drawing.OVERALL_FACE_WITNESS_GAP >= drawing.EXTENSION_START_GAP >= 0.0
-    assert face[0][1] == pytest.approx(0.1952)
-    assert face[1] == pytest.approx(old[1])
-    assert old[1][1] < face[0][1] < old[0][1]
-    # New ink is a strict subset of the old witness, so this local gap
-    # cannot add a collision with another dimension or text.
-    for point in face:
-        assert drawing.distance_to_point(old, point) == pytest.approx(0.0)
-    assert math.dist(*face) == pytest.approx(0.0700)
-    measured_clearance = drawing.distance_to_point(shoulder, face[0])
-    assert measured_clearance == pytest.approx(
-        drawing.RADIUS_STATION_CLEARANCE + drawing.RADIUS_INK_SLOP
-    )
-    assert measured_clearance >= drawing.RADIUS_STATION_CLEARANCE
-    for witness in witnesses:
-        assert not any(drawing.segments_cross(stroke, witness) for stroke in ink)
-    assert drawing._radius_overall_witness_ink_problem(ink, witnesses) is None
-    # The new ray is still on the genuine face-side material arc, not its
-    # extension in air, and the station retains its exact 3 mm local gap.
-    assert math.dist(tip, centre) == pytest.approx(geom.GROOVE_RADIUS * drawing._S / 1000.0)
-    assert tip[0] > centre[0]
-    assert drawing._side_y(geom.GROOVE_ROOT_DIA / 2.0) < tip[1] < drawing._side_y(geom.SPIGOT_DIA / 2.0)
-    assert drawing.SIDE_KEEP["GrooveRadius"] == pytest.approx((0.166923980015449, 0.2003781))
-    assert shoulder[0] == pytest.approx((0.151647580015449, 0.1976))
-    assert shoulder[1] == pytest.approx((0.180647580015449, 0.1976))
-    assert drawing._groove_radius_ink_problem(ink, tip, station, centre) is None
-    assert drawing.GROOVE_STATION_GAP == 0.003
-    assert drawing.RADIUS_STATION_CLEARANCE == 0.002
-    assert drawing.RADIUS_INK_SLOP == 0.0004
-
-
-def test_radius_material_arc_line_meets_the_full_shoulder_without_an_elbow_jog() -> None:
-    ink, tip, station, centre = _material_radius_ink()
-    assert len(ink) == 2
-    assert ink[0] == (centre, tip)
-    assert ink[1][0] == tip
-    assert abs(ink[0][1][1] - ink[0][0][1]) > drawing.RADIUS_INK_SLOP
-    assert math.dist(*ink[1]) == pytest.approx(0.029)
-    assert drawing._groove_radius_ink_problem(ink, tip, station, centre) is None
-    assert drawing._radius_overall_witness_ink_problem(ink, _overall_witness_ink()) is None
-
-
-@pytest.mark.parametrize(
-    ("case", "message"),
-    [
-        ("missing-shoulder", "no unique rebuilt horizontal shoulder"),
-        ("missing-face", "no unique witness"),
-        ("duplicate-free", "no unique witness"),
-        ("short-witness", "does not reach its dimension line"),
-        ("native14-gap", "gap did not reach the rebuilt ink"),
-        ("cross-free", "not clear"),
-    ],
-)
-def test_overall_witness_ink_requires_both_full_witnesses_and_clear_radius(
-    case: str, message: str,
-) -> None:
-    ink, _tip, _station, _centre = _material_radius_ink()
-    witnesses = _overall_witness_ink()
-    if case == "missing-shoulder":
-        ink.pop()
-    elif case == "missing-face":
-        witnesses.pop()
-    elif case == "duplicate-free":
-        witnesses.append(witnesses[0])
-    elif case == "short-witness":
-        witnesses[1] = (witnesses[1][0], (witnesses[1][1][0], drawing._SIDE_BOTTOM))
-    elif case == "native14-gap":
-        witnesses[1] = _NATIVE14_OVERALL_FACE_WITNESS
-    else:
-        elbow = (witnesses[0][0][0] - 0.002, drawing._SIDE_BOTTOM + 0.010)
-        ink[-2] = (ink[-2][0], elbow)
-        ink[-1] = (elbow, (ink[-1][1][0], elbow[1]))
-        assert drawing.segments_cross(ink[-1], witnesses[0])
-    problem = drawing._radius_overall_witness_ink_problem(ink, witnesses)
-    assert problem is not None and message in problem
-
-
-@pytest.mark.parametrize("clearance", [0.0019, 0.0021])
-def test_overall_witness_measured_clearance_does_not_spend_the_ink_slop(
-    clearance: float,
-) -> None:
-    ink, _tip, _station, _centre = _material_radius_ink()
-    witnesses = _overall_witness_ink()
-    y = witnesses[1][0][1] + clearance
-    elbow = (ink[-1][0][0], y)
-    ink[-2] = (ink[-2][0], elbow)
-    ink[-1] = (elbow, (ink[-1][1][0], y))
-    problem = drawing._radius_overall_witness_ink_problem(ink, witnesses)
-    if clearance < drawing.RADIUS_STATION_CLEARANCE:
-        assert problem is not None and "not clear" in problem
-    else:
-        assert problem is None
-
-
-def test_material_radius_ink_and_separate_station_foot_pass() -> None:
-    assert drawing._groove_radius_ink_problem(*_material_radius_ink()) is None
-
-
-@pytest.mark.parametrize(
-    ("case", "message"),
-    [
-        ("retry12-arrow", "not on the face-side material arc"),
-        ("opposite-arc", "not on the face-side material arc"),
-        ("off-circle", "not on the face-side material arc"),
-        ("empty", "no attached leader ink"),
-        ("disconnected", "no attached leader ink"),
-        ("missing-witness", "no unique witness"),
-        ("stale-gap", "did not reach the rebuilt ink"),
-        ("near-foot", "not clear"),
-        ("crossing", "not clear"),
-    ],
-)
-def test_radius_ink_refuses_extension_air_detachment_and_station_ambiguity(
-    case: str, message: str
-) -> None:
-    ink, tip, station, centre = _material_radius_ink()
-    if case == "retry12-arrow":
-        tip = (0.15154, 0.20036)  # scout's native12: v5.09, arc stops at v4.50
-    elif case == "opposite-arc":
-        tip = (2.0 * centre[0] - tip[0], tip[1])
-    elif case == "off-circle":
-        tip = (tip[0] + 0.001, tip[1])
-    elif case == "empty":
-        ink = []
-    elif case == "disconnected":
-        ink = [((0.170, 0.195), (0.180, 0.195))]
-    elif case == "missing-witness":
-        station = []
-    elif case == "stale-gap":
-        station[0] = ((centre[0], centre[1] + 0.001), station[0][1])
-    elif case == "near-foot":
-        ink.append((centre, (centre[0], centre[1] + 0.0015)))
-    else:
-        ink.append((centre, (centre[0], centre[1] + 0.004)))
-    problem = drawing._groove_radius_ink_problem(ink, tip, station, centre)
-    assert problem is not None and message in problem
-
-
 class _ArrowData:
     """IDisplayData arrow count and 12-double GetArrowHeadAtIndex2 method."""
 
@@ -2080,170 +2132,77 @@ class _RadialAnnotation(_RootAnnotation):
 
 def _radius_readback_fakes(
     monkeypatch: pytest.MonkeyPatch, *, count: int = 1, complete: bool = True
-) -> tuple[_RootAnnotation, _RootAnnotation, _RootAnnotation]:
+) -> tuple[_RadialAnnotation, _RootAnnotation]:
     ink, tip, station_ink, centre = _material_radius_ink()
     display = _radial_display()
     display.ArcExtensionLineOrOppositeSide = False
     display.data = _ArrowData(tip, count=count, complete=complete)
     radius, station = _RadialAnnotation(display), _RootAnnotation(_station_display())
     radius.ink = ink
-    overall = _RootAnnotation(_overall_display())
-    overall.ink = _overall_witness_ink()
+    station.ink = station_ink
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    points = {
+        (geom.GROOVE_X / 1000.0, 0.0, -geom.GROOVE_CENTRE_R / 1000.0): centre,
+        (geom.SPIGOT_FACE_X / 1000.0, 0.0, 0.0): _FACE_ON_AXIS,
+    }
     monkeypatch.setattr(
-        drawing, "model_point_in_view", lambda adapter, view, xyz, *, label: centre
+        drawing, "model_point_in_view", lambda adapter, view, xyz, *, label: points[xyz]
     )
 
     def segments(annotation: _RootAnnotation) -> list:
-        if annotation is radius:
-            return radius.ink
-        if annotation is station:
-            return station_ink
-        assert annotation is overall
-        return overall.ink
+        assert annotation is radius or annotation is station
+        return annotation.ink
 
     monkeypatch.setattr(drawing, "dimension_segments", segments)
-    return radius, station, overall
+    return radius, station
 
 
 def test_rebuilt_radius_proof_reads_native_arrow_tip_and_model_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    radius, station, overall = _radius_readback_fakes(monkeypatch)
-    drawing._prove_groove_radius(object(), object(), radius, station, overall)
+    radius, station = _radius_readback_fakes(monkeypatch)
+    drawing._prove_groove_radius(object(), object(), radius, station)
 
 
-@pytest.mark.parametrize("case", [
-    "0.07mm-jog", "disconnected-shoulder", "other-centre", "missing-radial",
-    "tilted-shoulder",
-])
-def test_native_direct_radius_junction_refuses_jogs_and_disconnected_or_wrong_ink(
-    monkeypatch: pytest.MonkeyPatch, case: str,
-) -> None:
-    radius, station, overall = _radius_readback_fakes(monkeypatch)
-    radial, shoulder = radius.ink
-    tip = radial[1]
-    if case == "0.07mm-jog":
-        joint = (tip[0] + 0.00007, tip[1])
-        radius.ink = [radial, (tip, joint), (joint, shoulder[1])]
-    elif case == "disconnected-shoulder":
-        radius.ink[1] = (
-            (shoulder[0][0] + 0.00007, shoulder[0][1]),
-            (shoulder[1][0] + 0.00007, shoulder[1][1]),
-        )
-    elif case == "other-centre":
-        radius.ink[0] = ((radial[0][0] + 0.00007, radial[0][1]), tip)
-    elif case == "missing-radial":
-        radius.ink.pop(0)
-    else:
-        radius.ink[1] = (shoulder[0], (shoulder[1][0], shoulder[1][1] + 0.00007))
-    assert drawing.RADIUS_JUNCTION_EPSILON == 1e-6
-    # All existing material/station/overall proofs precede this stricter,
-    # independent junction proof; none gets relaxed to accommodate a jog.
-    with pytest.raises(RuntimeError, match="does not have a direct junction"):
-        drawing._prove_groove_radius(object(), object(), radius, station, overall)
+def test_rebuilt_radius_proof_refuses_a_lost_max_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    radius, station = _radius_readback_fakes(monkeypatch)
+    radius.display.dimension.Tolerance.Type = 0  # swTolNONE: a bare R1.2
+    with pytest.raises(RuntimeError, match="single MAX limit"):
+        drawing._prove_groove_radius(object(), object(), radius, station)
 
 
-@pytest.mark.parametrize("reverse", [False, True])
-def test_native_direct_junction_accepts_connected_ink_in_either_collection_order(
-    monkeypatch: pytest.MonkeyPatch, reverse: bool,
-) -> None:
-    radius, station, overall = _radius_readback_fakes(monkeypatch)
-    if reverse:
-        radius.ink = [stroke[::-1] for stroke in reversed(radius.ink)]
-    drawing._prove_groove_radius(object(), object(), radius, station, overall)
-
-
-def test_native_direct_junction_accepts_exactly_zero_unprinted_records(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    radius, station, overall = _radius_readback_fakes(monkeypatch)
-    radius.ink.append(((0.0, 0.0), (0.0, 0.0)))
-    drawing._prove_groove_radius(object(), object(), radius, station, overall)
-
-
-@pytest.mark.parametrize(
-    ("residual_mm", "accepted"),
-    [(0.0005, True), (0.000999, True), (0.001001, False), (0.07, False)],
-)
-def test_native_junction_normalizes_rounding_residuals_but_not_real_jogs(
-    monkeypatch: pytest.MonkeyPatch, residual_mm: float, accepted: bool,
-) -> None:
-    radius, station, overall = _radius_readback_fakes(monkeypatch)
-    radial, shoulder = radius.ink
-    tip = radial[1]
-    joint = (tip[0] + residual_mm / 1000.0, tip[1])
-    radius.ink = [radial, (tip, joint), (joint, shoulder[1])]
-    if accepted:
-        drawing._prove_groove_radius(object(), object(), radius, station, overall)
-    else:
-        with pytest.raises(RuntimeError, match="does not have a direct junction"):
-            drawing._prove_groove_radius(object(), object(), radius, station, overall)
-
-
-@pytest.mark.parametrize("member", ["radial-centre", "shoulder-start", "shoulder-end-y"])
-@pytest.mark.parametrize(("residual_mm", "accepted"), [(0.000999, True), (0.001001, False)])
-def test_native_junction_endpoint_matches_use_the_same_calibration_boundary(
-    monkeypatch: pytest.MonkeyPatch, member: str, residual_mm: float, accepted: bool,
-) -> None:
-    radius, station, overall = _radius_readback_fakes(monkeypatch)
-    radial, shoulder = radius.ink
-    delta = residual_mm / 1000.0
-    if member == "radial-centre":
-        radius.ink[0] = ((radial[0][0] + delta, radial[0][1]), radial[1])
-    elif member == "shoulder-start":
-        radius.ink[1] = ((shoulder[0][0] + delta, shoulder[0][1]), shoulder[1])
-    else:
-        radius.ink[1] = (shoulder[0], (shoulder[1][0], shoulder[1][1] + delta))
-    if accepted:
-        drawing._prove_groove_radius(object(), object(), radius, station, overall)
-    else:
-        with pytest.raises(RuntimeError, match="does not have a direct junction"):
-            drawing._prove_groove_radius(object(), object(), radius, station, overall)
-
-
-def test_numerically_zero_junction_residual_still_obeys_raw_overall_witness_clearance(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    radius, station, overall = _radius_readback_fakes(monkeypatch)
-    x, start_y = overall.ink[1][0]
-    radius.ink.append(((x, start_y + 0.001), (x + 0.0000005, start_y + 0.001)))
-    with pytest.raises(RuntimeError, match="does not clear the overall length.*not clear"):
-        drawing._prove_groove_radius(object(), object(), radius, station, overall)
-
-
-def test_rebuilt_radius_proof_refuses_native14_full_shoulder_crossing(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    radius, station, overall = _radius_readback_fakes(monkeypatch)
-    centre = (drawing._side_x(geom.GROOVE_X), drawing._side_y(geom.GROOVE_CENTRE_R))
-    radius.ink = [
-        (centre, _NATIVE14_RADIUS_TIP),
-        (_NATIVE14_RADIUS_TIP, _NATIVE14_RADIUS_SHOULDER[0]),
-        _NATIVE14_RADIUS_SHOULDER,
-    ]
-    radius.display.data = _ArrowData(_NATIVE14_RADIUS_TIP)
-    overall.ink[1] = _NATIVE14_OVERALL_FACE_WITNESS
-    with pytest.raises(RuntimeError, match="does not clear the overall length"):
-        drawing._prove_groove_radius(object(), object(), radius, station, overall)
+def test_rebuilt_radius_proof_refuses_r1s_shelf_at_the_od(monkeypatch: pytest.MonkeyPatch) -> None:
+    # r1: the shoulder ran level at the OD and the arrow sat at the mouth.
+    # Its arrow is already off the material arc; its leader, put back on it,
+    # still shelves at the OD.
+    radius, station = _radius_readback_fakes(monkeypatch)
+    elbow = (drawing.RADIUS_ELBOW_XY[0], drawing._side_y(geom.SPIGOT_DIA / 2.0))
+    radius.ink, tip = _radius_ink(elbow)
+    radius.display.data = _ArrowData(tip)
+    with pytest.raises(RuntimeError, match="not on the face-side material arc"):
+        drawing._prove_groove_radius(object(), object(), radius, station)
+    radius.ink, _tip = _radius_ink((_FACE_ON_AXIS[0] + 0.004, drawing.GROOVE_ROOT_SHEET_YS[1] - 0.001))
+    radius.display.data = _ArrowData(_tip)
+    with pytest.raises(RuntimeError, match="does not read in open air.*not between"):
+        drawing._prove_groove_radius(object(), object(), radius, station)
 
 
 @pytest.mark.parametrize(
     ("name", "feature", "value"),
     [
-        ("OtherLength", "TurnedProfile", geom.OVERALL_LENGTH),
-        ("OverallLength", "OtherSketch", geom.OVERALL_LENGTH),
-        ("OverallLength", "TurnedProfile", geom.OVERALL_LENGTH + 2e-5),
+        ("OtherLength", "GrooveProfile", spec.GROOVE_STATION),
+        ("GrooveStation", "OtherSketch", spec.GROOVE_STATION),
+        ("GrooveStation", "GrooveProfile", spec.GROOVE_STATION + 2e-5),
     ],
 )
-def test_rebuilt_overall_witness_proof_requires_the_genuine_model_dimension(
+def test_station_witness_gaps_are_written_only_on_the_genuine_model_dimension(
     monkeypatch: pytest.MonkeyPatch, name: str, feature: str, value: float,
 ) -> None:
-    radius, station, overall = _radius_readback_fakes(monkeypatch)
-    overall.display.dimension.FullName = f"{name}@{feature}@mg-output-fixture.SLDPRT"
-    overall.display.dimension.SystemValue = value / 1000.0
+    _projection_fakes(monkeypatch)
+    station = _NativeDisplay(name, feature, value, kind=2)
     with pytest.raises(RuntimeError, match="wrong model dimension"):
-        drawing._prove_groove_radius(object(), object(), radius, station, overall)
+        _place(_radial_display(), station)
+    assert station.gaps == []
 
 
 @pytest.mark.parametrize(
@@ -2253,11 +2212,9 @@ def test_rebuilt_overall_witness_proof_requires_the_genuine_model_dimension(
 def test_rebuilt_radius_proof_refuses_missing_extra_or_unreadable_arrow(
     monkeypatch: pytest.MonkeyPatch, count: int, complete: bool, message: str
 ) -> None:
-    radius, station, overall = _radius_readback_fakes(
-        monkeypatch, count=count, complete=complete
-    )
+    radius, station = _radius_readback_fakes(monkeypatch, count=count, complete=complete)
     with pytest.raises(RuntimeError, match=message):
-        drawing._prove_groove_radius(object(), object(), radius, station, overall)
+        drawing._prove_groove_radius(object(), object(), radius, station)
 
 
 _Y_BORE_CYLINDER = (0.0, 0.004, 0.0, 0.0, 1.0, 0.0, geom.ROD_BORE_DIA / 2000.0)
@@ -2549,7 +2506,7 @@ def test_bore_axis_insertion_reuses_native_face_helper_and_shortens_existing_mar
 def test_radius_readback_refuses_floating_ink_and_lost_native_style(
     monkeypatch: pytest.MonkeyPatch, case: str,
 ) -> None:
-    radius, station, overall = _radius_readback_fakes(monkeypatch)
+    radius, station = _radius_readback_fakes(monkeypatch)
     if case == "dangling":
         radius.dangling = True
     elif case == "sheet-owned":
@@ -2559,7 +2516,7 @@ def test_radius_readback_refuses_floating_ink_and_lost_native_style(
     else:
         radius.display.data = None
     with pytest.raises(RuntimeError):
-        drawing._prove_groove_radius(object(), object(), radius, station, overall)
+        drawing._prove_groove_radius(object(), object(), radius, station)
 
 
 @pytest.mark.parametrize("brackets", [("(", ")"), ("", ""), ("(<MOD-DIAM>", ")")])
@@ -2626,10 +2583,7 @@ def test_radius_arc_property_requires_measured_bool_false_after_write(
     display = _radial_display(arc_persists=False)
     display._arc = readback
     with pytest.raises(RuntimeError, match="still attaches"):
-        drawing._place_groove_radius(
-            object(), _RootAnnotation(display), _RootAnnotation(_station_display()),
-            _RootAnnotation(_overall_display()),
-        )
+        _place(display)
 
 
 @pytest.mark.parametrize("readback", _NON_BOOL_READBACKS)
@@ -2640,10 +2594,7 @@ def test_radius_diametric_property_requires_measured_bool_false_before_write(
     display = _radial_display()
     display.Diametric = readback
     with pytest.raises(RuntimeError, match="genuine radial dimension"):
-        drawing._place_groove_radius(
-            object(), _RootAnnotation(display), _RootAnnotation(_station_display()),
-            _RootAnnotation(_overall_display()),
-        )
+        _place(display)
 
 
 @pytest.mark.parametrize("readback", _NON_BOOL_READBACKS)
@@ -2651,7 +2602,7 @@ def test_radius_diametric_property_requires_measured_bool_false_before_write(
 def test_rebuilt_radius_bool_readbacks_refuse_none_integer_boundmethod_and_object(
     monkeypatch: pytest.MonkeyPatch, readback: object, member: str,
 ) -> None:
-    radius, station, overall = _radius_readback_fakes(monkeypatch)
+    radius, station = _radius_readback_fakes(monkeypatch)
     if member == "Diametric":
         radius.display.Diametric = readback
     elif member == "ArcExtensionLineOrOppositeSide":
@@ -2659,7 +2610,7 @@ def test_rebuilt_radius_bool_readbacks_refuse_none_integer_boundmethod_and_objec
     else:
         radius.dangling = readback
     with pytest.raises(RuntimeError):
-        drawing._prove_groove_radius(object(), object(), radius, station, overall)
+        drawing._prove_groove_radius(object(), object(), radius, station)
 
 
 @pytest.mark.parametrize("readback", _NON_BOOL_READBACKS)

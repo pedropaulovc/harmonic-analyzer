@@ -5,4 +5,4 @@ mg-output-fixture:
   finish: as-machined
   quantity: 1
   tolerance_class: machined_block
-  process: "turned from 3/8 hex bar (brass): face the free end, turn the spigot and its full-radius wire groove; hold on flats and centre-drill the 120-degree corner ridge before drilling and reaming the rod bore through the corners on the hex axis; tap #4-40 from the spigot face into the bore"
+  process: "turned from 3/8 hex bar (brass): face the free end, turn the spigot and its full-radius wire groove; hold on flats and centre-drill the 120-degree corner ridge before drilling the Ø5.2 rod bore through the corners on the hex axis; tap #4-40 from the spigot face into the bore"
