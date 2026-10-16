@@ -151,28 +151,37 @@ _PAD = 0.004
 
 # Sheet 1, Front view: the lever settings' text, in sheet metres from the
 # projected chain points. The clamp station's line runs above the clamp's
-# thumb-screw head with its callout above it; the fixture drop's text stands
+# thumb-screw head with its callout above it. The fixture drop's text stands
 # right of the vertical rod, clear of the fixture screw (toward the bracket,
-# left) and the wire (down-left to the wheel).
+# left) and the wire (down-left to the wheel), and BELOW the fixture axis's
+# extension line: placed between the two extension lines (r3), its 3-line
+# block reached down through the lower one and its left end over the rod
+# (machinist review r1).
 CLAMP_STATION_RISE = 0.012
-FIXTURE_DROP_RUN = 0.022
+FIXTURE_DROP_RUN = 0.030
+FIXTURE_DROP_BELOW = 0.006
 LEVER_CALLOUT_LOCATION = {
     stack.CLAMP_STATION_DIMENSION: "above",
     stack.FIXTURE_DROP_DIMENSION: "below",
 }
 LEVER_VIEW_LABEL = "lever settings (Front)"
 
-# Sheet 2: the wheel group's exploded view in the field left of the BOM, the
-# BOM in the top-right corner under its caption, and under the BOM the
-# collapsed whole-assembly view the BOM is inserted on (the MHA-PD-000 BOM
-# reference): the exploded views are isolated afterwards, and view-only
-# isolation must never touch the view that owns the parts list.
+# Sheet 2: the wheel group's exploded view in the field left of the BOM with
+# its caption under it (as the lever sheet's), the BOM in the top-right
+# corner, and under the BOM the collapsed whole-assembly view the BOM is
+# inserted on (the MHA-PD-000 BOM reference): the exploded views are isolated
+# afterwards, and view-only isolation must never touch the view that owns the
+# parts list.
 BALLOON_MARGIN = 0.012
 BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
+# Wide enough that no description wraps: r3 (run
+# 20261016T072448223Z-614c0a10f732427c87668fb67f9db447) wrapped the 0.072
+# column's "#4-40 X 7/16 KNURLED THUMB SCREW" to two lines, pushing the BOM's
+# last row onto the reference caption.
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
     "part": 0.032,
-    "description": 0.072,
+    "description": 0.082,
     "sku": 0.032,
     "quantity": 0.012,
 }
@@ -181,20 +190,22 @@ MADE_PART_SKU = "-"
 BOM_ROW_HEIGHT = 0.006
 BOM_ANCHOR = (
     INNER_BORDER[2] - _PAD - sum(BOM_COLUMN_WIDTHS.values()),
-    INNER_BORDER[3] - 0.012,
+    INNER_BORDER[3] - _PAD,
 )
-WHEEL_CAPTION_XY = (BOM_ANCHOR[0], INNER_BORDER[3] - _PAD)
 WHEEL_FIELD = (
     INNER_BORDER[0] + _PAD,
-    INNER_BORDER[1] + _PAD,
+    TITLE_BLOCK[3] + _PAD,
     TITLE_BLOCK[0] - _PAD,
     INNER_BORDER[3] - _PAD,
 )
 if WHEEL_FIELD[2] + _PAD > BOM_ANCHOR[0]:
     raise AssertionError("the wheel group's field runs under the BOM")
+WHEEL_CAPTION_XY = (INNER_BORDER[0] + _PAD + 0.002, TITLE_BLOCK[3] - _PAD)
 WHEEL_GROUP = "WHEEL GROUP"
 WHEEL_LABEL = "wheel group exploded"
-BOM_BOTTOM = BOM_ANCHOR[1] - (len(stack.BOM_ORDER) + 1) * BOM_ROW_HEIGHT
+# The heading's two-line titles ("ITEM NO.", "PART NUMBER") take two rows.
+BOM_HEADING_ROWS = 2
+BOM_BOTTOM = BOM_ANCHOR[1] - (len(stack.BOM_ORDER) + BOM_HEADING_ROWS) * BOM_ROW_HEIGHT
 BOM_REFERENCE_CAPTION_XY = (BOM_ANCHOR[0], BOM_BOTTOM - _PAD)
 BOM_REFERENCE_FIELD = (
     BOM_ANCHOR[0],
@@ -427,7 +438,10 @@ PRESSED = StackDetail(
     (0.330, 0.200),
     frozenset({"mg-wheel-bar", "mg-wheel-axle"}),
     BORE_ROW_HEIGHT,
-    "MG-WHEEL-AXLE PRESSED\nINTO MG-WHEEL-BAR",
+    # The BOM's own part numbers and descriptions (machinist review r1).
+    f"{BOM_PART_NUMBERS['mg-wheel-axle']} {BOM_DESCRIPTIONS['mg-wheel-axle']} "
+    f"PRESSED\nINTO {BOM_PART_NUMBERS['mg-wheel-bar']} "
+    f"{BOM_DESCRIPTIONS['mg-wheel-bar']}",
 )
 _ENDSHAKE_CENTRE_D = (stack.HUB_FRONT_D + TIP_Y) / 2.0
 _ENDSHAKE_RADIUS = 7.0
@@ -693,7 +707,7 @@ def lever_keep(
 ) -> dict[str, tuple[float, float]]:
     """Where each lever setting's text sits, from the chain's three projected
     points (sheet metres): the clamp station over the lever between the tip
-    and the clamp, the fixture drop beside the rod between lever and fixture."""
+    and the clamp, the fixture drop right of the rod below the fixture."""
     return {
         stack.CLAMP_STATION_DIMENSION: (
             (tip[0] + clamp[0]) / 2.0,
@@ -701,7 +715,7 @@ def lever_keep(
         ),
         stack.FIXTURE_DROP_DIMENSION: (
             clamp[0] + FIXTURE_DROP_RUN,
-            (clamp[1] + fixture[1]) / 2.0,
+            fixture[1] - FIXTURE_DROP_BELOW,
         ),
     }
 
@@ -1109,6 +1123,33 @@ def _validate_bom(adapter: Any, table: Any) -> dict[str, str]:
     return {stem: values[1] for stem, values in actual.items()}
 
 
+def _assert_bom_clears_reference_caption(table: Any) -> None:
+    """The BOM's printed bottom must stay above the reference caption.
+
+    The reference view and its caption are laid out from :data:`BOM_BOTTOM`
+    before the table exists; this reads the inserted table's anchor and row
+    heights (top-left anchored, as the layout audit boxes it) so a taller
+    heading or a wrapped row fails here, naming the measured bottom. The
+    margin is the audit's text air (it wanted 2.26 mm on r3).
+    """
+    bound = _early_bound(table, "ITableAnnotation")
+    annotation = _early_bound(bound.GetAnnotation(), "IAnnotation")
+    top = float(annotation.GetPosition()[1])
+    height = sum(float(bound.GetRowHeight(row)) for row in range(int(bound.RowCount)))
+    bottom = top - height
+    _telemetry.info(
+        f"magnifier BOM spans y {bottom * 1000.0:.1f}..{top * 1000.0:.1f} mm",
+        bom_top_mm=round(top * 1000.0, 2),
+        bom_bottom_mm=round(bottom * 1000.0, 2),
+    )
+    if bottom < BOM_REFERENCE_CAPTION_XY[1] + 0.0025:
+        raise RuntimeError(
+            f"magnifier BOM bottom {bottom * 1000.0:.1f} mm runs onto the reference "
+            f"caption at {BOM_REFERENCE_CAPTION_XY[1] * 1000.0:.1f} mm "
+            f"(planned {BOM_BOTTOM * 1000.0:.1f} mm)"
+        )
+
+
 def _link_view_to_bom(view: Any, table: Any, *, label: str) -> None:
     """Number ``view``'s balloons from the BOM table inserted on another view."""
     bom = _early_bound(table, "IBomTableAnnotation")
@@ -1286,6 +1327,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="magnifier",
     )
     items = _validate_bom(adapter, table)
+    _assert_bom_clears_reference_caption(table)
     for view, label in (
         (wheel, WHEEL_LABEL),
         (lever, LEVER_LABEL),
@@ -1388,7 +1430,14 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts=SHEET_LAYOUTS,
-        sheet_scales=SHEET_SCALES,
+        # Each sheet's title-block scale is its main view's: the ladder's
+        # rung the exploded and finished views settled on.
+        sheet_scales={
+            SHEET_NAMES[0]: SHEET_SCALE,
+            SHEET_NAMES[1]: scales[WHEEL_LABEL],
+            SHEET_NAMES[2]: scales[LEVER_LABEL],
+            SHEET_NAMES[3]: scales[FINISHED_LABEL],
+        },
         settled_checks=(
             *settled_checks,
             lambda: assert_balloon_landings(adapter, landings),
