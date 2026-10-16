@@ -756,15 +756,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 1.778,
                 5.2207,
             ),
-            # #743 PR2: MHA-VN-032 #8-32 x 3/4 through the 6.0 rocker-bracket
+            # Owner Q13c: MHA-VN-071 #8-32 x 5/8 through the 6.0 rocker-bracket
             # foot, one per bracket since the 2026-10-09 flip.
             **_expected_numbered_pairs(
-                "ch-channel-1/vn-pedestal-hold-down-screw",
+                "ch-channel-1/vn-bracket-hold-down-screw",
                 range(1, 3),
                 "fr-frame-1/fr-rocker-arm-support",
                 4.1656,
                 3.454,
-                13.05,
+                9.875,
             ),
         },
     }

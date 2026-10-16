@@ -29,6 +29,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    remove_notes_matching,
     view_name,
     visible_component_entities,
 )
@@ -966,6 +967,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # add). r743-p1s-B showed the import brings NO label in that top view.
     import_cosmetic_threads(adapter, iso)
     import_cosmetic_threads(adapter, view_b)
+    # Whether the iso draws BracketSeats' "#8-32 Tapped Hole" label is
+    # SolidWorks' choice: on part key 40ff46054ba2 the q12q13-r3 render counted
+    # none and the stack-top build one, past the right border. The tap is
+    # stated once, on its hole callout, so any such label goes and the count
+    # is logged, not gated (draw_sm_knife_mount); finalize_drawing then proves
+    # none is left.
+    removed_tap_labels = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(f"removed {removed_tap_labels} automatic tapped-hole label(s)")
 
     return await finalize_drawing(
         adapter,
@@ -973,12 +982,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker-Arm Support Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # On the 178.8 casting the isometric drew BracketSeats' "#8-32 Tapped
-        # Hole" label, past the right border (fix3 render), and finalize
-        # removed it. On the 180.5 casting neither import draws one: three
-        # main-stack runs counted none at finalize and the saved sheet prints
-        # none. The sweep stays, so a label that does appear fails the count
-        # instead of printing.
+        # The sweep stays, so a label that appears after the removal above
+        # fails the count instead of printing.
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=0,
     )
