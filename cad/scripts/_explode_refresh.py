@@ -9,9 +9,12 @@ authoring function therefore yields the presentation a FULL build would have
 saved, without the insert/mate loop.
 
 The tier proves rather than assumes that: the reopened model must open clean
-with its simplified configuration already in sync, the re-authored model must
-be collapsed, and its resolved geometry fingerprint must equal the proof the
-saved model was published with. Any difference raises before the in-place save.
+with its simplified configuration already in sync, and the re-authored model
+must be collapsed with the resolved geometry fingerprint it had on reopen
+(else it raises before the in-place save). After the save the persisted
+model, fingerprinted exactly where a FULL build takes its proof (after the
+rebuild-state reconciliation), must equal the proof it was published with;
+otherwise the proof is left retired, so the next build takes the FULL tier.
 PNG renders, the free-DOF manifest and every other sidecar describe the
 collapsed operational model, which is unchanged, so they are kept as saved.
 
@@ -26,6 +29,7 @@ from typing import Any
 
 import _telemetry
 from _assembly import (
+    _invalidate_massprops_proof,
     _massprops_sidecar,
     assembly_geometry_digest,
     author_in_drawing_configurations,
@@ -35,7 +39,7 @@ from _assembly import (
     saved_rebuild_status,
     sync_simplified_configuration,
 )
-from _check import check, log
+from _check import check
 from _com import _early_bound
 from _part_save import set_isometric_view
 from _paths import OUT_SLDASM
@@ -128,6 +132,10 @@ async def refresh_explode(
         )
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     _require_collapsed(model, asm_name, "before re-authoring")
+    # The in-memory fingerprint is compared with itself: the saved proof is
+    # taken on the reconciled persisted model, which an open session can differ
+    # from without any geometry having moved.
+    opened = await assembly_geometry_digest(adapter, asm_name)
 
     def reauthor(configuration: str) -> None:
         with _telemetry.span(
@@ -135,23 +143,37 @@ async def refresh_explode(
         ) as sp:
             removed = _delete_exploded_views(model, configuration)
             sp.set_attribute("views", ",".join(removed))
-        log(f"explode refresh {asm_name}: {configuration} deleted {removed!r}")
+        _telemetry.info(
+            f"explode refresh {asm_name}: {configuration} deleted {removed!r}"
+        )
         author(configuration)
 
     author_in_drawing_configurations(adapter, asm_name, reauthor)
     final_rebuild_before_save(adapter, asm_name)
     _require_collapsed(model, asm_name, "after re-authoring")
     assert_reference_geometry_hidden(adapter, asm_name)
-    digest = await assembly_geometry_digest(adapter, asm_name)
-    if digest != proof:
+    authored = await assembly_geometry_digest(adapter, asm_name)
+    _telemetry.info(
+        f"explode refresh {asm_name}: geometry proof {proof[:12]}, "
+        f"reopened {opened[:12]}, re-authored {authored[:12]}"
+    )
+    if authored != opened:
         raise RuntimeError(
             f"{asm_name}: re-authoring the explode changed the resolved geometry "
-            f"({proof[:12]} -> {digest[:12]}); rebuild it from scratch"
+            f"({opened[:12]} -> {authored[:12]}); rebuild it from scratch"
         )
     _require_collapsed(model, asm_name, "before save")
+    # Retire the proof before the bytes it vouches for are replaced.
+    _invalidate_massprops_proof(sidecar)
     with _telemetry.span("save", asm=asm_name, changed=True):
         set_isometric_view(adapter)
         save_assembly_in_place(adapter, asm_name, True)
     await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
-    sidecar.write_text(digest + "\n", encoding="utf-8")
+    persisted = await assembly_geometry_digest(adapter, asm_name)
+    if persisted != proof:
+        raise RuntimeError(
+            f"{asm_name}: the re-saved model's geometry fingerprint {persisted[:12]} "
+            f"differs from its proof {proof[:12]}; rebuild it from scratch"
+        )
+    sidecar.write_text(persisted + "\n", encoding="utf-8")
     return {"assembly": str(asm_path)}

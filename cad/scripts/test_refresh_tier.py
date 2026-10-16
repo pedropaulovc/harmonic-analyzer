@@ -183,7 +183,9 @@ class _Model:
         return False
 
 
-def _fake_session(monkeypatch, tmp_path, *, digest):
+def _fake_session(monkeypatch, tmp_path, *, digests):
+    """``digests`` are the fingerprints on reopen, after re-authoring and of
+    the re-saved model, in that order."""
     events = []
     views = {"Default": ["OLD"], "Default Simplified": ["OLD Simplified"]}
     model = _Model(events, views)
@@ -195,8 +197,10 @@ def _fake_session(monkeypatch, tmp_path, *, digest):
         events.append(("open", Path(path).name))
         return SimpleNamespace(is_success=True)
 
+    fingerprints = iter(digests)
+
     async def geometry(_adapter, _name):
-        return digest
+        return next(fingerprints)
 
     async def reconcile(_adapter, _name, _path):
         events.append(("reconcile",))
@@ -238,7 +242,7 @@ def test_explode_refresh_replaces_each_configurations_views_then_saves(
     monkeypatch, tmp_path
 ):
     adapter, author, events, proof = _fake_session(
-        monkeypatch, tmp_path, digest="proof"
+        monkeypatch, tmp_path, digests=("open", "open", "proof")
     )
 
     asyncio.run(_explode_refresh.refresh_explode(adapter, "pd-paper-drive", author))
@@ -257,7 +261,7 @@ def test_explode_refresh_replaces_each_configurations_views_then_saves(
 
 def test_explode_refresh_refuses_moved_geometry_before_saving(monkeypatch, tmp_path):
     adapter, author, events, proof = _fake_session(
-        monkeypatch, tmp_path, digest="moved"
+        monkeypatch, tmp_path, digests=("open", "moved")
     )
 
     with pytest.raises(RuntimeError, match="changed the resolved geometry"):
@@ -267,9 +271,24 @@ def test_explode_refresh_refuses_moved_geometry_before_saving(monkeypatch, tmp_p
     assert proof.read_text(encoding="utf-8") == "proof\n"
 
 
+def test_explode_refresh_retires_the_proof_when_the_saved_model_differs(
+    monkeypatch, tmp_path
+):
+    adapter, author, events, proof = _fake_session(
+        monkeypatch, tmp_path, digests=("open", "open", "moved")
+    )
+
+    with pytest.raises(RuntimeError, match="differs from its proof"):
+        asyncio.run(_explode_refresh.refresh_explode(adapter, "pd-paper-drive", author))
+
+    assert events[-2:] == [("save", True), ("reconcile",)]
+    # Without a proof the next build cannot take the explode tier again.
+    assert not proof.exists()
+
+
 def test_explode_refresh_refuses_a_model_left_exploded(monkeypatch, tmp_path):
     adapter, author, events, _proof = _fake_session(
-        monkeypatch, tmp_path, digest="proof"
+        monkeypatch, tmp_path, digests=("open",)
     )
     adapter.currentModel.IsExploded = lambda: True
 
