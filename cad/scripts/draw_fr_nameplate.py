@@ -241,9 +241,14 @@ def _section_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
 
 
 # SectionReference's depths, each on its own dimension line from the face.
+# The field's callout is two rows, the feature and why it holds three places,
+# so with its value the block is three rows tall (the r4 render's two-row
+# blocks measured ~9 mm). It stands 0.3 higher than on that render and the
+# engraving's block 0.6 higher, keeping a gap between the two blocks and the
+# field's leader shelf above its outside arrow at the face.
 SECTION_KEEP = {
-    "FieldDepth": _section_xy(SECTION_FIELD_X, 1.4),
-    "EngravingDepth": _section_xy(SECTION_GROOVE_X, 2.8),
+    "FieldDepth": _section_xy(SECTION_FIELD_X, 1.7),
+    "EngravingDepth": _section_xy(SECTION_GROOVE_X, 3.4),
 }
 # The floor under the groove: a sheet reference from the groove's floor to
 # the back face (plate x, z), chained below the engraving depth.

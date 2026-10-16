@@ -407,6 +407,28 @@ def test_section_a_dimensions_each_depth_on_its_own_line() -> None:
     assert floor["callout"] == "FLOOR UNDER ENGRAVING"
 
 
+def test_sunk_field_depth_names_why_it_holds_three_places() -> None:
+    # PR #1468 r4 review: the 0.400 field depth printed .XXX with no stated
+    # function. The field must stay above the engraving's floor so the
+    # lettering stays cut; from literals, 0.700 and 0.400 at .XXX (+-0.13)
+    # leave 0.04, and at .XX (+-0.51) the field could cut below the engraving.
+    assert (0.700 - 0.13) - (0.400 + 0.13) == pytest.approx(0.04)
+    assert (0.700 - 0.13) - (0.400 + 0.51) < 0.0
+    assert print_spec.ENGRAVING_BELOW_FIELD_MIN == pytest.approx(0.04)
+    assert print_spec.DRAWING_PRECISION[print_spec.SECTION_REFERENCE] == {
+        "FieldDepth": 3,
+        "EngravingDepth": 3,
+    }
+    rows = print_spec.FIELD_DEPTH_CALLOUT.split("\n")
+    assert rows == ["SUNK FIELD", "ABOVE ENGRAVING"]
+    # The three-row block (value and two callout rows, 4.5 mm each) keeps its
+    # leader shelf above the field's outside arrow, ~5.7 mm long on the r4
+    # render, at the decorated face.
+    face_y = drawing._section_xy(print_spec.SECTION_FIELD_X, 0.0)[1]
+    block_bottom = drawing.SECTION_KEEP["FieldDepth"][1] - 0.00225 * (1 + len(rows))
+    assert block_bottom > face_y + 0.006
+
+
 class _FakeDisplay:
     def __init__(self) -> None:
         self.precision: tuple[int, ...] | None = None
@@ -487,17 +509,21 @@ def test_floor_reference_measures_through_the_shared_helper(
 
 def test_section_a_texts_and_caption_clear_each_other() -> None:
     # Measured r2 text blocks (8:1): a two-row value and callout is about
-    # 8 mm tall and its callout row about 2.85 mm a character wide. Each
-    # block is boxed left-aligned on its dimension line (as r2 printed),
-    # right-aligned on it (as r4 printed the floor reference) and centred on
-    # it, so no SOLIDWORKS placement can collide.
+    # 8 mm tall and its callout row about 2.85 mm a character wide; r4's
+    # measured ~9 mm, so each row here takes 4.5 mm and a block's width is
+    # its longest callout row's. Each block is boxed left-aligned on its
+    # dimension line (as r2 printed), right-aligned on it (as r4 printed the
+    # floor reference) and centred on it, so no SOLIDWORKS placement can
+    # collide.
     def boxes(pick: dict) -> list[tuple[float, float, float, float]]:
         x, y = pick["text_xy"]
-        width = 0.00285 * len(pick["callout"])
+        rows = pick["callout"].split("\n")
+        width = 0.00285 * max(len(row) for row in rows)
+        half = 0.00225 * (1 + len(rows))
         return [
-            (x, y - 0.004, x + width, y + 0.004),
-            (x - width, y - 0.004, x, y + 0.004),
-            (x - width / 2.0, y - 0.004, x + width / 2.0, y + 0.004),
+            (x, y - half, x + width, y + half),
+            (x - width, y - half, x, y + half),
+            (x - width / 2.0, y - half, x + width / 2.0, y + half),
         ]
 
     def overlaps(a: tuple, b: tuple) -> bool:

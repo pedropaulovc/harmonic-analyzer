@@ -133,6 +133,30 @@ if ENGRAVING_FLOOR_MIN <= 0.0:
         f"engraving can reach through the plate: {ENGRAVING_FLOOR_MIN}"
     )
 
+# The sunk field's one job is to stay above the engraving's floor, so the
+# lettering cut into the field stays incised (PR #1468 r4 review: the .XXX
+# field depth carried no stated function; its callout now names it). Both
+# depths print .XXX: the engraving floor sits 0.300 under the field nominal
+# and ENGRAVING_BELOW_FIELD_MIN (0.040) at the printed bands. At the .XX
+# row's +-0.51 the field could cut deeper than the engraving and erase it,
+# so the field's three places are the function's, not an over-specification.
+ENGRAVING_BELOW_FIELD_MIN = (
+    ENGRAVING_FLOOR_DEPTH
+    + printed_deviations(
+        ENGRAVING_FLOOR_DEPTH, DRAWING_PRECISION[SECTION_REFERENCE]["EngravingDepth"]
+    )[0]
+    - (
+        FIELD_DEPTH
+        + printed_deviations(
+            FIELD_DEPTH, DRAWING_PRECISION[SECTION_REFERENCE]["FieldDepth"]
+        )[1]
+    )
+)
+if ENGRAVING_BELOW_FIELD_MIN <= 0.0:
+    raise AssertionError(
+        f"the sunk field can cut below the engraving: {ENGRAVING_BELOW_FIELD_MIN}"
+    )
+
 # drawing-guidelines.md rule 18 (1.5D of full thread) for the four McMaster
 # 90114A511 #4-40 x 1/4 brass fillisters that hold the plate to the base's
 # blind seats (PR #1468 r3 review). The shortest stock screw (ASME B18.6.3
@@ -279,7 +303,7 @@ DIMENSION_PREFIXES = {
     "TopHoleStation": "2X ",
 }
 DIMENSION_CALLOUTS = {"PlateThick": "SETS FLOOR UNDER ENGRAVING"}
-FIELD_DEPTH_CALLOUT = "SUNK FIELD"
+FIELD_DEPTH_CALLOUT = "SUNK FIELD\nABOVE ENGRAVING"
 ENGRAVING_DEPTH_CALLOUT = "ALL ENGRAVING"
 SECTION_CALLOUTS = {
     "FieldDepth": FIELD_DEPTH_CALLOUT,
