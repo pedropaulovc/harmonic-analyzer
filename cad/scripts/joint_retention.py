@@ -1904,7 +1904,7 @@ JOINTS: tuple[Joint, ...] = (
             "(option A1: hook, rod and drum lane coplanar), so its moment is about machine Z and no "
             "operating torque acts about the rod's thread axis (machine Y)"
         ),
-        axial_capture="shoulder seated on the clamp's bottom face by thread torque; worst-case full-thread engagement mg_rod_clamp_joint.ENGAGEMENT_WORST 5.015 >= 1.5D (4.2675)",
+        axial_capture="shoulder seated on the clamp's bottom face by thread torque; worst-case full-thread engagement mg_rod_clamp_joint.ENGAGEMENT_WORST 4.605 >= 1.5D (4.2675)",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
