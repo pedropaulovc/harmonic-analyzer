@@ -31,8 +31,9 @@ def test_anchor_seats_are_the_purchased_anchors_own_threads() -> None:
     assert (boss.kind, boss.end) == ("tapped", "through_all")
     assert plate.size == ANCHOR_9489T111.thread_size
     assert boss.size == ANCHOR_9490T1.thread_size
-    # Each anchor's thread must span the seat it screws into.
-    assert ANCHOR_9489T111.thread_length_mm > sm_summing_lever_spec.PLATE_T
+    # Each anchor's thread must span the seat it screws into (the
+    # spring-anchor pad under the plate's free edge).
+    assert ANCHOR_9489T111.thread_length_mm > sm_summing_lever_spec.SPRING_SEAT_T
     assert ANCHOR_9490T1.thread_length_mm >= sm_summing_lever_spec.ANCHOR_H
     # ...and each tap must fit the feature it passes through.
     assert blind_cut_dia_mm(boss) < 2.0 * sm_summing_lever_spec.ANCHOR_R
@@ -178,21 +179,17 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
     assert joint.THREAD_DEPTH_BAND == 0.05
     assert joint.DRILL_DEPTH_BAND == 0.10
-    assert joint.RECEIVER_DIMENSION_BANDS == {
-        "CoefficientsPlate": {"D1": 0.05},
-        "EdgeRibBack": {"D1": 0.05},
-    }
+    assert joint.RECEIVER_DIMENSION_BANDS == {"EdgeRibBack": {"D1": joint.RIB_DEPTH_BAND}}
     assert "variable.ToleranceMin" in drawing_source
     assert "variable.ToleranceMax" in drawing_source
     assert "variable = dynamic_dispatch(raw._oleobj_)" in drawing_source
     assert '_early_bound(raw, "ICalloutVariable")' not in drawing_source
     assert "ReceiverY0" in drawing_source
-    assert "PlateThickness" in drawing.BACK_KEEP
+    assert "SpringSeatThickness" in drawing.BACK_KEEP
+    assert "PlateThickness" in drawing.PLATE_SECTION_TEXT_MM
     assert "RibDepth" in drawing.TOP_KEEP
-    assert "Bracket Receiver Note" in drawing_source
-    assert notes.BRACKET_RECEIVER_NOTE == (
-        f"2X #2-56 THREAD WALL {notes._floor2(notes.BRACKET_TAP_WALL_MIN):.2f} MIN"
-    )
+    assert "Bracket Receiver Note" not in drawing_source
+    assert "Manufacturing Notes" not in drawing_source
     final_proof = source.index('"summing lever after native receiver bands"')
     assert source.index("_receiver_model_bands(adapter)") < final_proof
     assert source.index("_receiver_coordinate_dimensions(adapter)") < final_proof
@@ -241,12 +238,14 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
         **drawing.DETAIL_KEEP,
         **drawing.TOP_KEEP,
         **drawing.BACK_KEEP,
+        **drawing.PLATE_SECTION_TEXT_MM,
     }
     placed = [
         *drawing.FRONT_KEEP,
         *drawing.DETAIL_KEEP,
         *drawing.TOP_KEEP,
         *drawing.BACK_KEEP,
+        *drawing.PLATE_SECTION_TEXT_MM,
     ]
     assert len(placed) == len(keeps), "a dimension is kept in two views"
     marked = set().union(*notes.DRAWING_DIMENSIONS.values())
@@ -262,19 +261,15 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
 
 
 def test_notes_are_short_stated_shortfalls() -> None:
-    for text in (
-        notes.DRAWING_NOTES,
-        notes.BRACKET_RECEIVER_NOTE,
-        notes.ISOMETRIC_VIEW_NOTE,
-        notes.BACK_VIEW_NOTE,
-    ):
+    for text in (notes.ISOMETRIC_VIEW_NOTE, notes.BACK_VIEW_NOTE):
         assert len(text.splitlines()) <= 4
         for word in ("RULE", "EXCEPTION", "RULING", "NYLON", "LOCTITE", "THREADLOCK"):
             assert word not in text.upper()
-    assert notes.DRAWING_NOTES == (
-        f"20X #6-32 ENGAGEMENT {notes._floor2(notes.SPRING_TAP_ENGAGEMENT_MIN):.2f} MIN "
-        f"({notes._floor2(notes.SPRING_TAP_ENGAGEMENT_MIN / notes.SPRING_TAP_MAJOR_DIA):.2f}D)"
-    )
+    # The spring pad itself gives every #6-32 anchor 1.5D of full thread at
+    # the pad's worst case, so no engagement shortfall is printed.
+    assert notes.SPRING_TAP_ENGAGEMENT_MIN >= 1.5 * notes.SPRING_TAP_MAJOR_DIA
+    assert not hasattr(notes, "DRAWING_NOTES")
+    assert not hasattr(notes, "BRACKET_RECEIVER_NOTE")
     assert "summation anchor position" not in sm_summing_lever_spec.GEOMETRIC_TOLERANCES_MM
 
 
@@ -373,7 +368,7 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         [sketch_feature, thread_feature, thread_feature_b],
     )
     features = {
-        name: Feature(name, [Dimension("D1", name, 5.08)])
+        name: Feature(name, [Dimension("D1", name, lever_build.RECEIVER_RIB_T)])
         for name in part.RECEIVER_DIMENSION_BANDS
     }
     features["BracketMountingTaps"] = taps
@@ -418,10 +413,7 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     inventory = []
     monkeypatch.setattr(part._telemetry, "info", inventory.append)
     part._receiver_model_bands(adapter)
-    assert bands == [
-        ("CoefficientsPlate", "PlateThickness", 0.05),
-        ("EdgeRibBack", "RibDepth", 0.05),
-    ]
+    assert bands == [("EdgeRibBack", "RibDepth", 0.25)]
     # Subfeatures are not FeatureByName-reachable and both threads are "D1":
     # band the exact native objects found in the walk, never a by-name lookup.
     assert held == [
@@ -457,15 +449,21 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         part._receiver_model_bands(adapter)
 
 
-def test_receiver_lateral_wall_includes_lower_face_coordinate_band() -> None:
+def test_receiver_row_sits_inside_the_end_rib_height() -> None:
+    """The row is located from the plate top, which the plate's title-block
+    thickness band moves by half that band about the rib's mid-plane; both
+    taps lie inside the end rib's reach, so their walls run to the rib's
+    upper and lower faces, not the plate's."""
     import magnifying_bracket_joint_layout as joint
 
     drill_radius_max = (joint.TAP_DRILL_DIA + 0.10) / 2.0
-    row = sm_summing_lever_spec.PLATE_T / 2.0
-    lower_wall = row - joint.POSITION_BAND - drill_radius_max
-    upper_wall = (
-        sm_summing_lever_spec.PLATE_T - joint.LEVER_PLATE_THICKNESS_BAND
-        - row - joint.POSITION_BAND - drill_radius_max
+    outer_x = max(point[0] for point in joint.LEVER_HOLE_POINTS)
+    assert outer_x + drill_radius_max + joint.POSITION_BAND < lever_build.RIB_PLATE_REACH
+    row_offset_max = joint.POSITION_BAND + joint.LINEAR_BAND / 2.0
+    rib_half_min = (
+        lever_build.edge_rib_half_height(outer_x + drill_radius_max + joint.POSITION_BAND)
+        - joint.LINEAR_BAND / 2.0
     )
-    assert lower_wall >= 1.5
-    assert upper_wall >= 1.5
+    wall = rib_half_min - row_offset_max - drill_radius_max - joint.DRILL_WANDER_MAX
+    assert wall == pytest.approx(3.18390, abs=1e-5)
+    assert wall >= 2.0
