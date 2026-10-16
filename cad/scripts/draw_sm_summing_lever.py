@@ -957,17 +957,21 @@ TOP_KEEP = {
 # The receiver stations stand above the view: 14.75 nearer, its text left of
 # the free edge, 28.45 above it, its text and the pattern's mate right of the
 # span (a horizontal dimension stacks a callout below the value above its
-# line).  Left of the free edge the padded tap length stands inboard, its text
-# and its PLATE AND PAD below and left of its line, over the pad width's
-# block (farm r12 put the 7.00 at x 0.141..0.153, y 0.133..0.137: words under
-# it there meet the 10.00 and the pad width's extension line at x 0.160),
-# and the row height outboard, its text
-# above and left of the length's upper arrow (at x 0.147 that arrow ran
-# through it, farm r5); the pad's width hangs below and left of both,
-# outside its extension lines.
+# line).  Left of the free edge the padded tap length stands inboard, and the
+# row height outboard, its text above and left of the length's upper arrow
+# (at x 0.147 that arrow ran through it, farm r5); the pad's width hangs
+# below and left of both, outside its extension lines.  The length's line
+# stays at x 0.153 (its keep's x is its line's: at 0.135, farm r13, its
+# upper arrow's tail crossed the row height's shoulder), its text on a
+# shoulder left of it, the shoulder under its lowest line and the block
+# centred over it, so its PLATE AND PAD (x 0.123..0.153) sits on the
+# shoulder and the 7.00 above it, clear of the row height's lower arrow tail
+# (x 0.143, down to y 0.1436).  The pad width's block and the view's label
+# drop 5 and 7 mm (into empty sheet) to leave the PLATE AND PAD room above
+# the 10.00.
 BACK_KEEP = {
-    "SpringSeatThickness": (0.135, 0.142),
-    "SpringPadWidth": (0.130, 0.123),
+    "SpringSeatThickness": (0.153, 0.133),
+    "SpringPadWidth": (0.130, 0.118),
     "ReceiverX0": (0.220, 0.1815),
     # Each tight station names the bracket (machinist review r5): the 14.75's
     # two lines stand over the row height's one, which prints above its value.
@@ -975,7 +979,7 @@ BACK_KEEP = {
     "ReceiverY0": (0.143, 0.1585),
 }
 # The back view's label, under the pad's width.  The point is its top left.
-BACK_VIEW_NOTE_XY = (0.110, 0.109)
+BACK_VIEW_NOTE_XY = (0.110, 0.102)
 # Sheet 1's plan names sheet 2's view: a letter arrow onto the -Z end, the
 # face VIEW F looks at (fr_rocker_arm_support's VIEW B arrow).  Its tip is
 # on the receiver rib's outer edge at model x 21.4 (sheet x 0.246), between
