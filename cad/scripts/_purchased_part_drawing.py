@@ -10,6 +10,7 @@ its installation line.
 
 from __future__ import annotations
 
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +31,25 @@ _PART_VIEW_CELLS = (
 )
 
 
-async def build_purchased_part_drawing(adapter: Any, spec: DrawingSpec) -> dict[str, str]:
+class HiddenLineDisplay(Enum):
+    """How Front/Top/Right draw the edges hidden behind the part.
+
+    The Isometric always has hidden lines removed.
+    """
+
+    # Dashed hidden edges, for a part whose bores and pins they explain.
+    VISIBLE = "visible"
+    # No hidden edges, as on a purchased fastener: on an undimensioned
+    # reference view the dashed bores and pins only clutter it.
+    REMOVED = "removed"
+
+
+async def build_purchased_part_drawing(
+    adapter: Any,
+    spec: DrawingSpec,
+    *,
+    hidden_lines: HiddenLineDisplay = HiddenLineDisplay.VISIBLE,
+) -> dict[str, str]:
     """Front/Top/Right plus Isometric of a purchased part, its note as the install line."""
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
@@ -49,4 +68,5 @@ async def build_purchased_part_drawing(adapter: Any, spec: DrawingSpec) -> dict[
         material_property="Material Specification",
         installation_notes=properties["Manufacturing Notes"],
         cells=_PART_VIEW_CELLS,
+        hidden_lines_removed=hidden_lines is HiddenLineDisplay.REMOVED,
     )

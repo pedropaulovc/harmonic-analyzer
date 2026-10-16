@@ -11,6 +11,11 @@ pin axis along local Z. Two named reference axes -- Axis1 at the x=0 station,
 Axis2 at the x=P station -- are the chain pattern's PathLink1/PathLink2 (their
 spacing IS the pattern pitch). See _chain.py for the clearance rationale (all
 gaps >= 0.25 mm; the links float as disconnected multibody solids).
+
+Both links are bought: McMaster-Carr ANSI #25 roller chain cut to the loop's
+pitch count, closed by one connecting link that serves as an outer link. Each
+part stamps its registry stock identity and a one-line note for its
+purchased-part reference sheet (``_purchased_part_drawing``).
 """
 
 from __future__ import annotations
@@ -18,11 +23,14 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import _config
+
 from _chain import (
     BUSH_BORE_R,
     BUSH_HALF_LEN,
     INNER_PLATE_HOLE_R,
     INNER_PLATE_Z,
+    LINK_COUNT,
     LINK_PITCH,
     OUTER_PLATE_HOLE_R,
     OUTER_PLATE_Z,
@@ -34,14 +42,62 @@ from _chain import (
 )
 from _appearance import BAR_STEEL, apply_color, apply_material
 from _check import check
+from _custom_properties import apply_custom_properties
+from _drawing_marks import apply_drawing_properties
 from _extrude import extrude_at_offset
 from _part_checks import report_mass_properties
 from _part_save import save_part_and_images
+from _saved_part_guard import require_saved_drawing_properties
 from _sketch import ensure_fully_defined, set_sketch_direct_db
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 
 import _telemetry
+
+_ROWS = {
+    "vn-chain-inner-link": _config.parts("vn-chain-inner-link"),
+    "vn-chain-outer-link": _config.parts("vn-chain-outer-link"),
+}
+CHAIN_SKU, CONNECTING_LINK_SKU = _ROWS["vn-chain-outer-link"]["supplier_skus"]
+if _ROWS["vn-chain-inner-link"]["supplier_skus"] != [CHAIN_SKU]:
+    raise AssertionError("inner links come only in the cut roller chain")
+LINKS_PER_KIND = LINK_COUNT // 2
+# The chain is sold by the foot; the loop is LINK_COUNT whole pitches of it.
+CHAIN_ORDER_FEET = math.ceil(LINK_COUNT * LINK_PITCH / 304.8)
+# One line each: the purchased sheet reserves ~0.21 m for the note. The
+# connecting link's clip orientation is an assembly fact (MHA-PD-000 step).
+DRAWING_NOTES = {
+    "vn-chain-inner-link": (
+        f"BREAK {CHAIN_ORDER_FEET} FT OF {CHAIN_SKU} TO {LINKS_PER_KIND} INNER + "
+        f"{LINKS_PER_KIND - 1} OUTER LINKS; {CONNECTING_LINK_SKU} CLOSES "
+        f"{LINK_COUNT} PITCHES."
+    ),
+    "vn-chain-outer-link": (
+        f"{LINKS_PER_KIND} PER LOOP: {LINKS_PER_KIND - 1} IN THE CUT {CHAIN_SKU} "
+        f"+ 1 {CONNECTING_LINK_SKU} CONNECTING LINK."
+    ),
+}
+# Everything the purchased-part sheet reads from the saved part.
+DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Stock Name",
+    "Supplier",
+    "Supplier SKUs",
+    "Manufacturing Notes",
+)
+
+
+def stock_properties(part_name: str) -> dict[str, str]:
+    """The registry's purchase identity, stamped for the reference sheet."""
+    row = _ROWS[part_name]
+    return {
+        "Stock Name": str(row["stock_name"]),
+        "Supplier": str(row["supplier"]),
+        "Supplier SKUs": ", ".join(str(sku) for sku in row["supplier_skus"]),
+    }
 
 
 async def _sketch_plate(adapter: Any, hole_r: float) -> None:
@@ -170,8 +226,14 @@ async def build_link(
 
     await apply_material(adapter, material)
     await apply_color(adapter, BAR_STEEL)
+    apply_custom_properties(adapter, stock_properties(part_name))
+    apply_drawing_properties(
+        adapter, part_name, {"Manufacturing Notes": DRAWING_NOTES[part_name]}
+    )
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, part_name)
+    artefacts = await save_part_and_images(adapter, part_name)
+    require_saved_drawing_properties(adapter, DRAWING_PROPERTIES)
+    return artefacts
 
 
 async def _volume(adapter: Any) -> float:

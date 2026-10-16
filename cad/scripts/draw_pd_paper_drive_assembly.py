@@ -329,6 +329,8 @@ _SKU = {
     "vn-fillister-screw": _config.parts("vn-fillister-screw")["supplier_skus"][0],
     "vn-platen-clip-screw": _config.parts("vn-platen-clip-screw")["supplier_skus"][0],
     "vn-guide-lock-screw": _config.parts("vn-guide-lock-screw")["supplier_skus"][0],
+    "vn-chain-inner-link": _config.parts("vn-chain-inner-link")["supplier_skus"][0],
+    "vn-chain-outer-link": _config.parts("vn-chain-outer-link")["supplier_skus"][0],
     "vn-transgear-arm-plate-screw": _config.parts("vn-transgear-arm-plate-screw")[
         "supplier_skus"
     ][0],
@@ -374,8 +376,8 @@ BOM_DESCRIPTIONS = {
         f"BRASS FILLISTER SCREW, MCMASTER {_SKU['vn-platen-clip-screw']}"
     ),
     "vn-guide-lock-screw": f"PAN HEAD SCREW, MCMASTER {_SKU['vn-guide-lock-screw']}",
-    "vn-chain-inner-link": "ANSI #25 CHAIN INNER LINK",
-    "vn-chain-outer-link": "ANSI #25 CHAIN OUTER LINK",
+    "vn-chain-inner-link": f"ANSI #25 INNER LINK, MCMASTER {_SKU['vn-chain-inner-link']}",
+    "vn-chain-outer-link": f"ANSI #25 OUTER LINK, MCMASTER {_SKU['vn-chain-outer-link']}",
     # Grouped: its configurations' BOM description wins over a written cell,
     # so the row prints the registry description the builder stamps.
     "pd-transgear-removable": str(_config.parts("pd-transgear-removable")["description"]),
@@ -1237,8 +1239,9 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"LOOP {chain.LINK_COUNT} PITCHES OF ANSI #25 CHAIN, "
             f"{_N['vn-chain-inner-link']} INNER AND {_N['vn-chain-outer-link']} OUTER "
             f"LINKS, OVER THE {sprocket.KNOB_CONFIG} AND THE {sprocket.CRANK_CONFIG}; "
-            "JOIN THE ENDS WITH A #25 "
-            "CONNECTING LINK AS ONE OUTER LINK, ITS CLIP'S CLOSED END LEADING "
+            "JOIN THE ENDS WITH A #25 CONNECTING LINK, MCMASTER "
+            f"{_config.parts('vn-chain-outer-link')['supplier_skus'][1]}, "
+            "AS ONE OUTER LINK, ITS CLIP'S CLOSED END LEADING "
             "IN THE DIRECTION OF TRAVEL. THE CENTRES ARE FIXED: NO TENSIONING, "
             "THE SLACK RUN HANGS FREE."
         ),
