@@ -19,7 +19,8 @@ two counterbored slots on the west one (owner ruling 2026-10-15, option A).
   row locates to, and the front face's slide roughness. Each
   roughness symbol has its reason beside it; the sheet has no general note.
 * Detail C looks face-on at the outer slot: the slot's and its
-  counterbore's widths and travels, the slot's width naming why it is one.
+  counterbore's widths and travels, the slot's width naming the MHA-SH-002
+  taps it takes up and the counterbore's the MHA-VN-021 head it holds.
   Section B-B cuts the inner slot across the bar for the counterbore's depth.
 * Each face view carries its caption; section A-A cuts the pivot tap across
   the bar: the banded thickness, the drill's depth limits and the full
@@ -226,44 +227,56 @@ FINISH_CHAR_HEIGHT = 0.0025
 CAPTION_SETTLE_M = 0.0006
 
 # The west slots in the clear field under the front-face view. Detail C looks
-# face-on at the outer slot at 2:1, left of the view's caption and the title
-# block: the counterbore's width left of it, the slot's right (its callout
-# saying why it is a slot), the slot's travel below and the counterbore's
-# above; its label right of the slot's width, its letter over the bar. It is
-# a cropped *Back model view, dimensioned uncropped then cropped (the
+# face-on at the outer slot at 2:1, between section B-B and the title block:
+# the counterbore's width left of it (its text between its extension lines),
+# the slot's right, its text under the slot's lower edge on a shouldered
+# leader (inside its 4.98 span the three-line block was struck by its own
+# dimension line, r4 machinist review), the slot's travel below and the
+# counterbore's above; its label right of the slot's width. It is a cropped
+# *Back model view, dimensioned uncropped then cropped (the
 # draw_ch_amplitude_bar notch details): a model view has no native label or
 # parent circle, so its label is a note in the native label's words and its
-# mark a black circle and letter on the front-face view.
+# mark a black circle and letter on the front-face view. The letter stands
+# off the bar's end, under the clamp row's extension line: over the bar it
+# printed on section B-B's upper letter, whose arrows end over the outer slot.
 DETAIL_SLOT_X = max(CLAMP_SLOT_X)
 DETAIL_FOCUS = (DETAIL_SLOT_X, 0.0, -BAR_DEPTH / 2.0)  # model mm
-DETAIL_CENTER = (0.120, 0.040)
+DETAIL_CENTER = (0.106, 0.048)
 DETAIL_SCALE = (2, 1)
 DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0  # sheet metres per mm
 DETAIL_RADIUS_MM = 7.5
 DETAIL_LABEL = f"DETAIL C\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
-DETAIL_LABEL_XY = (0.190, 0.034)  # top centre
+DETAIL_LABEL_XY = (0.195, 0.040)  # top centre
 DETAIL_LETTER = "C"
-DETAIL_LETTER_RISE = 0.005  # the letter's top over the bar's top edge
+DETAIL_LETTER_TOP = (LEFT_END - 0.004, BACK_CENTER[1] - 0.0025)  # top centre
 DETAIL_POSITION_TOL_M = 1e-4
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
+# Measured on the r4 sheet (2.65 mm a character): a kept text outside its
+# extension lines hangs beside its dimension line, centred on the keep's
+# height (ClampRowHeight, HangerRowHeight); inside them it centres on the
+# keep. The counterbore's three lines (14.6 mm) fit its 17 mm span, raised
+# by their offset under the value; the slot's (42 mm wide) stand right of
+# the travel texts and under the slot's lower edge.
 DETAIL_KEEP = {
-    "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.030, DETAIL_CENTER[1]),
-    "ClampSlotWidth": (DETAIL_CENTER[0] + 0.035, DETAIL_CENTER[1]),
+    "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.031, DETAIL_CENTER[1] + 0.0028),
+    "ClampSlotWidth": (DETAIL_CENTER[0] + 0.026, DETAIL_CENTER[1] - 0.017),
     "ClampSlotTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] - 0.020),
     "ClampSlotCboreTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] + 0.021),
 }
 # Section B-B cuts the inner slot across the bar, at 1:1 in the sheet's
-# lower-left corner: the counterbore's depth over it, its text outside the
-# front face and its callout above it (below would cross the cut bar), the
-# caption under it.
+# lower-left corner: the counterbore's depth over it, its text and callout
+# outside the front face the counterbore enters, the block's shoulder over
+# the bar's top (the section A-A thickness's layout), the caption under it.
+# With the callout above the value the r4 render ran the shoulder through the
+# cut bar and out past the border, and dropped the callout; the text now
+# stands far enough off the face for the whole block to stay inside.
 SLOT_SECTION_X = min(CLAMP_SLOT_X)
-SLOT_SECTION_CENTER = (0.040, 0.045)
+SLOT_SECTION_CENTER = (0.051, 0.045)
 SLOT_SECTION_SCALE = (1, 1)
 SLOT_SECTION_CAPTION_XY = (SLOT_SECTION_CENTER[0], 0.028)  # top centre
 SLOT_SECTION_KEEP_NAMES = ("ClampSlotCboreDepth",)
-SLOT_DEPTH_RISE = 0.005
-SLOT_DEPTH_TEXT_SIDE = 0.006
-CALLOUTS_ABOVE = ("ClampSlotCboreDepth",)
+SLOT_DEPTH_RISE = 0.013
+SLOT_DEPTH_TEXT_SIDE = 0.0165
 
 # Section A-A: the thickness up-left of the cut bar, the full thread and the
 # drill depth below it (shorter nearer). Each text stands outside its
@@ -564,9 +577,9 @@ def _dimension_then_crop(adapter: Any, view: Any) -> list[Any]:
 
 
 def _label_slot_detail(adapter: Any, detail: Any, back: Any) -> None:
-    """Detail C's label under its crop circle, owned by the detail, and its
+    """Detail C's label right of its callouts, owned by the detail, and its
     mark on the front-face view: a black circle round the outer slot and the
-    letter over the bar. The back view is left active."""
+    letter off the bar's end. The back view is left active."""
     _activate(adapter, detail, label="slot detail C")
     _place_caption(adapter, DETAIL_LABEL, DETAIL_LABEL_XY)
     _activate(adapter, back, label="front face view")
@@ -585,7 +598,7 @@ def _label_slot_detail(adapter: Any, detail: Any, back: Any) -> None:
         raise RuntimeError("slot detail C mark circle colour did not persist")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
-    _place_caption(adapter, DETAIL_LETTER, (mark[0], BACK_TOP + DETAIL_LETTER_RISE))
+    _place_caption(adapter, DETAIL_LETTER, DETAIL_LETTER_TOP)
 
 
 def _slot_section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
@@ -823,21 +836,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *detail_annotations,
         *slot_section_annotations,
     ]
-    set_dimension_callouts(
-        adapter,
-        annotations,
-        {
-            name: text
-            for name, text in DIMENSION_CALLOUTS.items()
-            if name not in CALLOUTS_ABOVE
-        },
-    )
-    set_dimension_callouts(
-        adapter,
-        annotations,
-        {name: DIMENSION_CALLOUTS[name] for name in CALLOUTS_ABOVE},
-        location="above",
-    )
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # Places (and so each dimension's band or limit) are authored on the part;
     # the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

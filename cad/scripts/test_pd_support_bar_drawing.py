@@ -611,10 +611,11 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     east = 2.0 * slack - 2.0 * (0.18 + EAR_STATION_BAND)
     assert east == pytest.approx(0.0286, abs=1e-4)
     assert part.clamp_east_pair_margin() == pytest.approx(east)
-    # The sheet says why they are slots, with no numbers.
+    # The sheet names the clamp taps the slots take up (rule 4: the band's
+    # mate), and restates no value beside part numbers.
     why = sheet_spec.DIMENSION_CALLOUTS["ClampSlotWidth"]
-    assert "SLOTS TAKE UP\nCOLUMN PITCH" in why
-    assert re.search(r"\d", why) is None
+    assert "TAKE UP" in why and "MHA-SH-002" in why
+    assert re.search(r"\d", re.sub(r"MHA-[A-Z]{2}-\d{3}", "", why)) is None
 
 
 def test_slot_heads_bear_and_stay_inside_their_counterbores() -> None:
@@ -643,6 +644,8 @@ def test_slot_heads_bear_and_stay_inside_their_counterbores() -> None:
     # The slot counterbore is the round one's width, cut as deep.
     assert part.CLAMP_SLOT_CBORE_WIDTH == part.CLAMP_CBORE_DIA == 8.5
     assert part.CLAMP_SLOT_CBORE_RUN == part.CLAMP_SLOT_RUN
+    # The .XXX counterbore names the screw whose head it holds.
+    assert "MHA-VN-021" in sheet_spec.DIMENSION_CALLOUTS["ClampSlotCboreWidth"]
 
 
 def test_slot_counterbores_leave_rule_17_walls() -> None:
@@ -688,8 +691,24 @@ def test_slot_views_frame_the_slots() -> None:
     scale = drawing.SLOT_SECTION_SCALE[0] / drawing.SLOT_SECTION_SCALE[1]
     bottom = drawing.SLOT_SECTION_CENTER[1] - spec.BAR_HEIGHT * scale / 2000.0
     assert drawing.SLOT_SECTION_CAPTION_XY[1] < bottom
-    # The depth's callout stands above it, off the cut bar.
-    assert drawing.CALLOUTS_ABOVE == tuple(drawing.SLOT_SECTION_KEEP_NAMES)
+    # Detail C's slot-width text stands under the slot's lower edge, right of
+    # the crop circle (inside its 4.98 span its own dimension line struck it,
+    # r4 review), and the label right of that.
+    radius = drawing.DETAIL_RADIUS_MM * drawing.DETAIL_MM
+    width_x, width_y = drawing.DETAIL_KEEP["ClampSlotWidth"]
+    assert width_x > drawing.DETAIL_CENTER[0] + radius
+    edge = drawing.DETAIL_CENTER[1] - part.CLAMP_SLOT_WIDTH * drawing.DETAIL_MM / 2.0
+    assert width_y < edge
+    assert drawing.DETAIL_LABEL_XY[0] > width_x
+    # Its letter stands off the bar, past the end and under the clamp row's
+    # extension line, right of the row height's dimension line: over the
+    # outer slot it printed on section B-B's upper letter (r4 review).
+    letter_x, letter_top = drawing.DETAIL_LETTER_TOP
+    assert drawing.BACK_KEEP["ClampRowHeight"][0] < letter_x < drawing.LEFT_END
+    assert letter_top < drawing.BACK_CENTER[1]
+    # Section B-B stands left of detail C's counterbore-width text.
+    back_face = drawing.SLOT_SECTION_CENTER[0] + spec.BAR_DEPTH * scale / 2000.0
+    assert back_face < drawing.DETAIL_KEEP["ClampSlotCboreWidth"][0]
 
 
 class _DetailView:

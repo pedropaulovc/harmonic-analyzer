@@ -141,11 +141,14 @@ DIMENSION_CALLOUTS = {
     "ThreadMin": f"FULL THREAD ({PIVOT_TAP_FULL_THREAD_MIN / THREAD_MAJOR_MM[PIVOT_TAP_THREAD]:.2f}D)",
     "PivotCskDia": f"{_CSK}, MHA-VN-041\nSHOULDER BEARS OUTSIDE",
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
-    # The west slots: why they are slots, and the screws whose heads their
-    # counterbores sink, as the round counterbores' callout says.
-    "ClampSlotWidth": "THRU\nSLOTS TAKE UP\nCOLUMN PITCH",
-    "ClampSlotCboreWidth": "C'BORE",
-    "ClampSlotCboreDepth": "MHA-VN-021 HEADS\nBELOW SLIDE FACE",
+    # The west slots (rule 4: each band names its mate): the slots' width,
+    # run and stations take up the pitch of the MHA-SH-002 clamp taps the
+    # screws land in (build_pd_support_bar.clamp_slot_closure_margin); the
+    # counterbore's width and run hold the MHA-VN-021 head
+    # (clamp_slot_head_clearance). Short lines: detail C is 2:1 in a corner.
+    "ClampSlotWidth": "THRU, TAKE UP\nMHA-SH-002 PITCH",
+    "ClampSlotCboreWidth": "C'BORE FOR\nMHA-VN-021",
+    "ClampSlotCboreDepth": "MHA-VN-021\nHEADS BELOW\nSLIDE FACE",
 }
 # The slot widths' count: both west slots share one detail.
 DIMENSION_PREFIXES = {
