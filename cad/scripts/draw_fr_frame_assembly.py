@@ -147,10 +147,14 @@ WORKING_FRONT_CENTER = (0.053763, 0.163612)
 # (run 20261015T235155114Z) they ended at 92.9 mm against the flange's
 # 82.3 mm, and the (1044.8) line at 92.0 mm struck the right-hand "B". Each
 # height line keeps HEIGHT_LINE_CLEARANCE_M from the letters, from its
-# neighbour and from section A-A's flange edge; B-B moves right by half A-A's
-# shift so the gap between the sections stays open.
-BASE_SECTION_CENTER = (0.176714, 0.1823453)
-TOP_SECTION_CENTER = (0.338290, 0.1815266)
+# neighbour and from section A-A's flange edge. Between the overall line and
+# A-A's flange edge there is VIEW_GAP_M or more, so the dimensions read as the
+# front view's (PR #1468 r6 review: at 2.4 mm the lines pressed against A-A).
+# Both sections move right for that gap, B-B's right edge 2.5 mm inside the
+# border and the two sections still over 6 mm apart.
+BASE_SECTION_CENTER = (0.181714, 0.1823453)
+TOP_SECTION_CENTER = (0.340290, 0.1815266)
+VIEW_GAP_M = 0.007
 CUTTING_LETTER_REACH_M = 0.0106
 HEIGHT_LINE_CLEARANCE_M = 0.002
 # The height dimensions' lines stand at their texts' x: the top cross-bore

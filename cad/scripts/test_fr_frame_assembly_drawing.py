@@ -917,9 +917,11 @@ def test_height_dimensions_stand_clear_of_the_cutting_plane_letters() -> None:
     clearance = drawing.HEIGHT_LINE_CLEARANCE_M
     assert letters_right + clearance <= top_axis_x
     assert top_axis_x + clearance <= overall_x
-    assert overall_x + clearance <= base_left
+    # r6 review: a visible gap between the front view's dimensions and A-A.
+    assert overall_x + drawing.VIEW_GAP_M <= base_left
+    assert drawing.VIEW_GAP_M >= 0.006
     base_right = drawing.BASE_SECTION_CENTER[0] + section_half
     top_left = drawing.TOP_SECTION_CENTER[0] - section_half
     top_right = drawing.TOP_SECTION_CENTER[0] + section_half
-    assert top_left - base_right >= 0.005
+    assert top_left - base_right >= 0.006
     assert top_right <= 0.4191 - 0.002  # B-size inner border, 17 in less 0.5 in
