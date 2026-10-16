@@ -167,8 +167,7 @@ KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
 # outside the part, is D's R0.1 MAX leader's).  The fence, 1.5 model mm
 # round the theoretical sharp (6 mm in D), holds the round and both flanks;
 # at 10:1 it prints 15 mm round RIDGE_DETAIL_CENTER in the free field under
-# section C-C, the label below it.  The angle's text stands over the vertex,
-# outside the part, its extension lines carried out along both flanks.
+# section C-C, the label below it (see KNIFE_ANGLE_TEXT_DROP for the angle).
 RIDGE_DETAIL_LETTER = "E"
 RIDGE_DETAIL_CENTER = (0.070, 0.075)
 RIDGE_DETAIL_SCALE = (10.0, 1.0)
@@ -504,10 +503,11 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
 
 
-# Detail E's included-angle text: over the vertex, in the flanks' opposite
-# wedge (the same angle), 9 sheet mm up at 10:1 -- outside the part and
-# inside E's 15 mm fence, its arc's ends 7.6 mm either side.
-KNIFE_ANGLE_TEXT_RISE = 0.009
+# Detail E's included-angle text: inside the ridge's own wedge, 9 sheet mm
+# under the vertex at 10:1, where the wedge is 28 mm wide and E holds nothing
+# else.  Over the vertex, in the flanks' opposite wedge, SolidWorks measures
+# the reflex 244.86 (farm r11 2026-10-16).
+KNIFE_ANGLE_TEXT_DROP = 0.009
 
 
 def _knife_ridge_angle(adapter: Any, ridge_detail: Any) -> Any:
@@ -552,7 +552,7 @@ def _knife_ridge_angle(adapter: Any, ridge_detail: Any) -> Any:
         ridge_detail,
         p0=picks[0],
         p1=picks[1],
-        text_xy=(vertex[0], vertex[1] + KNIFE_ANGLE_TEXT_RISE),
+        text_xy=(vertex[0], vertex[1] - KNIFE_ANGLE_TEXT_DROP),
         label="knife-edge included angle",
         orientation="angular",
         entities=(flats[0], flats[1]),
