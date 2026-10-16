@@ -303,7 +303,12 @@ DIMENSION_PREFIXES = {
     "TopHoleStation": "2X ",
 }
 DIMENSION_CALLOUTS = {"PlateThick": "SETS FLOOR UNDER ENGRAVING"}
-FIELD_DEPTH_CALLOUT = "SUNK FIELD\nABOVE ENGRAVING"
+# Two rows of at most 18 characters, so even a block left-aligned on the
+# field's dimension line stays inside the border. "DEPTH" ties the 0.400 to
+# the face it is measured from; the second row gives its function (PR #1468
+# r6 review: "SUNK FIELD / ABOVE ENGRAVING" could read as the field standing
+# 0.400 above the engraving floor).
+FIELD_DEPTH_CALLOUT = "SUNK FIELD DEPTH\nENGRAVING BELOW IT"
 ENGRAVING_DEPTH_CALLOUT = "ALL ENGRAVING"
 SECTION_CALLOUTS = {
     "FieldDepth": FIELD_DEPTH_CALLOUT,
