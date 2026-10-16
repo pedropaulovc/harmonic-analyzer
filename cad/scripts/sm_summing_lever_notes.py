@@ -35,11 +35,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # cut to.  Note 5 lists the machined features explicitly -- the sheet also
 # carries the 20X controlled anchor-tap pattern and the two magnifying-bracket
 # receiver taps, so "only knife edges and anchor bore" would contradict it
-# (codex #354; receiver taps per the #1287 review).  Both lower spring anchors
-# thread straight into this casting and are each locked by a jam nut against
-# it (MHA-VN-070 on the boss top, MHA-CH-012 under the plate); the THRU ALL
-# tap callouts already say the taps run full depth, and eye clocking and
-# locking are assembly steps (machinist review r7), so no note narrates them.
+# (codex #354; receiver taps per the #1287 review).  Notes 6-7 carry the no-nut
+# rule: both lower spring anchors are purchased eyebolts that thread straight
+# into this casting, so the casting is their nut and the eye clocking and
+# threadlocker are the print's business, not an assembly aside.
 DRAWING_NOTES = "\n".join(
     (
         f"1. HEX TRUNNIONS {HEX_W:.3f} W x {HEX_H:.3f} HIGH,",
@@ -52,6 +51,13 @@ DRAWING_NOTES = "\n".join(
         "   PER SUPPLIED MODEL/PATTERN.",
         "   MACHINE KNIFE EDGES AND TAP SPRING",
         "   ANCHOR AND BRACKET SEATS ONLY.",
+        "6. PURCHASED SPRING EYEBOLTS THREAD",
+        "   DIRECTLY INTO THIS PART; NO NUTS.",
+        "   TAP FULL DEPTH THROUGH PLATE",
+        "   AND BOSS.",
+        "7. CLOCK EACH EYE TO SPRING PULL",
+        "   PLANE; SET WITH REMOVABLE",
+        "   MEDIUM-STRENGTH THREADLOCKER.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
