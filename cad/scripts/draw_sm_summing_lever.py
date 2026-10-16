@@ -743,10 +743,13 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_entity=datum_ridge.edge,
         leader_attach_xy=knife_edge_datum,
-        # 24 mm out: at 20 the tag's box straddled the plate's right edge
-        # (0.2575) and the edge ran through the 'A' (text-on-line on every
-        # #1105 run); now the box starts 1.8 mm past it.
-        symbol_xy=(knife_edge_datum[0] + 0.024, knife_edge_datum[1] - 0.012),
+        # An edge-attached datum tag re-solves its triangle to the symbol's
+        # perpendicular foot on the edge, clamped to the edge's span: a tag
+        # 12 mm below the stub mid landed on the stub's inboard end at the
+        # plate end (farm r2, 5.4 mm off). Level with the stub mid, the
+        # leader runs straight right over the stub's +X half; the box ends
+        # ~7 mm short of the 20X frame's leader dropping at x 0.2545.
+        symbol_xy=(knife_edge_datum[0] + 0.007, knife_edge_datum[1]),
         datum="A",
         label="knife-edge pivot axis",
     )
@@ -949,7 +952,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
     # the TOP of the column. The frame sits above the +Z trunnion stub with
     # its right stub ending over the rim, so the leader drops vertically
-    # through the 1.5 mm gap between the flange end and datum A's tag and runs
+    # just past the receiver rib's end, right of datum A's tag, and runs
     # only ~5 mm over the plate (the diagonal from 0.175 crossed the stub and
     # flange: leader-over-part, 24 mm).
     seed_rim_left = _top_xy(HOLE_X - HOLE_DIA / 2.0, -HOLE_Z_FIRST)
