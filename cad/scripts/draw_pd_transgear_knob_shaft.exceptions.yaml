@@ -1,0 +1,17 @@
+# Owner-accepted machinist-review exceptions for draw_pd_transgear_knob_shaft.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_pd_transgear_knob_shaft.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor: "note:pd_transgear_knob_shaft_spec.TOOTH_SPACE_CALLOUT"
+  finding: "runout callout over-specified (rule 5)"
+  reason: "tooth-space radial runout to the actual running bore is the owner gear-tooth critical class (owner-accepted)"
+- id: "RV-02"
+  kind: "accept"
+  anchor:
+    - "frame:pd_transgear_knob_shaft_spec.GEOMETRIC_CONTROLS[core_total_runout]"
+    - "frame:pd_transgear_knob_shaft_spec.GEOMETRIC_CONTROLS[front_neck_total_runout]"
+  finding: "runout frames over-specified (rule 5)"
+  reason: "finite stock-cutter clearance requires runout control of the core and front relief to the running journal (owner-accepted gear class)"

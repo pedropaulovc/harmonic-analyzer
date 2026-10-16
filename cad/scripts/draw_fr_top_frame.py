@@ -3000,6 +3000,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=hanger_center_landing_xy,
         frame_xy=HANGER_CENTER_FRAME_XY,
         characteristic="position",
+        # machinist-exception: RV-01
         tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"],
         datums=("D",), quantity=HANGER_CENTER_QUALIFIER,
         label="hanger axes on crossbar median plane",
@@ -3731,6 +3732,7 @@ async def build(adapter: Any) -> dict[str, str]:
             leader_attach_xy=hanger_slot_landing(end_centre, knee),
             frame_xy=HANGER_SLOT_FRAME_XY[station],
             characteristic="position",
+            # machinist-exception: RV-01
             tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"],
             datums=datums,
             translated=datums[1:],

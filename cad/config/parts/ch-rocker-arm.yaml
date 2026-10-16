@@ -6,19 +6,3 @@ ch-rocker-arm:
   quantity: 20
   tolerance_class: machined_block
   process: "machined from solid stock"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "rod-pin hole position frame (position dia 0.20 to A|B), datum feature C"
-      finding: "position frame over-specified on a channel part (rule 5)"
-      reason: "rod-pin coordinates set the connecting-rod lever length and angle; changing them changes the cam-to-rocker closure and neutral pose (owner-accepted channel-consistency control); datum C clocks the arm from the rod pin, which sets the arm's angle"
-    - id: "RV-02"
-      kind: "accept"
-      where: "the two surface-profile frames: the R800 upper arc, and the R816 lower arc with its tapers and both tip lands, between J and K"
-      finding: "surface-profile frames over-specified (rule 5)"
-      reason: "the R800 form sets the amplitude-bar foot sliding-contact locus closing the rocker-bar-lever chain, and the R816 arc, tapers and tip lands between J and K complete the concentric strap envelope filed to one scribed line; a radius size band cannot state the accepted form (owner-accepted)"
-    - id: "RV-03"
-      kind: "minor"
-      where: "the sheet note HUB WALL 1.53 MIN"
-      finding: "bore-to-hub wall below the 2.0 mm target (rules 17, 20)"
-      reason: "1.53 MIN at the worst printed limits, above the unchanged 1.5 floor; the OD ceiling is set by the amplitude-bar foot cheeks at rest so the shared hub nominal stays unchanged (owner-ruled shortfall)"

@@ -504,6 +504,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=seed_rim_left,
         frame_xy=(0.2133, 0.199),
         characteristic="position",
+        # machinist-exception: RV-01
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
         datums=("A", "B"),
         diameter=True,

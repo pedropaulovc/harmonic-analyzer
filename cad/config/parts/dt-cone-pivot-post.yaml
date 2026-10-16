@@ -9,9 +9,3 @@ dt-cone-pivot-post:
   # dt_post_mount_stack; the head height and mounting pitch are unchanged.
   # Crank axis height and cone incline read the current machine configs;
   # the former 86 mm / 72.7 mm / 12.5182-degree v36 values are historical.
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the crank-bore diametral angularity frame to the cone-journal bore (datum A, clocked by the foot seat datum B, plan angle basic)"
-      finding: "angularity frame over-specified (rule 5)"
-      reason: "the fixed-centre 16T:64T crossed mesh loses running clearance to yaw and tilt of the crank axis; the mesh must never bind (owner-ruled)"

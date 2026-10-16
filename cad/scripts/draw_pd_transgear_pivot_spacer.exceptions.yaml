@@ -1,0 +1,12 @@
+# Owner-accepted machinist-review exceptions for draw_pd_transgear_pivot_spacer.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_pd_transgear_pivot_spacer.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "frame:pd_transgear_pivot_spacer_spec.GEOMETRIC_TOLERANCES_MM[rear face perpendicularity to bore]"
+    - "frame:pd_transgear_pivot_spacer_spec.GEOMETRIC_TOLERANCES_MM[front face perpendicularity to bore]"
+  finding: "squareness frames over-specified (rule 5)"
+  reason: "the preloaded spring seats the hanger on these faces; their squareness is the hanger only tilt (owner-accepted)"

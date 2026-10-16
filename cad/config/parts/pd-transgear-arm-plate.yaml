@@ -23,9 +23,3 @@ pd-transgear-arm-plate:
     SET THE SPECIFIED CRITICAL S-K POSE BEFORE MATCH-REAMING.
     TWO MHA-VN-056 DOWELS LOCATE; SCREWS CLAMP ONLY.
     DO NOT LOCATE BY COUNTERSINK CENTERING OR SCREW-HOLE FLOAT.
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the locating-pattern and running-axis position controls"
-      finding: "position controls over-specified (rule 5)"
-      reason: "required by the whole-stack stock-form gate including the rigid two-hole registration yaw; stock dowels in reamed holes locate, the screws clamp (owner-accepted)"

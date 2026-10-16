@@ -221,11 +221,13 @@ class EndFaceMark:
         )
 
 
+# machinist-exception: RV-01
 REAR_FACE_FRAME = EndFaceMark(
     key="rear_face",
     label="spacer rear face perpendicularity to bore",
     landing_x_mm=(BORE_DIA + OD) / 4.0,
 )
+# machinist-exception: RV-01
 FRONT_FACE_FRAME = EndFaceMark(
     key="front_face",
     label="spacer front face perpendicularity to bore",

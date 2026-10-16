@@ -1,0 +1,12 @@
+# Owner-accepted machinist-review exceptions for draw_pd_platen_rack.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_pd_platen_rack.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "note:pd_platen_rack_spec.INCOMING_RACK_INSPECTION_NOTE"
+    - "note:pd_platen_rack_spec.GEAR_DATA"
+  finding: "pitch-accuracy limits missing on the purchased rack (rule 12)"
+  reason: "pitch accuracy is the catalogue part own; the assembly checks the running mesh over the whole engaged window (owner-accepted)"

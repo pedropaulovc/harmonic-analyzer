@@ -255,10 +255,9 @@ def test_apex_set_screw_meets_rule_18_so_nothing_is_declared() -> None:
     """The owner's 2026-10-15 shortfall ruling (#1371) covered the R8 arch's
     1.08D; the lifted arch holds 1.5D, so the sheet states no shortfall and
     the part declares no exception for one."""
-    from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
-    assert load_exceptions(CAD_ROOT / "config", "ch_pivot_bracket", "part") == ()
+    assert load_exceptions("ch_pivot_bracket") == ()
     assert not hasattr(drawing, "SET_SCREW_QUALIFIER")
     assert spec.SET_SCREW_FULL_THREAD_MIN == pytest.approx(
         sum(spec.SET_SCREW_WALL_TERMS.values())

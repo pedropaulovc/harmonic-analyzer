@@ -7,9 +7,3 @@ pd-transgear-pivot-spacer:
   quantity: 1
   tolerance_class: machined_block
   process: "turned from bar (brass): drill and ream the bore, face both ends to length"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the two faces squareness frames to the pressed bore (datum A)"
-      finding: "squareness frames over-specified (rule 5)"
-      reason: "the preloaded spring seats the hanger on these faces; their squareness is the hanger only tilt (owner-accepted)"

@@ -3282,6 +3282,9 @@ def task_check():
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
         SCRIPTS_DIR / "test_machinist_review.py",
+        # Owner-declared review exceptions (draw_<name>.exceptions.yaml): schema,
+        # anchors resolve against the draw closure, ids pair with draw-script tags.
+        SCRIPTS_DIR / "test_machinist_exceptions.py",
         # Release-package prompt benchmarks: deterministic grading and workspace
         # contracts run offline, without reviewer/model or SolidWorks activity.
         SCRIPTS_DIR / "test_machinist_review_bench.py",
@@ -3326,6 +3329,9 @@ def task_check():
         # test_dt_cone_pivot_post_drawing reads the policy's GD&T allowlist;
         # allowlist edits must rerun its frame-ownership contract.
         SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
+        # The review's declared exceptions, read beside each draw script by
+        # test_machinist_exceptions and the per-drawing contracts.
+        *sorted(SCRIPTS_DIR.glob("draw_*.exceptions.yaml")),
     ]
     # test_adapter_feature_resolution exercises the vendored adapter, which
     # module_deps_of never walks (an installed package, see SUBMODULE_SRC). Its
@@ -3526,7 +3532,12 @@ def task_check():
                     {
                         "submodule_sources": [
                             _rel_tag(path) for path in adapter_contract_deps
-                        ]
+                        ],
+                        # A deleted declarations file must re-run its pairing check.
+                        "machinist_exceptions": [
+                            _rel_tag(str(path))
+                            for path in sorted(SCRIPTS_DIR.glob("draw_*.exceptions.yaml"))
+                        ],
                     }
                 )
             ],

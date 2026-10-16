@@ -507,22 +507,20 @@ def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
 
 def test_nameplate_transfer_is_the_declared_fit_up() -> None:
     # Owner ruling 2026-10-15 (#1468): the nameplate taps are spotted through
-    # the actual MHA-FR-004 plate at assembly, declared as RV-01. Its `where`
-    # must quote the callout the sheet prints, and the taps must stay out of
-    # the hole table (a printed station would reopen the stack).
+    # the actual MHA-FR-004 plate at assembly, declared as RV-01. Its anchor
+    # is the callout the sheet prints, and the taps must stay out of the hole
+    # table (a printed station would reopen the stack).
     import draw_fr_harmonic_base as sheet
-    from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
-    declared = {
-        entry.id: entry
-        for entry in load_exceptions(CAD_ROOT / "config", "fr_harmonic_base", "part")
-    }
+    declared = {entry.id: entry for entry in load_exceptions("fr_harmonic_base")}
     fit_up = declared["RV-01"]
-    assert fit_up.kind == "accept"
+    assert fit_up.kind.value == "accept"
     assert fit_up.finding == "fit-up at assembly (rule 19)"
     assert fit_up.reason.endswith("(owner-accepted)")
-    assert " ".join(sheet.TRANSFER_NAMEPLATE_CALLOUT.split()) in fit_up.where
+    assert [str(anchor) for anchor in fit_up.anchors] == [
+        "note:draw_fr_harmonic_base.TRANSFER_NAMEPLATE_CALLOUT"
+    ]
     assert sheet.TRANSFER_NAMEPLATE_CALLOUT.startswith("TRANSFER FROM MHA-FR-004\n")
     nameplate_seats = {
         (x, z, part.NAMEPLATE_SCREW_HOLE_DIA) for x, z in part.NAMEPLATE_SCREW_XZ

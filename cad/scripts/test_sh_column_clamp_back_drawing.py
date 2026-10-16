@@ -15,8 +15,7 @@ import sh_column_clamp_back_geom as geom
 import sh_column_clamp_back_spec as spec
 import sh_column_clamp_fit as fit
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
-from _paths import CAD_ROOT
-from machinist_exceptions import load_exceptions
+from machinist_exceptions import load_exceptions, render_anchor
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 from fr_tube_frame_spec import OUTER_DIA
@@ -160,14 +159,17 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
 
 def test_owner_ruled_shortfall_is_declared_and_stated() -> None:
     # drawing-simplicity-policy.md "Named exceptions": the stated shortfall
-    # matches a kind-minor declaration under the package's own key, whose
-    # `where` names the printed note, at the value the spec computes.
-    entries = load_exceptions(CAD_ROOT / "config", "sh_column_clamp_back", "part")
+    # matches a kind-minor declaration beside the draw script, anchored on
+    # the printed note, at the value the spec computes.
+    entries = load_exceptions("sh_column_clamp_back")
     assert [entry.id for entry in entries] == ["RV-01"]
     (entry,) = entries
-    assert entry.kind == "minor"
+    assert entry.kind.value == "minor"
     assert entry.reason.endswith("(owner-ruled shortfall)")
-    assert entry.where.endswith(spec.BACK_WALL_NOTE)
+    (anchor,) = entry.anchors
+    assert (
+        render_anchor(anchor, "sh_column_clamp_back") == f'note "{spec.BACK_WALL_NOTE}"'
+    )
     # The printed value: the computed worst case at the sheet's two places,
     # rounded down (never overstating a minimum).
     assert spec.BACK_WALL_NOTE == "MIN BACK WALL 1.97"

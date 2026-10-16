@@ -430,6 +430,7 @@ async def build(adapter: Any) -> dict[str, str]:
             edge_entity=visible_circle_edge(adapter, plan, BORE_DIA),
         ),
         **{
+            # machinist-exception: RV-01
             f"plate_locator_{index}_position": PmiDrawingPlacement(
                 back, FRAME_XY[f"plate_locator_{index}_position"],
                 edge_entity=back_edges.circle_at(

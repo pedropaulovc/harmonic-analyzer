@@ -1579,6 +1579,7 @@ async def build(adapter: Any) -> dict[str, str]:
             # crossed HeadHt's and CrankBossDia's lines (leader-crosses-line,
             # af13).  A sheet-point pick sets the landing; explicit leader
             # placement detached a GTol from its edge (fulcrum 1149f227f).
+            # machinist-exception: RV-01
             "crank_bore_angularity": PmiDrawingPlacement(
                 view=front,
                 position=(0.124, _front_y(CRANK_BORE_HEIGHT) - 0.0037),
