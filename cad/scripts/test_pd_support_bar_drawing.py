@@ -711,9 +711,10 @@ def test_slot_views_frame_the_slots() -> None:
     assert drawing.BACK_KEEP["ClampRowHeight"][0] < letter_x < drawing.LEFT_END
     assert letter_top < drawing.BACK_CENTER[1]
     # Detail C's counterbore-width text stands over the counterbore's upper
-    # edge, left of the crop circle (inside its span it met its own extension
-    # line and arrow, r6 review), its line right of section B-B and over its
-    # top face.
+    # edge, left of the detail's crop (inside its span it met its own
+    # extension line and arrow, r6 review). Its shoulder (28.5 mm on the r7
+    # sheet) ends right of section B-B's back face, so the section rises
+    # beside the text rather than under it.
     cbore_x, cbore_y = drawing.DETAIL_KEEP["ClampSlotCboreWidth"]
     assert cbore_x < drawing.DETAIL_CENTER[0] - radius
     cbore_edge = (
@@ -721,9 +722,27 @@ def test_slot_views_frame_the_slots() -> None:
     )
     assert cbore_y > cbore_edge
     back_face = drawing.SLOT_SECTION_CENTER[0] + spec.BAR_DEPTH * scale / 2000.0
-    top_face = drawing.SLOT_SECTION_CENTER[1] + spec.BAR_HEIGHT * scale / 2000.0
-    assert back_face < cbore_x
-    assert cbore_y > top_face
+    assert cbore_x - 0.0285 - back_face >= 0.0025
+
+
+def test_section_letters_and_slot_caption_have_air() -> None:
+    """Rules 13 and 14 (r7 review): the section letters stand off the bar's
+    edges and section B-B's caption stands between its cut and the border.
+    Offsets are the r7 sheet's: each letter from 1.28 mm under its arrow's
+    line to 4.89 over it; the caption 14.6 tall, its top 0.05 under its
+    anchor; the inner border's edge at y 12.9."""
+    scale = drawing.FACE_SCALE[0] / drawing.FACE_SCALE[1]
+    top_line = drawing.SECTION_OVERRUN_TOP * scale
+    foot_line = drawing.SECTION_OVERRUN_FOOT * scale
+    assert top_line - 1.28 >= 1.5  # upper letter's bottom over the top edge
+    assert foot_line - 4.89 >= 1.5  # lower letter's top under the bottom edge
+    slot_scale = drawing.SLOT_SECTION_SCALE[0] / drawing.SLOT_SECTION_SCALE[1]
+    cut_bottom = (
+        drawing.SLOT_SECTION_CENTER[1] - spec.BAR_HEIGHT * slot_scale / 2000.0
+    ) * 1000.0
+    caption_top = drawing.SLOT_SECTION_CAPTION_XY[1] * 1000.0 - 0.05
+    assert cut_bottom - caption_top >= 2.5
+    assert caption_top - 14.6 - 12.9 >= 2.5
 
 
 def test_slot_section_depth_line_runs_through_the_open_slot(monkeypatch) -> None:

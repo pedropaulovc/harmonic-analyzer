@@ -243,6 +243,9 @@ CAPTION_SETTLE_M = 0.0006
 # mark a black circle and letter on the front-face view. The letter stands
 # off the bar's end, under the clamp row's extension line: over the bar it
 # printed on section B-B's upper letter, whose arrows end over the outer slot.
+# The crop prints no outline (draw_fr_rocker_arm_support's VIEW B): its full
+# circle drawn tight round the obround counterbore read as a round
+# counterbore (r7 machinist review).
 DETAIL_SLOT_X = max(CLAMP_SLOT_X)
 DETAIL_FOCUS = (DETAIL_SLOT_X, 0.0, -BAR_DEPTH / 2.0)  # model mm
 DETAIL_CENTER = (0.106, 0.048)
@@ -255,16 +258,18 @@ DETAIL_LETTER = "C"
 DETAIL_LETTER_TOP = (LEFT_END - 0.004, BACK_CENTER[1] - 0.0025)  # top centre
 DETAIL_POSITION_TOL_M = 1e-4
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
-# Measured on the r4 and r6 sheets (2.55-2.65 mm a character, 5.5 mm a
+# Measured on the r4, r6 and r7 sheets (2.55-2.65 mm a character, 5.5 mm a
 # line): a kept text outside its extension lines hangs beside its dimension
 # line, on the side away from the feature, its block centred on the keep's
 # height (ClampRowHeight, and the r6 slot width: keep 31.0, block 21.9-41.1);
-# inside them it centres on the keep. The counterbore's block (27 mm by
-# 14.7) hangs left of its line at x 78, 1.7 mm over section B-B's top face
-# and 2 mm under the 440.50 extension line's end; the slot's (46 mm by
-# 24.7) right of its line at x 132, 1 mm under the slot's lower edge.
+# inside them it centres on the keep. The counterbore's block (27.4 mm by
+# 14.7, its shoulder 28.5 long; r7, line at x 78: 49.7-77.1) hangs left of
+# its line at x 89, 3 mm right of section B-B's back face so the section can
+# rise beside it, and 1.9 mm under the 440.50 extension line's end; the
+# slot's (46 mm by 24.7) right of its line at x 132, 1 mm under the slot's
+# lower edge.
 DETAIL_KEEP = {
-    "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.028, DETAIL_CENTER[1] + 0.020),
+    "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.017, DETAIL_CENTER[1] + 0.020),
     "ClampSlotWidth": (DETAIL_CENTER[0] + 0.026, DETAIL_CENTER[1] - 0.019),
     "ClampSlotTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] - 0.020),
     "ClampSlotCboreTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] + 0.021),
@@ -279,11 +284,18 @@ DETAIL_KEEP = {
 # text's centre stands SLOT_DEPTH_SHELF_DROP over the line, the drop the r6
 # sheet measured from a kept four-line depth text to its shelf (72.00 to
 # 60.85), and far enough off the face for the block to clear it and the
-# border.
+# border. The caption's top centre stands SLOT_CAPTION_DROP under the
+# section's centre: its block (r7: 14.6 tall, its top 0.05 under the anchor)
+# then has 3 mm of air under the cut and 3.4 over the inner border's edge
+# (y 12.9), which the r7 caption touched (0.4) at centre y 45.
 SLOT_SECTION_X = min(CLAMP_SLOT_X)
-SLOT_SECTION_CENTER = (0.053, 0.045)
+SLOT_SECTION_CENTER = (0.053, 0.048)
 SLOT_SECTION_SCALE = (1, 1)
-SLOT_SECTION_CAPTION_XY = (SLOT_SECTION_CENTER[0], 0.028)  # top centre
+SLOT_CAPTION_DROP = 0.017
+SLOT_SECTION_CAPTION_XY = (
+    SLOT_SECTION_CENTER[0],
+    SLOT_SECTION_CENTER[1] - SLOT_CAPTION_DROP,
+)  # top centre
 SLOT_SECTION_KEEP_NAMES = ("ClampSlotCboreDepth",)
 SLOT_DEPTH_SHELF_DROP = 0.0112
 SLOT_DEPTH_TEXT_SIDE = 0.018
@@ -301,7 +313,16 @@ SECTION_THREAD_TEXT_SIDE = 0.026
 SECTION_THREAD_DROP = 0.010
 SECTION_DRILL_DROP = 0.027
 CAPTION_DROP = 0.035
-SECTION_OVERRUN = 3.0  # mm the cutting line runs past each long edge
+# How far (model mm) each cutting line runs past the bar's top and bottom
+# edges. Both views are 1:2, and SolidWorks stands each end's letter at the
+# same offset from its arrow's line (r7: from 1.28 mm under it to 4.89 over),
+# so the foot's letter, unlike the top's, rises toward the bar. At 1.5 mm
+# the lower B and A sat across the bottom edges and the upper ones 0.2 mm
+# over the top (r7 machinist review, rule 14); these clear the letters by
+# 3.0 - 1.28 = 1.72 mm over the top edge and 6.5 - 4.89 = 1.61 under the
+# bottom.
+SECTION_OVERRUN_TOP = 6.0
+SECTION_OVERRUN_FOOT = 13.0
 
 DRAWING_PRECISION_BY_NAME = {
     name: places
@@ -519,7 +540,7 @@ def _crop_slot_detail(adapter: Any, view: Any) -> None:
         label="slot detail C crop",
         add_to_db=False,
     )
-    status = int(view.Crop2(False, False, 1))
+    status = int(view.Crop2(False, True, 1))
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     view.UpdateViewDisplayGeometry()
@@ -544,12 +565,10 @@ def _crop_slot_detail(adapter: Any, view: Any) -> None:
             f"slot detail C crop did not take: outline {outline!r}, "
             f"before {uncropped!r}"
         )
-    boundary = (bool(view.CropViewJaggedOutline), bool(view.CropViewNoOutline))
-    if boundary != (False, False):
-        raise RuntimeError(
-            "slot detail C's crop boundary is not its plain circle: jagged, "
-            f"no-outline {boundary!r}"
-        )
+    # The jagged-outline accessor is invalid without an outline
+    # (_drawing_detail_crop), so only the no-outline flag is read back.
+    if not bool(view.CropViewNoOutline):
+        raise RuntimeError("slot detail C's crop prints an outline; expected none")
 
 
 def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
@@ -792,12 +811,13 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot section",
         base_view=face,
     ):
-        reach = BAR_HEIGHT / 2.0 + SECTION_OVERRUN
+        top = BAR_HEIGHT / 2.0 + SECTION_OVERRUN_TOP
+        foot = -(BAR_HEIGHT / 2.0 + SECTION_OVERRUN_FOOT)
         section = create_section_view(
             adapter,
             face,
-            line_start=_sheet(adapter, face, (PIVOT_TAP_X, reach, 0.0), "cut top"),
-            line_end=_sheet(adapter, face, (PIVOT_TAP_X, -reach, 0.0), "cut foot"),
+            line_start=_sheet(adapter, face, (PIVOT_TAP_X, top, 0.0), "cut top"),
+            line_end=_sheet(adapter, face, (PIVOT_TAP_X, foot, 0.0), "cut foot"),
             view_xy=SECTION_CENTER,
             section_label="A",
             scale=SECTION_SCALE,
@@ -822,8 +842,8 @@ async def build(adapter: Any) -> dict[str, str]:
     slot_section = create_section_view(
         adapter,
         back,
-        line_start=_sheet(adapter, back, (SLOT_SECTION_X, reach, 0.0), "B cut top"),
-        line_end=_sheet(adapter, back, (SLOT_SECTION_X, -reach, 0.0), "B cut foot"),
+        line_start=_sheet(adapter, back, (SLOT_SECTION_X, top, 0.0), "B cut top"),
+        line_end=_sheet(adapter, back, (SLOT_SECTION_X, foot, 0.0), "B cut foot"),
         view_xy=SLOT_SECTION_CENTER,
         section_label="B",
         scale=SLOT_SECTION_SCALE,
