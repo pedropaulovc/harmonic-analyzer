@@ -121,7 +121,9 @@ def test_each_detail_sits_in_the_free_field_with_its_label_under_its_ink(
 
 def test_the_gauge_detail_names_what_it_presses_into_what() -> None:
     label = drawing.PRESSED.label_text
-    assert "MG-WHEEL-AXLE" in label and "MG-WHEEL-BAR" in label
+    # Named as the BOM rows name them: part number and description.
+    assert "MHA-MG-007 WHEEL AXLE PRESSED" in label
+    assert "INTO MHA-MG-008 WHEEL BAR" in label
     # The pressed detail's three-line label still clears the endshake crop.
     lines = len(label.splitlines())
     assert (
