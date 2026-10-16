@@ -373,7 +373,7 @@ def test_the_dowel_pattern_frame_is_the_zone_the_stacks_were_derived_on() -> Non
     assert knife_mount.PIN_HOLE_SPAN_TOL == dowel.SPAN_TOL == float(zone)
     assert knife_mount.PIN_HOLE_HALF_SPAN_TOL == pytest.approx(0.065)
     assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.41177, abs=5e-5)
-    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(6.392778, abs=5e-6)
+    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(5.644570, abs=5e-6)
     assert top_frame.HANGER_SLOT_LENGTH_REQUIRED == pytest.approx(3.795, abs=5e-4)
     # Enlarging the pattern zone to Ø0.23 would consume more screw float
     # even before the hole's deep-drill drift is charged.
@@ -426,20 +426,34 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
     assert asm.KNIFE_DOWEL_SPAN_MIN == pytest.approx(15.134)
     assert asm.KNIFE_MOUNT_YAW_DEG == pytest.approx(0.4446826439)
     assert asm.KNIFE_BORE_FAR_END_OFFSET == pytest.approx(0.1648677151)
-    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(6.392777874)
+    # Detail D tolerances the ridge angle at the title block's +/-1 deg; one
+    # flank at that limit raises the widest section's shoulder 0.0995.
+    assert lever.RIDGE_ANGLE_TOL_DEG == 1.0
+    assert lever.KNIFE_SHOULDER_RISE == pytest.approx(0.0994781, abs=5e-7)
+    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(5.644570107)
     assert asm.KNIFE_FREE_ROCK_WORST_DEG >= asm.KNIFE_FREE_ROCK_FLOOR_DEG == 5.0
     assert knife_mount.BORE_R_MIN == 6.0
+    # Without the raised shoulder the same section and bore rock 6.39 deg.
     assert knife_mount.free_rock_deg(
         0.1648677151, hex_w=8.21, hex_h=10.138, r_bore=6.0
     ) == pytest.approx(6.392777874)
-    # The increased span lets the intermediate 8.33 width pass, but still
-    # rejects the wider 8.653 counterexample at the same five-degree floor.
-    for hex_w, holds in ((8.653, False), (8.33, True), (8.090, True)):
+    assert knife_mount.free_rock_deg(
+        0.1648677151,
+        hex_w=8.21,
+        hex_h=10.138,
+        r_bore=6.0,
+        shoulder_drop=10.138 / 4.0 - 0.0994781,
+    ) == pytest.approx(5.644570, abs=5e-5)
+    # With the raised shoulder only the narrowed widths hold the five-degree
+    # floor: the intermediate 8.33 and the old 8.653 both fail it.
+    for hex_w, holds in ((8.653, False), (8.33, False), (8.090, True)):
         rock = knife_mount.free_rock_deg(
             asm.KNIFE_BORE_FAR_END_OFFSET,
             hex_w=hex_w + lever.HEX_BAND,
             hex_h=lever.HEX_H - lever.HEX_BAND,
             r_bore=knife_mount.BORE_R_MIN,
+            shoulder_drop=(lever.HEX_H - lever.HEX_BAND) / 4.0
+            - lever.KNIFE_SHOULDER_RISE,
         )
         assert (rock >= 5.0) is holds, hex_w
     # Nominal geometry, straight bore: 8.92 deg.
