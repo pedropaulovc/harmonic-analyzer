@@ -78,9 +78,9 @@ def fixture_wire_clearances(samples: int = 20001) -> dict[str, float]:
     return minima
 
 
-def test_fixture_hook_is_the_rotated_front_tangent() -> None:
+def test_fixture_hook_lies_in_the_rod_plane() -> None:
     assert all(math.isclose(a, b, abs_tol=1e-9) for a, b in zip(assembly._HOOK_EXPECTED, wire.WIRE_START, strict=True))
-    assert wire.HOOK_Z == fixture.HOOK_TARGET_Z
+    assert wire.HOOK_Z == fixture.HOOK_TARGET_Z == fixture.VROD_Z == wire.DRUM_END_Z
     assert math.isclose(
         assembly.VROD_Z, fixture.VROD_Z, rel_tol=0.0, abs_tol=1e-9
     )
@@ -108,23 +108,38 @@ def test_departing_wire_clears_groove_flanks_spigot_and_screw() -> None:
 
 def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
     from _interference_contracts import (
+        _MG_CLAMP_THUMB_TRIPLE_MM,
         _MG_FIXTURE_THREAD_TRIPLE_MM,
         _MG_LEVER_PRESS_TRIPLE_MM,
+        _MG_ROD_THREAD_TRIPLE_MM,
         allowed_interference_pairs,
     )
     from _hole_spec import TAP_DRILL_MM
     from _mcmaster_91882a221 import SHANK_DIA
+    import mg_magnifying_clamp_geom as clamp
+    import mg_rod_clamp_joint as rod_joint
     from mg_lever_press_fit_geom import COLLAR_BORE_DIA, COLLAR_ENGAGEMENT_MAX, PRESS_ZONE_DIA
 
     # Shared runtime contracts must stay independent of the pose-bearing owners.
     # Pin the literals here instead of importing those owners into every assembly.
     owned_thread = (SHANK_DIA, TAP_DRILL_MM["#4-40"], fixture.TAP_LENGTH)
     owned_press = (PRESS_ZONE_DIA, COLLAR_BORE_DIA, COLLAR_ENGAGEMENT_MAX)
+    owned_clamp_thumb = (SHANK_DIA, clamp.ROD_TAP_DRILL_DIA, clamp.THUMB_TAP_LENGTH)
+    # The rod's full-major section from the tip to the relief (the tip chamfer
+    # lies inside it; the relief is under the drill).
+    owned_rod_thread = (
+        rod_joint.THREAD_MAJOR,
+        clamp.ROD_TAP_DRILL_DIA,
+        rod_joint.ROD_THREAD_LEN - rod_joint.RELIEF_WIDTH,
+    )
+    assert rod_joint.RELIEF_DIA < clamp.ROD_TAP_DRILL_DIA
     # The nominal cylinder stays 7; the independently pinned print envelope
     # includes the partial hemisphere still larger than the collar bore.
     for literal, owned in (
         (_MG_FIXTURE_THREAD_TRIPLE_MM, owned_thread),
         (_MG_LEVER_PRESS_TRIPLE_MM, owned_press),
+        (_MG_CLAMP_THUMB_TRIPLE_MM, owned_clamp_thumb),
+        (_MG_ROD_THREAD_TRIPLE_MM, owned_rod_thread),
     ):
         assert all(
             math.isclose(a, b, rel_tol=0.0, abs_tol=1e-12)
@@ -141,8 +156,17 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
                 frozenset(("mg-magnifying-lever-1", "mg-magnifying-bracket-1")),
                 owned_press,
             ),
+            (
+                frozenset(("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")),
+                owned_rod_thread,
+            ),
         )
     }
+    clamp_thumb = frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1"))
+    major, bore, length = owned_clamp_thumb
+    assert math.isclose(
+        pairs[clamp_thumb], 1.10 * math.pi * (major**2 - bore**2) * length / 4.0, abs_tol=1e-12
+    )
     for pair, limit in expected.items():
         assert math.isclose(pairs[pair], limit, abs_tol=1e-12)
         qualified = frozenset(f"mg-magnifier-1/{name}" for name in pair)

@@ -113,12 +113,14 @@ def test_installed_hook_sits_on_the_wire_start() -> None:
     assert math.hypot(y, z) == pytest.approx(
         geom.GROOVE_ROOT_DIA / 2.0 + geom.WIRE_DIA / 2.0 + geom.WIRE_CLEARANCE
     )
-    # The hook leaves on the rod's front tangent, wire clear of the rod.
+    # Option A1: the hook lies in the rod's own plane (dz = 0), on the bracket
+    # side, and the run heads further from the rod, so the wire clears it.
     from mg_magnifying_vertical_rod_geom import ROD_DIA
+    import vn_lever_wire_geom as wire
 
-    assert geom.VROD_Z - geom.HOOK_TARGET_Z == pytest.approx(
-        ROD_DIA / 2.0 + geom.WIRE_DIA / 2.0 + geom.WIRE_CLEARANCE
-    )
+    assert geom.HOOK_TARGET_Z == geom.VROD_Z
+    assert -geom.HOOK_OFFSET_X - ROD_DIA / 2.0 - geom.WIRE_DIA / 2.0 >= geom.WIRE_CLEARANCE
+    assert wire.WIRE_END[0] < wire.WIRE_START[0]
 
 
 def test_hook_point_is_authored_on_the_top_plane_where_the_geometry_puts_it() -> None:
