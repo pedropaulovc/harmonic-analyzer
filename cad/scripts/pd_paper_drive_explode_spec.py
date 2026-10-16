@@ -33,7 +33,7 @@ class ExplodeStep:
 
 
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
-    ExplodeStep("rack below the platen", ("pd-platen-rack",), "y", -36.0),
+    ExplodeStep("rack below the platen", ("pd-platen-rack",), "y", -37.0),
     ExplodeStep("guide screws forward", ("vn-fillister-screw",), "z", -45.0),
     ExplodeStep(
         "clips and paper forward",
