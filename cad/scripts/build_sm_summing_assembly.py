@@ -69,7 +69,6 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     anchor_point_to_origin,
-    anchor_point_to_point,
     blank_sketch,
     dimension_between,
     ensure_fully_defined,
@@ -408,7 +407,6 @@ UPPER_EYE_CLAMP_NOTES = (
 # Y), every vertex driven from a global; the drawing shows each sketch in the
 # one view that dimensions it and imports only its marked dimension.
 _SETTING_GLOBALS = {
-    "SmKnifeX": spec.KNIFE_POINT[0],
     "SmKnifeY": spec.KNIFE_POINT[1],
     "SmCounterScrewX": spec.COUNTER_SCREW_POINT[0],
     "SmCounterScrewY": spec.COUNTER_SCREW_POINT[1],
@@ -449,24 +447,33 @@ async def _finish_setting(
 
 
 async def _author_settings(adapter) -> None:
-    """CounterSetting: knife contact to the MHA-SM-004 axis (the gooseneck
-    height the level setting finds). KnifeRockGauge: the boss face's minimum
-    travel at the free-rock floor, up the boss-hook axis."""
+    """CounterSetting: the MHA-SM-004 axis above the knife contact level (the
+    gooseneck height the level setting finds). KnifeRockGauge: the boss face's
+    minimum travel at the free-rock floor, up the boss-hook axis."""
     for name, value in _SETTING_GLOBALS.items():
         await set_global(adapter, name, f"{value}mm")
 
+    # The setting line runs up the counter spring's axis, from the knife
+    # contact level to the screw axis, so the only printed construction lies
+    # along the spring it sets (a slant from the knife would cross the spring).
     knife, screw = spec.KNIFE_POINT, spec.COUNTER_SCREW_POINT
+    base = (screw[0], knife[1])
     dims = SketchDims()
     check("create counter setting sketch", await adapter.create_sketch("Front"))
-    line = await _construction_line(adapter, knife, screw, "counter setting line")
-    await anchor_point_to_origin(adapter, f"{line}.start", *knife, "knife contact")
-    dims.record("KnifeX", '-"SmKnifeX"')
-    dims.record("KnifeY", '"SmKnifeY"')
-    await anchor_point_to_point(
-        adapter, f"{line}.start", f"{line}.end",
-        screw[0] - knife[0], screw[1] - knife[1], "counter screw from knife",
+    line = await _construction_line(adapter, base, screw, "counter setting line")
+    check(
+        "counter setting vertical",
+        await adapter.add_sketch_constraint(line, None, "vertical"),
     )
-    dims.record("CounterScrewInboard", '"SmKnifeX" - "SmCounterScrewX"')
+    await anchor_point_to_origin(
+        adapter, f"{line}.start", *base, "spring axis at knife level"
+    )
+    dims.record("CounterScrewX", '-"SmCounterScrewX"')
+    dims.record("KnifeY", '"SmKnifeY"')
+    await dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "vertical_distance",
+        spec.COUNTER_SCREW_RISE, "counter screw rise",
+    )
     dims.record(spec.COUNTER_DIMENSION, '"SmCounterScrewY" - "SmKnifeY"')
     await _finish_setting(adapter, spec.COUNTER_FEATURE, dims, spec.COUNTER_DIMENSION)
 

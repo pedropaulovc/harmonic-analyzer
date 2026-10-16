@@ -21,7 +21,7 @@ from diagnostics import diag_build_90760A140 as recipe
 STEM = "vn-boss-hook-jam-nut"
 SHEET = "vn_boss_hook_jam_nut"
 NUMBER = "MHA-VN-070"
-STOCK_NAME = "Zinc-Plated Steel Narrow-Profile Hex Nut"
+STOCK_NAME = "#10-24 Zinc-Plated Steel Narrow-Profile Hex Nut"
 BUILD = "build_90760A140"
 IN = 25.4
 
