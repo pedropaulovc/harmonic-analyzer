@@ -85,3 +85,14 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["process"] == "purchased"
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def test_the_balloon_ring_is_a_shape_neutral_mid_run_split() -> None:
+    # MHA-MG-000 lands the wire's balloon on this ring; it must not change the
+    # wire, so it is a split line (no added solid feature) at mid-run.
+    assert part.BALLOON_RING_STATION == vn_lever_wire_spec.BALLOON_RING_FRACTION * part.WIRE_LEN
+    assert 0.0 < vn_lever_wire_spec.BALLOON_RING_FRACTION < 1.0
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert source.count("InsertSplitLineProject(") == 1
+    assert "create_extrusion(" in source and source.count("create_extrusion(") == 1
+    assert 'blank_sketch(adapter, "BalloonRingReference")' in source
