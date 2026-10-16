@@ -161,6 +161,25 @@ DETAIL_LABEL_XY = (0.075, 0.176)
 # between the rib-arc and cylinder leaders.
 DETAIL_LETTER_OFFSET = (0.0, -0.016)
 KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
+# Detail E: the knife-edge vertex at 10:1, cut from Detail D, carrying only
+# the ridge's included angle (machinist reviews r7/r8: in D the angle's text
+# stood inside the hexagon on its centreline, and the wedge over the vertex,
+# outside the part, is D's R0.1 MAX leader's).  The fence, 1.5 model mm
+# round the theoretical sharp (6 mm in D), holds the round and both flanks;
+# at 10:1 it prints 15 mm round RIDGE_DETAIL_CENTER in the free field under
+# section C-C, the label below it.  The angle's text stands over the vertex,
+# outside the part, its extension lines carried out along both flanks.
+RIDGE_DETAIL_LETTER = "E"
+RIDGE_DETAIL_CENTER = (0.070, 0.075)
+RIDGE_DETAIL_SCALE = (10.0, 1.0)
+RIDGE_DETAIL_RADIUS_MM = 1.5
+RIDGE_DETAIL_LABEL_XY = (0.070, 0.052)
+# E's letter up-left of the vertex in D, outside D's fence and clear of the
+# R0.1 MAX callout up-right, its leader running to E's fence.
+RIDGE_DETAIL_LETTER_OFFSET = (-0.017, 0.0095)
+# Flank picks this far down each flank from the sharp: past the round's
+# tangent (0.063) and inside E's fence.
+RIDGE_FLANK_PICK_MM = 0.9
 
 # Section C-C: the plate's own thickness.  Every end view shows the end ribs
 # over the plate and the spring-anchor pad below its free edge, so no view
@@ -234,17 +253,64 @@ def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
 
 def _knife_detail(adapter: Any, front: Any) -> Any:
     """A native 4:1 detail of the trunnion end in the front profile."""
+    return _detail_view(
+        adapter,
+        front,
+        centre_mm=(0.0, 0.0, 0.0),
+        radius_m=DETAIL_RADIUS_MM * _S / 1000.0,
+        at_xy=DETAIL_CENTER,
+        scale=DETAIL_SCALE,
+        letter=DETAIL_LETTER,
+        label_xy=DETAIL_LABEL_XY,
+        letter_offset=DETAIL_LETTER_OFFSET,
+        label="knife detail",
+    )
+
+
+def _ridge_detail(adapter: Any, detail: Any) -> Any:
+    """A native 10:1 detail of Detail D's knife-edge vertex (Detail E)."""
+    return _detail_view(
+        adapter,
+        detail,
+        centre_mm=(0.0, HEX_H / 2.0, PLATE_L / 2.0 + HEX_DEPTH),
+        radius_m=RIDGE_DETAIL_RADIUS_MM * DETAIL_SCALE[0] / 1000.0,
+        at_xy=RIDGE_DETAIL_CENTER,
+        scale=RIDGE_DETAIL_SCALE,
+        letter=RIDGE_DETAIL_LETTER,
+        label_xy=RIDGE_DETAIL_LABEL_XY,
+        letter_offset=RIDGE_DETAIL_LETTER_OFFSET,
+        label="ridge detail",
+    )
+
+
+def _detail_view(
+    adapter: Any,
+    parent_view: Any,
+    *,
+    centre_mm: tuple[float, float, float],
+    radius_m: float,
+    at_xy: tuple[float, float],
+    scale: tuple[float, float],
+    letter: str,
+    label_xy: tuple[float, float],
+    letter_offset: tuple[float, float],
+    label: str,
+) -> Any:
+    """A native detail of ``parent_view``: its fence, ``radius_m`` on the
+    sheet, round model point ``centre_mm``; the view centred on ``at_xy``,
+    its label at ``label_xy``, the parent circle's letter ``letter_offset``
+    from the fence centre, each position read back."""
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(front, "IView")
-    if not drawing.ActivateView(view_name(adapter, front)):
-        raise RuntimeError("failed to activate knife-detail parent")
+    parent = _early_bound(parent_view, "IView")
+    if not drawing.ActivateView(view_name(adapter, parent_view)):
+        raise RuntimeError(f"failed to activate the {label}'s parent")
     draw.ClearSelection2(True)
     center = model_point_in_view(
-        adapter, front, (0.0, 0.0, 0.0), label="knife-detail centre"
+        adapter, parent_view, _metres(centre_mm), label=f"{label} centre"
     )
-    # The fence is drawn in sheet space on the 1:2 parent.
-    radius = DETAIL_RADIUS_MM * _S / 1000.0
+    # The fence is drawn in sheet space on the parent.
+    radius = radius_m
     sketch = _early_bound(parent.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
@@ -267,7 +333,7 @@ def _knife_detail(adapter: Any, front: Any) -> Any:
     finally:
         manager.AddToDB = previous_add_to_db
     if fence is None:
-        raise RuntimeError("failed to create knife-detail fence")
+        raise RuntimeError(f"failed to create the {label} fence")
     arc = _early_bound(fence, "ISketchArc")
     fence_centre = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
     placed_centre = (float(fence_centre.X), float(fence_centre.Y))
@@ -276,22 +342,22 @@ def _knife_detail(adapter: Any, front: Any) -> Any:
         or abs(float(arc.GetRadius()) - math.dist(points[0][:2], points[1][:2])) > 1e-9
     ):
         raise RuntimeError(
-            f"knife-detail fence moved off its authored circle: {placed_centre}"
+            f"{label} fence moved off its authored circle: {placed_centre}"
         )
     draw.ClearSelection2(True)
     selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
     selection_data = selection.CreateSelectData()
-    selection_data.View = front
+    selection_data.View = parent_view
     if not _early_bound(fence, "ISketchSegment").Select4(False, selection_data):
-        raise RuntimeError("failed to select the knife-detail fence")
+        raise RuntimeError(f"failed to select the {label} fence")
     if int(selection.GetSelectedObjectCount2(-1)) != 1:
-        raise RuntimeError("knife-detail fence is not the only selection")
+        raise RuntimeError(f"{label} fence is not the only selection")
     detail = drawing.CreateDetailViewAt4(
-        *DETAIL_CENTER,
+        *at_xy,
         0.0,
         2,  # swDetViewLEADER: a leader joins the letter to the fence
-        *DETAIL_SCALE,
-        DETAIL_LETTER,
+        *scale,
+        letter,
         1,  # swDetCircleCIRCLE
         True,
         False,
@@ -299,43 +365,43 @@ def _knife_detail(adapter: Any, front: Any) -> Any:
         5,
     )
     if detail is None:
-        raise RuntimeError("failed to create knife detail")
+        raise RuntimeError(f"failed to create the {label}")
     detail = _early_bound(detail, "IView")
-    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    detail.ScaleRatio = double_array([float(value) for value in scale])
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     outline = tuple(float(value) for value in detail.GetOutline())
     position = tuple(float(value) for value in detail.Position)
     if len(outline) != 4 or len(position) != 2:
-        raise RuntimeError(f"knife detail has invalid bounds: {outline!r}")
+        raise RuntimeError(f"{label} has invalid bounds: {outline!r}")
     target = [
-        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        position[axis] + at_xy[axis] - (outline[axis] + outline[axis + 2]) / 2.0
         for axis in range(2)
     ]
     if not detail.SetViewPosition(double_array(target), False):
-        raise RuntimeError("failed to position knife detail")
+        raise RuntimeError(f"failed to position the {label}")
     draw.EditRebuild3()
     notes = tuple(_read_member(detail, "GetNotes") or ())
     if len(notes) != 1:
-        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+        raise RuntimeError(f"expected one native {label} label, found {len(notes)}")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    label_xyz = (*label_xy, 0.0)
     if not annotation.SetPosition2(*label_xyz):
-        raise RuntimeError("failed to position knife detail label")
+        raise RuntimeError(f"failed to position the {label} label")
     circles = tuple(_read_member(parent, "GetDetailCircles") or ())
     if len(circles) != 1:
-        raise RuntimeError(f"expected one knife-detail circle, found {len(circles)}")
+        raise RuntimeError(f"expected one {label} circle, found {len(circles)}")
     circle = _early_bound(circles[0], "IDetailCircle")
-    letter = tuple(center[i] + DETAIL_LETTER_OFFSET[i] for i in range(2))
-    circle.SetLabelPosition(*letter)  # VT_VOID: the read-back is the proof
+    letter_xy = tuple(center[i] + letter_offset[i] for i in range(2))
+    circle.SetLabelPosition(*letter_xy)  # VT_VOID: the read-back is the proof
     draw.EditRebuild3()
     actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
     if math.dist(actual, label_xyz) > 1e-8:
-        raise RuntimeError(f"knife detail label position did not persist: {actual}")
+        raise RuntimeError(f"{label} label position did not persist: {actual}")
     placed = tuple(float(value) for value in circle.GetLabelPosition())
-    if len(placed) != 2 or math.dist(placed, letter) > 1e-8:
-        raise RuntimeError(f"knife-detail letter position did not persist: {placed}")
+    if len(placed) != 2 or math.dist(placed, letter_xy) > 1e-8:
+        raise RuntimeError(f"{label} letter position did not persist: {placed}")
     return detail
 
 
@@ -368,6 +434,31 @@ def _attach_radial_leaders(
     missing = sorted(wanted - seen)
     if missing:
         raise RuntimeError(f"{label}: radial dimensions missing: {missing}")
+
+
+def _shorten_radii(
+    adapter: Any, annotations: Iterable[Any], names: Iterable[str], *, label: str
+) -> None:
+    """Foreshorten each named radius: ``IDisplayDimension::ShortenedRadius``
+    draws the jogged radius, its line stopping short of a centre beyond the
+    view, so no bare line runs from the arc centre to the text (machinist
+    review r8: the R138.85's line read as a loose line in the plan).  A bool
+    put SolidWorks ignores still returns, so each flag is read back
+    (draw_pd_latch_hook._shorten_radii)."""
+    wanted = set(names)
+    seen = set()
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in wanted:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ShortenedRadius = True
+        if not bool(display.ShortenedRadius):
+            raise RuntimeError(f"{label}: {name} did not keep its shortened radius")
+        seen.add(name)
+    missing = sorted(wanted - seen)
+    if missing:
+        raise RuntimeError(f"{label}: radii to shorten missing: {missing}")
 
 
 def _apply_callouts(adapter: Any, annotations: list[Any], *, label: str) -> None:
@@ -413,47 +504,55 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
 
 
-# Detail D's included-angle text: inside the ridge's own wedge, on the
-# hexagon's centreline 13.5 sheet mm under the vertex.  The vertex's R MAX
-# keeps the wedge above: its leader must land inside the round's span (the
-# flats' normals, 57.6..122.4 deg), and an angle there would cross it.
-KNIFE_ANGLE_TEXT_DROP = 0.0135
+# Detail E's included-angle text: over the vertex, in the flanks' opposite
+# wedge (the same angle), 9 sheet mm up at 10:1 -- outside the part and
+# inside E's 15 mm fence, its arc's ends 7.6 mm either side.
+KNIFE_ANGLE_TEXT_RISE = 0.009
 
 
-def _knife_ridge_angle(adapter: Any, detail: Any) -> Any:
-    """Detail D's knife-edge included angle (machinist review r4 B2, r7 B1): a
-    driven angular dimension between the +Z stub's two upper flats, printed
-    plain so the title block's angular band governs it.  HexWidth and
-    HexHeight leave the flanks, so the shoulders' height, free; this angle
-    fixes them (``sm_summing_lever_spec.KNIFE_SHOULDER_RISE`` charges its band
-    to the free-rock worst case).  The picks name the outboard end face's two
-    upper slant edges at their midpoints, and the value must read
-    RIDGE_ANGLE_DEG: the supplement means the text landed in a side wedge."""
+def _knife_ridge_angle(adapter: Any, ridge_detail: Any) -> Any:
+    """Detail E's knife-edge included angle (machinist reviews r4 B2, r7 B1,
+    r8): a driven angular dimension between the +Z stub's two upper flats,
+    printed plain so the title block's angular band governs it.  HexWidth
+    and HexHeight leave the flanks, so the shoulders' height, free; this
+    angle fixes them (``sm_summing_lever_spec.KNIFE_SHOULDER_RISE`` charges
+    its band to the free-rock worst case).  The picks name the outboard end
+    face's two upper slant edges RIDGE_FLANK_PICK_MM down from the sharp,
+    and the value must read RIDGE_ANGLE_DEG: the supplement means the text
+    landed in a side wedge."""
     z_mm = PLATE_L / 2.0 + HEX_DEPTH
+    flank = math.hypot(HEX_W / 2.0, HEX_H / 4.0)
+    step = (
+        RIDGE_FLANK_PICK_MM * HEX_W / 2.0 / flank,
+        RIDGE_FLANK_PICK_MM * HEX_H / 4.0 / flank,
+    )
     slant_points = [
-        (side * HEX_W / 4.0, 3.0 * HEX_H / 8.0, z_mm) for side in (-1.0, 1.0)
+        (side * step[0], HEX_H / 2.0 - step[1], z_mm) for side in (-1.0, 1.0)
     ]
-    edges = scan_view_edges(detail, label="knife detail")
+    edges = scan_view_edges(ridge_detail, label="ridge detail")
     flats = [
         edges.exact_line_through(point, label=f"knife ridge {name} flat").edge
         for point, name in zip(slant_points, ("left", "right"))
     ]
     picks = model_points_in_view(
         adapter,
-        detail,
+        ridge_detail,
         [_metres(point) for point in slant_points],
         label="knife ridge flat",
         names=("left", "right"),
     )
     vertex = model_point_in_view(
-        adapter, detail, _metres((0.0, HEX_H / 2.0, z_mm)), label="knife ridge vertex"
+        adapter,
+        ridge_detail,
+        _metres((0.0, HEX_H / 2.0, z_mm)),
+        label="knife ridge vertex",
     )
     angle = add_edge_dimension(
         adapter,
-        detail,
+        ridge_detail,
         p0=picks[0],
         p1=picks[1],
-        text_xy=(vertex[0], vertex[1] - KNIFE_ANGLE_TEXT_DROP),
+        text_xy=(vertex[0], vertex[1] + KNIFE_ANGLE_TEXT_RISE),
         label="knife-edge included angle",
         orientation="angular",
         entities=(flats[0], flats[1]),
@@ -698,7 +797,10 @@ FRONT_KEEP = {
     "WebThickness": (0.215, 0.247),
     "EdgeRibFrontArcR": (0.1948, 0.2120),
     "EdgeRibFrontEndTopX": (0.2443, 0.254),
-    "EdgeRibFrontEndTopY": (0.268, 0.244),
+    # Right of the plate tip, its three lines under the value (machinist
+    # review r8: from what, and why the end stands proud of the plate)
+    # starting 3 mm right of the dimension line (~0.263).
+    "EdgeRibFrontEndTopY": (0.282, 0.246),
 }
 # Detail D at 4:1: the hexagon's centre prints at DETAIL_CENTER, its flats at
 # x 0.0588/0.0912, its vertices at y 0.2015/0.2425, the fence 0.030 round it.
@@ -707,8 +809,8 @@ FRONT_KEEP = {
 # diameter's four lines (top 0.1784) and the label, its line ~0.181; the
 # vertex height stands right of the fence, its text level with the centre
 # and its three callout lines below the value; the vertex's R MAX leads off
-# up-right from over the fence (inside the round's span, see
-# KNIFE_ANGLE_TEXT_DROP).
+# up-right from over the fence, inside the round's span (the flats' normals,
+# 57.6..122.4 deg).  The included angle is Detail E's.
 DETAIL_KEEP = {
     "HexWidth": (0.121, 0.1895),
     "HexHeight": (0.130, DETAIL_CENTER[1]),
@@ -741,6 +843,8 @@ TOP_KEEP = {
     # inside the arc rules the radius from its centre (farm r6), clear of
     # everything but the front view's rib-arc callout (see FRONT_KEEP).  The
     # text's far corner stays 7 mm inside the arc, 8 mm under the 21.72.
+    # Foreshortened (_shorten_radii): the full line from the centre read as
+    # a loose line (machinist review r8).
     "SummationArcRadius": (0.2096, 0.162),
     # Left of the -Z stub, under the 20X frame, its text centred on its line:
     # 2.8 mm left of datum A's arrow (at x 0.226 they touched, farm r6), its
@@ -873,11 +977,14 @@ async def build(adapter: Any) -> dict[str, str]:
     _attach_radial_leaders(
         adapter, top_annotations, ("SummationArcRadius",), label="top"
     )
+    _shorten_radii(adapter, top_annotations, ("SummationArcRadius",), label="top")
     _attach_radial_leaders(
         adapter, detail_annotations, ("KnifeRidgeRadius",), label="knife detail"
     )
     _assert_knife_ridge_radius(adapter, detail_annotations)
-    _knife_ridge_angle(adapter, detail)
+    ridge_detail = _ridge_detail(adapter, detail)
+    set_hidden_lines_removed(adapter, ridge_detail)
+    _knife_ridge_angle(adapter, ridge_detail)
     _apply_callouts(
         adapter,
         [*front_annotations, *top_annotations, *detail_annotations],
