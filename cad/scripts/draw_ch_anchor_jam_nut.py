@@ -78,7 +78,7 @@ SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 FRONT_CENTER = (0.090, 0.155)
 RIGHT_CENTER = (0.215, 0.155)
-ISO_CENTER = (0.345, 0.155)
+ISO_CENTER = (0.375, 0.155)
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
 _HALF_OD = OD / 2.0 * _S
 _HALF_T = THICKNESS / 2.0 * _S
@@ -116,9 +116,10 @@ RIGHT_KEEP = {
         RIGHT_CENTER[1] + _HALF_OD + 0.018,
     ),
 }
-# Far enough right that the O.D.'s callouts, centred on its value, clear
-# the side view.
-OD_ON_SIDE = (RIGHT_CENTER[0] + _HALF_T + 0.045, RIGHT_CENTER[1])
+# Far enough right that the O.D.'s callouts, centred on its value (the
+# neighbour line is about 0.104 wide), clear the side view's face and the
+# thickness extension line (review r10); the isometric stands off past them.
+OD_ON_SIDE = (RIGHT_CENTER[0] + _HALF_T + 0.058, RIGHT_CENTER[1])
 THREAD_CALLOUT_XY = (FRONT_CENTER[0] + _HALF_OD + 0.012, FRONT_CENTER[1] + 0.035)
 # Rule 12 (hole and slot callouts say what to do); rule 4: the O.D.'s tight
 # band names what bounds it on both sides; rule 20: the thin nut's
