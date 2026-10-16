@@ -110,7 +110,6 @@ HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92
 
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "summation anchor position": "0.30",
     # Ø0.15, tightened from 0.30 (owner ruling on code review
     # C06): two neighbouring MHA-CH-014 jam nuts stand on adjacent taps, and
     # at Ø0.30 their worst approach leaves no O.D. both the wall floor and the
