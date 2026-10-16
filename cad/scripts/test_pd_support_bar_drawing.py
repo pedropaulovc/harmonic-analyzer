@@ -431,6 +431,8 @@ def test_callouts_name_the_mates() -> None:
         "LOCATE TO MHA-SH-002 TAPS",
         "MHA-VN-021 HEADS BELOW SLIDE FACE",
     ]
+    # The banded clamp row's height names those taps at the dimension too.
+    assert "MHA-SH-002" in callouts["ClampRowHeight"]
 
 
 def test_slide_faces_carry_the_slide_grade() -> None:
@@ -612,9 +614,11 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     assert east == pytest.approx(0.0286, abs=1e-4)
     assert part.clamp_east_pair_margin() == pytest.approx(east)
     # The sheet names the clamp taps the slots take up (rule 4: the band's
-    # mate), and restates no value beside part numbers.
+    # mate) and says their limits and stations set that take-up, restating
+    # no value beside part numbers.
     why = sheet_spec.DIMENSION_CALLOUTS["ClampSlotWidth"]
-    assert "TAKE UP" in why and "MHA-SH-002" in why
+    assert "TAKE-UP" in why and "MHA-SH-002" in why
+    assert "LIMITS" in why and "STATIONS" in why
     assert re.search(r"\d", re.sub(r"MHA-[A-Z]{2}-\d{3}", "", why)) is None
 
 
@@ -706,9 +710,41 @@ def test_slot_views_frame_the_slots() -> None:
     letter_x, letter_top = drawing.DETAIL_LETTER_TOP
     assert drawing.BACK_KEEP["ClampRowHeight"][0] < letter_x < drawing.LEFT_END
     assert letter_top < drawing.BACK_CENTER[1]
-    # Section B-B stands left of detail C's counterbore-width text.
+    # Detail C's counterbore-width text stands over the counterbore's upper
+    # edge, left of the crop circle (inside its span it met its own extension
+    # line and arrow, r6 review), its line right of section B-B and over its
+    # top face.
+    cbore_x, cbore_y = drawing.DETAIL_KEEP["ClampSlotCboreWidth"]
+    assert cbore_x < drawing.DETAIL_CENTER[0] - radius
+    cbore_edge = (
+        drawing.DETAIL_CENTER[1] + part.CLAMP_SLOT_CBORE_WIDTH * drawing.DETAIL_MM / 2.0
+    )
+    assert cbore_y > cbore_edge
     back_face = drawing.SLOT_SECTION_CENTER[0] + spec.BAR_DEPTH * scale / 2000.0
-    assert back_face < drawing.DETAIL_KEEP["ClampSlotCboreWidth"][0]
+    top_face = drawing.SLOT_SECTION_CENTER[1] + spec.BAR_HEIGHT * scale / 2000.0
+    assert back_face < cbore_x
+    assert cbore_y > top_face
+
+
+def test_slot_section_depth_line_runs_through_the_open_slot(monkeypatch) -> None:
+    """Section B-B's depth line runs where the counterbore's mouth and the
+    through slot are open, so neither extension line crosses the hatch (r6:
+    over the top face the floor's ran up through the cut), and its text
+    stands outside the front face, whichever way the cut projects."""
+    for flip in (1.0, -1.0):
+        origin = (0.050, 0.045)
+
+        def sheet(_adapter, _view, point, _label, flip=flip, origin=origin):
+            _x, y, z = point
+            return (origin[0] + flip * z / 1000.0, origin[1] + y / 1000.0)
+
+        monkeypatch.setattr(drawing, "_sheet", sheet)
+        text_x, text_y = drawing._slot_section_keep(None, None)["ClampSlotCboreDepth"]
+        front = origin[0] - flip * spec.BAR_DEPTH / 2000.0
+        line_y = text_y - drawing.SLOT_DEPTH_SHELF_DROP
+        assert abs(line_y - origin[1]) < part.CLAMP_SLOT_WIDTH / 2000.0
+        assert (text_x - front) * flip < 0.0
+        assert abs(text_x - front) == pytest.approx(drawing.SLOT_DEPTH_TEXT_SIDE)
 
 
 class _DetailView:

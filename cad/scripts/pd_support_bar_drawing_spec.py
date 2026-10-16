@@ -129,7 +129,9 @@ DIMENSION_CALLOUTS = {
     # The two rows print on one line at 1:2 though they are separate rows
     # (the hanger row from the machine layout, the clamp row at mid-height).
     "HangerRowHeight": f"MHA-VN-041 PIVOT AND\n{_HOOK_TAPS},\nNOT ON THE CLAMP ROW",
-    "ClampRowHeight": "BAR\nMID-HEIGHT",
+    # The clamp row's band is the MHA-SH-002 taps' (CLAMP_POSITION_BAND), so
+    # its mate stands at the dimension, not only under the hole callout.
+    "ClampRowHeight": "MHA-SH-002\nTAPS AT BAR\nMID-HEIGHT",
     "PivotTapStation": "MHA-VN-041 PIVOT",
     "BracketTapStation1": _HOOK_TAPS,
     "BracketTapStation2": _HOOK_TAPS,
@@ -143,10 +145,12 @@ DIMENSION_CALLOUTS = {
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
     # The west slots (rule 4: each band names its mate): the slots' width,
     # run and stations take up the pitch of the MHA-SH-002 clamp taps the
-    # screws land in (build_pd_support_bar.clamp_slot_closure_margin); the
-    # counterbore's width and run hold the MHA-VN-021 head
-    # (clamp_slot_head_clearance). Short lines: detail C is 2:1 in a corner.
-    "ClampSlotWidth": "THRU, TAKE UP\nMHA-SH-002 PITCH",
+    # screws land in (build_pd_support_bar.clamp_slot_closure_margin), so
+    # their limits and stations set how much they take up (the r6 machinist
+    # read "take up" as licence to loosen them); the counterbore's width and
+    # run hold the MHA-VN-021 head (clamp_slot_head_clearance). Short lines:
+    # detail C is 2:1 in a corner.
+    "ClampSlotWidth": "THRU, LIMITS AND\nSTATIONS SET THE\nMHA-SH-002 TAKE-UP",
     "ClampSlotCboreWidth": "C'BORE FOR\nMHA-VN-021",
     "ClampSlotCboreDepth": "MHA-VN-021\nHEADS BELOW\nSLIDE FACE",
 }

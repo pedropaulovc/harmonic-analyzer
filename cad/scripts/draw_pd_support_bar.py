@@ -200,7 +200,9 @@ FACE_CAPTION_TOP = (0.150, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 # that end too (the BarProfile dimension's model edge), the clamp row's height
 # off the other end, where its rise is: its text stands left of its dimension
 # line, so the line hugs the bar to keep the text inside the border (r5
-# audit: outside-border).
+# audit: outside-border). Naming the MHA-SH-002 taps makes it four lines of
+# at most 11 characters: about 18-47 mm by 97-117 mm, under its lower
+# extension line (122 mm) and left of detail C's letter (51 mm).
 BACK_KEEP = {
     "ClampStation1": (RIGHT_END + 0.019, BACK_BOTTOM - 0.010),
     "ClampStation2": (RIGHT_END + 0.019, BACK_BOTTOM - 0.018),
@@ -228,11 +230,13 @@ CAPTION_SETTLE_M = 0.0006
 
 # The west slots in the clear field under the front-face view. Detail C looks
 # face-on at the outer slot at 2:1, between section B-B and the title block:
-# the counterbore's width left of it (its text between its extension lines),
-# the slot's right, its text under the slot's lower edge on a shouldered
-# leader (inside its 4.98 span the three-line block was struck by its own
-# dimension line, r4 machinist review), the slot's travel below and the
-# counterbore's above; its label right of the slot's width. It is a cropped
+# the counterbore's width left of it, its text over the counterbore's upper
+# edge on a shouldered leader (inside its 17 mm span the three-line block
+# met its own extension line and arrow, r6 machinist review), the slot's
+# right, its text under the slot's lower edge the same way (inside its 4.98
+# span the block was struck by its own dimension line, r4), the slot's
+# travel below and the counterbore's above; its label right of the slot's
+# width. It is a cropped
 # *Back model view, dimensioned uncropped then cropped (the
 # draw_ch_amplitude_bar notch details): a model view has no native label or
 # parent circle, so its label is a note in the native label's words and its
@@ -251,32 +255,38 @@ DETAIL_LETTER = "C"
 DETAIL_LETTER_TOP = (LEFT_END - 0.004, BACK_CENTER[1] - 0.0025)  # top centre
 DETAIL_POSITION_TOL_M = 1e-4
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
-# Measured on the r4 sheet (2.65 mm a character): a kept text outside its
-# extension lines hangs beside its dimension line, centred on the keep's
-# height (ClampRowHeight, HangerRowHeight); inside them it centres on the
-# keep. The counterbore's three lines (14.6 mm) fit its 17 mm span, raised
-# by their offset under the value; the slot's (42 mm wide) stand right of
-# the travel texts and under the slot's lower edge.
+# Measured on the r4 and r6 sheets (2.55-2.65 mm a character, 5.5 mm a
+# line): a kept text outside its extension lines hangs beside its dimension
+# line, on the side away from the feature, its block centred on the keep's
+# height (ClampRowHeight, and the r6 slot width: keep 31.0, block 21.9-41.1);
+# inside them it centres on the keep. The counterbore's block (27 mm by
+# 14.7) hangs left of its line at x 78, 1.7 mm over section B-B's top face
+# and 2 mm under the 440.50 extension line's end; the slot's (46 mm by
+# 24.7) right of its line at x 132, 1 mm under the slot's lower edge.
 DETAIL_KEEP = {
-    "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.031, DETAIL_CENTER[1] + 0.0028),
-    "ClampSlotWidth": (DETAIL_CENTER[0] + 0.026, DETAIL_CENTER[1] - 0.017),
+    "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.028, DETAIL_CENTER[1] + 0.020),
+    "ClampSlotWidth": (DETAIL_CENTER[0] + 0.026, DETAIL_CENTER[1] - 0.019),
     "ClampSlotTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] - 0.020),
     "ClampSlotCboreTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] + 0.021),
 }
 # Section B-B cuts the inner slot across the bar, at 1:1 in the sheet's
-# lower-left corner: the counterbore's depth over it, its text and callout
-# outside the front face the counterbore enters, the block's shoulder over
-# the bar's top (the section A-A thickness's layout), the caption under it.
-# With the callout above the value the r4 render ran the shoulder through the
-# cut bar and out past the border, and dropped the callout; the text now
-# stands far enough off the face for the whole block to stay inside.
+# lower-left corner: the counterbore's depth with its text and callout
+# outside the front face the counterbore enters, the caption under it. The
+# depth's line runs at the bar's mid-height, through the counterbore's mouth
+# and the through slot, so neither extension line crosses the cut: over the
+# top face (r6) the floor's extension line ran up through the hatch and read
+# as a seam (its 0.13 stroke from the floor's lower corner, PDF paths). The
+# text's centre stands SLOT_DEPTH_SHELF_DROP over the line, the drop the r6
+# sheet measured from a kept four-line depth text to its shelf (72.00 to
+# 60.85), and far enough off the face for the block to clear it and the
+# border.
 SLOT_SECTION_X = min(CLAMP_SLOT_X)
-SLOT_SECTION_CENTER = (0.051, 0.045)
+SLOT_SECTION_CENTER = (0.053, 0.045)
 SLOT_SECTION_SCALE = (1, 1)
 SLOT_SECTION_CAPTION_XY = (SLOT_SECTION_CENTER[0], 0.028)  # top centre
 SLOT_SECTION_KEEP_NAMES = ("ClampSlotCboreDepth",)
-SLOT_DEPTH_RISE = 0.013
-SLOT_DEPTH_TEXT_SIDE = 0.0165
+SLOT_DEPTH_SHELF_DROP = 0.0112
+SLOT_DEPTH_TEXT_SIDE = 0.018
 
 # Section A-A: the thickness up-left of the cut bar, the full thread and the
 # drill depth below it (shorter nearer). Each text stands outside its
@@ -603,19 +613,19 @@ def _label_slot_detail(adapter: Any, detail: Any, back: Any) -> None:
 
 def _slot_section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
     """Section B-B's depth text from its own projection, whichever way the cut
-    looks: over the bar, outside the front face the counterbore enters."""
+    looks: outside the front face the counterbore enters, its line at the
+    bar's mid-height."""
 
     def point(z: float, y: float = 0.0) -> tuple[float, float]:
         return _sheet(adapter, section, (SLOT_SECTION_X, y, z), "section B-B")
 
-    top = point(0.0, BAR_HEIGHT / 2.0)[1]
-    front = point(-BAR_DEPTH / 2.0)[0]
+    front, middle = point(-BAR_DEPTH / 2.0)
     floor = point(-BAR_DEPTH / 2.0 + CLAMP_CBORE_DEPTH)[0]
     away = math.copysign(1.0, front - floor)
     return {
         "ClampSlotCboreDepth": (
             front + away * SLOT_DEPTH_TEXT_SIDE,
-            top + SLOT_DEPTH_RISE,
+            middle + SLOT_DEPTH_SHELF_DROP,
         )
     }
 
