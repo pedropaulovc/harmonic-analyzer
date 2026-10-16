@@ -140,7 +140,10 @@ DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * DETAIL_MM
 # outer edge, left of the crop circle. Its text sits this far under the boss
 # face, outside the gauge span: at 1:1 the span is shorter than the value
 # and callout, so text placed inside it prints on its own dimension line.
-ROCK_TEXT_OFFSET = 0.016
+# Outside the span SolidWorks hangs the text off a shelf to the line's
+# outboard side (r2: 35 mm wide), so the line stays close to the boss to
+# keep that text clear of the Right view.
+ROCK_TEXT_OFFSET = 0.010
 ROCK_TEXT_DROP = 0.008
 DETAIL_LABEL_GAP = 0.005
 DETAIL_LABEL_INSET = 0.040
