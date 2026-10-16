@@ -1175,6 +1175,35 @@ def _place_collapsed_view(
     return view
 
 
+_TANGENT_EDGES_VISIBLE = 2  # swDisplayTangentEdges_e.swTangentEdgesVisible
+
+
+def _show_tangent_edges(adapter: Any, view: Any, *, label: str) -> None:
+    """Draw the view's tangent edges and read the mode back.
+
+    The MHA-MG-003 lever is a capsule: a revolved rod with a hemispherical
+    dome at each end, so its only model edges are tangent ones (the dome
+    junctions and the press-zone land). With tangent edges hidden the view
+    lists none of its edges as drawn and its balloon finds no ink (r1, run
+    20261016T062016526Z-f9642112ccea4d2ab63c137a71a668ea: 0 listed visible
+    edges, no hit on its 12 body extremes).
+    """
+    bound = _early_bound(view, "IView")
+    before = int(bound.GetDisplayTangentEdges2())
+    if before != _TANGENT_EDGES_VISIBLE:
+        bound.SetDisplayTangentEdges2(_TANGENT_EDGES_VISIBLE)
+        if not adapter.currentModel.EditRebuild3():
+            raise RuntimeError(f"{label}: tangent-edge rebuild failed")
+    after = int(bound.GetDisplayTangentEdges2())
+    _telemetry.info(
+        f"{label}: tangent edges {before} -> {after}",
+        tangent_before=before,
+        tangent_after=after,
+    )
+    if after != _TANGENT_EDGES_VISIBLE:
+        raise RuntimeError(f"{label}: tangent edges read {after}, not visible")
+
+
 @_telemetry.traced("drawing.mg_magnifier_assembly")
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -1242,6 +1271,7 @@ async def build(adapter: Any) -> dict[str, str]:
         (lever, explode.LEVER_GROUP_STEMS, LEVER_LABEL),
     ):
         isolate_drawing_view_components(adapter, view, visible_stems=stems, label=label)
+    _show_tangent_edges(adapter, lever, label=LEVER_LABEL)
     # View-only isolation must leave the logical parts list alone.
     if _bom_items(_early_bound(table, "ITableAnnotation")) != items:
         raise RuntimeError("magnifier BOM items moved when the exploded views were isolated")
