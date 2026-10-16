@@ -613,7 +613,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "ms_stop_block",  # MHA-MS-002: #4-40 UNC-2B tapped through the floor (receiver of vn_thumb_screw) + 2x #2-56 UNC blind taps (receiver of vn_ms_stop_plate_screw)
         "vn_ms_stop_plate_screw",  # #2-56 x 1/4 brass fillister (McMaster 90114A124, MHA-VN-054), member: 2 into ms_stop_block through the cover plate
         "mg_output_fixture",  # #4-40 UNC axial tap from the spigot face into the rod bore (mg_output_fixture_spec.TAP_SPEC), receiver of the 2nd thumb_screw
-        "vn_pedestal_hold_down_screw",  # #8-32 x 3/4 fillister (90280A197, MHA-VN-032), member: 2 arbor-pedestal seats in harmonic_base, 2 pivot-bracket seats in rocker_arm_support
+        "vn_pedestal_hold_down_screw",  # #8-32 x 3/4 fillister (90280A197, MHA-VN-032), member: 2 arbor-pedestal seats in harmonic_base
+        "vn_bracket_hold_down_screw",  # #8-32 x 5/8 fillister (90280A196, MHA-VN-071), member: 2 pivot-bracket seats in rocker_arm_support
         "pn_pen_frame",  # #4-40 UNC-2B tapped hole up through the bottom rail, receiver of pen_set_screw
         "vn_pen_hanger_jam_nut",  # McMaster 90760A009 thin #8-32 hex nut (MHA-VN-064), member: jammed against the hanger nut on hanger_screw
         "vn_pen_hanger_nut",  # McMaster 90480A009 #8-32 hex nut (MHA-VN-063), receiver of hanger_screw on the strap front
@@ -1303,7 +1304,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="ha-harmonic-analyzer/north-pivot-bracket-hold-down",
         assembly="ha_harmonic_analyzer",
-        member="vn_pedestal_hold_down_screw",
+        member="vn_bracket_hold_down_screw",
         receiver="fr_rocker_arm_support",
         thread="#8-32",
         quantity=1,
@@ -1323,19 +1324,19 @@ JOINTS: tuple[Joint, ...] = (
         lock_binds=(),
         lock_step="",
         evidence=(
-            "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header (MHA-VN-032, #8-32 x 3/4 fillister, one per foot); "
-            "vn_pedestal_hold_down_screw_spec.THREAD; rocker_bracket_seat_layout.SEAT_SPEC (tapped_bottoming #8-32 2B); "
+            "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header (MHA-VN-071, #8-32 x 5/8 fillister, one per foot); "
+            "vn_bracket_hold_down_screw_spec.THREAD; rocker_bracket_seat_layout.SEAT_SPEC (tapped_bottoming #8-32 2B); "
             "draw_dt_drive_train_assembly.py BANK_STEPS step north-pivot-bracket-set (MHA-DT-000 STEP 10: 'DRILL AND TAP THE RAIL "
             "THROUGH ITS FOOT ... SCREW IT DOWN AND RECHECK Y'), left screwed down while draw_ch_channel_assembly.py step "
             "north-ear-datum pushes the plain shaft south through the ear; "
             "ch_channel_assembly_steps.NORTH_BRACKET_SET_REF; "
-            "config parts/vn-pedestal-hold-down-screw.yaml (90280A197)"
+            "config parts/vn-bracket-hold-down-screw.yaml (90280A196)"
         ),
     ),
     Joint(
         id="ha-harmonic-analyzer/south-pivot-bracket-hold-down",
         assembly="ha_harmonic_analyzer",
-        member="vn_pedestal_hold_down_screw",
+        member="vn_bracket_hold_down_screw",
         receiver="fr_rocker_arm_support",
         thread="#8-32",
         quantity=1,

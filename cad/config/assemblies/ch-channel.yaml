@@ -36,13 +36,13 @@ flip_invert:
   - ch pivot bracket datum y
   - ch pivot bracket datum z
   - ch pivot bracket datum y @npn
-  # #743 PR2: the channel's datum-located MHA-VN-032 bracket hold-downs,
+  # #743 PR2: the channel's datum-located MHA-VN-071 bracket hold-downs,
   # inserted IDENTITY like the brackets whose x/y/z seeds they share
   # (r743-4D: the channel build's first MISS was the washer's x; the
   # hold-downs follow it in the same datum-locate loop).
-  - vn pedestal hold down screw datum x
-  - vn pedestal hold down screw datum y
-  - vn pedestal hold down screw datum z
+  - vn bracket hold down screw datum x
+  - vn bracket hold down screw datum y
+  - vn bracket hold down screw datum z
   # #743 PR2: the MHA-CH-009 thrust washers (north and south, user
   # 2026-10-10), datum-located IDENTITY like the pivot brackets (r743-4D
   # flip-seed MISS on its x); both share the one canonical signature.

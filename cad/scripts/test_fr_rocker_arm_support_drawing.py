@@ -29,15 +29,15 @@ import vn_lag_screw_spec as screw
 
 def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
     locations = {
-        "TaperRun",
         "CavityEndStation",
         "CavityTopStation",
         "PocketEndStation",
         "WebFaceStation",
+        "TopFlatMinusZStation",
+        "TopFlatPlusZStation",
     }
     expected = {
         "FootSpan",
-        "TopSpan",
         "WallHeight",
         "Depth",
         "WinWidth",
@@ -61,6 +61,7 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "RimChamferSize": RIM_CHAMFER_CALLOUT,
         "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
         "PocketEndStation": "BOTH SIDES",
+        "TopFlatPlusZStation": "CENTERS MHA-CH-008\nSEAT TAPS IN WEB",
     }
     part_owned = {
         "PocketFloorRadius",
@@ -480,12 +481,12 @@ def test_window_is_the_source_square_with_rails_as_deep_as_the_foot() -> None:
 
 
 def test_web_volume_deltas_are_the_closed_forms() -> None:
-    """The source casting's native targets plus the 9.525 web's deltas and
+    """The source casting's native targets plus the 12.70 web's deltas and
     the longer wall's (180.5 for the source's 177.8): the window and cavity
     cut inside the side posts, so every stage gains the trapezoid's area
     times the added length."""
     growth = support.WEB - support.SOURCE_WEB
-    assert growth == pytest.approx(1.5875)
+    assert growth == pytest.approx(3.175)
     assert support.BOSS_DEPTH == pytest.approx(2.0 * placement.SUPPORT_HALF_MACHINE_Z)
     assert support.SOURCE_BOSS_DEPTH == 177.8
     wall = (
@@ -540,8 +541,8 @@ def test_pocket_floor_fillet_is_the_printed_max_and_its_volume_closed_form() -> 
     assert support.POCKET_FLOOR_R_TOL_TYPE == 6
     assert f"{support.POCKET_FLOOR_R_MAX:.{support.POCKET_FLOOR_R_PLACES}f}" == "0.8"
     # One edge per pocket, on the top rail's floor corner, +Z first (its
-    # size lands there: the section's upper right, the left lane carrying
-    # TaperRun's extension line).
+    # size lands there: the section's upper right, under the top flat's +Z
+    # station).
     assert support.POCKET_FLOOR_FILLET_EDGES == [
         [0.0, support.BIG, support.WEB],
         [0.0, support.BIG, -support.WEB],
@@ -582,9 +583,9 @@ def test_bracket_seats_sit_under_the_bracket_holes() -> None:
 
     assert seats.SEAT_SPEC.kind == "tapped_bottoming"
     assert seats.SEAT_SPEC.size == seats.SCREW_THREAD == "#8-32"
-    assert seats.SEAT_SPEC.depth_mm == seats.SEAT_DRILL_DEPTH == 18.0
+    assert seats.SEAT_SPEC.depth_mm == seats.SEAT_DRILL_DEPTH == 14.7
     assert seats.SEAT_SPEC.overrides_mm == {"ThreadDepth": seats.SEAT_THREAD_DEPTH}
-    assert seats.SEAT_THREAD_DEPTH == 14.7
+    assert seats.SEAT_THREAD_DEPTH == 11.5
     assert len(seats.SEAT_MACHINE_XZ) == len(sides.SIDES) == 2
     assert [z for _, z in seats.SEAT_MACHINE_XZ] == pytest.approx(
         [
@@ -600,9 +601,9 @@ def test_bracket_seats_sit_under_the_bracket_holes() -> None:
 
 
 def test_bracket_screw_stack_holds_at_the_printed_worst_case() -> None:
-    # MHA-VN-032 #8-32 x 3/4 through MHA-CH-008's 6.0 (.XX) foot.
-    assert seats.SCREW_REACH_MIN == pytest.approx(19.05 - 0.76 - 6.508)
-    assert seats.SCREW_REACH_MAX == pytest.approx(19.05 - 5.492)
+    # MHA-VN-071 #8-32 x 5/8 through MHA-CH-008's 6.0 (.XX) foot (owner Q13c).
+    assert seats.SCREW_REACH_MIN == pytest.approx(15.875 - 0.76 - 6.508)
+    assert seats.SCREW_REACH_MAX == pytest.approx(15.875 - 5.492)
     assert seats.ENGAGEMENT_MIN >= 1.5 * seats.SCREW_MAJOR_DIA
     assert seats.SEAT_THREAD_DEPTH - 0.8 >= seats.SCREW_REACH_MAX + 0.25
     assert seats.SEAT_DRILL_DEPTH - 0.8 >= seats.SEAT_THREAD_DEPTH + 0.8 + 2 * 25.4 / 32
@@ -711,7 +712,8 @@ def _imported(name: str, places: int) -> SimpleNamespace:
         "RimChamferSize",
         "SeatEastStation",
         "SeatWestStation",
-        "TaperRun",
+        "TopFlatMinusZStation",
+        "TopFlatPlusZStation",
         "CavityEndStation",
         "CavityTopStation",
         "PocketEndStation",
@@ -731,7 +733,6 @@ def test_part_owned_places_are_the_parts_and_the_sheet_reads_them_back(
     import _drawing_dimensions
 
     assert support.DRAWING_PRECISION == {
-        "WallProfile": {"TaperRun": support.SECTION_LOCATION_PLACES},
         "PocketFloorFillet": {"PocketFloorRadius": support.POCKET_FLOOR_R_PLACES},
         "RimChamfer": {"RimChamferSize": support.RIM_CHAMFER_PLACES},
         "SeatStationReference": {
@@ -743,7 +744,11 @@ def test_part_owned_places_are_the_parts_and_the_sheet_reads_them_back(
             "CavityTopStation": support.CAVITY_LOCATION_PLACES,
             "PocketEndStation": support.POCKET_END_PLACES,
         },
-        "WebLocationReference": {"WebFaceStation": support.SECTION_LOCATION_PLACES},
+        "WebLocationReference": {
+            "WebFaceStation": support.SECTION_LOCATION_PLACES,
+            "TopFlatMinusZStation": seats.TOP_FLAT_PLACES,
+            "TopFlatPlusZStation": seats.TOP_FLAT_PLACES,
+        },
     }
     assert (
         support.POCKET_FLOOR_R_PLACES,
@@ -752,7 +757,8 @@ def test_part_owned_places_are_the_parts_and_the_sheet_reads_them_back(
         support.CAVITY_LOCATION_PLACES,
         support.POCKET_END_PLACES,
         support.SECTION_LOCATION_PLACES,
-    ) == (1, 1, 2, 1, 2, 2)
+        seats.TOP_FLAT_PLACES,
+    ) == (1, 1, 2, 1, 2, 2, 3)
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in inspect.getsource(
         support.build
     )
@@ -928,7 +934,10 @@ def _record_location_sketch(monkeypatch: pytest.MonkeyPatch, sketch_builder) -> 
         emitted.append((ref1, ref2, kind, value))
 
     async def anchor(_adapter, ref, x, y, _label) -> None:
-        assert x != 0.0 and y != 0.0  # the general case: two dimensions
+        assert y != 0.0
+        if x == 0.0:  # on the vertical axis: a relation and one dimension
+            emitted.append(("origin", ref, "y", y))
+            return
         emitted.extend([("origin", ref, "x", x), ("origin", ref, "y", y)])
 
     async def nothing(*_args: object) -> None:
@@ -939,6 +948,7 @@ def _record_location_sketch(monkeypatch: pytest.MonkeyPatch, sketch_builder) -> 
     monkeypatch.setattr(support, "ensure_fully_defined", nothing)
     ok = SimpleNamespace(is_success=True, data=None)
     relations: dict[str, str] = {}
+    point_relations: list[tuple[str, str]] = []
 
     class Adapter:
         _sketch_entities = defaultdict(
@@ -954,7 +964,10 @@ def _record_location_sketch(monkeypatch: pytest.MonkeyPatch, sketch_builder) -> 
             return SimpleNamespace(is_success=True, data=line)
 
         async def add_sketch_constraint(self, line, other, relation) -> SimpleNamespace:
-            assert other is None
+            if other is not None:
+                assert relation == "horizontal_points"
+                point_relations.append((line, other))
+                return ok
             relations[line] = relation
             return ok
 
@@ -985,6 +998,8 @@ def _record_location_sketch(monkeypatch: pytest.MonkeyPatch, sketch_builder) -> 
         b = (0.0, 0.0) if ref2 == "origin" else point(ref2)
         axis = 0 if kind == "horizontal_distance" else 1
         assert abs(a[axis] - b[axis]) == pytest.approx(value)
+    for ref1, ref2 in point_relations:
+        assert point(ref1)[1] == pytest.approx(point(ref2)[1])
     return chords, dims, jobs
 
 
@@ -997,7 +1012,7 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
 ) -> None:
     """PR #1469 r4 machinist review (blockers): the 127.0 SQ cavity and the
     165.1 SQ pockets printed with no location, and section A-A placed neither
-    the 9.53 web nor the 16.9 top face across the 63.5 base. Owner ruling
+    the 9.53 web nor the top face across the 63.5 base. Owner ruling
     (rule 10): dimension from a real feature. Each location spans two
     construction chords lying on edges their view draws, prints its value at
     the part's places, and its drive keeps it on its features for any edit."""
@@ -1027,8 +1042,14 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
             assert abs(chord_point[1 - axis]) <= run
     # Right plane (-Z, Y): along the base from its -Z edge, and up the web's
     # -Z face between the pocket floor's fillet and the cavity's rim chamfer,
-    # clear of where the drawing picks the web for its 9.53.
-    assert set(right_chords) == {"BaseChord", "WebChord"}
+    # clear of where the drawing picks the web for its 12.70.
+    assert set(right_chords) == {
+        "BaseChord",
+        "WebChord",
+        "WebCentreChord",
+        "TopFlatMinusZStationChord",
+        "TopFlatPlusZStationChord",
+    }
     base, web = right_chords["BaseChord"], right_chords["WebChord"]
     assert base[0] == (support.WIDE, -support.HALF_Y)
     assert base[1][1] == -support.HALF_Y and base[1][0] < support.WIDE
@@ -1038,12 +1059,32 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         assert -(support.BIG - support.POCKET_FLOOR_R_MAX) < y
         assert y < -(support.CAV + support.CHAMFER)
         assert abs(y - web_pick_y) > 2.0
+    # Owner Q13-B: the web's centre chord down the section's centreline from
+    # the top face's middle, and each flat chord in along the top face from
+    # its edge, short of the flat's middle.
+    centre = right_chords["WebCentreChord"]
+    assert centre[0] == (0.0, support.HALF_Y)
+    assert centre[1][0] == 0.0 and centre[1][1] < support.HALF_Y
+    for name, u in support.TOP_FLAT_STATIONS.items():
+        start, end = right_chords[f"{name}Chord"]
+        assert start == (u, support.HALF_Y) and end[1] == support.HALF_Y
+        assert 0.0 < abs(end[0]) < abs(u) == support.NARROW
     # Each location runs from the face chord's start to its feature chord's.
     spans = {
         "CavityEndStation": (front_dims, "EndChord", "CavitySideChord"),
         "PocketEndStation": (front_dims, "EndChord", "PocketSideChord"),
         "CavityTopStation": (front_dims, "TopChord", "CavityTopChord"),
         "WebFaceStation": (right_dims, "BaseChord", "WebChord"),
+        "TopFlatMinusZStation": (
+            right_dims,
+            "WebCentreChord",
+            "TopFlatMinusZStationChord",
+        ),
+        "TopFlatPlusZStation": (
+            right_dims,
+            "WebCentreChord",
+            "TopFlatPlusZStationChord",
+        ),
     }
     for name, (dims, face, feature) in spans.items():
         ref1, ref2, _kind, _value = dims[name]
@@ -1065,12 +1106,10 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         "CavityEndStation": "26.7",
         "PocketEndStation": "7.70",
         "CavityTopStation": "25.4",
-        "WebFaceStation": "26.99",
+        "WebFaceStation": "25.40",
+        "TopFlatMinusZStation": "8.467",
+        "TopFlatPlusZStation": "8.467",
     }
-    # TaperRun (WallProfile) already spans the base's -Z edge to the top
-    # face's: the section prints it for the top face.
-    taper = support.WIDE - support.NARROW
-    assert f"{taper:.{drawing.PART_PRECISION['TaperRun']}f}" == "23.28"
 
     nominal = {
         "WallWidth": support.BOSS_DEPTH,
@@ -1078,6 +1117,7 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         "CavHalf": support.CAV,
         "WindowOuter": support.BIG,
         "FootHalf": support.WIDE,
+        "TopHalf": support.NARROW,
     }
     jobs = {
         **{name.split("@")[0]: drive for name, drive in front_jobs.items()},
@@ -1089,7 +1129,14 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
     }
     assert set(right_jobs) == {
         f"{name}@WebLocationReference"
-        for name in ("BaseChordZ", "BaseChordY", "WebFaceStation")
+        for name in (
+            "BaseChordZ",
+            "BaseChordY",
+            "WebFaceStation",
+            "WebCentreChordY",
+            "TopFlatMinusZStation",
+            "TopFlatPlusZStation",
+        )
     }
     for edit in (
         {},
@@ -1097,6 +1144,7 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         {"HalfHeight": 90.0, "CavHalf": 60.0},
         {"WindowOuter": 80.0},
         {"FootHalf": 33.0},
+        {"TopHalf": 9.0},
     ):
         values = {**nominal, **edit}
         expected = {
@@ -1109,6 +1157,9 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
             "BaseChordY": values["HalfHeight"],
             # The window cuts start WEB off the centre plane: no global.
             "WebFaceStation": values["FootHalf"] - support.WEB,
+            "WebCentreChordY": values["HalfHeight"],
+            "TopFlatMinusZStation": values["TopHalf"],
+            "TopFlatPlusZStation": values["TopHalf"],
         }
         assert {
             name: _evaluate_drive(drive, values) for name, drive in jobs.items()
@@ -1150,8 +1201,8 @@ def test_pocket_floor_radius_text_stands_right_of_the_section_level_with_its_cor
     None
 ):
     """The R0.8 MAX lands on its first edge, the +Z pocket's floor corner:
-    the section's upper right. The left lane carries the base edge's
-    extension line up to TaperRun (PR #1469 r4 review)."""
+    the section's upper right, under the top flat's +Z station and its
+    reason rows (PR #1469 r4 review; owner Q13-B)."""
     scale = drawing.VIEW_SCALE / 1000
     assert support.POCKET_FLOOR_FILLET_EDGES[0] == [0.0, support.BIG, support.WEB]
     radius = _text_box(
@@ -1166,9 +1217,9 @@ def test_pocket_floor_radius_text_stands_right_of_the_section_level_with_its_cor
         assert radius[0] > wall_x + 0.002
     assert radius[2] < drawing.RIGHT_KEEP["WallHeight"][0] - 0.002
     for other in (
-        _text_box("16.9", drawing.RIGHT_KEEP["TopSpan"]),
+        _text_box(FLAT_PLUS_TEXT, drawing.RIGHT_KEEP["TopFlatPlusZStation"]),
         _text_box("177.8", drawing.RIGHT_KEEP["WallHeight"]),
-        _text_box("9.53", drawing.WEB_TEXT_XY),
+        _text_box("12.70", drawing.WEB_TEXT_XY),
     ):
         assert _boxes_clear(radius, other, 0.003)
     # The text is level with the upper floor corner its leader lands on.
@@ -1176,9 +1227,12 @@ def test_pocket_floor_radius_text_stands_right_of_the_section_level_with_its_cor
     assert radius[1] < corner_y < radius[3] + 0.003
 
 
+FLAT_PLUS_TEXT = "8.467\nCENTERS MHA-CH-008\nSEAT TAPS IN WEB"
+
+
 def test_section_locations_stand_off_the_section_and_its_texts() -> None:
-    """TaperRun's row stands above the 16.9's, which prints right of its span
-    off TaperRun's top-face extension line; WebFaceStation's row stands
+    """The top flat's two edges print on one row above the section, each
+    text outboard of its own edge (owner Q13-B); WebFaceStation's row stands
     between the base and the 63.5, whose text sits right of the web face's
     extension line; the front view's locations clear its other texts."""
     scale = drawing.VIEW_SCALE / 1000
@@ -1187,12 +1241,14 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     top_right = centre_x + support.NARROW * scale
     base_left = centre_x - support.WIDE * scale
     web_left = centre_x - support.WEB * scale
-    taper = _text_box("23.28", drawing.RIGHT_KEEP["TaperRun"])
-    top_span = _text_box("16.9", drawing.RIGHT_KEEP["TopSpan"])
-    assert top_span[0] > top_right and top_span[0] > top_left + 0.003
+    section_top = centre_y + support.HALF_Y * scale
+    taper = _text_box("8.467", drawing.RIGHT_KEEP["TopFlatMinusZStation"])
+    top_span = _text_box(FLAT_PLUS_TEXT, drawing.RIGHT_KEEP["TopFlatPlusZStation"])
+    assert taper[2] < top_left - 0.002
+    assert top_span[0] > top_right + 0.002
+    assert min(taper[1], top_span[1]) > section_top + 0.002
     assert _boxes_clear(taper, top_span, 0.003)
-    assert taper[1] > top_span[3]
-    web_face = _text_box("26.99", drawing.RIGHT_KEEP["WebFaceStation"])
+    web_face = _text_box("25.40", drawing.RIGHT_KEEP["WebFaceStation"])
     foot = _text_box("63.5", drawing.RIGHT_KEEP["FootSpan"])
     assert web_face[3] < centre_y - support.HALF_Y * scale
     assert foot[0] > web_left + 0.003
@@ -1428,7 +1484,7 @@ def test_cavity_radius_callout_sits_on_its_corner_bisector_outside_the_view() ->
     front_right = drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2 * scale
     assert label[0] > front_right + 0.003
     for other in (
-        _text_box("16.9", drawing.RIGHT_KEEP["TopSpan"]),
+        _text_box("8.467", drawing.RIGHT_KEEP["TopFlatMinusZStation"]),
         _rim_chamfer_box(),
         _text_box("177.8", drawing.FRONT_KEEP["Depth"]),
     ):

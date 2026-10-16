@@ -42,13 +42,13 @@ Z = wall thickness):
 * **WindowCut1 / WindowCut2** -- ONE shared 165.1 mm window square
   (``WindowProfile``, ``±82.55``), so the top rail is the source's 6.35, as
   deep as the side posts and the foot. Each cut is a Through-All that STARTS
-  ``WEB`` (4.7625) off the sketch plane in the opposite direction (forward /
+  ``WEB`` (6.35) off the sketch plane in the opposite direction (forward /
   reverse, the second re-selecting ``WindowProfile`` -> a shared-sketch
   reference), so the 2*WEB band between them survives as the central web --
   the source's ``FromOffsetDistance`` / ``ReverseDirection`` pair, reproducing
-  the two-sketches-feed-three-cuts tree. The web is 9.525 (3/8 in), up from
-  the source's 6.35, to carry the bracket seats (user-approved sketch,
-  2026-10-09).
+  the two-sketches-feed-three-cuts tree. The web is 12.70 (1/2 in), uniform
+  along the length and symmetric about the centre plane, up from the source's
+  6.35, to carry the bracket seats (owner Q13c, 2026-10-16).
 * **CornerFillet** -- R12.7 on the four cavity corner edges.
 * **PocketCornerFillet** -- R6.35 on the four corners of each opposed pocket.
 * **PocketFloorFillet** -- R0.8 around each pocket's floor-to-wall corner,
@@ -137,7 +137,13 @@ from fr_rocker_arm_support_section_spec import (
     WIDE,
 )
 from fr_rocker_arm_support_spec import HOLE_DIA, HOLE_SPEC, SUPPORT_HALF_MACHINE_Z
-from rocker_bracket_seat_layout import SEAT_LOCAL_X, SEAT_SPEC, WEB, WEB_PLACES
+from rocker_bracket_seat_layout import (
+    SEAT_LOCAL_X,
+    SEAT_SPEC,
+    TOP_FLAT_PLACES,
+    WEB,
+    WEB_PLACES,
+)
 
 PART_NAME = "fr-rocker-arm-support"
 # The source repro was authored in steel, but this casting is now the machine's
@@ -208,7 +214,7 @@ SQUARE_WINDOW_CUT2_VOLUME = 245_806
 SQUARE_CORNER_FILLET_VOLUME = 246_685
 SQUARE_POCKET_FILLET_VOLUME = 247_860
 SQUARE_RIM_CHAMFER_REMOVAL = 3_153
-WEB_GROWTH = WEB - SOURCE_WEB  # 1.5875
+WEB_GROWTH = WEB - SOURCE_WEB  # 3.175
 WINDOW_NET_AREA = (2.0 * BIG) ** 2 - (2.0 * CAV) ** 2
 WEB_BAND_VOLUME = WINDOW_NET_AREA * WEB_GROWTH  # left per window cut
 CORNER_FILLET_GROWTH = 4.0 * (1.0 - math.pi / 4.0) * FILLET_R**2 * 2.0 * WEB_GROWTH
@@ -245,9 +251,8 @@ POCKET_FLOOR_R_BAND = (0.0, -POCKET_FLOOR_R_MAX)  # (upper, lower)
 POCKET_FLOOR_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.8 MAX"
 POCKET_FLOOR_R_PLACES = 1
 # One point per pocket on its top-rail floor edge (Z = +WEB first: its size
-# lands on that corner, the section's upper-right, clear of the base edge's
-# extension line the section's TaperRun rises on at its left); tangent
-# propagation takes the rest of each loop.
+# lands on that corner, the section's upper-right, under the top flat's +Z
+# station's text); tangent propagation takes the rest of each loop.
 POCKET_FLOOR_FILLET_EDGES = [[0.0, BIG, WEB], [0.0, BIG, -WEB]]
 _FLOOR_SPANDREL = (1.0 - math.pi / 4.0) * POCKET_FLOOR_R_MAX**2
 _FLOOR_CENTROID = POCKET_FLOOR_R_MAX * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
@@ -266,7 +271,9 @@ HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
 # The manufacturing print's dimension set (draw_fr_rocker_arm_support.py imports
 # exactly these marked dimensions; its keep maps must stay in lockstep).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "WallProfile": {"FootSpan", "TaperRun", "TopSpan", "WallHeight"},
+    # The top flat prints from the web's centre plane (WebLocationReference,
+    # owner Q13-B), so the profile's TaperRun and TopSpan stay off the print.
+    "WallProfile": {"FootSpan", "WallHeight"},
     "Wall": {"Depth"},
     # A single associative size plus an SQ callout defines each square.
     "WindowProfile": {"WinWidth"},
@@ -281,7 +288,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "CavityTopStation",
         "PocketEndStation",
     },
-    "WebLocationReference": {"WebFaceStation"},
+    "WebLocationReference": {
+        "WebFaceStation",
+        "TopFlatMinusZStation",
+        "TopFlatPlusZStation",
+    },
 }
 
 # Decimal places the PART owns (drawing-simplicity-policy.md: the model owns
@@ -294,15 +305,16 @@ RIM_CHAMFER_PLACES = 1
 # (rocker_bracket_seat_layout's 5.39 / 7.00 end walls).
 SEAT_STATION_PLACES = 2
 # The cavity's locations print at the .X band (a through lightening cut); the
-# pocket's 7.70 at two places, its value; the web's and the top face's
-# locations across the base at the web thickness's own places (PR #1469 r4
-# machinist review; Main's ruling: routine .XX bands, the seat-on-web lateral
-# stack is #1569's).
+# pocket's 7.70 at two places, its value; the web's location across the base
+# at the web thickness's own places (PR #1469 r4 machinist review; Main's
+# ruling: routine .XX bands). The top flat's edges print off the web's centre
+# plane at .XXX: the bracket feet stand on the flat and the transferred seats
+# follow them, so the flat holds the seats' threads central in the web
+# (owner Q13-B, rocker_bracket_seat_layout's web-wall stack).
 CAVITY_LOCATION_PLACES = 1
 POCKET_END_PLACES = 2
 SECTION_LOCATION_PLACES = WEB_PLACES
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "WallProfile": {"TaperRun": SECTION_LOCATION_PLACES},
     "PocketFloorFillet": {"PocketFloorRadius": POCKET_FLOOR_R_PLACES},
     "RimChamfer": {"RimChamferSize": RIM_CHAMFER_PLACES},
     "SeatStationReference": {
@@ -314,7 +326,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "CavityTopStation": CAVITY_LOCATION_PLACES,
         "PocketEndStation": POCKET_END_PLACES,
     },
-    "WebLocationReference": {"WebFaceStation": SECTION_LOCATION_PLACES},
+    "WebLocationReference": {
+        "WebFaceStation": SECTION_LOCATION_PLACES,
+        "TopFlatMinusZStation": TOP_FLAT_PLACES,
+        "TopFlatPlusZStation": TOP_FLAT_PLACES,
+    },
 }
 
 # The seats' REF stations (r7 machinist review: the seats print with no
@@ -382,15 +398,16 @@ SEAT_STATION_DRIVES = {
 # review: the 127.0 SQ cavity and the 165.1 SQ pockets printed with no
 # position, and section A-A placed neither the 9.53 web nor the 16.9 top
 # face across the 63.5 base; owner ruling 2026-10-16, rule 10: dimension
-# from a real feature). TaperRun@WallProfile already runs from the base's -Z
-# edge to the top face's, so section A-A prints it for the top face; nothing
-# models the rest, so two blanked reference sketches do, each printed
-# location one driving dimension:
+# from a real feature); nothing models them, so two blanked reference
+# sketches do, each printed location one driving dimension:
 # * CavityLocationReference (Front plane, sketch (u, v) = model (X, Y)): the
 #   -X end face to the cavity's and to the pocket's side wall, and the top
 #   face down to the cavity's top wall;
 # * WebLocationReference (Right plane, sketch (u, v) = model (-Z, Y)): the
-#   base's -Z edge to the web's -Z face.
+#   base's -Z edge to the web's -Z face, and the web's centre plane out to
+#   each edge of the top flat (owner Q13-B, 2026-10-16: the flat's edges, not
+#   TaperRun@WallProfile off the base, so the seats' feet stand central on
+#   the web).
 # A shown reference sketch prints, so each is short construction chords
 # lying on lines its view draws (build_fr_nameplate's FaceReference idiom),
 # and each location spans two chords' starts. The locations and the chords'
@@ -399,18 +416,29 @@ SEAT_STATION_DRIVES = {
 # sits along its line is unprinted: REFERENCE_EDGE_STATION off a corner, or
 # that far into a cavity or pocket wall's straight run past its corner
 # radius. The web chord stands REFERENCE_CHORD above the pocket floor's
-# fillet, below where the drawing picks the web's faces for its 9.53.
+# fillet, below where the drawing picks the web's faces for its 9.53; the
+# web's centre chord runs down from the top face's middle on the section's
+# web centreline, and each flat chord runs in along the top face from its
+# edge (the profile's sharp, under the rim chamfer).
 REFERENCE_CHORD = 1.0
 REFERENCE_EDGE_STATION = 5.0
 CAVITY_END_STATION = BOSS_DEPTH / 2.0 - CAV  # 26.75, printed 26.7
 CAVITY_TOP_STATION = HALF_Y - CAV  # 25.4
 POCKET_END_STATION = BOSS_DEPTH / 2.0 - BIG  # 7.70
-WEB_FACE_STATION = WIDE - WEB  # 26.99
+WEB_FACE_STATION = WIDE - WEB  # 25.40
 LOCATION_DRIVES = {
     "CavityEndStation": f'{END_FACE_DRIVE} - "CavHalf"',
     "CavityTopStation": '"HalfHeight" - "CavHalf"',
     "PocketEndStation": f'{END_FACE_DRIVE} - "WindowOuter"',
     "WebFaceStation": f'"FootHalf" - {WEB}mm',
+    "TopFlatMinusZStation": '"TopHalf"',
+    "TopFlatPlusZStation": '"TopHalf"',
+}
+# Sketch u of each flat edge's chord start (u = model -Z), the centre chord
+# on u = 0.
+TOP_FLAT_STATIONS = {
+    "TopFlatMinusZStation": NARROW,
+    "TopFlatPlusZStation": -NARROW,
 }
 
 # PocketFloorFillet volume minus four through clearance drills.
@@ -711,11 +739,15 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
     """WebLocationReference on the Right plane, section A-A's cutting plane,
     sketch (u, v) = model (-Z, Y); returns the drive jobs.
 
-    Chords along the base from its -Z edge (the sharp the 63.5 and TaperRun
-    measure from too) and up the web's -Z face from REFERENCE_CHORD above
-    the pocket floor's fillet; WebFaceStation spans their starts. 2 x 4 DOF
-    less: the base chord's anchored start (2), two square relations and
-    lengths (4), the location and the web chord's height (2) = 0.
+    Chords along the base from its -Z edge (the sharp the 63.5 measures from
+    too) and up the web's -Z face from REFERENCE_CHORD above the pocket
+    floor's fillet; WebFaceStation spans their starts. A chord down the web's
+    centre plane from the top face's middle, and one in along the top face
+    from each flat edge; each TopFlat*Station spans the centre chord's start
+    to that edge's. 5 x 4 DOF less: the base and centre chords' anchored
+    starts (4), five square relations and lengths (10), the web location and
+    the web chord's height (2), each flat chord's top-face relation and
+    station (4) = 0.
     """
     sketch = REFERENCE_SKETCHES[2]
     dims = SketchDims()
@@ -758,6 +790,47 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
         "vertical_distance",
         -web_y,
     )
+    # The web's centre plane, up from the top face's middle on section A-A's
+    # web centreline, and the top flat's two edges off it (owner Q13-B).
+    centre = await _reference_chord(
+        adapter,
+        sketch,
+        dims,
+        "WebCentreChord",
+        (0.0, HALF_Y),
+        (0.0, HALF_Y - REFERENCE_CHORD),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{centre}.start", 0.0, HALF_Y, f"{sketch} web centre chord"
+    )
+    dims.record("WebCentreChordY", '"HalfHeight"')
+    for name, u in TOP_FLAT_STATIONS.items():
+        inward = -math.copysign(REFERENCE_CHORD, u)
+        flat = await _reference_chord(
+            adapter,
+            sketch,
+            dims,
+            f"{name}Chord",
+            (u, HALF_Y),
+            (u + inward, HALF_Y),
+        )
+        check(
+            f"{sketch} {name} chord on the top face",
+            await adapter.add_sketch_constraint(
+                f"{flat}.start", f"{centre}.start", "horizontal_points"
+            ),
+        )
+        await _location(
+            adapter,
+            sketch,
+            dims,
+            name,
+            f"{centre}.start",
+            f"{flat}.start",
+            "horizontal_distance",
+            abs(u),
+            LOCATION_DRIVES[name],
+        )
     await ensure_fully_defined(adapter, f"{sketch} sketch")
     check(f"exit_sketch {sketch}", await adapter.exit_sketch())
     name_last_feature(adapter, sketch)
@@ -957,7 +1030,7 @@ async def build(adapter) -> dict[str, str]:
     # matching the source's segment set:
     #   * WindowProfile -- the 165.1 mm window square. WindowCut1 and WindowCut2
     #     BOTH consume this ONE sketch (the second re-selects it -> a shared-sketch
-    #     reference), each a Through-All cut that STARTS WEB (4.7625) off the
+    #     reference), each a Through-All cut that STARTS WEB (6.35) off the
     #     sketch plane in the opposite direction, so the 2*WEB band between them
     #     survives as the central web -- the source's FromOffsetDistance/
     #     ReverseDirection pair, not a sketch gap. The square drives off

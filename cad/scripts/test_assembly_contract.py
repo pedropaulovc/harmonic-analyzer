@@ -310,7 +310,7 @@ def test_seed_flip_reads_only_the_active_assembly(fresh_seed_state):
         "ch-fulcrum-shaft",
         "vn-fulcrum-set-screw",
         "ch-pivot-bracket",
-        "vn-pedestal-hold-down-screw",
+        "vn-bracket-hold-down-screw",
         "ch-rocker-thrust-washer",
         "vn-rocker-bank-spring",
         "vn-arbor-set-screw",

@@ -26,7 +26,7 @@ the M6.8 mirror layer is gone).
   in mid-air); since the 2026-10-09 sketch both feet run OUTBOARD, and one
   MHA-CH-008 serves both sides, flush with the south support end face and
   short of the north one, #1341) +
-  pedestal-hold-down-screw x2 (MHA-VN-032, one down through each foot into
+  bracket-hold-down-screw x2 (MHA-VN-071, one down through each foot into
   the support's transferred #8-32 seat -- rocker_bracket_seat_layout) +
   vn-arbor-set-screw x2 (MHA-VN-034, one down through each MHA-CH-008 ear's
   apex onto the shaft's flat)
@@ -467,15 +467,15 @@ SET_SCREW_PROUD = SET_SCREW_TIP_Y + _SET_SCREW_LEN - (
 SET_SCREW_PROUD_INSTALLED = SET_SCREW_PROUD - SET_SCREW_SHAFT_DROP
 if min(_bracket_spec.SET_SCREW_WALLS_MIN.values()) <= 0.0:
     raise AssertionError("an apex set screw breaks out of its ear's faces")
-# Bracket hold-downs (#743 PR2): one MHA-VN-032 (#8-32 x 3/4 fillister) per
-# bracket, through its #8 close-clearance foot hole into the support's
+# Bracket hold-downs (#743 PR2): one MHA-VN-071 (#8-32 x 5/8 fillister, owner
+# Q13c) per bracket, through its #8 close-clearance foot hole into the support's
 # transferred seat. rocker_bracket_seat_layout owns the seats and their
 # worst-case stack, ch_pivot_bracket_sides the head's clearance to the ear;
 # here the screw they assumed must be the part placed, the brackets must stand
 # on the support's centreline, each head must sit on its foot, and the hole
 # must clear the screw's under-head junction fillet (P/10 in the fillister
 # recipe, diag_mcmaster_fillister), which a #19 caught (r743-3C).
-from vn_pedestal_hold_down_screw_spec import (  # noqa: E402
+from vn_bracket_hold_down_screw_spec import (  # noqa: E402
     _PITCH as _HDSCREW_PITCH,
     HEAD_DIA as _HDSCREW_HEAD_DIA,
     SHANK_LEN as _HDSCREW_LEN,
@@ -498,7 +498,7 @@ if (
     _HDSCREW_THREAD != _SEAT_SCREW_THREAD
     or abs(_HDSCREW_LEN - _SEAT_SCREW_LENGTH) > 1e-9
 ):
-    raise AssertionError("rocker_bracket_seat_layout's screw is not the MHA-VN-032 placed")
+    raise AssertionError("rocker_bracket_seat_layout's screw is not the MHA-VN-071 placed")
 if abs(PIVOT[0] - _SUPPORT_WORLD_X) > 1e-9:
     raise AssertionError("pivot brackets are off the rocker-arm-support's centreline")
 BRACKET_HOLE_FILLET_CLEARANCE = (
@@ -1133,13 +1133,13 @@ async def build(adapter) -> dict[str, str]:
         label="rocker-bank-spring south",
     )
     await _locate_to_datum(adapter, rocker_spring)
-    # Bracket hold-downs (MHA-VN-032): head down on each bracket foot's top,
+    # Bracket hold-downs (MHA-VN-071): head down on each bracket foot's top,
     # over the seat rocker_bracket_seat_layout derived from its hole.
     # Free-space here (the support is the frame's), datum-located likewise.
     for screw_x, screw_z in BRACKET_SCREW_XZ:
         hold_down = await place_component(
             adapter,
-            "vn-pedestal-hold-down-screw",
+            "vn-bracket-hold-down-screw",
             [screw_x, SUPPORT_APEX_Y + PIVOT_BRACKET_FOOT_H, screw_z],
             [0.0, 0.0, 0.0],
             IDENTITY,

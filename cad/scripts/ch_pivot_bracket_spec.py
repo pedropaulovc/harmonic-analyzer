@@ -54,8 +54,8 @@ HEIGHT_BAND = 0.508  # title-block .XX: the overall and the bore heights
 APEX_ABOVE_BORE = EAR_TOP_Y - BORE_H  # 9.80
 ARCH_LIFT = APEX_ABOVE_BORE - EAR_ARCH_R  # 1.80: the arch centre over the bore
 BORE_LIGAMENT = APEX_ABOVE_BORE - BORE_DIA / 2.0  # 6.55: drawing-guidelines.md rule 17 (walls and webs) web over the bore
-# The MHA-VN-032 hold-down passes here: #8 close clearance, the hole MHA-DT-002
-# gives the same screw. The old #19 (0.025 radial over the thread major)
+# The MHA-VN-071 hold-down passes here: #8 close clearance, the hole MHA-DT-002
+# gives its #8-32 fillister of the same head. The old #19 (0.025 radial over the thread major)
 # caught the screw's under-head junction fillet on its mouth (r743-3C).
 HOLD_DOWN_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
 HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)

@@ -8,9 +8,10 @@ import _config
 import _interference_contracts
 import build_ch_channel_assembly as channel
 import build_ch_pivot_bracket as bracket_build
-import build_vn_pedestal_hold_down_screw as hold_down_build
-import vn_pedestal_hold_down_screw_spec as hold_down
+import build_vn_bracket_hold_down_screw as hold_down_build
+import vn_bracket_hold_down_screw_spec as hold_down
 import dt_arbor_pedestal_spec as pedestal
+import vn_pedestal_hold_down_screw_spec as pedestal_screw
 import build_fr_rocker_arm_support as support
 import ch_pivot_bracket_sides as sides
 import ch_pivot_bracket_spec as bracket
@@ -18,8 +19,8 @@ import fr_rocker_arm_support_spec as support_spec
 import rocker_bracket_seat_layout as seats
 
 
-def test_layout_screw_is_the_placed_mha_143() -> None:
-    assert hold_down_build.SPEC.skus == ("90280A197",)
+def test_layout_screw_is_the_placed_bracket_hold_down() -> None:
+    assert hold_down_build.SPEC.skus == ("90280A196",)
     assert seats.SCREW_THREAD == hold_down.THREAD
     assert seats.SCREW_LENGTH == hold_down.SHANK_LEN
     assert seats.SCREW_MAJOR_DIA == pytest.approx(hold_down.SHANK_DIA, abs=1e-3)
@@ -40,17 +41,17 @@ def test_top_level_contract_literals_match_the_layout() -> None:
         limit
         for pair, limit in pairs.items()
         if "fr-frame-1/fr-rocker-arm-support-1" in pair
-        and any(name.startswith("ch-channel-1/vn-pedestal-hold-down-screw-") for name in pair)
+        and any(name.startswith("ch-channel-1/vn-bracket-hold-down-screw-") for name in pair)
     }
     screws = {
         name
         for pair in pairs
         if "fr-frame-1/fr-rocker-arm-support-1" in pair
         for name in pair
-        if name.startswith("ch-channel-1/vn-pedestal-hold-down-screw-")
+        if name.startswith("ch-channel-1/vn-bracket-hold-down-screw-")
     }
     assert screws == {
-        f"ch-channel-1/vn-pedestal-hold-down-screw-{n}"
+        f"ch-channel-1/vn-bracket-hold-down-screw-{n}"
         for n in range(1, len(seats.SEAT_MACHINE_XZ) + 1)
     }
     (limit,) = limits
@@ -65,10 +66,12 @@ def test_top_level_contract_literals_match_the_layout() -> None:
 
 def test_seat_stack_margins() -> None:
     # The printed worst case, restated: every margin the layout asserts.
-    assert seats.ENGAGEMENT_MIN == pytest.approx(10.976, abs=1e-3)
+    assert seats.ENGAGEMENT_MIN == pytest.approx(7.801, abs=1e-3)
+    assert seats.ENGAGEMENT_MIN >= 1.5 * seats.SCREW_MAJOR_DIA
     assert seats.SEAT_THREAD_DEPTH - seats.LINEAR_1PL - seats.SCREW_REACH_MAX == (
-        pytest.approx(0.342, abs=1e-3)
+        pytest.approx(0.317, abs=1e-3)
     )
+    assert (seats.SEAT_THREAD_DEPTH, seats.SEAT_DRILL_DEPTH) == (11.5, 14.7)
     assert seats.SEAT_DRILL_NAME == "#29"
     # The print carries each depth row at .X.
     for value in (seats.SEAT_DRILL_DEPTH, seats.SEAT_THREAD_DEPTH):
@@ -76,14 +79,28 @@ def test_seat_stack_margins() -> None:
 
 
 def test_seat_thread_keeps_the_web_wall_at_the_printed_worst_case() -> None:
-    """Each seat runs down the web column, so the web's thickness bounds it:
-    the thread's major diameter to either web face, the web at the low end of
-    its printed .XX band."""
+    """Each seat runs down the 12.70 web column (owner Q13c: thickened
+    uniformly, symmetric about its centre plane): the thread's major diameter
+    to either web face, the web at the low end of its printed .XX band and
+    the seat at its worst offset off the web's centre plane (owner Q13-B: the
+    flat's edges at .XXX off it)."""
     assert support.WEB is seats.WEB
-    assert 2.0 * seats.WEB == pytest.approx(9.525)  # 3/8 in
-    assert seats.WEB_PLACES == 2
-    wall = (2.0 * seats.WEB - seats.LINEAR_2PL) / 2.0 - seats.SCREW_MAJOR_DIA / 2.0
-    assert wall == pytest.approx(seats.WEB_WALL_MIN)
+    assert 2.0 * seats.WEB == pytest.approx(12.70)  # 1/2 in
+    assert (seats.WEB_PLACES, seats.TOP_FLAT_PLACES) == (2, 3)
+    # The foot flush with the flat's edge (8.467 + 0.13), its hole at its
+    # nearest to that side (16.00 - 0.51 wide, 8.00 + 0.51 off the far side).
+    foot = (8.4665 + 0.127) - ((16.0 - 0.508) - (8.0 + 0.508))
+    assert seats.FOOT_FLOAT == pytest.approx(foot) == pytest.approx(1.6095)
+    # An 11/64 transfer punch in the #8 close hole at its +0.10 drilled max.
+    punch = (4.572 + 0.10 - 11.0 / 64.0 * 25.4) / 2.0
+    assert seats.PUNCH_FLOAT == pytest.approx(punch, abs=1e-3)
+    wall = (
+        (2.0 * seats.WEB - seats.LINEAR_2PL) / 2.0
+        - (foot + punch)
+        - seats.SCREW_MAJOR_DIA / 2.0
+    )
+    assert wall == pytest.approx(seats.WEB_WALL_MIN, abs=1e-3)
+    assert wall == pytest.approx(2.25, abs=0.01)
     assert wall >= seats.RULE12_WEB_TARGET
 
 
@@ -132,8 +149,11 @@ def test_bracket_hole_clears_the_screw_junction_fillet() -> None:
     assert bracket.HOLE_DIA < hold_down.HEAD_DIA
 
 
-def test_bracket_hole_is_mha_004s_hole_for_the_same_screw() -> None:
-    """Both carry the MHA-VN-032 hold-down; their holes must not drift apart."""
+def test_bracket_hole_is_mha_004s_hole_for_the_same_thread() -> None:
+    """Both carry an #8-32 fillister hold-down of the same head (the bracket's
+    5/8, the pedestal's 3/4); their holes must not drift apart."""
+    assert hold_down.THREAD == pedestal_screw.THREAD
+    assert hold_down.HEAD_DIA == pedestal_screw.HEAD_DIA
     assert bracket.HOLD_DOWN_HOLE_SPEC == pedestal.SCREW_HOLE_SPEC
 
 

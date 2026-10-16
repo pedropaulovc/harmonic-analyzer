@@ -6,7 +6,7 @@ sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
 The support is a painted gray-iron frame with a trapezoidal wall, two opposed
-pockets leaving a 9.525 central web, a through cavity, a chamfered window rim,
+pockets leaving a 12.70 central web, a through cavity, a chamfered window rim,
 four 5/16 clearance holes through its mounting foot, and the rocker brackets'
 two #8-32 seats in its top face, transferred from the set brackets at
 assembly. The sheet runs 1:2, with each view's scale pinned explicitly.
@@ -176,6 +176,11 @@ DIMENSION_CALLOUTS = {
     "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
     # One location covers both opposed pockets, as the SQ size does.
     "PocketEndStation": "BOTH SIDES",
+    # The flat's edges off the web's centre plane hold the transferred seats
+    # central in the web (owner Q13-B, rocker_bracket_seat_layout's stack).
+    "TopFlatPlusZStation": (
+        f"CENTERS {_config.parts('ch-pivot-bracket')['number']}\nSEAT TAPS IN WEB"
+    ),
 }
 # The sheet's own places. RimChamferSize's, PocketFloorRadius's, the seat REF
 # stations' and the locations' are the PART's
@@ -189,8 +194,7 @@ DIMENSION_PRECISION = {
     "CavityRadius": 1,
     "WallHeight": 1,
     "FootSpan": 1,
-    "TopSpan": 1,
-    # A held thickness, 9.525 at the routine ±0.51: the seats' thread-wall
+    # A held thickness, 12.70 at the routine ±0.51: the seats' thread-wall
     # stack reads the same places (rocker_bracket_seat_layout).
     "WebThickness": WEB_PLACES,
     "FootThickness": 2,
@@ -300,20 +304,21 @@ FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
 # top-rail floor corner (build_fr_rocker_arm_support.POCKET_FLOOR_FILLET_EDGES),
 # which the section shows in profile at its upper right. The text stands
 # level with it right of the section, between the slanted wall and the
-# 177.8, which moves out to clear it: the left lane carries the base edge's
-# extension line up to TaperRun. The 16.9 prints right of its span, off the
-# top-face edge's extension line TaperRun runs on up past it; the 63.5
-# prints right of the web face's extension line WebFaceStation runs down to
-# just above it, its row no lower than r8's (r10 review: 1 mm lower, its
-# left extension line's overshoot struck the SECTION A-A label's E).
-# TaperRun (the base edge to the top face's) and WebFaceStation (to the
-# web's face, WebLocationReference, blanked in the part) both measure from
-# the base's -Z edge, the section's left.
+# 177.8, which moves out to clear it. The top flat's two edges print off the
+# web's centre plane (WebLocationReference, blanked in the part; owner
+# Q13-B), both on the row above the section: each span is only 4.2 mm of
+# sheet, so each text stands outboard of its own edge, and the right one's
+# reason rows hang below it, above the R0.8 MAX's block. The 63.5 prints
+# right of the web face's extension line WebFaceStation runs down to just
+# above it, its row no lower than r8's (r10 review: 1 mm lower, its left
+# extension line's overshoot struck the SECTION A-A label's E).
+# WebFaceStation (to the web's face) measures from the base's -Z edge, the
+# section's left.
 RIGHT_KEEP = {
     "WallHeight": (0.256, 0.185),
     "FootSpan": (0.2125, 0.133),
-    "TopSpan": (0.2155, 0.238),
-    "TaperRun": (0.195, 0.2475),
+    "TopFlatMinusZStation": (0.191, 0.2475),
+    "TopFlatPlusZStation": (0.2375, 0.2475),
     "WebFaceStation": (0.1958, 0.1375),
     "PocketFloorRadius": (0.2335, 0.2195),
 }
