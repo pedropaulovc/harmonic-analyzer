@@ -140,6 +140,18 @@ FRONT_CENTER = (0.070, 0.150)
 # r5's audit had "60.0" printing 4.0 mm over Drawing View2.
 RIGHT_CENTER = (0.168, 0.150)
 ISO_CENTER = (0.225, 0.140)
+# Machinist review r3 (run 20261016T120248930Z-2fa1ae0c1aaa4f1ea2370a197868591c):
+# the unlabelled principal view shows the bar in front of the wheel, while
+# step 11 leads the wire "seen from the front". The model's *Front looks from
+# the bar side, +z (mg_magnifying_wheel_geom: the pen-side front view mirrors
+# local x), and its *Right from +x, the fitter's left as he faces the machine
+# front: the drum, at machine -z, prints on its right. Each caption is centred
+# under its view (caption_under); the side view's stays short so it ends left
+# of the isometric (r8's outlines: Right 153-183 mm, Isometric from 194 mm).
+ASSEMBLED_VIEW_CAPTIONS = {
+    "*Front": "VIEW FROM THE BACK",
+    "*Right": "VIEW FROM THE LEFT",
+}
 
 # Sheet geometry, metres: the template's inner border and the title block in
 # its lower-right corner. Every view ring and note stays inside the border and
@@ -1257,6 +1269,12 @@ def _move_wire_balloon(
         )
 
 
+def caption_under(outline: Box, text: str) -> tuple[float, float]:
+    """Top-left of a one-line caption centred under ``outline``."""
+    width = len(text) * CAPTION_CHAR_WIDTH
+    return (outline[0] + outline[2] - width) / 2.0, outline[1] - CAPTION_GAP
+
+
 def caption_over(outline: Box, text: str) -> tuple[float, float]:
     """Top-left of a one-line caption centred over ``outline``."""
     width = len(text) * CAPTION_CHAR_WIDTH
@@ -1295,6 +1313,7 @@ def _place_assembled_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
     view and the two axle-stack details."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     front = None
+    captioned = []
     for name, centre in (
         ("*Front", FRONT_CENTER),
         ("*Right", RIGHT_CENTER),
@@ -1307,8 +1326,18 @@ def _place_assembled_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
         apply_view_configuration(adapter, view, role=role, label=f"{PDF_TITLE} {name}")
         if name == "*Front":
             front = view
+        if name in ASSEMBLED_VIEW_CAPTIONS:
+            captioned.append((view, name))
     lever_settled = _lever_settings(adapter, front)
     stack_settled = _stack_dimensions(adapter)
+    for view, name in captioned:
+        _add_note_block(
+            adapter,
+            SHEET_NAMES[0],
+            ASSEMBLED_VIEW_CAPTIONS[name],
+            caption_under(_view_outline(view, label=name), ASSEMBLED_VIEW_CAPTIONS[name]),
+            label=f"{name} caption",
+        )
     return lever_settled, stack_settled
 
 
