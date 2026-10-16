@@ -989,6 +989,59 @@ def _fit_exploded(adapter: Any, view: Any, *, label: str) -> tuple[float, float]
     raise RuntimeError(f"{label}: no scale fits: " + " | ".join(findings))
 
 
+def _make_explode_readable(
+    view: Any, configuration: str, *, label: str
+) -> Callable[[], None]:
+    """Leave the exploded view's ``configuration`` readable by the balloon
+    walker; return the call that restores the source's active configuration.
+
+    ``_drawing_balloons._view_explode_offsets`` reads a NON-active
+    configuration's steps directly, and makes an ACTIVE one readable by showing
+    its explode on the model. Placed from the octant named view, the source's
+    non-active Default Simplified read zero steps (farm run
+    20261016T075516581Z), so when it does, Default Simplified is made the
+    source's active configuration for the walk and Default shown again after.
+    The source must come back as clean as it went in: the drawing save would
+    otherwise write the released assembly.
+    """
+    bound = _early_bound(view, "IView")
+    source = _early_bound(bound.ReferencedDocument, "IModelDoc2")
+    manager = _early_bound(source.ConfigurationManager, "IConfigurationManager")
+
+    def active_name() -> str:
+        return str(_early_bound(manager.ActiveConfiguration, "IConfiguration").Name)
+
+    active = active_name()
+    owner = source.GetConfigurationByName(configuration)
+    if owner is None:
+        raise RuntimeError(f"{label}: source has no {configuration!r}")
+    steps = int(_early_bound(owner, "IConfiguration").GetNumberOfExplodeSteps())
+    _telemetry.event(
+        "pen.explode_read", configuration=configuration, active=active, steps=steps
+    )
+    if steps or active == configuration:
+        return lambda: None
+    was_dirty = bool(source.GetSaveFlag())
+    if not bool(source.ShowConfiguration2(configuration)) or (
+        active_name() != configuration
+    ):
+        raise RuntimeError(
+            f"{label}: cannot make {configuration!r} the source's active"
+        )
+
+    def restore() -> None:
+        if not bool(source.ShowConfiguration2(active)) or active_name() != active:
+            raise RuntimeError(f"{label}: cannot show the source's {active!r} again")
+        if not bool(bound.IsExploded()):
+            raise RuntimeError(f"{label}: restoring {active!r} collapsed the view")
+        if bool(source.GetSaveFlag()) and not was_dirty:
+            raise RuntimeError(
+                f"{label}: switching the source's configuration dirtied it"
+            )
+
+    return restore
+
+
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     """The exploded isometric, its BOM (with vendor SKU) and one balloon per
     row; returns the check that proves every balloon after the last rebuild."""
@@ -1019,14 +1072,24 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         label="pen",
     )
     items = _validate_bom(adapter, table)
-    landings = add_component_bom_balloons(
-        adapter,
-        exploded,
-        items=items,
-        anchors=BALLOON_ANCHORS,
-        label="pen exploded-view BOM coverage",
-        margin=BALLOON_MARGIN,
-    )
+    restore = _make_explode_readable(exploded, configuration, label=label)
+    try:
+        landings = add_component_bom_balloons(
+            adapter,
+            exploded,
+            items=items,
+            anchors=BALLOON_ANCHORS,
+            label="pen exploded-view BOM coverage",
+            margin=BALLOON_MARGIN,
+        )
+    finally:
+        primary_error = sys.exception()
+        try:
+            restore()
+        except Exception as cleanup_error:
+            if primary_error is None:
+                raise
+            _telemetry.warn(f"{label}: after balloon failure: {cleanup_error}")
     if len(landings) != sum(BOM_QUANTITIES.values()):
         raise RuntimeError(
             f"pen exploded view carries {len(landings)} balloons, expected one per "
