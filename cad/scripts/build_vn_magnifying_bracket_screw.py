@@ -1,4 +1,4 @@
-r"""Purchased MHA-VN-050 magnifying-bracket screw: McMaster 91794A077.
+r"""Purchased MHA-VN-050 magnifying-bracket screw: McMaster 91794A078.
 
 The passivated 18-8 stainless stock screw retains its frame: head +Y, shank -Y,
 junction at Y=0, ``ScrewAxis`` = Front ∩ Right.
@@ -13,7 +13,7 @@ from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part
-from diagnostics.diag_build_91794A077 import build_91794A077
+from diagnostics.diag_build_91794A078 import build_91794A078
 from vn_magnifying_bracket_screw_spec import SKU
 
 PART_NAME = "vn-magnifying-bracket-screw"
@@ -26,7 +26,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         part_name=PART_NAME,
         components=(
-            StockComponent(sku=SKU, author=build_91794A077, transform=RigidTransform()),
+            StockComponent(sku=SKU, author=build_91794A078, transform=RigidTransform()),
         ),
         material=MATERIAL,
         save_threaded_part=save_simplified_part,

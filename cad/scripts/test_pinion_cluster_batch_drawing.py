@@ -462,7 +462,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             # bottom tap drill, tip to relief.
             frozenset(
                 ("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")
-            ): _annulus_limit(2.845, 2.261, 6.1),
+            ): _annulus_limit(2.845, 2.261, 6.0),
             # MHA-MG-007 3/16 drill-rod pin pressed through the wheel bar's
             # reamed .1865 bore, the bar's 9.0 depth.
             frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _annulus_limit(
@@ -694,7 +694,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "sm-summing-1/sm-summing-lever",
                 2.1844,
                 1.778,
-                4.725,
+                4.7625,
             ),
             # Twenty stock 9489T111 #6-32 anchors engage only the 0.2-in
             # summing-lever plate; #36 tap drill, not the full stock shank.

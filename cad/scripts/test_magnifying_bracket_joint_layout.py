@@ -77,29 +77,26 @@ def test_side_by_side_stations_have_counterbore_and_head_bearing() -> None:
         assert pose == (
             lever_point[0] + KNIFE[0],
             KNIFE[1],
-            joint.SIDE_PLATE_FRONT_Z + joint.COUNTERBORE_DEPTH,
+            joint.SIDE_PLATE_FRONT_Z,
         )
-    assert joint.CLEARANCE_SPEC.kind == "counterbore_fillister"
+    assert joint.CLEARANCE_SPEC.kind == "clearance"
     assert joint.CLEARANCE_SPEC.size == "#2"
     assert joint.CLEARANCE_SPEC.fit == "normal"
     assert joint.CLEARANCE_SPEC.end == "through_all"
-    assert joint.CLEARANCE_SPEC.overrides_mm == {
-        "HoleDiameter": 2.591,
-        "CounterBoreDiameter": 3.8,
-        "CounterBoreDepth": 1.55,
-    }
+    assert joint.CLEARANCE_SPEC.overrides_mm == {}
+    assert joint.CLEARANCE_DIA == 2.591
     assert joint.SCREW_MAJOR_DIA < joint.CLEARANCE_DIA < joint.SCREW_HEAD_DIA
     assert joint.COUNTERBORE_DIA - joint.SCREW_HEAD_DIA == pytest.approx(0.244)
     assert joint.HEAD_FLOAT_MIN == pytest.approx(0.122)
     assert joint.HEAD_POSITION_MISMATCH_MAX == pytest.approx(0.10)
     assert joint.HEAD_FLOAT_MIN >= joint.HEAD_POSITION_MISMATCH_MAX
-    assert joint.GRIP_MIN == pytest.approx(1.525)
+    assert joint.GRIP_MIN == pytest.approx(3.045)
     assert joint.COUNTERBORE_END_WALL_MIN == pytest.approx(2.000)
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(3.840)
-    assert joint.HEAD_PROTRUSION == pytest.approx(0.5582)
+    assert joint.HEAD_PROTRUSION == pytest.approx(2.1082)
     # A flush head cannot keep the full-thread envelope inside the 5.08 rib.
     flush_reach = joint.SCREW_LENGTH - joint.SIDE_PLATE_THICKNESS + joint.SCREW_HEAD_HEIGHT
-    assert flush_reach == pytest.approx(5.2832)
+    assert flush_reach == pytest.approx(6.8707)
     assert flush_reach > joint.RIB_DEPTH
     head_air = (
         min(joint.SCREW_MACHINE_X) - joint.SCREW_HEAD_DIA / 2.0
@@ -113,25 +110,25 @@ def test_side_by_side_stations_have_counterbore_and_head_bearing() -> None:
 
 
 def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
-    assert screw.SKU == joint.SCREW_SKU == "91794A077"
+    assert screw.SKU == joint.SCREW_SKU == "91794A078"
     assert screw.THREAD == joint.SCREW_THREAD == "#2-56"
     assert (screw.MAJOR_DIA, screw.LENGTH, screw.HEAD_H, screw.HEAD_DIA) == (
         joint.SCREW_MAJOR_DIA,
         joint.SCREW_LENGTH,
         joint.SCREW_HEAD_HEIGHT,
         joint.SCREW_HEAD_DIA,
-    ) == (2.1844, 6.35, 2.1082, 3.556)
-    assert joint.GRIP == pytest.approx(1.625)
-    assert joint.GRIP_BAND == pytest.approx(0.10)
-    assert joint.ENGAGEMENT == pytest.approx(4.725)
-    assert joint.ENGAGEMENT_MIN == pytest.approx(3.2975)
+    ) == (2.1844, 7.9375, 2.1082, 3.556)
+    assert joint.GRIP == pytest.approx(3.175)
+    assert joint.GRIP_BAND == pytest.approx(0.13)
+    assert joint.ENGAGEMENT == pytest.approx(4.7625)
+    assert joint.ENGAGEMENT_MIN == pytest.approx(3.305)
     assert joint.ENGAGEMENT_MIN >= 1.5 * joint.SCREW_MAJOR_DIA
     assert joint.TAP_SPEC.thread_class == "2B"
     assert joint.TAP_SPEC.end == "blind"
     assert joint.TAP_SPEC.depth_mm == joint.DRILL_DEPTH == 6.05
     assert joint.TAP_SPEC.overrides_mm["ThreadDepth"] == joint.THREAD_DEPTH == 4.95
     assert joint.THREAD_RIB_MARGIN_MIN == pytest.approx(0.03)
-    assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.075)
+    assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0075)
     assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.042857142857)
     assert joint.DRILL_POINT_RIB_MARGIN == pytest.approx(-1.50416454)
     assert joint.DRILL_POINT_RIB_MARGIN_MIN == pytest.approx(-1.68420754)
@@ -142,8 +139,8 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
 @pytest.mark.parametrize(
     ("replacement", "failure"),
     (
-        ("SCREW_LENGTH = 6.35", "1.5D full engagement"),
-        ("COUNTERBORE_DEPTH = 1.55", "1.5D full engagement"),
+        ("SCREW_LENGTH = 7.9375", "1.5D full engagement"),
+        ("FLANGE_THICKNESS_BAND = 0.13", "1.5D full engagement"),
         ("THREAD_DEPTH = 4.95", "bottoms"),
         ("RIB_DEPTH = 5.08", "beyond the front rib"),
         ("DRILL_DEPTH = 6.05", "bottoming-tap lead"),
@@ -154,8 +151,8 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
 def test_joint_guards_reject_lost_margins(replacement: str, failure: str) -> None:
     source = Path(joint.__file__).read_text(encoding="utf-8")
     bad_value = {
-        "SCREW_LENGTH": 6.30,
-        "COUNTERBORE_DEPTH": 1.50,
+        "SCREW_LENGTH": 7.85,
+        "FLANGE_THICKNESS_BAND": 0.20,
         "THREAD_DEPTH": 4.85,
         "RIB_DEPTH": 5.04,
         "DRILL_DEPTH": 6.00,

@@ -14,8 +14,8 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_fastener import RigidTransform
 from _test_stock_recipes import discovered_recipes
-from diagnostics import diag_build_91794A077 as recipe
-from _mcmaster_91794a077 import FILLISTER_SIZE
+from diagnostics import diag_build_91794A078 as recipe
+from _mcmaster_91794a078 import FILLISTER_SIZE
 
 STEM = "vn-magnifying-bracket-screw"
 
@@ -25,7 +25,7 @@ def test_catalogue_and_recipe_are_the_verified_stock_screw() -> None:
     stock = FASTENERS[STEM]
     assert part.SPEC is stock
     assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,)
-    assert stock.skus == ("91794A077",)
+    assert stock.skus == ("91794A078",)
     assert stock.stock_name == row["stock_name"] == row["title"] == (
         "18-8 Stainless Steel Fillister Head Slotted Screw"
     )
@@ -36,7 +36,7 @@ def test_catalogue_and_recipe_are_the_verified_stock_screw() -> None:
     assert row["process"] == "purchased"
     metadata = discovered_recipes()[spec.SKU]
     assert metadata.module == recipe.__name__
-    assert metadata.callable_name == "build_91794A077"
+    assert metadata.callable_name == "build_91794A078"
     assert metadata.threaded is True
 
 
@@ -72,7 +72,7 @@ def test_builder_preserves_the_supplied_frame(monkeypatch: pytest.MonkeyPatch) -
     components = captured["components"]
     assert len(components) == 1
     assert components[0].sku == spec.SKU
-    assert components[0].author is recipe.build_91794A077
+    assert components[0].author is recipe.build_91794A078
     assert components[0].transform == RigidTransform()
     assert captured["screw_axis_planes"] == ("Front Plane", "Right Plane")
     assert captured["material"] == part.SPEC.material

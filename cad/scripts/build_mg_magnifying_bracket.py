@@ -7,11 +7,13 @@ and a forward arm ending in a collar (O12, bore mg_lever_press_fit_geom
 (p.46 "firmly affixed"; user ruling 2026-10-11). The collar/rod sit at the
 plate centreline (machine y 979.7, after the 2026-08-02 Cascade-A drop). The
 flange seats flush on the summing lever's installed front face and carries
-two native #2 counterbores entering -Z. Joint geometry and hole
-specifications are owned by magnifying_bracket_joint_layout, independently
-of assemblies; the press fit (bore nominal, band, engagement, budget,
-installation notes) by the config-free mg_lever_press_fit_geom, which the
-lever print and this one share.
+two native plain #2 clearance holes entering -Z, the screw heads bearing on
+the flange's front face. Joint geometry and hole specifications are owned by
+magnifying_bracket_joint_layout, independently of assemblies; the press fit
+(bore nominal, band, engagement, budget, installation notes) by the
+config-free mg_lever_press_fit_geom, which the lever print and this one share.
+``ArmRootFillet`` breaks the three arm-to-flange inside corners on the
+flange's front face at the print's single MAX radius.
 
 ``ArmSection`` (blanked, on the Right plane): the arm's section in the
 profile the RIGHT view prints -- its lower face from the bore axis, the seat
@@ -63,24 +65,22 @@ from _sketch_circle import define_circle
 
 import _telemetry
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_precision import apply_drawing_precision, set_dimension_display_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision, set_dimension_display_precision
 from _drawing_tolerances import set_dimension_symmetric_tolerance, set_dimension_bilateral_tolerance
 from mg_magnifying_bracket_spec import (
+    ARM_ROOT_R_BAND,
+    ARM_ROOT_R_MAX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
+    RADIUS_TOL_TYPE,
 )
-from mg_lever_press_fit_geom import COLLAR_BORE_BAND, COLLAR_BORE_DIA, COLLAR_LENGTH_BAND
+from mg_lever_press_fit_geom import COLLAR_BORE_DIA, COLLAR_LENGTH_BAND
 from mg_magnifying_lever_geom import COLLAR_HALF_LEN as LEVER_COLLAR_HALF_LEN
 from magnifying_bracket_joint_layout import (
     BRACKET_HOLE_POINTS,
     CLEARANCE_DIA,
     CLEARANCE_SPEC,
-    COUNTERBORE_DIA,
-    COUNTERBORE_DEPTH,
-    COUNTERBORE_DEPTH_BAND,
-    PLATE_THICKNESS_BAND,
     POSITION_BAND,
     SIDE_PLATE_X as FLANGE_X,
     SIDE_PLATE_Y as FLANGE_Y,
@@ -107,6 +107,17 @@ ARM_Y = (-3.0, 4.5)
 # moved the collar 45.21 forward of the plate, 58.30 -> 103.51 from the axis.
 ARM_PAST_SEAT = 3.11
 ARM_Z = (4.0, round(FLANGE_Z[1] + ARM_PAST_SEAT, 2))
+# The arm-root fillet leaves the flange's front face a flat beside the arm on
+# both sides (above the arm 1.85, below it 3.35), so the print's MAX radius
+# never runs the fillet onto the flange's edges.
+ARM_ROOT_EDGES = (
+    ((-ARM_HALF_X, (ARM_Y[0] + ARM_Y[1]) / 2.0, FLANGE_Z[0]), ARM_Y[1] - ARM_Y[0]),
+    ((0.0, ARM_Y[0], FLANGE_Z[0]), 2.0 * ARM_HALF_X),
+    ((0.0, ARM_Y[1], FLANGE_Z[0]), 2.0 * ARM_HALF_X),
+)
+if not ARM_ROOT_R_MAX < min(FLANGE_Y[1] - ARM_Y[1], ARM_Y[0] - FLANGE_Y[0]):
+    raise AssertionError("the arm-root fillet would leave no flat on the flange's front face")
+
 
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
@@ -134,11 +145,9 @@ def _resolve_native_mounting_dimensions(adapter) -> dict[str, str]:
     if abs(float(height.SystemValue) * 1000.0 - (FLANGE_Y[1] - FLANGE_Y[0])) > 1e-5:
         raise RuntimeError("Flange: native extrusion height differs from contract")
     height.Name = "FlangeHeight"
-    feature = _early_bound(model.FeatureByName("MountingCounterbores"), "IFeature")
+    feature = _early_bound(model.FeatureByName("MountingHoles"), "IFeature")
     required = {
         "HoleDiameter": ("dia", CLEARANCE_DIA),
-        "CounterBoreDiameter": ("dia", COUNTERBORE_DIA),
-        "CounterBoreDepth": ("depth", COUNTERBORE_DEPTH),
     }
     matches = {name: [] for name in required}
     display = feature.GetFirstDisplayDimension()
@@ -153,25 +162,42 @@ def _resolve_native_mounting_dimensions(adapter) -> dict[str, str]:
     resolved = {}
     for name, dimensions in matches.items():
         if len(dimensions) != 1:
-            raise RuntimeError(f"MountingCounterbores: expected one native {name}, found {len(dimensions)}")
+            raise RuntimeError(f"MountingHoles: expected one native {name}, found {len(dimensions)}")
         resolved[name] = str(dimensions[0].Name)
     return resolved
 
 
 def _apply_native_mounting_annotations(adapter, native_names: dict[str, str]) -> None:
-    """Apply head-seat bands and callout precision to observed Wizard names."""
-    set_dimension_symmetric_tolerance(
-        adapter, "MountingCounterbores", native_names["CounterBoreDepth"], COUNTERBORE_DEPTH_BAND
+    """Give the observed Wizard hole diameter its callout precision; the
+    drilled hole takes the title block's DRILLED HOLES band, no native one."""
+    set_dimension_display_precision(
+        adapter, "MountingHoles", native_names["HoleDiameter"], 3
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "MountingCounterbores", native_names["CounterBoreDiameter"], 0.0, 0.10
-    )
-    for role, decimals in (
-        ("HoleDiameter", 3), ("CounterBoreDiameter", 2), ("CounterBoreDepth", 2)
-    ):
-        set_dimension_display_precision(
-            adapter, "MountingCounterbores", native_names[role], decimals
+
+
+def _arm_root_radius_max_limit(adapter) -> None:
+    """ArmRootR as the single limit "R1.0 MAX" carrying the band's deviations
+    (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
+    from _com import _early_bound
+    lower, upper = deviations(ARM_ROOT_R_BAND)
+    _, dimension = _named_dimension(adapter, "ArmRootFillet", "ArmRootR")
+    label = "ArmRootR@ArmRootFillet"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, ARM_ROOT_R_MAX / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {ARM_ROOT_R_MAX}"
         )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = RADIUS_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != RADIUS_TOL_TYPE
+        or not math.isclose(float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12)
+        or not math.isclose(float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12)
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {ARM_ROOT_R_MAX:g} MAX")
 
 
 async def _mounting_coordinate_dimensions(adapter) -> None:
@@ -240,6 +266,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "FlangeZ1", f"{FLANGE_Z[1]}mm")
     await set_global(adapter, "FlangeY0", f"{FLANGE_Y[0]}mm")
     await set_global(adapter, "FlangeY1", f"{FLANGE_Y[1]}mm")
+    await set_global(adapter, "ArmRootRMax", f"{ARM_ROOT_R_MAX}mm")
 
     # Each sketch records its dim names + drive equations into a per-sketch
     # SketchDims as the define_* helper emits each dim; the drive equations are
@@ -251,8 +278,8 @@ async def build(adapter) -> dict[str, str]:
     # +X), extruded mid-plane so it spans x -HalfLen..+HalfLen. Two on-axis
     # circles, so each records ONLY its diameter dim -- and those are the
     # print's: the end view (RIGHT) imports the O12 and the press-seat bore
-    # with its band natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), where the old revolved
-    # half-profile put the bore on a hidden wall line.
+    # (its reference nominal, under the matched-fit callout) natively, where
+    # the old revolved half-profile put the bore on a hidden wall line.
     collar = SketchDims()
     check("create_sketch collar", await adapter.create_sketch("Right"))
     await define_circle(
@@ -379,24 +406,42 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"flange: added {added:.1f}, expected {v_net:.1f}")
     expected = vol
 
+    # Arm-to-flange inside corners on the flange's front (-Z) face: the arm's
+    # west face and both its Y faces meet the flange there.  Filleted AT the
+    # print's MAX radius; each straight edge adds (1 - pi/4) R^2 per length
+    # (the two blends at the arm's west corners are within the tolerance).
+    check(
+        "fillet arm-to-flange inside corners",
+        await adapter.add_fillet(
+            ARM_ROOT_R_MAX, [list(point) for point, _length in ARM_ROOT_EDGES], propagate=False
+        ),
+    )
+    name_last_feature(adapter, "ArmRootFillet")
+    arm_root = name_dimensions(adapter, "ArmRootFillet", ["ArmRootR"])
+    drive_jobs.append((arm_root[0], '"ArmRootRMax"'))
+    v_arm_root = (1.0 - math.pi / 4.0) * ARM_ROOT_R_MAX ** 2 * sum(
+        length for _point, length in ARM_ROOT_EDGES
+    )
+    expected += v_arm_root
+    await volume_check(adapter, "arm-to-flange inside corner fillet", expected, 0.15 * v_arm_root)
+
+    # Plain clearance holes through the flange, entering its front (-Z) face,
+    # where the screw heads bear.
     wizard_holes(
         adapter,
         CLEARANCE_SPEC,
         BRACKET_HOLE_POINTS,
         (0.0, 0.0, -1.0),
-        "magnifying bracket counterbores",
-        name="MountingCounterbores",
+        "magnifying bracket mounting holes",
+        name="MountingHoles",
         expect_dia_mm=CLEARANCE_DIA,
     )
     cut_volume = (
-        len(BRACKET_HOLE_POINTS) * math.pi / 4.0 * (
-            CLEARANCE_DIA ** 2 * SIDE_PLATE_THICKNESS
-            + (COUNTERBORE_DIA ** 2 - CLEARANCE_DIA ** 2) * COUNTERBORE_DEPTH
-        )
+        len(BRACKET_HOLE_POINTS) * math.pi / 4.0 * CLEARANCE_DIA ** 2 * SIDE_PLATE_THICKNESS
     )
     expected -= cut_volume
     await volume_check(
-        adapter, "bracket mounting counterbores", expected, 0.02 * cut_volume
+        adapter, "bracket mounting holes", expected, 0.02 * cut_volume
     )
 
     # 4. Arm section witness (ArmSection, blanked; Right plane, sketch (u, v)
@@ -607,34 +652,29 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Native model dimensions own the flange, head-seat and press-seat bands;
-    # the print imports the plan dimensions and exposes the stepped holes by
-    # callout. The bore and length bands are mg_lever_press_fit_geom's
-    # (upper, lower) contracts: the press contact is the collar's length less
+    # Native model dimensions own the coordinate and press-stack bands; the
+    # print imports the plan dimensions and exposes the plain holes by
+    # callout. The flange's thickness (the screws' grip) takes the title
+    # block's .XXX band and the bore is a reference nominal under its
+    # matched-fit callout (mg_magnifying_bracket_spec.COLLAR_BORE_CALLOUT), so
+    # neither carries a native band. The length band is mg_lever_press_fit_geom's
+    # (upper, lower) contract: the press contact is the collar's length less
     # the lever's dome, so the length's band bounds the installation force.
     native_mounting_names = _resolve_native_mounting_dimensions(adapter)
     await _mounting_coordinate_dimensions(adapter)
-    set_dimension_symmetric_tolerance(
-        adapter, "FlangeProfile", "FlangeDepth", PLATE_THICKNESS_BAND
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "CollarProfile", "CollarBore", *deviations(COLLAR_BORE_BAND)
-    )
     set_dimension_bilateral_tolerance(
         adapter, "Collar", "CollarLen", *deviations(COLLAR_LENGTH_BAND)
     )
     _apply_native_mounting_annotations(adapter, native_mounting_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _arm_root_radius_max_limit(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
     blank_reference_sketches(adapter, ("ArmSection", "ArmFootprint"))
     # Annotation changes must preserve the cut holes through the final rebuild,
