@@ -116,16 +116,18 @@ def test_every_setting_is_printed_with_a_callout_beside_its_detail() -> None:
             assert sum(value * value for value in offset) ** 0.5 < 2 * detail.radius_mm
 
 
-def test_each_detail_title_carries_its_boundary_letter() -> None:
-    bounded = {
-        detail.key
-        for detail in drawing.DETAILS
-        if detail.axis_points is None and detail.orientation in ("*Front", "*Right")
-    }
-    assert bounded == {"stud", "hanger"}
+def test_each_detail_title_carries_its_letter_and_any_other_direction() -> None:
+    keys = {detail.key for detail in drawing.DETAILS}
+    assert drawing.BOUNDED_ON_RIGHT <= keys
     for detail in drawing.DETAILS:
-        letter = spec.DETAIL_LETTERS[detail.key]
-        assert detail.title.splitlines()[0].startswith(f"DETAIL {letter}")
+        first = detail.title.splitlines()[0]
+        assert first.startswith(f"DETAIL {spec.DETAIL_LETTERS[detail.key]}")
+        # Bounded on RIGHT and drawn from the right, or else its title says
+        # which way it looks.
+        same = detail.key in drawing.BOUNDED_ON_RIGHT and (
+            detail.orientation == "*Right" and detail.axis_points is None
+        )
+        assert same == (" - FROM " not in first)
     assert len(set(spec.DETAIL_LETTERS.values())) == len(drawing.DETAILS)
 
 
