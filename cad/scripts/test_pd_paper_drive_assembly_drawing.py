@@ -1239,6 +1239,11 @@ def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     assert f"{steps.BAR_TOP_ABOVE_DECK:.1f} ABOVE THE BASE DECK" in _step_body(
         "bar-clamped"
     )
+    # The round pair locates the bar before the slotted pair is tightened;
+    # the step names it by its holes, as no package sheet defines END A.
+    bar_clamped = _step_body("bar-clamped")
+    assert "TIGHTEN THE ROUND-HOLE PAIR, THEN THE SLOTTED PAIR." in bar_clamped
+    assert "END A" not in bar_clamped
     # The latched hook cannot take up a rack set off its band (rack-crest
     # ruling): the step prints the crest band itself.
     assert f"CRESTS {steps.RACK_CREST_TEXT} BELOW ITS BOTTOM EDGE" in _step_body(
