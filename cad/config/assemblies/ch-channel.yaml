@@ -85,3 +85,4 @@ required_free_stems:
 # amplitude-bar slide.
 free_dof: 0
 free_dof_per_active_channel: 3
+
