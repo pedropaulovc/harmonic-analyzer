@@ -22,11 +22,11 @@ def test_cut_end_crosses_the_plate_and_carries_the_jam_nut():
     cut_end = anchor.eye_od_mm / 2 - spec.FINISHED_OVERALL_MM
     assert cut_end == pytest.approx(spec.TRIM.shank_end_y_mm)
     # Installed and seated, the Ø3.175 neck shoulders on the plate's top face,
-    # so the thread starts there, engages the whole plate, and the cut end
-    # hangs below the underside far enough to carry the jam nut.
+    # so the thread starts there, engages the whole padded tap, and the cut
+    # end hangs below the pad underside far enough to carry the jam nut.
     installed_end = mounts.CHANNEL_ANCHOR_XY[1] + spec.TRIM.shank_end_y_mm
-    underside = mounts.PLATE_TOP_Y - lever.PLATE_T
-    assert spec.THREAD_ENGAGEMENT_MM == lever.PLATE_T
+    underside = mounts.PLATE_TOP_Y - lever.SPRING_SEAT_T
+    assert spec.THREAD_ENGAGEMENT_MM == lever.SPRING_SEAT_T
     thread_start = (
         mounts.CHANNEL_ANCHOR_XY[1]
         + spec.TRIM.shank_end_y_mm
@@ -54,18 +54,20 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
     assert spec.CHAMFER_AXIAL_MAX_MM == pytest.approx(maximum_axial)
     floor = spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm
     assert spec.FULL_THREADS_PAST_NUT == 2
+    assert spec.PAST_NUT_FLOOR_MM == pytest.approx(floor)
+    assert floor == pytest.approx(1.5875)
     worst = spec.full_threads_past_nut_mm(spec.ADJUSTMENT_TRAVEL_MM, -band)
     assert worst >= floor
     # The trim is sized to that floor, not past it: only the round-up that
     # puts the printed one-place overall on the model's own number.
     assert worst - floor < 0.1
     assert spec.FINISHED_OVERALL_MM == pytest.approx(round(spec.FINISHED_OVERALL_MM, 1))
-    # Hand-checked: thread below the seated neck, less plate, nut and deburr.
+    # Hand-checked: thread below the seated neck, less padded tap, nut, deburr.
     short_part = spec.SHANK_LENGTH_MM - band - anchor.unthreaded_shank_length_mm
     assert worst == pytest.approx(
         short_part
         - spec.ADJUSTMENT_TRAVEL_MM
-        - lever.PLATE_T
+        - lever.SPRING_SEAT_T
         - jam_nut.THICKNESS_MAX
         - maximum_axial
     )
