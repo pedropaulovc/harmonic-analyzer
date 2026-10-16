@@ -67,6 +67,7 @@ import _telemetry
 from _appearance import CASTING_GREEN, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
@@ -104,7 +105,8 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_tolerances import set_dimension_symmetric_tolerance
-from _drawing_precision import set_dimension_display_precision
+from _drawing_precision import _named_dimension, set_dimension_display_precision
+from _fit_deviations import deviations
 from _drawing_prefix import set_dimension_prefix
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
@@ -123,6 +125,10 @@ from sm_summing_lever_spec import (
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_OFFSET,
+    KNIFE_RIDGE_R,
+    KNIFE_RIDGE_R_BAND,
+    KNIFE_RIDGE_R_TOL_TYPE,
+    RIDGE_ANGLE_DEG,
     SPRING_PAD_W,
     SPRING_SEAT_T,
     SURFACE_FINISHES,
@@ -542,6 +548,74 @@ async def _hex_collar(
         # to its right; the +Z stub carries the finish and datum B).
         [depth] = name_dimensions(adapter, stem, [f"{stem}Depth"])
         drive_jobs.append((depth, '"HexDepth"'))
+
+
+async def _knife_ridge_fillet(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+    """Round both trunnions' top-vertex ridges at KNIFE_RIDGE_R (rule 16: a
+    knife edge is truncated by a small stated radius, here the print's R MAX
+    limit).  Picked mid-stub on each ridge line, the only edge through that
+    point; HexHeight stays the theoretical sharp, the knife axis (Axis3) too."""
+    picks = [
+        [0.0, HEX_H / 2.0, side * (HEX_Z_INNER + HEX_DEPTH / 2.0)]
+        for side in (1.0, -1.0)
+    ]
+    v_before = await _measured_volume(adapter, "before the knife-ridge round")
+    check(
+        "fillet knife-edge ridges",
+        await adapter.add_fillet(KNIFE_RIDGE_R, picks, propagate=False),
+    )
+    name_last_feature(adapter, "KnifeRidgeFillet")
+    [radius] = name_dimensions(adapter, "KnifeRidgeFillet", ["KnifeRidgeRadius"])
+    drive_jobs.append((radius, '"KnifeRidgeR"'))
+    # Each ridge loses the spandrel between its two faces and the round:
+    # r^2 (cot(a/2) - (pi - a)/2) for the included angle a, over the stub.
+    half = math.radians(RIDGE_ANGLE_DEG) / 2.0
+    spandrel = KNIFE_RIDGE_R**2 * (1.0 / math.tan(half) - (math.pi / 2.0 - half))
+    v_round = 2.0 * spandrel * HEX_DEPTH
+    # A ~0.01 mm^3 cut on the whole body is below the mass-property noise, so
+    # this only proves the round took nothing else; the drawing's scan of the
+    # round's tangent lines proves it is there.
+    await volume_check(
+        adapter, "knife-edge ridge rounds", v_before - v_round, 1e-4 * v_before
+    )
+
+
+async def _measured_volume(adapter, label: str) -> float:
+    await force_rebuild(adapter)
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"mass props {label} failed: {mass.error}")
+    return float(mass.data.volume)
+
+
+def _knife_ridge_max_limit(adapter) -> None:
+    """KnifeRidgeRadius as the single limit "R0.1 MAX" carrying the band's
+    deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
+    lower, upper = deviations(KNIFE_RIDGE_R_BAND)
+    _, dimension = _named_dimension(adapter, "KnifeRidgeFillet", "KnifeRidgeRadius")
+    label = "KnifeRidgeRadius@KnifeRidgeFillet"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, KNIFE_RIDGE_R / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
+            f"{KNIFE_RIDGE_R}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = KNIFE_RIDGE_R_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != KNIFE_RIDGE_R_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    set_dimension_display_precision(adapter, "KnifeRidgeFillet", "KnifeRidgeRadius", 1)
+    _telemetry.success(f"{label}: single limit {KNIFE_RIDGE_R:g} MAX")
 
 
 async def _edge_rib(
@@ -1200,6 +1274,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HexW", f"{HEX_W}mm")
     await set_global(adapter, "HexH", f"{HEX_H}mm")
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
+    await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
     await set_global(adapter, "RibReach", '"HoleX" - 4.1mm')
     # EDGE_RIB_END_HALF_H: the edge-rib slant's height at the end face.
@@ -1226,6 +1301,7 @@ async def build(adapter) -> dict[str, str]:
         stem="HexKnifeBack",
         drive_jobs=drive_jobs,
     )
+    await _knife_ridge_fillet(adapter, drive_jobs)
     await _edge_rib(
         adapter,
         flip=False,
@@ -1288,6 +1364,7 @@ async def build(adapter) -> dict[str, str]:
     # stamp the make-critical title-block properties.
     clear_dimensions_for_drawing(adapter)
     _drawing_dimension_contract(adapter)
+    _knife_ridge_max_limit(adapter)
     _receiver_model_bands(adapter)
     await _receiver_coordinate_dimensions(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)

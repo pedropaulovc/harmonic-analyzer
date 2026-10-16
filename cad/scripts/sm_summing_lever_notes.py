@@ -19,7 +19,8 @@ from sm_summing_lever_spec import HOLE_SPEC, SPRING_SEAT_T
 # Every cast contour is sized on the views (machinist review 2026-10-16: the
 # sheet may not defer to a pattern the package does not include): the plate,
 # the summation web's side radius, each rib's arc, end station and thickness,
-# the boss, and the trunnion envelope and length.
+# the boss, the spring-anchor pad under the hole row, and the trunnion
+# envelope, length and knife-edge radius.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateWidth", "PlateLength"},
     "CoefficientsPlate": {"PlateThickness"},
@@ -37,14 +38,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "EdgeRibFront": {"EdgeRibThickness"},
     "MiddleRib": {"MiddleRibThickness"},
     "HexKnifeBack": {"HexKnifeBackDepth"},
+    "KnifeRidgeFillet": {"KnifeRidgeRadius"},
     "KnifeEnvelopeReference": {"HexWidth", "HexHeight"},
 }
 
 # Model-owned text the part writes onto its own dimensions (prefix compartment).
-# The summation web's two sides share one radius; both trunnions one length.
+# The summation web's two sides share one radius; both trunnions one length
+# and one knife-edge radius.
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("SummationPlateProfile", "SummationArcRadius"): "2X R",
     ("HexKnifeBack", "HexKnifeBackDepth"): "2X ",
+    ("KnifeRidgeFillet", "KnifeRidgeRadius"): "2X ",
 }
 
 KNIFE_MOUNT_NUMBER = "MHA-SM-002"  # sm-knife-mount: the knife-edge seat
