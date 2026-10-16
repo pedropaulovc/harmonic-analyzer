@@ -34,6 +34,15 @@ RODS_PINNED_KEY = "rod-forks-pinned"
 KEEPERS_PAIR_REAMED_KEY = "fulcrum-keepers-pair-reamed"
 KEEPERS_SET_KEY = "fulcrum-keepers-set"
 SET_SCREWS_STAKED_KEY = "fulcrum-set-screws-staked"
+# The lever bank: each amplitude bar is pinned to its lever at the bench (the
+# pin is pressed into the bar's cheeks and runs in the lever), then the levers
+# go onto the fulcrum shaft between the set keepers in channel order, each
+# bar's foot notch dropped over its rocker's strap, before the keeper set
+# screws are staked onto the shaft's flats. The channel springs are hooked
+# last; their anchors are threaded and set at MHA-HA-000.
+BARS_PINNED_KEY = "bars-pinned"
+LEVER_BANK_THREADED_KEY = "lever-bank-threaded"
+SPRINGS_HOOKED_KEY = "springs-hooked"
 
 SEQUENCE: tuple[str, ...] = (
     "rocker-stack-accepted",
@@ -46,7 +55,10 @@ SEQUENCE: tuple[str, ...] = (
     "preload-accepted",
     KEEPERS_PAIR_REAMED_KEY,
     KEEPERS_SET_KEY,
+    BARS_PINNED_KEY,
+    LEVER_BANK_THREADED_KEY,
     SET_SCREWS_STAKED_KEY,
+    SPRINGS_HOOKED_KEY,
 )
 
 _NUMBER = {key: index for index, key in enumerate(SEQUENCE, start=1)}
