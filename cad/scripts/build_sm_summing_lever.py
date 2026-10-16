@@ -96,6 +96,7 @@ from magnifying_bracket_joint_layout import (
     DRILL_DEPTH_BAND,
     THREAD_DEPTH_BAND,
     RECEIVER_DIMENSION_BANDS,
+    RIB_DEPTH as RECEIVER_RIB_T,
 )
 from _drawing_marks import (
     apply_drawing_properties,
@@ -177,14 +178,17 @@ SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
 TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
 ARC_R = CYL_R + RIB_PAD  # rib arc radius wrapping the cylinder     15.24
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
+# The -Z edge rib is the magnifier bracket's receiver: deeper (7.0) so the
+# whole #2-56 tap drill stays in it (magnifying_bracket_joint_layout).
+RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 69.20
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
 # Every rib extrudes AFTER the spring holes (feature 1), so a rib reaching the
 # hole column at HOLE_X re-fills any hole whose z lands in its z-span. The middle
 # rib (+-RIB_T/2 = +-2.54) once refilled j=10 (the 4.21 mm^3
 # channel-spring-installed-6 clash); on the cam plane (HOLE_Z_OFFSET -3.528) the
-# j=0 tap sits 0.49 inboard of the -Z edge rib's inner face (-71.12), so that rib
-# would refill 0.86 of it. Every rib's +X end therefore stops inboard of the
+# j=0 tap (z -70.63) lies inside the -Z receiver rib's z-span (-76.20..-69.20),
+# so that rib would refill it. Every rib's +X end therefore stops inboard of the
 # hole column by the spring coil radius (~3.25) + margin so every hole stays
 # open; the ribs still stiffen the inner lever, the outer plate arm is the (thin)
 # spring-hole field.
@@ -492,7 +496,8 @@ async def _edge_rib(
 ) -> None:
     """Feature 4: Front-plane rib -- two slant lines, a vertical end face and a
     semicircle (radius ARC_R, centred at the origin) wrapping the cylinder,
-    blind-extruded at the +-RIB_OFFSET start offset along Z.
+    blind-extruded at the +-RIB_OFFSET start offset along Z (the -Z receiver
+    rib RECEIVER_RIB_T deep from +-RECEIVER_RIB_OFFSET).
 
     Vertices (A, C on the arc; B, D the end face at RIB_PLATE_REACH, short of
     the spring-hole column the -Z rib's span crosses, +-EDGE_RIB_END_HALF_H on
@@ -547,7 +552,10 @@ async def _edge_rib(
     check(f"exit_sketch {name}", await adapter.exit_sketch())
     name_last_feature(adapter, f"{stem}Profile")
     drive_jobs += rib.apply(adapter, f"{stem}Profile")
-    extrude_at_offset(adapter, RIB_T, RIB_OFFSET, flip=flip)
+    if flip:
+        extrude_at_offset(adapter, RECEIVER_RIB_T, RECEIVER_RIB_OFFSET, flip=True)
+    else:
+        extrude_at_offset(adapter, RIB_T, RIB_OFFSET)
     name_last_feature(adapter, stem)
     if stem == "EdgeRibFront":
         # The -Z rib's depth is the receiver's banded RibDepth
@@ -1120,6 +1128,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlateT", f"{PLATE_T}mm")
     await set_global(adapter, "CylR", f"{CYL_R}mm")
     await set_global(adapter, "RibT", f"{RIB_T}mm")
+    await set_global(adapter, "ReceiverRibT", f"{RECEIVER_RIB_T}mm")
     await set_global(adapter, "RibPad", f"{RIB_PAD}mm")
     await set_global(adapter, "SumH", f"{SUM_H}mm")
     await set_global(adapter, "AnchorR", f"{ANCHOR_R}mm")
