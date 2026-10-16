@@ -63,15 +63,24 @@ ISO_SCALE = (3.0, 1.0)
 FRONT_CENTER = (0.100, 0.180)
 ISO_CENTER = (0.310, 0.213)
 # The cut end sits about 0.072 below the view centre (half the 28.8 at 5:1).
+# The deburr's value and callout hang right of the shank, clear of their own
+# extension lines (review r8: centred under the 2.3 mm leg they were struck)
+# and above the notes.
 FRONT_KEEP = {
     "FinishedOverall": (0.042, 0.180),
-    "ChamferWidth": (0.128, 0.098),
+    "ChamferWidth": (0.168, 0.100),
     "ChamferAngle": (0.124, 0.117),
 }
-# The deburr band is tighter than the title block because its minimum leg
-# must bring the cut end under the #6-32 tap drill, so the cut thread starts
-# in the lever's tap (and in the jam nut's): the callout names that mate.
-CHAMFER_CALLOUT = {"ChamferWidth": "LEAD-IN TO MHA-SM-003 TAP"}
+# The deburr band is tighter than the title block on both sides (review r8
+# read it as a plain lead-in): its minimum leg brings the cut end under the
+# #6-32 tap drill so the cut thread starts in the lever's tap, and its
+# maximum, at the steepest angle, is charged to the full threads the shank
+# keeps past the jam nut.  The callout names both mates.
+CHAMFER_CALLOUT = {
+    "ChamferWidth": (
+        "MIN: CUT END STARTS IN MHA-SM-003 TAP\nMAX: KEEPS FULL THREAD PAST MHA-CH-012"
+    )
+}
 EXPECTED_CONTROLS = {
     "FinishedOverall": (
         FINISHED_OVERALL_MM / 1000,

@@ -30,6 +30,8 @@ z = THICKNESS.  The cut runs along local X.  ``Axis1`` is the thread axis.
 
 from __future__ import annotations
 
+import math
+
 from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
 from sm_summing_lever_spec import CHANNEL_PITCH, HOLE_SPEC
@@ -97,11 +99,15 @@ TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 # The sketch rectangle's span along X: past the O.D. so the cut runs out both
 # sides (a construction size, not marked for the drawing).
 SLOT_SPAN = OD + 2.0
-# Rule 12 (hole and slot callouts say what to do): the drive cut is sawn.
-SLOT_CALLOUT = "SAW ACROSS"
-# The O.D.'s three places are for its neighbours: twenty nuts stand side by
-# side at the anchor pitch, and the 0.25 gap holds only at the .XXX band.
-OD_CALLOUT = "CLEARS THE NEXT MHA-CH-012"
+# Rule 12 (hole and slot callouts say what to do), without naming a method.
+SLOT_CALLOUT = "SLOT THRU ACROSS"
+# The O.D.'s three places are bounded both ways (review r8 read them as a
+# clearance size only): the wall to the thread below, printed as a fact
+# above the value, and the neighbouring nut above, named below it -- twenty
+# nuts stand side by side at the anchor pitch and the 0.25 gap holds only
+# at the .XXX band.
+OD_WALL_CALLOUT = f"WALL {math.floor(WALL_WORST * 10) / 10:.1f} MIN"
+OD_CALLOUT = "CLEARS NEXT MHA-CH-012"
 # A jam nut is thin by kind, and the stock anchor's shank caps it: the full
 # thread it carries at its thinnest, less the incomplete thread a through tap
 # leaves, falls short of 1.5D and the sheet states it as a fact.
