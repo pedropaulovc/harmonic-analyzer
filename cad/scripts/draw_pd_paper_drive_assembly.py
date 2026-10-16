@@ -385,18 +385,23 @@ PIVOT_STAKE_TIP = (
     support_bar.PIVOT_TAP_CSK_DIA / 2.0 + 0.6,
 )
 PIVOT_STAKE_NOTE = f"STAKE TAP MOUTH,\n{PIVOT_STAKE_POINTS_TEXT}"
-# The note stands centred on the axis just outside the section's circle at
-# the front-face end, between the two balloon columns and clear of the native
-# section caption. Sheet x of its left edge, and its gap off the circle.
-PIVOT_STAKE_NOTE_X = PIVOT_SECTION_CENTER[0] - 0.022
+# The note stands just outside the section's circle at the front-face end,
+# its left edge PIVOT_STAKE_NOTE_SIDE_GAP right of the tip, so its leader
+# leaves the text's left end and runs up (or down) and left to the tip without
+# crossing it. Farm r6 review: centred on the axis, with the tip right of
+# centre, SolidWorks attached the leader at the text's right end and the
+# leader ran back through "MOUTH,". The note's top-left is the INote position
+# (r6: 0.073, 0.086 asked, text top-left at 0.0731, 0.0860).
+PIVOT_STAKE_NOTE_SIDE_GAP = 0.006
 PIVOT_STAKE_NOTE_GAP = 0.004
 PIVOT_STAKE_NOTE_LINE_PITCH = 0.0045
 
 
-def pivot_stake_note_xy(front_side: float) -> tuple[float, float]:
-    """Top-left sheet point of the stake note: just outside the section's
-    circle on the front face's side (``front_side`` +1.0 when the front
-    face is above the circle's centre on the sheet, -1.0 below)."""
+def pivot_stake_note_xy(tip_x: float, front_side: float) -> tuple[float, float]:
+    """Top-left sheet point of the stake note: right of the leader's tip at
+    sheet x ``tip_x``, just outside the section's circle on the front face's
+    side (``front_side`` +1.0 when the front face is above the circle's
+    centre on the sheet, -1.0 below)."""
     if front_side not in (1.0, -1.0):
         raise ValueError(f"front_side must be +1.0 or -1.0, not {front_side!r}")
     offset = PIVOT_SECTION_RADIUS + PIVOT_STAKE_NOTE_GAP
@@ -405,7 +410,7 @@ def pivot_stake_note_xy(front_side: float) -> tuple[float, float]:
         top = PIVOT_SECTION_CENTER[1] + offset + lines * PIVOT_STAKE_NOTE_LINE_PITCH
     else:
         top = PIVOT_SECTION_CENTER[1] - offset
-    return (PIVOT_STAKE_NOTE_X, top)
+    return (tip_x + PIVOT_STAKE_NOTE_SIDE_GAP, top)
 
 
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
@@ -2406,20 +2411,36 @@ def _note_pivot_stake(
     label: str,
 ) -> None:
     """Point the stake note at the tap's front mouth in SECTION A-A
-    (PIVOT_STAKE_TIP), the note outside the circle at the front face's end."""
+    (PIVOT_STAKE_TIP), the note outside the circle at the front face's end,
+    right of the tip so its leader leaves the text's left end."""
     (tip,) = _pivot_section_cut_points(
         adapter, section, (("right", *PIVOT_STAKE_TIP),), label=label
     )
     if tip[0] <= PIVOT_SECTION_CENTER[0]:
         raise RuntimeError(f"{label}: the stake tip {tip!r} is not right of the axis")
-    add_leader_note(
-        adapter,
-        PIVOT_STAKE_NOTE,
-        text_xy=pivot_stake_note_xy(1.0 if front[1] > head[1] else -1.0),
-        attach_xy=tip,
-        label=label,
-        view=section,
+    text_xy = pivot_stake_note_xy(tip[0], 1.0 if front[1] > head[1] else -1.0)
+    note = _early_bound(
+        add_leader_note(
+            adapter,
+            PIVOT_STAKE_NOTE,
+            text_xy=text_xy,
+            attach_xy=tip,
+            label=label,
+            view=section,
+        ),
+        "INote",
     )
+    # The leader's first point is its end on the note: it must leave the
+    # text's left end, not its far side (farm r6 review).
+    points = list(
+        _early_bound(note.GetAnnotation(), "IAnnotation").GetLeaderPointsAtIndex(0)
+        or ()
+    )
+    if len(points) < 6 or float(points[0]) > text_xy[0] + 0.001:
+        raise RuntimeError(
+            f"{label}: the leader leaves the note at {points[:2]!r}, "
+            f"not its left end at x {text_xy[0]:.4f}"
+        )
 
 
 def _balloon_pivot_section(

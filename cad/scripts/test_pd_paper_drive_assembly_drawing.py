@@ -1014,31 +1014,47 @@ def test_the_pivot_stake_note_points_at_the_front_mouth_clear_of_the_balloons() 
     sx, sy = drawing.PIVOT_SECTION_CENTER
     radius = drawing.PIVOT_SECTION_RADIUS
     scale = drawing.PIVOT_SECTION_SCALE[0] / drawing.PIVOT_SECTION_SCALE[1] / 1000.0
-    column_x = radius + drawing.PIVOT_BALLOON_GAP
-    x0 = drawing.PIVOT_STAKE_NOTE_X
-    # Between the balloon columns, roughly centred on the axis.
-    assert sx - column_x + BALLOON_RADIUS < x0
-    assert x0 + width < sx + column_x - BALLOON_RADIUS
-    assert abs(x0 + width / 2.0 - sx) < 0.005
+    # The section is centred on the stack with its axis vertical, so the tip
+    # stands r right of the circle's centre.
+    tip_x = sx + r * scale
+    column_x = sx + radius + drawing.PIVOT_BALLOON_GAP
+    field_right = drawing.SHEET_TWO_RING_LIMITS[0] - drawing.SHEET_TWO_RING_GAP
     caption_y = drawing.PIVOT_SECTION_CAPTION_XY[1]
+    right_tips = [
+        tip_y
+        for _stem, side, tip_y, _r in drawing.PIVOT_BALLOON_TIPS
+        if side == "right"
+    ]
     for front_side in (1.0, -1.0):
-        left, top = drawing.pivot_stake_note_xy(front_side)
-        assert left == x0
+        left, top = drawing.pivot_stake_note_xy(tip_x, front_side)
         bottom = top - height
-        # Outside the circle at the front face's end.
+        # The whole text right of the tip: the leader leaves its left end.
+        assert left - tip_x >= 0.005
+        assert left + width < field_right
+        # Outside the circle at the front face's end, the tip beyond the
+        # text's near edge, so the leader runs away from the text.
+        tip_y = sy - front_side * (y - centre_y) * scale
         if front_side > 0:
             assert bottom > sy + radius
+            assert sy < tip_y < bottom
         else:
             assert top < sy - radius
+            assert top < tip_y < sy
             # Above the native section caption with a line to spare.
             assert bottom - NOTE_LINE_PITCH > caption_y
-        # The leader stays short and on the front face's side of the centre.
-        tip_y = sy + front_side * abs(y - centre_y) * scale
-        assert 0.0 < (tip_y - sy) * front_side < radius
         near = top if front_side < 0 else bottom
-        assert math.hypot(r * scale, tip_y - near) < 0.015
+        assert math.hypot(left - tip_x, tip_y - near) < 0.015
+        # Clear of the right balloon column, whichever way the axis runs.
+        ys = sorted(
+            (sy - front_side * (tip - centre_y) * scale for tip in right_tips),
+            reverse=True,
+        )
+        for balloon_y in drawing.spread_balloon_column(ys, drawing.PIVOT_BALLOON_PITCH):
+            dx = max(left - column_x, 0.0, column_x - (left + width))
+            dy = max(bottom - balloon_y, 0.0, balloon_y - top)
+            assert math.hypot(dx, dy) > BALLOON_RADIUS + 0.002
     with pytest.raises(ValueError):
-        drawing.pivot_stake_note_xy(0.0)
+        drawing.pivot_stake_note_xy(tip_x, 0.0)
 
 
 def test_pivot_section_balloon_columns_keep_order_and_pitch() -> None:
