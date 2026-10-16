@@ -813,6 +813,7 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
                 "pd_paper_drive",
                 "ms_measuring_stick",
                 "pn_pen",
+                "sm_summing",
             },
         ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
