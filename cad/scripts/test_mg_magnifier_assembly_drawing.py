@@ -815,18 +815,22 @@ def test_the_lever_group_takes_1_2_5_centred_with_its_caption_under_it() -> None
 
 
 def test_the_setting_axis_picks_land_on_the_bare_cylinders_off_the_chain() -> None:
-    # r14 (run 20261016T171305106Z), back view at 1:4: the clamp block ends
-    # 18.7 mm under the lever axis and 5.9 mm right of the rod axis; the
-    # fixture's top sits 5.5 mm over its axis.
+    # r14 (run 20261016T171305106Z), back view at 1:4: the picks stay 5 mm
+    # off the clamp block, the 7/16 hex whose bottom face sits LEVER_BORE_Y
+    # under the lever axis and whose corners sit HEX_AC/2 either side of the
+    # rod axis along the lever (#1559), and off the fixture's top, 5.5 mm
+    # over its axis.
+    import mg_magnifying_clamp_geom as clamp
+
     picks = drawing.setting_axis_picks_m()
     rod_x, rod_y, rod_z = (value * 1000.0 for value in picks["vertical rod"])
     lever_x, lever_y, lever_z = (value * 1000.0 for value in picks["lever"])
     assert rod_z == lever_z == 0.0
     assert 0.0 < rod_x - stack.CLAMP_CENTRE_X < drawing._VROD_R
-    assert stack.LEVER_AXIS_Y - rod_y > 18.7 + 5.0
+    assert stack.LEVER_AXIS_Y - rod_y > clamp.LEVER_BORE_Y + 5.0
     assert rod_y - stack.FIXTURE_AXIS_Y > 5.5 + 5.0
     assert 0.0 < lever_y - stack.LEVER_AXIS_Y < drawing._LEVER_R
-    assert lever_x - stack.CLAMP_CENTRE_X > 5.9 + 5.0
+    assert lever_x - stack.CLAMP_CENTRE_X > clamp.HEX_AC / 2.0 + 5.0
     assert stack.LEVER_TIP_X - lever_x > drawing._LEVER_R + 5.0
 
 
@@ -917,15 +921,19 @@ def test_the_joint_retention_rows_point_at_magnifier_steps() -> None:
 
 
 @pytest.mark.parametrize(
-    ("stem", "radius", "rows"),
+    ("stem", "station", "radius", "rows"),
     [
         (
             "mg-magnifying-lever",
             assembly.LEVER_ROD_DIA / 2.0,
+            assembly.LEVER_ROD_DIA / 2.0,
             _transforms.ROT_Y_180,
         ),
         (
+            # The shoulder's Ø5 edge (#1559): the old x = R station now falls
+            # on the turned-down thread, so a point at radius R is off the rod.
             "mg-magnifying-vertical-rod",
+            assembly.VROD_SHOULDER_X,
             assembly.VROD_DIA / 2.0,
             _transforms.compose_rows(
                 _transforms.rot_z_rows(-90.0), _transforms.ROT_Y_180
@@ -933,11 +941,11 @@ def test_the_joint_retention_rows_point_at_magnifier_steps() -> None:
         ),
     ],
 )
-def test_capsule_balloon_anchors_sit_on_a_dome_tangent_facing_the_isometric(
-    stem: str, radius: float, rows: list[list[float]]
+def test_rod_balloon_anchors_sit_on_a_drawn_circle_facing_the_isometric(
+    stem: str, station: float, radius: float, rows: list[list[float]]
 ) -> None:
     x, y, z = drawing.BALLOON_ANCHORS[stem].point_mm
-    assert x == pytest.approx(radius)
+    assert x == pytest.approx(station)
     assert math.hypot(y, z) == pytest.approx(radius)
     normal = [
         sum((0.0, y / radius, z / radius)[i] * rows[i][j] for i in range(3))
@@ -948,6 +956,6 @@ def test_capsule_balloon_anchors_sit_on_a_dome_tangent_facing_the_isometric(
         # Square to the rod axis, and straight at the viewer.
         assert sum(normal) == pytest.approx(math.sqrt(2.0))
     else:
-        # Opposite the revolve seam (R, R, 0): a vertex of the drawn circle for
-        # any even segment count (r12 missed mid-chord at 1:2).
+        # Opposite the revolve seam (x, R, 0): a vertex of the drawn circle
+        # for any even segment count (r12 missed mid-chord at 1:2).
         assert (y, z) == pytest.approx((-radius, 0.0))
