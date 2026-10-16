@@ -84,6 +84,7 @@ from sm_summing_lever_notes import (
     DIMENSION_CALLOUTS_ABOVE,
     DIMENSION_CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
+    SPRING_TAP_CALLOUT_PROCESS,
 )
 from sm_summing_lever_spec import (
     ANCHOR_H,
@@ -141,12 +142,14 @@ ISO_CENTER = (0.350, 0.225)
 BACK_CENTER = (0.225, 0.190)
 SHEET_NAMES = ("Lever Geometry", "Bracket Receiver")
 
-# Detail A: the trunnion envelope at 4:1, in the open field left of the front
+# Detail D: the trunnion envelope at 4:1, in the open field left of the front
 # profile.  The fence (7.5 model mm) holds the hexagon (5.13 half-height) and
 # none of the rib or web outline (the R15.24 rib arc, 7.6 sheet mm out).
 # Centred on the axis, the hexagon prints at DETAIL_CENTER, its fence 30 mm
 # round it; the label hangs below the width's dimension line, clear of
-# section C-C's caption.
+# section C-C's caption.  D, not A: datum feature A is the -Z trunnion
+# (machinist review r5: one letter named both).
+DETAIL_LETTER = "D"
 DETAIL_CENTER = (0.075, 0.222)
 DETAIL_SCALE = (4.0, 1.0)
 DETAIL_RADIUS_MM = 7.5
@@ -283,7 +286,7 @@ def _knife_detail(adapter: Any, front: Any) -> Any:
         0.0,
         0,  # swDetViewSTANDARD
         *DETAIL_SCALE,
-        "A",
+        DETAIL_LETTER,
         1,  # swDetCircleCIRCLE
         True,
         False,
@@ -376,7 +379,7 @@ def _apply_callouts(adapter: Any, annotations: list[Any], *, label: str) -> None
 
 
 def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Prove Detail A's KnifeRidgeRadius prints the part's R MAX: radial,
+    """Prove Detail D's KnifeRidgeRadius prints the part's R MAX: radial,
     measuring KNIFE_RIDGE_R, the native swTolMAX the part set
     (draw_ch_pivot_bracket._dress_corner_radius's readback)."""
     found = [
@@ -405,7 +408,7 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
 
 
-# Detail A's included-angle text: inside the ridge's own wedge, on the
+# Detail D's included-angle text: inside the ridge's own wedge, on the
 # hexagon's centreline 13.5 sheet mm under the vertex.  The vertex's R MAX
 # keeps the wedge above: its leader must land inside the round's span (the
 # flats' normals, 57.6..122.4 deg), and an angle there would cross it.
@@ -413,7 +416,7 @@ KNIFE_ANGLE_TEXT_DROP = 0.0135
 
 
 def _knife_ridge_angle(adapter: Any, detail: Any) -> Any:
-    """Detail A's knife-edge included angle (machinist review r4 B2): a driven
+    """Detail D's knife-edge included angle (machinist review r4 B2): a driven
     angular dimension between the +Z stub's two upper flats, shown as a
     reference -- HexWidth and HexHeight already fix it (RIDGE_ANGLE_DEG is
     2 atan((W/2) / (H/4))), so a toleranced angle would dimension the
@@ -662,14 +665,17 @@ FRONT_KEEP = {
     "EdgeRibFrontEndTopX": (0.2443, 0.254),
     "EdgeRibFrontEndTopY": (0.268, 0.244),
 }
-# Detail A at 4:1: the hexagon's centre prints at DETAIL_CENTER, its flats at
+# Detail D at 4:1: the hexagon's centre prints at DETAIL_CENTER, its flats at
 # x 0.0588/0.0912, its vertices at y 0.2015/0.2425, the fence 0.030 round it.
-# The width hangs below the fence, centred between its extension lines; the
-# vertex height stands right of it, its text level with the centre and its
-# three callout lines below the value; the vertex's R MAX leads off up-right
-# from over the fence (inside the round's span, see KNIFE_ANGLE_TEXT_DROP).
+# The width's three lines stand right of its span (32.4 mm: the callout's
+# 37 mm would run its extension lines through the text), above the boss
+# diameter's four lines (top 0.1784) and the label, its line ~0.181; the
+# vertex height stands right of the fence, its text level with the centre
+# and its three callout lines below the value; the vertex's R MAX leads off
+# up-right from over the fence (inside the round's span, see
+# KNIFE_ANGLE_TEXT_DROP).
 DETAIL_KEEP = {
-    "HexWidth": (DETAIL_CENTER[0], 0.183),
+    "HexWidth": (0.121, 0.1895),
     "HexHeight": (0.130, DETAIL_CENTER[1]),
     "KnifeRidgeRadius": (0.093, 0.259),
 }
@@ -681,7 +687,9 @@ TOP_KEEP = {
     # text (whose line, with 76.20's, dropped to 0.0695 for that), and the
     # text sits right of the span, clear of B.
     "PlateWidth": (0.266, 0.0813),
-    "PlateLength": (0.395, TOP_CENTER[1]),
+    # Right of the -Z rib's three lines (they end at x 0.4007; at 0.395 its
+    # line crossed "DRILL", farm r7).
+    "PlateLength": (0.405, TOP_CENTER[1]),
     "RibDepth": (0.325, 0.160),  # -Z receiver rib: Top prints model +Z down
     # The boss's diameter names the web arcs' ends under its value; its
     # four lines stand left of its leader, above the anchor tap's callout.
@@ -729,7 +737,9 @@ BACK_KEEP = {
     "SpringSeatThickness": (0.153, 0.176),
     "SpringPadWidth": (0.130, 0.163),
     "ReceiverX0": (0.220, 0.2215),
-    "ReceiverX1": (0.130, 0.2085),
+    # Each tight station names the bracket (machinist review r5): the 14.75's
+    # two lines stand over the row height's one, which prints above its value.
+    "ReceiverX1": (0.130, 0.2145),
     "ReceiverY0": (0.143, 0.1985),
 }
 # The back view's label, under the pad's width.  The point is its top left.
@@ -1095,7 +1105,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # whose letter prints at x 0.259..0.265, y 0.136..0.143 (farm r3: the
     # leader off the middle hole, y 0.1336, ran 6.2 mm through the letter,
     # then at y 0.129..0.1355). Hole 7 (y 0.1230) keeps the leader clear
-    # under it. Every callout on
+    # under it; the text centres on x 0.304 so the process line's 67 mm
+    # (from x 0.271) clears that letter.  Every callout on
     # the end hole had to leave it downward and so crossed the plate-end
     # extension lines of 152.40 and the start-Z dimension -- steepening the
     # leader only traded that for text-on-line and arrow-near-text against
@@ -1112,8 +1123,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge=callout_rim.edge,
-        callout_xy=(0.292, _top_xy(HOLE_X, -callout_hole_z)[1] + 0.0015),
+        callout_xy=(0.304, _top_xy(HOLE_X, -callout_hole_z)[1] + 0.0015),
         label="spring-hole pattern",
+        process=SPRING_TAP_CALLOUT_PROCESS,
     )
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
     # the TOP of the column. The frame sits above the +Z trunnion stub with
