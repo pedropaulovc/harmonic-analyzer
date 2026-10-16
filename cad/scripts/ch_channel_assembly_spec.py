@@ -161,22 +161,28 @@ class ExplodeStep:
 
 _KEEPER_GROUP = (KEEPER, KEEPER_SET_SCREW, KEEPER_FOOT_SCREW)
 _BRACKET_GROUP = (BRACKET, BRACKET_SET_SCREW, BRACKET_HOLD_DOWN)
+# The exploded view's outline is the isometric of the exploded model's x/y/z
+# box, not of its ink (r12/r13 drawing leaves: 300 more north on DETAIL B's
+# cluster grew it 17.5 mm tall and 30 mm wide, 90 more up on the pulled
+# channel 10.5 mm tall, each exactly that box's growth). The balloon ring
+# leaves it 198 mm of sheet height and r11 used 181, so 17 mm (x 7 x sqrt 6:
+# 286 model mm) is left to spend: a step that carries a part past the box
+# spends 1 per mm along x or z and 2 along y.
+#
 # The north bracket's hardware and the north washer (DETAIL B's cluster): at
 # 60 north alone the bracket sat inside the hanging rocker arms. Leaders 4 and
 # 7 met on it there, and the letter B fell on the arms (r10 machinist review).
-# 400 further north and 360 up puts the cluster in the open area left of the
-# pulled-out channel (below): on the r11 sheet, with that channel's footprint
-# (the bank eroded along its pitch) shifted as below, the circle stands 12 px
-# (2.5 mm) or more clear of every part.
+# 60 further north and 500 up lifts the cluster, free (still inside the box),
+# into the open space between the bank's bar column and the pulled-out
+# channel: on an r11 sheet replay the circle stands 34 px (7 mm) clear of
+# the bank, the channel and DETAIL C's circle.
 _NORTH_END_GROUP = (*_BRACKET_GROUP, WASHER)
-# One whole channel, pulled out of the bank off both shafts: closed up, the
-# 20 channels print as one dark mass at 1:7 and the balloons pinned on the
-# north-most instances landed inside it (r11 machinist review). North alone
-# also drops it in the isometric: at 250 north its rods put the view's
-# outline 0.8 mm past the balloon ring's room (r12 drawing leaf). 340 north
-# and 90 up drop it 9 mm on the sheet, not 15, with its footprint 12 px
-# (2.5 mm) clear of the bank's on an r11 sheet replay; its two pins then come
-# 25 further out of their bores, along their axes.
+# One whole channel, pulled north out of the bank off both shafts: closed up,
+# the 20 channels print as one dark mass at 1:7 and the balloons pinned on
+# the north-most instances landed inside it (r11 machinist review). At 300
+# its footprint stands 26 px (5.5 mm) clear of the bank's on an r11 sheet
+# replay; its two pins then come 25 further out of their bores, along their
+# axes. It spends 156 of the box's 286 (its pins' north ends ~400 north).
 _CHANNEL_GROUP = (
     ARM,
     ROD,
@@ -200,8 +206,8 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("bank spring out", (BANK_SPRING,), "z", -40.0, "south"),
     ExplodeStep("south washer out", (WASHER,), "z", -20.0, "south"),
     ExplodeStep("north washer out", (WASHER,), "z", 20.0, "north"),
-    ExplodeStep("north end further out", _NORTH_END_GROUP, "z", 400.0, "north"),
-    ExplodeStep("north end up", _NORTH_END_GROUP, "y", 360.0, "north"),
+    ExplodeStep("north end further out", _NORTH_END_GROUP, "z", 60.0, "north"),
+    ExplodeStep("north end up", _NORTH_END_GROUP, "y", 500.0, "north"),
     ExplodeStep("rods down", (ROD,), "y", -50.0),
     # Up, not along x: 50 west put each bar (pin x 72.9) on its own spring's
     # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick);
@@ -220,8 +226,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # crossed leaders 2/17 and 8/10 (r6 layout audit); south it attaches out at
     # the right, which a replay of the r6 ring places clear of every leader.
     ExplodeStep("fulcrum shaft out south", (FULCRUM_SHAFT,), "z", -120.0),
-    ExplodeStep("north-most channel out", _CHANNEL_GROUP, "z", 340.0, "north-most"),
-    ExplodeStep("north-most channel up", _CHANNEL_GROUP, "y", 90.0, "north-most"),
+    ExplodeStep("north-most channel out", _CHANNEL_GROUP, "z", 300.0, "north-most"),
     ExplodeStep("its pins out", (ROD_PIN, BAR_PIN), "z", 25.0, "north-most"),
 )
 EXPLODED_STEMS = frozenset(stem for step in EXPLODE_STEPS for stem in step.stems)

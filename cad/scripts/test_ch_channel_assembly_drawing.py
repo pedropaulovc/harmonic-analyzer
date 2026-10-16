@@ -302,12 +302,12 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     asm = drawing.asm
     north = "north"
     lug_z = drawing.FULCRUM_KEEPER_CENTRE_Z + drawing.KEEPER_Z_OFF
-    # 60 north, then the whole north-end cluster 400 further north and 360 up,
+    # 60 north, then the whole north-end cluster 60 further north and 500 up,
     # clear of the hanging rocker arms (r10 machinist review, DETAIL B), and
-    # (r11) clear of the north-most channel pulled out below it.
-    assert drawing.exploded_offset(asm.BRACKET, north) == (0.0, 360.0, 460.0)
-    assert drawing.exploded_offset(asm.BRACKET_SET_SCREW, north) == (0.0, 385.0, 460.0)
-    assert drawing.exploded_offset(asm.WASHER, north) == (0.0, 360.0, 420.0)
+    # (r11) between the bank and the north-most channel pulled out of it.
+    assert drawing.exploded_offset(asm.BRACKET, north) == (0.0, 500.0, 120.0)
+    assert drawing.exploded_offset(asm.BRACKET_SET_SCREW, north) == (0.0, 525.0, 120.0)
+    assert drawing.exploded_offset(asm.WASHER, north) == (0.0, 500.0, 80.0)
     assert drawing.exploded_offset(asm.KEEPER_FOOT_SCREW, north) == (0.0, 25.0, 50.0)
     assert drawing.exploded_offset(asm.BRACKET, "south") == (0.0, 0.0, -60.0)
     bracket, keeper = drawing.NORTH_BRACKET_DETAIL, drawing.NORTH_KEEPER_DETAIL
@@ -427,12 +427,12 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
     ]
     assert len(pulled) == 9 and set(channel.values()) <= set(pulled)
     assert all(name.endswith("-20") for name in pulled)
-    assert drawing.exploded_offset(asm.ARM, "north-most") == (0.0, 90.0, 340.0)
-    assert drawing.exploded_offset(asm.ROD, "north-most") == (0.0, 40.0, 340.0)
-    assert drawing.exploded_offset(asm.ROD_PIN, "north-most") == (0.0, 90.0, 365.0)
-    assert drawing.exploded_offset(asm.BAR_PIN, "north-most") == (0.0, 140.0, 365.0)
+    assert drawing.exploded_offset(asm.ARM, "north-most") == (0.0, 0.0, 300.0)
+    assert drawing.exploded_offset(asm.ROD, "north-most") == (0.0, -50.0, 300.0)
+    assert drawing.exploded_offset(asm.ROD_PIN, "north-most") == (0.0, 0.0, 325.0)
+    assert drawing.exploded_offset(asm.BAR_PIN, "north-most") == (0.0, 50.0, 325.0)
     spring = drawing.exploded_offset(drawing.SPRING_STEM, "north-most")
-    assert spring == (0.0, 90.0, 340.0)
+    assert spring == (0.0, 0.0, 300.0)
     assert drawing.exploded_offset(asm.ARM, "north") == (0.0, 0.0, 0.0)
     assert {"ch-pivot-shaft", asm.ARM, asm.LEVER}.isdisjoint(asm.FULLY_EXPLODED_STEMS)
     assert asm.FULCRUM_SHAFT in asm.EXPLODED_STEMS
