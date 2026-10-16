@@ -30,7 +30,7 @@ _EXPECTED = {
     "vn-knife-hanger-washer": (("96659A104",), "MHA-VN-060", 2),
     "vn-knife-mount-dowel": (("98381A473",), "MHA-VN-051", 4),
     "vn-latch-hook-bracket-screw": (("90280A108",), "MHA-VN-043", 2),
-    "vn-magnifying-bracket-screw": (("91794A077",), "MHA-VN-050", 2),
+    "vn-magnifying-bracket-screw": (("91794A078",), "MHA-VN-050", 2),
     "vn-ms-stop-plate-screw": (("90114A124",), "MHA-VN-054", 2),
     "vn-lag-screw": (("92240A540",), "MHA-VN-009", 4),
     "vn-pedestal-hold-down-screw": (("90280A197",), "MHA-VN-032", 2),
@@ -121,7 +121,7 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
     # brass #2-56 fillister (MHA-VN-054).
     assert fleet_quantity("90280A199") == 0
     assert fleet_quantity("90280A108") == 4
-    assert fleet_quantity("91794A077") == 2
+    assert fleet_quantity("91794A078") == 2
     assert fleet_quantity("90280A201") == 6
     assert fleet_quantity("90280A203") == 4
     assert fleet_quantity("90114A511") == 15

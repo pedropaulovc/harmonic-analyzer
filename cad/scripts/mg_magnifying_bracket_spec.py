@@ -14,20 +14,44 @@ long about local X) whose bore is the PRESS seat for the Ø6 magnifying lever
 (nominal and bands from ``mg_lever_press_fit_geom``, the joint's one read
 point), a rectangular ARM cantilevering +Z to the summing plate, and a mounting
 FLANGE whose +Z face butts the plate's front face.  The two plan rectangles
-carry the auto-importable marked dimensions, including the flange thickness
-band; the collar's end-view circles carry the OD and the banded bore, and its
-extrude the banded length; the blanked ``ArmSection`` witness carries the
-arm's section and the bore axis's one datum chain (the mounting face and the
-arm's end, both from the axis) in the side view.  Native counterbore callouts
-define the through bore and head seat.
+carry the auto-importable marked dimensions (the flange thickness at the
+title block's .XXX band, the screws' grip); the collar's end-view circles
+carry the OD and the bore, a REFERENCE nominal whose callout states the
+matched fit on the MHA-MG-003 lever, and its extrude the banded length,
+which names the lever's press zone it matches; the blanked ``ArmSection``
+witness carries the arm's section and the bore axis's one datum chain (the
+mounting face and the arm's end, both from the axis) in the side view.  A
+native plain clearance-hole callout names the summing lever's tapped holes
+the banded hole pattern matches.  ``ArmRootFillet`` breaks the arm-to-flange
+inside corners at a single MAX radius (drawing-guidelines.md rule 16).
 """
 
 from __future__ import annotations
-from magnifying_bracket_joint_layout import (
-    POSITION_BAND,
-    GRIP_MIN,
+
+from magnifying_bracket_joint_layout import POSITION_BAND
+from mg_lever_press_fit_geom import (
+    COLLAR_LENGTH,
+    COLLAR_LENGTH_BAND,
+    PRESS_FIT_BUDGET,
+    PRESS_ZONE_DIA,
+    PRESS_ZONE_DIA_BAND,
+    PRESS_ZONE_LENGTH,
+    PRESS_ZONE_LENGTH_BAND,
+    check_press_fit_budget,
+    press_fit_budget,
 )
-from mg_lever_press_fit_geom import PRESS_INSTALLATION_NOTES
+
+# Arm-to-flange inside corners (drawing-guidelines.md rule 16): the three
+# concave edges where the arm leaves the flange's front (-Z) face are filleted
+# AT the largest radius the print allows, a single MAX limit, so the shop may
+# leave any smaller corner a Ø2 end mill cuts.  One place: rule 3, no extra
+# places on a radius.  The build proves the fillet leaves the flange's front
+# face a flat beside the arm on both sides.
+ARM_ROOT_R_PLACES = 1
+ARM_ROOT_R_MAX = 1.0
+ARM_ROOT_R_BAND = (0.0, -ARM_ROOT_R_MAX)  # (upper, lower)
+# swTolType_e.swTolMAX: a corner radius prints as one limit, "R1.0 MAX".
+RADIUS_TOL_TYPE = 6
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The two extruded PLAN rectangles auto-import to the front view
@@ -38,9 +62,10 @@ from mg_lever_press_fit_geom import PRESS_INSTALLATION_NOTES
 # stays unmarked: the arm's end is located from the bore axis instead
 # (mreview09 blocker 3, two origins for the collar).  The collar's annulus
 # sketch (Right plane) imports to the side view -- the OD and the press-seat
-# bore with its native band -- and the mid-plane extrude's one dimension, the
-# collar length with its band (COLLAR_LENGTH_BAND: the press contact is the
-# collar's length less the lever's dome), to the front view.  The blanked
+# bore, a reference nominal under its matched-fit callout -- and the mid-plane
+# extrude's one dimension, the collar length with its band (COLLAR_LENGTH_BAND:
+# the press contact is the collar's length less the lever's dome), to the
+# front view.  The blanked
 # ArmSection witness (Right plane) imports to the same side view: the arm's
 # face nearest the bore axis (Y -3 versus the other face at Y +4.5,
 # controlling ArmBelowAxis), the flange's mounting face
@@ -52,7 +77,9 @@ from mg_lever_press_fit_geom import PRESS_INSTALLATION_NOTES
 # arm's thickness and its lower face from the flange's hole-datum edge (both
 # controlling: the arm face is the machinist's measurable datum for the
 # holes' row, mreview10 blocker 1), toleranced where the footprint is seen,
-# not edge-on. ---
+# not edge-on.  The arm-to-flange inside corners' fillet radius (ArmRootFillet)
+# imports to the front view, where the corner at the arm's west face prints
+# as an arc. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarBore"},
     "Collar": {"CollarLen"},
@@ -62,6 +89,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "MountingCoordinates": {"MountingX0", "MountingX1", "MountingY0"},
     "ArmSection": {"ArmBelowAxis", "SeatToAxis", "ArmPastSeat"},
     "ArmFootprint": {"FootprintThickness", "FootprintOffset"},
+    "ArmRootFillet": {"ArmRootR"},
 }
 
 # Wizard callout precision is applied in the build through observed native
@@ -74,6 +102,7 @@ DRAWING_PRECISION = {
     "Flange": {"FlangeHeight": 2},
     "ArmSection": {"ArmBelowAxis": 2, "SeatToAxis": 2, "ArmPastSeat": 2},
     "ArmFootprint": {"FootprintThickness": 2, "FootprintOffset": 2},
+    "ArmRootFillet": {"ArmRootR": ARM_ROOT_R_PLACES},
 }
 # The pure SHEET-derived reference is SeatToAxis + ArmPastSeat (arm end).
 # It reads actual model entities and prints in parentheses; its places remain
@@ -82,21 +111,55 @@ DRAWING_PRECISION = {
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "arm end from bore axis": 2,
 }
-# The collar's length band, like the bore's, is read by the build straight
-# from mg_lever_press_fit_geom (COLLAR_LENGTH_BAND) onto the extrude's CollarLen.
+# The collar's length band is read by the build straight from
+# mg_lever_press_fit_geom (COLLAR_LENGTH_BAND) onto the extrude's CollarLen.
 DRAWING_POSITION_BAND = POSITION_BAND
 
-# True free-text instructions only (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the collar's sizes and the
-# bore's band, the arm's section and the mounting pattern are native dimensions
-# on the sheet (the bore's callout names the MHA-MG-003 lever), so the notes
-# carry the assembly-time press and its retention -- the press contract's own
-# wording, shared with the lever print and the assembly (user ruling
-# 2026-10-11) -- and the one named floor exception, nothing the views show.
-DRAWING_NOTES = "\n".join(
-    (
-        PRESS_INSTALLATION_NOTES,
-        # Pending exception ruling: MHA-MG-001 counterbore floor 1.525 MIN (#1294).
-        f"COUNTERBORE FLOOR {GRIP_MIN:.3f} MIN.",
+# Dimension callouts that state a manufacturing fact (the mate, the fit) are
+# derived here from the fit contract, never typed on the sheet
+# (_drawing_contract's spec-string rule).
+#
+# The bore is a matched fit to the finished MHA-MG-003 lever's press zone
+# (drawing-guidelines.md rule 4, matched pairs): its nominal prints as a
+# REFERENCE and the callout states the acceptance -- the fit budget's own
+# diametral interference range.  The lever's press zone keeps its printed
+# limits, so a pair made to the stated interference is one the budget bounds:
+# at the tightest interference, on either limit of the lever's zone, the
+# matched pair's press force and collar stress stay inside the budget the
+# lever print's force limit comes from.
+for _rod in (
+    PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[1],
+    PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[0],
+):
+    _matched = press_fit_budget(
+        press_zone_dia_band=(_rod - PRESS_ZONE_DIA, _rod - PRESS_ZONE_DIA),
+        collar_bore_dia=_rod - PRESS_FIT_BUDGET["interference_max"],
+        collar_bore_band=(0.0, 0.0),
     )
+    check_press_fit_budget(_matched)
+    for _key in ("press_force_max_n", "collar_von_mises_mpa", "engagement"):
+        if _matched[_key] > PRESS_FIT_BUDGET[_key] * (1.0 + 1e-12):
+            raise AssertionError(
+                f"a matched collar bore exceeds the press budget's {_key}"
+            )
+COLLAR_BORE_CALLOUT = (
+    f"REAM OR BORE: {PRESS_FIT_BUDGET['interference_min']:.3f}-"
+    f"{PRESS_FIT_BUDGET['interference_max']:.3f}\n"
+    "DIAMETRAL INTERFERENCE ON\n"
+    "MHA-MG-003 LEVER"
 )
+# The collar's length band sets a stack: the lever's end sits flush with the
+# collar's outer face, so the collar spans exactly the lever's banded press
+# zone, and its length bounds the press contact (COLLAR_ENGAGEMENT_MAX, the
+# press force).  The callout names that zone.
+if (COLLAR_LENGTH, COLLAR_LENGTH_BAND) != (PRESS_ZONE_LENGTH, PRESS_ZONE_LENGTH_BAND):
+    raise AssertionError(
+        "the collar length must equal the lever's press zone, band and all"
+    )
+COLLAR_LENGTH_CALLOUT = "COLLAR LENGTH\nALONG BORE AXIS =\nMHA-MG-003 LEVER PRESS ZONE"
+
+# No note block (drawing-guidelines.md rule 7): every requirement is a native
+# dimension or a callout at its feature.  The press, its force limit and the
+# retaining compound are assembly steps, carried by the lever print and the
+# assembly (mg_lever_press_fit_geom.PRESS_INSTALLATION_NOTES), not this part.
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

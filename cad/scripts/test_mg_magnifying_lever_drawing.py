@@ -325,20 +325,30 @@ def test_press_zone_text_clears_its_lines_and_the_isometric() -> None:
 
 def test_press_zone_callout_ties_the_zone_to_the_bracket_bore() -> None:
     """Review item 5 / code-review nit: the banded zone's callout names the
-    mating MHA-MG-001 bore, its band and the interference, every number
-    derived from mg_lever_press_fit_geom in the spec -- the sheet carries no
+    mating MHA-MG-001 bore as the REFERENCE nominal that sheet prints and the
+    matched-fit interference its callout states (rule 25: the sheets agree;
+    the bore carries no absolute band), every number derived from
+    mg_lever_press_fit_geom in the spec -- the sheet carries no
     manufacturing string of its own (_drawing_contract)."""
     import mg_lever_press_fit_geom as press
+    import mg_magnifying_bracket_spec as bracket_spec
     from _drawing_contract import drawing_specification_violations
 
     callout = mg_magnifying_lever_spec.PRESS_ZONE_DIA_CALLOUT
     assert drawing.REFERENCE_CALLOUTS["PressZoneDia"] is callout
     assert callout == (
-        "IN MHA-MG-001<MOD-DIAM>5.986 +0.006/0 BORE:\n0.002-0.014 INTERFERENCE"
+        "IN MHA-MG-001 (<MOD-DIAM>5.986) BORE:\n0.002-0.014 DIAMETRAL INTERFERENCE"
     )
-    assert f"{press.COLLAR_BORE_DIA:.3f}" in callout
-    assert f"{press.PRESS_FIT_BUDGET['interference_min']:.3f}-" in callout
-    assert f"{press.PRESS_FIT_BUDGET['interference_max']:.3f} INTERFERENCE" in callout
+    assert f"(<MOD-DIAM>{press.COLLAR_BORE_DIA:.3f})" in callout
+    assert "/" not in callout and "+0.006" not in callout
+    interference = (
+        f"{press.PRESS_FIT_BUDGET['interference_min']:.3f}-"
+        f"{press.PRESS_FIT_BUDGET['interference_max']:.3f}"
+    )
+    assert f"{interference} DIAMETRAL INTERFERENCE" in callout
+    # The bracket sheet's bore callout states the same matched fit.
+    assert interference in bracket_spec.COLLAR_BORE_CALLOUT
+    assert "DIAMETRAL INTERFERENCE" in bracket_spec.COLLAR_BORE_CALLOUT
     script = Path(drawing.__file__)
     assert not drawing_specification_violations(
         script.read_text(encoding="utf-8"), filename=script.name

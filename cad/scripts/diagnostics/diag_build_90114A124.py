@@ -1,7 +1,7 @@
 r"""McMaster 90114A124 -- #2-56 x 1/4 brass slotted fillister screw.
 
 Catalogue dimensions were read live on 2026-10-09 from the product table and
-2-D PDF. As with 91794A077, secondary dome, slot, thread and runout details
+2-D PDF. As with 91794A078, secondary dome, slot, thread and runout details
 are the existing native fillister-family assumptions, not vendor-solid
 measurements. No vendor model has been harvested or replica gate claimed.
 """

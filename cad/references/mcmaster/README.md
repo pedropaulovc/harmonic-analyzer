@@ -51,7 +51,7 @@ recipes:
 | 91792A108 | `vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
 | 91794A112 | `vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A055 | `vn-transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
-| 91794A077 | `vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
+| 91794A078 | `vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A080 | `vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A540 | `vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
@@ -143,7 +143,7 @@ Live catalog verification on October 11, 2026:
   (6.35 mm), screw size decimal 0.086 in (2.1844 mm), head diameter
   0.14 in (3.556 mm), and head height 0.083 in (2.1082 mm). The drawing
   states no dimensional tolerances. Brass matches the book photograph's
-  brass clip screws, so the same-size 18-8 stainless 91794A077 (MHA-VN-050's
+  brass clip screws, so the same-size 18-8 stainless 91794A077 (then MHA-VN-050's
   stock) is rejected for appearance; no brass #2-56 shorter than 1/4 in was
   found live. The shared #4-40 MHA-VN-006 brass fillister 90114A511 is
   rejected for the clip: its 4.65 mm head overhangs the clip's 4.23 mm rail,
@@ -219,13 +219,36 @@ Live catalogue verification on October 10, 2026:
   **70,000 psi**, package quantity **100**. The 90280A steel family has no
   #2-56 size. The smaller thread follows the transferred top-frame tap: the
   #4-40 tap left too thin a drawing-guidelines.md rule 17 (walls and webs) ligament under the keeper foot. The head
-  and thread are the 91794A077 row's, so the shared fillister recipe builds it
+  and thread are the 91794A077/91794A078 rows', so the shared fillister recipe builds it
   from the length alone; no vendor SLDPRT has been harvested for it.
   `diagnostics.diag_build_90280A194` stays as a diagnostic recipe.
 
+Live catalog verification on October 16, 2026:
+
+- [91794A078](https://www.mcmaster.com/91794A078/) replaces 91794A077 as the
+  two MHA-VN-050 magnifying-bracket screws (owner ruling, October 16, 2026).
+  The live page was read on October 16, 2026: 18-8 stainless fillister head
+  slotted screw, #2-56 thread, 5/16 in long, fully threaded, head diameter
+  0.14 in (3.556 mm), head height 0.083 in (2.1082 mm), $6.55 per pack of 100.
+  The vendor [SLDPRT](https://www.mcmaster.com/mvC/Library/CAD2/20260108/53AE5A4D/91794A078_18-8%20Stainless%20Steel%20Fillister%20Head%20Slotted%20Screw.SLDPRT)
+  link was seen but not harvested; the part stays catalogue-only.
+  Machinist review r1 of MHA-MG-001 found the Ø3.8 × 1.55 ±0.05 counterbore's
+  depth band rescued a wall, so the bracket drops the counterbore: the heads
+  bear on the 1/8 in stock flange's front face over plain normal #2 Ø2.591
+  thru holes, and the flange prints 3.175 at the title block's .XXX ±0.13.
+  Grip 3.175 (3.045 minimum) leaves 4.7625 mm engagement nominal, 3.305 mm
+  worst case (above 1.5D, 3.2766 mm), with a 0.0075 mm minimum screw-tip gap
+  in the 4.95 ±0.05 full thread. Brass was rejected: the 90114A brass
+  fillister family has no #2-56 × 5/16, and a 3/8 brass screw through a
+  3/16 flange kept only a 1.04 shank-shear margin (66.05 MPa against
+  68.9 MPa allowable, 0.6 × 50 ksi / 3). The heads were already 18-8
+  stainless on main. `diagnostics.diag_build_91794A078` reuses the native
+  fillister family recipe; its derived slot, dome, thread/runout and
+  vendor-frame mapping are family assumptions, not verified vendor geometry.
+
 Live catalog verification on October 8, 2026:
 
-- [91794A077](https://www.mcmaster.com/91794A077/), selected for the two
+- [91794A077](https://www.mcmaster.com/91794A077/), formerly selected for the two
   MHA-VN-050 magnifying-bracket screws, is titled “18-8 Stainless Steel
   Fillister Head Slotted Screw, 2-56 Thread Size, 1/4" Long”. The live page
   and [technical drawing](https://www.mcmaster.com/mvC/Library/CAD2/20260108/09FCA726/91794A077_18-8%20Stainless%20Steel%20Fillister%20Head%20Slotted%20ScrewS.GIF)
@@ -238,10 +261,11 @@ Live catalog verification on October 8, 2026:
   The provisional #4-40 x 3/8 90280A108 selection is rejected for this joint:
   its larger thread and longer reach cannot satisfy the rib envelope and
   no-bottoming stack. It remains selected for the other three fleet parts.
-  The #2 screw uses a Ø3.8 x 1.55 deep counterbore, leaving 1.625 mm nominal
+  The #2 screw then used a Ø3.8 x 1.55 deep counterbore, leaving 1.625 mm nominal
   grip and a deliberately protruding head (0.5582 mm nominal, not flush).
-  Its worst-case engagement is 3.2975 mm, above 1.5D (3.2766 mm); maximum
-  reach 4.825 mm stays below the 4.90 mm minimum full-thread depth.
+  Its worst-case engagement was 3.2975 mm, above 1.5D (3.2766 mm); maximum
+  reach 4.825 mm stays below the 4.90 mm minimum full-thread depth. (Superseded
+  by 91794A078 above, October 16, 2026.)
   The 5.00 mm maximum full-thread envelope stays within the 5.03 mm minimum
   rib depth. The drill body and point may continue into the lever plate.
   The native ±0.05 depth band belongs to `EdgeRibBack`, the actual -Z
@@ -271,9 +295,9 @@ Live catalog verification on October 8, 2026:
   missing-cut diagnosis.
   Both builders force a final rebuild and prove the post-annotation volume
   before publication, so a later missing cut cannot inherit an earlier pass.
-  `diagnostics.diag_build_91794A077` reuses the native fillister family recipe;
-  its derived slot, dome, thread/runout and vendor-frame mapping are family
-  assumptions, not verified vendor geometry. No vendor model is harvested.
+  The former `diagnostics.diag_build_91794A077` reused the native fillister
+  family recipe; it was replaced by `diagnostics.diag_build_91794A078`. No
+  vendor model is harvested.
 
 Catalog specifications checked on September 10, 2026:
 
@@ -1013,7 +1037,7 @@ Catalog specifications checked on September 10, 2026:
   passed to the native fillister author, whose local `@stock_recipe` declaration
   identifies the threaded SKU without a shared recipe registry.
   `diag_build_90114A124.py` follows the existing catalogue-only
-  `91794A077` fillister-family recipe: its dome, slot and thread/runout
+  `91794A078` fillister-family recipe: its dome, slot and thread/runout
   details are family assumptions, not measurements of a vendor solid.
   No vendor solid was downloaded and no replica equivalence is claimed.
 
