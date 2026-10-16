@@ -25,7 +25,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateWidth", "PlateLength"},
     "CoefficientsPlate": {"PlateThickness"},
     "SpringPadProfile": {"SpringPadWidth", "SpringSeatThickness"},
-    "CylinderProfile": {"CylDia"},
+    "CylinderReference": {"CylinderDia"},
     "SummationAnchorProfile": {"AnchorOuterDia"},
     "SummationAnchor": {"AnchorHeight"},
     "SummationPlateProfile": {"SummationArcRadius"},
@@ -33,7 +33,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "EdgeRibFrontProfile": {
         "EdgeRibFrontArcR",
         "EdgeRibFrontEndTopX",
-        "EdgeRibFrontEndTopY",
+        "EdgeRibFrontEndStep",
     },
     "EdgeRibFront": {"EdgeRibThickness"},
     "MiddleRib": {"MiddleRibThickness"},
@@ -52,7 +52,17 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("KnifeRidgeFillet", "KnifeRidgeRadius"): "2X R",
     ("KnifeEnvelopeReference", "HexWidth"): "2X ",
     ("KnifeEnvelopeReference", "HexHeight"): "2X ",
+    # A linear dimension across the plan's cylinder band prints no Ø itself.
+    ("CylinderReference", "CylinderDia"): "<MOD-DIAM>",
 }
+
+# The pivot cylinder's diameter is sized in the plan, across the band its
+# two lines draw (machinist review r10: in the end views the R15.24 rib
+# outline hides it, so the old Ø25.40 leader landed on a rib slant).  The
+# plates join the cylinder at its mid-plane, so no silhouette shows there: a
+# hidden Top-plane reference line spans the diameter at this world Z, between
+# the mid rib and the +Z end rib, where the dimension prints.
+CYLINDER_REFERENCE_Z = 40.0
 
 KNIFE_MOUNT_NUMBER = "MHA-SM-002"  # sm-knife-mount: the knife-edge seat
 BRACKET_NUMBER = "MHA-MG-001"  # mg-magnifying-bracket
@@ -94,12 +104,12 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     # review r10 read the band as rescuing a floor).
     "RibDepth": "TAP DRILL POINT STAYS IN RIB\nCLEAR OF THIN PLATE WALLS",
     "SpringPadWidth": "UNDERSIDE PAD\nFULL LENGTH",
-    # The rib end's half-height is the slant's at RIB_PLATE_REACH: clipped
+    # The rib end's top corner is the slant's at RIB_PLATE_REACH: clipped
     # there, not run to a point, so the -Z receiver rib keeps its wall round
-    # the bracket's 2-56 tap (build_sm_summing_lever.EDGE_RIB_END_HALF_H);
-    # the end face stands 0.44 proud of each plate face for that (machinist
-    # review r8).
-    "EdgeRibFrontEndTopY": "END RIBS FROM\nPLATE MID-PLANE\nKEEPS TAP WALL",
+    # the bracket's 2-56 tap (build_sm_summing_lever.EDGE_RIB_END_STEP).  It
+    # is located from the plate's top face, the face the receiver row height
+    # uses (machinist review r10: from the mid-plane the origin was in air).
+    "EdgeRibFrontEndStep": "END RIBS ABOVE\nPLATE TOP FACE\nKEEPS TAP WALL",
 }
 
 # Leads the 2-56 receiver callout: what its two depth limits hold.  The full
@@ -136,4 +146,9 @@ if SPRING_TAP_ENGAGEMENT_MIN < 1.5 * SPRING_TAP_MAJOR_DIA:
     )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
-BACK_VIEW_NOTE = "BACK VIEW SCALE 1:1"
+# Sheet 2's view looks at the -Z end face (the bracket receiver): sheet 1's
+# plan carries a lettered viewing arrow onto that face, and the view is
+# named by the letter (machinist review r10 read "BACK VIEW" as looking from
+# below).  A, B are datums; C the section; D, E the details.
+BACK_VIEW_LETTER = "F"
+BACK_VIEW_NOTE = f"VIEW {BACK_VIEW_LETTER} SCALE 1:1"
