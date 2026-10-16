@@ -6,14 +6,17 @@ blind #4-40 rod tap from the bottom face, both on the hex axis.
 
 Views (3:1, hidden lines removed throughout, drawing-guidelines.md rule 9):
 
-* RIGHT (looking along the lever bore, at a corner): the flats' width, the
-  bore's outline, the block height and the bore's height and Ø.
-* SECTION A-A, cut on the hex axis through the corners from the right view:
-  the bore through the corners, both blind taps in solid lines and the floor
-  between the rod tap and the bore.  It carries datum A (the bottom seat),
-  the bore's parallelism to it and the bore's Ra.
-* TOP: the hex across the flats (stock REF) and the thumb-screw tap's callout.
-* BOTTOM: the rod tap's callout.
+* FRONT (``*Right``, looking along the lever bore at a corner): the block
+  height, the bore's height from the bottom seat, its distance from the flat
+  on the right (along the bore's centreline) and its Ø callout, which states
+  the wall that location leaves.
+* TOP and BOTTOM, turned and pinned into third-angle projection above and
+  below the front (corners up and down, the flats square to the sheet): the
+  flats (stock REF) over the top view, and each tap's native callout.
+* SECTION A-A, cut on the hex axis through the corners from the front: the
+  bore through the corners, both blind taps in solid lines and the floor
+  between the rod tap and the bore, under a solid-line hatch with the
+  cosmetic threads kept off it; the bottom seat carries its flag note.
 * Shaded isometric, 2:1.
 
 Run with SolidWorks open::
@@ -24,22 +27,25 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     dimension_name,
     place_view,
     remove_notes_matching,
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -48,32 +54,29 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_finish import add_surface_finish
-from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _telemetry
 from mg_magnifying_clamp_spec import (
     BLOCK_HEIGHT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    GEOMETRIC_TOLERANCES_MM,
     HEX_AC,
     HEX_AF,
     LEVER_BORE_CALLOUT,
-    LEVER_BORE_DIA,
     LEVER_BORE_Y,
     REFERENCE_DIMENSIONS,
     ROD_TAP_DRILL_DIA,
     ROD_TAP_PROCESS,
-    SURFACE_FINISHES,
+    SEAT_NOTE,
     TAP_CALLOUT_PRECISION,
     TAP_DRILL_DEPTH_VARIABLE,
     TAP_THREAD_DEPTH_VARIABLE,
@@ -93,62 +96,90 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A 12.8 x 11.1 x 28.65 hex: 3:1 puts the 86 mm tall right view and section
-# side by side with room for the height dimensions either side.
+# A 12.8 x 11.1 x 28.65 hex: 3:1 stacks the 39 mm top view, the 86 mm front
+# and the 39 mm bottom view in one column, the section and isometric beside.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 ISO_SCALE = (2, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet m per model mm
 
-RIGHT_CENTER = (0.080, 0.165)
-SECTION_CENTER = (0.200, RIGHT_CENTER[1])
-TOP_CENTER = (0.295, 0.225)
-BOTTOM_CENTER = (0.295, 0.125)
-# Low right, over the title block (x > ~0.258, y < ~0.070).
-ISO_CENTER = (0.395, 0.130)
-NOTES_XY = (0.020, 0.075)
-ISO_NOTE_XY = (0.365, 0.088)
+# The projection column: the front at mid-height, the top and bottom views in
+# line with it (their centres pinned to the front's hex axis).
+RIGHT_CENTER = (0.085, 0.1272)
+TOP_CENTER = (RIGHT_CENTER[0], 0.2175)
+BOTTOM_CENTER = (RIGHT_CENTER[0], 0.045)
+# The section high enough that its caption clears the title block
+# (x > ~0.216, y < ~0.066); the isometric right of it, inside the border.
+SECTION_CENTER = (0.250, 0.170)
+ISO_CENTER = (0.365, 0.190)
+# Note positions are their text's top-left corners.
+NOTES_XY = (0.225, 0.082)
+ISO_NOTE_XY = (0.335, 0.150)
+SEAT_NOTE_XY = (0.287, 0.116)
 
 _HALF_AF = HEX_AF / 2.0 * _S
 _HALF_AC = HEX_AC / 2.0 * _S
-_BORE_R = LEVER_BORE_DIA / 2.0
 
 
 def _elev_y(center: tuple[float, float], model_y_mm: float) -> float:
-    """Sheet y of a height above the bottom face in the right view or the
+    """Sheet y of a height above the bottom face in the front view or the
     section (both centred on the block's height)."""
     return center[1] + (model_y_mm - BLOCK_HEIGHT / 2.0) * _S
 
 
-# The right view: the Ø above the view, the heights either side.
+_BORE_SHEET_Y = _elev_y(RIGHT_CENTER, LEVER_BORE_Y)
+_RIGHT_FLAT_X = RIGHT_CENTER[0] + _HALF_AF
+_RIGHT_LEFT_X = RIGHT_CENTER[0] - _HALF_AF
+
+# The front view: both heights to the left; the bore's distance from the
+# right-hand flat along its own centreline (the A-A line stands on the hex
+# axis, so a vertical witness from the bore centre would run along it); the
+# Ø callout up and to the right, its leader above that dimension.
 RIGHT_KEEP = {
-    "Height": (RIGHT_CENTER[0] - _HALF_AF - 0.018, RIGHT_CENTER[1]),
-    "LeverBoreYDim": (
-        RIGHT_CENTER[0] + _HALF_AF + 0.016,
-        _elev_y(RIGHT_CENTER, LEVER_BORE_Y / 2.0),
-    ),
-    "LeverBoreDiaDim": (RIGHT_CENTER[0], _elev_y(RIGHT_CENTER, BLOCK_HEIGHT) + 0.022),
+    "Height": (_RIGHT_LEFT_X - 0.028, RIGHT_CENTER[1]),
+    "LeverBoreYDim": (_RIGHT_LEFT_X - 0.012, _elev_y(RIGHT_CENTER, LEVER_BORE_Y / 2.0)),
+    "LeverBoreFromFlat": (_RIGHT_FLAT_X + 0.010, _BORE_SHEET_Y),
+    "LeverBoreDiaDim": (0.150, _BORE_SHEET_Y + 0.037),
 }
-# The top view: the flats (Z, sheet vertical) to the left of the hex.
-TOP_KEEP = {"HexAf": (TOP_CENTER[0] - _HALF_AC - 0.014, TOP_CENTER[1])}
+# The top view: the flats (Z, sheet horizontal) above it, between its upper
+# vertices.
+TOP_KEEP = {"HexAf": (TOP_CENTER[0], TOP_CENTER[1] + _HALF_AC + 0.010)}
 
 DIMENSION_CALLOUTS = {"LeverBoreDiaDim": LEVER_BORE_CALLOUT}
 
-# The tap callouts run out to the right of each end view.
-THUMB_TAP_CALLOUT_XY = (TOP_CENTER[0] + _HALF_AC + 0.012, TOP_CENTER[1] + 0.030)
-ROD_TAP_CALLOUT_XY = (BOTTOM_CENTER[0] + _HALF_AC + 0.012, BOTTOM_CENTER[1] + 0.042)
+# The tap callouts (their text centres) out to the right of each end view,
+# low enough that each leader crosses the right-hand flat, under the flat's
+# upper vertex and the HexAf witness standing on it.
+THUMB_TAP_CALLOUT_XY = (0.165, TOP_CENTER[1] + 0.010)
+ROD_TAP_CALLOUT_XY = (0.150, BOTTOM_CENTER[1] + 0.008)
 # SolidWorks' own descriptive note for a Hole Wizard tap ("#4-40 Tapped Hole").
 TAPPED_HOLE_NOTE = "Tapped Hole"
 
-# The section's cutting line: vertical through the hex axis on the right view,
+# The section's cutting line: vertical through the hex axis on the front view,
 # past the block top and bottom.
 _SECTION_OVERSHOOT = 0.006
-# Picks in the section stand a third of the half-width off the hex axis (clear
-# of both taps); the section is symmetric about the axis, so a mirrored
-# section lands them on the same features.
+# The seat flag's pick stands a third of the half-width off the hex axis,
+# clear of the rod tap; the section is symmetric about the axis, so a
+# mirrored section lands it on the same face.
 _PICK_DX = 0.35 * _HALF_AC
-_SECTION_RIGHT = SECTION_CENTER[0] + _HALF_AC
-_SECTION_LEFT = SECTION_CENTER[0] - _HALF_AC
+
+# Third-angle projection of the front (``*Right``: +Z to sheet left, +Y up):
+# the top view sees +X (toward the front's viewer) down the sheet, the bottom
+# view up it; both keep +Z to the left.  Model axes, 1 mm long, in metres.
+_AXES = {"+X": (0.001, 0.0, 0.0), "+Y": (0.0, 0.001, 0.0), "+Z": (0.0, 0.0, 0.001)}
+FRONT_AXES = {"+Z": math.pi, "+Y": math.pi / 2.0}
+TOP_AXES = {"+X": -math.pi / 2.0, "+Z": math.pi}
+BOTTOM_AXES = {"+X": math.pi / 2.0, "+Z": math.pi}
+PROJECTION_ANGLE_SLOP = 1e-6
+PROJECTION_SLOP_M = 1e-5
+
+# swAnnotationType_e: swCosmeticThread, swCenterMarkSym.
+_COSMETIC_THREAD_ANNOTATION = 1
+_CENTER_MARK_ANNOTATION = 13
+_SECTION_THREAD_LAYER = "MG-CLAMP-SECTION-THREADS-HIDDEN"
+# The section's hatch: ANSI31's continuous 45 deg lines, not the brass
+# material's dashed ANSI33.
+SECTION_HATCH_PATTERN = "ANSI31"
 
 # swDimensionTextParts_e definitions (5-8) and the writable part each is set
 # through (1-4) -- the draw_mg_output_fixture convention.
@@ -194,6 +225,146 @@ def _reference_thread_depth(display: Any) -> None:
             f"read {after!r}"
         )
     _telemetry.success(f"thumb tap thread depth bracketed REF: {wanted[part]!r}")
+
+
+def _axis_direction(
+    adapter: Any, view: Any, axis: tuple[float, float, float], label: str
+) -> tuple[float, float]:
+    origin = model_point_in_view(
+        adapter, view, (0.0, 0.0, 0.0), label=f"{label} origin"
+    )
+    tip = model_point_in_view(adapter, view, axis, label=f"{label} tip")
+    return tip[0] - origin[0], tip[1] - origin[1]
+
+
+def _require_axes(adapter: Any, view: Any, axes: dict[str, float], label: str) -> None:
+    for name, angle in axes.items():
+        dx, dy = _axis_direction(adapter, view, _AXES[name], f"{label} {name}")
+        if (
+            abs(math.hypot(dx, dy) - _S) > PROJECTION_SLOP_M
+            or abs(math.remainder(math.atan2(dy, dx) - angle, math.tau))
+            > PROJECTION_ANGLE_SLOP
+        ):
+            raise RuntimeError(
+                f"{label} {name}: projected axis {(dx, dy)} is not at {angle:g} rad"
+            )
+
+
+def _project_end_view(
+    adapter: Any,
+    front: Any,
+    end: Any,
+    *,
+    axes: dict[str, float],
+    center_y: float,
+    label: str,
+) -> None:
+    """Turn a named end view into the front's third-angle projection and pin
+    its hex axis under the front's (the draw_mg_output_fixture recipe)."""
+    native = _early_bound(end, "IView")
+    dx, dy = _axis_direction(adapter, native, _AXES["+X"], f"{label} +X before")
+    if math.hypot(dx, dy) <= PROJECTION_SLOP_M:
+        raise RuntimeError(f"{label} +X has no measurable projected direction")
+    # No assumed quarter turn: rotate the measured +X onto its projection.
+    native.Angle = float(native.Angle) + axes["+X"] - math.atan2(dy, dx)
+    rebuild_drawing(adapter, label=f"turn clamp {label} view")
+    _require_axes(adapter, native, axes, label)
+    front_origin = model_point_in_view(
+        adapter, front, (0.0, 0.0, 0.0), label="front origin"
+    )
+    target = (front_origin[0], center_y)
+    at = model_point_in_view(adapter, native, (0.0, 0.0, 0.0), label=f"{label} origin")
+    position = tuple(float(value) for value in native.Position)
+    moved = [position[axis] + target[axis] - at[axis] for axis in range(2)]
+    if native.SetViewPosition(double_array(moved), False) is not True:
+        raise RuntimeError(f"failed to pin the clamp {label} view in projection")
+    rebuild_drawing(adapter, label=f"pin clamp {label} view")
+    at = model_point_in_view(
+        adapter, native, (0.0, 0.0, 0.0), label=f"{label} origin pinned"
+    )
+    if math.dist(at, target) > PROJECTION_SLOP_M:
+        raise RuntimeError(
+            f"clamp {label} origin {at} is not in line with the front's {target}"
+        )
+    _telemetry.success(f"clamp {label} view in projection: origin {at}")
+
+
+def _solid_line_hatch(adapter: Any, section: Any) -> None:
+    """Swap the brass material hatch (dashed ANSI33) for continuous lines."""
+    hatches = tuple(_early_bound(section, "IView").GetFaceHatches() or ())
+    if not hatches:
+        raise RuntimeError("section A-A has no face hatch")
+    for raw in hatches:
+        hatch = _early_bound(raw, "IFaceHatch")
+        hatch.UseMaterialHatch = False
+        if str(hatch.Pattern) != SECTION_HATCH_PATTERN:
+            hatch.Pattern = SECTION_HATCH_PATTERN
+    rebuild_drawing(adapter, label="section A-A solid-line hatch")
+    read = [
+        (
+            bool(_early_bound(raw, "IFaceHatch").UseMaterialHatch),
+            str(_early_bound(raw, "IFaceHatch").Pattern),
+        )
+        for raw in _early_bound(section, "IView").GetFaceHatches() or ()
+    ]
+    if len(read) != len(hatches) or any(
+        material or pattern != SECTION_HATCH_PATTERN for material, pattern in read
+    ):
+        raise RuntimeError(
+            f"section A-A hatch is not {SECTION_HATCH_PATTERN}: {read!r}"
+        )
+    _telemetry.success(
+        f"section A-A: {len(read)} face hatch(es) {SECTION_HATCH_PATTERN}"
+    )
+
+
+def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
+    """Keep the taps' cosmetic-thread ink out of a section (rule 9: a section
+    never carries hidden lines); the callouts state both threads.  The
+    draw_dt_cone_tip_block hidden-layer recipe."""
+    manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(_SECTION_THREAD_LAYER)
+    if layer is None:
+        if (
+            int(
+                manager.AddLayer(
+                    _SECTION_THREAD_LAYER, "clamp section thread ink hidden", 0, 0, 0
+                )
+            )
+            != 1
+        ):
+            raise RuntimeError("failed to add the clamp section thread layer")
+        layer = manager.GetLayer(_SECTION_THREAD_LAYER)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = False
+    if bool(layer.Visible) or bool(layer.Printable):
+        raise RuntimeError("the clamp section thread layer is not hidden")
+    hidden = 0
+    for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
+            continue
+        annotation.Layer = _SECTION_THREAD_LAYER
+        if str(annotation.Layer or "") != _SECTION_THREAD_LAYER:
+            raise RuntimeError(
+                f"clamp {label} cosmetic thread refused the hidden layer"
+            )
+        hidden += 1
+    if not hidden:
+        raise RuntimeError(f"clamp {label} has no cosmetic thread to hide")
+    rebuild_drawing(adapter, label=f"hide clamp {label} cosmetic threads")
+    return hidden
+
+
+def _require_one_center_mark(view: Any, label: str) -> None:
+    """The template's own tap centre mark, once."""
+    marks = tuple(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+    if len(marks) != 1:
+        raise RuntimeError(
+            f"expected one tap centre mark on the {label} view, found {len(marks)}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -245,6 +416,18 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (right, top, bottom, iso):
         set_hidden_lines_removed(adapter, view)
+    _require_axes(adapter, _early_bound(right, "IView"), FRONT_AXES, "front")
+    _project_end_view(
+        adapter, right, top, axes=TOP_AXES, center_y=TOP_CENTER[1], label="top"
+    )
+    _project_end_view(
+        adapter,
+        right,
+        bottom,
+        axes=BOTTOM_AXES,
+        center_y=BOTTOM_CENTER[1],
+        label="bottom",
+    )
     section = create_section_view(
         adapter,
         right,
@@ -259,12 +442,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="hex-axis section through the corners",
     )
     set_hidden_lines_removed(adapter, section)
+    _solid_line_hatch(adapter, section)
+    hidden = _hide_cosmetic_threads(adapter, section, label="section A-A")
+    _telemetry.info(f"hid {hidden} cosmetic thread(s) in section A-A")
 
     right_annotations = curate_view_dimensions(
         adapter,
         right,
         keep=RIGHT_KEEP,
-        view_label="right",
+        view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     top_annotations = curate_view_dimensions(
@@ -293,9 +479,10 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, top_by_name[name], label=f"MHA-MG-002 {name} stock reference"
         )
 
+    # The template marks each end view's tap; a second, scripted mark doubled
+    # it (the r1 audit's duplicate-annotation), so the sheet only proves the one.
     for view, label in ((top, "top"), (bottom, "bottom")):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
-            raise RuntimeError(f"failed to add the tap centre mark to the {label} view")
+        _require_one_center_mark(view, label)
     # Each end view shows one visible tap-drill circle: its native callout
     # prints the drill and thread rows with the process ahead of the thread.
     thumb_callout = add_native_hole_callout(
@@ -330,46 +517,15 @@ async def build(adapter: Any) -> dict[str, str]:
     removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
     _telemetry.info(f"removed {removed} automatic {TAPPED_HOLE_NOTE!r} note(s)")
 
-    # Datum A = the bottom seat (the MHA-MG-004 shoulder's face), on the
-    # section's bottom line; the lever bore's lower wall carries its
-    # parallelism to A, and its upper wall the sliding bore's Ra.
-    add_datum_feature(
+    # The bottom seat's "leave it flat" flag (rule 7), on section A-A's bottom
+    # line beside the rod tap, down and to the right clear of the caption.
+    add_attached_note(
         adapter,
         section,
-        edge_xy=(SECTION_CENTER[0] + _PICK_DX, _elev_y(SECTION_CENTER, 0.0)),
-        symbol_xy=(_SECTION_RIGHT + 0.012, _elev_y(SECTION_CENTER, 0.0) - 0.010),
-        datum="A",
-        label="bottom seat",
-    )
-    add_feature_control_frame(
-        adapter,
-        section,
-        edge_xy=(
-            SECTION_CENTER[0] + _PICK_DX,
-            _elev_y(SECTION_CENTER, LEVER_BORE_Y - _BORE_R),
-        ),
-        frame_xy=(
-            _SECTION_RIGHT + 0.010,
-            _elev_y(SECTION_CENTER, LEVER_BORE_Y) - 0.014,
-        ),
-        characteristic="parallelism",
-        tolerance=GEOMETRIC_TOLERANCES_MM["lever bore parallel to bottom seat"],
-        datums=("A",),
-        label="lever bore parallel to bottom seat",
-    )
-    add_surface_finish(
-        adapter,
-        section,
-        edge_xy=(
-            SECTION_CENTER[0] - _PICK_DX,
-            _elev_y(SECTION_CENTER, LEVER_BORE_Y + _BORE_R),
-        ),
-        symbol_xy=(
-            _SECTION_LEFT - 0.014,
-            _elev_y(SECTION_CENTER, LEVER_BORE_Y) + 0.016,
-        ),
-        control=surface_finish_by_key(SURFACE_FINISHES, "lever_bore"),
-        label="lever bore finish",
+        text=SEAT_NOTE,
+        entity_xy=(SECTION_CENTER[0] + _PICK_DX, _elev_y(SECTION_CENTER, 0.0)),
+        note_xy=SEAT_NOTE_XY,
+        label="MHA-MG-004 shoulder seat",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)

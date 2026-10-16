@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -13,16 +14,13 @@ import mg_rod_clamp_joint as joint
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    (control,) = spec.SURFACE_FINISHES
-    assert control.key == "lever_bore"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == spec.LEVER_BORE_DIA
-    assert control.face.contains_y_mm == spec.LEVER_BORE_Y
+def test_no_surface_finish_on_the_clamped_bore() -> None:
+    # The lever is clamped in its bore: it neither runs nor slides (rule 6).
+    assert not hasattr(spec, "SURFACE_FINISHES")
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "lever_bore")' in drawing_source
+    assert "surface_finishes=" not in part_source
+    assert "add_surface_finish" not in drawing_source
     assert "roughness_ra=" not in drawing_source
 
 
@@ -69,9 +67,20 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     assert spec.WALLS["rod-tap drill point to the lever bore"][1] == pytest.approx(
         spec.ROD_TAP_FLOOR_WALL_WORST
     )
-    assert spec.BORE_WALL_STATED_MIN == 2.00
-    assert spec.BORE_WALL_STATED_MIN <= spec.BORE_WALL_WORST_PRINTED
-    assert spec.BORE_OFFSET_MAX > spec.BORE_WANDER
+    assert spec.BORE_WALL[1] == pytest.approx(1.6289, abs=1e-4)
+    assert spec.BORE_WALL_STATED_MIN == 1.62
+    assert spec.WALL_FLOOR <= spec.BORE_WALL_STATED_MIN <= spec.BORE_WALL[1]
+    assert spec.BORE_WALL_STATED_MIN < spec.WALL_TARGET
+    assert spec.LEVER_BORE_FROM_FLAT == pytest.approx(spec.HEX_AF / 2.0)
+    assert spec.LEVER_BORE_FROM_FLAT_PLACES == spec.HEIGHT_PLACES
+    # The printed 5.56's band about the true half-flats, the stock's half band
+    # and the drill's wander to mid-block.
+    printed = round(spec.LEVER_BORE_FROM_FLAT, spec.HEIGHT_PLACES)
+    band = spec.printed_band_mm(spec.HEIGHT_PLACES)
+    offset = printed - spec.LEVER_BORE_FROM_FLAT
+    assert spec.BORE_OFFSET_MAX == pytest.approx(
+        abs(offset) + band + spec.HEX_AF_BAND / 2.0 + spec.BORE_WANDER
+    )
     assert spec.THUMB_ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert joint.ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert spec.TAP_REACH_NEEDED <= spec.PLUG_TAP_USABLE_LENGTH
@@ -80,14 +89,18 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     assert spec.ROD_TAP_SPEC is joint.ROD_TAP_SPEC
 
 
-def test_linked_notes_state_stock_wall_taps_and_seat() -> None:
+def test_linked_notes_state_stock_only_and_the_bore_states_its_wall() -> None:
     notes = spec.DRAWING_NOTES
-    assert len(notes.splitlines()) <= 4
-    assert "7/16 HEX BAR, FLATS AS SUPPLIED" in notes
-    assert "BORE TO FLAT WALL 2.00 MIN" in notes
-    assert "THREAD ENDS AT LEVER BORE" in notes
-    assert "MHA-MG-004 SHOULDER SEAT" in notes
+    assert notes == "7/16 HEX BAR, FLATS AS SUPPLIED."
+    for gone in ("CENTRED", "PLUG TAP", "CHAMFER", "WALL", "SEAT", "THREAD ENDS"):
+        assert gone not in notes
+    assert not hasattr(spec, "TAP_TOOL_NOTE")
+    assert not hasattr(spec, "BORE_WALL_NOTE")
+    assert "WALL TO FLAT 1.62 MIN" in spec.LEVER_BORE_CALLOUT
     assert "MHA-MG-003" in spec.LEVER_BORE_CALLOUT
+    assert spec.SEAT_NOTE.startswith("MHA-MG-004 SHOULDER SEAT")
+    assert "NO CHAMFER OR SPOTFACE" in spec.SEAT_NOTE
+    assert spec.THUMB_TAP_PROCESS == "TAP INTO BORE"
     for stale in ("SKEW", "5.2", "Ø5 VERTICAL ROD"):
         assert stale not in notes
     assert "BRASS" not in notes and "C36000" not in notes
@@ -96,18 +109,34 @@ def test_linked_notes_state_stock_wall_taps_and_seat() -> None:
     assert "LINEAR +/-" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "text=SEAT_NOTE" in source
 
 
-def test_native_gdt_section_and_tap_callouts() -> None:
+def test_no_gdt_one_section_and_native_tap_callouts() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'characteristic="parallelism"' in source
-    assert source.count("add_surface_finish(") == 1
+    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
+    assert "add_datum_feature" not in source
+    assert "add_feature_control_frame" not in source
+    assert "add_surface_finish" not in source
+    assert "auto_center_marks" not in source
     assert source.count("create_section_view(") == 1
+    assert drawing.SECTION_HATCH_PATTERN == "ANSI31"
     # Both #4-40 taps print native Hole Wizard callouts at the .XX depth places.
     assert source.count("add_native_hole_callout(") == 2
     assert set(spec.TAP_CALLOUT_PRECISION.values()) == {joint.HOLE_DEPTH_PLACES}
+
+
+def test_end_views_are_third_angle_projections_of_the_front() -> None:
+    half_pi = math.pi / 2.0
+    assert drawing.FRONT_AXES == {"+Z": math.pi, "+Y": half_pi}
+    assert drawing.TOP_AXES == {"+X": -half_pi, "+Z": math.pi}
+    assert drawing.BOTTOM_AXES == {"+X": half_pi, "+Z": math.pi}
+    # In line with the front: same column, above and below it.
+    assert drawing.TOP_CENTER[0] == drawing.RIGHT_CENTER[0] == drawing.BOTTOM_CENTER[0]
+    front_half = spec.BLOCK_HEIGHT / 2.0 * drawing._S
+    end_half = spec.HEX_AC / 2.0 * drawing._S
+    assert drawing.TOP_CENTER[1] - end_half > drawing.RIGHT_CENTER[1] + front_half
+    assert drawing.BOTTOM_CENTER[1] + end_half < drawing.RIGHT_CENTER[1] - front_half
 
 
 def test_thumb_tap_reference_thread_depth_brackets_only_the_thread() -> None:
