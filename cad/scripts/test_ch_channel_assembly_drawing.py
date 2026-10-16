@@ -427,12 +427,12 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
     ]
     assert len(pulled) == 9 and set(channel.values()) <= set(pulled)
     assert all(name.endswith("-20") for name in pulled)
-    assert drawing.exploded_offset(asm.ARM, "north-most") == (0.0, 0.0, 250.0)
-    assert drawing.exploded_offset(asm.ROD, "north-most") == (0.0, -50.0, 250.0)
-    assert drawing.exploded_offset(asm.ROD_PIN, "north-most") == (0.0, 0.0, 275.0)
-    assert drawing.exploded_offset(asm.BAR_PIN, "north-most") == (0.0, 50.0, 275.0)
+    assert drawing.exploded_offset(asm.ARM, "north-most") == (0.0, 90.0, 340.0)
+    assert drawing.exploded_offset(asm.ROD, "north-most") == (0.0, 40.0, 340.0)
+    assert drawing.exploded_offset(asm.ROD_PIN, "north-most") == (0.0, 90.0, 365.0)
+    assert drawing.exploded_offset(asm.BAR_PIN, "north-most") == (0.0, 140.0, 365.0)
     spring = drawing.exploded_offset(drawing.SPRING_STEM, "north-most")
-    assert spring == (0.0, 0.0, 250.0)
+    assert spring == (0.0, 90.0, 340.0)
     assert drawing.exploded_offset(asm.ARM, "north") == (0.0, 0.0, 0.0)
     assert {"ch-pivot-shaft", asm.ARM, asm.LEVER}.isdisjoint(asm.FULLY_EXPLODED_STEMS)
     assert asm.FULCRUM_SHAFT in asm.EXPLODED_STEMS
