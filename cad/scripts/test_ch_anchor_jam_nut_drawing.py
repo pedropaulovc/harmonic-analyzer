@@ -17,6 +17,7 @@ import draw_ch_anchor_jam_nut as drawing
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
+from _printed_tolerance import printed_band_mm
 
 
 def test_required_drawing_paths() -> None:
@@ -91,16 +92,22 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         for name in names
     }
     assert drawing.DRAWING_PRECISION_BY_NAME == {
-        "NutOd": 3,
+        "NutOd": 2,
         "NutThickness": 2,
         "SlotWidth": 2,
         "SlotDepth": 2,
     }
 
 
-def test_no_explicit_tolerance_band() -> None:
-    # Every size takes the title block's row for its places.
-    assert model_toleranced_dimensions(part) == {}
+def test_only_the_od_carries_an_explicit_band() -> None:
+    # The O.D.'s band sits inside the wall-floor / neighbour window, which the
+    # title block's .XX row overruns; every other size takes the title block.
+    assert model_toleranced_dimensions(part) == {("NutProfile", "NutOd"): "OD_BAND"}
+    assert spec.OD_BAND < printed_band_mm(spec.OD_PLACES)
+    assert (
+        spec.OD - printed_band_mm(spec.OD_PLACES)
+        < 2 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]
+    )
 
 
 def test_spec_margins() -> None:
@@ -155,7 +162,7 @@ def test_callouts_and_no_notes() -> None:
     # The thin nut's engagement shortfall is printed as a plain fact.
     assert spec.ENGAGEMENT_MIN < 1.5 * spec.THREAD_MAJOR
     assert spec.THICKNESS_CALLOUT == "ENGAGEMENT 1.9 MIN (0.5D)"
-    # The O.D.'s .XXX band is bounded by the wall as well as the neighbour.
+    # The O.D.'s explicit band is bounded by the wall as well as the neighbour.
     assert drawing.DIMENSION_CALLOUTS_ABOVE == {"NutOd": "WALL 1.5 MIN"}
     assert spec.MIN_WALL <= spec.WALL_WORST
     text = Path(drawing.__file__).read_text(encoding="utf-8").upper()
