@@ -7,7 +7,8 @@ builder-owned ``MS_EXPLODED`` presentation with the BOM (numbers, descriptions,
 vendor SKU, quantity) and a balloon on every component, both plate screws
 included; sheet 3 the finished isometric beside the assembly order and
 checks. Every text, pose and reference value comes from
-``ms_measuring_stick_assembly_spec`` or the part registry; this recipe only
+``ms_measuring_stick_assembly_spec``, ``ms_measuring_stick_assembly_sheet``,
+``ms_measuring_stick_explode_spec`` or the part registry; this recipe only
 lays the sheets out. It never edits the source assembly or its explodes.
 """
 
@@ -21,7 +22,9 @@ from typing import Any, Callable
 
 import _config
 import _telemetry
+import ms_measuring_stick_assembly_sheet as sheet
 import ms_measuring_stick_assembly_spec as spec
+import ms_measuring_stick_explode_spec as explode
 import ms_stick_spec as stick
 import ms_stop_spec as stop
 from _check import check
@@ -158,7 +161,7 @@ BOM_ANCHOR = (
     (_EXPLODED_TEMPLATE.width_m - sum(BOM_COLUMN_WIDTHS.values())) / 2.0,
     0.405 + EXPLODED_GROUP_SHIFT_Y,
 )
-EXPLODED_CAPTION = spec.EXPLODED_CAPTION
+EXPLODED_CAPTION = sheet.EXPLODED_CAPTION
 # Preserve the measured caption/table air; centre the narrower five-column BOM.
 EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.415 + EXPLODED_GROUP_SHIFT_Y)
 
@@ -169,7 +172,7 @@ STEPS_XY = (0.018, 0.258)
 CHECKS_XY = (0.018, 0.105)
 STEPS_LINE_WIDTH = 58  # characters; default-format note text
 
-BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in spec.BOM_ORDER}
+BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in sheet.BOM_ORDER}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 # Literal stems, so the config-dependency analysis reads exactly these rows.
 PART_ROWS = {
@@ -187,7 +190,7 @@ BOM_SKUS = {
     stem: " / ".join(str(sku) for sku in row.get("supplier_skus") or ()) or MADE_PART_SKU
     for stem, row in PART_ROWS.items()
 }
-BOM_DESCRIPTIONS = dict(spec.BOM_DESCRIPTIONS)
+BOM_DESCRIPTIONS = dict(sheet.BOM_DESCRIPTIONS)
 BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
@@ -215,15 +218,15 @@ SECOND_SCREW_BALLOON_ANCHORS = {
 
 # Geometry-owned measurements: overall reference and controlled assembly setting.
 ASSEMBLY_DIMENSIONS = (
-    ("overall length", spec.REFERENCE_OVERALL_LENGTH, ""),
-    ("stop position", spec.SETTING_NEAR_FACE_MM, spec.STOP_POSITION_CALLOUT),
+    ("overall length", sheet.REFERENCE_OVERALL_LENGTH, ""),
+    ("stop position", spec.SETTING_NEAR_FACE_MM, sheet.STOP_POSITION_CALLOUT),
 )
 
 EXPLODED_VIEW_NAMES = {
-    ASSEMBLY_VIEW_CONFIGURATION: spec.EXPLODED_VIEW_NAME,
-    SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(spec.EXPLODED_VIEW_NAME),
+    ASSEMBLY_VIEW_CONFIGURATION: explode.EXPLODED_VIEW_NAME,
+    SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(explode.EXPLODED_VIEW_NAME),
 }
-if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
+if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the measuring-stick explode is authored in Default")
 
 
@@ -244,11 +247,11 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
     return "\n".join(out)
 
 
-SETUP_NOTE = _wrapped((spec.CLAMPED_SETUP_NOTE,), width=SETUP_NOTE_WIDTH)
+SETUP_NOTE = _wrapped((sheet.CLAMPED_SETUP_NOTE,), width=SETUP_NOTE_WIDTH)
 ASSEMBLY_STEPS = _wrapped(
-    spec.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
+    sheet.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
-ASSEMBLY_CHECKS = _wrapped(spec.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
+ASSEMBLY_CHECKS = _wrapped(sheet.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -677,7 +680,7 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
             )
             annotations = curate_view_dimensions(
                 adapter, front, keep={spec.SETTING_DIMENSION: text_xy},
-                view_label="clamped setting", dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+                view_label="clamped setting", dimensions_by_feature=sheet.DRAWING_DIMENSIONS,
             )
             if len(annotations) != 1:
                 raise RuntimeError("clamped setting must import one native dimension")
@@ -702,7 +705,7 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
                 ),
                 "IDisplayDimension",
             )
-            precision = spec.DRAWING_REFERENCE_PRECISION
+            precision = sheet.DRAWING_REFERENCE_PRECISION
         else:
             precision = spec.SETTING_PRECISION
         if label == "overall length":
@@ -1007,10 +1010,10 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
         ),
     )
-    if properties["Number"] != spec.DRAWING_NUMBER:
+    if properties["Number"] != sheet.DRAWING_NUMBER:
         raise RuntimeError(
             f"measuring-stick source Number {properties['Number']!r} != "
-            f"{spec.DRAWING_NUMBER!r}"
+            f"{sheet.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
 
