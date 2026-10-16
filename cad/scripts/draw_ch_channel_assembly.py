@@ -189,8 +189,8 @@ def _fitup_notes() -> tuple[str, str]:
         "set-screws-driven": (
             f"SHAFT HELD AS SET, FLATS UP: RUN ONE {pivot_set_screw} DOWN EACH "
             "APEX TAP ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG. "
-            # Owner-ruled shortfall, declared as ch-channel RV-01 (the
-            # bracket's own: ch-pivot-bracket RV-01, #1371).
+            # The bracket's engagement fact; the lifted arch meets rule 18
+            # (ch_pivot_bracket_spec), so no exception is declared for it.
             f"{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
         ),
         "preload-accepted": (

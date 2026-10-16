@@ -224,31 +224,21 @@ def test_tap_callout_says_to_bore_and_states_no_shortfall() -> None:
     assert spec.SET_SCREW_ENGAGEMENT_D >= spec.SET_SCREW_MIN_ENGAGEMENT_D == 1.5
 
 
-def test_apex_set_screw_shortfall_is_declared_and_stated() -> None:
-    """Owner ruling 2026-10-15 (#1371): the apex #4-40's full thread, short of
-    1.5D, is a kind-minor declaration under the part's own key; its `where`
-    quotes the callout line the sheet prints, at the spec's values."""
+def test_apex_set_screw_meets_rule_18_so_nothing_is_declared() -> None:
+    """The owner's 2026-10-15 shortfall ruling (#1371) covered the R8 arch's
+    1.08D; the lifted arch holds 1.5D, so the sheet states no shortfall and
+    the part declares no exception for one."""
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
-    (entry,) = load_exceptions(CAD_ROOT / "config", "ch_pivot_bracket", "part")
-    assert (entry.id, entry.kind) == ("RV-01", "minor")
-    assert entry.reason.endswith("(owner-ruled shortfall)")
-    assert "rule 18" in entry.finding and "1.5D" in entry.finding
-    printed = (
-        f"{spec.SET_SCREW_THREAD} ENGAGEMENT {spec.SET_SCREW_FULL_THREAD_MIN:.2f} MIN "
-        f"({spec.SET_SCREW_ENGAGEMENT_PRINTED:.2f}D)."
-    )
-    assert drawing.SET_SCREW_QUALIFIER == printed
-    assert entry.where.endswith(printed)
-    # The printed values are the worst-case wall sum and the D ratio rounded
-    # down (never overstated), short of 1.5D.
+    assert load_exceptions(CAD_ROOT / "config", "ch_pivot_bracket", "part") == ()
+    assert not hasattr(drawing, "SET_SCREW_QUALIFIER")
     assert spec.SET_SCREW_FULL_THREAD_MIN == pytest.approx(
         sum(spec.SET_SCREW_WALL_TERMS.values())
     )
     ratio = spec.SET_SCREW_FULL_THREAD_MIN / spec.SET_SCREW_MAJOR_DIA
     assert spec.SET_SCREW_ENGAGEMENT_PRINTED == math.floor(ratio * 100.0) / 100.0
-    assert spec.SET_SCREW_ENGAGEMENT_PRINTED < 1.5
+    assert spec.SET_SCREW_ENGAGEMENT_PRINTED >= 1.5
 
 
 def test_tap_callout_rewrite_refuses_an_unexpected_native_format() -> None:

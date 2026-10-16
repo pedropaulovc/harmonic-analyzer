@@ -341,8 +341,8 @@ def test_the_finished_shaft_is_set_by_its_north_tip_before_the_screws() -> None:
 def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fact() -> None:
     """User, 2026-10-10: one MHA-VN-034 down each ear's apex tap onto the
     plain shaft's flat, once the shaft is set, before the preload is
-    accepted. The step prints the bracket spec's engagement fact, the named
-    exception, from the spec, never typed."""
+    accepted. The step prints the bracket spec's engagement fact from the
+    spec, never typed."""
     import ch_pivot_bracket_spec as bracket_spec
 
     set_screw = _config.parts("vn-arbor-set-screw")["number"]
@@ -361,30 +361,24 @@ def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fa
     assert drawing.FITUP_STEPS.count("ENGAGEMENT") == 1
 
 
-def test_the_set_screw_shortfall_is_declared_on_the_assembly() -> None:
-    """Owner ruling 2026-10-15 (#1371): the step that states the bracket's
-    engagement shortfall matches a kind-minor declaration in the channel
-    contract, which the review reads for this drawing; its `where` quotes the
-    printed step, rebuilt from the spec's values."""
+def test_the_set_screw_step_states_a_fact_that_needs_no_declaration() -> None:
+    """The owner's 2026-10-15 shortfall ruling (#1371) covered the R8 arch's
+    1.08D; the lifted arch holds 1.5D, so the step's engagement fact is no
+    shortfall and the channel contract declares no exception for it."""
     import ch_pivot_bracket_spec as bracket_spec
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
     name = "ch_channel_assembly"
     assert DRAWINGS_BY_NAME[name].source_kind == "assembly"
-    (entry,) = load_exceptions(CAD_ROOT / "config", name, "assembly")
-    assert (entry.id, entry.kind) == ("RV-01", "minor")
-    assert entry.reason.endswith("(owner-ruled shortfall)")
-    assert "rule 18" in entry.finding and "1.5D" in entry.finding
+    assert load_exceptions(CAD_ROOT / "config", name, "assembly") == ()
     fact = (
         f"{bracket_spec.SET_SCREW_THREAD} ENGAGEMENT "
         f"{bracket_spec.SET_SCREW_FULL_THREAD_MIN:.2f} MIN "
         f"({bracket_spec.SET_SCREW_ENGAGEMENT_PRINTED:.2f}D)."
     )
-    body = _step_body("set-screws-driven")
-    assert body.endswith(fact)
-    assert entry.where.endswith(body)
-    # The build reads the same file and ignores the declaration.
+    assert _step_body("set-screws-driven").endswith(fact)
+    assert bracket_spec.SET_SCREW_ENGAGEMENT_PRINTED >= 1.5
     assert assembly_contract("ch-channel").number == "MHA-CH-000"
 
 
