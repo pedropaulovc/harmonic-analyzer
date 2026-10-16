@@ -15,8 +15,8 @@ Values MUST match build_sm_summing_lever.py.
 from __future__ import annotations
 
 import math
-import _config
 from _hole_spec import HoleSpec
+from _printed_tolerance import angular_band_deg
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 
@@ -61,13 +61,13 @@ KNIFE_RIDGE_TANGENT_XY = (
     _RIDGE_SETBACK * math.sin(_RIDGE_HALF),
     HEX_H / 2.0 - _RIDGE_SETBACK * math.cos(_RIDGE_HALF),
 )
-# Detail D tolerances the ridge angle at the title block's angular band
+# Detail E tolerances the ridge angle at the title block's angular band
 # (machinist review r7: HEX_W and HEX_H alone leave the flanks, so the
 # shoulders' height, free).  Nothing holds the two flanks symmetric, so one
 # flank may take the whole band: at the widest .XXX section its shoulder then
 # rises KNIFE_SHOULDER_RISE (0.0994) over the nominal angle's, and the
 # free-rock worst case folds that rise in with the section and bore bands.
-RIDGE_ANGLE_TOL_DEG = float(_config.title_block("angular")["value_deg"])
+RIDGE_ANGLE_TOL_DEG = angular_band_deg()
 _HEX_HALF_W_MAX = (HEX_W + HEX_BAND) / 2.0
 KNIFE_SHOULDER_RISE = _HEX_HALF_W_MAX / math.tan(
     _RIDGE_HALF
