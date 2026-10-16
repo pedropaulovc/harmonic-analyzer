@@ -6,6 +6,7 @@ import pytest
 
 import build_ha_harmonic_analyzer_assembly as builder
 import draw_ha_harmonic_analyzer_assembly as drawing
+import ha_harmonic_analyzer_assembly_notes as notes
 import ha_harmonic_analyzer_assembly_spec as spec
 import ha_harmonic_analyzer_assembly_steps as steps
 import joint_retention
@@ -41,16 +42,16 @@ def test_bom_is_one_row_per_subassembly_in_insertion_order() -> None:
         stem: assembly_contract(stem).number for stem in spec.BOM_ORDER
     }
     assert all(number.endswith("-000") for number in drawing.BOM_PART_NUMBERS.values())
-    assert set(spec.BOM_DESCRIPTIONS) == set(spec.BOM_ORDER)
+    assert set(notes.BOM_DESCRIPTIONS) == set(spec.BOM_ORDER)
     assert (
-        max(map(len, spec.BOM_DESCRIPTIONS.values()))
+        max(map(len, notes.BOM_DESCRIPTIONS.values()))
         <= drawing.BOM_DESCRIPTION_MAX_CHARS
     )
 
 
 @pytest.mark.parametrize("row", spec.BOM_ORDER)
 def test_each_row_balloons_a_part_only_its_subassembly_builds(row: str) -> None:
-    part = spec.BALLOON_PARTS[row]
+    part = notes.BALLOON_PARTS[row]
     scripts = Path(builder.__file__).parent
     owners = [
         stem
@@ -61,6 +62,14 @@ def test_each_row_balloons_a_part_only_its_subassembly_builds(row: str) -> None:
         )
     ]
     assert owners == [row]
+
+
+def test_builder_recipe_does_not_read_the_sheet_text() -> None:
+    # Wording edits must not rebuild the complete-machine assembly.
+    for module in (builder, spec):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "import ha_harmonic_analyzer_assembly_notes" not in source
+        assert "from ha_harmonic_analyzer_assembly_notes" not in source
 
 
 def test_explode_moves_every_subassembly_but_the_frame_once_each() -> None:
@@ -88,11 +97,11 @@ def test_settings_are_derived_from_the_pose_sources() -> None:
 
 
 def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
-    assert len(spec.ASSEMBLY_STEPS) == len(steps.SEQUENCE)
-    for number, line in enumerate(spec.ASSEMBLY_STEPS, 1):
+    assert len(notes.ASSEMBLY_STEPS) == len(steps.SEQUENCE)
+    for number, line in enumerate(notes.ASSEMBLY_STEPS, 1):
         assert line.startswith(f"{number}. ")
     printed = " ".join(
-        (*spec.ASSEMBLY_STEPS, *spec.ASSEMBLY_CHECKS, drawing.ASSEMBLED_NOTE)
+        (*notes.ASSEMBLY_STEPS, *notes.ASSEMBLY_CHECKS, drawing.ASSEMBLED_NOTE)
     )
     # The settings live on the associative sheet-1 dimensions only.
     for value in (spec.BAR_HEIGHT_MM, spec.STUD_DROP_MM):
