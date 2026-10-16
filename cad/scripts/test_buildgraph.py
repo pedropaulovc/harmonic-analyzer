@@ -1453,6 +1453,7 @@ def test_assemblies_depend_on_assembly_helpers():
         (
             "_assembly_patterns",
             {
+                "ch_channel",
                 "dt_drive_train",
                 "fr_frame",
                 "mg_magnifier",

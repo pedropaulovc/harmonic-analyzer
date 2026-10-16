@@ -807,6 +807,7 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
         (
             "_assembly_patterns",
             {
+                "ch_channel",
                 "dt_drive_train",
                 "fr_frame",
                 "mg_magnifier",
