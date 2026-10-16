@@ -928,26 +928,30 @@ async def build(adapter: Any) -> dict[str, str]:
             f"spring-hole pitch count {pitch_prefix!r} did not persist: "
             f"{pitch_display.GetText(1)!r}"
         )
-    # The 20X callout hangs on the middle hole, text in the open field right
-    # of the column: with 44.45 below the plate end, 0.100..0.185 there
-    # holds nothing. Every callout on the end hole had to leave it downward
-    # and so crossed the plate-end extension lines of 152.40 and the start-Z
-    # dimension -- steepening the leader only traded that for text-on-line
-    # and arrow-near-text against the 39.85 arrowhead and the start-Z
-    # overshoot (runs 20260928T130915425Z, ...131249806Z, ...131507773Z).
-    mid_hole_z = HOLE_Z_LAST - (HOLE_COUNT // 2) * CHANNEL_PITCH
-    mid_rim = top_edges.circle_at(
-        (HOLE_X, PLATE_T / 2.0, mid_hole_z),
+    # The 20X callout hangs on hole 7 (three below the middle), text in the
+    # open field right of the column: with 44.45 below the plate end,
+    # 0.100..0.185 there holds nothing but section C-C's free-edge arrow,
+    # whose letter prints at x 0.256..0.262, y 0.129..0.1355 (farm r3: the
+    # leader off the middle hole, y 0.1336, ran 6.2 mm through it). Hole 7
+    # (y 0.1230) keeps the leader ~5 mm under that letter. Every callout on
+    # the end hole had to leave it downward and so crossed the plate-end
+    # extension lines of 152.40 and the start-Z dimension -- steepening the
+    # leader only traded that for text-on-line and arrow-near-text against
+    # the 39.85 arrowhead and the start-Z overshoot (runs
+    # 20260928T130915425Z, ...131249806Z, ...131507773Z).
+    callout_hole_z = HOLE_Z_LAST - (HOLE_COUNT // 2 - 3) * CHANNEL_PITCH
+    callout_rim = top_edges.circle_at(
+        (HOLE_X, PLATE_T / 2.0, callout_hole_z),
         HOLE_DIA / 2.0,
         axis=(0.0, 1.0, 0.0),
-        label="spring-hole middle rim",
+        label="spring-hole callout rim",
     )
     add_native_hole_callout(
         adapter,
         top,
-        edge=mid_rim.edge,
-        callout_xy=(0.292, _top_xy(HOLE_X, -mid_hole_z)[1] + 0.0015),
-        label="spring-hole middle",
+        edge=callout_rim.edge,
+        callout_xy=(0.292, _top_xy(HOLE_X, -callout_hole_z)[1] + 0.0015),
+        label="spring-hole pattern",
     )
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
     # the TOP of the column. The frame sits above the +Z trunnion stub with
