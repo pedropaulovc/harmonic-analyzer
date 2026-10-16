@@ -127,14 +127,15 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
     assert joint.TAP_SPEC.end == "blind"
     assert joint.TAP_SPEC.depth_mm == joint.DRILL_DEPTH == 6.05
     assert joint.TAP_SPEC.overrides_mm["ThreadDepth"] == joint.THREAD_DEPTH == 4.95
-    assert joint.RIB_DEPTH == 7.0
-    assert joint.RIB_DEPTH_BAND == 0.25
-    assert joint.THREAD_RIB_MARGIN_MIN == pytest.approx(1.75)
+    assert joint.RIB_DEPTH == 7.3
+    assert joint.RIB_DEPTH_BAND == joint.LINEAR_BAND == 0.51
+    assert joint.THREAD_RIB_MARGIN_MIN == pytest.approx(1.79)
     assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0075)
     assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.042857142857)
-    # The whole tap drill, point included, stays in the deepened end rib.
-    assert joint.DRILL_POINT_RIB_MARGIN == pytest.approx(0.41583546)
-    assert joint.DRILL_POINT_RIB_MARGIN_MIN == pytest.approx(0.03579246)
+    # The whole tap drill, point included, stays in the deepened end rib at
+    # the title block's band, its wander counted as if axial.
+    assert joint.DRILL_POINT_RIB_MARGIN == pytest.approx(0.71583546)
+    assert joint.DRILL_POINT_RIB_MARGIN_MIN == pytest.approx(0.0406367, abs=1e-6)
     assert joint.DRILL_WANDER_MAX == pytest.approx(0.0351558, abs=1e-7)
 
 
@@ -144,8 +145,8 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
         ("SCREW_LENGTH = 7.9375", "1.5D full engagement"),
         ("FLANGE_THICKNESS_BAND = 0.13", "1.5D full engagement"),
         ("THREAD_DEPTH = 4.95", "bottoms"),
-        ("RIB_DEPTH = 7.0", "breaks out of the front rib"),
-        ("RIB_DEPTH_BAND = 0.25", "breaks out of the front rib"),
+        ("RIB_DEPTH = 7.3", "breaks out of the front rib"),
+        ("RIB_DEPTH_BAND = LINEAR_BAND", "breaks out of the front rib"),
         ("DRILL_DEPTH = 6.05", "bottoming-tap lead"),
         ("SIDE_PLATE_HEIGHT = 12.7", r"drawing-guidelines\.md rule 17 \(walls and webs\) wall"),
         ("COUNTERBORE_DIA = 3.8", "head float"),
@@ -157,8 +158,8 @@ def test_joint_guards_reject_lost_margins(replacement: str, failure: str) -> Non
         "SCREW_LENGTH": 7.85,
         "FLANGE_THICKNESS_BAND": 0.20,
         "THREAD_DEPTH": 4.85,
-        "RIB_DEPTH": 6.95,
-        "RIB_DEPTH_BAND": 0.30,
+        "RIB_DEPTH": 7.2,
+        "RIB_DEPTH_BAND": 0.60,
         "DRILL_DEPTH": 6.00,
         "SIDE_PLATE_HEIGHT": 8.0,
         "COUNTERBORE_DIA": 3.70,
