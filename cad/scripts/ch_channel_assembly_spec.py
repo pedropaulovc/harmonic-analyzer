@@ -17,8 +17,10 @@ pair being set off the top frame.
 Explode (``EXPLODED_VIEW_NAME``): every channel alike, end hardware out along
 z on its own side, fasteners up out of their taps, the rods down off the
 arms, the bars (with the pins pressed in them) up off the rocker straps, the
-spring anchors down and the fulcrum shaft withdrawn south; the pivot shaft,
-rockers, levers and springs stay put.
+spring anchors down and the fulcrum shaft withdrawn south; the north-most
+channel (the one the balloons pin) is pulled out north of the bank whole, its
+two pins out of their bores; the pivot shaft and the other channels' rockers,
+levers and springs stay put.
 """
 
 from __future__ import annotations
@@ -126,15 +128,29 @@ BAR = "ch-amplitude-bar"
 BAR_PIN = "ch-bar-pivot-pin"
 HOOK = "vn-spring-hook"
 ANCHOR_NUT = "ch-anchor-jam-nut"
+ARM = "ch-rocker-arm"
+ROD_PIN = "ch-rod-pivot-pin"
+LEVER = "ch-channel-lever"
+# The installed spring's family: the model holds its built variants
+# (``-stretchNN``, build_ch_channel_assembly), each one family here.
+CHANNEL_SPRING = "vn-channel-spring-installed"
 
-Side = Literal["south", "north"]
+
+def family(stem: str) -> str:
+    """The explode family of a model component stem."""
+    return CHANNEL_SPRING if stem.startswith(f"{CHANNEL_SPRING}-stretch") else stem
+
+
+# "north-most": each member family's instance of greatest z only, the one
+# its balloon pins (draw_ch_channel_assembly._validate_source).
+Side = Literal["south", "north", "north-most"]
 
 
 @dataclass(frozen=True)
 class ExplodeStep:
     """One native explode step: every instance of each member family (on
-    ``side`` of ``BANK_MID_Z`` only, when given) moves ``distance_mm`` along
-    the world ``axis`` (sign = direction)."""
+    ``side`` of ``BANK_MID_Z`` only, or only the north-most one, when given)
+    moves ``distance_mm`` along the world ``axis`` (sign = direction)."""
 
     label: str
     stems: tuple[str, ...]
@@ -148,10 +164,27 @@ _BRACKET_GROUP = (BRACKET, BRACKET_SET_SCREW, BRACKET_HOLD_DOWN)
 # The north bracket's hardware and the north washer (DETAIL B's cluster): at
 # 60 north alone the bracket sat inside the hanging rocker arms. Leaders 4 and
 # 7 met on it there, and the letter B fell on the arms (r10 machinist review).
-# 100 further north and 300 up puts the cluster in the open area left of the
-# bars, above the arm deck: the r10 sheet has no ink within 40 px (9 mm) of
-# its projected centre, or at the letter's upper-right corner.
+# 400 further north and 360 up puts the cluster in the open area left of the
+# pulled-out channel (below): on the r11 sheet, with that channel's footprint
+# (the bank eroded along its pitch) shifted 250 north, the circle stands 60 px
+# (13 mm) clear of every part.
 _NORTH_END_GROUP = (*_BRACKET_GROUP, WASHER)
+# One whole channel, pulled north off both shafts: closed up, the 20 channels
+# print as one dark mass at 1:7 and the balloons pinned on the north-most
+# instances landed inside it (r11 machinist review). At 250 its footprint
+# stands clear of the bank's on the r11 sheet; its two pins then come 25
+# further out of their bores, along their axes.
+_CHANNEL_GROUP = (
+    ARM,
+    ROD,
+    ROD_PIN,
+    LEVER,
+    BAR,
+    BAR_PIN,
+    CHANNEL_SPRING,
+    HOOK,
+    ANCHOR_NUT,
+)
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("south keeper out", _KEEPER_GROUP, "z", -50.0, "south"),
     ExplodeStep("north keeper out", _KEEPER_GROUP, "z", 50.0, "north"),
@@ -164,8 +197,8 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("bank spring out", (BANK_SPRING,), "z", -40.0, "south"),
     ExplodeStep("south washer out", (WASHER,), "z", -20.0, "south"),
     ExplodeStep("north washer out", (WASHER,), "z", 20.0, "north"),
-    ExplodeStep("north end further out", _NORTH_END_GROUP, "z", 100.0, "north"),
-    ExplodeStep("north end up", _NORTH_END_GROUP, "y", 300.0, "north"),
+    ExplodeStep("north end further out", _NORTH_END_GROUP, "z", 400.0, "north"),
+    ExplodeStep("north end up", _NORTH_END_GROUP, "y", 360.0, "north"),
     ExplodeStep("rods down", (ROD,), "y", -50.0),
     # Up, not along x: 50 west put each bar (pin x 72.9) on its own spring's
     # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick);
@@ -184,8 +217,15 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # crossed leaders 2/17 and 8/10 (r6 layout audit); south it attaches out at
     # the right, which a replay of the r6 ring places clear of every leader.
     ExplodeStep("fulcrum shaft out south", (FULCRUM_SHAFT,), "z", -120.0),
+    ExplodeStep("north-most channel out", _CHANNEL_GROUP, "z", 250.0, "north-most"),
+    ExplodeStep("its pins out", (ROD_PIN, BAR_PIN), "z", 25.0, "north-most"),
 )
 EXPLODED_STEMS = frozenset(stem for step in EXPLODE_STEPS for stem in step.stems)
+# The families every instance of which moves (the channel's own move only
+# its north-most instance).
+FULLY_EXPLODED_STEMS = frozenset(
+    stem for step in EXPLODE_STEPS if step.side != "north-most" for stem in step.stems
+)
 
 
 @dataclass(frozen=True)
@@ -203,27 +243,39 @@ def plan_explode(
     Refuses a family the model lacks, a sided step that would move nothing,
     and a sided pair that is not one instance per side.
     """
-    stems = {instance.stem for instance in instances}
-    missing = sorted(EXPLODED_STEMS - stems)
+    by_family = [(family(instance.stem), instance) for instance in instances]
+    missing = sorted(EXPLODED_STEMS - {stem for stem, _ in by_family})
     if missing:
         raise ValueError(f"explode families absent from the model: {missing!r}")
     plan = []
     for step in EXPLODE_STEPS:
+        if step.side == "north-most":
+            names = [
+                max(
+                    (instance for owner, instance in by_family if owner == stem),
+                    key=lambda instance: instance.z_mm,
+                ).name
+                for stem in step.stems
+            ]
+            plan.append((step, tuple(sorted(names))))
+            continue
         names = []
-        for instance in instances:
-            if instance.stem not in step.stems:
+        moved = set()
+        for stem, instance in by_family:
+            if stem not in step.stems:
                 continue
             south = instance.z_mm < BANK_MID_Z
             if step.side is None or (step.side == "south") == south:
                 names.append(instance.name)
+                moved.add(stem)
         if not names:
             raise ValueError(f"{step.label}: moves no instance")
-        if step.side is not None:
-            moved = {instance.stem for instance in instances if instance.name in names}
-            if moved != set(step.stems) or len(names) != len(step.stems):
-                raise ValueError(
-                    f"{step.label}: expected one instance per family, got {names!r}"
-                )
+        if step.side is not None and (
+            moved != set(step.stems) or len(names) != len(step.stems)
+        ):
+            raise ValueError(
+                f"{step.label}: expected one instance per family, got {names!r}"
+            )
         plan.append((step, tuple(sorted(names))))
     return plan
 
