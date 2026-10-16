@@ -69,21 +69,21 @@ FLANGE_THICKNESS_BAND = 0.13
 # The -Z end rib was 5.08 deep, so the drill's tip ran past it into the 5.08
 # plate and held the plate to +/-0.05 for its wall.  Owner ruling 2026-10-16
 # (option A; the user's ask timed out and the recommended option was
-# auto-selected) deepens the rib to 7.0, so the whole tap drill, point and
-# wander stay in the rib: the plate band drops to the title block and the
-# rib band loosens to 0.25, inside the drill-point margin.
+# auto-selected) deepened the rib to 7.0 at a 0.25 band, so the whole tap
+# drill, point and wander stay in the rib.  Machinist review r12 read that
+# band as tightening to rescue a wall, with no mate; per the standing user
+# preference (move the nominal so the title block holds, coordinator
+# 2026-10-16) the rib is 7.3, the least one-place depth whose drill-point
+# margin holds at the title block's .XX band, so it takes no native band.
 PLATE_THICKNESS_BAND = 0.05
 COUNTERBORE_DEPTH_BAND = 0.05
 THREAD_DEPTH_BAND = 0.05
 DRILL_DEPTH_BAND = 0.10
-RIB_DEPTH = 7.0
-RIB_DEPTH_BAND = 0.25
-RECEIVER_DIMENSION_BANDS = {
-    "EdgeRibBack": {"D1": RIB_DEPTH_BAND},  # -Z entry; Front is the opposite rib
-}
+RIB_DEPTH = 7.3
 POSITION_BAND = 0.05
 DRILLED_DIAMETER_PLUS = 0.10
 LINEAR_BAND = 0.51  # PRINTED title-block .XX band, not the unrounded .02 in
+RIB_DEPTH_BAND = LINEAR_BAND  # the title block's: the rib takes no native band
 HEAD_FLOAT_MIN = (COUNTERBORE_DIA - SCREW_HEAD_DIA) / 2.0
 HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND
 EDGE_BREAK = 0.25
@@ -117,16 +117,18 @@ TAP_LEAD_MARGIN_MIN = (
     - THREAD_DEPTH - THREAD_DEPTH_BAND - 2.0 * SCREW_PITCH
 )
 DRILL_POINT_RIB_MARGIN = RIB_DEPTH - DRILL_DEPTH - DRILL_POINT_DEPTH
-DRILL_POINT_RIB_MARGIN_MIN = (
-    RIB_DEPTH - RIB_DEPTH_BAND - DRILL_DEPTH - DRILL_DEPTH_BAND
-    - DRILL_POINT_DEPTH_MAX
-)
 # Lateral drift of the drill at its deepest reach (fr_top_frame_spec's 0.3
 # deg realistic wander, restated so the joint stays a pure leaf module): the
 # rib walls round the tap are judged with it.
 DRILL_WANDER_DEG = 0.3
 DRILL_WANDER_MAX = math.tan(math.radians(DRILL_WANDER_DEG)) * (
     DRILL_DEPTH + DRILL_DEPTH_BAND + DRILL_POINT_DEPTH_MAX
+)
+# The drill point's floor margin also takes the whole wander, as if it were
+# axial (it is lateral: an upper bound, so the 7.3 rib holds even then).
+DRILL_POINT_RIB_MARGIN_MIN = (
+    RIB_DEPTH - RIB_DEPTH_BAND - DRILL_DEPTH - DRILL_DEPTH_BAND
+    - DRILL_POINT_DEPTH_MAX - DRILL_WANDER_MAX
 )
 COUNTERBORE_END_WALL_MIN = (
     min(SCREW_MACHINE_X) - SIDE_PLATE_MACHINE_X[0]
