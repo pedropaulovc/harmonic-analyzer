@@ -61,6 +61,7 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_leader_note
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -504,6 +505,10 @@ def _add_view_f_arrow(adapter: Any, top: Any) -> None:
     points = list(annotation.GetLeaderPointsAtIndex(0) or ())
     if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
         raise RuntimeError("view F arrow tip moved when its letter was sized")
+    _telemetry.info(
+        f"view F arrow: leader {points[0]:.5f},{points[1]:.5f} -> "
+        f"{points[-3]:.5f},{points[-2]:.5f} (square when the x agree)"
+    )
 
 
 def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
@@ -967,11 +972,12 @@ TOP_KEEP = {
 # centred over it, so its PLATE AND PAD (x 0.123..0.153) sits on the
 # shoulder and the 7.00 above it, clear of the row height's lower arrow tail
 # (x 0.143, down to y 0.1436).  The pad width's block and the view's label
-# drop 5 and 7 mm (into empty sheet) to leave the PLATE AND PAD room above
-# the 10.00.
+# drop 7 and 9 mm (into empty sheet) to leave the PLATE AND PAD room above
+# the 10.00 (at 5 mm, farm r13b, the two blocks stood 3.18 apart, under the
+# audit's 3.48 text separation).
 BACK_KEEP = {
     "SpringSeatThickness": (0.153, 0.133),
-    "SpringPadWidth": (0.130, 0.118),
+    "SpringPadWidth": (0.130, 0.116),
     "ReceiverX0": (0.220, 0.1815),
     # Each tight station names the bracket (machinist review r5): the 14.75's
     # two lines stand over the row height's one, which prints above its value.
@@ -979,17 +985,23 @@ BACK_KEEP = {
     "ReceiverY0": (0.143, 0.1585),
 }
 # The back view's label, under the pad's width.  The point is its top left.
-BACK_VIEW_NOTE_XY = (0.110, 0.102)
+BACK_VIEW_NOTE_XY = (0.110, 0.100)
 # Sheet 1's plan names sheet 2's view: a letter arrow onto the -Z end, the
 # face VIEW F looks at (fr_rocker_arm_support's VIEW B arrow).  Its tip is
 # on the receiver rib's outer edge at model x 21.4 (sheet x 0.246), between
 # the hex stub (x 0.2335..0.2375) and the 20X frame's leader (x 0.2545); the
 # letter stands 8 mm above the edge, under that frame (bottom y 0.192).
+# The leader leaves the letter's right side, VIEW_F_LEADER_DX right of the
+# note's left (farm r13: note x 0.24422, leader start 0.24775), so the note
+# stands that far left of the tip and the arrow drops square onto the end
+# face.  Centred over the tip it leant 9 degrees, and machinist review r13
+# read it as looking down onto the rib, like the plan, not at the end face.
 # (note upper-left, leader tip) in sheet metres.
 VIEW_LETTER_HEIGHT = 0.005
+VIEW_F_LEADER_DX = 0.00353
 _VIEW_F_TIP = _top_xy(21.4, PLATE_L / 2.0)
 VIEW_F_ARROW = (
-    (_VIEW_F_TIP[0] - 0.36 * VIEW_LETTER_HEIGHT, _VIEW_F_TIP[1] + 0.013),
+    (_VIEW_F_TIP[0] - VIEW_F_LEADER_DX, _VIEW_F_TIP[1] + 0.013),
     _VIEW_F_TIP,
 )
 
@@ -1090,6 +1102,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, top_annotations, ("SummationArcRadius",), label="top"
     )
     _shorten_radii(adapter, top_annotations, ("SummationArcRadius",), label="top")
+    # The boss's Ø19.05 takes one arrow on its near rim, no line through the
+    # centre: there it crossed the anchor tap callout's leader, which runs
+    # through the tap's centre (machinist review r13, rule 14).
+    [boss_dia] = [
+        annotation
+        for annotation in top_annotations
+        if dimension_name(adapter, annotation) == "AnchorOuterDia"
+    ]
+    set_near_side_diameter(boss_dia, "boss diameter")
     _attach_radial_leaders(
         adapter, detail_annotations, ("KnifeRidgeRadius",), label="knife detail"
     )
