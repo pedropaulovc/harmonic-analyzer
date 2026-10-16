@@ -39,7 +39,7 @@ def test_plain_shaft_domed_proud_of_each_keeper() -> None:
     assert spec.SHAFT_DIA == keeper.BORE_DIA
     assert spec.CYLINDER_HALF == keeper.KEEPER_Z_OFF + keeper.LUG_HALF_T + 1.025
     assert spec.DOME_R == spec.SHAFT_DIA / 2.0
-    assert math.isclose(spec.SHAFT_LENGTH, 162.4)
+    assert math.isclose(spec.SHAFT_LENGTH, 166.4)
 
 
 def test_flats_sit_under_the_keeper_taps() -> None:
@@ -67,20 +67,22 @@ def test_flat_chord_guard_is_the_least_chord_over_printed_band_corners() -> None
 def test_flat_pair_is_baselined_from_one_end() -> None:
     # Machinist review (baseline r1, rule 10): the stations were a chain
     # (tip -> 4.925 -> 148.000). Both now run from the -Z dome tip: the -Z
-    # flat's outer edge and the +Z flat's inner edge, at .XX, with the
-    # overall length at .X; one shaft station still seats both cups, keeps
-    # each flat inside its lug and the cylinder past both lug faces, at the
-    # worst case of every printed and fit-up band.
+    # flat's outer edge and the +Z flat's inner edge, at .X on whole tenths
+    # (owner ruling Q11-B's 8.0 lug: the 4.4 flat), with the flat length at
+    # .XX and the overall length at .X; one shaft station still seats both
+    # cups, keeps each flat inside its lug and the cylinder past both lug
+    # faces, at the worst case of every printed and fit-up band.
     spec = ch_fulcrum_shaft_spec
-    assert math.isclose(spec.FLAT_FROM_END, 5.45)
-    assert math.isclose(spec.FLAT_BASELINE, 153.45)
+    assert math.isclose(spec.FLAT_LENGTH, 4.4)
+    assert math.isclose(spec.FLAT_FROM_END, 6.0)
+    assert math.isclose(spec.FLAT_BASELINE, 156.0)
     assert {"FlatFromEnd", "FlatBaseline"} <= spec.DRAWING_DIMENSIONS["FlatProfile"]
     assert {"FlatFromEnd", "FlatBaseline"} <= set(drawing.RIGHT_KEEP)
     assert spec.DRAWING_PRECISION["ShaftProfile"]["OverallLength"] == 1
-    assert spec.DRAWING_PRECISION["FlatProfile"]["FlatFromEnd"] == 2
-    assert spec.DRAWING_PRECISION["FlatProfile"]["FlatBaseline"] == 2
+    assert spec.DRAWING_PRECISION["FlatProfile"]["FlatFromEnd"] == 1
+    assert spec.DRAWING_PRECISION["FlatProfile"]["FlatBaseline"] == 1
     assert spec.DRAWING_PRECISION["FlatProfile"]["FlatLength"] == 2
-    assert round(spec.FLAT_STATION_WINDOW_MM, 3) == 0.152
+    assert round(spec.FLAT_STATION_WINDOW_MM, 3) == 0.057
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '\'"ShaftLength" / 2 - "FlatPitch" / 2 - "FlatLength" / 2\'' in source
     assert '\'"ShaftLength" / 2 + "FlatPitch" / 2 - "FlatLength" / 2\'' in source
@@ -95,28 +97,18 @@ def _station_window(spec) -> float:
     )
 
 
-def test_no_flat_station_dimension_can_drop_a_place(monkeypatch) -> None:
-    # Band sensitivity at unchanged nominals: each one-place loosening of a
-    # flat station or the flat length, alone, closes the flat-station window
-    # (drawing-guidelines.md rule 17); the overall length is already .X.
+def test_the_flat_length_cannot_drop_a_place(monkeypatch) -> None:
+    # Band sensitivity at unchanged nominals: the stations and the overall
+    # length already print .X; loosening the flat length to .X closes the
+    # flat-station window (drawing-guidelines.md rule 17).
     spec = ch_fulcrum_shaft_spec
     assert math.isclose(_station_window(spec), spec.FLAT_STATION_WINDOW_MM)
-    looser = {
-        "flat_from_end": ("flat_from_end",),
-        "flat_baseline": ("flat_baseline",),
-        "flat_length": ("front_flat", "rear_flat"),
-    }
-    closed = {}
-    for label, keys in looser.items():
-        with monkeypatch.context() as patch:
-            for key in keys:
-                patch.setitem(spec._STATION_BANDS, key, 0.8)
-            closed[label] = round(_station_window(spec), 3)
-    assert closed == {
-        "flat_from_end": -0.138,
-        "flat_baseline": -0.138,
-        "flat_length": -0.428,
-    }
+    for key in ("flat_from_end", "flat_baseline", "length"):
+        assert spec._STATION_BANDS[key] == spec._BAND_BY_PLACES[1]
+    with monkeypatch.context() as patch:
+        for key in ("front_flat", "rear_flat"):
+            patch.setitem(spec._STATION_BANDS, key, spec._BAND_BY_PLACES[1])
+        assert round(_station_window(spec), 3) == -0.258
 
 
 def test_both_flats_print_one_length_and_one_across_flat() -> None:
@@ -148,12 +140,12 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     left_tip, right_tip = drawing._LEFT_TIP_X, drawing._RIGHT_TIP_X
     from_end_x, _ = keep["FlatFromEnd"]
     # Outboard of the left tip, inside the left zone margin.
-    assert from_end_x + len("5.45") * char / 2.0 <= left_tip - 0.001
-    assert from_end_x - len("5.45") * char / 2.0 >= 0.0127 + 0.003
+    assert from_end_x + len("6.0") * char / 2.0 <= left_tip - 0.001
+    assert from_end_x - len("6.0") * char / 2.0 >= 0.0127 + 0.003
     # Left of the right flat's inner edge, whose extension line rises to the
     # baseline row; the right tip's only extension line rises past it.
     flat_x, flat_y = keep["FlatLength"]
-    assert flat_x + len("2X 3.50") * char / 2.0 <= drawing._RIGHT_FLAT_INNER_X - 0.001
+    assert flat_x + len("2X 4.40") * char / 2.0 <= drawing._RIGHT_FLAT_INNER_X - 0.001
     rows = [keep[name][1] for name in ("FlatLength", "FlatBaseline", "OverallLength")]
     assert rows == sorted(rows) and flat_y == keep["FlatFromEnd"][1]
     # Machinist review r1: the across-flat value and callout sat between its
@@ -203,7 +195,7 @@ def test_three_place_sizes_name_their_mates() -> None:
         keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA_BAND[0],
         keeper.BORE_DIA_BAND[0] - spec.SHAFT_DIA_BAND[1],
     )
-    assert "0.035-0.070 DIAMETRAL CLEARANCE" in spec.SHAFT_DIA_CALLOUT
+    assert "0.038-0.070 DIAMETRAL CLEARANCE" in spec.SHAFT_DIA_CALLOUT
     assert "MHA-CH-007" in spec.SHAFT_DIA_CALLOUT
     assert "MHA-CH-002" in spec.SHAFT_DIA_CALLOUT
     assert "MHA-VN-055" in spec.ACROSS_FLAT_CALLOUT
@@ -238,7 +230,7 @@ def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:
     # under the two feet, MHA-FR-002's faced rail top, flat to one 0.04 zone: a
     # step, opposite rolls across the 14 width (each lug centre 25.2 high) and
     # a pitch over the 16.5 seat; the shaft runs through both lug centres
-    # 148 apart and each 6.0 lug spends its thickness x (pitch + slope).
+    # 150 apart and each 8.0 lug spends its thickness x (pitch + slope).
     keeper = ch_fulcrum_keeper_spec
     spec = ch_fulcrum_shaft_spec
     assert math.isclose(spec.BORE_OFFSET_UNPAIRED_MM, 1.02)
@@ -250,42 +242,42 @@ def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:
     assert keeper.KEEPER_SEAT_LENGTH_MM == 16.5
     lug_t = 2.0 * keeper.LUG_HALF_T
     span = 2.0 * keeper.KEEPER_Z_OFF
-    assert span == 148.0
+    assert span == 150.0
     sideways = 2.0 * keeper.SHAFT_AXIS_H * flatness / keeper.KEEPER_WIDTH
     slope = math.hypot(flatness, sideways) / span
     pitch = flatness / keeper.KEEPER_SEAT_LENGTH_MM
     allowance = lug_t * (pitch + slope)
     assert math.isclose(keeper.BORE_SEAT_ALLOWANCE_MM, allowance)
-    assert round(allowance, 4) == 0.0206
+    assert round(allowance, 4) == 0.0274
     least = keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA_BAND[0]
-    assert least >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM + allowance  # 0.035 >= 0.0306
+    assert least >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM + allowance  # 0.038 >= 0.0374
     assert math.isclose(spec.PAIRED_MIN_CLEARANCE_MM, least - allowance)
-    assert round(spec.PAIRED_MIN_CLEARANCE_MM, 4) == 0.0144
+    assert round(spec.PAIRED_MIN_CLEARANCE_MM, 4) == 0.0106
     assert spec.PAIRED_MIN_CLEARANCE_MM >= keeper.BORE_RUNNING_MIN_CLEARANCE_MM == 0.010
 
 
 def test_the_pair_reamer_reaches_and_sizes_the_bores() -> None:
-    # One pass through both lugs: a 12 in long-series 0.2514 chucking reamer,
+    # One pass through both lugs: a 12 in long-series 0.2515 chucking reamer,
     # made to order (Super Tool catalogue 2026 p.59, 9458EL: .2211-.2530,
     # 12 OAL, 1-1/2 flute, .2193 shank, NAS 897 Type C; p.42: +.0002/-.0000
     # in), gripped 1 in, carries its whole flute past the far lug's outer
-    # face, 154.0 from the near one; the toleranced reamer lies in the band.
+    # face, 158.0 from the near one; the toleranced reamer lies in the band.
     keeper = ch_fulcrum_keeper_spec
-    assert keeper.KEEPER_OUTER_FACE_SPAN_MM == 154.0
+    assert keeper.KEEPER_OUTER_FACE_SPAN_MM == 158.0
     assert keeper.PAIR_REAMER_OAL_IN == 12.0
     reach = (12.0 - 1.0 - 1.5) * 25.4
-    assert math.isclose(keeper.PAIR_REAMER_REACH_MARGIN_MM, reach - 154.0)
-    assert round(keeper.PAIR_REAMER_REACH_MARGIN_MM, 1) == 87.3
+    assert math.isclose(keeper.PAIR_REAMER_REACH_MARGIN_MM, reach - 158.0)
+    assert round(keeper.PAIR_REAMER_REACH_MARGIN_MM, 1) == 83.3
     # An 8 in OAL reamer would not carry the flute through.
-    assert (8.0 - 1.0 - 1.5) * 25.4 < 154.0
-    assert keeper.PAIR_REAMER_DIA_IN == 0.2514
+    assert (8.0 - 1.0 - 1.5) * 25.4 < 158.0
+    assert keeper.PAIR_REAMER_DIA_IN == 0.2515
     low, high = (
         (keeper.PAIR_REAMER_DIA_IN + plus) * 25.4 - keeper.BORE_DIA
         for plus in (0.0, 0.0002)
     )
     assert math.isclose(keeper.PAIR_REAMER_RANGE_MM[0], low)
     assert math.isclose(keeper.PAIR_REAMER_RANGE_MM[1], high)
-    assert (round(low, 5), round(high, 5)) == (0.03556, 0.04064)
+    assert (round(low, 5), round(high, 5)) == (0.0381, 0.04318)
     assert keeper.BORE_DIA_BAND[1] <= low < high <= keeper.BORE_DIA_BAND[0]
 
 
@@ -303,8 +295,8 @@ def test_analytic_volumes() -> None:
     assert math.isclose(
         part.V_BODY, math.pi * r * r * (length - 2 * r) + 4 / 3 * math.pi * r**3
     )
-    # One flat: a 0.3-deep segment of the Ø6.35 round, 3.5 long.
-    assert math.isclose(part.V_FLAT, 1.905, abs_tol=0.001)
+    # One flat: a 0.3-deep segment of the Ø6.35 round, 4.4 long.
+    assert math.isclose(part.V_FLAT, 2.394, abs_tol=0.001)
 
 
 def test_precision_matches_the_marked_dimensions() -> None:

@@ -14,8 +14,8 @@ corner is filleted at its MAX radius (``CornerFillet``).
 Layout (part frame): +X along the shaft, OUTBOARD (away from the lever
 bank; the lug mid-plane / set-screw axis is x = 0); +Y up from the seat
 (y = 0 lands on the rail top face, machine 1036.2); +Z across the 14 width.
-The lug spans x -3..+3 from the seat up; the foot runs outboard from the
-lug's outer face to x = +13.5, and the whole underside x -3..+13.5 is the
+The lug spans x -4..+4 from the seat up; the foot runs outboard from the
+lug's outer face to x = +12.5, and the whole underside x -4..+12.5 is the
 flat seat.
 
 One part serves both ends: the assembly places the +Z (rear) end keeper
@@ -103,9 +103,9 @@ from ch_fulcrum_keeper_spec import (
 PART_NAME = "ch-fulcrum-keeper"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
-LUG_T = 2.0 * LUG_HALF_T  # 6.0 lug thickness along X
+LUG_T = 2.0 * LUG_HALF_T  # 8.0 lug thickness along X
 # Mid-plane through-cut total (both_directions splits the depth half per side
-# of the sketch plane): past the lug's +-3 X extent, clear of the foot below.
+# of the sketch plane): past the lug's +-4 X extent, clear of the foot below.
 BORE_CUT_DEPTH = 2.0 * LUG_T
 
 # The keeper's foot screw is the part-owned #2 close-clearance counterbore;
@@ -164,7 +164,7 @@ REFERENCE_LINES = (
         (SCREW_X, SCREW_FROM_SIDE),
         "horizontal",
         SCREW_FROM_TIP,
-        ('"FootL" / 2', '"LugT" / 2 + "FootL"', '"KeeperWidth" / 2'),
+        ('"FootScrewFromTip"', '"LugT" / 2 + "FootL"', '"KeeperWidth" / 2'),
     ),
     (
         "FootScrewSideReference",
@@ -379,6 +379,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
     await set_global(adapter, "SupplyH", f"{SUPPLY_HEIGHT_MIN}mm")
+    await set_global(adapter, "FootScrewFromTip", f"{SCREW_FROM_TIP}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -420,7 +421,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "lug", v_lug, 0.005 * v_lug)
 
     # --- Foot: side-profile rectangle on Front (XY), extruded +-Z ---------
-    # Outboard of the lug's outer face, x +3..+13.5, y 0..8; its underside
+    # Outboard of the lug's outer face, x +4..+12.5, y 0..8; its underside
     # is coplanar with the lug's, so the two make one flat seat.
     foot = SketchDims()
     check("create_sketch foot", await adapter.create_sketch("Front"))
@@ -531,12 +532,12 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ShaftBore")
-    # Coaxial cylinder through the 6.0 lug only: the bore (y 22.0..28.4)
+    # Coaxial cylinder through the 8.0 lug only: the bore (y 22.0..28.4)
     # lies wholly inside the lug + crown and well above the foot (y <= 8).
     v_bore = math.pi * (BORE_DIA / 2.0) ** 2 * LUG_T
     volume = await volume_check(adapter, "shaft bore", volume - v_bore, 0.01 * v_bore)
 
-    # --- Foot screw hole: fillister counterbore in the foot centre --------
+    # --- Foot screw hole: fillister counterbore SCREW_FROM_TIP off the tip --
     screw_hole = wizard_holes(
         adapter,
         SCREW_HOLE_SPEC,
@@ -572,7 +573,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # The tap drill removes the crown wall between the crown and the bore:
     # half of each perpendicular cross-hole volume, crown minus bore (the
-    # drill's +-0.76 footprint along X stays inside the 6.0 lug, so the crown
+    # drill's +-0.76 footprint along X stays inside the 8.0 lug, so the crown
     # is a full cylinder across it).
     tap_dia = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC)
     v_tap = (

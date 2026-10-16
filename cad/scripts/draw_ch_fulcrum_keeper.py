@@ -68,12 +68,10 @@ from ch_fulcrum_keeper_spec import (
     FOOT_SCREW_SIDE_CALLOUT,
     FOOT_TIP_X,
     LUG_HALF_T,
-    LUG_THICKNESS_CALLOUT,
     OVERALL_LENGTH,
     REFERENCE_DIMENSIONS,
     SCREW_X,
     SET_SCREW_HOLE_SPEC,
-    SET_SCREW_STATION_CALLOUT,
     SUPPLY_HEIGHT_CALLOUT,
     SUPPLY_HEIGHT_MIN,
     SUPPLY_HEIGHT_TOL_TYPE,
@@ -95,7 +93,7 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 
 # Sheet layout (meters).  The front (side-profile) view's model bbox is
-# X -3..+13.5 (lug inner face to foot tip) by Y 0..32.2; at 2:1 that is
+# X -4..+12.5 (lug inner face to foot tip) by Y 0..32.2; at 2:1 that is
 # ~33 x 64.4 mm.  Third angle: the plan (top view) rides above the front,
 # the end view (right) sits to its right, the isometric top-right.
 FRONT_CENTER = (0.110, 0.130)
@@ -105,7 +103,7 @@ ISO_CENTER = (0.330, 0.190)
 
 # Model bbox centre the projected views are laid out around (front and plan
 # share model X).
-_X_MID = (-LUG_HALF_T + FOOT_TIP_X) / 2.0  # 5.25
+_X_MID = (-LUG_HALF_T + FOOT_TIP_X) / 2.0  # 4.25
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -173,29 +171,27 @@ DIMENSION_CALLOUTS = {
     "CrownRadius": f"{CROWN_ROUND_CALLOUT},\nPER {_PAIR_REAM_STEP}",
     "BoreFromSide": BORE_CENTRE_CALLOUT,
 }
-# Each three-place size states the function that holds it there (rule 4,
+# The three-place size states the function that holds it there (rule 4,
 # machinist review baseline: 6.000 / 3.000 / 7.000 printed with neither a
-# band nor a reason): the tap's station off the DRO-set inner lug face puts
-# the set screw on its shaft flat; the lug thickness holds the tap's outer
-# web (MR-fleet r1: chained with the station it read as doing no work); the
-# foot hole's side station centres the transferred frame tap in its web.
+# band nor a reason): the foot hole's side station centres the transferred
+# frame tap in its web. The lug thickness and the tap's station print at the
+# title block's .XX (owner ruling Q11-B), so they carry no function line.
 # The supplied blank's least height states what it is (MR-fleet r3: the
 # square-topped blank's height was printed nowhere).
 FRONT_CALLOUTS = {
-    "LugThickness": LUG_THICKNESS_CALLOUT,
     "SupplyHeight": SUPPLY_HEIGHT_CALLOUT,
 }
 TOP_CALLOUTS = {
-    "SetScrewLocation": SET_SCREW_STATION_CALLOUT,
     "ScrewFromSide": FOOT_SCREW_SIDE_CALLOUT,
 }
 
 # Per-view survivors of the marked-dimension import: parametric name ->
 # sheet position.  The front view carries the lug thickness chained left of
-# the foot length below the seat, its text and function out to the left
-# over the notes, and under both the overall length (a reference, MR-fleet
-# r3: the chain printed no overall), ~8 mm under the 6.000's dimension line
-# (r4: 3.6 mm under it, its own line sat on the 6.000's arrows) and above
+# the foot length below the seat, its text out to the left of the inner lug
+# face (its own extension line is the overall length's too),
+# and under both the overall length (a reference, MR-fleet r3: the chain
+# printed no overall), ~8 mm under the chain's dimension line (r4: 3.6 mm
+# under it, its own line sat on the chain's arrows) and above
 # the notes; the finished height (a reference) left of the lug and the
 # supplied height (single limit MIN) outside it, the larger size outermost
 # (r4: the supply size alone left its extension line in empty space above
@@ -204,7 +200,7 @@ TOP_CALLOUTS = {
 # (the ch_pivot_bracket placement), so its leader runs through the round's
 # centre onto the arc.
 # The plan carries the crown tap's station off the inner lug face above the
-# plan, its text and function out to the left under the sheet border
+# plan, its text out to the left of the inner face's extension line
 # (MR-fleet r1: in the front view its extension line off the tap axis ended
 # in mid-air; the plan sees the tap end-on), the foot screw's station off the
 # foot tip (above the plan) and off the -Z side face, the latter's text and
@@ -213,19 +209,19 @@ TOP_CALLOUTS = {
 # crown stack, the reamed bore and the bore's reference place off a side face
 # with its centre-plane band above it.
 FRONT_KEEP = {
-    "LugThickness": (0.066, 0.086),
-    "FootLength": (_front_x(SCREW_X), 0.086),
+    "LugThickness": (0.080, 0.086),
+    "FootLength": (_front_x((LUG_HALF_T + FOOT_TIP_X) / 2.0), 0.086),
     "OverallLength": (FRONT_CENTER[0], 0.068),
     "FootRise": (0.140, 0.106),
     "OverallHeight": (0.080, FRONT_CENTER[1]),
     "SupplyHeight": (0.042, FRONT_CENTER[1]),
-    "CornerRadius": (0.122, 0.130),
+    "CornerRadius": (0.1257, 0.130),
 }
 # The manufacturing notes' top-left corner's height (MR-fleet r4: 4 mm lower
 # to make room for the overall length above them).
 NOTES_TOP = 0.058
 TOP_KEEP = {
-    "SetScrewLocation": (0.068, 0.2535),
+    "SetScrewLocation": (0.082, 0.2535),
     "ScrewFromTip": (_front_x((FOOT_TIP_X + SCREW_X) / 2.0), 0.252),
     "ScrewFromSide": (0.178, 0.214),
 }

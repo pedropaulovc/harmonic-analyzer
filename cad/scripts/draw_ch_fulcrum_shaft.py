@@ -59,7 +59,7 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 AXIS_Y = 0.212
 # Left of the sheet centre: the across-flat callout block starts at its
 # dimension line right of the right tip and runs ~35 mm right (r2 crossed
-# the border at 0.216); the left tip's 5.45 still clears the zone margin.
+# the border at 0.216); the left tip's 6.0 still clears the zone margin.
 RIGHT_CENTER = (0.198, AXIS_Y)
 # The isometric fills the free band over the title block at 1:1 (half the
 # sheet scale, hence its note): the shaft runs lower-left to upper-right
@@ -83,7 +83,7 @@ _LEFT_TIP_X = RIGHT_CENTER[0] - _on_sheet(SHAFT_LENGTH / 2.0)
 _RIGHT_TIP_X = RIGHT_CENTER[0] + _on_sheet(SHAFT_LENGTH / 2.0)
 _RIGHT_FLAT_INNER_X = _RIGHT_TIP_X - _on_sheet(FLAT_FROM_END + FLAT_LENGTH)
 # Rows above the shaft, nearest first; every text stands where no other
-# dimension's extension line runs: 5.45 outboard left of the left tip, the
+# dimension's extension line runs: 6.0 outboard left of the left tip, the
 # flat length left of its flat's inner edge, and the overall length (the
 # only dimension off the right tip) on the top row.
 _ROW_1 = AXIS_Y + 0.014

@@ -53,20 +53,23 @@ SHAFT_R = SHAFT_DIA / 2.0
 # tip-to-tip length print at .X and still keep both domes clear of the bores
 # (FLAT_STATION_WINDOW_MM below). ---
 END_PROUD = 1.025
-CYLINDER_HALF = KEEPER_Z_OFF + LUG_HALF_T + END_PROUD  # 78.025
+CYLINDER_HALF = KEEPER_Z_OFF + LUG_HALF_T + END_PROUD  # 80.025
 DOME_R = SHAFT_R
-SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 162.4 tip to tip
+SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 166.4 tip to tip
 
 # --- Set-screw flats: one per end on +Y, centred on the keeper lug mid-plane
 # (z = +-KEEPER_Z_OFF), so the crown tap's cup point lands mid-flat. Both
 # stations are baseline dimensions from the -Z dome tip (sheet left): the -Z
 # flat's outer edge FLAT_FROM_END off it and the +Z flat's inner edge
-# FLAT_BASELINE off it, so no station chains through another. ---
-FLAT_PITCH = 2.0 * KEEPER_Z_OFF  # 148.0 centre to centre (assembly only)
-FLAT_LENGTH = 3.5
+# FLAT_BASELINE off it, so no station chains through another. 4.4 long (3.5
+# under the 6.0 lug): with the 8.0 lug's .XX bands in the chain a 3.5 flat
+# leaves no station window at all; at 4.4 both stations land on whole tenths
+# and print .X, the flat length alone .XX (FLAT_STATION_WINDOW_MM). ---
+FLAT_PITCH = 2.0 * KEEPER_Z_OFF  # 150.0 centre to centre (assembly only)
+FLAT_LENGTH = 4.4
 FLAT_DEPTH = 0.3
-FLAT_FROM_END = SHAFT_LENGTH / 2.0 - FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 5.45
-FLAT_BASELINE = SHAFT_LENGTH / 2.0 + FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 153.45
+FLAT_FROM_END = SHAFT_LENGTH / 2.0 - FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 6.0
+FLAT_BASELINE = SHAFT_LENGTH / 2.0 + FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 156.0
 ACROSS_FLAT = SHAFT_DIA - FLAT_DEPTH  # 6.05: the printed size
 FLAT_HEIGHT = SHAFT_R - FLAT_DEPTH  # 2.875: the set screw's cup seat above the axis
 
@@ -155,16 +158,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places are the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the model owns
 # them. ShaftDia carries its SHAFT_H band natively; AcrossFlat at .XXX holds
 # FLAT_CHORD_MIN above the set screw's major and its >= 1.5D engagement and
-# proud ruling. FlatFromEnd and FlatBaseline at .XX with OverallLength at .X
-# hold FLAT_STATION_WINDOW_MM open (test_ch_fulcrum_shaft_drawing pins which
-# ones cannot drop a place). DomeRadius is a reference: the full hemisphere
-# follows from the diameter.
+# proud ruling. FlatFromEnd and FlatBaseline at .X, FlatLength at .XX and
+# OverallLength at .X hold FLAT_STATION_WINDOW_MM open
+# (test_ch_fulcrum_shaft_drawing pins that the flat length cannot drop a
+# place). DomeRadius is a reference: the full hemisphere follows from the
+# diameter.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDia": 3, "OverallLength": 1},
     "FlatProfile": {
         "FlatLength": 2,
-        "FlatFromEnd": 2,
-        "FlatBaseline": 2,
+        "FlatFromEnd": 1,
+        "FlatBaseline": 1,
         "AcrossFlat": 3,
         "DomeRadius": 2,
     },
@@ -187,9 +191,8 @@ DIMENSION_PREFIXES = {
 # --- Flat stations, at the worst case of every printed band and of the
 # MHA-CH-000 fit-up (drawing-guidelines.md rule 19 (absorb stacks at fit-up, not with tighter bands)). The keepers go on the frame with their
 # lug inner faces DRO-set (KEEPER_FITUP_LOCATION_BAND_MM each); each tap
-# stands SetScrewLocation off its lug's inner face (the window below still
-# chains it through the outer face and LugThickness, a conservative extra
-# band), the lug LugThickness thick. The shaft is free to slide until both
+# stands SetScrewLocation off its lug's inner face, as the keeper prints it,
+# and the lug is LugThickness thick. The shaft is free to slide until both
 # screws bite, so it needs ONE
 # axial place where at once: each cup lies wholly on its flat; each flat's
 # inner edge stays inside its lug (no lever hub rides a flat); and the
@@ -241,8 +244,8 @@ _inner_front = _lin(-_INNER, front_face=1.0)
 _inner_rear = _lin(_INNER, rear_face=1.0)
 _outer_front = _sum((1, _inner_front), (-1, _lin(2.0 * LUG_HALF_T, front_lug=1.0)))
 _outer_rear = _sum((1, _inner_rear), (1, _lin(2.0 * LUG_HALF_T, rear_lug=1.0)))
-_tap_front = _sum((1, _outer_front), (1, _lin(LUG_HALF_T, front_tap=1.0)))
-_tap_rear = _sum((1, _outer_rear), (-1, _lin(LUG_HALF_T, rear_tap=1.0)))
+_tap_front = _sum((1, _inner_front), (-1, _lin(LUG_HALF_T, front_tap=1.0)))
+_tap_rear = _sum((1, _inner_rear), (1, _lin(LUG_HALF_T, rear_tap=1.0)))
 _from_end = _lin(FLAT_FROM_END, flat_from_end=1.0)
 _front_len = _lin(FLAT_LENGTH, front_flat=1.0)
 _rear_len = _lin(FLAT_LENGTH, rear_flat=1.0)
@@ -312,7 +315,7 @@ if PAIRED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
 SHAFT_FIT_CLEARANCE_MM = (
     BORE_DIA_BAND[1] - SHAFT_DIA_BAND[0],
     BORE_DIA_BAND[0] - SHAFT_DIA_BAND[1],
-)  # (0.035, 0.070)
+)  # (0.038, 0.070)
 # No line ends in punctuation: the widest row ends on the dimension's
 # vertical leader, and a trailing ';' touched it (machinist review r2).
 SHAFT_DIA_CALLOUT = "\n".join(

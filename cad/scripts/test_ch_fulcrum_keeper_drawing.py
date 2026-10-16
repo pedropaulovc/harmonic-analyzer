@@ -36,19 +36,23 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_geometry_matches_the_top_frame_contract() -> None:
     # The keeper exists to hold the fulcrum shaft 25.2 above the rail top
     # face (1061.4 - 1036.2, the 2026-08-02 rederive contract) on a flat
-    # seat: a 6.0 lug with a straight foot running OUTBOARD to x = 13.5.
+    # seat: an 8.0 lug (owner ruling Q11-B) with a straight 8.5 foot running
+    # OUTBOARD to x = 12.5 (Q11-B': the tip stays clear of the frame's
+    # corner bosses), its screw 4.5 off the tip.
     spec = ch_fulcrum_keeper_spec
     assert spec.SHAFT_AXIS_H == 25.2
     assert 2.0 * spec.CROWN_R == spec.KEEPER_WIDTH == 14.0
-    assert 2.0 * spec.LUG_HALF_T == 6.0
-    assert spec.FOOT_TIP_X == spec.LUG_HALF_T + spec.FOOT_L == 13.5
-    assert spec.SCREW_X == 8.25
-    assert spec.KEEPER_SCREW_Z_OFF == spec.KEEPER_Z_OFF + spec.SCREW_X == 82.25
+    assert 2.0 * spec.LUG_HALF_T == 8.0
+    assert spec.FOOT_TIP_X == spec.LUG_HALF_T + spec.FOOT_L == 12.5
+    assert spec.SCREW_X == spec.FOOT_TIP_X - spec.SCREW_FROM_TIP == 8.0
+    assert spec.KEEPER_Z_OFF == 75.0
+    assert spec.KEEPER_INNER_FACE_SPAN_MM == 142.0
+    assert spec.KEEPER_SCREW_Z_OFF == spec.KEEPER_Z_OFF + spec.SCREW_X == 83.0
     # Plain reamed bore on the plain Ø6.35 shaft: a running band, cut by one
-    # made-to-order 0.2514 in reamer through both keepers at their installed
+    # made-to-order 0.2515 in reamer through both keepers at their installed
     # spacing, that covers the faced rail seats' flatness (ch_fulcrum_shaft_spec).
     assert spec.BORE_DIA == 6.35
-    assert spec.BORE_DIA_BAND == (0.050, 0.035)  # (upper, lower)
+    assert spec.BORE_DIA_BAND == (0.050, 0.038)  # (upper, lower)
     # The mate is the OTHER keeper of the pair, which the quantity note states.
     # MR-fleet r1: the supply condition -- no bore until the pair-ream, the
     # crown rounded after it -- is on the two callouts.
@@ -86,23 +90,25 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     spec = ch_fulcrum_keeper_spec
     assert spec.SET_SCREW_ENGAGEMENT_D >= 1.5
     assert spec.FOOT_SCREW_ENGAGEMENT_D >= 1.5
-    assert spec.SET_SCREW_WEB_MM >= 1.5
+    assert spec.SET_SCREW_WEB_MM >= 2.0
     assert spec.FOOT_TIP_WALL_MM >= 2.0
     assert spec.FOOT_SIDE_WALL_MM >= 2.0
     # Owner ruling Q10-B: the bore stands within +-0.3 of the width's centre
     # plane, so each side wall is half the least .X width less that band.
     assert spec.BORE_SIDE_WALL_MM >= 2.0
     assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.1
-    assert round(spec.SET_SCREW_WEB_MM, 3) == 1.813
-    assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.79
-    assert round(spec.FOOT_CBORE_LUG_CLEARANCE_MM, 3) == 1.99
+    assert round(spec.SET_SCREW_WEB_MM, 3) == 2.053
+    assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.04
+    assert round(spec.FOOT_CBORE_LUG_CLEARANCE_MM, 3) == 1.03
     assert round(spec.FOOT_SCREW_ENGAGEMENT_D, 2) == 1.79
     # The native counterbore callout prints the template's .XX; the engagement
     # and bottoming stacks take that printed depth (2.11), not 2.1082.
     assert spec.FOOT_COUNTERBORE_DEPTH_PLACES == 2
-    # The web is only met with the lug and tap station at three places.
-    assert spec.DRAWING_PRECISION["LugBody"]["LugThickness"] == 3
-    assert spec.DRAWING_PRECISION["SetScrewReference"]["SetScrewLocation"] == 3
+    # Owner ruling Q11-B: the 8.0 lug holds the web at the title block's .XX
+    # lug and tap station; Q11-B': the foot length prints .XX too.
+    assert spec.DRAWING_PRECISION["LugBody"]["LugThickness"] == 2
+    assert spec.DRAWING_PRECISION["SetScrewReference"]["SetScrewLocation"] == 2
+    assert spec.DRAWING_PRECISION["FootProfile"]["FootLength"] == 2
     # Off the foot tip the hole's station holds the tip wall at .XX; the
     # frame's transferred tap takes the .XXX side-station band.
     assert spec.DRAWING_PRECISION["FootScrewReference"]["ScrewFromTip"] == 2
@@ -112,9 +118,8 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
 
 def test_three_place_sizes_state_their_function() -> None:
     # Machinist review baseline (rule 3/4): 6.000, 3.000 and 7.000 printed
-    # with neither a band nor a function. Each now names what it holds; MR-fleet
-    # r1: the station alone sets the screw on its flat, from the inner face,
-    # and the lug thickness holds the tap's outer web.
+    # with neither a band nor a function. Owner ruling Q11-B dropped the
+    # first two to the title block's .XX; the one left names what it holds.
     spec = ch_fulcrum_keeper_spec
     three_place = {
         name
@@ -124,19 +129,13 @@ def test_three_place_sizes_state_their_function() -> None:
     } - {"BoreDia"}  # the reamed bore carries its own band
     callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
     # The supplied height's callout names what it is, not a function.
-    assert set(callouts) - {"SupplyHeight"} == three_place
-    assert " ".join(drawing.FRONT_CALLOUTS["LugThickness"].split()) == (
-        "HOLDS CROWN TAP OUTER WALL"
-    )
-    assert drawing.TOP_CALLOUTS["SetScrewLocation"] == spec.SET_SCREW_STATION_CALLOUT
-    shaft = _config.parts("ch-fulcrum-shaft")["number"]
+    assert set(callouts) - {"SupplyHeight"} == three_place == {"ScrewFromSide"}
     frame = _config.parts("fr-top-frame")["number"]
-    assert shaft in spec.SET_SCREW_STATION_CALLOUT
     assert frame in drawing.TOP_CALLOUTS["ScrewFromSide"]
-    # At .X (+-0.8 for .XXX's +-0.13) the lug would leave the outer web, the
-    # thinner one, under the 1.5 floor.
+    # At .X (+-0.8 for .XX's +-0.51 on both the lug and the tap station) the
+    # outer web would fall under the 1.5 floor.
     bands = spec._BAND_BY_PLACES
-    assert spec.SET_SCREW_WEB_MM + bands[3] - bands[1] < 1.5
+    assert spec.SET_SCREW_WEB_MM + 2.0 * (bands[2] - bands[1]) < 1.5
 
 
 def test_corner_round_prints_its_max_limit_in_the_open_corner() -> None:
@@ -347,7 +346,7 @@ def test_tap_and_foot_hole_station_reference_sketches() -> None:
     _, plane, dimension, start, end, _, value, _ = rows["FootScrewReference"]
     assert (plane, dimension) == ("Top", "ScrewFromTip")
     assert start == corner and end == (spec.SCREW_X, corner[1])
-    assert value == spec.FOOT_TIP_X - spec.SCREW_X == 5.25
+    assert value == spec.FOOT_TIP_X - spec.SCREW_X == spec.SCREW_FROM_TIP == 4.5
     _, plane, dimension, start, end, _, value, _ = rows["FootScrewSideReference"]
     assert (plane, dimension) == ("Top", "ScrewFromSide")
     # One keeper part: the foot hole on the width centreline.
@@ -564,7 +563,7 @@ def test_end_view_callouts_stand_clear_of_the_part_and_each_other() -> None:
             keep["CrownRadius"], ["(R7.0)", *callouts["CrownRadius"].splitlines()]
         ),
         "BoreDia": _text_block(
-            keep["BoreDia"], ["Ø6.350 +0.035", *callouts["BoreDia"].splitlines()], stack=True
+            keep["BoreDia"], ["Ø6.350 +0.038", *callouts["BoreDia"].splitlines()], stack=True
         ),
         "Depth": _text_block(keep["Depth"], ["14.0"]),
         # Owner ruling Q10-B: the reference station carries its centre-plane
@@ -659,11 +658,12 @@ def _tap_rows() -> list[str]:
 
 
 def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
-    # The three-place sizes' function rows: 3.000 above the plan out to the
-    # left (MR-fleet r1), 6.000 left of the seat over the notes, 7.000 under
-    # its extension lines right of the plan; the supplied height's MIN left
-    # of the lug (MR-fleet r3). None may touch a view, a neighbour, its own
-    # extension lines, the supplied height's lines or the border.
+    # The station and thickness texts and the function rows: 4.00 above the
+    # plan out to the left (MR-fleet r1), 8.00 left of the seat over the
+    # notes, 7.000 under its extension lines right of the plan; the supplied
+    # height's MIN left of the lug (MR-fleet r3). None may touch a view, a
+    # neighbour, its own extension lines, the supplied height's lines or the
+    # border.
     from _layout_geometry import Box, Segment, segment_box_distance
 
     spec = ch_fulcrum_keeper_spec
@@ -696,13 +696,13 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
     keeps = {**drawing.FRONT_KEEP, **drawing.TOP_KEEP}
     callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
     values = {
-        "SetScrewLocation": "3.000",
-        "LugThickness": "6.000",
+        "SetScrewLocation": "4.00",
+        "LugThickness": "8.00",
         "ScrewFromSide": "7.000",
         "SupplyHeight": "33.2 MIN",
     }
     blocks = {
-        name: _value_block(keeps[name], value, callouts[name])
+        name: _value_block(keeps[name], value, callouts.get(name, ""))
         for name, value in values.items()
     }
     # The 7.000 block prints with its LEFT edge at the requested x, not its
@@ -720,8 +720,8 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         "tap callout": tap,
         "overall length": overall_length,
         "overall height": _text_block(drawing.FRONT_KEEP["OverallHeight"], ["(32.2)"]),
-        "foot length": _text_block(drawing.FRONT_KEEP["FootLength"], ["10.5"]),
-        "screw from tip": _text_block(drawing.TOP_KEEP["ScrewFromTip"], ["5.25"]),
+        "foot length": _text_block(drawing.FRONT_KEEP["FootLength"], ["8.50"]),
+        "screw from tip": _text_block(drawing.TOP_KEEP["ScrewFromTip"], ["4.50"]),
         "corner radius": _text_block(drawing.FRONT_KEEP["CornerRadius"], ["R1.0 MAX"]),
     }
     for name, block in blocks.items():
@@ -731,9 +731,9 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         for other, box in {**neighbours, **blocks}.items():
             if other != name:
                 assert _box_gap(block, box) >= _AIR, (name, other)
-    # Each text stands outside its own extension lines: 3.000's left of the
+    # Each text stands outside its own extension lines: 4.00's left of the
     # plan's inner-face edge and over the plan (its line runs above the
-    # outline), 6.000's left of the inner lug face, 7.000's below the screw
+    # outline), 8.00's left of the inner lug face, 7.000's below the screw
     # axis.
     assert blocks["SetScrewLocation"].xmax <= plan.xmin - _AIR
     assert blocks["SetScrewLocation"].ymin >= plan.ymax + 0.003
@@ -761,8 +761,8 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         if name != "lug":
             assert segment_box_distance(square_top, box) >= 0.003, name
     # r4: SolidWorks drew the (16.5)'s line ~2.7 mm off its text, onto the
-    # 6.000's arrows under that block's last row; either side, it stays clear
-    # of the 6.000's line and of the notes.
+    # lug thickness's arrows under that block's last row; either side, it
+    # stays clear of the 8.00's line and of the notes.
     assert blocks["LugThickness"].ymin - (overall_length.ymax + 0.003) >= _AIR
     assert overall_length.ymin - 0.003 - notes_top >= _AIR
     length_y = drawing.FRONT_KEEP["OverallLength"][1]
@@ -777,7 +777,7 @@ def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
     # Machinist review r13: the tap/staking block ran 5.70 mm past the left
     # inner border (x 12.7 mm). Reflowed to rows of at most 24 characters,
     # the whole block and its leader shoulder stand inside with air, clear of
-    # the plan, of the 3.000 text and its function and of the foot-hole callout.
+    # the plan, of the 4.00 text and of the foot-hole callout.
     from _layout_audit import _segment_crossing
     from _layout_geometry import Box, Segment, point_segment_distance
 
@@ -795,9 +795,7 @@ def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
         cy + spec.KEEPER_WIDTH * scale / 2.0,
     )
     station = "SetScrewLocation"
-    set_screw_location = _value_block(
-        drawing.TOP_KEEP[station], "3.000", drawing.TOP_CALLOUTS[station]
-    )
+    set_screw_location = _value_block(drawing.TOP_KEEP[station], "4.00", "")
     foot_hole = Box(0.1035, 0.1945, 0.1469, 0.2095)  # r13 printed + DRILL row
     for other in (plan, set_screw_location, foot_hole):
         assert _box_gap(block, other) >= _AIR, other

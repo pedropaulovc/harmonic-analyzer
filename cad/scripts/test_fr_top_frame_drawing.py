@@ -202,13 +202,13 @@ def test_smaller_bosses_leave_real_plan_corners_and_the_outward_foot_seat() -> N
         keeper.FULCRUM_KEEPER_CENTRE_Z + keeper.KEEPER_SCREW_Z_OFF
     )
     # Contract stations are displayed to three places; do not round the bank.
-    assert part.KEEPER_TAP_Z_FRONT == pytest.approx(-82.754, abs=0.0005)
-    assert part.KEEPER_TAP_Z_REAR == pytest.approx(81.746, abs=0.0005)
+    assert part.KEEPER_TAP_Z_FRONT == pytest.approx(-83.504, abs=0.0005)
+    assert part.KEEPER_TAP_Z_REAR == pytest.approx(82.496, abs=0.0005)
     assert part.KEEPER_FOOT_TIP_Z_FRONT == pytest.approx(-88.004, abs=0.0005)
     assert part.KEEPER_FOOT_TIP_Z_REAR == pytest.approx(86.996, abs=0.0005)
     assert part.KEEPER_FOOT_BOSS_MARGINS == pytest.approx((1.496, 2.504), abs=0.0005)
     assert min(part.KEEPER_FOOT_BOSS_MARGINS) >= 1.0
-    assert part.KEEPER_FOOT_PRINTED_BOSS_MARGINS == pytest.approx((0.150, 0.640))
+    assert part.KEEPER_FOOT_PRINTED_BOSS_MARGINS == pytest.approx((0.060, 0.550))
     assert min(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS) > 0.0
     assert part.KEEPER_FOOT_RAIL_MARGINS == pytest.approx((4.996, 6.004), abs=0.0005)
     stock_major = FILLISTER_SIZE[0]
@@ -2549,7 +2549,10 @@ def test_hanger_callout_and_frame_clear_the_border_and_each_other() -> None:
 
 # R5's native HOLES-SOCKETS leader runs (sheet m) behind its one enforced
 # leader-crosses-leader: the then-Ø17 spotface callout's diameter run and
-# the centring frame's run to its default clearance-rim landing.
+# the centring frame's run to its default clearance-rim landing.  R5 drew the
+# plan centred at R5_PLAN_CENTER; the diameter run and the rim landing ride
+# with the view, the frame (HANGER_CENTER_FRAME_XY) is placed on the sheet.
+R5_PLAN_CENTER = (0.1910853, 0.160)
 R5_HANGER_CALLOUT_RUN = ((0.1800, 0.1997), (0.1872, 0.2042))
 R5_HANGER_FRAME_RUN = ((0.1936, 0.2605), (0.1826, 0.2009))
 
@@ -2579,20 +2582,28 @@ def test_hanger_frame_lands_on_the_rim_clear_of_the_callout_leader() -> None:
     across the callout's diameter run at (182.7,201.4) mm.  It now lands on
     the same rim up-right of the axis, the frame's side of the callout's
     diameter, and right of D's trace (the 182.0 extension line)."""
-    centre = _plan(part.HANGER_X, part.STUD_Z_FRONT)
     radius = spec.HANGER_CLEARANCE_DIA / 2.0 * _S
-    callout_a, callout_b = R5_HANGER_CALLOUT_RUN
-    frame_start, old_landing = R5_HANGER_FRAME_RUN
-    # The logged runs: the Ø17 rim's diameter through the axis, and a run to the
-    # clearance rim, crossing where R5 reported.
-    assert math.dist(
-        ((callout_a[0] + callout_b[0]) / 2.0, (callout_a[1] + callout_b[1]) / 2.0), centre
-    ) < 0.0002
-    assert math.dist(callout_a, callout_b) == pytest.approx(17.0 * _S, abs=0.0002)
-    assert math.dist(old_landing, centre) == pytest.approx(radius, abs=0.0002)
+    frame_start, r5_landing = R5_HANGER_FRAME_RUN
+    # The logged runs, in R5's view: the Ø17 rim's diameter through the axis,
+    # and a run to the clearance rim, crossing where R5 reported.
+    r5_centre = (
+        R5_PLAN_CENTER[0] + part.HANGER_X * _S,
+        R5_PLAN_CENTER[1] - part.STUD_Z_FRONT * _S,
+    )
+    r5_a, r5_b = R5_HANGER_CALLOUT_RUN
+    assert math.dist(((r5_a[0] + r5_b[0]) / 2.0, (r5_a[1] + r5_b[1]) / 2.0), r5_centre) < 0.0002
+    assert math.dist(r5_a, r5_b) == pytest.approx(17.0 * _S, abs=0.0002)
+    assert math.dist(r5_landing, r5_centre) == pytest.approx(radius, abs=0.0002)
     assert _segment_crossing(R5_HANGER_CALLOUT_RUN, R5_HANGER_FRAME_RUN) == pytest.approx(
         (0.1827, 0.2014), abs=1e-4,
     )
+    # The same view-attached ink where the plan now stands (it follows the
+    # keeper transfer shift); the frame stays where it is placed.
+    centre = _plan(part.HANGER_X, part.STUD_Z_FRONT)
+    dx, dy = centre[0] - r5_centre[0], centre[1] - r5_centre[1]
+    callout_a, callout_b = ((x + dx, y + dy) for x, y in R5_HANGER_CALLOUT_RUN)
+    callout_run = (callout_a, callout_b)
+    old_landing = (r5_landing[0] + dx, r5_landing[1] + dy)
     # The landing: a real point on the selected clearance rim at the finished
     # top, at the declared bearing, between the callout's run and D's trace.
     x, y, z = drawing.hanger_center_landing()
@@ -2621,10 +2632,10 @@ def test_hanger_frame_lands_on_the_rim_clear_of_the_callout_leader() -> None:
     assert side(old_landing) < 0.0 < side(frame_start)
     assert side(landing) > 0.0
     rerouted = (frame_start, landing)
-    assert _segment_crossing(R5_HANGER_CALLOUT_RUN, rerouted) is None
+    assert _segment_crossing(callout_run, rerouted) is None
     gap = min(
-        *(_point_to_segment(p, R5_HANGER_CALLOUT_RUN) for p in rerouted),
-        *(_point_to_segment(p, rerouted) for p in R5_HANGER_CALLOUT_RUN),
+        *(_point_to_segment(p, callout_run) for p in rerouted),
+        *(_point_to_segment(p, rerouted) for p in callout_run),
     )
     assert gap > 0.0005 > drawing.ARROW_HALF_WIDTH
     # Wholly right of D's trace: the 182.0 extension line is never reached.
@@ -4853,7 +4864,7 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert part.KEEPER_FOOT_BOSS_MARGINS == pytest.approx((1.496, 2.504), abs=0.0005)
     # Along the rail the faced top runs boss to boss, so the fitted foot
     # stays on it exactly when it clears the bosses at the printed bands.
-    assert part.KEEPER_FOOT_PRINTED_BOSS_MARGINS == pytest.approx((0.150, 0.640))
+    assert part.KEEPER_FOOT_PRINTED_BOSS_MARGINS == pytest.approx((0.060, 0.550))
     assert part.KEEPER_FOOT_RAIL_MARGINS == pytest.approx((4.996, 6.004), abs=0.0005)
     # Across it the widest printed foot, at the farthest printed fit-up
     # offset from the web, stays inside the narrowest printed flange less
