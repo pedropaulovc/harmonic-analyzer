@@ -117,8 +117,9 @@ VIEW_LABEL_GAP = 0.004
 
 # --- sheet 1: assembled views and the three settings details -------------------
 # The pen at 1:2: front and right side by side down the left, labels under
-# them; DETAIL C (the carriage plan at 1:1) under them; DETAILs A and B at 2:1
-# across the top right with the as-shipped note under them.
+# them; DETAIL C (the carriage plan at 2:1, turned marker-axis across) under
+# them; DETAILs A and B at 2:1 across the top right with the as-shipped note
+# under them.
 FRONT_CENTER = (0.050, 0.192)
 RIGHT_CENTER = (0.125, 0.192)
 SETTINGS_NOTE_XY = (0.225, 0.150)
@@ -145,7 +146,9 @@ class Detail:
     ``model_centre`` (machine mm) lands on the sheet at ``centre``; the crop
     circle reaches ``radius_mm`` model millimetres round it. ``feature`` is the
     builder's settings sketch whose marked dimensions the detail prints
-    (``None``: a lock shown, nothing dimensioned)."""
+    (``None``: a lock shown, nothing dimensioned). ``axis_points`` (machine mm,
+    from, to), when given, is the direction the view is turned to lay along
+    sheet +X."""
 
     key: str
     orientation: str
@@ -156,6 +159,9 @@ class Detail:
     stems: frozenset[str]
     feature: str | None
     label_xy: tuple[float, float]
+    axis_points: (
+        tuple[tuple[float, float, float], tuple[float, float, float]] | None
+    ) = None
 
     @property
     def title(self) -> str:
@@ -206,13 +212,14 @@ HANGER_DETAIL = Detail(
 CARRIAGE_DETAIL = Detail(
     key="carriage",
     orientation="*Top",
-    scale=(1, 1),
+    scale=(2, 1),
     model_centre=spec.CARRIAGE_DETAIL_CENTRE,
     radius_mm=spec.CARRIAGE_DETAIL_RADIUS,
-    centre=(0.075, 0.066),
+    centre=(0.110, 0.058),
     stems=_CARRIAGE_STEMS,
     feature=spec.CARRIAGE_FEATURE,
-    label_xy=(0.112, 0.088),
+    label_xy=(0.156, 0.090),
+    axis_points=spec.CARRIAGE_AXIS_POINTS,
 )
 DETAILS = (STUD_DETAIL, HANGER_DETAIL, CARRIAGE_DETAIL)
 
@@ -256,9 +263,14 @@ BOM_ANCHOR = (
     SHEET_INNER_BORDER[2] - sum(BOM_COLUMN_WIDTHS.values()) - 0.003,
     SHEET_INNER_BORDER[3] - 0.004,
 )
+# The header and the marker's row wrap to two lines: the table measured 91.5 mm
+# tall (farm run 20261016T064716571Z), not its 14 rows at BOM_ROW_HEIGHT.
+BOM_WRAPPED_LINES = 2
 EXPLODED_CAPTION_XY = (
     BOM_ANCHOR[0],
-    BOM_ANCHOR[1] - (len(spec.BOM_ORDER) + 1) * BOM_ROW_HEIGHT - NOTE_GAP,
+    BOM_ANCHOR[1]
+    - (len(spec.BOM_ORDER) + 1 + BOM_WRAPPED_LINES) * BOM_ROW_HEIGHT
+    - NOTE_GAP,
 )
 BALLOON_MARGIN = 0.012
 # The exploded outline plus its balloon ring keeps left of the BOM.
@@ -557,6 +569,34 @@ def _placed_base_view(
     _label_view(adapter, view, title, (x0, y0 - VIEW_LABEL_GAP), label=label)
 
 
+def _turn_detail(adapter: Any, view: Any, detail: Detail) -> None:
+    """Turn ``view`` so ``detail.axis_points`` read along sheet +X, and prove
+    it (the dt_crank_drive_gear A-A turn: ``IView.Angle`` less the axis's
+    sheet angle)."""
+    native = _early_bound(view, "IView")
+    label = f"{detail.label} axis"
+
+    def axis() -> tuple[float, float]:
+        start, end = (
+            model_point_in_view(
+                adapter,
+                native,
+                tuple(value / 1000.0 for value in point),
+                label=label,
+            )
+            for point in detail.axis_points or ()
+        )
+        return end[0] - start[0], end[1] - start[1]
+
+    dx, dy = axis()
+    native.Angle = float(native.Angle) - math.atan2(dy, dx)
+    adapter.currentModel.EditRebuild3()
+    dx, dy = axis()
+    if dx <= 0.0 or abs(dy) > 1e-8:
+        raise RuntimeError(f"{label} did not turn across: ({dx!r}, {dy!r})")
+    _telemetry.info(f"{label}: turned to {math.degrees(float(native.Angle)):.3f} deg")
+
+
 def _placed_detail(adapter: Any, detail: Detail) -> Any:
     """``detail`` uncropped and isolated: its orientation at its scale, moved
     so ``detail.model_centre`` lands on ``detail.centre``."""
@@ -568,6 +608,8 @@ def _placed_detail(adapter: Any, detail: Detail) -> Any:
     )
     set_hidden_lines_removed(adapter, view)
     apply_view_configuration(adapter, view, role=ViewRole.PLAIN, label=detail.label)
+    if detail.axis_points is not None:
+        _turn_detail(adapter, view, detail)
     label = f"{detail.label} centre"
     centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
     position = tuple(float(value) for value in view.Position)
