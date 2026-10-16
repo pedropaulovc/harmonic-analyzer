@@ -104,9 +104,10 @@ EXPLODE_STEPS: tuple[tuple[str, tuple[str, ...], str | None, str, float], ...] =
 # machine X, sketch y = machine Y), each driven from globals and marked for the
 # drawing, which shows each in the one view that dimensions it.
 #
-# CounterSetting: the knife-edge contact line to the MHA-SM-004 axis over the
-# counter spring. Sliding the gooseneck post in the frame hub sets it until
-# the lever is level, so it prints as a reference nominal.
+# CounterSetting: the MHA-SM-004 axis over the counter spring, measured up the
+# spring's own axis from the knife-edge contact level. Sliding the gooseneck
+# post in the frame hub sets it until the lever is level, so it prints as a
+# reference nominal.
 #
 # KnifeRockGauge: how far the boss-hook face rises when the lever rocks the
 # free-rock floor about the knife edge -- the free-rock acceptance in a

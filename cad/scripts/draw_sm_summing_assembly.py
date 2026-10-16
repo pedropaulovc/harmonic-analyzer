@@ -421,7 +421,8 @@ def _dimension_value_mm(display: Any) -> float:
 
 
 def _counter_setting(adapter: Any, front: Any) -> Callable[[], None]:
-    """The knife-to-screw height as a reference dimension on the front view."""
+    """The screw axis height over the knife contact level, a reference
+    dimension on the front view."""
     label = "counter screw height"
     knife, screw = (
         model_point_in_view(
