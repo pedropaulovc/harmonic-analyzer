@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 import build_ha_harmonic_analyzer_assembly as builder
+import ch_channel_assembly_steps
 import draw_ha_harmonic_analyzer_assembly as drawing
 import fr_top_frame_spec
 import fr_tube_frame_spec
@@ -137,6 +138,14 @@ def test_integration_joints_point_at_their_integration_steps() -> None:
     assert anchor.lock_part == nut.member == "ch_anchor_jam_nut"
     bracket = rows["ha-harmonic-analyzer/magnifying-bracket-screws"]
     assert bracket.installed_at == steps.step_ref("magnifier-bracket-screwed")
+
+
+def test_channel_sheet_cites_the_anchor_step_by_its_number() -> None:
+    # MHA-CH-000 prints this pointer as a literal (its steps module sits below
+    # this one in the stack); a reorder here must move it too.
+    assert ch_channel_assembly_steps.HA_ANCHORS_SET_REF == steps.step_ref(
+        "channel-anchors-set"
+    )
 
 
 def test_steps_sheet_text_clears_the_title_block() -> None:
