@@ -646,13 +646,16 @@ def _mounting_rims(back: Any) -> list[Any]:
 # the rib-end height right of the plate tip, the rib arc and the hidden
 # cylinder taking leaders from below on either side of the detail letter, the
 # boss height left of the boss, and the web thickness standing above the web.
-# The rib arc's four lines centre 1 mm under the view, 4 mm over the 20X
-# frame, its leader landing at 224 deg round the axis.
+# A radial leader runs along the line from the arc's centre to the end of its
+# text block's BOTTOM line (farm r5: the R15.24 leader went to "AT BOSS
+# AXIS"'s right end, through the detail letter).  The rib arc's four lines
+# stand under the view, left of the 20X frame, their bottom line's right end
+# at (0.2032, 0.1969): 230 deg round the axis, 3 mm left of the letter.
 FRONT_KEEP = {
     "CylDia": (0.290, 0.214),
     "AnchorHeight": (0.183, 0.235),
     "WebThickness": (0.215, 0.247),
-    "EdgeRibFrontArcR": (0.210, 0.211),
+    "EdgeRibFrontArcR": (0.1868, 0.2070),
     "EdgeRibFrontEndTopX": (0.2443, 0.254),
     "EdgeRibFrontEndTopY": (0.268, 0.244),
 }
@@ -677,25 +680,30 @@ TOP_KEEP = {
     "PlateWidth": (0.266, 0.0813),
     "PlateLength": (0.395, TOP_CENTER[1]),
     "RibDepth": (0.325, 0.160),  # -Z receiver rib: Top prints model +Z down
-    "AnchorOuterDia": (0.145, 0.175),
+    # The boss's diameter names the web arcs' ends under its value; its
+    # four lines stand left of its leader, above the anchor tap's callout.
+    "AnchorOuterDia": (0.145, 0.168),
     # Plan geometry (baseline render): the cylinder band x 0.2286..0.2417,
     # the -Z plate end at y 0.1681 with its stub to 0.179, the +Z end at
     # 0.0922, the summation web's arcs from the boss (x 0.2021) to the
     # cylinder ends.
-    # Above the web's upper arc (centre (0.1737, 0.2001), 69.4 sheet mm), the
-    # text 60 deg round from its centre, inside the arc's visible span (-70
-    # to -37 deg): at -72 deg (0.200, 0.168) the radius ran opposite-side
-    # across the sheet (farm r4).  Its two callout lines stand 4 mm right of
-    # the Ø19.05's leader and left of the 21.72's lower arrow (x 0.2176).
-    "SummationArcRadius": (0.200, 0.155),
-    # Left of the -Z stub, under the 20X frame and right of the R138.85.
-    "HexKnifeBackDepth": (0.218, 0.1735),
+    # Inside the web's upper arc (centre (0.1737, 0.2001), 69.4 sheet mm,
+    # visible from -70 to -37 deg round it).  The leader starts at the text's
+    # left end, at -60 deg and 46 mm from the centre, so it lands on the
+    # visible arc: from -93 deg (farm r5) or -72 deg (r4) SolidWorks moved the
+    # arrow to the opposite side, ruling the radius across the sheet.  The
+    # text's far corner stays 7 mm inside the arc, 8 mm under the 21.72.
+    "SummationArcRadius": (0.2096, 0.162),
+    # Left of the -Z stub, under the 20X frame; its lower arrow (x 0.226)
+    # stands 4.5 mm right of the R138.85.
+    "HexKnifeBackDepth": (0.226, 0.1735),
     # Left of the +Z end rib, above its span: below it the finish symbol and
     # the 76.20/39.85 row leave no room, and the web's lower arc reaches the
-    # cylinder at x 0.226 there.  The text ends at x 0.211, right of the
-    # 76.20 X location's extension line (x 0.1972), and stands above the
-    # boss Z location's datum-B extension line (y 0.0919).
-    "EdgeRibThickness": (0.211, 0.1035),
+    # cylinder at x 0.226 there.  The text spans x 0.1979..0.2095, right of
+    # the 76.20 X location's extension line (x 0.1972); the lower arrow
+    # stands 3.8 mm left of the finish symbol's text; the text stands above
+    # the boss Z location's datum-B extension line (y 0.0919).
+    "EdgeRibThickness": (0.2095, 0.1035),
     # Above the mid rib between the boss and the cylinder, under the web's
     # upper arc (y 0.146 and up there), the text ending at the line.
     "MiddleRibThickness": (0.226, 0.1365),
@@ -705,17 +713,18 @@ TOP_KEEP = {
 # y 0.1925, the spring pad from the free edge to x 0.170 down to y 0.1855,
 # the cylinder's circle x 0.1917..0.2171, y 0.1773..0.2027).
 # The receiver stations stand above the view: 14.75 nearer, its text left of
-# the free edge, 28.45 above it with the pattern's mate named, its text right
-# of the span.  Left of the free edge the row height stands inboard, its text
-# above, and the padded tap length outboard, its text below, so neither's
-# extension lines cross the other's dimension line; the pad's width hangs
-# below and left of both, outside its extension lines.
+# the free edge, 28.45 above it, its text and the pattern's mate right of the
+# span (a horizontal dimension stacks a callout below the value above its
+# line).  Left of the free edge the padded tap length stands inboard, its text
+# below, and the row height outboard, its text above and left of the
+# length's upper arrow (at x 0.147 that arrow ran through it, farm r5); the
+# pad's width hangs below and left of both, outside its extension lines.
 BACK_KEEP = {
-    "SpringSeatThickness": (0.147, 0.176),
+    "SpringSeatThickness": (0.153, 0.176),
     "SpringPadWidth": (0.130, 0.163),
-    "ReceiverX0": (0.220, 0.221),
+    "ReceiverX0": (0.220, 0.2215),
     "ReceiverX1": (0.130, 0.2085),
-    "ReceiverY0": (0.155, 0.1985),
+    "ReceiverY0": (0.143, 0.1985),
 }
 # The back view's label, under the pad's width.  The point is its top left.
 BACK_VIEW_NOTE_XY = (0.110, 0.149)
