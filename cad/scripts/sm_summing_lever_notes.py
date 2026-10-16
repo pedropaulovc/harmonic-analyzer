@@ -61,8 +61,11 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
 # outline hides it, so the old Ø25.40 leader landed on a rib slant).  The
 # plates join the cylinder at its mid-plane, so no silhouette shows there: a
 # hidden Top-plane reference line spans the diameter at this world Z, between
-# the mid rib and the +Z end rib, where the dimension prints.
-CYLINDER_REFERENCE_Z = 40.0
+# the mid rib and the +Z end rib, where the dimension prints.  The line lies
+# under the dimension line, which prints 2.8 sheet mm below its text (farm r11
+# 2026-10-16: at Z 40, under the text, the line printed as a stray dashed
+# line over the Ø25.40, machinist review r11).
+CYLINDER_REFERENCE_Z = 45.6
 
 KNIFE_MOUNT_NUMBER = "MHA-SM-002"  # sm-knife-mount: the knife-edge seat
 BRACKET_NUMBER = "MHA-MG-001"  # mg-magnifying-bracket
@@ -109,7 +112,9 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     # the bracket's 2-56 tap (build_sm_summing_lever.EDGE_RIB_END_STEP).  It
     # is located from the plate's top face, the face the receiver row height
     # uses (machinist review r10: from the mid-plane the origin was in air).
-    "EdgeRibFrontEndStep": "END RIBS ABOVE\nPLATE TOP FACE\nKEEPS TAP WALL",
+    # No tap-wall words: the taps sit inboard of the step, under the slant,
+    # and r11 read them as walled by the step's 0.44 band.
+    "EdgeRibFrontEndStep": "END RIBS ABOVE\nPLATE TOP FACE",
 }
 
 # Leads the 2-56 receiver callout: what its two depth limits hold.  The full
