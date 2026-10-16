@@ -54,7 +54,7 @@ beyond the thread-envelope allowances in ``_interference_contracts``.
 
 Fitter package (draw_pn_pen_assembly.py, MHA-PN-000): the three carriage
 settings -- stud height, pen yaw and nib preset -- are blanked construction
-sketches (``StudSetting`` on the Front plane, ``CarriageSetting`` on the Top
+sketches (``StudSetting`` on the Right plane, ``CarriageSetting`` on the Top
 plane) whose driving, toleranced dimensions the drawing imports, and the
 ``PN_EXPLODED`` presentation is authored here from
 ``pn_pen_assembly_spec.EXPLODE_STEPS`` in both drawing configurations.
@@ -489,18 +489,18 @@ def _construction(adapter: Any, line: str, label: str) -> None:
 
 async def _author_stud_setting(adapter: Any) -> None:
     """STUD HEIGHT: a vertical construction line on the rod axis from the
-    rod's top face to the stud's head top (Front plane, sketch = machine X,
+    rod's top face to the stud's head top (Right plane, sketch = machine -Z,
     Y), its length the toleranced setting. No solid or pose edits."""
-    (x, rod_top_y), (_x, head_top_y) = spec.STUD_LINE
+    (u, rod_top_y), (_u, head_top_y) = spec.STUD_LINE
     dims = SketchDims()
-    check("create stud setting sketch", await adapter.create_sketch("Front"))
+    check("create stud setting sketch", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    line = check("stud setting line", await adapter.add_line(x, rod_top_y, x, head_top_y))
+    line = check("stud setting line", await adapter.add_line(u, rod_top_y, u, head_top_y))
     set_sketch_direct_db(adapter, False)
     _construction(adapter, line, "stud setting line")
     check("stud setting vertical", await adapter.add_sketch_constraint(line, None, "vertical"))
-    await anchor_point_to_origin(adapter, f"{line}.start", x, rod_top_y, "rod top on axis")
-    dims.record("StudRodAxisX")
+    await anchor_point_to_origin(adapter, f"{line}.start", u, rod_top_y, "rod top on axis")
+    dims.record("StudRodAxisZ")
     dims.record("StudRodTopY")
     await dimension_between(
         adapter, f"{line}.start", f"{line}.end", "vertical_distance",

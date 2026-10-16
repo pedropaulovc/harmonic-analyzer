@@ -136,12 +136,13 @@ def test_each_detail_title_carries_its_letter_and_any_other_direction() -> None:
     for detail in drawing.DETAILS:
         first = detail.title.splitlines()[0]
         assert first.startswith(f"DETAIL {spec.DETAIL_LETTERS[detail.key]}")
-        # Bounded on RIGHT and drawn from the right, or else its title says
-        # which way it looks.
-        same = detail.key in drawing.BOUNDED_ON_RIGHT and (
-            detail.orientation == "*Right" and detail.axis_points is None
-        )
-        assert same == (" - FROM " not in first)
+        # A detail circled on RIGHT enlarges what the circle holds: drawn from
+        # the right, unturned, its title naming no other direction.
+        if detail.key in drawing.BOUNDED_ON_RIGHT:
+            assert detail.orientation == "*Right" and detail.axis_points is None
+            assert " - FROM " not in first
+        else:
+            assert " - FROM " in first
     assert len(set(spec.DETAIL_LETTERS.values())) == len(drawing.DETAILS)
 
 
