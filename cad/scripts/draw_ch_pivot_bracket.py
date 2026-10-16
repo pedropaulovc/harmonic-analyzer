@@ -509,7 +509,8 @@ async def build(adapter: Any) -> dict[str, str]:
     imported_annotations = [*front_annotations, *top_annotations, *right_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
     _dress_corner_radius(adapter, right_annotations)
-    for view, label in ((front, "front"), (top, "plan")):
+    # The right view's arch-to-block tangent line is no edge the shop cuts.
+    for view, label in ((front, "front"), (top, "plan"), (right, "right")):
         view.SetDisplayTangentEdges2(0)
         if int(view.GetDisplayTangentEdges2()) != 0:
             raise RuntimeError(f"failed to hide {label}-view tangent edges")

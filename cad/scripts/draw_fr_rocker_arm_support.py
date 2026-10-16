@@ -147,7 +147,7 @@ FRONT_KEEP = {
     # left: from the -X end face, the pocket wall's 6.85 on the inner band
     # (its text outside left, its pocket-wall extension line stopping below
     # the outer band) and the cavity wall's 25.9 on the outer one, under the
-    # 178.8; from the top face, the cavity's top wall left of the view. The
+    # 180.5; from the top face, the cavity's top wall left of the view. The
     # 6.85's BOTH SIDES stands left of the 25.4's dimension line and its line
     # above the 25.4's outside arrow tail (r9 review: the tail struck the
     # callout's E and crossed the 6.85's line).

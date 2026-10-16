@@ -1216,7 +1216,7 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     for a, b in ((pocket, cavity), (pocket, cavity_top), (cavity, cavity_top)):
         assert _boxes_clear(a, b, 0.002)
     for other in (
-        _text_box("178.8", drawing.FRONT_KEEP["Depth"]),
+        _text_box("180.5", drawing.FRONT_KEEP["Depth"]),
         _text_box("R6.35\n8X", drawing.FRONT_KEEP["PocketRadius"]),
     ):
         for box in (pocket, cavity, cavity_top):
