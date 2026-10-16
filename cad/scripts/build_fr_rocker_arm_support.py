@@ -291,10 +291,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # reads RimChamferSize, so 1.27 prints as 1.3 on the .X band.
 RIM_CHAMFER_PLACES = 1
 # The seats' REF stations off the end faces print at the seat stack's places
-# (rocker_bracket_seat_layout's 4.95 / 6.56 end walls).
+# (rocker_bracket_seat_layout's 5.39 / 7.00 end walls).
 SEAT_STATION_PLACES = 2
 # The cavity's locations print at the .X band (a through lightening cut); the
-# pocket's 6.85 at two places, its value; the web's and the top face's
+# pocket's 7.70 at two places, its value; the web's and the top face's
 # locations across the base at the web thickness's own places (PR #1469 r4
 # machinist review; Main's ruling: routine .XX bands, the seat-on-web lateral
 # stack is #1569's).
@@ -402,9 +402,9 @@ SEAT_STATION_DRIVES = {
 # fillet, below where the drawing picks the web's faces for its 9.53.
 REFERENCE_CHORD = 1.0
 REFERENCE_EDGE_STATION = 5.0
-CAVITY_END_STATION = BOSS_DEPTH / 2.0 - CAV  # 25.9
+CAVITY_END_STATION = BOSS_DEPTH / 2.0 - CAV  # 26.75, printed 26.7
 CAVITY_TOP_STATION = HALF_Y - CAV  # 25.4
-POCKET_END_STATION = BOSS_DEPTH / 2.0 - BIG  # 6.85
+POCKET_END_STATION = BOSS_DEPTH / 2.0 - BIG  # 7.70
 WEB_FACE_STATION = WIDE - WEB  # 26.99
 LOCATION_DRIVES = {
     "CavityEndStation": f'{END_FACE_DRIVE} - "CavHalf"',

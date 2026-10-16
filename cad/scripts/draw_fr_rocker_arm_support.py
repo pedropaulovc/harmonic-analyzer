@@ -146,7 +146,7 @@ FRONT_KEEP = {
     # in the part) stand above the view's left end, clear of the R6.35 low
     # left: from the -X end face, the pocket wall's 7.70 on the inner band
     # (its text outside left, its pocket-wall extension line stopping below
-    # the outer band) and the cavity wall's 26.8 on the outer one, under the
+    # the outer band) and the cavity wall's 26.7 on the outer one, under the
     # 180.5; from the top face, the cavity's top wall left of the view. The
     # 7.70's BOTH SIDES stands left of the 25.4's dimension line and its line
     # above the 25.4's outside arrow tail (r9 review: the tail struck the
@@ -952,12 +952,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Materialize the iso's cosmetic threads before the strict final note
-    # cleanup, so BracketSeats' descriptive label exists when it is counted
+    # cleanup, so any descriptive BracketSeats label exists when it is counted
     # rather than first appearing during the native drawing save.
     # VIEW B shows the same seats face-on, so its cosmetic threads are
     # imported too (the thread circles print; nothing is left for the save to
-    # add). r743-p1s-B showed the import brings NO label in that top view:
-    # finalize removed exactly the iso's one.
+    # add). r743-p1s-B showed the import brings NO label in that top view.
     import_cosmetic_threads(adapter, iso)
     import_cosmetic_threads(adapter, view_b)
 
@@ -967,12 +966,14 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker-Arm Support Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # BracketSeats' descriptive label on the isometric ran past the
-        # right border (fix3 render); the seat note already states it. One
-        # label per tapped Hole Wizard feature, and only the iso draws one
-        # (r743-p1s-B: VIEW B's import brought none).
+        # On the 178.8 casting the isometric drew BracketSeats' "#8-32 Tapped
+        # Hole" label, past the right border (fix3 render), and finalize
+        # removed it. On the 180.5 casting neither import draws one: three
+        # main-stack runs counted none at finalize and the saved sheet prints
+        # none. The sweep stays, so a label that does appear fails the count
+        # instead of printing.
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=1,
+        expected_redundant_notes=0,
     )
 
 

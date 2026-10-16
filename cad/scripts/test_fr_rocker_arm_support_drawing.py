@@ -6,6 +6,7 @@ import asyncio
 import math
 import re
 from collections import defaultdict
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -1048,12 +1049,20 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         ref1, ref2, _kind, _value = dims[name]
         # A chord's length dimension runs from its start.
         assert (ref1, ref2) == (dims[face][0], dims[feature][0])
+    # SolidWorks holds lengths in metres and rounds that binary value: the
+    # 180.5 casting's cavity wall stands 26.75 off the end face, a .X tie
+    # whose metre value lies just under it, so the sheet prints 26.7 (r1 of
+    # the main stack's render; mm-side half-even rounding would say 26.8).
     printed = {
-        name: f"{dims[name][3]:.{drawing.PART_PRECISION[name]}f}"
+        name: str(
+            (Decimal(dims[name][3] / 1000.0) * 1000).quantize(
+                Decimal(1).scaleb(-drawing.PART_PRECISION[name])
+            )
+        )
         for name, (dims, _face, _feature) in spans.items()
     }
     assert printed == {
-        "CavityEndStation": "26.8",
+        "CavityEndStation": "26.7",
         "PocketEndStation": "7.70",
         "CavityTopStation": "25.4",
         "WebFaceStation": "26.99",
@@ -1200,7 +1209,7 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     front_left = drawing.FRONT_CENTER[0] - support.BOSS_DEPTH / 2.0 * scale
     front_top = drawing.FRONT_CENTER[1] + support.HALF_Y * scale
     pocket = _text_box("7.70\nBOTH SIDES", drawing.FRONT_KEEP["PocketEndStation"])
-    cavity = _text_box("26.8", drawing.FRONT_KEEP["CavityEndStation"])
+    cavity = _text_box("26.7", drawing.FRONT_KEEP["CavityEndStation"])
     cavity_top = _text_box("25.4", drawing.FRONT_KEEP["CavityTopStation"])
     assert pocket[2] < front_left and cavity_top[2] < front_left
     # Clear of the 25.4's dimension line and of its outside arrow tail above
@@ -1209,7 +1218,7 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     assert pocket[2] < drawing.FRONT_KEEP["CavityTopStation"][0] - 0.001
     assert pocket[1] > front_top + 0.008
     assert front_top < cavity[1] and cavity[3] < DEPTH_DIM_LINE_Y - 0.002
-    # The 26.8 stands inside its span, the end face to the cavity wall.
+    # The 26.7 stands inside its span, the end face to the cavity wall.
     assert front_left < cavity[0] and cavity[2] < drawing.FRONT_CENTER[0] - (
         support.CAV * scale
     )
@@ -1353,11 +1362,12 @@ def test_foot_thickness_text_sits_above_its_extension_lines() -> None:
     assert foot[0] > front_right + 0.003
 
 
-def test_iso_tapped_hole_label_is_materialized_then_removed() -> None:
+def test_iso_tapped_hole_label_is_materialized_then_counted() -> None:
     """r743-rocker-fix3's isometric carried SolidWorks' own "#8-32 Tapped
     Hole" label past the right border. The seat note already states the thread,
     so the cosmetic threads are imported before finalize (the pen-hanger
-    pattern) and finalize removes exactly that one label."""
+    pattern) and finalize sweeps for that label. The 180.5 casting draws none
+    (main-stack r1 and its probes), so the sweep must remove exactly zero."""
     import ast
 
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
@@ -1374,7 +1384,7 @@ def test_iso_tapped_hole_label_is_materialized_then_removed() -> None:
     }
     assert kwargs == {
         "redundant_note_substrings": ("Tapped Hole",),
-        "expected_redundant_notes": 1,
+        "expected_redundant_notes": 0,
     }
     threads = [c for c in calls if c.func.id == "import_cosmetic_threads"]
     assert [[ast.unparse(a) for a in c.args] for c in threads] == [
