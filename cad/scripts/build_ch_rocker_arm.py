@@ -77,13 +77,15 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_prefix import set_dimension_prefix
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
-from ch_rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
+from ch_rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE, RIGHT_VIEW_NOTE
+from ch_rocker_arm_notes import HUB_ROOT_PREFIX, HUB_ROOT_R_BAND, HUB_ROOT_R_TOL_TYPE
 from ch_rocker_arm_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_rocker_arm_spec import (
     ARM_THICKNESS as SPEC_ARM_THICKNESS,
@@ -91,6 +93,7 @@ from ch_rocker_arm_spec import (
     HUB_DIA,
     HUB_LENGTH,
     HUB_LENGTH_BAND,
+    HUB_ROOT_RADIUS_MAX,
     PIVOT_HOLE_BAND,
     PIVOT_MID_Y,
     ROD_HOLE_SPEC,
@@ -188,6 +191,43 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
+# The hub-to-strap root fillet (Opus #1020 r2 C2): one full circle on each
+# strap face, a concave corner of section (1 - pi/4) R^2 whose centroid sits
+# R (10 - 3 pi) / (12 - 3 pi) out from the hub wall (Pappus).
+_HUB_ROOT_SECTION = (1.0 - math.pi / 4.0) * HUB_ROOT_RADIUS_MAX**2
+_HUB_ROOT_CENTROID_R = HUB_DIA / 2.0 + HUB_ROOT_RADIUS_MAX * (10.0 - 3.0 * math.pi) / (
+    12.0 - 3.0 * math.pi
+)
+V_HUB_ROOT = 2.0 * 2.0 * math.pi * _HUB_ROOT_CENTROID_R * _HUB_ROOT_SECTION
+
+
+def _hub_root_radius_max_limit(adapter) -> None:
+    """HubRootRadius as the single limit "R0.2 MAX" carrying the band's
+    deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
+    lower, upper = deviations(HUB_ROOT_R_BAND)
+    _, dimension = _named_dimension(adapter, "HubRoot", "HubRootRadius")
+    label = "HubRootRadius@HubRoot"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, HUB_ROOT_RADIUS_MAX / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {HUB_ROOT_RADIUS_MAX}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = HUB_ROOT_R_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != HUB_ROOT_R_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+
+
 def _strap_area() -> float:
     """Cross-section area of the tapered strap (two arcs + two perpendicular tip
     faces + two tapered end faces) by shoelace over a densely-sampled boundary --
@@ -244,6 +284,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
     await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
     await set_global(adapter, "HubLength", f"{HUB_LENGTH}mm")
+    await set_global(adapter, "HubRootR", f"{HUB_ROOT_RADIUS_MAX}mm")
     await set_global(adapter, "RodHoleX", f"{ROD_HOLE_X}mm")
     # (The old RodHoleDia/RodHoleX knobs are gone: the rod pin hole is now a native
     # Hole Wizard #47 feature whose diameter comes from the drill standard; its
@@ -430,7 +471,32 @@ async def build(adapter) -> dict[str, str]:
     hub_length_dim = name_dimensions(adapter, "Hub", ["HubLength"])
     drive_jobs.append((hub_length_dim[0], '"HubLength"'))
     v_hub = math.pi * (HUB_DIA / 2.0) ** 2 * (HUB_LENGTH - ARM_THICKNESS)
-    await volume_check(adapter, "strap + hub", v_strap + v_hub, 0.01 * v_strap)
+    v_hub_measured = await volume_check(
+        adapter, "strap + hub", v_strap + v_hub, 0.01 * v_strap
+    )
+
+    # Hub-to-strap root (Opus #1020 r2 C2, drawing-guidelines rule 16): the
+    # circle where the hub meets each strap face, filleted AT the largest
+    # radius the MHA-CH-001 foot cheeks clear (test_rocker_bank_layout), the
+    # radius the print gives as a single MAX limit.
+    check(
+        "fillet hub roots",
+        await adapter.add_fillet(
+            HUB_ROOT_RADIUS_MAX,
+            [
+                [HUB_DIA / 2.0, _mid_y(0.0), ARM_THICKNESS / 2.0],
+                [HUB_DIA / 2.0, _mid_y(0.0), -ARM_THICKNESS / 2.0],
+            ],
+            propagate=False,
+        ),
+    )
+    name_last_feature(adapter, "HubRoot")
+    hub_root_dim = name_dimensions(adapter, "HubRoot", ["HubRootRadius"])
+    drive_jobs.append((hub_root_dim[0], '"HubRootR"'))
+    v_hub += V_HUB_ROOT
+    await volume_check(
+        adapter, "hub root fillets", v_hub_measured + V_HUB_ROOT, 0.1 * V_HUB_ROOT
+    )
 
     # Pivot pin hole on the axis (x 0), mid-depth. On-axis centre: define_circle
     # records only the centre-Z dim (the X is a relation) + the diameter -- TWO
@@ -580,6 +646,9 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "TopEdgeReference", "TopAbovePivot", *deviations(TOP_EDGE_BAND)
     )
+    # The hub roots print as the single limit "2X R0.2 MAX": both strap faces.
+    _hub_root_radius_max_limit(adapter)
+    set_dimension_prefix(adapter, "HubRoot", "HubRootRadius", HUB_ROOT_PREFIX)
     # The reamed pivot bore's band rides its O6.50 natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance));
     # note 6 keeps only the REAM process word.
     set_dimension_bilateral_tolerance(
@@ -596,18 +665,19 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Right View Note": RIGHT_VIEW_NOTE,
         },
     )
-    # The reference sketch owns a printed dimension but no geometry: hide it so
-    # no assembly instance renders it (#880). The drawing shows it per view
-    # through _drawing_hidden_sketches to import that dimension.
+    # The reference sketch owns a printed dimension but no geometry: hide it
+    # so no assembly instance renders it (#880). The drawing shows it in its
+    # view through _drawing_hidden_sketches to import its dimension.
     blank_sketch(adapter, "TopEdgeReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
         (
             "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes", "Isometric View Note",
+            "Manufacturing Notes", "Isometric View Note", "Right View Note",
         ),
     )
     return artefacts

@@ -313,7 +313,7 @@ def _assert_rocker_print_authority() -> None:
     suffix = eval(compile(ast.Expression(assignments["through_suffix"]), draw.__file__, "eval"), {}, {"suffix": ""})
     assert prefix.split()[0] == pivot["process"].upper(), "pivot process drifted from its native dimension text"
     assert pivot["thru"] and "THRU" in suffix, "hole end drifted from its native dimension text"
-    assert features["profile_outer"]["mirror_symmetric"] and "MIRROR PLANE:" in rocker_notes.DRAWING_NOTES
+    assert features["profile_outer"]["mirror_symmetric"] and "MIRROR PLANE THROUGH A" in rocker_notes.DRAWING_NOTES
     native_text = set(exporter._cite(draw, "_dress_detail_dimensions"))
     for field in ("process", "thru"):
         assert native_text <= set(pivot["cite"][field])

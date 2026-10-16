@@ -134,10 +134,21 @@ HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the bui
 HUB_LENGTH_BAND = (0.05, 0.0)
 # The strap symmetric to the hub within this (total; #948 ruling R, PR #1292):
 # the hub stack places the arm, the strap carries the rod's fork, so a flat
-# rod's float on the arm is measured from the hub's mid-plane.
+# rod's float on the arm is measured from the hub's mid-plane. The sheet
+# prints it as a position zone on the strap width to datum G, the hub width.
 STRAP_HUB_SYMMETRY = 0.10
+# The hub-to-strap root fillet (drawing-guidelines rule 16), printed as the
+# single limit "R0.2 MAX" (Opus #1020 r2 C2). The MHA-CH-001 foot cheeks pass
+# over the hub at d = 0 and the bar floats axially in its foot notch, so a
+# cheek can run on the strap face, where the fillet stands its full radius
+# proud of the hub wall: the radius is capped by the cheeks' radial air over
+# the hub (test_rocker_bank_layout pins the worst case).
+HUB_ROOT_RADIUS_MAX = 0.2
 
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "rod-pin hole position": "0.20",
+    "strap position to hub": "0.10",
 }
+if float(GEOMETRIC_TOLERANCES_MM["strap position to hub"]) != STRAP_HUB_SYMMETRY:
+    raise AssertionError("the strap position zone must print STRAP_HUB_SYMMETRY")

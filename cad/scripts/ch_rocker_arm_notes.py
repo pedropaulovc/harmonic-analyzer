@@ -13,14 +13,16 @@ from __future__ import annotations
 import math
 
 from _printed_tolerance import printed_band_mm
+from ch_pivot_shaft_spec import SHAFT_DIA, SHAFT_DIA_BAND
 from ch_rocker_arm_spec import (
     HUB_COAXIALITY_DIA,
     HUB_DIA,
+    HUB_ROOT_RADIUS_MAX,
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
-    STRAP_HUB_SYMMETRY,
-    TOP_EDGE_ABOVE_PIVOT,
+    R_TOP,
 )
+from ch_rod_pivot_pin_spec import BUDGET as ROD_JOINT_BUDGET
 
 # Coaxiality is owned by the spec, including its eccentricity in the hub's OD
 # floor. The note controls the result without prescribing the machining setup.
@@ -30,7 +32,8 @@ from ch_rocker_arm_spec import (
 # in native dimensions / datum tags / FCFs / surface symbols. Hole process,
 # size and through condition ride the native callouts; outline dimensions
 # define the ends. BASIC radii and top height feed the arc-system profile
-# frames directly.
+# frames directly; the BASIC pin coordinates feed the pin hole's position
+# frame.
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_rocker_arm marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -46,8 +49,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "TopEdgeReference": {"TopAbovePivot"},
     # The strap thickness, +/-0.025 natively at three places (Main ruling
     # 2026-10, option b; ch_rocker_arm_spec.ARM_THICKNESS_BAND): the Strap
-    # extrude's depth, printed in the end view where the section reads.
+    # extrude's depth, printed in the end view where the section reads. Its
+    # mid-plane is located by a position frame to datum G, the hub width
+    # (#948 ruling R; Main's 2026-10-15 option B over the old 2X StrapOffset).
     "Strap": {"StrapThickness"},
+    # The hub-to-strap root fillets' single limit (HUB_ROOT_RADIUS_MAX).
+    "HubRoot": {"HubRootRadius"},
 }
 
 # Decimal classes already authored by the part; shared with the offline
@@ -58,7 +65,15 @@ DRAWING_PRECISION = {
     "HubProfile": {"HubDia": DEFAULT_DRAWING_PRECISION},
     "TopEdgeReference": {"TopAbovePivot": DEFAULT_DRAWING_PRECISION},
     "Strap": {"StrapThickness": 3},
+    "HubRoot": {"HubRootRadius": 1},
 }
+# swTolMAX prints the nominal then MAX, so the modelled radius IS the limit;
+# the band runs from sharp up to it. Both strap faces: 2X. A custom radius
+# prefix replaces SolidWorks' own "R" (r3 run printed "2X 0.2 max."), so it
+# carries it (pn_pen_v_block_spec.DIMENSION_PREFIXES).
+HUB_ROOT_R_BAND = (0.0, -HUB_ROOT_RADIUS_MAX)  # (upper, lower)
+HUB_ROOT_R_TOL_TYPE = 6  # swTolType_e.swTolMAX
+HUB_ROOT_PREFIX = "2X R"
 
 # Judge the minimum wall against the metric band the shop actually reads,
 # not the underlying 0.508 mm inch class: title_block.yaml prints ±0.51.
@@ -73,38 +88,74 @@ HUB_WALL_MIN = (
     / 10**DEFAULT_DRAWING_PRECISION
 )
 # Named exception: MHA-CH-006 hub wall
-HUB_WALL_NOTE = f"MIN HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f}"
+HUB_WALL_NOTE = f"HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f} MIN"
 
 # BUILT_UP_PERMISSION_NOTE may be supplied only as exact explicit permission
 # text in DRAWING_NOTES. None/absence means one_piece, never inferred permission.
 BUILT_UP_PERMISSION_NOTE = None
 
+# Four lines (drawing-guidelines rule 7; Opus #1020 r3 C3): each note reflows
+# to two full-width rows under the front view, left of the title block.
 DRAWING_NOTES = "\n".join(
     (
         # B2-1, option 4: datum C is the rod-pin hole, so the same CAD mirror
         # plane is the A|B|C frame's axis through A; the BASIC pin coordinates
-        # clock it. The plane, geometry and zones are unchanged.
-        "1. MIRROR PLANE: THROUGH DATUM AXIS A,",
-        "   PERPENDICULAR TO DATUM B, CLOCKED BY",
-        "   DATUM C (ROD-PIN HOLE, 1X, END SHOWN).",
-        # The tip lands' 10.46° is the arc half-angle: radial to the centre.
-        "2. COMMON ARC CENTRE ABOVE A ON THE PLANE;",
-        "   TIP LANDS RADIAL TO IT.",
-        f"   BASIC {TOP_EDGE_ABOVE_PIVOT:.{DEFAULT_DRAWING_PRECISION}f}: TOP ARC ABOVE A.",
-        # #948 ruling R: the rod's float on the arm is taken from the hub's
-        # mid-plane, so the strap's offset from it is held.
-        "3. STRAP SYMMETRIC TO HUB WITHIN "
-        f"{STRAP_HUB_SYMMETRY:.{DEFAULT_DRAWING_PRECISION}f};",
-        "   INTEGRAL HUB LENGTH SETS THE PITCH",
-        "   (NO SPACERS). HUB OD COAXIAL WITH PIVOT",
-        f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f}. {HUB_WALL_NOTE}.",
-        # Source context: channel_kinematics.arc_geometry/solve_state and
-        # build_ch_rocker_arm's chapter-30 profile reconstruction. The lower
-        # arc is not a second amplitude-bar contact or independent gain control.
-        # Preserve upper amplitude-bar contact and lower moving-strap envelope
-        # intent in one line. The removed rod-pin geometry sentence repeated
-        # note 1's identified hole plus its native basics/callout/position FCF.
-        "4. UPPER BAR CONTACT; LOWER STRAP ENVELOPE",
+        # clock it. The tip lands' 10.46° is the arc half-angle: radial to the
+        # centre. Both ends' locations from A sit on the views; the 1X keeps
+        # the mirroring off the hole.
+        "1. MIRROR PLANE THROUGH A, PERPENDICULAR TO B, CLOCKED BY DATUM C",
+        "   (ROD-PIN HOLE, 1X); ARC CENTRES ON IT, LANDS RADIAL, ENDS MIRROR.",
+        # The OD ceiling is the amplitude bar's foot cheeks at d = 0
+        # (ch_rocker_arm_spec), so the coaxiality holds the named-exception wall.
+        f"2. HUB OD COAXIAL WITH BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f}; {HUB_WALL_NOTE}.",
+        "   OD CLEARS MHA-CH-001 FOOT CHEEKS.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+# The end view prints at 3:1, not the sheet's 1:2, off the front's projection
+# line: a removed view named by its viewing arrow (Opus #1020 r1), enlarged
+# so the hub width, its datum and the strap's position read apart (r2).
+VIEW_ARROW_LETTER = "F"
+RIGHT_VIEW_SCALE = 3
+RIGHT_VIEW_NOTE = f"VIEW {VIEW_ARROW_LETTER} SCALE {RIGHT_VIEW_SCALE}:1"
+
+
+def _limits(low: float, high: float) -> str:
+    """A clearance range at the sheet's places, rounded outward, never inward."""
+    scale = 10**DEFAULT_DRAWING_PRECISION
+    return (
+        f"{math.floor(low * scale + 1e-9) / scale:.{DEFAULT_DRAWING_PRECISION}f}-"
+        f"{math.ceil(high * scale - 1e-9) / scale:.{DEFAULT_DRAWING_PRECISION}f}"
+    )
+
+
+# Named mates for the two tight bands (drawing-guidelines rule 4): the reamed
+# bore runs on the MHA-CH-005 pivot shaft; the strap runs in the MHA-CH-003
+# rod's fork slot (ch_rod_pivot_pin_spec.joint_budget side clearance).
+PIVOT_SHAFT_CLEARANCE = (
+    PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
+    PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0] - (SHAFT_DIA + SHAFT_DIA_BAND[1]),
+)
+PIVOT_FIT_CALLOUT = (
+    f"({_limits(*PIVOT_SHAFT_CLEARANCE)} DIAMETRAL\n"
+    "CLEARANCE ON PIVOT\n"
+    "SHAFT MHA-CH-005)"
+)
+STRAP_FIT_CALLOUT = (
+    f"({_limits(ROD_JOINT_BUDGET['side_clearance_min'], ROD_JOINT_BUDGET['side_clearance_max'])} SIDE\n"
+    "CLEARANCE IN ROD\n"
+    "FORK MHA-CH-003)"
+)
+# Integral hub length, not spacers, sets channel pitch: the hubs stack face to
+# face on the pivot shaft (rocker_bank_layout). Below-text rows (above-text
+# line breaks print as one run).
+HUB_LENGTH_CALLOUT = "SETS ARM PITCH:\n20X STACK ON\nMHA-CH-005"
+# The amplitude bar's foot rides the top edge (ch_rocker_arm_spec
+# TOP_EDGE_BAND): the one profile frame names it below the frame.
+TOP_EDGE_MATE_CALLOUT = "MHA-CH-001 FOOT TRACK"
+# The rod-pin hole's mate (rule 4; Opus #1020 r3 C5): the MHA-CH-010 pin runs
+# in it (ch_rod_pivot_pin_spec), a prefix row over the native #47 DRILL.
+ROD_PIN_MATE_CALLOUT = "FOR PIN MHA-CH-010"
+# The lower arc shares the top edge's centre (Opus #1020 r2 B1): below-text
+# rows under R816 (above-text line breaks print as one run).
+BOTTOM_RADIUS_CALLOUT = f"CONCENTRIC\nWITH R{R_TOP:.0f}"
