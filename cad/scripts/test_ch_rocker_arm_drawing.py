@@ -219,14 +219,12 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "°" not in notes
     assert "NORMAL TO LENGTH" not in notes and "NOMINAL MIRROR PLANE" not in notes
     # Named-exception wall and the mate that caps the OD.
-    assert f"{ch_rocker_arm_notes.HUB_WALL_NOTE}." in notes
-    assert "MHA-CH-001" in notes
+    assert f"2. {ch_rocker_arm_notes.HUB_WALL_NOTE}; OD CLEARS MHA-CH-001 FOOT CHEEKS." in notes
     assert _notes_fit_left_of_the_title_block(notes)
-    assert len(notes.splitlines()) == 4
-    assert (
-        f"2. HUB OD COAXIAL WITH BORE WITHIN Ø{ch_rocker_arm_spec.HUB_COAXIALITY_DIA:.2f};"
-        in notes
-    )
+    assert len(notes.splitlines()) == 3
+    # The hub OD's coaxiality is its native position frame in detail D
+    # (regate-r1 #2), not a tolerance in a note.
+    assert "COAXIAL" not in notes and "WITHIN" not in notes and "Ø" not in notes
     assert "TURN HUB" not in notes and "ONE SETUP" not in notes
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
@@ -415,6 +413,7 @@ def test_r20_local_requests_leave_views_geometry_and_strict_caption_air_unchange
     assert drawing.HUB_SCALE == (4.0, 1.0)
     assert drawing.END_SCALE == (2.0, 1.0)
     assert drawing.DETAIL_NO_OUTLINE == {"D": True, "E": False}
+    assert drawing.DETAIL_STYLE == {"D": 2, "E": 0}  # swDetViewLEADER / swDetViewSTANDARD
     assert drawing.DETAIL_LETTER_XY == {"D": (0.188, 0.161), "E": (0.264, 0.155)}
     assert drawing.ROD_CALLOUT_XY == (0.279, 0.115)
     assert drawing.FCF_XY == (0.262, 0.1001)
@@ -3300,6 +3299,36 @@ def test_strap_position_frame_refuses_an_unproven_frame(
         drawing._strap_position_frame(env.adapter, env.view, env.imported)
 
 
+def test_hub_position_frame_locates_the_hub_od_to_a_on_its_own_diameter(view_f_dimension) -> None:
+    """regate-r1 #2: the hub OD's coaxiality is a native Ø position frame to A
+    under its Ø10.20 in detail D, the zone the hub wall minimum is built on."""
+    env = view_f_dimension
+    assert drawing._hub_position_frame(env.adapter, env.view, env.imported) is env.gtol
+    zone = ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["hub OD position to bore"]
+    assert zone == f"{ch_rocker_arm_spec.HUB_COAXIALITY_DIA:.2f}" == "0.10"
+    assert drawing.HUB_OD.fields["position_datums"][0] == ["A"]
+    expected = gtol_frame_signature(gtol_frame_xml("position", zone, datums=("A",), diameter=True))
+    assert gtol_frame_signature(env.state["xml"]) == expected
+    # The zone is diametral: the same frame without Ø is a different signature.
+    assert expected != gtol_frame_signature(gtol_frame_xml("position", zone, datums=("A",)))
+    assert env.calls == [
+        "ClearSelection2", ("SelectByID2", ("RD3@Drawing View2", "DIMENSION")),
+        "InsertGtol", "SetSymbolXml", "ClearSelection2", ("rebuild", "hub OD position to A"),
+    ]
+
+
+@pytest.mark.parametrize("defect,message", [
+    ({"InsertGtol": None}, "hub OD position to A: InsertGtol returned nothing"),
+    ({"format": 1}, "frame did not persist"),
+    ({"attached": "other"}, "attached to another dimension"),
+])
+def test_hub_position_frame_refuses_an_unproven_frame(view_f_dimension, defect: dict, message: str) -> None:
+    env = view_f_dimension
+    env.reset(**{key: env.other if value == "other" else value for key, value in defect.items()})
+    with pytest.raises(RuntimeError, match=message):
+        drawing._hub_position_frame(env.adapter, env.view, env.imported)
+
+
 def test_projection_barrier_is_void_and_precedes_native_math(bound, monkeypatch):
     events = []
     view = _native("IView", UpdateViewDisplayGeometry=lambda: events.append("barrier"))
@@ -3467,12 +3496,23 @@ class _DetailProfile:
 
 class _DetailCropCircle:
     _native_interfaces = ("IDetailCircle",)
-    __slots__ = ("label", "profiles", "NoOutline", "_jagged", "full", "display")
+    __slots__ = ("label", "profiles", "NoOutline", "_jagged", "full", "display", "style", "style_ok", "style_writes")
 
-    def __init__(self, label, profile):
+    def __init__(self, label, profile, *, style=None):
         self.label, self.profiles = label, (profile,)
         self.NoOutline = label == "D"
         self._jagged, self.full, self.display = False, True, 1
+        self.style = drawing.DETAIL_STYLE[label] if style is None else style
+        self.style_ok, self.style_writes = True, []
+
+    def GetStyle(self):
+        return self.style
+
+    def SetStyle(self, style):
+        self.style_writes.append(style)
+        if self.style_ok is True:
+            self.style = style
+        return self.style_ok is not False
 
     @property
     def JaggedOutline(self):
@@ -3594,7 +3634,7 @@ class _DetailView:
 
 
 @pytest.mark.parametrize("label", ["D", "E"])
-@pytest.mark.parametrize("defect", [None, "activation", "parent", "scale", "move", "ignored-move", "stale", "missing-position", "fence", "selection", "creation", "source-radius", "source-centre", "profile-radius", "profile-centre", "near-profile-centre", "partial", "missing-profile", "outline-flags", "projection-scale"])
+@pytest.mark.parametrize("defect", [None, "activation", "parent", "scale", "move", "ignored-move", "stale", "missing-position", "fence", "selection", "creation", "source-radius", "source-centre", "profile-radius", "profile-centre", "near-profile-centre", "partial", "missing-profile", "outline-flags", "projection-scale", "ignored-style", "refused-style", "lost-style"])
 def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, monkeypatch, label, defect):
     parent = _DetailParent()
     if defect == "projection-scale":
@@ -3634,11 +3674,18 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
             profile.centre = (profile.centre[0] + shift, profile.centre[1], profile.centre[2])
         elif defect == "partial":
             profile.complete = 0
-        detail.crop_circle = _DetailCropCircle(label, profile)
+        # The style argument persists unless the defect says it was ignored.
+        detail.crop_circle = _DetailCropCircle(
+            label, profile, style=1 if defect in ("ignored-style", "refused-style", "lost-style") else args[3],
+        )
         if defect == "missing-profile":
             detail.crop_circle.profiles = ()
         elif defect == "outline-flags":
             detail.crop_circle.NoOutline = label != "D"
+        elif defect == "refused-style":
+            detail.crop_circle.style_ok = False
+        elif defect == "lost-style":
+            detail.crop_circle.style_ok = "lost"  # reports success, keeps the wrong style
         return None if defect == "creation" else detail
     doc = _native("IModelDoc2", "IDrawingDoc", ActivateView=lambda _name: defect != "activation", ClearSelection2=lambda _all: None,
     SketchManager=manager,
@@ -3656,7 +3703,7 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
     target = drawing.HUB_CENTER if label == "D" else drawing.END_CENTER
     scale = drawing.HUB_SCALE if label == "D" else drawing.END_SCALE
     kwargs = dict(centre=centre, radius_mm=radius_mm, target=target, scale=scale, label=label)
-    if defect is None:
+    if defect in (None, "ignored-style"):
         assert drawing._create_detail(adapter, parent, **kwargs) is detail
         assert detail.Position == pytest.approx(target, rel=0.0, abs=1e-12)
         assert detail.physical == pytest.approx(target, rel=0.0, abs=1e-12)
@@ -3666,7 +3713,13 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
         assert detail.GetOutline()[3] > target[1] + detail.radius
         assert created[0].radius == pytest.approx(radius_mm / 1000.0)  # Nonidentity sketch scale 2.
         assert parent.transform.inverse_calls >= 2
+        # D leads its letter to the fence (regate-r1 #3); E stays standard.
+        assert calls[0][3] == drawing.DETAIL_STYLE[label] == {"D": 2, "E": 0}[label]
         assert calls[0][7:] == (1, label == "E", False, label == "D", 5)
+        # The documented setter runs only when creation ignored the style.
+        expected_writes = [drawing.DETAIL_STYLE[label]] if defect == "ignored-style" else []
+        assert detail.crop_circle.style_writes == expected_writes
+        assert detail.crop_circle.GetStyle() == drawing.DETAIL_STYLE[label]
     else:
         with pytest.raises(RuntimeError):
             drawing._create_detail(adapter, parent, **kwargs)
@@ -3827,7 +3880,7 @@ def test_crop_accepts_shared_box_drift_only_within_unchanged_tolerance(bound, mo
 @pytest.mark.parametrize("defect", [
     "radius", "nan-radius", "zero-radius", "centre", "off-sheet-plane", "missing-centre", "partial", "segment",
     "empty", "missing-items", "multiple", "missing-segment",
-    "missing-circle", "missing-parent", "no-outline", "display", "label",
+    "missing-circle", "missing-parent", "no-outline", "display", "label", "style",
     "inverse", "matrix", "missing-sketch", "missing-transform", "missing-utility", "parent-scale", "parent-scale-shape", "projection-scale",
     "detail-scale", "detail-scale-shape", "parent-scale-link", "sheet-scale-link", "invalid-bbox",
 ])
@@ -3865,6 +3918,8 @@ def test_native_crop_refuses_wrong_persisted_geometry_flags_or_coordinate_frame(
         circle.display = 0
     elif defect == "label":
         circle.label = "X"
+    elif defect == "style":
+        circle.style = 0  # D's leader lost: the fence no longer names its detail
     elif defect == "inverse":
         parent.transform.bad_inverse = True
     elif defect == "matrix":
@@ -8692,7 +8747,7 @@ def test_r24_production_wires_all_native_local_guards_without_banned_fcf_setter_
         "_r24_arc_sweep", "_r24_arc_contains", "_r24_arc_intersections",
         "_r24_no_arc_crossings", "_r24_terminals",
     }.isdisjoint(definitions)
-    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 4
+    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 3
     # Note 1 still carries the mirror plane's arc-centre statement.
     assert re.search(r"ARC\s+CENTRES? ON IT", ch_rocker_arm_notes.DRAWING_NOTES)
     assert ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == 8.0

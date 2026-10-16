@@ -209,7 +209,8 @@ def test_hub_wall_covers_the_worst_printed_limits_and_eccentricity() -> None:
     assert stated_wall <= wall + 1e-9
     assert arm_notes.HUB_WALL_NOTE == f"HUB WALL {stated_wall:.{places}f} MIN"
     assert arm_notes.HUB_WALL_NOTE in arm_notes.DRAWING_NOTES
-    assert f"WITHIN Ø{arm.HUB_COAXIALITY_DIA:.{places}f}" in arm_notes.DRAWING_NOTES
+    # The eccentricity is the hub OD's printed position zone to A.
+    assert float(arm.GEOMETRIC_TOLERANCES_MM["hub OD position to bore"]) == arm.HUB_COAXIALITY_DIA
     # The spec's pessimistic hundredth-mm ceiling also covers the rounded
     # printed class; lowering that floor by one printed step does not.
     floor_wall = (arm.HUB_DIA_MIN - display_band - bore_max) / 2.0 - eccentricity

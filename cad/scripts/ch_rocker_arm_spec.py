@@ -113,7 +113,7 @@ TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
 # (channel_kinematics ``bar_bottom``); test_rocker_bank_layout pins the slack.
 PIVOT_HOLE_BAND = (0.03, 0.0)  # (upper, lower): reamed; native on PivotDia
 RULE12_WALL_FLOOR = 1.5  # drawing-guidelines.md rule 17 (walls and webs)
-HUB_COAXIALITY_DIA = 0.10  # authoritative diametral zone; notes print this source
+HUB_COAXIALITY_DIA = 0.10  # authoritative diametral zone; the hub OD's position frame prints it
 LINEAR_2PL = 0.508  # raw .XX class; notes judge the actual printed ±0.51
 _HUB_FLOOR = (
     PIVOT_HOLE_DIA
@@ -149,6 +149,9 @@ HUB_ROOT_RADIUS_MAX = 0.2
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "rod-pin hole position": "0.20",
     "strap position to hub": "0.10",
+    "hub OD position to bore": "0.10",
 }
 if float(GEOMETRIC_TOLERANCES_MM["strap position to hub"]) != STRAP_HUB_SYMMETRY:
     raise AssertionError("the strap position zone must print STRAP_HUB_SYMMETRY")
+if float(GEOMETRIC_TOLERANCES_MM["hub OD position to bore"]) != HUB_COAXIALITY_DIA:
+    raise AssertionError("the hub OD position zone must print HUB_COAXIALITY_DIA")

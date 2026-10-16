@@ -94,7 +94,7 @@ HUB_WALL_NOTE = f"HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f} MIN"
 # text in DRAWING_NOTES. None/absence means one_piece, never inferred permission.
 BUILT_UP_PERMISSION_NOTE = None
 
-# Four lines (drawing-guidelines rule 7; Opus #1020 r3 C3): each note reflows
+# Three lines (drawing-guidelines rule 7; Opus #1020 r3 C3): note 1 reflows
 # to two full-width rows under the front view, left of the title block.
 DRAWING_NOTES = "\n".join(
     (
@@ -106,9 +106,9 @@ DRAWING_NOTES = "\n".join(
         "1. MIRROR PLANE THROUGH A, PERPENDICULAR TO B, CLOCKED BY DATUM C",
         "   (ROD-PIN HOLE, 1X); ARC CENTRES ON IT, LANDS RADIAL, ENDS MIRROR.",
         # The OD ceiling is the amplitude bar's foot cheeks at d = 0
-        # (ch_rocker_arm_spec), so the coaxiality holds the named-exception wall.
-        f"2. HUB OD COAXIAL WITH BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f}; {HUB_WALL_NOTE}.",
-        "   OD CLEARS MHA-CH-001 FOOT CHEEKS.",
+        # (ch_rocker_arm_spec); the hub OD's position frame to A in detail D
+        # (HUB_COAXIALITY_DIA) holds the named-exception wall.
+        f"2. {HUB_WALL_NOTE}; OD CLEARS MHA-CH-001 FOOT CHEEKS.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

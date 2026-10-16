@@ -195,12 +195,17 @@ HUB_CENTER = (0.180, 0.095)
 END_CENTER = (0.330, 0.110)
 HUB_SCALE = (4.0, 1.0)
 END_SCALE = (2.0, 1.0)
-# D's letter sits right of its small parent fence around A, clear of the
-# R800/R816 texts below the strap's left half, so it reads as D's boundary.
+# D's letter sits below-right of its small parent fence around A, clear of the
+# R800/R816 texts below the strap's left half; DETAIL_STYLE leads it to the fence.
 DETAIL_LETTER_XY = {"D": (0.188, 0.161), "E": (0.264, 0.155)}
 # D's crop is a view boundary, not a third concentric manufactured diameter.
 # Keep its persisted circular fence; omit only the printed detail-view outline.
 DETAIL_NO_OUTLINE = {"D": True, "E": False}
+# swDetViewStyle_e. D's fence prints 0.8 mm outside the hub OD on the 1:2
+# front; with a free letter it read as a third concentric circle (regate-r1
+# #3). The leader style draws a leader from the fence to its letter. E's
+# fence stands apart from every feature, so it keeps the standard style.
+DETAIL_STYLE = {"D": 2, "E": 0}  # swDetViewLEADER, swDetViewSTANDARD
 # DOT on the printed south centre-mark arm, at the actual hole's south rim.
 # Keep the circular model edge attached; never move an FCF attachment by setter.
 FCF_XY = (0.262, 0.1001)
@@ -507,13 +512,14 @@ def _detail_crop(adapter: Any, view: Any, *, label: str) -> tuple[float, float, 
     if no_outline is not required_no_outline:
         raise RuntimeError(f"detail {label}: actual circle NoOutline={no_outline!r}, "
                            f"required={required_no_outline!r}, native_view_bbox={bbox}")
-    actual_flags = (detail_circle.GetLabel(), int(detail_circle.GetDisplay()), no_outline)
-    required_flags = (label, 1, required_no_outline)
+    actual_flags = (detail_circle.GetLabel(), int(detail_circle.GetDisplay()),
+                    int(detail_circle.GetStyle()), no_outline)
+    required_flags = (label, 1, DETAIL_STYLE[label], required_no_outline)
     if not no_outline:
         actual_flags += (detail_circle.JaggedOutline, detail_circle.HasFullOutline())
         required_flags += (False, True)
     if actual_flags != required_flags:
-        raise RuntimeError(f"detail {label}: actual circle label/display/outline flags={actual_flags!r}, "
+        raise RuntimeError(f"detail {label}: actual circle label/display/style/outline flags={actual_flags!r}, "
                            f"required={required_flags!r}, native_view_bbox={bbox}")
     if readback.label != label:
         raise RuntimeError(f"detail {label}: persisted native circle label changed to {readback.label!r}")
@@ -632,13 +638,19 @@ def _create_detail(
     if _early_bound(circle, "ISketchSegment").Select4(False, data) is not True:
         raise RuntimeError(f"detail {label}: cannot select parent fence")
     no_outline = DETAIL_NO_OUTLINE[label]
+    style = DETAIL_STYLE[label]
     native = drawing.CreateDetailViewAt4(
-        *target, 0.0, 0, *scale, label, 1, not no_outline, False, no_outline, 5,
+        *target, 0.0, style, *scale, label, 1, not no_outline, False, no_outline, 5,
     )
     draw.ClearSelection2(True)
     if native is None:
         raise RuntimeError(f"detail {label}: CreateDetailViewAt4 returned no view")
     detail = _early_bound(native, "IView")
+    # IDetailCircle::SetStyle is the documented setter; _detail_crop reads
+    # the persisted style back on every settling pass.
+    fence = _early_bound(detail.GetDetail(), "IDetailCircle")
+    if fence is None or (int(fence.GetStyle()) != style and fence.SetStyle(style) is not True):
+        raise RuntimeError(f"detail {label}: native detail circle refused style {style}")
     detail.UseParentScale = False
     detail.UseSheetScale = 0
     detail.ScaleRatio = double_array(list(scale))
@@ -1893,8 +1905,10 @@ HUB_OD = requirement(
         "at": _CENTRE, "axis": _AXIS,
         "dia": (_band(rocker.HUB_DIA, _P), ("HUB_DIA",)),
         "dia_nominal": (rocker.HUB_DIA, ("HUB_DIA",)),
-        "coaxiality_dia": (rocker.HUB_COAXIALITY_DIA, ("HUB_COAXIALITY_DIA", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
-        "coaxial_to": ("pivot_bore", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
+        # A position frame to A under the Ø10.20 in detail D carries the zone.
+        "coaxiality_dia": (rocker.HUB_COAXIALITY_DIA, ("HUB_COAXIALITY_DIA", ("draw_ch_rocker_arm", "_hub_position_frame"))),
+        "coaxial_to": ("pivot_bore", (("draw_ch_rocker_arm", "_hub_position_frame"),)),
+        "position_datums": (["A"], (("draw_ch_rocker_arm", "_hub_position_frame"),)),
     }, precision={"dia": _P, "coaxiality_dia": _P},
 )
 HUB_KEEP = {
@@ -2443,8 +2457,9 @@ def _select_view_dimension(adapter: Any, view: Any, annotation: Any, *, label: s
     if not name or not full_name:
         raise RuntimeError(f"{label}: dimension has no selection name / FullName")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    if not _early_bound(model, "IDrawingDoc").ActivateView(view_name(adapter, view)):
-        raise RuntimeError(f"{label}: failed to activate view F")
+    where = view_name(adapter, view)
+    if not _early_bound(model, "IDrawingDoc").ActivateView(where):
+        raise RuntimeError(f"{label}: failed to activate {where}")
     model.ClearSelection2(True)
     matches = [
         display for display in (
@@ -2454,7 +2469,7 @@ def _select_view_dimension(adapter: Any, view: Any, annotation: Any, *, label: s
         if display.GetNameForSelection() == name
     ]
     if len(matches) != 1:
-        raise RuntimeError(f"{label}: expected one {name!r} in view F, found {len(matches)}")
+        raise RuntimeError(f"{label}: expected one {name!r} in {where}, found {len(matches)}")
     display = matches[0]
     dimension_annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     if (int(dimension_annotation.GetType()) != 4  # swDisplayDimension
@@ -2534,16 +2549,15 @@ def _hub_width_datum(adapter: Any, view: Any, hub_length: Any) -> Any:
     return tag
 
 
-def _strap_position_frame(adapter: Any, view: Any, strap_thickness: Any) -> Any:
-    """Position the strap width's centre plane to G under its 2.500 size
-    (#948 ruling R's symmetry; Main's 2026-10-15 option B): a native frame on
-    the selected size dimension, never a leader to one face."""
-    label = "strap position to G"
-    tolerance = GEOMETRIC_TOLERANCES_MM["strap position to hub"]
-    datums = tuple(STRAP_FACES.fields["position_datums"][0])
-    xml = gtol_frame_xml("position", tolerance, datums=datums)
+def _dimension_position_frame(
+    adapter: Any, view: Any, size: Any, *, label: str, tolerance: str,
+    datums: tuple[str, ...], diameter: bool = False,
+) -> Any:
+    """A native position frame on the selected size dimension, never a
+    leader to one face; read back before and after its attaching rebuild."""
+    xml = gtol_frame_xml("position", tolerance, datums=datums, diameter=diameter)
     expected = gtol_frame_signature(xml)
-    display, dimension_annotation = _select_view_dimension(adapter, view, strap_thickness, label=label)
+    display, dimension_annotation = _select_view_dimension(adapter, view, size, label=label)
     raw = adapter.currentModel.InsertGtol()
     if raw is None:
         raise RuntimeError(f"{label}: InsertGtol returned nothing")
@@ -2554,7 +2568,7 @@ def _strap_position_frame(adapter: Any, view: Any, strap_thickness: Any) -> Any:
     if frame is None:
         # An old-format empty frame from the template: seed, then convert
         # (_drawing_gdt.add_feature_control_frame's migration order).
-        gtol.SetFrameSymbols2(1, f"<{GTOL_SYMBOLS['position']}>", False, "", False, "", "", "", "")
+        gtol.SetFrameSymbols2(1, f"<{GTOL_SYMBOLS['position']}>", diameter, "", False, "", "", "", "")
         if gtol.SetFrameValues2(1, tolerance, "", *[*datums, "", ""][:3]) is not True:
             raise RuntimeError(f"{label}: failed to seed the frame for migration")
         if gtol.CanConvertFormat() is not True or int(gtol.ConvertFormat()) != 0:
@@ -2574,6 +2588,26 @@ def _strap_position_frame(adapter: Any, view: Any, strap_thickness: Any) -> Any:
     if gtol_frame_signature(str(applied or "")) != expected:
         raise RuntimeError(f"{label}: frame changed after rebuild: {applied!r}")
     return gtol
+
+
+def _strap_position_frame(adapter: Any, view: Any, strap_thickness: Any) -> Any:
+    """Position the strap width's centre plane to G under its 2.500 size
+    (#948 ruling R's symmetry; Main's 2026-10-15 option B)."""
+    return _dimension_position_frame(
+        adapter, view, strap_thickness, label="strap position to G",
+        tolerance=GEOMETRIC_TOLERANCES_MM["strap position to hub"],
+        datums=tuple(STRAP_FACES.fields["position_datums"][0]),
+    )
+
+
+def _hub_position_frame(adapter: Any, hub: Any, hub_dia: Any) -> Any:
+    """Position the hub OD's axis to A under its Ø10.20 in detail D: the
+    zone the hub wall minimum is computed with (regate-r1 #2, not a note)."""
+    return _dimension_position_frame(
+        adapter, hub, hub_dia, label="hub OD position to A",
+        tolerance=GEOMETRIC_TOLERANCES_MM["hub OD position to bore"],
+        datums=tuple(HUB_OD.fields["position_datums"][0]), diameter=True,
+    )
 
 
 def _add_between_points(adapter: Any, front: Any) -> dict[str, Any]:
@@ -3687,6 +3721,13 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot bore finish",
         char_height=PIVOT_FINISH_CHAR_HEIGHT,
     )
+    # The hub OD's coaxiality to A rides its own Ø10.20 in D (regate-r1 #2).
+    try:
+        (hub_dia,) = [ann for ann in hub_annotations if dimension_name(adapter, ann) == "HubDia"]
+        _hub_position_frame(adapter, hub, hub_dia)
+    except Exception as exc:  # noqa: BLE001 - the imported native drawing still exists
+        _capture_layout_failure(adapter, "detail D hub OD position frame", exc)
+        raise
     # Then a position FCF tying the rod-pin hole to A|B: B (broad face, on the
     # end view) orients the hole axes, and the BASIC X/Y above hold its 133.34
     # from A. Rotation about A is free -- the hole itself is datum C, which
