@@ -32,7 +32,7 @@ ROD_LENGTH = 165.0  # calibrated p1, x -200..-35 (med; supersedes the 310 "4x" g
 # 2/4 + 4/4; the tip draws a ~6 mm arc, and the clamp's position along the rod --
 # the radius from this pivot -- is what sets the <=4x magnification). The ridge
 # line runs along Z at machine (pre-mirror) (15, 984.834); in lever-local coords
-# (assembly placement (-200, 979.7, -128.3), rod along +X) that is (215, 5.134).
+# (assembly placement (-200, 979.7, -173.51), rod along +X) that is (215, 5.134).
 # Duplicated literals -- build_mg_magnifier_assembly asserts them against
 # build_sm_summing_assembly's KNIFE/KNIFE_CONTACT_Y and its own placement.
 KNIFE_LOCAL_X = 215.0

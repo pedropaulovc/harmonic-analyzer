@@ -106,57 +106,70 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 # The sheet's FRONT view is the part's *Top named view (viewer +Y): sheet
-# x = 134 + X, y = 206.15 - Z mm (retry09 native audit, 20261012T124257186Z).
-# The BOTTOM view (*Front, viewer +Z) sits under it in third angle: its
-# x = 134 + X too.  The *Right named view is placed, then turned and pinned
-# into projection by _project_side_view; SIDE_CENTER only drops it nearby.
-FRONT_CENTER = (0.115, 0.180)
-BOTTOM_CENTER = (0.115, 0.110)
-SIDE_CENTER = (0.228, 0.180)
-ISO_CENTER = (0.340, 0.130)
-# Where the side view's bore axis prints (x) and the front view's origin
-# height (y): the collar's Z -6..6 and the arm's end at Z 58.3 centre the
-# front view's outline 26.15 mm below the origin.  The build measures the
-# origin in both views and pins the side view to the FRONT view's reading;
-# these constants only place the side view's texts.
+# x = 98 + X, y = 230.15 - Z mm.  The BOTTOM view (*Front, viewer +Z) sits
+# under it in third angle: its x = 98 + X too.  The *Right named view is
+# placed, then turned and pinned into projection by _project_side_view;
+# SIDE_CENTER only drops it nearby.
+# The A1 pose (#1559) put the collar 45.21 mm further from the mounting face
+# (arm end Z 58.30 -> 103.51).  The layout below is the retry09..retry15
+# native-audited sheet translated, not re-invented: everything tied to the
+# collar (the collar's diameters and length, the in-span stations from the
+# bore axis) rose 24 mm with the bore axis (206.15 -> 230.15 mm), everything
+# tied to the arm's end and the flange (the arm width, the flange's plan
+# dimensions, the side view's stacks under the arm, the whole bottom view
+# with its coordinates, caption and counterbore callout) fell 21.21 mm, and
+# the front and bottom views with their dimensions moved 36 mm left (x 134
+# -> 98 + X) so the counterbore callout, carried down with the bottom view,
+# stays left of the title block (x > 216 mm under y 66 mm).  The linked
+# notes drop under the caption and the isometric, now 1:2, moves up right.
+FRONT_ORIGIN_Y = 0.23015
+# The collar's Z -6 and the arm's end centre the front view's outline
+# (ARM_Z[1] - 6) / 2 mm below the origin.  The build measures the origin in
+# both views and pins the side view to the FRONT view's reading; these
+# constants only place the texts.
+FRONT_CENTER = (0.079, FRONT_ORIGIN_Y - (ARM_Z[1] - COLLAR_OD / 2.0) / 2000.0)
+BOTTOM_CENTER = (0.079, 0.08879)
+SIDE_CENTER = (0.228, FRONT_CENTER[1])
+# At 1:1 the A1 part's isometric (~137 x 92 mm) would crowd the side view's
+# stacks and the sheet's right edge; at 1:2 (~69 x 46 mm) it spans x ~316..
+# 384 mm, y ~137..183 mm, right of every side-view row (x <= 303 mm).
+ISO_CENTER = (0.350, 0.160)
+ISO_SCALE = (1, 2)
+ISO_NOTE_XY = (0.316, 0.125)
+# Where the side view's bore axis prints (x).
 SIDE_AXIS_X = 0.228
-FRONT_ORIGIN_Y = FRONT_CENTER[1] + 0.02615
 
 # The three plan dimensions ride the FRONT view (both extruded rectangles lie
 # on the part's Top plane), as does the collar's mid-plane extrude length
 # (along X).  +Z runs DOWN the front view (the collar, Z -6..6, sits at its
-# top, y 200..212 mm; the arm's end, Z 58.3, at its bottom, y 147.8 mm).  The
-# collar's length therefore reads above the collar, its witnesses 4 mm long:
-# below the view (v41) they ran the full height of the part.  That text sits
-# right of the collar's x 139 mm witness, and the flange width's text moves
-# left so the collar length's outside arrows clear it.  Its three rows
-# (retry09, requested (155, 224) mm) print centred on x 155 mm at y 215.7,
-# 221.2 and 226.8 mm, the line at the lowest row's baseline running from the
-# collar's x 129 mm end to the widest row's far end (x 175.8 mm); the band
-# (+0.00/-0.05, a 15.7 mm stack beside "10.00") widens the value row to
-# ~27 mm, still inside "ALONG BORE AXIS" (41.5 mm).
+# top, y 224.15..236.15 mm; the arm's end, Z 103.51, at its bottom, y 126.64
+# mm).  The collar's length reads above the collar, its witnesses 4 mm long;
+# its three rows (retry09: centred on the requested x, the line at the
+# lowest row's baseline 3.55 mm over the collar) print over x ~98..140 mm,
+# y ~239.7..254.3 mm, 12.4 mm under the drawable top (266.7 mm).
 # A HORIZONTAL dimension's rows requested beyond its span print centred on
 # the requested x, and its dimension line runs on under the lowest row to that
-# row's far end (retry09 native audit: "10.00 / ARM WIDTH" requested at x 88
-# mm beside the arm, y 170 mm, printed over x 75..101 mm with the flange
-# width's witness at x 91 mm through both rows).  The arm width therefore
-# reads BELOW the arm's end (y 147.85 mm), between the aligned front and
-# bottom views, hung left of its span (x 129..139 mm): rows over x ~100..126
-# mm, y 133..142.5 mm, the dimension line at y 132.4 mm and its witnesses
-# dropping through air from the arm's end; 3 mm of air to its own witness,
-# 11 mm over the bottom view's top (y 121.9 mm) and clear of the flange
-# depth's column at x 89 mm.  The flange depth's block sits a text height
-# plus under the flange width's (its value row's top at y 204.5 mm, the
-# width's callout row's bottom at 211.4 mm; the audit reads two blocks within
-# a text height as one dimension).  The arm's 54.30 length from its buried
-# start (Z 4, inside the collar) is gone: the arm's end is located from the
-# bore axis in the side view, the same datum as the mounting face.
+# row's far end (retry09 native audit).  The arm width therefore reads BELOW
+# the arm's end (y 126.64 mm), between the aligned front and bottom views,
+# hung left of its span (x 93..103 mm): rows over x ~64..90 mm, y 111.8..
+# 121.3 mm, the dimension line at y 111.2 mm and its witnesses dropping
+# through air from the arm's end, 11 mm over the bottom view's top (y 100.7
+# mm) and clear of the flange depth's column at x 53 mm.  The flange's two
+# plan dimensions keep their retry09 places from the flange (the width's
+# value row ~62 mm over the mounting face, y 129.75 mm), left of the arm;
+# the flange depth's block sits a text height plus under the flange width's.
+# The arm's length from its buried start (Z 4, inside the collar) is not
+# dimensioned: the arm's end is located from the bore axis in the side view.
 FRONT_KEEP = {
-    "ArmWidth": (0.113, 0.138),
-    "FlangeWidth": (0.104, 0.216),
-    "FlangeDepth": (0.089, 0.200),
-    "CollarLen": (0.155, 0.224),
+    "ArmWidth": (0.077, 0.11679),
+    "FlangeWidth": (0.068, 0.19479),
+    "FlangeDepth": (0.053, 0.17879),
+    "CollarLen": (0.119, 0.248),
 }
+# The bottom view's numbers below are the retry09..retry15 audits' in the
+# pre-A1 frame; the A1 sheet carries this whole group (views, dimensions,
+# caption, callout) 36 mm left and 21.21 mm down: sheet x = 98 + X, y =
+# 88.79 + Y mm, so subtract (36, 21.21) mm from every coordinate quoted.
 # East of the bottom view (x = 134 + X, y = 110 + Y mm: the flange's east end
 # at x 139 mm, its hole-datum face at y 103.65 mm, its top at 116.35 mm; the
 # arm's end face, drawn face-on inside the flange, over x 129..139 mm, y
@@ -204,10 +217,10 @@ FRONT_KEEP = {
 # 11.8 mm right of the offset's row at its widest and ends 5.5 mm under the
 # thickness' lower tail; the side view's lowest rows start at x 179.5 mm,
 # y 172 mm.
-BOTTOM_KEEP = {"FlangeHeight": (0.166, 0.1263)}
+BOTTOM_KEEP = {"FlangeHeight": (0.130, 0.10509)}
 BOTTOM_FOOTPRINT_KEEP = {
-    "FootprintOffset": (0.150, 0.0999),
-    "FootprintThickness": (0.175, 0.11178),
+    "FootprintOffset": (0.114, 0.07869),
+    "FootprintThickness": (0.139, 0.09057),
 }
 # The caption belongs BELOW the lower view, not between it and the front view.
 # Centre it on the measured bottom-view outline, below that view's lowest
@@ -216,11 +229,14 @@ BOTTOM_FOOTPRINT_KEEP = {
 # (retry15: top y 70.12 mm). The callout block is to the right; its diagonal
 # leader is independently proven clear of the caption's actual extent.
 BOTTOM_CAPTION = "VIEW ON MOUNTING FACE"
-BOTTOM_CAPTION_XY = (0.0865, 0.0774)
+BOTTOM_CAPTION_XY = (0.0505, 0.05619)
 BOTTOM_CAPTION_GAP_M = 0.002
 # INote.GetExtent reads ~0.3 mm apart between sessions; settle within twice.
 CAPTION_SETTLE_M = 0.0006
-MANUFACTURING_NOTES_XY = (0.020, 0.070)
+# Under the caption (its bottom ~51.9 mm) and the counterbore callout
+# (bottom ~53.7 mm), over the drawable bottom: native15's 18.1 mm block
+# then spans y ~31.0..49.1 mm, 2.8 mm under the caption.
+MANUFACTURING_NOTES_XY = (0.020, 0.049)
 # The mounting holes' coordinates on the bottom view (viewer +Z: x = 134 + X,
 # y = 110 + Y mm; the flange's west end at x 91 mm, its lower face at y 103.65
 # mm, the holes at x 95 and 108.7 mm, y 110 mm).  Each coordinate sketch
@@ -245,13 +261,14 @@ MANUFACTURING_NOTES_XY = (0.020, 0.070)
 # 4.00's row box.  The holes' row witness runs over the flange from 5.4 mm
 # past the hole (x 100.4 mm, retry09's measured overrun) to x 79 mm.
 BOTTOM_HOLE_KEEP = {
-    "MountingX0": (0.075, 0.0918),
-    "MountingX1": (0.075, 0.0838),
-    "MountingY0": (0.080, 0.1166),
+    "MountingX0": (0.039, 0.07059),
+    "MountingX1": (0.039, 0.06259),
+    "MountingY0": (0.044, 0.09539),
 }
 # The collar's end-on circles: the annulus sketch lies on the part's Right
 # plane, so its two diameters import to the side view, whose collar centre is
-# the pinned origin (SIDE_AXIS_X, FRONT_ORIGIN_Y) = (228, 206.15) mm.  A
+# the pinned origin (SIDE_AXIS_X, FRONT_ORIGIN_Y) = (228, 230.15) mm (the
+# quoted y below are pre-A1: add 24 mm).  A
 # diameter's block prints centred on the requested x, its value row's bottom
 # at the requested y (1 mm higher with a tolerance stack), the callout rows
 # 5.6 mm apart under it (the first 4.5 mm under a toleranced value), its
@@ -273,10 +290,10 @@ BOTTOM_HOLE_KEEP = {
 # OD), the OD's arrow on its upper-left rim at ~(224.3, 210.9) mm, the
 # bore's on its upper-right rim at ~(230, 208.3) mm.  Retry10's default
 # style ran each diameter line on through the centre to the far rim, and
-# both chords crossed the mounting face's witness from the origin (y 206.15
+# both chords crossed the mounting face's witness from the origin (y 230.15
 # mm, which starts at the collar's far edge, x 234 mm, and runs left through
 # the centre to its column): two dim-line-crosses-extension findings.
-# Landing above the axis, neither leader reaches y 206.15 mm;
+# Landing above the axis, neither leader reaches y 230.15 mm;
 # _prove_collar_diameters_clear reads the ink back after the rebuild and
 # fails on any crossing with either axis witness, a landing off its rim or
 # ink inside the rim.
@@ -287,13 +304,13 @@ SIDE_KEEP = {
 # The arm's section, from the part's ArmSection witness (shown in the side
 # view by curate_hidden_dimensions).  Turned into projection, the view's
 # sheet-right is model -Y: the arm (Y -3..4.5) spans x 223.5..231 mm, the
-# flange edge-on (Y +/-6.35) x 221.65..234.35 mm at y 150.96..154.16 mm (its
-# mounting face, Z 55.19, at the bottom), the arm's end at y 147.85 mm, the
-# collar's centre at (228, 206.15) mm.  A witness leaves its point 1 mm out
+# flange edge-on (Y +/-6.35) x 221.65..234.35 mm at y 129.75..132.93 mm (its
+# mounting face, Z 100.40, at the bottom), the arm's end at y 126.64 mm, the
+# collar's centre at (228, 230.15) mm.  A witness leaves its point 1 mm out
 # and runs 1 mm past the dimension line (retry09).
-# The bore axis has ONE toleranced chain along Z (mreview10 blocker 2: 55.19
-# and 58.30 both from the axis over-located the arm's end):
-#   - the mounting face from the bore axis, "55.19 / MOUNTING FACE / TO BORE
+# The bore axis has ONE toleranced chain along Z (mreview10 blocker 2: the
+# face and the arm's end both from the axis over-located the arm's end):
+#   - the mounting face from the bore axis, "100.40 / MOUNTING FACE / TO BORE
 #     AXIS" (~37 mm), VERTICAL and in-span (a text requested inside a
 #     vertical span prints centred on the column and breaks the line: the
 #     bottom view's 12.70, retry09), on the LEFT: its seat corner is at Y
@@ -312,8 +329,8 @@ SIDE_KEEP = {
 #     Its witnesses still name the arm's end and the mounting face;
 #     the upper tail ends at y 157.31 mm, under the mounting-face rows.
 #     This remains an ordinary .XX control, not a tight overhang band.
-# The arm's end from the bore axis, "(58.30) / ARM END / FROM BORE AXIS", is
-# the chain's SUM (55.19 + 3.11 = 58.30 exactly) and prints as the sheet's
+# The arm's end from the bore axis, "(103.51) / ARM END / FROM BORE AXIS", is
+# the chain's SUM (100.40 + 3.11 = 103.51) and prints as the sheet's
 # drawing-native REFERENCE (_arm_end_reference: a vertical dimension
 # between the collar's OD rim, re-anchored to its CENTRE, and the arm's end
 # edge, proven to measure ARM_Z[1] on those two entities, parenthesised, its
@@ -343,17 +360,23 @@ SIDE_KEEP = {
 # witnesses to its tail at x 221.65 mm, clear of the overhang's column at
 # x 212 mm and the mounting face's at x 198 mm.  The overhang's labelled
 # block hangs well under this line; the counterbore callout ends at y ~95
-# mm and the isometric starts at x 294.7 mm.  _assert_dimensions_clear
+# mm (pre-A1 frame) and the 1:2 isometric starts at x ~316 mm.  _assert_dimensions_clear
 # still proves the complete rebuilt side-view ink, without exemptions.
+# A1 (#1559): the stations from the bore axis (SeatToAxis, the arm end's
+# reference) rose 24 mm with it, staying in-span; the stacks under the arm's
+# end (ArmPastSeat, ArmBelowAxis) fell 21.21 mm with it, keeping the quoted
+# clearances to the arm's end and to the counterbore callout under them.
+# Subtract 21.21 mm from the y quoted above for those two, add 24 mm for the
+# other two and for the collar's diameters.
 SIDE_SECTION_KEEP = {
-    "SeatToAxis": (SIDE_AXIS_X - 0.030, 0.1785),
-    "ArmPastSeat": (SIDE_AXIS_X - 0.016, 0.1195),
-    "ArmBelowAxis": (SIDE_AXIS_X + 0.036, 0.1400),
+    "SeatToAxis": (SIDE_AXIS_X - 0.030, 0.2025),
+    "ArmPastSeat": (SIDE_AXIS_X - 0.016, 0.09829),
+    "ArmBelowAxis": (SIDE_AXIS_X + 0.036, 0.11879),
 }
 # The sheet-derived reference: its spec key (DRAWING_REFERENCE_PRECISION),
 # its in-span text position and its callout-below rows.
 ARM_END_REFERENCE = "arm end from bore axis"
-ARM_END_REFERENCE_XY = (SIDE_AXIS_X + 0.031, 0.177)
+ARM_END_REFERENCE_XY = (SIDE_AXIS_X + 0.031, 0.201)
 ARM_END_REFERENCE_CALLOUT = "ARM END\nFROM BORE AXIS"
 # swDimensionType_e: swLinearDimension, swHorLinearDimension,
 # swVertLinearDimension. Angular type 3 is never a linear distance.
@@ -413,7 +436,7 @@ SECTION_CALLOUTS = {
 }
 # The counterbore callout names the entry face in the sheet's own words: the
 # bottom view looks at the mounting face (the one the plate sees, named on
-# the 55.19), and the counterbores enter from the opposite, -Z face.
+# the 100.40), and the counterbores enter from the opposite, -Z face.
 # One short process row keeps that certainty without Native15's extra row:
 # the native counterbore tolerance stack itself takes two physical rows,
 # so two process rows made five total. The trailing break keeps the native
@@ -821,7 +844,7 @@ def _prove_collar_diameters_clear(
     """After the rebuild: each diameter's arrow lands on its own rim, no
     diameter ink crosses its rim inward, and neither crosses an axis witness
     (the mounting face's and the arm-end reference's both run along y
-    206.15 mm through the centre -- collinear, so one group per station)."""
+    230.15 mm through the centre -- collinear, so one group per station)."""
     od_r = COLLAR_OD / 2000.0
     bore_r = COLLAR_BORE_DIA / 2000.0
     ink = {name: dimension_segments(a) for name, a in (*diameters.items(), *stations.items())}
@@ -1038,7 +1061,7 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Top", *FRONT_CENTER, scale=(1, 1))
     bottom = place_view(adapter, str(SOURCE), "*Front", *BOTTOM_CENTER, scale=(1, 1))
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # The collar bore and the counterbores are fully defined by their callouts
     # (mreview09: the front view's dashed lines only cluttered the 10.00 and
     # 3.175), so every view prints hidden lines removed.
@@ -1117,23 +1140,25 @@ async def build(adapter: Any) -> dict[str, str]:
     hole_callout = add_native_hole_callout(
         adapter,
         bottom,
-        # The east hole (x 108.7 mm), nearer the block. Native15's untouched
+        # The east hole (x 72.7 mm), nearer the block. Native15's untouched
         # thru row, counterbore row and counterbore tolerance stack occupied
         # three physical rows; two separate process rows made FIVE. Keep one
         # compact, face-specific process row (25 characters, shorter than the
         # former 27-character face row), for four physical rows total.
-        # Native15's block at this anchor spanned y 73.11..96.83 mm. Removing
-        # one process row shrinks it inside the existing y 74.9..95.1 mm
-        # clearance envelope; the native sizes, bands and leader style stay.
-        # The widest row stays within x ~174..250 mm, right of the offset's
-        # text (x <= 162.2 mm), above the linked notes and left of the iso.
+        # Native15's block at the pre-A1 anchor spanned y 73.11..96.83 mm.
+        # Removing one process row shrank it inside a y 74.9..95.1 mm
+        # envelope, now y 53.7..73.9 mm with the bottom view's 21.21 mm drop;
+        # the native sizes, bands and leader style stay. The widest row stays
+        # within x ~138..214 mm (left of the title block, x > 216 mm under y
+        # 66 mm), right of the offset's text (x <= 126.2 mm), above the
+        # linked notes and left of the iso.
         # The leader leaves the lowest row's near end and climbs left toward
         # the hole, clear of its own upper rows, both mounting X dimensions,
         # the offset's shoulder and the caption under the coordinate stack.
         # Those witness/caption clearances still have their native readbacks;
         # no hole variable, tolerance or shared callout helper is rewritten.
         edge=rims[1].edge,
-        callout_xy=(0.212, 0.086),
+        callout_xy=(0.176, 0.06479),
         label="two bracket counterbores",
         process=COUNTERBORE_PROCESS,
     )
@@ -1187,7 +1212,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _place_bottom_caption(
         adapter, bottom, [*east_annotations, *hole_annotations], manufacturing_note, hole_callout
     )
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.095)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

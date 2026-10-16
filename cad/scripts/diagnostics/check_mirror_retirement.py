@@ -183,14 +183,14 @@ expect(
     "mg-magnifier",
     "mg-magnifying-clamp-1",
     list(m.CLAMP_POS),
-    ROT_Y_POS90,
+    IDENTITY,
     "mg-magnifying-clamp",
 )
 _rz = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
 expect(
     "mg-magnifier",
     "vn-thumb-screw-1",
-    [m.CLAMP_X, m.LEVER_ROD_Y + 19.0, m.LEVER_ROD_Z],
+    [m.CLAMP_X, m.THUMB_SCREW_OUTER_FACE_Y, m.LEVER_ROD_Z],
     _rz,
     "vn-thumb-screw",
 )
