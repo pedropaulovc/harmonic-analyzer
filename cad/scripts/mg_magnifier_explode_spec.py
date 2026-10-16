@@ -20,10 +20,12 @@ wheel hides it from its balloon.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Literal, Sequence
 
 from _simplified_names import simplified_name
+from mg_output_fixture_geom import FIXTURE_YAW_RAD
 
 EXPLODED_VIEW_NAME = "MG_MAGNIFIER_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
@@ -61,6 +63,10 @@ def member_stem(member: str) -> str:
     return member.partition(":")[0]
 
 
+# How far the fixture's thumb screw backs out of its spigot, along its axis.
+FIXTURE_SCREW_TRAVEL = 20.0
+
+
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # Wheel group, the stack off the front of the axle, front first. Station d
     # (from the bar's front face, mg_wheel_group) after the move: spacer
@@ -95,7 +101,21 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         "y",
         -45.0,
     ),
-    ExplodeStep("fixture screw out", ("vn-thumb-screw:2",), "x", -20.0),
+    # The spigot axis runs east and FIXTURE_YAW back (+Z) to lay the groove's
+    # front tangent in the wheel plane (#1559), so the screw backs out along
+    # it in two world steps; one -X step left it 8 mm off its tap's line.
+    ExplodeStep(
+        "fixture screw out",
+        ("vn-thumb-screw:2",),
+        "x",
+        -FIXTURE_SCREW_TRAVEL * math.cos(FIXTURE_YAW_RAD),
+    ),
+    ExplodeStep(
+        "fixture screw out, back",
+        ("vn-thumb-screw:2",),
+        "z",
+        FIXTURE_SCREW_TRAVEL * math.sin(FIXTURE_YAW_RAD),
+    ),
     ExplodeStep(
         "bracket off the lever",
         ("mg-magnifying-bracket", "vn-magnifying-bracket-screw"),
