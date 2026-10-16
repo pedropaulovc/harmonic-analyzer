@@ -14,9 +14,9 @@ r"""Create the MHA-CH-000 channel assembly fitter package (four sheets).
    pair-ream and DRO fit-up on the top frame, the bars pinned to the levers,
    the lever bank threaded, the set screws staked and the springs hooked.
 
-The settings are the assembly's own model dimensions (the hidden
-ChannelSettingsReference sketch, build_ch_channel_assembly), not numbers in
-note text; the steps are numbered by ``ch_channel_assembly_steps``.
+The settings are the assembly's own model dimensions (the hidden rocker- and
+lever-bank settings sketches, build_ch_channel_assembly), not numbers in note
+text; the steps are numbered by ``ch_channel_assembly_steps``.
 """
 
 from __future__ import annotations
@@ -1016,10 +1016,12 @@ def _crop(adapter: Any, view: Any, bank: BankView) -> None:
 def _dimensioned_bank(
     adapter: Any, bank: BankView, keep: dict[str, tuple[float, float]]
 ) -> list[Any]:
-    """Place ``bank``, show the settings chain in it, import ``keep``, crop it
-    if it is a detail, prove the kept dimensions survived, and label it."""
+    """Place ``bank``, show its own settings sketch in it (the other bank's
+    lies off the sheet), import ``keep``, crop it if it is a detail, prove the
+    kept dimensions survived, and label it."""
     view = _placed_bank_view(adapter, bank)
-    _show_base_view_sketches(adapter, view, (asm.FEATURE,), label=bank.title)
+    features = tuple(dict.fromkeys(asm.DIMENSION_FEATURE[name] for name in keep))
+    _show_base_view_sketches(adapter, view, features, label=bank.title)
     annotations = curate_view_dimensions(
         adapter,
         view,
@@ -1123,10 +1125,16 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
         name = dimension_name(adapter, annotation)
         if name in asm.REFERENCE_DIMENSIONS:
             set_reference_dimension(adapter, annotation, label=f"channel {name}")
-    if sorted(displays) != sorted(asm.DRAWING_DIMENSIONS[asm.FEATURE]):
+    if sorted(displays) != sorted(asm.DIMENSION_FEATURE):
         raise RuntimeError(f"fit-up views imported {sorted(displays)}")
     assert_imported_precision(
-        adapter, annotations, dict(asm.DRAWING_PRECISION[asm.FEATURE])
+        adapter,
+        annotations,
+        {
+            name: places
+            for names in asm.DRAWING_PRECISION.values()
+            for name, places in names.items()
+        },
     )
     _assert_settings(displays)
     return lambda: _assert_settings(displays)
