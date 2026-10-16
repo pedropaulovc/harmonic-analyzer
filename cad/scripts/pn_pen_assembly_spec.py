@@ -129,6 +129,12 @@ BOM_DESCRIPTIONS = {
 # equal X/Z steps.
 EXPLODED_VIEW_NAME = "PN_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
+# The exploded view's viewer octant (_named_views): REAR-TOP-LEFT. The rod set
+# screw's tap opens on the yawed block's front face, whose normal is machine
+# (-X, -Z); the built-in *Isometric (+X+Y+Z) sees that face edge-on from
+# behind, so its set screw read as a part in the block's top bore. From
+# (-1, +1, -1) the face and the tap's axis come toward the reader.
+EXPLODED_OCTANT = (-1, 1, -1)
 _CARRIAGE = (V_BLOCK, ROD_SET_SCREW, FRAME, THUMB_SCREW, MARKER)
 EXPLODE_STEPS = (
     ("hanger jam nut off", (HANGER_JAM_NUT,), "z", -26.0),
@@ -139,8 +145,10 @@ EXPLODE_STEPS = (
     ("stud out of the rod", (STUD, STUD_NUT), "y", 12.0),
     ("jam nut off the stud", (STUD,), "y", 10.0),
     ("carriage off the pivot", _CARRIAGE, "y", -24.0),
-    ("rod set screw out x", (ROD_SET_SCREW,), "x", -12.0),
-    ("rod set screw out z", (ROD_SET_SCREW,), "z", -12.0),
+    # 36.8 mm along the tap: the screw's cup clears the block's front face
+    # and its silhouette below the face's lower edge in the octant view.
+    ("rod set screw out x", (ROD_SET_SCREW,), "x", -26.0),
+    ("rod set screw out z", (ROD_SET_SCREW,), "z", -26.0),
     ("marker back x", (MARKER,), "x", 36.0),
     ("marker back z", (MARKER,), "z", -36.0),
     ("thumb screw down", (THUMB_SCREW,), "y", -16.0),
@@ -189,19 +197,27 @@ YAW_DEG = carriage.PEN_BLOCK_YAW_DEG
 YAW_TOLERANCE_DEG = 1.0
 YAW_PRECISION = 0
 # The angle's text point, sketch mm: inside the wedge between the two arms,
-# on its bisector (the same wedge on the sheet, which keeps 45 not 135).
+# on its bisector (the same wedge on the sheet, which keeps 45 not 135), far
+# enough out that the arc's arrowheads land beyond the three-line text block
+# (about 26 x 18 sheet mm at 2:1) and the 45-degree arm clears its corner; at
+# 15 the arrowhead struck the "1°" (machinist review, farm run
+# 20261016T071639431Z).
 _BISECTOR_DEG = 180.0 + YAW_DEG / 2.0
-YAW_TEXT_RADIUS = 15.0
+YAW_TEXT_RADIUS = 23.0
 YAW_TEXT_UV = (
     CARRIAGE_END_UV[0] + YAW_TEXT_RADIUS * math.cos(math.radians(_BISECTOR_DEG)),
     CARRIAGE_END_UV[1] + YAW_TEXT_RADIUS * math.sin(math.radians(_BISECTOR_DEG)),
 )
-# The nib preset's text point, sketch mm: off the marker-axis arm's middle on
-# the side away from the yaw wedge (beyond the paper-end face, clear of parts).
+# The nib preset's text point, sketch mm: on the side of the marker-axis arm
+# away from the yaw wedge, and beyond the nib tip along the axis, so the
+# three-line callout (about 42 mm wide on the sheet, 21 model mm at 2:1) stands
+# clear outside both extension lines rather than between them (farm run
+# 20261016T071639431Z: the end-face extension line ran through the text there).
 NIB_TEXT_OFFSET = 10.0
+NIB_TEXT_BEYOND = 13.0
 NIB_TEXT_UV = (
-    (CARRIAGE_END_UV[0] + NIB_UV[0]) / 2.0 + NIB_TEXT_OFFSET * math.sqrt(0.5),
-    (CARRIAGE_END_UV[1] + NIB_UV[1]) / 2.0 - NIB_TEXT_OFFSET * math.sqrt(0.5),
+    NIB_UV[0] - (NIB_TEXT_BEYOND - NIB_TEXT_OFFSET) * math.sqrt(0.5),
+    NIB_UV[1] - (NIB_TEXT_BEYOND + NIB_TEXT_OFFSET) * math.sqrt(0.5),
 )
 # The stud height's text point, machine mm: left of the rod axis, mid-height,
 # far enough out that the callout's widest line clears the stud's shank.
