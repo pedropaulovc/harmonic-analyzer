@@ -302,11 +302,12 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     asm = drawing.asm
     north = "north"
     lug_z = drawing.FULCRUM_KEEPER_CENTRE_Z + drawing.KEEPER_Z_OFF
-    # 60 north, then the whole north-end cluster 100 further north and 300 up,
-    # clear of the hanging rocker arms (r10 machinist review, DETAIL B).
-    assert drawing.exploded_offset(asm.BRACKET, north) == (0.0, 300.0, 160.0)
-    assert drawing.exploded_offset(asm.BRACKET_SET_SCREW, north) == (0.0, 325.0, 160.0)
-    assert drawing.exploded_offset(asm.WASHER, north) == (0.0, 300.0, 120.0)
+    # 60 north, then the whole north-end cluster 400 further north and 360 up,
+    # clear of the hanging rocker arms (r10 machinist review, DETAIL B), and
+    # (r11) clear of the north-most channel pulled out below it.
+    assert drawing.exploded_offset(asm.BRACKET, north) == (0.0, 360.0, 460.0)
+    assert drawing.exploded_offset(asm.BRACKET_SET_SCREW, north) == (0.0, 385.0, 460.0)
+    assert drawing.exploded_offset(asm.WASHER, north) == (0.0, 360.0, 420.0)
     assert drawing.exploded_offset(asm.KEEPER_FOOT_SCREW, north) == (0.0, 25.0, 50.0)
     assert drawing.exploded_offset(asm.BRACKET, "south") == (0.0, 0.0, -60.0)
     bracket, keeper = drawing.NORTH_BRACKET_DETAIL, drawing.NORTH_KEEPER_DETAIL
@@ -406,12 +407,34 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
             ]
     plan = asm.plan_explode(instances)
     moved = {name for step in plan for name in step[1]}
-    assert moved == {
-        instance.name for instance in instances if instance.stem in asm.EXPLODED_STEMS
+    # r11 machinist review: one channel, the north-most (the balloons'), is
+    # pulled out of the closed-up bank; every other channel stays in it.
+    channel = {
+        stem: max(
+            (instance for instance in instances if asm.family(instance.stem) == stem),
+            key=lambda instance: instance.z_mm,
+        ).name
+        for stem in asm.EXPLODED_STEMS - asm.FULLY_EXPLODED_STEMS
     }
-    assert {"ch-pivot-shaft", "ch-rocker-arm", "ch-channel-lever"}.isdisjoint(
-        asm.EXPLODED_STEMS
-    )
+    assert set(channel) == {asm.ARM, asm.ROD_PIN, asm.LEVER, asm.CHANNEL_SPRING}
+    assert moved == {
+        instance.name
+        for instance in instances
+        if asm.family(instance.stem) in asm.FULLY_EXPLODED_STEMS
+    } | set(channel.values())
+    (pulled,) = [
+        names for step, names in plan if step.label == "north-most channel out"
+    ]
+    assert len(pulled) == 9 and set(channel.values()) <= set(pulled)
+    assert all(name.endswith("-20") for name in pulled)
+    assert drawing.exploded_offset(asm.ARM, "north-most") == (0.0, 0.0, 250.0)
+    assert drawing.exploded_offset(asm.ROD, "north-most") == (0.0, -50.0, 250.0)
+    assert drawing.exploded_offset(asm.ROD_PIN, "north-most") == (0.0, 0.0, 275.0)
+    assert drawing.exploded_offset(asm.BAR_PIN, "north-most") == (0.0, 50.0, 275.0)
+    spring = drawing.exploded_offset(drawing.SPRING_STEM, "north-most")
+    assert spring == (0.0, 0.0, 250.0)
+    assert drawing.exploded_offset(asm.ARM, "north") == (0.0, 0.0, 0.0)
+    assert {"ch-pivot-shaft", asm.ARM, asm.LEVER}.isdisjoint(asm.FULLY_EXPLODED_STEMS)
     assert asm.FULCRUM_SHAFT in asm.EXPLODED_STEMS
 
 
