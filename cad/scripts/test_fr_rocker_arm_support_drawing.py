@@ -1046,8 +1046,9 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
     assert set(right_chords) == {
         "BaseChord",
         "WebChord",
-        "WebCentreChord",
+        "TopFlatMinusZStationFaceChord",
         "TopFlatMinusZStationChord",
+        "TopFlatPlusZStationFaceChord",
         "TopFlatPlusZStationChord",
     }
     base, web = right_chords["BaseChord"], right_chords["WebChord"]
@@ -1059,16 +1060,20 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         assert -(support.BIG - support.POCKET_FLOOR_R_MAX) < y
         assert y < -(support.CAV + support.CHAMFER)
         assert abs(y - web_pick_y) > 2.0
-    # Owner Q13-B: the web's centre chord down the section's centreline from
-    # the top face's middle, and each flat chord in along the top face from
-    # its edge, short of the flat's middle.
-    centre = right_chords["WebCentreChord"]
-    assert centre[0] == (0.0, support.HALF_Y)
-    assert centre[1][0] == 0.0 and centre[1][1] < support.HALF_Y
-    for name, u in support.TOP_FLAT_STATIONS.items():
+    # Owner Q13d: each flat edge off its nearer web face, a real surface. The
+    # face chord runs down its side's web face from under the upper pocket
+    # floor's fillet, above the cavity's rim chamfer; the flat chord in along
+    # the top face from its edge, short of the web face's line.
+    for name, row in support.TOP_FLAT_STATIONS.items():
+        assert abs(row.face_u) == support.WEB and abs(row.edge_u) == support.NARROW
+        assert row.face_u * row.edge_u > 0.0
+        for z, y in right_chords[f"{name}FaceChord"]:
+            assert z == row.face_u
+            assert support.CAV + support.CHAMFER < y
+            assert y < support.BIG - support.POCKET_FLOOR_R_MAX
         start, end = right_chords[f"{name}Chord"]
-        assert start == (u, support.HALF_Y) and end[1] == support.HALF_Y
-        assert 0.0 < abs(end[0]) < abs(u) == support.NARROW
+        assert start == (row.edge_u, support.HALF_Y) and end[1] == support.HALF_Y
+        assert support.WEB < abs(end[0]) < abs(start[0])
     # Each location runs from the face chord's start to its feature chord's.
     spans = {
         "CavityEndStation": (front_dims, "EndChord", "CavitySideChord"),
@@ -1077,12 +1082,12 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         "WebFaceStation": (right_dims, "BaseChord", "WebChord"),
         "TopFlatMinusZStation": (
             right_dims,
-            "WebCentreChord",
+            "TopFlatMinusZStationFaceChord",
             "TopFlatMinusZStationChord",
         ),
         "TopFlatPlusZStation": (
             right_dims,
-            "WebCentreChord",
+            "TopFlatPlusZStationFaceChord",
             "TopFlatPlusZStationChord",
         ),
     }
@@ -1107,8 +1112,8 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         "PocketEndStation": "7.70",
         "CavityTopStation": "25.4",
         "WebFaceStation": "25.40",
-        "TopFlatMinusZStation": "8.467",
-        "TopFlatPlusZStation": "8.467",
+        "TopFlatMinusZStation": "2.117",
+        "TopFlatPlusZStation": "2.117",
     }
 
     nominal = {
@@ -1133,8 +1138,9 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
             "BaseChordZ",
             "BaseChordY",
             "WebFaceStation",
-            "WebCentreChordY",
+            "TopFlatMinusZStationChordY",
             "TopFlatMinusZStation",
+            "TopFlatPlusZStationChordY",
             "TopFlatPlusZStation",
         )
     }
@@ -1157,9 +1163,11 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
             "BaseChordY": values["HalfHeight"],
             # The window cuts start WEB off the centre plane: no global.
             "WebFaceStation": values["FootHalf"] - support.WEB,
-            "WebCentreChordY": values["HalfHeight"],
-            "TopFlatMinusZStation": values["TopHalf"],
-            "TopFlatPlusZStation": values["TopHalf"],
+            "TopFlatMinusZStationChordY": values["HalfHeight"],
+            "TopFlatPlusZStationChordY": values["HalfHeight"],
+            # Each flat edge off its web face, WEB off the centre plane.
+            "TopFlatMinusZStation": values["TopHalf"] - support.WEB,
+            "TopFlatPlusZStation": values["TopHalf"] - support.WEB,
         }
         assert {
             name: _evaluate_drive(drive, values) for name, drive in jobs.items()
@@ -1202,7 +1210,7 @@ def test_pocket_floor_radius_text_stands_right_of_the_section_level_with_its_cor
 ):
     """The R0.8 MAX lands on its first edge, the +Z pocket's floor corner:
     the section's upper right, under the top flat's +Z station and its
-    reason rows (PR #1469 r4 review; owner Q13-B)."""
+    reason rows (PR #1469 r4 review; owner Q13d)."""
     scale = drawing.VIEW_SCALE / 1000
     assert support.POCKET_FLOOR_FILLET_EDGES[0] == [0.0, support.BIG, support.WEB]
     radius = _text_box(
@@ -1227,12 +1235,12 @@ def test_pocket_floor_radius_text_stands_right_of_the_section_level_with_its_cor
     assert radius[1] < corner_y < radius[3] + 0.003
 
 
-FLAT_PLUS_TEXT = "8.467\nCENTERS MHA-CH-008\nSEAT TAPS IN WEB"
+FLAT_PLUS_TEXT = "2.117\nCENTERS MHA-CH-008\nSEAT TAPS IN WEB"
 
 
 def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     """The top flat's two edges print on one row above the section, each
-    text outboard of its own edge (owner Q13-B); WebFaceStation's row stands
+    text outboard of its own edge (owner Q13d); WebFaceStation's row stands
     between the base and the 63.5, whose text sits right of the web face's
     extension line; the front view's locations clear its other texts."""
     scale = drawing.VIEW_SCALE / 1000
@@ -1242,7 +1250,7 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     base_left = centre_x - support.WIDE * scale
     web_left = centre_x - support.WEB * scale
     section_top = centre_y + support.HALF_Y * scale
-    taper = _text_box("8.467", drawing.RIGHT_KEEP["TopFlatMinusZStation"])
+    taper = _text_box("2.117", drawing.RIGHT_KEEP["TopFlatMinusZStation"])
     top_span = _text_box(FLAT_PLUS_TEXT, drawing.RIGHT_KEEP["TopFlatPlusZStation"])
     assert taper[2] < top_left - 0.002
     assert top_span[0] > top_right + 0.002
@@ -1484,7 +1492,7 @@ def test_cavity_radius_callout_sits_on_its_corner_bisector_outside_the_view() ->
     front_right = drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2 * scale
     assert label[0] > front_right + 0.003
     for other in (
-        _text_box("8.467", drawing.RIGHT_KEEP["TopFlatMinusZStation"]),
+        _text_box("2.117", drawing.RIGHT_KEEP["TopFlatMinusZStation"]),
         _rim_chamfer_box(),
         _text_box("177.8", drawing.FRONT_KEEP["Depth"]),
     ):

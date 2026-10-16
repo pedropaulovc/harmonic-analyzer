@@ -73,7 +73,8 @@ Z = wall thickness):
 * **CavityLocationReference** / **WebLocationReference** -- blanked Front- and
   Right-plane sketches of construction chords on drawn edges, whose dimensions
   locate the cavity and the pockets from the -X end face and the top face (the
-  front view) and the web from the base's edge (section A-A).
+  front view), and the web from the base's edge and each top-flat edge from
+  its nearer web face (section A-A; owner Q13d).
 
 Like the 71 tracked parts, this is **equation-driven and self-naming**: eight
 equation-manager globals (``FootHalf``/``TopHalf``/``HalfHeight``/``CavHalf``/
@@ -140,6 +141,7 @@ from fr_rocker_arm_support_spec import HOLE_DIA, HOLE_SPEC, SUPPORT_HALF_MACHINE
 from rocker_bracket_seat_layout import (
     SEAT_LOCAL_X,
     SEAT_SPEC,
+    TOP_FLAT_EDGE_FROM_WEB,
     TOP_FLAT_PLACES,
     WEB,
     WEB_PLACES,
@@ -271,8 +273,8 @@ HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
 # The manufacturing print's dimension set (draw_fr_rocker_arm_support.py imports
 # exactly these marked dimensions; its keep maps must stay in lockstep).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    # The top flat prints from the web's centre plane (WebLocationReference,
-    # owner Q13-B), so the profile's TaperRun and TopSpan stay off the print.
+    # Each top-flat edge prints off its nearer web face (WebLocationReference,
+    # owner Q13d), so the profile's TaperRun and TopSpan stay off the print.
     "WallProfile": {"FootSpan", "WallHeight"},
     "Wall": {"Depth"},
     # A single associative size plus an SQ callout defines each square.
@@ -307,10 +309,10 @@ SEAT_STATION_PLACES = 2
 # The cavity's locations print at the .X band (a through lightening cut); the
 # pocket's 7.70 at two places, its value; the web's location across the base
 # at the web thickness's own places (PR #1469 r4 machinist review; Main's
-# ruling: routine .XX bands). The top flat's edges print off the web's centre
-# plane at .XXX: the bracket feet stand on the flat and the transferred seats
-# follow them, so the flat holds the seats' threads central in the web
-# (owner Q13-B, rocker_bracket_seat_layout's web-wall stack).
+# ruling: routine .XX bands). Each top-flat edge prints off its nearer web
+# face at .XXX: the bracket feet stand on the flat and the transferred seats
+# follow them, so the flat holds the seats' threads clear of the web's faces
+# (owner Q13d, rocker_bracket_seat_layout's web-wall stack).
 CAVITY_LOCATION_PLACES = 1
 POCKET_END_PLACES = 2
 SECTION_LOCATION_PLACES = WEB_PLACES
@@ -404,10 +406,9 @@ SEAT_STATION_DRIVES = {
 #   -X end face to the cavity's and to the pocket's side wall, and the top
 #   face down to the cavity's top wall;
 # * WebLocationReference (Right plane, sketch (u, v) = model (-Z, Y)): the
-#   base's -Z edge to the web's -Z face, and the web's centre plane out to
-#   each edge of the top flat (owner Q13-B, 2026-10-16: the flat's edges, not
-#   TaperRun@WallProfile off the base, so the seats' feet stand central on
-#   the web).
+#   base's -Z edge to the web's -Z face, and each web face out to the top
+#   flat's edge on its side (owner Q13d, 2026-10-16: a real surface, not the
+#   web's centre plane Q13-B used, nor TaperRun@WallProfile off the base).
 # A shown reference sketch prints, so each is short construction chords
 # lying on lines its view draws (build_fr_nameplate's FaceReference idiom),
 # and each location spans two chords' starts. The locations and the chords'
@@ -415,11 +416,11 @@ SEAT_STATION_DRIVES = {
 # start offset), so a GUI edit keeps them on their features; where a chord
 # sits along its line is unprinted: REFERENCE_EDGE_STATION off a corner, or
 # that far into a cavity or pocket wall's straight run past its corner
-# radius. The web chord stands REFERENCE_CHORD above the pocket floor's
-# fillet, below where the drawing picks the web's faces for its 9.53; the
-# web's centre chord runs down from the top face's middle on the section's
-# web centreline, and each flat chord runs in along the top face from its
-# edge (the profile's sharp, under the rim chamfer).
+# radius. The low web chord stands REFERENCE_CHORD above the lower pocket
+# floor's fillet, below where the drawing picks the web's faces for its
+# 12.70; each high web chord runs down the web's face from REFERENCE_CHORD
+# under the upper floor fillet, and each flat chord runs in along the top
+# face from its edge (the profile's sharp, under the rim chamfer).
 REFERENCE_CHORD = 1.0
 REFERENCE_EDGE_STATION = 5.0
 CAVITY_END_STATION = BOSS_DEPTH / 2.0 - CAV  # 26.75, printed 26.7
@@ -431,15 +432,28 @@ LOCATION_DRIVES = {
     "CavityTopStation": '"HalfHeight" - "CavHalf"',
     "PocketEndStation": f'{END_FACE_DRIVE} - "WindowOuter"',
     "WebFaceStation": f'"FootHalf" - {WEB}mm',
-    "TopFlatMinusZStation": '"TopHalf"',
-    "TopFlatPlusZStation": '"TopHalf"',
+    "TopFlatMinusZStation": f'"TopHalf" - {WEB}mm',
+    "TopFlatPlusZStation": f'"TopHalf" - {WEB}mm',
 }
-# Sketch u of each flat edge's chord start (u = model -Z), the centre chord
-# on u = 0.
+
+
+class TopFlatStation(NamedTuple):
+    """One top-flat edge location: sketch u (= model -Z) of its web face's
+    chord and of its flat chord's start."""
+
+    face_u: float
+    edge_u: float
+
+
 TOP_FLAT_STATIONS = {
-    "TopFlatMinusZStation": NARROW,
-    "TopFlatPlusZStation": -NARROW,
+    "TopFlatMinusZStation": TopFlatStation(WEB, NARROW),
+    "TopFlatPlusZStation": TopFlatStation(-WEB, -NARROW),
 }
+if any(
+    abs(abs(row.edge_u) - abs(row.face_u) - TOP_FLAT_EDGE_FROM_WEB) > 1e-12
+    for row in TOP_FLAT_STATIONS.values()
+):
+    raise AssertionError("a top-flat station is not the seat stack's edge offset")
 
 # PocketFloorFillet volume minus four through clearance drills.
 FOOT_HOLED_VOLUME = (
@@ -740,14 +754,14 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
     sketch (u, v) = model (-Z, Y); returns the drive jobs.
 
     Chords along the base from its -Z edge (the sharp the 63.5 measures from
-    too) and up the web's -Z face from REFERENCE_CHORD above the pocket
-    floor's fillet; WebFaceStation spans their starts. A chord down the web's
-    centre plane from the top face's middle, and one in along the top face
-    from each flat edge; each TopFlat*Station spans the centre chord's start
-    to that edge's. 5 x 4 DOF less: the base and centre chords' anchored
-    starts (4), five square relations and lengths (10), the web location and
-    the web chord's height (2), each flat chord's top-face relation and
-    station (4) = 0.
+    too) and up the web's -Z face from REFERENCE_CHORD above the lower pocket
+    floor's fillet; WebFaceStation spans their starts. Per top-flat edge, a
+    chord down its side's web face from REFERENCE_CHORD under the upper floor
+    fillet and one in along the top face from the edge; each TopFlat*Station
+    spans the face chord's start to the edge's (owner Q13d). 6 x 4 DOF less:
+    the base chord's anchored start (2), six square relations and lengths
+    (12), the web location and the low web chord's height (2), each high web
+    chord's place (4), each flat chord's height and station (4) = 0.
     """
     sketch = REFERENCE_SKETCHES[2]
     dims = SketchDims()
@@ -790,45 +804,68 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
         "vertical_distance",
         -web_y,
     )
-    # The web's centre plane, up from the top face's middle on section A-A's
-    # web centreline, and the top flat's two edges off it (owner Q13-B).
-    centre = await _reference_chord(
-        adapter,
-        sketch,
-        dims,
-        "WebCentreChord",
-        (0.0, HALF_Y),
-        (0.0, HALF_Y - REFERENCE_CHORD),
-    )
-    await anchor_point_to_origin(
-        adapter, f"{centre}.start", 0.0, HALF_Y, f"{sketch} web centre chord"
-    )
-    dims.record("WebCentreChordY", '"HalfHeight"')
-    for name, u in TOP_FLAT_STATIONS.items():
-        inward = -math.copysign(REFERENCE_CHORD, u)
+    # Each top-flat edge off the web face on its side (owner Q13d): the face
+    # chord runs down from under the upper pocket floor's fillet, inside the
+    # web's straight run above the cavity's rim chamfer.
+    face_y = BIG - POCKET_FLOOR_R_MAX - REFERENCE_CHORD
+    for name, row in TOP_FLAT_STATIONS.items():
+        face = await _reference_chord(
+            adapter,
+            sketch,
+            dims,
+            f"{name}FaceChord",
+            (row.face_u, face_y),
+            (row.face_u, face_y - REFERENCE_CHORD),
+        )
+        await _location(
+            adapter,
+            sketch,
+            dims,
+            f"{name}FaceChordZ",
+            f"{face}.start",
+            "origin",
+            "horizontal_distance",
+            abs(row.face_u),
+        )
+        await _location(
+            adapter,
+            sketch,
+            dims,
+            f"{name}FaceChordY",
+            f"{face}.start",
+            "origin",
+            "vertical_distance",
+            face_y,
+        )
+        inward = -math.copysign(REFERENCE_CHORD, row.edge_u)
         flat = await _reference_chord(
             adapter,
             sketch,
             dims,
             f"{name}Chord",
-            (u, HALF_Y),
-            (u + inward, HALF_Y),
+            (row.edge_u, HALF_Y),
+            (row.edge_u + inward, HALF_Y),
         )
-        check(
-            f"{sketch} {name} chord on the top face",
-            await adapter.add_sketch_constraint(
-                f"{flat}.start", f"{centre}.start", "horizontal_points"
-            ),
+        await _location(
+            adapter,
+            sketch,
+            dims,
+            f"{name}ChordY",
+            f"{flat}.start",
+            "origin",
+            "vertical_distance",
+            HALF_Y,
+            '"HalfHeight"',
         )
         await _location(
             adapter,
             sketch,
             dims,
             name,
-            f"{centre}.start",
+            f"{face}.start",
             f"{flat}.start",
             "horizontal_distance",
-            abs(u),
+            TOP_FLAT_EDGE_FROM_WEB,
             LOCATION_DRIVES[name],
         )
     await ensure_fully_defined(adapter, f"{sketch} sketch")

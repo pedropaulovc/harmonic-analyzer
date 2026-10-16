@@ -177,8 +177,8 @@ DIMENSION_CALLOUTS = {
     "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
     # One location covers both opposed pockets, as the SQ size does.
     "PocketEndStation": "BOTH SIDES",
-    # The flat's edges off the web's centre plane hold the transferred seats
-    # central in the web (owner Q13-B, rocker_bracket_seat_layout's stack).
+    # Each flat edge off its nearer web face holds the transferred seats
+    # clear of the web's faces (owner Q13d, rocker_bracket_seat_layout's stack).
     "TopFlatPlusZStation": (
         f"CENTERS {_config.parts('ch-pivot-bracket')['number']}\nSEAT TAPS IN WEB"
     ),
@@ -305,13 +305,13 @@ FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
 # top-rail floor corner (build_fr_rocker_arm_support.POCKET_FLOOR_FILLET_EDGES),
 # which the section shows in profile at its upper right. The text stands
 # level with it right of the section, between the slanted wall and the
-# 177.8, which moves out to clear it. The top flat's two edges print off the
-# web's centre plane (WebLocationReference, blanked in the part; owner
-# Q13-B), both on the row above the section: each span is only 4.2 mm of
+# 177.8, which moves out to clear it. The top flat's two edges print off
+# their nearer web faces (WebLocationReference, blanked in the part; owner
+# Q13d), both on the row above the section: each span is only about 1 mm of
 # sheet, so each text stands outboard of its own edge (the right one at
 # least 2 mm clear of the left span's outboard arrow, the audit's arrow
-# clearance; r3 render: 1.91 at 0.2375), and the right one's reason rows
-# hang below it, above the R0.8 MAX's block. The 63.5 prints
+# clearance), and the right one's reason rows hang below it, above the
+# R0.8 MAX's block. The 63.5 prints
 # right of the web face's extension line WebFaceStation runs down to just
 # above it, its row no lower than r8's (r10 review: 1 mm lower, its left
 # extension line's overshoot struck the SECTION A-A label's E).
