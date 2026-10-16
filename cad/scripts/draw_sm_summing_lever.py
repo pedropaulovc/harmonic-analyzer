@@ -139,7 +139,10 @@ _BBOX_CX = (TIP_X - ANCHOR_R + PLATE_W) / 2.0
 FRONT_CENTER = (0.225, 0.235)
 TOP_CENTER = (0.225, 0.130)  # aligned plan below the front profile
 ISO_CENTER = (0.350, 0.225)
-BACK_CENTER = (0.225, 0.190)
+# 40 mm below the sheet's top band, so the view and its callouts centre in
+# the field above the title block (machinist review r10: at 0.190 they
+# bunched along the top edge over an empty lower two-thirds).
+BACK_CENTER = (0.225, 0.150)
 SHEET_NAMES = ("Lever Geometry", "Bracket Receiver")
 
 # Detail D: the trunnion envelope at 4:1, in the open field left of the front
@@ -909,9 +912,9 @@ TOP_KEEP = {
     "MiddleRibThickness": (0.226, 0.1365),
 }
 # Sheet 2, back view at 1:1 (model X reversed: the plate's free edge prints at
-# sheet x 0.160, the taps at 0.1747 and 0.1884 on y 0.190, the plate top at
-# y 0.1925, the spring pad from the free edge to x 0.170 down to y 0.1855,
-# the cylinder's circle x 0.1917..0.2171, y 0.1773..0.2027).
+# sheet x 0.160, the taps at 0.1747 and 0.1884 on y 0.150, the plate top at
+# y 0.1525, the spring pad from the free edge to x 0.170 down to y 0.1455,
+# the cylinder's circle x 0.1917..0.2171, y 0.1373..0.1627).
 # The receiver stations stand above the view: 14.75 nearer, its text left of
 # the free edge, 28.45 above it, its text and the pattern's mate right of the
 # span (a horizontal dimension stacks a callout below the value above its
@@ -920,16 +923,16 @@ TOP_KEEP = {
 # length's upper arrow (at x 0.147 that arrow ran through it, farm r5); the
 # pad's width hangs below and left of both, outside its extension lines.
 BACK_KEEP = {
-    "SpringSeatThickness": (0.153, 0.176),
-    "SpringPadWidth": (0.130, 0.163),
-    "ReceiverX0": (0.220, 0.2215),
+    "SpringSeatThickness": (0.153, 0.136),
+    "SpringPadWidth": (0.130, 0.123),
+    "ReceiverX0": (0.220, 0.1815),
     # Each tight station names the bracket (machinist review r5): the 14.75's
     # two lines stand over the row height's one, which prints above its value.
-    "ReceiverX1": (0.130, 0.2145),
-    "ReceiverY0": (0.143, 0.1985),
+    "ReceiverX1": (0.130, 0.1745),
+    "ReceiverY0": (0.143, 0.1585),
 }
 # The back view's label, under the pad's width.  The point is its top left.
-BACK_VIEW_NOTE_XY = (0.110, 0.149)
+BACK_VIEW_NOTE_XY = (0.110, 0.109)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -1353,7 +1356,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Right of the view, where the 2026-10-09 render seated it.
     mounting_callout = add_native_hole_callout(
         adapter, back, edge=mounting_rims[0].edge,
-        callout_xy=(0.292, 0.155), label="two blind bracket mounting taps",
+        callout_xy=(0.292, 0.115), label="two blind bracket mounting taps",
         process=BRACKET_TAP_CALLOUT_PROCESS,
     )
     from win32com.client.dynamic import Dispatch as dynamic_dispatch

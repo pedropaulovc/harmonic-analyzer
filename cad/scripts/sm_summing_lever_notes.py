@@ -88,7 +88,11 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
     "ReceiverX0": f"MATCHES HOLES IN\nBRACKET {BRACKET_NUMBER}",
     "ReceiverX1": f"MATCHES {BRACKET_NUMBER}",
-    "RibDepth": f"TAPPED END RIB\nCONTAINS {BRACKET_SCREW_NUMBER} TAP DRILL",
+    # The 2-56 drill runs along Z through the rib into the plate's line: its
+    # floor is the plate's length, but past the rib the 5.08 plate leaves it
+    # 1.26 MIN side walls, so the rib's depth holds the drill point (machinist
+    # review r10 read the band as rescuing a floor).
+    "RibDepth": "TAP DRILL POINT STAYS IN RIB\nCLEAR OF THIN PLATE WALLS",
     "SpringPadWidth": "UNDERSIDE PAD\nFULL LENGTH",
     # The rib end's half-height is the slant's at RIB_PLATE_REACH: clipped
     # there, not run to a point, so the -Z receiver rib keeps its wall round
