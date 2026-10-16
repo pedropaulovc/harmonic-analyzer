@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _transforms
 import build_mg_magnifier_assembly as assembly
 import draw_mg_magnifier_assembly as drawing
 import joint_retention
@@ -678,3 +679,34 @@ def test_every_bom_family_is_ballooned_exactly_once_across_the_package() -> None
 def test_the_joint_retention_rows_point_at_magnifier_steps() -> None:
     assert joint_retention.STEP_LISTS["mg_magnifier"] == steps.SEQUENCE
     assert DRAWINGS_BY_NAME["mg_magnifier_assembly"].part == "mg_magnifier"
+
+
+@pytest.mark.parametrize(
+    ("stem", "radius", "rows"),
+    [
+        (
+            "mg-magnifying-lever",
+            assembly.LEVER_ROD_DIA / 2.0,
+            _transforms.ROT_Y_180,
+        ),
+        (
+            "mg-magnifying-vertical-rod",
+            assembly.VROD_DIA / 2.0,
+            _transforms.compose_rows(
+                _transforms.rot_z_rows(-90.0), _transforms.ROT_Y_180
+            ),
+        ),
+    ],
+)
+def test_capsule_balloon_anchors_sit_on_a_dome_tangent_facing_the_isometric(
+    stem: str, radius: float, rows: list[list[float]]
+) -> None:
+    x, y, z = drawing.BALLOON_ANCHORS[stem].point_mm
+    assert x == pytest.approx(radius)
+    assert math.hypot(y, z) == pytest.approx(radius)
+    normal = [
+        sum((0.0, y / radius, z / radius)[i] * rows[i][j] for i in range(3))
+        for j in range(3)
+    ]
+    # Square to the rod axis, and straight at the +X+Y+Z viewer.
+    assert sum(normal) == pytest.approx(math.sqrt(2.0))
