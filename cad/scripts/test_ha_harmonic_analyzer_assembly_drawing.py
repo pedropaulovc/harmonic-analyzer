@@ -12,6 +12,7 @@ import ha_harmonic_analyzer_assembly_notes as notes
 import ha_harmonic_analyzer_assembly_spec as spec
 import ha_harmonic_analyzer_assembly_steps as steps
 import joint_retention
+import vn_spring_hook_spec
 from _assembly_contract import assembly_contract
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 
@@ -118,16 +119,22 @@ def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
     for value in (spec.BAR_HEIGHT_MM, spec.STUD_DROP_MM):
         assert f"{value:.1f}" not in printed
     assert "PER MHA-MG-000 SHEET 4." in printed
-    for bad in ("TBD", "TODO"):
+    # Period hardware: no step leans on, or names, a chemical or nylon lock.
+    for bad in ("TBD", "TODO", "THREADLOCK", "LOCTITE", "NYLON", "NYLOC"):
         assert bad not in printed
+    # The anchor's install and acceptance are the anchor spec's text, unforked.
+    assert vn_spring_hook_spec.ANCHOR_INSTALL_STEP in printed
+    assert vn_spring_hook_spec.ANCHOR_INSTALL_CHECK in printed
 
 
 def test_integration_joints_point_at_their_integration_steps() -> None:
     rows = {joint.id: joint for joint in joint_retention.JOINTS}
     anchor = rows["ha-harmonic-analyzer/channel-anchor-in-summing-plate"]
-    assert (
-        anchor.installed_at == anchor.lock_step == steps.step_ref("channel-anchors-set")
-    )
+    nut = rows["ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor"]
+    step = steps.step_ref("channel-anchors-set")
+    assert anchor.installed_at == anchor.lock_step == nut.installed_at == step
+    assert anchor.lock is joint_retention.Lock.JAM_NUT
+    assert anchor.lock_part == nut.member == "ch_anchor_jam_nut"
     bracket = rows["ha-harmonic-analyzer/magnifying-bracket-screws"]
     assert bracket.installed_at == steps.step_ref("magnifier-bracket-screwed")
 
