@@ -16,8 +16,9 @@ pair being set off the top frame.
 
 Explode (``EXPLODED_VIEW_NAME``): every channel alike, end hardware out along
 z on its own side, fasteners up out of their taps, the rods down off the
-arms, the bars (with the pins pressed in them) east along the levers and the
-spring anchors down; the shafts, rockers, levers and springs stay put.
+arms, the bars (with the pins pressed in them) up off the rocker straps, the
+spring anchors down and the fulcrum shaft withdrawn north; the pivot shaft,
+rockers, levers and springs stay put.
 """
 
 from __future__ import annotations
@@ -109,6 +110,7 @@ SOURCE_CONFIGURATION = "Default"
 BANK_MID_Z = STACK_MID_Z
 
 KEEPER = "ch-fulcrum-keeper"
+FULCRUM_SHAFT = "ch-fulcrum-shaft"
 KEEPER_SET_SCREW = "vn-fulcrum-set-screw"
 KEEPER_FOOT_SCREW = "vn-frame-side-screw"
 BRACKET = "ch-pivot-bracket"
@@ -152,10 +154,15 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("south washer out", (WASHER,), "z", -20.0, "south"),
     ExplodeStep("north washer out", (WASHER,), "z", 20.0, "north"),
     ExplodeStep("rods down", (ROD,), "y", -50.0),
-    # East, not west: 50 west put each bar (pin x 72.9) on its own spring's
-    # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick).
-    ExplodeStep("bars east", (BAR, BAR_PIN), "x", 50.0),
+    # Up, not along x: 50 west put each bar (pin x 72.9) on its own spring's
+    # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick);
+    # 50 east put bar 3 over the bank spring (r4 balloon pick, shared edge).
+    ExplodeStep("bars up", (BAR, BAR_PIN), "y", 50.0),
     ExplodeStep("anchors down", (HOOK,), "y", -40.0),
+    # Withdrawn north past the north keeper: in place only its 10 mm tips
+    # stand clear of the lever hubs, under 1.5 mm at 1:7, and its balloon
+    # landed on lever 20's ink (r4 balloon pick, shared edge).
+    ExplodeStep("fulcrum shaft out north", (FULCRUM_SHAFT,), "z", 120.0),
 )
 EXPLODED_STEMS = frozenset(stem for step in EXPLODE_STEPS for stem in step.stems)
 
