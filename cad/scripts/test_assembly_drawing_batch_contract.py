@@ -60,7 +60,8 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     # measuring-stick sheet is a full fitter package (BOM, explode, steps); the
     # magnifier left it with the axle-stack details (Codex PR #1330) and is
     # now a four-sheet fitter package (BOM, explode, steps); the pen sheet is a
-    # full fitter package (settings details, BOM, explode, steps).
+    # full fitter package (settings details, BOM, explode, steps); the summing
+    # sheet is a full fitter package (settings, BOM, explode, steps).
     if drawing
     not in (
         draw_fr_frame_assembly,
@@ -70,6 +71,7 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
         draw_ms_measuring_stick_assembly,
         draw_mg_magnifier_assembly,
         draw_pn_pen_assembly,
+        draw_sm_summing_assembly,
     )
 )
 
@@ -198,6 +200,11 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "pn_pen_carriage_geom.py",
                 )
             } <= set(deps)
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_sm_summing_assembly:
+            scripts_dir = Path(draw_sm_summing_assembly.__file__).resolve().parent
+            # The spec module (settings, explode plan, steps text) the sheets print.
+            assert str(scripts_dir / "sm_summing_assembly_spec.py") in deps
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
             assert str(Path(_assembly_drawing.__file__).resolve()) in deps
