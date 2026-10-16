@@ -165,15 +165,17 @@ KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
 # Section C-C: the plate's own thickness.  Every end view shows the end ribs
 # over the plate and the spring-anchor pad below its free edge, so no view
 # shows the 5.08 edge-on; a partial cut across the plate alone, between two
-# spring taps (mid-pitch, clear of both), shows it at 1:1 under Detail A's
-# label, its cut end inboard of the pad.  The cut runs in the plan from just
-# outboard of the cylinder (R12.70) past the free edge; the value stands
-# beyond the cut's inboard end, the caption above.  In the plan the cut sits
-# at sheet y 0.1565, so its letters (14..20 mm under it) print at y
-# 0.136..0.143, above the mid rib's 5.08 extension lines; its outboard end
-# runs 8.5 mm past the free edge so that letter (x 0.259..0.265) clears the
-# hole column's centre marks.
-PLATE_SECTION_Z = HOLE_Z_LAST - (HOLE_COUNT // 2 + 6.5) * CHANNEL_PITCH
+# spring taps (mid-pitch, clear of both), shows it at 1:1 under Detail D's
+# label.  The cut runs in the plan from just outboard of the cylinder
+# (R12.70) past the free edge; the value stands beyond the cut's inboard end,
+# the caption above.  The cut looks up the sheet (machinist review r7: looking
+# down it, the pad printed at the section's left, mirrored from the plan), so
+# its arrows and letters stand 14..20 mm over it: the cut sits five pitches
+# down the column from its old station, at sheet y ~0.139, its letters at
+# ~0.153..0.159, under the -Z end rib (0.168) and over the mid rib's 5.08
+# (0.131..0.138, left of the cut); its outboard end runs 8.5 mm past the free
+# edge so that letter (x 0.259..0.265) clears the hole column's centre marks.
+PLATE_SECTION_Z = HOLE_Z_LAST - (HOLE_COUNT // 2 + 1.5) * CHANNEL_PITCH
 PLATE_SECTION_X = (14.0, PLATE_W + 8.5)
 PLATE_SECTION_SCALE = (1, 1)
 PLATE_SECTION_CENTER = (0.075, 0.130)
@@ -419,13 +421,14 @@ KNIFE_ANGLE_TEXT_DROP = 0.0135
 
 
 def _knife_ridge_angle(adapter: Any, detail: Any) -> Any:
-    """Detail D's knife-edge included angle (machinist review r4 B2): a driven
-    angular dimension between the +Z stub's two upper flats, shown as a
-    reference -- HexWidth and HexHeight already fix it (RIDGE_ANGLE_DEG is
-    2 atan((W/2) / (H/4))), so a toleranced angle would dimension the
-    hexagon twice.  The picks name the outboard end face's two upper slant
-    edges at their midpoints, and the value must read RIDGE_ANGLE_DEG: the
-    supplement means the text landed in a side wedge."""
+    """Detail D's knife-edge included angle (machinist review r4 B2, r7 B1): a
+    driven angular dimension between the +Z stub's two upper flats, printed
+    plain so the title block's angular band governs it.  HexWidth and
+    HexHeight leave the flanks, so the shoulders' height, free; this angle
+    fixes them (``sm_summing_lever_spec.KNIFE_SHOULDER_RISE`` charges its band
+    to the free-rock worst case).  The picks name the outboard end face's two
+    upper slant edges at their midpoints, and the value must read
+    RIDGE_ANGLE_DEG: the supplement means the text landed in a side wedge."""
     z_mm = PLATE_L / 2.0 + HEX_DEPTH
     slant_points = [
         (side * HEX_W / 4.0, 3.0 * HEX_H / 8.0, z_mm) for side in (-1.0, 1.0)
@@ -463,16 +466,22 @@ def _knife_ridge_angle(adapter: Any, detail: Any) -> Any:
             f"knife-edge included angle reads {measured:.4f} deg, "
             f"not {RIDGE_ANGLE_DEG:.4f}"
         )
-    # The native prefix/suffix channel around the live value, not
-    # ShowParenthesis (which brackets above-line text).
-    display.SetText(1, "(")
-    display.SetText(2, ")")
-    if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")"):
+    # Plain: no prefix/suffix parentheses and no ShowParenthesis brackets, so
+    # the angle reads as a toleranced size, not a reference.
+    display.SetText(1, "")
+    display.SetText(2, "")
+    display.ShowParenthesis = False
+    if (
+        str(display.GetText(1) or ""),
+        str(display.GetText(2) or ""),
+        bool(display.ShowParenthesis),
+    ) != ("", "", False):
         raise RuntimeError(
-            "knife-edge included angle lost its reference parentheses: "
-            f"{display.GetText(1)!r} {display.GetText(2)!r}"
+            "knife-edge included angle still prints as a reference: "
+            f"{display.GetText(1)!r} {display.GetText(2)!r} "
+            f"{display.ShowParenthesis!r}"
         )
-    _telemetry.info(f"knife-edge included angle: {measured:.3f} deg, reference")
+    _telemetry.info(f"knife-edge included angle: {measured:.3f} deg, toleranced")
     return angle
 
 
@@ -550,9 +559,10 @@ def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
 
 def _plate_section(adapter: Any, top: Any) -> list[Any]:
     """Section C-C across the plate (PLATE_SECTION_* above): cut face only,
-    turned +Y up and landed on PLATE_SECTION_CENTER (draw_pd_platen's
-    ``_orient_section``/``_centre_section``), carrying the plate thickness.
-    Which way the cut looks along Z only mirrors the rectangle."""
+    looking up the sheet so the free edge and its pad print on the right as
+    in the plan, turned +Y up and landed on PLATE_SECTION_CENTER
+    (draw_pd_platen's ``_orient_section``/``_centre_section``), carrying the
+    plate thickness."""
     line = model_points_in_view(
         adapter,
         top,
@@ -584,16 +594,36 @@ def _plate_section(adapter: Any, top: Any) -> list[Any]:
     above = _metres(
         (_PLATE_SECTION_ANCHOR_MM[0], 1.0, _PLATE_SECTION_ANCHOR_MM[2])
     )
-    for attempt in range(3):
-        origin = model_point_in_view(adapter, native, anchor, label="C-C anchor")
-        up = model_point_in_view(adapter, native, above, label="C-C +Y")
-        dx, dy = up[0] - origin[0], up[1] - origin[1]
-        if dy > 0.0 and abs(dx) <= 1e-7:
-            break
-        native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(dy, dx)
-        rebuild_drawing(adapter, label=f"section C-C turned, pass {attempt}")
-    else:
+    free_edge = _metres((PLATE_W, 0.0, PLATE_SECTION_Z))
+
+    def turn_up(stage: str) -> None:
+        for attempt in range(3):
+            origin = model_point_in_view(adapter, native, anchor, label="C-C anchor")
+            up = model_point_in_view(adapter, native, above, label="C-C +Y")
+            dx, dy = up[0] - origin[0], up[1] - origin[1]
+            if dy > 0.0 and abs(dx) <= 1e-7:
+                return
+            native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(dy, dx)
+            rebuild_drawing(
+                adapter, label=f"section C-C turned ({stage}), pass {attempt}"
+            )
         raise RuntimeError(f"section C-C does not run +Y up: ({dx:g}, {dy:g})")
+
+    def free_edge_dx() -> float:
+        origin = model_point_in_view(adapter, native, anchor, label="C-C anchor")
+        edge = model_point_in_view(adapter, native, free_edge, label="C-C free edge")
+        return edge[0] - origin[0]
+
+    turn_up("as cut")
+    if free_edge_dx() < 0.0:
+        reversed_cut = not bool(cut.GetReversedCutDirection())
+        cut.SetReversedCutDirection(reversed_cut)
+        rebuild_drawing(adapter, label="section C-C looks up the sheet")
+        if bool(cut.GetReversedCutDirection()) != reversed_cut:
+            raise RuntimeError("section C-C cut direction did not persist")
+        turn_up("reversed")
+    if not free_edge_dx() > 0.0:
+        raise RuntimeError("section C-C still prints the free edge on the left")
     for attempt in range(4):
         native.UpdateViewDisplayGeometry()
         projected = model_point_in_view(

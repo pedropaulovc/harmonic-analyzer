@@ -107,6 +107,7 @@ def free_rock_deg(
     hex_w: float = HEX_W,
     hex_h: float = HEX_H,
     r_bore: float = R_BORE,
+    shoulder_drop: float | None = None,
 ) -> float:
     """The summing lever's free rock, degrees, before a hex shoulder touches
     this bore, the bore axis ``far_end_offset`` off the ridge line across the
@@ -115,14 +116,17 @@ def free_rock_deg(
 
     The hex trunnion (``sm_summing_lever_spec`` HEX_W x HEX_H, vertex up)
     rocks about its top vertex on the bore crown; its upper shoulder sits at
-    (hex_w/2, -hex_h/4) from the ridge.  Conservatively the ridge bears at
-    one end of the bore and the whole offset acts at the other, shifting the
-    bore centre sideways by ``far_end_offset`` toward the shoulder's swing.
-    The rock is where that rotated shoulder reaches the bore wall (radius
-    ``r_bore``); the keywords judge the trunnion and bore at a band limit.
+    (hex_w/2, -shoulder_drop) from the ridge, ``shoulder_drop`` hex_h/4 on
+    the nominal profile (a flank at its angle-band limit raises it).
+    Conservatively the ridge bears at one end of the bore and the whole
+    offset acts at the other, shifting the bore centre sideways by
+    ``far_end_offset`` toward the shoulder's swing.  The rock is where that
+    rotated shoulder reaches the bore wall (radius ``r_bore``); the keywords
+    judge the trunnion and bore at a band limit.
     """
-    shoulder_r = math.hypot(hex_w / 2.0, hex_h / 4.0)
-    phi0 = math.atan2(-hex_h / 4.0, hex_w / 2.0)
+    drop = hex_h / 4.0 if shoulder_drop is None else shoulder_drop
+    shoulder_r = math.hypot(hex_w / 2.0, drop)
+    phi0 = math.atan2(-drop, hex_w / 2.0)
 
     def inside(phi: float) -> bool:
         x = shoulder_r * math.cos(phi) + far_end_offset
@@ -144,11 +148,12 @@ def free_rock_deg(
 # 7.96, 0.18 -> 7.17.  The drawing-guidelines.md rule 17 (walls and webs) budget -- the trunnion's .XXX section and
 # the bore's .XX size at their band limits, t the ⊥Ø0.05 zone plus the dowel
 # yaw across the deepest .X block -- is
-# ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 6.31 in
-# the reamed bore), which owns the crossbar's slip terms.  The top seat
-# clamps to the frame's faced Ra 3.2 underside plane (MHA-FR-002, user ruling
-# 2026-10-12), so no bedding term enters: seat form tilts the block, it
-# cannot yaw the bore off the dowel line.
+# ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 5.64 in
+# the reamed bore with the ridge angle at its band), which owns the
+# crossbar's slip terms.  The top seat clamps to the frame's faced Ra 3.2
+# underside plane (MHA-FR-002, user ruling 2026-10-12), so no bedding term
+# enters: seat form tilts the block, it cannot yaw the bore off the dowel
+# line.
 KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
 # The bore crown (its upper inner wall) below the top seat: 14.62.
 BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
