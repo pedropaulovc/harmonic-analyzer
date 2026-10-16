@@ -4524,14 +4524,17 @@ note = 'Illustrative metric leaf radius gauge, including R7.0; compare the upper
 
 # --- ch_rocker_arm (trial T4) additions ---
 # Outline template for MHA-CH-006: the arm's finished outline (R800 top edge, R816
-# bottom, tapers, tip lands) with a Ø6.5 pivot hole, laid on the part to scribe the outline
-# and held against it to check the filed edges. Shop-made (Pedro 2026-10-11), not bought:
+# bottom, tapers, tip lands) with a Ø6.5 pivot hole and a radial slot at the arm's rod-pin
+# hole, laid on the part to scribe the outline and held against it to check the filed
+# edges. Shop-made (Pedro 2026-10-11), not bought:
 # a dedicated trammel bar (not the amplitude bar; Pedro 2026-10-11) with clamp-on pivot and
 # scriber blocks scribes R800/R816 on blued O1 plate, which is then cut and filed to the
 # lines. Make-route: local://rocker-template-route.md (trial T4 note). It becomes the TL CAD
 # part ch_rocker_arm_tl_outline_template; prechips has no field for that reference, so the
 # name is in `name`/`note`. Accepted on PROFILE (Pedro 2026-10-11): DTI stations within
-# +/-0.03 of the nominal arcs about the pivot; the trammel setting is the proof of R.
+# +/-0.03 of the nominal arcs about the pivot; the trammel setting is the proof of R. The
+# same acceptance is taken with pins in both the pivot hole and the rod slot (#1545): the
+# slot's 0.0780 in pin is one of gauges.pin-gauges and clocks the template on the arm.
 # verify = false is an ASSUMED placeholder pending Pedro's measurement (authorized
 # 2026-10-11, see local://rocker-measurement-checklist.md B3): the template is assumed made
 # and accepted as above; set verify = true again until it really is.
@@ -4546,7 +4549,7 @@ range_mm = [8.0, 817.0]
 resolution_mm = { value = 0.05, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "gauge dial or digital display, smallest marked increment" } }
 shop_made = true
 verify = false
-note = "Shop-made template (CAD part ch_rocker_arm_tl_outline_template; make-route rocker-template-route.md: dedicated trammel bar scribes R800/R816 on layout-blued O1 plate, cut outside the lines, file to them). Top edge aimed 8.25 above the pivot. Accepted on profile: DTI within +/-0.03 of nominal about the pivot at 15 stations. range_mm spans every outline dimension it is laid against, from the top edge 8.0-8.5 above the pivot to R816 (arc lengths 266-293 between); resolution_mm 0.05 is AUTHOR'S CHOICE from that +/-0.03 acceptance and a backlit light-gap reading (a 0.02 gap shows), not a calibration. verify=false: ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see checklist B3)"
+note = "Shop-made template (CAD part ch_rocker_arm_tl_outline_template; make-route rocker-template-route.md: dedicated trammel bar scribes R800/R816 on layout-blued O1 plate, cut outside the lines, file to them). Top edge aimed 8.25 above the pivot. Accepted on profile: DTI within +/-0.03 of nominal about the pivot and rod slot (pins in both; the slot's pin is the 0.0780 in from gauges.pin-gauges) at 15 stations. range_mm spans every outline dimension it is laid against, from the top edge 8.0-8.5 above the pivot to R816 (arc lengths 266-293 between); resolution_mm 0.05 is AUTHOR'S CHOICE from that +/-0.03 acceptance and a backlit light-gap reading (a 0.02 gap shows), not a calibration. verify=false: ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see checklist B3)"
 
 # The PM-30MV's own table as a holding surface for work clamped straight to it with the
 # clamping-kit straps (thin plate that the PM-6 jaws would stand above). prechips has no

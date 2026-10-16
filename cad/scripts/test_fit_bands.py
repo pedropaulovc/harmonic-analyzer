@@ -318,6 +318,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("ch_rocker_arm_tl_filing_stud_spec", "BODY_BAND"): (
         "matched-fit design intent, indexed for the rocker and filing-button clearances"
     ),
+    ("ch_rocker_arm_tl_outline_template_spec", "ROD_SLOT_WIDTH_BAND"): (
+        "matched-fit design intent, indexed into ROD_SLOT_WIDTH_MAX for the "
+        "printed clearance on the rod-hole pin gauge"
+    ),
 }
 
 KNOWN_BAD: dict[str, pytest.MarkDecorator] = {}

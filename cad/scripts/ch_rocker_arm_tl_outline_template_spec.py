@@ -3,7 +3,8 @@ r"""Pure-data contract for the rocker arm's outline template (MHA-CH-006-TL-13).
 Shop gauge, not a machine part (cad/docs/subsystem-identities.md). An annealed
 O1 plate carrying the rocker arm's finished outline: the R800 top and R816
 bottom arcs about the pivot, the radial tip lands and the tapered ends, plus a
-locating hole for a pin gauge in the arm's reamed pivot bore. The arm is
+locating hole for a pin gauge in the arm's reamed pivot bore and a radial slot
+for a second pin gauge in its rod-pin hole, which clocks it. The arm is
 scribed from it (S5) and its outline is checked against it (S7: top-edge
 height, radii, arc lengths, tip lands).
 
@@ -24,7 +25,9 @@ from __future__ import annotations
 
 import math
 
+import _config
 import ch_rocker_arm_spec as rocker
+from _hole_spec import blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm, printed_deviations
 
 R_TOP = rocker.R_TOP
@@ -61,7 +64,8 @@ if (
     )
 
 # Shop acceptance (inventory gauges.arm-outline-template, Pedro 2026-10-11):
-# DTI stations within +/-0.03 of nominal about the pivot.
+# DTI stations within +/-0.03 of nominal, taken about the pivot hole and the
+# rod slot (below) with pins in both.
 DTI_ACCEPTANCE = 0.03
 # The sheet fixes each arc by its low point on the mirror line, measured from
 # the pin gauge in the hole, and prints its radius at the title block's .XX
@@ -177,6 +181,102 @@ if LOW_POINT_BAND[0] + LOCATOR_REGISTRATION_MAX > 0.25 * _ROCKER_ZONE / 2.0 + 1e
         " quarter of the rocker zone"
     )
 
+# Rod-pin slot: the template's clocking. The rocker's datum C is its #47
+# rod-pin hole (MHA-CH-006, Ø0.20 position to A|B). The pivot pin alone
+# leaves the template free to turn about the pivot; a fixed pin gauge in the
+# arm's rod-pin hole, through a slot here at that hole's BASIC station,
+# clocks it. The slot runs radially from the pivot, so the hole's radial
+# position error and the pin's play only slide the pin along it: the slot's
+# width alone sets the clocking. The station prints BASIC, as on the rocker,
+# and the template's profile acceptance (DTI_ACCEPTANCE) is taken about the
+# pivot hole and this slot with pins in both.
+ROD_SLOT_PLACES = 3
+ROD_SLOT_X = round(rocker.ROD_HOLE_X, ROD_SLOT_PLACES)  # 133.067 BASIC
+ROD_SLOT_Y = round(rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y, ROD_SLOT_PLACES)  # 8.456
+ROD_SLOT_LEVER = math.hypot(ROD_SLOT_X, ROD_SLOT_Y)  # 133.335
+ROD_SLOT_AXIS = (ROD_SLOT_X / ROD_SLOT_LEVER, ROD_SLOT_Y / ROD_SLOT_LEVER)
+_ROD_SLOT_TANGENT = (-ROD_SLOT_AXIS[1], ROD_SLOT_AXIS[0])
+# The pin: the largest of the shop's 0.001 in Class ZZ minus set
+# (gauges.pin-gauges; ASME B89.1.5 Class ZZ is 0.0002 in at this size) that
+# enters the #47 hole at its drilled minimum.
+ROD_PIN_GAUGE_IN = 0.0780
+ROD_PIN_CLASS_ZZ_IN = 0.0002
+ROD_PIN_MAX = ROD_PIN_GAUGE_IN * 25.4  # 1.98120
+ROD_PIN_MIN = (ROD_PIN_GAUGE_IN - ROD_PIN_CLASS_ZZ_IN) * 25.4  # 1.97612
+# The rocker's #47 hole at the title block's drilled-hole band (native specs
+# read the band directly: _printed_limits is drawing/feature-only).
+_DRILLED = _config.title_block("drilled_hole")
+_ROD_HOLE_DIA = blind_cut_dia_mm(rocker.ROD_HOLE_SPEC)
+_ROD_HOLE_LOW = _ROD_HOLE_DIA - float(_DRILLED["minus_mm"])  # 1.994
+_ROD_HOLE_HIGH = _ROD_HOLE_DIA + float(_DRILLED["plus_mm"])  # 2.094
+if not ROD_PIN_MAX < _ROD_HOLE_LOW <= (ROD_PIN_GAUGE_IN + 0.001) * 25.4:
+    raise AssertionError("the rod-hole pin is no longer the set's largest that enters")
+# The slot is an H7 width on that pin (ISO 286, 1-3 mm: +0.010/0), printed as
+# a matched fit: its reference width and the clearance on the pin.
+ROD_SLOT_WIDTH = 1.983
+ROD_SLOT_WIDTH_BAND = (0.010, 0.0)  # (upper, lower)
+ROD_SLOT_WIDTH_MAX = ROD_SLOT_WIDTH + ROD_SLOT_WIDTH_BAND[0]
+ROD_SLOT_CLEARANCE = (
+    math.floor((ROD_SLOT_WIDTH - ROD_PIN_MAX) * 1e3 + 1e-9) / 1e3,
+    math.ceil((ROD_SLOT_WIDTH_MAX - ROD_PIN_MIN) * 1e3 - 1e-9) / 1e3,
+)  # 0.001-0.017: the true limits 0.0018-0.0169, rounded outward
+if ROD_SLOT_CLEARANCE[0] <= 0.0:
+    raise AssertionError("the rod-hole pin does not enter the smallest slot")
+ROD_SLOT_CALLOUT = (
+    f"{ROD_SLOT_CLEARANCE[0]:.3f}-{ROD_SLOT_CLEARANCE[1]:.3f} DIAMETRAL\n"
+    f"CLEARANCE ON PIN GAUGE\n{ROD_PIN_GAUGE_IN:.4f} IN (CLASS ZZ MINUS)"
+)
+# The flat (end-centre run) lets the pin in wherever the rocker puts its hole
+# radially (half its Ø0.20 position zone), plus the pin's play in that hole,
+# plus a three-place title-block band for where the slot itself lands along
+# its radial (its station is BASIC, so the print sets no band there: the
+# pin entering on a good arm is the functional check). The run is printed at
+# three places, so its minimum is what must reach.
+ROD_HOLE_RADIAL = float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]) / 2.0
+ROD_HOLE_PLAY = (_ROD_HOLE_HIGH - ROD_PIN_MIN) / 2.0  # 0.0589
+ROD_SLOT_PLAY = (ROD_SLOT_WIDTH_MAX - ROD_PIN_MIN) / 2.0  # 0.0084
+ROD_SLOT_FLAT = 0.75
+if (ROD_SLOT_FLAT - printed_band_mm(ROD_SLOT_PLACES)) / 2.0 < (
+    ROD_HOLE_RADIAL + ROD_HOLE_PLAY + printed_band_mm(ROD_SLOT_PLACES)
+):
+    raise AssertionError("the rod slot's run no longer lets the pin in")
+# Clocking budget. A template laid on the arm moves rigidly: the pivot pin
+# lets it shift by up to LOCATOR_REGISTRATION_MAX, and the rod pin lets the
+# slot's centre move across the slot by up to ROD_CLOCKING_PLAY (its play in
+# the rocker's hole and in the slot, plus the BASIC station's rounding off
+# the rocker's hole). For an edge point p with unit normal n, the rotation
+# that the slot allows is (e - d.t)/lever, where d is the pivot shift, e the
+# cross-slot shift and t the slot's cross direction, so the edge moves
+#     d.(n - g t) + g e,  g = (z x p).n / lever,
+# at most |n - g t| LOCATOR_REGISTRATION_MAX + |g| ROD_CLOCKING_PLAY, plus the
+# template's own DTI_ACCEPTANCE. The lever arm g reaches 2.08 at the tail end,
+# whose top end is the worst station (top ends -X 0.159, +X 0.108; bottom
+# ends 0.148 / 0.099; tip lands 0.080 / 0.062; apex 0.056).
+_ROD_SLOT_ROUNDING = abs(
+    (ROD_SLOT_X - rocker.ROD_HOLE_X) * _ROD_SLOT_TANGENT[0]
+    + (ROD_SLOT_Y - (rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y)) * _ROD_SLOT_TANGENT[1]
+)
+ROD_CLOCKING_PLAY = ROD_HOLE_PLAY + ROD_SLOT_PLAY + _ROD_SLOT_ROUNDING  # 0.0674
+# The template's share of the rocker's half-zone (0.25 either side of the
+# aim): a template-gauge allocation, not a part tolerance. The other 0.09 is
+# left to filing to the scribed line (#1545, approved 2026-10-15).
+END_STATION_SHARE = 0.16
+
+
+def clocking_error(
+    point: tuple[float, float], normal: tuple[float, float], play: float | None = None
+) -> float:
+    """Worst normal error of an outline point laid on the arm (unit ``normal``):
+    the template's own acceptance plus the rigid motion the two pins allow.
+    ``play`` overrides the cross-slot play (a round hole's, in the tests)."""
+    cross = ROD_CLOCKING_PLAY if play is None else play
+    gain = (point[0] * normal[1] - point[1] * normal[0]) / ROD_SLOT_LEVER
+    pivot = math.hypot(
+        normal[0] - gain * _ROD_SLOT_TANGENT[0], normal[1] - gain * _ROD_SLOT_TANGENT[1]
+    )
+    return DTI_ACCEPTANCE + pivot * LOCATOR_REGISTRATION_MAX + abs(gain) * cross
+
+
 # Plate: O1 ground flat stock, 1/8 in, thickness as supplied.
 THICK = 3.175
 THICK_PLACES = 3
@@ -217,7 +317,97 @@ def outline_area() -> float:
     return abs(area) / 2.0
 
 
-PLATE_VOLUME = (outline_area() - math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2) * THICK
+def rod_slot_points(
+    width: float = ROD_SLOT_WIDTH, flat: float = ROD_SLOT_FLAT
+) -> tuple[tuple[float, float], ...]:
+    """The rod slot's stadium, counter-clockwise (the ``add_arc`` sense).
+
+    ``(p1, p2, p3, p4, outer_centre, inner_centre)``: side a runs p1 -> p2 on
+    the slot's clockwise side, the outer end arcs about outer_centre from p2
+    to p3, side b runs p3 -> p4 and the inner end arcs about inner_centre from
+    p4 back to p1 (build_fr_top_frame.slot_stadium_points, turned radial).
+    """
+
+    def at(along: float, across: float) -> tuple[float, float]:
+        return (
+            ROD_SLOT_X + along * ROD_SLOT_AXIS[0] + across * _ROD_SLOT_TANGENT[0],
+            ROD_SLOT_Y + along * ROD_SLOT_AXIS[1] + across * _ROD_SLOT_TANGENT[1],
+        )
+
+    half_flat, half_width = flat / 2.0, width / 2.0
+    return (
+        at(-half_flat, -half_width),
+        at(half_flat, -half_width),
+        at(half_flat, half_width),
+        at(-half_flat, half_width),
+        at(half_flat, 0.0),
+        at(-half_flat, 0.0),
+    )
+
+
+def _segment_distance(
+    point: tuple[float, float], start: tuple[float, float], end: tuple[float, float]
+) -> float:
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    along = ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / (
+        dx * dx + dy * dy
+    )
+    along = min(1.0, max(0.0, along))
+    return math.dist(point, (start[0] + along * dx, start[1] + along * dy))
+
+
+def outline_clocking_errors(play: float | None = None) -> list[float]:
+    """``clocking_error`` at both ends of every sampled outline segment, each
+    with that segment's normal: arcs, tip lands and tapered ends alike."""
+    points = outline_points()
+    errors: list[float] = []
+    for a, b in zip(points, points[1:] + points[:1], strict=True):
+        length = math.dist(a, b)
+        normal = ((a[1] - b[1]) / length, (b[0] - a[0]) / length)
+        errors += [clocking_error(a, normal, play), clocking_error(b, normal, play)]
+    return errors
+
+
+if END_STATION_SHARE >= _ROCKER_ZONE / 2.0:
+    raise AssertionError("the template's clocking share leaves nothing for filing")
+ROD_CLOCKING_WORST = max(outline_clocking_errors())  # 0.1588, the tail's top end
+if ROD_CLOCKING_WORST > END_STATION_SHARE + 1e-9:
+    raise AssertionError(
+        "pivot and rod-pin play carry an outline edge outside the template's share"
+    )
+
+
+def _rod_slot_web() -> float:
+    """drawing-guidelines.md rule 17 (walls and webs): the web between the rod
+    slot, at its widest and longest, and the outline at its low-point band.
+    The slot's core segment never crosses an outline segment, so their
+    distance is the least of the four end-to-segment distances."""
+    outer, inner = rod_slot_points(
+        ROD_SLOT_WIDTH_MAX, ROD_SLOT_FLAT + printed_band_mm(ROD_SLOT_PLACES)
+    )[4:]
+    points = outline_points()
+    core = min(
+        min(
+            _segment_distance(outer, a, b),
+            _segment_distance(inner, a, b),
+            _segment_distance(a, inner, outer),
+            _segment_distance(b, inner, outer),
+        )
+        for a, b in zip(points, points[1:] + points[:1], strict=True)
+    )
+    return core - ROD_SLOT_WIDTH_MAX / 2.0 - max(-LOW_POINT_BAND[1], LOW_POINT_BAND[0])
+
+
+ROD_SLOT_WEB_MIN = round(_rod_slot_web(), 4)
+if ROD_SLOT_WEB_MIN < 1.5 - 1e-9:
+    raise AssertionError(
+        "the rod slot falls under the drawing-guidelines.md rule 17 (walls and webs) floor"
+    )
+
+ROD_SLOT_AREA = math.pi * (ROD_SLOT_WIDTH / 2.0) ** 2 + ROD_SLOT_FLAT * ROD_SLOT_WIDTH
+PLATE_VOLUME = (
+    outline_area() - math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 - ROD_SLOT_AREA
+) * THICK
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutlineProfile": {
@@ -233,6 +423,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ApexReference": {"TopAbovePivot", "BottomBelowPivot"},
     "PivotHoleProfile": {"PivotDia"},
     "Plate": {"Thick"},
+    "RodSlotProfile": {"RodSlotWidth", "RodSlotFlat"},
+    "RodSlotReference": {"RodSlotX", "RodSlotY"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {
@@ -248,6 +440,14 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ApexReference": {"TopAbovePivot": APEX_PLACES, "BottomBelowPivot": APEX_PLACES},
     "PivotHoleProfile": {"PivotDia": PIVOT_PLACES},
     "Plate": {"Thick": THICK_PLACES},
+    "RodSlotProfile": {
+        "RodSlotWidth": ROD_SLOT_PLACES,
+        "RodSlotFlat": ROD_SLOT_PLACES,
+    },
+    "RodSlotReference": {
+        "RodSlotX": ROD_SLOT_PLACES,
+        "RodSlotY": ROD_SLOT_PLACES,
+    },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -264,6 +464,16 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("ApexReference", "BottomBelowPivot"): LOW_POINT_BAND,
     ("PivotHoleProfile", "PivotDia"): PIVOT_HOLE_BAND,
 }
+# The rod slot's station is BASIC (the rocker's datum C, at its BASIC
+# station); its width is the reference nominal of a matched fit on its pin.
+BASIC_DIMENSIONS: tuple[tuple[str, str], ...] = (
+    ("RodSlotReference", "RodSlotX"),
+    ("RodSlotReference", "RodSlotY"),
+)
+REFERENCE_DIMENSIONS = frozenset({"RodSlotWidth"})
+# The slot runs radially from the pivot: its station callout says so.
+ROD_SLOT_STATION_CALLOUT = "ROD SLOT, RADIAL TO PIVOT"
+DETAIL_SCALE = (5, 1)
 
 # The scribing edges' SHARP requirement rides the radius and tip-land
 # callouts of the edges it applies to, not a general note.
@@ -277,6 +487,8 @@ SHARP_EDGE_CALLOUT = "SHARP EDGE"
 PROFILE_CALLOUT = "ROCKER PROFILE"
 ROCKER_NUMBER = "MHA-CH-006"
 STATION_CALLOUT = f"{PROFILE_CALLOUT}, {ROCKER_NUMBER}"
+# The run's function (its three-place minimum is what must reach), no method.
+ROD_SLOT_FLAT_CALLOUT = f"PIN REACH TO ROD-PIN\nHOLE, {ROCKER_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:4"
 
 # The #1413 placeholder provenance every solid carries: ``by`` is
@@ -292,7 +504,8 @@ _MEASURED = {
 }
 # prechips models a fixture as boxes and cylinders only, so the bound shop
 # inventory carries the plate's envelope (its outline's extents by the plate
-# thickness) with the pivot hole as a void, in this module's frame.
+# thickness) with the pivot hole and the rod slot's pin seat as voids, in
+# this module's frame.
 PRECHIPS_SOLIDS: list[dict[str, object]] = [
     {
         "name": "plate",
@@ -316,6 +529,17 @@ PRECHIPS_SOLIDS: list[dict[str, object]] = [
         "dia_mm": PIVOT_HOLE_DIA,
         "length_mm": THICK,
         "locates": "pin gauge in the rocker's pivot bore",
+        "measured": dict(_MEASURED),
+    },
+    {
+        "name": "rod-slot",
+        "shape": "cylinder",
+        "void": True,
+        "at_mm": [ROD_SLOT_X, ROD_SLOT_Y, 0.0],
+        "axis": [0.0, 0.0, 1.0],
+        "dia_mm": ROD_SLOT_WIDTH,
+        "length_mm": THICK,
+        "locates": "pin gauge in the rocker's rod-pin hole (datum C); the radial slot's run is not modelled",
         "measured": dict(_MEASURED),
     },
 ]

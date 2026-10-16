@@ -20,7 +20,6 @@ from ch_rocker_arm_spec import (
     PIVOT_HOLE_DIA,
     STRAP_HUB_SYMMETRY,
     TOP_EDGE_ABOVE_PIVOT,
-    _ALPHA_TOP,
 )
 
 # Coaxiality is owned by the spec, including its eccentricity in the hub's OD
@@ -82,13 +81,15 @@ BUILT_UP_PERMISSION_NOTE = None
 
 DRAWING_NOTES = "\n".join(
     (
-        # B2-1: the same CAD mirror plane is now reconstructible from A|B|C.
-        # This changes its note reference only, not the plane, geometry or zones.
+        # B2-1, option 4: datum C is the rod-pin hole, so the same CAD mirror
+        # plane is the A|B|C frame's axis through A; the BASIC pin coordinates
+        # clock it. The plane, geometry and zones are unchanged.
         "1. MIRROR PLANE: THROUGH DATUM AXIS A,",
-        "   PERPENDICULAR TO DATUM B, AT",
-        f"   {math.degrees(_ALPHA_TOP):.2f}° BASIC TO DATUM C.",
-        "   ROD-PIN HOLE (1X) AT THE END SHOWN.",
-        "2. COMMON ARC CENTRE ABOVE A ON THE PLANE.",
+        "   PERPENDICULAR TO DATUM B, CLOCKED BY",
+        "   DATUM C (ROD-PIN HOLE, 1X, END SHOWN).",
+        # The tip lands' 10.46° is the arc half-angle: radial to the centre.
+        "2. COMMON ARC CENTRE ABOVE A ON THE PLANE;",
+        "   TIP LANDS RADIAL TO IT.",
         f"   BASIC {TOP_EDGE_ABOVE_PIVOT:.{DEFAULT_DRAWING_PRECISION}f}: TOP ARC ABOVE A.",
         # #948 ruling R: the rod's float on the arm is taken from the hub's
         # mid-plane, so the strap's offset from it is held.
@@ -104,8 +105,6 @@ DRAWING_NOTES = "\n".join(
         # intent in one line. The removed rod-pin geometry sentence repeated
         # note 1's identified hole plus its native basics/callout/position FCF.
         "4. UPPER BAR CONTACT; LOWER STRAP ENVELOPE",
-        "5. DATUM C: STRAP END LAND IN DETAIL E.",
-        "   MIRROR PLANE IS DEFINED BY NOTE 1.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import copy
+import itertools
 import json
 import math
 import re
@@ -68,7 +69,7 @@ from _drawing_dimensions import (
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, scan_view_edges
 from _drawing_finish import add_surface_finish
-from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_gdt import add_datum_feature, add_feature_control_frame, add_frame_datum_feature
 
 # The part saves TopEdgeReference hidden (#880): this form shows it in the
 # view that imports its dimension.
@@ -76,6 +77,7 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_layout_audit import _DISPLAY_PRIMITIVES, _Reader, _dump_annotation, _dump_display
 from _drawing_layout_collect import check_drawing_layout
+from _drawing_leader_notes import add_leader_note
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
@@ -177,8 +179,12 @@ ROD_HOLE = requirement(
         "nominal_dia": (blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), ("ROD_HOLE_SPEC", ("_hole_spec", "NUMBER_DRILL_MM"))),
         "thru": (rocker.ROD_HOLE_SPEC.end == "through_all", ("ROD_HOLE_SPEC", ("_drawing_hole_callout", "add_native_hole_callout"))),
         "position_dia": (float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]), ("GEOMETRIC_TOLERANCES_MM",)),
-        "position_datums": (["A", "B", "C"], (("draw_ch_rocker_arm", "build"),)),
+        # Datum C clocks the arm from the rod pin, which sets the arm's angle
+        # (Pedro, option 4). Its own position can only refer to A|B: rotation
+        # about A is free, so the Ø0.20 holds its distance from A.
+        "position_datums": (["A", "B"], (("draw_ch_rocker_arm", "build"),)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "build"),)),
+        "datum": ("C", (("draw_ch_rocker_arm", "build"),)),
     }, precision={"at": "unknown", "dia": _P, "position_dia": _P},
 )
 HUB_CENTER = (0.180, 0.095)
@@ -192,6 +198,19 @@ DETAIL_NO_OUTLINE = {"D": True, "E": False}
 # DOT on the printed south centre-mark arm, at the actual hole's south rim.
 # Keep the circular model edge attached; never move an FCF attachment by setter.
 FCF_XY = (0.262, 0.1001)
+# Datum C's symbol hangs under the rod-pin frame at the middle of its width
+# (Y14.5 puts a feature of size's datum feature symbol on its frame; a tag on
+# the hole callout attaches to nothing -- _drawing_gdt.add_frame_datum_feature).
+# v43 printed ⌖|Ø0.20|A|B|C as 7.0+16.3+6.2+5.6+6.6 mm cells, one 7.0 mm row:
+# without C the frame is ~35.1 mm wide. The helper holds x to the frame and
+# fails the sheet past 3 mm; 5 mm of stem stand above the 7 mm letter box,
+# whose bottom middle this is.
+ROD_FRAME_SIZE = (0.0351, 0.0070)
+DATUM_TAG_BOX = 0.007
+ROD_DATUM_C_XY = (
+    FCF_XY[0] + ROD_FRAME_SIZE[0] / 2.0,
+    FCF_XY[1] - ROD_FRAME_SIZE[1] - 0.005 - DATUM_TAG_BOX,
+)
 # Short leftward hole leader exits E without tracing the tapered material edge.
 ROD_CALLOUT_XY = (0.279, 0.115)
 # The iso caption's top-left, under the iso's right half and right of the end
@@ -201,12 +220,14 @@ ISO_CAPTION_XY = (0.325, 0.183)
 
 # Re-express the part-owned one-sided height envelope as a normal profile zone:
 # no second numeric tolerance lives in the drawing prose. The zero lower limit
-# is pinned by the rocker contract; it is Ⓤ0 on the lower (inside-material) arc.
+# is pinned by the rocker contract; it is Ⓤ0 on the lower (inside-material)
+# outline: the R816 arc, both tapers and both tip lands, between J and K.
 ARC_PROFILE_ZONE_MM = f"{TOP_EDGE_BAND[0]:g}"
 ARC_PROFILE_OUTSIDE_MM = {
     "TopRadius": ARC_PROFILE_ZONE_MM,
     "BottomRadius": f"{TOP_EDGE_BAND[1]:g}",
 }
+ARC_PROFILE_DATUMS = ("A", "B", "C")
 
 # The two frames control one nominal concentric arc system. Their material
 # sides differ: top outside is +Y, bottom inside is +Y. A single shared frame
@@ -216,6 +237,14 @@ ARC_PROFILE_FRAME_XY = {
     "BottomRadius": (0.020, 0.160),
 }
 ARC_PROFILE_PICK_X_MM = {"TopRadius": -130.0, "BottomRadius": -110.0}
+# The lower frame's between symbol: its zone runs from the top-arc end at -X
+# (J), down the land and taper, along R816, and up to the top-arc end at +X (K).
+# Both letters point at their corners in the front view, the frame's view.
+# Sheet offsets from the projected corner (v43 render): J sits left of the
+# (292.51) witness; K sits right of the E circle, clear of the 8.46 dim line.
+PROFILE_BETWEEN = ("J", "K")
+BETWEEN_POINT_OFFSET = {"J": (-0.007, 0.002), "K": (0.009, 0.002)}
+LAND_LABEL = "LAND"
 # Sheet-layout clearance, NOT a manufacturing tolerance. SIDE_SMART may put
 # the native junction on either frame edge; prove its rebuilt route, not a
 # junction inferred from the requested top-left or a fixed frame width.
@@ -236,7 +265,7 @@ NOTES_SEAT_SETTLE = 0.00005
 NOTES_MIN_LINE_PITCH = 0.0025
 
 # Tip-face midpoint (model mm): the top-arc endpoint pushed half the tip face
-# outward along the end radius -- where datum C (clocking) attaches.
+# outward along the end radius -- on the +Z land edge detail E's 5.59 measures.
 _TIP_FACE_MID_X = TOP_END_X + (TIP_FACE / 2.0) * (TOP_END_X / R_TOP)
 _TIP_FACE_MID_Y = TOP_END_Y - (TIP_FACE / 2.0) * math.cos(TOP_ARC_LEN / 2.0 / R_TOP)
 _ROD_TIP_Y = TOP_END_Y - TIP_FACE * math.cos(_ALPHA_TOP)
@@ -249,7 +278,6 @@ LAND_LOCATION_TEXT_XY = (0.219, 0.235)
 PIN_X_TEXT_XY = (0.219, 0.197)
 PIN_Y_TEXT_XY = (0.267, 0.162)
 TAPER_WITNESS_LENGTH = 0.008
-LAND_DATUM_STANDOFF = 0.014
 STRAP_OFFSET_TEXT_XY = (RIGHT_CENTER[0] - 0.018, RIGHT_CENTER[1] + 0.030)
 STRAP_OFFSET_WITNESS_LENGTH = 0.010
 
@@ -274,18 +302,67 @@ _TOP, _TIP, _BOTTOM = _rocker_points()
 _RIGHT = (_plane_between(_TOP, _TIP), _plane_between(_TIP, _BOTTOM))
 _TIPS = tuple(PlanarFace((-face.normal[0], face.normal[1], 0.0), face.offset_mm) for face in _RIGHT)
 _LAND_ANGLE = math.degrees(rocker._ALPHA_TOP)
+_XY = tuple[float, float]
+
+
+def _least_tip_land_mm() -> float:
+    """The shortest tip land the J↔K and top-edge zones permit (+X; mirrored).
+
+    The land is BASIC 5.59 inside the lower Ⓤ0 zone: its top end is on the top
+    arc, whose zone lies wholly outside it (toward the arc centre), and its foot
+    is on the taper. Each of the land and taper lines may lie anywhere in its
+    zone, tilted too, so each line's two ends move independently between the
+    zone's outside and inside limits, and the top arc between its own. The
+    length is near-linear in those five offsets, so the least is at a vertex:
+    the taper tilted in by the whole zone at the land's foot only (4.979).
+    prechips 0.1.2's ``tilt_across`` takes this as the land_angle extent (C2).
+    """
+    zone, lower_outside = TOP_EDGE_BAND
+    cx, cy = 0.0, rocker.CENTER_Y
+    mx, my = (_TOP[0] + _BOTTOM[0]) / 2.0, (_TOP[1] + _BOTTOM[1]) / 2.0
+
+    def inward(start: _XY, end: _XY) -> _XY:
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        nx, ny = -dy / math.hypot(dx, dy), dx / math.hypot(dx, dy)
+        side = (mx - start[0]) * nx + (my - start[1]) * ny
+        return (nx, ny) if side > 0.0 else (-nx, -ny)
+
+    def moved(point: _XY, normal: _XY, by: float) -> _XY:
+        return (point[0] + by * normal[0], point[1] + by * normal[1])
+
+    land_in, taper_in = inward(_TOP, _TIP), inward(_TIP, _BOTTOM)
+    lower = (-lower_outside, zone - lower_outside)  # into the material
+    top_radii = (rocker.R_TOP - zone, rocker.R_TOP)  # wholly outside: centreward
+    lengths = []
+    for offsets in itertools.product(lower, repeat=4):
+        p0, p1 = moved(_TOP, land_in, offsets[0]), moved(_TIP, land_in, offsets[1])
+        q0, q1 = moved(_TIP, taper_in, offsets[2]), moved(_BOTTOM, taper_in, offsets[3])
+        dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+        ex, ey = q1[0] - q0[0], q1[1] - q0[1]
+        s = ((q0[0] - p0[0]) * ey - (q0[1] - p0[1]) * ex) / (dx * ey - dy * ex)
+        foot = (p0[0] + s * dx, p0[1] + s * dy)
+        fx, fy = p0[0] - cx, p0[1] - cy
+        a, b = dx**2 + dy**2, 2.0 * (fx * dx + fy * dy)
+        for radius in top_radii:
+            root = math.sqrt(b * b - 4.0 * a * (fx**2 + fy**2 - radius**2))
+            u = min(((-b + root) / (2.0 * a), (-b - root) / (2.0 * a)), key=abs)
+            lengths.append(math.dist((p0[0] + u * dx, p0[1] + u * dy), foot))
+    return min(lengths)
+
+
+TIP_LAND_LEAST_MM = math.floor(_least_tip_land_mm() * 1e3) / 1e3  # 4.979
 
 for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x", -1, _TIPS[0])):
     requirement(
         _name, kind="face", faces=(_face,), requirements=("tip_land", "land_angle_deg") + (("station",) if _sign == 1 else ()), fields={
-            "tip_land": (_band(rocker.TIP_FACE, _P), ("TIP_FACE", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
+            # BASIC inside the J↔K zone, which is its band (#1545 option 4).
+            "tip_land": (rocker.TIP_FACE, ("TIP_FACE", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
             "land_angle_deg": (round(_LAND_ANGLE, _P), ("_ALPHA_TOP", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
             "land_angle_nominal_deg": (_LAND_ANGLE, ("_ALPHA_TOP",)),
             "dimension_type": ("basic", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
             "radial_tip_end": ([_sign * _TIP[0], _TIP[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
             "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
             **({
-                "datum": ("C", (("draw_ch_rocker_arm", "_add_land_datum"),)),
                 "station": (rocker.ROD_TIP_X, ("ROD_TIP_X", ("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"))),
                 "station_nominal": (rocker.ROD_TIP_X, ("ROD_TIP_X",)),
             } if _sign == 1 else {}),
@@ -293,7 +370,7 @@ for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x",
     )
 
 part_metadata(datums={
-    "C": ({"feature": "tip_land_pos_x", "surface": "rod-side (+X) radial tip land"}, (("draw_ch_rocker_arm", "_add_land_datum"),)),
+    "C": ({"feature": "rod_hole", "surface": "#47 rod-pin hole"}, (("draw_ch_rocker_arm", "build"),)),
 })
 
 
@@ -1715,20 +1792,27 @@ TOP_EDGE = requirement(
         # The consumer schema has no surface-profile/disposition fields.
         # Preserve the sourced control as a note plus an unknown requirement,
         # never as an invented radius or height acceptance band.
-        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['TopRadius']} TO A|B|C", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['TopRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
         "arc_len": (rocker.TOP_ARC_LEN, ("TOP_ARC_LEN",)),
         "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)),
         "centre_from_pivot_ref": (rocker.CENTER_Y - rocker.PIVOT_MID_Y, ("CENTER_Y", "PIVOT_MID_Y")),
         "end": (list(_TOP), ("TOP_END_X", "TOP_END_Y")),
     }, precision={"height_above_pivot": _TOP_P, "radius": _P},
 )
+# One Ⓤ0 zone over the lower outline between J and K: the R816 arc, both
+# tapers and both tip lands, all filed to the one scribed line (option 4).
 PROFILE_OUTER = requirement(
     "profile_outer", kind="profile", faces=(CylinderFace(2 * rocker.R_BOTTOM), _RIGHT[1], _TIPS[1]),
     requirements=("bottom_radius", "mirror_symmetric", "unknown"), fields={
         "bottom_radius": (rocker.R_BOTTOM, ("R_BOTTOM", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
         "bottom_radius_nominal": (rocker.R_BOTTOM, ("R_BOTTOM",)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
-        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['BottomRadius']} TO A|B|C", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['BottomRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}, BETWEEN {PROFILE_BETWEEN[0]} AND {PROFILE_BETWEEN[1]}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        # The J↔K zone also covers the two lands, whose faces stay with their
+        # own features: one STEP face carries one feature name
+        # (_export_feature_faces). prechips 0.1.1's Feature record has no
+        # between/governs keys (extra="forbid"), so J↔K rides only this text;
+        # 0.1.2's surface_profile_governs makes it functional.
         "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)), "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
         "bottom_arc_len": (rocker.BOT_ARC_LEN, ("BOT_ARC_LEN",)),
         "mirror_symmetric": (True, (("ch_rocker_arm_notes", "DRAWING_NOTES"),)), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH",)),
@@ -1844,6 +1928,8 @@ def _dress_detail_dimensions(
             adapter, display, expected_mm=remaining.pop(name), label=f"imported {name}"
         )
         if name == "RodTipLen":
+            # The land runs inside the J↔K profile: BASIC, the zone is its band.
+            set_basic_dimension(adapter, display, label="tip land length")
             continue
         # Single exterior arrows, not diametral lines through both concentric
         # circles: otherwise the new hub OD and pivot bore leaders intersect.
@@ -1950,6 +2036,8 @@ def _add_rocker_outline_dimensions(
         adapter, taper_dimension, expected_mm=BOT_END_X, label="taper intersection X",
         entities=(pivot, taper), entity_types=("EDGE", "VERTEX"),
     )
+    # The taper's foot is a J↔K profile station: BASIC, the zone is its band.
+    set_basic_dimension(adapter, taper_dimension, label="taper intersection X")
     taper_dimension = _early_bound(taper_dimension, "IDisplayDimension")
     taper_dimension.SetText(4, "R816/TAPER")
     if str(taper_dimension.GetText(4) or "") != "R816/TAPER":
@@ -1961,26 +2049,26 @@ def _add_rocker_outline_dimensions(
     land_entities = (pivot, vertices[1])
     land_dimension = add_edge_dimension(
         adapter, front, p0=pivot_xy, p1=width_xy[1],
-        text_xy=LAND_LOCATION_TEXT_XY, label="datum C land X location",
+        text_xy=LAND_LOCATION_TEXT_XY, label="tip land X location",
         orientation="horizontal", entities=land_entities, entity_types=("EDGE", "VERTEX"),
     )
-    set_arc_endpoints_to_center(adapter, land_dimension, label="datum C land X location")
+    set_arc_endpoints_to_center(adapter, land_dimension, label="tip land X location")
     land_dimension = _early_bound(land_dimension, "IDisplayDimension")
     model = _early_bound(land_dimension.GetDimension2(0), "IDimension")
     if model.GetArcEndCondition(1) != 1:
-        raise RuntimeError("datum C land X location: physical A endpoint must be centred")
+        raise RuntimeError("tip land X location: physical A endpoint must be centred")
     assert_dimension_measures(
-        adapter, land_dimension, expected_mm=ROD_TIP_X, label="datum C land X location",
+        adapter, land_dimension, expected_mm=ROD_TIP_X, label="tip land X location",
         entities=land_entities, entity_types=("EDGE", "VERTEX"),
     )
-    set_basic_dimension(adapter, land_dimension, label="datum C land X location")
-    land_dimension.SetText(4, "DATUM C LAND")
-    if str(land_dimension.GetText(4) or "") != "DATUM C LAND":
-        raise RuntimeError("datum C land X location: native label did not persist")
+    set_basic_dimension(adapter, land_dimension, label="tip land X location")
+    land_dimension.SetText(4, LAND_LABEL)
+    if str(land_dimension.GetText(4) or "") != LAND_LABEL:
+        raise RuntimeError("tip land X location: native label did not persist")
     land_dimension.MaxWitnessLineLength = TAPER_WITNESS_LENGTH
     if (not _native_finite_scalar(land_dimension.MaxWitnessLineLength)
             or abs(land_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
-        raise RuntimeError("datum C land X location retained full-height witnesses")
+        raise RuntimeError("tip land X location retained full-height witnesses")
     return annotations, taper_dimension, (pivot, taper), land_dimension, land_entities
 
 
@@ -2026,27 +2114,27 @@ def _require_land_location(
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     name = dimension_name(adapter, annotation)
     if not name:
-        raise RuntimeError("datum C land X location has no native dimension name")
+        raise RuntimeError("tip land X location has no native dimension name")
     owners = [
         label for label, view in views
         for candidate in _bound_view_annotations(view, label=f"rocker {label}")
         if dimension_name(adapter, candidate) == name
     ]
     if owners != ["front"]:
-        raise RuntimeError(f"datum C land X location census owners {owners!r}, expected ['front']")
+        raise RuntimeError(f"tip land X location census owners {owners!r}, expected ['front']")
     assert_dimension_measures(
-        adapter, display, expected_mm=ROD_TIP_X, label="datum C land X location",
+        adapter, display, expected_mm=ROD_TIP_X, label="tip land X location",
         entities=entities, entity_types=("EDGE", "VERTEX"),
     )
     model = _early_bound(display.GetDimension2(0), "IDimension")
     if (model.GetArcEndCondition(1) != 1
             or model.GetToleranceType() != 1
             or display.ShowDimensionValue is not True
-            or str(display.GetText(4) or "") != "DATUM C LAND"
+            or str(display.GetText(4) or "") != LAND_LABEL
             or any(str(display.GetText(part) or "") for part in (1, 2))
             or not _native_finite_scalar(display.MaxWitnessLineLength)
             or abs(display.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
-        raise RuntimeError("datum C land X location lost its centred BASIC label/value or witness cap")
+        raise RuntimeError("tip land X location lost its centred BASIC label/value or witness cap")
 
 
 def _require_rod_through_callout(callout: Any) -> None:
@@ -2209,29 +2297,37 @@ def _add_strap_offset_dimension(adapter: Any, right: Any) -> Any:
     return display
 
 
-def _add_land_datum(adapter: Any, front: Any, land: ViewEdge) -> Any:
-    """Attach C to the exact +Z radial land, with its triangle on the midpoint."""
-    if (
-        land.line is None
-        or any(abs(point[2] - ARM_THICKNESS / 2.0) > 1e-5 for point in land.line)
-        or abs(land.length_mm - TIP_FACE) > 1e-5
-    ):
-        raise RuntimeError("datum C needs the exact +Z radial land edge")
-    start, end = _project(
-        adapter, front, [tuple(v / 1000.0 for v in point) for point in land.line],
-        label="datum C exact land endpoints",
+def _add_between_points(adapter: Any, front: Any) -> dict[str, Any]:
+    """Point J and K at the top-arc ends: the lower profile's two limits."""
+    corners = _project(
+        adapter, front,
+        ((-TOP_END_X / 1000.0, TOP_END_Y / 1000.0, 0.0),
+         (TOP_END_X / 1000.0, TOP_END_Y / 1000.0, 0.0)),
+        label="profile J/K top-arc ends",
     )
-    midpoint = ((start[0] + end[0]) / 2.0, (start[1] + end[1]) / 2.0)
-    dx, dy = end[0] - start[0], end[1] - start[1]
-    nx, ny = -dy, dx
-    if nx < 0.0:
-        nx, ny = -nx, -ny
-    reach = LAND_DATUM_STANDOFF / math.hypot(nx, ny)
-    return add_datum_feature(
-        adapter, front, edge_entity=land.edge, leader_attach_xy=midpoint,
-        symbol_xy=(midpoint[0] + nx * reach, midpoint[1] + ny * reach),
-        datum="C", label="+Z rod-side radial land",
-    )
+    if not corners[0][0] < corners[1][0]:
+        raise RuntimeError(f"profile J/K: -X end does not print left of +X: {corners!r}")
+    notes = {}
+    for letter, corner in zip(PROFILE_BETWEEN, corners):
+        dx, dy = BETWEEN_POINT_OFFSET[letter]
+        notes[letter] = add_leader_note(
+            adapter, letter, text_xy=(corner[0] + dx, corner[1] + dy),
+            attach_xy=corner, label=f"profile limit {letter}", view=front,
+        )
+    return notes
+
+
+def _set_profile_between(adapter: Any, gtol: Any) -> None:
+    """Native J↔K between symbol under the lower profile frame, read back."""
+    gtol = _early_bound(gtol, "IGtol")
+    gtol.SetBetweenTwoPoints(True, *PROFILE_BETWEEN)  # VT_VOID
+    rebuild_drawing(adapter, label="lower profile between symbol")
+    texts = tuple(str(gtol.GetBetweenTwoPointsText(index) or "") for index in (0, 1))
+    if gtol.GetBetweenTwoPoints() is not True or texts != PROFILE_BETWEEN:
+        raise RuntimeError(
+            f"lower profile between symbol read back {gtol.GetBetweenTwoPoints()!r} "
+            f"{texts!r}, expected True {PROFILE_BETWEEN!r}"
+        )
 
 
 def _arc_profile_point(name: str) -> tuple[float, float, float]:
@@ -2245,7 +2341,7 @@ def _arc_profile_point(name: str) -> tuple[float, float, float]:
 
 
 def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
-    """Attach and retain native frames: Ⓤ0.5 top, Ⓤ0 bottom, total zone 0.5."""
+    """Attach and retain native frames: Ⓤ0.5 top, Ⓤ0 bottom J↔K, total zone 0.5."""
     profiles = {}
     for name, radius in (("TopRadius", R_TOP), ("BottomRadius", R_BOTTOM)):
         edge = visible_circle_edge(adapter, front, 2.0 * radius)
@@ -2259,9 +2355,11 @@ def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
             characteristic="profile_surface",
             tolerance=ARC_PROFILE_ZONE_MM,
             outside_disposition=ARC_PROFILE_OUTSIDE_MM[name],
-            datums=("A", "B", "C"),
+            datums=ARC_PROFILE_DATUMS,
             label=f"arc-system {name} profile",
         )
+    _set_profile_between(adapter, profiles["BottomRadius"])
+    _add_between_points(adapter, front)
     return profiles
 
 
@@ -2778,14 +2876,19 @@ def _require_r24_detail_layout(
     taper: Any, taper_entities: tuple[Any, Any], land: ViewEdge,
     rod_tip_attached: tuple[Any, ...],
 ) -> None:
-    """Reprove the independent 5.59/C, strap and taper state after regeneration."""
+    """Reprove the independent 5.59, datum C, strap and taper state after regeneration."""
     annotations = _bound_view_annotations(end, label="R24 final detail E")
     tip_annotations = [
         ann for ann in annotations
         if ann.GetType() == 4 and dimension_name(adapter, ann) == "RodTipLen"
     ]
-    if len(tip_annotations) != 1 or sum(ann.GetType() == 2 for ann in annotations) != 1:
-        raise RuntimeError("R24: missing native 5.59/C cluster")
+    tags = [ann for ann in annotations if ann.GetType() == 2]  # swDatumTag
+    if len(tip_annotations) != 1:
+        raise RuntimeError("R24: missing native 5.59")
+    if (len(tags) != 1
+            or str(_early_bound(tags[0].GetSpecificAnnotation(), "IDatumTag").GetLabel() or "")
+            != ROD_HOLE.fields["datum"][0]):
+        raise RuntimeError("R24: detail E must carry exactly one datum tag, C on the rod-pin frame")
     _require_rod_tip_endpoints(
         adapter, end, land, tip_annotations[0], expected_attachments=rod_tip_attached,
     )
@@ -2808,8 +2911,18 @@ def _require_taper_witnesses(adapter: Any, end: Any, taper: Any, taper_entities:
     assert_dimension_measures(adapter, taper, expected_mm=BOT_END_X, label="final 132.76 taper",
                               entities=taper_entities, entity_types=("EDGE", "VERTEX"))
     taper_record, _g = _r24_record(adapter, taper.GetAnnotation(), label="132.76 taper")
-    witnesses = [s for s in _r24_straight_ink(taper_record) if abs(s.x1 - s.x0) <= DETAIL_GEOMETRY_TOL_M]
-    if len(witnesses) != 2 or any(s.length > TAPER_WITNESS_LENGTH + DETAIL_GEOMETRY_TOL_M for s in witnesses):
+    # The BASIC frame's two sides are vertical ink too: a witness is the
+    # vertical line carrying one of the dimension's two arrow tips.
+    tips = [tuple(row[:2]) for row in taper_record["display"].get("arrows", ())]
+    witnesses = [
+        s for s in _r24_straight_ink(taper_record)
+        if abs(s.x1 - s.x0) <= DETAIL_GEOMETRY_TOL_M
+        and any(point_segment_distance(tip, s) <= DETAIL_GEOMETRY_TOL_M for tip in tips)
+    ]
+    if (len(tips) != 2 or len(witnesses) != 2
+            or any(sum(point_segment_distance(tip, s) <= DETAIL_GEOMETRY_TOL_M for s in witnesses) != 1
+                   for tip in tips)
+            or any(s.length > TAPER_WITNESS_LENGTH + DETAIL_GEOMETRY_TOL_M for s in witnesses)):
         raise RuntimeError("132.76: missing/uncapped native witness pair")
     readback = read_circular_detail_crop(adapter, end, label="R24 parent E circle")
     parent_circle = (*readback.parent_centre, readback.parent_radius)
@@ -3228,10 +3341,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot bore finish",
         char_height=PIVOT_FINISH_CHAR_HEIGHT,
     )
-    # Then a position FCF tying the rod-pin hole to the complete A-B-C frame.
-    # Datum B (broad face, on the end view) orients the hole axes; datum C
-    # (the +X tip face) clocks rotation about the pivot axis, so the X/Y BASIC
-    # coordinates above have an inspectable direction.
+    # Then a position FCF tying the rod-pin hole to A|B: B (broad face, on the
+    # end view) orients the hole axes, and the BASIC X/Y above hold its 133.34
+    # from A. Rotation about A is free -- the hole itself is datum C, which
+    # clocks the profile frames (Pedro, option 4).
     # Datum B on the strap's broad face in the end view, picked ABOVE the hub
     # band (the O10 hub hides the flank over y 3..13 since 2026-09-02); the
     # end view is centred on the strap's mid-depth (PIVOT_MID_Y).
@@ -3248,7 +3361,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum=STRAP_DATUM_B.fields["datum"][0],
         label="broad face",
     )
-    _add_land_datum(adapter, end, rod_land)
     (rod_position_landing,) = _project(
         adapter, end,
         ((ROD_HOLE_X / 1000.0, (ROD_HOLE_Y - _ROD_HOLE_DIA / 2.0) / 1000.0, 0.0),),
@@ -3273,6 +3385,15 @@ async def build(adapter: Any) -> dict[str, str]:
     except Exception as exc:  # noqa: BLE001 - capture native DOT readback failures too
         _capture_layout_failure(adapter, "R24 native DOT configuration", exc)
         raise
+    try:
+        add_frame_datum_feature(
+            adapter, end, rod_position_gtol,
+            datum=ROD_HOLE.fields["datum"][0], symbol_xy=ROD_DATUM_C_XY,
+            label="rod-pin hole datum feature",
+        )
+    except Exception as exc:  # noqa: BLE001 - capture the frame/tag readback
+        _capture_layout_failure(adapter, "R24 datum C on the rod-pin frame", exc)
+        raise
     arc_profiles = _add_arc_profiles(adapter, front)
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_XY)
@@ -3292,7 +3413,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ("front", front, FRONT_KEEP), ("detail D", hub, HUB_KEEP),
             ("detail E", end, END_KEEP), ("right", right, RIGHT_KEEP), ("iso", iso, {}),
         ))
-        phase = "datum C land location"
+        phase = "tip land location"
         _require_land_location(
             adapter, (("front", front), ("detail D", hub), ("detail E", end),
                       ("right", right), ("iso", iso)),
