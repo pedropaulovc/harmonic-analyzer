@@ -12,10 +12,12 @@ reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
 anchors are purchased eyebolts that thread straight into those taps, so the
 print controls thread identity and position, never a seat bore.  Sheet 1
 shows a 1:2 front profile (the cylinder, boss, web and the rib outline every
-rib shares), a 4:1 detail of the trunnion envelope, a 1:2 top plan (plate,
-ribs, summation web, trunnion length, the anchor taps and their pattern
-control) and a 1:4 isometric; sheet 2 shows the 1:2 back view of the two
-bracket receiver taps and the plate wall they sit in.  The sheet runs at 1:2.
+rib shares), a 4:1 detail of the trunnion envelope and its knife-edge round, a
+1:2 top plan (plate, ribs, summation web, trunnion length, the anchor taps and
+their pattern control), a 1:1 partial section C-C of the plate's thickness
+and a 1:4 isometric; sheet 2 shows the 1:2 back view of the two bracket
+receiver taps and the spring-anchor pad under the plate they sit in.  The
+sheet runs at 1:2.
 
 Run with SolidWorks open::
 
@@ -97,6 +99,9 @@ from sm_summing_lever_spec import (
     HOLE_X,
     HOLE_Z_FIRST,
     HOLE_Z_LAST,
+    KNIFE_RIDGE_R,
+    KNIFE_RIDGE_R_TOL_TYPE,
+    KNIFE_RIDGE_TANGENT_XY,
     PLATE_L,
     PLATE_T,
     PLATE_W,
@@ -333,6 +338,104 @@ def _apply_callouts(adapter: Any, annotations: list[Any], *, label: str) -> None
     _telemetry.info(f"{label}: callouts on {sorted(present)}")
 
 
+def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Prove Detail A's KnifeRidgeRadius prints the part's R MAX: radial,
+    measuring KNIFE_RIDGE_R, the native swTolMAX the part set
+    (draw_ch_pivot_bracket._dress_corner_radius's readback)."""
+    found = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "KnifeRidgeRadius"
+    ]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"expected one KnifeRidgeRadius in the knife detail, found {len(found)}"
+        )
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("the imported knife-ridge radius is not radial")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != KNIFE_RIDGE_R_TOL_TYPE:
+        raise RuntimeError(
+            f"KnifeRidgeRadius lost its native MAX type: {int(tolerance.Type)}"
+        )
+    if not math.isclose(
+        float(dimension.SystemValue), KNIFE_RIDGE_R / 1000.0, abs_tol=1e-9
+    ):
+        raise RuntimeError("KnifeRidgeRadius does not measure the ridge round")
+    _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
+
+
+# The ridge centreline runs the +Z stub's length and 2 model mm past its
+# outboard face: 1 sheet mm, ending 1.5 mm above 44.45's dimension line.
+RIDGE_AXIS_OVERRUN_MM = 2.0
+
+
+def _ridge_centerline(adapter: Any, top: Any) -> Any:
+    """An owned centreline on the +Z knife ridge's theoretical sharp in the
+    plan (draw_sm_knife_mount._add_section_axes's idiom): the round leaves
+    no edge on the ridge itself, and rule 16 dimensions to the sharp.
+
+    Its ends are model points projected to the sheet and taken into the
+    view's sketch frame, placed direct to the database (an inferred end snaps
+    onto the round's tangent lines 0.03 sheet mm away) and read back.
+    Returns the ``ISketchSegment`` for a dimension to pick.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, top)):
+        raise RuntimeError("failed to activate the plan for its ridge centreline")
+    draw.ClearSelection2(True)
+    ends = model_points_in_view(
+        adapter,
+        top,
+        [
+            (0.0, HEX_H / 2000.0, z / 1000.0)
+            for z in (PLATE_L / 2.0, PLATE_L / 2.0 + HEX_DEPTH + RIDGE_AXIS_OVERRUN_MM)
+        ],
+        label="ridge centreline end",
+        names=("inboard", "outboard"),
+    )
+    sketch = _early_bound(top.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in ends:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateCenterLine(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if segment is None:
+        raise RuntimeError("failed to create the ridge centreline")
+    line = _early_bound(segment, "ISketchLine")
+    for expected, accessor in zip(points, ("GetStartPoint2", "GetEndPoint2")):
+        placed = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+        actual = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XYZ"]
+        drift = max(abs(a - b) for a, b in zip(actual, expected))
+        if drift > 1e-9:
+            raise RuntimeError(
+                f"ridge centreline {accessor[3:-6].lower()} point sits "
+                f"{drift * 1000.0:.4g} mm from where it was authored"
+            )
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError("ridge centreline color did not persist")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="summing lever ridge centreline")
+    return segment
+
+
 def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
     return tuple(value / 1000.0 for value in point_mm)
 
@@ -451,10 +554,12 @@ FRONT_KEEP = {
 }
 # Detail A at 4:1: the hexagon's centre prints at DETAIL_CENTER.  The width
 # hangs below the fence; the vertex height stands right of it, its text level
-# with the centre and VERTEX UP below the value.
+# with the centre and VERTEX UP below the value; the vertex's R MAX leads off
+# up-right, above the height's top extension line.
 DETAIL_KEEP = {
     "HexWidth": (DETAIL_CENTER[0], 0.186),
     "HexHeight": (0.118, DETAIL_CENTER[1]),
+    "KnifeRidgeRadius": (0.098, 0.256),
 }
 TOP_KEEP = {
     # Below the plate end, its witness lines 14 mm long: at 0.160 they ran
@@ -591,6 +696,10 @@ async def build(adapter: Any) -> dict[str, str]:
     _attach_radial_leaders(
         adapter, top_annotations, ("SummationArcRadius",), label="top"
     )
+    _attach_radial_leaders(
+        adapter, detail_annotations, ("KnifeRidgeRadius",), label="knife detail"
+    )
+    _assert_knife_ridge_radius(adapter, detail_annotations)
     _apply_callouts(
         adapter,
         [*front_annotations, *top_annotations, *detail_annotations],
@@ -618,18 +727,22 @@ async def build(adapter: Any) -> dict[str, str]:
     # Keep datum and finish on opposite ridges so their leaders stay distinct.
     # One sweep of the plan's visible edges serves every named pick below.
     # The ridge is the hexagon's top vertex line, y = HEX_H/2 (vertex-up
-    # sketch centred on the pivot axis, build_summing_lever._hex_collar).
+    # sketch centred on the pivot axis, build_summing_lever._hex_collar),
+    # rounded at R0.1 MAX: the plan shows the round's two tangent lines 0.05
+    # sheet mm either side of it, and every pick names the +X one (the edge
+    # of the upper-right face the finish controls) by entity.
     top_edges = scan_view_edges(top, label="summing lever top plan")
-    knife_edge_datum = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
+    ridge_x, ridge_y = KNIFE_RIDGE_TANGENT_XY
+    stub_mid_z = PLATE_L / 2.0 + HEX_DEPTH / 2.0
     datum_ridge = top_edges.exact_line_through(
-        (0.0, HEX_H / 2.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0)),
-        label="-Z knife-edge ridge",
+        (ridge_x, ridge_y, -stub_mid_z), label="-Z knife-edge ridge round"
     )
+    knife_edge_datum = _top_xy(ridge_x, stub_mid_z)
     add_datum_feature(
         adapter,
         top,
-        edge_xy=knife_edge_datum,
-        expected_entity=datum_ridge.edge,
+        edge_entity=datum_ridge.edge,
+        leader_attach_xy=knife_edge_datum,
         # 24 mm out: at 20 the tag's box straddled the plate's right edge
         # (0.2575) and the edge ran through the 'A' (text-on-line on every
         # #1105 run); now the box starts 1.8 mm past it.
@@ -637,7 +750,9 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="knife-edge pivot axis",
     )
-    knife_edge = _top_xy(0.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0))
+    finish_ridge = top_edges.exact_line_through(
+        (ridge_x, ridge_y, stub_mid_z), label="+Z knife-edge ridge round"
+    )
     # The ridge lands in a pocket closed by the 76.20 extension line (left),
     # the 76.20/39.85 dimension line (below) and the plate (above); the default
     # 43 mm body cannot fit, so the 2.5 mm body sits inside it (layout audit:
@@ -645,7 +760,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         top,
-        edge_xy=knife_edge,
+        edge_entity=finish_ridge.edge,
+        leader_attach_xy=_top_xy(ridge_x, -stub_mid_z),
         symbol_xy=(0.208, 0.084),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
@@ -653,22 +769,21 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # X location of the anchor tap from the knife-edge pivot axis (the +Z
     # trunnion ridge, the finish's): a plain title-block dimension, both
-    # endpoints named -- the ridge line through a mid-stub point, the tap's
-    # rim on the boss top (centre (TIP_X, ANCHOR_H/2, 0), the hole wizard's
-    # placement in build_sm_summing_lever._counter_anchor_tap).  The mid rib's
-    # apex shares this station (its 76.20 in the front profile).
+    # endpoints named -- the ridge's theoretical sharp (rule 16), an owned
+    # centreline down the +Z stub, and the tap's rim on the boss top (centre
+    # (TIP_X, ANCHOR_H/2, 0), the hole wizard's placement in
+    # build_sm_summing_lever._counter_anchor_tap).  The mid rib's apex shares
+    # this station (its 76.20 in the front profile).
     ridge_dim_edge = _top_xy(0.0, -(PLATE_L / 2.0 + 0.3 * HEX_DEPTH))
     anchor_tap_bottom = _top_xy(TIP_X, -COUNTER_R)
-    dim_ridge = top_edges.exact_line_through(
-        (0.0, HEX_H / 2.0, PLATE_L / 2.0 + 0.3 * HEX_DEPTH),
-        label="+Z knife-edge ridge",
-    )
+    ridge_axis = _ridge_centerline(adapter, top)
     anchor_rim = top_edges.circle_at(
         (TIP_X, ANCHOR_H / 2.0, 0.0),
         COUNTER_R,
         axis=(0.0, 1.0, 0.0),
         label="counter-anchor tap rim",
     )
+    ridge_entity_types = ("SKETCHSEGMENT", "EDGE")
     anchor_location = add_edge_dimension(
         adapter,
         top,
@@ -677,14 +792,16 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.216, 0.0723),
         label="anchor tap X location",
         orientation="horizontal",
-        entities=(dim_ridge.edge, anchor_rim.edge),
+        entity_types=ridge_entity_types,
+        entities=(ridge_axis, anchor_rim.edge),
     )
     assert_dimension_measures(
         adapter,
         anchor_location,
         expected_mm=-TIP_X,
         label="anchor tap X location",
-        entities=(dim_ridge.edge, anchor_rim.edge),
+        entities=(ridge_axis, anchor_rim.edge),
+        entity_types=ridge_entity_types,
     )
 
     # Anchor-tap pattern control: datum B on the plate end the seed hole is
@@ -739,14 +856,16 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.248, 0.0723),
         label="spring-hole row X",
         orientation="horizontal",
-        entities=(dim_ridge.edge, seed_rim.edge),
+        entity_types=ridge_entity_types,
+        entities=(ridge_axis, seed_rim.edge),
     )
     assert_dimension_measures(
         adapter,
         row_x,
         expected_mm=HOLE_X,
         label="spring-hole row X",
-        entities=(dim_ridge.edge, seed_rim.edge),
+        entities=(ridge_axis, seed_rim.edge),
+        entity_types=ridge_entity_types,
     )
     set_basic_dimension(adapter, row_x, label="spring-hole row X")
     seed_rim_top = _top_xy(HOLE_X, -HOLE_Z_LAST + HOLE_DIA / 2.0)
