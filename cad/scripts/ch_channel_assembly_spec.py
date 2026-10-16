@@ -97,7 +97,10 @@ DIMENSION_TOLERANCES = {
 REFERENCE_DIMENSIONS = frozenset({LUG_SPAN_DIMENSION})
 DIMENSION_CALLOUTS = {
     SPRING_SET_DIMENSION: "SPRING-SET BLADE",
-    STACK_LENGTH_DIMENSION: "STACK, CLOSED UP",
+    # The accepted stack caps the hubs' summed excess, so each strap stays on
+    # its rod's cam plane and under its bar's foot notch (test_channel_axial_
+    # budget); r10 machinist review: name what the tight band sets (rule 4).
+    STACK_LENGTH_DIMENSION: "STACK, CLOSED UP: STRAP PITCH TO RODS AND BARS",
     LUG_SPAN_DIMENSION: "LUG SPAN",
 }
 if set(DIMENSION_TOLERANCES) | REFERENCE_DIMENSIONS != set(DIMENSION_FEATURE):
@@ -142,6 +145,13 @@ class ExplodeStep:
 
 _KEEPER_GROUP = (KEEPER, KEEPER_SET_SCREW, KEEPER_FOOT_SCREW)
 _BRACKET_GROUP = (BRACKET, BRACKET_SET_SCREW, BRACKET_HOLD_DOWN)
+# The north bracket's hardware and the north washer (DETAIL B's cluster): at
+# 60 north alone the bracket sat inside the hanging rocker arms. Leaders 4 and
+# 7 met on it there, and the letter B fell on the arms (r10 machinist review).
+# 100 further north and 300 up puts the cluster in the open area left of the
+# bars, above the arm deck: the r10 sheet has no ink within 40 px (9 mm) of
+# its projected centre, or at the letter's upper-right corner.
+_NORTH_END_GROUP = (*_BRACKET_GROUP, WASHER)
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("south keeper out", _KEEPER_GROUP, "z", -50.0, "south"),
     ExplodeStep("north keeper out", _KEEPER_GROUP, "z", 50.0, "north"),
@@ -154,6 +164,8 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("bank spring out", (BANK_SPRING,), "z", -40.0, "south"),
     ExplodeStep("south washer out", (WASHER,), "z", -20.0, "south"),
     ExplodeStep("north washer out", (WASHER,), "z", 20.0, "north"),
+    ExplodeStep("north end further out", _NORTH_END_GROUP, "z", 100.0, "north"),
+    ExplodeStep("north end up", _NORTH_END_GROUP, "y", 300.0, "north"),
     ExplodeStep("rods down", (ROD,), "y", -50.0),
     # Up, not along x: 50 west put each bar (pin x 72.9) on its own spring's
     # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick);

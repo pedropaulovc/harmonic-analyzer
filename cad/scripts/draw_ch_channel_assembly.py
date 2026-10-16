@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
+import math
 import sys
 import textwrap
 from pathlib import Path
@@ -73,12 +74,16 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
 )
 from _drawing_view_display import set_hidden_lines_removed
+from _printed_tolerance import printed_band_mm
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
 import ch_channel_assembly_spec as asm
 import ch_channel_assembly_steps as steps
 from ch_fulcrum_keeper_spec import (
+    BORE_DIA as KEEPER_BORE_DIA,
+    CROWN_DIA,
+    DRAWING_PRECISION as KEEPER_PRECISION,
     FULCRUM_KEEPER_CENTRE_Z,
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_PLACES,
@@ -88,6 +93,7 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_Z_OFF,
     PAIR_REAMER_DIA_IN,
     PAIR_REAMER_OAL_IN,
+    SET_SCREW_THREAD as KEEPER_SET_SCREW_THREAD,
 )
 from ch_pivot_bracket_spec import SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
 from ch_pivot_shaft_spec import DOME_HEIGHT
@@ -609,6 +615,20 @@ def _fitup_notes() -> tuple[str, str]:
     # ruling): the lever-bank view's reference lug span.
     if abs(rear_face - front_face - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
         raise AssertionError("the pair-ream span is not the fit-up span")
+    # Each crown is finished at the bench to the MHA-CH-007 crown diameter
+    # (CrownDia, printed .X: "ROUND ABOUT THE REAMED BORE, PER" this step),
+    # turned or filed about a gauge pin in its own reamed bore, and only then
+    # tapped through to the bore. Concentric, the crown keeps the crown thread's
+    # 1.5D at the .X minimum (ch_fulcrum_keeper_spec.SET_SCREW_ENGAGEMENT_D;
+    # 0.064 to spare, so no eccentricity can be absorbed). The fitter gauges it
+    # as crown top over the pin's underside, the crown radius plus the pin's,
+    # with the low limit rounded up (Main's ruling, 2026-10-16).
+    crown_band = printed_band_mm(KEEPER_PRECISION["LugCrownProfile"]["CrownDia"])
+    pin_r = KEEPER_BORE_DIA / 2.0
+    crown_over_pin = (
+        math.ceil(((CROWN_DIA - crown_band) / 2.0 + pin_r) * 10.0 - 1e-9) / 10.0,
+        round((CROWN_DIA + crown_band) / 2.0 + pin_r, 1),
+    )
     text = {
         # The rings are captured in the closed cam slots as the cylinder stack
         # goes together, and the pressed pin needs its far tine backed on the
@@ -638,8 +658,8 @@ def _fitup_notes() -> tuple[str, str]:
             f"FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
             f"SPRING-SET BLADE (DETAIL {DETAIL_LETTER}) BESIDE THE SPRING, "
             "BANK PUSHED NORTH. "
-            f"CLAMP, TRANSFER ITS SEAT INTO THE {support} RAIL, TAP AS {support}, "
-            f"SCREW DOWN ONE {hold_down}, PULL THE BLADE."
+            f"CLAMP, TRANSFER ITS FOOT HOLE INTO THE {support} RAIL, TAP AS "
+            f"{support}, SCREW DOWN ONE {hold_down}, PULL THE BLADE."
         ),
         "shaft-set": (
             f"SLIDE THE {shaft} SHAFT UNTIL ITS NORTH TIP STANDS "
@@ -663,10 +683,14 @@ def _fitup_notes() -> tuple[str, str]:
         steps.KEEPERS_PAIR_REAMED_KEY: (
             f"CLAMP BOTH {keeper}, FEET OUTBOARD ON ONE FLAT, INNER LUG FACES "
             "AT THE LEVER BANK VIEW'S LUG SPAN, BORE AXIS PARALLEL TO THE "
-            "FLAT; DRILL AND REAM BOTH IN ONE PASS, "
-            f"{PAIR_REAMER_OAL_IN:.0f} IN {PAIR_REAMER_DIA_IN:.4f} REAMER; ROUND "
-            f"EACH CROWN ON ITS BORE. ACCEPT IF THE {fulcrum_shaft} SHAFT SLIDES "
-            "FREELY THROUGH BOTH, CLAMPED."
+            f"FLAT; DRILL AND REAM BOTH IN ONE PASS WITH A {PAIR_REAMER_DIA_IN:.4f} "
+            f"IN DIA REAMER, {PAIR_REAMER_OAL_IN:.0f} IN LONG. ACCEPT IF THE "
+            f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED. THEN, ON "
+            f"A {KEEPER_BORE_DIA:.2f} PIN IN EACH BORE, ROUND ITS CROWN TO THE "
+            f"{keeper} CROWN DIA {CROWN_DIA:.1f} ABOUT THE PIN AND TAP IT "
+            f"{KEEPER_SET_SCREW_THREAD} TO THE BORE. ACCEPT: CROWN TOP "
+            f"{crown_over_pin[0]:.1f} TO {crown_over_pin[1]:.1f} OVER THE PIN'S "
+            "UNDERSIDE."
         ),
         steps.KEEPERS_SET_KEY: (
             f"{top_frame} ON THE MILL: SHAFT THROUGH BOTH KEEPERS, FEET "
@@ -674,7 +698,8 @@ def _fitup_notes() -> tuple[str, str]:
             f"{KEEPER_FITUP_X_FROM_WEB_MM:.{places}f} WEST OF THE RAIL WEB "
             f"CENTRE BELOW IT, LUG INNER FACES AT Z {front_face:.{places}f} AND "
             f"{rear_face:.{places}f} FROM THE UPPER-LEFT SOCKET, EACH WITHIN "
-            f"{KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}. CLAMP; TRANSFER EACH "
+            f"{KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}, SO THE {fulcrum_shaft} "
+            "FLATS LIE UNDER BOTH CROWN TAPS. CLAMP; TRANSFER EACH "
             f"FOOT HOLE INTO THE RAIL, TAP AS {top_frame}, SCREW DOWN ONE "
             f"{foot_screw}."
         ),

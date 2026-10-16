@@ -186,6 +186,13 @@ def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> N
     assert f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS." in setting
     assert "SPRING-SET BLADE (DETAIL A) BESIDE THE SPRING" in setting
     assert "PULL THE BLADE" in setting
+    # r10 machinist review: worded as step 10's keeper transfer.
+    support = _config.parts("fr-rocker-arm-support")["number"]
+    hold_down = _config.parts("vn-pedestal-hold-down-screw")["number"]
+    assert (
+        f"TRANSFER ITS FOOT HOLE INTO THE {support} RAIL, TAP AS {support}, "
+        f"SCREW DOWN ONE {hold_down}, PULL THE BLADE."
+    ) in setting
     accept = _step_body("preload-accepted")
     assert "PUSHED SOUTH," in accept
     assert "THE BANK SPRINGS BACK ONTO THE NORTH WASHER" in accept
@@ -295,9 +302,11 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     asm = drawing.asm
     north = "north"
     lug_z = drawing.FULCRUM_KEEPER_CENTRE_Z + drawing.KEEPER_Z_OFF
-    assert drawing.exploded_offset(asm.BRACKET, north) == (0.0, 0.0, 60.0)
-    assert drawing.exploded_offset(asm.BRACKET_SET_SCREW, north) == (0.0, 25.0, 60.0)
-    assert drawing.exploded_offset(asm.WASHER, north) == (0.0, 0.0, 20.0)
+    # 60 north, then the whole north-end cluster 100 further north and 300 up,
+    # clear of the hanging rocker arms (r10 machinist review, DETAIL B).
+    assert drawing.exploded_offset(asm.BRACKET, north) == (0.0, 300.0, 160.0)
+    assert drawing.exploded_offset(asm.BRACKET_SET_SCREW, north) == (0.0, 325.0, 160.0)
+    assert drawing.exploded_offset(asm.WASHER, north) == (0.0, 300.0, 120.0)
     assert drawing.exploded_offset(asm.KEEPER_FOOT_SCREW, north) == (0.0, 25.0, 50.0)
     assert drawing.exploded_offset(asm.BRACKET, "south") == (0.0, 0.0, -60.0)
     bracket, keeper = drawing.NORTH_BRACKET_DETAIL, drawing.NORTH_KEEPER_DETAIL
@@ -442,13 +451,29 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
         drawing.asm.LUG_INNER_FACE_Z[1] - drawing.asm.LUG_INNER_FACE_Z[0]
     )
     assert "BORE AXIS PARALLEL TO THE FLAT" in reamed
-    assert "DRILL AND REAM BOTH IN ONE PASS, 12 IN 0.2515 REAMER" in reamed
+    assert (
+        "DRILL AND REAM BOTH IN ONE PASS WITH A 0.2515 IN DIA REAMER, 12 IN LONG."
+        in reamed
+    )
     assert keeper.PAIR_REAMER_REACH_MARGIN_MM > 0.0
-    assert "ROUND EACH CROWN ON ITS BORE" in reamed
     assert (
         f"ACCEPT IF THE {fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED."
         in reamed
     )
+    # r10 machinist blocker (Main's ruling A): the crown is finished to the
+    # keeper print's crown diameter about a pin in its own bore, then tapped,
+    # and gauged over the pin. The gauge's low limit never admits a crown
+    # under the .X minimum the crown thread's 1.5D is proved at.
+    assert (
+        f"ON A 6.35 PIN IN EACH BORE, ROUND ITS CROWN TO THE {number} CROWN DIA "
+        "14.0 ABOUT THE PIN AND TAP IT #1-72 TO THE BORE." in reamed
+    )
+    assert reamed.endswith("ACCEPT: CROWN TOP 9.8 TO 10.6 OVER THE PIN'S UNDERSIDE.")
+    least_crown = keeper.set_screw_wall_terms(keeper.CROWN_DIA)[
+        "crown radius at .X minimum"
+    ]
+    assert 9.8 - keeper.BORE_DIA / 2.0 >= least_crown
+    assert keeper.SET_SCREW_ENGAGEMENT_D >= keeper.SET_SCREW_MIN_ENGAGEMENT_D
     fitted = _step_body(steps.KEEPERS_SET_KEY)
     assert f"{top_frame} ON THE MILL:" in fitted
     # Main's ruling: X off the receiving web, Z off the upper-left socket.
@@ -459,7 +484,12 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert f"{x} WEST OF THE RAIL WEB CENTRE BELOW IT" in fitted
     z = f"Z {front:.{places}f} AND {rear:.{places}f} FROM THE UPPER-LEFT SOCKET"
     assert z in fitted
-    assert f"WITHIN {keeper.KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}" in fitted
+    assert (
+        f"WITHIN {keeper.KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}, SO THE " in fitted
+    )
+    # The band's function (Main's ruling, 2026-10-16): the shaft's flat-station
+    # window, 0.14 at 0.02 and gone by 0.09 (ch_fulcrum_shaft_spec).
+    assert f"SO THE {fulcrum_shaft} FLATS LIE UNDER BOTH CROWN TAPS." in fitted
     assert "TRANSFER EACH FOOT HOLE INTO THE RAIL" in fitted
     staked = _step_body(steps.SET_SCREWS_STAKED_KEY)
     assert "STAKE EACH TAP MOUTH AT 2 POINTS" in staked
