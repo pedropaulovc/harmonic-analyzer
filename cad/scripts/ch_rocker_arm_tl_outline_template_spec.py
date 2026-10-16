@@ -9,12 +9,13 @@ scribed from it (S5) and its outline is checked against it (S7: top-edge
 height, radii, arc lengths, tip lands).
 
 Every edge derives from the rocker's own CAD source (``ch_rocker_arm_spec``),
-never from a render. The one deliberate offset: the whole arc system sits
-0.25 higher than the rocker model's nominal. The rocker print lets both arcs
-come out 0..+0.5 high (``ch_rocker_arm_spec.TOP_EDGE_BAND``, printed as a
-0.5 surface profile, outside on the top arc and inside on the bottom one), so
-the template aims at the middle of that zone and leaves its whole width to
-the filing that follows it.
+never from a render. The one deliberate offset: every edge aims at the middle
+of the rocker's 0.5 surface-profile zone (``ch_rocker_arm_spec.TOP_EDGE_BAND``,
+outside on the top arc, inside on the lower outline), leaving the zone's whole
+width to the filing that follows. The arc system sits 0.25 higher, on the
+trammel's own radii; the tip lands and tapered ends are offset 0.25 along
+their own normals, since a +Y shift would carry the near-vertical lands out
+of the lower zone.
 
 Frame: origin on the pivot-hole axis in the face laid on the arm, +Y toward
 the arcs' common centre (the mirror line is the Y axis), +X toward the
@@ -32,6 +33,7 @@ from _printed_tolerance import printed_band_mm, printed_deviations
 
 R_TOP = rocker.R_TOP
 R_BOTTOM = rocker.R_BOTTOM
+_ROCKER_ZONE = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
 
 # The aim: the middle of the rocker's one-sided top-edge band.
 _ROCKER_TOP_LOW = rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[1]
@@ -87,22 +89,112 @@ for _low, _high, _nominal in (
             "template low-point band spends more than a quarter of the rocker zone"
         )
 
-# The arcs end where the rocker's do: its 11.5 in / 10.5 in arc lengths
-# (``_ALPHA_TOP`` / ``_ALPHA_BOT`` half-angles), the end stations printed at
-# three places and the model carrying the printed value. The half-angles are
-# re-derived from the rounded stations so the sketch closes exactly.
+# The rocker's lower outline (the R816 arc, both tapers and both tip lands,
+# between J and K) is one 0.5 Ⓤ0 surface profile: the zone lies wholly inside
+# the material, so its middle is half the zone in from the BASIC outline along
+# each segment's own normal. A rigid +Y shift is mid-zone on the arcs only: it
+# put each tip land 0.0453 OUTSIDE that zone (#1544). So the straight edges are
+# offset along their own normals instead, through the three printed stations:
+# the top-arc end, the tip-land length and the bottom-arc end. The arcs stay
+# on the trammel's R800/R816 about CENTER_Y (MHA-CH-006-TL-14..19 scribe them).
+_MID_ZONE = _ROCKER_ZONE / 2.0  # 0.25 into the material on the lower outline
 END_PLACES = 3
-TOP_END_X = round(R_TOP * math.sin(rocker._ALPHA_TOP), END_PLACES)  # 145.240
-BOT_END_X = round(R_BOTTOM * math.sin(rocker._ALPHA_BOT), END_PLACES)  # 132.757
-if (
-    abs(TOP_END_X - rocker.TOP_END_X) > 0.5e-3
-    or abs(BOT_END_X - rocker.BOT_END_X) > 0.5e-3
-):
-    raise AssertionError("template end stations drifted from the rocker's")
+_ROCKER_CENTRE = (0.0, rocker.CENTER_Y - rocker.PIVOT_MID_Y)
+_ROCKER_MIDDLE = (0.0, _ROCKER_CENTRE[1] - (R_TOP + R_BOTTOM) / 2.0)
+
+
+def _inward(
+    start: tuple[float, float], end: tuple[float, float]
+) -> tuple[float, float]:
+    """Unit normal of start -> end toward the arm's material."""
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dy)
+    normal = (-dy / length, dx / length)
+    side = (_ROCKER_MIDDLE[0] - start[0]) * normal[0] + (
+        _ROCKER_MIDDLE[1] - start[1]
+    ) * normal[1]
+    return normal if side > 0.0 else (-normal[0], -normal[1])
+
+
+def _offset(
+    points: tuple[tuple[float, float], ...], by: float
+) -> tuple[tuple[float, float], ...]:
+    normal = _inward(points[0], points[-1])
+    return tuple((x + by * normal[0], y + by * normal[1]) for x, y in points)
+
+
+def _crossing(
+    p: tuple[float, float],
+    d: tuple[float, float],
+    q: tuple[float, float],
+    e: tuple[float, float],
+) -> tuple[float, float]:
+    s = ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / (d[0] * e[1] - d[1] * e[0])
+    return (p[0] + s * d[0], p[1] + s * d[1])
+
+
+# The rocker's BASIC +X land (radial from its top-arc end) and taper, pivot frame.
+_ROCKER_TOP_END = (
+    R_TOP * math.sin(rocker._ALPHA_TOP),
+    _ROCKER_CENTRE[1] - R_TOP * math.cos(rocker._ALPHA_TOP),
+)
+_ROCKER_TIP = (
+    _ROCKER_TOP_END[0] + rocker.TIP_FACE * math.sin(rocker._ALPHA_TOP),
+    _ROCKER_TOP_END[1] - rocker.TIP_FACE * math.cos(rocker._ALPHA_TOP),
+)
+_ROCKER_BOT_END = (
+    rocker.BOT_END_X,
+    _ROCKER_CENTRE[1] - math.sqrt(R_BOTTOM**2 - rocker.BOT_END_X**2),
+)
+ROCKER_LAND = (_ROCKER_TOP_END, _ROCKER_TIP)
+ROCKER_TAPER = (_ROCKER_TIP, _ROCKER_BOT_END)
+_LAND_AIM = _offset(ROCKER_LAND, _MID_ZONE)
+_TAPER_AIM = _offset(ROCKER_TAPER, _MID_ZONE)
+_TAPER_DIRECTION = (
+    _TAPER_AIM[1][0] - _TAPER_AIM[0][0],
+    _TAPER_AIM[1][1] - _TAPER_AIM[0][1],
+)
+# The land stays radial to CENTER_Y (the sketch's relation), aimed through its
+# mid-zone line's middle; the half-angles are re-derived from the rounded
+# stations so the sketch closes exactly.
+_LAND_AIM_MIDDLE = tuple((a + b) / 2.0 for a, b in zip(*_LAND_AIM, strict=True))
+TOP_END_X = round(
+    R_TOP
+    * _LAND_AIM_MIDDLE[0]
+    / math.hypot(_LAND_AIM_MIDDLE[0], _LAND_AIM_MIDDLE[1] - CENTER_Y),
+    END_PLACES,
+)  # 144.951
 ALPHA_TOP = math.asin(TOP_END_X / R_TOP)
+TOP_END_Y = CENTER_Y - R_TOP * math.cos(ALPHA_TOP)  # 21.491
+_LAND_DIRECTION = (math.sin(ALPHA_TOP), -math.cos(ALPHA_TOP))
+# Each tip land runs radially outward from the top arc's end to the mid-zone
+# taper; the tapered end runs from its foot to the bottom arc's end.
+TIP_FACE = round(
+    math.dist(
+        (TOP_END_X, TOP_END_Y),
+        _crossing(
+            (TOP_END_X, TOP_END_Y), _LAND_DIRECTION, _TAPER_AIM[0], _TAPER_DIRECTION
+        ),
+    ),
+    END_PLACES,
+)  # 5.699
+TIP_X = TOP_END_X + TIP_FACE * _LAND_DIRECTION[0]  # 145.984
+TIP_Y = TOP_END_Y + TIP_FACE * _LAND_DIRECTION[1]  # 15.887
+
+
+def _taper_meets_bottom_arc() -> float:
+    """X where the mid-zone taper line meets the template's bottom arc."""
+    length = math.hypot(*_TAPER_DIRECTION)
+    ex, ey = _TAPER_DIRECTION[0] / length, _TAPER_DIRECTION[1] / length
+    fx, fy = _TAPER_AIM[0][0], _TAPER_AIM[0][1] - CENTER_Y
+    b = fx * ex + fy * ey
+    along = -b + math.sqrt(b * b - (fx * fx + fy * fy - R_BOTTOM**2))
+    return _TAPER_AIM[0][0] + along * ex
+
+
+BOT_END_X = round(_taper_meets_bottom_arc(), END_PLACES)  # 132.636
 ALPHA_BOT = math.asin(BOT_END_X / R_BOTTOM)
-TOP_END_Y = CENTER_Y - R_TOP * math.cos(ALPHA_TOP)  # 21.545
-BOT_END_Y = CENTER_Y - R_BOTTOM * math.cos(ALPHA_BOT)  # 3.122
+BOT_END_Y = CENTER_Y - R_BOTTOM * math.cos(ALPHA_BOT)  # 3.102
 # With the centre on the pivot centreline and the low point held, a radius
 # error dR moves the edge at station x by dR x^2 / (2 R^2): at the end
 # stations that drift plus the low-point band stays inside the DTI acceptance.
@@ -114,19 +206,33 @@ for _name, _radius, _station in (
     _lower, _upper = printed_deviations(_radius, RADIUS_PLACES)
     END_STATION_DRIFT[_name] = (
         max(-_lower, _upper) * _station**2 / (2.0 * _radius**2)
-    )  # top 0.0084, bottom 0.0068
+    )  # top 0.0084, bottom 0.0067
     if END_STATION_DRIFT[_name] + LOW_POINT_BAND[0] > DTI_ACCEPTANCE + 1e-9:
         raise AssertionError(
             f"title-block {_name} radius band carries the arc end outside the DTI acceptance"
         )
-# Each tip land is radial (square to the top arc), TIP_FACE long, outward
-# from the top arc's end; the tapered end runs from its foot to the bottom
-# arc's end.
-TIP_FACE = rocker.TIP_FACE  # 5.588 = 0.22 in, exact at three places
-if abs(TIP_FACE - round(TIP_FACE, END_PLACES)) > 1e-9:
-    raise AssertionError("tip land length no longer prints exactly at three places")
-TIP_X = TOP_END_X + TIP_FACE * math.sin(ALPHA_TOP)  # 146.255
-TIP_Y = TOP_END_Y - TIP_FACE * math.cos(ALPHA_TOP)  # 16.050
+
+
+# The arcs' one residual: R800/R816 about CENTER_Y are _MID_ZONE toward the
+# centre from the rocker's arcs on the mirror line only; at angle phi off it
+# they fall short of mid-zone by about _MID_ZONE (1 - cos phi), most at the arc
+# ends. Exactly: a template-arc point's distance from the rocker's centre,
+# less the rocker radius, plus _MID_ZONE (both arcs' mid-zone lies centreward).
+def arc_mid_zone_residual(radius: float, x: float) -> float:
+    """Template arc ``radius`` at station ``x``: its edge's offset from mid-zone."""
+    y = CENTER_Y - math.sqrt(radius**2 - x**2)
+    return math.hypot(x, y - _ROCKER_CENTRE[1]) - radius + _MID_ZONE
+
+
+ARC_MID_ZONE_RESIDUAL = {
+    "top": arc_mid_zone_residual(R_TOP, TOP_END_X),  # 0.0041
+    "bottom": arc_mid_zone_residual(R_BOTTOM, BOT_END_X),  # 0.0033
+}
+for _name, _residual in ARC_MID_ZONE_RESIDUAL.items():
+    if not 0.0 <= _residual <= END_STATION_DRIFT[_name] + 1e-9:
+        raise AssertionError(
+            f"the {_name} arc's mid-zone residual exceeds its budgeted end drift"
+        )
 # The end stations print at three places: their band is about a quarter of
 # the rocker's own two-place band on the same ends.
 if printed_band_mm(END_PLACES) > 0.26 * printed_band_mm(2):
@@ -174,7 +280,7 @@ LOCATOR_REGISTRATION_MAX = (
     )
     / 1e4
 )  # 0.0262 = 0.0094 template + 0.0169 rocker, rounded up
-_ROCKER_ZONE = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
+# The aim spends a quarter of the zone (_ROCKER_ZONE, above) at most.
 if LOW_POINT_BAND[0] + LOCATOR_REGISTRATION_MAX > 0.25 * _ROCKER_ZONE / 2.0 + 1e-9:
     raise AssertionError(
         "pin-gauge play in both bores plus the low-point band spends more than a"
@@ -249,9 +355,9 @@ if (ROD_SLOT_FLAT - printed_band_mm(ROD_SLOT_PLACES)) / 2.0 < (
 # cross-slot shift and t the slot's cross direction, so the edge moves
 #     d.(n - g t) + g e,  g = (z x p).n / lever,
 # at most |n - g t| LOCATOR_REGISTRATION_MAX + |g| ROD_CLOCKING_PLAY, plus the
-# template's own DTI_ACCEPTANCE. The lever arm g reaches 2.08 at the tail end,
+# template's own DTI_ACCEPTANCE. The lever arm g reaches 1.10 at the tail end,
 # whose top end is the worst station (top ends -X 0.159, +X 0.108; bottom
-# ends 0.148 / 0.099; tip lands 0.080 / 0.062; apex 0.056).
+# ends 0.148 / 0.099; tapers 0.134 / 0.106; tip lands 0.062 / 0.062; apex 0.057).
 _ROD_SLOT_ROUNDING = abs(
     (ROD_SLOT_X - rocker.ROD_HOLE_X) * _ROD_SLOT_TANGENT[0]
     + (ROD_SLOT_Y - (rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y)) * _ROD_SLOT_TANGENT[1]
@@ -370,7 +476,7 @@ def outline_clocking_errors(play: float | None = None) -> list[float]:
 
 if END_STATION_SHARE >= _ROCKER_ZONE / 2.0:
     raise AssertionError("the template's clocking share leaves nothing for filing")
-ROD_CLOCKING_WORST = max(outline_clocking_errors())  # 0.1588, the tail's top end
+ROD_CLOCKING_WORST = max(outline_clocking_errors())  # 0.1586, the tail's top end
 if ROD_CLOCKING_WORST > END_STATION_SHARE + 1e-9:
     raise AssertionError(
         "pivot and rod-pin play carry an outline edge outside the template's share"
