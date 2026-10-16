@@ -390,8 +390,11 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
 def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -> None:
     features = exporter.requirement_manifest("ch_rocker_arm")["features"]
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
-        assert features[name]["requirements"] == ["tip_land", "land_angle_deg"] + (["station"] if name == "tip_land_pos_x" else [])
-    assert features["profile_outer"]["requirements"] == ["bottom_radius", "mirror_symmetric", "unknown"]
+        # The land length is BASIC with no band of its own: a field, not a requirement.
+        assert features[name]["requirements"] == ["land_angle_deg"] + (["station"] if name == "tip_land_pos_x" else []) + ["surface_profile"]
+    assert features["profile_outer"]["requirements"] == ["bottom_radius", "mirror_symmetric", "surface_profile"]
+    assert features["top_edge"]["requirements"] == ["height_above_pivot", "radius", "surface_profile"]
+    assert not any("unknown" in fields.get("requirements", ()) for fields in features.values())
     assert "bottom_arc_len" not in features["profile_outer"]["requirements"]
     assert "arc_len" not in features["top_edge"]["requirements"]
     assert features["top_edge"]["radius"] == rocker.R_TOP
@@ -404,7 +407,7 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
         ("profile_outer", rocker.TOP_EDGE_BAND[1], ", BETWEEN J AND K"),
     ):
         assert features[name]["dimension_type"] == "basic"
-        assert "unknown" in features[name]["requirements"]
+        assert features[name]["surface_profile_u"] == outside
         assert features[name]["note"] == f"SURFACE PROFILE {rocker.TOP_EDGE_BAND[0]:g} U{outside:g} TO A|B|C{suffix}"
         assert set(exporter._cite(rocker, "TOP_EDGE_BAND")) <= set(features[name]["cite"]["note"])
     assert "depth_ref" not in features["profile_outer"]["requirements"]
@@ -414,6 +417,29 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
     assert shaft["datums"] == {}
     assert set(shaft["features"]) == {"pivot_bearing", "north_flat", "south_flat", "north_dome", "south_dome"}
     assert shaft["features"]["pivot_bearing"]["requirements"] == ["dia", "finish_ra"]
+
+
+def test_rocker_profile_zones_export_the_printed_frames_and_govern_their_own_basics() -> None:
+    draw = importlib.import_module("draw_ch_rocker_arm")
+    features = exporter.requirement_manifest("ch_rocker_arm")["features"]
+    zone_fields = ("surface_profile", "surface_profile_u", "surface_profile_datums")
+    for name, frame in (("top_edge", "TopRadius"), ("profile_outer", "BottomRadius"), ("tip_land_pos_x", "BottomRadius"), ("tip_land_neg_x", "BottomRadius")):
+        fields = features[name]
+        assert fields["surface_profile"] == float(draw.ARC_PROFILE_ZONE_MM) == rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
+        assert fields["surface_profile_u"] == float(draw.ARC_PROFILE_OUTSIDE_MM[frame])
+        assert fields["surface_profile_datums"] == list(draw.ARC_PROFILE_DATUMS)
+        # Each governed key is one of the feature's own BASIC requirements.
+        assert set(fields["surface_profile_governs"]) <= set(fields["requirements"]) - {"surface_profile"}
+        assert set(exporter._cite(rocker, "TOP_EDGE_BAND")) <= set(fields["cite"]["surface_profile"])
+    # The J-to-K zone covers both lands: each declares profile_outer's identical frame.
+    lower = {field: features["profile_outer"][field] for field in zone_fields}
+    for name in ("tip_land_pos_x", "tip_land_neg_x"):
+        assert {field: features[name][field] for field in zone_fields} == lower
+        assert features[name]["surface_profile_governs"]["land_angle_deg"] == {"tilt_across": draw.TIP_LAND_LEAST_MM}
+    assert features["tip_land_pos_x"]["surface_profile_governs"]["station"] == {"sense": "increases", "obliquity_deg": math.degrees(rocker._ALPHA_TOP)}
+    assert "station" not in features["tip_land_neg_x"]["surface_profile_governs"]
+    assert features["top_edge"]["surface_profile_governs"] == {"radius": "decreases", "height_above_pivot": "increases"}
+    assert features["profile_outer"]["surface_profile_governs"] == {"bottom_radius": "increases"}
 
 
 def test_shaft_flats_are_coplanar_faces_named_by_their_stations() -> None:
