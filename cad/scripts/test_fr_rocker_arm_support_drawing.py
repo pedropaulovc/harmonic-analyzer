@@ -1189,7 +1189,9 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     assert foot[0] > web_left + 0.003
     assert base_left < drawing.RIGHT_KEEP["WebFaceStation"][0] < web_left
     assert _boxes_clear(web_face, foot, 0.003)
-    assert foot[1] > SECTION_CAPTION_BOTTOM
+    # r10 review: one mm lower than r8's row, the 63.5's left extension line
+    # overshot its line into the SECTION A-A label's E.
+    assert drawing.RIGHT_KEEP["FootSpan"][1] >= 0.133
     for other in (
         _text_box("R12.7\n4X", drawing.FRONT_KEEP["CavityRadius"]),
         _rim_chamfer_box(),

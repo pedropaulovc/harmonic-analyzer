@@ -304,15 +304,17 @@ FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
 # extension line up to TaperRun. The 16.9 prints right of its span, off the
 # top-face edge's extension line TaperRun runs on up past it; the 63.5
 # prints right of the web face's extension line WebFaceStation runs down to
-# just above it. TaperRun (the base edge to the top face's) and
-# WebFaceStation (to the web's face, WebLocationReference, blanked in the
-# part) both measure from the base's -Z edge, the section's left.
+# just above it, its row no lower than r8's (r10 review: 1 mm lower, its
+# left extension line's overshoot struck the SECTION A-A label's E).
+# TaperRun (the base edge to the top face's) and WebFaceStation (to the
+# web's face, WebLocationReference, blanked in the part) both measure from
+# the base's -Z edge, the section's left.
 RIGHT_KEEP = {
     "WallHeight": (0.256, 0.185),
-    "FootSpan": (0.2125, 0.132),
+    "FootSpan": (0.2125, 0.133),
     "TopSpan": (0.2155, 0.238),
     "TaperRun": (0.195, 0.2475),
-    "WebFaceStation": (0.1958, 0.1365),
+    "WebFaceStation": (0.1958, 0.1375),
     "PocketFloorRadius": (0.2335, 0.2195),
 }
 # The chamfer text on its OffsetText leader (the text centres on its point),
