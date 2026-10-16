@@ -609,12 +609,17 @@ def test_override_reaches_model_and_hash_without_losing_package_context(
     _, part = case
     assembly = mr.ReviewPackage(part.name, "assembly", part.sources)
     reviews = []
+    source_snapshots = []
     for index, (package, prompt) in enumerate([
         (part, ""), (assembly, ""), (assembly, "Rubric A"), (assembly, "Rubric B"),
     ]):
         identity = _identity((case[0], package), prompt=prompt, reviewer=reviewer)
         result = evaluation.run_case(identity, "baseline", package, prompt, tmp_path / str(index))
         assert result["error"] is None
+        source_snapshots.append([
+            Path(source)
+            for source in result["review"]["extra"]["evidence"]["attempts"][0]["sources"]
+        ])
         reviews.append(result["review"])
         sent = provider["calls"][-1]["prompt"]
         assert result["review"]["prompt_sha256"] == hashlib.sha256(sent.encode()).hexdigest()
@@ -627,7 +632,7 @@ def test_override_reaches_model_and_hash_without_losing_package_context(
     assert reviews[2]["prompt_sha256"] != reviews[3]["prompt_sha256"]
     attempt_dirs = {call["attempt_dir"] for call in provider["calls"]}
     assert len(attempt_dirs) == len(provider["calls"])
-    for call in provider["calls"]:
+    for call, sources in zip(provider["calls"], source_snapshots):
         # Each attempt runs in its own neutral directory, outside the repository.
         assert call["cwd"] == call["attempt_dir"]
         assert not any((parent / ".git").exists() for parent in call["cwd"].resolve().parents)
@@ -636,7 +641,7 @@ def test_override_reaches_model_and_hash_without_losing_package_context(
             assert call["codex_home"] == str(mr.CODEX_HOME)
         else:
             assert call["files"] == {"schema.json", "mcp.json"}
-        assert call["sources"] == list(part.sources)
+        assert call["sources"] == sources
         assert call["images"] == [part.sources[0].read_bytes()]
         assert call["cwd"] != part.sources[0].parent
         assert str(part.sources[0]) not in call["prompt"]
@@ -647,7 +652,7 @@ def test_override_reaches_model_and_hash_without_losing_package_context(
                 argument.split("=", 1)[1] for argument in call["command"]
                 if argument.startswith("mcp_servers.sheets.args=")
             ))
-            assert args[1:] == [str(source.resolve()) for source in part.sources]
+            assert args[1:] == [str(source.resolve()) for source in sources]
         else:
             assert call["command"][call["command"].index("--allowedTools") + 1] == (
                 "mcp__sheets__view_sheet,mcp__sheets__crop"
@@ -1118,7 +1123,15 @@ def test_mcp_provenance_preserves_sources_actual_argv_and_path_adapted_argv(
     assert attempt_dir == provider["calls"][0]["attempt_dir"]
     assert cwd == provider["calls"][0]["cwd"]
     assert retained == (directory / result["report"]).parent / f"{case[1].name}.attempts" / attempt_dir.name
-    assert invocation["sources"] == [str(source.resolve()) for source in case[1].sources]
+    report_path = directory / result["report"]
+    snapshot_sources = [
+        report_path.parent / f"{case[1].name}.sources" / source.name
+        for source in case[1].sources
+    ]
+    assert invocation["sources"] == [str(source.resolve()) for source in snapshot_sources]
+    assert [mr._sha256(source) for source in snapshot_sources] == [
+        mr._sha256(source) for source in case[1].sources
+    ]
     command = invocation["command"]
     assert command == provider["calls"][0]["command"]
     # retained_argv is not a replay. It only re-points the attempt's own files at
@@ -1151,7 +1164,7 @@ def test_mcp_provenance_preserves_sources_actual_argv_and_path_adapted_argv(
         assert json.loads((retained / "mcp.json").read_text(encoding="utf-8")) == {
             "mcpServers": {"sheets": {
                 "command": sys.executable,
-                "args": [str(mr.SHEETS_SERVER), *(str(source.resolve()) for source in case[1].sources)],
+                "args": [str(mr.SHEETS_SERVER), *(str(source.resolve()) for source in snapshot_sources)],
             }},
         }
         assert invocation["artifacts"] == []
@@ -1230,7 +1243,9 @@ def test_original_frozen_source_digest_is_revalidated_without_model_execution(
 
 
 @pytest.mark.parametrize("reviewer", ["codex", "claude"])
-@pytest.mark.parametrize("damage", ["missing", "foreign", "relative", "duplicate", "report_sources"])
+@pytest.mark.parametrize(
+    "damage", ["missing", "foreign", "relative", "duplicate", "report_sources", "snapshot_content"],
+)
 def test_source_allowlist_cannot_be_redefined_by_preserved_report(
     tmp_path: Path, case, provider, reviewer: str, damage: str,
 ) -> None:
@@ -1250,10 +1265,14 @@ def test_source_allowlist_cannot_be_redefined_by_preserved_report(
         invocation["sources"] = [case[1].sources[0].name]
     elif damage == "duplicate":
         invocation["sources"] *= 2
+    elif damage == "snapshot_content":
+        Path(invocation["sources"][0]).write_bytes(b"tampered snapshot")
     else:
         report["sources"] = [str(Path(invocation["retained_dir"]) / "sheet-1.png")]
     _preserve_report(result, directory, report)
-    with pytest.raises(ValueError, match="allowlist|inputs/settings"):
+    with pytest.raises(
+        ValueError, match="allowlist|inputs/settings|immutable source snapshot",
+    ):
         evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
 
 
