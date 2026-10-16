@@ -484,12 +484,19 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert f"{x} WEST OF THE RAIL WEB CENTRE BELOW IT" in fitted
     z = f"Z {front:.{places}f} AND {rear:.{places}f} FROM THE UPPER-LEFT SOCKET"
     assert z in fitted
-    assert (
-        f"WITHIN {keeper.KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}, SO THE " in fitted
-    )
+    assert f"WITHIN {keeper.KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}: THE " in fitted
     # The band's function (Main's ruling, 2026-10-16): the shaft's flat-station
-    # window, 0.14 at 0.02 and gone by 0.09 (ch_fulcrum_shaft_spec).
-    assert f"SO THE {fulcrum_shaft} FLATS LIE UNDER BOTH CROWN TAPS." in fitted
+    # window, 0.14 at 0.02 and gone by 0.09 (ch_fulcrum_shaft_spec). The slide
+    # (r11 review) moves both flats at once; the band is what leaves it a seat.
+    staked_number = steps.step_number(steps.SET_SCREWS_STAKED_KEY)
+    assert (
+        f"THE {fulcrum_shaft} FLATS ARE A FIXED PITCH APART, AND THIS BAND LEAVES "
+        f"ONE STEP {staked_number} SHAFT POSITION WITH BOTH FLATS UNDER THEIR "
+        "CROWN TAPS AND NO LEVER HUB ON A FLAT."
+    ) in fitted
+    assert "EACH FLAT LIES UNDER ITS CROWN TAP" in _step_body(
+        steps.SET_SCREWS_STAKED_KEY
+    )
     assert "TRANSFER EACH FOOT HOLE INTO THE RAIL" in fitted
     staked = _step_body(steps.SET_SCREWS_STAKED_KEY)
     assert "STAKE EACH TAP MOUTH AT 2 POINTS" in staked
