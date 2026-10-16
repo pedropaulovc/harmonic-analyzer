@@ -88,13 +88,14 @@ SHEET_LAYOUTS = dict(
     )
 )
 # The machine is 1360 tall: 1:5 holds it on a portrait sheet at a scale the
-# fitter can read. The explode spreads ~1.4 x 2.0 m on screen (summing lever
-# lifted over the gooseneck, drive train east and below): 1:10 keeps it and
-# its balloon ring between the BOM and the title block. The steps sheet's
-# orientation view is a thumbnail beside the text.
+# fitter can read. The explode's isometric spreads 2.6 x 3.1 m (r1 farm
+# outline: the summing lever lifted over the gooseneck, drive train west and
+# the channel bank behind): 1:15 keeps it and its balloon ring between the BOM
+# and the title block. The steps sheet's orientation view is a thumbnail
+# beside the text.
 ASSEMBLED_SCALE = (1.0, 5.0)
-EXPLODED_SCALE = (1.0, 10.0)
-STEPS_VIEW_SCALE = (1.0, 15.0)
+EXPLODED_SCALE = (1.0, 15.0)
+STEPS_VIEW_SCALE = (1.0, 20.0)
 SHEET_SCALES = dict(
     zip(
         SHEET_NAMES,
