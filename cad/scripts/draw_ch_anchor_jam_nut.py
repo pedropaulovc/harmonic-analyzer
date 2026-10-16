@@ -49,10 +49,11 @@ from ch_anchor_jam_nut_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     OD,
+    OD_CALLOUT,
     SLOT_CALLOUT,
-    SLOT_DEPTH,
     TAP_DRILL_DIA,
     THICKNESS,
+    THICKNESS_CALLOUT,
     THREAD,
 )
 
@@ -88,26 +89,38 @@ DRAWING_PRECISION_BY_NAME = {
 }
 
 # The O.D. and the slot width both import on the face view.  The slot width
-# stays there, left of the face across the cut; the O.D. is a donor there
-# (its line would cross the cut and the thread callout) and moves onto the
-# side view, right of the nut.  The side view looks along the cut (the
-# driven face on its left): the thickness hangs under it, the cut depth sits
-# over the notch above it.
+# stays there, left of the face across the cut, its value and callout hung
+# below the lower arrow (farm r7: centred between the arrows, both extension
+# lines ran through the value); the O.D. is a donor there (its line would
+# cross the cut and the thread callout) and moves onto the side view, right
+# of the nut.  The side view looks along the cut (the driven face on its
+# left): the thickness hangs under it, the cut depth sits over the notch
+# above it.
 FRONT_KEEP = {
     "NutOd": (FRONT_CENTER[0] - _HALF_OD - 0.020, FRONT_CENTER[1] - 0.040),
-    "SlotWidth": (FRONT_CENTER[0] - _HALF_OD - 0.018, FRONT_CENTER[1]),
+    "SlotWidth": (FRONT_CENTER[0] - _HALF_OD - 0.012, FRONT_CENTER[1] - 0.012),
 }
 RIGHT_KEEP = {
     "NutThickness": (RIGHT_CENTER[0], RIGHT_CENTER[1] - _HALF_OD - 0.018),
+    # Left of the driven face, arrows in from outside (farm r7: centred over
+    # the 5 mm notch, the floor's extension line ran through the value).
     "SlotDepth": (
-        RIGHT_CENTER[0] - _HALF_T + SLOT_DEPTH / 2.0 * _S,
+        RIGHT_CENTER[0] - _HALF_T - 0.009,
         RIGHT_CENTER[1] + _HALF_OD + 0.018,
     ),
 }
-OD_ON_SIDE = (RIGHT_CENTER[0] + _HALF_T + 0.025, RIGHT_CENTER[1])
+# Far enough right that the O.D.'s callout, centred under its value, clears
+# the side view.
+OD_ON_SIDE = (RIGHT_CENTER[0] + _HALF_T + 0.040, RIGHT_CENTER[1])
 THREAD_CALLOUT_XY = (FRONT_CENTER[0] + _HALF_OD + 0.012, FRONT_CENTER[1] + 0.035)
 # Rule 12 (hole and slot callouts say what to do): the drive cut is sawn.
-DIMENSION_CALLOUTS = {"SlotWidth": SLOT_CALLOUT}
+# Rule 4: the O.D.'s tight band names its function; rule 20: the thin nut's
+# engagement is stated as a fact on its thickness.
+DIMENSION_CALLOUTS = {
+    "SlotWidth": SLOT_CALLOUT,
+    "NutOd": OD_CALLOUT,
+    "NutThickness": THICKNESS_CALLOUT,
+}
 
 
 def _assert_native_thread(display: Any) -> None:

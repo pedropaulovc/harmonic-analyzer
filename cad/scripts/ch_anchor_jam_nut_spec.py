@@ -99,5 +99,15 @@ TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 SLOT_SPAN = OD + 2.0
 # Rule 12 (hole and slot callouts say what to do): the drive cut is sawn.
 SLOT_CALLOUT = "SAW ACROSS"
+# The O.D.'s three places are for its neighbours: twenty nuts stand side by
+# side at the anchor pitch, and the 0.25 gap holds only at the .XXX band.
+OD_CALLOUT = "CLEARS THE NEXT MHA-CH-012"
+# A jam nut is thin by kind, and the stock anchor's shank caps it: the full
+# thread it carries at its thinnest, less the incomplete thread a through tap
+# leaves, falls short of 1.5D and the sheet states it as a fact.
+INCOMPLETE_THREADS = 1.5
+ENGAGEMENT_MIN = THICKNESS_MIN - INCOMPLETE_THREADS * ANCHOR_9489T111.thread_pitch_mm
+ENGAGEMENT_MIN_D = ENGAGEMENT_MIN / THREAD_MAJOR
+THICKNESS_CALLOUT = f"ENGAGEMENT {ENGAGEMENT_MIN:.1f} MIN ({ENGAGEMENT_MIN_D:.1f}D)"
 # No surface runs or slides: no roughness symbol.
 SURFACE_FINISHES: tuple = ()
