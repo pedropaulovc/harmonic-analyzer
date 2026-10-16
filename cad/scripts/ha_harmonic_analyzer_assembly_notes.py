@@ -43,7 +43,8 @@ if set(BOM_DESCRIPTIONS) != set(BOM_ORDER):
 # fulcrum shaft that first held it is buried in the lever hubs (r2 leaf: no
 # visible edge).
 BALLOON_PARTS: dict[str, str] = {
-    "fr-frame": "fr-top-frame",
+    # The base, nearest the viewer: the top frame's leader crossed the frame.
+    "fr-frame": "fr-harmonic-base",
     "dt-drive-train": "dt-crank-handle",
     "ch-channel": "ch-channel-lever",
     "sm-summing": "sm-summing-lever",
@@ -94,8 +95,8 @@ _STEP_TEXT: dict[str, str] = {
         "BEFORE FINAL ASSEMBLY. THE POST STAYS OUT OF ITS HUB."
     ),
     "channel-built": (
-        "CHANNEL BANK: BUILD MHA-CH-000 COMPLETE. EACH MHA-VN-004 SPRING HANGS "
-        "FROM ITS LEVER WITH ITS BOTTOM LOOP FREE."
+        "CHANNEL BANK: BUILD MHA-CH-000 COMPLETE ON THE FRAME PER ITS STEPS. "
+        "EACH MHA-VN-004 SPRING HANGS FROM ITS LEVER WITH ITS BOTTOM LOOP FREE."
     ),
     "channel-anchors-set": (
         f"CHANNEL ANCHORS ({CHANNEL_ANCHORS} OFF): DISCARD THE HEX NUT SUPPLIED "
