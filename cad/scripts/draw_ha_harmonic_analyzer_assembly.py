@@ -89,13 +89,14 @@ SHEET_LAYOUTS = dict(
     )
 )
 # The machine is 1360 tall: 1:5 holds it on a portrait sheet at a scale the
-# fitter can read. The explode's isometric spreads 2.6 x 3.1 m (r1 farm
-# outline: the summing lever lifted over the gooseneck, drive train west and
-# the channel bank behind): 1:15 keeps it and its balloon ring between the BOM
-# and the title block. The steps sheet's orientation view is a thumbnail
-# beside the text.
+# fitter can read. The explode's isometric outline (SolidWorks' projected
+# model box, about twice the ink) is 2.41 x 2.94 m (r5 audit: 161 x 196 mm at
+# 1:15, the ink only ~82 x 125 mm, leaving most of the sheet empty). 1:12
+# keeps that outline (201 x 245 mm) inside the border and between the BOM and
+# the title block, the ink ~1.25x larger. The steps sheet's orientation view is
+# a thumbnail beside the text.
 ASSEMBLED_SCALE = (1.0, 5.0)
-EXPLODED_SCALE = (1.0, 15.0)
+EXPLODED_SCALE = (1.0, 12.0)
 STEPS_VIEW_SCALE = (1.0, 20.0)
 SHEET_SCALES = dict(
     zip(

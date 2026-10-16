@@ -9,7 +9,7 @@ unmoved), and the assembly is collapsed again before save -- the saved
 operational pose is proven unchanged, transform for transform. The same steps
 are authored in Default and in Default Simplified (as
 ``HA_EXPLODED Simplified``): a drawing view shows the explode of the
-configuration it references, and the exploded sheet's 1:15 view references the
+configuration it references, and the exploded sheet's view references the
 teeth/thread-free one.
 """
 
