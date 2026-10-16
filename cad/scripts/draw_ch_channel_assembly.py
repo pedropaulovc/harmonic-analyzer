@@ -289,6 +289,7 @@ class BankView:
     orientation: str = "*Right"
     exploded: bool = False
     letter: str = ""  # a detail's letter, at its boundary in the parent
+    letter_corner: tuple[int, int] = (1, 1)  # letter_xy's corner for it
 
     @property
     def mm(self) -> float:
@@ -384,10 +385,15 @@ def detail_boundary(
     return centre, detail.crop_radius_mm * parent.mm
 
 
-def letter_xy(centre: tuple[float, float], radius: float) -> tuple[float, float]:
-    """A detail letter's note point, past its boundary on the upper right."""
+def letter_xy(
+    centre: tuple[float, float],
+    radius: float,
+    corner: tuple[int, int] = (1, 1),
+) -> tuple[float, float]:
+    """A detail letter's note point, past its boundary toward ``corner``
+    (x, y signs: (1, 1) upper right)."""
     offset = radius + DETAIL_LETTER_OFFSET
-    return centre[0] + offset, centre[1] + offset
+    return centre[0] + corner[0] * offset, centre[1] + corner[1] * offset
 
 
 LEVER_BANK = BankView(
@@ -461,6 +467,10 @@ NORTH_KEEPER_DETAIL = BankView(
     orientation="*Isometric",
     exploded=True,
     letter="C",
+    # Lower right: at the upper right, lever balloon 14's leader ran through
+    # the letter (r8 layout audit, leader-through-text); r7's leaders pass
+    # 10 mm clear of the lower right.
+    letter_corner=(1, -1),
 )
 EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
 _STACK_MID = (asm.PIVOT_CHAIN_Z[2] + asm.PIVOT_CHAIN_Z[3]) / 2.0
@@ -1158,17 +1168,18 @@ def _mark_detail(
     view: Any,
     centre: tuple[float, float],
     radius: float,
-    letter: str,
+    detail: BankView,
     *,
     parent: str,
 ) -> None:
     """Draw a detail's boundary circle (sheet m) in its parent ``view`` and
     letter it outside, view-owned so both move with the view."""
-    label = f"{parent} detail {letter} boundary"
+    label = f"{parent} detail {detail.letter} boundary"
     _sketch_view_circle(adapter, view, centre, radius, label=label)
     adapter.currentModel.ClearSelection2(True)
     _activate_view(adapter, view, label=parent)
-    if add_note(adapter, letter, *letter_xy(centre, radius)) is None:
+    point = letter_xy(centre, radius, detail.letter_corner)
+    if add_note(adapter, detail.letter, *point) is None:
         raise RuntimeError(f"failed to letter the {label}")
 
 
@@ -1198,7 +1209,7 @@ def _mark_exploded_details(adapter: Any, exploded: Any) -> None:
             exploded,
             (centre[0], centre[1]),
             radius,
-            detail.letter,
+            detail,
             parent="channel exploded",
         )
 
@@ -1226,7 +1237,7 @@ def _dimensioned_bank(
     )
     if detail is not None:
         centre, radius = detail_boundary(bank, detail)
-        _mark_detail(adapter, view, centre, radius, detail.letter, parent=bank.title)
+        _mark_detail(adapter, view, centre, radius, detail, parent=bank.title)
     if bank.crop_radius_mm is not None:
         _crop(adapter, view, bank)
         kept = {
