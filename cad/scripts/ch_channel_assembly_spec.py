@@ -4,16 +4,19 @@ Pure data, no SolidWorks: build_ch_channel_assembly authors the settings
 reference sketch and the named explode from it, and draw_ch_channel_assembly
 reads the same names back.
 
-Settings (``FEATURE``): one construction chain on the Right plane (sketch x is
-machine -z, sketch y machine y) along the pivot axis -- south ear inner face,
-south washer south face, hub 0 south face, hub 19 north face -- and one leg on
-the fulcrum axis between the keeper lugs' inner faces. The spring set and the
-closed-up stack length are the fit-up's two settings (rocker_bank_layout); the
-lug span is shown as a reference, the pair being set off the top frame.
+Settings: two construction sketches on the Right plane (sketch x is machine
+-z, sketch y machine y), one per bank view, so each 1:1 view shows only the
+chain on its own axis (the other lies 808 mm off it, off the sheet).
+``PIVOT_FEATURE`` is a chain along the pivot axis -- south ear inner face,
+south washer south face, hub 0 south face, hub 19 north face;
+``FULCRUM_FEATURE`` one leg on the fulcrum axis between the keeper lugs'
+inner faces. The spring set and the closed-up stack length are the fit-up's
+two settings (rocker_bank_layout); the lug span is shown as a reference, the
+pair being set off the top frame.
 
 Explode (``EXPLODED_VIEW_NAME``): every channel alike, end hardware out along
 z on its own side, fasteners up out of their taps, the rods down off the
-arms, the bars (with the pins pressed in them) west off the levers and the
+arms, the bars (with the pins pressed in them) east along the levers and the
 spring anchors down; the shafts, rockers, levers and springs stay put.
 """
 
@@ -42,8 +45,10 @@ from rocker_bank_layout import (
     STACK_MID_Z,
 )
 
-# --- Settings reference sketch ----------------------------------------------
-FEATURE = "ChannelSettingsReference"
+# --- Settings reference sketches --------------------------------------------
+PIVOT_FEATURE = "RockerBankSettingsReference"
+FULCRUM_FEATURE = "LeverBankSettingsReference"
+FEATURES = (PIVOT_FEATURE, FULCRUM_FEATURE)
 SPRING_SET_DIMENSION = "RockerSpringSet"
 STACK_LENGTH_DIMENSION = "RockerStackLength"
 LUG_SPAN_DIMENSION = "KeeperLugSpan"
@@ -72,10 +77,15 @@ if abs(LUG_INNER_FACE_Z[1] - LUG_INNER_FACE_Z[0] - KEEPER_INNER_FACE_SPAN_MM) > 
 
 # Marked for the drawing: the two settings and the reference span.
 DRAWING_DIMENSIONS = {
-    FEATURE: {SPRING_SET_DIMENSION, STACK_LENGTH_DIMENSION, LUG_SPAN_DIMENSION}
+    PIVOT_FEATURE: {SPRING_SET_DIMENSION, STACK_LENGTH_DIMENSION},
+    FULCRUM_FEATURE: {LUG_SPAN_DIMENSION},
 }
 DRAWING_PRECISION = {
-    FEATURE: {SPRING_SET_DIMENSION: 2, STACK_LENGTH_DIMENSION: 2, LUG_SPAN_DIMENSION: 2}
+    PIVOT_FEATURE: {SPRING_SET_DIMENSION: 2, STACK_LENGTH_DIMENSION: 2},
+    FULCRUM_FEATURE: {LUG_SPAN_DIMENSION: 2},
+}
+DIMENSION_FEATURE = {
+    name: feature for feature, names in DRAWING_DIMENSIONS.items() for name in names
 }
 TOLERANCE_PRECISION = 2
 # (lower, upper) deviations; the stack accepts only long (STACK_L20_ACCEPT).
@@ -89,7 +99,7 @@ DIMENSION_CALLOUTS = {
     STACK_LENGTH_DIMENSION: "STACK, CLOSED UP",
     LUG_SPAN_DIMENSION: "LUG SPAN",
 }
-if set(DIMENSION_TOLERANCES) | REFERENCE_DIMENSIONS != DRAWING_DIMENSIONS[FEATURE]:
+if set(DIMENSION_TOLERANCES) | REFERENCE_DIMENSIONS != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension is toleranced or reference")
 
 # --- Named explode -----------------------------------------------------------
