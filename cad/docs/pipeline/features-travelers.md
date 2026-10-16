@@ -256,7 +256,7 @@ files, CAD-tagged fixture spec modules, the locked consumer and executed wrapper
 closure. It runs locally on the submitter without a SolidWorks seat, including
 under the farm executor, and needs FreeCAD 1.1 (see
 [`DEVELOPING.md`](../../../DEVELOPING.md#process-traveler-prerequisites)).
-The consumer is pinned to PyPI `prechips==0.1.1`; no upstream examples are run by
+The consumer is pinned to PyPI `prechips==0.1.2`; no upstream examples are run by
 this task family.
 
 | prechips exit | build/release gate | interpretation |
@@ -277,7 +277,7 @@ record matching SHA-256 hashes for every render under `inputs["render:…"]`,
 declare `expected_exit == 0`, and match the manifest's `step_sha256`.
 Its `hash` must equal `prechips.report.report_hash(report)`, so editing report
 metadata without regenerating its canonical content hash also invalidates it.
-prechips 0.1.1 does not record an HTML digest itself. After a successful default
+prechips 0.1.2 does not record an HTML digest itself. After a successful default
 run, the wrapper adds `inputs["traveler:html"]` with the exact HTML path,
 SHA-256 and original `source_report_hash`, then recomputes the report's canonical
 hash. The HTML's `prechips-report` meta tag keeps that original upstream hash,
