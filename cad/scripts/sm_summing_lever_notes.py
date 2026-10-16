@@ -44,7 +44,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Model-owned text the part writes onto its own dimensions (prefix compartment).
 # The summation web's two sides share one radius; both trunnions one length,
-# one knife-edge radius and one hexagon (Detail A shows the +Z one).  A radial
+# one knife-edge radius and one hexagon (Detail D shows the +Z one).  A radial
 # prefix replaces the native R, so a radius prefix carries its own.
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("SummationPlateProfile", "SummationArcRadius"): "2X R",
@@ -72,26 +72,39 @@ BRACKET_SCREW_NUMBER = "MHA-VN-050"  # vn-magnifying-bracket-screw
 # at the plate end inside the cylinder; the radius's text has room only for
 # its value (inside the arc, clear of the trunnion stub), so the boss's
 # diameter names both ends.  The three receiver coordinates are one bracket
-# hole pattern: the outer station names the mate once.  The spring-anchor pad
-# is on the underside, which no view shows full length, so its width says it
-# runs the plate's length.
+# hole pattern, each tight station naming the mate (rule 7: flagged where it
+# applies).  The spring-anchor pad is on the underside, which no view shows
+# full length, so its width says it runs the plate's length.  The hexagon's
+# width holds .XXX for the trunnion's worst-case free rock in the knife
+# mount's bore (``sm_knife_mount_spec``), so it names that.
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "EdgeRibFrontEndTopX": "ALL RIBS",
     "EdgeRibFrontEndTopY": "END RIBS",
+    "ReceiverY0": f"MATCHES {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
+    "HexWidth": f"SETS FREE ROCK\nIN {KNIFE_MOUNT_NUMBER}",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
     "ReceiverX0": f"MATCHES HOLES IN\nBRACKET {BRACKET_NUMBER}",
+    "ReceiverX1": f"MATCHES {BRACKET_NUMBER}",
     "RibDepth": f"TAPPED END RIB\nCONTAINS {BRACKET_SCREW_NUMBER} TAP DRILL",
     "SpringPadWidth": "UNDERSIDE PAD\nFULL LENGTH",
 }
 
-# Leads the 2-56 receiver callout: what its two depth bands hold.
+# Leads the 2-56 receiver callout: what its two depth bands hold.  The full
+# thread's +/-0.05 is the bottoming tap's: its deepest thread plus two
+# pitches of lead must stay inside the shallowest drill
+# (``magnifying_bracket_joint_layout.TAP_LEAD_MARGIN_MIN``; machinist review
+# r5 read the band as idle on a full-thread minimum).
 BRACKET_TAP_CALLOUT_PROCESS = (
-    f"FULL THREAD IN END RIB, DRILL CLEARS {BRACKET_SCREW_NUMBER} TIP\n"
+    f"FULL THREAD IN END RIB\nDRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"
 )
+# Leads the 20X 6-32 callout: the thread runs the padded thickness (the back
+# view's 7.00), not the bare plate's 5.08 (machinist review r5 read it as
+# the plate's, 1.1D).
+SPRING_TAP_CALLOUT_PROCESS = "THREAD THRU PLATE AND PAD\n"
 
 # --- Joint proofs the print relies on (drawing-guidelines rules 18 and 20). ---
 # The 20 channel-spring anchors thread through the pad: its worst-case
