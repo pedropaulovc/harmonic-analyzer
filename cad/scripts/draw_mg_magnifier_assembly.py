@@ -52,8 +52,10 @@ import mg_magnifier_assembly_spec as stack
 import mg_magnifier_explode_spec as explode
 from _check import check
 from _com import _early_bound
+from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
+    BalloonLanding,
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
@@ -64,6 +66,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_high_quality_shaded_with_edges,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -174,7 +177,10 @@ LEVER_VIEW_LABEL = "lever settings (Front)"
 # corner, and under the BOM the collapsed whole-assembly view the BOM is
 # inserted on (the MHA-PD-000 BOM reference): the exploded views are isolated
 # afterwards, and view-only isolation must never touch the view that owns the
-# parts list.
+# parts list. The reference is HIDDEN once the package is laid out: machinist
+# review r2 (run 20261016T105658863Z-132a077b63f840489c527e3ef02d296d) found
+# the whole assembly unreadable at the 1:16 its field allows, and a repeat of
+# sheet 4's 1:4 finished view, so it only carries the parts list.
 BALLOON_MARGIN = 0.012
 BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
 # Wide enough that no description wraps: r3 (run
@@ -211,16 +217,14 @@ WHEEL_LABEL = "wheel group exploded"
 # rows; the reference view still fits its field at 1:16 (44.3 mm tall on r3).
 BOM_HEADING_ROWS = 3
 BOM_BOTTOM = BOM_ANCHOR[1] - (len(stack.BOM_ORDER) + BOM_HEADING_ROWS) * BOM_ROW_HEIGHT
-BOM_REFERENCE_CAPTION_XY = (BOM_ANCHOR[0], BOM_BOTTOM - _PAD)
 BOM_REFERENCE_FIELD = (
     BOM_ANCHOR[0],
     TITLE_BLOCK[3] + _PAD,
     INNER_BORDER[2] - _PAD,
-    BOM_REFERENCE_CAPTION_XY[1] - 0.006,
+    BOM_BOTTOM - _PAD - 0.006,
 )
 BOM_REFERENCE_SCALE_LADDER = ((1.0, 8.0), (1.0, 10.0), (1.0, 12.0), (1.0, 16.0))
 BOM_REFERENCE_LABEL = "BOM reference"
-BOM_REFERENCE_CAPTION = "COMPLETE ASSEMBLY"
 # Sheet 3: the lever group's exploded view over the full width above the
 # title block; its caption left of the title block.
 LEVER_FIELD = (
@@ -233,13 +237,19 @@ LEVER_GROUP = "LEVER GROUP"
 LEVER_CAPTION_XY = (INNER_BORDER[0] + _PAD + 0.002, TITLE_BLOCK[3] - _PAD)
 LEVER_LABEL = "lever group exploded"
 # Sheet 4: the sequence and checks down the left, the finished assembly right
-# of them above the title block, its caption over it.
+# of them above the title block, its caption centred over it. The lever wire's
+# balloon stands right of the view (FINISHED_WIRE_BALLOON_*).
 STEPS_XY = (0.018, 0.258)
 STEPS_LINE_WIDTH = 58  # characters; default-format note text (as MHA-MS-000)
 STEPS_RIGHT = 0.156  # 58 default-format characters from STEPS_XY
 # Default-format note line pitch (the MHA-PD-000 stake note measured 0.0045).
 NOTE_LINE_PITCH = 0.0046
-FINISHED_CAPTION_XY = (STEPS_RIGHT + _PAD, INNER_BORDER[3] - _PAD)
+# Machinist review r2: the caption at the field's left corner sat ~40 mm left
+# of the view it names, so it is centred over the view's outline once the view
+# has settled. Its width is the character count at the r6 PDF's measured
+# pitch ("FINISHED ASSEMBLY (SCALE 1:4)": 29 characters, 68.8 mm).
+CAPTION_CHAR_WIDTH = 0.00237
+CAPTION_GAP = 0.004
 FINISHED_FIELD = (
     STEPS_RIGHT + _PAD,
     TITLE_BLOCK[3] + _PAD,
@@ -254,6 +264,14 @@ FINISHED_CENTER = (
 FINISHED_SCALE_LADDER = (SHEET_SCALE, (1.0, 5.0), (1.0, 6.0))
 FINISHED_LABEL = "finished assembly"
 FINISHED_CAPTION = "FINISHED ASSEMBLY"
+# The wire's only model edges are its two end circles: the hook end sits under
+# the fixture's spigot, so its balloon lands on the drum end inside the wheel.
+# Ringed about the view's centre, that balloon dropped below the view and its
+# leader rose through the wheel bar, the rim and the spokes (machinist review
+# r2). It is moved right of the view instead, rising at this angle from its
+# landing so the leader leaves the wheel above the bar through the upper-right
+# spoke gap.
+FINISHED_WIRE_BALLOON_RISE_DEG = 35.0
 
 BOM_QUANTITIES = {stem: stack.QUANTITIES[stem] for stem in stack.BOM_ORDER}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
@@ -1128,14 +1146,14 @@ def _validate_bom(adapter: Any, table: Any) -> dict[str, str]:
     return {stem: values[1] for stem, values in actual.items()}
 
 
-def _assert_bom_clears_reference_caption(table: Any) -> None:
-    """The BOM's printed bottom must stay above the reference caption.
+def _assert_bom_clears_reference_field(table: Any) -> None:
+    """The BOM's printed bottom must stay above the reference view's field.
 
-    The reference view and its caption are laid out from :data:`BOM_BOTTOM`
-    before the table exists; this reads the inserted table's anchor and row
-    heights (top-left anchored, as the layout audit boxes it) so a taller
-    heading or a wrapped row fails here, naming the measured bottom. The
-    margin is the audit's text air (it wanted 2.26 mm on r3).
+    The reference field is laid out from :data:`BOM_BOTTOM` before the table
+    exists; this reads the inserted table's anchor and row heights (top-left
+    anchored, as the layout audit boxes it) so a taller heading or a wrapped
+    row fails here, naming the measured bottom. The margin is the audit's
+    text air (it wanted 2.26 mm on r3); the hidden view keeps its outline.
     """
     bound = _early_bound(table, "ITableAnnotation")
     annotation = _early_bound(bound.GetAnnotation(), "IAnnotation")
@@ -1147,12 +1165,81 @@ def _assert_bom_clears_reference_caption(table: Any) -> None:
         bom_top_mm=round(top * 1000.0, 2),
         bom_bottom_mm=round(bottom * 1000.0, 2),
     )
-    if bottom < BOM_REFERENCE_CAPTION_XY[1] + 0.0025:
+    if bottom < BOM_REFERENCE_FIELD[3] + 0.0025:
         raise RuntimeError(
-            f"magnifier BOM bottom {bottom * 1000.0:.1f} mm runs onto the reference "
-            f"caption at {BOM_REFERENCE_CAPTION_XY[1] * 1000.0:.1f} mm "
+            f"magnifier BOM bottom {bottom * 1000.0:.1f} mm runs into the reference "
+            f"field at {BOM_REFERENCE_FIELD[3] * 1000.0:.1f} mm "
             f"(planned {BOM_BOTTOM * 1000.0:.1f} mm)"
         )
+
+
+def _hide_bom_reference(adapter: Any, view: Any, table: Any, items: dict[str, str]) -> None:
+    """Hide the view the BOM is inserted on; the parts list must not move.
+
+    ``IView.SetVisible`` returns nothing, so ``GetVisible`` proves the hide;
+    the BOM rows are read again because a table that followed its view's
+    visibility into its rows would drop the package's parts list.
+    """
+    bound = _early_bound(view, "IView")
+    bound.SetVisible(False, False)
+    rebuild_drawing(adapter, label="hide BOM reference")
+    if bool(bound.GetVisible()):
+        raise RuntimeError(f"{BOM_REFERENCE_LABEL}: view still reads visible")
+    if _bom_items(_early_bound(table, "ITableAnnotation")) != items:
+        raise RuntimeError("magnifier BOM items moved when its reference view was hidden")
+
+
+def wire_balloon_centre(
+    landing: tuple[float, float], outline: Box, *, rise_deg: float, reach: float
+) -> tuple[float, float]:
+    """Sheet point for the wire balloon's circle: ``reach`` right of the
+    view's outline, on the line rising ``rise_deg`` from its landing."""
+    x = outline[2] + reach
+    return x, landing[1] + (x - landing[0]) * math.tan(math.radians(rise_deg))
+
+
+def _move_wire_balloon(
+    adapter: Any, view: Any, landing: BalloonLanding, *, label: str
+) -> None:
+    """Stand the wire balloon right of the finished view (see
+    :data:`FINISHED_WIRE_BALLOON_RISE_DEG`), its landing untouched.
+
+    ``SetPosition`` moves the annotation's anchor, a constant offset from the
+    circle the sheet draws (``_drawing_balloons._spread_balloons``), so the
+    offset is carried and the circle's centre read back.
+    """
+    if landing.sheet_xy is None:
+        raise RuntimeError(f"{label}: the wire balloon has no proven landing")
+    note = _early_bound(landing.note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    circle_x, circle_y, _radius = rendered_balloon_circle(note, label=label)
+    anchor = annotation.GetPosition()
+    offset = (float(anchor[0]) - circle_x, float(anchor[1]) - circle_y)
+    target = wire_balloon_centre(
+        landing.sheet_xy,
+        _view_outline(view, label=label),
+        rise_deg=FINISHED_WIRE_BALLOON_RISE_DEG,
+        reach=BALLOON_MARGIN,
+    )
+    if not annotation.SetPosition(target[0] + offset[0], target[1] + offset[1], 0.0):
+        raise RuntimeError(f"{label}: failed to move the wire balloon")
+    rebuild_drawing(adapter, label="move wire balloon")
+    moved_x, moved_y, _radius = rendered_balloon_circle(note, label=label)
+    if math.dist((moved_x, moved_y), target) > 0.0005:
+        raise RuntimeError(
+            f"{label}: wire balloon centred at ({moved_x * 1000.0:.1f}, "
+            f"{moved_y * 1000.0:.1f}) mm, not ({target[0] * 1000.0:.1f}, "
+            f"{target[1] * 1000.0:.1f}) mm"
+        )
+
+
+def caption_over(outline: Box, text: str) -> tuple[float, float]:
+    """Top-left of a one-line caption centred over ``outline``."""
+    width = len(text) * CAPTION_CHAR_WIDTH
+    return (
+        (outline[0] + outline[2] - width) / 2.0,
+        outline[3] + CAPTION_GAP + NOTE_LINE_PITCH,
+    )
 
 
 def _link_view_to_bom(view: Any, table: Any, *, label: str) -> None:
@@ -1314,7 +1401,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The reference carries no balloons, so its ring is its outline: fit the
     # outline grown by the balloon reach.
     _activate_sheet(adapter, SHEET_NAMES[1])
-    reference_scale = _fit_ring(
+    _fit_ring(
         adapter,
         reference,
         BOM_REFERENCE_SCALE_LADDER,
@@ -1332,7 +1419,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="magnifier",
     )
     items = _validate_bom(adapter, table)
-    _assert_bom_clears_reference_caption(table)
+    _assert_bom_clears_reference_field(table)
     for view, label in (
         (wheel, WHEEL_LABEL),
         (lever, LEVER_LABEL),
@@ -1392,6 +1479,8 @@ async def build(adapter: Any) -> dict[str, str]:
             f"magnifier package carries {len(landings)} balloons, expected one per "
             f"BOM row ({len(BOM_COMPONENTS)})"
         )
+    (wire_landing,) = (landing for landing in landings if landing.stem == explode.WIRE_STEM)
+    _move_wire_balloon(adapter, finished, wire_landing, label=FINISHED_LABEL)
 
     _add_note_block(
         adapter,
@@ -1402,23 +1491,17 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _add_note_block(
         adapter,
-        SHEET_NAMES[1],
-        f"{BOM_REFERENCE_CAPTION} (SCALE {scale_text(reference_scale)})",
-        BOM_REFERENCE_CAPTION_XY,
-        label="BOM reference caption",
-    )
-    _add_note_block(
-        adapter,
         SHEET_NAMES[2],
         exploded_caption(LEVER_GROUP, scales[LEVER_LABEL]),
         LEVER_CAPTION_XY,
         label="lever caption",
     )
+    finished_caption = f"{FINISHED_CAPTION} (SCALE {scale_text(scales[FINISHED_LABEL])})"
     _add_note_block(
         adapter,
         SHEET_NAMES[3],
-        f"{FINISHED_CAPTION} (SCALE {scale_text(scales[FINISHED_LABEL])})",
-        FINISHED_CAPTION_XY,
+        finished_caption,
+        caption_over(_view_outline(finished, label=FINISHED_LABEL), finished_caption),
         label="finished caption",
     )
     _add_note_block(
@@ -1427,6 +1510,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_note_block(
         adapter, SHEET_NAMES[3], ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
     )
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    _hide_bom_reference(adapter, reference, table, items)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
