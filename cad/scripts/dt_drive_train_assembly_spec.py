@@ -5,8 +5,9 @@ family belongs to which drawing cluster, and the ordered explode steps that
 separate the families for the exploded cluster sheets. Positions come from the
 opened model; distances are presentation offsets, not dimensions.
 
-Drawing wording (BOM descriptions, steps, checks) stays in the drawing script so
-a wording change never enters the native assembly rebuild closure.
+Drawing wording (BOM descriptions, steps, checks), the sheets' fit-limit
+rounding and the per-cluster member split stay in the drawing script, so a
+sheet change never enters the native assembly rebuild closure.
 """
 
 from __future__ import annotations
@@ -16,8 +17,6 @@ from typing import Literal, Sequence
 
 EXPLODED_VIEW_NAME = "DRIVE_TRAIN_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
-# Acceptance limits on the assembly sheets round inward at these places.
-FIT_LIMIT_PLACES = 2
 
 # Families still arriving from a sibling branch, classified ahead of time so
 # the integration head needs no plan edit; an absent pending family is not an
@@ -354,18 +353,3 @@ def plan_explode(
             raise ValueError(f"explode step {step.label!r} selects nothing")
         resolved.append((step, names))
     return resolved
-
-
-def cluster_members(
-    instances: Sequence[Instance],
-) -> dict[Cluster, tuple[str, ...]]:
-    """Component names per drawing cluster; every family sits in exactly one."""
-    members: dict[Cluster, list[str]] = {cluster: [] for cluster in CLUSTERS}
-    for instance in instances:
-        owners = [c for c, stems in CLUSTERS.items() if instance.stem in stems]
-        if not owners:
-            raise ValueError(f"{instance.name}: family {instance.stem!r} has no cluster")
-        if len(owners) != 1:
-            raise ValueError(f"{instance.name}: family in clusters {owners!r}")
-        members[owners[0]].append(instance.name)
-    return {cluster: tuple(sorted(names)) for cluster, names in members.items()}
