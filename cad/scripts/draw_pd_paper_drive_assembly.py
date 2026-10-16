@@ -367,12 +367,47 @@ PIVOT_VIEW_REF = (
     f"SECTION {PIVOT_SECTION_LABEL}-{PIVOT_SECTION_LABEL}, "
     f"SHEET {SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}"
 )
+# Two stake points, opposite across the tap so the cut plane through the axis
+# shows both: the section's leader names the one right of the axis.
+PIVOT_STAKE_POINTS_TEXT = "2 OPPOSITE POINTS"
 PIVOT_CAPTION = (
     "THE HANGER PIVOT AS FITTED IN\n"
-    f"STEP {steps.step_number('hanger-pivoted')}: STAKE THE TAP MOUTH\n"
-    "ONTO THE SCREW TIP AT 2 POINTS"
+    f"STEP {steps.step_number('hanger-pivoted')}: STAKE THE TAP MOUTH ONTO\n"
+    f"THE SCREW TIP AT {PIVOT_STAKE_POINTS_TEXT}"
 )
 PIVOT_CAPTION_XY = (0.022, 0.255)
+# The lock in the view (rule 23; the r5 machinist review of SECTION A-A): a
+# pointer into the bar's cut face at the tap's front mouth, right of the axis,
+# 0.5 mm in from the front face and 0.6 mm outside the countersink's rim, so
+# it lands in the metal the punch moves. (y, r) in the screw's frame (mm).
+PIVOT_STAKE_TIP = (
+    PIVOT_FRONT_FACE_Y + 0.5,
+    support_bar.PIVOT_TAP_CSK_DIA / 2.0 + 0.6,
+)
+PIVOT_STAKE_NOTE = f"STAKE TAP MOUTH,\n{PIVOT_STAKE_POINTS_TEXT}"
+# The note stands centred on the axis just outside the section's circle at
+# the front-face end, between the two balloon columns and clear of the native
+# section caption. Sheet x of its left edge, and its gap off the circle.
+PIVOT_STAKE_NOTE_X = PIVOT_SECTION_CENTER[0] - 0.022
+PIVOT_STAKE_NOTE_GAP = 0.004
+PIVOT_STAKE_NOTE_LINE_PITCH = 0.0045
+
+
+def pivot_stake_note_xy(front_side: float) -> tuple[float, float]:
+    """Top-left sheet point of the stake note: just outside the section's
+    circle on the front face's side (``front_side`` +1.0 when the front
+    face is above the circle's centre on the sheet, -1.0 below)."""
+    if front_side not in (1.0, -1.0):
+        raise ValueError(f"front_side must be +1.0 or -1.0, not {front_side!r}")
+    offset = PIVOT_SECTION_RADIUS + PIVOT_STAKE_NOTE_GAP
+    if front_side > 0.0:
+        lines = PIVOT_STAKE_NOTE.count("\n") + 1
+        top = PIVOT_SECTION_CENTER[1] + offset + lines * PIVOT_STAKE_NOTE_LINE_PITCH
+    else:
+        top = PIVOT_SECTION_CENTER[1] - offset
+    return (PIVOT_STAKE_NOTE_X, top)
+
+
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 
 # --- sheet 3: the platen-and-support steps, the ballooned exploded view -----
@@ -1248,11 +1283,12 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "MADE, ON THE SHOULDER, FLUSH WITH ITS END ON A FLAT. FACE THE SCREW'S "
             f"TIP SO THAT, SEATED IN THE {_N['pd-support-bar']} BAR'S THROUGH TAP, IT "
             f"STANDS {pivot_screw.TIP_RECESS[0]:.2f} TO {pivot_screw.TIP_RECESS[1]:.2f} "
-            "BELOW THE BAR'S FRONT FACE; IF ITS UNFACED TIP STANDS DEEPER, USE "
-            "ANOTHER SCREW. SEAT IT, THREADLOCKER OPTIONAL (LOW STRENGTH ONLY); THE "
+            "BELOW THE BAR'S FRONT FACE. THE ARM'S PIVOT BORE WAS REAMED TO THIS "
+            "SCREW, CHOSEN BEFORE REAMING SO ITS UNFACED TIP REACHES THAT WINDOW: KEEP "
+            "THEM TOGETHER. SEAT IT, THREADLOCKER OPTIONAL (LOW STRENGTH ONLY); THE "
             "ARM FALLS FREELY. PLATEN SLID CLEAR, STAKE THE FRONT TAP MOUTH ONTO THE "
-            f"TIP AT 2 POINTS, NOTHING PROUD OF THE FACE ({PIVOT_VIEW_REF}). THE "
-            "ARM'S PIVOT BORE IS REAMED TO THIS SCREW: KEEP THEM TOGETHER."
+            f"TIP AT {PIVOT_STAKE_POINTS_TEXT}, NOTHING PROUD OF THE FACE "
+            f"({PIVOT_VIEW_REF})."
         ),
         "disc-cluster-assembled": (
             f"FIT THE {_N['pd-rack-pinion']} DISC ON THE {_N['pd-transgear-disc-hub']} "
@@ -1598,6 +1634,7 @@ def sheet_texts(notes: StepNotes) -> tuple[str, ...]:
         FITUP_REFERENCE_CAPTION,
         BOM_REFERENCE_CAPTION,
         PIVOT_CAPTION,
+        PIVOT_STAKE_NOTE,
     )
 
 
@@ -2321,11 +2358,15 @@ def _check_axis_down_the_sheet(
         )
 
 
-def _balloon_pivot_section(
-    adapter: Any, section: Any, items: dict[str, str], *, label: str
-) -> None:
-    """Point one item-number balloon into each part's cut face
-    (PIVOT_BALLOON_TIPS), in a column each side of the section's circle."""
+def _pivot_section_cut_points(
+    adapter: Any,
+    section: Any,
+    tips: Sequence[tuple[str, float, float]],
+    *,
+    label: str,
+) -> list[tuple[float, float]]:
+    """Sheet points of ``(side, y, r)`` tips on the section's cut plane in
+    the screw's frame (mm): ``r`` off the axis, "right" or "left" of it."""
     origin, along_x, along_z = _pivot_sheet_points(
         adapter,
         section,
@@ -2351,9 +2392,47 @@ def _balloon_pivot_section(
             y,
             across[1] * r * (1.0 if side == "right" else -1.0),
         )
-        for _stem, side, y, r in PIVOT_BALLOON_TIPS
+        for side, y, r in tips
     ]
-    tips = _pivot_sheet_points(adapter, section, points, label=label)
+    return _pivot_sheet_points(adapter, section, points, label=label)
+
+
+def _note_pivot_stake(
+    adapter: Any,
+    section: Any,
+    head: tuple[float, float],
+    front: tuple[float, float],
+    *,
+    label: str,
+) -> None:
+    """Point the stake note at the tap's front mouth in SECTION A-A
+    (PIVOT_STAKE_TIP), the note outside the circle at the front face's end."""
+    (tip,) = _pivot_section_cut_points(
+        adapter, section, (("right", *PIVOT_STAKE_TIP),), label=label
+    )
+    if tip[0] <= PIVOT_SECTION_CENTER[0]:
+        raise RuntimeError(f"{label}: the stake tip {tip!r} is not right of the axis")
+    add_leader_note(
+        adapter,
+        PIVOT_STAKE_NOTE,
+        text_xy=pivot_stake_note_xy(1.0 if front[1] > head[1] else -1.0),
+        attach_xy=tip,
+        label=label,
+        view=section,
+    )
+
+
+def _balloon_pivot_section(
+    adapter: Any, section: Any, items: dict[str, str], *, label: str
+) -> None:
+    """Point one item-number balloon into each part's cut face
+    (PIVOT_BALLOON_TIPS), in a column each side of the section's circle."""
+    tips = _pivot_section_cut_points(
+        adapter,
+        section,
+        [(side, y, r) for _stem, side, y, r in PIVOT_BALLOON_TIPS],
+        label=label,
+    )
     cx = PIVOT_SECTION_CENTER[0]
     placed: list[tuple[str, Any, tuple[float, float]]] = []
     for side, x in (
@@ -2470,6 +2549,9 @@ def _place_pivot_view(adapter: Any, items: dict[str, str]) -> None:
     )
     _balloon_pivot_section(
         adapter, section, items, label="paper-drive hanger pivot balloons"
+    )
+    _note_pivot_stake(
+        adapter, section, head, front, label="paper-drive hanger pivot stake note"
     )
     _place_sheet_note(
         adapter,

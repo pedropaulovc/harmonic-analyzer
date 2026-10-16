@@ -320,7 +320,7 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     for method in ("RFS", "UNCERTAINTY", "QUALIFIED", "ACTUAL"):
         assert method not in fitted
     assert "COUNTERSINK" not in fitted
-    assert "PIVOT BORE IS REAMED TO THIS SCREW" in _step_body("hanger-pivoted")
+    assert "PIVOT BORE WAS REAMED TO THIS SCREW" in _step_body("hanger-pivoted")
     assert steps.step_number("arm-plate-located") + 1 == steps.step_number("arm-plate-fitted")
 
 
@@ -852,7 +852,16 @@ def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
     assert "BLIND" not in body
     assert "THROUGH TAP" in body
     assert f"{low:.2f} TO {high:.2f} BELOW THE BAR'S FRONT FACE" in body
-    assert "STAKE THE FRONT TAP MOUTH ONTO THE TIP" in body
+    assert "STAKE THE FRONT TAP MOUTH ONTO THE TIP AT 2 OPPOSITE POINTS" in body
+    # The screw is chosen by its unfaced tip before the arm's bore is reamed
+    # to it, so the fitter never meets a matched screw that fails the check.
+    assert (
+        "THE ARM'S PIVOT BORE WAS REAMED TO THIS SCREW, CHOSEN BEFORE REAMING "
+        "SO ITS UNFACED TIP REACHES THAT WINDOW: KEEP THEM TOGETHER."
+    ) in body
+    face = body.index("BELOW THE BAR'S FRONT FACE")
+    assert face < body.index("CHOSEN BEFORE REAMING")
+    assert "ANOTHER SCREW" not in body
     assert drawing.PIVOT_VIEW_REF in body
     assert body.index(_number("vn-transgear-pivot-shim")) < body.index(
         _number("vn-transgear-pivot-spring")
@@ -979,6 +988,57 @@ def test_each_pivot_section_balloon_points_into_its_own_cut_face() -> None:
     # Down the stack the tips alternate sides.
     order = sorted(tips.values(), key=lambda tip: -tip[1])
     assert [side for side, _y, _r in order] == ["right", "left"] * 3
+
+
+def test_the_pivot_stake_note_points_at_the_front_mouth_clear_of_the_balloons() -> None:
+    """Rule 23: SECTION A-A shows where the lock is, its pointer in the bar's
+    metal at the front tap mouth and its text off the section and balloons."""
+    y, r = drawing.PIVOT_STAKE_TIP
+    front = -(pivot_screw.SHOULDER_LEN + assembly.BAR.BAR_DEPTH)
+    csk_rim = assembly.BAR.PIVOT_TAP_CSK_DIA / 2.0
+    # In the bar, under 1 mm from the front face and the countersink's rim.
+    assert front < y < front + 1.0
+    assert csk_rim < r < csk_rim + 1.0
+    centre_y = drawing.PIVOT_VIEW_CENTRE_MM[1]
+    assert math.hypot(r, y - centre_y) < drawing.PIVOT_FRAME_RADIUS_MM
+    # Its tip is right of the axis; the bar's balloon points left.
+    sides = {stem: side for stem, side, *_ in drawing.PIVOT_BALLOON_TIPS}
+    assert sides["pd-support-bar"] == "left"
+    assert drawing.PIVOT_STAKE_POINTS_TEXT in drawing.PIVOT_STAKE_NOTE
+    assert drawing.PIVOT_STAKE_POINTS_TEXT in drawing.PIVOT_CAPTION
+    assert drawing.PIVOT_STAKE_NOTE in drawing.sheet_texts(_unit_step_notes())
+
+    lines = drawing.PIVOT_STAKE_NOTE.splitlines()
+    width = max(map(len, lines)) * NOTE_CHAR_WIDTH
+    height = len(lines) * NOTE_LINE_PITCH
+    sx, sy = drawing.PIVOT_SECTION_CENTER
+    radius = drawing.PIVOT_SECTION_RADIUS
+    scale = drawing.PIVOT_SECTION_SCALE[0] / drawing.PIVOT_SECTION_SCALE[1] / 1000.0
+    column_x = radius + drawing.PIVOT_BALLOON_GAP
+    x0 = drawing.PIVOT_STAKE_NOTE_X
+    # Between the balloon columns, roughly centred on the axis.
+    assert sx - column_x + BALLOON_RADIUS < x0
+    assert x0 + width < sx + column_x - BALLOON_RADIUS
+    assert abs(x0 + width / 2.0 - sx) < 0.005
+    caption_y = drawing.PIVOT_SECTION_CAPTION_XY[1]
+    for front_side in (1.0, -1.0):
+        left, top = drawing.pivot_stake_note_xy(front_side)
+        assert left == x0
+        bottom = top - height
+        # Outside the circle at the front face's end.
+        if front_side > 0:
+            assert bottom > sy + radius
+        else:
+            assert top < sy - radius
+            # Above the native section caption with a line to spare.
+            assert bottom - NOTE_LINE_PITCH > caption_y
+        # The leader stays short and on the front face's side of the centre.
+        tip_y = sy + front_side * abs(y - centre_y) * scale
+        assert 0.0 < (tip_y - sy) * front_side < radius
+        near = top if front_side < 0 else bottom
+        assert math.hypot(r * scale, tip_y - near) < 0.015
+    with pytest.raises(ValueError):
+        drawing.pivot_stake_note_xy(0.0)
 
 
 def test_pivot_section_balloon_columns_keep_order_and_pitch() -> None:
