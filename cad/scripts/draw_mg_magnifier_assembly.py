@@ -1206,24 +1206,48 @@ def _move_wire_balloon(
 
     ``SetPosition`` moves the annotation's anchor, a constant offset from the
     circle the sheet draws (``_drawing_balloons._spread_balloons``), so the
-    offset is carried and the circle's centre read back.
+    offset is carried and the circle's centre read back. The landing is the
+    leader's attachment, the LAST point of ``GetLeaderPointsAtIndex(0)`` (as
+    ``_spread_balloons`` reads it): run
+    20261016T114112897Z-cf1b751ae93e49429fa94f02d50ed634 showed the wire's
+    landing carries no hit-tested ``sheet_xy``, SolidWorks choosing the point
+    on the listed edge.
     """
-    if landing.sheet_xy is None:
-        raise RuntimeError(f"{label}: the wire balloon has no proven landing")
     note = _early_bound(landing.note, "INote")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    leader = annotation.GetLeaderPointsAtIndex(0)
+    if not leader or len(leader) < 6:
+        raise RuntimeError(f"{label}: the wire balloon has no readable leader")
+    attach = (float(leader[-3]), float(leader[-2]))
+    if landing.sheet_xy is not None and math.dist(attach, landing.sheet_xy) > 0.0005:
+        miss = math.dist(attach, landing.sheet_xy) * 1000.0
+        raise RuntimeError(
+            f"{label}: the wire balloon's leader ends {miss:.2f} mm from its proven landing"
+        )
     circle_x, circle_y, _radius = rendered_balloon_circle(note, label=label)
     anchor = annotation.GetPosition()
     offset = (float(anchor[0]) - circle_x, float(anchor[1]) - circle_y)
     target = wire_balloon_centre(
-        landing.sheet_xy,
+        attach,
         _view_outline(view, label=label),
         rise_deg=FINISHED_WIRE_BALLOON_RISE_DEG,
         reach=BALLOON_MARGIN,
     )
+    _telemetry.info(
+        f"{label}: wire balloon landing ({attach[0] * 1000.0:.1f}, "
+        f"{attach[1] * 1000.0:.1f}) mm, circle to ({target[0] * 1000.0:.1f}, "
+        f"{target[1] * 1000.0:.1f}) mm",
+    )
     if not annotation.SetPosition(target[0] + offset[0], target[1] + offset[1], 0.0):
         raise RuntimeError(f"{label}: failed to move the wire balloon")
     rebuild_drawing(adapter, label="move wire balloon")
+    # assert_balloon_landings (a settled check) proves the moved balloon still
+    # attaches to the wire; this reports any shift of SolidWorks' own point.
+    moved = annotation.GetLeaderPointsAtIndex(0)
+    _telemetry.info(
+        f"{label}: wire balloon leader now ends at "
+        f"({float(moved[-3]) * 1000.0:.1f}, {float(moved[-2]) * 1000.0:.1f}) mm",
+    )
     moved_x, moved_y, _radius = rendered_balloon_circle(note, label=label)
     if math.dist((moved_x, moved_y), target) > 0.0005:
         raise RuntimeError(
