@@ -44,9 +44,11 @@ SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SHEET_SCALE = (4.0, 1.0)
 ISO_SCALE = (2.0, 1.0)
-FRONT_CENTER = (0.100, 0.165)
+# The jam-nut shank (#1189) is 3.8 longer, 15 mm on the sheet: the view sits
+# high enough that the cut-end detail circle clears the notes below it.
+FRONT_CENTER = (0.100, 0.175)
 ISO_CENTER = (0.310, 0.213)
-FRONT_KEEP = {"FinishedOverall": (0.040, 0.165)}
+FRONT_KEEP = {"FinishedOverall": (0.040, 0.175)}
 DETAIL_KEEP = {"ChamferWidth": (0.235, 0.090), "ChamferAngle": (0.340, 0.115)}
 SHEET = TrimSheet(
     sheet_scale=SHEET_SCALE,
