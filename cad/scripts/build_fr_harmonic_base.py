@@ -65,7 +65,7 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
@@ -84,7 +84,6 @@ from fr_harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_THICKNESS,
     BOTTOM_WIDTH,
-    CASTING_FILLET_R,
     COLUMN_SOCKET_XZ,
     COLUMN_X,
     DECK_CORNER_R,
@@ -101,6 +100,8 @@ from fr_harmonic_base_spec import (
     HANGING_BOSS_MIN_DIA,
     PART_SURFACE_FINISHES,
     POCKET_CEILING_Y,
+    POCKET_CORNER_FILLET_R,
+    POCKET_FILLET_TOL_TYPE,
     POCKET_HALF_X,
     POCKET_HALF_Z,
     POCKET_WALL,
@@ -1205,10 +1206,101 @@ def _pocket_fillet_areas() -> list[float]:
     """The eight boss-to-wall fillets: each socket boss meets one end wall
     and one side wall."""
     return [
-        _boss_wall_fillet_area(SOCKET_BOSS_DIA / 2.0, inset, CASTING_FILLET_R)
+        _boss_wall_fillet_area(SOCKET_BOSS_DIA / 2.0, inset, POCKET_CORNER_FILLET_R)
         for x, z in COLUMN_SOCKET_XZ
         for inset in (POCKET_HALF_X - abs(x), POCKET_HALF_Z - abs(z))
     ]
+
+
+def _disc_rect_corners(
+    centre: tuple[float, float], radius: float, rect: PocketShape
+) -> list[tuple[float, float, float]]:
+    """Where a round boss's cylinder crosses a rect feature's faces inside
+    the pocket: (x, z, inset) per crossing, the inset being the boss centre's
+    signed distance to that face, positive on the face's air side (the
+    convention _boss_wall_fillet_area takes)."""
+    cx, cz = centre
+    _kind, x0, x1, z0, z1 = rect
+    found = []
+    for along_x, value, side, lo, hi in (
+        (False, x0, -1.0, z0, z1),
+        (False, x1, 1.0, z0, z1),
+        (True, z0, -1.0, x0, x1),
+        (True, z1, 1.0, x0, x1),
+    ):
+        across, along = (cz, cx) if along_x else (cx, cz)
+        inset = side * (across - value)
+        if abs(inset) >= radius:
+            continue
+        half = math.sqrt(radius**2 - inset**2)
+        for t in (along - half, along + half):
+            x, z = (t, value) if along_x else (value, t)
+            if lo < t < hi and abs(x) < POCKET_HALF_X and abs(z) < POCKET_HALF_Z:
+                found.append((x, z, inset))
+    return found
+
+
+def _pocket_corner_fillets(fillet_r: float) -> list[tuple[list[float], float, float]]:
+    """(pick, edge length, plan section) for each vertical reentrant pocket
+    edge PocketFillets leaves sharp: each rib to the wall and to the other
+    rib, the cone-lock pad to the front wall, the pinion-block pads to the
+    cross rib, each lug to its end wall and its socket boss, the swing-stop
+    boss to the long rib and the spring-foot boss to its block pad. Each pick
+    sits mid-height on its edge. test_fr_harmonic_base_pocket_fillets_drawing
+    enumerates the same edges from the plan shapes and proves the radius
+    against every seat, socket and cross tap at the worst case."""
+    square = _fillet_section_area(fillet_r)
+    half_rib = RIB_THICKNESS / 2.0
+    corners: list[tuple[float, float, float, float]] = []  # x, z, bottom, area
+    for sa in (-1.0, 1.0):
+        for sb in (-1.0, 1.0):
+            corners += [
+                (sa * POCKET_HALF_X, sb * half_rib, RIB_RELIEF, square),
+                (sa * half_rib, sb * POCKET_HALF_Z, RIB_RELIEF, square),
+                (sa * half_rib, sb * half_rib, RIB_RELIEF, square),
+            ]
+    _kind, lock_x0, lock_x1, _z0, _z1 = LOCK_PAD_SHAPE
+    lock_wall_z = math.copysign(POCKET_HALF_Z, LOCK_PAD_WALL_Z)
+    corners += [
+        (x, lock_wall_z, DEEP_BOSS_BOTTOM_Y, square) for x in (lock_x0, lock_x1)
+    ]
+    for _kind, x0, x1, z0, z1 in BLOCK_PAD_SHAPES:
+        for rib_x in (-half_rib, half_rib):
+            if x0 < rib_x < x1:
+                corners += [(rib_x, z, SHALLOW_BOSS_BOTTOM_Y, square) for z in (z0, z1)]
+    for (x, z), lug in zip(COLUMN_SOCKET_XZ, CROSS_TAP_LUG_SHAPES, strict=True):
+        lug_z = z - math.copysign(CROSS_TAP_LUG_LENGTH, z)
+        corners.append(
+            (math.copysign(POCKET_HALF_X, x), lug_z, SHALLOW_BOSS_BOTTOM_Y, square)
+        )
+        for cx, cz, inset in _disc_rect_corners((x, z), SOCKET_BOSS_DIA / 2.0, lug):
+            area = _boss_wall_fillet_area(SOCKET_BOSS_DIA / 2.0, inset, fillet_r)
+            corners.append((cx, cz, SHALLOW_BOSS_BOTTOM_Y, area))
+    for centre, rect in (
+        (STOP_SCREW_XZ, LONG_RIB_SHAPE),
+        *((foot, pad) for foot in FOOT_SCREW_XZ for pad in BLOCK_PAD_SHAPES),
+    ):
+        for cx, cz, inset in _disc_rect_corners(centre, HANGING_BOSS_HALF, rect):
+            area = _boss_wall_fillet_area(HANGING_BOSS_HALF, inset, fillet_r)
+            corners.append((cx, cz, SHALLOW_BOSS_BOTTOM_Y, area))
+    return [
+        ([x, (bottom + POCKET_CEILING_Y) / 2.0, z], POCKET_CEILING_Y - bottom, area)
+        for x, z, bottom, area in corners
+    ]
+
+
+def _pocket_corner_fillet_volume(fillet_r: float) -> float:
+    """Metal the PocketCornerFillets feature adds: section x edge length."""
+    return sum(
+        length * area for _pick, length, area in _pocket_corner_fillets(fillet_r)
+    )
+
+
+# Every vertical reentrant pocket corner, both fillet features: the count the
+# one "R MAX" dimension prints.
+POCKET_FILLET_COUNT = len(_pocket_fillet_areas()) + len(
+    _pocket_corner_fillets(POCKET_CORNER_FILLET_R)
+)
 
 
 def _span_overlap(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -1396,7 +1488,7 @@ async def _paint_machined_faces_black(adapter) -> None:
         _telemetry.info(f"{key} face painted black ({area * 1e6:.0f} mm^2)")
 
 
-REFERENCE_SKETCHES = ("HeightReference", "CrossTapReference")
+REFERENCE_SKETCHES = ("HeightReference", "CrossTapReference", "PlanReference")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1631,9 +1723,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "socket bosses", after + v_hang, 0.005 * v_hang + 10.0
     )
 
-    # The rect pads, the lugs, the ribs and the spring-foot boss stand under
-    # seats the hole table does not locate (transfer seats, cross taps) or
-    # under none, so the drawing places them from the table's own X0 Y0: the
+    # The rect pads, the lugs, the ribs, the spring-foot boss and the
+    # nameplate bosses stand under seats the hole table does not locate
+    # (transfer seats, cross taps, the MHA-FR-004 taps) or under none, so the
+    # drawing places them from the table's own X0 Y0: the
     # flange's rear-west theoretical sharp corner, one datum per view (drawing
     # drawing-guidelines.md rule 10 (dimension from a real feature)). Each sketch carries that corner as a point, and every
     # such feature is dimensioned FROM it, so the printed locations are these
@@ -1665,6 +1758,42 @@ async def build(adapter) -> dict[str, str]:
     def _from_origin(x: float, sketch_y: float) -> tuple[float, float]:
         """Hole-table (X, Y) of a Top-plane sketch point (sketch y = -z)."""
         return x + BOTTOM_LENGTH / 2.0, sketch_y + BOTTOM_WIDTH / 2.0
+
+    async def _boss_from_origin(
+        dims: SketchDims,
+        origin: str,
+        x: float,
+        z: float,
+        label: str,
+        names: tuple[str, str, str],
+    ) -> None:
+        """Sketch a hanging boss whose centre the table does not hold: the
+        centre placed from X0 Y0 (``names[0]``, ``names[1]``), as
+        define_circle would place it from the origin, then its diameter."""
+        manager = adapter.currentSketchManager
+        previous = bool(manager.AddToDB)
+        manager.AddToDB = True
+        try:
+            circle = await adapter.add_circle(x, -z, HANGING_BOSS_HALF)
+            check(f"add_circle {label}", circle)
+        finally:
+            manager.AddToDB = previous
+        await anchor_point_to_point(
+            adapter,
+            origin,
+            f"{circle.data}.center",
+            *_from_origin(x, -z),
+            f"{label} from X0 Y0",
+        )
+        dims.record(names[0])
+        dims.record(names[1])
+        check(
+            f"dimension {label} diameter",
+            await adapter.add_sketch_dimension(
+                circle.data, None, "diameter", 2.0 * HANGING_BOSS_HALF
+            ),
+        )
+        dims.record(names[2], '"HangingBossDia"')
 
     async def _pad(
         dims: SketchDims,
@@ -1837,31 +1966,10 @@ async def build(adapter) -> dict[str, str]:
                 continue
             # Under the transferred MHA-DT-024 foot hole, which the table does
             # not hold: the boss's own centre is placed from X0 Y0 (FootBossX,
-            # FootBossY), as define_circle would place it from the origin.
-            manager = adapter.currentSketchManager
-            previous = bool(manager.AddToDB)
-            manager.AddToDB = True
-            try:
-                circle = await adapter.add_circle(x, -z, HANGING_BOSS_HALF)
-                check(f"add_circle {label}", circle)
-            finally:
-                manager.AddToDB = previous
-            await anchor_point_to_point(
-                adapter,
-                origin,
-                f"{circle.data}.center",
-                *_from_origin(x, -z),
-                f"{label} from X0 Y0",
+            # FootBossY).
+            await _boss_from_origin(
+                sketch, origin, x, z, label, ("FootBossX", "FootBossY", name_size)
             )
-            sketch.record("FootBossX")
-            sketch.record("FootBossY")
-            check(
-                f"dimension {label} diameter",
-                await adapter.add_sketch_dimension(
-                    circle.data, None, "diameter", 2.0 * HANGING_BOSS_HALF
-                ),
-            )
-            sketch.record(name_size, '"HangingBossDia"')
         await _pad(
             sketch,
             LOCK_PAD_SHAPE,
@@ -1904,15 +2012,33 @@ async def build(adapter) -> dict[str, str]:
     async def _shallow_sketch(sketch: SketchDims) -> None:
         origin = await _table_origin(sketch, "ShallowBoss")
         for i, (x, z) in enumerate(SHALLOW_BOSS_CENTRES):
-            await define_circle(
-                adapter,
+            label = f"shallow boss ({x:+.1f}, {z:+.1f})"
+            name_size = f"ShallowBoss{i}Dia"
+            if (x, z) not in NAMEPLATE_SCREW_XZ:
+                # Concentric with a tabled hole (B1, D1): the table locates it.
+                await define_circle(
+                    adapter,
+                    x,
+                    -z,
+                    HANGING_BOSS_HALF,
+                    label,
+                    dims=sketch,
+                    names=(f"ShallowBoss{i}X", f"ShallowBoss{i}Z", name_size),
+                    drives=(None, None, '"HangingBossDia"'),
+                )
+                continue
+            # Under an MHA-FR-004 nameplate tap, which the table no longer
+            # holds: the boss's centre is placed from X0 Y0, named in
+            # NAMEPLATE_SCREW_XZ order (fr_harmonic_base_spec marks one
+            # diagonal pair, each value printed 2X).
+            k = NAMEPLATE_SCREW_XZ.index((x, z))
+            await _boss_from_origin(
+                sketch,
+                origin,
                 x,
-                -z,
-                HANGING_BOSS_HALF,
-                f"shallow boss ({x:+.1f}, {z:+.1f})",
-                dims=sketch,
-                names=(f"ShallowBoss{i}X", f"ShallowBoss{i}Z", f"ShallowBoss{i}Dia"),
-                drives=(None, None, '"HangingBossDia"'),
+                z,
+                label,
+                (f"NameplateBoss{k}X", f"NameplateBoss{k}Y", name_size),
             )
         for i, shape in enumerate(BLOCK_PAD_SHAPES):
             await _pad(
@@ -2007,7 +2133,7 @@ async def build(adapter) -> dict[str, str]:
         fillet_heights += [SHALLOW_BOSS_BOTTOM_Y, POCKET_CEILING_Y]
     check(
         "fillet pocket boss junctions",
-        await adapter.add_fillet(CASTING_FILLET_R, fillet_picks, propagate=False),
+        await adapter.add_fillet(POCKET_CORNER_FILLET_R, fillet_picks, propagate=False),
     )
     name_last_feature(adapter, "PocketFillets")
     name_dimensions(adapter, "PocketFillets", ["PocketFilletRadius"])
@@ -2017,6 +2143,31 @@ async def build(adapter) -> dict[str, str]:
     )
     after = await volume_check(
         adapter, "pocket fillets", after + v_fillets, 0.05 * v_fillets + 5.0
+    )
+
+    # The same radius on every other vertical reentrant pocket edge (rib,
+    # pad, lug and boss corners), so the one "R MAX" dimension on
+    # PocketFillets covers all of them (machinist review rule 16). No two of
+    # these edges share a vertex and each ends at sharp horizontal edges, so
+    # nothing propagates.
+    corner_fillets = _pocket_corner_fillets(POCKET_CORNER_FILLET_R)
+    check(
+        "fillet pocket rib, pad, lug and boss corners",
+        await adapter.add_fillet(
+            POCKET_CORNER_FILLET_R,
+            [pick for pick, _length, _area in corner_fillets],
+            propagate=False,
+        ),
+    )
+    name_last_feature(adapter, "PocketCornerFillets")
+    v_corner_fillets = _pocket_corner_fillet_volume(POCKET_CORNER_FILLET_R)
+    # 2 % + 5 (about 106 mm^3 at R6): a dropped rib corner (about 277 mm^3)
+    # fails the step; check() on add_fillet guards the shallower corners.
+    after = await volume_check(
+        adapter,
+        "pocket corner fillets",
+        after + v_corner_fillets,
+        0.02 * v_corner_fillets + 5.0,
     )
 
     # Four blind native 1/4-20 UNC-2B seats from the support deck. The screws
@@ -2509,8 +2660,9 @@ async def build(adapter) -> dict[str, str]:
     # (the first build failed with "geometry top view is missing model
     # dimensions: ['RimWidth']"), so draw_fr_harmonic_base imports them through
     # _drawing_hidden_sketches.curate_view_dimensions, which shows each owner
-    # sketch in its own view only. The pocket wall needs no such sketch: the
-    # sheet prints the pocket's own PocketLen/PocketWid in the bottom view.
+    # sketch in its own view only. The pocket's size needs no such sketch (the
+    # sheet prints its own PocketLen/PocketWid in the bottom view); its place
+    # from X0 Y0 does, with the pad's and the deck's: PlanReference below.
 
     # On the left silhouette (x = -BOTTOM_LENGTH/2), where the front view's
     # flange-to-deck dimension has always drawn its witness lines.
@@ -2549,12 +2701,11 @@ async def build(adapter) -> dict[str, str]:
     name_dimensions(adapter, "HeightReference", ["FlangeToDeck"])
     _verify_named_dimension(adapter, "FlangeToDeck@HeightReference", TOP_THICKNESS)
 
-    # The cross-tap X stations, chained from the flange's west face (the hole
-    # table's X0) to the first tap and on to the second, along the tap axis.
+    # The cross-tap X stations, each a baseline from the flange's west face
+    # (the hole table's X0) along the tap axis, both from one start point.
     # The taps share their X with the A1-A4 bores, but the table locates only
     # the bores, and "ON A1-A4 X CENTRES" in the tap callout was a location
-    # in a note (hb-render-4 eye pass). Chained, not baselined: the front
-    # view has one free dimension row beneath it.
+    # in a note (hb-render-4 eye pass).
     check("create_sketch cross-tap reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     tap_edge_ref = check(
@@ -2563,21 +2714,23 @@ async def build(adapter) -> dict[str, str]:
             -BOTTOM_LENGTH / 2.0, BASE_SCREW_Y, -COLUMN_X, BASE_SCREW_Y
         ),
     )
-    tap_pitch_ref = check(
-        "cross-tap pitch reference line",
-        await adapter.add_line(-COLUMN_X, BASE_SCREW_Y, COLUMN_X, BASE_SCREW_Y),
+    tap_far_ref = check(
+        "cross-tap far reference line",
+        await adapter.add_line(
+            -BOTTOM_LENGTH / 2.0, BASE_SCREW_Y, COLUMN_X, BASE_SCREW_Y
+        ),
     )
     set_sketch_direct_db(adapter, False)
-    for line in (tap_edge_ref, tap_pitch_ref):
+    for line in (tap_edge_ref, tap_far_ref):
         _as_construction(adapter, line)
         check(
             f"cross-tap reference {line} horizontal",
             await adapter.add_sketch_constraint(line, None, "horizontal"),
         )
     check(
-        "cross-tap reference chain",
+        "cross-tap reference baseline",
         await adapter.add_sketch_constraint(
-            f"{tap_edge_ref}.end", f"{tap_pitch_ref}.start", "coincident"
+            f"{tap_edge_ref}.start", f"{tap_far_ref}.start", "coincident"
         ),
     )
     await dimension_between(
@@ -2590,11 +2743,11 @@ async def build(adapter) -> dict[str, str]:
     )
     await dimension_between(
         adapter,
-        f"{tap_pitch_ref}.start",
-        f"{tap_pitch_ref}.end",
+        f"{tap_far_ref}.start",
+        f"{tap_far_ref}.end",
         "horizontal_distance",
-        2.0 * COLUMN_X,
-        "cross-tap pitch",
+        BOTTOM_LENGTH / 2.0 + COLUMN_X,
+        "cross-tap far X from flange edge",
     )
     await anchor_point_to_origin(
         adapter,
@@ -2606,11 +2759,116 @@ async def build(adapter) -> dict[str, str]:
     await ensure_fully_defined(adapter, "cross-tap reference sketch")
     check("exit_sketch cross-tap reference", await adapter.exit_sketch())
     name_last_feature(adapter, "CrossTapReference")
-    name_dimensions(adapter, "CrossTapReference", ["CrossTapX", "CrossTapPitch"])
+    name_dimensions(adapter, "CrossTapReference", ["CrossTapX", "CrossTapFarX"])
     _verify_named_dimension(
         adapter, "CrossTapX@CrossTapReference", BOTTOM_LENGTH / 2.0 - COLUMN_X
     )
-    _verify_named_dimension(adapter, "CrossTapPitch@CrossTapReference", 2.0 * COLUMN_X)
+    _verify_named_dimension(
+        adapter, "CrossTapFarX@CrossTapReference", BOTTOM_LENGTH / 2.0 + COLUMN_X
+    )
+
+    # The plan stations of the pad, the deck and the underside pocket from
+    # the hole table's X0 Y0 (the flange's rear-west theoretical sharp
+    # corner). The plates are centred, so their own Len/Wid dims fix only
+    # their sizes; these baselines, each from the one X0 Y0 point along the
+    # flange's rear edge (X) or west edge (Y), place them from the datum
+    # every other plan location is measured from. Driven by the plate
+    # globals, so a footprint edit moves the printed stations with it.
+    # Top-plane sketch y is machine -Z: the rear edge lies at y = -width/2.
+    plan = SketchDims()
+    plan_x0, plan_y0 = -BOTTOM_LENGTH / 2.0, -BOTTOM_WIDTH / 2.0
+    plan_rows = (
+        (
+            "PadX",
+            "horizontal",
+            (BOTTOM_LENGTH - TOP_LENGTH) / 2.0,
+            '("BottomLength" - "TopLength") / 2',
+        ),
+        (
+            "PadY",
+            "vertical",
+            (BOTTOM_WIDTH - TOP_WIDTH) / 2.0,
+            '("BottomWidth" - "TopWidth") / 2',
+        ),
+        (
+            "DeckX",
+            "horizontal",
+            BOTTOM_LENGTH / 2.0 - DECK_HALF_X,
+            '("BottomLength" - "DeckLength") / 2',
+        ),
+        (
+            "DeckY",
+            "vertical",
+            BOTTOM_WIDTH / 2.0 - DECK_HALF_Z,
+            '("BottomWidth" - "DeckWidth") / 2',
+        ),
+        (
+            "PocketX",
+            "horizontal",
+            BOTTOM_LENGTH / 2.0 - POCKET_HALF_X,
+            '("BottomLength" - "TopLength") / 2 + "PocketWall"',
+        ),
+        (
+            "PocketY",
+            "vertical",
+            BOTTOM_WIDTH / 2.0 - POCKET_HALF_Z,
+            '("BottomWidth" - "TopWidth") / 2 + "PocketWall"',
+        ),
+    )
+    check("create_sketch plan reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    plan_lines = []
+    for name, direction, value, _drive in plan_rows:
+        end_x = plan_x0 + (value if direction == "horizontal" else 0.0)
+        end_y = plan_y0 + (value if direction == "vertical" else 0.0)
+        plan_lines.append(
+            check(
+                f"plan reference {name} line",
+                await adapter.add_line(plan_x0, plan_y0, end_x, end_y),
+            )
+        )
+    set_sketch_direct_db(adapter, False)
+    for line, (name, direction, _value, _drive) in zip(
+        plan_lines, plan_rows, strict=True
+    ):
+        _as_construction(adapter, line)
+        check(
+            f"plan reference {name} {direction}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    for line in plan_lines[1:]:
+        check(
+            f"plan reference {line} from X0 Y0",
+            await adapter.add_sketch_constraint(
+                f"{line}.start", f"{plan_lines[0]}.start", "coincident"
+            ),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{plan_lines[0]}.start", plan_x0, plan_y0, "plan reference X0 Y0"
+    )
+    plan.record("PlanOriginX", '"BottomLength" / 2')
+    plan.record("PlanOriginY", '"BottomWidth" / 2')
+    for line, (name, direction, value, drive) in zip(
+        plan_lines, plan_rows, strict=True
+    ):
+        await dimension_between(
+            adapter,
+            f"{line}.start",
+            f"{line}.end",
+            f"{direction}_distance",
+            value,
+            f"plan reference {name}",
+        )
+        plan.record(name, drive)
+    await ensure_fully_defined(adapter, "plan reference sketch")
+    check("exit_sketch plan reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "PlanReference")
+    # The main drive batch ran before the reference sketches existed.
+    for dim_name, expr in plan.apply(adapter, "PlanReference"):
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    for name, _direction, value, _drive in plan_rows:
+        _verify_named_dimension(adapter, f"{name}@PlanReference", value)
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)
@@ -2638,6 +2896,17 @@ async def build(adapter) -> dict[str, str]:
         "SpotFaceDepth",
         *deviations(SPOTFACE_DEPTH_BAND_MM),
     )
+    # Every pocket corner fillet prints as one single limit, "R6.0 MAX":
+    # swTolMAX prints the nominal then MAX, so the modelled radius IS the max.
+    _display, fillet_radius = _named_dimension(
+        adapter, "PocketFillets", "PocketFilletRadius"
+    )
+    tolerance = _early_bound(fillet_radius.Tolerance, "IDimensionTolerance")
+    tolerance.Type = POCKET_FILLET_TOL_TYPE
+    if int(tolerance.Type) != POCKET_FILLET_TOL_TYPE:
+        raise RuntimeError(
+            "PocketFilletRadius@PocketFillets: MAX limit did not persist"
+        )
     # A pair's shared size or coordinate prints once, as "2X": the count is
     # specification, so the part owns it like the places.
     for (feature_name, dimension_name), prefix in UNDERSIDE_PAD_PREFIXES.items():

@@ -87,7 +87,16 @@ HANGING_BOSS_MIN_DIA = 16.0  # max(this, 2.5 x tap drill) per seat
 # tip stands 32.96 up and needs 1.5D (6.25) under it: 26.71 at most.
 DEEP_BOSS_BOTTOM_Y = 12.0
 SHALLOW_BOSS_BOTTOM_Y = 26.5
-CASTING_FILLET_R = 6.0
+# ONE radius for every vertical reentrant pocket corner: the socket-boss
+# junctions (PocketFillets) and the rib, pad, lug and boss corners
+# (PocketCornerFillets) print as one "R6.0 MAX" (machinist review rule 16).
+# R6 is the largest standard value that keeps rule 17's 1.5 wall from every
+# seat, socket and cross tap at the worst case
+# (test_fr_harmonic_base_pocket_fillets_drawing).
+POCKET_CORNER_FILLET_R = 6.0
+# swTolMAX prints the nominal then "MAX", so the model sits at the max: any
+# smaller fillet, down to sharp, keeps every wall the proof checked.
+POCKET_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX
 
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
     raise AssertionError("base plates are not centred")
@@ -179,9 +188,10 @@ SOCKET_BORE_FINISHES = tuple(
 )
 PART_SURFACE_FINISHES = (*SURFACE_FINISHES, *SOCKET_BORE_FINISHES)
 
-# The underside's rect pads, cross-tap lugs, ribs and MHA-DT-024 foot boss
-# stand under seats the hole table does not locate (transfer seats, cross
-# taps) or under none, so their sizes and their places from the table's X0 Y0
+# The underside's rect pads, cross-tap lugs, ribs, MHA-DT-024 foot boss and
+# MHA-FR-004 nameplate bosses stand under seats the hole table does not
+# locate (transfer seats, cross taps, nameplate taps) or under none, so their
+# sizes and their places from the table's X0 Y0
 # are model dims too (Codex P2 on #1310; machinist review of the ribs and the
 # foot boss). Each pair shares its size and one coordinate, so one pad of the
 # pair carries the shared dim (UNDERSIDE_PAD_PREFIXES prints it 2X) and each
@@ -190,6 +200,21 @@ PART_SURFACE_FINISHES = (*SURFACE_FINISHES, *SOCKET_BORE_FINISHES)
 # the socket bosses, the block pads' east ends into the cross rib, and the
 # ribs' ends into the wall (a rib's other coordinate is its centring, shown by
 # its thickness about the pocket's centre line).
+#
+# The four nameplate taps stand on a rectangle, so each boss X and each boss Y
+# is shared by two bosses and prints 2X. build_fr_harmonic_base names boss
+# ``k`` of fr_nameplate_spec.MOUNT_HOLE_XZ ``NameplateBoss{k}X``/``Y``: k 0
+# east-rear, 1 east-front, 2 west-rear, 3 west-front (pinned by
+# test_fr_harmonic_base_drawing). Sheet 4 hangs the X rows above the rear and
+# the Y columns west of the view, so the X stations come off the two REAR
+# bosses and the Y stations off the two WEST ones: no witness line crosses
+# its twin boss.
+NAMEPLATE_BOSS_LOCATION_DIMENSIONS = (
+    "NameplateBoss2X",
+    "NameplateBoss2Y",
+    "NameplateBoss0X",
+    "NameplateBoss3Y",
+)
 UNDERSIDE_PAD_DIMENSIONS: dict[str, tuple[str, ...]] = {
     "DeepBossProfile": (
         "LockPadWidth",
@@ -203,7 +228,13 @@ UNDERSIDE_PAD_DIMENSIONS: dict[str, tuple[str, ...]] = {
         "FootBossX",
         "FootBossY",
     ),
-    "ShallowBossProfile": ("BlockPad0Width", "BlockPad1X", "BlockPad0Y", "BlockPad1Y"),
+    "ShallowBossProfile": (
+        "BlockPad0Width",
+        "BlockPad1X",
+        "BlockPad0Y",
+        "BlockPad1Y",
+        *NAMEPLATE_BOSS_LOCATION_DIMENSIONS,
+    ),
     "CrossTapLugProfile": ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y"),
     "LongRibProfile": ("LongRibY",),
     "CrossRibProfile": ("CrossRibX",),
@@ -212,7 +243,10 @@ UNDERSIDE_PAD_PREFIXES: dict[tuple[str, str], str] = {
     (feature, name): "2X "
     for feature, names in (
         ("DeepBossProfile", ("PedestalPad0Width", "PedestalPadLength", "PedestalPad1X")),
-        ("ShallowBossProfile", ("BlockPad0Width", "BlockPad1X")),
+        (
+            "ShallowBossProfile",
+            ("BlockPad0Width", "BlockPad1X", *NAMEPLATE_BOSS_LOCATION_DIMENSIONS),
+        ),
         ("CrossTapLugProfile", ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y")),
     )
     for name in names
@@ -236,7 +270,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "DeckCorners": {"DeckCornerRadius"},
     "DeckEdgeBreak": {"DeckEdgeChamfer"},
     "HeightReference": {"FlangeToDeck"},
-    "CrossTapReference": {"CrossTapX", "CrossTapPitch"},
+    "CrossTapReference": {"CrossTapX", "CrossTapFarX"},
+    "PlanReference": {"PadX", "PadY", "DeckX", "DeckY", "PocketX", "PocketY"},
     "TopRimBreaks": {"TopRimChamfer"},
     "BottomEdgeBreak": {"BottomEdgeChamfer"},
     "BaseSpotFaceRearProfile": {"SpotFaceDia", "Spot0Y"},
@@ -290,7 +325,17 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "DeckCorners": {"DeckCornerRadius": 1},
     "DeckEdgeBreak": {"DeckEdgeChamfer": 1},
     "HeightReference": {"FlangeToDeck": 1},
-    "CrossTapReference": {"CrossTapX": 1, "CrossTapPitch": 1},
+    "CrossTapReference": {"CrossTapX": 1, "CrossTapFarX": 1},
+    # The plan stations from X0 Y0 print their modelled nominal: the 1/4 in
+    # flange reveal makes 6.35, 13.35 and 18.35, which one place would misstate.
+    "PlanReference": {
+        "PadX": 2,
+        "PadY": 2,
+        "DeckX": 1,
+        "DeckY": 2,
+        "PocketX": 2,
+        "PocketY": 2,
+    },
     "TopRimBreaks": {"TopRimChamfer": 1},
     "BottomEdgeBreak": {"BottomEdgeChamfer": 1},
     "BaseSpotFaceRearProfile": {"SpotFaceDia": 1, "Spot0Y": 1},

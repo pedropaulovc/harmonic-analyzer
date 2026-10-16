@@ -1,0 +1,346 @@
+r"""Pure-data print contract for the nameplate's manufacturing drawing (#628).
+
+PURE DATA, no SolidWorks/COM imports. ``build_fr_nameplate`` marks and gives
+places to exactly ``DRAWING_DIMENSIONS``; ``draw_fr_nameplate`` keeps exactly
+those model dimensions and adds one sheet-derived reference, the floor under
+the engraving, whose places live in ``DRAWING_REFERENCE_PRECISION``. Kept
+apart from ``fr_nameplate_spec`` on purpose: that module feeds the base and
+the frame assembly, so a print-only edit here must not rebuild them.
+
+Fit (owner-ratified 2026-10-15, fr-harmonic-base RV-01): the base's four
+#4-40 seats are spotted through the finished plate at assembly
+(drawing-guidelines.md rule 19 (absorb stacks at fit-up)), so the plate's
+holes need only keep their head on the raised border and a real edge
+ligament. Each hole locates from its two adjacent plate edges at the title
+block's one-place grade; the corner profile, the sunk field and the engraving
+are the vendored DXF contours the build imports, named on the sheet rather
+than redrawn as dimensions.
+"""
+
+from __future__ import annotations
+
+import math
+
+from _dxf_text import read_lwpolylines
+from _hole_spec import CLEARANCE_MM
+from _paths import REFERENCES_DIR
+from _mcmaster_90114a511 import BF_PITCH as SCREW_PITCH
+from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _release_artwork import bundle_path
+from fr_nameplate_spec import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH, SCREW_XY
+from vn_fillister_screw_spec import SHANK_DIA as SCREW_MAJOR_DIA
+from vn_fillister_screw_spec import SHANK_LEN as SCREW_LEN
+
+# --- Model dimensions the print shows: feature -> parametric names. The slab's
+# extrude depth is the plate thickness; the Hole Wizard placement sketch
+# carries each station from the part origin, the plate's lower-left corner
+# (S0X is the left column, S0Z the bottom row). The outline is an imported
+# contour and the field and engraving cuts are mid-plane (their one depth is
+# twice the depth below the face), so no feature dimension carries the plate's
+# width or height, a far-edge hole station or a depth below the decorated
+# face: each is the one driving dimension the build gives it in a hidden
+# reference sketch (drawing-simplicity-policy.md, "The model owns tolerance
+# and precision"). FaceReference lies on the decorated face (the Front plane);
+# SectionReference on SECTION_PLANE, section A-A's cutting plane. ---
+FACE_REFERENCE = "FaceReference"
+SECTION_REFERENCE = "SectionReference"
+REFERENCE_SKETCHES = (FACE_REFERENCE, SECTION_REFERENCE)
+SECTION_PLANE = "SectionAPlane"
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "PlateSlab": {"PlateThick"},
+    "ScrewHoles": {"S0X", "S0Z"},
+    FACE_REFERENCE: {"PlateWidth", "PlateHeight", "RightHoleStation", "TopHoleStation"},
+    SECTION_REFERENCE: {"FieldDepth", "EngravingDepth"},
+}
+
+# Places. The engraving is incised 0.300 below the 0.400 sunk field, so the
+# thinnest floor left under it is the thickness less 0.700: the thickness and
+# both depths print .XXX so that floor is a measured number, not a .X guess
+# (Main ruling 2026-10-14; the floor's shortfall under rule 17's 1.5 floor is
+# stated on the sheet, MINIMUM_NOTES). The outline and the hole stations
+# print .X: the base is spotted through the plate.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PlateSlab": {"PlateThick": 3},
+    "ScrewHoles": {"S0X": 1, "S0Z": 1},
+    FACE_REFERENCE: {
+        "PlateWidth": 1,
+        "PlateHeight": 1,
+        "RightHoleStation": 1,
+        "TopHoleStation": 1,
+    },
+    SECTION_REFERENCE: {"FieldDepth": 3, "EngravingDepth": 3},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
+    set(DRAWING_PRECISION[feature]) != names
+    for feature, names in DRAWING_DIMENSIONS.items()
+):
+    raise AssertionError("every marked nameplate dimension needs authored places")
+
+# The one sheet-derived dimension: the floor left under the engraving, a
+# parenthesised reference (thickness less the engraving depth) with no band
+# and no model dimension to import. Keyed by the sheet's label.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"floor under engraving": 3}
+
+# Section A-A's depths from the decorated face: the sunk field, then every
+# engraved groove (border pinstripe and field lettering alike) to one floor.
+# The floor left under the engraving prints as a reference at its nominal
+# (0.800); its worst case at the printed bands, ENGRAVING_FLOOR_MIN (0.540),
+# sits under rule 17's 1.5 floor as a decorative exception, not a structural
+# wall (user ruling 2026-10-14; declared as fr-nameplate machinist exception
+# RV-02), and the sheet states it as a minimum in MINIMUM_NOTES.
+FIELD_DEPTH = 0.4
+ENGRAVING_FLOOR_DEPTH = 0.7
+FLOOR_UNDER_ENGRAVING = PLATE_THICKNESS - ENGRAVING_FLOOR_DEPTH
+
+# Section A-A cuts the whole plate at SECTION_Y (plate-local), in the gap
+# between the CHICAGO row and the scroll ornament. Along the cut (plate x):
+# the raised border's top (the decorated face) up to 3.15, the border
+# pinstripe groove (the engraving floor) 3.16..3.60, then the sunk field. The
+# offline test proves each station against the DXFs.
+SECTION_Y = 14.85
+SECTION_FACE_X = 2.6
+SECTION_GROOVE_X = 3.38
+SECTION_FIELD_X = 5.5
+# SectionReference's construction chords (plate x0, x1, z), each lying on a
+# cut-face line the section shows: the decorated face ending at its station,
+# the groove floor and the field floor each starting at theirs. A depth's
+# dimension spans the face chord's end to its floor chord's start.
+SECTION_REFERENCE_CHORDS: dict[str, tuple[float, float, float]] = {
+    "face": (SECTION_FACE_X - 1.0, SECTION_FACE_X, 0.0),
+    "groove": (SECTION_GROOVE_X, SECTION_GROOVE_X + 0.1, -ENGRAVING_FLOOR_DEPTH),
+    "field": (SECTION_FIELD_X, SECTION_FIELD_X + 1.0, -FIELD_DEPTH),
+}
+ENGRAVING_FLOOR_MIN = (
+    PLATE_THICKNESS
+    + printed_deviations(PLATE_THICKNESS, DRAWING_PRECISION["PlateSlab"]["PlateThick"])[
+        0
+    ]
+    - (
+        ENGRAVING_FLOOR_DEPTH
+        + printed_deviations(
+            ENGRAVING_FLOOR_DEPTH,
+            DRAWING_PRECISION[SECTION_REFERENCE]["EngravingDepth"],
+        )[1]
+    )
+)
+if ENGRAVING_FLOOR_MIN <= 0.0:
+    raise AssertionError(
+        f"engraving can reach through the plate: {ENGRAVING_FLOOR_MIN}"
+    )
+
+# The sunk field's one job is to stay above the engraving's floor, so the
+# lettering cut into the field stays incised (PR #1468 r4 review: the .XXX
+# field depth carried no stated function; its callout now names it). Both
+# depths print .XXX: the engraving floor sits 0.300 under the field nominal
+# and ENGRAVING_BELOW_FIELD_MIN (0.040) at the printed bands. At the .XX
+# row's +-0.51 the field could cut deeper than the engraving and erase it,
+# so the field's three places are the function's, not an over-specification.
+ENGRAVING_BELOW_FIELD_MIN = (
+    ENGRAVING_FLOOR_DEPTH
+    + printed_deviations(
+        ENGRAVING_FLOOR_DEPTH, DRAWING_PRECISION[SECTION_REFERENCE]["EngravingDepth"]
+    )[0]
+    - (
+        FIELD_DEPTH
+        + printed_deviations(
+            FIELD_DEPTH, DRAWING_PRECISION[SECTION_REFERENCE]["FieldDepth"]
+        )[1]
+    )
+)
+if ENGRAVING_BELOW_FIELD_MIN <= 0.0:
+    raise AssertionError(
+        f"the sunk field can cut below the engraving: {ENGRAVING_BELOW_FIELD_MIN}"
+    )
+
+# drawing-guidelines.md rule 18 (1.5D of full thread) for the four McMaster
+# 90114A511 #4-40 x 1/4 brass fillisters that hold the plate to the base's
+# blind seats (PR #1468 r3 review). The shortest stock screw (ASME B18.6.3
+# allows #4 machine screws 1/8..1/2 long 0.02 in short) through the thickest
+# accepted plate, less the tip's incomplete 0.75 pitch. Thread starts within
+# two pitches (1.27) of the head, inside even the thinnest plate, so all the
+# thread below the plate is full form; the base thread (6.00 deep, 5.49 at
+# its .XX minimum) runs past the 4.98 deepest reach, so the screw, not the
+# seat, is the limit: 3.736 (1.31D) against 4.267.
+# Owner ruling 2026-10-15: accepted under rule 20, unloaded cosmetic plate
+# (option C: keep the 1/4 screw; declared as fr-nameplate machinist exception
+# RV-03, stated in MINIMUM_NOTES). The shortfall may not grow past the
+# accepted value, and a joint that reaches 1.5D no longer needs the ruling.
+SCREW_LENGTH_SHORT_ALLOWANCE = 0.02 * 25.4
+SCREW_TIP_INCOMPLETE = 0.75 * SCREW_PITCH
+SCREW_ENGAGEMENT_TARGET = 1.5 * SCREW_MAJOR_DIA
+SCREW_FULL_THREAD_MIN = (
+    SCREW_LEN
+    - SCREW_LENGTH_SHORT_ALLOWANCE
+    - (
+        PLATE_THICKNESS
+        + printed_deviations(
+            PLATE_THICKNESS, DRAWING_PRECISION["PlateSlab"]["PlateThick"]
+        )[1]
+    )
+    - SCREW_TIP_INCOMPLETE
+)
+SCREW_FULL_THREAD_ACCEPTED = 3.736
+if not (
+    0.0
+    < SCREW_FULL_THREAD_ACCEPTED
+    <= round(SCREW_FULL_THREAD_MIN, 3)
+    < SCREW_ENGAGEMENT_TARGET
+):
+    raise AssertionError(
+        f"nameplate screw full thread {SCREW_FULL_THREAD_MIN:.3f} is not the "
+        f"accepted rule-20 shortfall [{SCREW_FULL_THREAD_ACCEPTED}, "
+        f"{SCREW_ENGAGEMENT_TARGET:.3f})"
+    )
+
+# The three vendored contours the build imports (cad/references), named on the
+# sheet by the path cut_release stages each at in the release bundle, spelled
+# exactly as the file is (lower case: the path must open as printed). No
+# digits, no method: the shop cuts them however it engraves.
+OUTLINE_DXF_NAME = "fr-nameplate-outline.dxf"
+FIELD_DXF_NAME = "fr-nameplate-field.dxf"
+ENGRAVING_DXF_NAME = "fr-nameplate-engraving.dxf"
+
+# Each hole's station from its adjacent edges, as the sheet prints it.
+SCREW_HOLE_DIA = CLEARANCE_MM[("#4", "close")]
+HOLE_EDGE_STATIONS: dict[str, float] = {
+    "left": min(x for x, _ in SCREW_XY),
+    "right": PLATE_WIDTH - max(x for x, _ in SCREW_XY),
+    "bottom": min(y for _, y in SCREW_XY),
+    "top": PLATE_HEIGHT - max(y for _, y in SCREW_XY),
+}
+_STATION_PLACES = {
+    "left": DRAWING_PRECISION["ScrewHoles"]["S0X"],
+    "right": DRAWING_PRECISION[FACE_REFERENCE]["RightHoleStation"],
+    "bottom": DRAWING_PRECISION["ScrewHoles"]["S0Z"],
+    "top": DRAWING_PRECISION[FACE_REFERENCE]["TopHoleStation"],
+}
+
+# Edge ligaments at the printed worst case (drawing-guidelines.md rule 17's
+# 1.5 floor), measured to the vendored outline itself: each hole is concentric
+# with a rounded corner, so the corner arc, not a straight edge, is nearest
+# when the shop drills both stations at their minima (PR #1468 r3 review).
+# Each hole locates from its corner's two edges, so its accepted centres are
+# the rectangle of the two printed station limits in that corner's DXF frame.
+# The outline is convex (asserted), and distance to a convex boundary is
+# concave inside it, so the least distance over a rectangle lies at one of its
+# four vertices. The largest hole is the callout's printed .XX diameter (never
+# under the model's) plus the DRILLED HOLES allowance.
+LIGAMENT_FLOOR = 1.5
+_HOLE_R_MAX = (
+    max(SCREW_HOLE_DIA, round(SCREW_HOLE_DIA, 2)) + drilled_oversize_mm()
+) / 2.0
+_OUTLINE_TEXT = (REFERENCES_DIR / OUTLINE_DXF_NAME).read_text(encoding="ascii")
+_OUTLINE = read_lwpolylines(_OUTLINE_TEXT[_OUTLINE_TEXT.find("\nENTITIES\n") :])[0][0]
+_TURNS = [
+    (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])
+    for a, b, c in zip(
+        _OUTLINE, _OUTLINE[1:] + _OUTLINE[:1], _OUTLINE[2:] + _OUTLINE[:2]
+    )
+]
+if min(_TURNS) < 0.0 < max(_TURNS):
+    raise AssertionError("the nameplate outline is no longer convex")
+
+
+def _outline_distance(point: tuple[float, float]) -> float:
+    """Least distance from ``point`` to the outline's polyline."""
+    best = math.inf
+    for (ax, ay), (bx, by) in zip(_OUTLINE, _OUTLINE[1:] + _OUTLINE[:1]):
+        dx, dy = bx - ax, by - ay
+        length2 = dx * dx + dy * dy
+        t = 0.0
+        if length2 > 0.0:
+            t = min(
+                1.0, max(0.0, ((point[0] - ax) * dx + (point[1] - ay) * dy) / length2)
+            )
+        best = min(best, math.hypot(point[0] - ax - t * dx, point[1] - ay - t * dy))
+    return best
+
+
+def _station_limits(edge: str) -> tuple[float, float]:
+    station = HOLE_EDGE_STATIONS[edge]
+    lower, upper = printed_deviations(station, _STATION_PLACES[edge])
+    return station + lower, station + upper
+
+
+def _accepted_centres(x: float, y: float) -> list[tuple[float, float]]:
+    """The four extreme accepted centres of the hole nearest (x, y)'s corner."""
+    if x < PLATE_WIDTH / 2.0:
+        xs = _station_limits("left")
+    else:
+        xs = tuple(PLATE_WIDTH - limit for limit in _station_limits("right"))
+    if y < PLATE_HEIGHT / 2.0:
+        ys = _station_limits("bottom")
+    else:
+        ys = tuple(PLATE_HEIGHT - limit for limit in _station_limits("top"))
+    return [(cx, cy) for cx in xs for cy in ys]
+
+
+HOLE_LIGAMENT_WORST = min(
+    _outline_distance(centre) - _HOLE_R_MAX
+    for x, y in SCREW_XY
+    for centre in _accepted_centres(x, y)
+)
+if HOLE_LIGAMENT_WORST < LIGAMENT_FLOOR:
+    raise AssertionError(
+        f"nameplate screw-hole ligament {HOLE_LIGAMENT_WORST:.3f} under {LIGAMENT_FLOOR}"
+    )
+# The largest station shift any accepted plate may show, for the head-on-border
+# check the offline test runs against the vendored field contour.
+HOLE_STATION_SHIFT_MAX = max(
+    max(abs(value) for value in printed_deviations(station, _STATION_PLACES[edge]))
+    for edge, station in HOLE_EDGE_STATIONS.items()
+)
+
+DIMENSION_PREFIXES = {
+    "S0X": "2X ",
+    "S0Z": "2X ",
+    "RightHoleStation": "2X ",
+    "TopHoleStation": "2X ",
+}
+DIMENSION_CALLOUTS = {"PlateThick": "SETS FLOOR UNDER ENGRAVING"}
+# Two rows of at most 18 characters, so even a block left-aligned on the
+# field's dimension line stays inside the border. "DEPTH" ties the 0.400 to
+# the face it is measured from; the second row gives its function (PR #1468
+# r6 review: "SUNK FIELD / ABOVE ENGRAVING" could read as the field standing
+# 0.400 above the engraving floor).
+FIELD_DEPTH_CALLOUT = "SUNK FIELD DEPTH\nENGRAVING BELOW IT"
+ENGRAVING_DEPTH_CALLOUT = "ALL ENGRAVING"
+SECTION_CALLOUTS = {
+    "FieldDepth": FIELD_DEPTH_CALLOUT,
+    "EngravingDepth": ENGRAVING_DEPTH_CALLOUT,
+}
+FLOOR_UNDER_ENGRAVING_CALLOUT = "FLOOR UNDER ENGRAVING"
+HOLE_CALLOUT_PROCESS = "DRILL"
+
+
+def _stated_minimum(value: float) -> str:
+    """A worst-case minimum at two places, rounded DOWN: never overstated."""
+    return f"{math.floor(value * 100.0 + 1e-9) / 100.0:.2f}"
+
+
+# The two stated shortfalls, plain facts below the screw-head note:
+# fr-nameplate machinist exceptions RV-02 (the floor) and RV-03 (the screws'
+# full thread in the base), each formatted from its worst-case value above.
+FLOOR_MINIMUM_NOTE = f"FLOOR UNDER ENGRAVING {_stated_minimum(ENGRAVING_FLOOR_MIN)} MIN"
+SCREW_ENGAGEMENT_NOTE = (
+    f"SCREWS ENGAGE {_stated_minimum(SCREW_FULL_THREAD_MIN)} MIN FULL THREAD"
+)
+MINIMUM_NOTES = "\n".join((FLOOR_MINIMUM_NOTE, SCREW_ENGAGEMENT_NOTE))
+
+# The DXF rows: fr-nameplate machinist exception RV-01 (the outline, the sunk
+# field and the engraving are the release bundle's DXF artwork, not
+# dimensioned on the sheet).
+MANUFACTURING_NOTES = "\n".join(
+    (
+        f"OUTLINE AND CORNERS PER {bundle_path(OUTLINE_DXF_NAME)}",
+        f"SUNK FIELD PER {bundle_path(FIELD_DXF_NAME)}",
+        f"ENGRAVING PER {bundle_path(ENGRAVING_DXF_NAME)}",
+        "DXF PATHS ARE RELATIVE TO THE RELEASE BUNDLE",
+    )
+)
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

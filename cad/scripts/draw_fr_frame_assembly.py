@@ -22,6 +22,7 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     place_view,
+    view_name,
     visible_component_entities,
 )
 
@@ -46,10 +47,11 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_dimensions import set_arc_endpoints_to_center, set_reference_dimension
+from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import _edge_endpoint_key
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
-from _drawing_scan import _zoomed_on
+from _drawing_scan import _HIT_ZOOM_HALF, _zoomed_on
 from _drawing_sections import create_section_view
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_tables import insert_bom_table
@@ -61,7 +63,7 @@ from _drawing_view_configuration import (
     assert_full_detail_view,
     set_view_exploded_state,
 )
-from _drawing_view_display import set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _fr_frame_balloon_anchors import FRAME_BALLOON_ANCHORS
 from _session import run_build
 from _simplified_names import simplified_name
@@ -73,6 +75,8 @@ from fr_frame_attachment_spec import (
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
+from fr_harmonic_base_spec import BOTTOM_WIDTH, DECK_HALF_X
+from fr_nameplate_spec import MOUNT_POS as NAMEPLATE_MOUNT_POS
 from vn_frame_cross_screw_spec import (
     HEAD_DIA as CROSS_SCREW_HEAD_DIA,
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,
@@ -93,6 +97,35 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
+# Step 9 sets MHA-FR-004 before its base seats are spotted through it (#628):
+# the plate's lower edge as lettered (plate y = 0) lies at machine x =
+# MOUNT_POS[0], parallel to the deck's MHA-FR-004 end at DECK_HALF_X. Section
+# B-B looks down on both edges and dimensions the inset between them; step 9
+# points to that dimension instead of repeating its value.
+NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
+# Machine z stations each inset pick tries in turn: on both edges, clear of
+# the plate's corner screw heads (z +/-42) and the deck's centre line (z 0).
+NAMEPLATE_INSET_PICK_Z_M = (0.025, 0.020, 0.030, 0.015, 0.035)
+# How far (model mm) a picked edge's ends may lie from the target machine x.
+# r6 (run 20261015T051440407Z) dimensioned a line 1.334 mm off its target.
+NAMEPLATE_INSET_PICK_TOLERANCE_MM = 0.05
+# swSelectType_e.swSelEDGES
+_SW_SEL_EDGES = 1
+# Machine z of the inset text, which carries the dimension line with it: past
+# the base's outer edge (BOTTOM_WIDTH / 2), so the text sits below the plan
+# view off the part and the line clears the plate's lettering. 17 mm is ~5.7
+# mm on the 1:3 sheet: the 3.5 mm text and the line ~1 mm below it clear the
+# base outline, above the title block.
+NAMEPLATE_INSET_TEXT_Z_M = (BOTTOM_WIDTH / 2.0 + 17.0) / 1000.0
+# Sheet distance of the inset text beyond the deck end, along the dimension
+# line: the 1:3 gap is too narrow to hold it between the edges.
+NAMEPLATE_INSET_TEXT_OFFSET_M = 0.005
+
+# The controlling setup height names itself on its own native dimension, not
+# in a free note the reader must pair with it.
+TOP_AXIS_HEIGHT_SUFFIX = " TOP CROSS-BORE AXIS HEIGHT FROM BASE UNDERSIDE"
+_DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
+
 
 SHEET_NAMES = (
     "ASSEMBLED + JOINT SECTIONS",
@@ -108,8 +141,26 @@ if SPEC.layout is not SHEET_LAYOUTS[SHEET_NAMES[0]]:
     raise AssertionError("the frame package primary sheet must remain landscape")
 SHEET_SCALE = (1.0, 8.0)
 WORKING_FRONT_CENTER = (0.053763, 0.163612)
-BASE_SECTION_CENTER = (0.170714, 0.1823453)
-TOP_SECTION_CENTER = (0.335290, 0.1815266)
+# The two joint sections stand right of the 1:8 view's height dimensions,
+# which stand right of the A/B cutting-plane arrows and letters. Those letters
+# reach CUTTING_LETTER_REACH_M past the view's flange edge: on the r4 render
+# (run 20261015T235155114Z) they ended at 92.9 mm against the flange's
+# 82.3 mm, and the (1044.8) line at 92.0 mm struck the right-hand "B". Each
+# height line keeps HEIGHT_LINE_CLEARANCE_M from the letters, from its
+# neighbour and from section A-A's flange edge. Between the overall line and
+# A-A's flange edge there is VIEW_GAP_M or more, so the dimensions read as the
+# front view's (PR #1468 r6 review: at 2.4 mm the lines pressed against A-A).
+# Both sections move right for that gap, B-B's right edge 2.5 mm inside the
+# border and the two sections still over 6 mm apart.
+BASE_SECTION_CENTER = (0.181714, 0.1823453)
+TOP_SECTION_CENTER = (0.340290, 0.1815266)
+VIEW_GAP_M = 0.007
+CUTTING_LETTER_REACH_M = 0.0106
+HEIGHT_LINE_CLEARANCE_M = 0.002
+# The height dimensions' lines stand at their texts' x: the top cross-bore
+# axis innermost, the overall reference outside it.
+TOP_AXIS_HEIGHT_TEXT_XY = (0.0950, 0.254)
+OVERALL_HEIGHT_TEXT_XY = (0.0980, 0.244)
 JOINT_SECTION_SCALE = (1.0, 3.0)
 EXPLODED_ISO_CENTER = (0.140, 0.198)
 # 1:8, not 1:7: at 1:7 the balloon ring's apex (outline + 12 mm margin) sat at
@@ -235,10 +286,12 @@ ASSEMBLY_STEPS = "\n".join(
         "   SKIRT. AFTER MATCH MARKS ALIGN AND MHA-VN-027 HEADS SEAT, PUSH EACH",
         "   CAP OVER THE CHAMFERED OPEN END UNTIL THE TUBE REACHES THE CAP'S",
         "   INSIDE SEAT.",
-        "8. SEAT MHA-FR-005 ON DECK, WINDOWS TOWARD LONG SIDES; INSTALL FOUR",
+        "8. SEAT MHA-FR-005 ON DECK, WINDOWS FACING THE SHORT ENDS; INSTALL FOUR",
         "   MHA-VN-009 TOP-DOWN AND DRAW DOWN EVENLY UNTIL ALL HEADS SEAT.",
-        "9. INSTALL MHA-FR-004 DECORATED FACE UP; SEAT ALL FOUR MHA-VN-006",
-        "   HEADS.",
+        "9. SET MHA-FR-004 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL TO",
+        "   AND INSET FROM THE NEAR DECK END PER SECTION B-B, SHEET 1; CLAMP.",
+        "   SPOT MHA-FR-001 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH PER ITS",
+        "   MHA-FR-001 TRANSFER CALLOUT. SEAT ALL FOUR MHA-VN-006 HEADS.",
         "10. START MHA-VN-023 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
     )
 )
@@ -251,8 +304,7 @@ ASSEMBLY_CHECKS = "\n".join(
         "   CLEARS BOTH TUBE WALLS AND HAS POSITIVE THREAD ENGAGEMENT IN BOTH",
         "   NEAR AND FAR CASTING THREAD SEGMENTS.",
         "3. ALL FOUR MHA-VN-028 CAPS REACH THEIR INSIDE SEATS; SKIRTS CLEAR THE",
-        "   MHA-FR-002 RECESSES, TOPS ARE EVEN, AND TUBE ENDS ARE NOT",
-        "   DISTORTED.",
+        "   MHA-FR-002 RECESSES AND TUBE ENDS ARE NOT DISTORTED.",
         "4. MHA-FR-005 AND MHA-FR-004 LIE FLAT; ALL EIGHT OF THEIR SCREW HEADS",
         "   BEAR.",
         "5. GOOSENECK BORE IS UNOBSTRUCTED WITH MHA-VN-023 BACKED CLEAR.",
@@ -322,7 +374,7 @@ def _configure_view(
     return configuration
 
 
-def _checked_height_dimension(
+def _checked_linear_dimension(
     adapter: Any, display: Any, *, expected_mm: float, label: str
 ) -> Any:
     display = _early_bound(display, "IDisplayDimension")
@@ -336,6 +388,21 @@ def _checked_height_dimension(
         raise RuntimeError(f"failed to set {label} precision")
     if int(display.GetPrimaryPrecision2()) != 1:
         raise RuntimeError(f"{label} did not retain one-place precision")
+    adapter.currentModel.EditRebuild3()
+    return display
+
+
+def _set_dimension_suffix(
+    adapter: Any, display: Any, suffix: str, *, label: str
+) -> Any:
+    """Write ``suffix`` after a dimension's value and read the native text back."""
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(_DIMENSION_TEXT_SUFFIX, suffix)
+    actual = str(display.GetText(_DIMENSION_TEXT_SUFFIX) or "")
+    if actual != suffix:
+        raise RuntimeError(
+            f"{label}: suffix {suffix!r} did not persist, read {actual!r}"
+        )
     adapter.currentModel.EditRebuild3()
     return display
 
@@ -496,10 +563,10 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         front,
         base_bottom,
         cap_top,
-        text_xy=(0.092, 0.244),
+        text_xy=OVERALL_HEIGHT_TEXT_XY,
         label="finished frame overall height",
     )
-    overall = _checked_height_dimension(
+    overall = _checked_linear_dimension(
         adapter,
         overall,
         expected_mm=CAP_TOP_Y,
@@ -524,16 +591,22 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         front,
         base_bottom,
         screw_head,
-        text_xy=(0.086, 0.254),
+        text_xy=TOP_AXIS_HEIGHT_TEXT_XY,
         label="installed top cross-screw axis height",
     )
     screw_axis = set_arc_endpoints_to_center(
         adapter, screw_axis, label="installed top cross-screw axis height"
     )
-    screw_axis = _checked_height_dimension(
+    screw_axis = _checked_linear_dimension(
         adapter,
         screw_axis,
         expected_mm=TOP_SCREW_Y,
+        label="installed top cross-screw axis height",
+    )
+    screw_axis = _set_dimension_suffix(
+        adapter,
+        screw_axis,
+        TOP_AXIS_HEIGHT_SUFFIX,
         label="installed top cross-screw axis height",
     )
 
@@ -619,10 +692,166 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
             scale=JOINT_SECTION_SCALE,
             label=label,
         )
-        set_hidden_lines_visible(adapter, section)
+        # A section shows its cut in solid lines only; the working front
+        # view keeps its hidden lines.
+        set_hidden_lines_removed(adapter, section)
         apply_view_configuration(adapter, section, label=f"joint section {cut_y:.3f}")
         sections.append(section)
     return sections[0], sections[1]
+
+
+def _read_inset_pick(
+    adapter: Any, view: Any, sheet_xy: Sequence[float]
+) -> tuple[Any, str, tuple[float, float] | None]:
+    """Pick the edge drawn at ``sheet_xy`` and read back where it lies.
+
+    Returns the edge, its owner (or why there is none) and its two ends'
+    machine x in mm; edge and x are ``None`` when the pick is not a readable
+    component edge. The pick runs zoomed onto the station (``_HIT_ZOOM_HALF``),
+    so its aperture is hundredths of a millimetre instead of the fit zoom's
+    few sheet millimetres, which span both edges' neighbours at 1:3.
+    """
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate drawing view {name!r}")
+    draw.ClearSelection2(True)
+    with _zoomed_on(adapter, sheet_xy, _HIT_ZOOM_HALF):
+        selected = draw.Extension.SelectByID2(
+            "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, null_callout(), 0
+        )
+    if not selected:
+        return None, "no edge", None
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    index = int(manager.GetSelectedObjectCount2(-1))
+    kind = int(manager.GetSelectedObjectType3(index, -1))
+    edge = manager.GetSelectedObject6(index, -1)
+    draw.ClearSelection2(True)
+    if kind != _SW_SEL_EDGES or edge is None:
+        return None, f"selection type {kind}", None
+    component = adapter._attempt(
+        lambda: _early_bound(edge, "IEntity").GetComponent(), default=None
+    )
+    if component is None:
+        return None, "edge without a component", None
+    owner = str(_early_bound(component, "IComponent2").Name2)
+    key = _edge_endpoint_key(adapter, edge)
+    if key is None:
+        return None, f"{owner} edge without curve params", None
+    transform = _component_transform(component)
+    start, end = (_transform_point(transform, key[i : i + 3]) for i in (0, 3))
+    return edge, owner, (start[0] * 1000.0, end[0] * 1000.0)
+
+
+def _pick_inset_edge(
+    adapter: Any,
+    view: Any,
+    *,
+    label: str,
+    target_mm: float,
+    stations: Sequence[tuple[float, Sequence[float]]],
+) -> Any:
+    """Return ``label``'s edge from the first ``(z, sheet_xy)`` station on target.
+
+    Every pick is read back and logged with the machine x it found, hit or
+    miss, so a wrong line explains itself; a miss moves the pick along z to
+    the next station. Fails naming every reading when none lies within
+    ``NAMEPLATE_INSET_PICK_TOLERANCE_MM`` of ``target_mm`` at both ends.
+    """
+    readings = []
+    for z_m, sheet_xy in stations:
+        edge, owner, xs = _read_inset_pick(adapter, view, sheet_xy)
+        hit = xs is not None and all(
+            abs(x - target_mm) <= NAMEPLATE_INSET_PICK_TOLERANCE_MM for x in xs
+        )
+        reading = (
+            f"z {z_m * 1000.0:g} mm sheet ({sheet_xy[0]:.5f}, {sheet_xy[1]:.5f}): "
+            f"{owner}"
+            + ("" if xs is None else f" at machine x {xs[0]:.3f}/{xs[1]:.3f} mm")
+        )
+        _telemetry.info(
+            f"nameplate inset pick {label} {reading} "
+            f"(target x {target_mm:g} mm) -> {'hit' if hit else 'miss'}"
+        )
+        if hit:
+            return edge
+        readings.append(reading)
+    raise RuntimeError(
+        f"nameplate inset {label}: no pick lies at machine x {target_mm:g} mm; "
+        f"read {'; '.join(readings)}"
+    )
+
+
+def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
+    """Dimension step 9's nameplate inset from the deck end in plan section B-B.
+
+    Both edges are picked at their projected sheet stations: on this assembly
+    section the API lists nothing. ``IView::GetVisibleComponents`` returned no
+    component (r4, run 20261015T024651004Z), and ``GetVisibleEntities2`` gave
+    no edge for the drawing-component tree's shown plate (r5, run
+    20261015T042140629Z), while the sheet prints both edges. Each pick is read
+    back to its machine x (:func:`_pick_inset_edge`) and the dimension is made
+    between the verified edges; the measured value is still checked against
+    ``NAMEPLATE_END_INSET``.
+    """
+    targets = (
+        ("nameplate lower edge", NAMEPLATE_MOUNT_POS[0]),
+        ("deck end", DECK_HALF_X),
+    )
+    y_m = NAMEPLATE_MOUNT_POS[1] / 1000.0
+    projected = model_points_in_view(
+        adapter,
+        section,
+        [
+            *(
+                (x_mm / 1000.0, y_m, z_m)
+                for _, x_mm in targets
+                for z_m in NAMEPLATE_INSET_PICK_Z_M
+            ),
+            *((x_mm / 1000.0, y_m, NAMEPLATE_INSET_TEXT_Z_M) for _, x_mm in targets),
+        ],
+        label="nameplate inset stations",
+        names=[
+            *(
+                f"{name} z {z_m * 1000.0:g}"
+                for name, _ in targets
+                for z_m in NAMEPLATE_INSET_PICK_Z_M
+            ),
+            *(f"{name} text line" for name, _ in targets),
+        ],
+    )
+    count = len(NAMEPLATE_INSET_PICK_Z_M)
+    station_rows = [
+        list(zip(NAMEPLATE_INSET_PICK_Z_M, projected[i * count : (i + 1) * count]))
+        for i in range(len(targets))
+    ]
+    plate_xy, deck_xy = (rows[0][1] for rows in station_rows)
+    plate_line, deck_line = projected[len(targets) * count :]
+    gap = math.hypot(deck_line[0] - plate_line[0], deck_line[1] - plate_line[1])
+    if gap <= 0.0:
+        raise RuntimeError("nameplate inset edges coincide on the sheet")
+    edges = tuple(
+        _pick_inset_edge(
+            adapter, section, label=name, target_mm=target_mm, stations=rows
+        )
+        for (name, target_mm), rows in zip(targets, station_rows)
+    )
+    text_xy = tuple(
+        deck + (deck - plate) / gap * NAMEPLATE_INSET_TEXT_OFFSET_M
+        for plate, deck in zip(plate_line, deck_line)
+    )
+    display = add_edge_dimension(
+        adapter,
+        section,
+        p0=plate_xy,
+        p1=deck_xy,
+        text_xy=(text_xy[0], text_xy[1]),
+        label="nameplate end inset",
+        entities=edges,
+    )
+    return _checked_linear_dimension(
+        adapter, display, expected_mm=NAMEPLATE_END_INSET, label="nameplate end inset"
+    )
 
 
 def _component_stem(component: Any) -> str:
@@ -1469,13 +1698,8 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     # teeth/thread-free configuration, and the A-A/B-B sections follow it.
     _configure_view(adapter, front, exploded=False, label="working front")
     _add_frame_height_dimensions(adapter, front)
-    _create_joint_sections(adapter, front)
-    _add_note_block(
-        adapter,
-        "TOP CROSS-BORE AXIS HEIGHT",
-        (0.119, 0.254),
-        label="controlling height identity",
-    )
+    _, top_section = _create_joint_sections(adapter, front)
+    _add_nameplate_inset_dimension(adapter, top_section)
 
     _add_note_block(
         adapter,
@@ -1553,8 +1777,8 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _add_note_block(adapter, ASSEMBLY_STEPS, (0.018, 0.263), label="assembly sequence")
     # Reflowed canonical references occupy 37 sequence rows. The existing
     # ~4.7 mm pitch estimates the last sequence row's anchor near y=94 mm,
-    # overlapping checks at y=95. At y=80, the 12th checks row's anchor is
-    # near y=28 mm, not its full text bottom; native extents prove clearance.
+    # overlapping checks at y=95. At y=80, the 11th checks row's anchor is
+    # near y=33 mm, not its full text bottom; native extents prove clearance.
     _add_note_block(adapter, ASSEMBLY_CHECKS, (0.018, 0.080), label="assembly checks")
     _add_note_block(
         adapter,

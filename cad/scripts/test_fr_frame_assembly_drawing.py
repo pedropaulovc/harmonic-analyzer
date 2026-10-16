@@ -547,3 +547,381 @@ def test_short_balloon_restores_fit_when_zooming_or_positioning_fails(
     zoomed = 2 * drawing._SHORT_BALLOON_ZOOM_HALF
     expected = [None, pytest.approx(zoomed)] if fault == "position" else [None]
     assert [span for _xy, span in placed_at] == expected
+
+
+def _step_lines(number: int) -> list[str]:
+    steps = drawing.ASSEMBLY_STEPS.splitlines()
+    start = next(i for i, line in enumerate(steps) if line.startswith(f"{number}. "))
+    end = next(
+        (i for i in range(start + 1, len(steps)) if re.match(r"\d+\. ", steps[i])),
+        len(steps),
+    )
+    return steps[start:end]
+
+
+def _step(number: int) -> str:
+    return " ".join(line.strip() for line in _step_lines(number))
+
+
+def test_assembly_steps_keep_their_crowded_sheet_3_footprint() -> None:
+    steps = drawing.ASSEMBLY_STEPS.splitlines()
+    assert len(steps) <= 39
+    assert max(map(len, steps)) <= 72
+
+
+def test_step_8_faces_the_support_windows_toward_the_short_ends() -> None:
+    # The builder turns MHA-FR-005 so its window normal (local Z, row 2)
+    # runs along machine X, the deck's length: the windows face the ends.
+    import build_fr_frame_assembly as frame
+    from fr_harmonic_base_spec import DECK_LENGTH, DECK_WIDTH
+
+    assert [abs(value) for value in frame.SUPPORT_ROWS[2]] == [1.0, 0.0, 0.0]
+    assert DECK_LENGTH > DECK_WIDTH
+    step = _step(8)
+    assert "WINDOWS FACING THE SHORT ENDS" in step
+    assert "LONG SIDES" not in step
+
+
+def test_step_9_sets_the_nameplate_then_spots_its_base_seats_through_it() -> None:
+    # #628: the base sheet prints the four nameplate seats as TRANSFER FROM
+    # MHA-FR-004 AT ASSEMBLY, so the step locates the plate on the deck, then
+    # spots, drills and taps through it before the screws go in.
+    import build_fr_harmonic_base as base
+
+    step = _step(9)
+    assert drawing.NAMEPLATE_END_INSET == pytest.approx(base.NAMEPLATE_DECK_CLEARANCE)
+    # The inset is section B-B's native dimension, never a number in the note.
+    assert "INSET FROM THE NEAR DECK END PER SECTION B-B" in step
+    assert not re.search(r"\d\.\d", step)
+    place = step.index(
+        "SET MHA-FR-004 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL"
+    )
+    spot = step.index("SPOT MHA-FR-001 THROUGH ITS FOUR HOLES")
+    assert place < step.index("CLAMP.") < spot < step.index("TRANSFER CALLOUT")
+    assert step.index("TRANSFER CALLOUT") < step.index("SEAT ALL FOUR MHA-VN-006 HEADS")
+    assert len(_step_lines(9)) <= 4
+
+
+def test_check_3_accepts_the_caps_by_their_seats_alone() -> None:
+    checks = drawing.ASSEMBLY_CHECKS.splitlines()
+    start = next(i for i, line in enumerate(checks) if line.startswith("3. "))
+    assert checks[start].startswith(
+        "3. ALL FOUR MHA-VN-028 CAPS REACH THEIR INSIDE SEATS"
+    )
+    assert "TOPS ARE EVEN" not in drawing.ASSEMBLY_CHECKS
+
+
+class _TextDisplay:
+    """A display dimension whose text parts persist unless ``drops``."""
+
+    def __init__(self, *, drops: bool = False) -> None:
+        self.parts: dict[int, str] = {}
+        self.drops = drops
+
+    def SetText(self, part, text) -> None:  # noqa: N802
+        if not self.drops:
+            self.parts[part] = text
+
+    def GetText(self, part) -> str:  # noqa: N802
+        return self.parts.get(part, "")
+
+
+class _Rebuilds:
+    def __init__(self) -> None:
+        self.count = 0
+
+    def EditRebuild3(self) -> bool:  # noqa: N802
+        self.count += 1
+        return True
+
+
+def test_top_axis_height_names_itself_in_its_own_native_suffix() -> None:
+    # The tube-frame sheet sends the fitter to this height by name.
+    from fr_tube_frame_spec import DRAWING_NOTES
+
+    assert "TOP CROSS-BORE AXIS HEIGHT" in DRAWING_NOTES
+    assert drawing.TOP_AXIS_HEIGHT_SUFFIX == (
+        " TOP CROSS-BORE AXIS HEIGHT FROM BASE UNDERSIDE"
+    )
+    model = _Rebuilds()
+    display = _TextDisplay()
+    returned = drawing._set_dimension_suffix(
+        SimpleNamespace(currentModel=model),
+        display,
+        drawing.TOP_AXIS_HEIGHT_SUFFIX,
+        label="top axis",
+    )
+    assert returned is display
+    assert display.parts == {2: drawing.TOP_AXIS_HEIGHT_SUFFIX}  # suffix only
+    assert model.count == 1
+
+
+def test_a_suffix_that_does_not_persist_fails_the_sheet() -> None:
+    model = _Rebuilds()
+    with pytest.raises(RuntimeError, match="top axis: suffix"):
+        drawing._set_dimension_suffix(
+            SimpleNamespace(currentModel=model),
+            _TextDisplay(drops=True),
+            drawing.TOP_AXIS_HEIGHT_SUFFIX,
+            label="top axis",
+        )
+    assert model.count == 0
+
+
+def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
+    monkeypatch,
+) -> None:
+    stations = {}
+    picks = {}
+    added = {}
+    checked = {}
+
+    def project(_adapter, _view, points, *, label, names):
+        stations["points"] = points
+        stations["names"] = names
+        # 1:3 plan view, machine x to the sheet's right.
+        return [(0.300 + point[0] / 3.0, 0.180 - point[2] / 3.0) for point in points]
+
+    def pick(_adapter, view, *, label, target_mm, stations):
+        picks[label] = (view, target_mm, stations)
+        return f"edge {label}"
+
+    def add(_adapter, view, **kwargs):
+        added.update(kwargs, view=view)
+        return "display"
+
+    def check(_adapter, display, *, expected_mm, label):
+        checked.update(display=display, expected_mm=expected_mm)
+        return display
+
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "_pick_inset_edge", pick)
+    monkeypatch.setattr(drawing, "add_edge_dimension", add)
+    monkeypatch.setattr(drawing, "_checked_linear_dimension", check)
+
+    assert drawing._add_nameplate_inset_dimension(None, "B-B") == "display"
+
+    count = len(drawing.NAMEPLATE_INSET_PICK_Z_M)
+    assert len(set(drawing.NAMEPLATE_INSET_PICK_Z_M)) == count
+    assert len(stations["points"]) == len(stations["names"]) == 2 * count + 2
+    plate_x = drawing.NAMEPLATE_MOUNT_POS[0]
+    deck_x = plate_x + drawing.NAMEPLATE_END_INSET
+    for label, target, offset in (
+        ("nameplate lower edge", plate_x, 0),
+        ("deck end", deck_x, count),
+    ):
+        view, target_mm, rows = picks[label]
+        assert view == "B-B"
+        assert target_mm == pytest.approx(target)
+        assert [z for z, _ in rows] == list(drawing.NAMEPLATE_INSET_PICK_Z_M)
+        for (z, sheet_xy), point in zip(rows, stations["points"][offset:]):
+            assert point == pytest.approx((target / 1000.0, point[1], z))
+            assert sheet_xy == pytest.approx((0.300 + target / 3000.0, 0.180 - z / 3.0))
+    assert added["view"] == "B-B"
+    # The dimension spans exactly the read-back edges; the value check stays.
+    assert added["entities"] == ("edge nameplate lower edge", "edge deck end")
+    first_z = drawing.NAMEPLATE_INSET_PICK_Z_M[0]
+    assert added["p0"] == pytest.approx(
+        (0.300 + plate_x / 3000.0, 0.180 - first_z / 3.0)
+    )
+    assert added["p1"] == pytest.approx(
+        (0.300 + deck_x / 3000.0, 0.180 - first_z / 3.0)
+    )
+    # The text, and the dimension line with it, sit past the base's outer edge:
+    # below the plan view, clear of the plate and its lettering, beyond the
+    # deck end and away from the plate.
+    text_z = drawing.NAMEPLATE_INSET_TEXT_Z_M
+    assert text_z * 1000.0 > drawing.BOTTOM_WIDTH / 2.0
+    assert stations["points"][-2:] == [
+        pytest.approx((plate_x / 1000.0, stations["points"][0][1], text_z)),
+        pytest.approx((deck_x / 1000.0, stations["points"][0][1], text_z)),
+    ]
+    assert added["text_xy"] == pytest.approx(
+        (
+            0.300 + deck_x / 3000.0 + drawing.NAMEPLATE_INSET_TEXT_OFFSET_M,
+            0.180 - text_z / 3.0,
+        )
+    )
+    assert checked == {"display": "display", "expected_mm": drawing.NAMEPLATE_END_INSET}
+
+
+def _scripted_inset_picks(monkeypatch, readings):
+    logged = []
+    picked = []
+
+    def read(_adapter, _view, sheet_xy):
+        picked.append(tuple(sheet_xy))
+        return readings[len(picked) - 1]
+
+    monkeypatch.setattr(drawing, "_read_inset_pick", read)
+    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
+    return logged, picked
+
+
+INSET_STATIONS = ((0.025, (0.1, 0.2)), (0.020, (0.1, 0.21)), (0.030, (0.1, 0.19)))
+
+
+def test_an_inset_pick_off_target_moves_along_z_and_logs_both_readings(
+    monkeypatch,
+) -> None:
+    logged, picked = _scripted_inset_picks(
+        monkeypatch,
+        [
+            ("near line", "fr-frame-1/fr-nameplate-1", (161.666, 161.666)),
+            ("target", "fr-frame-1/fr-nameplate-1", (163.01, 162.99)),
+        ],
+    )
+    edge = drawing._pick_inset_edge(
+        None, "B-B", label="plate", target_mm=163.0, stations=INSET_STATIONS
+    )
+    assert edge == "target"
+    assert picked == [(0.1, 0.2), (0.1, 0.21)]
+    assert len(logged) == 2
+    assert "z 25 mm" in logged[0] and "machine x 161.666/161.666 mm" in logged[0]
+    assert logged[0].endswith("-> miss")
+    assert "z 20 mm" in logged[1] and "machine x 163.010/162.990 mm" in logged[1]
+    assert logged[1].endswith("-> hit")
+
+
+def test_inset_picks_that_never_reach_the_target_fail_naming_every_reading(
+    monkeypatch,
+) -> None:
+    logged, _ = _scripted_inset_picks(
+        monkeypatch,
+        [
+            ("near line", "fr-frame-1/fr-harmonic-base-1", (168.334, 168.334)),
+            (None, "selection type 5", None),
+            # One end on target is not enough: the edge must lie along z there.
+            ("slant", "fr-frame-1/fr-harmonic-base-1", (167.0, 170.0)),
+        ],
+    )
+    with pytest.raises(RuntimeError) as failure:
+        drawing._pick_inset_edge(
+            None, "B-B", label="deck end", target_mm=167.0, stations=INSET_STATIONS
+        )
+    message = str(failure.value)
+    assert "no pick lies at machine x 167 mm" in message
+    assert "machine x 168.334/168.334 mm" in message
+    assert "selection type 5" in message
+    assert "machine x 167.000/170.000 mm" in message
+    assert len(logged) == 3 and all(line.endswith("-> miss") for line in logged)
+
+
+class _InsetPickDraw:
+    """A drawing whose zoomed coordinate pick returns one scripted object."""
+
+    def __init__(self, picked, kind) -> None:
+        self.picked, self.kind = picked, kind
+        self.calls = []
+        self.Extension = self
+        self.SelectionManager = self
+
+    def ActivateView(self, name):  # noqa: N802
+        self.calls.append(("activate", name))
+        return True
+
+    def ClearSelection2(self, _all):  # noqa: N802
+        self.calls.append(("clear",))
+
+    def ViewZoomTo2(self, *box):  # noqa: N802
+        self.calls.append(("zoom", box))
+
+    def ViewZoomtofit2(self):  # noqa: N802
+        self.calls.append(("fit",))
+
+    def SelectByID2(self, name, kind, x, y, *_rest):  # noqa: N802
+        self.calls.append(("select", kind, x, y))
+        return self.picked is not None
+
+    def GetSelectedObjectCount2(self, _mark):  # noqa: N802
+        return 2  # the view, then the edge
+
+    def GetSelectedObjectType3(self, index, _mark):  # noqa: N802
+        assert index == 2
+        return self.kind
+
+    def GetSelectedObject6(self, index, _mark):  # noqa: N802
+        assert index == 2
+        return self.picked
+
+
+def _inset_pick_adapter(monkeypatch, picked, kind=1):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view)
+    monkeypatch.setattr(drawing, "_edge_endpoint_key", lambda _adapter, edge: edge.key)
+    draw = _InsetPickDraw(picked, kind)
+
+    def attempt(call, default=None):
+        try:
+            return call()
+        except Exception:
+            return default
+
+    return SimpleNamespace(currentModel=draw, _attempt=attempt), draw
+
+
+def test_an_inset_pick_reads_back_its_edge_in_machine_x(monkeypatch) -> None:
+    # Component-local x 0.150 m, moved +13 mm along machine x: 163 mm.
+    plate = _Full((1, 0, 0, 0, 1, 0, 0, 0, 1, 0.013, 0.0, 0.0, 1.0, 0, 0, 0))
+    plate.Name2 = "fr-frame-1/fr-nameplate-1"
+    edge = SimpleNamespace(
+        key=(0.150, 0.0523, 0.010, 0.150, 0.0523, 0.040), GetComponent=lambda: plate
+    )
+    adapter, draw = _inset_pick_adapter(monkeypatch, edge)
+
+    picked, owner, xs = drawing._read_inset_pick(adapter, "B-B", (0.1, 0.2))
+
+    assert picked is edge and owner == "fr-frame-1/fr-nameplate-1"
+    assert xs == pytest.approx((163.0, 163.0))
+    half = drawing._HIT_ZOOM_HALF
+    # Zoomed onto the station for the pick, back to fit before the read-back.
+    assert draw.calls[:5] == [
+        ("activate", "B-B"),
+        ("clear",),
+        ("zoom", (0.1 - half, 0.2 - half, 0.0, 0.1 + half, 0.2 + half, 0.0)),
+        ("select", "EDGE", 0.1, 0.2),
+        ("fit",),
+    ]
+
+
+def test_an_inset_pick_that_is_not_a_component_edge_reads_no_x(monkeypatch) -> None:
+    orphan = SimpleNamespace(key=(0.0,) * 6, GetComponent=lambda: None)
+    for picked, kind, reason in (
+        (None, 1, "no edge"),
+        ("silhouette", 11, "selection type 11"),
+        (orphan, 1, "edge without a component"),
+    ):
+        adapter, _ = _inset_pick_adapter(monkeypatch, picked, kind)
+        assert drawing._read_inset_pick(adapter, "B-B", (0.1, 0.2)) == (
+            None,
+            reason,
+            None,
+        )
+
+
+def test_height_dimensions_stand_clear_of_the_cutting_plane_letters() -> None:
+    # PR #1468 r4 machinist review: the (1044.8) line struck the right-hand
+    # B-B letter, and the A-A arrow shared its corridor. Both height lines now
+    # stand right of the letters and left of section A-A, each with clearance;
+    # the sections stay apart and inside the border.
+    from fr_harmonic_base_spec import BOTTOM_LENGTH
+
+    front_half = BOTTOM_LENGTH / 2.0 / 8.0 / 1000.0  # the 1:8 view's flange
+    section_half = BOTTOM_LENGTH / 2.0 / 3.0 / 1000.0  # both 1:3 sections
+    letters_right = (
+        drawing.WORKING_FRONT_CENTER[0] + front_half + drawing.CUTTING_LETTER_REACH_M
+    )
+    top_axis_x = drawing.TOP_AXIS_HEIGHT_TEXT_XY[0]
+    overall_x = drawing.OVERALL_HEIGHT_TEXT_XY[0]
+    base_left = drawing.BASE_SECTION_CENTER[0] - section_half
+    clearance = drawing.HEIGHT_LINE_CLEARANCE_M
+    assert letters_right + clearance <= top_axis_x
+    assert top_axis_x + clearance <= overall_x
+    # r6 review: a visible gap between the front view's dimensions and A-A.
+    assert overall_x + drawing.VIEW_GAP_M <= base_left
+    assert drawing.VIEW_GAP_M >= 0.006
+    base_right = drawing.BASE_SECTION_CENTER[0] + section_half
+    top_left = drawing.TOP_SECTION_CENTER[0] - section_half
+    top_right = drawing.TOP_SECTION_CENTER[0] + section_half
+    assert top_left - base_right >= 0.006
+    assert top_right <= 0.4191 - 0.002  # B-size inner border, 17 in less 0.5 in

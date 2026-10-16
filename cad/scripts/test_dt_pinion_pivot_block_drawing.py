@@ -224,9 +224,12 @@ def test_notes_stay_within_policy_and_leave_assembly_to_the_assembly() -> None:
     # Never a method (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): spotting the base seats through the block
     # is the rig-set step and the base sheet's transfer callout.
     assert not any("ASSEMBLY" in line or "SPOT" in line for line in notes)
+    import draw_fr_harmonic_base as base_sheet
+    from dt_drive_train_steps import step_ref
     from pinion_rig_fitup import RIG_SET_STEP
 
     assert "SPOTTING THE TRANSFER SEATS" in RIG_SET_STEP
+    assert f"AFTER {step_ref('rig-set')};" in base_sheet.TRANSFER_BLOCK_CALLOUT
     # The feeler setting is an assembly step (drive-train assembly drawing),
     # and a note carries no dimension (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), Codex #854).
     assert not any(re.search(r"\d", line) and "MHA-" not in line for line in notes)
