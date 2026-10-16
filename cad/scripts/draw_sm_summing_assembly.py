@@ -130,15 +130,18 @@ DETAIL_CENTRE = (0.305, 0.172)
 # The detail frames the knife contact, the mount, the boss and the eye of the
 # boss hook: model centre between knife and boss axis, just above the knife.
 DETAIL_MODEL_CENTRE_MM = (
-    (spec.KNIFE_POINT[0] + spec.BOSS_FACE_POINT[0]) / 2.0,
+    (spec.KNIFE_POINT[0] + spec.COUNTER_SCREW_POINT[0]) / 2.0,
     spec.BOSS_FACE_POINT[1] + 5.0,
 )
-DETAIL_RADIUS_MM = 50.0
+DETAIL_RADIUS_MM = 52.0
 DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0  # sheet metres per model mm
 DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * DETAIL_MM
-# The rock gauge's dimension stands this far outboard of the boss axis,
-# beyond the crop circle.
-ROCK_TEXT_OFFSET = 0.024
+# The rock gauge's dimension line stands this far outboard of the boss's
+# outer edge, left of the crop circle. Its text sits this far under the boss
+# face, outside the gauge span: at 1:1 the span is shorter than the value
+# and callout, so text placed inside it prints on its own dimension line.
+ROCK_TEXT_OFFSET = 0.016
+ROCK_TEXT_DROP = 0.008
 DETAIL_LABEL_GAP = 0.005
 DETAIL_LABEL_INSET = 0.040
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
@@ -158,10 +161,9 @@ BOM_SKU_TITLE = "VENDOR SKU"
 MADE_PART_SKU = "-"
 BOM_ROW_HEIGHT = 0.006
 BOM_ANCHOR = (0.226, 0.258)
-EXPLODED_CAPTION_XY = (
-    BOM_ANCHOR[0],
-    BOM_ANCHOR[1] - (len(spec.BOM_ORDER) + 1) * BOM_ROW_HEIGHT - 0.008,
-)
+# The BOM's wrapped description rows grow it past its nominal row pitch
+# (r1: bottom at 0.1855), so the caption takes a fixed station well under it.
+EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.176)
 
 # --- Sheet 3 ------------------------------------------------------------------
 ASSEMBLY_ISO_CENTER = (0.322, 0.172)
@@ -549,7 +551,7 @@ def _knife_detail(adapter: Any) -> Callable[[], None]:
     outboard = math.copysign(1.0, face[0] - knife[0])
     text_xy = (
         face[0] + outboard * ROCK_TEXT_OFFSET,
-        face[1] + spec.BOSS_ROCK_TRAVEL * DETAIL_MM / 2.0,
+        face[1] - ROCK_TEXT_DROP,
     )
     annotation = _imported_setting(
         adapter,
