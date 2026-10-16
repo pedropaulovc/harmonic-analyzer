@@ -11,12 +11,14 @@ import pytest
 
 import build_mg_magnifier_assembly as assembly
 import draw_mg_magnifier_assembly as drawing
+import joint_retention
 import mg_magnifier_assembly_spec as stack
+import mg_magnifier_assembly_steps as steps
+import mg_magnifier_explode_spec as explode
 import mg_wheel_axle_spacer_spec
 import mg_wheel_axle_spec
 import mg_wheel_group
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
-from mg_lever_press_fit_geom import PRESS_INSTALLATION_NOTES
 
 # The LANDSCAPE sheet's free field right of the isometric: inside the border
 # (about 13 mm in from the trim) and above the title block (sheet metres).
@@ -341,70 +343,338 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
     ]
     assert blanked == [feature]
 
+def test_the_package_has_four_landscape_sheets_with_the_wire_steps_on_the_last() -> None:
+    assert drawing.SHEET_NAMES[-1] == "ASSEMBLY STEPS"
+    assert len(drawing.SHEET_NAMES) == 4
+    assert set(drawing.SHEET_LAYOUTS.values()) == {DrawingLayout.LANDSCAPE}
+    # MHA-HA-000 prints "LEVER WIRE PER MHA-MG-000 (SHEET 4)" and names these keys.
+    assert steps.WIRE_HOOKED_KEY == "lever-wire-hooked"
+    assert steps.WIRE_TIED_KEY == "lever-wire-tied"
+    assert steps.SEQUENCE[-2:] == (steps.WIRE_HOOKED_KEY, steps.WIRE_TIED_KEY)
+    assert "SHEET 4" in stack.EXPLODED_CAPTION
 
 
-def test_press_note_is_model_owned_and_inserted_before_native_finalization(
-    monkeypatch, tmp_path
-) -> None:
-    # The assembly stamps the same drawing-free instruction as the bracket,
-    # not a copied caption that can drift from the force or safe pressing setup.
+def test_every_step_is_numbered_in_sequence_and_names_no_setting_value() -> None:
+    assert tuple(stack.STEP_TEXT) == steps.SEQUENCE
+    assert stack.ASSEMBLY_STEPS == tuple(
+        f"{steps.step_number(key)}. {stack.STEP_TEXT[key]}" for key in steps.SEQUENCE
+    )
+    settings = (
+        stack.PRESS_GAUGE,
+        stack.ENDSHAKE,
+        stack.CLAMP_STATION,
+        stack.FIXTURE_DROP,
+    )
+    for text in (*stack.STEP_TEXT.values(), *stack.ASSEMBLY_CHECKS):
+        for value in settings:
+            for printed in {f"{value:g}", f"{value:.1f}", f"{value:.2f}"}:
+                assert not re.search(rf"(?<![\d.]){re.escape(printed)}(?![\d])", text), (
+                    printed,
+                    text,
+                )
+    joined = " ".join(stack.STEP_TEXT.values())
+    for setting in ("PRESS GAUGE", "WHEEL ENDSHAKE", "CLAMP STATION", "FIXTURE DROP"):
+        assert f"{setting} (SHEET 1" in joined, setting
+    # The detached method note and any rod-retention step stay out (#1559).
+    assert "HOLD ROD NEAR END" not in joined
+    assert "THREAD THE ROD" not in joined
+
+
+def test_the_builder_stamps_no_drawing_note_property() -> None:
     tree = ast.parse(Path(assembly.__file__).read_text(encoding="utf-8"))
-    values = [
-        value
+    keys = {
+        node.value
         for node in ast.walk(tree)
-        if isinstance(node, ast.Dict)
-        for key, value in zip(node.keys, node.values, strict=True)
-        if isinstance(key, ast.Constant) and key.value == "Drawing Notes"
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+    assert "Drawing Notes" not in keys
+    assert "PRESS_INSTALLATION_NOTES" not in Path(assembly.__file__).read_text(
+        encoding="utf-8"
+    )
+
+
+def test_the_lever_settings_match_the_placed_lever_group() -> None:
+    assert stack.LEVER_TIP_X == pytest.approx(assembly.LEVER_X0)
+    assert stack.LEVER_AXIS_Y == pytest.approx(assembly.LEVER_ROD_Y)
+    assert stack.CLAMP_CENTRE_X == pytest.approx(assembly.CLAMP_X)
+    assert stack.FIXTURE_AXIS_Y == pytest.approx(assembly.FIXTURE_POSITION[1])
+    assert stack.CLAMP_STATION > 0.0 and stack.FIXTURE_DROP > 0.0
+    assert set(stack.LEVER_CALLOUTS) == set(drawing.LEVER_CALLOUT_LOCATION)
+    assert stack.LEVER_DRAWING_DIMENSIONS == {
+        stack.LEVER_FEATURE: {stack.CLAMP_STATION_DIMENSION, stack.FIXTURE_DROP_DIMENSION}
+    }
+    drawing._printable_lever_callouts()
+
+
+def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
+    monkeypatch,
+) -> None:
+    ok = lambda data=None: SimpleNamespace(is_success=True, data=data, error=None)  # noqa: E731
+    lines: list[tuple[float, ...]] = []
+    relations: list[tuple] = []
+    globals_authored: dict[str, str] = {}
+    equations: dict[str, str] = {}
+    lengths: dict[str, tuple[str, float]] = {}
+    anchors: list[tuple] = []
+    blanked: list[str] = []
+
+    class Adapter:
+        _sketch_entities: dict[str, object] = {}
+        currentModel = object()
+
+        async def create_sketch(self, plane):
+            assert plane == "Front"
+            return ok()
+
+        async def add_line(self, *coords):
+            name = f"leg{len(lines)}"
+            lines.append(coords)
+            self._sketch_entities[name] = SimpleNamespace(ConstructionGeometry=False)
+            return ok(name)
+
+        async def add_sketch_constraint(self, *args):
+            relations.append(args)
+            return ok()
+
+        async def exit_sketch(self):
+            return ok()
+
+    class Dims:
+        def __init__(self):
+            self.rows = []
+
+        def record(self, name, drive=None):
+            self.rows.append((name, drive))
+
+        def apply(self, adapter, feature):
+            return [(f"{name}@{feature}", drive) for name, drive in self.rows if drive]
+
+    def early_bound(entity, iface):
+        if iface == "IAssemblyDoc":
+            return SimpleNamespace(FeatureByName=lambda name: name)
+        if iface == "IFeature":
+            return SimpleNamespace(Visible=1 if entity in blanked else 2)
+        return entity
+
+    async def set_global(adapter, name, expression):
+        globals_authored[name] = expression
+
+    async def drive_dimension(adapter, name, expression):
+        equations[name] = expression
+
+    async def dimension_between(adapter, a, b, kind, value, name):
+        lengths[name] = (kind, value)
+
+    async def anchor(adapter, ref, x, y, label):
+        anchors.append((ref, x, y))
+
+    async def noop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(assembly, "set_global", set_global)
+    monkeypatch.setattr(assembly, "drive_dimension", drive_dimension)
+    monkeypatch.setattr(assembly, "dimension_between", dimension_between)
+    monkeypatch.setattr(assembly, "SketchDims", Dims)
+    monkeypatch.setattr(assembly, "_early_bound", early_bound)
+    monkeypatch.setattr(assembly, "anchor_point_to_origin", anchor)
+    monkeypatch.setattr(assembly, "ensure_fully_defined", noop)
+    for name in (
+        "set_sketch_direct_db",
+        "name_last_feature",
+        "apply_drawing_precision",
+        "mark_dimensions_for_drawing",
+    ):
+        monkeypatch.setattr(assembly, name, lambda *a, **kw: None)
+    monkeypatch.setattr(
+        assembly, "blank_sketch", lambda adapter, feature: blanked.append(feature)
+    )
+
+    asyncio.run(assembly._author_lever_setting_reference(Adapter()))
+
+    tip = (stack.LEVER_TIP_X, stack.LEVER_AXIS_Y)
+    clamp = (stack.CLAMP_CENTRE_X, stack.LEVER_AXIS_Y)
+    fixture = (stack.CLAMP_CENTRE_X, stack.FIXTURE_AXIS_Y)
+    assert lines == [(*tip, *clamp), (*clamp, *fixture)]
+    assert ("leg0", None, "horizontal") in relations
+    assert ("leg1", None, "vertical") in relations
+    assert ("leg0.end", "leg1.start", "coincident") in relations
+    assert anchors == [("leg0.start", *tip)]
+    assert lengths == {
+        stack.CLAMP_STATION_DIMENSION: ("horizontal_distance", stack.CLAMP_STATION),
+        stack.FIXTURE_DROP_DIMENSION: ("vertical_distance", stack.FIXTURE_DROP),
+    }
+    feature = stack.LEVER_FEATURE
+    assert equations == {
+        f"LeverTipX@{feature}": '"LeverTipX"',
+        f"LeverAxisY@{feature}": '"LeverAxisY"',
+        f"{stack.CLAMP_STATION_DIMENSION}@{feature}": '"LeverClampStation"',
+        f"{stack.FIXTURE_DROP_DIMENSION}@{feature}": '"LeverFixtureDrop"',
+    }
+    assert globals_authored == {
+        "LeverTipX": f"{stack.LEVER_TIP_X}mm",
+        "LeverAxisY": f"{stack.LEVER_AXIS_Y}mm",
+        "LeverClampStation": f"{stack.CLAMP_STATION}mm",
+        "LeverFixtureDrop": f"{stack.FIXTURE_DROP}mm",
+    }
+    assert all(entity.ConstructionGeometry for entity in Adapter._sketch_entities.values())
+    assert blanked == [feature]
+
+
+def test_the_explode_moves_every_shown_family_but_the_wire_in_one_group() -> None:
+    moved = {
+        explode.member_stem(member)
+        for step in explode.EXPLODE_STEPS
+        for member in step.members
+    }
+    # The bar with its pressed axle, and the lever with its clamp, stay put
+    # as each group's base; everything else moves.
+    assert moved == explode.SHOWN_STEMS - {
+        explode.WIRE_STEM,
+        "mg-wheel-bar",
+        "mg-wheel-axle",
+        "mg-magnifying-lever",
+        "mg-magnifying-clamp",
+    }
+    assert explode.WHEEL_GROUP_STEMS.isdisjoint(explode.LEVER_GROUP_STEMS)
+    assert explode.SHOWN_STEMS == set(stack.BOM_ORDER)
+
+
+def test_plan_explode_resolves_instances_and_refuses_missing_ones() -> None:
+    instances = [
+        explode.Instance(f"{stem}-{number}", stem)
+        for stem in stack.BOM_ORDER
+        for number in range(1, stack.QUANTITIES[stem] + 1)
     ]
-    assert len(values) == 1
-    assert isinstance(values[0], ast.Name) and values[0].id == "PRESS_INSTALLATION_NOTES"
-    assert "COLLAR ONTO LEVER; HOLD ROD NEAR END" in PRESS_INSTALLATION_NOTES
-    assert "WITH OUTER FACE" in PRESS_INSTALLATION_NOTES
-    # #1570: press only, no bond.
-    assert "LOCTITE" not in PRESS_INSTALLATION_NOTES
-    assert "SOLDER" not in PRESS_INSTALLATION_NOTES
-    note_calls = []
-    events = []
-    source = tmp_path / "magnifier.SLDASM"
-    source.write_bytes(b"source-presence fixture; native opening is faked")
+    plan = explode.plan_explode(instances)
+    assert [step for step, _names in plan] == list(explode.EXPLODE_STEPS)
+    for step, names in plan:
+        assert names, step.label
+        for name in names:
+            assert explode.member_stem(name.rsplit("-", 1)[0]) in {
+                explode.member_stem(member) for member in step.members
+            }
+    first_nut = next(
+        names for step, names in plan if step.members == ("vn-wheel-axle-nut:1",)
+    )
+    assert first_nut == ("vn-wheel-axle-nut-1",)
+    with pytest.raises(ValueError, match="absent"):
+        explode.plan_explode([i for i in instances if i.stem != "mg-output-fixture"])
+    with pytest.raises(ValueError, match="no instance"):
+        explode.plan_explode([i for i in instances if i.name != "vn-wheel-axle-nut-2"])
 
-    async def open_model(path):
-        assert path == str(source)
-        events.append("open")
-        return SimpleNamespace(is_success=True, data=None, error=None)
 
-    adapter = SimpleNamespace(currentModel=object(), open_model=open_model)
+def test_the_bom_rows_are_the_registry_parts_with_their_skus() -> None:
+    assert drawing.BOM_COMPONENTS == stack.BOM_ORDER
+    assert set(stack.BOM_DESCRIPTIONS) == set(stack.BOM_ORDER)
+    for stem, row in drawing.PART_ROWS.items():
+        assert drawing.BOM_PART_NUMBERS[stem] == row["number"]
+        skus = row.get("supplier_skus") or ()
+        assert drawing.BOM_SKUS[stem] == (" / ".join(skus) if skus else "-")
+    assert drawing.BOM_SKUS["vn-thumb-screw"] == "91882A221"
+    assert drawing.BOM_SKUS["mg-magnifying-lever"] == "-"
+    assert stack.QUANTITIES["vn-thumb-screw"] == 2
 
-    def linked_note(actual_adapter, name, x, y, *, char_height):
-        events.append("press-note")
-        note_calls.append((actual_adapter, name, x, y, char_height))
 
-    def stack_dimensions(actual_adapter):
-        assert actual_adapter is adapter
-        events.append("stack")
-        return settled
+def _inside(inner, outer) -> bool:
+    return (
+        inner[0] >= outer[0] - 1e-9
+        and inner[1] >= outer[1] - 1e-9
+        and inner[2] <= outer[2] + 1e-9
+        and inner[3] <= outer[3] + 1e-9
+    )
 
-    def settled():
-        events.append("settled")
 
-    async def finalize(actual_adapter, outputs, **kwargs):
-        assert actual_adapter is adapter
-        assert outputs is drawing.OUTPUTS
-        assert kwargs["settled_checks"] == (settled,)
-        events.append("finalize")
-        return {"pdf": "finalized"}
+def _overlap(a, b) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
-    monkeypatch.setattr(drawing, "SOURCE", source)
-    monkeypatch.setattr(drawing, "read_required_properties", lambda *args, **kwargs: None)
-    monkeypatch.setattr(drawing, "new_project_drawing", lambda *args, **kwargs: None)
-    monkeypatch.setattr(drawing, "place_view", lambda *args, **kwargs: object())
-    monkeypatch.setattr(drawing, "apply_view_configuration", lambda *args, **kwargs: None)
-    monkeypatch.setattr(drawing, "assert_full_detail_view", lambda *args, **kwargs: None)
-    monkeypatch.setattr(drawing, "_stack_dimensions", stack_dimensions)
-    monkeypatch.setattr(drawing, "add_property_linked_note", linked_note)
-    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
-    assert asyncio.run(drawing.build(adapter)) == {"pdf": "finalized"}
-    assert events == ["open", "stack", "press-note", "finalize"]
-    assert note_calls == [
-        (adapter, "Drawing Notes", *drawing.PRESS_NOTE_XY, drawing.PRESS_NOTE_CHAR_HEIGHT)
+
+def test_the_package_fields_stay_inside_the_border_and_off_the_title_block() -> None:
+    bom = (
+        drawing.BOM_ANCHOR[0],
+        drawing.BOM_BOTTOM,
+        drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values()),
+        drawing.BOM_ANCHOR[1],
+    )
+    for field in (
+        drawing.WHEEL_FIELD,
+        drawing.LEVER_FIELD,
+        drawing.FINISHED_FIELD,
+        drawing.BOM_REFERENCE_FIELD,
+        bom,
+    ):
+        assert _inside(field, drawing.INNER_BORDER), field
+    for field in (drawing.LEVER_FIELD, drawing.FINISHED_FIELD, drawing.BOM_REFERENCE_FIELD):
+        assert not _overlap(field, drawing.TITLE_BLOCK), field
+    assert not _overlap(drawing.WHEEL_FIELD, bom)
+    assert not _overlap(drawing.WHEEL_FIELD, drawing.TITLE_BLOCK)
+    assert not _overlap(drawing.BOM_REFERENCE_FIELD, bom)
+    assert drawing.BOM_REFERENCE_FIELD[3] < drawing.BOM_REFERENCE_CAPTION_XY[1]
+    assert drawing.FINISHED_FIELD[0] > drawing.STEPS_RIGHT
+
+
+def test_the_steps_and_checks_fit_their_column() -> None:
+    for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS):
+        assert max(len(line) for line in block.splitlines()) <= drawing.STEPS_LINE_WIDTH
+    checks_bottom = drawing.CHECKS_XY[1] - (
+        drawing.ASSEMBLY_CHECKS.count("\n") + 1
+    ) * drawing.NOTE_LINE_PITCH
+    assert checks_bottom > drawing.INNER_BORDER[1]
+    assert drawing.ASSEMBLY_STEPS.startswith("ASSEMBLY SEQUENCE\n1. ")
+    assert f"\n{len(steps.SEQUENCE)}. " in drawing.ASSEMBLY_STEPS
+
+
+def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
+    from _drawing_common import _SW_SHADED_EDGES
+    from _drawing_view_configuration import (
+        SIMPLIFIED_VIEW_CONFIGURATION,
+        view_configuration,
+    )
+
+    for ladder in (
+        drawing.EXPLODED_SCALE_LADDER,
+        drawing.FINISHED_SCALE_LADDER,
+        drawing.BOM_REFERENCE_SCALE_LADDER,
+    ):
+        for scale in ladder:
+            assert (
+                view_configuration(scale, _SW_SHADED_EDGES)
+                == SIMPLIFIED_VIEW_CONFIGURATION
+            )
+    assert drawing.exploded_caption("WHEEL GROUP", (1.0, 3.0)).endswith("(SCALE 1:3)")
+
+
+def test_step_down_takes_the_largest_scale_whose_ring_fits() -> None:
+    field = (0.0, 0.0, 0.200, 0.150)
+    widths = {(1.0, 2.0): 0.250, (1.0, 3.0): 0.150, (1.0, 4.0): 0.110}
+
+    def outline_at(scale):
+        width = widths[scale]
+        return (0.0, 0.0, width, width * 0.5)
+
+    scale, outline = drawing.step_down_to_fit(
+        outline_at, drawing.EXPLODED_SCALE_LADDER, field, name="t"
+    )
+    assert scale == (1.0, 3.0)
+    with pytest.raises(ValueError, match="no t scale fits"):
+        drawing.step_down_to_fit(
+            outline_at, drawing.EXPLODED_SCALE_LADDER, (0.0, 0.0, 0.05, 0.05), name="t"
+        )
+
+
+def test_every_bom_family_is_ballooned_exactly_once_across_the_package() -> None:
+    items = {stem: str(index) for index, stem in enumerate(stack.BOM_ORDER, start=1)}
+    ballooned = [
+        stem
+        for stems in (
+            explode.WHEEL_GROUP_STEMS,
+            explode.LEVER_GROUP_STEMS,
+            frozenset({explode.WIRE_STEM}),
+        )
+        for stem, _item in drawing.balloon_items(items, stems)
     ]
+    assert sorted(ballooned) == sorted(stack.BOM_ORDER)
+
+
+def test_the_joint_retention_rows_point_at_magnifier_steps() -> None:
+    assert joint_retention.STEP_LISTS["mg_magnifier"] == steps.SEQUENCE
+    assert DRAWINGS_BY_NAME["mg_magnifier_assembly"].part == "mg_magnifier"
