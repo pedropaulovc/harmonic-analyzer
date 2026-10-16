@@ -11,11 +11,12 @@ taps, a solid pivot cylinder (152.4 long, along Z), and a summation arm
 reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
 anchors are purchased eyebolts that thread straight into those taps, so the
 print controls thread identity and position, never a seat bore.  Sheet 1
-shows a 1:2 front profile (the cylinder, boss, web and the rib outline every
-rib shares), a 4:1 detail of the trunnion envelope and its knife-edge round, a
-1:2 top plan (plate, ribs, summation web, trunnion length, the anchor taps and
-their pattern control), a 1:1 partial section C-C of the plate's thickness
-and a 1:4 isometric; sheet 2 shows the 1:1 back view of the two bracket
+shows a 1:2 front profile (the boss, web and the rib outline every rib
+shares), a 4:1 detail of the trunnion envelope and its knife-edge round, a
+1:2 top plan (plate, ribs, cylinder, summation web, trunnion length, the
+anchor taps and their pattern control, and the VIEW F arrow onto the -Z
+end), a 1:1 partial section C-C of the plate's thickness and a 1:4
+isometric; sheet 2 shows VIEW F at 1:1, the -Z end with the two bracket
 receiver taps and the spring-anchor pad under the plate they sit in, so the
 end rib's slant over each tap reads.  Sheet 1 runs at 1:2.
 
@@ -59,6 +60,7 @@ from _drawing_hidden_sketches import (
     part_sketches_shown,
 )
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -79,8 +81,10 @@ from magnifying_bracket_joint_layout import (
     THREAD_DEPTH,
 )
 from sm_summing_lever_notes import (
+    BACK_VIEW_LETTER,
     BOSS_Z_CALLOUT,
     BRACKET_TAP_CALLOUT_PROCESS,
+    CYLINDER_REFERENCE_Z,
     DIMENSION_CALLOUTS_ABOVE,
     DIMENSION_CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
@@ -476,6 +480,32 @@ def _apply_callouts(adapter: Any, annotations: list[Any], *, label: str) -> None
     _telemetry.info(f"{label}: callouts on {sorted(present)}")
 
 
+def _add_view_f_arrow(adapter: Any, top: Any) -> None:
+    """The letter arrow on the plan that names sheet 2's VIEW F."""
+    text_xy, tip_xy = VIEW_F_ARROW
+    note = add_leader_note(
+        adapter,
+        BACK_VIEW_LETTER,
+        text_xy=text_xy,
+        attach_xy=tip_xy,
+        view=top,
+        label="view F viewing arrow",
+    )
+    # add_note leaves text at the document height; size the letter here and
+    # prove the leader tip did not move with it.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError("view F arrow note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError("failed to size the view F arrow letter")
+    rebuild_drawing(adapter, label="view F arrow letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError("view F arrow tip moved when its letter was sized")
+
+
 def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
     """Prove Detail D's KnifeRidgeRadius prints the part's R MAX: radial,
     measuring KNIFE_RIDGE_R, the native swTolMAX the part set
@@ -825,9 +855,10 @@ def _mounting_rims(back: Any) -> list[Any]:
 # 7.6 mm round the axis, the web bar y 0.2338..0.2363 from the boss to that
 # arc, the plate tip x 0.2535..0.2575.  Every rib shares the +Z end rib's
 # outline, so its dimensions sit here once: the 35.75 reach above the view,
-# the rib-end height right of the plate tip, the rib arc and the hidden
-# cylinder taking leaders from below on either side of the detail letter, the
-# boss height left of the boss, and the web thickness standing above the web.
+# the rib end's step over the plate top right of the plate tip, the rib arc
+# taking a leader from below left of the detail letter, the boss height left
+# of the boss, and the web thickness standing above the web.  The cylinder
+# is sized in the plan (TOP_KEEP): here the rib outline hides it.
 # A radial leader runs along the line from the arc's centre to the end of its
 # text block's BOTTOM line (farm r5: the R15.24 leader went to "AT BOSS
 # AXIS"'s right end, through the detail letter).  The rib arc's four lines
@@ -839,18 +870,18 @@ def _mounting_rims(back: Any) -> list[Any]:
 # read as a leader off this shelf); the top line stands under 19.05's lower
 # arrow.
 FRONT_KEEP = {
-    "CylDia": (0.290, 0.214),
     "AnchorHeight": (0.183, 0.235),
     "WebThickness": (0.215, 0.247),
     "EdgeRibFrontArcR": (0.1948, 0.2120),
     "EdgeRibFrontEndTopX": (0.2443, 0.254),
     # Right of the plate tip, its three lines under the value (machinist
-    # review r8: from what, and why the end stands proud of the plate).  The
-    # keep centres the 21 mm block: at 0.246 its bottom line sat on the
-    # lower extension line, the shelf underlining it and the upper arrow in
-    # its text (farm r12); at 0.253 the shelf runs over the upper arrow and
-    # the top line stands under the border.
-    "EdgeRibFrontEndTopY": (0.284, 0.253),
+    # review r8: from what, and why the end stands proud of the plate; r10:
+    # from the plate top face, not the mid-plane).  The keep centres the 21
+    # mm block: at 0.246 its bottom line sat on the lower extension line, the
+    # shelf underlining it and the upper arrow in its text (farm r12); at
+    # 0.253 the shelf runs over the upper arrow and the top line stands under
+    # the border.
+    "EdgeRibFrontEndStep": (0.284, 0.253),
 }
 # Detail D at 4:1: the hexagon's centre prints at DETAIL_CENTER, its flats at
 # x 0.0588/0.0912, its vertices at y 0.2015/0.2425, the fence 0.030 round it.
@@ -910,6 +941,13 @@ TOP_KEEP = {
     # Above the mid rib between the boss and the cylinder, under the web's
     # upper arc (y 0.146 and up there), the text ending at the line.
     "MiddleRibThickness": (0.226, 0.1365),
+    # The cylinder's diameter across its band, from the part's hidden
+    # CylinderReference line (machinist review r10: in the front view its
+    # leader landed on the rib outline that hides it).  Its text stands left
+    # of the band on the line: right of the boss's 76.20 extension line (x
+    # 0.1972), 3 mm over the 5.08's text and 2.3 mm clear of the web's lower
+    # arc.
+    "CylinderDia": (0.209, _top_xy(0.0, -CYLINDER_REFERENCE_Z)[1]),
 }
 # Sheet 2, back view at 1:1 (model X reversed: the plate's free edge prints at
 # sheet x 0.160, the taps at 0.1747 and 0.1884 on y 0.150, the plate top at
@@ -933,6 +971,18 @@ BACK_KEEP = {
 }
 # The back view's label, under the pad's width.  The point is its top left.
 BACK_VIEW_NOTE_XY = (0.110, 0.109)
+# Sheet 1's plan names sheet 2's view: a letter arrow onto the -Z end, the
+# face VIEW F looks at (fr_rocker_arm_support's VIEW B arrow).  Its tip is
+# on the receiver rib's outer edge at model x 21.4 (sheet x 0.246), between
+# the hex stub (x 0.2335..0.2375) and the 20X frame's leader (x 0.2545); the
+# letter stands 8 mm above the edge, under that frame (bottom y 0.192).
+# (note upper-left, leader tip) in sheet metres.
+VIEW_LETTER_HEIGHT = 0.005
+_VIEW_F_TIP = _top_xy(21.4, PLATE_L / 2.0)
+VIEW_F_ARROW = (
+    (_VIEW_F_TIP[0] - 0.36 * VIEW_LETTER_HEIGHT, _VIEW_F_TIP[1] + 0.013),
+    _VIEW_F_TIP,
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -994,7 +1044,10 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
-    top_annotations = curate_view_dimensions(
+    # The cylinder's diameter lives in a reference sketch the part saves
+    # hidden (its band shows no silhouette to dimension): the hidden-owner
+    # curate shows it in the plan, the one view that dimensions it.
+    top_annotations = curate_hidden_dimensions(
         adapter,
         top,
         keep=TOP_KEEP,
@@ -1340,6 +1393,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole pattern position",
     )
     _plate_section(adapter, top)
+    _add_view_f_arrow(adapter, top)
 
     # The isometric's view label, under the iso.
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
