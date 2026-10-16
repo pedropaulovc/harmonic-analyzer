@@ -193,7 +193,7 @@ class Detail:
 
 STUD_DETAIL = Detail(
     key="stud",
-    orientation="*Front",
+    orientation="*Right",
     scale=(2, 1),
     model_centre=spec.STUD_DETAIL_CENTRE,
     radius_mm=spec.STUD_DETAIL_RADIUS,
@@ -239,7 +239,7 @@ def _top_plan_point(uv: tuple[float, float]) -> tuple[float, float, float]:
 # Each kept dimension's text point, machine mm, projected into its detail.
 DIMENSION_TEXT_POINTS = {
     STUD_DETAIL.key: {
-        spec.STUD_DIMENSION: (*spec.STUD_TEXT_XY, spec.STUD_DETAIL_CENTRE[2]),
+        spec.STUD_DIMENSION: spec.STUD_TEXT_POINT,
     },
     CARRIAGE_DETAIL.key: {
         spec.YAW_DIMENSION: _top_plan_point(spec.YAW_TEXT_UV),
