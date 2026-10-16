@@ -239,7 +239,14 @@ def test_the_package_sheets_and_settings_contract() -> None:
         **drawing.SPRING_KEEP,
         **drawing.LUG_KEEP,
     }
-    assert sorted(kept) == sorted(asm.DRAWING_DIMENSIONS[asm.FEATURE])
+    assert sorted(kept) == sorted(asm.DIMENSION_FEATURE)
+    # Each bank view shows only its own axis's sketch.
+    assert {asm.DIMENSION_FEATURE[name] for name in drawing.LUG_KEEP} == {
+        asm.FULCRUM_FEATURE
+    }
+    assert {
+        asm.DIMENSION_FEATURE[name] for name in (*drawing.STACK_KEEP, *drawing.SPRING_KEEP)
+    } == {asm.PIVOT_FEATURE}
     assert set(asm.DIMENSION_CALLOUTS) == set(kept)
     assert asm.REFERENCE_DIMENSIONS == {asm.LUG_SPAN_DIMENSION}
     assert set(asm.DIMENSION_TOLERANCES) == set(kept) - asm.REFERENCE_DIMENSIONS
