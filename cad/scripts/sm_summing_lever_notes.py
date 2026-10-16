@@ -1,6 +1,6 @@
-r"""Summing-lever drawing prose -- the shortfall statements the part build
-stamps into the SLDPRT, the view labels, the mate-naming dimension callouts,
-and the marked-dimension contract.
+r"""Summing-lever drawing prose -- the view labels the part build stamps into
+the SLDPRT, the mate-naming dimension callouts, the marked-dimension contract
+and the joint proofs that let the print state no shortfall.
 
 Split OUT of ``summing_lever_spec`` (codex #354, same treatment as
 ``connecting_rod_notes``): ``build_summing_assembly`` and ``build_knife_mount``
@@ -12,15 +12,8 @@ offline drawing test.
 
 from __future__ import annotations
 
-import math
-
-from magnifying_bracket_joint_layout import (
-    LEVER_PLATE_THICKNESS,
-    LEVER_PLATE_THICKNESS_BAND,
-    POSITION_BAND,
-    SCREW_MAJOR_DIA,
-)
-from sm_summing_lever_spec import HOLE_SPEC, PLATE_T
+from magnifying_bracket_joint_layout import LINEAR_BAND
+from sm_summing_lever_spec import HOLE_SPEC, SPRING_SEAT_T
 
 # --- Marked-dimension contract.  build_sm_summing_lever marks exactly these. ---
 # Every cast contour is sized on the views (machinist review 2026-10-16: the
@@ -29,6 +22,8 @@ from sm_summing_lever_spec import HOLE_SPEC, PLATE_T
 # the boss, and the trunnion envelope and length.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateWidth", "PlateLength"},
+    "CoefficientsPlate": {"PlateThickness"},
+    "SpringPadProfile": {"SpringPadWidth", "SpringSeatThickness"},
     "CylinderProfile": {"CylDia"},
     "SummationAnchorProfile": {"AnchorOuterDia"},
     "SummationAnchor": {"AnchorHeight"},
@@ -64,13 +59,13 @@ BRACKET_SCREW_NUMBER = "MHA-VN-050"  # vn-magnifying-bracket-screw
 # never runs through its own callout.
 # The mid rib runs tangent from the boss axis to the rib arc; the boss axis is
 # already located by the 76.20 in the plan, so its apex takes words, not a
-# second 76.20.
+# second 76.20.  The spring-anchor pad is on the underside, which no view
+# shows full length, so its width says it runs the plate's length.
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "EdgeRibFrontEndTopX": "ALL RIBS",
     "EdgeRibFrontEndTopY": "END RIBS",
     "EdgeRibThickness": "DATUM B END RIB",
     "MiddleRibThickness": "MID RIB\nAPEX AT BOSS AXIS",
-    "PlateThickness": f"WALL AT {BRACKET_NUMBER} TAPS",
     "ReceiverX0": f"MATCHES {BRACKET_NUMBER}",
     "ReceiverX1": f"MATCHES {BRACKET_NUMBER}",
 }
@@ -79,6 +74,7 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "HexHeight": "VERTEX UP",
     "EdgeRibFrontArcR": "ALL RIBS",
     "RibDepth": f"TAPPED END RIB\nCONTAINS {BRACKET_SCREW_NUMBER} TAP DRILL",
+    "SpringPadWidth": "UNDERSIDE PAD\nFULL LENGTH",
     "ReceiverY0": f"MATCHES {BRACKET_NUMBER}",
 }
 
@@ -87,38 +83,23 @@ BRACKET_TAP_CALLOUT_PROCESS = (
     f"FULL THREAD IN END RIB, DRILL CLEARS {BRACKET_SCREW_NUMBER} TIP\n"
 )
 
-
-def _floor2(value: float) -> float:
-    """Round a worst-case minimum DOWN to the printed two places."""
-    return math.floor(value * 100.0 + 1e-9) / 100.0
-
-
-# --- Stated shortfalls (drawing-guidelines rule 20), computed, never typed. ---
-# The 20 channel-spring anchors thread through the 5.08 plate: its worst-case
-# thickness less 1.5 incomplete threads is the full thread a 6-32 engages.
+# --- Joint proofs the print relies on (drawing-guidelines rules 18 and 20). ---
+# The 20 channel-spring anchors thread through the pad: its worst-case
+# thickness at the title block's .XX band, less 1.5 incomplete threads, is
+# the full thread a 6-32 engages, and it must reach 1.5D, so the print states
+# no shortfall.
 if HOLE_SPEC.size != "#6-32":
     raise AssertionError(
         f"spring-anchor engagement assumes #6-32, not {HOLE_SPEC.size}"
     )
 SPRING_TAP_MAJOR_DIA = 0.138 * 25.4
 SPRING_TAP_PITCH = 25.4 / 32.0
-SPRING_TAP_ENGAGEMENT_MIN = (
-    PLATE_T - LEVER_PLATE_THICKNESS_BAND - 1.5 * SPRING_TAP_PITCH
-)
-# The 2-56 receiver row sits 2.54 off the plate's lower face; the bottoming
-# tap's lead threads run past the -Z end rib into the plate alone, so the
-# thread major's wall to the upper face takes the full plate and row bands.
-BRACKET_TAP_WALL_MIN = (
-    LEVER_PLATE_THICKNESS
-    - LEVER_PLATE_THICKNESS_BAND
-    - (LEVER_PLATE_THICKNESS / 2.0 + POSITION_BAND)
-    - SCREW_MAJOR_DIA / 2.0
-)
+SPRING_TAP_ENGAGEMENT_MIN = SPRING_SEAT_T - LINEAR_BAND - 1.5 * SPRING_TAP_PITCH
+if SPRING_TAP_ENGAGEMENT_MIN < 1.5 * SPRING_TAP_MAJOR_DIA:
+    raise AssertionError(
+        f"20X {HOLE_SPEC.size} keeps {SPRING_TAP_ENGAGEMENT_MIN:.3f} of full "
+        f"thread, under 1.5D"
+    )
 
-DRAWING_NOTES = (
-    f"20X {HOLE_SPEC.size} ENGAGEMENT {_floor2(SPRING_TAP_ENGAGEMENT_MIN):.2f} MIN "
-    f"({_floor2(SPRING_TAP_ENGAGEMENT_MIN / SPRING_TAP_MAJOR_DIA):.2f}D)"
-)
-BRACKET_RECEIVER_NOTE = f"2X #2-56 THREAD WALL {_floor2(BRACKET_TAP_WALL_MIN):.2f} MIN"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
 BACK_VIEW_NOTE = "BACK VIEW SCALE 1:2"

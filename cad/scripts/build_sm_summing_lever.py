@@ -110,10 +110,8 @@ from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from sm_summing_lever_notes import (
     BACK_VIEW_NOTE,
-    BRACKET_RECEIVER_NOTE,
     DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
 from sm_summing_lever_spec import (
@@ -125,6 +123,8 @@ from sm_summing_lever_spec import (
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_OFFSET,
+    SPRING_PAD_W,
+    SPRING_SEAT_T,
     SURFACE_FINISHES,
 )
 
@@ -324,11 +324,64 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         ),
     )
     name_last_feature(adapter, "CoefficientsPlate")
+    # The mid-plane extrude's one depth is the whole thickness, printed in
+    # the drawing's section C-C at the title block's .XX band.
+    [plate_thickness] = name_dimensions(
+        adapter, "CoefficientsPlate", ["PlateThickness"]
+    )
+    drive_jobs.append((plate_thickness, '"PlateT"'))
     # The plate is a plain rectangular prism, so an exact analytic volume gate
     # anchors the hole-field tripwires below (the WHOLE part has no analytic
     # gate -- organic arcs -- but this first feature does).
     v_plate = PLATE_W * PLATE_L * PLATE_T
     await volume_check(adapter, "coefficients plate", v_plate, 1e-3 * v_plate)
+
+    # Spring-anchor pad (sm_summing_lever_spec.SPRING_SEAT_T): a Front-plane
+    # rectangle from the plate TOP at the free edge down to the pad underside,
+    # extruded the plate's full length, so its two dimensions are the tap's
+    # own length and the pad's width, both visible edge-on in the end views.
+    # It overlaps the plate above its underside; only the 1.92 below adds.
+    # Cut BEFORE the spring holes so the through taps run the whole 7.00.
+    pad = SketchDims()
+    check("create_sketch spring pad", await adapter.create_sketch("Front"))
+    pad_top = PLATE_T / 2.0
+    pad_bottom = pad_top - SPRING_SEAT_T
+    pad_inner = SX * -(PLATE_W - SPRING_PAD_W)
+    pad_outer = SX * -PLATE_W
+    pad_points = [
+        (pad_outer, pad_top),
+        (pad_inner, pad_top),
+        (pad_inner, pad_bottom),
+        (pad_outer, pad_bottom),
+    ]
+    pad_outline = await add_line_chain(adapter, pad_points)
+    await define_rectilinear_chain(
+        adapter,
+        pad_outline,
+        pad_points,
+        label="spring pad",
+        dims=pad,
+        names=[
+            "SpringPadWidth",
+            "SpringSeatThickness",
+            "SpringPadEdgeX",
+            "SpringPadTopY",
+        ],
+        drives=['"SpringPadW"', '"SpringSeatT"', '"PlateW"', '"PlateT" / 2'],
+    )
+    await ensure_fully_defined(adapter, "spring pad sketch")
+    check("exit_sketch spring pad", await adapter.exit_sketch())
+    name_last_feature(adapter, "SpringPadProfile")
+    drive_jobs += pad.apply(adapter, "SpringPadProfile")
+    check(
+        "extrude spring pad",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=PLATE_L, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "SpringPad")
+    v_plate += SPRING_PAD_W * (SPRING_SEAT_T - PLATE_T) * PLATE_L
+    await volume_check(adapter, "spring pad", v_plate, 1e-3 * v_plate)
 
     # Spring-hole field: ONE seed hole at station j=HOLE_COUNT-1 + a native
     # linear pattern marching the remaining stations down world -Z at
@@ -364,7 +417,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     )
     drive_jobs += seed_result.placement_drive_jobs
     seed_cut = seed_result.name
-    v_hole = math.pi * (seed_dia / 2.0) ** 2 * PLATE_T
+    v_hole = math.pi * (seed_dia / 2.0) ** 2 * SPRING_SEAT_T
     await volume_check(adapter, "spring hole seed", v_plate - v_hole, 0.02 * v_hole)
     check(
         "linear pattern spring holes",
@@ -835,18 +888,15 @@ def _receiver_model_bands(adapter) -> None:
                 dimension = _early_bound(dimension, "IDimension")
             if (
                 dimension is None
-                or abs(float(dimension.SystemValue) * 1000.0 - PLATE_T) > 1e-5
+                or abs(float(dimension.SystemValue) * 1000.0 - RECEIVER_RIB_T) > 1e-5
             ):
                 raise RuntimeError(
-                    f"{feature_name}: missing native receiver thickness {dimension_name}"
+                    f"{feature_name}: missing native receiver depth {dimension_name}"
                 )
-            drawing_name = (
-                "PlateThickness" if feature_name == "CoefficientsPlate" else "RibDepth"
-            )
-            dimension.Name = drawing_name
-            set_dimension_symmetric_tolerance(adapter, feature_name, drawing_name, band)
-            set_dimension_display_precision(adapter, feature_name, drawing_name, 2)
-            mark_dimensions_for_drawing(adapter, feature_name, [drawing_name])
+            dimension.Name = "RibDepth"
+            set_dimension_symmetric_tolerance(adapter, feature_name, "RibDepth", band)
+            set_dimension_display_precision(adapter, feature_name, "RibDepth", 2)
+            mark_dimensions_for_drawing(adapter, feature_name, ["RibDepth"])
 
     feature = _early_bound(model.FeatureByName("BracketMountingTaps"), "IFeature")
     required = {
@@ -1028,7 +1078,9 @@ def _drawing_dimension_contract(adapter) -> None:
 
 
 async def _receiver_coordinate_dimensions(adapter) -> None:
-    """Native coordinate dimensions from the real free edge and lower face."""
+    """Native coordinate dimensions from the real free edge and top face (the
+    spring pad hangs below the plate at the free edge, so its old lower-face
+    corner is no longer an edge)."""
     from _sketch import anchor_point_to_point
     from magnifying_bracket_joint_layout import POSITION_BAND
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -1036,7 +1088,7 @@ async def _receiver_coordinate_dimensions(adapter) -> None:
     check("receiver coordinate sketch", await adapter.create_sketch("Front"))
     dimensions = SketchDims()
     for index, point in enumerate(LEVER_HOLE_POINTS):
-        start = (PLATE_W, -PLATE_T / 2.0)
+        start = (PLATE_W, PLATE_T / 2.0)
         corner = (point[0], start[1])
         lines = await add_line_chain(adapter, [start, corner, point[:2]], close=False)
         await anchor_point_to_origin(
@@ -1129,6 +1181,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "CylR", f"{CYL_R}mm")
     await set_global(adapter, "RibT", f"{RIB_T}mm")
     await set_global(adapter, "ReceiverRibT", f"{RECEIVER_RIB_T}mm")
+    await set_global(adapter, "SpringSeatT", f"{SPRING_SEAT_T}mm")
+    await set_global(adapter, "SpringPadW", f"{SPRING_PAD_W}mm")
     await set_global(adapter, "RibPad", f"{RIB_PAD}mm")
     await set_global(adapter, "SumH", f"{SUM_H}mm")
     await set_global(adapter, "AnchorR", f"{ANCHOR_R}mm")
@@ -1241,10 +1295,8 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Back View Note": BACK_VIEW_NOTE,
-            "Bracket Receiver Note": BRACKET_RECEIVER_NOTE,
         },
     )
     # Native dimension metadata must not erase the already-verified blind taps.
@@ -1260,10 +1312,8 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
             "Back View Note",
-            "Bracket Receiver Note",
         ),
     )
     return artefacts
