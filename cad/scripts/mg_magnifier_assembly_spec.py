@@ -65,12 +65,15 @@ DIMENSION_TOLERANCES = {
     PRESS_GAUGE_DIMENSION: PRESS_GAUGE_TOL,
     ENDSHAKE_DIMENSION: ENDSHAKE_TOL,
 }
-# Each callout states what its band protects. The gauge's prints above its
+# Each callout states what its band protects, naming the mate the tight gauge
+# serves (drawing-guidelines.md rule 4; machinist review r6 read the ±0.05 as
+# over-tight without it: mg_wheel_group's worst-case stack spends it, leaving
+# LOCKNUT_THREAD_MARGIN 0.002). The gauge's prints above its
 # value, on one line: SolidWorks keeps a line break in that compartment but
 # prints none of the callout (run 20261012T185729782Z). The endshake's
 # prints below, where line breaks print.
 DIMENSION_CALLOUTS = {
-    PRESS_GAUGE_DIMENSION: "PRESS GAUGE: KEEPS WHEEL LOCKNUT ON FULL THREAD",
+    PRESS_GAUGE_DIMENSION: "PRESS GAUGE: KEEPS MHA-VN-025 LOCKNUT ON FULL THREAD",
     ENDSHAKE_DIMENSION: "\n".join(
         (
             "WHEEL FREE, NO RATTLE;",
@@ -216,8 +219,9 @@ STEP_TEXT = {
         "AGAINST THE BOSS; ITS FRONT FACE STAYS BELOW THE SPIGOT FACE."
     ),
     "wheel-stacked": (
-        "ON THE AXLE, IN ORDER: THE MHA-MG-011 SPACER, THE MHA-VN-057 BACK "
-        "WASHER, THE WHEEL WITH ITS DRUM FORWARD, THE MHA-VN-058 FRONT WASHER."
+        "LIGHT OIL ON THE AXLE; ON IT, IN ORDER: THE MHA-MG-011 SPACER, THE "
+        "MHA-VN-057 BACK WASHER, THE WHEEL WITH ITS DRUM FORWARD, THE "
+        "MHA-VN-058 FRONT WASHER."
     ),
     _steps.ENDSHAKE_SET_KEY: (
         "RUN THE FIRST MHA-VN-025 NUT DOWN ON THE FRONT WASHER TO THE WHEEL "

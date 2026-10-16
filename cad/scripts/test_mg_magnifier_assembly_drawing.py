@@ -85,8 +85,9 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     endshake = stack.DIMENSION_CALLOUTS[stack.ENDSHAKE_DIMENSION]
     assert "SET BY THE FIRST NUT" in endshake
     assert "LOCKED BY THE SECOND" in endshake
+    # No dimension rides callout text; a part number naming the mate may.
     for text in stack.DIMENSION_CALLOUTS.values():
-        assert not re.search(r"\d", text), text
+        assert not re.search(r"\d", re.sub(r"MHA-[A-Z]{2}-\d{3}", "", text)), text
     # One detail imports each setting.
     assert set(drawing.PRESSED_KEEP) == {stack.PRESS_GAUGE_DIMENSION}
     assert set(drawing.ENDSHAKE_KEEP) == {stack.ENDSHAKE_DIMENSION}
@@ -355,6 +356,24 @@ def test_the_package_has_four_landscape_sheets_with_the_wire_steps_on_the_last()
     assert steps.WIRE_TIED_KEY == "lever-wire-tied"
     assert steps.SEQUENCE[-2:] == (steps.WIRE_HOOKED_KEY, steps.WIRE_TIED_KEY)
     assert "SHEET 4" in stack.EXPLODED_CAPTION
+
+
+def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
+    # The builder's COM explode (_mg_magnifier_explode -> _assembly_patterns ->
+    # _assembly) reads every parts/* and assemblies/* YAML, so importing it
+    # re-keyed this sheet on any part edit. The drawing reads the pure spec.
+    from pathlib import Path
+
+    import _buildgraph
+
+    script = Path(drawing.__file__)
+    names = {Path(dep).name for dep in _buildgraph.module_deps_of(script)}
+    assert not names & {
+        "_assembly.py",
+        "_assembly_patterns.py",
+        "_mg_magnifier_explode.py",
+    }
+    assert not [token for token in _buildgraph.config_files_of(script) if "*" in token]
 
 
 def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:
@@ -739,6 +758,7 @@ def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
 
     for ladder in (
         drawing.EXPLODED_SCALE_LADDER,
+        drawing.LEVER_SCALE_LADDER,
         drawing.FINISHED_SCALE_LADDER,
         drawing.BOM_REFERENCE_SCALE_LADDER,
     ):
@@ -748,6 +768,73 @@ def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
                 == SIMPLIFIED_VIEW_CONFIGURATION
             )
     assert drawing.exploded_caption("WHEEL GROUP", (1.0, 3.0)).endswith("(SCALE 1:3)")
+
+
+def test_the_lever_group_takes_1_2_left_of_the_title_block() -> None:
+    # r11 (run 20261016T150215480Z) printed the lever group's outline 82.6 x
+    # 116.1 mm at 1:3; at 1:2 its balloon ring must fit the new field.
+    width, height = 0.0826 * 1.5, 0.1161 * 1.5
+    field = drawing.LEVER_FIELD
+    reach = 2.0 * drawing.BALLOON_RING_REACH
+    assert width + reach <= field[2] - field[0]
+    assert height + reach <= field[3] - field[1]
+    assert drawing.LEVER_SCALE_LADDER[0] == (1.0, 2.0)
+    # The caption: right of the field, above the title block, inside the border.
+    text = drawing.exploded_caption(drawing.LEVER_GROUP, (1.0, 2.5))
+    left, top = drawing.LEVER_CAPTION_XY
+    caption = (left, top - drawing.NOTE_LINE_PITCH, left + len(text) * 0.00256, top)
+    assert caption[0] > field[2]
+    assert caption[1] > drawing.TITLE_BLOCK[3]
+    assert caption[2] < drawing.INNER_BORDER[2]
+
+
+def test_the_axle_nut_balloons_land_square_to_the_axle_on_distinct_parts() -> None:
+    import math
+
+    import vn_wheel_axle_front_washer_spec as washer
+    import vn_wheel_axle_nut_spec as nut
+
+    def screen(point):
+        # Ry(180) placement, then the *Isometric (+X+Y+Z) projection.
+        x, y, z = -point[0], point[1], -point[2]
+        return ((x - z) / math.sqrt(2.0), (-x + 2.0 * y - z) / math.sqrt(6.0))
+
+    wx, wy, wz = drawing.FRONT_WASHER_BALLOON_POINT_MM
+    assert wz == 0.0 and math.hypot(wx, wy) == pytest.approx(washer.OD / 2.0)
+    nx, ny, nz = drawing.LOCKNUT_BALLOON_POINT_MM
+    # On the flat facing 240 deg (corners on the local +-Y meridian).
+    normal = math.radians(240.0)
+    assert nz == 0.0
+    assert nx * math.cos(normal) + ny * math.sin(normal) == pytest.approx(
+        nut.ACROSS_FLATS / 2.0
+    )
+    axle = screen((0.0, 0.0, 1.0))  # the stack's explode runs along local +z
+    for point, side in (
+        (drawing.FRONT_WASHER_BALLOON_POINT_MM, (-0.5, math.sqrt(3.0) / 2.0)),
+        (drawing.LOCKNUT_BALLOON_POINT_MM, (0.5, -math.sqrt(3.0) / 2.0)),
+    ):
+        sx, sy = screen(point)
+        length = math.hypot(sx, sy)
+        assert (sx / length, sy / length) == pytest.approx(side)
+        assert sx * axle[0] + sy * axle[1] == pytest.approx(0.0, abs=1e-9)
+    anchors = drawing.BALLOON_ANCHORS
+    assert anchors["vn-wheel-axle-nut"].instance == "vn-wheel-axle-nut-2"
+    # Instance 2 is the locknut, exploded farthest out.
+    farthest = min(
+        (step for step in explode.EXPLODE_STEPS if step.axis == "z"),
+        key=lambda step: step.distance_mm,
+    )
+    assert farthest.members == ("vn-wheel-axle-nut:2",)
+
+
+def test_the_press_gauge_names_the_nut_it_serves_and_the_axle_is_oiled() -> None:
+    import _config
+
+    number = _config.parts("vn-wheel-axle-nut")["number"]
+    callout = stack.DIMENSION_CALLOUTS[stack.PRESS_GAUGE_DIMENSION]
+    assert f"{number} LOCKNUT ON FULL THREAD" in callout
+    assert "\n" not in callout
+    assert stack.STEP_TEXT["wheel-stacked"].startswith("LIGHT OIL ON THE AXLE;")
 
 
 def test_step_down_takes_the_largest_scale_whose_ring_fits() -> None:

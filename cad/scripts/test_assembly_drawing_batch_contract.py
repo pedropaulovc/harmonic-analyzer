@@ -166,18 +166,18 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
         elif drawing is draw_mg_magnifier_assembly:
             scripts_dir = Path(draw_mg_magnifier_assembly.__file__).resolve().parent
             # The stack spec whose settings and steps the sheets print, the
-            # step order, the explode plan, and the axle spec that places the
-            # endshake detail.
+            # step order, the explode plan (pure: not the builder's COM
+            # explode), and the axle spec that places the endshake detail.
             assert {
                 str(scripts_dir / name)
                 for name in (
                     "mg_magnifier_assembly_spec.py",
                     "mg_magnifier_assembly_steps.py",
                     "mg_magnifier_explode_spec.py",
-                    "_mg_magnifier_explode.py",
                     "mg_wheel_axle_spec.py",
                 )
             } <= set(deps)
+            assert str(scripts_dir / "_mg_magnifier_explode.py") not in deps
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
             assert str(Path(_assembly_drawing.__file__).resolve()) in deps
