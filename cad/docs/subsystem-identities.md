@@ -280,6 +280,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | `vn-transgear-pivot-shim` | — | MHA-VN-069 |
 | part | — | `vn-rocker-thrust-washer` | — | MHA-VN-070 |
 | part | — | `vn-bracket-hold-down-screw` | — | MHA-VN-071 |
+| part | — | `vn-boss-hook-jam-nut` | — | MHA-VN-070 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
@@ -340,3 +341,4 @@ next free Number in its category and has no old stem or old Number.
 | added | `vn-bracket-hold-down-screw` | MHA-VN-071 | McMaster 90280A196 #8-32 x 5/8 slotted narrow fillister, zinc-plated steel; one per MHA-CH-008 foot into MHA-FR-005's top-face seat (owner Q13c), so the transferred seat stays 11.5 thread / 14.7 drill; MHA-VN-032 keeps the arbor pedestals |
 | added | `ch-rocker-hub` | MHA-CH-012 | turned 1018 hub of the built-up MHA-CH-006 rocker arm (`component_of: ch-rocker-arm`); its Ø10.20 r6 land is pressed into the MHA-CH-013 strap's H7 hole, then the bore and length are finished on MHA-CH-006 |
 | added | `ch-rocker-strap` | MHA-CH-013 | 1018 flat strap of the built-up MHA-CH-006 rocker arm (`component_of: ch-rocker-arm`); finished outline and 2.5 thickness with the Ø10.20 H7 hole for the MHA-CH-012 hub |
+| added | `vn-boss-hook-jam-nut` | MHA-VN-070 | thin zinc-plated steel #10-24 narrow-profile hex nut jammed against the MHA-SM-003 boss top face, locking the MHA-VN-001 counter anchor |
