@@ -585,8 +585,9 @@ def _knife_ridge_angle(adapter: Any, ridge_detail: Any) -> Any:
 
 
 # Datum A's box over the vertex in Detail E, clear of the angle's arc stubs
-# (9 mm out along the flanks) and inside E's 15 mm fence.
-RIDGE_DATUM_RISE = 0.008
+# (9 mm out along the flanks) and inside E's 15 mm fence: the request is the
+# box's foot, the box 7 mm tall (at 0.008 its top sat on the fence, r14).
+RIDGE_DATUM_RISE = 0.006
 
 
 def _ridge_datum(adapter: Any, ridge_detail: Any) -> Any:
