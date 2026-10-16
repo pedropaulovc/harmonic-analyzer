@@ -130,7 +130,9 @@ BORDER = 0.0127
 # --- sheet 1: assembled views (the v41 single-sheet positions) ---------------
 FRONT_CENTER = (0.060, 0.150)
 RIGHT_CENTER = (0.130, 0.150)
-ISO_CENTER = (0.225, 0.140)
+# r1: at y 0.140 the isometric's outline (0.154 tall) dipped to y 0.063,
+# into the title block's 0.066 top; 0.150 leaves it 7 mm clear.
+ISO_CENTER = (0.225, 0.150)
 ASSEMBLED_CAPTION_XY = (0.272, 0.250)
 ASSEMBLED_CAPTION = "\n".join(
     (
