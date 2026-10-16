@@ -10,7 +10,6 @@ from typing import Any
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 from _check import check
-from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -19,13 +18,12 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_dimension_precision
+from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed
 from _session import run_build
 import _stock_trim_drawing as trim_drawing
-from _stock_trim_drawing import TrimSheet
 import _telemetry
 from vn_boss_hook_spec import (
     CHAMFER_ANGLE_DEG,
@@ -36,7 +34,6 @@ from vn_boss_hook_spec import (
     DIMENSION_TOLERANCE_TYPES,
     FINISHED_OVERALL_MM,
     FINISHED_OVERALL_TOLERANCE_MM,
-    TRIM,
 )
 
 SPEC = DRAWINGS_BY_NAME["vn_boss_hook"]
@@ -45,21 +42,21 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SHEET_SCALE = (4.0, 1.0)
 ISO_SCALE = (2.0, 1.0)
 # The jam-nut shank (#1189) is 3.8 longer, 15 mm on the sheet: the view sits
-# high enough that the cut-end detail circle clears the notes below it.
+# high enough that the cut-end chamfer dimensions clear the notes below it.
 FRONT_CENTER = (0.100, 0.175)
 ISO_CENTER = (0.310, 0.213)
-FRONT_KEEP = {"FinishedOverall": (0.040, 0.175)}
-DETAIL_KEEP = {"ChamferWidth": (0.235, 0.090), "ChamferAngle": (0.340, 0.115)}
-SHEET = TrimSheet(
-    sheet_scale=SHEET_SCALE,
-    detail_center=(0.280, 0.115),
-    detail_scale=(12.0, 1.0),
-    fence_radius_mm=3.2,
-    cut_end_y_mm=TRIM.shank_end_y_mm,
-    detail_offset_mm=1.0,
-    detail_label_xy=(0.360, 0.085),
-    parent_letter_offset=(0.020, 0.014),
-)
+# The cut-end deburr is dimensioned on the 4:1 front view itself (its 0.8 leg
+# prints 3.2 long); a magnified detail added nothing a machinist needs.
+FRONT_KEEP = {
+    "FinishedOverall": (0.040, 0.175),
+    "ChamferWidth": (0.150, 0.089),
+    "ChamferAngle": (0.132, 0.106),
+}
+# The deburr band is tighter than the title block because its minimum leg
+# must bring the cut end under the 3.797 tap drill, so the cut thread starts
+# in the lever's tap: the callout names that mate.
+CHAMFER_CALLOUT = {"ChamferWidth": "LEAD-IN TO MHA-SM-003 TAP"}
+NOTES_Y = 0.076
 EXPECTED_CONTROLS = {
     "FinishedOverall": (
         FINISHED_OVERALL_MM / 1000,
@@ -121,32 +118,24 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    set_hidden_lines_visible(adapter, front)
-    detail = trim_drawing.end_detail(adapter, front, SHEET)
-    set_hidden_lines_visible(adapter, detail)
-    # Import against the new HLV geometry without waiting for a window repaint.
-    _early_bound(detail, "IView").UpdateViewDisplayGeometry()
-    # The detail claims its manufacturing dimensions before the parent import.
-    detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=DETAIL_KEEP, view_label="cut end detail"
+    # Hidden lines removed: the helix's back side, dashed, told the machinist
+    # nothing about a purchased thread and cluttered the cut end.
+    set_hidden_lines_removed(adapter, front)
+    annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="finished overall and cut end"
     )
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="finished overall"
-    )
-    annotations = [*front_annotations, *detail_annotations]
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
+    set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(adapter, annotations)
     add_property_linked_note(adapter, "Supplier", 0.016, 0.060, char_height=0.003)
     add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.060, char_height=0.003)
     add_property_linked_note(adapter, "Stock Name", 0.016, 0.049, char_height=0.003)
     add_property_linked_note(adapter, "Isometric View Note", 0.275, 0.163)
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, 0.083, char_height=0.003
+        adapter, "Manufacturing Notes", 0.016, NOTES_Y, char_height=0.003
     )
-    for view in (front, detail):
-        set_hidden_lines_visible(adapter, view)
-    trim_drawing.position_detail_label(adapter, detail, SHEET)
-    trim_drawing.position_parent_detail_letter(adapter, front, SHEET)
+    # Re-assert after annotating: a real mode change regenerates the edge set.
+    set_hidden_lines_removed(adapter, front)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
