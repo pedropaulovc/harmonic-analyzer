@@ -19,7 +19,8 @@ auto-names. The tree is Wall (``Boss-Extrude1``) -> CavityCut/WindowCut1/
 WindowCut2 (``Cut-Extrude2/3/4``) -> CornerFillet (``Fillet3``) ->
 PocketCornerFillet -> PocketFloorFillet -> FootClearanceHoles (5/16 DRILL
 THRU, HoleWzd) -> RimChamfer (``Chamfer2``) -> BracketSeats (#743, HoleWzd)
--> SeatStationReference (hidden drawing-reference sketch). The trapezoid lives
+-> SeatStationReference/CavityLocationReference/WebLocationReference (hidden
+drawing-reference sketches). The trapezoid lives
 on the **Right plane** (sketch-x -> model Z taper, sketch-y -> model Y height,
 mid-plane extrude along X); the window/cavity cuts use SINGLE origin-centred
 squares on the **Front plane** (matching the source's window/cavity sketches).
@@ -69,12 +70,16 @@ Z = wall thickness):
 * **SeatStationReference** -- a blanked Top-plane sketch of two construction
   lines, each end face to its seat's centre, whose dimensions VIEW B prints as
   REF (the transfer stays the method; the REF says where the seats land).
+* **CavityLocationReference** / **WebLocationReference** -- blanked Front- and
+  Right-plane sketches of construction chords on drawn edges, whose dimensions
+  locate the cavity and the pockets from the -X end face and the top face (the
+  front view) and the web from the base's edge (section A-A).
 
 Like the 71 tracked parts, this is **equation-driven and self-naming**: eight
 equation-manager globals (``FootHalf``/``TopHalf``/``HalfHeight``/``CavHalf``/
 ``WindowOuter``/``WallWidth``, plus the seats' ``SeatEastX``/``SeatWestX``,
 all ``mm``) drive every profile sketch's dimensions, the seats' Hole Wizard
-placements and their REF stations (named e.g.
+placements, their REF stations and the drawing's locations (named e.g.
 ``WallHeight@WallProfile``, ``WinWidth@WindowProfile``), the sketches and
 features carry stable names, and the drive equations are applied in one deferred
 batch after a rebuild. A final "equations neutral" ``volume_check`` proves the
@@ -132,7 +137,7 @@ from fr_rocker_arm_support_section_spec import (
     WIDE,
 )
 from fr_rocker_arm_support_spec import HOLE_DIA, HOLE_SPEC, SUPPORT_HALF_MACHINE_Z
-from rocker_bracket_seat_layout import SEAT_LOCAL_X, SEAT_SPEC, WEB
+from rocker_bracket_seat_layout import SEAT_LOCAL_X, SEAT_SPEC, WEB, WEB_PLACES
 
 PART_NAME = "fr-rocker-arm-support"
 # The source repro was authored in steel, but this casting is now the machine's
@@ -239,10 +244,11 @@ POCKET_FLOOR_R_MAX = 0.8
 POCKET_FLOOR_R_BAND = (0.0, -POCKET_FLOOR_R_MAX)  # (upper, lower)
 POCKET_FLOOR_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.8 MAX"
 POCKET_FLOOR_R_PLACES = 1
-# One point per pocket on its top-rail floor edge (Z = -WEB first: its size
-# lands on that corner, the section's upper-left); tangent propagation takes
-# the rest of each loop.
-POCKET_FLOOR_FILLET_EDGES = [[0.0, BIG, -WEB], [0.0, BIG, WEB]]
+# One point per pocket on its top-rail floor edge (Z = +WEB first: its size
+# lands on that corner, the section's upper-right, clear of the base edge's
+# extension line the section's TaperRun rises on at its left); tangent
+# propagation takes the rest of each loop.
+POCKET_FLOOR_FILLET_EDGES = [[0.0, BIG, WEB], [0.0, BIG, -WEB]]
 _FLOOR_SPANDREL = (1.0 - math.pi / 4.0) * POCKET_FLOOR_R_MAX**2
 _FLOOR_CENTROID = POCKET_FLOOR_R_MAX * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
 POCKET_FLOOR_FILLET_GROWTH = (
@@ -260,7 +266,7 @@ HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
 # The manufacturing print's dimension set (draw_fr_rocker_arm_support.py imports
 # exactly these marked dimensions; its keep maps must stay in lockstep).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "WallProfile": {"FootSpan", "TopSpan", "WallHeight"},
+    "WallProfile": {"FootSpan", "TaperRun", "TopSpan", "WallHeight"},
     "Wall": {"Depth"},
     # A single associative size plus an SQ callout defines each square.
     "WindowProfile": {"WinWidth"},
@@ -270,6 +276,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PocketFloorFillet": {"PocketFloorRadius"},
     "RimChamfer": {"RimChamferSize"},
     "SeatStationReference": {"SeatEastStation", "SeatWestStation"},
+    "CavityLocationReference": {
+        "CavityEndStation",
+        "CavityTopStation",
+        "PocketEndStation",
+    },
+    "WebLocationReference": {"WebFaceStation"},
 }
 
 # Decimal places the PART owns (drawing-simplicity-policy.md: the model owns
@@ -281,13 +293,28 @@ RIM_CHAMFER_PLACES = 1
 # The seats' REF stations off the end faces print at the seat stack's places
 # (rocker_bracket_seat_layout's 4.95 / 6.56 end walls).
 SEAT_STATION_PLACES = 2
+# The cavity's locations print at the .X band (a through lightening cut); the
+# pocket's 6.85 at two places, its value; the web's and the top face's
+# locations across the base at the web thickness's own places (PR #1469 r4
+# machinist review; Main's ruling: routine .XX bands, the seat-on-web lateral
+# stack is #1569's).
+CAVITY_LOCATION_PLACES = 1
+POCKET_END_PLACES = 2
+SECTION_LOCATION_PLACES = WEB_PLACES
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "WallProfile": {"TaperRun": SECTION_LOCATION_PLACES},
     "PocketFloorFillet": {"PocketFloorRadius": POCKET_FLOOR_R_PLACES},
     "RimChamfer": {"RimChamferSize": RIM_CHAMFER_PLACES},
     "SeatStationReference": {
         "SeatEastStation": SEAT_STATION_PLACES,
         "SeatWestStation": SEAT_STATION_PLACES,
     },
+    "CavityLocationReference": {
+        "CavityEndStation": CAVITY_LOCATION_PLACES,
+        "CavityTopStation": CAVITY_LOCATION_PLACES,
+        "PocketEndStation": POCKET_END_PLACES,
+    },
+    "WebLocationReference": {"WebFaceStation": SECTION_LOCATION_PLACES},
 }
 
 # The seats' REF stations (r7 machinist review: the seats print with no
@@ -305,7 +332,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # globals are unsigned, as the placement distance is: each point keeps the
 # side it was authored on, and each station measures from the end face on
 # that same side.
-REFERENCE_SKETCHES = ("SeatStationReference",)
+REFERENCE_SKETCHES = (
+    "SeatStationReference",
+    "CavityLocationReference",
+    "WebLocationReference",
+)
 
 
 class SeatStation(NamedTuple):
@@ -345,6 +376,41 @@ SEAT_GLOBALS = {row.seat_global: abs(row.seat_x) for row in SEAT_STATION_LINES}
 SEAT_STATION_DRIVES = {
     row.dimension: f'{END_FACE_DRIVE} - "{row.seat_global}"'
     for row in SEAT_STATION_LINES
+}
+
+# The cavity's, the pockets' and the web's locations (PR #1469 r4 machinist
+# review: the 127.0 SQ cavity and the 165.1 SQ pockets printed with no
+# position, and section A-A placed neither the 9.53 web nor the 16.9 top
+# face across the 63.5 base; owner ruling 2026-10-16, rule 10: dimension
+# from a real feature). TaperRun@WallProfile already runs from the base's -Z
+# edge to the top face's, so section A-A prints it for the top face; nothing
+# models the rest, so two blanked reference sketches do, each printed
+# location one driving dimension:
+# * CavityLocationReference (Front plane, sketch (u, v) = model (X, Y)): the
+#   -X end face to the cavity's and to the pocket's side wall, and the top
+#   face down to the cavity's top wall;
+# * WebLocationReference (Right plane, sketch (u, v) = model (-Z, Y)): the
+#   base's -Z edge to the web's -Z face.
+# A shown reference sketch prints, so each is short construction chords
+# lying on lines its view draws (build_fr_nameplate's FaceReference idiom),
+# and each location spans two chords' starts. The locations and the chords'
+# lines are driven from the globals (the web's face is the window cuts' WEB
+# start offset), so a GUI edit keeps them on their features; where a chord
+# sits along its line is unprinted: REFERENCE_EDGE_STATION off a corner, or
+# that far into a cavity or pocket wall's straight run past its corner
+# radius. The web chord stands REFERENCE_CHORD above the pocket floor's
+# fillet, below where the drawing picks the web's faces for its 9.53.
+REFERENCE_CHORD = 1.0
+REFERENCE_EDGE_STATION = 5.0
+CAVITY_END_STATION = BOSS_DEPTH / 2.0 - CAV  # 25.9
+CAVITY_TOP_STATION = HALF_Y - CAV  # 25.4
+POCKET_END_STATION = BOSS_DEPTH / 2.0 - BIG  # 6.85
+WEB_FACE_STATION = WIDE - WEB  # 26.99
+LOCATION_DRIVES = {
+    "CavityEndStation": f'{END_FACE_DRIVE} - "CavHalf"',
+    "CavityTopStation": '"HalfHeight" - "CavHalf"',
+    "PocketEndStation": f'{END_FACE_DRIVE} - "WindowOuter"',
+    "WebFaceStation": f'"FootHalf" - {WEB}mm',
 }
 
 # PocketFloorFillet volume minus four through clearance drills.
@@ -478,6 +544,220 @@ async def _seat_station_reference(adapter) -> list[tuple[str, str]]:
             f"{name} from the end face",
         )
         dims.record(name, SEAT_STATION_DRIVES[name])
+    await ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    name_last_feature(adapter, sketch)
+    return dims.apply(adapter, sketch)
+
+
+async def _reference_chord(
+    adapter,
+    sketch: str,
+    dims: SketchDims,
+    name: str,
+    start: tuple[float, float],
+    end: tuple[float, float],
+) -> str:
+    """One unprinted construction chord from ``start`` along a line its view
+    draws, held horizontal or vertical at its length ``name``. Direct-to-DB,
+    as the seat lines are, so creation-time inference adds no relation."""
+    relation = "horizontal" if start[1] == end[1] else "vertical"
+    set_sketch_direct_db(adapter, True)
+    line = check(f"{sketch} {name}", await adapter.add_line(*start, *end))
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{sketch} {name} did not take the construction flag")
+    check(
+        f"{sketch} {name} {relation}",
+        await adapter.add_sketch_constraint(line, None, relation),
+    )
+    await _location(
+        adapter,
+        sketch,
+        dims,
+        name,
+        f"{line}.start",
+        f"{line}.end",
+        f"{relation}_distance",
+        math.dist(start, end),
+    )
+    return line
+
+
+async def _location(
+    adapter,
+    sketch: str,
+    dims: SketchDims,
+    name: str,
+    ref1: str,
+    ref2: str,
+    kind: str,
+    value: float,
+    drive: str | None = None,
+) -> None:
+    """One dimension between two point refs, recorded as ``name``."""
+    await dimension_between(adapter, ref1, ref2, kind, value, f"{sketch} {name}")
+    dims.record(name, drive)
+
+
+async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
+    """CavityLocationReference on the Front plane, sketch (u, v) = model
+    (X, Y); returns the drive jobs.
+
+    Chords down the -X end face and along the top face, each
+    REFERENCE_EDGE_STATION from their corner; down the cavity's and the
+    pocket's -X side walls and along the cavity's top wall, each that far
+    into the wall's straight run. The end chord's start locates both side
+    walls (CavityEndStation, PocketEndStation), the top chord's the cavity's
+    top wall (CavityTopStation). 5 x 4 DOF less: two anchored starts (4),
+    five square relations and lengths (10), three locations and three places
+    along a wall (6) = 0.
+    """
+    sketch = REFERENCE_SKETCHES[1]
+    dims = SketchDims()
+    station, chord = REFERENCE_EDGE_STATION, REFERENCE_CHORD
+    check(f"create_sketch {sketch}", await adapter.create_sketch("Front"))
+    end_x, end_y = -BOSS_DEPTH / 2.0, HALF_Y - station
+    end = await _reference_chord(
+        adapter, sketch, dims, "EndChord", (end_x, end_y), (end_x, end_y - chord)
+    )
+    await anchor_point_to_origin(
+        adapter, f"{end}.start", end_x, end_y, f"{sketch} end face chord"
+    )
+    dims.record("EndChordX", END_FACE_DRIVE)
+    dims.record("EndChordY")
+    top_x = end_x + station
+    top = await _reference_chord(
+        adapter, sketch, dims, "TopChord", (top_x, HALF_Y), (top_x + chord, HALF_Y)
+    )
+    await anchor_point_to_origin(
+        adapter, f"{top}.start", top_x, HALF_Y, f"{sketch} top face chord"
+    )
+    dims.record("TopChordX")
+    dims.record("TopChordY", '"HalfHeight"')
+    cavity_run = CAV - FILLET_R - station
+    for name, value, chord_name, x, y in (
+        ("CavityEndStation", CAVITY_END_STATION, "CavitySideChord", -CAV, cavity_run),
+        (
+            "PocketEndStation",
+            POCKET_END_STATION,
+            "PocketSideChord",
+            -BIG,
+            BIG - POCKET_FILLET_R - station,
+        ),
+    ):
+        side = await _reference_chord(
+            adapter, sketch, dims, chord_name, (x, y), (x, y - chord)
+        )
+        await _location(
+            adapter,
+            sketch,
+            dims,
+            name,
+            f"{end}.start",
+            f"{side}.start",
+            "horizontal_distance",
+            value,
+            LOCATION_DRIVES[name],
+        )
+        await _location(
+            adapter,
+            sketch,
+            dims,
+            f"{chord_name}Y",
+            f"{side}.start",
+            "origin",
+            "vertical_distance",
+            y,
+        )
+    cavity_top = await _reference_chord(
+        adapter,
+        sketch,
+        dims,
+        "CavityTopChord",
+        (-cavity_run, CAV),
+        (-cavity_run + chord, CAV),
+    )
+    await _location(
+        adapter,
+        sketch,
+        dims,
+        "CavityTopStation",
+        f"{top}.start",
+        f"{cavity_top}.start",
+        "vertical_distance",
+        CAVITY_TOP_STATION,
+        LOCATION_DRIVES["CavityTopStation"],
+    )
+    await _location(
+        adapter,
+        sketch,
+        dims,
+        "CavityTopChordX",
+        f"{cavity_top}.start",
+        "origin",
+        "horizontal_distance",
+        cavity_run,
+    )
+    await ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    name_last_feature(adapter, sketch)
+    return dims.apply(adapter, sketch)
+
+
+async def _web_location_reference(adapter) -> list[tuple[str, str]]:
+    """WebLocationReference on the Right plane, section A-A's cutting plane,
+    sketch (u, v) = model (-Z, Y); returns the drive jobs.
+
+    Chords along the base from its -Z edge (the sharp the 63.5 and TaperRun
+    measure from too) and up the web's -Z face from REFERENCE_CHORD above
+    the pocket floor's fillet; WebFaceStation spans their starts. 2 x 4 DOF
+    less: the base chord's anchored start (2), two square relations and
+    lengths (4), the location and the web chord's height (2) = 0.
+    """
+    sketch = REFERENCE_SKETCHES[2]
+    dims = SketchDims()
+    check(f"create_sketch {sketch}", await adapter.create_sketch("Right"))
+    base = await _reference_chord(
+        adapter,
+        sketch,
+        dims,
+        "BaseChord",
+        (WIDE, -HALF_Y),
+        (WIDE - REFERENCE_EDGE_STATION, -HALF_Y),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{base}.start", WIDE, -HALF_Y, f"{sketch} base edge chord"
+    )
+    dims.record("BaseChordZ", '"FootHalf"')
+    dims.record("BaseChordY", '"HalfHeight"')
+    web_y = -(BIG - POCKET_FLOOR_R_MAX - REFERENCE_CHORD)
+    web = await _reference_chord(
+        adapter, sketch, dims, "WebChord", (WEB, web_y), (WEB, web_y + REFERENCE_CHORD)
+    )
+    await _location(
+        adapter,
+        sketch,
+        dims,
+        "WebFaceStation",
+        f"{base}.start",
+        f"{web}.start",
+        "horizontal_distance",
+        WEB_FACE_STATION,
+        LOCATION_DRIVES["WebFaceStation"],
+    )
+    await _location(
+        adapter,
+        sketch,
+        dims,
+        "WebChordY",
+        f"{web}.start",
+        "origin",
+        "vertical_distance",
+        -web_y,
+    )
     await ensure_fully_defined(adapter, f"{sketch} sketch")
     check(f"exit_sketch {sketch}", await adapter.exit_sketch())
     name_last_feature(adapter, sketch)
@@ -821,8 +1101,12 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += bracket_seats.placement_drive_jobs
     await volume_check(adapter, "BracketSeats", BRACKET_SEATS_VOLUME, 200)
 
-    # 10. SeatStationReference: the seats' REF stations for VIEW B.
+    # 10. SeatStationReference: the seats' REF stations for VIEW B; the
+    #     cavity's, the pockets', and the web's locations for the front view
+    #     and section A-A.
     drive_jobs += await _seat_station_reference(adapter)
+    drive_jobs += await _cavity_location_reference(adapter)
+    drive_jobs += await _web_location_reference(adapter)
 
     # Apply the deferred drive equations now that the whole model + a rebuild
     # exist, so every named-dim target resolves. Each equation evaluates to the

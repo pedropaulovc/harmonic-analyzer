@@ -44,7 +44,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
@@ -56,6 +56,7 @@ from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
+    part_sketches_shown,
 )
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_leader_note
@@ -141,6 +142,15 @@ FRONT_KEEP = {
         FRONT_CENTER[0] + BOSS_DEPTH / 2.0 * VIEW_SCALE / 1000.0 + 0.0025,
         FRONT_CENTER[1] - HALF_Y * VIEW_SCALE / 1000.0 - 0.0025,
     ),
+    # The cavity's and the pockets' locations (CavityLocationReference, blanked
+    # in the part) stand above the view's left end, clear of the R6.35 low
+    # left: from the -X end face, the pocket wall's 6.85 on the inner band
+    # (its text outside left, its pocket-wall extension line stopping below
+    # the outer band) and the cavity wall's 25.9 on the outer one, under the
+    # 178.8; from the top face, the cavity's top wall left of the view.
+    "PocketEndStation": (0.043, 0.2395),
+    "CavityEndStation": (0.0668, 0.249),
+    "CavityTopStation": (0.052, 0.2231),
 }
 # The cavity corner CornerFillet's dimension attaches to, as sheet signs.
 CAVITY_RADIUS_CORNER = (1, 1)
@@ -161,10 +171,13 @@ DIMENSION_CALLOUTS = {
     "RimChamferSize": " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS",
     # One fillet loop per pocket floor (r7 review: the corner was unstated).
     "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
+    # One location covers both opposed pockets, as the SQ size does.
+    "PocketEndStation": "BOTH SIDES",
 }
-# The sheet's own places. RimChamferSize's, PocketFloorRadius's and the seat
-# REF stations' are the PART's (build_fr_rocker_arm_support.DRAWING_PRECISION):
-# read back (PART_PRECISION), never set here.
+# The sheet's own places. RimChamferSize's, PocketFloorRadius's, the seat REF
+# stations' and the locations' are the PART's
+# (build_fr_rocker_arm_support.DRAWING_PRECISION): read back
+# (PART_PRECISION), never set here.
 DIMENSION_PRECISION = {
     "Depth": 1,
     "WinWidth": 1,
@@ -280,16 +293,24 @@ WEB_TEXT_XY = (RIGHT_CENTER[0] + 0.026, RIGHT_CENTER[1] - 0.0122)
 # extension line instead, in the gap between the front view and the
 # section's slanted wall.
 FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
-# PocketFloorFillet's R0.8 MAX lands on its first edge, the -Z pocket's
+# PocketFloorFillet's R0.8 MAX lands on its first edge, the +Z pocket's
 # top-rail floor corner (build_fr_rocker_arm_support.POCKET_FLOOR_FILLET_EDGES),
-# which the section shows in profile at its upper left. The text stands in
-# the lane left of the section's top, under the cavity's R12.7 and above the
-# chamfer callout.
+# which the section shows in profile at its upper right. The text stands
+# level with it right of the section, between the slanted wall and the
+# 177.8, which moves out to clear it: the left lane carries the base edge's
+# extension line up to TaperRun. The 16.9 prints right of its span, off the
+# top-face edge's extension line TaperRun runs on up past it; the 63.5
+# prints right of the web face's extension line WebFaceStation runs down to
+# just above it. TaperRun (the base edge to the top face's) and
+# WebFaceStation (to the web's face, WebLocationReference, blanked in the
+# part) both measure from the base's -Z edge, the section's left.
 RIGHT_KEEP = {
-    "WallHeight": (0.240, 0.185),
-    "FootSpan": (0.205, 0.133),
-    "TopSpan": (0.205, 0.238),
-    "PocketFloorRadius": (0.176, 0.224),
+    "WallHeight": (0.256, 0.185),
+    "FootSpan": (0.2125, 0.132),
+    "TopSpan": (0.2155, 0.238),
+    "TaperRun": (0.195, 0.2475),
+    "WebFaceStation": (0.1958, 0.1365),
+    "PocketFloorRadius": (0.2335, 0.2195),
 }
 # The chamfer text on its OffsetText leader (the text centres on its point),
 # in the lane between the front view and the section, low enough that the
@@ -669,8 +690,9 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open rocker-arm-support source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     read_required_properties(
-        adapter.currentModel,
+        source_model,
         (
             "Number",
             "Revision",
@@ -712,32 +734,50 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
-    right = create_section_view(
+    # WebLocationReference lies in A-A's cutting plane, saved hidden: a
+    # derived view takes it from the part as it stands when it is cut and
+    # selects it through its base view, so the section is cut and curated
+    # while the part shows it (draw_fr_nameplate's recipe).
+    with part_sketches_shown(
         adapter,
-        front,
-        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - 0.050),
-        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.050),
-        view_xy=RIGHT_CENTER,
-        section_label="A",
-        scale=(1, 2),
-        label="rocker-arm support centre section",
-    )
+        source_model,
+        ("WebLocationReference",),
+        label="section A-A web location",
+        base_view=front,
+    ):
+        right = create_section_view(
+            adapter,
+            front,
+            line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - 0.050),
+            line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.050),
+            view_xy=RIGHT_CENTER,
+            section_label="A",
+            scale=(1, 2),
+            label="rocker-arm support centre section",
+        )
+        set_hidden_lines_removed(adapter, right)
+        right_dimensions = curate_hidden_owner_dimensions(
+            adapter,
+            right,
+            keep=RIGHT_KEEP,
+            view_label="right",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     # Every view hides its hidden edges: Section A-A shows the pockets, web
     # and cavity, and View B the seats, so dashed lines in the front and the
     # hole-table view only buried the A1-A4 holes (r4 machinist review).
-    for view in (front, right, bottom, iso):
+    for view in (front, bottom, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_dimensions = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    right_dimensions = curate_view_dimensions(
+    # The cavity's and the pockets' locations: CavityLocationReference is
+    # saved hidden, so the hidden-owner curate shows it in this view only.
+    front_dimensions = curate_hidden_owner_dimensions(
         adapter,
-        right,
-        keep=RIGHT_KEEP,
-        view_label="right",
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     dimensions = [*front_dimensions, *right_dimensions]
