@@ -469,9 +469,14 @@ def test_every_step_is_numbered_in_sequence_and_names_no_setting_value() -> None
     joined = " ".join(stack.STEP_TEXT.values())
     for setting in ("PRESS GAUGE", "WHEEL ENDSHAKE", "CLAMP STATION", "FIXTURE DROP"):
         assert f"{setting} (SHEET 1" in joined, setting
-    # The detached method note and any rod-retention step stay out (#1559).
+    # The detached method note stays out; the rod is screwed home on its
+    # shoulder in the fixture step, with no lock (#1559).
     assert "HOLD ROD NEAR END" not in joined
-    assert "THREAD THE ROD" not in joined
+    fixture_set = stack.STEP_TEXT[steps.FIXTURE_SET_KEY]
+    assert "CLAMP'S BOTTOM TAP" in fixture_set
+    assert "SHOULDER SEATS" in fixture_set
+    assert "ROD BORE" not in joined
+    assert not re.search(r"LOCTITE|THREADLOCK|SET SCREW", joined)
 
 
 def test_the_builder_stamps_no_drawing_note_property() -> None:
