@@ -130,9 +130,12 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
 # along the plate's mid-plane, so past the rib's inboard face is more plate,
 # not a floor: DRILL_POINT_RIB_MARGIN_MIN only keeps the point out of the
 # bare plate's thinner walls.  Machinist review r14 read the 7.30 rib as the
-# drill's floor (rule 17), so the callout says so (rule 20).
+# drill's floor (rule 17), so the callout says so (rule 20).  The thread is
+# shallower than the drill, so a drill ending in the rib puts the thread
+# there too.  Two lines here keep the callout to the audit's four rows (farm
+# r15: three made it five, tall-block).
 BRACKET_TAP_CALLOUT_PROCESS = (
-    "FULL THREAD AND DRILL POINT IN END RIB\nPLATE CONTINUES BEYOND RIB\n"
+    "DRILL ENDS IN RIB, SOLID PLATE BEYOND\n"
     f"DRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"
 )
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
