@@ -18,7 +18,6 @@ from __future__ import annotations
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from mg_lever_press_fit_geom import (
-    COLLAR_BORE_BAND,
     COLLAR_BORE_DIA,
     PRESS_FIT_BUDGET,
     PRESS_FORCE_MAX_KN,
@@ -89,23 +88,18 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("rod_od", MACHINED_UM, CylinderFace(ROD_DIA)),
 )
 
-
-def _deviation(value: float) -> str:
-    """One printed deviation of the mating bore: a bare 0, else signed to the
-    bore's three places."""
-    return "0" if value == 0.0 else f"{value:+.3f}"
-
-
-# Dimension callouts that state a manufacturing fact (the mate, its band, the
+# Dimension callouts that state a manufacturing fact (the mate, the
 # interference) are derived here from the fit contract -- never typed on the
-# sheet (_drawing_contract's spec-string rule).  <MOD-DIAM> is SolidWorks' own
-# Ø token; it carries its own leading gap, so no space before it.  Two rows,
-# so the block stays short of the isometric.
+# sheet (_drawing_contract's spec-string rule).  The mating bore reads as the
+# REFERENCE nominal the MHA-MG-001 sheet prints, under the same matched-fit
+# interference its callout states (rule 25: the two sheets agree; the bore is
+# fitted to the rod, so it carries no absolute band of its own).  <MOD-DIAM>
+# is SolidWorks' own Ø token.  Two rows, so the block stays short of the
+# isometric.
 PRESS_ZONE_DIA_CALLOUT = (
-    f"IN MHA-MG-001<MOD-DIAM>{COLLAR_BORE_DIA:.3f} "
-    f"{_deviation(COLLAR_BORE_BAND[0])}/{_deviation(COLLAR_BORE_BAND[1])} BORE:\n"
+    f"IN MHA-MG-001 (<MOD-DIAM>{COLLAR_BORE_DIA:.3f}) BORE:\n"
     f"{PRESS_FIT_BUDGET['interference_min']:.3f}-"
-    f"{PRESS_FIT_BUDGET['interference_max']:.3f} INTERFERENCE"
+    f"{PRESS_FIT_BUDGET['interference_max']:.3f} DIAMETRAL INTERFERENCE"
 )
 
 # True free-text instructions only: the length, the zone, both diameter bands
