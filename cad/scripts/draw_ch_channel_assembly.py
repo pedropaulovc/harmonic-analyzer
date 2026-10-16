@@ -184,8 +184,8 @@ BOM_ROW_HEIGHT = 0.006
 EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.124)
 EXPLODED_CAPTION = "\n".join(
     (
-        f"EXPLODED: ALL {COUNT} CHANNELS ALIKE; ONE BALLOON PER BOM ROW,",
-        "ON THE NORTH-MOST INSTANCE.",
+        f"EXPLODED: ALL {COUNT} CHANNELS ALIKE, THE NORTH-MOST PULLED OUT",
+        "NORTH; ONE BALLOON PER BOM ROW, ON THE NORTH-MOST INSTANCE.",
         f"QTY IS PER {steps.DRAWING_NUMBER} (ALL {COUNT} CHANNELS).",
     )
 )
@@ -437,10 +437,12 @@ LEVER_BANK = BankView(
 
 def exploded_offset(stem: str, side: asm.Side) -> tuple[float, float, float]:
     """The net channel-explode displacement (model mm) of ``stem``'s
-    instance on ``side``: every step that moves its family, summed."""
+    instance on ``side``: every step that moves its family, summed. The
+    north-most instance is on the north side too."""
+    sides = {None, side} | ({"north"} if side == "north-most" else set())
     offset = [0.0, 0.0, 0.0]
     for step in asm.EXPLODE_STEPS:
-        if stem in step.stems and step.side in (None, side):
+        if asm.family(stem) in step.stems and step.side in sides:
             offset["xyz".index(step.axis)] += step.distance_mm
     return offset[0], offset[1], offset[2]
 
