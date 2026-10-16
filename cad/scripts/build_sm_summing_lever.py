@@ -80,6 +80,7 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -112,6 +113,7 @@ from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from sm_summing_lever_notes import (
     BACK_VIEW_NOTE,
+    CYLINDER_REFERENCE_Z,
     DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
     ISOMETRIC_VIEW_NOTE,
@@ -207,9 +209,17 @@ if RIB_PLATE_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
 # magnifying bracket's receiver (magnifying_bracket_joint_layout): its outer
 # #2-56 tap at x 29.7 keeps the full-height slant around its thread (wall
 # 3.69 nominal), where a point at 35.75 would leave only the 5.08 plate (1.45).
-# The end face stands EDGE_RIB_END_HALF_H - PLATE_T / 2 (0.44) proud of each
-# plate face.
+# The end face stands EDGE_RIB_END_STEP (0.44) proud of each plate face, and
+# the print locates its top corner from the plate's top face, a real surface
+# (machinist review r10: from the pivot mid-plane the origin is in mid-air).
+# The step is derived, not a new knob: the rib's corner stays where the
+# slant puts it, so re-dimensioning it moves no geometry.
 EDGE_RIB_END_HALF_H = ARC_R * (1.0 - RIB_PLATE_REACH / PLATE_W)  # 2.98
+EDGE_RIB_END_STEP = EDGE_RIB_END_HALF_H - PLATE_T / 2.0  # 0.44
+if not math.isclose(EDGE_RIB_END_STEP, 0.44, abs_tol=0.005):
+    raise AssertionError(
+        f"edge-rib end step {EDGE_RIB_END_STEP:.4f} is not the built 0.44"
+    )
 
 
 def edge_rib_half_height(x: float) -> float:
@@ -628,20 +638,27 @@ async def _edge_rib(
 
     Vertices (A, C on the arc; B, D the end face at RIB_PLATE_REACH, short of
     the spring-hole column the -Z rib's span crosses, +-EDGE_RIB_END_HALF_H on
-    the slant towards (PLATE_W, 0)): the arc centre is the origin (the two
-    y-symmetric ends + the cylinder-side interior point force it there), so it
-    defines off a coincident-to-origin centre + a radial dim, with A/C pinned
-    on the y-axis; B and D take two distance dims each from the origin, which
-    also makes B-D vertical (a vertical relation on top would over-define)."""
+    the slant towards (PLATE_W, 0); P on the end face at the plate's top face):
+    the arc centre is the origin (the two y-symmetric ends + the cylinder-side
+    interior point force it there), so it defines off a coincident-to-origin
+    centre + a radial dim, with A/C pinned on the y-axis.  D takes two distance
+    dims from the origin; P, on the vertical P-D, its height from the origin;
+    B its reach from the origin and its EDGE_RIB_END_STEP over P, which also
+    makes B-P vertical (a vertical relation on top would over-define).  The
+    end face is two collinear segments so the printed step runs from P, the
+    corner where the face meets the plate top -- below P the face lies inside
+    the plate and the spring pad, so the solid is the one-segment face's."""
     rib = SketchDims()
     check(f"create_sketch {name}", await adapter.create_sketch("Front"))
     end_x = SX * -RIB_PLATE_REACH
     a, c = (0.0, ARC_R), (0.0, -ARC_R)
     b, d = (end_x, EDGE_RIB_END_HALF_H), (end_x, -EDGE_RIB_END_HALF_H)
+    p = (end_x, PLATE_T / 2.0)
     interior = (SX * ARC_R, 0.0)  # cylinder-side point the arc passes through
     set_sketch_direct_db(adapter, True)
     line_ab = check(f"{name} line A-B", await adapter.add_line(*a, *b))
-    line_bd = check(f"{name} end face B-D", await adapter.add_line(*b, *d))
+    line_bp = check(f"{name} end step B-P", await adapter.add_line(*b, *p))
+    line_pd = check(f"{name} end face P-D", await adapter.add_line(*p, *d))
     line_dc = check(f"{name} line D-C", await adapter.add_line(*d, *c))
     arc, _, _ = await _three_point_arc(adapter, c, a, interior, f"{name} arc")
     set_sketch_direct_db(adapter, False)
@@ -649,10 +666,10 @@ async def _edge_rib(
         f"{name} arc centre -> origin",
         await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
     )
-    # Five display dims, recorded in creation order: the arc radius (-> "ArcR"),
-    # then each end-face corner's horizontal then vertical distance from the
-    # origin (B/D at +RIB_PLATE_REACH since SX=-1, unsigned magnitudes ->
-    # "RibReach" and "RibEndH").
+    # Six display dims, recorded in creation order: the arc radius (-> "ArcR");
+    # D's horizontal then vertical distance from the origin (at +RIB_PLATE_REACH
+    # since SX=-1, unsigned magnitudes -> "RibReach", "RibEndH"); P's height
+    # (-> "PlateT" / 2); B's reach (-> "RibReach") and its step over P.
     check(
         f"{name} arc radius",
         await adapter.add_sketch_dimension(arc, None, "radial", ARC_R),
@@ -668,13 +685,39 @@ async def _edge_rib(
         f"{name} arc end on y-axis",
         await adapter.add_sketch_constraint(f"{arc}.end", "origin", "vertical_points"),
     )
-    await anchor_point_to_origin(adapter, f"{line_ab}.end", *b, f"{name} end top")
-    rib.record(f"{stem}EndTopX", '"RibReach"')
-    rib.record(f"{stem}EndTopY", '"RibEndH"')
-    await anchor_point_to_origin(adapter, f"{line_dc}.start", *d, f"{name} end bottom")
+    bottom = f"{line_dc}.start"
+    plate_top = f"{line_pd}.start"
+    top = f"{line_ab}.end"
+    await anchor_point_to_origin(adapter, bottom, *d, f"{name} end bottom")
     rib.record(f"{stem}EndBottomX", '"RibReach"')
     rib.record(f"{stem}EndBottomY", '"RibEndH"')
-    _ = line_bd
+    check(
+        f"{name} end face P-D vertical",
+        await adapter.add_sketch_constraint(line_pd, None, "vertical"),
+    )
+    await dimension_between(
+        adapter, plate_top, "origin", "vertical_distance", p[1], f"{name} plate top"
+    )
+    rib.record(f"{stem}EndPlateTopY", '"PlateT" / 2')
+    await dimension_between(
+        adapter,
+        top,
+        "origin",
+        "horizontal_distance",
+        RIB_PLATE_REACH,
+        f"{name} end reach",
+    )
+    rib.record(f"{stem}EndTopX", '"RibReach"')
+    await dimension_between(
+        adapter,
+        plate_top,
+        top,
+        "vertical_distance",
+        EDGE_RIB_END_STEP,
+        f"{name} end step over plate top",
+    )
+    rib.record(f"{stem}EndStep", '"RibEndH" - "PlateT" / 2')
+    _ = line_bp
     await ensure_fully_defined(adapter, f"{name} sketch")
     check(f"exit_sketch {name}", await adapter.exit_sketch())
     name_last_feature(adapter, f"{stem}Profile")
@@ -1139,6 +1182,51 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
     model.ClearSelection2(True)
 
 
+async def _cylinder_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+    """Hidden Top-plane reference: the pivot cylinder's diameter for the plan.
+
+    Both plates join the cylinder at its mid-plane, so its silhouettes lie
+    inside them and the plan shows only the band where it meets the plate
+    tops; the end views see the R15.24 rib outline over it.  A construction
+    line across the diameter at CYLINDER_REFERENCE_Z carries it as a driving
+    dimension off "CylR"; the part saves the sketch hidden and the drawing
+    shows it in the plan only (``_drawing_hidden_sketches``).  The Top-plane
+    sketch maps world Z to -sketchY."""
+    reference = SketchDims()
+    check("create cylinder reference", await adapter.create_sketch("Top"))
+    start = (-CYL_R, -CYLINDER_REFERENCE_Z)
+    set_sketch_direct_db(adapter, True)
+    diameter = check(
+        "cylinder diameter reference",
+        await adapter.add_line(*start, CYL_R, start[1]),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, diameter)
+    check(
+        "cylinder diameter reference horizontal",
+        await adapter.add_sketch_constraint(diameter, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{diameter}.start",
+        f"{diameter}.end",
+        "horizontal_distance",
+        2.0 * CYL_R,
+        "cylinder diameter reference",
+    )
+    reference.record("CylinderDia", '"CylR" * 2')
+    await anchor_point_to_origin(
+        adapter, f"{diameter}.start", *start, "cylinder diameter reference start"
+    )
+    reference.record("CylinderRefX", '"CylR"')
+    reference.record("CylinderRefZ", None)
+    await ensure_fully_defined(adapter, "cylinder reference sketch")
+    check("exit cylinder reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CylinderReference")
+    drive_jobs += reference.apply(adapter, "CylinderReference")
+    blank_reference_sketches(adapter, ("CylinderReference",))
+
+
 def _drawing_dimension_contract(adapter) -> None:
     """Size and mark every dimension the print imports (DRAWING_DIMENSIONS)."""
     # The trunnion envelope is the knife-edge size: three places carry the
@@ -1322,6 +1410,7 @@ async def build(adapter) -> dict[str, str]:
     await _counter_anchor_tap(adapter, drive_jobs)
     await _bracket_mounting_taps(adapter)
     await _knife_envelope_reference(adapter, drive_jobs)
+    await _cylinder_reference(adapter, drive_jobs)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
