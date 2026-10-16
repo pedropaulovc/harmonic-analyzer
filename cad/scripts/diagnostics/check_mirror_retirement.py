@@ -801,6 +801,13 @@ for j in range(20):
         IDENTITY,
         f"spring-hook ch{j:02d}",
     )
+    expect(
+        CH,
+        f"ch-anchor-jam-nut-{j + 1}",
+        [*c.CHANNEL_ANCHOR_NUT_XY, z_mid],
+        c.CHANNEL_ANCHOR_NUT_ROWS,
+        f"spring-hook jam nut ch{j:02d}",
+    )
 
 # ---- paper-drive -------------------------------------------------------------
 import build_pd_paper_drive_assembly as p

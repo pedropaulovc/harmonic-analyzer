@@ -362,6 +362,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_anchor_jam_nut",
+        part="ch_anchor_jam_nut",
+        artifact_stem="ch-anchor-jam-nut",
+        script_name="draw_ch_anchor_jam_nut.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="mg_wheel_axle_spacer",
         part="mg_wheel_axle_spacer",
         artifact_stem="mg-wheel-axle-spacer",

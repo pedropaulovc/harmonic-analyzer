@@ -1,11 +1,12 @@
 """Create the manufacturing drawing for the modified McMaster 9489T111 anchor.
 
 The anchor is purchased by SKU but is NOT installed as supplied: the captive
-hex nut is discarded and the shank is cut back into the summing-lever plate it
-threads into, so the sheet carries the same two cutting controls as the counter
-anchor (``draw_boss_hook``) -- the finished overall length to the eye crown and
-the restored 45 deg deburr at the new end. Both bands are the title block's;
-see ``spring_hook_spec`` for why the 1/16 in recess absorbs them.
+hex nut is discarded (the MHA-CH-012 round jam nut locks it) and the shank is cut to
+cross the summing-lever plate and carry that nut, so the sheet carries the
+same two cutting controls as the counter anchor (``draw_boss_hook``) -- the
+finished overall length to the eye crown and the restored 45 deg deburr at the
+new end. The length band is the title block's; ``vn_spring_hook_spec`` shows
+the shortest in-band part still keeps two full threads past the nut.
 
 Run with SolidWorks open::
 
@@ -54,14 +55,15 @@ from vn_spring_hook_spec import (
 SPEC = DRAWINGS_BY_NAME["vn_spring_hook"]
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
-# The finished part is 19.368 x 12.7 mm: 5:1 fills the same sheet area the
-# counter anchor fills at 4:1, and the Ø3.5 shank end needs 20:1 to carry a
-# readable 0.46 deburr.
+# The finished part is 28.8 x 12.7 mm since its shank carries the MHA-CH-012
+# jam nut under the plate: 5:1 keeps the front view inside the counter
+# anchor's 4:1 sheet band, raised so the cut end clears the notes, and the
+# Ø3.5 shank end needs 20:1 to carry a readable 0.46 deburr.
 SHEET_SCALE = (5.0, 1.0)
 ISO_SCALE = (3.0, 1.0)
-FRONT_CENTER = (0.100, 0.165)
+FRONT_CENTER = (0.100, 0.172)
 ISO_CENTER = (0.310, 0.213)
-FRONT_KEEP = {"FinishedOverall": (0.042, 0.165)}
+FRONT_KEEP = {"FinishedOverall": (0.042, 0.172)}
 DETAIL_KEEP = {"ChamferWidth": (0.235, 0.090), "ChamferAngle": (0.340, 0.115)}
 SHEET = TrimSheet(
     sheet_scale=SHEET_SCALE,

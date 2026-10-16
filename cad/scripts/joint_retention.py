@@ -635,7 +635,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pd_rack_pinion",  # 120T disc (MHA-PD-006): 3x #0-80 through taps drilled and tapped at assembly (A06 disc-taps-transferred), receiver of the disc screws
         "fr_rocker_arm_support",  # receiver only of channel screws: 4x #8-32 BracketSeats (top-level rows); its own foot holes are 5/16 clearance
         "vn_slotted_screw",  # #8-32 x 1-1/2 fillister (90280A203, MHA-VN-019), member into harmonic_base tapped seat
-        "vn_spring_hook",  # #6-32 eyebolt (McMaster 9489T111, MHA-VN-012); member, x20 into summing_lever tapped plate (top-level row); no channel-internal joint
+        "vn_spring_hook",  # #6-32 eyebolt (McMaster 9489T111, MHA-VN-012); member, x20 into summing_lever tapped plate (top-level row), receiver of its jam nut; no channel-internal joint
+        "ch_anchor_jam_nut",  # MHA-CH-012 made brass round nut, #6-32 tapped through, member: x20 jammed on the summing-lever plate underside, locking each channel anchor (top-level row)
         "sm_summing_lever",  # receiver: #10-24 counter-anchor, 20x #6-32 channel anchors, two blind #2-56 magnifying-bracket seats
         "pd_support_bar",  # #8-32 blind pivot tap + 2x #4-40 through latch-hook taps (pd_support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
         "vn_swing_stop_screw",  # #4-40 fillister (90280A108), member into harmonic_base (top level)
@@ -1757,7 +1758,7 @@ JOINTS: tuple[Joint, ...] = (
         thread="#6-32 UNC",
         quantity=1,
         per_channel=True,  # build_ch_channel_assembly places one per range(CHANNELS)
-        installed_at="",
+        installed_at="MHA-HA-000 CHANNEL ANCHOR STEP",
         exposure=Exposure.ADJUSTER,
         exposure_reason=(
             "per-channel calibration unscrews each anchor to set its spring preload (5% of preload per turn); "
@@ -1765,22 +1766,50 @@ JOINTS: tuple[Joint, ...] = (
             "crank, and that spring pulls the anchor out of its tap"
         ),
         axial_capture=(
-            "thread only: the Ø3.175 neck shoulders on the plate top face as a DOWN-stop when fully seated, "
-            "but calibration backs it off that shoulder (up to 1.143 mm / 1 counted turn), leaving 3.49 mm "
-            "(~4.4 threads) of plate engagement and no seated face; the supplied hex nut is discarded"
+            "the trimmed 9489T111 shank crosses the full 5.08 plate and carries the MHA-CH-012 jam nut on the "
+            "plate underside, which bears the spring's upward pull; the Ø3.175 neck shoulders on the plate top "
+            "only when fully seated (calibration backs it off up to 1 counted turn), and at the worst case "
+            "(shortest in-band part, whole budget backed out) two full turns still show below the nut"
         ),
-        lock=Lock.THREADLOCKER_ONLY,
+        lock=Lock.JAM_NUT,
+        lock_part="ch_anchor_jam_nut",
+        lock_binds=("vn_spring_hook", "sm_summing_lever"),
+        lock_step="MHA-HA-000 CHANNEL ANCHOR STEP",
+        evidence=(
+            "coordinator rulings 2026-10-16 (period hardware; option A after the hex-pitch collision): a made "
+            "round #6-32 jam nut on the plate underside, driven by a forked driver through its notched face "
+            "while the eye is held at its clocking. "
+            "build_ha_harmonic_analyzer_assembly.py module docstring (channel spring anchors thread DOWN into "
+            "the 20 #6-32 taps); build_ch_channel_assembly.py _assert_spring_mount and "
+            "CHANNEL_ANCHOR_NUT_XY/CHANNEL_ANCHOR_NUT_ROWS; vn_spring_hook_spec.py SHANK_LENGTH_MM/"
+            "PROTRUSION_MAX_MM/full_threads_past_nut_mm/ADJUSTMENT_TURNS/ANCHOR_INSTALL_STEP; "
+            "sm_summing_lever_spec.HOLE_SPEC; stock_anchor_geom.ANCHOR_9489T111; ch_anchor_jam_nut_spec.py; "
+            "cad/config/parts/vn-spring-hook.yaml installation_notes"
+        ),
+    ),
+    Joint(
+        id="ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor",
+        assembly="ha_harmonic_analyzer",
+        member="ch_anchor_jam_nut",
+        receiver="vn_spring_hook",
+        thread="#6-32 UNC",
+        quantity=1,
+        per_channel=True,  # build_ch_channel_assembly places one per range(CHANNELS)
+        installed_at="MHA-HA-000 CHANNEL ANCHOR STEP",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason=(
+            "the jam nut is tightened against the plate underside with the eye held clocked; nut, anchor and "
+            "lever then ride as one body, and the spring's twist on the eye reaches that body through the "
+            "plate thread and the nut's bearing face -- no operating torque acts on the nut's own faces"
+        ),
+        axial_capture="round nut bearing on the plate underside, jammed against the anchor's thread flanks",
+        lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "build_ha_harmonic_analyzer_assembly.py module docstring (channel spring anchors thread DOWN into "
-            "the 20 #6-32 taps); build_ch_channel_assembly.py _assert_spring_mount; vn_spring_hook_spec.py "
-            "docstring + DRAWING_NOTES ('DISCARD THE SUPPLIED HEX NUT; NO NUT IS INSTALLED'), "
-            "ADJUSTMENT_TRAVEL_MM/ADJUSTMENT_TURNS; sm_summing_lever_spec.HOLE_SPEC; stock_anchor_geom.ANCHOR_9489T111; "
-            "cad/config/parts/vn-spring-hook.yaml installation_notes ('RUN DOWN UNTIL NECK SEATS ON PLATE TOP; BACK "
-            "OUT 1 TURN MAX TO SET CHANNEL PRELOAD. CLOCK EYE TO SPRING PULL PLANE. USE REMOVABLE MEDIUM-STRENGTH "
-            "THREADLOCKER.')"
+            "build_ch_channel_assembly.py CHANNEL_ANCHOR_NUT_XY/CHANNEL_ANCHOR_NUT_ROWS; "
+            "ch_anchor_jam_nut_spec.py; ch-anchor-jam-nut.yaml"
         ),
     ),
     # --- measuring stick ---
@@ -2343,6 +2372,9 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     ),
     "ha-harmonic-analyzer/channel-anchor-in-summing-plate": Occurrence(
         "ha_harmonic_analyzer", "build_ch_channel_assembly.py", "direct threaded seat"
+    ),
+    "ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor": Occurrence(
+        "ha_harmonic_analyzer", "build_ch_channel_assembly.py", "CHANNEL_ANCHOR_NUT_XY"
     ),
     "ms-measuring-stick/stop-thumbscrew": Occurrence(
         "ms_measuring_stick",
