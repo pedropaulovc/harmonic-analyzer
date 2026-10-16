@@ -779,9 +779,10 @@ from the per-input digests the saved `.SLDASM` was keyed from, recorded beside i
 the rest of the builder reaches — reopens the model, deletes its named explodes and
 re-authors them with the builder's own function (`refresh_assembly.py <stem>
 explode`), with no insert/mate loop. The reopened model must reproduce its saved
-geometry proof and be collapsed before the in-place save, and the re-saved model
-must reproduce it again (else the proof stays retired and the next build is
-FULL); it keeps the saved renders and `.dof.json`. Only a
+geometry proof, stay collapsed, and keep every top-level component pose
+numerically unchanged after re-authoring and in the re-saved model (else the proof
+stays retired and the next build is FULL); the proof is republished from the
+re-saved model, and the saved renders and `.dof.json` are kept. Only a
 builder whose sole use of that module is
 `author_in_drawing_configurations(adapter, ASM_NAME, lambda configuration:
 <fn>(adapter, configuration))` qualifies (on main: `pd_paper_drive`); an explode
