@@ -13,7 +13,7 @@ Settings (drawing-guidelines.md rule 22 (an assembly package is complete),
 setup and adjustment):
 
 * STUD HEIGHT -- the #0-80 eye stud's head top above the rod's top face,
-  ``StudHeadAboveRodTop@StudSetting`` on the Front plane. The band keeps the
+  ``StudHeadAboveRodTop@StudSetting`` on the Right plane. The band keeps the
   engagement in the rod's tap at least 1.5 D and short of its thread depth.
 * PEN YAW -- the marker axis to the rod flats (the paper face),
   ``PenYaw@CarriageSetting`` on the Top plane.
@@ -193,14 +193,17 @@ ROD_SET_SCREW_TRAIL = (
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
 
 # --- settings ----------------------------------------------------------------
-# STUD HEIGHT (Front plane, sketch (u, v) = machine (X, Y)): a vertical
+# STUD HEIGHT (Right plane, sketch (u, v) = machine (-Z, Y)): a vertical
 # construction line on the rod axis from the rod's top face to the stud's
-# head top, both in the rest pose the model is saved in.
+# head top, both in the rest pose the model is saved in. On the Right plane
+# so DETAIL A looks the same way as the RIGHT view its circle is drawn on
+# (the eye face-on); from the front the detail was no enlargement of the
+# circled region (machinist review, farm run 20261016T102522250Z).
 STUD_FEATURE = "StudSetting"
 STUD_DIMENSION = "StudHeadAboveRodTop"
 STUD_LINE = (
-    (carriage.PEN_ROD_X, carriage.ROD_SQUARE_TOP_REST_Y),
-    (carriage.PEN_ROD_X, carriage.STUD_HEAD_TOP_REST_Y),
+    (-carriage.PEN_Z_MID, carriage.ROD_SQUARE_TOP_REST_Y),
+    (-carriage.PEN_Z_MID, carriage.STUD_HEAD_TOP_REST_Y),
 )
 STUD_HEIGHT = carriage.STUD_HEAD_TOP_REST_Y - carriage.ROD_SQUARE_TOP_REST_Y
 STUD_TOLERANCE_MM = 0.4
@@ -254,9 +257,14 @@ NIB_TEXT_UV = (
     NIB_UV[0] - (NIB_TEXT_BEYOND - NIB_TEXT_OFFSET) * math.sqrt(0.5),
     NIB_UV[1] - (NIB_TEXT_BEYOND + NIB_TEXT_OFFSET) * math.sqrt(0.5),
 )
-# The stud height's text point, machine mm: left of the rod axis, mid-height,
-# far enough out that the callout's widest line clears the stud's shank.
-STUD_TEXT_XY = (carriage.PEN_ROD_X - 13.0, (STUD_LINE[0][1] + STUD_LINE[1][1]) / 2.0)
+# The stud height's text point, machine mm: on the sheet-left of the rod axis
+# in a Right view (machine +Z), away from the wire, mid-height, far enough out
+# that the callout's widest line clears the stud's shank.
+STUD_TEXT_POINT = (
+    carriage.PEN_ROD_X,
+    (STUD_LINE[0][1] + STUD_LINE[1][1]) / 2.0,
+    carriage.PEN_Z_MID + 13.0,
+)
 
 # The drawing imports exactly these, at these places.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -288,7 +296,7 @@ _TRAVEL = f"±{carriage.PEN_TRAVEL_HALF_MM:.0f}"
 
 # --- detail regions (machine mm): what each fitter detail is centred on and how
 # far round it reaches ------------------------------------------------------------
-STUD_DETAIL_CENTRE = (carriage.PEN_ROD_X, STUD_TEXT_XY[1], carriage.PEN_Z_MID)
+STUD_DETAIL_CENTRE = (carriage.PEN_ROD_X, STUD_TEXT_POINT[1], carriage.PEN_Z_MID)
 STUD_DETAIL_RADIUS = 14.0
 _BAR_BACK_Z = hanger.HANGER_POS[2] + max(hanger.STRAP_Z) + WHEEL_BAR_DEPTH
 _HANGER_SCREW_TIP_Z = _BAR_BACK_Z - hanger_screw.SHANK_LEN
@@ -310,14 +318,13 @@ CARRIAGE_DETAIL_RADIUS = 20.0
 # The two points whose sheet direction the turned detail lays along +X.
 CARRIAGE_AXIS_POINTS = (carriage.MARKER_POS, _END_MACHINE)
 
-# A and B are bounded on RIGHT; A is drawn from the front and C is the
-# turned plan, so each of those titles names its viewing direction.
+# A and B are bounded on RIGHT and drawn from the right; C is the turned
+# plan, so its title names its viewing direction.
 DETAIL_LETTERS = {"stud": "A", "hanger": "B", "carriage": "C"}
 SHEET_TITLES = {
     "carriage": f"DETAIL {DETAIL_LETTERS['carriage']} - FROM ABOVE\n"
     "PEN YAW + NIB PRESET\nSCALE 2 : 1",
-    "stud": f"DETAIL {DETAIL_LETTERS['stud']} - FROM FRONT\n"
-    "STUD HEIGHT + LOCK\nSCALE 2 : 1",
+    "stud": f"DETAIL {DETAIL_LETTERS['stud']}\nSTUD HEIGHT + LOCK\nSCALE 2 : 1",
     "hanger": f"DETAIL {DETAIL_LETTERS['hanger']}\nHANGER SCREW LOCK\nSCALE 2 : 1",
 }
 VIEW_TITLES = {
