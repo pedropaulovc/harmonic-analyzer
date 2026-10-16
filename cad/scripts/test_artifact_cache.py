@@ -12,6 +12,7 @@ import hashlib
 import json
 import logging
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -438,14 +439,36 @@ _LEAF_RESOURCE = "microsoft.applicationId=app,farm.worker=w@1,farm.execution=wf/
 @pytest.fixture
 def leaf(monkeypatch):
     """A farm leaf execution in rw mode, with prewarm state isolated per test and
-    its exit hook captured instead of registered with the interpreter."""
+    its exit hook captured instead of registered with the interpreter.
+
+    Only the cache module's OWN ``atexit`` binding is replaced. Patching the shared
+    ``atexit.register`` would also capture every other registration made in the
+    window -- e.g. ``weakref.finalize``'s one-shot ``_exitfunc``, registered by
+    whichever thread first builds a finalizer: the OTel batch exporter's first POST
+    (a urllib3 pool) lands ~5 s into the process, so on a slow run it fell inside a
+    prewarm test and failed check:cache."""
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
     monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", _LEAF_RESOURCE)
     monkeypatch.setattr(cache, "_BACKEND", cache._UNSET)
     monkeypatch.setattr(cache, "_PREWARMED", None)
     exits: list[tuple] = []
-    monkeypatch.setattr(cache.atexit, "register", lambda *args: exits.append(args))
+    monkeypatch.setattr(
+        cache, "atexit", types.SimpleNamespace(register=lambda *args: exits.append(args))
+    )
     return exits
+
+
+def test_leaf_captures_only_the_cache_modules_exit_hooks(leaf):
+    """An exit hook registered by other code while a leaf test runs (another
+    thread's first ``weakref.finalize``) stays out of the captured list."""
+    import atexit
+
+    def unrelated():
+        pass
+
+    atexit.register(unrelated)
+    atexit.unregister(unrelated)
+    assert leaf == []
 
 
 def _gated_backend():
