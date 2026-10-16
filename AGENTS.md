@@ -780,6 +780,25 @@ hooks) when the assembly script / a shared CAD helper in its recipe closure / a 
 missing. Force a full rebuild of one assembly by deleting its `.SLDASM` target,
 then `doit assembly:<stem>`.
 
+**Explode tier.** `build_or_refresh` picks the tier (`_refresh_tier.RefreshTier`)
+from the per-input digests the saved `.SLDASM` was keyed from, recorded beside it in
+`.<stem>.inputs.json` (never mtimes or git): a change confined to the assembly's
+*explode closure* — `_<stem>_explode.py` plus its own local imports, minus everything
+the rest of the builder reaches — reopens the model, deletes its named explodes and
+re-authors them with the builder's own function (`refresh_assembly.py <stem>
+explode`), with no insert/mate loop. It saves in place only once the model is
+collapsed and its geometry fingerprint equals the saved proof, and it keeps the
+saved renders and `.dof.json`. Only a builder whose sole use of that module is
+`author_in_drawing_configurations(adapter, ASM_NAME, lambda configuration:
+<fn>(adapter, configuration))` qualifies (on main: `pd_paper_drive`); an explode
+that takes other build state (`dt_drive_train`'s collar-pin roles) or lives inline
+(`fr_frame`, `ms_measuring_stick`) declines to FULL, as does any explode change
+that lands together with a recipe or referenced-part change. Each build of a
+qualifying stem also publishes its archive under an *explode base* key (the cache
+key without the explode closure), so a clean farm leaf restores that base and
+takes the EXPLODE tier. To qualify, move the explode and its data into
+`_<stem>_explode.py` / an explode-only spec.
+
 **Focused helper imports.** Import helpers directly from their owning modules:
 `_session` for build sessions, `_paths` for paths/constants, `_com` for COM access,
 `_part_save` for part exports, `_rebuild` for rebuilds, and the focused sketch,
