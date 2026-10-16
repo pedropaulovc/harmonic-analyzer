@@ -168,6 +168,17 @@ def test_hole_row_text_clears_the_near_hole_station_line():
     assert top < arrow_y - 0.002
 
 
+def test_near_hole_station_arrows_stand_inside_its_span():
+    # reviewfix-r3 machinist review: the near station's outside arrow tail ran
+    # left of the plan's near end, across the hole row's dimension line, which
+    # stands left of that end.  Inside, the span holds the value and an arrow
+    # (about 3 mm) each side of it.
+    assert draw.ARROWS_INSIDE == ("LeftX",)
+    assert draw.FRONT_KEEP["LeftZ"][0] < draw.LEFT_EDGE_X
+    span = draw._plan_x(clip.HOLE_INSET) - draw.LEFT_EDGE_X
+    assert span - len("7.190") * _CHAR_WIDTH > 2 * 0.004
+
+
 def test_length_line_clears_the_bridge_end_texts():
     # r8a audit: the length's FORMED line above its value pushed its
     # dimension line through the far bridge end's text.

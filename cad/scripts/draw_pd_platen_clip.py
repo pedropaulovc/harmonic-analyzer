@@ -154,7 +154,7 @@ HOLE_FAR_X = CLIP_LENGTH - HOLE_INSET
 # (r5: the hole row's "2X 3.300" spans 21 mm), so each column is its text's
 # right end: the hole row's widest line ("MHA-PD-002", ~23 mm) ends right of
 # the screw rail's line, the hole row's three-line block stands under the
-# near hole station's outside-arrow line (r7 audit: at 0.112 that line,
+# near hole station's dimension line (r7 audit: at 0.112 that line,
 # y ~0.1132, ran 2.7 mm into it), the spring rail's right of the overall
 # width's text, and the overall width's
 # inside the border.  The outer and the slit-side corner radii stand off the
@@ -188,6 +188,13 @@ FRONT_KEEP = {
     "EndR1": (0.345, 0.112),
     "SlitCornerR1": (0.355, 0.158),
 }
+# swDimensionArrowsSide_e.swDimArrowsInside (draw_fr_harmonic_base's form):
+# left to the document's smart arrows, the near hole station's outside arrow
+# tail ran left of the plan's near end, across the hole row's 2X 3.300
+# dimension line on its way down to its text (reviewfix-r3 machinist
+# review).  The station's 21.6 mm span holds its value and both arrows.
+ARROWS_INSIDE = ("LeftX",)
+_DIM_ARROWS_INSIDE = 0
 # Profile: the four bow stations (where the bows leave and rejoin the flat)
 # stack below it from the near end, smallest nearest, so no station's
 # extension line crosses another's dimension line; each value stands just
@@ -342,6 +349,24 @@ def _radius_leader_outside(adapter: Any, annotations: list[Any], name: str) -> N
         raise RuntimeError(f"{name} kept its leader to the arc's centre")
 
 
+def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
+    """Stand each ARROWS_INSIDE dimension's arrows inside its extension lines,
+    read back (draw_fr_harmonic_base's _set_pads_arrows_inside)."""
+    remaining = set(ARROWS_INSIDE)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        remaining.discard(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = _DIM_ARROWS_INSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError(f"{name} did not keep its arrows inside")
+    if remaining:
+        raise RuntimeError(f"no dimension to set arrows inside: {sorted(remaining)}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -422,6 +447,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
     )
     _radius_leader_outside(adapter, annotations, RADIUS_LEADER_OUTSIDE)
+    _set_arrows_inside(adapter, annotations)
     offset_dimension_text(adapter, annotations, OFFSET_TEXT)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
