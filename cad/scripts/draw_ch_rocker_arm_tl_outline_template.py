@@ -63,6 +63,7 @@ from ch_rocker_arm_tl_outline_template_spec import (
     PROFILE_CALLOUT,
     REFERENCE_DIMENSIONS,
     ROD_SLOT_CALLOUT,
+    ROD_SLOT_FLAT_CALLOUT,
     ROD_SLOT_STATION_CALLOUT,
     SHARP_EDGE_CALLOUT,
     STATION_CALLOUT,
@@ -140,12 +141,12 @@ FRONT_KEEP = {
     "RodSlotY": (0.352, 0.152),
 }
 # The width's dimension line stands outboard of the crop circle, right of the
-# slot's round end, with its value and fit callout above the circle; the run's
-# value sits left of its witness lines (the 3.75 mm span is narrower than the
-# text).
+# slot's round end, with its value and fit callout above the circle. The
+# run's value and its two-line function flag sit right of and below the
+# circle, under the detail label: left of the circle the flag would cross it.
 DETAIL_KEEP = {
     "RodSlotWidth": (DETAIL_CENTER[0] + 0.020, DETAIL_CENTER[1] + 0.028),
-    "RodSlotFlat": (DETAIL_CENTER[0] - 0.024, DETAIL_CENTER[1] - 0.011),
+    "RodSlotFlat": (DETAIL_CENTER[0] + 0.037, DETAIL_CENTER[1] - 0.012),
 }
 # Below the edge view and left of its extension lines (the text is far wider
 # than the 3.175 span), clear of the front view's rod tip and the isometric.
@@ -175,6 +176,9 @@ CALLOUTS_BELOW = {
     # drawing-guidelines.md rule 4: the slot's width is a matched fit, so the
     # print gives its reference nominal and the clearance on the named pin.
     "RodSlotWidth": ROD_SLOT_CALLOUT,
+    # The run prints at three places for its minimum's reach: the flag
+    # names that function and the hole it reaches (rule 3).
+    "RodSlotFlat": ROD_SLOT_FLAT_CALLOUT,
 }
 # The top stations take their profile flag above the value: below, it would
 # land on the apex block.

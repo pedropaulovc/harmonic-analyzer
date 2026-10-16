@@ -237,6 +237,14 @@ def test_rod_slot_run_takes_the_pin_wherever_the_rocker_puts_its_hole() -> None:
     reach = spec.ROD_HOLE_RADIAL + spec.ROD_HOLE_PLAY + band[1]
     assert run[0] / 2.0 >= reach
     assert spec.ROD_SLOT_WEB_MIN >= 1.5
+    # The three-place run states its function and the hole it reaches.
+    assert drawing.CALLOUTS_BELOW["RodSlotFlat"] == spec.ROD_SLOT_FLAT_CALLOUT
+    assert spec.ROD_SLOT_FLAT_CALLOUT == "PIN REACH TO ROD-PIN\nHOLE, MHA-CH-006"
+    # The station's flag says the slot is radial (its axis passes the pivot).
+    assert drawing.CALLOUTS_BELOW["RodSlotX"] == "ROD SLOT, RADIAL TO PIVOT"
+    assert spec.ROD_SLOT_AXIS == pytest.approx(
+        (spec.ROD_SLOT_X / spec.ROD_SLOT_LEVER, spec.ROD_SLOT_Y / spec.ROD_SLOT_LEVER)
+    )
 
 
 # #1545 (approved 2026-10-15): of the rocker's 0.25 half-zone either side of
@@ -506,3 +514,7 @@ def test_rod_slot_detail_circle_and_label_stay_clear_of_the_notes_and_frame() ->
     assert width_x > x + crop
     assert drawing.DETAIL_LABEL_XY[0] - 0.010 > width_x
     assert drawing.DETAIL_LABEL_TEXT == "DETAIL A\nSCALE 5 : 1"
+    # The run's value and flag sit right of the circle, under the label.
+    flat_x, flat_y = drawing.DETAIL_KEEP["RodSlotFlat"]
+    assert flat_x > x + crop and flat_y < y - 0.010
+    assert flat_y < drawing.DETAIL_LABEL_XY[1] - 0.015

@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import copy
+import itertools
 import json
 import math
 import re
@@ -301,11 +302,61 @@ _TOP, _TIP, _BOTTOM = _rocker_points()
 _RIGHT = (_plane_between(_TOP, _TIP), _plane_between(_TIP, _BOTTOM))
 _TIPS = tuple(PlanarFace((-face.normal[0], face.normal[1], 0.0), face.offset_mm) for face in _RIGHT)
 _LAND_ANGLE = math.degrees(rocker._ALPHA_TOP)
+_XY = tuple[float, float]
+
+
+def _least_tip_land_mm() -> float:
+    """The shortest tip land the J↔K and top-edge zones permit (+X; mirrored).
+
+    The land is BASIC 5.59 inside the lower Ⓤ0 zone: its top end is on the top
+    arc, whose zone lies wholly outside it (toward the arc centre), and its foot
+    is on the taper. Each of the land and taper lines may lie anywhere in its
+    zone, tilted too, so each line's two ends move independently between the
+    zone's outside and inside limits, and the top arc between its own. The
+    length is near-linear in those five offsets, so the least is at a vertex:
+    the taper tilted in by the whole zone at the land's foot only (4.979).
+    prechips 0.1.2's ``tilt_across`` takes this as the land_angle extent (C2).
+    """
+    zone, lower_outside = TOP_EDGE_BAND
+    cx, cy = 0.0, rocker.CENTER_Y
+    mx, my = (_TOP[0] + _BOTTOM[0]) / 2.0, (_TOP[1] + _BOTTOM[1]) / 2.0
+
+    def inward(start: _XY, end: _XY) -> _XY:
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        nx, ny = -dy / math.hypot(dx, dy), dx / math.hypot(dx, dy)
+        side = (mx - start[0]) * nx + (my - start[1]) * ny
+        return (nx, ny) if side > 0.0 else (-nx, -ny)
+
+    def moved(point: _XY, normal: _XY, by: float) -> _XY:
+        return (point[0] + by * normal[0], point[1] + by * normal[1])
+
+    land_in, taper_in = inward(_TOP, _TIP), inward(_TIP, _BOTTOM)
+    lower = (-lower_outside, zone - lower_outside)  # into the material
+    top_radii = (rocker.R_TOP - zone, rocker.R_TOP)  # wholly outside: centreward
+    lengths = []
+    for offsets in itertools.product(lower, repeat=4):
+        p0, p1 = moved(_TOP, land_in, offsets[0]), moved(_TIP, land_in, offsets[1])
+        q0, q1 = moved(_TIP, taper_in, offsets[2]), moved(_BOTTOM, taper_in, offsets[3])
+        dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+        ex, ey = q1[0] - q0[0], q1[1] - q0[1]
+        s = ((q0[0] - p0[0]) * ey - (q0[1] - p0[1]) * ex) / (dx * ey - dy * ex)
+        foot = (p0[0] + s * dx, p0[1] + s * dy)
+        fx, fy = p0[0] - cx, p0[1] - cy
+        a, b = dx**2 + dy**2, 2.0 * (fx * dx + fy * dy)
+        for radius in top_radii:
+            root = math.sqrt(b * b - 4.0 * a * (fx**2 + fy**2 - radius**2))
+            u = min(((-b + root) / (2.0 * a), (-b - root) / (2.0 * a)), key=abs)
+            lengths.append(math.dist((p0[0] + u * dx, p0[1] + u * dy), foot))
+    return min(lengths)
+
+
+TIP_LAND_LEAST_MM = math.floor(_least_tip_land_mm() * 1e3) / 1e3  # 4.979
 
 for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x", -1, _TIPS[0])):
     requirement(
         _name, kind="face", faces=(_face,), requirements=("tip_land", "land_angle_deg") + (("station",) if _sign == 1 else ()), fields={
-            "tip_land": (_band(rocker.TIP_FACE, _P), ("TIP_FACE", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
+            # BASIC inside the J↔K zone, which is its band (#1545 option 4).
+            "tip_land": (rocker.TIP_FACE, ("TIP_FACE", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
             "land_angle_deg": (round(_LAND_ANGLE, _P), ("_ALPHA_TOP", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
             "land_angle_nominal_deg": (_LAND_ANGLE, ("_ALPHA_TOP",)),
             "dimension_type": ("basic", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
@@ -1877,6 +1928,8 @@ def _dress_detail_dimensions(
             adapter, display, expected_mm=remaining.pop(name), label=f"imported {name}"
         )
         if name == "RodTipLen":
+            # The land runs inside the J↔K profile: BASIC, the zone is its band.
+            set_basic_dimension(adapter, display, label="tip land length")
             continue
         # Single exterior arrows, not diametral lines through both concentric
         # circles: otherwise the new hub OD and pivot bore leaders intersect.
@@ -1983,6 +2036,8 @@ def _add_rocker_outline_dimensions(
         adapter, taper_dimension, expected_mm=BOT_END_X, label="taper intersection X",
         entities=(pivot, taper), entity_types=("EDGE", "VERTEX"),
     )
+    # The taper's foot is a J↔K profile station: BASIC, the zone is its band.
+    set_basic_dimension(adapter, taper_dimension, label="taper intersection X")
     taper_dimension = _early_bound(taper_dimension, "IDisplayDimension")
     taper_dimension.SetText(4, "R816/TAPER")
     if str(taper_dimension.GetText(4) or "") != "R816/TAPER":

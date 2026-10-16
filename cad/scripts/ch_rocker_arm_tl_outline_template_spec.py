@@ -471,7 +471,8 @@ BASIC_DIMENSIONS: tuple[tuple[str, str], ...] = (
     ("RodSlotReference", "RodSlotY"),
 )
 REFERENCE_DIMENSIONS = frozenset({"RodSlotWidth"})
-ROD_SLOT_STATION_CALLOUT = "ROD SLOT"
+# The slot runs radially from the pivot: its station callout says so.
+ROD_SLOT_STATION_CALLOUT = "ROD SLOT, RADIAL TO PIVOT"
 DETAIL_SCALE = (5, 1)
 
 # The scribing edges' SHARP requirement rides the radius and tip-land
@@ -486,6 +487,8 @@ SHARP_EDGE_CALLOUT = "SHARP EDGE"
 PROFILE_CALLOUT = "ROCKER PROFILE"
 ROCKER_NUMBER = "MHA-CH-006"
 STATION_CALLOUT = f"{PROFILE_CALLOUT}, {ROCKER_NUMBER}"
+# The run's function (its three-place minimum is what must reach), no method.
+ROD_SLOT_FLAT_CALLOUT = f"PIN REACH TO ROD-PIN\nHOLE, {ROCKER_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:4"
 
 # The #1413 placeholder provenance every solid carries: ``by`` is

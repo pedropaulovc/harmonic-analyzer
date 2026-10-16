@@ -8490,3 +8490,31 @@ def test_r24_taper_parent_circle_clearance_is_nonintersection_not_a_new_one_mm_t
     case = r24_taper
     case.parent_centre = (0.2463786 + case.parent_radius + 0.0005, 0.1294438)
     drawing._require_taper_witnesses(case.adapter, object(), case.taper, case.entities)
+
+
+def test_least_tip_land_is_the_basic_land_shortened_by_the_taper_tilted_into_the_zone():
+    # Independent of the vertex search: the land stays on its basic line and
+    # the top arc on its basic radius; the taper keeps its bottom end and
+    # swings its foot the whole zone into the material, so the land ends
+    # where that tilted taper crosses it.
+    top, tip, bottom = drawing._TOP, drawing._TIP, drawing._BOTTOM
+    zone = ch_rocker_arm_spec.TOP_EDGE_BAND[0]
+    tx, ty = bottom[0] - tip[0], bottom[1] - tip[1]
+    length = math.hypot(tx, ty)
+    normal = (-ty / length, tx / length)
+    interior = ((top[0] + bottom[0]) / 2.0, (top[1] + bottom[1]) / 2.0)
+    if (interior[0] - tip[0]) * normal[0] + (interior[1] - tip[1]) * normal[1] < 0.0:
+        normal = (-normal[0], -normal[1])
+    foot = (tip[0] + zone * normal[0], tip[1] + zone * normal[1])
+    ux, uy = tip[0] - top[0], tip[1] - top[1]
+    ex, ey = bottom[0] - foot[0], bottom[1] - foot[1]
+    s = ((foot[0] - top[0]) * ey - (foot[1] - top[1]) * ex) / (ux * ey - uy * ex)
+    tilted = s * math.hypot(ux, uy)
+    assert drawing._least_tip_land_mm() == pytest.approx(tilted, abs=1e-9)
+    assert drawing.TIP_LAND_LEAST_MM == 4.979
+    assert 0.0 < drawing.TIP_LAND_LEAST_MM <= drawing._least_tip_land_mm()
+    # A parallel shift of the taper (zone / sin of the land-taper angle) is
+    # milder than the tilt; the land never lengthens past its basic as worst.
+    cos_angle = abs(ux * tx + uy * ty) / (math.hypot(ux, uy) * length)
+    parallel = ch_rocker_arm_spec.TIP_FACE - zone / math.sqrt(1.0 - cos_angle**2)
+    assert drawing.TIP_LAND_LEAST_MM < parallel < ch_rocker_arm_spec.TIP_FACE

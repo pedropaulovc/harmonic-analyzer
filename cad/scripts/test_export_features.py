@@ -362,7 +362,8 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
     assert features["hub_faces"]["length"] == [7.0565, 7.1065]
     assert features["hub_faces"]["length_nominal"] == 7.0565
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
-        assert features[name]["tip_land"] == [5.08, 6.10]
+        # BASIC: the J↔K profile zone is its band.
+        assert features[name]["tip_land"] == rocker.TIP_FACE
         assert features[name]["land_angle_deg"] == round(math.degrees(rocker._ALPHA_TOP), 2)
         assert features[name]["precision"]["land_angle_deg"] == 2
         assert features[name]["dimension_type"] == "basic"
