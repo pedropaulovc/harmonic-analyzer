@@ -299,9 +299,10 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
     assert moved == {
         instance.name for instance in instances if instance.stem in asm.EXPLODED_STEMS
     }
-    assert {"ch-pivot-shaft", "ch-fulcrum-shaft", "ch-rocker-arm"}.isdisjoint(
+    assert {"ch-pivot-shaft", "ch-rocker-arm", "ch-channel-lever"}.isdisjoint(
         asm.EXPLODED_STEMS
     )
+    assert asm.FULCRUM_SHAFT in asm.EXPLODED_STEMS
 
 
 def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
