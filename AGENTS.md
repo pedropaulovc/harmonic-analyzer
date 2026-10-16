@@ -930,6 +930,11 @@ Assemblies and drawings read dimensions from specs or these pure providers, not
 from part builders. `_platen_rack_geometry` owns the shared rack section;
 `_cone_gear_geometry` and `_cone_gear_readback` share cone calculations and saved
 topology checks without importing cone-part derivation.
+Assembly data splits by consumer: `<stem>_assembly_spec.py` (reaches the .SLDASM),
+`<stem>_explode_spec.py` (pure explode the builder authors), and drawing-only
+`<stem>_assembly_sheet.py` / `*_steps.py` (BOM, captions, sequence text).
+`test_assembly_sheet_isolation.py` (`check:graph`) fails if a builder's closure
+reaches a sheet/steps/`draw_*` module, or their literals type a dimension (`22.0`).
 
 ## Fine-grained config deps
 
