@@ -240,9 +240,9 @@ ARC_PROFILE_PICK_X_MM = {"TopRadius": -130.0, "BottomRadius": -110.0}
 # (J), down the land and taper, along R816, and up to the top-arc end at +X (K).
 # Both letters point at their corners in the front view, the frame's view.
 # Sheet offsets from the projected corner (v43 render): J sits left of the
-# (292.51) witness; K sits right of the E circle, left of the 8.46 witnesses.
+# (292.51) witness; K sits right of the E circle, clear of the 8.46 dim line.
 PROFILE_BETWEEN = ("J", "K")
-BETWEEN_POINT_OFFSET = {"J": (-0.007, 0.002), "K": (0.012, 0.002)}
+BETWEEN_POINT_OFFSET = {"J": (-0.007, 0.002), "K": (0.009, 0.002)}
 LAND_LABEL = "LAND"
 # Sheet-layout clearance, NOT a manufacturing tolerance. SIDE_SMART may put
 # the native junction on either frame edge; prove its rebuilt route, not a

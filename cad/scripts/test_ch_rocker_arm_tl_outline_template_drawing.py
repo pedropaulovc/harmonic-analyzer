@@ -500,6 +500,9 @@ def test_rod_slot_detail_circle_and_label_stay_clear_of_the_notes_and_frame() ->
     # The circle sits under the notes and right of the frame border.
     assert y + crop < drawing.NOTES_XY[1] - 0.010
     assert x - crop > 0.020 and y - crop > 0.010
-    # The label's top centre is right of the circle.
-    assert drawing.DETAIL_LABEL_XY[0] - 0.010 > x + crop
+    # The width's dimension line stands outside the circle, and the label's
+    # top centre is right of it.
+    width_x = drawing.DETAIL_KEEP["RodSlotWidth"][0]
+    assert width_x > x + crop
+    assert drawing.DETAIL_LABEL_XY[0] - 0.010 > width_x
     assert drawing.DETAIL_LABEL_TEXT == "DETAIL A\nSCALE 5 : 1"

@@ -98,11 +98,11 @@ DETAIL_CROP_RADIUS = DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0
 DETAIL_LETTER = "A"
 # A model view has no native label the API can show, so the label is a note
 # the view owns, in the native detail label's words, anchored at its top
-# centre: right of the crop circle, under the width.
+# centre: right of the width's dimension line, under its callout.
 DETAIL_LABEL_TEXT = (
     f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
 )
-DETAIL_LABEL_XY = (0.112, 0.050)
+DETAIL_LABEL_XY = (0.116, 0.050)
 # The face view's letter goes west of the slot's mark, level with its centre:
 # the plate between the pivot and the slot carries nothing else there.
 PARENT_LETTER_OFFSET = (
@@ -139,11 +139,12 @@ FRONT_KEEP = {
     "RodSlotX": (0.267, 0.097),
     "RodSlotY": (0.352, 0.152),
 }
-# The width's dimension line stands just outboard of the slot's round end
-# with its value and fit callout above the fence; the run's value sits left
-# of its witness lines (the 3.75 mm span is narrower than the text).
+# The width's dimension line stands outboard of the crop circle, right of the
+# slot's round end, with its value and fit callout above the circle; the run's
+# value sits left of its witness lines (the 3.75 mm span is narrower than the
+# text).
 DETAIL_KEEP = {
-    "RodSlotWidth": (DETAIL_CENTER[0] + 0.013, DETAIL_CENTER[1] + 0.028),
+    "RodSlotWidth": (DETAIL_CENTER[0] + 0.020, DETAIL_CENTER[1] + 0.028),
     "RodSlotFlat": (DETAIL_CENTER[0] - 0.024, DETAIL_CENTER[1] - 0.011),
 }
 # Below the edge view and left of its extension lines (the text is far wider
