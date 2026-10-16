@@ -1,0 +1,222 @@
+"""Offline contracts for the channel anchor jam nut (MHA-CH-012) drawing."""
+
+from __future__ import annotations
+
+import ast
+import math
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+import _config
+import build_ch_anchor_jam_nut as part
+import ch_anchor_jam_nut_spec as spec
+import draw_ch_anchor_jam_nut as drawing
+from _drawing_contract import model_toleranced_dimensions
+from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
+
+
+def test_required_drawing_paths() -> None:
+    assert drawing.SLDDRW.as_posix().endswith("/slddrw/ch-anchor-jam-nut.SLDDRW")
+    assert drawing.PDF.as_posix().endswith("/pdf/ch-anchor-jam-nut.pdf")
+    assert (
+        DRAWINGS_BY_NAME["ch_anchor_jam_nut"].script == Path(drawing.__file__).resolve()
+    )
+
+
+def test_dimension_transfer_uses_shared_helper() -> None:
+    from _drawing_dimensions import move_model_dimension
+
+    assert drawing.move_model_dimension is move_model_dimension
+
+
+def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
+    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
+    assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
+    assert drawing.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
+    assert spec.DRAWING_DIMENSIONS == {
+        "NutProfile": {"NutOd"},
+        "Nut": {"NutThickness"},
+        "DriveSlotProfile": {"SlotWidth"},
+        "DriveSlot": {"SlotDepth"},
+    }
+
+
+def _calls(path: str) -> list[ast.Call]:
+    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+
+
+def _calls_by_name(path: str) -> dict[str, ast.Call]:
+    return {call.func.id: call for call in _calls(path)}
+
+
+def test_builder_names_every_marked_dimension() -> None:
+    named: dict[str, set[str]] = {}
+    for call in _calls(part.__file__):
+        if call.func.id == "name_dimensions":
+            feature = ast.literal_eval(call.args[1])
+            named.setdefault(feature, set()).update(ast.literal_eval(call.args[2]))
+        elif call.func.id == "define_circle":
+            kw = {k.arg: k.value for k in call.keywords}
+            named.setdefault("NutProfile", set()).add(ast.literal_eval(kw["names"])[2])
+        elif call.func.id == "define_centered_rectangle":
+            kw = {k.arg: k.value for k in call.keywords}
+            named.setdefault("DriveSlotProfile", set()).update(
+                {ast.literal_eval(kw["name_width"]), ast.literal_eval(kw["name_depth"])}
+            )
+    for feature, names in spec.DRAWING_DIMENSIONS.items():
+        assert names <= named[feature], feature
+
+
+def test_every_marked_dimension_has_one_view_and_model_places() -> None:
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
+    assert not set(drawing.FRONT_KEEP) & set(drawing.RIGHT_KEEP)
+    assert set(drawing.DIMENSION_CALLOUTS) <= marked
+    assert {
+        (feature, name)
+        for feature, names in spec.DRAWING_PRECISION.items()
+        for name in names
+    } == {
+        (feature, name)
+        for feature, names in spec.DRAWING_DIMENSIONS.items()
+        for name in names
+    }
+    assert drawing.DRAWING_PRECISION_BY_NAME == {
+        "NutOd": 3,
+        "NutThickness": 2,
+        "SlotWidth": 2,
+        "SlotDepth": 2,
+    }
+
+
+def test_no_explicit_tolerance_band() -> None:
+    # Every size takes the title block's row for its places.
+    assert model_toleranced_dimensions(part) == {}
+
+
+def test_spec_margins() -> None:
+    assert spec.WALL_WORST >= 1.5
+    assert spec.UNDER_SLOT_WORST >= 1.5
+    assert spec.NEIGHBOUR_GAP_WORST >= 0.25
+    assert spec.WALL_WORST == pytest.approx(
+        (spec.OD_MIN - THREAD_MAJOR_MM["#6-32"]) / 2
+    )
+    assert spec.UNDER_SLOT_WORST == pytest.approx(
+        spec.THICKNESS_MIN - spec.SLOT_DEPTH_MAX
+    )
+    # The cut is narrower than the O.D., and its span runs out past it.
+    assert 0.0 < spec.SLOT_WIDTH < spec.OD
+    assert spec.SLOT_SPAN > spec.OD
+    # Fork prongs fit beside the shank: the cut is narrower than the bore, so
+    # a ring of nut stands each side of the thread under the prongs.
+    assert spec.SLOT_WIDTH < spec.TAP_DRILL_DIA
+    assert spec.SLOT_DEPTH < spec.THICKNESS
+    assert spec.THICKNESS - spec.SLOT_DEPTH >= 1.5
+
+
+def test_tap_is_the_anchor_thread_through() -> None:
+    assert spec.THREAD == "#6-32"
+    assert spec.TAP_SPEC.kind == "tapped"
+    assert spec.TAP_SPEC.end == "through_all"
+    assert spec.TAP_DRILL_DIA == pytest.approx(TAP_DRILL_MM["#6-32"])
+    wizard = _calls_by_name(part.__file__)["wizard_holes"]
+    assert ast.unparse(wizard.args[1]) == "TAP_SPEC"
+    assert {k.arg: ast.unparse(k.value) for k in wizard.keywords}["name"] == (
+        "'ThreadBore'"
+    )
+
+
+def test_analytic_volume() -> None:
+    r, d = spec.OD / 2.0, spec.TAP_DRILL_DIA / 2.0
+    assert part.V_DISC == pytest.approx(math.pi * r**2 * spec.THICKNESS)
+    assert part.V_THREAD == pytest.approx(math.pi * d**2 * spec.THICKNESS)
+    # A full-width strip is the whole circle.
+    assert part._strip_area(r, r) == pytest.approx(math.pi * r**2)
+    assert 0.0 < part.V_SLOT < spec.SLOT_WIDTH * spec.OD * spec.SLOT_DEPTH
+    assert part.V_TOTAL == pytest.approx(part.V_DISC - part.V_THREAD - part.V_SLOT)
+
+
+def test_callouts_and_no_notes() -> None:
+    assert not hasattr(spec, "DRAWING_NOTES")
+    assert drawing.DIMENSION_CALLOUTS == {"SlotWidth": "SAW ACROSS"}
+    text = Path(drawing.__file__).read_text(encoding="utf-8").upper()
+    for banned in ("LOCTITE", "THREADLOCK", "NYLON", "EXCEPTION", "RULING"):
+        assert banned not in text
+
+
+def test_registry_row() -> None:
+    row = _config.parts("ch-anchor-jam-nut")
+    assert row["number"] == "MHA-CH-012"
+    assert row["title"] == "Channel Anchor Jam Nut"
+    assert int(row["quantity"]) == 20
+    assert "C36000" in str(row["material_specification"])
+    assert row["finish"]
+    assert row["process"]
+    assert part.MATERIAL == "Brass"
+
+
+def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> None:
+    import _drawing_marks
+    import _part_properties
+
+    required = ast.literal_eval(
+        next(
+            k.value
+            for k in _calls_by_name(drawing.__file__)[
+                "read_required_properties"
+            ].keywords
+            if k.arg == "required"
+        )
+    )
+    carried = dict(_part_properties.part_properties(part.PART_NAME))
+    build_calls = _calls_by_name(part.__file__)
+    stamp = build_calls["apply_drawing_properties"]
+    assert [ast.unparse(a) for a in stamp.args] == ["adapter", "PART_NAME"]
+    assert stamp.lineno < build_calls["save_part_and_images"].lineno
+    stamped: dict[str, str] = {}
+    monkeypatch.setattr(
+        _drawing_marks,
+        "apply_custom_properties",
+        lambda _adapter, props: stamped.update(props),
+    )
+    _drawing_marks.apply_drawing_properties(None, part.PART_NAME)
+    carried.update(stamped)
+    missing = [name for name in required if not str(carried.get(name) or "").strip()]
+    assert missing == []
+
+
+def test_no_finish_symbol_and_no_gdt() -> None:
+    names = set(_calls_by_name(drawing.__file__))
+    assert not names & {
+        "add_datum_feature",
+        "add_feature_control_frame",
+        "add_surface_finish_symbol",
+    }
+    assert spec.SURFACE_FINISHES == ()
+
+
+def test_spec_imports_no_com_or_drawing_modules() -> None:
+    code = (
+        "import sys, ch_anchor_jam_nut_spec\n"
+        "bad = sorted(m for m in sys.modules if m.startswith("
+        "('win32', 'pythoncom', 'pywintypes', 'solidworks_mcp', '_drawing', "
+        "'_com')))\n"
+        "print(','.join(bad))\n"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=Path(spec.__file__).parent,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert out.stdout.strip() == ""

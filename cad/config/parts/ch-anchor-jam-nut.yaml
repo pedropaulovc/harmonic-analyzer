@@ -1,0 +1,9 @@
+ch-anchor-jam-nut:
+  title: Channel Anchor Jam Nut
+  number: MHA-CH-012
+  material: Brass
+  material_specification: C36000 free-machining brass round bar
+  finish: bright machined, oiled
+  quantity: 20
+  tolerance_class: machined_block
+  process: "turned from bar (brass): turn the O.D., drill and tap #6-32 through, part off and face to thickness, saw the drive cut across the driven face"

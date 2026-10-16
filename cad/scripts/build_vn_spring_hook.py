@@ -1,18 +1,18 @@
 """Build the channel-spring lower anchor from McMaster 9489T111.
 
 Twenty of these routing eyebolts replace the old formed-wire J-hook. Each one
-threads DIRECTLY into a #6-32 tap through the summing lever's coefficient plate
-(``sm_summing_lever_spec.HOLE_SPEC``, sourced from this same anchor record) and the
-channel spring's lower eye links onto its eye. The SUPPLIED HEX NUT IS OMITTED:
-the tapped plate is the nut, so the production part is the bolt body alone.
+threads DOWN through a #6-32 tap in the summing lever's coefficient plate
+(``sm_summing_lever_spec.HOLE_SPEC``, sourced from this same anchor record) and
+the channel spring's lower eye links onto its eye. The SUPPLIED HEX NUT IS
+OMITTED: the anchor is locked by the separate MHA-CH-012 round jam nut
+(``ch_anchor_jam_nut_spec``) on the plate underside, so the production
+part is the bolt body alone.
 
-Two supplier options this production part takes -- the nut above and LENGTH: the
-vendor's 19.05 mm shank is cut back to the neck plus 3.4925 mm of engaged thread
-(``vn_spring_hook_spec.SHANK_LENGTH_MM``, 6.6675 mm) with the 45 deg deburr
-restored at the new end.  Instead of hanging 10.795 mm into the channel bank,
-the cut end stops 1/16 in (``PLATE_RECESS_MM``) inside the plate -- adjustment
-room for unscrewing each channel's anchor -- and the factory thread phase
-survives.
+Two supplier options this production part takes -- the nut above and LENGTH:
+the vendor's 19.05 mm shank is cut to ``vn_spring_hook_spec.SHANK_LENGTH_MM``
+with the 45 deg deburr restored at the new end, so the shank crosses the plate,
+carries the jam nut and still shows two full threads below it after the
+calibration back-out -- and the factory thread phase survives.
 
 The tracked diagnostic recipe is an exact geometric replay of the supplied
 vendor SLDPRT and stays in the vendor's own frame -- eye centre at the origin,
@@ -67,9 +67,9 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 ANCHOR = ANCHOR_9489T111
 
-# The vendor ships 9489T111 with a captive hex nut; the anchor threads straight
-# into the summing lever, so the nut is never installed and no nut geometry
-# belongs in the SLDPRT -- and the trim below would cut through its seat.
+# The vendor ships 9489T111 with a captive hex nut; it is discarded (the
+# MHA-CH-012 jam nut is its own part), so no nut geometry belongs in the
+# SLDPRT -- and the trim below would cut through its seat.
 NUT = "omitted"
 
 
