@@ -17,7 +17,7 @@ pair being set off the top frame.
 Explode (``EXPLODED_VIEW_NAME``): every channel alike, end hardware out along
 z on its own side, fasteners up out of their taps, the rods down off the
 arms, the bars (with the pins pressed in them) up off the rocker straps, the
-spring anchors down and the fulcrum shaft withdrawn north; the pivot shaft,
+spring anchors down and the fulcrum shaft withdrawn south; the pivot shaft,
 rockers, levers and springs stay put.
 """
 
@@ -159,10 +159,13 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # 50 east put bar 3 over the bank spring (r4 balloon pick, shared edge).
     ExplodeStep("bars up", (BAR, BAR_PIN), "y", 50.0),
     ExplodeStep("anchors down", (HOOK,), "y", -40.0),
-    # Withdrawn north past the north keeper: in place only its 10 mm tips
-    # stand clear of the lever hubs, under 1.5 mm at 1:7, and its balloon
-    # landed on lever 20's ink (r4 balloon pick, shared edge).
-    ExplodeStep("fulcrum shaft out north", (FULCRUM_SHAFT,), "z", 120.0),
+    # Withdrawn past a keeper: in place only its 10 mm tips stand clear of the
+    # lever hubs, under 1.5 mm at 1:7, and its balloon landed on lever 20's
+    # ink (r4 balloon pick, shared edge). South, not north: withdrawn north its
+    # balloon joined the lever-bank cluster at the top of the view and the ring
+    # crossed leaders 2/17 and 8/10 (r6 layout audit); south it attaches out at
+    # the right, which a replay of the r6 ring places clear of every leader.
+    ExplodeStep("fulcrum shaft out south", (FULCRUM_SHAFT,), "z", -120.0),
 )
 EXPLODED_STEMS = frozenset(stem for step in EXPLODE_STEPS for stem in step.stems)
 
