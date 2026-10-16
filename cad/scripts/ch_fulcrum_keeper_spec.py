@@ -271,11 +271,14 @@ CROWN_MOST_R = CROWN_R + _CROWN_R_HALF_BAND  # 7.4
 # alone leaves too little: off the least round at 0.4 + 0.51 (.XX) the tap
 # keeps 1.43D, at the old 0.4 + 0.8 (.X) 1.38D. So the print holds the bore
 # on the width's centre plane, within +-BORE_CENTRE_BAND_MM
-# (BORE_CENTRE_CALLOUT on the (7.0) reference station), and the crown tap's
-# stack below spends exactly that offset: it keeps 1.5D up to +-0.37.
+# (BORE_CENTRE_CALLOUT on the (7.0) reference station, naming the MHA-VN-055
+# set screw whose full thread the band keeps: MR-fleet r10 read a bare "crown
+# tap depth" as no mate), and the crown tap's stack below spends exactly that
+# offset: it keeps 1.5D up to +-0.37.
 BORE_CENTRE_BAND_MM = 0.3
 BORE_CENTRE_CALLOUT = (
-    f"ON WIDTH CENTER \u00b1{BORE_CENTRE_BAND_MM:.1f},\nHOLDS CROWN TAP DEPTH"
+    f"ON WIDTH CENTER \u00b1{BORE_CENTRE_BAND_MM:.1f},\n"
+    "HOLDS MHA-VN-055\nTHREAD ENGAGEMENT"
 )
 
 

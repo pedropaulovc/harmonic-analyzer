@@ -197,8 +197,10 @@ def test_overall_sizes_print_as_references_and_the_bore_centred_on_the_width() -
     assert spec.DRAWING_PRECISION["BoreSideReference"] == {"BoreFromSide": 1}
     assert spec.BORE_FROM_SIDE == spec.KEEPER_WIDTH / 2.0
     assert spec.BORE_CENTRE_BAND_MM == 0.3
-    assert (
-        spec.BORE_CENTRE_CALLOUT == "ON WIDTH CENTER \u00b10.3,\nHOLDS CROWN TAP DEPTH"
+    # MR-fleet r10: the band names its mate (rule 4), the set screw whose full
+    # thread it keeps.
+    assert spec.BORE_CENTRE_CALLOUT == (
+        "ON WIDTH CENTER \u00b10.3,\nHOLDS MHA-VN-055\nTHREAD ENGAGEMENT"
     )
     assert drawing.DIMENSION_CALLOUTS["BoreFromSide"] is spec.BORE_CENTRE_CALLOUT
     assert spec.DRAWING_PRECISION["OverallHeightReference"] == {"OverallHeight": 1}
@@ -621,11 +623,12 @@ def test_end_view_callouts_stand_clear_of_the_part_and_each_other() -> None:
             assert _segment_crossing(leader, line) is None, (name, line)
     # The width stands under the foot, its text clear of the outline.
     assert blocks["Depth"].ymax <= bottom - _AIR
-    # The bore's (7.0) station stands above the crown, over the sheet-right
-    # side face, clear of the crown block and leader.
+    # The bore's (7.0) station stands above the crown, wholly right of the
+    # sheet-right side face (MR-fleet r10: centred over the span, both
+    # extension lines struck its last row), clear of the crown block and leader.
     bore_side = blocks["BoreFromSide"]
     assert bore_side.ymin >= bottom + spec.CROWN_TOP_Y * scale + _AIR
-    assert cx < keep["BoreFromSide"][0] < cx + half + 0.005
+    assert bore_side.xmin >= cx + half + 0.003
     assert segment_box_distance(leaders["CrownRadius"], bore_side) >= 0.003
 
 

@@ -165,8 +165,8 @@ FOOT_HOLE_PROCESS = "DRILL\n"
 # is then rounded, a full round tangent to both sides at the bore's height:
 # bench instructions of the pair-ream step, so each rides its own dimension.
 # The bore's (7.0) reference station off the side face states its place on
-# the width's centre plane and why it is held there (owner ruling Q10-B: the
-# crown tap's depth under the full round).
+# the width's centre plane and the part it holds there for (owner ruling
+# Q10-B: the MHA-VN-055 set screw's full thread under the full round).
 _PAIR_REAM_STEP = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
 DIMENSION_CALLOUTS = {
     "BoreDia": f"{BORE_PAIR_CALLOUT},\nPER {_PAIR_REAM_STEP}",
@@ -253,13 +253,14 @@ RIGHT_KEEP = {
     "LugRise": (0.196, 0.126),
     "CrownRadius": (0.168, 0.180),
     "BoreDia": (0.304, 0.1225),
-    # Above the crown, right of the crown block (the 3.000's precedent: a
-    # horizontal dimension's block centres on its requested point, the
-    # dimension line under its last row): its three rows are wider than the
-    # 14 mm span, so the block sits over the sheet-right side face, ~8 mm
-    # right of the crown block and ~10 mm over the crown top, clear of the
-    # crown leader, which leaves the arc up-left.
-    "BoreFromSide": (0.243, 0.180),
+    # Above the crown and wholly right of the sheet-right side face (the
+    # 7.000's precedent in the plan: a horizontal dimension's block centres on
+    # its requested point, the dimension line under its last row running in
+    # from the extension lines). MR-fleet r10: centred over the span, both
+    # extension lines ran up into the last row; out here they stop on the
+    # dimension line clear of the text, ~10 mm over the crown top and ~11 mm
+    # left of the isometric.
+    "BoreFromSide": (0.273, 0.182),
 }
 NEAR_SIDE_DIAMETERS = ("BoreDia",)
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
