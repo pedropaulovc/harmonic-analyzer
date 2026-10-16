@@ -223,6 +223,13 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Zinc-Plated Steel Narrow-Profile Hex Nut",
         "90760A009",
     ),
+    # Thin zinc-plated steel #10-24 nut jammed against the MHA-SM-003 boss
+    # top face, locking the MHA-VN-001 counter anchor.
+    "vn-boss-hook-jam-nut": _stock(
+        "vn-boss-hook-jam-nut",
+        "Zinc-Plated Steel Narrow-Profile Hex Nut",
+        "90760A140",
+    ),
     # The four platen-clip screws: brass #2-56 x 1/4, whose head stays inside
     # the clip's rail where the MHA-VN-006 #4-40 head would overhang.  A pan
     # head (2026-10-15): the 90114A124 fillister's least head left 0.05 mm of

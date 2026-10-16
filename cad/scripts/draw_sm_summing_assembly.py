@@ -183,6 +183,7 @@ PART_ROWS = {
     "vn-knife-mount-dowel": _config.parts("vn-knife-mount-dowel"),
     "sm-summing-lever": _config.parts("sm-summing-lever"),
     "vn-boss-hook": _config.parts("vn-boss-hook"),
+    "vn-boss-hook-jam-nut": _config.parts("vn-boss-hook-jam-nut"),
     "vn-counter-spring": _config.parts("vn-counter-spring"),
     "sm-gooseneck": _config.parts("sm-gooseneck"),
     "sm-gooseneck-spring-screw": _config.parts("sm-gooseneck-spring-screw"),

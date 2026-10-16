@@ -1370,6 +1370,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_boss_hook_jam_nut",
+        part="vn_boss_hook_jam_nut",
+        artifact_stem="vn-boss-hook-jam-nut",
+        script_name="draw_vn_boss_hook_jam_nut.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_post_mount_screw",
         part="vn_post_mount_screw",
         artifact_stem="vn-post-mount-screw",
