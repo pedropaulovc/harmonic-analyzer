@@ -83,6 +83,20 @@ def test_exploded_octant_faces_the_set_screw_tap_and_explodes_along_it() -> None
     assert length > v_block.SET_SCREW_TAP_LENGTH + 2 * rod_set_screw.LENGTH
 
 
+def test_wire_explodes_up_then_straight_to_the_sheet_left() -> None:
+    moves = [0.0, 0.0, 0.0]
+    for _label, stems, key, distance in spec.EXPLODE_STEPS:
+        if stems == (spec.WIRE,):
+            moves["xyz".index(key)] += distance
+    sx, _sy, sz = spec.EXPLODED_OCTANT
+    # The octant view's sheet-right is (sz, 0, -sx); the aside pair runs
+    # against it with no out-of-plane part.
+    assert moves[1] > 0.0
+    assert moves[0] * sz + moves[2] * -sx < 0.0
+    assert moves[0] * -sx + moves[2] * -sz == 0.0
+    assert drawing.BALLOON_ANCHORS[spec.WIRE].point_mm is not None
+
+
 def test_every_setting_is_printed_with_a_callout_beside_its_detail() -> None:
     printed = {
         name for points in drawing.DIMENSION_TEXT_POINTS.values() for name in points
