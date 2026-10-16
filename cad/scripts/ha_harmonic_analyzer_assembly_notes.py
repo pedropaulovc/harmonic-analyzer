@@ -12,6 +12,7 @@ from __future__ import annotations
 import dt_drive_train_steps
 import ha_harmonic_analyzer_assembly_steps as steps
 import pd_paper_drive_assembly_steps as pd_steps
+import vn_spring_hook_spec
 from ha_harmonic_analyzer_assembly_spec import (
     BAR_HEIGHT_DIMENSION,
     BOM_ORDER,
@@ -72,7 +73,6 @@ SETTING_CALLOUTS = {
 }
 
 # --- Fitter package text ----------------------------------------------------
-THREADLOCKER = "LOCTITE 243 (BLUE, REMOVABLE MEDIUM-STRENGTH)"
 CHANNEL_ANCHORS = 20
 
 
@@ -98,14 +98,12 @@ _STEP_TEXT: dict[str, str] = {
         "CHANNEL BANK: BUILD MHA-CH-000 COMPLETE ON THE FRAME PER ITS STEPS. "
         "EACH MHA-VN-004 SPRING HANGS FROM ITS LEVER WITH ITS BOTTOM LOOP FREE."
     ),
+    # The anchor's install and jam-nut lock are the anchor spec's own text
+    # (vn_spring_hook_spec, owned with the part), printed here unforked.
     "channel-anchors-set": (
         f"CHANNEL ANCHORS ({CHANNEL_ANCHORS} OFF): DISCARD THE HEX NUT SUPPLIED "
-        f"WITH EACH MHA-VN-012. WET THE THREAD WITH {THREADLOCKER}. RUN IT DOWN "
-        "ITS #6-32 TAP IN THE MHA-SM-003 PLATE UNTIL THE NECK SEATS ON THE "
-        "PLATE TOP, THEN BACK IT OUT NO MORE THAN 1 TURN (CHANNEL PRELOAD) TO "
-        "CLOCK THE EYE INTO ITS SPRING'S PULL PLANE. HOOK THE SPRING'S BOTTOM "
-        "LOOP INTO THE EYE. "
-        "CURE 24 H BEFORE THE MACHINE IS RUN."
+        f"WITH EACH MHA-VN-012. {vn_spring_hook_spec.ANCHOR_INSTALL_STEP} "
+        "HOOK THE SPRING'S BOTTOM LOOP INTO THE EYE."
     ),
     "summing-levelled": (
         "GOOSENECK AND LEVEL, PER MHA-SM-000 FINAL-ASSEMBLY STEPS: DROP THE "
@@ -175,8 +173,7 @@ ASSEMBLY_STEPS: tuple[str, ...] = tuple(
 ASSEMBLY_CHECKS: tuple[str, ...] = (
     "1. THE SHEET 1 BAR TOP AND STUD DROP READ AS DIMENSIONED; A "
     f"{NIB_CLEARANCE_TEXT} FEELER JUST DRAGS BETWEEN NIB AND PAPER.",
-    f"2. ALL {CHANNEL_ANCHORS} ANCHOR EYES STAND IN THEIR SPRINGS' PULL PLANES; "
-    "NO NECK STANDS MORE THAN 1 TURN OFF THE PLATE TOP.",
+    f"2. {vn_spring_hook_spec.ANCHOR_INSTALL_CHECK}",
     "3. WITH EVERY CHANNEL AMPLITUDE AT ZERO THE PLATE TOP READS LEVEL, AND "
     "TWO CRANK TURNS DRAW A STRAIGHT LINE ALONG THE PAPER.",
     "4. THROUGH TWO CRANK TURNS NOTHING BINDS OR RUBS, THE CHAIN STAYS ON BOTH "
