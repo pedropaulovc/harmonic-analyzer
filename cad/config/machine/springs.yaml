@@ -6,6 +6,11 @@
 # as interference. Where it starts succeeding scatters ~6e-7 mm between a fixture
 # and the mated assembly and ~2.3e-6 mm between rebuilds of the same swept spring,
 # so 6e-6 mm clears the measured scatter ~2.6x over.
+# 2026-10-16 (#1189): both counter records moved +3.836 mm in Y with the
+# MHA-VN-001 anchor, which now stands its jam-nut thread above the boss. The
+# whole counter stack (anchor, spring, gooseneck, screw) translates rigidly,
+# so every measured contact is unchanged; the summing assembly's native
+# contact gates re-certify both seats.
 # channels.yaml must exactly match a preset vector below. Custom stations require
 # new native calibration; builds never interpolate or search for a replacement.
 springs:
@@ -253,18 +258,18 @@ springs:
           length_mm: 349.69443255435453
           lower_eye_xy:
           - -91.19999999999999
-          - 1006.5068723439737
+          - 1010.3428723439737
           upper_eye_xy:
           - -91.2
-          - 1346.7017048983282
+          - 1350.5377048983282
           axis_xy:
           - -4.075529156905491e-17
           - 1.0
           centre_xy:
           - -91.19999999999999
-          - 1176.604288621151
+          - 1180.440288621151
           clocking: half_turn
-        gooseneck_origin_y_mm: 1186.3943698792273
+        gooseneck_origin_y_mm: 1190.2303698792273
         upper_support:
           component: sm-gooseneck-spring-screw
           number: MHA-SM-004
@@ -315,18 +320,18 @@ springs:
           length_mm: 350.26532759098535
           lower_eye_xy:
           - -91.19999999999999
-          - 1006.5068723439896
+          - 1010.3428723439896
           upper_eye_xy:
           - -91.2
-          - 1347.272599934975
+          - 1351.108599934975
           axis_xy:
           - -4.068867326056483e-17
           - 1.0
           centre_xy:
           - -91.19999999999999
-          - 1176.8897361394822
+          - 1180.7257361394823
           clocking: half_turn
-        gooseneck_origin_y_mm: 1186.965264915858
+        gooseneck_origin_y_mm: 1190.801264915858
         upper_support:
           component: sm-gooseneck-spring-screw
           number: MHA-SM-004

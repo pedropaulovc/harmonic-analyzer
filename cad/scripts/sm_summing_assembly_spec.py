@@ -31,6 +31,7 @@ HANGER_BOLT = "vn-knife-hanger-stud"
 DOWEL = "vn-knife-mount-dowel"
 LEVER = "sm-summing-lever"
 BOSS_HOOK = "vn-boss-hook"
+BOSS_JAM_NUT = "vn-boss-hook-jam-nut"
 COUNTER_SPRING = "vn-counter-spring"
 GOOSENECK = "sm-gooseneck"
 SPRING_SCREW = "sm-gooseneck-spring-screw"
@@ -44,6 +45,7 @@ QUANTITIES = {
     DOWEL: 4,
     LEVER: 1,
     BOSS_HOOK: 1,
+    BOSS_JAM_NUT: 1,
     COUNTER_SPRING: 1,
     GOOSENECK: 1,
     SPRING_SCREW: 1,
@@ -58,6 +60,7 @@ BOM_DESCRIPTIONS = {
     DOWEL: "1/8 DOWEL PIN",
     LEVER: "SUMMING LEVER",
     BOSS_HOOK: "#10-24 OPEN EYEBOLT, TRIMMED",
+    BOSS_JAM_NUT: "#10-24 THIN HEX JAM NUT",
     COUNTER_SPRING: "COUNTER SPRING",
     GOOSENECK: "COUNTER-SPRING GOOSENECK",
     SPRING_SCREW: "GOOSENECK SPRING SCREW",
@@ -68,10 +71,12 @@ if set(BOM_DESCRIPTIONS) != set(QUANTITIES):
 # --- Native explode (SM_EXPLODED) ---------------------------------------------
 # ASSEMBLY_STEPS read back to front: the gooseneck and its screw lift off the
 # spring, the screw backs out of the plug, the spring lifts off the boss hook
-# and the hook unscrews from the lever boss; then each knife-mount station
-# (mount, its two dowels, its washer and bolt) slides off its hex trunnion
-# along Z, the bolts and washers lift, the bolts clear their washers and the
-# dowels leave their mounts. (label, families, station, axis, signed mm):
+# and the hook unscrews from the lever boss, its jam nut left standing between
+# the cut end and the boss (the nut goes on from the cut end before the hook
+# enters the boss); then each knife-mount station (mount, its two dowels, its
+# washer and bolt) slides off its hex trunnion along Z, the bolts and washers
+# lift, the bolts clear their washers and the dowels leave their mounts.
+# (label, families, station, axis, signed mm):
 # ``station`` "front"/"back" moves only the instances at +Z/-Z of the lever
 # centre plane, None every instance; all along the assembly's global axes.
 # Sized for the drawing's *Isometric (it looks from +X+Y+Z): each mount clears
@@ -82,10 +87,11 @@ SOURCE_CONFIGURATION = "Default"
 STATIONS = ("front", "back")
 _STATION_FAMILIES = (KNIFE_MOUNT, DOWEL, HANGER_WASHER, HANGER_BOLT)
 EXPLODE_STEPS: tuple[tuple[str, tuple[str, ...], str | None, str, float], ...] = (
-    ("gooseneck lifts", (GOOSENECK, SPRING_SCREW), None, "y", 70.0),
+    ("gooseneck lifts", (GOOSENECK, SPRING_SCREW), None, "y", 80.0),
     ("spring screw backs out", (SPRING_SCREW,), None, "x", 35.0),
-    ("counter spring lifts off hook", (COUNTER_SPRING,), None, "y", 45.0),
-    ("boss hook unscrews", (BOSS_HOOK,), None, "y", 25.0),
+    ("counter spring lifts off hook", (COUNTER_SPRING,), None, "y", 55.0),
+    ("boss hook unscrews", (BOSS_HOOK,), None, "y", 35.0),
+    ("jam nut lifts off boss", (BOSS_JAM_NUT,), None, "y", 6.0),
     ("front station slides off", _STATION_FAMILIES, "front", "z", 45.0),
     ("back station slides off", _STATION_FAMILIES, "back", "z", -45.0),
     ("hanger bolts and washers lift", (HANGER_WASHER, HANGER_BOLT), None, "y", 40.0),
@@ -184,10 +190,12 @@ ASSEMBLED_NOTES = (
 ASSEMBLY_STEPS = (
     "1. PRESS TWO MHA-VN-051 DOWELS, CHAMFER END FIRST, INTO THE TOP-SEAT "
     "HOLES OF EACH MHA-SM-002 KNIFE MOUNT, EACH TO THE HOLE FLOOR.",
-    "2. THREAD MHA-VN-001 INTO THE TAPPED BOSS OF MHA-SM-003 WITH REMOVABLE "
-    "MEDIUM-STRENGTH THREADLOCKER UNTIL ITS CUT END IS WITHIN HALF A TURN OF "
-    "FLUSH WITH THE BOSS UNDERSIDE, FINISHING WITH THE EYE OPENING TOWARD THE "
-    "KNIFE EDGE AND THE EYE PLANE SQUARE TO IT.",
+    "2. SPIN THE MHA-VN-070 JAM NUT ONTO MHA-VN-001 FROM ITS CUT END UP TO THE "
+    "EYE. THREAD MHA-VN-001 INTO THE TAPPED BOSS OF MHA-SM-003 UNTIL ITS CUT "
+    "END IS WITHIN HALF A TURN OF FLUSH WITH THE BOSS UNDERSIDE, FINISHING "
+    "WITH THE EYE OPENING TOWARD THE KNIFE EDGE AND THE EYE PLANE SQUARE TO IT. "
+    "RUN THE JAM NUT DOWN TO THE BOSS TOP FACE AND, HOLDING THE EYE CLOCKED, "
+    "TIGHTEN IT. NO THREADLOCKER.",
     "3. SLIDE ONE MHA-SM-002 ONTO EACH HEX TRUNNION OF MHA-SM-003 FROM ITS "
     "OUTER END, DOWELS UP, SO THE TOP RIDGE OF THE HEX RESTS UNDER THE TOP OF "
     "THE BORE.",
@@ -224,6 +232,8 @@ ASSEMBLY_CHECKS = (
     "3. THE UPPER LOOP OF MHA-VN-005 CANNOT SWIVEL ON MHA-SM-004.",
     f"4. AFTER STEP 9 THE LEVER PLATE TOP READS {LEVEL_CRITERION} AND THE "
     "GOOSENECK POST DOES NOT TURN OR SLIDE IN ITS HUB.",
+    "5. THE EYE OF MHA-VN-001 CANNOT BE TURNED BY HAND: MHA-VN-070 IS TIGHT ON "
+    "THE BOSS TOP FACE.",
 )
 
 assert 0.0 < COUNTER_SCREW_RISE, COUNTER_SCREW_RISE

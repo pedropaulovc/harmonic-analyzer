@@ -192,12 +192,14 @@ def test_new_washers_add_two_instances_to_the_thirteen_component_recipe() -> Non
         "vn-knife-mount-dowel": 4,
         "sm-summing-lever": 1,
         "vn-boss-hook": 1,
+        "vn-boss-hook-jam-nut": 1,
         "vn-counter-spring": 1,
         "sm-gooseneck": 1,
         "sm-gooseneck-spring-screw": 1,
     }
-    assert sum(counts.values()) == 15
-    assert sum(counts.values()) - counts["vn-knife-hanger-washer"] == 13
+    assert sum(counts.values()) == 16
+    added = counts["vn-knife-hanger-washer"] + counts["vn-boss-hook-jam-nut"]
+    assert sum(counts.values()) - added == 13
 
 
 def test_washer_seat_pairs_allow_exact_contacts_but_no_solid_overlap() -> None:

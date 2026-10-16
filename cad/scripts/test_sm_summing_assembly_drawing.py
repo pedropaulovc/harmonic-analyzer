@@ -166,7 +166,14 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert rows["sm-summing/knife-hanger-in-mount"].installed_at == "MHA-SM-000 STEP 5"
     assert rows["sm-summing/boss-hook-in-lever"].installed_at == "MHA-SM-000 STEP 2"
     assert rows["sm-summing/gooseneck-spring-screw"].installed_at == "MHA-SM-000 STEP 7"
+    hook = rows["sm-summing/boss-hook-in-lever"]
+    assert hook.lock is joint_retention.Lock.JAM_NUT
+    assert hook.lock_part == "vn_boss_hook_jam_nut"
+    assert hook.lock_step == "MHA-SM-000 STEP 2"
+    nut = rows["sm-summing/boss-hook-jam-nut-on-hook"]
+    assert nut.installed_at == "MHA-SM-000 STEP 2"
     steps = {line.split(".", 1)[0]: line for line in spec.ASSEMBLY_STEPS}
     assert "MHA-VN-024" in steps["5"] and "THREADLOCKER" in steps["5"]
-    assert "MHA-VN-001" in steps["2"] and "THREADLOCKER" in steps["2"]
+    assert "MHA-VN-001" in steps["2"] and "MHA-VN-070" in steps["2"]
+    assert "NO THREADLOCKER" in steps["2"]
     assert "MHA-SM-004" in steps["7"] and "NO THREADLOCKER" in steps["7"]

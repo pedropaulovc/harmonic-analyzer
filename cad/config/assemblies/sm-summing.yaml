@@ -23,13 +23,16 @@ flip_invert:
 allowed_free_stems:
   - sm-summing-lever
   - vn-boss-hook
-# One freed DOF (the lever knife-edge rock); the lock-mated boss-hook must
-# read under-constrained WITH it (a grounded/fixed regression would freeze
-# the counter-spring anchor while the lever still swings, codex #201).
+  - vn-boss-hook-jam-nut
+# One freed DOF (the lever knife-edge rock); the lock-mated boss-hook and
+# its jam nut must read under-constrained WITH it (a grounded/fixed
+# regression would freeze the counter-spring anchor while the lever still
+# swings, codex #201).
 # The made MHA-SM-004 spring screw is locked to the fixed gooseneck; its
 # head clamps the upper eye to the plug and adds no operational freedom.
 required_free_stems:
   - sm-summing-lever
   - vn-boss-hook
-# The freed lever knife-edge rock; the boss-hook is lock-mated and rides it.
+  - vn-boss-hook-jam-nut
+# The freed lever knife-edge rock; the boss-hook and jam nut ride it locked.
 free_dof: 1
