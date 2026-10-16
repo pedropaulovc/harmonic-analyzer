@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import _telemetry
+import ha_harmonic_analyzer_assembly_notes as notes
 import ha_harmonic_analyzer_assembly_spec as spec
 from _assembly_contract import assembly_contract
 from _check import check
@@ -160,14 +161,14 @@ STEPS_VIEW_CENTER = (0.390, 0.170)
 
 BOM_COMPONENTS = spec.BOM_ORDER
 BOM_PART_NUMBERS = {stem: assembly_contract(stem).number for stem in BOM_COMPONENTS}
-BOM_DESCRIPTIONS = dict(spec.BOM_DESCRIPTIONS)
+BOM_DESCRIPTIONS = dict(notes.BOM_DESCRIPTIONS)
 if max(len(text) for text in BOM_DESCRIPTIONS.values()) > BOM_DESCRIPTION_MAX_CHARS:
     raise AssertionError("a BOM description outgrows its column")
 BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
-BALLOON_ANCHORS = {part: BalloonAnchor() for part in spec.BALLOON_PARTS.values()}
+BALLOON_ANCHORS = {part: BalloonAnchor() for part in notes.BALLOON_PARTS.values()}
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: spec.EXPLODED_VIEW_NAME,
@@ -196,19 +197,19 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
 
 ASSEMBLED_NOTE = _wrapped(
     (
-        spec.ORIENTATION_NOTE,
+        notes.ORIENTATION_NOTE,
         f"INTEGRATION STEPS ON SHEET {SHEET_NAMES.index('INTEGRATION STEPS') + 1}.",
     ),
     width=ASSEMBLED_NOTE_WIDTH,
 )
 STEPS_LEFT = _wrapped(
-    spec.ASSEMBLY_STEPS[:STEPS_SPLIT],
+    notes.ASSEMBLY_STEPS[:STEPS_SPLIT],
     width=STEPS_LINE_WIDTH,
     heading="INTEGRATION SEQUENCE",
 )
-STEPS_RIGHT = _wrapped(spec.ASSEMBLY_STEPS[STEPS_SPLIT:], width=STEPS_LINE_WIDTH)
+STEPS_RIGHT = _wrapped(notes.ASSEMBLY_STEPS[STEPS_SPLIT:], width=STEPS_LINE_WIDTH)
 ASSEMBLY_CHECKS = _wrapped(
-    spec.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH, heading="CHECKS BEFORE RUNNING"
+    notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH, heading="CHECKS BEFORE RUNNING"
 )
 CHECKS_XY = (
     STEPS_RIGHT_X,
@@ -520,7 +521,7 @@ def _add_setting_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
             )
         if int(display.GetPrimaryPrecision2()) != spec.SETTING_PRECISION:
             raise RuntimeError(f"{name}: precision did not persist")
-        callout = spec.SETTING_CALLOUTS[name]
+        callout = notes.SETTING_CALLOUTS[name]
         display.SetText(_CALLOUT_BELOW, callout)
         if str(display.GetText(_CALLOUT_BELOW) or "") != callout:
             raise RuntimeError(f"{name}: callout did not persist")
@@ -534,7 +535,7 @@ def _add_setting_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
                 raise RuntimeError(f"{name}: settled value {measured:g} mm changed")
             if (
                 str(display.GetText(_CALLOUT_BELOW) or "")
-                != spec.SETTING_CALLOUTS[name]
+                != notes.SETTING_CALLOUTS[name]
             ):
                 raise RuntimeError(f"{name}: settled callout changed")
 
@@ -659,7 +660,7 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     landings = add_component_bom_balloons(
         adapter,
         exploded,
-        items=tuple((spec.BALLOON_PARTS[stem], item) for stem, item in rows),
+        items=tuple((notes.BALLOON_PARTS[stem], item) for stem, item in rows),
         anchors=BALLOON_ANCHORS,
         label="complete-machine exploded-view BOM coverage",
         margin=BALLOON_MARGIN,
@@ -672,7 +673,7 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     _add_note_block(
         adapter,
         name,
-        spec.EXPLODED_CAPTION,
+        notes.EXPLODED_CAPTION,
         EXPLODED_CAPTION_XY,
         label="exploded caption",
     )
@@ -826,10 +827,10 @@ async def build(adapter: Any) -> dict[str, str]:
         ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
         required=("Number", "Revision", "Material Specification", "Finish", "Quantity"),
     )
-    if properties["Number"] != spec.DRAWING_NUMBER:
+    if properties["Number"] != notes.DRAWING_NUMBER:
         raise RuntimeError(
             f"complete-machine source Number {properties['Number']!r} != "
-            f"{spec.DRAWING_NUMBER!r}"
+            f"{notes.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
 
