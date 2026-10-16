@@ -59,6 +59,7 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
 )
 from _drawing_view_display import set_hidden_lines_removed
+from _named_views import octant_view_name
 from _simplified_names import simplified_name
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -316,27 +317,34 @@ BOM_NORMALIZED_ALIASES = {
 }
 # Every family is one separated body on the exploded view: each balloon walks
 # its own part for a visible edge, except two pinned off the stack the stud,
-# its jam nut and the rod's top make in the isometric. There the three walked
+# its jam nut and the rod's top make in the pictorial. There the three walked
 # attachments sat within 2 mm of one sheet bearing at different radii, so
 # leaders 2/9 and 8/9 crossed (farm run 20261016T061511876Z). The rod's
-# balloon takes the near vertical corner of its square low down (part mm:
-# square x, z +-S/2, y up from the shoulder); the stud's the sheet-rightmost
-# point of its head's top edge (revolved about +Y, iso sheet-right = +X -Z).
+# balloon takes the vertical corner of its square nearest the viewer, low down
+# (part mm: square x, z +-S/2, y up from the shoulder; the rod is placed
+# unrotated); the stud's the sheet-rightmost point of its head's top edge
+# (revolved about +Y; the octant's sheet-right is (sz, 0, -sx)).
+_OCTANT_X, _, _OCTANT_Z = spec.EXPLODED_OCTANT
 _ROD_ANCHOR_Y = 40.0
 _HEAD_R = stud.HEAD_DIA / 2.0
 BALLOON_ANCHORS = {
     **{stem: BalloonAnchor() for stem in BOM_COMPONENTS},
     spec.ROD: BalloonAnchor(
-        point_mm=(rod.ROD_SECTION / 2.0, _ROD_ANCHOR_Y, rod.ROD_SECTION / 2.0)
+        point_mm=(
+            _OCTANT_X * rod.ROD_SECTION / 2.0,
+            _ROD_ANCHOR_Y,
+            _OCTANT_Z * rod.ROD_SECTION / 2.0,
+        )
     ),
     spec.STUD: BalloonAnchor(
         point_mm=(
-            _HEAD_R * math.sqrt(0.5),
+            _OCTANT_Z * _HEAD_R * math.sqrt(0.5),
             stud.OVERALL_LENGTH,
-            -_HEAD_R * math.sqrt(0.5),
+            -_OCTANT_X * _HEAD_R * math.sqrt(0.5),
         )
     ),
 }
+EXPLODED_ORIENTATION = octant_view_name(*spec.EXPLODED_OCTANT)
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: spec.EXPLODED_VIEW_NAME,
@@ -987,7 +995,11 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     label = "pen exploded"
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
-        adapter, str(SOURCE), "*Isometric", *EXPLODED_ISO_CENTER, scale=SHEET_SCALE
+        adapter,
+        str(SOURCE),
+        EXPLODED_ORIENTATION,
+        *EXPLODED_ISO_CENTER,
+        scale=SHEET_SCALE,
     )
     set_high_quality_shaded_with_edges(adapter, exploded, label=label)
     # Configuration, then its own explode, then the BOM and balloons bind.
