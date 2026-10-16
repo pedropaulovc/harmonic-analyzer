@@ -49,16 +49,17 @@ ROD_STATION = 5.0  # free end to the rod-bore axis
 FREE_END_X = -ROD_STATION
 HEX_LENGTH = 11.0  # free end to the shoulder
 SHOULDER_X = FREE_END_X + HEX_LENGTH
-# Long enough that both groove lips hold the 2.0 wall target at the worst
-# case of the printed bands (mg_output_fixture_spec.WALLS).
+# Long enough that the groove's face-side lip and its root over the tap hold
+# the floor at the worst case of the printed bands
+# (mg_output_fixture_spec.WALLS states each one the target cannot reach).
 SPIGOT_LENGTH = 6.7
 SPIGOT_FACE_X = SHOULDER_X + SPIGOT_LENGTH
 OVERALL_LENGTH = HEX_LENGTH + SPIGOT_LENGTH
 
 # --- Rod bore: across the corners, along local Y, through the hex axis --------
-# Centred between the flats: the sheet states the centring and the wall it
-# must leave (mg_output_fixture_spec), not a location from one flat.
-ROD_BORE_DIA = 5.2  # a slip fit on the Ø5 vertical rod
+# Centred between the flats: the sheet states the wall it must leave
+# (mg_output_fixture_spec), not a location from one flat.
+ROD_BORE_DIA = 5.2  # drilled: running clearance on the Ø5 vertical rod
 
 # --- Spigot and its full-radius wire groove ------------------------------------
 SPIGOT_DIA = 9.0
