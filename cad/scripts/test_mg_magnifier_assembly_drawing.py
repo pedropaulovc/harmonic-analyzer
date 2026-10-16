@@ -398,6 +398,8 @@ def test_the_wire_is_tied_in_the_rest_state_with_both_ends_secured() -> None:
     assert "TIE 1" in tied and "6 O'CLOCK" in tied
     for text in (hooked, tied):
         assert "AT LEAST THREE TURNS" in text
+        # Machinist review r5: the spool wire's tails are trimmed once twisted.
+        assert "TRIM THE TAIL" in text
     # The wrap check stands on the wheel group's proven wrap margin.
     assert mg_wheel_group.LEVER_WIRE_WRAP_LEFT_DEG >= mg_wheel_group.WRAP_MARGIN_DEG
     assert any("SHORT OF TIE 1" in check for check in stack.ASSEMBLY_CHECKS)
