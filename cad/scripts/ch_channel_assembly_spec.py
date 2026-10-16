@@ -142,7 +142,9 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("south washer out", (WASHER,), "z", -20.0, "south"),
     ExplodeStep("north washer out", (WASHER,), "z", 20.0, "north"),
     ExplodeStep("rods down", (ROD,), "y", -50.0),
-    ExplodeStep("bars west", (BAR, BAR_PIN), "x", -50.0),
+    # East, not west: 50 west put each bar (pin x 72.9) on its own spring's
+    # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick).
+    ExplodeStep("bars east", (BAR, BAR_PIN), "x", 50.0),
     ExplodeStep("anchors down", (HOOK,), "y", -40.0),
 )
 EXPLODED_STEMS = frozenset(stem for step in EXPLODE_STEPS for stem in step.stems)
