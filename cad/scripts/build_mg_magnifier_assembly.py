@@ -23,7 +23,10 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
   wheel rim drives the pen rod via WIRE 2 (pn-pen.SLDASM).
   Its two assembly settings, the press gauge and the endshake, are model
   dimensions of a blanked construction chain (mg_magnifier_assembly_spec)
-  that the MHA-MG-000 sheet prints.
+  that the MHA-MG-000 sheet prints; a second blanked chain carries the lever
+  group's clamp station and fixture drop. The named explode the MHA-MG-000
+  exploded sheets show (MG_MAGNIFIER_EXPLODED) is authored here too
+  (_mg_magnifier_explode).
 * lever-wire -- WIRE 1's straight rest-pose run from the output fixture's
   spigot groove (in the rod's plane) down to the drum tangent. It ARTICULATES like the real wire: a
   ball joint at the hook (HookPoint on the wire coincident to the fixture's
@@ -93,6 +96,7 @@ from _assembly import (
     activate_assembly_contract,
     angle_driver,
     assembly_title_properties,
+    author_in_drawing_configurations,
     assert_component_placed,
     assert_free_dof_necessity,
     check_no_interference,
@@ -114,7 +118,7 @@ from _assembly_patterns import (
     PatternDirection,
 )
 from _interference_contracts import allowed_interference_pairs
-from mg_lever_press_fit_geom import PRESS_INSTALLATION_NOTES
+from _mg_magnifier_explode import create_mg_magnifier_explode
 from _transforms import (
     IDENTITY,
     ROT_X_NEG90,
@@ -282,6 +286,15 @@ assert math.isclose(
 # local +Z is the machine-front groove tangent. No chirality shim is applied.
 FIXTURE_ROWS = rows_from_euler([0.0, 180.0 + FIXTURE_YAW_DEG, 0.0])
 FIXTURE_POSITION = (CLAMP_X, FIXTURE_AXIS_Y, VROD_Z)
+assert all(
+    math.isclose(actual, expected, abs_tol=1e-9)
+    for actual, expected in (
+        (stack_spec.LEVER_TIP_X, LEVER_X0),
+        (stack_spec.LEVER_AXIS_Y, LEVER_ROD_Y),
+        (stack_spec.CLAMP_CENTRE_X, CLAMP_X),
+        (stack_spec.FIXTURE_AXIS_Y, FIXTURE_POSITION[1]),
+    )
+), "mg_magnifier_assembly_spec's lever settings drifted from the placed lever group"
 FIXTURE_SCREW_ROWS = compose_rows(ROT_Y_180, FIXTURE_ROWS)
 FIXTURE_SCREW_TIP_X = VROD_DIA / 2.0
 FIXTURE_SCREW_COLLAR_X = FIXTURE_SCREW_TIP_X + THUMB_SHANK_LEN
@@ -531,6 +544,91 @@ async def _author_axle_stack_reference(adapter) -> None:
     )
     if int(feature.Visible) != 1:  # swVisibilityStateHide
         raise RuntimeError(f"{spec.FEATURE} still visible after BlankSketch")
+
+
+async def _author_lever_setting_reference(adapter) -> None:
+    """The clamp station and the fixture drop as model dimensions: one
+    construction chain on the Front plane (sketch x, y = machine x, y) from
+    the lever rod's west tip along its axis to the clamp centre, then down the
+    vertical-rod line to the output fixture's axis (mg_magnifier_assembly_spec
+    LEVER_FEATURE). Dimensioned from globals, marked for the drawing and
+    blanked, as the axle stack chain is; no tolerance band: the title block's
+    general tolerance governs these operator settings."""
+    spec = stack_spec
+    for name, value in (
+        ("LeverTipX", spec.LEVER_TIP_X),
+        ("LeverAxisY", spec.LEVER_AXIS_Y),
+        ("LeverClampStation", spec.CLAMP_STATION),
+        ("LeverFixtureDrop", spec.FIXTURE_DROP),
+    ):
+        await set_global(adapter, name, f"{value}mm")
+    points = (
+        (spec.LEVER_TIP_X, spec.LEVER_AXIS_Y),
+        (spec.CLAMP_CENTRE_X, spec.LEVER_AXIS_Y),
+        (spec.CLAMP_CENTRE_X, spec.FIXTURE_AXIS_Y),
+    )
+    dims = SketchDims()
+    check("create lever settings sketch", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    legs = [
+        check(f"lever settings leg {index}", await adapter.add_line(*p0, *p1))
+        for index, (p0, p1) in enumerate(zip(points, points[1:]))
+    ]
+    set_sketch_direct_db(adapter, False)
+    for index, (leg, relation) in enumerate(zip(legs, ("horizontal", "vertical"))):
+        segment = _early_bound(adapter._sketch_entities[leg], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"lever settings leg {index} is not construction")
+        check(
+            f"lever settings leg {index} {relation}",
+            await adapter.add_sketch_constraint(leg, None, relation),
+        )
+    check(
+        "lever settings legs chained",
+        await adapter.add_sketch_constraint(
+            f"{legs[0]}.end", f"{legs[1]}.start", "coincident"
+        ),
+    )
+    await anchor_point_to_origin(adapter, f"{legs[0]}.start", *points[0], "lever tip")
+    dims.record("LeverTipX", '"LeverTipX"')
+    dims.record("LeverAxisY", '"LeverAxisY"')
+    await dimension_between(
+        adapter,
+        f"{legs[0]}.start",
+        f"{legs[0]}.end",
+        "horizontal_distance",
+        spec.CLAMP_STATION,
+        spec.CLAMP_STATION_DIMENSION,
+    )
+    dims.record(spec.CLAMP_STATION_DIMENSION, '"LeverClampStation"')
+    await dimension_between(
+        adapter,
+        f"{legs[1]}.start",
+        f"{legs[1]}.end",
+        "vertical_distance",
+        spec.FIXTURE_DROP,
+        spec.FIXTURE_DROP_DIMENSION,
+    )
+    dims.record(spec.FIXTURE_DROP_DIMENSION, '"LeverFixtureDrop"')
+    await ensure_fully_defined(adapter, "lever settings")
+    check("exit lever settings sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, spec.LEVER_FEATURE)
+    for name, expression in dims.apply(adapter, spec.LEVER_FEATURE):
+        await drive_dimension(adapter, name, expression)
+    apply_drawing_precision(adapter, spec.LEVER_DRAWING_PRECISION)
+    mark_dimensions_for_drawing(
+        adapter, spec.LEVER_FEATURE, spec.LEVER_DRAWING_DIMENSIONS[spec.LEVER_FEATURE]
+    )
+    blank_sketch(adapter, spec.LEVER_FEATURE)
+    feature = _early_bound(
+        _early_bound(adapter.currentModel, "IAssemblyDoc").FeatureByName(
+            spec.LEVER_FEATURE
+        ),
+        "IFeature",
+    )
+    if int(feature.Visible) != 1:  # swVisibilityStateHide
+        raise RuntimeError(f"{spec.LEVER_FEATURE} still visible after BlankSketch")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1013,6 +1111,7 @@ async def build(adapter) -> dict[str, str]:
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
     await _author_axle_stack_reference(adapter)
+    await _author_lever_setting_reference(adapter)
     # Title-block identity for the assembly drawing (draw_mg_magnifier_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;
@@ -1026,9 +1125,15 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification": "SEE COMPONENT DRAWINGS",
             "Finish": "SEE COMPONENT DRAWINGS",
             "Quantity": "1",
-            "Drawing Notes": PRESS_INSTALLATION_NOTES,
             "Drawn By": DRAWN_BY,
         },
+    )
+    # Both drawing configurations own the explode: the exploded sheets'
+    # views at 1:2 reference Default Simplified.
+    author_in_drawing_configurations(
+        adapter,
+        ASM_NAME,
+        lambda configuration: create_mg_magnifier_explode(adapter, configuration),
     )
     artefacts = await save_assembly_and_images(adapter, ASM_NAME)
     return artefacts

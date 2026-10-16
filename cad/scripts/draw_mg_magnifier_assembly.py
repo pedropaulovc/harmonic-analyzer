@@ -1,9 +1,10 @@
-r"""Create the one-sheet magnifier assembly drawing.
+r"""Create the four-sheet magnifier fitter package (MHA-MG-000).
 
-The sheet holds the Front, Right and Isometric orientation views at 1:4 and
-two cropped side-view details of the wheel axle. Each detail prints one
-assembly setting as the assembly's own model dimension
-(mg_magnifier_assembly_spec):
+Sheet 1, ASSEMBLED + SETTINGS: the Front, Right and Isometric views at 1:4,
+and every assembly setting printed as the assembly's own model dimension
+(mg_magnifier_assembly_spec). The Front view prints the lever group's two
+operator settings, the clamp station and the fixture drop. Two cropped
+side-view details of the wheel axle print one stack setting each:
 - AXLE AS PRESSED (2:1) shows only the bar and the axle. It prints the press
   gauge from the bar's front face to the shank step. The wheel hub hides the
   step once it is fitted.
@@ -12,9 +13,19 @@ assembly setting as the assembly's own model dimension
 
 Each detail is a cropped *Right model view, dimensioned while uncropped and
 cropped after. On a native detail, the targeted import delivered nothing
-(the ch-amplitude-bar finding). The dimensions belong to a construction chain
-the assembly saves blanked. Each detail shows the chain in that view only
+(the ch-amplitude-bar finding). The dimensions belong to construction chains
+the assembly saves blanked. Each view shows its chain in that view only
 before importing (the ms-measuring-stick ClampedSetting pattern).
+
+Sheet 2, WHEEL GROUP + BOM: the builder-owned MG_MAGNIFIER_EXPLODED
+presentation (mg_magnifier_explode_spec) with only the wheel group shown, the
+BOM (part number, description, vendor SKU, quantity) and one balloon per
+family. Sheet 3, LEVER GROUP: the same explode with only the lever group
+shown, ballooned from the same BOM. Sheet 4, ASSEMBLY STEPS: the finished
+assembly with the lever wire ballooned, beside the numbered sequence
+(mg_magnifier_assembly_steps) and the checks. Step text names the settings
+and never values them. This recipe never edits the source assembly or its
+explodes.
 """
 
 from __future__ import annotations
@@ -22,7 +33,9 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 import math
+from pathlib import Path
 import sys
+import textwrap
 from typing import Any, Callable
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -33,29 +46,44 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
+import _config
 import _telemetry
 import mg_magnifier_assembly_spec as stack
+import mg_magnifier_explode_spec as explode
 from _check import check
 from _com import _early_bound
-from _drawing_balloons import isolate_drawing_view_components
+from _drawing_balloons import (
+    BalloonAnchor,
+    add_component_bom_balloons,
+    assert_balloon_landings,
+    isolate_drawing_view_components,
+)
 from _drawing_common import (
+    _SW_SHADED_EDGES,
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_high_quality_shaded_with_edges,
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hidden_sketches import _show_base_view_sketches
-from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_tables import insert_bom_table
 from _drawing_view_configuration import (
+    ASSEMBLY_VIEW_CONFIGURATION,
+    SIMPLIFIED_VIEW_CONFIGURATION,
     ViewRole,
+    view_configuration,
     apply_view_configuration,
     assert_full_detail_view,
+    set_view_exploded_state,
 )
 from _drawing_view_display import set_hidden_lines_removed
+from _mg_magnifier_explode import exploded_view_name
 from _session import run_build
 from mg_wheel_axle_spec import TIP_Y
 from mg_wheel_bar_geom import BORE_ROW_HEIGHT
@@ -72,23 +100,221 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
-PDF_TITLE = "Magnifier Assembly Drawing"
+PDF_TITLE = "Magnifier Assembly Drawing Package"
 
+SHEET_NAMES = (
+    "ASSEMBLED + SETTINGS",
+    "WHEEL GROUP + BOM",
+    "LEVER GROUP",
+    "ASSEMBLY STEPS",
+)
+if SPEC.layout is not DrawingLayout.LANDSCAPE:
+    raise AssertionError("the magnifier sheet coordinates are landscape")
+SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 SHEET_SCALE = (1.0, 4.0)
+# Both exploded sheets at 1:2: small enough to print the simplified
+# configuration (no thread ink), large enough to read every washer and nut.
+# Each exploded view takes the largest ladder scale whose balloon ring fits
+# its field; every rung keeps the simplified configuration.
+EXPLODED_SCALE_LADDER = ((1.0, 2.0), (1.0, 3.0), (1.0, 4.0))
+if any(
+    view_configuration(scale, _SW_SHADED_EDGES) != SIMPLIFIED_VIEW_CONFIGURATION
+    for scale in EXPLODED_SCALE_LADDER
+):
+    raise AssertionError("a rescale on the exploded-view ladder would switch configuration")
+EXPLODED_SCALE = EXPLODED_SCALE_LADDER[0]
+SHEET_SCALES = {
+    SHEET_NAMES[0]: SHEET_SCALE,
+    SHEET_NAMES[1]: EXPLODED_SCALE,
+    SHEET_NAMES[2]: EXPLODED_SCALE,
+    SHEET_NAMES[3]: SHEET_SCALE,
+}
 FRONT_CENTER = (0.070, 0.150)
 RIGHT_CENTER = (0.150, 0.150)
 ISO_CENTER = (0.225, 0.140)
-PRESS_NOTE_XY = (0.018, 0.064)
-PRESS_NOTE_CHAR_HEIGHT = 0.0028
+
+# Sheet geometry, metres: the template's inner border and the title block in
+# its lower-right corner. Every view ring and note stays inside the border and
+# out of the title block (drawing-guidelines.md rule 13).
+_TEMPLATE = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
+_BORDER = 0.0127
+INNER_BORDER = (_BORDER, _BORDER, _TEMPLATE.width_m - _BORDER, _TEMPLATE.height_m - _BORDER)
+TITLE_BLOCK = (
+    _TEMPLATE.title_block_left_m,
+    0.0,
+    _TEMPLATE.width_m,
+    _TEMPLATE.title_block_top_m,
+)
+_PAD = 0.004
+
+# Sheet 1, Front view: the lever settings' text, in sheet metres from the
+# projected chain points. The clamp station's line runs above the clamp's
+# thumb-screw head with its callout above it; the fixture drop's text stands
+# right of the vertical rod, clear of the fixture screw (toward the bracket,
+# left) and the wire (down-left to the wheel).
+CLAMP_STATION_RISE = 0.012
+FIXTURE_DROP_RUN = 0.022
+LEVER_CALLOUT_LOCATION = {
+    stack.CLAMP_STATION_DIMENSION: "above",
+    stack.FIXTURE_DROP_DIMENSION: "below",
+}
+LEVER_VIEW_LABEL = "lever settings (Front)"
+
+# Sheet 2: the wheel group's exploded view in the field left of the BOM, the
+# BOM in the top-right corner under its caption, and under the BOM the
+# collapsed whole-assembly view the BOM is inserted on (the MHA-PD-000 BOM
+# reference): the exploded views are isolated afterwards, and view-only
+# isolation must never touch the view that owns the parts list.
+BALLOON_MARGIN = 0.012
+BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
+BOM_COLUMN_WIDTHS = {
+    "item": 0.012,
+    "part": 0.032,
+    "description": 0.072,
+    "sku": 0.032,
+    "quantity": 0.012,
+}
+BOM_SKU_TITLE = "VENDOR SKU"
+MADE_PART_SKU = "-"
+BOM_ROW_HEIGHT = 0.006
+BOM_ANCHOR = (
+    INNER_BORDER[2] - _PAD - sum(BOM_COLUMN_WIDTHS.values()),
+    INNER_BORDER[3] - 0.012,
+)
+WHEEL_CAPTION_XY = (BOM_ANCHOR[0], INNER_BORDER[3] - _PAD)
+WHEEL_FIELD = (
+    INNER_BORDER[0] + _PAD,
+    INNER_BORDER[1] + _PAD,
+    TITLE_BLOCK[0] - _PAD,
+    INNER_BORDER[3] - _PAD,
+)
+if WHEEL_FIELD[2] + _PAD > BOM_ANCHOR[0]:
+    raise AssertionError("the wheel group's field runs under the BOM")
+WHEEL_GROUP = "WHEEL GROUP"
+WHEEL_LABEL = "wheel group exploded"
+BOM_BOTTOM = BOM_ANCHOR[1] - (len(stack.BOM_ORDER) + 1) * BOM_ROW_HEIGHT
+BOM_REFERENCE_CAPTION_XY = (BOM_ANCHOR[0], BOM_BOTTOM - _PAD)
+BOM_REFERENCE_FIELD = (
+    BOM_ANCHOR[0],
+    TITLE_BLOCK[3] + _PAD,
+    INNER_BORDER[2] - _PAD,
+    BOM_REFERENCE_CAPTION_XY[1] - 0.006,
+)
+BOM_REFERENCE_SCALE_LADDER = ((1.0, 8.0), (1.0, 10.0), (1.0, 12.0), (1.0, 16.0))
+BOM_REFERENCE_LABEL = "BOM reference"
+BOM_REFERENCE_CAPTION = "COMPLETE ASSEMBLY"
+# Sheet 3: the lever group's exploded view over the full width above the
+# title block; its caption left of the title block.
+LEVER_FIELD = (
+    INNER_BORDER[0] + _PAD,
+    TITLE_BLOCK[3] + _PAD,
+    INNER_BORDER[2] - _PAD,
+    INNER_BORDER[3] - _PAD,
+)
+LEVER_GROUP = "LEVER GROUP"
+LEVER_CAPTION_XY = (INNER_BORDER[0] + _PAD + 0.002, TITLE_BLOCK[3] - _PAD)
+LEVER_LABEL = "lever group exploded"
+# Sheet 4: the sequence and checks down the left, the finished assembly right
+# of them above the title block, its caption over it.
+STEPS_XY = (0.018, 0.258)
+STEPS_LINE_WIDTH = 58  # characters; default-format note text (as MHA-MS-000)
+STEPS_RIGHT = 0.156  # 58 default-format characters from STEPS_XY
+# Default-format note line pitch (the MHA-PD-000 stake note measured 0.0045).
+NOTE_LINE_PITCH = 0.0046
+FINISHED_CAPTION_XY = (STEPS_RIGHT + _PAD, INNER_BORDER[3] - _PAD)
+FINISHED_FIELD = (
+    STEPS_RIGHT + _PAD,
+    TITLE_BLOCK[3] + _PAD,
+    INNER_BORDER[2] - _PAD,
+    INNER_BORDER[3] - _PAD - 0.008,
+)
+FINISHED_CENTER = (
+    (FINISHED_FIELD[0] + FINISHED_FIELD[2]) / 2.0,
+    (FINISHED_FIELD[1] + FINISHED_FIELD[3]) / 2.0,
+)
+# 1:4 prints the simplified configuration like every rung below it.
+FINISHED_SCALE_LADDER = (SHEET_SCALE, (1.0, 5.0), (1.0, 6.0))
+FINISHED_LABEL = "finished assembly"
+FINISHED_CAPTION = "FINISHED ASSEMBLY"
+
+BOM_QUANTITIES = {stem: stack.QUANTITIES[stem] for stem in stack.BOM_ORDER}
+BOM_COMPONENTS = tuple(BOM_QUANTITIES)
+# Literal stems, so the config-dependency analysis reads exactly these rows.
+PART_ROWS = {
+    "mg-wheel-axle": _config.parts("mg-wheel-axle"),
+    "mg-wheel-bar": _config.parts("mg-wheel-bar"),
+    "sh-column-clamp-front": _config.parts("sh-column-clamp-front"),
+    "sh-column-clamp-back": _config.parts("sh-column-clamp-back"),
+    "vn-clamp-screw": _config.parts("vn-clamp-screw"),
+    "mg-wheel-drum": _config.parts("mg-wheel-drum"),
+    "mg-magnifying-wheel": _config.parts("mg-magnifying-wheel"),
+    "mg-wheel-axle-spacer": _config.parts("mg-wheel-axle-spacer"),
+    "vn-wheel-axle-back-washer": _config.parts("vn-wheel-axle-back-washer"),
+    "vn-wheel-axle-front-washer": _config.parts("vn-wheel-axle-front-washer"),
+    "vn-wheel-axle-nut": _config.parts("vn-wheel-axle-nut"),
+    "mg-magnifying-lever": _config.parts("mg-magnifying-lever"),
+    "mg-magnifying-bracket": _config.parts("mg-magnifying-bracket"),
+    "vn-magnifying-bracket-screw": _config.parts("vn-magnifying-bracket-screw"),
+    "mg-magnifying-clamp": _config.parts("mg-magnifying-clamp"),
+    "vn-thumb-screw": _config.parts("vn-thumb-screw"),
+    "mg-magnifying-vertical-rod": _config.parts("mg-magnifying-vertical-rod"),
+    "mg-output-fixture": _config.parts("mg-output-fixture"),
+    "vn-lever-wire": _config.parts("vn-lever-wire"),
+}
+if set(PART_ROWS) != set(BOM_COMPONENTS):
+    raise AssertionError("BOM registry rows must cover exactly the assembly families")
+if set(BOM_COMPONENTS) != explode.SHOWN_STEMS:
+    raise AssertionError("every BOM family must show on one of the package's views")
+BOM_PART_NUMBERS = {stem: str(row["number"]) for stem, row in PART_ROWS.items()}
+# The registry owns part numbers and vendor SKU; components own material/finish.
+BOM_SKUS = {
+    stem: " / ".join(str(sku) for sku in row.get("supplier_skus") or ()) or MADE_PART_SKU
+    for stem, row in PART_ROWS.items()
+}
+BOM_DESCRIPTIONS = dict(stack.BOM_DESCRIPTIONS)
+BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
+BOM_NORMALIZED_ALIASES = {
+    alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
+}
+# One balloon per family (row); each walks its family's lowest-named shown
+# instance for a visible edge.
+BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
+
+EXPLODED_VIEW_NAMES = {
+    ASSEMBLY_VIEW_CONFIGURATION: exploded_view_name(ASSEMBLY_VIEW_CONFIGURATION),
+    SIMPLIFIED_VIEW_CONFIGURATION: exploded_view_name(SIMPLIFIED_VIEW_CONFIGURATION),
+}
+if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
+    raise AssertionError("the magnifier explode is authored in Default")
 
 
-def _annotate_collar_press(adapter: Any) -> None:
-    add_property_linked_note(
-        adapter,
-        "Drawing Notes",
-        *PRESS_NOTE_XY,
-        char_height=PRESS_NOTE_CHAR_HEIGHT,
-    )
+def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
+    """Wrap each numbered line under its own number; one note per block."""
+    out = [heading] if heading else []
+    for line in lines:
+        number, sep, rest = line.partition(". ")
+        if sep and number.isdigit():
+            out += textwrap.wrap(
+                rest,
+                width=width,
+                initial_indent=f"{number}. ",
+                subsequent_indent=" " * (len(number) + 2),
+            )
+        else:
+            out += textwrap.wrap(line, width=width, subsequent_indent="   ")
+    return "\n".join(out)
+
+
+ASSEMBLY_STEPS = _wrapped(
+    stack.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
+)
+ASSEMBLY_CHECKS = _wrapped(stack.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
+CHECKS_XY = (
+    STEPS_XY[0],
+    STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 1) * NOTE_LINE_PITCH - 2 * _PAD,
+)
+if CHECKS_XY[1] - (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH < INNER_BORDER[1]:
+    raise AssertionError("the assembly sequence and checks overrun the sheet")
 
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
@@ -408,16 +634,484 @@ def _stack_dimensions(adapter: Any) -> Callable[[], None]:
     return settled
 
 
-async def build(adapter: Any) -> dict[str, str]:
-    if not SOURCE.is_file():
-        raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
-    check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
-        required=("Number", "Revision", "Material Specification", "Finish", "Quantity"),
+def _printable_lever_callouts() -> dict[str, str]:
+    """The lever callouts, refused if an above one holds a line break (see
+    :func:`_printable_callouts`)."""
+    broken = sorted(
+        name
+        for name, location in LEVER_CALLOUT_LOCATION.items()
+        if location == "above" and "\n" in stack.LEVER_CALLOUTS[name]
     )
+    if broken:
+        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
+    return {name: stack.LEVER_CALLOUTS[name] for name in LEVER_CALLOUT_LOCATION}
+
+
+def _assert_lever_callouts(
+    displays: list[tuple[str, Any]], callouts: dict[str, str]
+) -> None:
+    for name, display in displays:
+        part = CALLOUT_TEXT_PART[LEVER_CALLOUT_LOCATION[name]]
+        text = str(display.GetText(part) or "")
+        if text.replace("\r\n", "\n") != callouts[name]:
+            raise RuntimeError(
+                f"{name}: {LEVER_CALLOUT_LOCATION[name]} callout reads {text!r}, "
+                f"not {callouts[name]!r}"
+            )
+
+
+def lever_keep(
+    tip: tuple[float, float],
+    clamp: tuple[float, float],
+    fixture: tuple[float, float],
+) -> dict[str, tuple[float, float]]:
+    """Where each lever setting's text sits, from the chain's three projected
+    points (sheet metres): the clamp station over the lever between the tip
+    and the clamp, the fixture drop beside the rod between lever and fixture."""
+    return {
+        stack.CLAMP_STATION_DIMENSION: (
+            (tip[0] + clamp[0]) / 2.0,
+            max(tip[1], clamp[1]) + CLAMP_STATION_RISE,
+        ),
+        stack.FIXTURE_DROP_DIMENSION: (
+            clamp[0] + FIXTURE_DROP_RUN,
+            (clamp[1] + fixture[1]) / 2.0,
+        ),
+    }
+
+
+def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
+    """The clamp station and the fixture drop on the Front view, with their
+    callouts; the returned check re-reads the callouts once settled."""
+    callouts = _printable_lever_callouts()
+    tip, clamp, fixture = model_points_in_view(
+        adapter,
+        view,
+        (
+            (stack.LEVER_TIP_X / 1000.0, stack.LEVER_AXIS_Y / 1000.0, 0.0),
+            (stack.CLAMP_CENTRE_X / 1000.0, stack.LEVER_AXIS_Y / 1000.0, 0.0),
+            (stack.CLAMP_CENTRE_X / 1000.0, stack.FIXTURE_AXIS_Y / 1000.0, 0.0),
+        ),
+        label=LEVER_VIEW_LABEL,
+        names=("lever tip", "clamp centre", "fixture axis"),
+    )
+    _show_base_view_sketches(adapter, view, (stack.LEVER_FEATURE,), label=LEVER_VIEW_LABEL)
+    annotations = curate_view_dimensions(
+        adapter,
+        view,
+        keep=lever_keep(tip, clamp, fixture),
+        view_label=LEVER_VIEW_LABEL,
+        dimensions_by_feature=stack.LEVER_DRAWING_DIMENSIONS,
+    )
+    for name, location in LEVER_CALLOUT_LOCATION.items():
+        set_dimension_callouts(
+            adapter, annotations, {name: callouts[name]}, location=location
+        )
+    assert_imported_precision(
+        adapter,
+        annotations,
+        {
+            name: places
+            for names in stack.LEVER_DRAWING_PRECISION.values()
+            for name, places in names.items()
+        },
+    )
+    displays = [
+        (
+            dimension_name(adapter, annotation),
+            _early_bound(
+                _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+                "IDisplayDimension",
+            ),
+        )
+        for annotation in annotations
+    ]
+    if sorted(name for name, _ in displays) != sorted(LEVER_CALLOUT_LOCATION):
+        raise RuntimeError(
+            f"{LEVER_VIEW_LABEL} imported {sorted(n for n, _ in displays)}"
+        )
+    _assert_lever_callouts(displays, callouts)
+    return lambda: _assert_lever_callouts(displays, callouts)
+
+
+def _activate_sheet(adapter: Any, name: str) -> Any:
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not ddoc.ActivateSheet(name):
+        raise RuntimeError(f"failed to activate drawing sheet {name!r}")
+    current = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+    actual = str(current.GetName() or "")
+    if actual != name:
+        raise RuntimeError(f"active drawing sheet is {actual!r}, expected {name!r}")
+    return current
+
+
+def _add_note_block(
+    adapter: Any, sheet_name: str, text: str, xy: tuple[float, float], *, label: str
+) -> Any:
+    """A sheet-owned note: activate the sheet so no view owns it."""
+    _activate_sheet(adapter, sheet_name)
+    note = add_note(adapter, text, *xy)
+    if note is None:
+        raise RuntimeError(f"failed to place the magnifier {label}")
+    note = _early_bound(note, "INote")
+    printed = str(note.GetText() or "").replace("\r\n", "\n").replace("\r", "\n")
+    if printed != text:
+        raise RuntimeError(f"magnifier {label} printed as {printed!r}")
+    return note
+
+
+Box = tuple[float, float, float, float]
+
+
+def _view_outline(view: Any, *, label: str) -> Box:
+    outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+    if len(outline) != 4 or outline[2] <= outline[0] or outline[3] <= outline[1]:
+        raise RuntimeError(f"{label}: invalid view outline {outline!r}")
+    return outline[0], outline[1], outline[2], outline[3]
+
+
+def _grown(box: Box, by: float) -> Box:
+    return (box[0] - by, box[1] - by, box[2] + by, box[3] + by)
+
+
+def ring_fit_shift(outline: Box, field: Box, *, name: str) -> tuple[float, float]:
+    """Shift that centres a view's balloon ring (its outline grown by
+    BALLOON_RING_REACH) in ``field``; raises naming each axis on which the
+    ring is larger than the room. Sheet metres (left, bottom, right, top)."""
+    ring = _grown(outline, BALLOON_RING_REACH)
+    findings = [
+        f"{name} ring {axis} {(ring[hi] - ring[lo]) * 1000:.1f} mm > room "
+        f"{(field[hi] - field[lo]) * 1000:.1f} mm"
+        for axis, lo, hi in (("width", 0, 2), ("height", 1, 3))
+        if ring[hi] - ring[lo] > field[hi] - field[lo]
+    ]
+    if findings:
+        raise ValueError(f"balloon ring does not fit: {'; '.join(findings)}")
+    return (
+        (field[0] + field[2] - ring[0] - ring[2]) / 2.0,
+        (field[1] + field[3] - ring[1] - ring[3]) / 2.0,
+    )
+
+
+def _shift_view(
+    adapter: Any, view: Any, delta: tuple[float, float], *, label: str
+) -> None:
+    """Move a drawing view by a sheet-space delta and read the move back."""
+    view = _early_bound(view, "IView")
+    before = tuple(float(value) for value in view.Position)
+    target = (before[0] + delta[0], before[1] + delta[1])
+    if not view.SetViewPosition(double_array(list(target)), False):
+        raise RuntimeError(f"{label}: SetViewPosition refused {target!r}")
+    adapter.currentModel.EditRebuild3()
+    after = tuple(float(value) for value in view.Position)
+    if math.dist(after, target) > 1e-6:
+        raise RuntimeError(f"{label}: view moved to {after!r}, expected {target!r}")
+
+
+def _set_view_scale(
+    adapter: Any, view: Any, scale: tuple[float, float], *, label: str
+) -> None:
+    """Re-scale a placed drawing view and read the scale back."""
+    view = _early_bound(view, "IView")
+    view.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
+    adapter.currentModel.EditRebuild3()
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if len(ratio) != 2 or abs(ratio[0] / ratio[1] - scale[0] / scale[1]) > 1e-9:
+        raise RuntimeError(f"{label}: view scale reads {ratio!r}, expected {scale!r}")
+
+
+def scale_text(scale: tuple[float, float]) -> str:
+    return f"{scale[0]:g}:{scale[1]:g}"
+
+
+def step_down_to_fit(
+    outline_at: Callable[[tuple[float, float]], Box],
+    ladder: tuple[tuple[float, float], ...],
+    field: Box,
+    *,
+    name: str,
+) -> tuple[tuple[float, float], Box]:
+    """The first ``ladder`` scale, largest first, whose ring fits ``field``.
+
+    ``outline_at`` applies a scale to the placed view and returns the outline
+    SolidWorks reads back; the outline carries a fixed sheet-space padding, so
+    each candidate is applied and re-read rather than predicted. Raises naming
+    every scale's overflow when the smallest still overflows.
+    """
+    findings = []
+    for scale in ladder:
+        outline = outline_at(scale)
+        try:
+            ring_fit_shift(outline, field, name=f"{name} at {scale_text(scale)}")
+        except ValueError as error:
+            findings.append(str(error))
+            continue
+        return scale, outline
+    raise ValueError(f"no {name} scale fits: {' | '.join(findings)}")
+
+
+def _fit_ring(
+    adapter: Any,
+    view: Any,
+    ladder: tuple[tuple[float, float], ...],
+    field: Box,
+    *,
+    label: str,
+) -> tuple[float, float]:
+    """Scale the view down the ladder until its balloon ring fits ``field``,
+    centre the ring there and prove it inside; return the scale."""
+    current = [tuple(float(value) for value in _early_bound(view, "IView").ScaleRatio)]
+
+    def outline_at(scale: tuple[float, float]) -> Box:
+        if scale != current[0]:
+            _set_view_scale(adapter, view, scale, label=label)
+            current[0] = scale
+        return _view_outline(view, label=label)
+
+    try:
+        scale, outline = step_down_to_fit(outline_at, ladder, field, name=label)
+        shift = ring_fit_shift(outline, field, name=label)
+    except ValueError as error:
+        raise RuntimeError(str(error)) from error
+    _shift_view(adapter, view, shift, label=f"{label} ring fit")
+    ring = _grown(_view_outline(view, label=label), BALLOON_RING_REACH)
+    if (
+        ring[0] < field[0] - 1e-6
+        or ring[1] < field[1] - 1e-6
+        or ring[2] > field[2] + 1e-6
+        or ring[3] > field[3] + 1e-6
+    ):
+        raise RuntimeError(f"{label}: balloon ring {ring!r} leaves its field {field!r}")
+    return scale
+
+
+def exploded_caption(group: str, scale: tuple[float, float]) -> str:
+    return f"{group} {stack.EXPLODED_CAPTION} (SCALE {scale_text(scale)})"
+
+
+def _component_stem(component: Any) -> str:
+    component = _early_bound(component, "IComponent2")
+    path = str(component.GetPathName() or "")
+    if not path:
+        raise RuntimeError(f"component {component.Name2!r} has no referenced path")
+    return Path(path).stem.casefold()
+
+
+def _validate_source(source_model: Any) -> None:
+    """The builder-owned explodes exist, and the source opens collapsed with
+    exactly the contracted families."""
+    assembly = _early_bound(source_model, "IAssemblyDoc")
+    manager = _early_bound(source_model.ConfigurationManager, "IConfigurationManager")
+    configuration = _early_bound(manager.ActiveConfiguration, "IConfiguration")
+    if str(configuration.Name) != ASSEMBLY_VIEW_CONFIGURATION:
+        raise RuntimeError("magnifier source must open in its Default configuration")
+    for owner, wanted in EXPLODED_VIEW_NAMES.items():
+        names = tuple(assembly.GetExplodedViewNames2(owner) or ())
+        if names != (wanted,):
+            raise RuntimeError(
+                f"magnifier {owner} exploded views {names!r} != {(wanted,)!r}"
+            )
+    counts: dict[str, int] = {}
+    for raw in tuple(assembly.GetComponents(True) or ()):
+        component = _early_bound(raw, "IComponent2")
+        stem = _component_stem(component)
+        counts[stem] = counts.get(stem, 0) + 1
+        total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
+        base = _early_bound(component.GetTotalTransform(False), "IMathTransform")
+        if any(
+            abs(float(actual) - float(expected)) > 1e-9
+            for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
+        ):
+            raise RuntimeError(
+                f"magnifier source must open collapsed: {component.Name2!r} "
+                "is displaced"
+            )
+    if counts != BOM_QUANTITIES:
+        raise RuntimeError(
+            f"magnifier families {counts!r} != contract {BOM_QUANTITIES!r}"
+        )
+
+
+def _create_sheets(adapter: Any) -> None:
     new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="magnifier package")
+    for name in SHEET_NAMES:
+        sheet = _activate_sheet(adapter, name)
+        numerator, denominator = SHEET_SCALES[name]
+        if not sheet.SetScale(float(numerator), float(denominator), False, False):
+            raise RuntimeError(f"failed to set magnifier sheet scale: {name}")
+
+
+_INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After
+_INSERT_COLUMN_DEFAULT_WIDTH = 0  # swInsertColumn_DefaultWidth
+
+
+def _bom_cells(table: Any) -> tuple[tuple[str, ...], ...]:
+    """Every displayed BOM cell, header row first."""
+    return tuple(
+        tuple(
+            str(table.DisplayedText(row, column) or "").strip()
+            for column in range(int(table.ColumnCount))
+        )
+        for row in range(int(table.RowCount))
+    )
+
+
+def _bom_column(
+    header: tuple[str, ...], predicate: Callable[[str], bool], label: str
+) -> int:
+    matches = [index for index, cell in enumerate(header) if predicate(cell.upper())]
+    if len(matches) != 1:
+        raise RuntimeError(f"magnifier BOM has no unique {label} column: {header!r}")
+    return matches[0]
+
+
+def _bom_rows(table: Any) -> dict[str, tuple[int, str, str, str]]:
+    """(row, item, description, quantity) per family, keyed by stem."""
+    contents = _bom_cells(table)
+    header = contents[0]
+    item_column = _bom_column(header, lambda cell: cell.startswith("ITEM NO"), "ITEM NO.")
+    part_column = _bom_column(header, lambda cell: cell == "PART NUMBER", "PART NUMBER")
+    description_column = _bom_column(
+        header, lambda cell: cell == "DESCRIPTION", "DESCRIPTION"
+    )
+    quantity_column = _bom_column(header, lambda cell: cell.startswith("QTY"), "QTY.")
+    rows: dict[str, tuple[int, str, str, str]] = {}
+    for row_index, row in enumerate(contents[1:], start=1):
+        text = row[part_column].casefold()
+        stem = BOM_NORMALIZED_ALIASES.get(text, text)
+        if stem in rows:
+            raise RuntimeError(f"magnifier BOM repeats component family {stem!r}")
+        rows[stem] = (
+            row_index,
+            row[item_column],
+            row[description_column],
+            row[quantity_column],
+        )
+    if set(rows) != set(BOM_COMPONENTS):
+        raise RuntimeError(
+            f"magnifier BOM identities {sorted(rows)!r} != {sorted(BOM_COMPONENTS)!r}"
+        )
+    return rows
+
+
+def _bom_items(table: Any) -> dict[str, str]:
+    return {stem: values[1] for stem, values in _bom_rows(table).items()}
+
+
+def _validate_bom(adapter: Any, table: Any) -> dict[str, str]:
+    """Rewrite part numbers, prove identities/descriptions/quantities, add the
+    registry's VENDOR SKU column after DESCRIPTION; return each family's item
+    number. Material and finish remain on the component drawings."""
+    table = _early_bound(table, "ITableAnnotation")
+    contents = _bom_cells(table)
+    rows = len(contents)
+    columns = len(contents[0]) if contents else 0
+    if rows != len(BOM_COMPONENTS) + 1 or columns < 4:
+        raise RuntimeError(
+            f"magnifier BOM is {rows}x{columns}; expected "
+            f"{len(BOM_COMPONENTS) + 1} rows and at least four columns"
+        )
+    header = contents[0]
+    for title in ("MATERIAL", BOM_SKU_TITLE):
+        if title in (cell.upper() for cell in header):
+            raise RuntimeError(f"magnifier BOM template already has {title!r}")
+    part_column = _bom_column(header, lambda cell: cell == "PART NUMBER", "PART NUMBER")
+    description_column = _bom_column(
+        header, lambda cell: cell == "DESCRIPTION", "DESCRIPTION"
+    )
+    actual = _bom_rows(table)
+    items = {values[1] for values in actual.values()}
+    if items != {str(item) for item in range(1, len(BOM_COMPONENTS) + 1)}:
+        raise RuntimeError(f"magnifier BOM item numbers {sorted(items)!r} are not contiguous")
+    for stem, (row_index, _item, description, quantity) in actual.items():
+        number = BOM_PART_NUMBERS[stem]
+        if contents[row_index][part_column] != number:
+            if not table.IsCellTextEditable(row_index, part_column):
+                raise RuntimeError(f"magnifier BOM part-number cell for {stem!r} is locked")
+            table.SetText2(row_index, part_column, False, number)
+        if description != BOM_DESCRIPTIONS[stem]:
+            raise RuntimeError(f"magnifier BOM description mismatch for {stem!r}")
+        if quantity != str(BOM_QUANTITIES[stem]):
+            raise RuntimeError(
+                f"magnifier BOM quantity for {stem!r} is {quantity!r}, "
+                f"expected {BOM_QUANTITIES[stem]}"
+            )
+
+    # The parts carry no SKU property; made parts print MADE_PART_SKU.
+    if not table.InsertColumn2(
+        _INSERT_COLUMN_AFTER, description_column, BOM_SKU_TITLE, _INSERT_COLUMN_DEFAULT_WIDTH
+    ):
+        raise RuntimeError("magnifier BOM refused the VENDOR SKU column")
+    column = description_column + 1
+    if not table.SetColumnTitle2(column, BOM_SKU_TITLE, False):
+        raise RuntimeError("magnifier BOM VENDOR SKU column title did not set")
+    for stem, (row_index, *_rest) in actual.items():
+        if not table.IsCellTextEditable(row_index, column):
+            raise RuntimeError(f"magnifier BOM VENDOR SKU cell for {stem!r} is locked")
+        table.SetText2(row_index, column, False, BOM_SKUS[stem])
+
+    header = _bom_cells(table)[0]
+    widths = {
+        "item": _bom_column(header, lambda cell: cell.startswith("ITEM NO"), "ITEM NO."),
+        "part": _bom_column(header, lambda cell: cell == "PART NUMBER", "PART NUMBER"),
+        "description": _bom_column(
+            header, lambda cell: cell == "DESCRIPTION", "DESCRIPTION"
+        ),
+        "sku": _bom_column(header, lambda cell: cell == BOM_SKU_TITLE, BOM_SKU_TITLE),
+        "quantity": _bom_column(header, lambda cell: cell.startswith("QTY"), "QTY."),
+    }
+    if len(header) != len(BOM_COLUMN_WIDTHS) or set(widths) != set(BOM_COLUMN_WIDTHS):
+        raise RuntimeError(f"magnifier BOM columns {header!r} are not the contract")
+    for key, column in widths.items():
+        width = BOM_COLUMN_WIDTHS[key]
+        if abs(float(table.SetColumnWidth(column, width, 0)) - width) > 1e-6:
+            raise RuntimeError(f"magnifier BOM {key} column width did not persist")
+    for row in range(rows):
+        table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("magnifier BOM rebuild failed")
+    settled = _bom_cells(table)
+    for stem, (row_index, *_rest) in actual.items():
+        for key, text in (("part", BOM_PART_NUMBERS[stem]), ("sku", BOM_SKUS[stem])):
+            applied = settled[row_index][widths[key]]
+            if applied != text:
+                raise RuntimeError(
+                    f"magnifier BOM {key} for {stem!r} reads {applied!r}, "
+                    f"expected {text!r}"
+                )
+    return {stem: values[1] for stem, values in actual.items()}
+
+
+def _link_view_to_bom(view: Any, table: Any, *, label: str) -> None:
+    """Number ``view``'s balloons from the BOM table inserted on another view."""
+    bom = _early_bound(table, "IBomTableAnnotation")
+    feature = _early_bound(bom.BomFeature, "IBomFeature")
+    name = str(feature.Name or "")
+    if not name:
+        raise RuntimeError("magnifier BOM feature has no name")
+    view = _early_bound(view, "IView")
+    if not view.SetKeepLinkedToBOM(True, name):
+        raise RuntimeError(f"{label}: SetKeepLinkedToBOM({name!r}) returned false")
+    if (
+        not bool(view.GetKeepLinkedToBOM())
+        or str(view.GetKeepLinkedToBOMName() or "") != name
+    ):
+        raise RuntimeError(f"{label}: view is not linked to BOM {name!r}")
+
+
+def balloon_items(
+    items: dict[str, str], stems: frozenset[str]
+) -> tuple[tuple[str, str], ...]:
+    """(stem, item) for each BOM family in ``stems``, in BOM order."""
+    return tuple((stem, items[stem]) for stem in BOM_COMPONENTS if stem in stems)
+
+
+def _place_assembled_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
+    """Front, Right and Isometric at 1:4, the lever settings on the Front
+    view and the two axle-stack details."""
+    _activate_sheet(adapter, SHEET_NAMES[0])
+    front = None
     for name, centre in (
         ("*Front", FRONT_CENTER),
         ("*Right", RIGHT_CENTER),
@@ -428,16 +1122,221 @@ async def build(adapter: Any) -> dict[str, str]:
         # isometric is the full-detail view.
         role = ViewRole.FULL_DETAIL if name == "*Isometric" else ViewRole.PLAIN
         apply_view_configuration(adapter, view, role=role, label=f"{PDF_TITLE} {name}")
+        if name == "*Front":
+            front = view
+    lever_settled = _lever_settings(adapter, front)
+    stack_settled = _stack_dimensions(adapter)
+    return lever_settled, stack_settled
+
+
+def _place_exploded_view(
+    adapter: Any, sheet_name: str, field: Box, *, label: str
+) -> Any:
+    """MG_MAGNIFIER_EXPLODED at EXPLODED_SCALE, configured and exploded before
+    anything binds to it; isolated and fitted after the BOM exists."""
+    _activate_sheet(adapter, sheet_name)
+    view = place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        (field[0] + field[2]) / 2.0,
+        (field[1] + field[3]) / 2.0,
+        scale=EXPLODED_SCALE,
+    )
+    set_high_quality_shaded_with_edges(adapter, view, label=label)
+    configuration = apply_view_configuration(adapter, view, label=label)
+    if configuration != SIMPLIFIED_VIEW_CONFIGURATION:
+        raise RuntimeError(f"{label} references {configuration!r}")
+    set_view_exploded_state(adapter, view, True, configuration=configuration, label=label)
+    return view
+
+
+def _place_collapsed_view(
+    adapter: Any,
+    sheet_name: str,
+    field: Box,
+    scale: tuple[float, float],
+    *,
+    label: str,
+) -> Any:
+    """A collapsed whole-assembly isometric at ``scale`` in ``field``."""
+    _activate_sheet(adapter, sheet_name)
+    view = place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        (field[0] + field[2]) / 2.0,
+        (field[1] + field[3]) / 2.0,
+        scale=scale,
+    )
+    set_high_quality_shaded_with_edges(adapter, view, label=label)
+    configuration = apply_view_configuration(adapter, view, label=label)
+    set_view_exploded_state(adapter, view, False, configuration=configuration, label=label)
+    return view
+
+
+@_telemetry.traced("drawing.mg_magnifier_assembly")
+async def build(adapter: Any) -> dict[str, str]:
+    if not SOURCE.is_file():
+        raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
+    check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
+    source_model = _early_bound(adapter.currentModel, "IModelDoc2")
+    properties = read_required_properties(
+        source_model,
+        ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
+        required=("Number", "Revision", "Material Specification", "Finish", "Quantity"),
+    )
+    if properties["Number"] != stack.DRAWING_NUMBER:
+        raise RuntimeError(
+            f"magnifier source Number {properties['Number']!r} != "
+            f"{stack.DRAWING_NUMBER!r}"
+        )
+    _validate_source(source_model)
+    _create_sheets(adapter)
+    settled_checks = _place_assembled_sheet(adapter)
+    # Every view's configuration and exploded state is final before the BOM
+    # binds: a configuration switch after it re-dirties the source.
+    wheel = _place_exploded_view(adapter, SHEET_NAMES[1], WHEEL_FIELD, label=WHEEL_LABEL)
+    reference = _place_collapsed_view(
+        adapter,
+        SHEET_NAMES[1],
+        BOM_REFERENCE_FIELD,
+        BOM_REFERENCE_SCALE_LADDER[0],
+        label=BOM_REFERENCE_LABEL,
+    )
+    lever = _place_exploded_view(adapter, SHEET_NAMES[2], LEVER_FIELD, label=LEVER_LABEL)
+    finished = _place_collapsed_view(
+        adapter, SHEET_NAMES[3], FINISHED_FIELD, SHEET_SCALE, label=FINISHED_LABEL
+    )
     assert_full_detail_view(adapter, label=PDF_TITLE)
-    settled = _stack_dimensions(adapter)
-    _annotate_collar_press(adapter)
+
+    # The reference carries no balloons, so its ring is its outline: fit the
+    # outline grown by the balloon reach.
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    reference_scale = _fit_ring(
+        adapter,
+        reference,
+        BOM_REFERENCE_SCALE_LADDER,
+        _grown(BOM_REFERENCE_FIELD, BALLOON_RING_REACH),
+        label=BOM_REFERENCE_LABEL,
+    )
+    table = insert_bom_table(
+        adapter,
+        reference,
+        anchor_xy=BOM_ANCHOR,
+        expected_components=BOM_COMPONENTS,
+        descriptions=BOM_DESCRIPTIONS,
+        identity_aliases=BOM_IDENTITY_ALIASES,
+        configuration_grouping="same-part",
+        label="magnifier",
+    )
+    items = _validate_bom(adapter, table)
+    for view, label in (
+        (wheel, WHEEL_LABEL),
+        (lever, LEVER_LABEL),
+        (finished, FINISHED_LABEL),
+    ):
+        _link_view_to_bom(view, table, label=label)
+    for view, stems, label in (
+        (wheel, explode.WHEEL_GROUP_STEMS, WHEEL_LABEL),
+        (lever, explode.LEVER_GROUP_STEMS, LEVER_LABEL),
+    ):
+        isolate_drawing_view_components(adapter, view, visible_stems=stems, label=label)
+    # View-only isolation must leave the logical parts list alone.
+    if _bom_items(_early_bound(table, "ITableAnnotation")) != items:
+        raise RuntimeError("magnifier BOM items moved when the exploded views were isolated")
+
+    landings = []
+    scales = {}
+    for sheet_name, view, ladder, field, stems, label in (
+        (
+            SHEET_NAMES[1],
+            wheel,
+            EXPLODED_SCALE_LADDER,
+            WHEEL_FIELD,
+            explode.WHEEL_GROUP_STEMS,
+            WHEEL_LABEL,
+        ),
+        (
+            SHEET_NAMES[2],
+            lever,
+            EXPLODED_SCALE_LADDER,
+            LEVER_FIELD,
+            explode.LEVER_GROUP_STEMS,
+            LEVER_LABEL,
+        ),
+        (
+            SHEET_NAMES[3],
+            finished,
+            FINISHED_SCALE_LADDER,
+            FINISHED_FIELD,
+            frozenset({explode.WIRE_STEM}),
+            FINISHED_LABEL,
+        ),
+    ):
+        _activate_sheet(adapter, sheet_name)
+        scales[label] = _fit_ring(adapter, view, ladder, field, label=label)
+        landings += add_component_bom_balloons(
+            adapter,
+            view,
+            items=balloon_items(items, stems),
+            anchors=BALLOON_ANCHORS,
+            label=f"magnifier {label} BOM coverage",
+            margin=BALLOON_MARGIN,
+        )
+    if len(landings) != len(BOM_COMPONENTS):
+        raise RuntimeError(
+            f"magnifier package carries {len(landings)} balloons, expected one per "
+            f"BOM row ({len(BOM_COMPONENTS)})"
+        )
+
+    _add_note_block(
+        adapter,
+        SHEET_NAMES[1],
+        exploded_caption(WHEEL_GROUP, scales[WHEEL_LABEL]),
+        WHEEL_CAPTION_XY,
+        label="wheel caption",
+    )
+    _add_note_block(
+        adapter,
+        SHEET_NAMES[1],
+        f"{BOM_REFERENCE_CAPTION} (SCALE {scale_text(reference_scale)})",
+        BOM_REFERENCE_CAPTION_XY,
+        label="BOM reference caption",
+    )
+    _add_note_block(
+        adapter,
+        SHEET_NAMES[2],
+        exploded_caption(LEVER_GROUP, scales[LEVER_LABEL]),
+        LEVER_CAPTION_XY,
+        label="lever caption",
+    )
+    _add_note_block(
+        adapter,
+        SHEET_NAMES[3],
+        f"{FINISHED_CAPTION} (SCALE {scale_text(scales[FINISHED_LABEL])})",
+        FINISHED_CAPTION_XY,
+        label="finished caption",
+    )
+    _add_note_block(
+        adapter, SHEET_NAMES[3], ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
+    )
+    _add_note_block(
+        adapter, SHEET_NAMES[3], ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         layout=SPEC.layout,
         pdf_title=PDF_TITLE,
         scale=SHEET_SCALE,
-        settled_checks=(settled,),
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts=SHEET_LAYOUTS,
+        sheet_scales=SHEET_SCALES,
+        settled_checks=(
+            *settled_checks,
+            lambda: assert_balloon_landings(adapter, landings),
+        ),
     )
 
 
