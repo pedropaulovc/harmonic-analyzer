@@ -3438,9 +3438,16 @@ def task_check():
             "file_dep": [
                 str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
                 str((SCRIPTS_DIR / "test_buildgraph.py").resolve()),
+                str((SCRIPTS_DIR / "test_part_coverage.py").resolve()),
+                *part_script_deps,
+                *(str(script_for(stem).resolve()) for stem in ASSEMBLY_ORDER),
                 config_py,
             ],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_buildgraph.py")],
+            "cmd": [
+                *pytest_cmd,
+                str(SCRIPTS_DIR / "test_buildgraph.py"),
+                str(SCRIPTS_DIR / "test_part_coverage.py"),
+            ],
         },
         "nameplate": {
             # The plate outline, notched field and engraving are all vendored
