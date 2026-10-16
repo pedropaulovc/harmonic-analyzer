@@ -8292,7 +8292,16 @@ def r24_taper(native_front, bound, monkeypatch):
          _r24_text("R816/TAPER", (0.2059139, 0.1264437), width=0.0261722)],
         [_native_line(0.18, 0.1334438, 0.18, 0.1254438),
          _native_line(0.2463786, 0.1334438, 0.2463786, 0.1254438),
-         _native_line(0.18, 0.1264438, 0.2463786, 0.1264438)],
+         _native_line(0.18, 0.1264438, 0.2463786, 0.1264438),
+         # BASIC frame around 132.76: its sides are vertical, short, arrowless.
+         _native_line(0.2108882, 0.131, 0.2108882, 0.1365),
+         _native_line(0.2271118, 0.131, 0.2271118, 0.1365),
+         _native_line(0.2108882, 0.131, 0.2271118, 0.131),
+         _native_line(0.2108882, 0.1365, 0.2271118, 0.1365)],
+        primitives={"arrows": [
+            [0.18, 0.1264438, 0.0002, -1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1],
+            [0.2463786, 0.1264438, 0.0002, 1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1],
+        ]},
     )
     ann = taper.annotation
     ann.GetType = lambda: 4
@@ -8315,7 +8324,7 @@ def test_r24_taper_native_capped_witnesses_clear_parent_e_without_changing_measu
 
 
 @pytest.mark.parametrize("defect", ["property", "nan-property", "long-ink", "cross-parent-circle", "wrong-nominal",
-                                    "wrong-vertex", "missing-witness"])
+                                    "wrong-vertex", "missing-witness", "missing-arrow", "one-witness-two-arrows"])
 def test_r24_taper_native_ink_parent_circle_and_original_measurement_all_govern(r24_taper, defect):
     case = r24_taper
     if defect == "property":
@@ -8326,13 +8335,19 @@ def test_r24_taper_native_ink_parent_circle_and_original_measurement_all_govern(
         case.data.lines[1][5] = 0.1721122
     elif defect == "cross-parent-circle":
         case.data.lines[1] = _native_line(0.2463786, 0.1817179, 0.2463786, 0.1737179)
+        case.data.primitives["arrows"][1][1] = 0.1777179
     elif defect == "wrong-nominal":
         case.taper.model.SystemValue += 0.0001
     elif defect == "wrong-vertex":
         case.taper.attached = (case.entities[0], object())
     elif defect == "missing-witness":
         case.data.lines.pop(1)
-    with pytest.raises(RuntimeError):
+    elif defect == "missing-arrow":
+        case.data.primitives["arrows"].pop(1)
+    elif defect == "one-witness-two-arrows":
+        case.data.primitives["arrows"][1][:2] = [0.18, 0.1294438]
+    message = "parent E circle" if defect == "cross-parent-circle" else None
+    with pytest.raises(RuntimeError, match=message):
         drawing._require_taper_witnesses(case.adapter, object(), case.taper, case.entities)
 
 

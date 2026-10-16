@@ -2911,8 +2911,18 @@ def _require_taper_witnesses(adapter: Any, end: Any, taper: Any, taper_entities:
     assert_dimension_measures(adapter, taper, expected_mm=BOT_END_X, label="final 132.76 taper",
                               entities=taper_entities, entity_types=("EDGE", "VERTEX"))
     taper_record, _g = _r24_record(adapter, taper.GetAnnotation(), label="132.76 taper")
-    witnesses = [s for s in _r24_straight_ink(taper_record) if abs(s.x1 - s.x0) <= DETAIL_GEOMETRY_TOL_M]
-    if len(witnesses) != 2 or any(s.length > TAPER_WITNESS_LENGTH + DETAIL_GEOMETRY_TOL_M for s in witnesses):
+    # The BASIC frame's two sides are vertical ink too: a witness is the
+    # vertical line carrying one of the dimension's two arrow tips.
+    tips = [tuple(row[:2]) for row in taper_record["display"].get("arrows", ())]
+    witnesses = [
+        s for s in _r24_straight_ink(taper_record)
+        if abs(s.x1 - s.x0) <= DETAIL_GEOMETRY_TOL_M
+        and any(point_segment_distance(tip, s) <= DETAIL_GEOMETRY_TOL_M for tip in tips)
+    ]
+    if (len(tips) != 2 or len(witnesses) != 2
+            or any(sum(point_segment_distance(tip, s) <= DETAIL_GEOMETRY_TOL_M for s in witnesses) != 1
+                   for tip in tips)
+            or any(s.length > TAPER_WITNESS_LENGTH + DETAIL_GEOMETRY_TOL_M for s in witnesses)):
         raise RuntimeError("132.76: missing/uncapped native witness pair")
     readback = read_circular_detail_crop(adapter, end, label="R24 parent E circle")
     parent_circle = (*readback.parent_centre, readback.parent_radius)
