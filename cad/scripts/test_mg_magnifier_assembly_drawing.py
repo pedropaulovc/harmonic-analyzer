@@ -770,22 +770,43 @@ def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
     assert drawing.exploded_caption("WHEEL GROUP", (1.0, 3.0)).endswith("(SCALE 1:3)")
 
 
-def test_the_lever_group_takes_1_2_left_of_the_title_block() -> None:
-    # r11 (run 20261016T150215480Z) printed the lever group's outline 82.6 x
-    # 116.1 mm at 1:3; at 1:2 its balloon ring must fit the new field.
-    width, height = 0.0826 * 1.5, 0.1161 * 1.5
+def test_the_lever_group_takes_1_2_5_centred_with_its_caption_under_it() -> None:
+    # Outlines measured 82.6 x 116.1 mm at 1:3 (r11) and 118.3 x 168.6 at 1:2
+    # (r13): size = k / scale + fixed padding.
+    def outline_size(denominator: float) -> tuple[float, float]:
+        sizes = []
+        for at_2, at_3 in ((0.1183, 0.0826), (0.1686, 0.1161)):
+            k = (at_2 - at_3) * 6.0
+            sizes.append(k / denominator + at_2 - k / 2.0)
+        return sizes[0], sizes[1]
+
     field = drawing.LEVER_FIELD
     reach = 2.0 * drawing.BALLOON_RING_REACH
-    assert width + reach <= field[2] - field[0]
-    assert height + reach <= field[3] - field[1]
-    assert drawing.LEVER_SCALE_LADDER[0] == (1.0, 2.0)
-    # The caption: right of the field, above the title block, inside the border.
+
+    def fits(denominator: float) -> bool:
+        width, height = outline_size(denominator)
+        return width + reach <= field[2] - field[0] and height + reach <= field[3] - field[1]
+
+    assert not fits(2.0)
+    assert fits(2.5)
+    assert drawing.LEVER_SCALE_LADDER[0] == (1.0, 2.5)
+    # Centred in the field, the caption sits under the view, above the title block.
+    width, height = outline_size(2.5)
+    centre = ((field[0] + field[2]) / 2.0, (field[1] + field[3]) / 2.0)
+    outline = (
+        centre[0] - width / 2.0,
+        centre[1] - height / 2.0,
+        centre[0] + width / 2.0,
+        centre[1] + height / 2.0,
+    )
     text = drawing.exploded_caption(drawing.LEVER_GROUP, (1.0, 2.5))
-    left, top = drawing.LEVER_CAPTION_XY
-    caption = (left, top - drawing.NOTE_LINE_PITCH, left + len(text) * 0.00256, top)
-    assert caption[0] > field[2]
-    assert caption[1] > drawing.TITLE_BLOCK[3]
-    assert caption[2] < drawing.INNER_BORDER[2]
+    left, top = drawing.lever_caption_xy(outline, text)
+    assert top < outline[1]
+    assert left + len(text) * drawing.CAPTION_CHAR_WIDTH / 2.0 == pytest.approx(centre[0])
+    assert left > drawing.INNER_BORDER[0]
+    assert left + len(text) * 0.00256 < drawing.INNER_BORDER[2]
+    with pytest.raises(ValueError, match="reaches the title block"):
+        drawing.lever_caption_xy((0.1, 0.075, 0.2, 0.2), text)
 
 
 def test_the_axle_nut_balloons_land_square_to_the_axle_on_distinct_parts() -> None:
