@@ -221,6 +221,15 @@ if not math.isclose(EDGE_RIB_END_STEP, 0.44, abs_tol=0.005):
         f"edge-rib end step {EDGE_RIB_END_STEP:.4f} is not the built 0.44"
     )
 
+# Receiver-coordinate marks (``_receiver_coordinate_dimensions``): short
+# construction lines whose ends carry the bracket-tap coordinates.  The edge
+# mark lies on the free edge below its top corner (the plate is PLATE_T deep
+# there); each tap mark lies on its row inside the tap drill.
+RECEIVER_EDGE_MARK = 1.0
+RECEIVER_TAP_MARK = 0.5
+if not RECEIVER_EDGE_MARK < PLATE_T or not RECEIVER_TAP_MARK < TAP_DRILL_DIA / 2.0:
+    raise AssertionError("receiver coordinate marks must stay on printed ink")
+
 
 def edge_rib_half_height(x: float) -> float:
     """Half-height |y| of an edge rib's Front-plane profile at local +X ``x``.
@@ -1242,37 +1251,82 @@ def _drawing_dimension_contract(adapter) -> None:
 async def _receiver_coordinate_dimensions(adapter) -> None:
     """Native coordinate dimensions from the real free edge and top face (the
     spring pad hangs below the plate at the free edge, so its old lower-face
-    corner is no longer an edge)."""
-    from _sketch import anchor_point_to_point
+    corner is no longer an edge).
+
+    Each dimension runs from the free edge's top corner, a model vertex, to
+    a tap centre.  Both are ends of short construction marks that lie on ink
+    the view prints anyway: the corner's runs down the free edge, each tap's
+    along its row inside the drill, on the centre mark.  The old L-chain
+    through the plate-top corner over each tap drew a line across the end
+    rib's face at the plate top, read as a face 2.54 over the taps
+    (machinist review r11); the rib's slants wall the taps there."""
     from magnifying_bracket_joint_layout import POSITION_BAND
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     check("receiver coordinate sketch", await adapter.create_sketch("Front"))
     dimensions = SketchDims()
-    for index, point in enumerate(LEVER_HOLE_POINTS):
-        start = (PLATE_W, PLATE_T / 2.0)
-        corner = (point[0], start[1])
-        lines = await add_line_chain(adapter, [start, corner, point[:2]], close=False)
-        await anchor_point_to_origin(
-            adapter, f"{lines[0]}.start", *start, "receiver free edge"
+    corner = (PLATE_W, PLATE_T / 2.0)
+    edge_end = (PLATE_W, corner[1] - RECEIVER_EDGE_MARK)
+    set_sketch_direct_db(adapter, True)
+    edge_mark = check(
+        "receiver free-edge mark", await adapter.add_line(*corner, *edge_end)
+    )
+    tap_marks = [
+        check(
+            f"receiver tap {index} mark",
+            await adapter.add_line(*point[:2], point[0] + RECEIVER_TAP_MARK, point[1]),
         )
-        dimensions.record(f"ReceiverOriginX{index}", None)
-        dimensions.record(f"ReceiverOriginY{index}", None)
-        await anchor_point_to_point(
+        for index, point in enumerate(LEVER_HOLE_POINTS)
+    ]
+    set_sketch_direct_db(adapter, False)
+    for mark in (edge_mark, *tap_marks):
+        _as_construction(adapter, mark)
+    origin_corner = f"{edge_mark}.start"
+    await anchor_point_to_origin(adapter, origin_corner, *corner, "receiver free edge")
+    dimensions.record("ReceiverOriginX", None)
+    dimensions.record("ReceiverOriginY", None)
+    check(
+        "receiver free-edge mark vertical",
+        await adapter.add_sketch_constraint(edge_mark, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        origin_corner,
+        f"{edge_mark}.end",
+        "vertical_distance",
+        RECEIVER_EDGE_MARK,
+        "receiver free-edge mark length",
+    )
+    dimensions.record("ReceiverEdgeMark", None)
+    for index, (mark, point) in enumerate(zip(tap_marks, LEVER_HOLE_POINTS)):
+        check(
+            f"receiver tap {index} mark horizontal",
+            await adapter.add_sketch_constraint(mark, None, "horizontal"),
+        )
+        await dimension_between(
             adapter,
-            f"{lines[0]}.start",
-            f"{lines[0]}.end",
-            corner[0] - start[0],
-            0.0,
+            f"{mark}.start",
+            f"{mark}.end",
+            "horizontal_distance",
+            RECEIVER_TAP_MARK,
+            f"receiver tap {index} mark length",
+        )
+        dimensions.record(f"ReceiverTapMark{index}", None)
+        await dimension_between(
+            adapter,
+            origin_corner,
+            f"{mark}.start",
+            "horizontal_distance",
+            corner[0] - point[0],
             "receiver X station",
         )
         dimensions.record(f"ReceiverX{index}", None)
-        await anchor_point_to_point(
+        await dimension_between(
             adapter,
-            f"{lines[1]}.start",
-            f"{lines[1]}.end",
-            0.0,
-            point[1] - start[1],
+            origin_corner,
+            f"{mark}.start",
+            "vertical_distance",
+            corner[1] - point[1],
             "receiver row",
         )
         dimensions.record(f"ReceiverY{index}", None)
