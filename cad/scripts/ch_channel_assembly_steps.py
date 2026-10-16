@@ -43,6 +43,11 @@ SET_SCREWS_STAKED_KEY = "fulcrum-set-screws-staked"
 BARS_PINNED_KEY = "bars-pinned"
 LEVER_BANK_THREADED_KEY = "lever-bank-threaded"
 SPRINGS_HOOKED_KEY = "springs-hooked"
+# The anchors are threaded, locked and set at MHA-HA-000 (key
+# "channel-anchors-set"). That sheet's steps module is not on this branch's
+# base yet, so the pointer is literal; once it lands this becomes
+# ha_harmonic_analyzer_assembly_steps.step_ref("channel-anchors-set").
+HA_ANCHORS_SET_REF = "MHA-HA-000 STEP 5"
 
 SEQUENCE: tuple[str, ...] = (
     "rocker-stack-accepted",

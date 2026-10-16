@@ -85,6 +85,7 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
     KEEPER_INNER_FACE_SPAN_MM,
+    KEEPER_Z_OFF,
     PAIR_REAMER_DIA_IN,
     PAIR_REAMER_OAL_IN,
 )
@@ -92,7 +93,12 @@ from ch_pivot_bracket_spec import SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
 from ch_pivot_shaft_spec import DOME_HEIGHT
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from frame_column_stations import COLUMN_X
-from rocker_bank_layout import COUNT, SHAFT_TIP_SET_BAND, STACK_MID_Z
+from rocker_bank_layout import (
+    COUNT,
+    PIVOT_BRACKET_Z,
+    SHAFT_TIP_SET_BAND,
+    STACK_MID_Z,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["ch_channel_assembly"]
@@ -160,7 +166,8 @@ EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.130)
 EXPLODED_CAPTION = "\n".join(
     (
         f"EXPLODED: ALL {COUNT} CHANNELS ALIKE; ONE BALLOON PER BOM ROW,",
-        "ON THE NORTH-MOST INSTANCE. QTY IS PER CHANNEL ASSEMBLY.",
+        "ON THE NORTH-MOST INSTANCE.",
+        f"QTY IS PER {steps.DRAWING_NUMBER} (ALL {COUNT} CHANNELS).",
     )
 )
 
@@ -266,8 +273,11 @@ END_LABEL_DROP_MM = 52.0  # end labels this far under the shaft axis
 
 @dataclass(frozen=True)
 class BankView:
-    """One isolated *Right model view of a bank, its ``centre_xyz`` (model mm)
-    landing on ``centre`` (sheet m); cropped to ``crop_radius_mm`` if set."""
+    """One isolated model view (a *Right view of a bank unless told
+    otherwise), its ``centre_xyz`` (model mm) landing on ``centre`` (sheet m);
+    cropped to ``crop_radius_mm`` if set. ``exploded`` shows the
+    configuration's channel explode, ``centre_xyz`` then being an exploded
+    position."""
 
     title: str
     scale: tuple[int, int]
@@ -276,6 +286,9 @@ class BankView:
     stems: frozenset[str]
     crop_radius_mm: float | None = None
     parts: str = ""
+    orientation: str = "*Right"
+    exploded: bool = False
+    letter: str = ""  # a detail's letter, at its boundary in the parent
 
     @property
     def mm(self) -> float:
@@ -283,7 +296,9 @@ class BankView:
         return self.scale[0] / self.scale[1] / 1000.0
 
     def sheet_xy(self, z: float, y: float) -> tuple[float, float]:
-        """Machine (z, y) in this view's plane, on the sheet."""
+        """Machine (z, y) in a *Right view's plane, on the sheet."""
+        if self.orientation != "*Right":
+            raise ValueError(f"{self.title} is not a *Right view")
         return (
             self.centre[0] - (z - self.centre_xyz[2]) * self.mm,
             self.centre[1] + (y - self.centre_xyz[1]) * self.mm,
@@ -297,6 +312,16 @@ class BankView:
     def label_text(self) -> str:
         lines = (self.title, self.parts, f"SCALE {self.scale[0]} : {self.scale[1]}")
         return "\n".join(line for line in lines if line)
+
+    @property
+    def crop_label_xy(self) -> tuple[float, float]:
+        """A cropped view's label point, under its circle."""
+        if self.crop_radius_mm is None:
+            raise ValueError(f"{self.title} has no crop circle")
+        return (
+            self.centre[0] - 0.016,
+            self.centre[1] - self.crop_radius_mm * self.mm - 0.004,
+        )
 
 
 _PIVOT_X, _PIVOT_Y = ROCKER_PIVOT_XY
@@ -322,9 +347,10 @@ ROCKER_BANK = BankView(
 )
 # The south end at 4:1: the ear's inner face, the spring, the washer and hub 0
 # about the circle's centre on the pivot axis.
+DETAIL_LETTER = "A"
 _DETAIL_CENTRE_Z = (asm.PIVOT_CHAIN_Z[0] + asm.PIVOT_CHAIN_Z[2]) / 2.0
 SOUTH_END = BankView(
-    "DETAIL A, SOUTH END",
+    f"DETAIL {DETAIL_LETTER}, SOUTH END",
     (4, 1),
     (_PIVOT_X, _PIVOT_Y, _DETAIL_CENTRE_Z),
     (0.072, 0.098),
@@ -340,7 +366,30 @@ SOUTH_END = BankView(
     ),
     crop_radius_mm=8.0,
     parts="EAR, SPRING, WASHER, HUB 0",
+    letter=DETAIL_LETTER,
 )
+# The letter sits this far (sheet m) outside the parent's boundary circle, up
+# and to the south, clear of the ear (its outer face 8.7 mm south of centre)
+# and above the shaft end.
+DETAIL_LETTER_OFFSET = 0.002
+
+
+def detail_boundary(
+    parent: BankView, detail: BankView
+) -> tuple[tuple[float, float], float]:
+    """``detail``'s crop circle as drawn in ``parent``: sheet centre, radius."""
+    if detail.crop_radius_mm is None:
+        raise ValueError(f"{detail.title} is not a cropped detail")
+    centre = parent.sheet_xy(detail.centre_xyz[2], detail.centre_xyz[1])
+    return centre, detail.crop_radius_mm * parent.mm
+
+
+def letter_xy(centre: tuple[float, float], radius: float) -> tuple[float, float]:
+    """A detail letter's note point, past its boundary on the upper right."""
+    offset = radius + DETAIL_LETTER_OFFSET
+    return centre[0] + offset, centre[1] + offset
+
+
 LEVER_BANK = BankView(
     "LEVER BANK",
     (1, 1),
@@ -357,14 +406,73 @@ LEVER_BANK = BankView(
         }
     ),
 )
+
+
+def exploded_offset(stem: str, side: asm.Side) -> tuple[float, float, float]:
+    """The net channel-explode displacement (model mm) of ``stem``'s
+    instance on ``side``: every step that moves its family, summed."""
+    offset = [0.0, 0.0, 0.0]
+    for step in asm.EXPLODE_STEPS:
+        if stem in step.stems and step.side in (None, side):
+            offset["xyz".index(step.axis)] += step.distance_mm
+    return offset[0], offset[1], offset[2]
+
+
+def _exploded(
+    point: tuple[float, float, float], stem: str, side: asm.Side
+) -> tuple[float, float, float]:
+    dx, dy, dz = exploded_offset(stem, side)
+    return point[0] + dx, point[1] + dy, point[2] + dz
+
+
+# At 1:7 the exploded view shows the small hardware at the bracket and keeper
+# ends too small and dark to tell apart (r7 machinist review), so each north
+# end (the instances the balloons pin) is enlarged, exploded, beside the BOM.
+# Each detail is centred on its exploded bore centre; the radii hold the
+# exploded set screw, hold-down or foot screw and (the bracket's) the north
+# washer, 29 to 40 mm from those centres in the isometric (estimated from the
+# spec dimensions, with margin).
+EXPLODED_DETAIL_SCALE = (1, 2)
+EXPLODED_DETAIL_X = 0.392  # the column between the BOM and the right border
+NORTH_BRACKET_DETAIL = BankView(
+    "DETAIL B",
+    EXPLODED_DETAIL_SCALE,
+    _exploded((_PIVOT_X, _PIVOT_Y, PIVOT_BRACKET_Z[1]), asm.BRACKET, "north"),
+    (EXPLODED_DETAIL_X, 0.240),
+    frozenset({asm.BRACKET, asm.BRACKET_SET_SCREW, asm.BRACKET_HOLD_DOWN, asm.WASHER}),
+    crop_radius_mm=44.0,
+    parts="NORTH BRACKET",
+    orientation="*Isometric",
+    exploded=True,
+    letter="B",
+)
+NORTH_KEEPER_DETAIL = BankView(
+    "DETAIL C",
+    EXPLODED_DETAIL_SCALE,
+    _exploded(
+        (_FULCRUM_X, _FULCRUM_Y, FULCRUM_KEEPER_CENTRE_Z + KEEPER_Z_OFF),
+        asm.KEEPER,
+        "north",
+    ),
+    (EXPLODED_DETAIL_X, 0.170),
+    frozenset({asm.KEEPER, asm.KEEPER_SET_SCREW, asm.KEEPER_FOOT_SCREW}),
+    crop_radius_mm=36.0,
+    parts="NORTH KEEPER",
+    orientation="*Isometric",
+    exploded=True,
+    letter="C",
+)
+EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
 _STACK_MID = (asm.PIVOT_CHAIN_Z[2] + asm.PIVOT_CHAIN_Z[3]) / 2.0
 _SPRING_MID = (asm.PIVOT_CHAIN_Z[0] + asm.PIVOT_CHAIN_Z[1]) / 2.0
 _LUG_MID = sum(asm.LUG_INNER_FACE_Z) / 2.0
 STACK_KEEP = {
     asm.STACK_LENGTH_DIMENSION: ROCKER_BANK.sheet_xy(_STACK_MID, _PIVOT_Y + 40.0)
 }
+# Above the 8 mm crop circle: at +6 the circle's arc crossed the callout
+# text (r7 layout audit, text-on-line).
 SPRING_KEEP = {
-    asm.SPRING_SET_DIMENSION: SOUTH_END.sheet_xy(_SPRING_MID, _PIVOT_Y + 6.0)
+    asm.SPRING_SET_DIMENSION: SOUTH_END.sheet_xy(_SPRING_MID, _PIVOT_Y + 9.5)
 }
 LUG_KEEP = {asm.LUG_SPAN_DIMENSION: LEVER_BANK.sheet_xy(_LUG_MID, _FULCRUM_Y + 32.0)}
 # swDimensionTextParts_e compartments.
@@ -495,13 +603,15 @@ def _fitup_notes() -> tuple[str, str]:
         "north-ear-datum": (
             f"NORTH {bracket} SET AT {steps.NORTH_BRACKET_SET_REF}: SWING "
             f"EACH ARM UP ON ITS ROD; PUSH THE {shaft} SHAFT, FLATS UP, "
-            f"SOUTH THROUGH THE EAR, ITS MICED {washer} AND HUBS {last} TO 0."
+            "SOUTH THROUGH THE EAR, THE "
+            f"{washer} MICED AND KEPT AT THAT STEP, AND HUBS {last} TO 0."
         ),
         "south-washer-fitted": f"SLIP THE OTHER {washer} ON AGAINST HUB 0.",
         "south-bracket-spring-set": (
             f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS. "
             f"FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
-            "SPRING-SET BLADE (DETAIL A) BESIDE THE SPRING, BANK PUSHED NORTH. "
+            f"SPRING-SET BLADE (DETAIL {DETAIL_LETTER}) BESIDE THE SPRING, "
+            "BANK PUSHED NORTH. "
             f"CLAMP, TRANSFER ITS SEAT INTO THE {support} RAIL, TAP AS {support}, "
             f"SCREW DOWN ONE {hold_down}, PULL THE BLADE."
         ),
@@ -559,10 +669,11 @@ def _fitup_notes() -> tuple[str, str]:
         ),
         # The anchors thread into the summing plate (MHA-HA-000 owns that
         # joint, its lock and its setting); this sheet only hooks the spring.
+        # The pointer is steps.HA_ANCHORS_SET_REF.
         steps.SPRINGS_HOOKED_KEY: (
             f"HOOK EACH {channel_spring} SPRING'S TOP LOOP THROUGH ITS {lever} "
-            f"LEVER'S SPRING HOLE. ITS BOTTOM LOOP TAKES ITS {anchor} ANCHOR AT "
-            "MHA-HA-000, WHERE THE ANCHOR IS THREADED, LOCKED AND SET."
+            f"LEVER'S SPRING HOLE. ITS BOTTOM LOOP TAKES ITS {anchor} ANCHOR, "
+            f"THREADED, LOCKED AND SET PER {steps.HA_ANCHORS_SET_REF}."
         ),
     }
     return (
@@ -926,6 +1037,12 @@ def _place_exploded_sheet(
         EXPLODED_CAPTION_XY,
         label="exploded-view caption",
     )
+    # After the balloons, so the boundary circles are never picked as a
+    # component's edge.
+    _mark_exploded_details(adapter, exploded)
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    for detail in EXPLODED_DETAILS:
+        _exploded_detail(adapter, detail)
     return lambda: assert_balloon_landings(adapter, landings)
 
 
@@ -938,18 +1055,26 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
 
 
 def _placed_bank_view(adapter: Any, bank: BankView) -> Any:
-    """``bank`` uncropped: a *Right model view at its scale, moved so its
-    model centre lands on ``bank.centre``, isolated to its families."""
+    """``bank`` uncropped: a model view in its orientation at its scale,
+    moved so its model centre lands on ``bank.centre``, isolated to its
+    families."""
     view = _early_bound(
-        place_view(adapter, str(SOURCE), "*Right", *bank.centre, scale=bank.scale),
+        place_view(
+            adapter, str(SOURCE), bank.orientation, *bank.centre, scale=bank.scale
+        ),
         "IView",
     )
     label = f"{bank.title} centre"
+    pictorial = bank.orientation != "*Right"
+    if pictorial:
+        # Display mode first, as the exploded view: the configuration
+        # policy judges a pictorial view shaded with edges.
+        set_high_quality_shaded_with_edges(adapter, view, label=bank.title)
     configuration = apply_view_configuration(
         adapter, view, role=ViewRole.PLAIN, label=bank.title
     )
     set_view_exploded_state(
-        adapter, view, False, configuration=configuration, label=bank.title
+        adapter, view, bank.exploded, configuration=configuration, label=bank.title
     )
     centre = model_point_in_view(adapter, view, bank.model_centre_m, label=label)
     position = tuple(float(value) for value in view.Position)
@@ -962,29 +1087,30 @@ def _placed_bank_view(adapter: Any, bank: BankView) -> Any:
         raise RuntimeError(
             f"{bank.title} centre sits at {centre!r}, not {bank.centre!r}"
         )
-    set_hidden_lines_removed(adapter, view)
+    if not pictorial:
+        set_hidden_lines_removed(adapter, view)
     isolate_drawing_view_components(
         adapter, view, visible_stems=bank.stems, label=bank.title
     )
     return view
 
 
-def _crop(adapter: Any, view: Any, bank: BankView) -> None:
-    """Crop ``view`` to the circle round ``bank.centre``: sketch the circle in
-    the active view's own sketch and Crop2 while it is still selected (the
-    draw_mg_magnifier_assembly detail)."""
-    if bank.crop_radius_mm is None:
-        raise ValueError(f"{bank.title} has no crop circle")
+def _sketch_view_circle(
+    adapter: Any,
+    view: Any,
+    centre: tuple[float, float],
+    radius_m: float,
+    *,
+    label: str,
+) -> None:
+    """Sketch a circle (sheet m) in ``view``'s own sketch, left selected."""
     view = _early_bound(view, "IView")
-    _activate_view(adapter, view, label=bank.title)
+    _activate_view(adapter, view, label=label)
     sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
-    for x, y in (
-        bank.centre,
-        (bank.centre[0] + bank.crop_radius_mm * bank.mm, bank.centre[1]),
-    ):
+    for x, y in (centre, (centre[0] + radius_m, centre[1])):
         point = _early_bound(
             utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
         )
@@ -998,7 +1124,19 @@ def _crop(adapter: Any, view: Any, bank: BankView) -> None:
     finally:
         manager.AddToDB = previous
     if circle is None:
-        raise RuntimeError(f"failed to sketch the {bank.title} crop circle")
+        raise RuntimeError(f"failed to sketch the {label} circle")
+
+
+def _crop(adapter: Any, view: Any, bank: BankView) -> None:
+    """Crop ``view`` to the circle round ``bank.centre``: sketch the circle in
+    the active view's own sketch and Crop2 while it is still selected (the
+    draw_mg_magnifier_assembly detail)."""
+    if bank.crop_radius_mm is None:
+        raise ValueError(f"{bank.title} has no crop circle")
+    view = _early_bound(view, "IView")
+    _sketch_view_circle(
+        adapter, view, bank.centre, bank.crop_radius_mm * bank.mm, label=bank.title
+    )
     status = int(view.Crop2(False, False, 1))
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
@@ -1015,12 +1153,67 @@ def _crop(adapter: Any, view: Any, bank: BankView) -> None:
         )
 
 
+def _mark_detail(
+    adapter: Any,
+    view: Any,
+    centre: tuple[float, float],
+    radius: float,
+    letter: str,
+    *,
+    parent: str,
+) -> None:
+    """Draw a detail's boundary circle (sheet m) in its parent ``view`` and
+    letter it outside, view-owned so both move with the view."""
+    label = f"{parent} detail {letter} boundary"
+    _sketch_view_circle(adapter, view, centre, radius, label=label)
+    adapter.currentModel.ClearSelection2(True)
+    _activate_view(adapter, view, label=parent)
+    if add_note(adapter, letter, *letter_xy(centre, radius)) is None:
+        raise RuntimeError(f"failed to letter the {label}")
+
+
+def _exploded_detail(adapter: Any, detail: BankView) -> None:
+    """One enlarged, exploded hardware cluster: placed, isolated, cropped to
+    its circle and labelled under it."""
+    view = _placed_bank_view(adapter, detail)
+    _crop(adapter, view, detail)
+    _activate_view(adapter, view, label=detail.title)
+    if add_note(adapter, detail.label_text, *detail.crop_label_xy) is None:
+        raise RuntimeError(f"failed to label {detail.title}")
+
+
+def _mark_exploded_details(adapter: Any, exploded: Any) -> None:
+    """Each enlarged cluster's boundary in the 1:7 exploded view, about its
+    exploded centre as that view projects it."""
+    numerator, denominator = SHEET_SCALE
+    for detail in EXPLODED_DETAILS:
+        if detail.crop_radius_mm is None:
+            raise ValueError(f"{detail.title} has no crop circle")
+        centre = model_point_in_view(
+            adapter, exploded, detail.model_centre_m, label=f"{detail.title} centre"
+        )
+        radius = detail.crop_radius_mm * numerator / denominator / 1000.0
+        _mark_detail(
+            adapter,
+            exploded,
+            (centre[0], centre[1]),
+            radius,
+            detail.letter,
+            parent="channel exploded",
+        )
+
+
 def _dimensioned_bank(
-    adapter: Any, bank: BankView, keep: dict[str, tuple[float, float]]
+    adapter: Any,
+    bank: BankView,
+    keep: dict[str, tuple[float, float]],
+    *,
+    detail: BankView | None = None,
 ) -> list[Any]:
     """Place ``bank``, show its own settings sketch in it (the other bank's
     lies off the sheet), import ``keep``, crop it if it is a detail, prove the
-    kept dimensions survived, and label it."""
+    kept dimensions survived, and label it. ``detail``, a detail taken from
+    ``bank``, gets its boundary circle and letter drawn in ``bank``."""
     view = _placed_bank_view(adapter, bank)
     features = tuple(dict.fromkeys(asm.DIMENSION_FEATURE[name] for name in keep))
     _show_base_view_sketches(adapter, view, features, label=bank.title)
@@ -1031,6 +1224,9 @@ def _dimensioned_bank(
         view_label=bank.title,
         dimensions_by_feature=asm.DRAWING_DIMENSIONS,
     )
+    if detail is not None:
+        centre, radius = detail_boundary(bank, detail)
+        _mark_detail(adapter, view, centre, radius, detail.letter, parent=bank.title)
     if bank.crop_radius_mm is not None:
         _crop(adapter, view, bank)
         kept = {
@@ -1042,10 +1238,7 @@ def _dimensioned_bank(
             raise RuntimeError(
                 f"{bank.title} lost {lost} to its crop; kept {sorted(kept)}"
             )
-        x0, y0 = (
-            bank.centre[0] - 0.016,
-            bank.centre[1] - bank.crop_radius_mm * bank.mm - 0.004,
-        )
+        x0, y0 = bank.crop_label_xy
     else:
         _assert_view_on_sheet(view, label=bank.title)
         x0, y0 = (
@@ -1110,7 +1303,7 @@ def _place_steps(adapter: Any, sheet: str, text: str, *, label: str) -> None:
 def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     """Sheets 3 and 4: the isolated banks with their settings, the steps."""
     _activate_sheet(adapter, SHEET_NAMES[2])
-    annotations = _dimensioned_bank(adapter, ROCKER_BANK, STACK_KEEP)
+    annotations = _dimensioned_bank(adapter, ROCKER_BANK, STACK_KEEP, detail=SOUTH_END)
     annotations += _dimensioned_bank(adapter, SOUTH_END, SPRING_KEEP)
     _place_labels(adapter, SHEET_NAMES[2], ROCKER_END_LABELS)
     _place_steps(adapter, SHEET_NAMES[2], FITUP_NOTES[0], label="rocker-bank steps")
