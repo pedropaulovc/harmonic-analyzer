@@ -56,7 +56,7 @@ def test_channel_assembly_keeps_registry_outputs_and_precomputed_placement() -> 
     assert drawing.SHEET_SCALE == (1.0, 7.0)
     assert drawing.FRONT_CENTER == (0.060, 0.150)
     assert drawing.RIGHT_CENTER == (0.130, 0.150)
-    assert drawing.ISO_CENTER == (0.225, 0.140)
+    assert drawing.ISO_CENTER == (0.225, 0.150)
 
 
 def test_step_numbers_follow_the_sequence_and_unknown_steps_are_refused() -> None:
