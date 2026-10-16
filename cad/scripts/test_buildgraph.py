@@ -157,6 +157,32 @@ def test_arm_plate_locating_pin_has_real_assembly_dependents() -> None:
     assert set(dependents_of(stem)) == {"pd_paper_drive", "ha_harmonic_analyzer"}
 
 
+@pytest.mark.parametrize(
+    ("stem", "number"),
+    [
+        ("pd_chain_sprocket", "MHA-PD-001"),
+        ("vn_hex_bolt", "MHA-VN-008"),
+    ],
+)
+def test_retired_orphan_families_are_not_allocated(stem, number) -> None:
+    import yaml
+    from _drawing_registry import DRAWINGS_BY_NAME
+    from _fastener_catalog import FASTENERS
+
+    assert stem not in part_stems()
+    assert stem not in DRAWINGS_BY_NAME
+    assert stem.replace("_", "-") not in FASTENERS
+    assert not (bg.CONFIG_DIR / "parts" / f"{stem.replace('_', '-')}.yaml").exists()
+    assert not (SCRIPTS_DIR / f"build_{stem}.py").exists()
+    assert not (SCRIPTS_DIR / f"draw_{stem}.py").exists()
+    for assembly in ASSEMBLY_ORDER:
+        assert stem not in references_of(assembly)
+    for registry in (bg.CONFIG_DIR / "parts").glob("*.yaml"):
+        for row in yaml.safe_load(registry.read_text(encoding="utf-8")).values():
+            if isinstance(row, dict):
+                assert row.get("number") != number, registry
+
+
 def test_retired_front_pin_is_not_allocated_but_rear_cup_pin_is() -> None:
     from _drawing_registry import DRAWINGS_BY_NAME
     from _fastener_catalog import FASTENERS

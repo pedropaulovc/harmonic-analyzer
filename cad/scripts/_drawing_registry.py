@@ -1188,13 +1188,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="vn_hex_bolt",
-        part="vn_hex_bolt",
-        artifact_stem="vn-hex-bolt",
-        script_name="draw_vn_hex_bolt.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="vn_knife_hanger_stud",
         part="vn_knife_hanger_stud",
         artifact_stem="vn-knife-hanger-stud",
