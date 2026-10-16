@@ -94,6 +94,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _session import run_build
 from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
+from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
 from mg_wheel_axle_spec import TIP_Y
 from mg_wheel_bar_geom import BORE_ROW_HEIGHT
 
@@ -382,32 +383,36 @@ BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
 # One balloon per family (row); each walks its family's lowest-named shown
-# instance for a visible edge, except the two capsule rods.
+# instance for a visible edge, except the two rods.
 #
-# MHA-MG-003 and MHA-MG-004 are revolved capsules (a hemispherical dome at
-# each end): no flat face, no end circle. Their only model edges are the two
-# dome-to-cylinder tangent circles at x = R from each tip, which IView's
-# visible-entity list does not report (0 listed, tangent edges shown), and
-# every body extreme point sits on a dome silhouette, which no EDGE hit test
-# picks (r1/r2, runs 20261016T062016526Z-f9642112ccea4d2ab63c137a71a668ea and
+# MHA-MG-003 is a revolved capsule (a hemispherical dome at each end): no
+# flat face, no end circle. Its only model edges are the two dome-to-cylinder
+# tangent circles at x = R from each tip, which IView's visible-entity list
+# does not report (0 listed, tangent edges shown), and every body extreme
+# point sits on a dome silhouette, which no EDGE hit test picks (r1/r2, runs
+# 20261016T062016526Z-f9642112ccea4d2ab63c137a71a668ea and
 # 20261016T065610791Z-790156178d0b4378a1fd0680e77ece6b: the lever walked 12
-# extremes, no ink). So each is pinned to the point of a tangent circle that
-# faces the *Isometric viewer (+X+Y+Z, mg_magnifier_explode_spec): its part
-# normal is the view direction projected square to the rod axis.
+# extremes, no ink). MHA-MG-004's top is a #4-40 thread turned down to a
+# shoulder (#1559); the shoulder's Ø5 edge is its one full-diameter hard
+# circle, 45 below the clamp's bottom face once the explode drops the rod
+# (the bottom dome is tangent, like the lever's). Each is
+# pinned to the point of a circle that faces the *Isometric viewer (+X+Y+Z,
+# mg_magnifier_explode_spec): its part normal is the view direction
+# projected square to the rod axis.
 #   lever, Ry(180) in the assembly (local y = +Y, z = -Z): the west junction
 #     (x = R, 50 clear of the clamp) at normal machine (0, 1, 1)/sqrt2;
-#   vertical rod (local x = -Y, y = -X, z = -Z): the top junction, 37 below
-#     the lever once the explode drops it, at normal machine (1, 0, 0), the
-#     point opposite the circle's seam. Each capsule is revolved from a Front
-#     (z = 0) half-profile at y > 0, so its tangent circles' seam vertex is
-#     (R, R, 0). The hit test's aperture is a few hundredths of a millimetre
-#     (_drawing_scan._HIT_ZOOM_HALF) and picks the drawn, tessellated circle:
-#     the rod's earlier front point (normal (1, 0, 1)/sqrt2, 135 deg from the
-#     seam) hit at 1:3 but drew no edge at 1:2 (r12, run
-#     20261016T155038849Z-7389d03825f14ebd9df43bc29b661e3d), as a 30 deg
-#     tessellation's chord sag at 135 deg (0.085 mm on R2.5) would, sheet
-#     0.028 at 1:3 and 0.043 at 1:2. The seam's opposite (180 deg) is a
-#     tessellation vertex for any even segment count, so lies on the drawn edge.
+#   vertical rod (local x = -Y, y = -X, z = -Z): the shoulder's outer edge
+#     at x = SHOULDER_X, at normal machine (1, 0, 0), the point opposite the
+#     circle's seam. Each rod is revolved from a Front (z = 0) half-profile at
+#     y > 0, so its circles' seam vertex is (x, R, 0). The hit test's aperture
+#     is a few hundredths of a millimetre (_drawing_scan._HIT_ZOOM_HALF) and
+#     picks the drawn, tessellated circle: the rod's earlier front point
+#     (normal (1, 0, 1)/sqrt2, 135 deg from the seam) hit at 1:3 but drew no
+#     edge at 1:2 (r12, run 20261016T155038849Z-7389d03825f14ebd9df43bc29b661e3d),
+#     as a 30 deg tessellation's chord sag at 135 deg (0.085 mm on R2.5)
+#     would, sheet 0.028 at 1:3 and 0.043 at 1:2. The seam's opposite (180
+#     deg) is a tessellation vertex for any even segment count, so lies on the
+#     drawn edge.
 _LEVER_R = LEVER_ROD_DIA / 2.0
 _VROD_R = VROD_DIA / 2.0
 # Machinist review r6 (run 20261016T150215480Z): on the wheel sheet the front
@@ -441,7 +446,7 @@ BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
         point_mm=(_LEVER_R, _LEVER_R / math.sqrt(2.0), -_LEVER_R / math.sqrt(2.0))
     ),
     "mg-magnifying-vertical-rod": BalloonAnchor(
-        point_mm=(_VROD_R, -_VROD_R, 0.0)
+        point_mm=(VROD_SHOULDER_X, -_VROD_R, 0.0)
     ),
     "vn-wheel-axle-front-washer": BalloonAnchor(point_mm=FRONT_WASHER_BALLOON_POINT_MM),
     "vn-wheel-axle-nut": BalloonAnchor(
