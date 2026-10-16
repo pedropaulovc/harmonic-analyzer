@@ -257,7 +257,7 @@ if asm.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
 # sheet y with machine y.
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 VIEW_POSITION_TOL_M = 1e-4
-STEPS_XY = (0.207, 0.258)
+STEPS_XY = (0.214, 0.258)
 STEPS_LINE_WIDTH = 64  # characters; default-format note text
 # The layout audit proves the blocks clear the title block; the line width
 # keeps them inside the right border (test_ch_channel_assembly_drawing).
@@ -305,7 +305,9 @@ ROCKER_BANK = BankView(
     "ROCKER BANK",
     (1, 1),
     (_PIVOT_X, _PIVOT_Y, STACK_MID_Z),
-    (0.105, 0.205),
+    # 188 mm wide at 1:1 (r5 outline 0.0111-0.1995 about x 0.105): centred
+    # between the left border and the steps column.
+    (0.111, 0.205),
     frozenset(
         {
             "ch-pivot-shaft",
@@ -343,7 +345,7 @@ LEVER_BANK = BankView(
     "LEVER BANK",
     (1, 1),
     (_FULCRUM_X, _FULCRUM_Y, FULCRUM_KEEPER_CENTRE_Z),
-    (0.105, 0.195),
+    (0.111, 0.195),
     frozenset(
         {
             "ch-fulcrum-shaft",
