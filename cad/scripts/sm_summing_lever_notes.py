@@ -79,7 +79,6 @@ BRACKET_SCREW_NUMBER = "MHA-VN-050"  # vn-magnifying-bracket-screw
 # mount's bore (``sm_knife_mount_spec``), so it names that.
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "EdgeRibFrontEndTopX": "ALL RIBS",
-    "EdgeRibFrontEndTopY": "END RIBS",
     "ReceiverY0": f"MATCHES {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
@@ -91,6 +90,12 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "ReceiverX1": f"MATCHES {BRACKET_NUMBER}",
     "RibDepth": f"TAPPED END RIB\nCONTAINS {BRACKET_SCREW_NUMBER} TAP DRILL",
     "SpringPadWidth": "UNDERSIDE PAD\nFULL LENGTH",
+    # The rib end's half-height is the slant's at RIB_PLATE_REACH: clipped
+    # there, not run to a point, so the -Z receiver rib keeps its wall round
+    # the bracket's 2-56 tap (build_sm_summing_lever.EDGE_RIB_END_HALF_H);
+    # the end face stands 0.44 proud of each plate face for that (machinist
+    # review r8).
+    "EdgeRibFrontEndTopY": "END RIBS FROM\nPLATE MID-PLANE\nKEEPS TAP WALL",
 }
 
 # Leads the 2-56 receiver callout: what its two depth limits hold.  The full
