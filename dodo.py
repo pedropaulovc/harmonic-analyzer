@@ -3068,6 +3068,9 @@ def task_check():
         SCRIPTS_DIR / "test_process_plans.py",
         SCRIPTS_DIR / "test_process_shop.py",
         SCRIPTS_DIR / "test_prechips_traveler.py",
+        # The rocker's S7 op 97 profile windows: computed from the printed
+        # zones and the template's geometry, pinned into the plan's text.
+        SCRIPTS_DIR / "test_ch_rocker_arm_profile_check.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_release_diff.py",

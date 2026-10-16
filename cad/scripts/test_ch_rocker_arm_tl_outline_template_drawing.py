@@ -12,15 +12,13 @@ import pytest
 import _config
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_outline_template_spec as spec
+import ch_rocker_arm_tl_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_outline_template as drawing
 import export_features
 from _paths import CAD_ROOT
 from _printed_tolerance import printed_deviations
 
 STEM = "ch_rocker_arm_tl_outline_template"
-# The template frame is the rocker build frame moved down to the pivot and
-# raised by the aim offset.
-_AIM_OFFSET = spec.TOP_ABOVE_PIVOT - rocker.TOP_EDGE_ABOVE_PIVOT
 
 
 def _features() -> dict:
@@ -81,21 +79,80 @@ def test_apex_bands_sit_mid_zone_inside_the_rocker_arc_zone() -> None:
 
 _ROCKER_BOT_END_Y = rocker.CENTER_Y - rocker.R_BOTTOM * math.cos(rocker._ALPHA_BOT)
 _ROCKER_TIP_Y = rocker.TOP_END_Y - rocker.TIP_FACE * math.cos(rocker._ALPHA_TOP)
+# The rocker's BASIC +X outline corners and arc centre, in the template frame.
+_ROCKER_TOP_END = (rocker.TOP_END_X, rocker.TOP_END_Y - rocker.PIVOT_MID_Y)
+_ROCKER_TIP = (rocker.ROD_TIP_X, _ROCKER_TIP_Y - rocker.PIVOT_MID_Y)
+_ROCKER_BOT_END = (rocker.BOT_END_X, _ROCKER_BOT_END_Y - rocker.PIVOT_MID_Y)
+_ROCKER_CENTRE_Y = rocker.CENTER_Y - rocker.PIVOT_MID_Y
+_MID_ZONE = (rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]) / 2.0
+
+
+def _into_material(point, start, end) -> float:
+    """``point``'s offset from the rocker line start -> end, + into the arm."""
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length = math.hypot(dx, dy)
+    normal = (-dy / length, dx / length)
+    middle = (0.0, _ROCKER_CENTRE_Y - (rocker.R_TOP + rocker.R_BOTTOM) / 2.0)
+    if (middle[0] - start[0]) * normal[0] + (middle[1] - start[1]) * normal[1] < 0.0:
+        normal = (-normal[0], -normal[1])
+    return (point[0] - start[0]) * normal[0] + (point[1] - start[1]) * normal[1]
 
 
 @pytest.mark.parametrize(
-    ("template", "rocker_point"),
+    ("template_line", "rocker_line"),
     [
-        ((spec.TOP_END_X, spec.TOP_END_Y), (rocker.TOP_END_X, rocker.TOP_END_Y)),
-        ((spec.BOT_END_X, spec.BOT_END_Y), (rocker.BOT_END_X, _ROCKER_BOT_END_Y)),
-        ((spec.TIP_X, spec.TIP_Y), (rocker.ROD_TIP_X, _ROCKER_TIP_Y)),
+        (
+            ((spec.TOP_END_X, spec.TOP_END_Y), (spec.TIP_X, spec.TIP_Y)),
+            (_ROCKER_TOP_END, _ROCKER_TIP),
+        ),
+        (
+            ((spec.TIP_X, spec.TIP_Y), (spec.BOT_END_X, spec.BOT_END_Y)),
+            (_ROCKER_TIP, _ROCKER_BOT_END),
+        ),
     ],
+    ids=["tip land", "tapered end"],
 )
-def test_outline_corners_are_the_rockers_raised_by_the_aim(
-    template, rocker_point
+def test_straight_edges_sit_mid_zone_along_their_own_normals(
+    template_line, rocker_line
 ) -> None:
-    expected = (rocker_point[0], rocker_point[1] - rocker.PIVOT_MID_Y + _AIM_OFFSET)
-    assert math.dist(template, expected) < 1e-3
+    """The lower outline's 0.5 Ⓤ0 zone lies wholly inside the material, so
+    each land and taper aims half the zone in along its own normal. The old
+    rigid +Y shift left the near-vertical land 0.045 OUTSIDE the zone."""
+    for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
+        point = tuple(
+            a + fraction * (b - a) for a, b in zip(*template_line, strict=True)
+        )
+        # Three-place stations and the radial land: 2 microns at most.
+        assert math.isclose(
+            _into_material(point, *rocker_line), _MID_ZONE, abs_tol=0.002
+        )
+
+
+def test_arcs_stay_on_the_trammel_and_their_mid_zone_residual_is_bounded() -> None:
+    """Both arcs keep the trammel's radii about a centre raised by half the
+    zone: mid-zone on the mirror line, short of it by half the zone times
+    (1 - cos phi) off it, within the printed radius's budgeted end drift."""
+    assert (spec.R_TOP, spec.R_BOTTOM) == trammel.TEMPLATE_RADII
+    assert math.isclose(spec.CENTER_Y - _ROCKER_CENTRE_Y, _MID_ZONE, abs_tol=1e-9)
+    for name, radius, end_x in (
+        ("top", spec.R_TOP, spec.TOP_END_X),
+        ("bottom", spec.R_BOTTOM, spec.BOT_END_X),
+    ):
+        worst = 0.0
+        for step in range(11):
+            x = end_x * step / 10.0
+            y = spec.CENTER_Y - math.sqrt(radius**2 - x**2)
+            # + toward the arcs' centre: outside the top edge, inside the bottom.
+            toward_centre = radius - math.hypot(x, y - _ROCKER_CENTRE_Y)
+            residual = _MID_ZONE - toward_centre
+            assert math.isclose(
+                residual, spec.arc_mid_zone_residual(radius, x), abs_tol=1e-9
+            )
+            worst = max(worst, residual)
+        phi = math.asin(end_x / radius)
+        assert math.isclose(worst, _MID_ZONE * (1.0 - math.cos(phi)), abs_tol=1e-5)
+        assert math.isclose(worst, spec.ARC_MID_ZONE_RESIDUAL[name], abs_tol=1e-12)
+        assert 0.0 < worst <= spec.END_STATION_DRIFT[name]
 
 
 def test_outline_corners_lie_on_their_arcs() -> None:

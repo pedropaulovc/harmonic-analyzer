@@ -352,10 +352,30 @@ def _least_tip_land_mm() -> float:
 
 TIP_LAND_LEAST_MM = math.floor(_least_tip_land_mm() * 1e3) / 1e3  # 4.979
 
+# A printed profile frame as prechips 0.1.2 reads it (docs/features.md, Surface
+# profiles): t, U and the datum frame are the frame's own printed strings. The
+# frame's material sides (ARC_PROFILE_FRAME_XY) give each governed BASIC's sense.
+_ZONE_SOURCES = ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "ARC_PROFILE_ZONE_MM"), ("draw_ch_rocker_arm", "_add_arc_profiles"))
+
+
+def _profile_zone(frame: str, governs: dict[str, Any], governs_sources: tuple[Any, ...]) -> dict[str, tuple[Any, tuple[Any, ...]]]:
+    """``frame`` keys ARC_PROFILE_OUTSIDE_MM; ``governs`` names this feature's own BASICs."""
+    return {
+        "surface_profile": (float(ARC_PROFILE_ZONE_MM), _ZONE_SOURCES),
+        "surface_profile_u": (float(ARC_PROFILE_OUTSIDE_MM[frame]), (*_ZONE_SOURCES, ("draw_ch_rocker_arm", "ARC_PROFILE_OUTSIDE_MM"))),
+        "surface_profile_datums": (ARC_PROFILE_DATUMS, (("draw_ch_rocker_arm", "ARC_PROFILE_DATUMS"), ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        "surface_profile_governs": (governs, (("draw_ch_rocker_arm", "ARC_PROFILE_FRAME_XY"), *governs_sources)),
+    }
+
+
+# The J↔K zone covers both lands, whose faces stay with their own features: one
+# STEP face carries one feature name (_export_feature_faces). So each land
+# declares the lower frame's identical zone (profile_outer's) and governs only
+# its own BASICs; no requirement is read through two zones.
 for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x", -1, _TIPS[0])):
     requirement(
-        _name, kind="face", faces=(_face,), requirements=("tip_land", "land_angle_deg") + (("station",) if _sign == 1 else ()), fields={
-            # BASIC inside the J↔K zone, which is its band (#1545 option 4).
+        _name, kind="face", faces=(_face,), requirements=("land_angle_deg",) + (("station",) if _sign == 1 else ()) + ("surface_profile",), fields={
+            # BASIC with no acceptance of its own: the J↔K zone bounds the land.
             "tip_land": (rocker.TIP_FACE, ("TIP_FACE", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
             "land_angle_deg": (round(_LAND_ANGLE, _P), ("_ALPHA_TOP", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
             "land_angle_nominal_deg": (_LAND_ANGLE, ("_ALPHA_TOP",)),
@@ -366,6 +386,13 @@ for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x",
                 "station": (rocker.ROD_TIP_X, ("ROD_TIP_X", ("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"))),
                 "station_nominal": (rocker.ROD_TIP_X, ("ROD_TIP_X",)),
             } if _sign == 1 else {}),
+            # The land angle is read across the shortest land the zones allow.
+            # The station is read along X, off the land's normal by the land
+            # angle; material added on the land moves it outward.
+            **_profile_zone("BottomRadius", {
+                "land_angle_deg": {"tilt_across": TIP_LAND_LEAST_MM},
+                **({"station": {"sense": "increases", "obliquity_deg": _LAND_ANGLE}} if _sign == 1 else {}),
+            }, (("draw_ch_rocker_arm", "TIP_LAND_LEAST_MM"), ("draw_ch_rocker_arm", "_least_tip_land_mm"), "_ALPHA_TOP")),
         }, precision={"tip_land": _P, "land_angle_deg": _P, **({"station": _P} if _sign == 1 else {})},
     )
 
@@ -1784,15 +1811,15 @@ FRONT_KEEP = {
 _TOP_P = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
 TOP_EDGE = requirement(
     "top_edge", kind="profile", faces=(CylinderFace(2 * rocker.R_TOP),),
-    requirements=("height_above_pivot", "radius", "unknown"), fields={
+    requirements=("height_above_pivot", "radius", "surface_profile"), fields={
         "height_above_pivot": (rocker.TOP_EDGE_ABOVE_PIVOT, ("TOP_EDGE_ABOVE_PIVOT", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
         "height_from": ("pivot_bore", (("draw_ch_rocker_arm", "build"),)),
         "radius": (rocker.R_TOP, ("R_TOP", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))), "radius_nominal": (rocker.R_TOP, ("R_TOP",)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
-        # The consumer schema has no surface-profile/disposition fields.
-        # Preserve the sourced control as a note plus an unknown requirement,
-        # never as an invented radius or height acceptance band.
+        # The printed frame, kept whole as text; the zone below is what reads it.
         "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['TopRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        # Material added on the top edge moves it toward the arc centre.
+        **_profile_zone("TopRadius", {"radius": "decreases", "height_above_pivot": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         "arc_len": (rocker.TOP_ARC_LEN, ("TOP_ARC_LEN",)),
         "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)),
         "centre_from_pivot_ref": (rocker.CENTER_Y - rocker.PIVOT_MID_Y, ("CENTER_Y", "PIVOT_MID_Y")),
@@ -1803,16 +1830,14 @@ TOP_EDGE = requirement(
 # tapers and both tip lands, all filed to the one scribed line (option 4).
 PROFILE_OUTER = requirement(
     "profile_outer", kind="profile", faces=(CylinderFace(2 * rocker.R_BOTTOM), _RIGHT[1], _TIPS[1]),
-    requirements=("bottom_radius", "mirror_symmetric", "unknown"), fields={
+    requirements=("bottom_radius", "mirror_symmetric", "surface_profile"), fields={
         "bottom_radius": (rocker.R_BOTTOM, ("R_BOTTOM", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
         "bottom_radius_nominal": (rocker.R_BOTTOM, ("R_BOTTOM",)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['BottomRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}, BETWEEN {PROFILE_BETWEEN[0]} AND {PROFILE_BETWEEN[1]}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
-        # The J↔K zone also covers the two lands, whose faces stay with their
-        # own features: one STEP face carries one feature name
-        # (_export_feature_faces). prechips 0.1.1's Feature record has no
-        # between/governs keys (extra="forbid"), so J↔K rides only this text;
-        # 0.1.2's surface_profile_governs makes it functional.
+        # Material added on the lower outline moves it away from the arc centre.
+        # The tip lands declare this same zone themselves (see the tip-land loop).
+        **_profile_zone("BottomRadius", {"bottom_radius": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)), "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
         "bottom_arc_len": (rocker.BOT_ARC_LEN, ("BOT_ARC_LEN",)),
         "mirror_symmetric": (True, (("ch_rocker_arm_notes", "DRAWING_NOTES"),)), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH",)),

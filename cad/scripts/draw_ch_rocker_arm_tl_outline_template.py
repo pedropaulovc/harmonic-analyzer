@@ -119,7 +119,7 @@ NOTE_CENTRING_PASSES = 2
 # Radius text stays outside both circles (below the outline) and each radius
 # keeps its arrow outside the arc with no solid leader, so its leader runs
 # from the text to its arc and stops: never on to the off-sheet centre.  The
-# radius blocks sit inboard of the 132.757 extension lines; the bottom apex
+# radius blocks sit inboard of the 132.636 extension lines; the bottom apex
 # block sits just left of the centreline so the R800 block clears it.
 EXTERIOR_RADII = ("TopRadius", "BottomRadius")
 FRONT_KEEP = {
@@ -134,7 +134,7 @@ FRONT_KEEP = {
     "TopRodX": (0.272, 0.207),
     "TailTipLen": (0.033, 0.197),
     "RodTipLen": (0.367, 0.197),
-    # The slot's BASIC station: x in its own lane under the 132.757 lane, y
+    # The slot's BASIC station: x in its own lane under the 132.636 lane, y
     # just outboard of the slot with its value below the arrows, clear of the
     # R816.00 block and the edge view's thickness.
     "RodSlotX": (0.267, 0.097),
@@ -159,7 +159,7 @@ RIGHT_KEEP = {"Thick": (0.370, 0.140)}
 # SHARP requirement and each apex height the rocker edge it sets.  SOLIDWORKS
 # centres each apex block on its position, so the extra line grows it upward:
 # the positions sit low enough that each +0.03 keeps its single-line height,
-# clear of the bottom arc and the 145.240 line.
+# clear of the bottom arc and the 144.951 line.
 CALLOUTS_BELOW = {
     "TopRadius": f"{ARC_CENTER_CALLOUT}\n{SHARP_EDGE_CALLOUT}",
     "BottomRadius": f"{ARC_CENTER_CALLOUT}\n{SHARP_EDGE_CALLOUT}",
@@ -170,7 +170,7 @@ CALLOUTS_BELOW = {
     "BottomTailX": STATION_CALLOUT,
     "BottomRodX": STATION_CALLOUT,
     # Each tip land's flag fits between the sheet border (tail) or the
-    # 145.240 extension line (rod) and its own extension lines, below the
+    # 144.951 extension line (rod) and its own extension lines, below the
     # value; its end-face direction rides above.
     "TailTipLen": PROFILE_CALLOUT,
     "RodTipLen": PROFILE_CALLOUT,
