@@ -31,6 +31,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    remove_notes_matching,
 )
 
 from _check import check
@@ -136,6 +137,8 @@ DIMENSION_CALLOUTS = {"LeverBoreDiaDim": LEVER_BORE_CALLOUT}
 # The tap callouts run out to the right of each end view.
 THUMB_TAP_CALLOUT_XY = (TOP_CENTER[0] + _HALF_AC + 0.012, TOP_CENTER[1] + 0.030)
 ROD_TAP_CALLOUT_XY = (BOTTOM_CENTER[0] + _HALF_AC + 0.012, BOTTOM_CENTER[1] + 0.042)
+# SolidWorks' own descriptive note for a Hole Wizard tap ("#4-40 Tapped Hole").
+TAPPED_HOLE_NOTE = "Tapped Hole"
 
 # The section's cutting line: vertical through the hex axis on the right view,
 # past the block top and bottom.
@@ -318,6 +321,14 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_precision(
         rod_callout, TAP_CALLOUT_PRECISION, label="#4-40 vertical-rod tap depths"
     )
+    # SolidWorks pins its own "#4-40 Tapped Hole" note beside a tap's native
+    # callout; the callout already states the thread. Farm run r1
+    # (20261016T211740899Z) measured one on the bottom view, its leader
+    # crossing the rod tap callout's (leader-crosses-leader). How many the
+    # two taps bring is logged here, after both callouts; finalize_drawing's
+    # census then proves none reached the print.
+    removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
+    _telemetry.info(f"removed {removed} automatic {TAPPED_HOLE_NOTE!r} note(s)")
 
     # Datum A = the bottom seat (the MHA-MG-004 shoulder's face), on the
     # section's bottom line; the lever bore's lower wall carries its
@@ -370,6 +381,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Magnifying Clamp Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        redundant_note_substrings=(TAPPED_HOLE_NOTE,),
+        expected_redundant_notes=0,
     )
 
 
