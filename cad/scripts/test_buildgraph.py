@@ -117,7 +117,7 @@ _INSERTED_SOURCES = {
     "ch_channel": "ch_amplitude_bar ch_bar_pivot_pin ch_channel_lever vn_channel_spring_installed ch_connecting_rod "
     "vn_frame_side_screw ch_fulcrum_keeper vn_fulcrum_set_screw ch_fulcrum_shaft vn_bracket_hold_down_screw ch_pivot_bracket "
     "ch_pivot_shaft ch_rocker_arm vn_rocker_bank_spring vn_rocker_thrust_washer ch_rod_pivot_pin vn_spring_hook "
-    "vn_arbor_set_screw",
+    "ch_anchor_jam_nut vn_arbor_set_screw",
     "sm_summing": "vn_boss_hook vn_boss_hook_jam_nut vn_counter_spring sm_gooseneck sm_gooseneck_spring_screw vn_knife_hanger_stud vn_knife_hanger_washer vn_knife_mount_dowel sm_knife_mount sm_summing_lever",
     "mg_magnifier": "vn_clamp_screw sh_column_clamp_back sh_column_clamp_front vn_lever_wire "
     "mg_magnifying_bracket vn_magnifying_bracket_screw mg_magnifying_clamp mg_magnifying_lever mg_magnifying_vertical_rod "

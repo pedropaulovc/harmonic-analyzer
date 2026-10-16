@@ -15,7 +15,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 | Prefix | Category | Parts |
 |---|---|---:|
 | `ha` / `HA` | Harmonic analyzer | 0 |
-| `ch` / `CH` | Channel | 12 |
+| `ch` / `CH` | Channel | 13 |
 | `dt` / `DT` | Drive train | 35 |
 | `fr` / `FR` | Frame | 5 |
 | `mg` / `MG` | Magnifier | 10 |
@@ -123,6 +123,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired part | `rocker-thrust-washer` | `ch-rocker-thrust-washer` | MHA-148 | MHA-CH-009 (retired; never reissued) |
 | part | — | `ch-rod-pivot-pin` | — | MHA-CH-010 |
 | part | — | `ch-bar-pivot-pin` | — | MHA-CH-011 |
+| part | — | `ch-anchor-jam-nut` | — | MHA-CH-012 |
 | part | `alignment-pinion` | `dt-alignment-pinion` | MHA-002 | MHA-DT-001 |
 | part | `arbor-pedestal` | `dt-arbor-pedestal` | MHA-004 | MHA-DT-002 |
 | part | `cone-gear` | `dt-cone-gear` | MHA-013 | MHA-DT-003 |
@@ -342,3 +343,4 @@ next free Number in its category and has no old stem or old Number.
 | added | `ch-rocker-hub` | MHA-CH-012 | turned 1018 hub of the built-up MHA-CH-006 rocker arm (`component_of: ch-rocker-arm`); its Ø10.20 r6 land is pressed into the MHA-CH-013 strap's H7 hole, then the bore and length are finished on MHA-CH-006 |
 | added | `ch-rocker-strap` | MHA-CH-013 | 1018 flat strap of the built-up MHA-CH-006 rocker arm (`component_of: ch-rocker-arm`); finished outline and 2.5 thickness with the Ø10.20 H7 hole for the MHA-CH-012 hub |
 | added | `vn-boss-hook-jam-nut` | MHA-VN-070 | thin zinc-plated steel #10-24 narrow-profile hex nut jammed against the MHA-SM-003 boss top face, locking the MHA-VN-001 counter anchor |
+| added | `ch-anchor-jam-nut` | MHA-CH-012 | turned brass round #6-32 jam nut, notched across its driven face for a forked driver, jammed against the MHA-SM-003 plate underside on each MHA-VN-012 channel anchor; round because a hex overruns the 7.06 anchor pitch |
