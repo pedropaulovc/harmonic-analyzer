@@ -194,6 +194,7 @@ BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.15 bar centre
 from pd_platen_spec import (  # noqa: E402
     CBORE_DEPTH as PLATEN_CBORE_DEPTH,
     CBORE_DIA as PLATEN_CBORE_DIA,
+    DRAWING_PRECISION_BY_NAME as PLATEN_PRECISION,
     GUIDE_HOLE_DIA as PLATEN_GUIDE_HOLE_DIA,
     GUIDE_HOLE_X as PLATEN_GUIDE_HOLE_X,
     GUIDE_HOLE_Y as PLATEN_GUIDE_HOLE_Y,
@@ -202,6 +203,7 @@ from pd_platen_spec import (  # noqa: E402
     PLATE_THICKNESS,
     PLATE_WIDTH,
     SOCKET_BOSS_DIA as PLATEN_SOCKET_BOSS_DIA,
+    SOCKET_BOSS_FILLET_R as PLATEN_BOSS_FILLET_R,
     SOCKET_BOSS_H as PLATEN_BOSS_H,
     SOCKET_SPEC as PLATEN_SOCKET_SPEC,
     SOCKET_THREAD_ENGAGEMENT as PLATEN_SOCKET_ENGAGEMENT,
@@ -610,8 +612,9 @@ if abs(DISC_Z0 - CLUSTER.FLOAT_WINDOW_CENTRE - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) 
 # 6c385465d) at the rim's farthest point from P, and the disc's wobble on its
 # mount (DISC_MOUNT_WOBBLE).
 PLATEN_YAW_LEVER = (BAR_LENGTH / 2.0) / (BAR_LENGTH / 2.0 - LOCK_STATION_X[0])
-# The platen (4.0) and rack bar (6.0) carry no drawing band: .XXX assumed.
-_PLATEN_THICKNESS_BAND = printed_band_mm(3)
+# The platen prints its thickness (pd_platen_spec.DRAWING_PRECISION); the rack
+# bar (6.0) carries no drawing band: .XXX assumed.
+_PLATEN_THICKNESS_BAND = printed_band_mm(PLATEN_PRECISION["Depth"])
 _RACK_THICKNESS_BAND = printed_band_mm(3)
 DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - KNOB_SHAFT_Z0 - DISC_SPEC.FACE_WIDTH  # 2.35
 DISC_PLATEN_BAND = (
@@ -924,7 +927,8 @@ assert math.isclose(
 )
 # The machine reflection swaps the platen's two local edge rows.  The right
 # holder uses Rz(+90) from the lower end; the left holder uses Rz(-90) from the
-# upper end.  Thus both spring rails (local +Y) point inward over the paper.
+# upper end.  Thus both spring rails (local +Y) point inward, toward the paper,
+# and stop short of it (test_pd_platen_refit holds the gap).
 _CLIP_RIGHT_SX = PLATEN_SOCKET_XY[0][0]
 _CLIP_LEFT_SX = PLATEN_SOCKET_XY[2][0]
 _CLIP_BOTTOM_Y = PLATE_Y0 + _CLIP_Y0_LOCAL
@@ -1502,18 +1506,23 @@ def _assert_lock_station_sweep() -> None:
         ]
     # The clip-screw socket bosses ride the platen back too, SOCKET_BOSS_H
     # proud of it, their screw tips flush in them; the thinnest bar carries
-    # the back rearward. The undrawn platen takes .XXX on the boss Ø and
-    # station, and twice it rearward: the tallest boss, or the tip left proud
-    # of the shortest one by a thin plate.
-    boss_r = PLATEN_SOCKET_BOSS_DIA / 2.0
+    # the back rearward. Each boss takes its printed Ø (on the radius), the
+    # root round's foot on the back face beyond it, and its station sideways,
+    # and rearward the tallest boss, or the tip left proud of the shortest one
+    # by a thin plate.
+    boss_r = PLATEN_SOCKET_BOSS_DIA / 2.0 + PLATEN_BOSS_FILLET_R
+    boss_dy = printed_band_mm(PLATEN_PRECISION["Boss2Dia"]) / 2.0 + printed_band_mm(
+        PLATEN_PRECISION["Socket2Y"]
+    )
+    boss_rear = printed_band_mm(PLATEN_PRECISION["BossH"]) + _PLATEN_THICKNESS_BAND
     bosses = [
         (
             f"clip-screw boss y{y:.1f}",
             _grown(
                 (y - boss_r, y + boss_r, BAR_FRONT_Z, BAR_FRONT_Z + PLATEN_BOSS_H),
-                2.0 * _PLATEN_THICKNESS_BAND,
+                boss_dy,
                 0.0,
-                -_BAR_DEPTH_DEV[0] + 2.0 * _PLATEN_THICKNESS_BAND,
+                -_BAR_DEPTH_DEV[0] + boss_rear,
             ),
         )
         for y in sorted({y for _, y in CLIP_SCREW_XY})
@@ -2627,8 +2636,8 @@ async def build(adapter) -> dict[str, str]:
         )
         await _lock_to_platen(bot, f"guide-lock bottom x{x_c:.0f}")
     # Paper holders: mirrored one-piece brass sheets hugging the platen edges.
-    # Opposite Z rotations keep each 4 mm flat rail on its screw sockets while
-    # both adjacent spring rails point inward over the recording paper.
+    # Opposite Z rotations keep each flat screw rail on its screw sockets while
+    # both adjacent spring rails point inward, short of the recording paper.
     for _sx, clip_x, clip_y, rz in CLIP_PLACEMENTS:
         clip = await place_component(
             adapter,

@@ -218,12 +218,14 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Zinc-Plated Steel Narrow-Profile Hex Nut",
         "90760A009",
     ),
-    # The four platen-clip screws: brass #2-56 x 1/4, whose 0.14 head stays
-    # inside the clip's rail where the MHA-VN-006 #4-40 head would overhang.
+    # The four platen-clip screws: brass #2-56 x 1/4, whose head stays inside
+    # the clip's rail where the MHA-VN-006 #4-40 head would overhang.  A pan
+    # head (2026-10-15): the 90114A124 fillister's least head left 0.05 mm of
+    # bearing land over the clip's largest drilled #2 loose hole.
     "vn-platen-clip-screw": _stock(
         "vn-platen-clip-screw",
-        "Brass Fillister Head Slotted Screw",
-        "90114A124",
+        "Brass Pan Head Slotted Screw",
+        "92446A077",
         material="Brass",
     ),
     # MSC 40923906: 1/4-20 x 4 in (101.6 mm) supplied stock. Only the

@@ -7,12 +7,13 @@ separate parts (build_pd_platen_rack.py / build_pd_platen_clip.py /
 build_pd_platen_guide.py). Fastener holes:
 
 * four clip-screw #2-56 through receivers at the resized plate's extreme
-  left/right edges (x 5.3928/264.2472), matching the resized clips'
+  left/right edges (x 4.5/265.14), matching the resized clips'
   7.1904-inset end holes at local y 29.6604/127.6296, each tapped on
-  through a Ø7 x 1.70 boss on the back face for >= 1.5D engagement;
-* ten O3 guide-screw through-holes in two rows of 5 (ch22 front photo)
-  at the guide rail centrelines: bottom row y 13, top row y 47 (machine
-  318 / 352 with the plate at y 305).
+  through a Ø7 x 1.70 boss on the back face for >= 1.5D engagement, each
+  boss rounded into the face at its R0.5 MAX root;
+* ten #4 loose (Ø3.658) counterbored guide-screw through-holes in two rows
+  of 5 (ch22 front photo) at the guide rail centrelines: bottom row y 13,
+  top row y 47 (machine 318 / 352 with the plate at y 305).
 
 Dimensions: the ch30-p002 Pose Studio fit sets the width to 269.64 mm and
 the user-confirmed front-face proportion to height:width = 1:2, hence
@@ -35,26 +36,58 @@ import sys
 from _appearance import apply_material, apply_color, PANEL_BLACK
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _extrude import extrude_at_offset
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
+from _fit_deviations import deviations
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _holes import HoleSpec, SharedCoordinate, blind_cut_dia_mm, wizard_holes
+from _visibility import blank_reference_geometry
 from pd_platen_spec import (
     CBORE_DEPTH,
     CBORE_DIA,
+    CBORE_FLOOR,
+    CBORE_FLOOR_REFERENCE_Y,
+    CBORE_SECTION_PLANE,
+    CBORE_SECTION_X,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     GUIDE_HOLE_DIA,
+    GUIDE_HOLE_FIT,
+    GUIDE_HOLE_X,
     GUIDE_HOLE_XY,
+    GUIDE_HOLE_Y,
+    ISOMETRIC_VIEW_NOTE,
     PLATE_HEIGHT,
     PLATE_THICKNESS,
     PLATE_WIDTH,
+    RIGHT_VIEW_NOTE,
     SOCKET_BOSS_DIA,
+    SOCKET_BOSS_FILLET_BAND,
+    SOCKET_BOSS_FILLET_PRINTED_XY,
+    SOCKET_BOSS_FILLET_R,
+    SOCKET_BOSS_FILLET_TOL_TYPE,
     SOCKET_BOSS_H,
     SOCKET_SPEC,
     SOCKET_THREAD_ENGAGEMENT,
@@ -69,6 +102,123 @@ MATERIAL = "Brass"  # see _appearance.apply_material docstring
 # The plate envelope, the clip-screw receivers and the counterbored
 # guide-screw through-holes live in pd_platen_spec.py, which the clip, the guide
 # rails and the paper-drive assembly read without importing this builder.
+
+# Hole Wizard placement order and printed coordinates (pd_platen_spec
+# .DRAWING_DIMENSIONS).  Sockets: the lower right one carries both coordinates
+# (its X extension runs down clear of every other hole), the upper right one
+# its own Y, the lower left one its own X; every other coordinate is a sketch
+# relation to those.  Guide holes: y-major, the bottom row's five X and each
+# row's first Y.
+SOCKET_ORDER = (
+    SOCKET_XY[2],  # (265.14, 58.5104)
+    SOCKET_XY[3],  # (265.14, 127.6296)
+    SOCKET_XY[0],  # (4.5, 58.5104)
+    SOCKET_XY[1],  # (4.5, 127.6296)
+)
+SOCKET_PLACEMENT = [
+    (("Socket1X", '"SocketX2"'), ("Socket1Y", '"SocketY1"')),
+    (SharedCoordinate(0), ("Socket2Y", '"SocketY2"')),
+    (("Socket3X", '"SocketX1"'), SharedCoordinate(0)),
+    (SharedCoordinate(2), SharedCoordinate(1)),
+]
+GUIDE_PLACEMENT = [
+    (
+        (f"Guide{column + 1}X", f'"GuideX{column + 1}"')
+        if row == 0
+        else SharedCoordinate(column),
+        (f"Guide{row * len(GUIDE_HOLE_X) + 1}Y", f'"GuideY{row + 1}"')
+        if column == 0
+        else SharedCoordinate(row * len(GUIDE_HOLE_X)),
+    )
+    for row in range(len(GUIDE_HOLE_Y))
+    for column in range(len(GUIDE_HOLE_X))
+]
+if [(x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X] != list(GUIDE_HOLE_XY):
+    raise AssertionError("guide-hole placement assumes the y-major GUIDE_HOLE_XY order")
+
+
+def _boss_fillet_max_limit(adapter) -> None:
+    """BossFilletR as a MAX single limit carrying the band's deviations
+    (build_pn_pen_rod._shoulder_fillet_max_limit's recipe): the native type
+    prints the nominal, so the nominal is the limit."""
+    lower, upper = deviations(SOCKET_BOSS_FILLET_BAND)
+    _, dimension = _named_dimension(adapter, "SocketBossFillet", "BossFilletR")
+    label = "BossFilletR@SocketBossFillet"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, SOCKET_BOSS_FILLET_R / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
+            f"{SOCKET_BOSS_FILLET_R}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = SOCKET_BOSS_FILLET_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != SOCKET_BOSS_FILLET_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {SOCKET_BOSS_FILLET_R:g} MAX")
+
+
+def _plane_frame(adapter, name: str) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """(rotation, origin mm) of a reference plane, read back from
+    ``IRefPlane::Transform`` (build_pn_pen_v_block._plane_frame)."""
+    feature = _early_bound(_feature_by_name(adapter, name), "IFeature")
+    plane = _early_bound(feature.GetSpecificFeature2(), "IRefPlane")
+    data = [
+        float(v) for v in _read_member(_read_member(plane, "Transform"), "ArrayData")
+    ]
+    return tuple(data[0:9]), tuple(v * 1000.0 for v in data[9:12])
+
+
+async def _cbore_section_plane(adapter) -> None:
+    """Section A-A's cutting plane: the Right plane carried +X to the top row's
+    middle guide hole.  Read back against the Right plane: the same rotation
+    (so a sketch on it keeps the Right plane's (u, v) = model (-Z, Y)) and an
+    origin shifted by exactly CBORE_SECTION_X along +X."""
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        f"create plane {CBORE_SECTION_PLANE}",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Right Plane", offset=CBORE_SECTION_X
+            )
+        ),
+    )
+    name_last_feature(adapter, CBORE_SECTION_PLANE)
+    right_rotation, right_origin = _plane_frame(adapter, "Right Plane")
+    rotation, origin = _plane_frame(adapter, CBORE_SECTION_PLANE)
+    shift = tuple(o - r for o, r in zip(origin, right_origin))
+    if any(abs(a - b) > 1e-9 for a, b in zip(rotation, right_rotation)) or any(
+        abs(s - e) > 1e-6 for s, e in zip(shift, (CBORE_SECTION_X, 0.0, 0.0))
+    ):
+        raise RuntimeError(
+            f"{CBORE_SECTION_PLANE}: rotation {rotation} / origin shift {shift} mm, "
+            f"expected the Right plane's {right_rotation} shifted "
+            f"({CBORE_SECTION_X}, 0, 0)"
+        )
+
+
+def _require_on_section_plane(adapter, sketch: str) -> None:
+    """create_sketch falls back to a standard plane when a named one fails to
+    select; the sketch's parents must name CBORE_SECTION_PLANE."""
+    feature = _early_bound(_feature_by_name(adapter, sketch), "IFeature")
+    parents = [
+        str(_early_bound(parent, "IFeature").Name)
+        for parent in (feature.GetParents() or ())
+    ]
+    if CBORE_SECTION_PLANE not in parents:
+        raise RuntimeError(
+            f"{sketch} is not on {CBORE_SECTION_PLANE}: parents {parents}"
+        )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -88,6 +238,19 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
     await set_global(adapter, "SocketBossDia", f"{SOCKET_BOSS_DIA}mm")
     await set_global(adapter, "SocketBossH", f"{SOCKET_BOSS_H}mm")
+    await set_global(adapter, "SocketBossFilletR", f"{SOCKET_BOSS_FILLET_R}mm")
+    # The counterbore depth the guide Hole Wizard override cuts; only the
+    # drawing's floor reference reads it.
+    await set_global(adapter, "CounterBoreDepth", f"{CBORE_DEPTH}mm")
+    # The printed hole stations (SOCKET_PLACEMENT / GUIDE_PLACEMENT).
+    for index, value in enumerate(sorted({x for x, _ in SOCKET_XY}), start=1):
+        await set_global(adapter, f"SocketX{index}", f"{value}mm")
+    for index, value in enumerate(sorted({y for _, y in SOCKET_XY}), start=1):
+        await set_global(adapter, f"SocketY{index}", f"{value}mm")
+    for index, value in enumerate(GUIDE_HOLE_X, start=1):
+        await set_global(adapter, f"GuideX{index}", f"{value}mm")
+    for index, value in enumerate(GUIDE_HOLE_Y, start=1):
+        await set_global(adapter, f"GuideY{index}", f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -118,6 +281,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=PLATE_THICKNESS)),
     )
     name_last_feature(adapter, "Plate")
+    depth_dim = name_dimensions(adapter, "Plate", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"PlateThickness"')]
     v_plate = PLATE_WIDTH * PLATE_HEIGHT * PLATE_THICKNESS
     await volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
@@ -157,18 +322,58 @@ async def build(adapter) -> dict[str, str]:
         adapter, "plate with socket bosses", v_plate + v_bosses, 0.05 * v_bosses
     )
 
+    # Boss roots: each boss rounds into the back face at the R MAX limit the
+    # print allows, picked on its root circle at +X (the only edge through
+    # that point).  The printed one is its own feature, the boss whose root
+    # silhouette the right view shows (pd_platen_spec); the other three share
+    # the global.
+    others = [xy for xy in SOCKET_XY if xy != SOCKET_BOSS_FILLET_PRINTED_XY]
+    if len(others) != len(SOCKET_XY) - 1:
+        raise AssertionError("the printed boss root must be one of the bosses")
+    fillet_jobs = []
+    for feature, dimension, stations in (
+        ("SocketBossFillet", "BossFilletR", [SOCKET_BOSS_FILLET_PRINTED_XY]),
+        ("SocketBossFillets", "BossFilletsR", others),
+    ):
+        check(
+            f"fillet {feature}",
+            await adapter.add_fillet(
+                SOCKET_BOSS_FILLET_R,
+                [[x + SOCKET_BOSS_DIA / 2.0, y, PLATE_THICKNESS] for x, y in stations],
+            ),
+        )
+        name_last_feature(adapter, feature)
+        fillet_dim = name_dimensions(adapter, feature, [dimension])
+        fillet_jobs += [(fillet_dim[0], '"SocketBossFilletR"')]
+    drive_jobs += fillet_jobs
+    # Pappus: the corner spandrel r^2 (1 - pi/4), its centroid r (10 - 3 pi) /
+    # (3 (4 - pi)) out from the boss surface, revolved about each boss axis.
+    spandrel = SOCKET_BOSS_FILLET_R**2 * (1.0 - math.pi / 4.0)
+    spandrel_r = SOCKET_BOSS_DIA / 2.0 + SOCKET_BOSS_FILLET_R * (
+        10.0 - 3.0 * math.pi
+    ) / (3.0 * (4.0 - math.pi))
+    v_fillets = len(SOCKET_XY) * 2.0 * math.pi * spandrel_r * spandrel
+    await volume_check(
+        adapter,
+        "socket boss root fillets",
+        v_plate + v_bosses + v_fillets,
+        0.25 * v_fillets,
+    )
+
     # Clip-screw receivers: ONE native Hole Wizard #2-56 through-tapped
     # feature (4 points) from the front face. The heads sit on the clip's flat
     # 0.8 sheet, so the 3.85 plate plus the 1.70 rear boss take the rest of the
     # stock shank as thread and its tip finishes flush at the boss's rear face
     # rather than bottoming in a blind socket.
     pre = await adapter.get_mass_properties()
-    wizard_holes(
+    sockets = wizard_holes(
         adapter, SOCKET_SPEC,
-        [[x, y, 0.0] for x, y in SOCKET_XY],
+        [[x, y, 0.0] for x, y in SOCKET_ORDER],
         (0.0, 0.0, -1.0),
         "clip-screw through-tapped receivers (#2-56)", name="Sockets",
+        placement_dims=SOCKET_PLACEMENT,
     )
+    drive_jobs += sockets.placement_drive_jobs
     post = await adapter.get_mass_properties()
     v_sockets = (
         len(SOCKET_XY)
@@ -183,22 +388,24 @@ async def build(adapter) -> dict[str, str]:
 
     # Guide-screw through-holes + head counterbores: ONE native Hole Wizard
     # counterbored #4 FILLISTER feature (10 points) from the front face. The
-    # Ø3 shanks pass through into the guide rails and the Ø6.5 x 2.9178
+    # #4 loose shanks pass through into the guide rails and the Ø6.5 x 2.9178
     # counterbores hold the stock heads exactly 0.2 sub-flush.
-    # The through Ø3 and counterbore Ø6.5 artefact diameters are preserved as
-    # explicit overrides; only depth follows the exact purchased head.
+    # The through Ø (#4 loose) and the counterbore Ø6.5 artefact diameter are
+    # explicit overrides; the depth follows the exact purchased head.
     pre = post
-    wizard_holes(
+    guide_holes = wizard_holes(
         adapter,
-        HoleSpec("counterbore_fillister", "#4", overrides_mm={
+        HoleSpec("counterbore_fillister", "#4", fit=GUIDE_HOLE_FIT, overrides_mm={
             "HoleDiameter": GUIDE_HOLE_DIA,
             "CounterBoreDiameter": CBORE_DIA,
             "CounterBoreDepth": CBORE_DEPTH,
         }),
         [[x, y, 0.0] for x, y in GUIDE_HOLE_XY],
         (0.0, 0.0, -1.0),
-        "guide-screw counterbored holes (#4)", name="GuideHoles",
+        "guide-screw counterbored holes (#4 loose)", name="GuideHoles",
+        placement_dims=GUIDE_PLACEMENT,
     )
+    drive_jobs += guide_holes.placement_drive_jobs
     post = await adapter.get_mass_properties()
     v_guide = len(GUIDE_HOLE_XY) * (
         math.pi * (GUIDE_HOLE_DIA / 2.0) ** 2 * PLATE_THICKNESS
@@ -209,10 +416,66 @@ async def build(adapter) -> dict[str, str]:
     if abs(removed - v_guide) > 0.02 * v_guide:
         raise RuntimeError(f"guide holes removed {removed:.1f}, expected {v_guide:.1f}")
 
+    # Drawing-only counterbore-floor reference (the user-accepted rule-17
+    # exception, pd_platen_spec.CBORE_FLOOR): one construction line across the
+    # floor, mid-annulus below the top row's middle guide hole, from the back
+    # face to the counterbore's bottom.  It sits on section A-A's cutting
+    # plane because the drawing's section through that hole prints it (a
+    # reference sketch a derived view imports lies in its cut;
+    # build_pn_pen_v_block).  Section plane (u, v) -> (-Z, Y), as Right.
+    await _cbore_section_plane(adapter)
+    floor = SketchDims()
+    check(
+        "create_sketch counterbore floor",
+        await adapter.create_sketch(CBORE_SECTION_PLANE),
+    )
+    set_sketch_direct_db(adapter, True)
+    floor_line = check(
+        "counterbore floor reference line",
+        await adapter.add_line(
+            -PLATE_THICKNESS,
+            CBORE_FLOOR_REFERENCE_Y,
+            -CBORE_DEPTH,
+            CBORE_FLOOR_REFERENCE_Y,
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[floor_line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("counterbore floor reference did not take construction flag")
+    check(
+        "counterbore floor reference horizontal",
+        await adapter.add_sketch_constraint(floor_line, None, "horizontal"),
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{floor_line}.start",
+        -PLATE_THICKNESS,
+        CBORE_FLOOR_REFERENCE_Y,
+        "counterbore floor reference at the back face",
+    )
+    floor.record("CboreFloorZ", '"PlateThickness"')
+    floor.record("CboreFloorY", None)
+    await dimension_between(
+        adapter,
+        f"{floor_line}.start",
+        f"{floor_line}.end",
+        "horizontal_distance",
+        CBORE_FLOOR,
+        "counterbore floor",
+    )
+    floor.record("CboreFloor", '"PlateThickness" - "CounterBoreDepth"')
+    await ensure_fully_defined(adapter, "counterbore floor reference sketch")
+    check("exit_sketch counterbore floor", await adapter.exit_sketch())
+    name_last_feature(adapter, "CboreFloorReference")
+    _require_on_section_plane(adapter, "CboreFloorReference")
+    drive_jobs += floor.apply(adapter, "CboreFloorReference")
+
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
-    v_final = v_plate + v_bosses - v_sockets - v_guide
+    v_final = v_plate + v_bosses + v_fillets - v_sockets - v_guide
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
@@ -228,7 +491,31 @@ async def build(adapter) -> dict[str, str]:
     # kills the residual spin, an X distance snapshot pins the feed position.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "slide axis")
 
+    # Manufacturing drawing support: every printed dimension's places live on
+    # the model (drawing-simplicity-policy.md `How the repository implements
+    # the guidelines`), then mark exactly the print's dimensions (the drawing
+    # imports the marked set and must find every one) and stamp the view notes.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _boss_fillet_max_limit(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await report_mass_properties(adapter)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Right View Note": RIGHT_VIEW_NOTE,
+        },
+    )
+    # The floor reference is construction-only: saved hidden so no assembly
+    # renders it; the drawing shows it in section A-A through
+    # _drawing_hidden_sketches to import the floor dimension.  Its cutting
+    # plane is hidden too.
+    blank_sketch(adapter, "CboreFloorReference")
+    blank_reference_geometry(adapter, ((CBORE_SECTION_PLANE, "PLANE"),))
     return await save_part_and_images(adapter, PART_NAME)
 
 

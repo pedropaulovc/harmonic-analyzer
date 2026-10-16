@@ -608,7 +608,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
         "vn_latch_hook_bracket_screw",  # #4-40 narrow fillister (McMaster 90280A108, MHA-VN-043), member: 2 into the support_bar's #4-40 through taps
         "vn_magnifying_bracket_screw",  # #2-56 fillister, member: two in bracket counterbores into summing_lever (top-level row)
-        "vn_platen_clip_screw",  # #2-56 brass fillister (90114A124, MHA-VN-059), member: 4 into the platen's through taps, clamping the paper clips
+        "vn_platen_clip_screw",  # #2-56 brass slotted pan head (92446A077, MHA-VN-059), member: 4 into the platen's through taps, clamping the paper clips
         "mg_magnifying_clamp",  # #4-40 UNC-2B tapped ScrewHole (Hole Wizard), receiver of thumb_screw
         "ms_stop_block",  # MHA-MS-002: #4-40 UNC-2B tapped through the floor (receiver of vn_thumb_screw) + 2x #2-56 UNC blind taps (receiver of vn_ms_stop_plate_screw)
         "vn_ms_stop_plate_screw",  # #2-56 x 1/4 brass fillister (McMaster 90114A124, MHA-VN-054), member: 2 into ms_stop_block through the cover plate
@@ -1970,7 +1970,7 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="clips-fitted",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="clamps each brass paper clip to the platen, and both travel together as one body. The clip's spring-rail reaction acts along the screw axis (preload only), and two screws per clip stop the clip turning, so no operating torque acts about either screw axis",
-        axial_capture="fillister head directly on the clip's flat 0.8 brass sheet (no seat boss); shank through the clip #2 clearance into the platen's through #2-56 tap and rear boss, 5.55 mm engagement (pd_platen_spec.SOCKET_THREAD_ENGAGEMENT, 2.54D), tip flush with the boss",
+        axial_capture="pan head directly on the clip's flat 0.8 brass sheet (no seat boss); shank through the clip #2 clearance into the platen's through #2-56 tap and rear boss, 5.55 mm engagement (pd_platen_spec.SOCKET_THREAD_ENGAGEMENT, 2.54D), tip flush with the boss",
         lock=Lock.NONE,
         evidence="build_pd_paper_drive_assembly.py:build ('platen clip-screw grid') and _assert_fastener_stacks (clip #2-56 engagement, tip flush); draw_pd_paper_drive_assembly._step_text 'clips-fitted'; pd_platen_spec.SOCKET_SPEC tapped #2-56 through; build_pd_platen_clip.CLIP_THICKNESS",
     ),

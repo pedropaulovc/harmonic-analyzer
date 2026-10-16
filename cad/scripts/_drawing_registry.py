@@ -123,6 +123,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pd_platen",
+        part="pd_platen",
+        artifact_stem="pd-platen",
+        script_name="draw_pd_platen.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="pd_platen_clip",
+        part="pd_platen_clip",
+        artifact_stem="pd-platen-clip",
+        script_name="draw_pd_platen_clip.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_crank_arm",
         part="dt_crank_arm",
         artifact_stem="dt-crank-arm",

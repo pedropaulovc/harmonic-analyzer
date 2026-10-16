@@ -38,7 +38,7 @@ _EXPECTED = {
     "vn-pen-adjust-nut": (("92671A115",), "MHA-VN-062", 1),
     "vn-pen-hanger-nut": (("90480A009",), "MHA-VN-063", 1),
     "vn-pen-hanger-jam-nut": (("90760A009",), "MHA-VN-064", 1),
-    "vn-platen-clip-screw": (("90114A124",), "MHA-VN-059", 4),
+    "vn-platen-clip-screw": (("92446A077",), "MHA-VN-059", 4),
     "vn-pinion-strap-pin": (("98296A027",), "MHA-VN-033", 3),
     "vn-post-mount-screw": (("40923906",), "MHA-VN-031", 2),
     "vn-slotted-screw": (("90280A203",), "MHA-VN-019", 4),
@@ -112,16 +112,19 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
     # Raised pinion blocks use #8-32 x 1-1/2; clamp screws retain x 1-1/4.
     # The swing stop and paper-drive latch hook share the foot screw SKU,
     # while the magnifying bracket takes two #2-56 x 1/4 (MHA-VN-050). The
-    # four platen-clip screws left the brass #4-40 x 1/4 for the brass #2-56
-    # x 1/4 (MHA-VN-059), whose head fits inside the clip's rail; the
-    # measuring stick's stop plate takes the same SKU twice (MHA-VN-054).
+    # four platen-clip screws left the brass #4-40 x 1/4 for a brass #2-56
+    # x 1/4 (MHA-VN-059), whose head fits inside the clip's rail, and then
+    # the #2-56 fillister for the pan head, whose least head bears on the
+    # clip around its loose hole; the measuring stick's stop plate keeps the
+    # brass #2-56 fillister (MHA-VN-054).
     assert fleet_quantity("90280A199") == 0
     assert fleet_quantity("90280A108") == 4
     assert fleet_quantity("91794A077") == 2
     assert fleet_quantity("90280A201") == 6
     assert fleet_quantity("90280A203") == 4
     assert fleet_quantity("90114A511") == 15
-    assert fleet_quantity("90114A124") == 6
+    assert fleet_quantity("90114A124") == 2
+    assert fleet_quantity("92446A077") == 4
 
 
 def test_special_bom_titles_remain_machine_specific() -> None:
