@@ -15,9 +15,9 @@ shows a 1:2 front profile (the cylinder, boss, web and the rib outline every
 rib shares), a 4:1 detail of the trunnion envelope and its knife-edge round, a
 1:2 top plan (plate, ribs, summation web, trunnion length, the anchor taps and
 their pattern control), a 1:1 partial section C-C of the plate's thickness
-and a 1:4 isometric; sheet 2 shows the 1:2 back view of the two bracket
-receiver taps and the spring-anchor pad under the plate they sit in.  The
-sheet runs at 1:2.
+and a 1:4 isometric; sheet 2 shows the 1:1 back view of the two bracket
+receiver taps and the spring-anchor pad under the plate they sit in, so the
+end rib's slant over each tap reads.  Sheet 1 runs at 1:2.
 
 Run with SolidWorks open::
 
@@ -93,6 +93,7 @@ from sm_summing_lever_spec import (
     GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
     HEX_H,
+    HEX_W,
     HOLE_COUNT,
     HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
@@ -105,6 +106,7 @@ from sm_summing_lever_spec import (
     PLATE_L,
     PLATE_T,
     PLATE_W,
+    RIDGE_ANGLE_DEG,
     SURFACE_FINISHES,
     TIP_X,
 )
@@ -142,10 +144,13 @@ SHEET_NAMES = ("Lever Geometry", "Bracket Receiver")
 # Detail A: the trunnion envelope at 4:1, in the open field left of the front
 # profile.  The fence (7.5 model mm) holds the hexagon (5.13 half-height) and
 # none of the rib or web outline (the R15.24 rib arc, 7.6 sheet mm out).
+# Centred on the axis, the hexagon prints at DETAIL_CENTER, its fence 30 mm
+# round it; the label hangs below the width's dimension line, clear of
+# section C-C's caption.
 DETAIL_CENTER = (0.075, 0.222)
 DETAIL_SCALE = (4.0, 1.0)
 DETAIL_RADIUS_MM = 7.5
-DETAIL_LABEL_XY = (0.075, 0.160)
+DETAIL_LABEL_XY = (0.075, 0.176)
 # The parent circle's letter, straight below the rib arc (its bottom prints at
 # sheet y 0.2275), between the rib-arc and cylinder leaders.
 DETAIL_LETTER_OFFSET = (0.0, -0.011)
@@ -157,12 +162,16 @@ KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
 # spring taps (mid-pitch, clear of both), shows it at 1:1 under Detail A's
 # label, its cut end inboard of the pad.  The cut runs in the plan from just
 # outboard of the cylinder (R12.70) past the free edge; the value stands
-# beyond the cut's inboard end, the caption above.
-PLATE_SECTION_Z = HOLE_Z_LAST - (HOLE_COUNT // 2 + 4.5) * CHANNEL_PITCH
-PLATE_SECTION_X = (14.0, PLATE_W + 2.0)
+# beyond the cut's inboard end, the caption above.  In the plan the cut sits
+# at sheet y 0.1565, so its letters (14..20 mm under it) print at y
+# 0.136..0.143, above the mid rib's 5.08 extension lines; its outboard end
+# runs 8.5 mm past the free edge so that letter (x 0.259..0.265) clears the
+# hole column's centre marks.
+PLATE_SECTION_Z = HOLE_Z_LAST - (HOLE_COUNT // 2 + 6.5) * CHANNEL_PITCH
+PLATE_SECTION_X = (14.0, PLATE_W + 8.5)
 PLATE_SECTION_SCALE = (1, 1)
-PLATE_SECTION_CENTER = (0.075, 0.120)
-PLATE_SECTION_CAPTION_XY = (0.075, 0.140)
+PLATE_SECTION_CENTER = (0.075, 0.130)
+PLATE_SECTION_CAPTION_XY = (0.075, 0.150)
 # Model mm in the cutting plane: the anchor landed on PLATE_SECTION_CENTER
 # (the plate's mid-plane midway along the cut), and the value's text, 6 mm
 # past the cut's inboard end on that mid-plane.
@@ -239,8 +248,36 @@ def _knife_detail(adapter: Any, front: Any) -> Any:
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
+    # Direct to the database: inferred, the centre snapped onto the
+    # hexagon's left flat and the rim point onto its right flat (farm r4
+    # 2026-10-16: a fence of radius HEX_W centred 3.8 model mm off the axis,
+    # clipping the hexagon's right shoulders).
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if fence is None:
         raise RuntimeError("failed to create knife-detail fence")
+    arc = _early_bound(fence, "ISketchArc")
+    fence_centre = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    placed_centre = (float(fence_centre.X), float(fence_centre.Y))
+    if (
+        math.dist(placed_centre, points[0][:2]) > 1e-9
+        or abs(float(arc.GetRadius()) - math.dist(points[0][:2], points[1][:2])) > 1e-9
+    ):
+        raise RuntimeError(
+            f"knife-detail fence moved off its authored circle: {placed_centre}"
+        )
+    draw.ClearSelection2(True)
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = selection.CreateSelectData()
+    selection_data.View = front
+    if not _early_bound(fence, "ISketchSegment").Select4(False, selection_data):
+        raise RuntimeError("failed to select the knife-detail fence")
+    if int(selection.GetSelectedObjectCount2(-1)) != 1:
+        raise RuntimeError("knife-detail fence is not the only selection")
     detail = drawing.CreateDetailViewAt4(
         *DETAIL_CENTER,
         0.0,
@@ -366,6 +403,71 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
     ):
         raise RuntimeError("KnifeRidgeRadius does not measure the ridge round")
     _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
+
+
+# Detail A's included-angle text: inside the ridge's own wedge, on the
+# hexagon's centreline 13.5 sheet mm under the vertex.  The vertex's R MAX
+# keeps the wedge above: its leader must land inside the round's span (the
+# flats' normals, 57.6..122.4 deg), and an angle there would cross it.
+KNIFE_ANGLE_TEXT_DROP = 0.0135
+
+
+def _knife_ridge_angle(adapter: Any, detail: Any) -> Any:
+    """Detail A's knife-edge included angle (machinist review r4 B2): a driven
+    angular dimension between the +Z stub's two upper flats, shown as a
+    reference -- HexWidth and HexHeight already fix it (RIDGE_ANGLE_DEG is
+    2 atan((W/2) / (H/4))), so a toleranced angle would dimension the
+    hexagon twice.  The picks name the outboard end face's two upper slant
+    edges at their midpoints, and the value must read RIDGE_ANGLE_DEG: the
+    supplement means the text landed in a side wedge."""
+    z_mm = PLATE_L / 2.0 + HEX_DEPTH
+    slant_points = [
+        (side * HEX_W / 4.0, 3.0 * HEX_H / 8.0, z_mm) for side in (-1.0, 1.0)
+    ]
+    edges = scan_view_edges(detail, label="knife detail")
+    flats = [
+        edges.exact_line_through(point, label=f"knife ridge {name} flat").edge
+        for point, name in zip(slant_points, ("left", "right"))
+    ]
+    picks = model_points_in_view(
+        adapter,
+        detail,
+        [_metres(point) for point in slant_points],
+        label="knife ridge flat",
+        names=("left", "right"),
+    )
+    vertex = model_point_in_view(
+        adapter, detail, _metres((0.0, HEX_H / 2.0, z_mm)), label="knife ridge vertex"
+    )
+    angle = add_edge_dimension(
+        adapter,
+        detail,
+        p0=picks[0],
+        p1=picks[1],
+        text_xy=(vertex[0], vertex[1] - KNIFE_ANGLE_TEXT_DROP),
+        label="knife-edge included angle",
+        orientation="angular",
+        entities=(flats[0], flats[1]),
+    )
+    display = _early_bound(angle, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured = math.degrees(abs(float(dimension.SystemValue)))
+    if abs(measured - RIDGE_ANGLE_DEG) > 1e-3:
+        raise RuntimeError(
+            f"knife-edge included angle reads {measured:.4f} deg, "
+            f"not {RIDGE_ANGLE_DEG:.4f}"
+        )
+    # The native prefix/suffix channel around the live value, not
+    # ShowParenthesis (which brackets above-line text).
+    display.SetText(1, "(")
+    display.SetText(2, ")")
+    if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")"):
+        raise RuntimeError(
+            "knife-edge included angle lost its reference parentheses: "
+            f"{display.GetText(1)!r} {display.GetText(2)!r}"
+        )
+    _telemetry.info(f"knife-edge included angle: {measured:.3f} deg, reference")
+    return angle
 
 
 # The ridge centreline runs the +Z stub's length and 2 model mm past its
@@ -544,22 +646,26 @@ def _mounting_rims(back: Any) -> list[Any]:
 # the rib-end height right of the plate tip, the rib arc and the hidden
 # cylinder taking leaders from below on either side of the detail letter, the
 # boss height left of the boss, and the web thickness standing above the web.
+# The rib arc's four lines centre 1 mm under the view, 4 mm over the 20X
+# frame, its leader landing at 224 deg round the axis.
 FRONT_KEEP = {
     "CylDia": (0.290, 0.214),
     "AnchorHeight": (0.183, 0.235),
     "WebThickness": (0.215, 0.247),
-    "EdgeRibFrontArcR": (0.210, 0.222),
+    "EdgeRibFrontArcR": (0.210, 0.211),
     "EdgeRibFrontEndTopX": (0.2443, 0.254),
     "EdgeRibFrontEndTopY": (0.268, 0.244),
 }
-# Detail A at 4:1: the hexagon's centre prints at DETAIL_CENTER.  The width
-# hangs below the fence; the vertex height stands right of it, its text level
-# with the centre and VERTEX UP below the value; the vertex's R MAX leads off
-# up-right, above the height's top extension line.
+# Detail A at 4:1: the hexagon's centre prints at DETAIL_CENTER, its flats at
+# x 0.0588/0.0912, its vertices at y 0.2015/0.2425, the fence 0.030 round it.
+# The width hangs below the fence, centred between its extension lines; the
+# vertex height stands right of it, its text level with the centre and its
+# three callout lines below the value; the vertex's R MAX leads off up-right
+# from over the fence (inside the round's span, see KNIFE_ANGLE_TEXT_DROP).
 DETAIL_KEEP = {
-    "HexWidth": (DETAIL_CENTER[0], 0.186),
-    "HexHeight": (0.118, DETAIL_CENTER[1]),
-    "KnifeRidgeRadius": (0.098, 0.256),
+    "HexWidth": (DETAIL_CENTER[0], 0.183),
+    "HexHeight": (0.130, DETAIL_CENTER[1]),
+    "KnifeRidgeRadius": (0.093, 0.259),
 }
 TOP_KEEP = {
     # Below the plate end, its witness lines 14 mm long: at 0.160 they ran
@@ -576,32 +682,43 @@ TOP_KEEP = {
     # the -Z plate end at y 0.1681 with its stub to 0.179, the +Z end at
     # 0.0922, the summation web's arcs from the boss (x 0.2021) to the
     # cylinder ends.
-    # Up-left of the web's upper arc, left of the trunnion stub.
-    "SummationArcRadius": (0.200, 0.168),
-    # Left of the -Z stub, under the 20X frame and right of the R138.80.
+    # Above the web's upper arc (centre (0.1737, 0.2001), 69.4 sheet mm), the
+    # text 60 deg round from its centre, inside the arc's visible span (-70
+    # to -37 deg): at -72 deg (0.200, 0.168) the radius ran opposite-side
+    # across the sheet (farm r4).  Its two callout lines stand 4 mm right of
+    # the Ø19.05's leader and left of the 21.72's lower arrow (x 0.2176).
+    "SummationArcRadius": (0.200, 0.155),
+    # Left of the -Z stub, under the 20X frame and right of the R138.85.
     "HexKnifeBackDepth": (0.218, 0.1735),
     # Left of the +Z end rib, above its span: below it the finish symbol and
     # the 76.20/39.85 row leave no room, and the web's lower arc reaches the
-    # cylinder at x 0.226 there.
-    "EdgeRibThickness": (0.205, 0.098),
+    # cylinder at x 0.226 there.  The text ends at x 0.211, right of the
+    # 76.20 X location's extension line (x 0.1972), and stands above the
+    # boss Z location's datum-B extension line (y 0.0919).
+    "EdgeRibThickness": (0.211, 0.1035),
     # Above the mid rib between the boss and the cylinder, under the web's
-    # upper arc.
-    "MiddleRibThickness": (0.224, 0.135),
+    # upper arc (y 0.146 and up there), the text ending at the line.
+    "MiddleRibThickness": (0.226, 0.1365),
 }
-# Sheet 2, back view at 1:2 (model X reversed: the plate's free edge prints at
-# sheet x 0.1925, the taps at 0.2067 and 0.1998 on y 0.190, the plate top at
-# y 0.1913, the spring pad from the free edge to x 0.1975 down to y 0.1878).
-# The receiver stations stand above the view, their text right of the spans
-# (the 2026-10-09 positions); the row height and then the padded tap length
-# stand left of the free edge, both from the plate top; the pad's width hangs
-# below it, left of the receiver callout's leader.
+# Sheet 2, back view at 1:1 (model X reversed: the plate's free edge prints at
+# sheet x 0.160, the taps at 0.1747 and 0.1884 on y 0.190, the plate top at
+# y 0.1925, the spring pad from the free edge to x 0.170 down to y 0.1855,
+# the cylinder's circle x 0.1917..0.2171, y 0.1773..0.2027).
+# The receiver stations stand above the view: 14.75 nearer, its text left of
+# the free edge, 28.45 above it with the pattern's mate named, its text right
+# of the span.  Left of the free edge the row height stands inboard, its text
+# above, and the padded tap length outboard, its text below, so neither's
+# extension lines cross the other's dimension line; the pad's width hangs
+# below and left of both, outside its extension lines.
 BACK_KEEP = {
-    "SpringSeatThickness": (0.165, 0.200),
-    "SpringPadWidth": (0.195, 0.172),
-    "ReceiverX0": (0.225, 0.220),
-    "ReceiverX1": (0.225, 0.229),
-    "ReceiverY0": (0.182, 0.185),
+    "SpringSeatThickness": (0.147, 0.176),
+    "SpringPadWidth": (0.130, 0.163),
+    "ReceiverX0": (0.220, 0.221),
+    "ReceiverX1": (0.130, 0.2085),
+    "ReceiverY0": (0.155, 0.1985),
 }
+# The back view's label, under the pad's width.  The point is its top left.
+BACK_VIEW_NOTE_XY = (0.110, 0.149)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -700,6 +817,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, detail_annotations, ("KnifeRidgeRadius",), label="knife detail"
     )
     _assert_knife_ridge_radius(adapter, detail_annotations)
+    _knife_ridge_angle(adapter, detail)
     _apply_callouts(
         adapter,
         [*front_annotations, *top_annotations, *detail_annotations],
@@ -708,15 +826,17 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Counter-anchor tap native callout (thread + depth) in the top plan.  Pick
     # a point on the hole rim (not its centre) so SolidWorks catches the
-    # circular edge: its left quadrant, the leader then running down-left to
-    # text below the Ø19.05's -- up-left it ran through the mid rib's
-    # two-line callout (farm r1 2026-10-16, leader-through-text).
+    # circular edge: its left quadrant, the leader then running up-left to
+    # text between the boss and the Ø19.05's text -- up-left over the mid
+    # rib it ran through that rib's two-line callout (farm r1 2026-10-16,
+    # leader-through-text), and down-left its text took the room the boss's
+    # Z location needs (machinist review r4 B3).
     anchor_tap_edge = _top_xy(TIP_X - COUNTER_R, 0.0)
     add_native_hole_callout(
         adapter,
         top,
         edge_xy=anchor_tap_edge,
-        callout_xy=(0.145, 0.112),
+        callout_xy=(0.145, 0.140),
         label="anchor tap",
     )
 
@@ -835,6 +955,32 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="plate +Z end face",
     )
+    # Z location of the anchor boss (machinist review r4 B3: the plan located
+    # it only in X): datum B to the tap's centre, half the plate length.  The
+    # pick sits at the end line's inboard end (the rib's top edge at the
+    # cylinder), so the extension line runs left under the web's lower arc,
+    # not along the outline; the text stands in the span left of the boss,
+    # under the anchor tap's callout and right of the Ø19.05's leader.
+    boss_z_pick = _top_xy(
+        min(point[0] for point in end_edge.line) + 1.0, -PLATE_L / 2.0
+    )
+    boss_z = add_edge_dimension(
+        adapter,
+        top,
+        p0=boss_z_pick,
+        p1=anchor_tap_edge,
+        text_xy=(0.150, 0.111),
+        label="anchor boss Z location",
+        orientation="vertical",
+        entities=(end_edge.edge, anchor_rim.edge),
+    )
+    assert_dimension_measures(
+        adapter,
+        boss_z,
+        expected_mm=PLATE_L / 2.0,
+        label="anchor boss Z location",
+        entities=(end_edge.edge, anchor_rim.edge),
+    )
     seed_rim = top_edges.circle_at(
         (HOLE_X, PLATE_T / 2.0, HOLE_Z_LAST),
         HOLE_DIA / 2.0,
@@ -931,9 +1077,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # The 20X callout hangs on hole 7 (three below the middle), text in the
     # open field right of the column: with 44.45 below the plate end,
     # 0.100..0.185 there holds nothing but section C-C's free-edge arrow,
-    # whose letter prints at x 0.256..0.262, y 0.129..0.1355 (farm r3: the
-    # leader off the middle hole, y 0.1336, ran 6.2 mm through it). Hole 7
-    # (y 0.1230) keeps the leader ~5 mm under that letter. Every callout on
+    # whose letter prints at x 0.259..0.265, y 0.136..0.143 (farm r3: the
+    # leader off the middle hole, y 0.1336, ran 6.2 mm through the letter,
+    # then at y 0.129..0.1355). Hole 7 (y 0.1230) keeps the leader clear
+    # under it. Every callout on
     # the end hole had to leave it downward and so crossed the plate-end
     # extension lines of 152.40 and the start-Z dimension -- steepening the
     # leader only traded that for text-on-line and arrow-near-text against
@@ -979,7 +1126,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not drawing.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate bracket receiver sheet")
-    back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=(1, 2))
+    back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=(1, 1))
     receiver_iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4),
     )
@@ -1045,10 +1192,10 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
     _apply_callouts(adapter, back_annotations, label="bracket receiver")
-    # The view label below the pad's width callout and left of the receiver
+    # The view label below the pad's width, left of the view and the receiver
     # callout's leader: at (0.205, 0.172) that leader ran through it (farm r1
-    # 2026-10-16, leader-through-text).  The point is the label's top left.
-    add_property_linked_note(adapter, "Back View Note", 0.160, 0.155)
+    # 2026-10-16, leader-through-text).
+    add_property_linked_note(adapter, "Back View Note", *BACK_VIEW_NOTE_XY)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
