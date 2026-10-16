@@ -39,6 +39,7 @@ import _buildgraph
 import _config
 import ch_channel_assembly_steps
 import dt_drive_train_steps
+import ha_harmonic_analyzer_assembly_steps
 import mg_magnifier_assembly_steps
 import pd_paper_drive_assembly_steps
 import sm_gooseneck_spring_screw_geom as gooseneck_screw
@@ -1754,7 +1755,7 @@ JOINTS: tuple[Joint, ...] = (
         thread="#6-32 UNC",
         quantity=1,
         per_channel=True,  # build_ch_channel_assembly places one per range(CHANNELS)
-        installed_at="MHA-HA-000 CHANNEL ANCHOR STEP",
+        installed_at=ha_harmonic_analyzer_assembly_steps.step_ref("channel-anchors-set"),
         exposure=Exposure.ADJUSTER,
         exposure_reason=(
             "per-channel calibration unscrews each anchor to set its spring preload (5% of preload per turn); "
@@ -1770,7 +1771,7 @@ JOINTS: tuple[Joint, ...] = (
         lock=Lock.JAM_NUT,
         lock_part="ch_anchor_jam_nut",
         lock_binds=("vn_spring_hook", "sm_summing_lever"),
-        lock_step="MHA-HA-000 CHANNEL ANCHOR STEP",
+        lock_step=ha_harmonic_analyzer_assembly_steps.step_ref("channel-anchors-set"),
         evidence=(
             "coordinator rulings 2026-10-16 (period hardware; option A after the hex-pitch collision): a made "
             "round #6-32 jam nut on the plate underside, driven by a forked driver through its notched face "
@@ -1791,7 +1792,7 @@ JOINTS: tuple[Joint, ...] = (
         thread="#6-32 UNC",
         quantity=1,
         per_channel=True,  # build_ch_channel_assembly places one per range(CHANNELS)
-        installed_at="MHA-HA-000 CHANNEL ANCHOR STEP",
+        installed_at=ha_harmonic_analyzer_assembly_steps.step_ref("channel-anchors-set"),
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "the jam nut is tightened against the plate underside with the eye held clocked; nut, anchor and "
@@ -1802,7 +1803,7 @@ JOINTS: tuple[Joint, ...] = (
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
-        lock_step="",
+        lock_step=ha_harmonic_analyzer_assembly_steps.step_ref("channel-anchors-set"),
         evidence=(
             "build_ch_channel_assembly.py CHANNEL_ANCHOR_NUT_XY/CHANNEL_ANCHOR_NUT_ROWS; "
             "ch_anchor_jam_nut_spec.py; ch-anchor-jam-nut.yaml"
@@ -1873,7 +1874,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="sm_summing_lever",
         thread="#2-56 UNC",
         quantity=2,
-        installed_at="",
+        installed_at=ha_harmonic_analyzer_assembly_steps.step_ref("magnifier-bracket-screwed"),
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamp the bracket flange to the summing lever; both rock together "
