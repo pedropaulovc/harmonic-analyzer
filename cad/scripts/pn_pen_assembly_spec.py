@@ -191,20 +191,21 @@ YAW_PRECISION = 0
 # The angle's text point, sketch mm: inside the wedge between the two arms,
 # on its bisector (the same wedge on the sheet, which keeps 45 not 135).
 _BISECTOR_DEG = 180.0 + YAW_DEG / 2.0
-YAW_TEXT_RADIUS = 12.0
+YAW_TEXT_RADIUS = 15.0
 YAW_TEXT_UV = (
     CARRIAGE_END_UV[0] + YAW_TEXT_RADIUS * math.cos(math.radians(_BISECTOR_DEG)),
     CARRIAGE_END_UV[1] + YAW_TEXT_RADIUS * math.sin(math.radians(_BISECTOR_DEG)),
 )
 # The nib preset's text point, sketch mm: off the marker-axis arm's middle on
 # the side away from the yaw wedge (beyond the paper-end face, clear of parts).
-NIB_TEXT_OFFSET = 9.0
+NIB_TEXT_OFFSET = 10.0
 NIB_TEXT_UV = (
     (CARRIAGE_END_UV[0] + NIB_UV[0]) / 2.0 + NIB_TEXT_OFFSET * math.sqrt(0.5),
     (CARRIAGE_END_UV[1] + NIB_UV[1]) / 2.0 - NIB_TEXT_OFFSET * math.sqrt(0.5),
 )
-# The stud height's text point, machine mm: left of the rod axis, mid-height.
-STUD_TEXT_XY = (carriage.PEN_ROD_X - 9.0, (STUD_LINE[0][1] + STUD_LINE[1][1]) / 2.0)
+# The stud height's text point, machine mm: left of the rod axis, mid-height,
+# far enough out that the callout's widest line clears the stud's shank.
+STUD_TEXT_XY = (carriage.PEN_ROD_X - 13.0, (STUD_LINE[0][1] + STUD_LINE[1][1]) / 2.0)
 
 # The drawing imports exactly these, at these places.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -246,15 +247,20 @@ HANGER_DETAIL_CENTRE = (
     (_BAR_BACK_Z + _HANGER_SCREW_TIP_Z) / 2.0,
 )
 HANGER_DETAIL_RADIUS = (_BAR_BACK_Z - _HANGER_SCREW_TIP_Z) / 2.0 + 4.0
-CARRIAGE_DETAIL_CENTRE = (
-    CARRIAGE_END_UV[0],
-    carriage.VBLOCK_POS[1],
-    -CARRIAGE_END_UV[1] - 3.5,
+# DETAIL C is turned so the marker axis reads left to right (nib left): its
+# crop centres a little into the block from the paper-end face, so the nib tip
+# and the stirrup's corners fall inside the circle and the block's far end is
+# cut off.
+CARRIAGE_DETAIL_INSET = 5.0
+CARRIAGE_DETAIL_CENTRE = carriage.block_to_machine(
+    (CARRIAGE_DETAIL_INSET, v_block.MARKER_AXIS_Y, v_block.DEPTH_MID_Z)
 )
-CARRIAGE_DETAIL_RADIUS = 30.0
+CARRIAGE_DETAIL_RADIUS = 20.0
+# The two points whose sheet direction the turned detail lays along +X.
+CARRIAGE_AXIS_POINTS = (carriage.MARKER_POS, _END_MACHINE)
 
 SHEET_TITLES = {
-    "carriage": "DETAIL C\nPEN YAW + NIB PRESET\nSCALE 1 : 1",
+    "carriage": "DETAIL C\nPEN YAW + NIB PRESET\nSCALE 2 : 1",
     "stud": "DETAIL A\nSTUD HEIGHT + LOCK\nSCALE 2 : 1",
     "hanger": "DETAIL B\nHANGER SCREW LOCK\nSCALE 2 : 1",
 }
@@ -315,7 +321,8 @@ ASSEMBLY_CHECKS = (
     "CHECKS:",
     f"- THE ROD SLIDES FREELY THROUGH BOTH GUIDES OVER ITS {_TRAVEL} TRAVEL "
     "AND FALLS UNDER THE CARRIAGE'S WEIGHT WHEN LIFTED AND RELEASED.",
-    "- THE CARRIAGE HANGS LEVEL; THE V-BLOCK DOES NOT TURN ON THE PIVOT BY HAND.",
+    "- THE V-BLOCK DOES NOT TURN ON THE PIVOT BY HAND, AND THE YAW STILL "
+    f"READS {_YAW_SETTING} (DETAIL C) AFTER TRYING IT.",
     f"- BOTH JAM NUTS (ITEMS {ITEM[STUD_NUT]}, {ITEM[HANGER_JAM_NUT]}) TIGHT; "
     "THE STUD AND THE HANGER SCREW DO NOT TURN BY HAND.",
 )
