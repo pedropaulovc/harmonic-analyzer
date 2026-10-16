@@ -650,12 +650,15 @@ def _mounting_rims(back: Any) -> list[Any]:
 # text block's BOTTOM line (farm r5: the R15.24 leader went to "AT BOSS
 # AXIS"'s right end, through the detail letter).  The rib arc's four lines
 # stand under the view, left of the 20X frame, their bottom line's right end
-# at (0.2032, 0.1969): 230 deg round the axis, 3 mm left of the letter.
+# at (0.2032, 0.2019): 226 deg round the axis, 3.7 mm left of the letter.
+# That bottom line stands 1.75 mm over the plan's R138.85 centre (0.1737,
+# 0.2001), where that radius's line starts (farm r6: it ran through "AT
+# BOSS AXIS"), and the top line as far under 19.05's lower arrow.
 FRONT_KEEP = {
     "CylDia": (0.290, 0.214),
     "AnchorHeight": (0.183, 0.235),
     "WebThickness": (0.215, 0.247),
-    "EdgeRibFrontArcR": (0.1868, 0.2070),
+    "EdgeRibFrontArcR": (0.1868, 0.2120),
     "EdgeRibFrontEndTopX": (0.2443, 0.254),
     "EdgeRibFrontEndTopY": (0.268, 0.244),
 }
@@ -691,12 +694,15 @@ TOP_KEEP = {
     # visible from -70 to -37 deg round it).  The leader starts at the text's
     # left end, at -60 deg and 46 mm from the centre, so it lands on the
     # visible arc: from -93 deg (farm r5) or -72 deg (r4) SolidWorks moved the
-    # arrow to the opposite side, ruling the radius across the sheet.  The
+    # arrow to the opposite side, ruling the radius across the sheet.  Text
+    # inside the arc rules the radius from its centre (farm r6), clear of
+    # everything but the front view's rib-arc callout (see FRONT_KEEP).  The
     # text's far corner stays 7 mm inside the arc, 8 mm under the 21.72.
     "SummationArcRadius": (0.2096, 0.162),
-    # Left of the -Z stub, under the 20X frame; its lower arrow (x 0.226)
-    # stands 4.5 mm right of the R138.85.
-    "HexKnifeBackDepth": (0.226, 0.1735),
+    # Left of the -Z stub, under the 20X frame, its text centred on its line:
+    # 2.8 mm left of datum A's arrow (at x 0.226 they touched, farm r6), its
+    # lower arrow 2.5 mm right of the R138.85.
+    "HexKnifeBackDepth": (0.2235, 0.1735),
     # Left of the +Z end rib, above its span: below it the finish symbol and
     # the 76.20/39.85 row leave no room, and the web's lower arc reaches the
     # cylinder at x 0.226 there.  The text spans x 0.1979..0.2095, right of
