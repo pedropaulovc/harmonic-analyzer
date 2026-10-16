@@ -806,7 +806,14 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
     [
         (
             "_assembly_patterns",
-            {"dt_drive_train", "fr_frame", "mg_magnifier", "pd_paper_drive", "ms_measuring_stick"},
+            {
+                "dt_drive_train",
+                "fr_frame",
+                "mg_magnifier",
+                "pd_paper_drive",
+                "ms_measuring_stick",
+                "pn_pen",
+            },
         ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
         ("_assembly", None),

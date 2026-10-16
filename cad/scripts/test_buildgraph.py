@@ -1452,7 +1452,14 @@ def test_assemblies_depend_on_assembly_helpers():
     [
         (
             "_assembly_patterns",
-            {"dt_drive_train", "fr_frame", "mg_magnifier", "pd_paper_drive", "ms_measuring_stick"},
+            {
+                "dt_drive_train",
+                "fr_frame",
+                "mg_magnifier",
+                "pd_paper_drive",
+                "ms_measuring_stick",
+                "pn_pen",
+            },
         ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
         # paper_drive reads its crank axis from cone_line, not the builder.
