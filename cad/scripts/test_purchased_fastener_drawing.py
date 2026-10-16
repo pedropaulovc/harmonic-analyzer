@@ -97,9 +97,8 @@ class _Note:
         return True
 
 
-@pytest.mark.parametrize("hidden_lines_removed", [True, False])
 def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
-    monkeypatch, tmp_path: Path, hidden_lines_removed: bool
+    monkeypatch, tmp_path: Path
 ) -> None:
     source = tmp_path / "test-fastener.SLDPRT"
     source.touch()
@@ -200,11 +199,6 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     )
     monkeypatch.setattr(
         purchased,
-        "set_hidden_lines_visible",
-        lambda _adapter, view: modes.update({view.GetOrientationName(): "visible"}),
-    )
-    monkeypatch.setattr(
-        purchased,
         "_fit_views",
         lambda _draw, _views, cells: {name: (1, 1) for name, _, _ in cells},
     )
@@ -250,21 +244,13 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     result = asyncio.run(
         purchased.build_purchased_fastener_drawing(
-            _Adapter(source),
-            spec,
-            item="#4-40 x 1/4 TEST SCREW",
-            hidden_lines_removed=hidden_lines_removed,
+            _Adapter(source), spec, item="#4-40 x 1/4 TEST SCREW"
         )
     )
 
-    # Hidden lines are removed by default (rule 9: no dimension names a
-    # hidden edge on a purchased reference sheet); the base-shape opt-out
-    # dashes Front/Top/Right only.
-    ortho = "HLR" if hidden_lines_removed else "visible"
-    assert modes == {
-        **dict.fromkeys(("*Front", "*Top", "*Right"), ortho),
-        "*Isometric": "HLR",
-    }
+    # Every view is hidden-lines-removed (rule 9: no dimension names a
+    # hidden edge on a purchased reference sheet).
+    assert modes == dict.fromkeys(("*Front", "*Top", "*Right", "*Isometric"), "HLR")
     printed = [call[1] for call in calls if call[0] == "note"]
     assert "#4-40 x 1/4 TEST SCREW" in printed
     assert purchased._GENERAL_TEXT[False] in printed

@@ -13,17 +13,18 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_part_drawing import HiddenLineDisplay, build_purchased_part_drawing
+from _purchased_part_drawing import build_purchased_part_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_chain_inner_link"]
 PART_STEM = SPEC.artifact_stem
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "ANSI #25 ROLLER CHAIN, INNER LINK (1/4 PITCH)"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    # Undimensioned reference views: dashed bores and pins inform nothing.
     return await build_purchased_part_drawing(
-        adapter, SPEC, hidden_lines=HiddenLineDisplay.REMOVED
+        adapter, SPEC, item=ITEM, cut_to_suit=True
     )
 
 
