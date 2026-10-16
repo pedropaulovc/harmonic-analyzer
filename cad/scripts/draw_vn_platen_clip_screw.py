@@ -13,13 +13,13 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_platen_clip_screw"]
-# The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "#2-56 x 1/4 PAN HEAD SLOTTED SCREW"
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    # The far-side slot and thread circle only clutter the 5:1 end view; the
+    # other views show the head and thread in solid lines (r3 review).
     return await build_purchased_fastener_drawing(
-        adapter, SPEC, item=ITEM
+        adapter, SPEC, hidden_lines_removed=True
     )
 
 
