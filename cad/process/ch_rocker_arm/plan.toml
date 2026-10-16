@@ -621,7 +621,7 @@ contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep
 # 30-40), hacksaw through the two taper-and-land tabs just outside the scribed line (ops
 # 50-60) and file the outline, tapers and tip lands included, to the line (ops 70-100). The
 # clamped hub holds the arm and the clamped ends hold the frame when the tabs part. prechips
-# 0.1.1 has no break-out or hand-saw action (break-out phase: prechips#213; saw_cut needs a
+# 0.1.2 has no break-out or hand-saw action (break-out phase: prechips#213; saw_cut needs a
 # bandsaw and one cut plane, and any action outside its bench set would put the DRO, zero
 # and headroom screens back on this bench setup), so ops 30-60 are bench `deburr` steps
 # whose note is the printed instruction.
