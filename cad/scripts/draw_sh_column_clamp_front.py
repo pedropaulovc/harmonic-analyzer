@@ -1,15 +1,20 @@
 r"""Create the curated machinist drawing for the column clamp, front arc.
 
 The SLDPRT remains authoritative.  This recipe supplies only the front-arc
-views, dimension layout, hole callouts, and manufacturing notes;
-sheet/template and export behavior lives in ``_drawing_common``.
-Dimension import and curation live in ``_drawing_dimension_import``.
+views, dimension layout and hole callout; sheet/template and export behavior
+lives in ``_drawing_common``.  Dimension import and curation live in
+``_drawing_dimension_import``.
 
 The sheet runs at 2:1 (the arc is 48 mm ear tip to ear tip); the isometric
-carries an explicit 1:1 override so it stays clear of the title block.  Third
-angle: the top view (the 17.9 x 48 plan carrying the column-relief arc) sits
-above the front view; the right view (the 48 x 16 bar face carrying the two
-ear holes) sits to its right.
+carries an explicit 1:1 override so it stays clear of the title block.  Two
+views in third-angle projection: the top view (the 17.9 x 48 plan carrying
+the column-relief arc, the bore axis centre-marked on the split face) and,
+projected to its left, the split face (the 48 x 16 face the relief opens
+into, turned so its 48 runs up the sheet beside the plan's, with the bore
+axis drawn as a centerline the ear-hole stations measure from).  No frames
+and no datums (drawing-guidelines.md rule 5; clamps are not on the
+drawing-simplicity allowlist): the bore axis locates the bar face, one side
+face and the ear holes by +/- dimensions authored on the part.
 
 Run with SolidWorks open::
 
@@ -23,12 +28,17 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
+    view_name,
 )
 
 from _check import check
+from _column_clamp_drawing import add_bore_axis_centerline, set_dimension_prefixes
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -36,28 +46,31 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
-    set_basic_dimension,
+    assert_imported_precision,
     set_dimension_callouts,
-    set_dimension_precision,
+    set_reference_dimensions,
 )
-from _drawing_edge_dimensions import add_edge_dimension
-from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from sh_column_clamp_front_spec import (
     ARC_DEPTH,
     ARC_HEIGHT,
-    BORE_RADIUS,
+    BACK_ARC_MATE,
+    BORE_DIAMETRAL_CLEARANCE,
+    COLUMN_BORE,
+    COLUMN_MATE,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
     EAR_HOLE_DIA,
     EAR_HOLE_Z,
-    GEOMETRIC_TOLERANCES_MM,
 )
 
 
@@ -74,37 +87,169 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (2.0, 1.0)
-
-# Sheet layout (meters).  The model bbox runs 0..17.9 in X (depth), +/-8 in Y
-# (height) and +/-24 in Z (width); at 2:1 the front view is 35.8 x 32 mm, the
-# top view 35.8 x 96 mm, the right view 96 x 32 mm.
-FRONT_CENTER = (0.105, 0.125)
-TOP_CENTER = (0.105, 0.205)
-RIGHT_CENTER = (0.250, 0.125)
-ISO_CENTER = (0.355, 0.205)
-
 _M = SHEET_SCALE[0] / 1000.0  # model mm -> sheet meters
 
+# Sheet layout (meters).  The model bbox runs 0..17.9 in X (split face, on
+# the bore axis, to bar face), +/-8 in Y (height) and +/-24 in Z (width); each
+# view centres on that bbox.  At 2:1 the top view is 35.8 x 96 mm with +X
+# right and +Z down, so the split face and the bore axis lie on its left edge,
+# level with the view centre.  The split-face view is the *Left view (looking
+# +X) turned a quarter turn clockwise: +Z runs down the sheet as in the top
+# view and the top face (+Y) faces the top view, a true left-side projection
+# of it; 32 x 96 mm.
+TOP_CENTER = (0.222, 0.175)
+FACE_CENTER = (0.095, 0.175)
+FACE_VIEW_ANGLE = -math.pi / 2.0
+ISO_CENTER = (0.355, 0.205)
+ISO_NOTE_XY = (0.330, 0.168)
+# The stated shortfalls (sh_column_clamp_front_spec.DRAWING_NOTES) stand in
+# the open lower-left field, under the split-face view's height callout
+# (0.090) and left of the title block (x 0.216, up to y 0.070), where the
+# fleet's notes stand.
+NOTES_XY = (0.020, 0.070)
+# Ear-height text centre off the face view's centre (sheet m): the bottom-face
+# witness stands ARC_HEIGHT / 2 at 2:1 = 0.016 off it, the widest callout
+# line is ~0.040 wide, so 0.040 leaves ~4 mm between text and witness.
+EAR_HEIGHT_TEXT_OFFSET = 0.040
 
-def _plan_x(model_x_mm: float) -> float:
-    """Sheet X of a model-X point in the front/top views (2:1, bbox-centred)."""
-    return FRONT_CENTER[0] + (model_x_mm - ARC_DEPTH / 2.0) * _M
+
+def _face_xy(y_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet point of a model (Y, Z) in the turned split-face view."""
+    return (FACE_CENTER[0] + y_mm * _M, FACE_CENTER[1] - z_mm * _M)
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position.  All three live on the top view (their sketches lie on the part's
-# Top plane): the depth chain above the view, the width chain to its left, the
-# bore diameter leadered off the relief arc.
+# position.  Top view (the block and bore sketches lie on the Top plane): the
+# depth above the view (its three-line text block centres on the point, so the
+# dimension line lands ~8 mm under it and the value ~6 mm over it: round 4 put
+# the value on the border at 0.262),
+# the width right of it, the bore axis to the near (+Z)
+# side face on a dimension line left of the split face with its value on that
+# line, and the bore's reference Ø leadered in through the upper half of the
+# open mouth from above left, clear of that dimension.  Split-face view: the
+# ear-hole station from the bore centerline left of it, its mate callout under
+# the value; under the view, the ears' shared height off the bottom face
+# (EarHoleHeight, from the part's hidden EarHeightReference sketch: its
+# witnesses leave the bottom face and ear 1's centre), and the height below
+# it.  The ears' height spans only 16 mm of sheet between its witnesses, far
+# short of its ~40 mm callout block, so that block stands OUTSIDE them, past
+# the bottom-face witness (which the height shares) and off the part, its
+# dimension line run out under it: no witness, ear centreline or part edge
+# crosses the text (farm round 20261015T1724 audit and machinist review,
+# rule 14).
 TOP_KEEP = {
-    "Depth": (0.105, 0.261),
-    "Width": (0.058, 0.205),
-    "BoreDia": (0.158, 0.243),
+    "Depth": (TOP_CENTER[0], 0.248),
+    "Width": (0.262, TOP_CENTER[1]),
+    "AnchorZ": (0.180, 0.151),
+    "BoreDia": (0.155, 0.212),
 }
-FRONT_KEEP = {}
-RIGHT_KEEP = {}
+FACE_KEEP = {
+    "Height": (FACE_CENTER[0], 0.090),
+    "EarHole1Z": (0.055, 0.1575),
+    "EarHoleHeight": (FACE_CENTER[0] - EAR_HEIGHT_TEXT_OFFSET, 0.113),
+}
+
+# Both ear holes stand on the one station and the one height the part prints
+# (EarHole1Z, EarHoleHeight).
+DIMENSION_PREFIXES = {"EarHole1Z": "2X ", "EarHoleHeight": "2X "}
+REFERENCE_DIMENSIONS = ("BoreDia",)
+# The bands tighter than the title block name their mate and why
+# (drawing-guidelines.md rule 4): the bore is matched to the purchased column
+# (sh_column_clamp_fit's grip budget), the depth at two places sets the clamp
+# screws' engagement in the back arc's taps (sh_column_clamp_front_spec), and
+# the ear stations and height line up with those taps.  The bore callout also says where
+# the axis lies (on the split face; round-3 review).  All under the value: SOLIDWORKS prints nothing of an
+# above-callout holding a line break
+# (draw_dt_cone_gear_shaft._printable_above_callouts).
 DIMENSION_CALLOUTS = {
-    "BoreDia": "THRU\nSLIP FIT ON <MOD-DIAM>25.4 COLUMN",
+    "BoreDia": (
+        f"{BORE_DIAMETRAL_CLEARANCE[0]:.2f}-{BORE_DIAMETRAL_CLEARANCE[1]:.2f} "
+        f"DIAMETRAL\nCLEARANCE ON\n{COLUMN_MATE}\nAXIS ON SPLIT FACE"
+    ),
+    "Depth": f"SETS SCREW ENGAGEMENT\nIN {BACK_ARC_MATE}",
+    "EarHole1Z": f"ALIGNS WITH\n{BACK_ARC_MATE} TAPS",
+    "EarHoleHeight": f"ALIGNS WITH\n{BACK_ARC_MATE} TAPS",
 }
+
+# Model points (mm) the sheet picks project from, on the split face (X = 0).
+# The drill callout lands on ear 2's rim up and right of its centre; the bore
+# centerline runs midway between the two straight edges where the relief
+# meets the split face.
+_EAR_R = EAR_HOLE_DIA / 2.0
+_EAR_2_RIM_MM = (0.0, 0.6 * _EAR_R, -EAR_HOLE_Z - 0.8 * _EAR_R)
+_RELIEF_EDGES_MM = tuple((0.0, -4.0, s * COLUMN_BORE / 2.0) for s in (1.0, -1.0))
+# The relief arc's far point on the top face, where its centre mark picks it.
+_RELIEF_ARC_MM = (COLUMN_BORE / 2.0, ARC_HEIGHT / 2.0, 0.0)
+HOLE_CALLOUT_XY = (0.110, 0.250)
+HOLE_CALLOUT_PROCESS = "DRILL"
+# A turned view that is off by a sign misplaces every recipe position, so the
+# build proves ear 1's centre lands where _face_xy puts it.
+_PROJECTION_TOL = 0.0005
+# The top view's frame: the bbox centre in X (model mm), for the same proof.
+_X_MID = ARC_DEPTH / 2.0
+
+
+def _mm_to_m(point: tuple[float, float, float]) -> tuple[float, float, float]:
+    return (point[0] / 1000.0, point[1] / 1000.0, point[2] / 1000.0)
+
+
+def _assert_lands(
+    adapter: Any,
+    view: Any,
+    point_mm: tuple[float, float, float],
+    expected: tuple[float, float],
+    *,
+    label: str,
+) -> None:
+    landed = model_point_in_view(adapter, view, _mm_to_m(point_mm), label=label)
+    if math.dist(landed, expected) > _PROJECTION_TOL:
+        raise RuntimeError(f"{label} projects to {landed}, not {expected}")
+
+
+def _turn_face_view(adapter: Any, drawing_model: Any, view: Any) -> None:
+    """Turn the split-face view upright beside the plan and prove its frame."""
+    native = _early_bound(view, "IView")
+    native.Angle = FACE_VIEW_ANGLE
+    if abs(math.remainder(float(native.Angle) - FACE_VIEW_ANGLE, 2.0 * math.pi)) > 1e-9:
+        raise RuntimeError("failed to turn the split-face view beside the plan")
+    drawing_model.EditRebuild3()
+    _assert_lands(
+        adapter,
+        view,
+        (0.0, 0.0, EAR_HOLE_Z),
+        _face_xy(0.0, EAR_HOLE_Z),
+        label="split-face view ear 1 centre",
+    )
+
+
+def _add_relief_center_mark(adapter: Any, top: Any) -> None:
+    """Centre-mark the relief arc: the bore axis the plan dimensions from is
+    drawn rather than implied."""
+    _assert_lands(
+        adapter,
+        top,
+        (0.0, ARC_HEIGHT / 2.0, 0.0),
+        (TOP_CENTER[0] - _X_MID * _M, TOP_CENTER[1]),
+        label="top view bore axis",
+    )
+    draw = adapter.currentModel
+    drawing_doc = _sw_type_info.early_bound_or_flag(
+        draw, "IDrawingDoc", "ActivateView", "InsertCenterMark3"
+    )
+    if not drawing_doc.ActivateView(view_name(adapter, top)):
+        raise RuntimeError("failed to activate the clamp-front top view")
+    arc_xy = model_point_in_view(
+        adapter, top, _mm_to_m(_RELIEF_ARC_MM), label="relief arc"
+    )
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        "", "EDGE", arc_xy[0], arc_xy[1], 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("failed to select the column-relief arc")
+    center_mark = drawing_doc.InsertCenterMark3(2, False, False)
+    draw.ClearSelection2(True)
+    if center_mark is None:
+        raise RuntimeError("failed to centre-mark the bore axis")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -112,28 +257,18 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open column-clamp-front source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Isometric View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Isometric View Note",
-        ),
+    required = (
+        "Number",
+        "Material Specification",
+        "Finish",
+        "Quantity",
+        "Manufacturing Notes",
+        "Isometric View Note",
     )
-    drawing_model, sheet = new_project_drawing(
+    read_required_properties(
+        adapter.currentModel, ("Revision", "Title", *required), required=required
+    )
+    drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
@@ -143,151 +278,71 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Column Clamp Front Arc Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "column clamp; front arc; gray iron casting; manufacturing drawing",
+            3: "column clamp; front arc; #8 clearance ears; manufacturing drawing",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
+    face = place_view(adapter, str(SOURCE), "*Left", *FACE_CENTER, scale=(2, 1))
+    _turn_face_view(adapter, drawing_model, face)
+    # finalize_drawing shades the pictorial isometric with edges; the iso
+    # first gets local HLR settings so its cosmetic threads export at full
+    # quality (_drawing_common.set_high_quality_shaded_with_edges).
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (right, iso):
+    for view in (top, face, iso):
         set_hidden_lines_removed(adapter, view)
-    # The front view shows the relief depth profile and the ear drills edge-on;
-    # the top view carries the hidden ear-hole rectangles beside the open arc.
-    for view in (front, top):
-        set_hidden_lines_visible(adapter, view)
 
-    top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
-    )
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
-    )
-    set_dimension_callouts(
-        adapter,
-        [*top_annotations, *front_annotations, *right_annotations],
-        DIMENSION_CALLOUTS,
-    )
-    # The relief is a 25.6 single-decimal fit bore (the notes cite 25.6 on
-    # 25.4); two decimals would read as false precision against the note.
-    set_dimension_precision(
-        adapter,
-        [*top_annotations, *front_annotations, *right_annotations],
-        {"BoreDia": 1},
-    )
-
-    # Collar height (16): dimension the front view's flat top/bottom faces.
-    # RIGHT of the view (x+0.033, was x-0.033): on the left its extension
-    # lines (y 0.109/0.141, x 0.071..0.086) fenced the mating face, and the
-    # parallelism FCF's leader to that face crossed the lower one.
-    add_edge_dimension(
-        adapter,
-        front,
-        p0=(FRONT_CENTER[0], FRONT_CENTER[1] - ARC_HEIGHT / 2.0 * _M),
-        p1=(FRONT_CENTER[0], FRONT_CENTER[1] + ARC_HEIGHT / 2.0 * _M),
-        text_xy=(FRONT_CENTER[0] + 0.033, FRONT_CENTER[1]),
-        label="collar-height overall",
-    )
-
-    if not auto_center_marks(adapter, right, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to the right view")
-
-    # Ear-hole span (35 c-c), BASIC: the position FCF below carries the
-    # tolerance.  Both ears show round in the right view.
-    ear_top = EAR_HOLE_DIA / 2.0 * _M
-    ear_spacing = add_edge_dimension(
-        adapter,
-        right,
-        p0=(RIGHT_CENTER[0] - EAR_HOLE_Z * _M, RIGHT_CENTER[1] + ear_top),
-        p1=(RIGHT_CENTER[0] + EAR_HOLE_Z * _M, RIGHT_CENTER[1] + ear_top),
-        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.028),
-        label="ear-hole spacing",
-    )
-    set_basic_dimension(adapter, ear_spacing, label="ear-hole spacing")
-
-    # Native datum/GD&T/surface annotations.  Datum A is the bar-seat face
-    # (the full-depth flat at x = 17.9 the support bar clamps against); datum
-    # B is the column-relief bore.
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=(_plan_x(ARC_DEPTH), TOP_CENTER[1] - 0.035),
-        symbol_xy=(0.150, TOP_CENTER[1] - 0.035),
-        datum="A",
-        label="bar-seat face",
-    )
-    # Datum B tags the relief bore from INSIDE its open half-disc: the top
-    # view is fenced on all four sides by the Depth/Width extension lines
-    # (they lie along the silhouette edges), so the old tag right of the view
-    # crossed Depth's right-hand one. Attached 20 deg below the bore's apex,
-    # the leader runs radially inward to the tag (angular -> forced shoulder,
-    # box to its left at ~x 0.091..0.098, y 0.195..0.202): 3.6 mm clear of the
-    # left extension line and 4.3 mm below the Ø25.6 leader.
-    datum_b_angle = math.radians(-20.0)
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=(
-            _plan_x(BORE_RADIUS * math.cos(datum_b_angle)),
-            TOP_CENTER[1] + BORE_RADIUS * math.sin(datum_b_angle) * _M,
+    annotations = [
+        *curate_view_dimensions(
+            adapter,
+            top,
+            keep=TOP_KEEP,
+            view_label="top",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
-        symbol_xy=(
-            _plan_x(9.0 * math.cos(datum_b_angle)),
-            TOP_CENTER[1] + 9.0 * math.sin(datum_b_angle) * _M,
+        *curate_view_dimensions(
+            adapter,
+            face,
+            keep=FACE_KEEP,
+            view_label="split face",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
-        datum="B",
-        label="column-relief bore",
-    )
-    add_feature_control_frame(
+    ]
+    # Places and bands are authored on the part; the sheet only proves the
+    # import kept the places, then marks the reference bore, the pair count
+    # and the mates.
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
+    set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+
+    _add_relief_center_mark(adapter, top)
+    picks = model_points_in_view(
         adapter,
-        right,
-        edge_xy=(
-            RIGHT_CENTER[0] + EAR_HOLE_Z * _M,
-            RIGHT_CENTER[1] - ear_top,
-        ),
-        frame_xy=(0.297, 0.108),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["ear-hole position"],
-        datums=("A", "B"),
-        diameter=True,
-        quantity="2X",
-        label="ear-hole position",
+        face,
+        [_mm_to_m(point) for point in (_EAR_2_RIM_MM, *_RELIEF_EDGES_MM)],
+        label="split-face picks",
+        names=("ear 2 rim", "relief edge +Z", "relief edge -Z"),
     )
-    # Frame level with its attachment (was (0.040, 0.096), whose diagonal
-    # leader crossed the 16.00's lower extension line): the leader now runs
-    # horizontally ~10 mm into the mating face, crossing nothing.
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(_plan_x(0.0), FRONT_CENTER[1]),
-        frame_xy=(0.052, FRONT_CENTER[1] + 0.0035),
-        characteristic="parallelism",
-        tolerance=GEOMETRIC_TOLERANCES_MM["mating-face parallelism"],
-        datums=("A",),
-        label="mating-face parallelism",
-    )
+    ear_2_rim, *relief_edges = picks
+    # The ear-hole stations measure from the bore axis: draw it.
+    add_bore_axis_centerline(adapter, face, relief_edges)
+    if not auto_center_marks(adapter, face, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to the split-face view")
+
     add_native_hole_callout(
         adapter,
-        right,
-        edge_xy=(
-            RIGHT_CENTER[0] - EAR_HOLE_Z * _M,
-            RIGHT_CENTER[1] - ear_top,
-        ),
-        callout_xy=(0.170, 0.093),
+        face,
+        edge_xy=ear_2_rim,
+        callout_xy=HOLE_CALLOUT_XY,
         label="ear holes",
+        process=HOLE_CALLOUT_PROCESS,
     )
-
-    # 0.020: the note is left-aligned ON its anchor, so the ink starts here. The
-    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred border rule
-    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
-    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.168)
+    # sh-column-clamp-front RV-01 (EAR_WALL_NOTE) and RV-02 (SCREW_LINE_NOTE).
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

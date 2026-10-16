@@ -1946,8 +1946,8 @@ JOINTS: tuple[Joint, ...] = (
         lock_step="",
         evidence=(
             "build_mg_magnifier_assembly.py:build (clamp-screw seed + lock_mate + linear_component_pattern x2, CLAMP_SCREW_X); "
-            "build_sh_column_clamp_back.py HOLE_SPEC tapped #8-32; sh_column_clamp_front_geom.py EAR_HOLE_SPEC clearance #8; "
-            "sh_column_clamp_front_spec.py DRAWING_NOTES; mg_wheel_bar_geom.py CLAMP_HOLE_SPEC; diag_mcmaster_fillister.py 90280A201"
+            "sh_column_clamp_back_geom.py HOLE_SPEC tapped #8-32; sh_column_clamp_front_geom.py EAR_HOLE_SPEC clearance #8; "
+            "sh_column_clamp_fit.py grip and screw-line budget; mg_wheel_bar_geom.py CLAMP_HOLE_SPEC; diag_mcmaster_fillister.py 90280A201"
         ),
     ),
     # --- paper_drive (MHA-PD-000, pd_paper_drive_assembly_steps) ---
@@ -1966,7 +1966,7 @@ JOINTS: tuple[Joint, ...] = (
         lock_part="",
         lock_binds=(),
         lock_step="",
-        evidence="build_pd_paper_drive_assembly.py:build (clamp-screw seeds + 'support clamp-screw pattern') and _assert_fastener_stacks (90280A201 clamps); draw_pd_paper_drive_assembly._step_text 'bar-clamped'; build_sh_column_clamp_back.HOLE_SPEC tapped #8-32; build_pd_support_bar.CLAMP_HOLE_SPEC/CLAMP_HOLE_X; sh_column_clamp_front_geom.EAR_HOLE_SPEC",
+        evidence="build_pd_paper_drive_assembly.py:build (clamp-screw seeds + 'support clamp-screw pattern') and _assert_fastener_stacks (90280A201 clamps); draw_pd_paper_drive_assembly._step_text 'bar-clamped'; sh_column_clamp_back_geom.HOLE_SPEC tapped #8-32; build_pd_support_bar.CLAMP_HOLE_SPEC/CLAMP_HOLE_X; sh_column_clamp_front_geom.EAR_HOLE_SPEC",
     ),
     Joint(
         id="pd-paper-drive/clip-screw-in-platen",

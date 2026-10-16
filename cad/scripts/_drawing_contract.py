@@ -132,6 +132,8 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_mg_wheel_axle.py",
         "draw_mg_wheel_bar.py",
         "draw_pn_pen_adjust_screw.py",
+        "draw_sh_column_clamp_front.py",
+        "draw_sh_column_clamp_back.py",
     }
 )
 _PRECISION_SETTERS = frozenset({"set_dimension_precision"})

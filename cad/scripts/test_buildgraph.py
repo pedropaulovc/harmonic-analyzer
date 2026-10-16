@@ -1540,9 +1540,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_motion_study_springs.py", "build_motion_study"): (
         "dtrefactor: reads ANGLE, DISTANCE, SPRING_KCH, SPRING_KCT, STOCK_KCH, STOCK_KCT, _by_z_rank, _components, _entity_ref, _family, _find_one, _iter_mates, _lone_real, _read_member, _sub_model, _suppress_named"
     ),
-    ("build_pd_paper_drive_assembly.py", "build_sh_column_clamp_back"): (
-        "dtrefactor: reads DEPTH, HOLE_SPEC"
-    ),
     ("build_pd_paper_drive_assembly.py", "build_pd_guide_lock"): (
         "dtrefactor: reads HOLE_DIA, LOCK_THICK, LOCK_WIDTH"
     ),

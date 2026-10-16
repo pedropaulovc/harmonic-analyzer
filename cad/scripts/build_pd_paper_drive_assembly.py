@@ -176,8 +176,9 @@ from build_pd_support_bar import (  # noqa: E402
     CLAMP_HOLE_X,
 )
 from sh_column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
-from build_sh_column_clamp_back import (  # noqa: E402
-    DEPTH as ARC_BACK_DEPTH,
+from sh_column_clamp_back_geom import (  # noqa: E402
+    BLOCK_DEPTH as ARC_BACK_BLOCK_DEPTH,
+    GRIP_OFFSET as ARC_BACK_GRIP_OFFSET,
     HOLE_SPEC as CLAMP_RECEIVER_SPEC,
 )
 
@@ -1083,16 +1084,20 @@ def _assert_fastener_stacks() -> None:
                 f"({major_dia:.4f} mm)"
             )
 
-    # 90280A201 clamps: head seat -> remaining bar -> front clamp -> tapped
-    # back clamp. The receiver is through, so its unused thickness is clearance,
-    # never a blind bottom.
+    # 90280A201 clamps: head seat -> remaining bar -> front clamp -> the open
+    # grip gap (the back arc's mating face stops ARC_BACK_GRIP_OFFSET short of
+    # the column axis, sh_column_clamp_back_geom) -> tapped back clamp. The
+    # receiver is through, so its unused thickness is clearance, never a blind
+    # bottom.
     if (
         CLAMP_RECEIVER_SPEC.kind,
         CLAMP_RECEIVER_SPEC.size,
         CLAMP_RECEIVER_SPEC.end,
     ) != ("tapped", "#8-32", "through_all"):
         raise AssertionError("clamp receiver is not a through #8-32 tap")
-    clamp_passage = BAR_DEPTH - CLAMP_CBORE_DEPTH + ARC_FRONT_DEPTH
+    clamp_passage = (
+        BAR_DEPTH - CLAMP_CBORE_DEPTH + ARC_FRONT_DEPTH + ARC_BACK_GRIP_OFFSET
+    )
     clamp_engagement = CLAMP_SCREW_LEN - clamp_passage
     nonnegative("clamp head recess", CLAMP_CBORE_DEPTH - CLAMP_SCREW_HEAD_H)
     nonnegative(
@@ -1102,7 +1107,7 @@ def _assert_fastener_stacks() -> None:
         "clamp shank radial clearance", (CLAMP_HOLE_DIA - CLAMP_SCREW_DIA) / 2.0
     )
     valid_engagement("clamp #8-32 engagement", clamp_engagement, CLAMP_SCREW_DIA)
-    nonnegative("clamp receiver tip clearance", ARC_BACK_DEPTH - clamp_engagement)
+    nonnegative("clamp receiver tip clearance", ARC_BACK_BLOCK_DEPTH - clamp_engagement)
     if abs(CLAMP_CBORE_DEPTH - CLAMP_SCREW_HEAD_H - CLAMP_HEAD_RECESS) > 1e-9:
         raise AssertionError("clamp head is not recessed by the specified 0.2 mm")
 
