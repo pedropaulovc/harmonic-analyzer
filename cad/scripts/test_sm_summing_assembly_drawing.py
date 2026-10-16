@@ -122,8 +122,8 @@ def test_settings_are_derived_from_the_placed_geometry() -> None:
 
 def test_setting_drives_reproduce_the_sketch_values() -> None:
     g = builder._SETTING_GLOBALS
-    assert -g["SmKnifeX"] == pytest.approx(-spec.KNIFE_POINT[0])
-    assert g["SmKnifeX"] - g["SmCounterScrewX"] == pytest.approx(
+    assert g["SmCounterScrewX"] == spec.COUNTER_SCREW_POINT[0]
+    assert spec.KNIFE_POINT[0] - g["SmCounterScrewX"] == pytest.approx(
         spec.COUNTER_SCREW_OFFSET_X
     )
     assert g["SmCounterScrewY"] - g["SmKnifeY"] == pytest.approx(
