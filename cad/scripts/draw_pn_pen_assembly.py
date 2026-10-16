@@ -129,6 +129,8 @@ SETTINGS_NOTE_WIDTH = 70  # characters
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
 DETAIL_LETTER_GAP = 0.001
+BOUNDARY_COLOR = 0  # COLORREF black, the outline's colour.
+BOUNDED_ON_RIGHT = frozenset(("stud", "hanger"))
 
 _CARRIAGE_STEMS = frozenset(
     (
@@ -683,13 +685,19 @@ def _sketch_view_circle(
 
 
 def _mark_detail_boundary(adapter: Any, parent: Any, detail: Detail) -> None:
-    """The detail's boundary on its parent view: a circle round what the
-    detail shows, lettered at its upper right (machinist review, farm run
+    """The detail's boundary on its parent view: a black circle round what
+    the detail shows, lettered at its upper right (machinist review, farm run
     20261016T082735510Z: the fitter could not tell where A and B come from)."""
     label = f"{detail.label} boundary"
     centre = model_point_in_view(adapter, parent, detail.model_centre_m, label=label)
     radius = detail.radius_mm * SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
     _sketch_view_circle(adapter, parent, centre, radius, label=label)
+    # A view-sketch circle prints in the sketch's grey (farm run
+    # 20261016T092607223Z); colour the still-selected circle as the outline.
+    selection = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+    if int(selection.GetSelectedObjectCount2(-1)) != 1:
+        raise RuntimeError(f"{label}: the sketched circle is not the one selection")
+    _early_bound(adapter.currentModel, "IDrawingDoc").SetLineColor(BOUNDARY_COLOR)
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
     reach = radius * math.sqrt(0.5) + DETAIL_LETTER_GAP
@@ -829,22 +837,12 @@ def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
     """Front and right at 1:2, the three details, the as-shipped note; returns
     the check that re-reads every setting once the drawing has settled."""
     _activate_sheet(adapter, SHEET_NAMES[0])
-    bases = {
-        "*Front": _placed_base_view(
-            adapter,
-            "*Front",
-            FRONT_CENTER,
-            spec.VIEW_TITLES["front"],
-            label="pen front",
-        ),
-        "*Right": _placed_base_view(
-            adapter,
-            "*Right",
-            RIGHT_CENTER,
-            spec.VIEW_TITLES["right"],
-            label="pen right",
-        ),
-    }
+    _placed_base_view(
+        adapter, "*Front", FRONT_CENTER, spec.VIEW_TITLES["front"], label="pen front"
+    )
+    right = _placed_base_view(
+        adapter, "*Right", RIGHT_CENTER, spec.VIEW_TITLES["right"], label="pen right"
+    )
     annotations = [
         annotation for detail in DETAILS for annotation in _detail(adapter, detail)
     ]
@@ -875,12 +873,12 @@ def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
     for name, display in displays:
         _assert_dimension_ink_on_sheet(display, label=f"pen {name}")
     _assert_settings(displays, when="placed")
-    # A detail drawn in a base view's own direction (A on FRONT, B on RIGHT)
-    # is bounded there; the turned plan C has no parent and says so in its
-    # title.
+    # A and B are bounded on RIGHT, where the stud and the hanger screw both
+    # show (on FRONT the strap hides the stud); A is drawn from the front and
+    # says so in its title, as the turned plan C does.
     for detail in DETAILS:
-        if detail.axis_points is None and detail.orientation in bases:
-            _mark_detail_boundary(adapter, bases[detail.orientation], detail)
+        if detail.key in BOUNDED_ON_RIGHT:
+            _mark_detail_boundary(adapter, right, detail)
     _add_note_block(
         adapter,
         SHEET_NAMES[0],
