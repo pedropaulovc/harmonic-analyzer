@@ -164,6 +164,32 @@ EXPLODE_STEPS = (
     ("stirrup off x", (FRAME,), "x", -16.0),
     ("stirrup off z", (FRAME,), "z", 16.0),
 )
+
+
+def exploded_point(stem: str, point: tuple[float, float, float]) -> tuple[float, ...]:
+    """``point`` (machine mm, assembled) carried by every step that moves
+    ``stem``."""
+    moved = list(point)
+    for _label, stems, key, distance in EXPLODE_STEPS:
+        if stem in stems:
+            moved["xyz".index(key)] += distance
+    return tuple(moved)
+
+
+# The rod set screw's trail on the exploded view: from its exploded cup back
+# to its tap's mouth on the exploded block's front face. Along the tap's axis
+# the octant view draws the screw's way out straight down the sheet, where it
+# read as entering the block's bottom (machinist review r4); the trail lands
+# it on the front-face tap step 4 names.
+ROD_SET_SCREW_TRAIL = (
+    exploded_point(ROD_SET_SCREW, carriage.ROD_SET_SCREW_POS),
+    exploded_point(
+        V_BLOCK,
+        carriage.block_to_machine(
+            (v_block.PIVOT_BORE_X, v_block.SET_SCREW_Y, v_block.BODY_Z0)
+        ),
+    ),
+)
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
 
 # --- settings ----------------------------------------------------------------
