@@ -12,3 +12,8 @@ ch-fulcrum-keeper:
       where: "right view, bore width station '(7.0) ON WIDTH CENTER \u00b10.3, HOLDS MHA-VN-055 THREAD ENGAGEMENT'"
       finding: "bore lateral band tightened from \u00b10.8 to \u00b10.3 to rescue crown-tap thread engagement (rule 4)"
       reason: "the crown is a full round that follows the 14.0 width, so the bore must sit on the width centre; \u00b10.3 holds the MHA-VN-055 set screw at 1.5D full thread and no more than 0.4 proud at the worst case; the geometry alternative is the parked lug/crown resize (owner ruling Q10-B)"
+    - id: "RV-02"
+      kind: "accept"
+      where: "foot-hole side station '7.000 \u00b10.13, CENTERS MHA-FR-002 TAP IN RAIL WEB'"
+      finding: "foot-hole lateral station held at .XXX instead of title-block .XX (rule 4)"
+      reason: "the MHA-FR-002 rail tap is transferred through this hole; at .XX the rail-web thread ligament drops from 1.62 to about 1.24, below the 1.5 floor (owner ruling 2026-10-16)"
