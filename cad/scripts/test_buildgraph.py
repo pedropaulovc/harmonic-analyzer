@@ -1459,6 +1459,7 @@ def test_assemblies_depend_on_assembly_helpers():
                 "pd_paper_drive",
                 "ms_measuring_stick",
                 "pn_pen",
+                "sm_summing",
             },
         ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),

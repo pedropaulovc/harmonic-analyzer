@@ -1432,7 +1432,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="sm_knife_mount",
         thread="#10-24 UNC",
         quantity=2,
-        installed_at="",
+        installed_at="MHA-SM-000 STEP 5",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the knife-edge bearing block's top seat to the stationary crossbar underside (MOUNT_GAP 0); "
@@ -1462,7 +1462,8 @@ JOINTS: tuple[Joint, ...] = (
             "HANGER_GRIP_TOL/HANGER_PIN_X; vn_knife_mount_dowel_spec.py; "
             "vn_knife_hanger_washer_spec.py; vn_knife_hanger_stud_spec.py THREAD_LENGTH_MIN/"
             "INCOMPLETE_TIP_LEN_MAX; cad/config/parts/vn-knife-hanger-stud.yaml "
-            "(92314A253) installation_notes ('USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.')"
+            "(92314A253) installation_notes ('USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.'); "
+            "sm_summing_assembly_spec.ASSEMBLY_STEPS 4-5, ASSEMBLY_CHECKS 1"
         ),
     ),
     Joint(
@@ -1472,7 +1473,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="sm_summing_lever",
         thread="#10-24 UNC",
         quantity=1,
-        installed_at="",
+        installed_at="MHA-SM-000 STEP 2",
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "the eyebolt rides the rocking summing lever and carries the counter-spring tension, which cycles "
@@ -1493,7 +1494,8 @@ JOINTS: tuple[Joint, ...] = (
             "(a CAD mate, not hardware); build_sm_summing_lever.py: _counter_anchor_tap ('NO NUT: this tap is "
             "the nut'); sm_summing_lever_spec.COUNTER_HOLE_SPEC; stock_anchor_geom.ANCHOR_9490T1; vn_boss_hook_spec.py; "
             "cad/config/parts/vn-boss-hook.yaml installation_notes ('THREAD DIRECTLY INTO ... TAPPED BOSS; NO NUT. "
-            "CLOCK EYE TO PULL PLANE. USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.')"
+            "CLOCK EYE TO PULL PLANE. USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.'); "
+            "sm_summing_assembly_spec.ASSEMBLY_STEPS 2"
         ),
     ),
     Joint(
@@ -1503,7 +1505,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="sm_gooseneck",
         thread=gooseneck_screw.THREAD,
         quantity=1,
-        installed_at="model Manufacturing Notes: upper-eye clamp",
+        installed_at="MHA-SM-000 STEP 7",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "user ruling 2026-09-21: tighten the head to clamp the supplier upper-eye "
@@ -1527,10 +1529,10 @@ JOINTS: tuple[Joint, ...] = (
             "step is printed as note 3 on the MHA-SM-004 sheet "
             "(sm_gooseneck_spring_screw_spec.CLAMP_INSTRUCTION, stamped as the "
             "screw's Manufacturing Notes and property-linked by "
-            "draw_sm_gooseneck_spring_screw) and repeated in the summing "
-            "assembly's Manufacturing Notes property (UPPER_EYE_CLAMP_NOTES; the "
-            "legacy three-view summing sheet prints no notes until built out, "
-            "drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)); _assert_counter_spring_top_hang"
+            "draw_sm_gooseneck_spring_screw), repeated in the summing "
+            "assembly's Manufacturing Notes property (UPPER_EYE_CLAMP_NOTES) and "
+            "printed as MHA-SM-000 step 7 (sm_summing_assembly_spec.ASSEMBLY_STEPS 7, "
+            "ASSEMBLY_CHECKS 3); _assert_counter_spring_top_hang"
         ),
     ),
     Joint(
