@@ -58,16 +58,32 @@ import math
 import sys
 
 from _check import check, log
+from _com import _early_bound
 from _custom_properties import apply_custom_properties
+from _dimensions import drive_dimension, set_global
+from _drawing_precision import apply_drawing_precision
+from _feature_tree import name_last_feature
 from _session import run_build
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    anchor_point_to_point,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
+from _sm_summing_explode import create_summing_explode
 import settled_spring_seats
-from _drawing_marks import DRAWN_BY
+import sm_summing_assembly_spec as spec
+from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _assembly import (
     activate_assembly_contract,
     angle_driver,
     assembly_title_properties,
     assert_free_dof_necessity,
     assert_component_placed,
+    author_in_drawing_configurations,
     check_no_interference,
     coincident_mate,
     component_names,
@@ -211,7 +227,7 @@ KNIFE_FREE_ROCK_WORST_DEG = knife_mount.free_rock_deg(
     hex_h=HEX_H - HEX_BAND,
     r_bore=knife_mount.BORE_R_MIN,
 )
-KNIFE_FREE_ROCK_FLOOR_DEG = 5.0
+KNIFE_FREE_ROCK_FLOOR_DEG = spec.KNIFE_FREE_ROCK_FLOOR_DEG
 
 
 def _assert_hanger_axis_positive_y(name: str, transform: list[float]) -> None:
@@ -374,6 +390,94 @@ UPPER_EYE_CLAMP_NOTES = (
     "TIGHTEN UNTIL UPPER EYE IS CLAMPED AND CANNOT SWIVEL.\n"
     "NO THREADLOCKER."
 )
+
+
+# --- assembly settings as model dimensions (MHA-SM-000 sheet 1) --------------
+# Blanked Front-plane construction sketches (sketch x = machine X, y = machine
+# Y), every vertex driven from a global; the drawing shows each sketch in the
+# one view that dimensions it and imports only its marked dimension.
+_SETTING_GLOBALS = {
+    "SmKnifeX": spec.KNIFE_POINT[0],
+    "SmKnifeY": spec.KNIFE_POINT[1],
+    "SmCounterScrewX": spec.COUNTER_SCREW_POINT[0],
+    "SmCounterScrewY": spec.COUNTER_SCREW_POINT[1],
+    "SmBossX": spec.BOSS_FACE_POINT[0],
+    "SmBossFaceY": spec.BOSS_FACE_POINT[1],
+    "SmBossRockTravel": spec.BOSS_ROCK_TRAVEL,
+}
+if not (
+    spec.KNIFE_POINT[0] < 0.0 < spec.KNIFE_POINT[1]
+    and spec.BOSS_FACE_POINT[0] < 0.0 < spec.BOSS_FACE_POINT[1]
+    and spec.COUNTER_SCREW_POINT[0] < spec.KNIFE_POINT[0]
+):
+    raise AssertionError("summing setting drives assume x < 0 < y, screw left of knife")
+
+
+async def _construction_line(
+    adapter, start: tuple[float, float], end: tuple[float, float], label: str
+) -> str:
+    set_sketch_direct_db(adapter, True)
+    line = check(label, await adapter.add_line(start[0], start[1], end[0], end[1]))
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{label} is not construction")
+    return line
+
+
+async def _finish_setting(
+    adapter, feature: str, dims: SketchDims, marked: str
+) -> None:
+    await ensure_fully_defined(adapter, feature)
+    check(f"exit {feature} sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    for name, expression in dims.apply(adapter, feature):
+        await drive_dimension(adapter, name, expression)
+    mark_dimensions_for_drawing(adapter, feature, {marked})
+
+
+async def _author_settings(adapter) -> None:
+    """CounterSetting: knife contact to the MHA-SM-004 axis (the gooseneck
+    height the level setting finds). KnifeRockGauge: the boss face's minimum
+    travel at the free-rock floor, up the boss-hook axis."""
+    for name, value in _SETTING_GLOBALS.items():
+        await set_global(adapter, name, f"{value}mm")
+
+    knife, screw = spec.KNIFE_POINT, spec.COUNTER_SCREW_POINT
+    dims = SketchDims()
+    check("create counter setting sketch", await adapter.create_sketch("Front"))
+    line = await _construction_line(adapter, knife, screw, "counter setting line")
+    await anchor_point_to_origin(adapter, f"{line}.start", *knife, "knife contact")
+    dims.record("KnifeX", '-"SmKnifeX"')
+    dims.record("KnifeY", '"SmKnifeY"')
+    await anchor_point_to_point(
+        adapter, f"{line}.start", f"{line}.end",
+        screw[0] - knife[0], screw[1] - knife[1], "counter screw from knife",
+    )
+    dims.record("CounterScrewInboard", '"SmKnifeX" - "SmCounterScrewX"')
+    dims.record(spec.COUNTER_DIMENSION, '"SmCounterScrewY" - "SmKnifeY"')
+    await _finish_setting(adapter, spec.COUNTER_FEATURE, dims, spec.COUNTER_DIMENSION)
+
+    face = spec.BOSS_FACE_POINT
+    top = (face[0], face[1] + spec.BOSS_ROCK_TRAVEL)
+    dims = SketchDims()
+    check("create knife rock gauge sketch", await adapter.create_sketch("Front"))
+    line = await _construction_line(adapter, face, top, "boss rock gauge line")
+    check("rock gauge vertical", await adapter.add_sketch_constraint(line, None, "vertical"))
+    await anchor_point_to_origin(adapter, f"{line}.start", *face, "boss face")
+    dims.record("BossX", '-"SmBossX"')
+    dims.record("BossFaceY", '"SmBossFaceY"')
+    await dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "vertical_distance",
+        spec.BOSS_ROCK_TRAVEL, "boss rock travel",
+    )
+    dims.record(spec.ROCK_DIMENSION, '"SmBossRockTravel"')
+    await _finish_setting(adapter, spec.ROCK_FEATURE, dims, spec.ROCK_DIMENSION)
+
+    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    for feature in spec.SETTING_FEATURES:
+        blank_sketch(adapter, feature)
 
 
 def _assert_counter_spring_top_hang(
@@ -736,6 +840,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
+    await _author_settings(adapter)
     # Title-block identity for the assembly drawing (draw_sm_summing_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry.
@@ -752,6 +857,11 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": UPPER_EYE_CLAMP_NOTES,
             "Drawn By": DRAWN_BY,
         },
+    )
+    # The package drawing's exploded views reference Default (shaded) or
+    # Default Simplified, so the explode is authored in both.
+    author_in_drawing_configurations(
+        adapter, ASM_NAME, lambda configuration: create_summing_explode(adapter, configuration)
     )
     return await save_assembly_and_images(
         adapter,
