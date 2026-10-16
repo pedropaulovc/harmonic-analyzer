@@ -97,7 +97,6 @@ from magnifying_bracket_joint_layout import (
     DRILL_POINT_DEPTH,
     DRILL_DEPTH_BAND,
     THREAD_DEPTH_BAND,
-    RECEIVER_DIMENSION_BANDS,
     RIB_DEPTH as RECEIVER_RIB_T,
 )
 from _drawing_marks import (
@@ -186,16 +185,16 @@ SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
 TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
 ARC_R = CYL_R + RIB_PAD  # rib arc radius wrapping the cylinder     15.24
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
-# The -Z edge rib is the magnifier bracket's receiver: deeper (7.0) so the
+# The -Z edge rib is the magnifier bracket's receiver: deeper (7.3) so the
 # whole #2-56 tap drill stays in it (magnifying_bracket_joint_layout).
-RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 69.20
+RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 68.90
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
 # Every rib extrudes AFTER the spring holes (feature 1), so a rib reaching the
 # hole column at HOLE_X re-fills any hole whose z lands in its z-span. The middle
 # rib (+-RIB_T/2 = +-2.54) once refilled j=10 (the 4.21 mm^3
 # channel-spring-installed-6 clash); on the cam plane (HOLE_Z_OFFSET -3.528) the
-# j=0 tap (z -70.63) lies inside the -Z receiver rib's z-span (-76.20..-69.20),
+# j=0 tap (z -70.63) lies inside the -Z receiver rib's z-span (-76.20..-68.90),
 # so that rib would refill it. Every rib's +X end therefore stops inboard of the
 # hole column by the spring coil radius (~3.25) + margin so every hole stays
 # open; the ribs still stiffen the inner lever, the outer plate arm is the (thin)
@@ -737,7 +736,7 @@ async def _edge_rib(
         extrude_at_offset(adapter, RIB_T, RIB_OFFSET)
     name_last_feature(adapter, stem)
     if stem == "EdgeRibFront":
-        # The -Z rib's depth is the receiver's banded RibDepth
+        # The -Z rib's depth is the receiver's named RibDepth
         # (_receiver_model_bands); only the +Z rib takes a plain name here.
         [thickness] = name_dimensions(adapter, stem, ["EdgeRibThickness"])
         drive_jobs.append((thickness, '"RibT"'))
@@ -999,30 +998,30 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
 
 
 def _receiver_model_bands(adapter) -> None:
-    """Author receiver limits on owned source dimensions, including subfeatures."""
+    """Author receiver limits on owned source dimensions, including subfeatures.
+
+    The -Z entry rib's depth (EdgeRibBack's D1; EdgeRibFront is the opposite
+    end) is only named and printed: at RIB_DEPTH it holds the drill point at
+    the title block's band (magnifying_bracket_joint_layout)."""
     from _com import _com_invoke, _early_bound
     from _dimensions import _feature_display_dimensions
     from _drawing_marks import _feature_tree
     from magnifying_bracket_joint_layout import THREAD_DEPTH
 
     model = _early_bound(adapter.currentModel, "IPartDoc")
-    for feature_name, dimensions in RECEIVER_DIMENSION_BANDS.items():
-        feature = _early_bound(model.FeatureByName(feature_name), "IFeature")
-        for dimension_name, band in dimensions.items():
-            dimension = feature.Parameter(dimension_name)
-            if dimension is not None:
-                dimension = _early_bound(dimension, "IDimension")
-            if (
-                dimension is None
-                or abs(float(dimension.SystemValue) * 1000.0 - RECEIVER_RIB_T) > 1e-5
-            ):
-                raise RuntimeError(
-                    f"{feature_name}: missing native receiver depth {dimension_name}"
-                )
-            dimension.Name = "RibDepth"
-            set_dimension_symmetric_tolerance(adapter, feature_name, "RibDepth", band)
-            set_dimension_display_precision(adapter, feature_name, "RibDepth", 2)
-            mark_dimensions_for_drawing(adapter, feature_name, ["RibDepth"])
+    feature_name = "EdgeRibBack"
+    feature = _early_bound(model.FeatureByName(feature_name), "IFeature")
+    dimension = feature.Parameter("D1")
+    if dimension is not None:
+        dimension = _early_bound(dimension, "IDimension")
+    if (
+        dimension is None
+        or abs(float(dimension.SystemValue) * 1000.0 - RECEIVER_RIB_T) > 1e-5
+    ):
+        raise RuntimeError(f"{feature_name}: missing native receiver depth D1")
+    dimension.Name = "RibDepth"
+    set_dimension_display_precision(adapter, feature_name, "RibDepth", 2)
+    mark_dimensions_for_drawing(adapter, feature_name, ["RibDepth"])
 
     feature = _early_bound(model.FeatureByName("BracketMountingTaps"), "IFeature")
     required = {

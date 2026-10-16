@@ -101,12 +101,15 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
     "ReceiverX0": f"MATCHES HOLES IN\nBRACKET {BRACKET_NUMBER}",
     "ReceiverX1": f"MATCHES {BRACKET_NUMBER}",
-    # The 2-56 drill runs along Z through the rib into the plate's line: its
-    # floor is the plate's length, but past the rib the 5.08 plate leaves it
-    # 1.26 MIN side walls, so the rib's depth holds the drill point (machinist
-    # review r10 read the band as rescuing a floor).
-    "RibDepth": "TAP DRILL POINT STAYS IN RIB\nCLEAR OF THIN PLATE WALLS",
+    # The -Z rib's 7.30 at the title block's band holds the whole 2-56 drill,
+    # point included (magnifying_bracket_joint_layout), so it carries no
+    # words (machinist review r12 read a tight band and its reason as
+    # rescuing a wall).
     "SpringPadWidth": "UNDERSIDE PAD\nFULL LENGTH",
+    # VIEW F's 7.00 runs from the plate top to the pad's underside: it names
+    # both (machinist review r12 found no pad depth, reading it as the plan's
+    # rib depth).
+    "SpringSeatThickness": "PLATE AND PAD",
     # The rib end's top corner is the slant's at RIB_PLATE_REACH: clipped
     # there, not run to a point, so the -Z receiver rib keeps its wall round
     # the bracket's 2-56 tap (build_sm_summing_lever.EDGE_RIB_END_STEP).  It
