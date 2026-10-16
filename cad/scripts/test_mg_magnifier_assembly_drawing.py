@@ -901,5 +901,11 @@ def test_capsule_balloon_anchors_sit_on_a_dome_tangent_facing_the_isometric(
         sum((0.0, y / radius, z / radius)[i] * rows[i][j] for i in range(3))
         for j in range(3)
     ]
-    # Square to the rod axis, and straight at the +X+Y+Z viewer.
-    assert sum(normal) == pytest.approx(math.sqrt(2.0))
+    assert sum(normal) > 0.0  # faces the +X+Y+Z viewer
+    if stem == "mg-magnifying-lever":
+        # Square to the rod axis, and straight at the viewer.
+        assert sum(normal) == pytest.approx(math.sqrt(2.0))
+    else:
+        # Opposite the revolve seam (R, R, 0): a vertex of the drawn circle for
+        # any even segment count (r12 missed mid-chord at 1:2).
+        assert (y, z) == pytest.approx((-radius, 0.0))

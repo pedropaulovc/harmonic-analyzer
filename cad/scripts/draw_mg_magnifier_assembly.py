@@ -394,7 +394,17 @@ BOM_NORMALIZED_ALIASES = {
 #   lever, Ry(180) in the assembly (local y = +Y, z = -Z): the west junction
 #     (x = R, 50 clear of the clamp) at normal machine (0, 1, 1)/sqrt2;
 #   vertical rod (local x = -Y, y = -X, z = -Z): the top junction, 37 below
-#     the lever once the explode drops it, at normal machine (1, 0, 1)/sqrt2.
+#     the lever once the explode drops it, at normal machine (1, 0, 0), the
+#     point opposite the circle's seam. Each capsule is revolved from a Front
+#     (z = 0) half-profile at y > 0, so its tangent circles' seam vertex is
+#     (R, R, 0). The hit test's aperture is a few hundredths of a millimetre
+#     (_drawing_scan._HIT_ZOOM_HALF) and picks the drawn, tessellated circle:
+#     the rod's earlier front point (normal (1, 0, 1)/sqrt2, 135 deg from the
+#     seam) hit at 1:3 but drew no edge at 1:2 (r12, run
+#     20261016T155038849Z-7389d03825f14ebd9df43bc29b661e3d), as a 30 deg
+#     tessellation's chord sag at 135 deg (0.085 mm on R2.5) would, sheet
+#     0.028 at 1:3 and 0.043 at 1:2. The seam's opposite (180 deg) is a
+#     tessellation vertex for any even segment count, so lies on the drawn edge.
 _LEVER_R = LEVER_ROD_DIA / 2.0
 _VROD_R = VROD_DIA / 2.0
 # Machinist review r6 (run 20261016T150215480Z): on the wheel sheet the front
@@ -428,7 +438,7 @@ BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
         point_mm=(_LEVER_R, _LEVER_R / math.sqrt(2.0), -_LEVER_R / math.sqrt(2.0))
     ),
     "mg-magnifying-vertical-rod": BalloonAnchor(
-        point_mm=(_VROD_R, -_VROD_R / math.sqrt(2.0), -_VROD_R / math.sqrt(2.0))
+        point_mm=(_VROD_R, -_VROD_R, 0.0)
     ),
     "vn-wheel-axle-front-washer": BalloonAnchor(point_mm=FRONT_WASHER_BALLOON_POINT_MM),
     "vn-wheel-axle-nut": BalloonAnchor(
