@@ -12,9 +12,10 @@ centre.  A 1/4 hex collides corner to corner and no wrench reaches between
 neighbours.  The round O.D. is the only free size, pinned between two worst
 cases: rule 17's 1.5 wall floor from the #6-32 major (small O.D.) and the
 0.25 modelling clearance to the neighbour (large O.D.).  The pitch leaves no
-geometry to trade, so the O.D. prints at three places (the title block's
-.XXX row, a plain lathe turning).  The 2.0 wall target cannot be met inside
-the pitch; the floor is.
+geometry to trade, so the O.D. prints at two places with an explicit band
+inside that window (rule 4: tightened for a function, the neighbour named at
+the callout; coordinator ruling 2026-10-16).  The 2.0 wall target cannot be
+met inside the pitch; the floor is.
 
 Drive: one saw cut across the lower face gives two diametrically opposite
 notches, the bore between them.  A forked driver (a screwdriver blade slotted
@@ -48,8 +49,12 @@ MIN_WALL = 1.5  # drawing-guidelines.md rule 17 floor
 NEIGHBOUR_CLEARANCE = 0.25  # spring_mount_geom.MIN_CLEARANCE_MM (asserted there)
 
 OD = 6.66
-OD_PLACES = 3
-OD_BAND = printed_band_mm(OD_PLACES)
+OD_PLACES = 2
+# Explicit, not the .XX row: the band must sit inside [wall floor, neighbour
+# clearance] = [6.505, 6.806], and the title block's ±0.51 does not.
+OD_BAND = 0.14
+if OD_BAND >= printed_band_mm(OD_PLACES):
+    raise AssertionError("the O.D. band is no tighter than the title block's")
 OD_MAX = OD + OD_BAND
 OD_MIN = OD - OD_BAND
 
@@ -101,13 +106,12 @@ TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 SLOT_SPAN = OD + 2.0
 # Rule 12 (hole and slot callouts say what to do), without naming a method.
 SLOT_CALLOUT = "SLOT THRU ACROSS"
-# The O.D.'s three places are bounded both ways (review r8 read them as a
-# clearance size only): the wall to the thread below, printed as a fact
-# above the value, and the neighbouring nut above, named below it -- twenty
-# nuts stand side by side at the anchor pitch and the 0.25 gap holds only
-# at the .XXX band.
+# The O.D.'s band is bounded both ways (reviews r8/r9 read it as a clearance
+# size only): the wall to the thread, printed as a fact above the value, and
+# the neighbouring nut, named with its pitch below it -- twenty nuts stand
+# side by side and the 0.25 gap holds only inside the explicit band.
 OD_WALL_CALLOUT = f"WALL {math.floor(WALL_WORST * 10) / 10:.1f} MIN"
-OD_CALLOUT = "CLEARS NEXT MHA-CH-012"
+OD_CALLOUT = f"CLEARS ADJACENT MHA-CH-012 AT {CHANNEL_PITCH:.2f} PITCH"
 # A jam nut is thin by kind, and the stock anchor's shank caps it: the full
 # thread it carries at its thinnest, less the incomplete thread a through tap
 # leaves, falls short of 1.5D and the sheet states it as a fact.

@@ -43,11 +43,13 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 from ch_anchor_jam_nut_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     OD,
+    OD_BAND,
     SLOT_DEPTH,
     SLOT_SPAN,
     SLOT_WIDTH,
@@ -198,7 +200,10 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # No explicit bands: every size takes the title block's row for its places.
+    # The O.D. carries its explicit band natively (its window is the wall
+    # floor and the neighbouring nut); every other size takes the title
+    # block's row for its places.
+    set_dimension_symmetric_tolerance(adapter, "NutProfile", "NutOd", OD_BAND)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
