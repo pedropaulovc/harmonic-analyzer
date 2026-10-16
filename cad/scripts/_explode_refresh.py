@@ -8,13 +8,17 @@ drawing configuration's exploded views and re-running the builder's own
 authoring function therefore yields the presentation a FULL build would have
 saved, without the insert/mate loop.
 
-The tier proves rather than assumes that: the reopened model must open clean
-with its simplified configuration already in sync, and the re-authored model
-must be collapsed with the resolved geometry fingerprint it had on reopen
-(else it raises before the in-place save). After the save the persisted
-model, fingerprinted exactly where a FULL build takes its proof (after the
-rebuild-state reconciliation), must equal the proof it was published with;
-otherwise the proof is left retired, so the next build takes the FULL tier.
+The tier proves rather than assumes that. The reopened model must open clean,
+with its simplified configuration already in sync and its resolved geometry
+fingerprint equal to the proof it was published with; the re-authored model
+must be collapsed. The fingerprint is only ever taken where a FULL build takes
+its proof, on the persisted model after the rebuild-state reconciliation: an
+open session that has just authored explodes in two configurations
+fingerprints differently (observed on the paper drive) without any component
+having moved. So the proof is retired before the in-place save, and
+republished only if the re-saved model reproduces it. Otherwise the tier
+raises with no proof on disk: the task fails, nothing is stamped or
+published, and the next build takes the FULL tier, which replaces the bytes.
 PNG renders, the free-DOF manifest and every other sidecar describe the
 collapsed operational model, which is unchanged, so they are kept as saved.
 
@@ -132,10 +136,12 @@ async def refresh_explode(
         )
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     _require_collapsed(model, asm_name, "before re-authoring")
-    # The in-memory fingerprint is compared with itself: the saved proof is
-    # taken on the reconciled persisted model, which an open session can differ
-    # from without any geometry having moved.
     opened = await assembly_geometry_digest(adapter, asm_name)
+    if opened != proof:
+        raise RuntimeError(
+            f"{asm_name}: the saved model fingerprints {opened[:12]}, not its proof "
+            f"{proof[:12]}; rebuild it from scratch"
+        )
 
     def reauthor(configuration: str) -> None:
         with _telemetry.span(
@@ -150,18 +156,7 @@ async def refresh_explode(
 
     author_in_drawing_configurations(adapter, asm_name, reauthor)
     final_rebuild_before_save(adapter, asm_name)
-    _require_collapsed(model, asm_name, "after re-authoring")
     assert_reference_geometry_hidden(adapter, asm_name)
-    authored = await assembly_geometry_digest(adapter, asm_name)
-    _telemetry.info(
-        f"explode refresh {asm_name}: geometry proof {proof[:12]}, "
-        f"reopened {opened[:12]}, re-authored {authored[:12]}"
-    )
-    if authored != opened:
-        raise RuntimeError(
-            f"{asm_name}: re-authoring the explode changed the resolved geometry "
-            f"({opened[:12]} -> {authored[:12]}); rebuild it from scratch"
-        )
     _require_collapsed(model, asm_name, "before save")
     # Retire the proof before the bytes it vouches for are replaced.
     _invalidate_massprops_proof(sidecar)
@@ -170,6 +165,10 @@ async def refresh_explode(
         save_assembly_in_place(adapter, asm_name, True)
     await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
     persisted = await assembly_geometry_digest(adapter, asm_name)
+    _telemetry.info(
+        f"explode refresh {asm_name}: geometry proof {proof[:12]}, "
+        f"re-saved {persisted[:12]}"
+    )
     if persisted != proof:
         raise RuntimeError(
             f"{asm_name}: the re-saved model's geometry fingerprint {persisted[:12]} "

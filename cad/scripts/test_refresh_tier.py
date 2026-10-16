@@ -184,8 +184,8 @@ class _Model:
 
 
 def _fake_session(monkeypatch, tmp_path, *, digests):
-    """``digests`` are the fingerprints on reopen, after re-authoring and of
-    the re-saved model, in that order."""
+    """``digests`` are the fingerprints of the reopened and the re-saved
+    model, in that order."""
     events = []
     views = {"Default": ["OLD"], "Default Simplified": ["OLD Simplified"]}
     model = _Model(events, views)
@@ -242,7 +242,7 @@ def test_explode_refresh_replaces_each_configurations_views_then_saves(
     monkeypatch, tmp_path
 ):
     adapter, author, events, proof = _fake_session(
-        monkeypatch, tmp_path, digests=("open", "open", "proof")
+        monkeypatch, tmp_path, digests=("proof", "proof")
     )
 
     asyncio.run(_explode_refresh.refresh_explode(adapter, "pd-paper-drive", author))
@@ -259,15 +259,17 @@ def test_explode_refresh_replaces_each_configurations_views_then_saves(
     assert proof.read_text(encoding="utf-8") == "proof\n"
 
 
-def test_explode_refresh_refuses_moved_geometry_before_saving(monkeypatch, tmp_path):
+def test_explode_refresh_refuses_a_model_that_reopens_off_its_proof(
+    monkeypatch, tmp_path
+):
     adapter, author, events, proof = _fake_session(
-        monkeypatch, tmp_path, digests=("open", "moved")
+        monkeypatch, tmp_path, digests=("drifted",)
     )
 
-    with pytest.raises(RuntimeError, match="changed the resolved geometry"):
+    with pytest.raises(RuntimeError, match="not its proof"):
         asyncio.run(_explode_refresh.refresh_explode(adapter, "pd-paper-drive", author))
 
-    assert ("save", True) not in events
+    assert events == [("open", "pd-paper-drive.SLDASM")]
     assert proof.read_text(encoding="utf-8") == "proof\n"
 
 
@@ -275,7 +277,7 @@ def test_explode_refresh_retires_the_proof_when_the_saved_model_differs(
     monkeypatch, tmp_path
 ):
     adapter, author, events, proof = _fake_session(
-        monkeypatch, tmp_path, digests=("open", "open", "moved")
+        monkeypatch, tmp_path, digests=("proof", "moved")
     )
 
     with pytest.raises(RuntimeError, match="differs from its proof"):
@@ -287,9 +289,7 @@ def test_explode_refresh_retires_the_proof_when_the_saved_model_differs(
 
 
 def test_explode_refresh_refuses_a_model_left_exploded(monkeypatch, tmp_path):
-    adapter, author, events, _proof = _fake_session(
-        monkeypatch, tmp_path, digests=("open",)
-    )
+    adapter, author, events, _proof = _fake_session(monkeypatch, tmp_path, digests=())
     adapter.currentModel.IsExploded = lambda: True
 
     with pytest.raises(RuntimeError, match="must be collapsed"):
