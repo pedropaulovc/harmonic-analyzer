@@ -63,25 +63,27 @@ BRACKET_SCREW_NUMBER = "MHA-VN-050"  # vn-magnifying-bracket-screw
 # dimensions say which ribs share them (one outline in the end views).  A
 # vertical dimension whose text stands above its span takes its callout above
 # the value, one whose text hangs below takes it below, so the dimension line
-# never runs through its own callout.
+# never runs through its own callout.  Callouts above are single lines: a
+# multi-line one never printed (farm r4/r5 2026-10-16, text-unmatched).
 # The mid rib runs tangent from the boss axis to the rib arc; the boss axis is
 # located by the 76.20s in the plan, so the rib arc's callout in the front
 # profile, where those tangents show, gives its apex words, not a third 76.20.
-# Each summation-web side arc rises from the boss's quadrant (visible in the
-# plan) and meets axis A at the plate end inside the cylinder, so its radius
-# names that end.  The three receiver coordinates are one bracket hole pattern:
-# the outer station names the mate once.  The spring-anchor pad is on the
-# underside, which no view shows full length, so its width says it runs the
-# plate's length.
+# Each summation-web side arc rises from the boss's quadrant and meets axis A
+# at the plate end inside the cylinder; the radius's text has room only for
+# its value (inside the arc, clear of the trunnion stub), so the boss's
+# diameter names both ends.  The three receiver coordinates are one bracket
+# hole pattern: the outer station names the mate once.  The spring-anchor pad
+# is on the underside, which no view shows full length, so its width says it
+# runs the plate's length.
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "EdgeRibFrontEndTopX": "ALL RIBS",
     "EdgeRibFrontEndTopY": "END RIBS",
-    "SummationArcRadius": "TO AXIS A\nAT PLATE END",
-    "ReceiverX0": f"MATCHES HOLES IN\nBRACKET {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
+    "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
+    "ReceiverX0": f"MATCHES HOLES IN\nBRACKET {BRACKET_NUMBER}",
     "RibDepth": f"TAPPED END RIB\nCONTAINS {BRACKET_SCREW_NUMBER} TAP DRILL",
     "SpringPadWidth": "UNDERSIDE PAD\nFULL LENGTH",
 }
