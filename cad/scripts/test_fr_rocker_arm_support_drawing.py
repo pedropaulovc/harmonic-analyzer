@@ -1053,8 +1053,8 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         for name, (dims, _face, _feature) in spans.items()
     }
     assert printed == {
-        "CavityEndStation": "25.9",
-        "PocketEndStation": "6.85",
+        "CavityEndStation": "26.8",
+        "PocketEndStation": "7.70",
         "CavityTopStation": "25.4",
         "WebFaceStation": "26.99",
     }
@@ -1199,8 +1199,8 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
         assert _boxes_clear(taper, other, 0.003)
     front_left = drawing.FRONT_CENTER[0] - support.BOSS_DEPTH / 2.0 * scale
     front_top = drawing.FRONT_CENTER[1] + support.HALF_Y * scale
-    pocket = _text_box("6.85\nBOTH SIDES", drawing.FRONT_KEEP["PocketEndStation"])
-    cavity = _text_box("25.9", drawing.FRONT_KEEP["CavityEndStation"])
+    pocket = _text_box("7.70\nBOTH SIDES", drawing.FRONT_KEEP["PocketEndStation"])
+    cavity = _text_box("26.8", drawing.FRONT_KEEP["CavityEndStation"])
     cavity_top = _text_box("25.4", drawing.FRONT_KEEP["CavityTopStation"])
     assert pocket[2] < front_left and cavity_top[2] < front_left
     # Clear of the 25.4's dimension line and of its outside arrow tail above
@@ -1209,7 +1209,7 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     assert pocket[2] < drawing.FRONT_KEEP["CavityTopStation"][0] - 0.001
     assert pocket[1] > front_top + 0.008
     assert front_top < cavity[1] and cavity[3] < DEPTH_DIM_LINE_Y - 0.002
-    # The 25.9 stands inside its span, the end face to the cavity wall.
+    # The 26.8 stands inside its span, the end face to the cavity wall.
     assert front_left < cavity[0] and cavity[2] < drawing.FRONT_CENTER[0] - (
         support.CAV * scale
     )

@@ -144,13 +144,13 @@ FRONT_KEEP = {
     ),
     # The cavity's and the pockets' locations (CavityLocationReference, blanked
     # in the part) stand above the view's left end, clear of the R6.35 low
-    # left: from the -X end face, the pocket wall's 6.85 on the inner band
+    # left: from the -X end face, the pocket wall's 7.70 on the inner band
     # (its text outside left, its pocket-wall extension line stopping below
-    # the outer band) and the cavity wall's 25.9 on the outer one, under the
+    # the outer band) and the cavity wall's 26.8 on the outer one, under the
     # 180.5; from the top face, the cavity's top wall left of the view. The
-    # 6.85's BOTH SIDES stands left of the 25.4's dimension line and its line
+    # 7.70's BOTH SIDES stands left of the 25.4's dimension line and its line
     # above the 25.4's outside arrow tail (r9 review: the tail struck the
-    # callout's E and crossed the 6.85's line).
+    # callout's E and crossed the pocket station's line).
     "PocketEndStation": (0.0365, 0.244),
     "CavityEndStation": (0.0668, 0.249),
     "CavityTopStation": (0.052, 0.2231),
