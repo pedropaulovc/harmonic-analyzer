@@ -557,7 +557,7 @@ def test_machined_faces_are_called_out_on_the_casting() -> None:
 
 
 def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
-    """#906 (USER RULING 2026-09-26, option ii): drawing-simplicity-policy.md `GD&T allowlist (rule 5)`'s crank-mesh entry.
+    """#906 (USER RULING 2026-09-26, option ii): part-config exception RV-01.
 
     One diametral angularity frame on the crank bore to datum A, the cone
     journal bore, clocked by datum B, the foot seat; its value is the spec
@@ -566,6 +566,7 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     """
     from _gtol_cylinder import CylinderFace
     from _gtol_planar import PlanarFace
+    from machinist_exceptions import load_exceptions
 
     assert spec.GEOMETRIC_TOLERANCES_MM == {}
     journal, foot = spec.PART_DATUMS
@@ -586,10 +587,14 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0795
     assert part.PART_DATUMS is spec.PART_DATUMS
     assert part.GEOMETRIC_CONTROLS is spec.GEOMETRIC_CONTROLS
-    policy = (
-        Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
-    ).read_text(encoding="utf-8")
-    assert "**Crank mesh.** MHA-DT-005's crank bore" in policy
+    exceptions = load_exceptions(
+        Path(spec.__file__).parents[1] / "config", "dt_cone_pivot_post", "part"
+    )
+    (allowance,) = (entry for entry in exceptions if entry.id == "RV-01")
+    assert allowance.kind == "accept"
+    assert f"crank-bore {frame.tolerance_zone} {frame.characteristic} frame" in allowance.where
+    for datum in frame.datums:
+        assert f"datum {datum}" in allowance.where
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "datums=PART_DATUMS" in source
     assert "controls=GEOMETRIC_CONTROLS" in source
