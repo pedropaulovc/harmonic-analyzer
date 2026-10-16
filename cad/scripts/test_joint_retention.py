@@ -269,18 +269,16 @@ def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> N
     assert f"\u00b1{rock:.1f}\u00b0 per reversal" in jr.RULINGS[row.exception].granted
 
 
-def test_the_knife_hanger_is_a_threadlocked_clamp_keyed_by_its_two_dowels() -> None:
+def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
     """The cut #10-24 hex bolt clamps through a new SAE washer; the two
-    pressed dowels react torque, so the removable threadlocker-only policy
-    remains unchanged. The plain washer is not a mechanical thread lock."""
+    pressed dowels react torque, so the static clamp takes no lock and no
+    threadlocker (period hardware). The plain washer is not a thread lock."""
     (row,) = [j for j in jr.JOINTS if j.id == "sm-summing/knife-hanger-in-mount"]
     assert row.thread == "#10-24 UNC"
     assert row.exposure is Exposure.STATIC_CLAMP
-    assert row.lock is Lock.THREADLOCKER_ONLY
-    sentence = "USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER."
-    assert sentence in row.evidence
+    assert row.lock is Lock.NONE
     notes = jr._config.parts("vn-knife-hanger-stud")["installation_notes"]
-    assert sentence in " ".join(notes.split())
+    assert "THREADLOCK" not in notes.upper()
     assert "vn_knife_mount_dowel" in jr.UNTHREADED_PARTS
     assert jr.UNTHREADED_STOCK["vn_knife_mount_dowel"] == (
         "dowel pin pressed into a reamed hole"

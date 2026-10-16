@@ -1452,18 +1452,20 @@ JOINTS: tuple[Joint, ...] = (
             "0.0760667 spare; one incomplete tip pitch leaves 7.2906667 full engagement, "
             "with 0.0344 minimum tip air"
         ),
-        lock=Lock.THREADLOCKER_ONLY,
+        lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
+            "coordinator ruling 2026-10-16 (period hardware, #1188 finding): a doweled static clamp needs "
+            "no lock, so the bolt goes in plain. "
             "build_sm_summing_assembly.py: module docstring, HANGER_STUD_Y/HANGER_REACH_MIN/HANGER_REACH_MAX, "
             "_assert_knife_hanger_stack; build_sm_knife_mount.py: MOUNT_GAP; sm_knife_mount_spec.py "
             "STUD_TAP_SPEC/STUD_TAP_THREAD_DEPTH_MIN/PIN_HOLE_X; fr_top_frame_spec.py HANGER_GRIP/"
             "HANGER_GRIP_TOL/HANGER_PIN_X; vn_knife_mount_dowel_spec.py; "
             "vn_knife_hanger_washer_spec.py; vn_knife_hanger_stud_spec.py THREAD_LENGTH_MIN/"
             "INCOMPLETE_TIP_LEN_MAX; cad/config/parts/vn-knife-hanger-stud.yaml "
-            "(92314A253) installation_notes ('USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.'); "
+            "(92314A253) installation_notes; "
             "sm_summing_assembly_spec.ASSEMBLY_STEPS 4-5, ASSEMBLY_CHECKS 1"
         ),
     ),
@@ -1492,7 +1494,7 @@ JOINTS: tuple[Joint, ...] = (
         lock_step="MHA-SM-000 STEP 2",
         evidence=(
             "coordinator ruling on #1189 (option a): thin #10-24 jam nut under the eye, tightened on the "
-            "boss top face once the eye is clocked; no threadlocker. build_sm_summing_assembly.py: "
+            "boss top face once the eye is clocked. build_sm_summing_assembly.py: "
             "_assert_counter_spring_hang (full boss engagement, jam-nut thread above the boss), JAM_NUT_POS "
             "and the 'boss-hook jam nut locked to lever' lock_mate; build_sm_summing_lever.py: "
             "_counter_anchor_tap; sm_summing_lever_spec.COUNTER_HOLE_SPEC; stock_anchor_geom.ANCHOR_9490T1; "
