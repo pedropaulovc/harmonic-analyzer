@@ -267,10 +267,10 @@ Live catalog verification on October 8, 2026:
   Its worst-case engagement was 3.2975 mm, above 1.5D (3.2766 mm); maximum
   reach 4.825 mm stays below the 4.90 mm minimum full-thread depth. (Superseded
   by 91794A078 above, October 16, 2026.)
-  The 5.00 mm maximum full-thread envelope stays within the 5.03 mm minimum
-  rib depth. The drill body and point may continue into the lever plate.
-  The native ±0.05 depth band belongs to `EdgeRibBack`, the actual -Z
-  entry rib; `EdgeRibFront` is the opposite end. The minimum 0.122 mm
+  The 5.00 mm maximum full-thread envelope stays within the 6.79 mm minimum
+  rib depth: the -Z entry rib, `EdgeRibBack` (`EdgeRibFront` is the opposite
+  end), is 7.30 deep at the title block's ±0.51, so the whole tap drill,
+  point and wander included, stays in it (0.040 mm minimum margin). The minimum 0.122 mm
   head-to-counterbore radial float exceeds the 0.10 mm maximum station
   pitch mismatch at the printed ±0.05 position bands. The minimum end wall
   is 2.00 mm from the real end-face station datum, without double-counting

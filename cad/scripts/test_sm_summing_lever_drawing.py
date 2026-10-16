@@ -179,7 +179,9 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
     assert joint.THREAD_DEPTH_BAND == 0.05
     assert joint.DRILL_DEPTH_BAND == 0.10
-    assert joint.RECEIVER_DIMENSION_BANDS == {"EdgeRibBack": {"D1": joint.RIB_DEPTH_BAND}}
+    # The -Z rib's depth rides the title block (no native band of its own).
+    assert joint.RIB_DEPTH_BAND == joint.LINEAR_BAND
+    assert not hasattr(joint, "RECEIVER_DIMENSION_BANDS")
     assert "variable.ToleranceMin" in drawing_source
     assert "variable.ToleranceMax" in drawing_source
     assert "variable = dynamic_dispatch(raw._oleobj_)" in drawing_source
@@ -367,10 +369,8 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         [drill, thread, thread_b, unrelated, angular],
         [sketch_feature, thread_feature, thread_feature_b],
     )
-    features = {
-        name: Feature(name, [Dimension("D1", name, lever_build.RECEIVER_RIB_T)])
-        for name in part.RECEIVER_DIMENSION_BANDS
-    }
+    rib_depth = Dimension("D1", "EdgeRibBack", lever_build.RECEIVER_RIB_T)
+    features = {"EdgeRibBack": Feature("EdgeRibBack", [rib_depth])}
     features["BracketMountingTaps"] = taps
     adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=features.get))
 
@@ -413,7 +413,8 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     inventory = []
     monkeypatch.setattr(part._telemetry, "info", inventory.append)
     part._receiver_model_bands(adapter)
-    assert bands == [("EdgeRibBack", "RibDepth", 0.25)]
+    assert bands == []
+    assert rib_depth.Name == "RibDepth"
     # Subfeatures are not FeatureByName-reachable and both threads are "D1":
     # band the exact native objects found in the walk, never a by-name lookup.
     assert held == [
@@ -433,8 +434,7 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     # mistaken for parent parameters.
     taps.children = ()
     inventory.clear()
-    for name in part.RECEIVER_DIMENSION_BANDS:
-        features[name].displays[0].GetDimension2(0).Name = "D1"
+    rib_depth.Name = "D1"
     with pytest.raises(RuntimeError, match="expected 2 native FullThreadDepth .*found 0"):
         part._receiver_model_bands(adapter)
     assert inventory and any("D1@Hole Thread22" in row for row in inventory)
@@ -443,8 +443,7 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     thread_feature.next_subfeature = None
     sketch_feature.next_subfeature = thread_feature
     thread_feature.displays.append(display(Dimension("D9", thread_feature.Name, 4.95)))
-    for name in part.RECEIVER_DIMENSION_BANDS:
-        features[name].displays[0].GetDimension2(0).Name = "D1"
+    rib_depth.Name = "D1"
     with pytest.raises(RuntimeError, match="expected 2 native FullThreadDepth \\(one per owner\\), found 2"):
         part._receiver_model_bands(adapter)
 

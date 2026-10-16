@@ -958,11 +958,15 @@ TOP_KEEP = {
 # the free edge, 28.45 above it, its text and the pattern's mate right of the
 # span (a horizontal dimension stacks a callout below the value above its
 # line).  Left of the free edge the padded tap length stands inboard, its text
-# below, and the row height outboard, its text above and left of the
-# length's upper arrow (at x 0.147 that arrow ran through it, farm r5); the
-# pad's width hangs below and left of both, outside its extension lines.
+# and its PLATE AND PAD below and left of its line, over the pad width's
+# block (farm r12 put the 7.00 at x 0.141..0.153, y 0.133..0.137: words under
+# it there meet the 10.00 and the pad width's extension line at x 0.160),
+# and the row height outboard, its text
+# above and left of the length's upper arrow (at x 0.147 that arrow ran
+# through it, farm r5); the pad's width hangs below and left of both,
+# outside its extension lines.
 BACK_KEEP = {
-    "SpringSeatThickness": (0.153, 0.136),
+    "SpringSeatThickness": (0.135, 0.142),
     "SpringPadWidth": (0.130, 0.123),
     "ReceiverX0": (0.220, 0.1815),
     # Each tight station names the bracket (machinist review r5): the 14.75's
@@ -1504,6 +1508,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # callout's leader: at (0.205, 0.172) that leader ran through it (farm r1
     # 2026-10-16, leader-through-text).
     add_property_linked_note(adapter, "Back View Note", *BACK_VIEW_NOTE_XY)
+    # The repeated isometric's label, where sheet 1 puts its own (machinist
+    # review r12: unlabelled on this sheet).
+    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
