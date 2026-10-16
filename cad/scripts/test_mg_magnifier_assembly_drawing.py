@@ -357,6 +357,46 @@ def test_the_package_has_four_landscape_sheets_with_the_wire_steps_on_the_last()
     assert "SHEET 4" in stack.EXPLODED_CAPTION
 
 
+def test_the_wire_is_tied_in_the_rest_state_with_both_ends_secured() -> None:
+    import mg_wheel_group
+
+    hooked = stack.STEP_TEXT[steps.WIRE_HOOKED_KEY]
+    tied = stack.STEP_TEXT[steps.WIRE_TIED_KEY]
+    # The rest pose the run is derived at, as MHA-HA-000 sets it.
+    assert "EVERY CHANNEL AMPLITUDE AT ZERO" in tied
+    assert "PLATE TOP LEVEL" in tied
+    assert "TIE 1" in tied and "6 O'CLOCK" in tied
+    for text in (hooked, tied):
+        assert "AT LEAST THREE TURNS" in text
+    # The wrap check stands on the wheel group's proven wrap margin.
+    assert mg_wheel_group.LEVER_WIRE_WRAP_LEFT_DEG >= mg_wheel_group.WRAP_MARGIN_DEG
+    assert any("SHORT OF TIE 1" in check for check in stack.ASSEMBLY_CHECKS)
+
+
+def test_the_assembled_views_name_their_direction_clear_of_their_neighbours() -> None:
+    # r8's printed outlines (sheet metres): Front, Right, Isometric.
+    front = (0.041, 0.091, 0.099, 0.204)
+    right = (0.153, 0.091, 0.183, 0.204)
+    iso_left = 0.194
+    assert drawing.ASSEMBLED_VIEW_CAPTIONS == {
+        "*Front": "VIEW FROM THE BACK",
+        "*Right": "VIEW FROM THE LEFT",
+    }
+    boxes = []
+    for outline, name in ((front, "*Front"), (right, "*Right")):
+        text = drawing.ASSEMBLED_VIEW_CAPTIONS[name]
+        left, top = drawing.caption_under(outline, text)
+        width = len(text) * drawing.CAPTION_CHAR_WIDTH
+        assert left + width / 2.0 == pytest.approx((outline[0] + outline[2]) / 2.0)
+        assert top < outline[1]
+        assert top - drawing.NOTE_LINE_PITCH > drawing.TITLE_BLOCK[3]
+        assert left > drawing.INNER_BORDER[0]
+        boxes.append((left, left + width))
+    assert boxes[0][1] < boxes[1][0]
+    assert boxes[1][1] < iso_left
+
+
+
 def test_every_step_is_numbered_in_sequence_and_names_no_setting_value() -> None:
     assert tuple(stack.STEP_TEXT) == steps.SEQUENCE
     assert stack.ASSEMBLY_STEPS == tuple(
