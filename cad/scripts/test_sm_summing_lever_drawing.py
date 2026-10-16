@@ -17,6 +17,7 @@ import build_sm_summing_lever as lever_build
 import draw_sm_summing_lever as drawing
 from dt_cone_pivot_post_installation import SUMMING_Z
 import rocker_bank_layout
+import sm_summing_lever_notes as notes
 import sm_summing_lever_spec
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
@@ -165,8 +166,10 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert 'name="BracketMountingTaps"' in source
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "mounting_rims[0].edge" in drawing_source
-    assert "FULL THREAD DEPTH / TAP DRILL DEPTH" in drawing_source
-    assert "BOTTOMING TAP -" in drawing_source
+    assert "process=BRACKET_TAP_CALLOUT_PROCESS" in drawing_source
+    # The process line leads the callout; the native size starts the next row.
+    assert notes.BRACKET_TAP_CALLOUT_PROCESS.endswith("\n")
+    assert notes.BRACKET_SCREW_NUMBER in notes.BRACKET_TAP_CALLOUT_PROCESS
     assert '"hw-threaddepth": THREAD_DEPTH' in drawing_source
     assert '"hw-tapdrldepth": DRILL_DEPTH' in drawing_source
     assert "bracket tap callout omits native depths" in drawing_source
@@ -184,10 +187,12 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert "variable = dynamic_dispatch(raw._oleobj_)" in drawing_source
     assert '_early_bound(raw, "ICalloutVariable")' not in drawing_source
     assert "ReceiverY0" in drawing_source
-    assert "PlateThickness" in drawing.FRONT_KEEP
+    assert "PlateThickness" in drawing.BACK_KEEP
     assert "RibDepth" in drawing.TOP_KEEP
     assert "Bracket Receiver Note" in drawing_source
-    assert "BRACKET TAP DRILL LATERAL WALL {DRILL_LATERAL_WALL_MIN:.3f} MIN." in source
+    assert notes.BRACKET_RECEIVER_NOTE == (
+        f"2X #2-56 THREAD WALL {notes._floor2(notes.BRACKET_TAP_WALL_MIN):.2f} MIN"
+    )
     final_proof = source.index('"summing lever after native receiver bands"')
     assert source.index("_receiver_model_bands(adapter)") < final_proof
     assert source.index("_receiver_coordinate_dimensions(adapter)") < final_proof
@@ -212,9 +217,7 @@ def test_receiver_rim_scan_uses_back_entry_face(monkeypatch) -> None:
     assert len(drawing._mounting_rims(back)) == len(joint.LEVER_HOLE_POINTS)
     assert [call[0] for call in calls] == list(joint.LEVER_HOLE_POINTS)
     assert all(call[1] == joint.TAP_DRILL_DIA / 2.0 for call in calls)
-    assert drawing._back_xy(joint.LEVER_HOLE_POINTS[0][0], 0.0)[0] > (
-        drawing._back_xy(joint.LEVER_HOLE_POINTS[1][0], 0.0)[0]
-    )
+    assert [call[2] for call in calls] == [(0.0, 0.0, 1.0)] * len(calls)
 
 
 def test_receiver_view_is_on_a_back_view_sheet_with_real_binding() -> None:
@@ -230,6 +233,49 @@ def test_receiver_view_is_on_a_back_view_sheet_with_real_binding() -> None:
             if node.func.id == "scan_view_edges":
                 assert len(node.args) == 1
     assert 'length = _early_bound(raw, "ICalloutLengthVariable")' in source
+
+
+def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
+    keeps = {
+        **drawing.FRONT_KEEP,
+        **drawing.DETAIL_KEEP,
+        **drawing.TOP_KEEP,
+        **drawing.BACK_KEEP,
+    }
+    placed = [
+        *drawing.FRONT_KEEP,
+        *drawing.DETAIL_KEEP,
+        *drawing.TOP_KEEP,
+        *drawing.BACK_KEEP,
+    ]
+    assert len(placed) == len(keeps), "a dimension is kept in two views"
+    marked = set().union(*notes.DRAWING_DIMENSIONS.values())
+    assert marked <= set(keeps)
+    for feature, names in notes.DRAWING_DIMENSIONS.items():
+        assert drawing.DIMENSIONS_BY_FEATURE[feature] == names
+    above = set(notes.DIMENSION_CALLOUTS_ABOVE)
+    below = set(notes.DIMENSION_CALLOUTS_BELOW)
+    assert not above & below
+    assert above | below <= set(keeps)
+    for name, _prefix in notes.DIMENSION_PREFIXES:
+        assert name in notes.DRAWING_DIMENSIONS
+
+
+def test_notes_are_short_stated_shortfalls() -> None:
+    for text in (
+        notes.DRAWING_NOTES,
+        notes.BRACKET_RECEIVER_NOTE,
+        notes.ISOMETRIC_VIEW_NOTE,
+        notes.BACK_VIEW_NOTE,
+    ):
+        assert len(text.splitlines()) <= 4
+        for word in ("RULE", "EXCEPTION", "RULING", "NYLON", "LOCTITE", "THREADLOCK"):
+            assert word not in text.upper()
+    assert notes.DRAWING_NOTES == (
+        f"20X #6-32 ENGAGEMENT {notes._floor2(notes.SPRING_TAP_ENGAGEMENT_MIN):.2f} MIN "
+        f"({notes._floor2(notes.SPRING_TAP_ENGAGEMENT_MIN / notes.SPRING_TAP_MAJOR_DIA):.2f}D)"
+    )
+    assert "summation anchor position" not in sm_summing_lever_spec.GEOMETRIC_TOLERANCES_MM
 
 
 def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesses(monkeypatch) -> None:
