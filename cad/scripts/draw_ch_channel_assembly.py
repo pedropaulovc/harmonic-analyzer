@@ -1,44 +1,85 @@
-r"""Create the one-sheet Front/Right/Isometric channel assembly drawing (MHA-CH-000).
+r"""Create the MHA-CH-000 channel assembly fitter package (four sheets).
 
-The sheet carries the rocker bank's fit-up steps (#948 ruling R, PR #1292): the
-south bracket is set off a wave disc spring that preloads the bank north, and
-the plain pivot shaft is cut to fit and held by a set screw in each ear (user,
-2026-10-10), so the setting and its acceptance are shop instructions this sheet
-must print (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), generated from ``rocker_bank_layout``
-and numbered by ``channel_assembly_steps``. The fulcrum shaft's keepers follow
-in a second block, numbered on from the first: their bench pair-ream, their
-DRO fit-up on the top frame and the set screws' staking
-(``ch_fulcrum_keeper_spec``).
+1. ASSEMBLED VIEWS: Front, Right and the full-detail isometric at 1:7.
+2. EXPLODED VIEW + BOM: the builder-owned CHANNEL_EXPLODED isometric
+   (ch_channel_assembly_spec), the native BOM with the registry's part
+   numbers and vendor SKUs, and one balloon per BOM row.
+3. ROCKER BANK FIT-UP: the bank isolated at 1:1 with the closed-up stack
+   length, a cropped 4:1 detail of the south end with the spring set, and
+   steps 1-8. The south bracket is set off a wave disc spring that preloads
+   the bank north, and the plain pivot shaft is cut to fit and held by a set
+   screw in each ear (#948 ruling R, PR #1292; user, 2026-10-10).
+4. LEVER BANK FIT-UP: the keepers, fulcrum shaft and levers isolated at 1:1
+   with the keeper lug span, and the remaining steps: the keepers' bench
+   pair-ream and DRO fit-up on the top frame, the bars pinned to the levers,
+   the lever bank threaded, the set screws staked and the springs hooked.
+
+The settings are the assembly's own model dimensions (the hidden
+ChannelSettingsReference sketch, build_ch_channel_assembly), not numbers in
+note text; the steps are numbered by ``ch_channel_assembly_steps``.
 """
 
 from __future__ import annotations
 
 import argparse
+from collections import Counter
+from dataclasses import dataclass
 import sys
 import textwrap
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable
 
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    dimension_name,
+    place_view,
+    view_name,
+)
 
 from _check import check
 from _com import _early_bound
 import _config
+from _drawing_balloons import (
+    BalloonAnchor,
+    add_component_bom_balloons,
+    assert_balloon_landings,
+    isolate_drawing_view_components,
+)
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_high_quality_shaded_with_edges,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_hidden_sketches import _show_base_view_sketches
+from _drawing_projection import model_point_in_view
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_tables import insert_bom_table
 from _drawing_view_configuration import (
+    ASSEMBLY_VIEW_CONFIGURATION,
+    SIMPLIFIED_VIEW_CONFIGURATION,
     ViewRole,
     apply_view_configuration,
     assert_full_detail_view,
+    set_view_exploded_state,
 )
+from _drawing_view_display import set_hidden_lines_removed
 from _session import run_build
+from _simplified_names import simplified_name
 import _telemetry
+import ch_channel_assembly_spec as asm
 import ch_channel_assembly_steps as steps
 from ch_fulcrum_keeper_spec import (
+    FULCRUM_KEEPER_CENTRE_Z,
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_PLACES,
     KEEPER_FITUP_X_FROM_WEB_MM,
@@ -49,14 +90,9 @@ from ch_fulcrum_keeper_spec import (
 )
 from ch_pivot_bracket_spec import SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
 from ch_pivot_shaft_spec import DOME_HEIGHT
-from channel_frame_geom import LEVER_FULCRUM_XY
+from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from frame_column_stations import COLUMN_X
-from rocker_bank_layout import (
-    COUNT,
-    ROCKER_SPRING_SET,
-    SHAFT_TIP_SET_BAND,
-    STACK_L20_ACCEPT,
-)
+from rocker_bank_layout import COUNT, SHAFT_TIP_SET_BAND, STACK_MID_Z
 
 
 SPEC = DRAWINGS_BY_NAME["ch_channel_assembly"]
@@ -71,31 +107,310 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
+SHEET_NAMES = (
+    "ASSEMBLED VIEWS",
+    "EXPLODED VIEW + BOM",
+    "ROCKER BANK FIT-UP",
+    "LEVER BANK FIT-UP",
+)
+if SPEC.layout is not DrawingLayout.LANDSCAPE:
+    raise AssertionError("the channel package is landscape throughout")
+SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 SHEET_SCALE = (1.0, 7.0)
+FITUP_SCALE = (1.0, 1.0)
+SHEET_SCALES = {
+    SHEET_NAMES[0]: SHEET_SCALE,
+    SHEET_NAMES[1]: SHEET_SCALE,
+    SHEET_NAMES[2]: FITUP_SCALE,
+    SHEET_NAMES[3]: FITUP_SCALE,
+}
+_TEMPLATE = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
+BORDER = 0.0127
+
+# --- sheet 1: assembled views (the v41 single-sheet positions) ---------------
 FRONT_CENTER = (0.060, 0.150)
 RIGHT_CENTER = (0.130, 0.150)
 ISO_CENTER = (0.225, 0.140)
-
-# The rocker-bank steps fill the empty field right of the isometric (x ~0.248
-# on the v36 render) and above the title block: the note's top-left corner,
-# then the right border and the lowest y the text may reach.
-FITUP_NOTE_XY = (0.268, 0.252)
-FITUP_FIELD_LIMIT = (0.412, 0.085)
-FITUP_LINE_WIDTH = 50  # characters; default-format note text
-# The fulcrum-shaft steps fill the band under the front and right views
-# (lowest at y ~0.079 on the v41 render), left of the title block (x ~0.218)
-# and above the bottom border (y ~0.013).
-FULCRUM_NOTE_XY = (0.016, 0.075)
-FULCRUM_FIELD_LIMIT = (0.214, 0.016)
-FULCRUM_LINE_WIDTH = 70
-FULCRUM_KEYS = (
-    steps.KEEPERS_PAIR_REAMED_KEY,
-    steps.KEEPERS_SET_KEY,
-    steps.SET_SCREWS_STAKED_KEY,
+ASSEMBLED_CAPTION_XY = (0.272, 0.250)
+ASSEMBLED_CAPTION = "\n".join(
+    (
+        "RIGHT VIEW: NORTH (HUB 19) LEFT, SOUTH (HUB 0) RIGHT.",
+        "SHEET 2: EXPLODED VIEW AND BILL OF MATERIALS.",
+        f"SHEETS 3 AND 4: FIT-UP, STEPS 1 TO {len(steps.SEQUENCE)}.",
+    )
 )
-# The second block numbers on from the first, so its steps close the sequence.
-if steps.SEQUENCE[-len(FULCRUM_KEYS) :] != FULCRUM_KEYS:
-    raise AssertionError("the fulcrum-shaft steps must close the sequence")
+
+# --- sheet 2: exploded isometric, BOM, balloons ------------------------------
+EXPLODED_ISO_CENTER = (0.100, 0.150)
+BALLOON_MARGIN = 0.014
+BOM_ANCHOR = (0.205, 0.262)
+BOM_COLUMN_WIDTHS = {
+    "item": 0.012,
+    "part": 0.030,
+    "description": 0.078,
+    "sku": 0.026,
+    "quantity": 0.012,
+}
+BOM_SKU_TITLE = "VENDOR SKU"
+MADE_PART_SKU = "-"
+BOM_ROW_HEIGHT = 0.006
+EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.130)
+EXPLODED_CAPTION = "\n".join(
+    (
+        f"EXPLODED: ALL {COUNT} CHANNELS ALIKE; ONE BALLOON PER BOM ROW,",
+        "ON THE NORTH-MOST INSTANCE. QTY IS PER CHANNEL ASSEMBLY.",
+    )
+)
+
+# Spring variants: one per distinct amplitude among the built channels, named
+# as build_ch_channel_assembly names them (first-occurrence order).
+CHANNELS = _config.active_count()
+if CHANNELS != COUNT:
+    raise AssertionError("the channel package is drawn for the full bank")
+_AMPLITUDES = _config.amplitudes()
+_VARIANTS = {
+    amplitude: index for index, amplitude in enumerate(dict.fromkeys(_AMPLITUDES))
+}
+SPRING_STEMS = tuple(
+    dict.fromkeys(
+        f"vn-channel-spring-installed-stretch{_VARIANTS[amplitude]:02d}"
+        for amplitude in _AMPLITUDES[:CHANNELS]
+    )
+)
+if len(SPRING_STEMS) != 1:
+    raise AssertionError(
+        "one BOM row per part number: several spring variants share MHA-VN-004"
+    )
+SPRING_STEM = SPRING_STEMS[0]
+
+BOM_QUANTITIES = {
+    "ch-pivot-shaft": 1,
+    "ch-fulcrum-shaft": 1,
+    asm.BRACKET: 2,
+    asm.BRACKET_SET_SCREW: 2,
+    asm.WASHER: 2,
+    asm.BANK_SPRING: 1,
+    asm.BRACKET_HOLD_DOWN: 2,
+    asm.KEEPER: 2,
+    asm.KEEPER_FOOT_SCREW: 2,
+    asm.KEEPER_SET_SCREW: 2,
+    "ch-rocker-arm": CHANNELS,
+    asm.ROD: CHANNELS,
+    asm.BAR: CHANNELS,
+    "ch-channel-lever": CHANNELS,
+    "ch-rod-pivot-pin": CHANNELS,
+    asm.BAR_PIN: CHANNELS,
+    SPRING_STEM: CHANNELS,
+    asm.HOOK: CHANNELS,
+}
+BOM_COMPONENTS = tuple(BOM_QUANTITIES)
+# Literal stems, so the config-dependency analysis reads exactly these rows.
+PART_ROWS = {
+    "ch-pivot-shaft": _config.parts("ch-pivot-shaft"),
+    "ch-fulcrum-shaft": _config.parts("ch-fulcrum-shaft"),
+    "ch-pivot-bracket": _config.parts("ch-pivot-bracket"),
+    "vn-arbor-set-screw": _config.parts("vn-arbor-set-screw"),
+    "ch-rocker-thrust-washer": _config.parts("ch-rocker-thrust-washer"),
+    "vn-rocker-bank-spring": _config.parts("vn-rocker-bank-spring"),
+    "vn-pedestal-hold-down-screw": _config.parts("vn-pedestal-hold-down-screw"),
+    "ch-fulcrum-keeper": _config.parts("ch-fulcrum-keeper"),
+    "vn-frame-side-screw": _config.parts("vn-frame-side-screw"),
+    "vn-fulcrum-set-screw": _config.parts("vn-fulcrum-set-screw"),
+    "ch-rocker-arm": _config.parts("ch-rocker-arm"),
+    "ch-connecting-rod": _config.parts("ch-connecting-rod"),
+    "ch-amplitude-bar": _config.parts("ch-amplitude-bar"),
+    "ch-channel-lever": _config.parts("ch-channel-lever"),
+    "ch-rod-pivot-pin": _config.parts("ch-rod-pivot-pin"),
+    "ch-bar-pivot-pin": _config.parts("ch-bar-pivot-pin"),
+    SPRING_STEM: _config.parts("vn-channel-spring-installed"),
+    "vn-spring-hook": _config.parts("vn-spring-hook"),
+}
+if set(PART_ROWS) != set(BOM_COMPONENTS):
+    raise AssertionError("BOM registry rows must cover exactly the assembly families")
+BOM_PART_NUMBERS = {stem: str(row["number"]) for stem, row in PART_ROWS.items()}
+BOM_SKUS = {
+    stem: " / ".join(str(sku) for sku in row.get("supplier_skus") or ())
+    or MADE_PART_SKU
+    for stem, row in PART_ROWS.items()
+}
+BOM_DESCRIPTIONS = {
+    stem: asm.BOM_DESCRIPTIONS[
+        "vn-channel-spring-installed" if stem == SPRING_STEM else stem
+    ]
+    for stem in BOM_COMPONENTS
+}
+BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
+BOM_NORMALIZED_ALIASES = {
+    alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
+}
+EXPLODED_VIEW_NAMES = {
+    ASSEMBLY_VIEW_CONFIGURATION: asm.EXPLODED_VIEW_NAME,
+    SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(asm.EXPLODED_VIEW_NAME),
+}
+if asm.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
+    raise AssertionError("the channel explode is authored in Default")
+
+# --- sheets 3 and 4: isolated 1:1 bank views, the south-end detail, steps ----
+# On a Right view sheet x runs with machine -z (north left, south right) and
+# sheet y with machine y.
+CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
+VIEW_POSITION_TOL_M = 1e-4
+STEPS_XY = (0.207, 0.258)
+STEPS_LINE_WIDTH = 64  # characters; default-format note text
+# The layout audit proves the blocks clear the title block; the line width
+# keeps them inside the right border (test_ch_channel_assembly_drawing).
+END_LABEL_DROP_MM = 52.0  # end labels this far under the shaft axis
+
+
+@dataclass(frozen=True)
+class BankView:
+    """One isolated *Right model view of a bank, its ``centre_xyz`` (model mm)
+    landing on ``centre`` (sheet m); cropped to ``crop_radius_mm`` if set."""
+
+    title: str
+    scale: tuple[int, int]
+    centre_xyz: tuple[float, float, float]
+    centre: tuple[float, float]
+    stems: frozenset[str]
+    crop_radius_mm: float | None = None
+    parts: str = ""
+
+    @property
+    def mm(self) -> float:
+        """Sheet metres per model millimetre."""
+        return self.scale[0] / self.scale[1] / 1000.0
+
+    def sheet_xy(self, z: float, y: float) -> tuple[float, float]:
+        """Machine (z, y) in this view's plane, on the sheet."""
+        return (
+            self.centre[0] - (z - self.centre_xyz[2]) * self.mm,
+            self.centre[1] + (y - self.centre_xyz[1]) * self.mm,
+        )
+
+    @property
+    def model_centre_m(self) -> tuple[float, float, float]:
+        return tuple(value / 1000.0 for value in self.centre_xyz)  # type: ignore[return-value]
+
+    @property
+    def label_text(self) -> str:
+        lines = (self.title, self.parts, f"SCALE {self.scale[0]} : {self.scale[1]}")
+        return "\n".join(line for line in lines if line)
+
+
+_PIVOT_X, _PIVOT_Y = ROCKER_PIVOT_XY
+_FULCRUM_X, _FULCRUM_Y = LEVER_FULCRUM_XY
+ROCKER_BANK = BankView(
+    "ROCKER BANK",
+    (1, 1),
+    (_PIVOT_X, _PIVOT_Y, STACK_MID_Z),
+    (0.105, 0.205),
+    frozenset(
+        {
+            "ch-pivot-shaft",
+            asm.BRACKET,
+            asm.BRACKET_SET_SCREW,
+            asm.BRACKET_HOLD_DOWN,
+            asm.WASHER,
+            asm.BANK_SPRING,
+            "ch-rocker-arm",
+        }
+    ),
+)
+# The south end at 4:1: the ear's inner face, the spring, the washer and hub 0
+# about the circle's centre on the pivot axis.
+_DETAIL_CENTRE_Z = (asm.PIVOT_CHAIN_Z[0] + asm.PIVOT_CHAIN_Z[2]) / 2.0
+SOUTH_END = BankView(
+    "DETAIL A, SOUTH END",
+    (4, 1),
+    (_PIVOT_X, _PIVOT_Y, _DETAIL_CENTRE_Z),
+    (0.072, 0.098),
+    frozenset(
+        {
+            "ch-pivot-shaft",
+            asm.BRACKET,
+            asm.BRACKET_SET_SCREW,
+            asm.WASHER,
+            asm.BANK_SPRING,
+            "ch-rocker-arm",
+        }
+    ),
+    crop_radius_mm=8.0,
+    parts="EAR, SPRING, WASHER, HUB 0",
+)
+LEVER_BANK = BankView(
+    "LEVER BANK",
+    (1, 1),
+    (_FULCRUM_X, _FULCRUM_Y, FULCRUM_KEEPER_CENTRE_Z),
+    (0.105, 0.195),
+    frozenset(
+        {
+            "ch-fulcrum-shaft",
+            asm.KEEPER,
+            asm.KEEPER_FOOT_SCREW,
+            asm.KEEPER_SET_SCREW,
+            "ch-channel-lever",
+            asm.BAR_PIN,
+        }
+    ),
+)
+_STACK_MID = (asm.PIVOT_CHAIN_Z[2] + asm.PIVOT_CHAIN_Z[3]) / 2.0
+_SPRING_MID = (asm.PIVOT_CHAIN_Z[0] + asm.PIVOT_CHAIN_Z[1]) / 2.0
+_LUG_MID = sum(asm.LUG_INNER_FACE_Z) / 2.0
+STACK_KEEP = {
+    asm.STACK_LENGTH_DIMENSION: ROCKER_BANK.sheet_xy(_STACK_MID, _PIVOT_Y + 40.0)
+}
+SPRING_KEEP = {
+    asm.SPRING_SET_DIMENSION: SOUTH_END.sheet_xy(_SPRING_MID, _PIVOT_Y + 6.0)
+}
+LUG_KEEP = {asm.LUG_SPAN_DIMENSION: LEVER_BANK.sheet_xy(_LUG_MID, _FULCRUM_Y + 32.0)}
+# swDimensionTextParts_e compartments.
+CALLOUT_TEXT_PART = 3  # swDimensionTextCalloutAbove
+REFERENCE_PREFIX_PART = 1  # swDimensionTextPrefix
+REFERENCE_SUFFIX_PART = 2  # swDimensionTextSuffix
+if any("\n" in text for text in asm.DIMENSION_CALLOUTS.values()):
+    raise AssertionError("an above-callout with a line break does not print")
+
+
+def _end_labels(
+    view: BankView,
+    north_z: float,
+    south_z: float,
+    y: float,
+    names: tuple[str, str],
+) -> tuple[tuple[str, tuple[float, float]], ...]:
+    """NORTH/SOUTH end labels under a bank's ends (a review asked which end is which)."""
+    drop = y - END_LABEL_DROP_MM
+    north = view.sheet_xy(north_z, drop)
+    south = view.sheet_xy(south_z, drop)
+    return (
+        (names[0], north),
+        (names[1], (south[0] - 0.034, south[1])),
+    )
+
+
+ROCKER_END_LABELS = _end_labels(
+    ROCKER_BANK,
+    asm.PIVOT_CHAIN_Z[3],
+    asm.PIVOT_CHAIN_Z[0],
+    _PIVOT_Y,
+    ("NORTH END, HUB 19", "SOUTH END, HUB 0"),
+)
+LEVER_END_LABELS = _end_labels(
+    LEVER_BANK,
+    asm.LUG_INNER_FACE_Z[1],
+    asm.LUG_INNER_FACE_Z[0],
+    _FULCRUM_Y,
+    ("NORTH END, LEVER 19", "SOUTH END, LEVER 0"),
+)
+
+ROCKER_KEYS = tuple(
+    steps.SEQUENCE[: steps.SEQUENCE.index(steps.KEEPERS_PAIR_REAMED_KEY)]
+)
+LEVER_KEYS = tuple(steps.SEQUENCE[len(ROCKER_KEYS) :])
+if LEVER_KEYS[0] != steps.KEEPERS_PAIR_REAMED_KEY or LEVER_KEYS[-1] != (
+    steps.SPRINGS_HOOKED_KEY
+):
+    raise AssertionError("the lever-bank steps close the sequence")
 
 
 def _block(
@@ -131,8 +446,12 @@ def _fitup_notes() -> tuple[str, str]:
     fulcrum_set_screw = _config.parts("vn-fulcrum-set-screw")["number"]
     foot_screw = _config.parts("vn-frame-side-screw")["number"]
     top_frame = _config.parts("fr-top-frame")["number"]
+    bar = _config.parts("ch-amplitude-bar")["number"]
+    lever = _config.parts("ch-channel-lever")["number"]
+    bar_pin = _config.parts("ch-bar-pivot-pin")["number"]
+    channel_spring = _config.parts("vn-channel-spring-installed")["number"]
+    anchor = _config.parts("vn-spring-hook")["number"]
     last = COUNT - 1
-    stack_low, stack_high = STACK_L20_ACCEPT
     set_step = steps.step_number("south-bracket-spring-set")
     # The pivot shaft comes finished, domed both ends to its overall length
     # (ch_pivot_shaft_spec): its north tip set DOME_HEIGHT proud of the north
@@ -142,14 +461,15 @@ def _fitup_notes() -> tuple[str, str]:
     # Each keeper lug is set off the top-frame rail web under it (its column's
     # socket axis) in X and off the frame's hole-station origin, the upper-left
     # socket, in Z (Main's ruling): the lug centre on the fulcrum line, its
-    # inner face off the front socket line.
+    # inner face off the front socket line. The frame is not in this
+    # assembly, so these set-points stay in the step text.
     places = KEEPER_FITUP_PLACES
     if abs(LEVER_FULCRUM_XY[0] - COLUMN_X - KEEPER_FITUP_X_FROM_WEB_MM) > 1e-9:
         raise AssertionError("KEEPER_FITUP_X_FROM_WEB_MM is off the fulcrum line")
     front_face, rear_face = KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
-    # The pair is reamed at the spacing KEEPERS_SET_KEY sets it to (Main's ruling).
-    ream_span = rear_face - front_face
-    if abs(ream_span - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
+    # The pair is reamed at the spacing KEEPERS_SET_KEY sets it to (Main's
+    # ruling): the lever-bank view's reference lug span.
+    if abs(rear_face - front_face - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
         raise AssertionError("the pair-ream span is not the fit-up span")
     text = {
         # The rings are captured in the closed cam slots as the cylinder stack
@@ -158,9 +478,9 @@ def _fitup_notes() -> tuple[str, str]:
         # after the hub stack is proved on the shaft, while the arms are loose.
         "rocker-stack-accepted": (
             f"STACK THE {COUNT} {arm} ROCKERS ON THE {shaft} SHAFT, CLOSED UP. "
-            f"HUB 0 SOUTH FACE TO HUB {last} NORTH FACE: "
-            f"{stack_low:.2f} TO {stack_high:.2f}; RE-FACE A LONG STACK. SLIDE "
-            "THE ROCKERS OFF IN ORDER AND KEEP THAT ORDER."
+            f"HUB 0 SOUTH FACE TO HUB {last} NORTH FACE TO THE ROCKER BANK "
+            "VIEW'S STACK DIMENSION; RE-FACE A LONG STACK. SLIDE THE ROCKERS "
+            "OFF IN ORDER AND KEEP THAT ORDER."
         ),
         "rod-forks-pinned": (
             f"BEFORE {steps.CYLINDER_STACK_REF}, AT THE BENCH: PIN EACH {rod} "
@@ -177,7 +497,7 @@ def _fitup_notes() -> tuple[str, str]:
         "south-bracket-spring-set": (
             f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS. "
             f"FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
-            f"{ROCKER_SPRING_SET:.2f} BLADE BESIDE THE SPRING, BANK PUSHED NORTH. "
+            "SPRING-SET BLADE (DETAIL A) BESIDE THE SPRING, BANK PUSHED NORTH. "
             f"CLAMP, TRANSFER ITS SEAT INTO THE {support} RAIL, TAP AS {support}, "
             f"SCREW DOWN ONE {hold_down}, PULL THE BLADE."
         ),
@@ -200,8 +520,8 @@ def _fitup_notes() -> tuple[str, str]:
         ),
         steps.KEEPERS_PAIR_REAMED_KEY: (
             f"CLAMP BOTH {keeper}, FEET OUTBOARD ON ONE FLAT, INNER LUG FACES "
-            f"{ream_span:.{places}f} APART, BORE AXIS PARALLEL TO THE FLAT; "
-            "DRILL AND REAM BOTH IN ONE PASS, "
+            "AT THE LEVER BANK VIEW'S LUG SPAN, BORE AXIS PARALLEL TO THE "
+            "FLAT; DRILL AND REAM BOTH IN ONE PASS, "
             f"{PAIR_REAMER_OAL_IN:.0f} IN {PAIR_REAMER_DIA_IN:.4f} REAMER; ROUND "
             f"EACH CROWN ON ITS BORE. ACCEPT IF THE {fulcrum_shaft} SHAFT SLIDES "
             "FREELY THROUGH BOTH, CLAMPED."
@@ -216,16 +536,34 @@ def _fitup_notes() -> tuple[str, str]:
             f"FOOT HOLE INTO THE RAIL, TAP AS {top_frame}, SCREW DOWN ONE "
             f"{foot_screw}."
         ),
+        steps.BARS_PINNED_KEY: (
+            f"AT THE BENCH: PIN EACH {bar} BAR TO ITS {lever} LEVER WITH ONE "
+            f"{bar_pin}, THE BAR'S TOP NOTCH ASTRIDE THE LEVER. PRESS THE PIN "
+            "THROUGH BOTH CHEEKS AND THE LEVER HOLE, FAR CHEEK BACKED; DRESS "
+            "BOTH ENDS FLUSH. ACCEPT IF THE BAR SWINGS FREE UNDER ITS OWN WEIGHT."
+        ),
+        steps.LEVER_BANK_THREADED_KEY: (
+            f"DRAW THE {fulcrum_shaft} SHAFT OUT NORTH. PUSH IT BACK SOUTH "
+            f"THROUGH THE NORTH {keeper}, LEVERS {last} TO 0 IN CHANNEL ORDER "
+            f"AND THE SOUTH {keeper}, EACH BAR'S FOOT NOTCH ASTRIDE ITS {arm} "
+            "STRAP. ACCEPT IF EVERY LEVER SWINGS FREE."
+        ),
         steps.SET_SCREWS_STAKED_KEY: (
             f"WITH THE LEVER BANK ON IT, SLIDE THE {fulcrum_shaft} SHAFT UNTIL "
             f"EACH FLAT LIES UNDER ITS CROWN TAP; TIGHTEN ONE {fulcrum_set_screw} SET "
             "SCREW ONTO EACH FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS."
         ),
+        # The anchors thread into the summing plate (MHA-HA-000 owns that
+        # joint, its lock and its setting); this sheet only hooks the spring.
+        steps.SPRINGS_HOOKED_KEY: (
+            f"HOOK EACH {channel_spring} SPRING'S TOP LOOP THROUGH ITS {lever} "
+            f"LEVER'S SPRING HOLE. ITS BOTTOM LOOP TAKES ITS {anchor} ANCHOR AT "
+            "MHA-HA-000, WHERE THE ANCHOR IS THREADED, LOCKED AND SET."
+        ),
     }
-    rocker_keys = tuple(key for key in steps.SEQUENCE if key not in FULCRUM_KEYS)
     return (
-        _block("ROCKER BANK FIT-UP", rocker_keys, text, FITUP_LINE_WIDTH),
-        _block("FULCRUM SHAFT FIT-UP", FULCRUM_KEYS, text, FULCRUM_LINE_WIDTH),
+        _block("ROCKER BANK FIT-UP", ROCKER_KEYS, text, STEPS_LINE_WIDTH),
+        _block("LEVER BANK FIT-UP", LEVER_KEYS, text, STEPS_LINE_WIDTH),
     )
 
 
@@ -233,19 +571,573 @@ FITUP_NOTES = _fitup_notes()
 FITUP_STEPS = "\n".join(FITUP_NOTES)
 
 
-def _place_fitup_steps(adapter: Any, sheet: Any) -> None:
-    """Sheet-owned notes: activate the sheet so no view owns them."""
+def _activate_sheet(adapter: Any, name: str) -> Any:
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
-    name = str(_early_bound(sheet, "ISheet").GetName() or "")
     if not ddoc.ActivateSheet(name):
         raise RuntimeError(f"failed to activate drawing sheet {name!r}")
-    for text, xy in zip(FITUP_NOTES, (FITUP_NOTE_XY, FULCRUM_NOTE_XY), strict=True):
-        note = add_note(adapter, text, *xy)
-        if note is None:
-            raise RuntimeError(f"failed to place the fit-up steps at {xy}")
-        printed = str(_early_bound(note, "INote").GetText() or "")
-        if printed.replace("\r\n", "\n").replace("\r", "\n") != text:
-            raise RuntimeError(f"fit-up steps printed as {printed!r}")
+    current = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+    actual = str(current.GetName() or "")
+    if actual != name:
+        raise RuntimeError(f"active drawing sheet is {actual!r}, expected {name!r}")
+    return current
+
+
+def _add_note_block(
+    adapter: Any, sheet_name: str, text: str, xy: tuple[float, float], *, label: str
+) -> Any:
+    """A sheet-owned note: activate the sheet so no view owns it."""
+    _activate_sheet(adapter, sheet_name)
+    note = add_note(adapter, text, *xy)
+    if note is None:
+        raise RuntimeError(f"failed to place the channel {label}")
+    note = _early_bound(note, "INote")
+    printed = str(note.GetText() or "").replace("\r\n", "\n").replace("\r", "\n")
+    if printed != text:
+        raise RuntimeError(f"channel {label} printed as {printed!r}")
+    return note
+
+
+def _view_outline(view: Any, *, label: str) -> tuple[float, float, float, float]:
+    outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+    if len(outline) != 4 or outline[2] <= outline[0] or outline[3] <= outline[1]:
+        raise RuntimeError(f"{label}: invalid view outline {outline!r}")
+    return outline[0], outline[1], outline[2], outline[3]
+
+
+def _assert_view_on_sheet(view: Any, *, margin: float = 0.0, label: str) -> None:
+    """The view's outline, grown by ``margin`` (a balloon ring), stays inside
+    the inner border and clear of the title block."""
+    x0, y0, x1, y1 = _view_outline(view, label=label)
+    x0, y0, x1, y1 = x0 - margin, y0 - margin, x1 + margin, y1 + margin
+    border = (BORDER, BORDER, _TEMPLATE.width_m - BORDER, _TEMPLATE.height_m - BORDER)
+    title = (
+        _TEMPLATE.title_block_left_m,
+        0.0,
+        _TEMPLATE.width_m,
+        _TEMPLATE.title_block_top_m,
+    )
+    findings = []
+    if x0 < border[0] or y0 < border[1] or x1 > border[2] or y1 > border[3]:
+        findings.append(f"leaves the inner border {border}")
+    if x1 > title[0] and x0 < title[2] and y0 < title[3] and y1 > title[1]:
+        findings.append(f"enters the title block {title}")
+    if findings:
+        raise RuntimeError(
+            f"{label}: outline {(x0, y0, x1, y1)!r} " + "; ".join(findings)
+        )
+
+
+def _center_view_outline(
+    adapter: Any, view: Any, center: tuple[float, float], *, label: str
+) -> None:
+    """Translate the actual outline using the current native origin."""
+    view = _early_bound(view, "IView")
+    x0, y0, x1, y1 = _view_outline(view, label=label)
+    before = tuple(float(value) for value in view.Position)
+    target = (
+        before[0] + center[0] - (x0 + x1) / 2.0,
+        before[1] + center[1] - (y0 + y1) / 2.0,
+    )
+    if not view.SetViewPosition(double_array(list(target)), False):
+        raise RuntimeError(f"{label}: SetViewPosition refused {target!r}")
+    adapter.currentModel.EditRebuild3()
+    x0, y0, x1, y1 = _view_outline(view, label=label)
+    if (
+        abs((x0 + x1) / 2.0 - center[0]) > 1e-6
+        or abs((y0 + y1) / 2.0 - center[1]) > 1e-6
+    ):
+        raise RuntimeError(f"{label}: measured outline did not centre at {center!r}")
+
+
+def _component_stem(component: Any) -> str:
+    component = _early_bound(component, "IComponent2")
+    path = str(component.GetPathName() or "")
+    if not path:
+        raise RuntimeError(f"component {component.Name2!r} has no referenced path")
+    return Path(path).stem.casefold()
+
+
+def _validate_source(source_model: Any) -> dict[str, str]:
+    """The builder-owned explodes exist, the source opens collapsed with
+    exactly the contracted families; returns each family's north-most
+    instance (nearest the isometric's eye), the one its balloon pins."""
+    assembly = _early_bound(source_model, "IAssemblyDoc")
+    manager = _early_bound(source_model.ConfigurationManager, "IConfigurationManager")
+    configuration = _early_bound(manager.ActiveConfiguration, "IConfiguration")
+    if str(configuration.Name) != ASSEMBLY_VIEW_CONFIGURATION:
+        raise RuntimeError("channel source must open in its Default configuration")
+    for owner, wanted in EXPLODED_VIEW_NAMES.items():
+        names = tuple(assembly.GetExplodedViewNames2(owner) or ())
+        if names != (wanted,):
+            raise RuntimeError(
+                f"channel {owner} exploded views {names!r} != {(wanted,)!r}"
+            )
+    counts: Counter[str] = Counter()
+    north: dict[str, tuple[float, str]] = {}
+    for raw in tuple(assembly.GetComponents(True) or ()):
+        component = _early_bound(raw, "IComponent2")
+        stem = _component_stem(component)
+        counts[stem] += 1
+        total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
+        base = _early_bound(component.GetTotalTransform(False), "IMathTransform")
+        values = tuple(float(value) for value in base.ArrayData)
+        if any(
+            abs(float(actual) - expected) > 1e-9
+            for actual, expected in zip(total.ArrayData, values, strict=True)
+        ):
+            raise RuntimeError(
+                f"channel source must open collapsed: {component.Name2!r} is displaced"
+            )
+        z = values[11]
+        name = str(component.Name2)
+        if stem not in north or z > north[stem][0]:
+            north[stem] = (z, name)
+    if dict(counts) != BOM_QUANTITIES:
+        raise RuntimeError(
+            f"channel families {dict(counts)!r} != contract {BOM_QUANTITIES!r}"
+        )
+    return {stem: name for stem, (_z, name) in north.items()}
+
+
+_INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After
+_INSERT_COLUMN_DEFAULT_WIDTH = 0  # swInsertColumn_DefaultWidth
+
+
+def _bom_cells(table: Any) -> tuple[tuple[str, ...], ...]:
+    """Every displayed BOM cell, header row first."""
+    return tuple(
+        tuple(
+            str(table.DisplayedText(row, column) or "").strip()
+            for column in range(int(table.ColumnCount))
+        )
+        for row in range(int(table.RowCount))
+    )
+
+
+def _bom_column(
+    header: tuple[str, ...], predicate: Callable[[str], bool], label: str
+) -> int:
+    matches = [index for index, cell in enumerate(header) if predicate(cell.upper())]
+    if len(matches) != 1:
+        raise RuntimeError(f"channel BOM has no unique {label} column: {header!r}")
+    return matches[0]
+
+
+def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
+    """Rewrite part numbers, prove identities/descriptions/quantities, add the
+    registry's VENDOR SKU column after DESCRIPTION; return (stem, item number)
+    in BOM order. Material and finish remain on component drawings."""
+    table = _early_bound(table, "ITableAnnotation")
+    contents = _bom_cells(table)
+    rows = len(contents)
+    columns = len(contents[0]) if contents else 0
+    if rows != len(BOM_COMPONENTS) + 1 or columns < 4:
+        raise RuntimeError(
+            f"channel BOM is {rows}x{columns}; expected "
+            f"{len(BOM_COMPONENTS) + 1} rows and at least four columns"
+        )
+    header = contents[0]
+    for title in ("MATERIAL", BOM_SKU_TITLE):
+        if title in (cell.upper() for cell in header):
+            raise RuntimeError(f"channel BOM template already has {title!r}")
+    item_column = _bom_column(
+        header, lambda cell: cell.startswith("ITEM NO"), "ITEM NO."
+    )
+    part_column = _bom_column(header, lambda cell: cell == "PART NUMBER", "PART NUMBER")
+    description_column = _bom_column(
+        header, lambda cell: cell == "DESCRIPTION", "DESCRIPTION"
+    )
+    quantity_column = _bom_column(header, lambda cell: cell.startswith("QTY"), "QTY.")
+
+    actual: dict[str, tuple[int, str, str, str]] = {}
+    for row_index, row in enumerate(contents[1:], start=1):
+        text = row[part_column].casefold()
+        stem = BOM_NORMALIZED_ALIASES.get(text, text)
+        if stem in actual:
+            raise RuntimeError(f"channel BOM repeats component family {stem!r}")
+        actual[stem] = (
+            row_index,
+            row[item_column],
+            row[description_column],
+            row[quantity_column],
+        )
+    if set(actual) != set(BOM_COMPONENTS):
+        raise RuntimeError(
+            f"channel BOM identities {sorted(actual)!r} != {sorted(BOM_COMPONENTS)!r}"
+        )
+    items = {values[1] for values in actual.values()}
+    if items != {str(item) for item in range(1, len(BOM_COMPONENTS) + 1)}:
+        raise RuntimeError(
+            f"channel BOM item numbers {sorted(items)!r} are not contiguous"
+        )
+    for stem, (row_index, _item, description, quantity) in actual.items():
+        number = BOM_PART_NUMBERS[stem]
+        if contents[row_index][part_column] != number:
+            if not table.IsCellTextEditable(row_index, part_column):
+                raise RuntimeError(
+                    f"channel BOM part-number cell for {stem!r} is locked"
+                )
+            table.SetText2(row_index, part_column, False, number)
+        if description != BOM_DESCRIPTIONS[stem]:
+            raise RuntimeError(f"channel BOM description mismatch for {stem!r}")
+        if quantity != str(BOM_QUANTITIES[stem]):
+            raise RuntimeError(
+                f"channel BOM quantity for {stem!r} is {quantity!r}, "
+                f"expected {BOM_QUANTITIES[stem]}"
+            )
+
+    # The parts carry no SKU property; made parts print MADE_PART_SKU.
+    if not table.InsertColumn2(
+        _INSERT_COLUMN_AFTER,
+        description_column,
+        BOM_SKU_TITLE,
+        _INSERT_COLUMN_DEFAULT_WIDTH,
+    ):
+        raise RuntimeError("channel BOM refused the VENDOR SKU column")
+    column = description_column + 1
+    if not table.SetColumnTitle2(column, BOM_SKU_TITLE, False):
+        raise RuntimeError("channel BOM VENDOR SKU column title did not set")
+    for stem, (row_index, *_rest) in actual.items():
+        if not table.IsCellTextEditable(row_index, column):
+            raise RuntimeError(f"channel BOM VENDOR SKU cell for {stem!r} is locked")
+        table.SetText2(row_index, column, False, BOM_SKUS[stem])
+
+    header = _bom_cells(table)[0]
+    widths = {
+        "item": _bom_column(
+            header, lambda cell: cell.startswith("ITEM NO"), "ITEM NO."
+        ),
+        "part": _bom_column(header, lambda cell: cell == "PART NUMBER", "PART NUMBER"),
+        "description": _bom_column(
+            header, lambda cell: cell == "DESCRIPTION", "DESCRIPTION"
+        ),
+        "sku": _bom_column(header, lambda cell: cell == BOM_SKU_TITLE, BOM_SKU_TITLE),
+        "quantity": _bom_column(header, lambda cell: cell.startswith("QTY"), "QTY."),
+    }
+    if len(header) != len(BOM_COLUMN_WIDTHS) or set(widths) != set(BOM_COLUMN_WIDTHS):
+        raise RuntimeError(f"channel BOM columns {header!r} are not the contract")
+    for key, column in widths.items():
+        width = BOM_COLUMN_WIDTHS[key]
+        if abs(float(table.SetColumnWidth(column, width, 0)) - width) > 1e-6:
+            raise RuntimeError(f"channel BOM {key} column width did not persist")
+    for row in range(rows):
+        table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("channel BOM rebuild failed")
+    settled = _bom_cells(table)
+    for stem, (row_index, *_rest) in actual.items():
+        for key, text in (("part", BOM_PART_NUMBERS[stem]), ("sku", BOM_SKUS[stem])):
+            applied = settled[row_index][widths[key]]
+            if applied != text:
+                raise RuntimeError(
+                    f"channel BOM {key} for {stem!r} reads {applied!r}, expected {text!r}"
+                )
+    return tuple((stem, actual[stem][1]) for stem in BOM_COMPONENTS)
+
+
+def _place_assembled_sheet(adapter: Any) -> None:
+    _activate_sheet(adapter, SHEET_NAMES[0])
+    for orientation, center in (
+        ("*Front", FRONT_CENTER),
+        ("*Right", RIGHT_CENTER),
+        ("*Isometric", ISO_CENTER),
+    ):
+        view = place_view(adapter, str(SOURCE), orientation, *center, scale=SHEET_SCALE)
+        # The isometric is the drawing's full-detail view.
+        role = ViewRole.FULL_DETAIL if orientation == "*Isometric" else ViewRole.PLAIN
+        configuration = apply_view_configuration(
+            adapter, view, role=role, label=f"channel {orientation}"
+        )
+        set_view_exploded_state(
+            adapter,
+            view,
+            False,
+            configuration=configuration,
+            label=f"channel {orientation}",
+        )
+        _assert_view_on_sheet(view, label=f"channel {orientation}")
+    assert_full_detail_view(adapter, label="channel assembly")
+    _add_note_block(
+        adapter,
+        SHEET_NAMES[0],
+        ASSEMBLED_CAPTION,
+        ASSEMBLED_CAPTION_XY,
+        label="assembled-views caption",
+    )
+
+
+def _place_exploded_sheet(
+    adapter: Any, north_instances: dict[str, str]
+) -> Callable[[], None]:
+    """The exploded isometric, its BOM (with vendor SKU) and one balloon per
+    BOM row on the family's north-most instance; returns the check that proves
+    every balloon again after the last rebuild."""
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    exploded = place_view(
+        adapter, str(SOURCE), "*Isometric", *EXPLODED_ISO_CENTER, scale=SHEET_SCALE
+    )
+    set_high_quality_shaded_with_edges(adapter, exploded, label="channel exploded")
+    # Configuration, then its own explode, then the BOM and balloons bind.
+    configuration = apply_view_configuration(
+        adapter, exploded, label="channel exploded"
+    )
+    set_view_exploded_state(
+        adapter, exploded, True, configuration=configuration, label="channel exploded"
+    )
+    _center_view_outline(
+        adapter, exploded, EXPLODED_ISO_CENTER, label="channel exploded"
+    )
+    _assert_view_on_sheet(exploded, margin=BALLOON_MARGIN, label="channel exploded")
+    table = insert_bom_table(
+        adapter,
+        exploded,
+        anchor_xy=BOM_ANCHOR,
+        expected_components=BOM_COMPONENTS,
+        descriptions=BOM_DESCRIPTIONS,
+        identity_aliases=BOM_IDENTITY_ALIASES,
+        configuration_grouping="same-part",
+        label="channel",
+    )
+    items = _validate_bom(adapter, table)
+    landings = add_component_bom_balloons(
+        adapter,
+        exploded,
+        items=items,
+        anchors={
+            stem: BalloonAnchor(instance=north_instances[stem])
+            for stem in BOM_COMPONENTS
+        },
+        label="channel exploded-view BOM coverage",
+        margin=BALLOON_MARGIN,
+    )
+    if len(landings) != len(BOM_COMPONENTS):
+        raise RuntimeError(
+            f"channel exploded view carries {len(landings)} balloons, "
+            f"expected one per BOM row ({len(BOM_COMPONENTS)})"
+        )
+    _add_note_block(
+        adapter,
+        SHEET_NAMES[1],
+        EXPLODED_CAPTION,
+        EXPLODED_CAPTION_XY,
+        label="exploded-view caption",
+    )
+    return lambda: assert_balloon_landings(adapter, landings)
+
+
+def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
+    name = view_name(adapter, view)
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate the {label} {name!r}")
+    adapter.currentModel.ClearSelection2(True)
+    return name
+
+
+def _placed_bank_view(adapter: Any, bank: BankView) -> Any:
+    """``bank`` uncropped: a *Right model view at its scale, moved so its
+    model centre lands on ``bank.centre``, isolated to its families."""
+    view = _early_bound(
+        place_view(adapter, str(SOURCE), "*Right", *bank.centre, scale=bank.scale),
+        "IView",
+    )
+    label = f"{bank.title} centre"
+    configuration = apply_view_configuration(
+        adapter, view, role=ViewRole.PLAIN, label=bank.title
+    )
+    set_view_exploded_state(
+        adapter, view, False, configuration=configuration, label=bank.title
+    )
+    centre = model_point_in_view(adapter, view, bank.model_centre_m, label=label)
+    position = tuple(float(value) for value in view.Position)
+    target = [position[axis] + bank.centre[axis] - centre[axis] for axis in range(2)]
+    if not view.SetViewPosition(double_array(target), False):
+        raise RuntimeError(f"failed to move {bank.title} onto its spot")
+    adapter.currentModel.EditRebuild3()
+    centre = model_point_in_view(adapter, view, bank.model_centre_m, label=label)
+    if max(abs(a - b) for a, b in zip(centre, bank.centre)) > VIEW_POSITION_TOL_M:
+        raise RuntimeError(
+            f"{bank.title} centre sits at {centre!r}, not {bank.centre!r}"
+        )
+    set_hidden_lines_removed(adapter, view)
+    isolate_drawing_view_components(
+        adapter, view, visible_stems=bank.stems, label=bank.title
+    )
+    return view
+
+
+def _crop(adapter: Any, view: Any, bank: BankView) -> None:
+    """Crop ``view`` to the circle round ``bank.centre``: sketch the circle in
+    the active view's own sketch and Crop2 while it is still selected (the
+    draw_mg_magnifier_assembly detail)."""
+    if bank.crop_radius_mm is None:
+        raise ValueError(f"{bank.title} has no crop circle")
+    view = _early_bound(view, "IView")
+    _activate_view(adapter, view, label=bank.title)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (
+        bank.centre,
+        (bank.centre[0] + bank.crop_radius_mm * bank.mm, bank.centre[1]),
+    ):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = False
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous
+    if circle is None:
+        raise RuntimeError(f"failed to sketch the {bank.title} crop circle")
+    status = int(view.Crop2(False, False, 1))
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+    view.UpdateViewDisplayGeometry()
+    cropped = bool(view.IsCropped())
+    _telemetry.info(
+        f"channel: {bank.title} Crop2 status {status}, IsCropped {cropped}",
+        crop_status=status,
+        cropped=cropped,
+    )
+    if status != CROP_NO_ERROR or not cropped:
+        raise RuntimeError(
+            f"{bank.title} is not cropped: Crop2 status {status}, IsCropped {cropped}"
+        )
+
+
+def _dimensioned_bank(
+    adapter: Any, bank: BankView, keep: dict[str, tuple[float, float]]
+) -> list[Any]:
+    """Place ``bank``, show the settings chain in it, import ``keep``, crop it
+    if it is a detail, prove the kept dimensions survived, and label it."""
+    view = _placed_bank_view(adapter, bank)
+    _show_base_view_sketches(adapter, view, (asm.FEATURE,), label=bank.title)
+    annotations = curate_view_dimensions(
+        adapter,
+        view,
+        keep=keep,
+        view_label=bank.title,
+        dimensions_by_feature=asm.DRAWING_DIMENSIONS,
+    )
+    if bank.crop_radius_mm is not None:
+        _crop(adapter, view, bank)
+        kept = {
+            dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+            for annotation in (_early_bound(view, "IView").GetAnnotations() or ())
+        }
+        lost = sorted(set(keep) - kept)
+        if lost:
+            raise RuntimeError(
+                f"{bank.title} lost {lost} to its crop; kept {sorted(kept)}"
+            )
+        x0, y0 = (
+            bank.centre[0] - 0.016,
+            bank.centre[1] - bank.crop_radius_mm * bank.mm - 0.004,
+        )
+    else:
+        _assert_view_on_sheet(view, label=bank.title)
+        x0, y0 = (
+            bank.centre[0] - 0.016,
+            _view_outline(view, label=bank.title)[1] - 0.004,
+        )
+    _activate_view(adapter, view, label=bank.title)
+    if add_note(adapter, bank.label_text, x0, y0) is None:
+        raise RuntimeError(f"failed to label {bank.title}")
+    return annotations
+
+
+def _displays(adapter: Any, annotations: list[Any]) -> dict[str, Any]:
+    return {
+        dimension_name(adapter, annotation): _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        for annotation in annotations
+    }
+
+
+def _assert_settings(displays: dict[str, Any]) -> None:
+    """Bands, reference state and callouts read back as the spec states them."""
+    for name, display in displays.items():
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        reference = (
+            str(display.GetText(REFERENCE_PREFIX_PART) or ""),
+            str(display.GetText(REFERENCE_SUFFIX_PART) or ""),
+        ) == ("(", ")")
+        if name in asm.REFERENCE_DIMENSIONS:
+            if not reference:
+                raise RuntimeError(f"{name}: not shown as a reference")
+        else:
+            lower, upper = asm.DIMENSION_TOLERANCES[name]
+            if (
+                reference
+                or abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-9
+                or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-9
+                or int(display.GetPrimaryTolPrecision2()) != asm.TOLERANCE_PRECISION
+            ):
+                raise RuntimeError(
+                    f"{name}: band is not {asm.DIMENSION_TOLERANCES[name]}"
+                )
+        text = str(display.GetText(CALLOUT_TEXT_PART) or "").replace("\r\n", "\n")
+        if text != asm.DIMENSION_CALLOUTS[name]:
+            raise RuntimeError(f"{name}: callout reads {text!r}")
+
+
+def _place_labels(
+    adapter: Any, sheet: str, labels: tuple[tuple[str, tuple[float, float]], ...]
+) -> None:
+    for text, xy in labels:
+        _add_note_block(adapter, sheet, text, xy, label=f"{text} label")
+
+
+def _place_steps(adapter: Any, sheet: str, text: str, *, label: str) -> None:
+    _add_note_block(adapter, sheet, text, STEPS_XY, label=label)
+
+
+def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
+    """Sheets 3 and 4: the isolated banks with their settings, the steps."""
+    _activate_sheet(adapter, SHEET_NAMES[2])
+    annotations = _dimensioned_bank(adapter, ROCKER_BANK, STACK_KEEP)
+    annotations += _dimensioned_bank(adapter, SOUTH_END, SPRING_KEEP)
+    _place_labels(adapter, SHEET_NAMES[2], ROCKER_END_LABELS)
+    _place_steps(adapter, SHEET_NAMES[2], FITUP_NOTES[0], label="rocker-bank steps")
+
+    _activate_sheet(adapter, SHEET_NAMES[3])
+    annotations += _dimensioned_bank(adapter, LEVER_BANK, LUG_KEEP)
+    _place_labels(adapter, SHEET_NAMES[3], LEVER_END_LABELS)
+    _place_steps(adapter, SHEET_NAMES[3], FITUP_NOTES[1], label="lever-bank steps")
+
+    for name, text in asm.DIMENSION_CALLOUTS.items():
+        set_dimension_callouts(adapter, annotations, {name: text}, location="above")
+    displays = _displays(adapter, annotations)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in asm.REFERENCE_DIMENSIONS:
+            set_reference_dimension(adapter, annotation, label=f"channel {name}")
+    if sorted(displays) != sorted(asm.DRAWING_DIMENSIONS[asm.FEATURE]):
+        raise RuntimeError(f"fit-up views imported {sorted(displays)}")
+    assert_imported_precision(
+        adapter, annotations, dict(asm.DRAWING_PRECISION[asm.FEATURE])
+    )
+    _assert_settings(displays)
+    return lambda: _assert_settings(displays)
+
+
+def _create_sheets(adapter: Any) -> None:
+    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="channel package")
+    for name in SHEET_NAMES:
+        sheet = _activate_sheet(adapter, name)
+        numerator, denominator = SHEET_SCALES[name]
+        if not sheet.SetScale(float(numerator), float(denominator), False, False):
+            raise RuntimeError(f"failed to set channel sheet scale: {name}")
 
 
 @_telemetry.traced("drawing.channel_assembly")
@@ -254,8 +1146,9 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 
     check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
+    source_model = _early_bound(adapter.currentModel, "IModelDoc2")
     read_required_properties(
-        adapter.currentModel,
+        source_model,
         (
             "Number",
             "Revision",
@@ -272,25 +1165,27 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
         ),
     )
-    _model, sheet = new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
-    for view_name, center in (
-        ("*Front", FRONT_CENTER),
-        ("*Right", RIGHT_CENTER),
-        ("*Isometric", ISO_CENTER),
-    ):
-        view = place_view(adapter, str(SOURCE), view_name, *center, scale=SHEET_SCALE)
-        # The isometric is the drawing's full-detail view.
-        role = ViewRole.FULL_DETAIL if view_name == "*Isometric" else ViewRole.PLAIN
-        apply_view_configuration(adapter, view, role=role, label=f"channel {view_name}")
-    assert_full_detail_view(adapter, label="channel assembly")
-    _place_fitup_steps(adapter, sheet)
+    north_instances = _validate_source(source_model)
+
+    _create_sheets(adapter)
+    _place_assembled_sheet(adapter)
+    balloons_settled = _place_exploded_sheet(adapter, north_instances)
+    settings_settled = _place_fitup_sheets(adapter)
+
+    def settled() -> None:
+        balloons_settled()
+        settings_settled()
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         layout=SPEC.layout,
-        pdf_title="Channel Assembly Drawing",
+        pdf_title="Channel Assembly Drawing Package",
         scale=SHEET_SCALE,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts=SHEET_LAYOUTS,
+        sheet_scales=SHEET_SCALES,
+        settled_checks=(settled,),
     )
 
 
