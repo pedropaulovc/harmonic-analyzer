@@ -19,7 +19,12 @@ from __future__ import annotations
 
 import math
 
-LOOP_R = 2.0  # mean loop radius (O5 eye, photo-scaled, low)
+from _printed_tolerance import printed_deviations
+
+# Mean loop radius (an O5.3 eye, photo-scaled, low): the Ø3.3 inside diameter
+# is the least one-place size whose title-block lower limit still admits the
+# keeper chain's bead (vn_keeper_chain_spec asserts the air).
+LOOP_R = 2.15
 WIRE_DIA = 1.0  # brass wire (low)
 TAIL_LEN = 4.0  # straight tail from the loop's tangent point to under the screw head
 # Air the drive train leaves between the tail wire and the arm face, the screw
@@ -27,5 +32,13 @@ TAIL_LEN = 4.0  # straight tail from the loop's tangent point to under the screw
 ANCHOR_AIR = 0.02
 
 LOOP_INNER_R = LOOP_R - WIRE_DIA / 2.0
+# The loop's inside diameter prints at the title block's one place on the
+# eye's sheet: an accepted loop lies anywhere in these limits.
+LOOP_ID = 2.0 * LOOP_INNER_R
+LOOP_ID_PLACES = 1
+LOOP_ID_MIN, LOOP_ID_MAX = (
+    round(LOOP_ID + deviation, 12)
+    for deviation in printed_deviations(LOOP_ID, LOOP_ID_PLACES)
+)
 V_LOOP = 2.0 * math.pi**2 * LOOP_R * (WIRE_DIA / 2.0) ** 2
 V_TAIL = math.pi * (WIRE_DIA / 2.0) ** 2 * TAIL_LEN

@@ -90,8 +90,10 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
     import pytest
 
     # The round ring's wire arc, centred in the straight cross-hole, keeps air
-    # to the hole wall across the whole pin section.
+    # to the hole wall across the whole pin section, at nominal and with the
+    # smallest printed ring through the fattest printed pin section.
     assert ring.HOLE_AIR >= ring.RING_HOLE_AIR
+    assert ring.HOLE_AIR_WORST >= ring.RING_HOLE_AIR
     # The side web is a named exception (under the 2.0 target): at the printed
     # worst case it holds the 1.5 floor, and the sheet states that value.
     worst_web = (
@@ -104,9 +106,9 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
     # of the printed bands (.XX station, DRILLED HOLES +0.10).
     ligament = dt_crank_pin_spec.RING_HOLE_X - 0.51 - (dt_crank_pin_spec.RING_HOLE_DIA + 0.10) / 2.0
     assert ligament >= 2.0
-    # It hangs clear of the pin: the ring's inside edge below the pin surface.
+    # It reaches clear of the pin: the ring's inside edge past the pin surface.
     pin_radius = ring.PIN_DIA_AT_HOLE / 2.0
-    assert ring.RING_BOTTOM_X - ring.WIRE_DIA / 2.0 - pin_radius >= 3.0
+    assert ring.RING_FAR_X - ring.WIRE_DIA / 2.0 - pin_radius >= 3.0
     assert ring.PIN_PROUD == pytest.approx(
         dt_crank_pin_spec.RING_HOLE_X + ring.WIRE_DIA / 2.0 + ring.HUB_CLEARANCE
     )
