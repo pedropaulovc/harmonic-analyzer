@@ -178,12 +178,13 @@ def test_view_arrow_names_the_removed_right_view_from_the_notes_letter() -> None
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
     notes = ch_rocker_arm_notes.DRAWING_NOTES
     flat = " ".join(line.strip() for line in notes.splitlines())
-    # One common nominal centre on the mirror plane through physical A.
-    assert re.search(r"ARC\s+CENTRES? ON IT", flat)
+    # One common nominal centre, directly above physical A; lands radial to it.
+    assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", flat)
     assert "R800" not in notes
     assert "R816" not in notes
-    # Processes and through conditions belong to the native size callouts.
-    assert "ROD-PIN HOLE, 1X" in notes
+    # Processes and through conditions belong to the native size callouts; the
+    # views name datum C, so no note explains it (rule 7, main-r1 Opus).
+    assert "ROD-PIN HOLE" not in notes and "DATUM C" not in notes
     assert "#47" not in notes
     assert "PIVOT HOLE: REAM" not in notes
     assert "16.00 REF" not in notes
@@ -208,20 +209,17 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "ROD-PIN SETS CONNECTING-ROD GEOMETRY." not in notes
     # Option 4: datum C is the rod-pin hole; the old note 5 (C on the land) is gone.
     assert "STRAP END LAND" not in notes and "DEFINED BY NOTE 1" not in notes
-    assert "MIRROR PLANE:" not in notes
-    assert "1. MIRROR PLANE THROUGH A, PERPENDICULAR TO B," in flat
-    assert (
-        "1. MIRROR PLANE THROUGH A, PERPENDICULAR TO B, CLOCKED BY DATUM C "
-        "(ROD-PIN HOLE, 1X); ARC CENTRES ON IT, LANDS RADIAL, ENDS MIRROR."
-        in flat
-    )
+    # Both ends are dimensioned on the views (J LAND row, 2X 5.59), not
+    # mirrored by a note (rule 7, main-r1 Opus).
+    assert "MIRROR" not in notes
+    assert "1. ARC CENTRE DIRECTLY ABOVE A; TIP LANDS RADIAL TO IT." in flat
     # The lands' 10.46° is derived (radial to the arc centre), never a note number.
     assert "°" not in notes
     assert "NORMAL TO LENGTH" not in notes and "NOMINAL MIRROR PLANE" not in notes
     # Named-exception wall and the mate that caps the OD.
     assert f"2. {ch_rocker_arm_notes.HUB_WALL_NOTE}; OD CLEARS MHA-CH-001 FOOT CHEEKS." in notes
     assert _notes_fit_left_of_the_title_block(notes)
-    assert len(notes.splitlines()) == 3
+    assert len(notes.splitlines()) == 2
     # The hub OD's coaxiality is its native position frame in detail D
     # (regate-r1 #2), not a tolerance in a note.
     assert "COAXIAL" not in notes and "WITHIN" not in notes and "Ø" not in notes
@@ -2701,6 +2699,9 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
     assert displays["HubDia"].precision == 2
     assert pivot.band == tuple(v / 1000.0 for v in ch_rocker_arm_spec.PIVOT_HOLE_BAND)
     assert pivot.model.GetToleranceType() == 4
+    # Both tip lands ride the one BASIC 5.59 (main-r1: no mirror note).
+    assert displays["RodTipLen"].text[1] == ch_rocker_arm_notes.TIP_LAND_PREFIX == "2X "
+    assert displays["RodTipLen"].model.GetToleranceType() == 1
     assert pivot.ShowDimensionValue is True
     # The ream band reads as clearance on its named mate (MR #1020).
     assert (pivot.text[3], pivot.text[4]) == ("<native-upper>", ch_rocker_arm_notes.PIVOT_FIT_CALLOUT)
@@ -2784,7 +2785,7 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
         entities = kwargs["entities"]
         if label == "rocker overall width":
             value_mm = abs(vertex_points[entities[1]][0] - vertex_points[entities[0]][0])
-        elif label in {"taper intersection X", "left taper intersection X", "tip land X location"}:
+        elif label in {"taper intersection X", "left taper intersection X", "tip land X location", "left tip land X location"}:
             value_mm = abs(vertex_points[entities[1]][0])
         else:
             pytest.fail(f"unowned native dimension {label}")
@@ -2848,11 +2849,12 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
         "taper intersection X": ch_rocker_arm_spec.BOT_END_X / 1000.0,
         "left taper intersection X": ch_rocker_arm_spec.BOT_END_X / 1000.0,
         "tip land X location": ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
+        "left tip land X location": ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
     }
     assert {
         label: display.model.SystemValue for label, display in state.displays.items()
     } == pytest.approx(expected)
-    width, taper, left_taper, land = state.calls
+    width, taper, left_taper, land, left_land = state.calls
     assert width["entity_types"] == ("VERTEX", "VERTEX")
     assert "entity_type" not in width
     assert taper["entity_types"] == ("EDGE", "VERTEX")
@@ -2880,6 +2882,19 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
     assert locator.text[4] == drawing.LAND_LABEL == "LAND"
     assert locator.writes[-2:] == [(4, ""), (4, "LAND")]
     assert locator.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
+    # The J land's mirrored BASIC LAND row from the same centred A (main-r1).
+    assert left_land["orientation"] == "horizontal"
+    assert left_land["text_xy"] == drawing.LEFT_LAND_LOCATION_TEXT_XY == (0.141, 0.242)
+    assert left_land["entity_types"] == ("EDGE", "VERTEX")
+    assert left_land["entities"] == (taper["entities"][0], width["entities"][0])
+    assert left_land["p0"] == taper["p0"] and left_land["p1"] == width["p0"]
+    assert 2.0 * drawing.FRONT_CENTER[0] - drawing.LEFT_LAND_LOCATION_TEXT_XY[0] == pytest.approx(drawing.LAND_LOCATION_TEXT_XY[0])
+    left_locator = state.displays["left tip land X location"]
+    assert left_locator.arc_conditions[1] == 1
+    assert left_locator.model.GetToleranceType() == 1
+    assert left_locator.text[1] == left_locator.text[2] == ""
+    assert left_locator.writes[-2:] == [(4, ""), (4, "LAND")]
+    assert left_locator.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
     width_display = state.displays["rocker overall width"]
     assert (width_display.text[1], width_display.text[2]) == ("(", ")")
     assert width_display.model.GetToleranceType() == 0
@@ -2895,7 +2910,7 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
 
 @pytest.mark.parametrize("label", [
     "rocker overall width", "taper intersection X", "left taper intersection X",
-    "tip land X location",
+    "tip land X location", "left tip land X location",
 ])
 @pytest.mark.parametrize("defect", ["creation", "wrong", "missing", "nan", "inf", "attachment"])
 def test_each_new_outline_measurement_fails_closed(native_front, label, defect) -> None:
@@ -2907,6 +2922,7 @@ def test_each_new_outline_measurement_fails_closed(native_front, label, defect) 
 
 @pytest.mark.parametrize("label", [
     "taper intersection X", "left taper intersection X", "tip land X location",
+    "left tip land X location",
 ])
 @pytest.mark.parametrize("defect", ["uncentred", "basic", "text", "cap"])
 def test_land_locator_rejects_ignored_native_setters(native_front, label, defect):
@@ -4877,11 +4893,12 @@ def test_details_keep_native_scale_source_census_and_unclipped_overall_contract(
             if isinstance(node, ast.Assign)
             and any(isinstance(target, ast.Attribute) and target.attr == "MaxWitnessLineLength"
                     for target in node.targets)]
-    assert len(caps) == 3
+    assert len(caps) == 4
     assert [ast.unparse(cap.targets[0]) for cap in caps] == [
         "taper_dimension.MaxWitnessLineLength",
         "left_taper_dimension.MaxWitnessLineLength",
         "land_dimension.MaxWitnessLineLength",
+        "left_land_dimension.MaxWitnessLineLength",
     ]
     assert all(ast.unparse(cap.value) == "TAPER_WITNESS_LENGTH" for cap in caps)  # Overall remains full-length.
     assert not hasattr(drawing, "OVERALL_WITNESS_LENGTH")
@@ -8338,7 +8355,7 @@ def test_r24_5_point_59_observed_sp4_true_true_one_mm_gap_has_real_visible_corne
     assert case.annotation.attached == before
     assert case.model.SystemValue == drawing.TIP_FACE / 1000.0
     assert not hasattr(case.annotation.display, "SetWitnessLineGap")
-    assert drawing.END_KEEP == {"RodTipLen": (0.377, 0.130)}
+    assert drawing.END_KEEP == {"RodTipLen": (0.377, 0.128)}
 
 
 @pytest.mark.parametrize("gaps,use_doc", [
@@ -8751,9 +8768,9 @@ def test_r24_production_wires_all_native_local_guards_without_banned_fcf_setter_
         "_r24_arc_sweep", "_r24_arc_contains", "_r24_arc_intersections",
         "_r24_no_arc_crossings", "_r24_terminals",
     }.isdisjoint(definitions)
-    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 3
-    # Note 1 still carries the mirror plane's arc-centre statement.
-    assert re.search(r"ARC\s+CENTRES? ON IT", ch_rocker_arm_notes.DRAWING_NOTES)
+    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 2
+    # Note 1 still carries the arc centre the 1:2 view cannot reach.
+    assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", ch_rocker_arm_notes.DRAWING_NOTES)
     assert ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == 8.0
     assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": 40.0}
 
@@ -9069,18 +9086,14 @@ def test_r24_raw_native_text_metric_scalar_types_refuse_before_using_the_dump(r2
         drawing._r24_record(r24_tip.adapter, r24_tip.annotation, label="native text metrics")
 
 
-def test_option_four_notes_carry_no_angle_and_name_datum_c_as_the_rod_pin_hole():
+def test_option_four_notes_carry_no_angle_and_leave_datum_c_to_the_views():
     notes = ch_rocker_arm_notes.DRAWING_NOTES
     flat = " ".join(notes.split())
     # The 10.46° land angle is derived (lands radial to the arc centre), so no
-    # note carries a number for it; C clocks the plane from the rod-pin hole.
+    # note carries a number for it; datum C is named on the rod-pin frame.
     assert "°" not in notes and "BASIC TO DATUM" not in notes
-    assert flat.startswith(
-        "1. MIRROR PLANE THROUGH A, PERPENDICULAR TO B, CLOCKED BY DATUM C "
-        "(ROD-PIN HOLE, 1X);"
-    )
-    assert re.search(r"ARC CENTRES? ON IT", flat)
-    assert "LANDS RADIAL" in flat and "ENDS MIRROR." in flat
+    assert flat.startswith("1. ARC CENTRE DIRECTLY ABOVE A; TIP LANDS RADIAL TO IT.")
+    assert "DATUM C" not in notes and "ENDS MIRROR" not in notes
     # Both ends' locations from A are on the views: no 8.00 restatement, no
     # datum C land narration in the notes.
     assert "TOP ARC ABOVE A" not in notes

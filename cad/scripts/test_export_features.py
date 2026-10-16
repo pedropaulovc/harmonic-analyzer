@@ -313,11 +313,14 @@ def _assert_rocker_print_authority() -> None:
     suffix = eval(compile(ast.Expression(assignments["through_suffix"]), draw.__file__, "eval"), {}, {"suffix": ""})
     assert prefix.split()[0] == pivot["process"].upper(), "pivot process drifted from its native dimension text"
     assert pivot["thru"] and "THRU" in suffix, "hole end drifted from its native dimension text"
-    assert features["profile_outer"]["mirror_symmetric"] and "MIRROR PLANE THROUGH A" in rocker_notes.DRAWING_NOTES
+    # Both ends are dimensioned on the views (J and K LAND rows, both tapers,
+    # 2X 5.59): the symmetry is cited to those natives, not a mirror note.
+    assert features["profile_outer"]["mirror_symmetric"] and "MIRROR" not in rocker_notes.DRAWING_NOTES
     native_text = set(exporter._cite(draw, "_dress_detail_dimensions"))
     for field in ("process", "thru"):
         assert native_text <= set(pivot["cite"][field])
-    assert set(exporter._cite(rocker_notes, "DRAWING_NOTES")) <= set(features["profile_outer"]["cite"]["mirror_symmetric"])
+    for source in ("_add_rocker_outline_dimensions", "_dress_detail_dimensions"):
+        assert set(exporter._cite(draw, source)) <= set(features["profile_outer"]["cite"]["mirror_symmetric"])
 
 
 def test_rocker_requirements_match_their_current_printed_authorities() -> None:
@@ -372,8 +375,9 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
         assert not any("linear_" in citation for citation in citations)
         assert set(exporter._cite(rocker, "_ALPHA_TOP")) <= set(citations)
         assert set(exporter._cite(rocker_notes, "DRAWING_NOTES")) <= set(citations)
-    assert features["tip_land_pos_x"]["station"] == rocker.ROD_TIP_X
-    assert set(exporter._cite(importlib.import_module("draw_ch_rocker_arm"), "_add_rocker_outline_dimensions")) <= set(features["tip_land_pos_x"]["cite"]["station"])
+        # Each land's own BASIC LAND row from A (the J row, main-r1 Opus).
+        assert features[name]["station"] == rocker.ROD_TIP_X
+        assert set(exporter._cite(importlib.import_module("draw_ch_rocker_arm"), "_add_rocker_outline_dimensions")) <= set(features[name]["cite"]["station"])
     assert manifest["material"]["thickness"] == 2.5
     assert exporter._cite(rocker, "ARM_THICKNESS")[0] in manifest["material"]["cite"]
     # The strap's native 2.500 +/-0.025 (Main ruling 2026-10, option b).
@@ -391,7 +395,7 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
     features = exporter.requirement_manifest("ch_rocker_arm")["features"]
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
         # The land length is BASIC with no band of its own: a field, not a requirement.
-        assert features[name]["requirements"] == ["land_angle_deg"] + (["station"] if name == "tip_land_pos_x" else []) + ["surface_profile"]
+        assert features[name]["requirements"] == ["land_angle_deg", "station", "surface_profile"]
     assert features["profile_outer"]["requirements"] == ["bottom_radius", "mirror_symmetric", "surface_profile"]
     assert features["top_edge"]["requirements"] == ["height_above_pivot", "radius", "surface_profile"]
     assert not any("unknown" in fields.get("requirements", ()) for fields in features.values())
@@ -436,8 +440,7 @@ def test_rocker_profile_zones_export_the_printed_frames_and_govern_their_own_bas
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
         assert {field: features[name][field] for field in zone_fields} == lower
         assert features[name]["surface_profile_governs"]["land_angle_deg"] == {"tilt_across": draw.TIP_LAND_LEAST_MM}
-    assert features["tip_land_pos_x"]["surface_profile_governs"]["station"] == {"sense": "increases", "obliquity_deg": math.degrees(rocker._ALPHA_TOP)}
-    assert "station" not in features["tip_land_neg_x"]["surface_profile_governs"]
+        assert features[name]["surface_profile_governs"]["station"] == {"sense": "increases", "obliquity_deg": math.degrees(rocker._ALPHA_TOP)}
     assert features["top_edge"]["surface_profile_governs"] == {"radius": "decreases", "height_above_pivot": "increases"}
     assert features["profile_outer"]["surface_profile_governs"] == {"bottom_radius": "increases"}
 

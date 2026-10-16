@@ -74,6 +74,9 @@ DRAWING_PRECISION = {
 HUB_ROOT_R_BAND = (0.0, -HUB_ROOT_RADIUS_MAX)  # (upper, lower)
 HUB_ROOT_R_TOL_TYPE = 6  # swTolType_e.swTolMAX
 HUB_ROOT_PREFIX = "2X R"
+# Detail E's BASIC tip land counts both ends: the J land is the K land's
+# mirror, so its length rides this 2X rather than a mirror note.
+TIP_LAND_PREFIX = "2X "
 
 # Judge the minimum wall against the metric band the shop actually reads,
 # not the underlying 0.508 mm inch class: title_block.yaml prints ±0.51.
@@ -94,17 +97,16 @@ HUB_WALL_NOTE = f"HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f} MIN"
 # text in DRAWING_NOTES. None/absence means one_piece, never inferred permission.
 BUILT_UP_PERMISSION_NOTE = None
 
-# Three lines (drawing-guidelines rule 7; Opus #1020 r3 C3): note 1 reflows
-# to two full-width rows under the front view, left of the title block.
+# Two lines (drawing-guidelines rule 7; Opus #1020 r3 C3).
 DRAWING_NOTES = "\n".join(
     (
-        # B2-1, option 4: datum C is the rod-pin hole, so the same CAD mirror
-        # plane is the A|B|C frame's axis through A; the BASIC pin coordinates
-        # clock it. The tip lands' 10.46° is the arc half-angle: radial to the
-        # centre. Both ends' locations from A sit on the views; the 1X keeps
-        # the mirroring off the hole.
-        "1. MIRROR PLANE THROUGH A, PERPENDICULAR TO B, CLOCKED BY DATUM C",
-        "   (ROD-PIN HOLE, 1X); ARC CENTRES ON IT, LANDS RADIAL, ENDS MIRROR.",
+        # B2-1, option 4: datum C is the rod-pin hole and the BASIC pin
+        # coordinates clock the A|B|C frame, so "above A" is that frame's
+        # axis. The tip lands' 10.46° is the arc half-angle: radial to the
+        # centre, which the 1:2 view cannot draw (~808 mm off the sheet). Both
+        # ends' lands sit on the views (main-r1 Opus: the J LAND row and 2X
+        # 5.59), and the views name datum C, so no mirror or datum narration.
+        "1. ARC CENTRE DIRECTLY ABOVE A; TIP LANDS RADIAL TO IT.",
         # The OD ceiling is the amplitude bar's foot cheeks at d = 0
         # (ch_rocker_arm_spec); the hub OD's position frame to A in detail D
         # (HUB_COAXIALITY_DIA) holds the named-exception wall.

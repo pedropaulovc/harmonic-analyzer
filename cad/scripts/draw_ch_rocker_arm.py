@@ -310,7 +310,7 @@ _ROD_TIP_Y = TOP_END_Y - TIP_FACE * math.cos(_ALPHA_TOP)
 _BOT_END_Y = CENTER_Y - math.sqrt(R_BOTTOM**2 - BOT_END_X**2)
 
 # Full witnesses connect the overall row to the actual physical tips. The
-# overall row and the A-to-land row sit above the top-edge profile frame (top
+# overall row and both A-to-land rows sit above the top-edge profile frame (top
 # 0.211); the left taper vertex gets its own row from A, under the left half,
 # below the R800/R816 texts.
 OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.221)
@@ -321,6 +321,9 @@ OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.221)
 TAPER_INTERSECTION_TEXT_XY = (0.219, 0.137)
 LEFT_TAPER_TEXT_XY = (0.127, 0.142)
 LAND_LOCATION_TEXT_XY = (0.219, 0.242)
+# The J land's row mirrors the K land's about A (FRONT_CENTER x 0.180): both
+# ends are dimensioned on the view, not left to a mirror note (main-r1 Opus).
+LEFT_LAND_LOCATION_TEXT_XY = (0.141, 0.242)
 PIN_X_TEXT_XY = (0.219, 0.197)
 # Its dimension line runs at the text's x, right of the view-F letter.
 PIN_Y_TEXT_XY = (0.2715, 0.162)
@@ -420,7 +423,7 @@ def _profile_zone(frame: str, governs: dict[str, Any], governs_sources: tuple[An
 # its own BASICs; no requirement is read through two zones.
 for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x", -1, _TIPS[0])):
     requirement(
-        _name, kind="face", faces=(_face,), requirements=("land_angle_deg",) + (("station",) if _sign == 1 else ()) + ("surface_profile",), fields={
+        _name, kind="face", faces=(_face,), requirements=("land_angle_deg", "station", "surface_profile"), fields={
             # BASIC with no acceptance of its own: the J↔K zone bounds the land.
             "tip_land": (rocker.TIP_FACE, ("TIP_FACE", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
             "land_angle_deg": (round(_LAND_ANGLE, _P), ("_ALPHA_TOP", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
@@ -428,18 +431,17 @@ for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x",
             "dimension_type": ("basic", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
             "radial_tip_end": ([_sign * _TIP[0], _TIP[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
             "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
-            **({
-                "station": (rocker.ROD_TIP_X, ("ROD_TIP_X", ("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"))),
-                "station_nominal": (rocker.ROD_TIP_X, ("ROD_TIP_X",)),
-            } if _sign == 1 else {}),
+            # Each land's own BASIC LAND row from A (the J row, main-r1 Opus).
+            "station": (rocker.ROD_TIP_X, ("ROD_TIP_X", ("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"))),
+            "station_nominal": (rocker.ROD_TIP_X, ("ROD_TIP_X",)),
             # The land angle is read across the shortest land the zones allow.
             # The station is read along X, off the land's normal by the land
             # angle; material added on the land moves it outward.
             **_profile_zone("BottomRadius", {
                 "land_angle_deg": {"tilt_across": TIP_LAND_LEAST_MM},
-                **({"station": {"sense": "increases", "obliquity_deg": _LAND_ANGLE}} if _sign == 1 else {}),
+                "station": {"sense": "increases", "obliquity_deg": _LAND_ANGLE},
             }, (("draw_ch_rocker_arm", "TIP_LAND_LEAST_MM"), ("draw_ch_rocker_arm", "_least_tip_land_mm"), "_ALPHA_TOP")),
-        }, precision={"tip_land": _P, "land_angle_deg": _P, **({"station": _P} if _sign == 1 else {})},
+        }, precision={"tip_land": _P, "land_angle_deg": _P, "station": _P},
     )
 
 part_metadata(datums={
@@ -1896,7 +1898,7 @@ PROFILE_OUTER = requirement(
         **_profile_zone("BottomRadius", {"bottom_radius": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)), "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
         "bottom_arc_len": (rocker.BOT_ARC_LEN, ("BOT_ARC_LEN",)),
-        "mirror_symmetric": (True, (("ch_rocker_arm_notes", "DRAWING_NOTES"),)), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH",)),
+        "mirror_symmetric": (True, (("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"), ("draw_ch_rocker_arm", "_dress_detail_dimensions"))), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH",)),
         "bottom_end": (list(_BOTTOM), ("BOT_END_X", "R_BOTTOM", "CENTER_Y")),
         "radial_tip_end": (list(_TIP), ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
     }, precision={"bottom_radius": _P},
@@ -1921,7 +1923,10 @@ HUB_KEEP = {
     "PivotDia": (0.120, 0.086),
     "HubDia": (0.212, 0.108),
 }
-END_KEEP = {"RodTipLen": (0.377, 0.130)}
+# The 2X 5.59 box sits between its own witnesses: the upper one passes its
+# top-left corner (0.05 mm at the plain 5.59, main-r1 PDF), so the widened
+# text is requested 2 mm lower, centred in the 124.0-133.4 mm clear band.
+END_KEEP = {"RodTipLen": (0.377, 0.128)}
 # View F at 3:1 (RIGHT_CENTER; strap faces x 0.0713/0.0788, hub ends
 # 0.0644/0.0856, part y 0.151-0.239, hub y 0.160-0.190). Native centres each
 # value-plus-three-row block on its request and runs the dimension line under
@@ -2073,6 +2078,11 @@ def _dress_detail_dimensions(
         if name == "RodTipLen":
             # The land runs inside the J↔K profile: BASIC, the zone is its band.
             set_basic_dimension(adapter, display, label="tip land length")
+            # Both tip lands are this BASIC: the J land is counted here, not
+            # left to a mirror note (main-r1 Opus).
+            display.SetText(1, rocker_notes.TIP_LAND_PREFIX)
+            if str(display.GetText(1) or "") != rocker_notes.TIP_LAND_PREFIX:
+                raise RuntimeError("tip land length lost its 2X count")
             continue
         # Single exterior arrows, not diametral lines through both concentric
         # circles: otherwise the new hub OD and pivot bore leaders intersect.
@@ -2247,6 +2257,29 @@ def _add_rocker_outline_dimensions(
     if (not _native_finite_scalar(land_dimension.MaxWitnessLineLength)
             or abs(land_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
         raise RuntimeError("tip land X location retained full-height witnesses")
+    # The J land's own BASIC row from A: the K land's mirror, on the view.
+    left_land_entities = (pivot, vertices[0])
+    left_land_dimension = add_edge_dimension(
+        adapter, front, p0=pivot_xy, p1=width_xy[0],
+        text_xy=LEFT_LAND_LOCATION_TEXT_XY, label="left tip land X location",
+        orientation="horizontal", entities=left_land_entities, entity_types=("EDGE", "VERTEX"),
+    )
+    set_arc_endpoints_to_center(adapter, left_land_dimension, label="left tip land X location")
+    left_land_dimension = _early_bound(left_land_dimension, "IDisplayDimension")
+    if _early_bound(left_land_dimension.GetDimension2(0), "IDimension").GetArcEndCondition(1) != 1:
+        raise RuntimeError("left tip land X location: physical A endpoint must be centred")
+    assert_dimension_measures(
+        adapter, left_land_dimension, expected_mm=ROD_TIP_X, label="left tip land X location",
+        entities=left_land_entities, entity_types=("EDGE", "VERTEX"),
+    )
+    set_basic_dimension(adapter, left_land_dimension, label="left tip land X location")
+    left_land_dimension.SetText(4, LAND_LABEL)
+    if str(left_land_dimension.GetText(4) or "") != LAND_LABEL:
+        raise RuntimeError("left tip land X location: native label did not persist")
+    left_land_dimension.MaxWitnessLineLength = TAPER_WITNESS_LENGTH
+    if (not _native_finite_scalar(left_land_dimension.MaxWitnessLineLength)
+            or abs(left_land_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
+        raise RuntimeError("left tip land X location retained full-height witnesses")
     return annotations, taper_dimension, (pivot, taper), land_dimension, land_entities
 
 
@@ -2287,7 +2320,7 @@ def _add_pin_coordinates(adapter: Any, front: Any) -> None:
 def _require_land_location(
     adapter: Any, views: Any, dimension: Any, entities: tuple[Any, Any],
 ) -> None:
-    """Recheck the sole front-view BASIC locator after the final rebuild."""
+    """Recheck the K land's front-view BASIC locator after the final rebuild."""
     display = _early_bound(dimension, "IDisplayDimension")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     name = dimension_name(adapter, annotation)
