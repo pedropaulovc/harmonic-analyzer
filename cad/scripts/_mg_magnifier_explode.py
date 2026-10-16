@@ -27,6 +27,7 @@ from mg_magnifier_explode_spec import (
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
     Instance,
+    exploded_view_name,
     plan_explode,
 )
 
@@ -49,18 +50,6 @@ def _presentation_transform(component: Any) -> tuple[float, ...]:
             f"{component.Name2}: invalid presentation transform {values!r}"
         )
     return values
-
-
-def exploded_view_name(configuration: str) -> str:
-    """The named explode ``configuration`` owns: exploded-view names are unique
-    per document, so ``Default Simplified``'s copy carries the suffix too."""
-    if configuration == SOURCE_CONFIGURATION:
-        return EXPLODED_VIEW_NAME
-    if configuration == simplified_name(SOURCE_CONFIGURATION):
-        return simplified_name(EXPLODED_VIEW_NAME)
-    raise ValueError(
-        f"{EXPLODED_VIEW_NAME}: no explode is authored in {configuration!r}"
-    )
 
 
 def _global_directions(adapter: Any, assembly: Any) -> dict[str, _Direction]:
