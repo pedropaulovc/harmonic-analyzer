@@ -50,6 +50,7 @@ from ch_anchor_jam_nut_spec import (
     DRAWING_PRECISION,
     OD,
     OD_CALLOUT,
+    OD_WALL_CALLOUT,
     SLOT_CALLOUT,
     TAP_DRILL_DIA,
     THICKNESS,
@@ -101,7 +102,13 @@ FRONT_KEEP = {
     "SlotWidth": (FRONT_CENTER[0] - _HALF_OD - 0.012, FRONT_CENTER[1] - 0.012),
 }
 RIGHT_KEEP = {
-    "NutThickness": (RIGHT_CENTER[0], RIGHT_CENTER[1] - _HALF_OD - 0.018),
+    # Hung right of the side view, arrows in from outside: its
+    # engagement line is wider than the 18 mm between the extension lines,
+    # which ran through it when centred (review r8).
+    "NutThickness": (
+        RIGHT_CENTER[0] + _HALF_T + 0.042,
+        RIGHT_CENTER[1] - _HALF_OD - 0.018,
+    ),
     # Left of the driven face, arrows in from outside (farm r7: centred over
     # the 5 mm notch, the floor's extension line ran through the value).
     "SlotDepth": (
@@ -109,18 +116,19 @@ RIGHT_KEEP = {
         RIGHT_CENTER[1] + _HALF_OD + 0.018,
     ),
 }
-# Far enough right that the O.D.'s callout, centred under its value, clears
+# Far enough right that the O.D.'s callouts, centred on its value, clear
 # the side view.
-OD_ON_SIDE = (RIGHT_CENTER[0] + _HALF_T + 0.040, RIGHT_CENTER[1])
+OD_ON_SIDE = (RIGHT_CENTER[0] + _HALF_T + 0.045, RIGHT_CENTER[1])
 THREAD_CALLOUT_XY = (FRONT_CENTER[0] + _HALF_OD + 0.012, FRONT_CENTER[1] + 0.035)
-# Rule 12 (hole and slot callouts say what to do): the drive cut is sawn.
-# Rule 4: the O.D.'s tight band names its function; rule 20: the thin nut's
+# Rule 12 (hole and slot callouts say what to do); rule 4: the O.D.'s tight
+# band names what bounds it on both sides; rule 20: the thin nut's
 # engagement is stated as a fact on its thickness.
 DIMENSION_CALLOUTS = {
     "SlotWidth": SLOT_CALLOUT,
     "NutOd": OD_CALLOUT,
     "NutThickness": THICKNESS_CALLOUT,
 }
+DIMENSION_CALLOUTS_ABOVE = {"NutOd": OD_WALL_CALLOUT}
 
 
 def _assert_native_thread(display: Any) -> None:
@@ -207,6 +215,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the jam nut face view")

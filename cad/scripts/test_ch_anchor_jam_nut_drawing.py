@@ -148,13 +148,16 @@ def test_analytic_volume() -> None:
 def test_callouts_and_no_notes() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
     assert drawing.DIMENSION_CALLOUTS == {
-        "SlotWidth": "SAW ACROSS",
+        "SlotWidth": "SLOT THRU ACROSS",
         "NutOd": spec.OD_CALLOUT,
         "NutThickness": spec.THICKNESS_CALLOUT,
     }
     # The thin nut's engagement shortfall is printed as a plain fact.
     assert spec.ENGAGEMENT_MIN < 1.5 * spec.THREAD_MAJOR
     assert spec.THICKNESS_CALLOUT == "ENGAGEMENT 1.9 MIN (0.5D)"
+    # The O.D.'s .XXX band is bounded by the wall as well as the neighbour.
+    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"NutOd": "WALL 1.5 MIN"}
+    assert spec.MIN_WALL <= spec.WALL_WORST
     text = Path(drawing.__file__).read_text(encoding="utf-8").upper()
     for banned in ("LOCTITE", "THREADLOCK", "NYLON", "EXCEPTION", "RULING"):
         assert banned not in text
