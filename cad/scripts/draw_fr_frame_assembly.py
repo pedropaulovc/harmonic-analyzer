@@ -141,8 +141,22 @@ if SPEC.layout is not SHEET_LAYOUTS[SHEET_NAMES[0]]:
     raise AssertionError("the frame package primary sheet must remain landscape")
 SHEET_SCALE = (1.0, 8.0)
 WORKING_FRONT_CENTER = (0.053763, 0.163612)
-BASE_SECTION_CENTER = (0.170714, 0.1823453)
-TOP_SECTION_CENTER = (0.335290, 0.1815266)
+# The two joint sections stand right of the 1:8 view's height dimensions,
+# which stand right of the A/B cutting-plane arrows and letters. Those letters
+# reach CUTTING_LETTER_REACH_M past the view's flange edge: on the r4 render
+# (run 20261015T235155114Z) they ended at 92.9 mm against the flange's
+# 82.3 mm, and the (1044.8) line at 92.0 mm struck the right-hand "B". Each
+# height line keeps HEIGHT_LINE_CLEARANCE_M from the letters, from its
+# neighbour and from section A-A's flange edge; B-B moves right by half A-A's
+# shift so the gap between the sections stays open.
+BASE_SECTION_CENTER = (0.176714, 0.1823453)
+TOP_SECTION_CENTER = (0.338290, 0.1815266)
+CUTTING_LETTER_REACH_M = 0.0106
+HEIGHT_LINE_CLEARANCE_M = 0.002
+# The height dimensions' lines stand at their texts' x: the top cross-bore
+# axis innermost, the overall reference outside it.
+TOP_AXIS_HEIGHT_TEXT_XY = (0.0950, 0.254)
+OVERALL_HEIGHT_TEXT_XY = (0.0980, 0.244)
 JOINT_SECTION_SCALE = (1.0, 3.0)
 EXPLODED_ISO_CENTER = (0.140, 0.198)
 # 1:8, not 1:7: at 1:7 the balloon ring's apex (outline + 12 mm margin) sat at
@@ -545,7 +559,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         front,
         base_bottom,
         cap_top,
-        text_xy=(0.092, 0.244),
+        text_xy=OVERALL_HEIGHT_TEXT_XY,
         label="finished frame overall height",
     )
     overall = _checked_linear_dimension(
@@ -573,7 +587,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         front,
         base_bottom,
         screw_head,
-        text_xy=(0.086, 0.254),
+        text_xy=TOP_AXIS_HEIGHT_TEXT_XY,
         label="installed top cross-screw axis height",
     )
     screw_axis = set_arc_endpoints_to_center(

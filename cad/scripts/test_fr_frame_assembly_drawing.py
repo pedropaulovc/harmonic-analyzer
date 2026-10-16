@@ -897,3 +897,29 @@ def test_an_inset_pick_that_is_not_a_component_edge_reads_no_x(monkeypatch) -> N
             reason,
             None,
         )
+
+
+def test_height_dimensions_stand_clear_of_the_cutting_plane_letters() -> None:
+    # PR #1468 r4 machinist review: the (1044.8) line struck the right-hand
+    # B-B letter, and the A-A arrow shared its corridor. Both height lines now
+    # stand right of the letters and left of section A-A, each with clearance;
+    # the sections stay apart and inside the border.
+    from fr_harmonic_base_spec import BOTTOM_LENGTH
+
+    front_half = BOTTOM_LENGTH / 2.0 / 8.0 / 1000.0  # the 1:8 view's flange
+    section_half = BOTTOM_LENGTH / 2.0 / 3.0 / 1000.0  # both 1:3 sections
+    letters_right = (
+        drawing.WORKING_FRONT_CENTER[0] + front_half + drawing.CUTTING_LETTER_REACH_M
+    )
+    top_axis_x = drawing.TOP_AXIS_HEIGHT_TEXT_XY[0]
+    overall_x = drawing.OVERALL_HEIGHT_TEXT_XY[0]
+    base_left = drawing.BASE_SECTION_CENTER[0] - section_half
+    clearance = drawing.HEIGHT_LINE_CLEARANCE_M
+    assert letters_right + clearance <= top_axis_x
+    assert top_axis_x + clearance <= overall_x
+    assert overall_x + clearance <= base_left
+    base_right = drawing.BASE_SECTION_CENTER[0] + section_half
+    top_left = drawing.TOP_SECTION_CENTER[0] - section_half
+    top_right = drawing.TOP_SECTION_CENTER[0] + section_half
+    assert top_left - base_right >= 0.005
+    assert top_right <= 0.4191 - 0.002  # B-size inner border, 17 in less 0.5 in
