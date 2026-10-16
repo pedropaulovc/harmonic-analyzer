@@ -24,7 +24,9 @@ from typing import Any, Callable
 
 import _config
 import _telemetry
+import pn_pen_adjust_screw_spec as stud
 import pn_pen_assembly_spec as spec
+import pn_pen_rod_spec as rod
 from _check import check
 from _com import _early_bound
 from _session import run_build
@@ -301,8 +303,28 @@ BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
 # Every family is one separated body on the exploded view: each balloon walks
-# its own part for a visible edge.
-BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
+# its own part for a visible edge, except two pinned off the stack the stud,
+# its jam nut and the rod's top make in the isometric. There the three walked
+# attachments sat within 2 mm of one sheet bearing at different radii, so
+# leaders 2/9 and 8/9 crossed (farm run 20261016T061511876Z). The rod's
+# balloon takes the near vertical corner of its square low down (part mm:
+# square x, z +-S/2, y up from the shoulder); the stud's the sheet-rightmost
+# point of its head's top edge (revolved about +Y, iso sheet-right = +X -Z).
+_ROD_ANCHOR_Y = 40.0
+_HEAD_R = stud.HEAD_DIA / 2.0
+BALLOON_ANCHORS = {
+    **{stem: BalloonAnchor() for stem in BOM_COMPONENTS},
+    spec.ROD: BalloonAnchor(
+        point_mm=(rod.ROD_SECTION / 2.0, _ROD_ANCHOR_Y, rod.ROD_SECTION / 2.0)
+    ),
+    spec.STUD: BalloonAnchor(
+        point_mm=(
+            _HEAD_R * math.sqrt(0.5),
+            stud.OVERALL_LENGTH,
+            -_HEAD_R * math.sqrt(0.5),
+        )
+    ),
+}
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: spec.EXPLODED_VIEW_NAME,
