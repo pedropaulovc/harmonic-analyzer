@@ -12,7 +12,7 @@ offline drawing test.
 
 from __future__ import annotations
 
-from magnifying_bracket_joint_layout import LINEAR_BAND
+from magnifying_bracket_joint_layout import LINEAR_BAND, SCREW_THREAD
 from sm_summing_lever_spec import HOLE_SPEC, SPRING_SEAT_T
 
 # --- Marked-dimension contract.  build_sm_summing_lever marks exactly these. ---
@@ -85,22 +85,25 @@ BRACKET_SCREW_NUMBER = "MHA-VN-050"  # vn-magnifying-bracket-screw
 # at the plate end inside the cylinder; the radius's text has room only for
 # its value (inside the arc, clear of the trunnion stub), so the boss's
 # diameter names both ends.  The three receiver coordinates are one bracket
-# hole pattern, each tight station naming the mate (rule 7: flagged where it
-# applies).  The spring-anchor pad is on the underside, which no view shows
-# full length, so its width says it runs the plate's length.  The hexagon's
+# hole pattern, each tight station naming the mate and that the pattern
+# locates it (rule 7: flagged where it applies; machinist review r14 could
+# not tell from MATCHES whether the screws locate or only clamp).  The two
+# left of VIEW F have room for one line only.  The spring-anchor pad is on
+# the underside, which no view shows full length, so its width says it runs
+# the plate's length.  The hexagon's
 # width holds .XXX for the trunnion's worst-case free rock in the knife
 # mount's bore (``sm_knife_mount_spec``), so it names that.
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "EdgeRibFrontEndTopX": "ALL RIBS",
-    "ReceiverY0": f"MATCHES {BRACKET_NUMBER}",
+    "ReceiverY0": f"LOCATES {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "HexWidth": f"SETS FREE ROCK\nIN {KNIFE_MOUNT_NUMBER}",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
-    "ReceiverX0": f"MATCHES HOLES IN\nBRACKET {BRACKET_NUMBER}",
-    "ReceiverX1": f"MATCHES {BRACKET_NUMBER}",
+    "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
+    "ReceiverX1": f"LOCATES {BRACKET_NUMBER}",
     # The -Z rib's 7.30 at the title block's band holds the whole 2-56 drill,
     # point included (magnifying_bracket_joint_layout), so it carries no
     # words (machinist review r12 read a tight band and its reason as
@@ -123,9 +126,14 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
 # Leads the 2-56 receiver callout: what its two depth limits hold.  The full
 # thread prints as a minimum; the drill's band keeps the bottoming tap's two
 # pitches of lead inside the shallowest drill
-# (``magnifying_bracket_joint_layout.TAP_LEAD_MARGIN_MIN``).
+# (``magnifying_bracket_joint_layout.TAP_LEAD_MARGIN_MIN``).  The drill runs
+# along the plate's mid-plane, so past the rib's inboard face is more plate,
+# not a floor: DRILL_POINT_RIB_MARGIN_MIN only keeps the point out of the
+# bare plate's thinner walls.  Machinist review r14 read the 7.30 rib as the
+# drill's floor (rule 17), so the callout says so (rule 20).
 BRACKET_TAP_CALLOUT_PROCESS = (
-    f"FULL THREAD IN END RIB\nDRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"
+    "FULL THREAD AND DRILL POINT IN END RIB\nPLATE CONTINUES BEYOND RIB\n"
+    f"DRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"
 )
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
 # is centred on the same station.
