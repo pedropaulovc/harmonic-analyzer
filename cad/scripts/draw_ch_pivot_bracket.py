@@ -6,7 +6,8 @@ and the apex set-screw tap) and the right view beside it for the foot-to-ear
 corner's MAX radius, all three projected and aligned, and a shaded
 isometric. Every value is a native model dimension the part build marks,
 places and bands (``ch_pivot_bracket_drawing_spec``); the sheet only places
-them.
+them, and adds one native REFERENCE between model edges: the bore axis to the
+arch apex, which the overall and bore heights already fix.
 """
 
 from __future__ import annotations
@@ -36,7 +37,9 @@ from _drawing_common import (
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
+    set_reference_dimension,
 )
+from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -58,7 +61,11 @@ from ch_pivot_bracket_drawing_spec import (
 )
 from ch_pivot_bracket_sides import FOOT_Z1, HOLE_STATION, HOLE_Z
 from ch_pivot_bracket_spec import (
+    APEX_ABOVE_BORE,
+    ARCH_LIFT,
+    BORE_DIA,
     BORE_H,
+    EAR_ARCH_R,
     EAR_T,
     EAR_TOP_Y,
     FOOT_H,
@@ -165,6 +172,27 @@ FRONT_KEEP = {
     "ArchRadius": (FRONT_CENTER[0] + 0.030, _front_y(EAR_TOP_Y) + 0.004),
     "BoreLateral": (FRONT_CENTER[0] - FOOT_W / 4.0 * _S, _front_y(0.0) - 0.010),
 }
+# The arch's centre stands ARCH_LIFT over the bore axis, not on it (owner
+# ruling Q12, 2026-10-16: the gate review read the R8.00 crown as concentric
+# with the bore and counted 8.00 - 3.25 of metal over it). The bore axis to
+# the arch apex prints as a REFERENCE chained on the bore height: the overall
+# and the bore heights fix it, and it is the metal the apex tap's thread is
+# counted in (ch_pivot_bracket_spec.APEX_ABOVE_BORE). A sheet dimension
+# between the bore circle (its centre) and the arch arc (its far point), so
+# the part and its cache key stay as they are. Its text stands in the foot
+# height's lane, halfway up its span, between the 25.20 and 35.00 extension
+# lines it shares; it prints at the two heights' places, which the drawing
+# document's default must already give (the sheet sets no precision).
+APEX_REFERENCE_TEXT_XY = (
+    FRONT_KEEP["FootHt"][0],
+    _front_y((BORE_H + EAR_TOP_Y) / 2.0),
+)
+APEX_REFERENCE_PLACES = DRAWING_PRECISION_BY_NAME["OverallHeight"]
+_ARC_END_CENTER = 1  # swArcEndCondition_e.swArcEndConditionCenter
+_ARC_END_MAX = 3  # swArcEndCondition_e.swArcEndConditionMax (furthest point)
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+FRONT_CENTER_MARKS = 1  # the cross-bore
+PLAN_CENTER_MARKS = 2  # the hold-down hole and the apex set-screw tap
 # Every plan length along the foot runs from the ear's INBOARD face (the plan's
 # top edge): the face fit-up sets and the fixtures hold Z0 on. Only the hole
 # station stands on the left; the tap station, the ear thickness and the foot
@@ -311,6 +339,126 @@ def _show_arch_radius(adapter: Any, annotations: list[Any]) -> None:
             raise RuntimeError("arch radius display did not persist")
         return
     raise RuntimeError("front view has no imported ArchRadius")
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION)
+        or ()
+    )
+
+
+@_telemetry.traced("drawing.pivot_bracket.apex_reference_edges")
+def _apex_reference_edges(view: Any) -> tuple[Any, Any]:
+    """The elevation's bore circle and arch arc, as part edges.
+
+    Matched on the part's own geometry (centre and radius, part millimetres),
+    not a sheet pick: the arch's centre lies inside the bore circle, among its
+    centre mark's lines. The ear's two faces each carry both curves; the near
+    face's (largest z) is taken, the far one projecting onto it.
+    """
+    wanted = {
+        "bore circle": (BORE_H, BORE_DIA / 2.0),
+        "arch arc": (BORE_H + ARCH_LIFT, EAR_ARCH_R),
+    }
+    found: dict[str, list[tuple[float, Any]]] = {label: [] for label in wanted}
+    for raw_edge in visible_view_entities(view, 1, label="pivot bracket front arcs"):
+        curve = _early_bound(raw_edge, "IEdge").GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) for value in curve.CircleParams)
+        cx, cy, cz = (value * 1000.0 for value in params[:3])
+        radius = params[6] * 1000.0
+        for label, (centre_y, wanted_radius) in wanted.items():
+            if (
+                abs(cx) <= 1e-3
+                and abs(cy - centre_y) <= 1e-3
+                and abs(radius - wanted_radius) <= 1e-3
+            ):
+                found[label].append((cz, raw_edge))
+    picks = []
+    for label, matches in found.items():
+        if not matches:
+            raise RuntimeError(f"front view shows no {label} for the apex reference")
+        picks.append(max(matches, key=lambda item: item[0])[1])
+    return picks[0], picks[1]
+
+
+@_telemetry.traced("drawing.pivot_bracket.apex_reference")
+def _add_apex_reference(adapter: Any, view: Any) -> Any:
+    """Dimension the bore axis to the arch apex as a REFERENCE (owner Q12).
+
+    Vertical, from the bore circle's centre (endpoint 1, the first pick) to
+    the arch arc's furthest point (endpoint 2), each arc condition set and
+    read back; its text then put back between the two heights' extension
+    lines (SolidWorks keeps the text outside the span the dimension had
+    while both ends sat on centres, 1.80 apart, too short for it -- r1);
+    then parenthesized, its value proved against APEX_ABOVE_BORE (a swapped
+    endpoint would read the bore's top to the arch centre, 1.45), its text
+    position and its places against the heights'.
+    """
+    bore, arch = _apex_reference_edges(view)
+    display = _early_bound(
+        add_edge_dimension(
+            adapter,
+            view,
+            p0=(0.0, 0.0),
+            p1=(0.0, 0.0),
+            text_xy=APEX_REFERENCE_TEXT_XY,
+            label="bore axis to arch apex",
+            orientation="vertical",
+            entities=(bore, arch),
+        ),
+        "IDisplayDimension",
+    )
+    model = _early_bound(display.GetDimension(), "IDimension")
+    for index, condition in ((1, _ARC_END_CENTER), (2, _ARC_END_MAX)):
+        result = int(model.SetArcEndCondition(index, condition))
+        if result != 0 or int(model.GetArcEndCondition(index)) != condition:
+            raise RuntimeError(
+                f"bore axis to arch apex endpoint {index} did not take arc "
+                f"condition {condition} (SolidWorks result {result})"
+            )
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(*APEX_REFERENCE_TEXT_XY, 0.0):
+        raise RuntimeError("failed to place the bore axis to arch apex text")
+    set_reference_dimension(
+        adapter, annotation, label="bore axis to arch apex reference"
+    )
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if any(
+        abs(actual - wanted) > 5e-4
+        for actual, wanted in zip(position[:2], APEX_REFERENCE_TEXT_XY, strict=True)
+    ):
+        raise RuntimeError(
+            f"bore axis to arch apex text sits at {position[:2]}, "
+            f"not {APEX_REFERENCE_TEXT_XY}"
+        )
+    measured = abs(float(model.SystemValue)) * 1000.0
+    if abs(measured - APEX_ABOVE_BORE) > 1e-4:
+        raise RuntimeError(
+            f"bore axis to arch apex measured {measured:.4f} mm, "
+            f"expected {APEX_ABOVE_BORE:.4f}"
+        )
+    primary = int(display.GetPrimaryPrecision2())
+    places = primary
+    # swDimensionPrecisionSettings_e.swPrecisionFollowsDocumentSetting = -2:
+    # read the drawing's linear-dimension default (swconst R2026x:
+    # swDetailingLinearDimPrecision = 24, swDetailingLinearDimension = 206).
+    if primary == -2:
+        extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+        places = int(extension.GetUserPreferenceInteger(24, 206))
+    if places != APEX_REFERENCE_PLACES:
+        raise RuntimeError(
+            f"bore axis to arch apex prints {places} places (primary {primary}), "
+            f"the heights {APEX_REFERENCE_PLACES}"
+        )
+    _telemetry.info(f"apex reference: {display.GetText(1)!r} {measured:.2f}")
+    return display
 
 
 @_telemetry.traced("drawing.diameter_second_arrow", label_param="label")
@@ -524,9 +672,26 @@ async def build(adapter: Any) -> dict[str, str]:
     _hide_diameter_leader_lines(
         adapter, top_annotations, dimension="HoleDia", label="hold-down hole"
     )
-    for view, label in ((front, "front"), (top, "plan")):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+    _add_apex_reference(adapter, front)
+    # The template may centre-mark the holes as each view is placed (the Q12
+    # r1 and r2 sheets arrived marked, and the explicit AutoInsertCenterMarks2
+    # printed every front and plan mark twice: #913's duplicate marks), and
+    # earlier sheets arrived unmarked. Add marks only to a bare view, then
+    # prove exactly one per hole: the cross-bore; the hold-down hole and the
+    # apex tap.
+    for view, label, expected in (
+        (front, "front", FRONT_CENTER_MARKS),
+        (top, "plan", PLAN_CENTER_MARKS),
+    ):
+        if _center_mark_count(view) == 0 and not auto_center_marks(
+            adapter, view, holes=True, size=0.0025
+        ):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
+        found = _center_mark_count(view)
+        if found != expected:
+            raise RuntimeError(
+                f"expected {expected} centre marks in the {label} view, found {found}"
+            )
 
     seat_entity = _seat_edge(front)
     # Below and right of the seat, clear of the bore-lateral lane on its left

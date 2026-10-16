@@ -84,10 +84,37 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
     assert part.DRAWING_PRECISION is drawing_spec.DRAWING_PRECISION
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
     # Every height is a model dimension now (#1371 r1: the overall height runs
-    # from the seat), so the sheet derives none.
+    # from the seat); the one sheet-made length, the bore axis to the apex
+    # (owner Q12), is a REFERENCE that sets no precision of its own.
     assert not hasattr(drawing_spec, "DRAWING_REFERENCE_PRECISION")
     assert "_set_reference_precision" not in _drawing_source()
     assert "AddVerticalDimension2" not in _drawing_source()
+    assert "SetPrecision3" not in _drawing_source()
+
+
+def test_bore_axis_to_apex_prints_as_a_reference_in_the_foot_height_lane() -> None:
+    """Owner Q12 (2026-10-16): the R8.00 arch's centre stands 1.80 over the
+    bore, so the sheet prints the metal over the bore as the bore axis to the
+    apex, 9.80 REF, chained on the bore height between its extension lines."""
+    assert spec.APEX_ABOVE_BORE == pytest.approx(9.80)
+    assert spec.ARCH_LIFT == pytest.approx(1.80)
+    assert 0.0 < spec.ARCH_LIFT < spec.BORE_DIA / 2.0
+    x, y = drawing.APEX_REFERENCE_TEXT_XY
+    assert x == drawing.FRONT_KEEP["FootHt"][0]
+    assert drawing.FRONT_KEEP["BoreCz"][0] < x < drawing.FRONT_CENTER[0]
+    assert drawing._front_y(spec.BORE_H) < y < drawing._front_y(spec.EAR_TOP_Y)
+    assert drawing.APEX_REFERENCE_PLACES == 2
+    source = _drawing_source()
+    assert "set_reference_dimension(" in source
+    assert "_add_apex_reference(adapter, front)" in source
+
+
+def test_each_hole_keeps_one_centre_mark() -> None:
+    # The template may mark the holes as each view is placed; the explicit
+    # AutoInsertCenterMarks2 then printed every mark twice (Q12 r1/r2, #913).
+    source = _drawing_source()
+    assert "if _center_mark_count(view) == 0 and not auto_center_marks(" in source
+    assert (drawing.FRONT_CENTER_MARKS, drawing.PLAN_CENTER_MARKS) == (1, 2)
 
 
 def test_model_bands_come_from_named_spec_constants() -> None:
@@ -301,6 +328,7 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         "set-screw callout": drawing.SET_SCREW_CALLOUT_XY,
         "right view": drawing.RIGHT_CENTER,
         "corner radius (planned frame)": _planned_corner_text(),
+        "bore axis to apex reference": drawing.APEX_REFERENCE_TEXT_XY,
     }
     for label, (x, y) in anchors.items():
         assert _FRAME_M < x < template.width_m - _FRAME_M, label
