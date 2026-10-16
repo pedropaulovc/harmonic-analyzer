@@ -388,28 +388,25 @@ def test_the_bar_bands_are_authored_on_the_model() -> None:
     """Codex P1 on #1353: the bottom-rail clearance and lock retention spend
     the bar's ±0.13 height band (and the pivot floor its ±0.13 thickness
     band), so the bar build authors both natively at .XXX on Height@BarProfile
-    and Depth@Bar (the helper reads each tolerance back), after the equation
-    drives so nothing resets them."""
+    and Depth@Bar, after the equation drives so nothing resets them. Those
+    bands ARE the title block's .XXX row, so the three places alone carry
+    them; an explicit ±0.13 would restate the title block (drawing-guidelines
+    rule 2, the support-bar sheet's machinist review)."""
     import inspect
 
     import build_pd_support_bar as support
     import pd_support_bar_spec as bar
+    from _printed_tolerance import printed_band_mm
 
     assert (bar.BAR_HEIGHT_BAND, bar.BAR_DEPTH_BAND) == (0.13, 0.13)
     assert bar.BAR_BAND_PLACES == 3
+    assert printed_band_mm(bar.BAR_BAND_PLACES) == bar.BAR_HEIGHT_BAND
     source = inspect.getsource(support.build)
-    height = (
-        'set_dimension_symmetric_tolerance(adapter, "BarProfile", "Height", '
-        "BAR_HEIGHT_BAND)"
-    )
-    depth = 'set_dimension_symmetric_tolerance(adapter, "Bar", "Depth", BAR_DEPTH_BAND)'
     precision = (
         '{"BarProfile": {"Height": BAR_BAND_PLACES}, "Bar": {"Depth": BAR_BAND_PLACES}}'
     )
-    for call in (height, depth, precision):
-        assert source.count(call) == 1
+    assert source.count(precision) == 1
+    assert '"BarProfile", "Height"' not in source.replace(precision, "")
     assert 'name_depth="Height"' in source
     assert 'name_dimensions(adapter, "Bar", ["Depth"])' in source
-    driven = source.index("drive_dimension(")
-    assert driven < source.index(precision) < source.index(height)
-    assert source.index(height) < source.index(depth)
+    assert source.index("drive_dimension(") < source.index(precision)

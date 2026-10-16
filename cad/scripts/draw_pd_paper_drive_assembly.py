@@ -1010,7 +1010,12 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{_N['sh-column-clamp-front']} FRONT AND A {_N['sh-column-clamp-back']} BACK "
             f"ARC, WITH THE {_N['vn-clamp-screw']} SCREWS FROM THE BAR FRONT. SET "
             f"THE BAR TOP {steps.BAR_TOP_ABOVE_DECK:.1f} ABOVE THE BASE DECK AT "
-            "BOTH COLUMNS; TIGHTEN."
+            # Rule 19 fit-up for the slotted west pair (owner ruling
+            # 2026-10-15, #1471 option A): the round pair locates.  Named by
+            # its holes, not the bar sheet's END A, which no package sheet
+            # defines (reviewfix-r3 machinist review).
+            "BOTH COLUMNS WITH ALL FOUR SCREWS SNUG; TIGHTEN THE ROUND-HOLE "
+            "PAIR, THEN THE SLOTTED PAIR."
         ),
         "rack-soldered": (
             f"SOFT-SOLDER THE {_N['pd-platen-rack']} RACK TO THE {_N['pd-platen']} "
