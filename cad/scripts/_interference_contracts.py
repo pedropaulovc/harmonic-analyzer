@@ -306,7 +306,7 @@ _MG_FIXTURE_THREAD_LIMIT = _smooth_annulus_limit_mm3(
 )
 
 _MAGNIFIER_ALLOWED_PAIRS = {
-    # 1.25 in screw - 9.0 wheel bar - 17.9 front arc - 0.5 grip gap (the back
+    # 1.25 in screw - 9.5 wheel bar - 17.4 front arc - 0.5 grip gap (the back
     # arc's mating face stops short of the column axis,
     # sh_column_clamp_back_geom.GRIP_OFFSET) = 4.35 in the back arc's tap.
     **_numbered_pairs(
@@ -320,7 +320,8 @@ _MAGNIFIER_ALLOWED_PAIRS = {
     ),
     # MHA-MG-007 drill-rod pin (Ø4.7625, mg_wheel_axle_spec.PIN_DIA) pressed in
     # the wheel bar's Ø4.7371 reamed bore (mg_wheel_bar_geom.AXLE_BORE_DIA)
-    # through the bar's 9.0 depth: the press.
+    # over at most 9.0 of the bar's 9.5 depth (its back end 0.60 sunk at
+    # nominal, mg_wheel_axle_spec.BACK_Y): the press.
     frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _smooth_annulus_limit_mm3(
         4.7625, 4.7371, 9.0
     ),
@@ -551,16 +552,16 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         "pd-transgear-arm",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 12.9375 - 5.0),
     ),
-    # MHA-VN-041 (vn_transgear_pivot_screw_spec) in the support bar's blind #8-32
-    # tap: its 4.7625 thread less the 1.1938 neck flat under the shoulder,
-    # whose Ø3.02 stays inside the #29 drill -- the full thread plus the 45°
-    # ramp back to the major (the MHA-DT-032 row's relief-and-lead-cone reading),
-    # 3.5687 of overlap. The contract's engagement (R9-7, vendor neck) counts
-    # full thread only: 4.7625 - 1.7653 = 2.9972 (0.72 D); the ramp adds
-    # solid overlap with the tap but carries no thread.
-    frozenset(("vn-transgear-pivot-screw-1", "pd-support-bar-1")): _smooth_annulus_limit_mm3(
-        4.1656, 3.454, 4.7625 - 1.1938
-    ),
+    # MHA-VN-041 (vn_transgear_pivot_screw_spec, 90325A174 faced to fit) in the
+    # support bar's THROUGH #8-32 tap: its fitted 9.15 thread less the 1.1938
+    # neck flat under the shoulder, whose Ø3.02 stays inside the #29 drill --
+    # the full thread plus the 45° ramp back to the major (the MHA-DT-032 row's
+    # relief-and-lead-cone reading), 7.9562 of overlap; the faced tip stands
+    # inside the front face. The contract's engagement (transgear_hanger_joints)
+    # counts full thread only, less one pitch at the faced tip.
+    frozenset(
+        ("vn-transgear-pivot-screw-1", "pd-support-bar-1")
+    ): _smooth_annulus_limit_mm3(4.1656, 3.454, 9.15 - 1.1938),
     # MHA-VN-043 #4-40 x 3/8 (vn_latch_hook_bracket_screw_spec) through the
     # MHA-PD-014 hook's 0.8 base (Ø3.2 clearance): 9.525 - 0.8 = 8.725 in the
     # support bar's #43 taps.
@@ -586,9 +587,9 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(2.0, 1.995, 6.0 - 1.70),
     ),
     # MHA-PD-020 (pd_transgear_pivot_spacer_spec, Ø4.727 ream) pressed on the
-    # MHA-VN-041 Ø4.7625 shoulder over its whole 5.5 length (R9-71): the press.
+    # MHA-VN-041 Ø4.7625 shoulder over its whole 5.0 length (R9-71): the press.
     frozenset(("pd-transgear-pivot-spacer-1", "vn-transgear-pivot-screw-1")): (
-        _smooth_annulus_limit_mm3(4.7625, 4.727, 5.5)
+        _smooth_annulus_limit_mm3(4.7625, 4.727, 5.0)
     ),
     # MHA-VN-047 (vn_transgear_retaining_ring_spec) in the MHA-PD-023 groove: the
     # vendor replica is the ring as McMaster ships it, its prongs on the

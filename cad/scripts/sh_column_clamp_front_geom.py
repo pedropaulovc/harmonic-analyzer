@@ -21,7 +21,17 @@ from _hole_spec import HoleSpec, blind_cut_dia_mm
 
 # --- Nominal geometry (book ch. 21/22, ch30 p005; layout memory/paper-drive-
 # rework.md E2). ---
-ARC_DEPTH = 17.9  # bar back face to the column-axis plane
+# The two clamped bars (MHA-PD-007 support bar, the magnifier's wheel bar)
+# are one stock section deep: the user's 2026-10-15 ruling thickened it to 9.5
+# (rule 18 engagement for the MHA-VN-041 pivot screw), growing REARWARD so
+# both front faces stay on the platen-back plane.  pd_support_bar_spec and
+# mg_wheel_bar_geom read BAR_DEPTH here.
+BAR_DEPTH = 9.5
+# The column-axis plane to the bars' front faces (machine z -112.0 to the
+# shared -138.9 platen-back plane): fixed, so the arc gives up what the bar
+# gains.
+BAR_FRONT_DEPTH = 26.9
+ARC_DEPTH = BAR_FRONT_DEPTH - BAR_DEPTH  # bar back face to the column-axis plane
 ARC_WIDTH = 48.0  # lateral span, ear tip to ear tip
 ARC_HEIGHT = 16.0  # along the column (2 * _clamp_arc.ARC_HALF_H)
 COLUMN_BORE = 25.6  # half-cylinder relief: slides on the O25.4 column

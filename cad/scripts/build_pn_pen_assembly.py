@@ -162,7 +162,7 @@ if STUD_HEAD_TOP_Y[1] > _RIM_LOW_Y_AT_WIRE - 2.0:
 
 # --- M6.10 fastener ----------------------------------------------------------
 # Pen-hanger screw from BEHIND the bar. Its under-head frame follows the shared
-# wheel-bar back face; the exact stock shank passes through the 9 mm bar, the
+# wheel-bar back face; the exact stock shank passes through the 9.5 mm bar, the
 # 3 mm strap's clearance hole, the nut on the strap front and the jam nut on
 # that, then stands clear of the magnifying-wheel rim.
 BAR_BACK_Z = HANGER_POS[2] + max(HANGER_STRAP_Z) + WHEEL_BAR_DEPTH

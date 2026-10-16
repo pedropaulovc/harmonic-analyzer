@@ -30,14 +30,12 @@ bar length and the clamp-screw stations.
 from __future__ import annotations
 
 from _gtol_planar import PlanarFace
-from _hole_spec import THREAD_MAJOR_MM
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_support_bar_spec import (
     BAR_BAND_PLACES,
     BAR_DEPTH,
     BAR_HEIGHT,
     BRACKET_TAP_SPEC,
-    PIVOT_TAP_FULL_THREAD_MIN,
     PIVOT_TAP_THREAD,
     TAP_CSK_ANGLE_DEG,
 )
@@ -80,8 +78,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HangerRowReference": {"HangerRowHeight", *HANGER_STATION_NAMES},
     "ClampRowReference": {"ClampRowHeight", *CLAMP_STATION_NAMES},
     "PivotTapProfile": {"PivotTapDrillDia"},
-    "PivotTap": {"DrillDepth"},
-    "PivotThreadReference": {"ThreadMin"},
     "CountersinkReference": {"PivotCskDia", "BracketCskDia"},
     "ClampSlotProfile": {"ClampSlotWidth", "ClampSlotTravel"},
     "ClampSlotCboreProfile": {"ClampSlotCboreWidth", "ClampSlotCboreTravel"},
@@ -102,8 +98,6 @@ SHEET_PRECISION: dict[str, dict[str, int]] = {
         **dict.fromkeys(CLAMP_STATION_NAMES, CLAMP_POSITION_PLACES),
     },
     "PivotTapProfile": {"PivotTapDrillDia": 2},
-    "PivotTap": {"DrillDepth": 1},
-    "PivotThreadReference": {"ThreadMin": 1},
     "CountersinkReference": {"PivotCskDia": 1, "BracketCskDia": 1},
     "ClampSlotProfile": {
         "ClampSlotWidth": CLAMP_SLOT_WIDTH_PLACES,
@@ -125,7 +119,7 @@ _CSK = f"{TAP_CSK_ANGLE_DEG:.0f}\u00b0 CSK"
 _HOOK_TAPS = "MHA-PD-014 HOOK TAPS"
 DIMENSION_CALLOUTS = {
     "Height": "MHA-PD-011\nHANGS ON IT",
-    "Depth": "PIVOT TAP FLOOR AND\nMHA-VN-043 SCREW TIPS",
+    "Depth": "MHA-VN-041 TIP RECESS AND\nMHA-VN-043 SCREW TIPS",
     # The two rows print on one line at 1:2 though they are separate rows
     # (the hanger row from the machine layout, the clamp row at mid-height).
     "HangerRowHeight": f"MHA-VN-041 PIVOT AND\n{_HOOK_TAPS},\nNOT ON THE CLAMP ROW",
@@ -136,12 +130,12 @@ DIMENSION_CALLOUTS = {
     "BracketTapStation1": _HOOK_TAPS,
     "BracketTapStation2": _HOOK_TAPS,
     # The thread class is the title block's (rule 2).
-    "PivotTapDrillDia": f"TAP {PIVOT_TAP_THREAD} UNC",
-    "DrillDepth": "FLAT BOTTOM",
-    # Rule 20: the blind full thread falls short of rule 18's 1.5D; the
-    # sheet states the shortfall as a plain fact (the 9.0 bar's floor).
-    "ThreadMin": f"FULL THREAD ({PIVOT_TAP_FULL_THREAD_MIN / THREAD_MAJOR_MM[PIVOT_TAP_THREAD]:.2f}D)",
-    "PivotCskDia": f"{_CSK}, MHA-VN-041\nSHOULDER BEARS OUTSIDE",
+    "PivotTapDrillDia": f"TAP {PIVOT_TAP_THREAD} UNC THRU",
+    # At most 24 characters a line: the latch-hook taps' callout leader
+    # passes just right of this text (layout audit: leader-through-text).
+    # One hole countersunk on both faces: no "2X", which on the hook taps'
+    # callout counts holes (r6 machinist review, rule 12).
+    "PivotCskDia": f"{_CSK} BOTH FACES,\nMHA-VN-041 BEARS OUTSIDE",
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
     # The west slots (rule 4: each band names its mate): the slots' width,
     # run and stations take up the pitch of the MHA-SH-002 clamp taps the

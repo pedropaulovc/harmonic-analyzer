@@ -1153,6 +1153,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_transgear_pivot_shim",
+        part="vn_transgear_pivot_shim",
+        artifact_stem="vn-transgear-pivot-shim",
+        script_name="draw_vn_transgear_pivot_shim.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_cylinder_bank_spring",
         part="vn_cylinder_bank_spring",
         artifact_stem="vn-cylinder-bank-spring",

@@ -207,16 +207,6 @@ class Ruling:
 # Keyed by the ``exception`` a row cites. Only the user grants one (policy
 # drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)).
 RULINGS: dict[str, Ruling] = {
-    "U-MHA-VN-041-threadlocker": Ruling(
-        joint="pd-paper-drive/pivot-screw-in-bar",
-        granted=(
-            "user, 2026-10-02, joint-specific drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) ruling relayed with R9-70: keep the "
-            "low-strength threadlocker on the MHA-VN-041 shoulder screw. The cross-pin ligament "
-            "would be 0.77, a jam nut cannot reach the bar's blind tap, and a pinch slit in "
-            "the bar misses the 2.0 wall target with no entry face, so no mechanical lock "
-            "fits without changing the photographed 91829A205 head"
-        ),
-    ),
     "U-MHA-PD-013-no-lock": Ruling(
         joint="pd-paper-drive/thumbnut-on-knob-shaft",
         granted=(
@@ -650,7 +640,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A199, MHA-VN-040), 1-in stock cut to fit; member: 2 into transgear_arm
         "vn_transgear_disc_screw",  # #0-80 slotted fillister (McMaster 91794A055, MHA-VN-039), cut to fit; member: 3 through the hub flange into rack_pinion
         "pd_transgear_knob_shaft",  # MHA-PD-008: #8-32 UNC die-cut front thread (thumbnut), receiver; the rear journal is cross-pinned to the cup (MHA-VN-048)
-        "vn_transgear_pivot_screw",  # #8-32 shoulder screw (McMaster 91829A205, MHA-VN-041), member into the support_bar's blind pivot tap
+        "vn_transgear_pivot_screw",  # #8-32 shoulder screw (McMaster 90325A174, MHA-VN-041), member into the support_bar's through pivot tap
         "pd_transgear_thumbnut",  # MHA-PD-013 knurled nut, #8-32 UNC-2B through; member on the knob shaft's front thread
         "mg_wheel_axle",  # 3/16 drill-rod pin, #4-40 UNC front end (mg_wheel_axle_spec.THREAD_CALLOUT), receiver of the wheel-axle nuts
         "vn_wheel_axle_nut",  # McMaster 92671A005 brass #4-40 hex nut x2 (nut + locknut), member
@@ -740,6 +730,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_transgear_arm_plate_locating_pin",  # MHA-VN-056 2 mm dowels pressed into the arm's blind sockets
         "pd_transgear_pivot_spacer",  # MHA-PD-020 brass spacer, reamed bore pressed on the pivot shoulder (locating, R9-71); no thread
         "vn_transgear_pivot_spring",  # MHA-VN-049 disc spring on the pivot shoulder; no thread
+        "vn_transgear_pivot_shim",  # MHA-VN-069 DIN 988 shim on the pivot shoulder under the head; no thread
         "vn_cylinder_bank_spring",  # MHA-VN-052 wave spring loose on the MHA-DT-013 arbor; no thread
         "vn_rocker_bank_spring",  # MHA-VN-053 wave spring loose on the MHA-CH-005 shaft; no thread
         "pd_transgear_pin",  # MHA-PD-023 plain steel pin pressed into the arm's reamed hole, ring groove at the front; no thread
@@ -775,6 +766,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_transgear_arm_plate_locating_pin": "dowel pin pressed into the arm's blind socket",
     "vn_transgear_retaining_ring": "external retaining ring fitted sideways in a groove",
     "vn_transgear_pivot_spring": "disc spring on the pivot shoulder; no thread",
+    "vn_transgear_pivot_shim": "shim ring on the pivot shoulder under the head; no thread",
     "vn_cylinder_bank_spring": "wave disc spring loose on the arbor; no thread",
     "vn_rocker_bank_spring": "wave disc spring loose on the pivot shaft; no thread",
     "vn_tube_frame_cap": "push-on round cap over the column end",
@@ -2052,20 +2044,23 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "shoulder bottomed on the bar's back face with the MHA-PD-020 spacer pressed on it flush; the "
-            "MHA-VN-049 spring under the head holds the arm on the spacer (room 0.70-0.95, "
-            "transgear_hanger_joints.SPRING_ROOM_MIN/MAX); thread in the bar's blind #8-32 tap "
-            "(worst-case engagement ~0.53 D, transgear_hanger_joints.PIVOT_ENGAGEMENT_WORST_D)"
+            "MHA-VN-049 spring under the MHA-VN-069 shim and the head holds the arm on the spacer "
+            "(room 0.70-1.00, transgear_hanger_joints.SPRING_ROOM_MIN/MAX); thread through the bar's "
+            "#8-32 through tap, the tip faced 0.20-0.50 below the front face at fit-up "
+            "(worst-case engagement ~1.52 D, transgear_hanger_joints.PIVOT_ENGAGEMENT_WORST_D)"
         ),
-        lock=Lock.THREADLOCKER_ONLY,
+        lock=Lock.STAKED,
+        lock_part="pd_support_bar:staked tap mouth",
+        lock_binds=("vn_transgear_pivot_screw", "pd_support_bar"),
         lock_step="hanger-pivoted",
-        exception="U-MHA-VN-041-threadlocker",
         evidence=(
-            "draw_pd_paper_drive_assembly._step_text 'hanger-pivoted' ('SEAT IT IN THE MHA-PD-007 BAR'S "
-            "BLIND TAP WITH LOW-STRENGTH THREADLOCKER; THE ARM FALLS FREELY'); "
-            "build_pd_paper_drive_assembly.py 'vn-transgear-pivot-screw' placement; "
-            "pd_support_bar_spec.PIVOT_TAP_THREAD; transgear_hanger_joints.SPRING_ROOM_MIN/MAX, "
-            "LATCH_ARM_ANGLE_PLAY and PIVOT_ENGAGEMENT_WORST_D; free-fall fit is not a "
-            "loaded-engagement proof, which requires the complete source-derived physical qualifier"
+            "user ruling 2026-10-15 (rule 23 staked end): draw_pd_paper_drive_assembly._step_text "
+            "'hanger-pivoted' (face the tip below the bar's front face, then stake the tap's front "
+            "mouth onto it; threadlocker optional) and its stake detail view; "
+            "build_pd_paper_drive_assembly.py 'vn-transgear-pivot-screw' placement and its "
+            "tip-recess check; pd_support_bar_spec.PIVOT_TAP_THREAD (through); "
+            "vn_transgear_pivot_screw_spec.TIP_RECESS; transgear_hanger_joints.SPRING_ROOM_MIN/MAX, "
+            "LATCH_ARM_ANGLE_PLAY and PIVOT_ENGAGEMENT_WORST_D"
         ),
     ),
     Joint(

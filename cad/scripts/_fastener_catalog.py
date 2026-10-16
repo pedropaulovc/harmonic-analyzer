@@ -288,8 +288,8 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     "vn-transgear-pivot-screw": _stock(
         "vn-transgear-pivot-screw",
-        "Slotted 18-8 Stainless Steel Precision Shoulder Screw",
-        "91829A205",
+        "Transgear Pivot Screw (18-8 Stainless Socket Shoulder Screw, Faced to Fit)",
+        "90325A174",
         material="AISI 304",
     ),
     "vn-transgear-knob-cup-pin": _stock(
@@ -315,6 +315,14 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "vn-transgear-pivot-spring",
         "Curved Disc Spring",
         "9715K43",
+    ),
+    # MHA-VN-069: one DIN 988 shim under the MHA-VN-041 head, on the spring (it
+    # restores the spring room after the 9.5 bar's rearward growth); spring
+    # steel, the library's plain carbon steel.
+    "vn-transgear-pivot-shim": _stock(
+        "vn-transgear-pivot-shim",
+        "DIN 988 Spring Steel Shim",
+        "98055A098",
     ),
     # MHA-VN-052 / -053 (#948 ruling R): one wave disc spring preloading each
     # bank north on its datum; steel and high-carbon steel, the library's

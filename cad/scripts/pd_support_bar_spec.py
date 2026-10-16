@@ -7,15 +7,16 @@ its engagement without importing a COM build script.
 Bar frame (the build's): bar axis along X with the origin at the bar centre;
 height along Y (y = 0 at mid-height); depth along Z with the FRONT face at
 z = -BAR_DEPTH/2 and the BACK face at z = +BAR_DEPTH/2.  The paper-drive
-assembly places it without rotation at machine (0, 303.734, -134.4), so the
-back face is machine z -129.9.
+assembly places it without rotation with its front face on the platen-back
+plane at machine z -138.9 and its back face on the front clamp arcs at
+-138.9 + BAR_DEPTH (-129.4): the 9.5 bar grew rearward, the arcs gave it up.
 
 Ch. 23 hanger holes (contract §5), all entering the BACK face:
 
-* the MHA-VN-041 pivot screw's #8-32 blind tap at the arm pivot P, machine
-  (-58, 303.234): a flat-bottomed tap drill (drill + end mill; no drill-point
-  cone) 6.8 +0/-0.4 deep, full thread 5.2 minimum (bottoming tap), entry
-  countersink Ø4.3 max so the shoulder's end ring still bears;
+* the MHA-VN-041 pivot screw's #8-32 THROUGH tap at the arm pivot P, machine
+  (-58, 303.234), countersunk Ø4.3 max both faces: the shoulder's end ring
+  still bears outside the back one, and the screw's faced tip stays below
+  the front face the platen slides on, staked at the front mouth;
 * the latch hook's (MHA-PD-014) two #4-40 THROUGH taps for its base screws
   (MHA-VN-043) at machine x 65.0 and 72.0 on the same line, countersunk Ø3.1
   max both faces (their exits on the front face lie under the platen
@@ -25,6 +26,7 @@ Ch. 23 hanger holes (contract §5), all entering the BACK face:
 from __future__ import annotations
 
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
+from sh_column_clamp_front_geom import BAR_DEPTH as BAR_DEPTH
 
 # 28 tall (Y), the top edge carrying the hanging platen's top rail at machine
 # y 317.734 and the bottom edge 1.0 above the bottom rail (the paper-drive
@@ -42,9 +44,13 @@ BAR_HEIGHT = 28.0
 # bar spends it (build_pd_paper_drive_assembly._assert_lock_retention).
 # build_pd_support_bar authors it natively on Height@BarProfile.
 BAR_HEIGHT_BAND = 0.13
-BAR_DEPTH = 9.0  # deep (Z) -- front face rubs the platen back (low)
-# The pivot floor and the latch-hook-bracket-screw (MHA-VN-043) tips need the bar's
-# thickness at 9.000 ±0.13 (.XXX); at .XX the floor would be 1.69 worst.
+# Deep (Z), BAR_DEPTH (sh_column_clamp_front_geom, shared with the wheel
+# bar): the back face on the clamp arcs, the front face carrying the platen's
+# back. 9.5, not the 9.0 stock read, so the MHA-VN-041 pivot screw's faced tip
+# (0.20-0.50 below the front face) keeps rule 18's 1.5D at the thinnest bar
+# (user ruling 2026-10-15; transgear_hanger_joints).
+# The pivot screw's tip recess and the latch-hook-bracket-screw (MHA-VN-043)
+# tips spend the bar's .XXX thickness band.
 # build_pd_support_bar authors it natively on Depth@Bar.
 BAR_DEPTH_BAND = 0.13
 BAR_BAND_PLACES = 3  # both bands print .XXX
@@ -55,13 +61,7 @@ HANGER_TAP_Y = -0.5  # machine y 303.234 on the 303.734 bar centre
 # --- MHA-VN-041 pivot tap -------------------------------------------------------
 PIVOT_TAP_X = -58.0
 PIVOT_TAP_THREAD = "#8-32"
-PIVOT_TAP_DRILL_DEPTH = 6.8
-PIVOT_TAP_DRILL_DEPTH_LIMITS = (-0.4, 0.0)
-PIVOT_TAP_FULL_THREAD_MIN = 5.2
-PIVOT_TAP_CSK_DIA = 4.3  # MAX
-# The Hole Wizard's blind tap always carries a 118-degree drill point, which
-# the flat-bottomed drill forbids, so the build cuts the tap drill as a flat
-# blind cylinder; its thread is this spec's, not a wizard feature's.
+PIVOT_TAP_CSK_DIA = 4.3  # MAX, both faces
 PIVOT_TAP_DRILL_DIA = TAP_DRILL_MM[PIVOT_TAP_THREAD]
 
 # --- Latch-hook base taps (MHA-PD-014's base, MHA-VN-043 screws) -----------------
@@ -76,13 +76,6 @@ HOLE_POSITION_BAND = 0.065
 _TAP_OVERSIZE_R = 0.025
 WALL_TARGET = 2.0
 WALLS: dict[str, tuple[float, float]] = {
-    "floor under the pivot tap": (
-        BAR_DEPTH - PIVOT_TAP_DRILL_DEPTH,
-        BAR_DEPTH
-        - BAR_DEPTH_BAND
-        - PIVOT_TAP_DRILL_DEPTH
-        - PIVOT_TAP_DRILL_DEPTH_LIMITS[1],
-    ),
     "pivot tap to the lower edge": (
         BAR_HEIGHT / 2.0 + HANGER_TAP_Y - THREAD_MAJOR_MM[PIVOT_TAP_THREAD] / 2.0,
         BAR_HEIGHT / 2.0
@@ -103,5 +96,3 @@ WALLS: dict[str, tuple[float, float]] = {
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_TARGET:
         raise AssertionError(f"support-bar {_name} wall {_worst:.3f} < {WALL_TARGET}")
-if PIVOT_TAP_FULL_THREAD_MIN > PIVOT_TAP_DRILL_DEPTH + PIVOT_TAP_DRILL_DEPTH_LIMITS[0]:
-    raise AssertionError("the pivot tap's full thread outruns its shallowest drill")

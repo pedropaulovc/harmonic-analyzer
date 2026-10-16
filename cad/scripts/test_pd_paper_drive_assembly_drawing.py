@@ -38,6 +38,7 @@ import pd_transgear_removable_spec as sprocket
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
 import vn_transgear_knob_cup_pin_spec as cup_pin
+import vn_transgear_pivot_screw_spec as pivot_screw
 
 STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
 # Default-format note text, measured on r743-rocker-fix3's render (leaf
@@ -76,6 +77,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-pivot-spacer": 1,
     "vn-transgear-pivot-screw": 1,
     "vn-transgear-pivot-spring": 1,
+    "vn-transgear-pivot-shim": 1,
     "vn-transgear-latch-pin": 1,
     "vn-latch-hook-bracket-screw": 2,
     "pd-latch-hook": 1,
@@ -318,7 +320,7 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     for method in ("RFS", "UNCERTAINTY", "QUALIFIED", "ACTUAL"):
         assert method not in fitted
     assert "COUNTERSINK" not in fitted
-    assert "PIVOT BORE IS REAMED TO THIS SCREW" in _step_body("hanger-pivoted")
+    assert "PIVOT BORE WAS REAMED TO THIS SCREW" in _step_body("hanger-pivoted")
     assert steps.step_number("arm-plate-located") + 1 == steps.step_number("arm-plate-fitted")
 
 
@@ -573,6 +575,34 @@ def test_an_uncrossed_ring_keeps_its_slots() -> None:
     assert drawing.uncrossed_ring_slots(centres[:2], attachments[1::-1]) == [1, 0]
 
 
+def test_the_isometric_ring_pair_from_run_082822_swaps() -> None:
+    """Run 20261015T082822796Z's audit: isometric balloons 14 and 16, leaders
+    (circle edge -> attachment), crossed at (372.9, 178.4) mm. Their slots
+    swap, and the swapped leaders cross nothing."""
+    centres = [(0.4017, 0.1595), (0.4032, 0.1753)]
+    attachments = [(0.3703, 0.1801), (0.3639, 0.1793)]
+
+    def crossings(slots: list[int]) -> list:
+        return find_leader_leader_crossings(
+            [
+                LeaderSegment(
+                    label=str(index),
+                    kind="balloon",
+                    x0=centres[slot][0],
+                    y0=centres[slot][1],
+                    x1=attach[0],
+                    y1=attach[1],
+                )
+                for index, (slot, attach) in enumerate(zip(slots, attachments))
+            ]
+        )
+
+    assert crossings([0, 1])
+    slots = drawing.uncrossed_ring_slots(centres, attachments)
+    assert slots == [1, 0]
+    assert not crossings(slots)
+
+
 # These families were assigned to the inner view after farm run
 # 20261001T051043622Z found no reachable isometric ink for the sleeve.
 # Native balloon landings, not old diameters or centres, defend the selection.
@@ -810,12 +840,32 @@ def test_the_knob_stack_prints_front_to_rear() -> None:
     assert body.index("REAR BOSS") < body.index(_number("pd-transgear-knob-cup"))
 
 
-def test_the_pivot_screw_is_threadlocked_and_the_spacer_pressed_as_made() -> None:
-    """R9-7 adds threadlocker to MHA-VN-041; R9-6 never faces MHA-PD-020.  R9-71:
-    the spacer is pressed on the shoulder flush with its end, and the MHA-VN-049
-    spring under the head holds the arm on it."""
+def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
+    """Rule 23: MHA-VN-041 runs through the bar, its tip faced below the
+    front face and staked there, shown in the pivot view; threadlocker is
+    optional. R9-6 never faces MHA-PD-020.  R9-71: the spacer is pressed on
+    the shoulder flush with its end, and the MHA-VN-049 spring under the
+    MHA-VN-069 shim holds the arm on it."""
     body = _step_body("hanger-pivoted")
-    assert "LOW-STRENGTH THREADLOCKER" in body
+    low, high = pivot_screw.TIP_RECESS
+    assert "THREADLOCKER OPTIONAL" in body
+    assert "BLIND" not in body
+    assert "THROUGH TAP" in body
+    assert f"{low:.2f} TO {high:.2f} BELOW THE BAR'S FRONT FACE" in body
+    assert "STAKE THE FRONT TAP MOUTH ONTO THE TIP AT 2 OPPOSITE POINTS" in body
+    # The screw is chosen by its unfaced tip before the arm's bore is reamed
+    # to it, so the fitter never meets a matched screw that fails the check.
+    assert (
+        "THE ARM'S PIVOT BORE WAS REAMED TO THIS SCREW, CHOSEN BEFORE REAMING "
+        "SO ITS UNFACED TIP REACHES THAT WINDOW: KEEP THEM TOGETHER."
+    ) in body
+    face = body.index("BELOW THE BAR'S FRONT FACE")
+    assert face < body.index("CHOSEN BEFORE REAMING")
+    assert "ANOTHER SCREW" not in body
+    assert drawing.PIVOT_VIEW_REF in body
+    assert body.index(_number("vn-transgear-pivot-shim")) < body.index(
+        _number("vn-transgear-pivot-spring")
+    )
     assert _number("vn-transgear-pivot-screw") in body
     assert _number("pd-transgear-pivot-spacer") in body
     assert _number("vn-transgear-pivot-spring") in body
@@ -844,20 +894,214 @@ def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
     assert "HEAD PLAY" not in body
 
 
+def test_the_pivot_section_and_its_locator_keep_to_sheet_two_left_field() -> None:
+    ring_left, _bottom, _right, ring_top = drawing.SHEET_TWO_RING_LIMITS
+    field_right = ring_left - drawing.SHEET_TWO_RING_GAP
+    # The section's balloon ring stays in the field.
+    sx, sy = drawing.PIVOT_SECTION_CENTER
+    reach = drawing.PIVOT_SECTION_RADIUS + drawing.BALLOON_RING_REACH
+    assert sx - reach > 0.018
+    assert sx + reach < field_right
+    # The locator's circle sits above the ring, its cutting line inside the
+    # circle and at least 1 mm past the stack each way along the axis.
+    lx, ly = drawing.PIVOT_LOCATOR_CENTER
+    lr = drawing.PIVOT_LOCATOR_RADIUS
+    assert lx + lr < field_right
+    assert ly + lr < ring_top
+    assert sy + reach < ly - lr - 0.006
+    scale = drawing.PIVOT_LOCATOR_SCALE[0] / drawing.PIVOT_LOCATOR_SCALE[1]
+    stack_half = (pivot_screw.HEAD_H - drawing.PIVOT_FRONT_FACE_Y) / 2.0
+    assert (stack_half + 1.0) * scale / 1000.0 <= drawing.PIVOT_CUT_HALF < lr
+    # The caption over the ring, left of the locator's section arrows.
+    caption_lines = drawing.PIVOT_CAPTION.splitlines()
+    cx, cy = drawing.PIVOT_CAPTION_XY
+    assert cx > 0.018
+    assert cx + max(map(len, caption_lines)) * NOTE_CHAR_WIDTH < lx - lr - 0.008
+    assert cy <= ring_top
+    assert cy - len(caption_lines) * NOTE_LINE_PITCH > sy + reach
+    # The native section caption under the ring, above the border.
+    caption_y = drawing.PIVOT_SECTION_CAPTION_XY[1]
+    assert caption_y < sy - reach
+    assert caption_y - 2 * NOTE_LINE_PITCH > drawing.SHEET_INNER_BORDER_BOTTOM
+    # Both circles frame the screw from its head to the bar's front face.
+    assert drawing.PIVOT_FRONT_FACE_Y == pytest.approx(
+        -(pivot_screw.SHOULDER_LEN + assembly.BAR.BAR_DEPTH)
+    )
+    assert drawing.PIVOT_SECTION_RADIUS == pytest.approx(
+        drawing.PIVOT_FRAME_RADIUS_MM
+        * drawing.PIVOT_SECTION_SCALE[0]
+        / drawing.PIVOT_SECTION_SCALE[1]
+        / 1000.0
+    )
+    assert drawing.PIVOT_VIEW_INSTANCES >= {
+        "pd-support-bar-1",
+        "vn-transgear-pivot-screw-1",
+        "vn-transgear-pivot-shim-1",
+    }
+
+
+def test_each_pivot_section_balloon_points_into_its_own_cut_face() -> None:
+    tips = {stem: (side, y, r) for stem, side, y, r in drawing.PIVOT_BALLOON_TIPS}
+    assert set(tips) == {
+        name.rsplit("-", 1)[0] for name in drawing.PIVOT_VIEW_INSTANCES
+    }
+    shim, spring, spacer = joints.SHIM, joints.SPRING, joints.SPACER
+    arm_geometry = joints.ARM
+    floor = -(shim.THICKNESS + spring.MODEL_HEIGHT)
+    arm_front = -(pivot_screw.SHOULDER_LEN - spacer.LENGTH)
+    # (y span along the axis, r span off it) of each part's cut face, in the
+    # screw's frame, head underside y 0.
+    faces = {
+        "vn-transgear-pivot-screw": (
+            (0.0, pivot_screw.HEAD_H),
+            (pivot_screw.SOCKET_AF / math.sqrt(3.0), pivot_screw.HEAD_DIA / 2.0),
+        ),
+        "vn-transgear-pivot-shim": ((-shim.THICKNESS, 0.0), (shim.ID / 2, shim.OD / 2)),
+        "vn-transgear-pivot-spring": (
+            (floor, -shim.THICKNESS),
+            (spring.ID / 2, spring.OD / 2),
+        ),
+        "pd-transgear-arm": (
+            (arm_front, floor),
+            (arm_geometry.PIVOT_BORE_DIA / 2, arm_geometry.SPOT_FACE_DIA / 2),
+        ),
+        "pd-transgear-pivot-spacer": (
+            (-pivot_screw.SHOULDER_LEN, arm_front),
+            (spacer.BORE_DIA / 2, spacer.OD / 2),
+        ),
+        "pd-support-bar": (
+            (drawing.PIVOT_FRONT_FACE_Y, -pivot_screw.SHOULDER_LEN),
+            (assembly.BAR.PIVOT_TAP_CSK_DIA / 2, drawing.PIVOT_FRAME_RADIUS_MM),
+        ),
+    }
+    centre_y = drawing.PIVOT_VIEW_CENTRE_MM[1]
+    for stem, (side, y, r) in tips.items():
+        (y0, y1), (r0, r1) = faces[stem]
+        assert y0 < y < y1, stem
+        assert r0 < r < r1, stem
+        # Inside the crop circle.
+        assert math.hypot(r, y - centre_y) < drawing.PIVOT_FRAME_RADIUS_MM, stem
+    # The spring's tip is on its cone's diagonal, inside its thin wall.
+    _side, y, r = tips["vn-transgear-pivot-spring"]
+    assert y == pytest.approx((floor - shim.THICKNESS) / 2.0)
+    assert r == pytest.approx((spring.ID + spring.OD) / 4.0)
+    # Down the stack the tips alternate sides.
+    order = sorted(tips.values(), key=lambda tip: -tip[1])
+    assert [side for side, _y, _r in order] == ["right", "left"] * 3
+
+
+def test_the_pivot_stake_note_points_at_the_front_mouth_clear_of_the_balloons() -> None:
+    """Rule 23: SECTION A-A shows where the lock is, its pointer in the bar's
+    metal at the front tap mouth and its text off the section and balloons."""
+    y, r = drawing.PIVOT_STAKE_TIP
+    front = -(pivot_screw.SHOULDER_LEN + assembly.BAR.BAR_DEPTH)
+    csk_rim = assembly.BAR.PIVOT_TAP_CSK_DIA / 2.0
+    # In the bar, under 1 mm from the front face and the countersink's rim.
+    assert front < y < front + 1.0
+    assert csk_rim < r < csk_rim + 1.0
+    centre_y = drawing.PIVOT_VIEW_CENTRE_MM[1]
+    assert math.hypot(r, y - centre_y) < drawing.PIVOT_FRAME_RADIUS_MM
+    # Its tip is right of the axis; the bar's balloon points left.
+    sides = {stem: side for stem, side, *_ in drawing.PIVOT_BALLOON_TIPS}
+    assert sides["pd-support-bar"] == "left"
+    assert drawing.PIVOT_STAKE_POINTS_TEXT in drawing.PIVOT_STAKE_NOTE
+    assert drawing.PIVOT_STAKE_POINTS_TEXT in drawing.PIVOT_CAPTION
+    assert drawing.PIVOT_STAKE_NOTE in drawing.sheet_texts(_unit_step_notes())
+
+    lines = drawing.PIVOT_STAKE_NOTE.splitlines()
+    width = max(map(len, lines)) * NOTE_CHAR_WIDTH
+    height = len(lines) * NOTE_LINE_PITCH
+    sx, sy = drawing.PIVOT_SECTION_CENTER
+    radius = drawing.PIVOT_SECTION_RADIUS
+    scale = drawing.PIVOT_SECTION_SCALE[0] / drawing.PIVOT_SECTION_SCALE[1] / 1000.0
+    # The section is centred on the stack with its axis vertical, so the tip
+    # stands r right of the circle's centre.
+    tip_x = sx + r * scale
+    column_x = sx + radius + drawing.PIVOT_BALLOON_GAP
+    field_right = drawing.SHEET_TWO_RING_LIMITS[0] - drawing.SHEET_TWO_RING_GAP
+    caption_y = drawing.PIVOT_SECTION_CAPTION_XY[1]
+    right_tips = [
+        tip_y
+        for _stem, side, tip_y, _r in drawing.PIVOT_BALLOON_TIPS
+        if side == "right"
+    ]
+    for front_side in (1.0, -1.0):
+        left, top = drawing.pivot_stake_note_xy(tip_x, front_side)
+        bottom = top - height
+        # The whole text right of the tip: the leader leaves its left end.
+        assert left - tip_x >= 0.005
+        assert left + width < field_right
+        # Outside the circle at the front face's end, the tip beyond the
+        # text's near edge, so the leader runs away from the text.
+        tip_y = sy - front_side * (y - centre_y) * scale
+        if front_side > 0:
+            assert bottom > sy + radius
+            assert sy < tip_y < bottom
+        else:
+            assert top < sy - radius
+            assert top < tip_y < sy
+            # Above the native section caption with a line to spare.
+            assert bottom - NOTE_LINE_PITCH > caption_y
+        near = top if front_side < 0 else bottom
+        assert math.hypot(left - tip_x, tip_y - near) < 0.015
+        # Clear of the right balloon column, whichever way the axis runs.
+        ys = sorted(
+            (sy - front_side * (tip - centre_y) * scale for tip in right_tips),
+            reverse=True,
+        )
+        for balloon_y in drawing.spread_balloon_column(ys, drawing.PIVOT_BALLOON_PITCH):
+            dx = max(left - column_x, 0.0, column_x - (left + width))
+            dy = max(bottom - balloon_y, 0.0, balloon_y - top)
+            assert math.hypot(dx, dy) > BALLOON_RADIUS + 0.002
+    with pytest.raises(ValueError):
+        drawing.pivot_stake_note_xy(tip_x, 0.0)
+
+
+def test_pivot_section_balloon_columns_keep_order_and_pitch() -> None:
+    pitch = drawing.PIVOT_BALLOON_PITCH
+    assert drawing.spread_balloon_column([0.05, 0.0, -0.05], pitch) == [
+        pytest.approx(v) for v in (0.05, 0.0, -0.05)
+    ]
+    spread = drawing.spread_balloon_column([0.010, 0.008, 0.007], pitch)
+    assert all(a - b >= pitch - 1e-12 for a, b in zip(spread, spread[1:]))
+    assert sum(spread) == pytest.approx(0.025)
+    with pytest.raises(ValueError):
+        drawing.spread_balloon_column([0.0, 0.01], pitch)
+    # Every balloon of either column stays inside the section's ring reach.
+    scale = drawing.PIVOT_SECTION_SCALE[0] / drawing.PIVOT_SECTION_SCALE[1] / 1000.0
+    sx, sy = drawing.PIVOT_SECTION_CENTER
+    centre_y = drawing.PIVOT_VIEW_CENTRE_MM[1]
+    reach = drawing.PIVOT_SECTION_RADIUS + drawing.BALLOON_RING_REACH
+    assert drawing.PIVOT_SECTION_RADIUS + drawing.PIVOT_BALLOON_GAP < reach
+    for flip in (1.0, -1.0):
+        for column in ("left", "right"):
+            ys = sorted(
+                (
+                    sy + flip * (y - centre_y) * scale
+                    for _stem, side, y, _r in drawing.PIVOT_BALLOON_TIPS
+                    if side == column
+                ),
+                reverse=True,
+            )
+            for balloon_y in drawing.spread_balloon_column(ys, pitch):
+                assert abs(balloon_y - sy) < reach - 0.005
+
+
 def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installation() -> None:
     """A static F-to-disc setting cannot certify all loaded overlapping patches."""
     assert _step_body("platen-hung").startswith("TRIAL-HANG")
     inspected = _step_body("collar-disc-air-inspected")
     assert "CHAIN OFF" in inspected
-    assert "REMOVE THE TRIAL PLATEN" in inspected
+    assert f"REMOVE THE {_number('pd-platen')} PLATEN" in inspected
+    assert "TRIAL PLATEN" not in inspected
     assert "ARM HELD IN ITS OPERATING LATCH POSE" in inspected
     assert " ".join(collar.COLLAR_DISC_AIR_PHRASE.split()) in inspected
     assert f"ONE DISC TURN = {disc.TEETH / knob_shaft.TEETH:g} KNOB TURNS" in inspected
-    assert "REFIT THE PLATEN AND LOCK THE ASSEMBLY" in inspected
+    assert "REFIT THE PLATEN AND LATCH THE HANGER" in inspected
     assert "RE-CHECK THE OVERLAP AIR AND RACK MESH" in inspected
     assert "BIASED" not in inspected
     assert steps.COLLAR_DISC_AIR_MIN == collar.COLLAR_DISC_AIR_MIN
-    assert "AT OVERLAP AFTER REFITTING AND LOCKING" in _step_body("fitup-accepted")
+    assert "AT OVERLAP AFTER REFITTING AND LATCHING" in _step_body("fitup-accepted")
     keys = (
         "hook-pin-hole-match-drilled",
         "collar-shoulder-seated",
@@ -893,7 +1137,27 @@ def test_the_rear_cup_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
     assert seq.index("pilot-faced-to-fit") < seq.index("knob-stack-fitted")
     assert seq.index("pilot-faced-to-fit") < seq.index("collar-shoulder-seated")
     assert f"{collar.PILOT_PROUD_TEXT} PROUD" in _step_body("pilot-faced-to-fit")
-    assert _step_body("collar-shoulder-seated").endswith("NUT TIGHT ON THE PILOT.")
+    seated = _step_body("collar-shoulder-seated")
+    assert "NUT TIGHT ON THE PILOT." in seated
+    # The nut is a static clamp (the D-flat and dowels drive): rule 23's
+    # U-MHA-PD-013-no-lock holds only while nobody turns it to drive.
+    assert seated.endswith("THUMBNUT IS A CLAMP ONLY; NEVER TURNED TO DRIVE.")
+
+
+def test_the_knob_and_its_grip_are_defined_and_service_turns_the_crank() -> None:
+    knob = _step_body("knob-stack-fitted")
+    chain_step = steps.step_number("chain-closed")
+    assert knob.endswith(
+        "THIS SHAFT IS THE KNOB; ITS GRIP IS THE COLLAR: HOLD OR TURN THE KNOB BY "
+        f"IT TILL STEP {chain_step}, THEN TURN THE CRANK."
+    )
+    assert "KNOB HELD" in _step_body("hanger-meshed")
+    assert steps.SEQUENCE.index("knob-stack-fitted") < steps.SEQUENCE.index(
+        "hanger-meshed"
+    )
+    assert _step_body("chain-run-accepted").startswith("TURN THE CRANK")
+    for key in steps.SEQUENCE[chain_step - 1 :]:
+        assert "TURN THE KNOB" not in _step_body(key), key
 
 
 def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> None:
@@ -1469,8 +1733,15 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     # The one-piece hook's pin hole is drilled from the pin at the set mesh,
     # then the part is hardened: no fitter-measured set position remains.
     assert "DRAWN PLACE" not in hook
-    assert "HARDEN AND TEMPER BLUE" in hook
-    assert hook.endswith("UNCLAMP, LATCH, RE-RUN THE DEFINED ENGAGED-FEED WINDOW.")
+    # Rule 24: the heat treatment is the hook drawing's; the re-run re-checks
+    # step 24's datum shake (rule 4: the drilled hole must keep that band).
+    hook_number = drawing._N["pd-latch-hook"]
+    assert f"HARDEN AND TEMPER PER {hook_number}." in hook
+    assert "BLUE" not in hook
+    assert hook.endswith(
+        "UNCLAMP, LATCH, RE-RUN THE DEFINED ENGAGED-FEED WINDOW; RE-CHECK "
+        f"{steps.RACK_DATUM_BACKLASH_TEXT} SHAKE AT THE DATUM."
+    )
 
 
 def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None:

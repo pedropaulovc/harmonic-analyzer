@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the platen support bar (MHA-PD-007).
 
 A 452 x 28 x 9 steel bar clamped across the frame columns. Its BACK face
-carries the transgear pivot's flat-bottomed #8-32 tap and the latch hook's two
+carries the transgear pivot's #8-32 through tap and the latch hook's two
 #4-40 through taps on one row; its FRONT face, which the platen slides on,
 carries the four clamp screws: two counterbored holes on the east column and
 two counterbored slots on the west one (owner ruling 2026-10-15, option A).
@@ -23,8 +23,8 @@ two counterbored slots on the west one (owner ruling 2026-10-15, option A).
   taps it takes up and the counterbore's the MHA-VN-021 head it holds.
   Section B-B cuts the inner slot across the bar for the counterbore's depth.
 * Each face view carries its caption; section A-A cuts the pivot tap across
-  the bar: the banded thickness, the drill's depth limits and the full
-  thread's MIN (PivotThreadReference, in the cutting plane).
+  the bar: the banded thickness and the tap's countersunk mouths on both
+  faces.
 
 Every value and band is a native model dimension authored by
 ``build_pd_support_bar``; the sheet only places and curates them.
@@ -181,7 +181,7 @@ FRONT_KEEP = {
     "Length": (FACE_CENTER[0], FACE_BOTTOM - 4.0 * ROW_STEP),
     "HangerRowHeight": (RIGHT_END + 0.022, FACE_BOTTOM - 0.010),
     "PivotTapDrillDia": (_face_x(PIVOT_TAP_X) + 0.032, FACE_TOP + 0.030),
-    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.043, FACE_TOP + 0.014),
+    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.039, FACE_TOP + 0.014),
     "BracketCskDia": (_face_x(BRACKET_TAP_X[0]) + 0.059, FACE_TOP + 0.014),
 }
 BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.056, FACE_TOP + 0.031)
@@ -300,19 +300,20 @@ SLOT_SECTION_KEEP_NAMES = ("ClampSlotCboreDepth",)
 SLOT_DEPTH_SHELF_DROP = 0.0112
 SLOT_DEPTH_TEXT_SIDE = 0.018
 
-# Section A-A: the thickness up-left of the cut bar, the full thread and the
-# drill depth below it (shorter nearer). Each text stands outside its
-# extension lines, beyond the tap's mouth, since the 2:1 spans are narrower
-# than the texts. The caption drops under them.
-SECTION_KEEP_NAMES = ("Depth", "ThreadMin", "DrillDepth")
+# Section A-A: the thickness up-left of the cut bar, its text outside the
+# extension lines since the 2:1 span is narrower than it. Nothing is
+# dimensioned under the cut bar, so its caption's top stands just under the
+# bar's foot at the native caption's x (r4 review: a 35 mm drop, kept from
+# when the thread and drill depths stood there, put it beside the isometric).
+SECTION_KEEP_NAMES = ("Depth",)
 SECTION_DEPTH_RISE = 0.010
 SECTION_DEPTH_SIDE = 0.028
-SECTION_DEPTH_TEXT_SIDE = 0.016
-# The full thread's text states its 1.5D shortfall, so it stands further out.
-SECTION_THREAD_TEXT_SIDE = 0.026
-SECTION_THREAD_DROP = 0.010
-SECTION_DRILL_DROP = 0.027
-CAPTION_DROP = 0.035
+SECTION_CAPTION_GAP = 0.004
+SECTION_CAPTION_TOP_Y = (
+    SECTION_CENTER[1]
+    - BAR_HEIGHT * SECTION_SCALE[0] / SECTION_SCALE[1] / 2000.0
+    - SECTION_CAPTION_GAP
+)
 # How far (model mm) each cutting line runs past the bar's top and bottom
 # edges. Both views are 1:2, and SolidWorks stands each end's letter at the
 # same offset from its arrow's line (r7: from 1.28 mm under it to 4.89 over),
@@ -360,26 +361,17 @@ def _turn_y_up(adapter: Any, view: Any, *, label: str) -> None:
 
 
 def _section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
-    """Section A-A's text positions from its own projection, whichever way the
-    cut looks: the thickness left of the bar's left face, the depths beyond
-    the tap's mouth."""
+    """Section A-A's text position from its own projection, whichever way the
+    cut looks: the thickness left of the bar's left face."""
 
     def point(z: float, y: float = HANGER_TAP_Y) -> tuple[float, float]:
         return _sheet(adapter, section, (PIVOT_TAP_X, y, z), "section A-A")
 
     top = point(0.0, BAR_HEIGHT / 2.0)[1]
-    bottom = point(0.0, -BAR_HEIGHT / 2.0)[1]
     mouth = point(BACK_FACE_Z)[0]
     front = point(-BACK_FACE_Z)[0]
-    away = math.copysign(1.0, mouth - front)
-    outside = mouth + away * SECTION_DEPTH_TEXT_SIDE
     return {
         "Depth": (min(mouth, front) - SECTION_DEPTH_SIDE, top + SECTION_DEPTH_RISE),
-        "ThreadMin": (
-            mouth + away * SECTION_THREAD_TEXT_SIDE,
-            bottom - SECTION_THREAD_DROP,
-        ),
-        "DrillDepth": (outside, bottom - SECTION_DRILL_DROP),
     }
 
 
@@ -802,36 +794,28 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
 
-    # Section A-A cuts down the pivot axis across the whole height; its
-    # full-thread line lies in the cutting plane and is shown while it is cut.
-    with hidden_sketches.part_sketches_shown(
+    # Section A-A cuts down the pivot axis across the whole height.
+    top = BAR_HEIGHT / 2.0 + SECTION_OVERRUN_TOP
+    foot = -(BAR_HEIGHT / 2.0 + SECTION_OVERRUN_FOOT)
+    section = create_section_view(
         adapter,
-        source_model,
-        ("PivotThreadReference",),
-        label="pivot section",
-        base_view=face,
-    ):
-        top = BAR_HEIGHT / 2.0 + SECTION_OVERRUN_TOP
-        foot = -(BAR_HEIGHT / 2.0 + SECTION_OVERRUN_FOOT)
-        section = create_section_view(
-            adapter,
-            face,
-            line_start=_sheet(adapter, face, (PIVOT_TAP_X, top, 0.0), "cut top"),
-            line_end=_sheet(adapter, face, (PIVOT_TAP_X, foot, 0.0), "cut foot"),
-            view_xy=SECTION_CENTER,
-            section_label="A",
-            scale=SECTION_SCALE,
-            label="section A-A",
-        )
-        _turn_y_up(adapter, section, label="section A-A")
-        set_hidden_lines_removed(adapter, section)
-        section_annotations = hidden_sketches.curate_view_dimensions(
-            adapter,
-            section,
-            keep=_section_keep(adapter, section),
-            view_label="section A-A",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        )
+        face,
+        line_start=_sheet(adapter, face, (PIVOT_TAP_X, top, 0.0), "cut top"),
+        line_end=_sheet(adapter, face, (PIVOT_TAP_X, foot, 0.0), "cut foot"),
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=SECTION_SCALE,
+        label="section A-A",
+    )
+    _turn_y_up(adapter, section, label="section A-A")
+    set_hidden_lines_removed(adapter, section)
+    section_annotations = hidden_sketches.curate_view_dimensions(
+        adapter,
+        section,
+        keep=_section_keep(adapter, section),
+        view_label="section A-A",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
 
     # The west slots: detail C face-on at the outer one (a cropped model
     # view, dimensioned before its crop), section B-B across the inner one
@@ -896,7 +880,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     )
     _add_slide_finishes(adapter, face, back)
-    _move_caption(adapter, section, lambda x, y: (x, y - CAPTION_DROP))
+    _move_caption(adapter, section, lambda x, _y: (x, SECTION_CAPTION_TOP_Y))
     _move_caption(adapter, slot_section, lambda _x, _y: SLOT_SECTION_CAPTION_XY)
     _place_caption(adapter, FACE_VIEW_CAPTION, FACE_CAPTION_TOP)
     _place_caption(adapter, BACK_VIEW_CAPTION, BACK_CAPTION_TOP)

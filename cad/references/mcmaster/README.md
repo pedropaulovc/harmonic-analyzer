@@ -39,6 +39,7 @@ recipes:
 | 91251A157 | — (catalogue-only diagnostic recipe; former `vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91255A106 | — (diagnostic recipe; a former `vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
+| 90325A174 | `vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
 | 91375A105 | `vn-pen-rod-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91375A106 | `vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
@@ -51,7 +52,6 @@ recipes:
 | 91794A077 | `vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A080 | `vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A540 | `vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
-| 91829A205 | `vn-transgear-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91829A560 | `vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 92314A253 | `vn-knife-hanger-stud` (modified stock; catalogue-only, no vendor model) | 18-8 Stainless Steel Hex Head Screw, #10-24 × 2 in, cut to length |
 | 91882A221 | `vn-thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
@@ -76,6 +76,7 @@ recipes:
 | 9714K392 | `vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9715K43 | `vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
 | 97431A260 | `vn-transgear-retaining-ring` | Side-Mount External Retaining Ring |
+| 98055A098 | `vn-transgear-pivot-shim` (MHA-VN-069; catalogue-only, no vendor model) | DIN 988 Shim, Stress-Resistant Spring Steel |
 | 98296A026 | `vn-transgear-collar-cross-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A031 | `vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
@@ -658,26 +659,27 @@ Catalog specifications checked on September 10, 2026:
   carries the 98381A473 harvest's end forms at the longer length; it is
   catalogue-only: no vendor model, no replica gate, and its standalone
   diagnostic is a catalog-only run.
-- [91829A205](https://www.mcmaster.com/91829A205/) (`vn-transgear-pivot-screw`,
+- [90325A174](https://www.mcmaster.com/90325A174/) (`vn-transgear-pivot-screw`,
   MHA-VN-041) is the hanger arm's pivot: its shoulder runs through the arm and
-  the pivot spacer, and its thread enters the support bar's blind tap. The
-  product page was read live on September 30, 2026: slotted 18-8 stainless
-  steel precision shoulder screw, passivated, MS51575-11; shoulder Ø3/16 in
-  (-0.001/0) x 1/2 in (0/+0.002), 8-32 UNC class 2A thread 3/16 in long,
-  head Ø5/16 in x 5/32 in. The geometry is the vendor model's own:
-  `diag_build_91829A205.py` replays the dimensions and solved sketch geometry
-  read from `91829A205.SLDPRT` (harvested on amet on September 30, 2026; the
-  read-only dump `cad/out/reports/mcmaster-91829A205-dump.json`), the
-  91829A560 feature tree at this size: slot 1.27 wide x 1.5875 deep,
-  head-rim chamfer 0.257969 and tip chamfer 0.374904 (both 45°), and the
-  thread neck under the shoulder's end face. The neck is a R0.5715 fillet
-  into a Ø3.0226 land, flat to 1.1938 below the end face, then a 45° flank
-  back to the thread major, so full thread starts 1.7653 below the end face
-  and the joint counts engagement from there. `diag_build_mcmaster.py
-  91829A205` runs the replica gate against the vendor's volume
-  451.9447 mm³, surface 485.1899 mm² and 20-face area multiset. Evidence
-  SHA-256: native SLDPRT
-  `bb7a805e75e4e656242ff71cc97cf7e34a7f97c4a90fd66f4b05cb3ebe24601c`.
+  the pivot spacer, and its thread runs through the support bar's through tap,
+  the tip faced 0.20-0.50 below the bar's front face at fit-up and staked at
+  the front tap mouth (rule 23, user ruling 2026-10-15; threadlocker
+  optional). It replaced 91829A205 (slotted, 8-32 x 3/16 thread: 0.72D
+  engagement nominal in the old blind tap), whose diagnostic recipe was
+  retired with it. The product page was read live on October 14, 2026: 18-8
+  stainless steel precision shoulder screw, 3/32 in hex socket; shoulder
+  Ø3/16 in (-0.001/0) x 1/2 in (0/+0.002), 8-32 UNC class 2A thread 3/8 in
+  long, head Ø5/16 in x 5/32 in (the same head envelope as 91829A205); $3.98
+  each. Only 90325A171..174 carry a 3/8 in thread on a 3/16 in shoulder. The
+  page's CAD download was refused (HTTP 403), so it is catalogue-only: no
+  vendor model and no replica gate. ASME B18.3-2012 Table 13 (3/16 row)
+  bounds what the page omits: socket key engagement T 0.079 min, head-rim
+  chamfer C 0.012 max, the thread neck, and the thread length's -0.020 in
+  tolerance (9.017 mm shortest). `diag_build_90325A174.py` keeps the retired
+  91829A205 recipe's replica-gated feature order with the slot replaced by
+  the hex socket; full thread starts 1.7653 below the shoulder's end face,
+  and the joint charges one full pitch at the faced tip, so the worst-case
+  engagement is 1.515D (1.582D nominal).
 - [91794A055](https://www.mcmaster.com/91794A055/) (`vn-transgear-disc-screw`,
   MHA-VN-039, three) joins the brass disc hub's flange to the 120T disc: each
   head sits on the flange and the thread enters one of the disc's through
@@ -781,7 +783,7 @@ Catalog specifications checked on September 10, 2026:
 
 - [9715K43](https://www.mcmaster.com/9715K43/) (`vn-transgear-pivot-spring`,
   MHA-VN-049, one) sits on the MHA-VN-041 pivot shoulder screw's shoulder, between
-  the underside of its head and the floor of the MHA-PD-018 arm's spot face, and
+  the MHA-VN-069 shim under its head and the floor of the MHA-PD-018 arm's spot face, and
   preloads the arm forward onto the MHA-PD-020 spacer. Its page was read live on
   October 2, 2026 ("Curved Disc Springs, for 0.190" Shaft Diameter, 0.200"
   ID, 0.423" OD, 0.0113" Thick"): for a 0.190 in shaft, ID 0.200 in, OD
@@ -802,6 +804,19 @@ Catalog specifications checked on September 10, 2026:
   SolidWorks model is offered on the page, but none was fetched or kept here,
   so it is catalogue-only: no replica gate, and its standalone diagnostic is
   a catalog-only run.
+- [98055A098](https://www.mcmaster.com/products/din-988-shims/thickness~0-5-mm/shims-1~~/shims-4~performance~stress-resistant/)
+  (`vn-transgear-pivot-shim`, MHA-VN-069, one) sits on the MHA-VN-041 shoulder
+  under its head, on the MHA-VN-049 spring. The 9.5 support bar grew rearward
+  0.5 (user ruling B, 2026-10-15), which carried the shoulder's end and the
+  head 0.5 rearward; the shim takes that back so the spring keeps its room:
+  0.80 nominal, 0.70 min, 1.0008 max against the spring's 0.6858 working and
+  1.1938 free heights, a preload of 15.2-38.9 N. The page was read live on
+  October 15, 2026: DIN 988 shim, stress-resistant spring steel, 5 mm ID x
+  10 mm OD x 0.5 mm thick, thickness -0.05/0, ID 5.03-5.40, OD 9.53-9.96;
+  pack of 50, $6.90. 98089A331 was rejected: its ±0.064 thickness leaves a
+  0.636 minimum room, under the spring's working height.
+  `diag_build_98055A098.py` models the annulus at nominal; no supplier CAD
+  was harvested, so it is catalogue-only: no replica gate.
 
 - [9714K392](https://www.mcmaster.com/9714K392/) (`vn-cylinder-bank-spring`,
   MHA-VN-052, one) sits on the MHA-DT-013 arbor between the front MHA-DT-026

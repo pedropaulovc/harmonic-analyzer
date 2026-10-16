@@ -158,10 +158,11 @@ def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, f
 # The worst far-face margin this test's restatement finds at the printed
 # rows, and the retired 3/4 pin's: with the latch hole's height at ±0.065
 # (LATCH_PIN_HEIGHT_BAND) it barely clears in a 6.10 hole; 0.05 deeper it
-# stops short of the face.
-_PINNED_FAR_FACE_MARGIN = 0.811
-_PINNED_OLD_PIN_MARGIN = 0.036
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.014
+# stops short of the face. Ruling B's 9.5 bar shortened the hook's ear
+# 16.0 -> 15.5, so the bend lever and its loss shrank 0.5.
+_PINNED_FAR_FACE_MARGIN = 0.818
+_PINNED_OLD_PIN_MARGIN = 0.043
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.007
 
 
 def _worst_far_face_margin(
