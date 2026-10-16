@@ -144,9 +144,11 @@ FRONT_KEEP = {
 # slot's round end, with its value and fit callout above the circle. The
 # run's value and its two-line function flag sit right of and below the
 # circle, under the detail label: left of the circle the flag would cross it.
+# The flag's widest line prints 51.4 mm wide (farm run 3111b8f0a), so its
+# centre stands far enough right that the whole line clears the circle.
 DETAIL_KEEP = {
     "RodSlotWidth": (DETAIL_CENTER[0] + 0.020, DETAIL_CENTER[1] + 0.028),
-    "RodSlotFlat": (DETAIL_CENTER[0] + 0.037, DETAIL_CENTER[1] - 0.012),
+    "RodSlotFlat": (DETAIL_CENTER[0] + 0.042, DETAIL_CENTER[1] - 0.012),
 }
 # Below the edge view and left of its extension lines (the text is far wider
 # than the 3.175 span), clear of the front view's rod tip and the isometric.

@@ -514,7 +514,10 @@ def test_rod_slot_detail_circle_and_label_stay_clear_of_the_notes_and_frame() ->
     assert width_x > x + crop
     assert drawing.DETAIL_LABEL_XY[0] - 0.010 > width_x
     assert drawing.DETAIL_LABEL_TEXT == "DETAIL A\nSCALE 5 : 1"
-    # The run's value and flag sit right of the circle, under the label.
+    # The run's value and flag sit right of the circle, under the label. Its
+    # widest line, "PIN REACH TO ROD-PIN", printed 51.4 mm wide and centred on
+    # the dimension (farm run 3111b8f0a's layout audit: text-on-line against
+    # the circle at +0.037), so the whole line must clear the circle's extent.
     flat_x, flat_y = drawing.DETAIL_KEEP["RodSlotFlat"]
-    assert flat_x > x + crop and flat_y < y - 0.010
+    assert flat_x - 0.0514 / 2.0 > x + crop and flat_y < y - 0.010
     assert flat_y < drawing.DETAIL_LABEL_XY[1] - 0.015
