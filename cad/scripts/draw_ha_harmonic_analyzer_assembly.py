@@ -116,15 +116,20 @@ _LANDSCAPE = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
 _PORTRAIT_USABLE_Y = (_PORTRAIT.title_block_top_m, _PORTRAIT.height_m - _BORDER)
 
 # Sheet 1: front (paper side) and the crank-side view to its right, one row,
-# the front's left edge set in far enough for the bar-height dimension. The
-# note sits under the views, above the title block.
+# the front's left edge set in far enough for the bar-height dimension and its
+# callout, which stand wholly west of the front view's ink (r3: at 0.040 the
+# callout crossed the left border by 9 mm and ran into the west column; the
+# outline carries ~7 mm of padding west of the ink). The crank-side outline
+# then ends ~7 mm inside the right border. The note sits under the views,
+# above the title block.
 ASSEMBLED_ROW_Y = 0.252
-FRONT_LEFT_X = 0.040
-VIEW_GAP_X = 0.020
-BAR_DIMENSION_TEXT_DX = -0.010  # left of the front view's outline
-# The stud-drop text stands just east (viewer's right) of the pen rod, at the
-# span's mid-height, so its extension lines stay short.
-STUD_DIMENSION_TEXT_MODEL_DX_MM = -45.0
+FRONT_LEFT_X = 0.052
+VIEW_GAP_X = 0.015
+BAR_DIMENSION_TEXT_DX = -0.016  # left of the front view's outline
+# The stud-drop text stands in the clear bay east (viewer's right) of the pen
+# rod, between the rod and the east column, at the span's mid-height (r3: at
+# -45 it sat across the rod and the wheel rim).
+STUD_DIMENSION_TEXT_MODEL_DX_MM = -96.0
 ASSEMBLED_NOTE_XY = (0.020, 0.100)
 ASSEMBLED_NOTE_WIDTH = 84  # characters; default-format note text
 
@@ -136,10 +141,11 @@ BALLOON_MARGIN = 0.012
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
     "part": 0.032,
-    "description": 0.100,
+    "description": 0.125,
     "quantity": 0.012,
 }
-BOM_DESCRIPTION_MAX_CHARS = 48  # ~2 mm per BOM character
+# ~2.7 mm per BOM character (r3: 0.100 wrapped five of the eight rows)
+BOM_DESCRIPTION_MAX_CHARS = 46
 BOM_ROW_HEIGHT = 0.006
 BOM_ANCHOR = ((_PORTRAIT.width_m - sum(BOM_COLUMN_WIDTHS.values())) / 2.0, 0.405)
 EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.415)
