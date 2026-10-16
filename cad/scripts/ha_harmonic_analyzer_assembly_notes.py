@@ -61,9 +61,11 @@ NIB_CLEARANCE_TEXT = f"{PEN_PAPER_CLEARANCE_MM:.2f}"
 # Each setting's printed callout names what it sets and the step that sets
 # it; the step text points back to the sheet-1 dimension, so the value lives
 # only on the associative model dimension.
+# Both callouts stay short: the bar-height text stands wholly west of the
+# front view, the stud text in the bay between the pen rod and the east column.
 SETTING_CALLOUTS = {
-    BAR_HEIGHT_DIMENSION: f"WHEEL BAR TOP (STEP {steps.step_number('magnifier-bar-clamped')})",
-    STUD_DROP_DIMENSION: f"STUD HEAD (STEP {steps.step_number('pen-wire-tied')})",
+    BAR_HEIGHT_DIMENSION: f"BAR TOP (STEP {steps.step_number('magnifier-bar-clamped')})",
+    STUD_DROP_DIMENSION: f"STUD (STEP {steps.step_number('pen-wire-tied')})",
 }
 
 # --- Fitter package text ----------------------------------------------------
@@ -150,9 +152,9 @@ _STEP_TEXT: dict[str, str] = {
         "ITS MHA-PN-000 SETTING."
     ),
     "stick-parked": (
-        "MEASURING STICK: PARK MHA-MS-000 ON THE GREEN LAND BETWEEN THE DECK'S "
-        "EAST EDGE AND THE EAST COLUMNS, STICK FRONT TO REAR, GRADUATIONS UP, "
-        "CENTRED FRONT TO REAR (SHEET 2)."
+        "MEASURING STICK: PARK MHA-MS-000 ON THE MHA-FR-001 AS-CAST TOP BETWEEN "
+        "THE RAISED DECK'S EAST EDGE AND THE EAST COLUMNS, AS SHOWN ON SHEET 2: "
+        "STICK FRONT TO REAR, GRADUATIONS UP, CENTRED FRONT TO REAR."
     ),
 }
 if set(_STEP_TEXT) != set(steps.SEQUENCE):
@@ -163,7 +165,7 @@ ASSEMBLY_STEPS: tuple[str, ...] = tuple(
 )
 
 ASSEMBLY_CHECKS: tuple[str, ...] = (
-    "1. WHEEL BAR TOP AND STUD HEAD READ THEIR SHEET 1 SETTINGS; A "
+    "1. BAR TOP AND STUD READ THEIR SHEET 1 SETTINGS; A "
     f"{NIB_CLEARANCE_TEXT} FEELER JUST DRAGS BETWEEN NIB AND PAPER.",
     f"2. ALL {CHANNEL_ANCHORS} ANCHOR EYES STAND IN THEIR SPRINGS' PULL PLANES; "
     "NO NECK STANDS MORE THAN 1 TURN OFF THE PLATE TOP.",
