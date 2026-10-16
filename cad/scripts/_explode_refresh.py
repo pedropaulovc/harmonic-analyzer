@@ -10,17 +10,21 @@ saved, without the insert/mate loop.
 
 The tier proves rather than assumes that. The reopened model must open clean,
 with its simplified configuration already in sync and its resolved geometry
-fingerprint equal to the proof it was published with; the re-authored model
-must be collapsed. The fingerprint is only ever taken where a FULL build takes
-its proof, on the persisted model after the rebuild-state reconciliation: an
-open session that has just authored explodes in two configurations
-fingerprints differently (observed on the paper drive) without any component
-having moved. So the proof is retired before the in-place save, and
-republished only if the re-saved model reproduces it. Otherwise the tier
-raises with no proof on disk: the task fails, nothing is stamped or
-published, and the next build takes the FULL tier, which replaces the bytes.
-PNG renders, the free-DOF manifest and every other sidecar describe the
-collapsed operational model, which is unchanged, so they are kept as saved.
+fingerprint equal to the proof it was published with, so the saved bytes are
+the ones the proof vouches for. No part changed (else the tier is not taken),
+so only a component pose could move: every top-level component's
+``Transform2`` must stay numerically equal to its reopened value after
+re-authoring (checked before the in-place save) and again on the reconciled
+re-saved model, and the model must be collapsed when saved. The proof is
+retired before the save and republished from the re-saved model, fingerprinted
+exactly where a FULL build takes it. That fingerprint hashes the ``repr`` of
+rounded values, so a solver-noise sign flip of a zero rotation entry
+(``-0.0`` -> ``0.0``, observed on the paper drive's knob drive pins) changes
+it with nothing moved; the pose comparison is numeric and does not. If a
+check fails the tier raises with no proof on disk: the task fails, nothing is
+stamped or published, and the next build takes the FULL tier, which replaces
+the bytes. PNG renders, the free-DOF manifest and every other sidecar describe
+the collapsed operational model, which is unchanged, so they are kept as saved.
 
 Kept outside every builder's import closure (refresh_assembly.py is its only
 importer), so editing it re-keys no artefact.
@@ -99,60 +103,40 @@ def _delete_exploded_views(model: Any, configuration: str) -> tuple[str, ...]:
     return names
 
 
-# --- THROWAWAY DIAGNOSTIC (farm proof only; removed before handoff) ---
-def _poses(model: Any) -> dict[str, tuple[float, ...]]:
-    asm = _early_bound(model, "IAssemblyDoc")
-    out = {}
-    for comp in asm.GetComponents(True) or ():
-        comp = _early_bound(comp, "IComponent2")
-        data = _early_bound(comp.Transform2, "IMathTransform").ArrayData
-        out[str(comp.Name2)] = tuple(round(float(v), 7) for v in data)
-    return out
+# Metres and direction cosines: far below the fingerprint's 0.1 mm rounding,
+# far above the collapse readback the explode authoring already enforces.
+POSE_TOLERANCE = 1e-9
 
 
-def _pose_diff(asm_name: str, when: str, base: dict, now: dict) -> None:
-    diffs = [
-        f"{name}: {base.get(name)} -> {now.get(name)}"
-        for name in sorted(base.keys() | now.keys())
-        if base.get(name) != now.get(name)
-    ]
-    _telemetry.info(
-        f"DIAG {asm_name} {when}: {len(diffs)} pose diffs; " + " | ".join(diffs[:6])
+def _component_poses(model: Any) -> dict[str, tuple[float, ...]]:
+    """Every top-level component's ``Transform2`` in the active configuration."""
+    assembly = _early_bound(model, "IAssemblyDoc")
+    poses = {}
+    for component in assembly.GetComponents(True) or ():
+        component = _early_bound(component, "IComponent2")
+        transform = _early_bound(component.Transform2, "IMathTransform")
+        poses[str(component.Name2)] = tuple(float(v) for v in transform.ArrayData)
+    return poses
+
+
+def _require_unmoved(
+    asm_name: str,
+    when: str,
+    before: dict[str, tuple[float, ...]],
+    after: dict[str, tuple[float, ...]],
+) -> None:
+    moved = sorted(
+        name
+        for name in before.keys() | after.keys()
+        if name not in before
+        or name not in after
+        or any(abs(a - b) > POSE_TOLERANCE for a, b in zip(before[name], after[name]))
     )
-
-
-async def _rows(adapter: Any, asm_name: str) -> tuple[str, list[str]]:
-    import _assembly
-    import hashlib
-
-    seen: list[bytes] = []
-
-    class _Capture:
-        @staticmethod
-        def sha256(data: bytes):
-            seen.append(data)
-            return hashlib.sha256(data)
-
-    real = _assembly.hashlib
-    _assembly.hashlib = _Capture
-    try:
-        digest = await assembly_geometry_digest(adapter, asm_name)
-    finally:
-        _assembly.hashlib = real
-    text = seen[-1].decode("utf-8")
-    return digest, text.split("), (")
-
-
-def _rows_diff(asm_name: str, when: str, base: list[str], now: list[str]) -> None:
-    gone = [row for row in base if row not in now]
-    new = [row for row in now if row not in base]
-    _telemetry.info(
-        f"DIAG {asm_name} {when}: rows {len(base)} -> {len(now)}; "
-        f"only before {gone[:4]!r}; only after {new[:4]!r}"
-    )
-
-
-# --- END THROWAWAY DIAGNOSTIC ---
+    if moved:
+        raise RuntimeError(
+            f"{asm_name}: {len(moved)} component(s) moved {when}: "
+            f"{', '.join(moved[:6])}; rebuild it from scratch"
+        )
 
 
 async def refresh_explode(
@@ -192,13 +176,13 @@ async def refresh_explode(
         )
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     _require_collapsed(model, asm_name, "before re-authoring")
-    opened, opened_rows = await _rows(adapter, asm_name)
-    opened_poses = _poses(model)
+    opened = await assembly_geometry_digest(adapter, asm_name)
     if opened != proof:
         raise RuntimeError(
             f"{asm_name}: the saved model fingerprints {opened[:12]}, not its proof "
             f"{proof[:12]}; rebuild it from scratch"
         )
+    poses = _component_poses(model)
 
     def reauthor(configuration: str) -> None:
         with _telemetry.span(
@@ -209,14 +193,14 @@ async def refresh_explode(
         _telemetry.info(
             f"explode refresh {asm_name}: {configuration} deleted {removed!r}"
         )
-        _pose_diff(asm_name, f"after delete {configuration}", opened_poses, _poses(model))
         author(configuration)
-        _pose_diff(asm_name, f"after author {configuration}", opened_poses, _poses(model))
 
     author_in_drawing_configurations(adapter, asm_name, reauthor)
     final_rebuild_before_save(adapter, asm_name)
-    _pose_diff(asm_name, "after final rebuild", opened_poses, _poses(model))
     assert_reference_geometry_hidden(adapter, asm_name)
+    _require_unmoved(
+        asm_name, "re-authoring the explode", poses, _component_poses(model)
+    )
     _require_collapsed(model, asm_name, "before save")
     # Retire the proof before the bytes it vouches for are replaced.
     _invalidate_massprops_proof(sidecar)
@@ -224,22 +208,12 @@ async def refresh_explode(
         set_isometric_view(adapter)
         save_assembly_in_place(adapter, asm_name, True)
     await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
-    persisted, persisted_rows = await _rows(adapter, asm_name)
-    _rows_diff(asm_name, "opened vs re-saved", opened_rows, persisted_rows)
-    _pose_diff(
-        asm_name,
-        "re-saved",
-        opened_poses,
-        _poses(_early_bound(adapter.currentModel, "IModelDoc2")),
-    )
+    saved = _early_bound(adapter.currentModel, "IModelDoc2")
+    _require_unmoved(asm_name, "in the re-saved model", poses, _component_poses(saved))
+    persisted = await assembly_geometry_digest(adapter, asm_name)
     _telemetry.info(
-        f"explode refresh {asm_name}: geometry proof {proof[:12]}, "
-        f"re-saved {persisted[:12]}"
+        f"explode refresh {asm_name}: geometry proof {proof[:12]} -> "
+        f"{persisted[:12]}, {len(poses)} component poses unchanged"
     )
-    if persisted != proof:
-        raise RuntimeError(
-            f"{asm_name}: the re-saved model's geometry fingerprint {persisted[:12]} "
-            f"differs from its proof {proof[:12]}; rebuild it from scratch"
-        )
     sidecar.write_text(persisted + "\n", encoding="utf-8")
     return {"assembly": str(asm_path)}

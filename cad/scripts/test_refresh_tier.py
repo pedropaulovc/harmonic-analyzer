@@ -146,12 +146,20 @@ class _Selection:
         return _explode_refresh.SW_SEL_EXPLVIEWS
 
 
-class _Model:
-    """IModelDoc2 + IAssemblyDoc stand-in owning per-configuration views."""
+PIN = "vn-transgear-knob-drive-pin-1"
+# A rotation with a signed zero, as the paper drive's knob drive pins report.
+PIN_POSE = (0.99863, -0.052336, 0.0, 0.0, -0.0, -1.0, 0.052336, 0.99863, -0.0)
+PIN_POSE += (0.01, 0.2, -0.1, 1.0, 0.0, 0.0, 0.0)
 
-    def __init__(self, events, views):
+
+class _Model:
+    """IModelDoc2 + IAssemblyDoc stand-in owning per-configuration views and
+    top-level component poses."""
+
+    def __init__(self, events, views, poses):
         self.events = events
         self.views = views
+        self.poses = poses
         self.selected = None
         self.SelectionManager = _Selection()
         self.Extension = SimpleNamespace(
@@ -179,16 +187,27 @@ class _Model:
     def GetExplodedViewNames2(self, configuration):
         return tuple(self.views.get(configuration, ()))
 
+    def GetComponents(self, _top_level):
+        return [
+            SimpleNamespace(Name2=name, Transform2=SimpleNamespace(ArrayData=pose))
+            for name, pose in self.poses.items()
+        ]
+
     def IsExploded(self):
         return False
 
 
-def _fake_session(monkeypatch, tmp_path, *, digests):
-    """``digests`` are the fingerprints of the reopened and the re-saved
-    model, in that order."""
+def _moved(pose, metres):
+    return (*pose[:9], pose[9] + metres, *pose[10:])
+
+
+def _fake_session(monkeypatch, tmp_path, *, digests, resaved_pin=PIN_POSE):
+    """``digests`` are the fingerprints of the reopened and the re-saved model,
+    in that order; ``resaved_pin`` is the pin's pose once the model is
+    reopened after the save."""
     events = []
     views = {"Default": ["OLD"], "Default Simplified": ["OLD Simplified"]}
-    model = _Model(events, views)
+    model = _Model(events, views, {PIN: PIN_POSE})
     (tmp_path / "pd-paper-drive.SLDASM").write_bytes(b"saved")
     proof = tmp_path / ".pd-paper-drive.massprops.sha"
     proof.write_text("proof\n", encoding="utf-8")
@@ -204,6 +223,7 @@ def _fake_session(monkeypatch, tmp_path, *, digests):
 
     async def reconcile(_adapter, _name, _path):
         events.append(("reconcile",))
+        adapter.currentModel = _Model(events, views, {PIN: resaved_pin})
 
     def author_both(_adapter, _name, author):
         for configuration in ("Default", "Default Simplified"):
@@ -238,14 +258,23 @@ def _fake_session(monkeypatch, tmp_path, *, digests):
     return adapter, author, events, proof
 
 
+def _refresh(adapter, author):
+    return asyncio.run(
+        _explode_refresh.refresh_explode(adapter, "pd-paper-drive", author)
+    )
+
+
 def test_explode_refresh_replaces_each_configurations_views_then_saves(
     monkeypatch, tmp_path
 ):
+    # The re-saved pin reports +0.0 where the reopened one reported -0.0: the
+    # fingerprint's repr changes, the pose does not.
+    unsigned = tuple(0.0 if value == 0.0 else value for value in PIN_POSE)
     adapter, author, events, proof = _fake_session(
-        monkeypatch, tmp_path, digests=("proof", "proof")
+        monkeypatch, tmp_path, digests=("proof", "resaved"), resaved_pin=unsigned
     )
 
-    asyncio.run(_explode_refresh.refresh_explode(adapter, "pd-paper-drive", author))
+    _refresh(adapter, author)
 
     assert events == [
         ("open", "pd-paper-drive.SLDASM"),
@@ -256,7 +285,7 @@ def test_explode_refresh_replaces_each_configurations_views_then_saves(
         ("save", True),
         ("reconcile",),
     ]
-    assert proof.read_text(encoding="utf-8") == "proof\n"
+    assert proof.read_text(encoding="utf-8") == "resaved\n"
 
 
 def test_explode_refresh_refuses_a_model_that_reopens_off_its_proof(
@@ -267,21 +296,41 @@ def test_explode_refresh_refuses_a_model_that_reopens_off_its_proof(
     )
 
     with pytest.raises(RuntimeError, match="not its proof"):
-        asyncio.run(_explode_refresh.refresh_explode(adapter, "pd-paper-drive", author))
+        _refresh(adapter, author)
 
     assert events == [("open", "pd-paper-drive.SLDASM")]
     assert proof.read_text(encoding="utf-8") == "proof\n"
 
 
-def test_explode_refresh_retires_the_proof_when_the_saved_model_differs(
+def test_explode_refresh_refuses_a_component_moved_by_authoring(monkeypatch, tmp_path):
+    adapter, author, events, proof = _fake_session(
+        monkeypatch, tmp_path, digests=("proof",)
+    )
+    model = adapter.currentModel
+
+    def nudging(configuration):
+        author(configuration)
+        model.poses[PIN] = _moved(PIN_POSE, 1e-6)
+
+    with pytest.raises(RuntimeError, match="moved re-authoring the explode"):
+        _refresh(adapter, nudging)
+
+    assert ("save", True) not in events
+    assert proof.read_text(encoding="utf-8") == "proof\n"
+
+
+def test_explode_refresh_retires_the_proof_when_the_saved_model_moved(
     monkeypatch, tmp_path
 ):
     adapter, author, events, proof = _fake_session(
-        monkeypatch, tmp_path, digests=("proof", "moved")
+        monkeypatch,
+        tmp_path,
+        digests=("proof",),
+        resaved_pin=_moved(PIN_POSE, 1e-6),
     )
 
-    with pytest.raises(RuntimeError, match="differs from its proof"):
-        asyncio.run(_explode_refresh.refresh_explode(adapter, "pd-paper-drive", author))
+    with pytest.raises(RuntimeError, match="moved in the re-saved model"):
+        _refresh(adapter, author)
 
     assert events[-2:] == [("save", True), ("reconcile",)]
     # Without a proof the next build cannot take the explode tier again.
@@ -293,6 +342,6 @@ def test_explode_refresh_refuses_a_model_left_exploded(monkeypatch, tmp_path):
     adapter.currentModel.IsExploded = lambda: True
 
     with pytest.raises(RuntimeError, match="must be collapsed"):
-        asyncio.run(_explode_refresh.refresh_explode(adapter, "pd-paper-drive", author))
+        _refresh(adapter, author)
 
     assert events == [("open", "pd-paper-drive.SLDASM")]
