@@ -44,6 +44,21 @@ HEX_BAND = 0.13  # title-block .XXX band on HEX_W and HEX_H
 HEX_DEPTH = 21.717
 # Included angle of the knife-edge ridge (the top vertex of the hexagon).
 RIDGE_ANGLE_DEG = 2.0 * math.degrees(math.atan2(HEX_W / 2.0, HEX_H / 4.0))
+# Each ridge is truncated by a small round (drawing-guidelines rule 16; owner
+# ruling 2026-10-16: the user's ask timed out and the recommended option was
+# auto-selected), modelled at its printed limit, R0.1 MAX; HEX_H stays the
+# theoretical sharp the print dimensions.  KNIFE_RIDGE_TANGENT_XY is the
+# (x, y) of the round's +X tangent line on the upper-right face, the visible
+# ridge edge the plan picks.
+KNIFE_RIDGE_R = 0.1
+KNIFE_RIDGE_R_BAND = (0.0, -KNIFE_RIDGE_R)  # (upper, lower)
+KNIFE_RIDGE_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.1 MAX"
+_RIDGE_HALF = math.radians(RIDGE_ANGLE_DEG) / 2.0
+_RIDGE_SETBACK = KNIFE_RIDGE_R / math.tan(_RIDGE_HALF)
+KNIFE_RIDGE_TANGENT_XY = (
+    _RIDGE_SETBACK * math.sin(_RIDGE_HALF),
+    HEX_H / 2.0 - _RIDGE_SETBACK * math.cos(_RIDGE_HALF),
+)
 
 # Outward normal and plane offset of the upper-right sloping face of the
 # vertex-up hexagon. Its upper endpoint is the +Y knife-edge ridge.
