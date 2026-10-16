@@ -227,7 +227,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     # top face, locking the MHA-VN-001 counter anchor.
     "vn-boss-hook-jam-nut": _stock(
         "vn-boss-hook-jam-nut",
-        "Zinc-Plated Steel Narrow-Profile Hex Nut",
+        "#10-24 Zinc-Plated Steel Narrow-Profile Hex Nut",
         "90760A140",
     ),
     # The four platen-clip screws: brass #2-56 x 1/4, whose head stays inside
