@@ -120,6 +120,7 @@ from sm_summing_lever_spec import (  # noqa: E402
     HEX_W,
     HEX_Z_INNER,
     HEX_Z_OUTER,
+    KNIFE_SHOULDER_RISE,
 )
 
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
@@ -214,7 +215,9 @@ HANGER_SCREW_FLOAT_SPARE = top_frame.HANGER_SCREW_FLOAT - (
 # The pair's worst transverse shift acts over its shortest 15.134 span.
 # Across the deepest .X block (14.8) that yaw walks the bore's far end;
 # the bore's perpendicularity zone adds another 0.05. Judge the trunnion
-# at its widest, lowest .XXX section in the smallest reamed bore.
+# at its widest, lowest .XXX section in the smallest reamed bore, with one
+# flank at the ridge angle's band limit raising its shoulder
+# (``sm_summing_lever_spec.KNIFE_SHOULDER_RISE``).
 KNIFE_DOWEL_SPAN_MIN = knife_mount.PIN_HOLE_SPAN - knife_mount.PIN_HOLE_SPAN_TOL
 KNIFE_MOUNT_YAW_DEG = math.degrees(
     math.atan(_KNIFE_DOWEL_PAIR_SHIFT / KNIFE_DOWEL_SPAN_MIN)
@@ -227,6 +230,7 @@ KNIFE_FREE_ROCK_WORST_DEG = knife_mount.free_rock_deg(
     hex_w=HEX_W + HEX_BAND,
     hex_h=HEX_H - HEX_BAND,
     r_bore=knife_mount.BORE_R_MIN,
+    shoulder_drop=(HEX_H - HEX_BAND) / 4.0 - KNIFE_SHOULDER_RISE,
 )
 KNIFE_FREE_ROCK_FLOOR_DEG = spec.KNIFE_FREE_ROCK_FLOOR_DEG
 
