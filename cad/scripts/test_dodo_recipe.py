@@ -3266,15 +3266,17 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
         yield 0.0
 
     target = tmp_path / f"{stem}.SLDASM"
-    sidecar = tmp_path / f".{stem}.recipe.md5"
-    if mode == "refresh":
-        target.write_bytes(b"asm")
-        sidecar.write_text("d" * 32 + "\n", encoding="utf-8")
+    ledger = tmp_path / f".{stem}.inputs.json"
     # Prime the task's rows from the real recipe, then stub the recipe so the
     # injected hook (no such file) is never read.
     dodo._fastener_rows_env(f"assembly:{stem}")
     deps = dodo._recipe_files(stem)
+    if mode == "refresh":
+        # Built from exactly the current recipe: only a reference could differ.
+        target.write_bytes(b"asm")
+        dodo._write_input_ledger(ledger, dodo._ledger_inputs(deps))
     monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: deps)
+    monkeypatch.setattr(dodo, "_assembly_file_deps", lambda _stem: deps)
     monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
     monkeypatch.setattr(dodo, "POST_ASSEMBLY", {stem: ("hook_probe.py",)})
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
@@ -3285,8 +3287,7 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
     monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
     monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
     monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: False)
-    monkeypatch.setattr(dodo, "_recipe_sidecar", lambda _stem: sidecar)
-    monkeypatch.setattr(dodo, "_digest_files", lambda _files: "d" * 32)
+    monkeypatch.setattr(dodo, "_input_ledger", lambda _stem: ledger)
     monkeypatch.setattr(dodo, "_assembly_cache_outputs", lambda _stem: [])
     monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda _stem: None)
     monkeypatch.setattr(dodo.subprocess, "Popen", FakePopen)
@@ -3320,6 +3321,125 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     for name, env in launched:
         assert env.get("HARMONIC_FASTENER_ROWS") == "vn-pen-set-screw", name
         assert env.get("HARMONIC_FIT_GROUPS") == fit_groups, name
+
+
+PD_EXPLODE_SPEC = "cad/scripts/pd_paper_drive_explode_spec.py"
+
+
+def _pd_clean_leaf(dodo, monkeypatch, tmp_path, *, base_inputs):
+    """Run ``build_or_refresh("pd_paper_drive")`` on a clean workspace whose full
+    cache key misses. ``base_inputs`` is the ledger of the cached explode base,
+    or None when the cache holds no base. Returns ``(commands, restores, stores)``
+    as ``(script, args)`` and ``(key, label)`` rows."""
+    launched, restores, stores = [], [], []
+
+    class FakePopen:
+        def __init__(self, cmd, cwd, env, **_kw):
+            launched.append((Path(cmd[1]).name, list(cmd[2:])))
+            self.stdout = iter(())
+
+        def wait(self):
+            return 0
+
+    @contextlib.contextmanager
+    def free_seat(label):
+        yield 0.0
+
+    target = tmp_path / "pd-paper-drive.SLDASM"
+    ledger = tmp_path / ".pd-paper-drive.inputs.json"
+
+    def restore(key, _outputs, label):
+        restores.append((key, label))
+        if base_inputs is None or not label.endswith("explode-base"):
+            return False
+        target.write_bytes(b"base")
+        (tmp_path / ".pd-paper-drive.massprops.sha").write_text("proof\n", encoding="utf-8")
+        dodo._write_input_ledger(ledger, base_inputs)
+        return True
+
+    deps = dodo._recipe_files("pd_paper_drive")
+    monkeypatch.setattr(dodo, "_assembly_file_deps", lambda _stem: deps)
+    monkeypatch.setattr(dodo, "_input_ledger", lambda _stem: ledger)
+    monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(
+        dodo._cache,
+        "store",
+        lambda key, _o, label: stores.append((key, label)) or "stored",
+    )
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_com_seat", free_seat)
+    monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_assembly_cache_outputs", lambda _stem: [])
+    monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda _stem: None)
+    monkeypatch.setattr(dodo.subprocess, "Popen", FakePopen)
+
+    dodo.build_or_refresh("pd_paper_drive", [], [], [str(target)])
+
+    assert dodo._read_input_ledger(ledger) == dodo._ledger_inputs(deps)
+    return launched, restores, stores
+
+
+def test_clean_leaf_with_an_explode_base_takes_the_explode_tier(monkeypatch, tmp_path):
+    dodo = _load_dodo()
+    current = dodo._ledger_inputs(dodo._recipe_files("pd_paper_drive"))
+    assert PD_EXPLODE_SPEC in current
+    base = {**current, PD_EXPLODE_SPEC: "0" * 32}
+
+    launched, restores, stores = _pd_clean_leaf(
+        dodo, monkeypatch, tmp_path, base_inputs=base
+    )
+
+    assert launched == [("refresh_assembly.py", ["pd_paper_drive", "explode"])]
+    assert [label for _key, label in restores] == [
+        "assembly:pd_paper_drive",
+        "assembly:pd_paper_drive explode-base",
+    ]
+    # The base it started from is already cached; only the full key is new.
+    assert stores == [restores[0]]
+
+
+def test_clean_leaf_without_a_base_builds_full_and_publishes_the_base(
+    monkeypatch, tmp_path
+):
+    dodo = _load_dodo()
+
+    launched, restores, stores = _pd_clean_leaf(
+        dodo, monkeypatch, tmp_path, base_inputs=None
+    )
+
+    assert launched == [("build_pd_paper_drive_assembly.py", [])]
+    assert stores == restores
+    assert stores[0][0] != stores[1][0]
+
+
+def test_explode_base_key_ignores_only_the_explode_closure(monkeypatch):
+    dodo = _load_dodo()
+    deps = dodo._recipe_files("pd_paper_drive")
+    plan = dodo.explode_plan("pd_paper_drive")
+    digest = dodo.ContentChecker._digest
+    keys = {}
+    for edited in (
+        None,
+        PD_EXPLODE_SPEC,
+        "cad/scripts/build_pd_paper_drive_assembly.py",
+    ):
+        monkeypatch.setattr(
+            dodo.ContentChecker,
+            "_digest",
+            staticmethod(
+                lambda path, edited=edited: "edited"
+                if edited and dodo._rel_tag(path) == edited
+                else digest(path)
+            ),
+        )
+        keys[edited] = (dodo._cache_key(deps), dodo._explode_base_key(deps, plan))
+    full, base = keys[None]
+    assert keys[PD_EXPLODE_SPEC][0] != full and keys[PD_EXPLODE_SPEC][1] == base
+    builder = keys["cad/scripts/build_pd_paper_drive_assembly.py"]
+    assert builder[0] != full and builder[1] != base
 
 
 @pytest.mark.parametrize(
