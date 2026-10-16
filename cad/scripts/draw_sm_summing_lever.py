@@ -77,9 +77,9 @@ from magnifying_bracket_joint_layout import (
     LEVER_HOLE_POINTS,
     TAP_DRILL_DIA,
     THREAD_DEPTH,
-    THREAD_DEPTH_BAND,
 )
 from sm_summing_lever_notes import (
+    BOSS_Z_CALLOUT,
     BRACKET_TAP_CALLOUT_PROCESS,
     DIMENSION_CALLOUTS_ABOVE,
     DIMENSION_CALLOUTS_BELOW,
@@ -154,9 +154,12 @@ DETAIL_CENTER = (0.075, 0.222)
 DETAIL_SCALE = (4.0, 1.0)
 DETAIL_RADIUS_MM = 7.5
 DETAIL_LABEL_XY = (0.075, 0.176)
-# The parent circle's letter, straight below the rib arc (its bottom prints at
-# sheet y 0.2275), between the rib-arc and cylinder leaders.
-DETAIL_LETTER_OFFSET = (0.0, -0.011)
+# The parent circle's letter, below the rib arc, tied to the 7.5 mm fence by
+# the leader style's leader: machinist review r6 read the bare fence, the
+# letter outside the rib arc, as an unsized Ø15 feature.  The letter's top
+# prints ~0.2235, its leader dropping 8 mm from the fence across the arc,
+# between the rib-arc and cylinder leaders.
+DETAIL_LETTER_OFFSET = (0.0, -0.016)
 KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
 
 # Section C-C: the plate's own thickness.  Every end view shows the end ribs
@@ -284,7 +287,7 @@ def _knife_detail(adapter: Any, front: Any) -> Any:
     detail = drawing.CreateDetailViewAt4(
         *DETAIL_CENTER,
         0.0,
-        0,  # swDetViewSTANDARD
+        2,  # swDetViewLEADER: a leader joins the letter to the fence
         *DETAIL_SCALE,
         DETAIL_LETTER,
         1,  # swDetCircleCIRCLE
@@ -653,15 +656,17 @@ def _mounting_rims(back: Any) -> list[Any]:
 # text block's BOTTOM line (farm r5: the R15.24 leader went to "AT BOSS
 # AXIS"'s right end, through the detail letter).  The rib arc's four lines
 # stand under the view, left of the 20X frame, their bottom line's right end
-# at (0.2032, 0.2019): 226 deg round the axis, 3.7 mm left of the letter.
-# That bottom line stands 1.75 mm over the plan's R138.85 centre (0.1737,
-# 0.2001), where that radius's line starts (farm r6: it ran through "AT
-# BOSS AXIS"), and the top line as far under 19.05's lower arrow.
+# at (0.2112, 0.2019): 234 deg round the axis, inside the arc's visible
+# span (it meets the lower slant at ~244 deg).  That bottom line stands 1.75
+# mm over the plan's R138.85 centre (0.1737, 0.2001), where that radius's
+# line starts, and 4.3 mm right of it (machinist review r6: over it, the line
+# read as a leader off this shelf); the top line stands under 19.05's lower
+# arrow.
 FRONT_KEEP = {
     "CylDia": (0.290, 0.214),
     "AnchorHeight": (0.183, 0.235),
     "WebThickness": (0.215, 0.247),
-    "EdgeRibFrontArcR": (0.1868, 0.2120),
+    "EdgeRibFrontArcR": (0.1948, 0.2120),
     "EdgeRibFrontEndTopX": (0.2443, 0.254),
     "EdgeRibFrontEndTopY": (0.268, 0.244),
 }
@@ -1006,6 +1011,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor boss Z location",
         entities=(end_edge.edge, anchor_rim.edge),
     )
+    # The mid rib shares the boss's station (machinist review r6: its 5.08
+    # thickness had no location along the plate), so this one 76.20 names
+    # both under its value.
+    boss_z_display = _early_bound(boss_z, "IDisplayDimension")
+    boss_z_display.SetText(4, BOSS_Z_CALLOUT)  # swDimensionTextCalloutBelow
+    if "MID RIB" not in str(boss_z_display.GetText(4) or ""):
+        raise RuntimeError(
+            f"anchor boss Z callout did not persist: {boss_z_display.GetText(4)!r}"
+        )
     seed_rim = top_edges.circle_at(
         (HOLE_X, PLATE_T / 2.0, HOLE_Z_LAST),
         HOLE_DIA / 2.0,
@@ -1181,7 +1195,6 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_depth = required_depths.pop(variable_name)
         if abs(float(length.Length) * 1000.0 - expected_depth) > 1e-5:
             raise RuntimeError(f"bracket mounting callout has wrong {variable_name}")
-        band = THREAD_DEPTH_BAND if variable_name == "hw-threaddepth" else DRILL_DEPTH_BAND
         observed = (
             int(variable.ToleranceType),
             float(variable.ToleranceMin) * 1000.0,
@@ -1194,7 +1207,19 @@ async def build(adapter: Any) -> dict[str, str]:
         # A hole callout variable carries its OWN tolerance (SW 2016+:
         # ICalloutVariable.ToleranceType; the model IDimensionTolerance does
         # not override it). Farm 2026-10-09: the cosmetic-thread depth band
-        # did not reach hw-threaddepth, so author the same source band here.
+        # did not reach hw-threaddepth, so author it here.  The full thread
+        # prints as a minimum (machinist review r5/r6, rule 4): the drill's
+        # own band bounds how deep a bottoming tap can cut, and the joint
+        # proofs' shallowest thread (4.90) is under the printed 4.95.
+        if variable_name == "hw-threaddepth":
+            variable.ToleranceType = 5  # swTolType_e.swTolMIN
+            if int(variable.ToleranceType) != 5:
+                raise RuntimeError(
+                    "bracket mounting callout full-thread depth did not "
+                    "persist as a MIN limit"
+                )
+            continue
+        band = DRILL_DEPTH_BAND
         variable.ToleranceType = 4  # swTolType_e.swTolSYMMETRIC
         variable.ToleranceMin = -band / 1000.0
         variable.ToleranceMax = band / 1000.0

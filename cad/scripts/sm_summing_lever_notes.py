@@ -93,14 +93,16 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "SpringPadWidth": "UNDERSIDE PAD\nFULL LENGTH",
 }
 
-# Leads the 2-56 receiver callout: what its two depth bands hold.  The full
-# thread's +/-0.05 is the bottoming tap's: its deepest thread plus two
-# pitches of lead must stay inside the shallowest drill
-# (``magnifying_bracket_joint_layout.TAP_LEAD_MARGIN_MIN``; machinist review
-# r5 read the band as idle on a full-thread minimum).
+# Leads the 2-56 receiver callout: what its two depth limits hold.  The full
+# thread prints as a minimum; the drill's band keeps the bottoming tap's two
+# pitches of lead inside the shallowest drill
+# (``magnifying_bracket_joint_layout.TAP_LEAD_MARGIN_MIN``).
 BRACKET_TAP_CALLOUT_PROCESS = (
     f"FULL THREAD IN END RIB\nDRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"
 )
+# Under the plan's boss Z location (datum B to the boss axis): the mid rib
+# is centred on the same station.
+BOSS_Z_CALLOUT = "BOSS AXIS AND\nMID RIB CENTRE"
 # Leads the 20X 6-32 callout: the thread runs the padded thickness (the back
 # view's 7.00), not the bare plate's 5.08 (machinist review r5 read it as
 # the plate's, 1.1D).
