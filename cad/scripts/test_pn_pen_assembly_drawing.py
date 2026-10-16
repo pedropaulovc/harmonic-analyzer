@@ -102,6 +102,19 @@ def test_every_setting_is_printed_with_a_callout_beside_its_detail() -> None:
             assert sum(value * value for value in offset) ** 0.5 < 2 * detail.radius_mm
 
 
+def test_each_detail_title_carries_its_boundary_letter() -> None:
+    bounded = {
+        detail.key
+        for detail in drawing.DETAILS
+        if detail.axis_points is None and detail.orientation in ("*Front", "*Right")
+    }
+    assert bounded == {"stud", "hanger"}
+    for detail in drawing.DETAILS:
+        letter = spec.DETAIL_LETTERS[detail.key]
+        assert detail.title.splitlines()[0].startswith(f"DETAIL {letter}")
+    assert len(set(spec.DETAIL_LETTERS.values())) == len(drawing.DETAILS)
+
+
 def test_text_blocks_respect_the_measured_note_width() -> None:
     for block, width in (
         (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),

@@ -127,6 +127,7 @@ SETTINGS_NOTE_XY = (0.225, 0.150)
 SETTINGS_NOTE_WIDTH = 70  # characters
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
+DETAIL_LETTER_GAP = 0.001
 
 _CARRIAGE_STEMS = frozenset(
     (
@@ -567,7 +568,7 @@ def _placed_base_view(
     title: str,
     *,
     label: str,
-) -> None:
+) -> Any:
     view = place_view(adapter, str(SOURCE), orientation, *center, scale=SHEET_SCALE)
     set_hidden_lines_removed(adapter, view)
     apply_view_configuration(adapter, view, role=ViewRole.PLAIN, label=label)
@@ -575,6 +576,7 @@ def _placed_base_view(
     x0, y0, x1, _y1 = _view_outline(view, label=label)
     _assert_on_sheet((x0, y0, x1, _y1), label=label)
     _label_view(adapter, view, title, (x0, y0 - VIEW_LABEL_GAP), label=label)
+    return view
 
 
 def _turn_detail(adapter: Any, view: Any, detail: Detail) -> None:
@@ -636,19 +638,22 @@ def _placed_detail(adapter: Any, detail: Detail) -> Any:
     return view
 
 
-def _crop(adapter: Any, view: Any, detail: Detail) -> None:
-    """Crop ``view`` to the circle round ``detail.centre``: sketch the circle
-    in the active view's own sketch and Crop2 while it is still selected."""
+def _sketch_view_circle(
+    adapter: Any,
+    view: Any,
+    centre: tuple[float, float],
+    radius: float,
+    *,
+    label: str,
+) -> None:
+    """A circle (sheet metres) in ``view``'s own sketch, left selected."""
     view = _early_bound(view, "IView")
-    _activate_view(adapter, view, label=detail.label)
+    _activate_view(adapter, view, label=label)
     sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
-    for x, y in (
-        detail.centre,
-        (detail.centre[0] + detail.crop_radius, detail.centre[1]),
-    ):
+    for x, y in (centre, (centre[0] + radius, centre[1])):
         point = _early_bound(
             utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
         )
@@ -662,7 +667,36 @@ def _crop(adapter: Any, view: Any, detail: Detail) -> None:
     finally:
         manager.AddToDB = previous
     if circle is None:
-        raise RuntimeError(f"failed to sketch the {detail.label} crop circle")
+        raise RuntimeError(f"failed to sketch the {label} circle")
+
+
+def _mark_detail_boundary(adapter: Any, parent: Any, detail: Detail) -> None:
+    """The detail's boundary on its parent view: a circle round what the
+    detail shows, lettered at its upper right (machinist review, farm run
+    20261016T082735510Z: the fitter could not tell where A and B come from)."""
+    label = f"{detail.label} boundary"
+    centre = model_point_in_view(adapter, parent, detail.model_centre_m, label=label)
+    radius = detail.radius_mm * SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
+    _sketch_view_circle(adapter, parent, centre, radius, label=label)
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+    reach = radius * math.sqrt(0.5) + DETAIL_LETTER_GAP
+    _label_view(
+        adapter,
+        parent,
+        spec.DETAIL_LETTERS[detail.key],
+        (centre[0] + reach, centre[1] + reach),
+        label=label,
+    )
+
+
+def _crop(adapter: Any, view: Any, detail: Detail) -> None:
+    """Crop ``view`` to the circle round ``detail.centre``: sketch the circle
+    in the active view's own sketch and Crop2 while it is still selected."""
+    view = _early_bound(view, "IView")
+    _sketch_view_circle(
+        adapter, view, detail.centre, detail.crop_radius, label=f"{detail.label} crop"
+    )
     status = int(view.Crop2(False, False, 1))
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
@@ -783,12 +817,22 @@ def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
     """Front and right at 1:2, the three details, the as-shipped note; returns
     the check that re-reads every setting once the drawing has settled."""
     _activate_sheet(adapter, SHEET_NAMES[0])
-    _placed_base_view(
-        adapter, "*Front", FRONT_CENTER, spec.VIEW_TITLES["front"], label="pen front"
-    )
-    _placed_base_view(
-        adapter, "*Right", RIGHT_CENTER, spec.VIEW_TITLES["right"], label="pen right"
-    )
+    bases = {
+        "*Front": _placed_base_view(
+            adapter,
+            "*Front",
+            FRONT_CENTER,
+            spec.VIEW_TITLES["front"],
+            label="pen front",
+        ),
+        "*Right": _placed_base_view(
+            adapter,
+            "*Right",
+            RIGHT_CENTER,
+            spec.VIEW_TITLES["right"],
+            label="pen right",
+        ),
+    }
     annotations = [
         annotation for detail in DETAILS for annotation in _detail(adapter, detail)
     ]
@@ -819,6 +863,12 @@ def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
     for name, display in displays:
         _assert_dimension_ink_on_sheet(display, label=f"pen {name}")
     _assert_settings(displays, when="placed")
+    # A detail drawn in a base view's own direction (A on FRONT, B on RIGHT)
+    # is bounded there; the turned plan C has no parent and says so in its
+    # title.
+    for detail in DETAILS:
+        if detail.axis_points is None and detail.orientation in bases:
+            _mark_detail_boundary(adapter, bases[detail.orientation], detail)
     _add_note_block(
         adapter,
         SHEET_NAMES[0],
