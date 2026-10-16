@@ -118,7 +118,7 @@ MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 # --- WIRE-1 yoke point (the coupling mate's wheel-side geometry) --------------
 # ``WireYokePoint``: a reference point on the hub PITCH circle (groove radius +
 # wire radius) at the lever-wire's tangency azimuth, in the wheel mid-plane. The
-# magnifier assembly holds it COINCIDENT to the lever-wire's YokePlane, tying the
+# magnifier assembly holds it COINCIDENT to the lever-wire's Top plane, tying the
 # wheel's spin to the lever group's travel along the wire (the linearized
 # inextensible-wire constraint -- see build_vn_lever_wire's docstring). The azimuth
 # is layout-derived, so it is imported from vn_lever_wire_geom: a layout move

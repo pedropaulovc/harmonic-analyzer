@@ -26,7 +26,10 @@ the groove root with its running clearance.
 
 Installed pose: ``Ry(180 deg + FIXTURE_YAW_DEG)`` about the vertical rod, so
 local +X runs back through the spigot toward the bracket and the hook lands
-on the lever wire's start (``vn_lever_wire_geom.WIRE_START``).
+on the lever wire's start (``vn_lever_wire_geom.WIRE_START``). Option A1
+(#1559, the true plumb plane of ch30 p.4): the rod axis sits in the drum's
+wire lane and the hook lies in the rod's own plane (dz = 0), so the lever
+wire runs coplanar with the drum lane.
 """
 
 from __future__ import annotations
@@ -101,9 +104,12 @@ HOOK_LOCAL = (GROOVE_X, 0.0, HOOK_RADIAL_OFFSET)
 
 # --- Installed pose (magnifier frame) -------------------------------------------
 FIXTURE_AXIS_Y = 919.7  # the hex axis's height on the vertical rod
-VROD_Z = -134.8  # the vertical rod's axis
-# The lever wire leaves from the rod's machine-front tangent.
-HOOK_TARGET_Z = VROD_Z - (VROD_DIA / 2.0 + WIRE_DIA / 2.0 + WIRE_CLEARANCE)
+# The vertical rod's axis: the drum's wire lane (vn_lever_wire_geom.DRUM_END_Z,
+# asserted equal there). A literal, so this part's recipe closure stays free of
+# the wheel and paper modules.
+VROD_Z = -173.51
+# The lever wire leaves in the rod's plane (option A1): dz = 0.
+HOOK_TARGET_Z = VROD_Z
 
 
 def fixture_yaw_rad(hook_x: float, hook_z: float, target_dz: float) -> float:
@@ -130,7 +136,7 @@ HOOK_OFFSET_Z = HOOK_LOCAL[0] * math.sin(FIXTURE_YAW_RAD) - HOOK_LOCAL[2] * math
 
 # --- Import-time geometry guards -------------------------------------------------
 if abs(HOOK_OFFSET_Z - (HOOK_TARGET_Z - VROD_Z)) > 1e-9:
-    raise AssertionError("MHA-MG-006 yaw does not put the hook on the rod's front tangent")
+    raise AssertionError("MHA-MG-006 yaw does not put the hook in the rod's plane")
 if HOOK_OFFSET_X >= 0.0:
     raise AssertionError("MHA-MG-006 hook must sit on the bracket side of the rod")
 if not GROOVE_CENTRE_R - SPIGOT_DIA / 2.0 < GROOVE_RADIUS:

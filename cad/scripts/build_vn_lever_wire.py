@@ -23,9 +23,10 @@ out of the assembly/wheel recipe closures. The drum-end Z (DRUM_END_Z) is the
 drum's axial middle, between the boss front face and the spigot front end,
 all read off the wheel mid-plane (the pen-rod line ``paper_drive_geom.PEN_Z_MID``).
 
-The wire is also the CARRIER of the WIRE-1 coupling: ``YokePlane``, a named
-reference plane parallel to Top (perpendicular to the wire axis) through the
-wheel's drum-pitch yoke point (``YOKE_POINT``). The magnifying wheel's
+The wire is also the CARRIER of the WIRE-1 coupling: its own Top plane
+(perpendicular to the wire axis, through the drum end) contains the wheel's
+drum-pitch yoke point (``YOKE_POINT``) on the coplanar A1 route
+(``vn_lever_wire_geom`` asserts it). The magnifying wheel's
 ``WireYokePoint`` is held COINCIDENT to it (the scotch-yoke primitive the
 Motion study's WIRE 2 already proved SolidWorks enforces), so the wheel's
 spin is tied to the lever group's travel along the wire axis -- the
@@ -38,8 +39,8 @@ from the coil (MHA-VN-066); modelled at the Ø0.8 design nominal, which lies in
 the catalogue band (``vn_lever_wire_geom``).
 
 Layout: wire axis along +Y from the origin (the assembly turns it onto the
-DRUM->HOOK direction -- the part ORIGIN is the DRUM end, so the Top plane and
-its YokePlane offset sit at the drum-end tangency), length ``WIRE_LEN``.
+DRUM->HOOK direction -- the part ORIGIN is the DRUM end, so the Top plane
+sits at the drum-end tangency), length ``WIRE_LEN``.
 
 Run (SolidWorks already open)::
 
@@ -85,13 +86,11 @@ MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 from vn_lever_wire_geom import (  # noqa: E402
     WIRE_DIA,
     WIRE_LEN,
-    YOKE_PLANE_OFFSET,
 )
 
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
-        CreatePlaneParameters,
         CreateReferencePointParameters,
         ExtrusionParameters,
     )
@@ -136,17 +135,6 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven lever wire (equations neutral)", v_wire, 0.005 * v_wire)
-
-    # YokePlane: the WIRE-1 coupling plane, parallel to Top (perpendicular to
-    # the wire axis) through the wheel's drum-pitch yoke point -- see module
-    # docstring. Blanked so the infinite plane never renders in assemblies.
-    check(
-        "create_plane YokePlane",
-        await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Top Plane", offset=YOKE_PLANE_OFFSET)),
-    )
-    name_last_feature(adapter, "YokePlane")
-    _blank_ref_plane(adapter, "YokePlane")
 
     # HookPoint: reference point at the hook-end face centre (the top circular
     # edge's arc centre -- adapter-native, deterministic). The assembly's ball
@@ -210,19 +198,6 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     return await save_part_and_images(adapter, PART_NAME)
-
-
-def _blank_ref_plane(adapter, name: str) -> None:
-    """Hide a reference plane (shown ref geometry renders in every assembly
-    instance -- the fix_shown_sketches BlankRefGeom idiom, applied at build)."""
-    from solidworks_mcp.adapters.pywin32_adapter import null_callout
-
-    model = adapter.currentModel
-    model.ClearSelection2(True)
-    if not model.Extension.SelectByID2(name, "PLANE", 0, 0, 0, False, 0, null_callout(), 0):
-        raise RuntimeError(f"blank ref plane: cannot select {name!r}")
-    model.BlankRefGeom()
-    model.ClearSelection2(True)
 
 
 if __name__ == "__main__":

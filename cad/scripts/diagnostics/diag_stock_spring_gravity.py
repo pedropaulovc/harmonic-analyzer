@@ -178,7 +178,7 @@ async def build(adapter):
             (m.BRACKET_X, m.LEVER_ROD_Y, m.LEVER_ROD_Z),
             m.IDENTITY,
         )
-        weight("mg-magnifying-clamp", m.CLAMP_POS, m.ROT_Y_POS90)
+        weight("mg-magnifying-clamp", m.CLAMP_POS, m.IDENTITY)
         rotation = m.compose_rows(m.rot_z_rows(-90), m.ROT_Y_180)
         weight(
             "vn-thumb-screw",
