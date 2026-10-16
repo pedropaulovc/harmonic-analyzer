@@ -52,22 +52,24 @@ from vn_spring_hook_spec import (
 SPEC = DRAWINGS_BY_NAME["vn_spring_hook"]
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
-# The finished part is 28.8 x 12.7 mm since its shank carries the MHA-CH-014
-# jam nut under the plate: 5:1 keeps the front view inside the counter
+# The finished part is 30.7 x 12.7 mm since its shank carries the MHA-CH-014
+# jam nut under the lever's spring pad: 5:1 keeps the front view inside the counter
 # anchor's 4:1 sheet band, raised so the cut end's deburr dimensions clear
 # the notes.  The deburr is dimensioned on the front view itself, as on the
 # counter anchor: machinist review r7 found a 20:1 detail for a plain end
 # chamfer added nothing a machinist needs.
 SHEET_SCALE = (5.0, 1.0)
 ISO_SCALE = (3.0, 1.0)
-FRONT_CENTER = (0.100, 0.180)
+FRONT_CENTER = (0.100, 0.18475)
 ISO_CENTER = (0.310, 0.213)
-# The cut end sits about 0.072 below the view centre (half the 28.8 at 5:1).
+# The cut end sits about 0.077 below the view centre (half the 30.7 at 5:1);
+# the centre rose 0.00475 with the 1.9 mm longer shank, so the end, its
+# deburr dimensions and the notes keep their 28.8-era stations.
 # The deburr's value and callout hang right of the shank, clear of their own
 # extension lines (review r8: centred under the 2.3 mm leg they were struck)
 # and above the notes.
 FRONT_KEEP = {
-    "FinishedOverall": (0.042, 0.180),
+    "FinishedOverall": (0.042, 0.18475),
     "ChamferWidth": (0.168, 0.100),
     "ChamferAngle": (0.124, 0.117),
 }

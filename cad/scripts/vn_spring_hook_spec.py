@@ -18,9 +18,9 @@ shortest in-band anchor (title-block 1-place band) under the thickest in-band
 nut, its deburr at the adverse corner of its band, backed out the whole
 budget.
 
-The plate is fully engaged at every pose (``THREAD_ENGAGEMENT_MM`` is the
-plate thickness): backing out only lifts the neck off the plate top, it no
-longer trades engagement for eye lift.
+The tap is engaged over its whole length at every pose (``THREAD_ENGAGEMENT_MM``
+is the plate plus its underside spring pad): backing out only lifts the neck
+off the plate top, it no longer trades engagement for eye lift.
 
 The fitter holds the eye at its clocking while the nut is tightened, so the
 trim survives the lock; re-trimming means slackening the nut first.  The
@@ -38,8 +38,9 @@ from stock_anchor_geom import ANCHOR_9489T111, trim
 
 _PITCH = ANCHOR_9489T111.thread_pitch_mm
 
-# The plate is engaged over its whole thickness at every calibration pose.
-THREAD_ENGAGEMENT_MM = sm_summing_lever_spec.PLATE_T
+# The tap is engaged over its whole length (plate plus underside pad) at
+# every calibration pose.
+THREAD_ENGAGEMENT_MM = sm_summing_lever_spec.SPRING_SEAT_T
 FINISHED_OVERALL_TOLERANCE_MM = _config.title_block("linear_1pl")["value_in"] * 25.4
 CHAMFER_WIDTH_MM = ANCHOR_9489T111.end_chamfer_mm
 # At the short chamfer limit the cut end's flat (major radius - chamfer) must
@@ -121,11 +122,17 @@ def full_threads_past_nut_mm(backed_out_mm: float, band_mm: float) -> float:
     )
 
 
+# Two full pitches (1.5875 mm) below the thickest nut at the worst case.
+PAST_NUT_FLOOR_MM = FULL_THREADS_PAST_NUT * _PITCH
 if (
     full_threads_past_nut_mm(ADJUSTMENT_TRAVEL_MM, -LENGTH_BAND_WORST_MM)
-    < FULL_THREADS_PAST_NUT * _PITCH - 1e-9
+    < PAST_NUT_FLOOR_MM - 1e-9
 ):
     raise ValueError("the shortest in-band anchor loses its threads past the nut")
+# The cut shank must come out of the purchased 9489T111: the lever's padded
+# tap length sets how much of it the anchor needs.
+if SHANK_LENGTH_MM >= ANCHOR_9489T111.shank_length_mm:
+    raise ValueError("the anchor's cut shank no longer fits the 9489T111 stock")
 
 DRAWING_DIMENSIONS = {
     "StockTrimProfile": {"FinishedOverall"},

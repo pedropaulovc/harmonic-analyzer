@@ -217,12 +217,15 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
     arc_min = rise - joint.LINEAR_BAND
     width_max = slant_reach + joint.LINEAR_BAND
     from_slant_end_min = slant_reach - tap_x - joint.POSITION_BAND
-    row_max = joint.POSITION_BAND + joint.LEVER_PLATE_THICKNESS_BAND / 2.0
+    # The row is located from the plate top, which the plate's title-block
+    # thickness band moves by half that band about the pivot mid-plane; the
+    # drill wanders laterally at its deepest reach.
+    row_max = joint.POSITION_BAND + joint.LINEAR_BAND / 2.0
     rib_wall_min = (
         (arc_min * from_slant_end_min - width_max * row_max)
-        / math.hypot(arc_min, width_max) - thread_radius
+        / math.hypot(arc_min, width_max) - thread_radius - joint.DRILL_WANDER_MAX
     )
-    assert rib_wall_min == pytest.approx(3.41324, abs=1e-5)
+    assert rib_wall_min == pytest.approx(3.15952, abs=1e-5)
     assert rib_wall_min >= 2.0
     # The native spring frame is Ø0.15 RFS (code review C06), not MMC.
     # Separate X/Z extremes are conservative.
@@ -238,9 +241,10 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
     )
     assert spring_dz_min < 0.0  # the j=0 station overlaps the drill's depth
     spring_web_min = (
-        math.hypot(spring_dx_min, max(spring_dz_min, 0.0)) - thread_radius - spring_radius
+        math.hypot(spring_dx_min, max(spring_dz_min, 0.0))
+        - thread_radius - spring_radius - joint.DRILL_WANDER_MAX
     )
-    assert spring_web_min == pytest.approx(6.67030, abs=1e-5)
+    assert spring_web_min == pytest.approx(6.63514, abs=1e-5)
     assert spring_web_min >= 2.0
 
 
