@@ -1,9 +1,10 @@
 """Four-view purchased-part reference sheets, linked to the native source part.
 
-Every view is hidden-lines-removed: the sheets carry no dimensions, so a dashed
-edge never names a feature (drawing-guidelines rule 9).  Front/Top/Right share
-the largest standard scale that fits their cells, which is the sheet scale; the
-Isometric takes its own largest fitting scale, printed in its caption.
+By default every view is hidden-lines-removed: the sheets carry no dimensions,
+so a dashed edge never names a feature (drawing-guidelines rule 9).
+Front/Top/Right share the largest standard scale that fits their cells, which
+is the sheet scale; the Isometric takes its own largest fitting scale, printed
+in its caption.
 
 The footer, bottom-left above the border and left of the title block, reads
 top to bottom: the part's own notes (installation, or a spring's acceptance
@@ -43,7 +44,7 @@ from _drawing_common import (
 from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
-from _drawing_view_display import set_hidden_lines_removed
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _fastener_catalog import fastener
 import _telemetry
 
@@ -450,6 +451,7 @@ async def build_purchased_fastener_drawing(
     *,
     item: str | None = None,
     cut_to_suit: bool = False,
+    hidden_lines_removed: bool = True,
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
 
@@ -457,7 +459,8 @@ async def build_purchased_fastener_drawing(
     ``#4-40 x 1/4 SOCKET SET SCREW, CUP POINT``; without one the row prints
     the registry stock name (vn_transgear_pivot_screw, reworked in PR #1477).
     ``cut_to_suit`` marks a fastener its registry installation note cuts at
-    assembly.
+    assembly.  ``hidden_lines_removed=False`` dashes the hidden edges on
+    Front/Top/Right; the Isometric is always hidden-lines-removed.
     """
     stock = fastener(spec.artifact_stem)
     source = spec.source
@@ -503,6 +506,7 @@ async def build_purchased_fastener_drawing(
         notes=str(registry.get("installation_notes", "")),
         cut_to_suit=cut_to_suit,
         document_title=str(registry["title"]),
+        hidden_lines_removed=hidden_lines_removed,
     )
 
 
@@ -547,6 +551,7 @@ async def _build_reference_sheet(
     cut_to_suit: bool = False,
     document_title: str | None = None,
     spring: bool = False,
+    hidden_lines_removed: bool = True,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -587,7 +592,10 @@ async def _build_reference_sheet(
             view = _early_bound(
                 place_view(adapter, str(source), name, *center, scale=(1, 1)), "IView"
             )
-            set_hidden_lines_removed(adapter, view)
+            if name == _ISOMETRIC or hidden_lines_removed:
+                set_hidden_lines_removed(adapter, view)
+            else:
+                set_hidden_lines_visible(adapter, view)
             views.append(view)
         # Later insertions may auto-adjust the sheet scale. Pin all views only
         # after insertion so the measurement pass is genuinely at native 1:1.
