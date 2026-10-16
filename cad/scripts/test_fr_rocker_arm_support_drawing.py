@@ -1201,6 +1201,11 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     cavity = _text_box("25.9", drawing.FRONT_KEEP["CavityEndStation"])
     cavity_top = _text_box("25.4", drawing.FRONT_KEEP["CavityTopStation"])
     assert pocket[2] < front_left and cavity_top[2] < front_left
+    # Clear of the 25.4's dimension line and of its outside arrow tail above
+    # the top face (r9 review: the tail struck BOTH SIDES): on r9's render
+    # the tail reached 5.7 mm above the face.
+    assert pocket[2] < drawing.FRONT_KEEP["CavityTopStation"][0] - 0.001
+    assert pocket[1] > front_top + 0.008
     assert front_top < cavity[1] and cavity[3] < DEPTH_DIM_LINE_Y - 0.002
     # The 25.9 stands inside its span, the end face to the cavity wall.
     assert front_left < cavity[0] and cavity[2] < drawing.FRONT_CENTER[0] - (
