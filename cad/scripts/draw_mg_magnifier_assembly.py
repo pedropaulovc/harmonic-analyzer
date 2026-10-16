@@ -64,6 +64,7 @@ from _drawing_balloons import (
     assert_balloon_landings,
     isolate_drawing_view_components,
 )
+from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     _SW_SHADED_EDGES,
     DrawingOutputs,
@@ -869,6 +870,7 @@ def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
         label=LEVER_VIEW_LABEL,
         names=("lever tip", "clamp centre", "fixture axis"),
     )
+    _add_setting_axes(adapter, view)
     _show_base_view_sketches(adapter, view, (stack.LEVER_FEATURE,), label=LEVER_VIEW_LABEL)
     annotations = curate_view_dimensions(
         adapter,
@@ -906,6 +908,41 @@ def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
         )
     _assert_lever_callouts(displays, callouts)
     return lambda: _assert_lever_callouts(displays, callouts)
+
+
+def setting_axis_picks_m() -> dict[str, tuple[float, float, float]]:
+    """Model points on the lever and vertical rod's cylinders, clear of the
+    clamp, the fixture and the setting chain on their axes."""
+    return {
+        "vertical rod": (
+            stack.CLAMP_CENTRE_X / 1000.0 + 0.4 * _VROD_R / 1000.0,
+            (stack.LEVER_AXIS_Y + stack.FIXTURE_AXIS_Y) / 2000.0,
+            0.0,
+        ),
+        "lever": (
+            (stack.CLAMP_CENTRE_X + stack.LEVER_TIP_X) / 2000.0,
+            stack.LEVER_AXIS_Y / 1000.0 + 0.4 * _LEVER_R / 1000.0,
+            0.0,
+        ),
+    }
+
+
+def _add_setting_axes(adapter: Any, view: Any) -> None:
+    """The vertical rod's and the lever's ASME centrelines on the back view.
+
+    Machinist review r7 (run 20261016T162927333Z) read the lever setting
+    chain, construction lines on these two axes in the document's long-short
+    font, as hidden lines in a hidden-lines-removed view. The chain must stay
+    shown or its 50.0/60.0 hide with it (_drawing_hidden_sketches, r21), and
+    r14 (run 20261016T171305106Z) proved the chain-font preference prints the
+    same pattern, so each part gets its own black centreline, past its ends,
+    and the chain reads as the axes it lies on.
+    """
+    for name, point in setting_axis_picks_m().items():
+        xy = model_point_in_view(adapter, view, point, label=f"{name} axis pick")
+        add_view_centerline(
+            adapter, view, face_xy=(xy[0], xy[1]), label=f"back view {name} axis"
+        )
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -1114,48 +1151,6 @@ def _create_sheets(adapter: Any) -> None:
         numerator, denominator = SHEET_SCALES[name]
         if not sheet.SetScale(float(numerator), float(denominator), False, False):
             raise RuntimeError(f"failed to set magnifier sheet scale: {name}")
-    _draw_construction_as_chain(adapter)
-
-
-# swconst.tlb (SOLIDWORKS 2026): swUserPreferenceIntegerValue_e
-# swLineFontConstructionCurvesStyle 66 / ...Thickness 65; swLineStyles_e
-# swLineCHAIN 3; swLineWeights_e swLW_THIN 0; swDetailingNoOptionSpecified 0.
-_PREF_CONSTRUCTION_STYLE = 66
-_PREF_CONSTRUCTION_THICKNESS = 65
-_LINE_CHAIN = 3
-_LINE_THIN = 0
-
-
-def _draw_construction_as_chain(adapter: Any) -> None:
-    """Print the setting chains (construction lines on the lever, vertical-rod
-    and axle axes) as thin dash-dot centrelines.
-
-    Machinist review r7 (run 20261016T162927333Z) read the lever chain on the
-    back view, drawn in the document's long-short construction font down the
-    vertical rod, as hidden lines, though the view is hidden-lines-removed.
-    The chains must stay shown or their dimensions hide with them
-    (_drawing_hidden_sketches, r21), so they print as the axes they lie on.
-    A document property, read back: a rejected write raises.
-    """
-    extension = adapter.currentModel.Extension
-    for pref, value in (
-        (_PREF_CONSTRUCTION_STYLE, _LINE_CHAIN),
-        (_PREF_CONSTRUCTION_THICKNESS, _LINE_THIN),
-    ):
-        before = int(extension.GetUserPreferenceInteger(pref, 0))
-        ok = extension.SetUserPreferenceInteger(pref, 0, value)
-        after = int(extension.GetUserPreferenceInteger(pref, 0))
-        _telemetry.info(
-            f"construction line font pref {pref}: {before} -> {after}",
-            pref=pref,
-            before=before,
-            after=after,
-        )
-        if not ok or after != value:
-            raise RuntimeError(
-                f"construction line font pref {pref} reads {after} after setting "
-                f"{value} (set returned {ok!r})"
-            )
 
 
 _INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After

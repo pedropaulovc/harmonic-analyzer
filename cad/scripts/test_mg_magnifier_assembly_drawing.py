@@ -809,6 +809,22 @@ def test_the_lever_group_takes_1_2_5_centred_with_its_caption_under_it() -> None
         drawing.lever_caption_xy((0.1, 0.075, 0.2, 0.2), text)
 
 
+def test_the_setting_axis_picks_land_on_the_bare_cylinders_off_the_chain() -> None:
+    # r14 (run 20261016T171305106Z), back view at 1:4: the clamp block ends
+    # 18.7 mm under the lever axis and 5.9 mm right of the rod axis; the
+    # fixture's top sits 5.5 mm over its axis.
+    picks = drawing.setting_axis_picks_m()
+    rod_x, rod_y, rod_z = (value * 1000.0 for value in picks["vertical rod"])
+    lever_x, lever_y, lever_z = (value * 1000.0 for value in picks["lever"])
+    assert rod_z == lever_z == 0.0
+    assert 0.0 < rod_x - stack.CLAMP_CENTRE_X < drawing._VROD_R
+    assert stack.LEVER_AXIS_Y - rod_y > 18.7 + 5.0
+    assert rod_y - stack.FIXTURE_AXIS_Y > 5.5 + 5.0
+    assert 0.0 < lever_y - stack.LEVER_AXIS_Y < drawing._LEVER_R
+    assert lever_x - stack.CLAMP_CENTRE_X > 5.9 + 5.0
+    assert stack.LEVER_TIP_X - lever_x > drawing._LEVER_R + 5.0
+
+
 def test_the_axle_nut_balloons_land_square_to_the_axle_on_distinct_parts() -> None:
     import math
 
