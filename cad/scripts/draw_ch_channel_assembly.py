@@ -150,7 +150,15 @@ ASSEMBLED_CAPTION = "\n".join(
 
 # --- sheet 2: exploded isometric, BOM, balloons ------------------------------
 EXPLODED_ISO_CENTER = (0.100, 0.150)
-BALLOON_MARGIN = 0.014
+# The lever balloon's leader runs along the bank axis, and the exploded fulcrum
+# shaft lies on that axis's south extension. The shaft has no hit-testable
+# edge, so SolidWorks picks where its leader lands (listed-edge), and that
+# landing moved 15 mm between r8 and r9. At 14 mm the ring's push-apart swung
+# balloon 14 down over the shaft, and a south-end landing crossed leader 2
+# (r9 audit). With 20 mm, a ring replay over every landing on the visible
+# shaft (balloon radius 5.0-5.5 mm) keeps leader 14 2-4 mm off the shaft, and
+# the ring top stays 3.6 mm inside the border.
+BALLOON_MARGIN = 0.020
 BOM_ANCHOR = (0.205, 0.262)
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
