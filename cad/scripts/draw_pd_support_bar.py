@@ -301,12 +301,19 @@ SLOT_DEPTH_SHELF_DROP = 0.0112
 SLOT_DEPTH_TEXT_SIDE = 0.018
 
 # Section A-A: the thickness up-left of the cut bar, its text outside the
-# extension lines since the 2:1 span is narrower than it. The caption drops
-# under the section.
+# extension lines since the 2:1 span is narrower than it. Nothing is
+# dimensioned under the cut bar, so its caption's top stands just under the
+# bar's foot at the native caption's x (r4 review: a 35 mm drop, kept from
+# when the thread and drill depths stood there, put it beside the isometric).
 SECTION_KEEP_NAMES = ("Depth",)
 SECTION_DEPTH_RISE = 0.010
 SECTION_DEPTH_SIDE = 0.028
-CAPTION_DROP = 0.035
+SECTION_CAPTION_GAP = 0.004
+SECTION_CAPTION_TOP_Y = (
+    SECTION_CENTER[1]
+    - BAR_HEIGHT * SECTION_SCALE[0] / SECTION_SCALE[1] / 2000.0
+    - SECTION_CAPTION_GAP
+)
 # How far (model mm) each cutting line runs past the bar's top and bottom
 # edges. Both views are 1:2, and SolidWorks stands each end's letter at the
 # same offset from its arrow's line (r7: from 1.28 mm under it to 4.89 over),
@@ -873,7 +880,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     )
     _add_slide_finishes(adapter, face, back)
-    _move_caption(adapter, section, lambda x, y: (x, y - CAPTION_DROP))
+    _move_caption(adapter, section, lambda x, _y: (x, SECTION_CAPTION_TOP_Y))
     _move_caption(adapter, slot_section, lambda _x, _y: SLOT_SECTION_CAPTION_XY)
     _place_caption(adapter, FACE_VIEW_CAPTION, FACE_CAPTION_TOP)
     _place_caption(adapter, BACK_VIEW_CAPTION, BACK_CAPTION_TOP)

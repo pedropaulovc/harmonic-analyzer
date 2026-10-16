@@ -771,6 +771,19 @@ def test_slot_section_depth_line_runs_through_the_open_slot(monkeypatch) -> None
         assert abs(text_x - front) == pytest.approx(drawing.SLOT_DEPTH_TEXT_SIDE)
 
 
+def test_section_a_a_caption_stands_directly_under_the_cut_bar() -> None:
+    """r4 review: 35 mm under the cut bar, the caption read as the
+    isometric's. Only the thickness is dimensioned on A-A, above the bar."""
+    assert drawing.SECTION_KEEP_NAMES == ("Depth",)
+    assert drawing.SECTION_DEPTH_RISE > 0.0
+    scale = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
+    foot = drawing.SECTION_CENTER[1] - spec.BAR_HEIGHT * scale / 2000.0
+    gap = foot - drawing.SECTION_CAPTION_TOP_Y
+    assert 0.002 <= gap <= 0.006
+    # Still above the isometric's centre, which stands under it.
+    assert drawing.SECTION_CAPTION_TOP_Y > drawing.ISO_CENTER[1] + 0.040
+
+
 class _DetailView:
     """A placed model view: its Position moves by SetViewPosition, and a model
     point projects ``offset`` from it."""
