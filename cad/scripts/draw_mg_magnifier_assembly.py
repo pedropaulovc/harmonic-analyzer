@@ -203,8 +203,10 @@ if WHEEL_FIELD[2] + _PAD > BOM_ANCHOR[0]:
 WHEEL_CAPTION_XY = (INNER_BORDER[0] + _PAD + 0.002, TITLE_BLOCK[3] - _PAD)
 WHEEL_GROUP = "WHEEL GROUP"
 WHEEL_LABEL = "wheel group exploded"
-# The heading's two-line titles ("ITEM NO.", "PART NUMBER") take two rows.
-BOM_HEADING_ROWS = 2
+# The heading's two-line titles ("ITEM NO.", "PART NUMBER") print 14.3 mm
+# tall (r4's read-back: 128.3 mm for 19 rows of 6.0), so the plan books three
+# rows; the reference view still fits its field at 1:16 (44.3 mm tall on r3).
+BOM_HEADING_ROWS = 3
 BOM_BOTTOM = BOM_ANCHOR[1] - (len(stack.BOM_ORDER) + BOM_HEADING_ROWS) * BOM_ROW_HEIGHT
 BOM_REFERENCE_CAPTION_XY = (BOM_ANCHOR[0], BOM_BOTTOM - _PAD)
 BOM_REFERENCE_FIELD = (
