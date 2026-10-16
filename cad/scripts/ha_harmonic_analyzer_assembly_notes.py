@@ -62,10 +62,12 @@ NIB_CLEARANCE_TEXT = f"{PEN_PAPER_CLEARANCE_MM:.2f}"
 # it; the step text points back to the sheet-1 dimension, so the value lives
 # only on the associative model dimension.
 # Both callouts stay short: the bar-height text stands wholly west of the
-# front view, the stud text in the bay between the pen rod and the east column.
+# front view, the stud-drop text in the narrow strip between the east column
+# and the crank-side view, so it names only its step (the extension lines
+# show it runs from the bar top to the stud head).
 SETTING_CALLOUTS = {
     BAR_HEIGHT_DIMENSION: f"BAR TOP (STEP {steps.step_number('magnifier-bar-clamped')})",
-    STUD_DROP_DIMENSION: f"STUD (STEP {steps.step_number('pen-wire-tied')})",
+    STUD_DROP_DIMENSION: f"STEP {steps.step_number('pen-wire-tied')}",
 }
 
 # --- Fitter package text ----------------------------------------------------
@@ -131,18 +133,23 @@ _STEP_TEXT: dict[str, str] = {
         "MHA-SM-003 AND DRIVE BOTH MHA-VN-050 #2-56 SCREWS UNTIL THE HEADS SEAT "
         "ON THE COUNTERBORE FLOORS. NO THREADLOCKER."
     ),
-    "lever-wire-fitted": "LEVER WIRE: PER MHA-MG-000 (SHEET 4).",
+    "lever-wire-fitted": "LEVER WIRE: PER MHA-MG-000 SHEET 4.",
     "pen-hung": (
         "PEN: HANG MHA-PN-000 FROM THE MHA-MG-008 BAR AND LOCK THE HANGER SCREW "
         "PER ITS HANGER SCREW LOCK STEP (MHA-VN-007, MHA-VN-063 NUT, "
         "MHA-VN-064 JAM NUT)."
     ),
+    # The wrap follows mg_wheel_group (PEN_WIRE_WRAP_DEG: from the 3 o'clock
+    # tangent counter-clockwise, up over the top, to TIE 2 at about 4:30, under
+    # one turn); TIE 2 is the radial hole drawn on the MHA-MG-005 sheet.
     "pen-wire-tied": (
         f"PEN WIRE, WITH THE PLATE TOP LEVEL (STEP {_n('summing-levelled')}): "
         "LEAD THE UPPER END OF MHA-VN-067 INTO THE MHA-MG-005 RIM GROOVE AT "
-        "THE 3 O'CLOCK TANGENT (FRONT VIEW) AND TIE IT OFF AT TIE 2, SET SO "
-        "THE MHA-PN-007 STUD HEAD TOP HANGS ITS SHEET 1 DROP BELOW THE "
-        "MHA-MG-008 BAR TOP. TRIM THE TAIL."
+        "THE 3 O'CLOCK TANGENT (FRONT VIEW), WRAP IT COUNTER-CLOCKWISE UP OVER "
+        "THE TOP (UNDER ONE TURN) TO THE TIE 2 HOLE SHOWN ON THE MHA-MG-005 "
+        "DRAWING, PASS IT THROUGH AND TIE IT OFF INSIDE THE RIM, SET SO THE "
+        "MHA-PN-007 STUD HEAD TOP HANGS THE SHEET 1 STEP "
+        f"{_n('pen-wire-tied')} DROP BELOW THE MHA-MG-008 BAR TOP. TRIM THE TAIL."
     ),
     "nib-set": (
         "NIB TO PAPER, WITH PAPER CLIPPED ON THE PLATEN: SLACKEN THE MHA-VN-010 "
@@ -165,7 +172,7 @@ ASSEMBLY_STEPS: tuple[str, ...] = tuple(
 )
 
 ASSEMBLY_CHECKS: tuple[str, ...] = (
-    "1. BAR TOP AND STUD READ THEIR SHEET 1 SETTINGS; A "
+    "1. THE SHEET 1 BAR TOP AND STUD DROP READ AS DIMENSIONED; A "
     f"{NIB_CLEARANCE_TEXT} FEELER JUST DRAGS BETWEEN NIB AND PAPER.",
     f"2. ALL {CHANNEL_ANCHORS} ANCHOR EYES STAND IN THEIR SPRINGS' PULL PLANES; "
     "NO NECK STANDS MORE THAN 1 TURN OFF THE PLATE TOP.",

@@ -126,10 +126,16 @@ ASSEMBLED_ROW_Y = 0.252
 FRONT_LEFT_X = 0.052
 VIEW_GAP_X = 0.015
 BAR_DIMENSION_TEXT_DX = -0.016  # left of the front view's outline
-# The stud-drop text stands in the clear bay east (viewer's right) of the pen
-# rod, between the rod and the east column, at the span's mid-height (r3: at
-# -45 it sat across the rod and the wheel rim).
-STUD_DIMENSION_TEXT_MODEL_DX_MM = -96.0
+# The stud-drop text stands outside the east column (viewer's right), in the
+# strip between the front view's ink and the crank-side view, the extension
+# lines carried across the column to it (r3: beside the rod it sat across the
+# rod and the wheel rim; r4: inside the frame, pressed against the pen
+# hanger). Model x of the text centre: the east column's outer face is at
+# x = -(197 + 12.7) (fr_top_frame_spec.COLUMN_X, fr_tube_frame_spec.OUTER_DIA;
+# pinned by the test); the 7-character callout is ~80 mm of model wide at 1:5,
+# so its west end clears the column by ~15 mm of model (3 mm of sheet) and its
+# east end stays ~10 mm of sheet short of the crank-side view's crank handle.
+STUD_DIMENSION_TEXT_MODEL_X_MM = -265.0
 ASSEMBLED_NOTE_XY = (0.020, 0.100)
 ASSEMBLED_NOTE_WIDTH = 84  # characters; default-format note text
 
@@ -477,8 +483,8 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
 
 def _add_setting_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
     """Import the builder's two driving setting dimensions onto the front
-    view: the bar height outside the view's west edge, the stud drop beside
-    the pen rod."""
+    view: the bar height outside the view's west edge, the stud drop outside
+    the east column."""
     x0, _y0, _x1, _y1 = _view_outline(front, label="assembled front")
     lines = {line.dimension: line for line in spec.SETTING_LINES}
     bar = lines[spec.BAR_HEIGHT_DIMENSION]
@@ -489,7 +495,7 @@ def _add_setting_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
         [
             (bar.x / 1000.0, (bar.y_low + bar.y_high) / 2000.0, 0.0),
             (
-                (stud.x + STUD_DIMENSION_TEXT_MODEL_DX_MM) / 1000.0,
+                STUD_DIMENSION_TEXT_MODEL_X_MM / 1000.0,
                 (stud.y_low + stud.y_high) / 2000.0,
                 0.0,
             ),
