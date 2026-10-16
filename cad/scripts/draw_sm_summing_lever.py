@@ -71,7 +71,7 @@ from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
 from _session import run_build
 from _section_axis import position_section_caption
-from _surface_finish import surface_finish_by_key
+from _surface_finish import MACHINED, MACHINED_UM, surface_finish_by_key
 import _telemetry
 from magnifying_bracket_joint_layout import (
     DRILL_DEPTH,
@@ -944,10 +944,11 @@ TOP_KEEP = {
     # The cylinder's diameter across its band, from the part's hidden
     # CylinderReference line (machinist review r10: in the front view its
     # leader landed on the rib outline that hides it).  Its text stands left
-    # of the band on the line: right of the boss's 76.20 extension line (x
-    # 0.1972), 3 mm over the 5.08's text and 2.3 mm clear of the web's lower
-    # arc.
-    "CylinderDia": (0.209, _top_xy(0.0, -CYLINDER_REFERENCE_Z)[1]),
+    # of the band, 2.8 mm over the line, which the dimension line covers
+    # (farm r11: the dimension line prints that far below its text): right
+    # of the boss's 76.20 extension line (x 0.1972), 3 mm over the 5.08's
+    # text and 2.3 mm clear of the web's lower arc.
+    "CylinderDia": (0.209, _top_xy(0.0, -CYLINDER_REFERENCE_Z)[1] + 0.0028),
 }
 # Sheet 2, back view at 1:1 (model X reversed: the plate's free edge prints at
 # sheet x 0.160, the taps at 0.1747 and 0.1884 on y 0.150, the plate top at
@@ -1141,6 +1142,28 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.216, 0.084),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
+        char_height=0.0025,
+    )
+    # Both knife edges seat (Detail D's 2X), so the -Z ridge carries the same
+    # grade (machinist review r11, rule 6: one symbol left the other edge
+    # open to as-cast).  The part's control names the +Z face only, so this
+    # second symbol takes its catalog grade, held equal to the control's.
+    # It stands over the -Z stub: right of 21.72's upper dimension line (x
+    # 0.2235), its text 3 mm over the F arrow's letter and 2 mm under the
+    # 20X position frame (y 0.192); its leader enters the stub's right side.
+    knife_um = surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge").roughness_um
+    if knife_um != MACHINED_UM:
+        raise AssertionError(f"-Z knife-edge symbol prints {MACHINED}, not {knife_um}")
+    add_surface_finish(
+        adapter,
+        top,
+        edge_entity=top_edges.exact_line_through(
+            (ridge_x, ridge_y, -stub_mid_z), label="-Z knife-edge ridge round"
+        ).edge,
+        leader_attach_xy=_top_xy(ridge_x, stub_mid_z),
+        symbol_xy=(0.233, 0.1828),
+        roughness_ra=MACHINED,
+        label="-Z knife-edge ridge finish",
         char_height=0.0025,
     )
     # X location of the anchor tap from the knife-edge pivot axis (the +Z
