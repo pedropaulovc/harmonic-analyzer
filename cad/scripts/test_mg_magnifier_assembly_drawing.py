@@ -357,6 +357,36 @@ def test_the_package_has_four_landscape_sheets_with_the_wire_steps_on_the_last()
     assert "SHEET 4" in stack.EXPLODED_CAPTION
 
 
+def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:
+    import math
+
+    import build_vn_lever_wire
+    import vn_lever_wire_geom as wire
+
+    x, station, z = drawing.WIRE_BALLOON_POINT_MM
+    # On the build's split ring, mid-run, on the wire's surface.
+    assert station == pytest.approx(build_vn_lever_wire.BALLOON_RING_STATION)
+    assert station == pytest.approx(wire.WIRE_LEN / 2.0)
+    assert math.hypot(x, z) == pytest.approx(wire.WIRE_DIA / 2.0)
+    assert drawing.BALLOON_ANCHORS["vn-lever-wire"].point_mm == drawing.WIRE_BALLOON_POINT_MM
+    # Turned into the machine frame, the point's outward normal faces +X+Y+Z.
+    delta = [h - d for h, d in zip(wire.WIRE_START, wire.WIRE_END)]
+    axis = [v / math.hypot(*delta) for v in delta]
+    n = math.hypot(axis[0], axis[1])
+    ex = (axis[1] / n, -axis[0] / n, 0.0)
+    ez = (
+        ex[1] * axis[2] - ex[2] * axis[1],
+        ex[2] * axis[0] - ex[0] * axis[2],
+        ex[0] * axis[1] - ex[1] * axis[0],
+    )
+    normal = [x * a + z * b for a, b in zip(ex, ez)]
+    viewer = [1.0 / math.sqrt(3.0)] * 3
+    facing = sum(a * b for a, b in zip(normal, viewer)) / math.hypot(*normal)
+    along = sum(a * b for a, b in zip(axis, viewer))
+    # All of the viewer direction square to the axis points at the ring point.
+    assert facing == pytest.approx(math.sqrt(1.0 - along**2))
+
+
 def test_the_wire_is_tied_in_the_rest_state_with_both_ends_secured() -> None:
     import mg_wheel_group
 
