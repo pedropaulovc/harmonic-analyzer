@@ -24,9 +24,10 @@ checkpointed atomically; interrupted/invalid cases rerun without overwriting old
 attempt artifacts. stdout contains only aggregate JSON; telemetry uses stderr.
 The run's inputs/ directory preserves raw baseline.txt, candidate.txt and
 schema.json bytes. Each report's extra.evidence preserves the exact effective
-prompt, schema text, authorized MCP source paths, actual argv and a path-adapted
-retained_argv for every provider attempt. retained_argv only points attempt-dir
-file arguments at their retained copies; it is provenance, not a runnable replay.
+prompt, schema text, and authorized immutable source snapshots, each bound to
+the frozen source hashes, plus actual argv and a path-adapted retained_argv for
+every provider attempt. retained_argv only points attempt-dir file arguments at
+their retained copies; it is provenance, not a runnable replay.
 Frozen PNGs stay outside the per-attempt directories; retained MCP configuration,
 process/output files and Codex's authoritative session rollout live directly in
 each retained attempt directory. Codex evidence is judged from that rollout, which
@@ -319,6 +320,22 @@ def validate_evidence(
         raise ValueError("checkpoint review differs from preserved report")
     mr.validate_verdict(review.verdict)
     sources = [source.resolve() for source in package.sources]
+    snapshot_dir = report_path.parent / f"{package.name}.sources"
+    snapshot_sources = [snapshot_dir / source.name for source in sources]
+    resolved_snapshot_dir = snapshot_dir.resolve()
+    if (
+        not snapshot_dir.is_dir()
+        or not resolved_snapshot_dir.is_relative_to(report_path.parent.resolve())
+        or any(
+            not snapshot.is_file()
+            or snapshot.resolve().parent != resolved_snapshot_dir
+            or mr._sha256(snapshot) != expected_hash
+            for snapshot, expected_hash in zip(
+                snapshot_sources, identity["images"][package.name],
+            )
+        )
+    ):
+        raise ValueError("missing, misplaced or changed immutable source snapshot")
     if [mr._sha256(source) for source in sources] != identity["images"][package.name]:
         raise ValueError("source changed after run identity was computed")
     expected = {
@@ -360,7 +377,7 @@ def validate_evidence(
         raise ValueError("incomplete invocation history")
     # The resource-free sole-sheets catalog is recomputed from the current SDK
     # server; only under it are Codex resource helpers neutral (never Claude's).
-    current_catalog = mr._sheet_resource_manifest(package.sources)
+    current_catalog = mr._sheet_resource_manifest(snapshot_sources)
     if _digest(evidence.get("mcp_catalog")) != _digest(current_catalog):
         raise ValueError("recorded MCP catalog differs from the current sheet server")
     if not mr._resource_neutrality_permitted(current_catalog):
@@ -415,10 +432,13 @@ def validate_evidence(
             or not retained.is_dir()
         ):
             raise ValueError("missing or misplaced retained attempt directory")
-        if invocation["sources"] != [str(source) for source in sources] or any(
-            source.is_relative_to(directory.resolve())
-            for source in sources
-            for directory in (cwd, attempt_dir, retained)
+        if (
+            invocation["sources"] != [str(source.resolve()) for source in snapshot_sources]
+            or any(
+                source.is_relative_to(directory.resolve())
+                for source in sources
+                for directory in (cwd, attempt_dir, retained)
+            )
         ):
             raise ValueError("invocation source allowlist differs from package")
         outcome, error, exit_code = invocation["outcome"], invocation["error"], invocation["exit_code"]
@@ -453,7 +473,10 @@ def validate_evidence(
                 or json.loads(config.read_text(encoding="utf-8")) != {
                     "mcpServers": {"sheets": {
                         "command": sys.executable,
-                        "args": [str(mr.SHEETS_SERVER), *(str(source) for source in sources)],
+                        "args": [
+                            str(mr.SHEETS_SERVER),
+                            *(str(source.resolve()) for source in snapshot_sources),
+                        ],
                     }},
                 }
             ):
@@ -532,7 +555,7 @@ def validate_evidence(
             )
             if review.reviewer == "claude"
             else mr.build_codex_command(
-                workdir=cwd, attempt_dir=attempt_dir, sources=sources,
+                workdir=cwd, attempt_dir=attempt_dir, sources=snapshot_sources,
                 schema=attempt_dir / "schema.json", output=attempt_dir / "verdict.json",
                 model=review.model, effort=review.effort, codex=command[0],
             )
