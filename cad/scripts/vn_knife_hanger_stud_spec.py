@@ -120,10 +120,15 @@ DIMENSION_CALLOUTS = {
         "SETS THREAD ENGAGEMENT\n"
         "AND TIP CLEARANCE"
     ),
-    # The band on the leg is the engagement reason; the native ChamferAngle
-    # prints its own 45 degrees.
+    # Both ends of the band on the leg are functional (review r9 read it as
+    # engagement only, already held by the tail's 1 PITCH MAX): the minimum
+    # brings the tip flat inside the MHA-SM-002 tap drill so the cut thread
+    # starts, the maximum keeps the incomplete tip inside the charged pitch.
+    # The native ChamferAngle prints its own 45 degrees.
     "ChamferWidth": (
-        "CUT-END CHAMFER\nSETS FULL-THREAD ENGAGEMENT\nIN MHA-SM-002 KNIFE MOUNT"
+        "CUT-END CHAMFER\n"
+        "MIN: TIP STARTS IN MHA-SM-002 TAP\n"
+        "MAX: SETS FULL-THREAD ENGAGEMENT"
     ),
     "ThreadLengthMin": (
         f"{PRINTED_THREAD} CONTINUOUS TAIL FROM TIP\n"
