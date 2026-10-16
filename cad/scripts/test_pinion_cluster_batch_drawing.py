@@ -696,15 +696,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 1.778,
                 4.7625,
             ),
-            # Twenty stock 9489T111 #6-32 anchors engage only the 0.2-in
-            # summing-lever plate; #36 tap drill, not the full stock shank.
+            # Twenty stock 9489T111 #6-32 anchors engage only the summing
+            # lever's 7.00 padded tap; #36 tap drill, not the full stock shank.
             **_expected_numbered_pairs(
                 "ch-channel-1/vn-spring-hook",
                 range(1, 21),
                 "sm-summing-1/sm-summing-lever",
                 3.5052,
                 2.705,
-                5.08,
+                7.0,
             ),
             frozenset(
                 (

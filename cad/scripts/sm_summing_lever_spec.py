@@ -84,6 +84,16 @@ CHANNEL_PITCH = 7.0565
 # _interference_contracts, so an import would put the gear-train and channel
 # config into every assembly's closure. test_sm_summing_lever_drawing pins it.
 HOLE_Z_OFFSET = -3.52825
+# The 5.08 plate leaves a #6-32 only 1.1D of full thread, so a continuous pad
+# along the hole row's underside (owner ruling 2026-10-16, option B; the
+# user's ask timed out and the recommended option was auto-selected) gives
+# each tap 1.5D at the title block's .XX band
+# (``sm_summing_lever_notes`` proves it).  SPRING_SEAT_T is the tap's whole
+# length: plate top to pad underside, where each MHA-CH-012 jam nut seats.
+# The pad runs the plate's full length and in from its free +X edge past the
+# nut's O.D.
+SPRING_SEAT_T = 7.0
+SPRING_PAD_W = 10.0
 
 # The vn-counter-spring lower anchor (McMaster 9490T1, part ``vn-boss-hook``) threads
 # DIRECTLY through the summation-anchor boss on the same no-nut rule, authored
@@ -102,7 +112,7 @@ HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76
 HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
 
 # Drawing prose + marked-dimension contract (DRAWING_DIMENSIONS /
-# DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) live in ``sm_summing_lever_notes`` --
+# ISOMETRIC_VIEW_NOTE) live in ``sm_summing_lever_notes`` --
 # ``build_sm_summing_assembly`` / ``build_sm_knife_mount`` import this module, so
 # drawing-only data here would put every notes edit in their rebuild
 # closures (codex #354).

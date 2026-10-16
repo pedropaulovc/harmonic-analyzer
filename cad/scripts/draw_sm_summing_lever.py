@@ -43,6 +43,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -57,13 +58,15 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
 from _session import run_build
+from _section_axis import position_section_caption
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from magnifying_bracket_joint_layout import (
@@ -143,12 +146,29 @@ DETAIL_LABEL_XY = (0.075, 0.160)
 DETAIL_LETTER_OFFSET = (0.0, -0.011)
 KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
 
-# The -Z end rib's banded depth and the plate's banded wall are named by
+# Section C-C: the plate's own thickness.  Every end view shows the end ribs
+# over the plate and the spring-anchor pad below its free edge, so no view
+# shows the 5.08 edge-on; a partial cut across the plate alone, between two
+# spring taps (mid-pitch, clear of both), shows it at 1:1 under Detail A's
+# label, its cut end inboard of the pad.  The cut runs in the plan from just
+# outboard of the cylinder (R12.70) past the free edge; the value stands
+# beyond the cut's inboard end, the caption above.
+PLATE_SECTION_Z = HOLE_Z_LAST - (HOLE_COUNT // 2 + 4.5) * CHANNEL_PITCH
+PLATE_SECTION_X = (14.0, PLATE_W + 2.0)
+PLATE_SECTION_SCALE = (1, 1)
+PLATE_SECTION_CENTER = (0.075, 0.120)
+PLATE_SECTION_CAPTION_XY = (0.075, 0.140)
+# Model mm in the cutting plane: the anchor landed on PLATE_SECTION_CENTER
+# (the plate's mid-plane midway along the cut), and the value's text, 6 mm
+# past the cut's inboard end on that mid-plane.
+_PLATE_SECTION_ANCHOR_MM = (sum(PLATE_SECTION_X) / 2.0, 0.0, PLATE_SECTION_Z)
+PLATE_SECTION_TEXT_MM = {"PlateThickness": (PLATE_SECTION_X[0] - 6.0, 0.0, PLATE_SECTION_Z)}
+
+# The -Z end rib's banded depth is named by
 # build_sm_summing_lever._receiver_model_bands, and the receiver stations by
 # its hidden coordinate sketch, outside the marked-dimension contract.
 DIMENSIONS_BY_FEATURE: dict[str, set[str]] = {
     **DRAWING_DIMENSIONS,
-    "CoefficientsPlate": {"PlateThickness"},
     "EdgeRibBack": {"RibDepth"},
     "ReceiverCoordinates": {"ReceiverX0", "ReceiverX1", "ReceiverY0"},
 }
@@ -313,6 +333,94 @@ def _apply_callouts(adapter: Any, annotations: list[Any], *, label: str) -> None
     _telemetry.info(f"{label}: callouts on {sorted(present)}")
 
 
+def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
+    return tuple(value / 1000.0 for value in point_mm)
+
+
+def _plate_section(adapter: Any, top: Any) -> list[Any]:
+    """Section C-C across the plate (PLATE_SECTION_* above): cut face only,
+    turned +Y up and landed on PLATE_SECTION_CENTER (draw_pd_platen's
+    ``_orient_section``/``_centre_section``), carrying the plate thickness.
+    Which way the cut looks along Z only mirrors the rectangle."""
+    line = model_points_in_view(
+        adapter,
+        top,
+        [_metres((x, PLATE_T / 2.0, PLATE_SECTION_Z)) for x in PLATE_SECTION_X],
+        label="section C-C line",
+        names=("inboard", "outboard"),
+    )
+    section = create_section_view(
+        adapter,
+        top,
+        line_start=line[0],
+        line_end=line[1],
+        view_xy=PLATE_SECTION_CENTER,
+        section_label="C",
+        scale=PLATE_SECTION_SCALE,
+        partial=True,
+        label="plate thickness section",
+    )
+    native = _early_bound(section, "IView")
+    cut = _early_bound(native.GetSection(), "IDrSection")
+    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
+    # dedicated bool getter may be truth-tested.
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="section C-C cut face only")
+    if not cut.GetDisplayOnlySurfaceCut():
+        raise RuntimeError("section C-C retained geometry beyond the cutting plane")
+    set_hidden_lines_removed(adapter, native)
+    anchor = _metres(_PLATE_SECTION_ANCHOR_MM)
+    above = _metres(
+        (_PLATE_SECTION_ANCHOR_MM[0], 1.0, _PLATE_SECTION_ANCHOR_MM[2])
+    )
+    for attempt in range(3):
+        origin = model_point_in_view(adapter, native, anchor, label="C-C anchor")
+        up = model_point_in_view(adapter, native, above, label="C-C +Y")
+        dx, dy = up[0] - origin[0], up[1] - origin[1]
+        if dy > 0.0 and abs(dx) <= 1e-7:
+            break
+        native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(dy, dx)
+        rebuild_drawing(adapter, label=f"section C-C turned, pass {attempt}")
+    else:
+        raise RuntimeError(f"section C-C does not run +Y up: ({dx:g}, {dy:g})")
+    for attempt in range(4):
+        native.UpdateViewDisplayGeometry()
+        projected = model_point_in_view(
+            adapter, native, anchor, label=f"C-C centre, pass {attempt}"
+        )
+        if math.dist(projected, PLATE_SECTION_CENTER) <= 1e-4:
+            break
+        position = tuple(float(value) for value in native.Position)
+        moved = [
+            position[axis] + PLATE_SECTION_CENTER[axis] - projected[axis]
+            for axis in (0, 1)
+        ]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to re-centre section C-C")
+        rebuild_drawing(adapter, label=f"section C-C re-centred, pass {attempt}")
+    else:
+        raise RuntimeError(
+            f"section C-C centre stands at {projected}, not {PLATE_SECTION_CENTER}"
+        )
+    keep = {
+        name: model_point_in_view(
+            adapter, native, _metres(point), label=f"C-C {name} text"
+        )
+        for name, point in PLATE_SECTION_TEXT_MM.items()
+    }
+    annotations = curate_view_dimensions(
+        adapter,
+        native,
+        keep=keep,
+        view_label="section C-C",
+        dimensions_by_feature=DIMENSIONS_BY_FEATURE,
+    )
+    position_section_caption(
+        adapter, native, PLATE_SECTION_CAPTION_XY, label="plate section C-C"
+    )
+    return annotations
+
+
 def _mounting_rims(back: Any) -> list[Any]:
     """Back looks from -Z directly onto the blind taps' entry circles."""
     edges = scan_view_edges(back, label="bracket receiver face")
@@ -376,12 +484,15 @@ TOP_KEEP = {
     "MiddleRibThickness": (0.224, 0.135),
 }
 # Sheet 2, back view at 1:2 (model X reversed: the plate's free edge prints at
-# sheet x 0.1925, the taps at 0.2067 and 0.1998 on y 0.190, the plate between
-# y 0.1887 and 0.1913).  The receiver stations stand above the view, their
-# text right of the spans (the 2026-10-09 positions); the row height and then
-# the plate wall stand left of the free edge.
+# sheet x 0.1925, the taps at 0.2067 and 0.1998 on y 0.190, the plate top at
+# y 0.1913, the spring pad from the free edge to x 0.1975 down to y 0.1878).
+# The receiver stations stand above the view, their text right of the spans
+# (the 2026-10-09 positions); the row height and then the padded tap length
+# stand left of the free edge, both from the plate top; the pad's width hangs
+# below it, left of the receiver callout's leader.
 BACK_KEEP = {
-    "PlateThickness": (0.165, 0.200),
+    "SpringSeatThickness": (0.165, 0.200),
+    "SpringPadWidth": (0.195, 0.172),
     "ReceiverX0": (0.225, 0.220),
     "ReceiverX1": (0.225, 0.229),
     "ReceiverY0": (0.182, 0.185),
@@ -403,20 +514,16 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
             "Back View Note",
-            "Bracket Receiver Note",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
             "Back View Note",
-            "Bracket Receiver Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -739,9 +846,9 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="20X",
         label="spring-hole pattern position",
     )
+    _plate_section(adapter, top)
 
-    # Under the 20X callout whose taps it qualifies; the iso's label under it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.268, 0.121)
+    # The isometric's view label, under the iso.
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
 
     if not drawing.ActivateSheet(SHEET_NAMES[1]):
@@ -812,8 +919,6 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
     _apply_callouts(adapter, back_annotations, label="bracket receiver")
-    # Under the receiver callout it qualifies; the view label under the view.
-    add_property_linked_note(adapter, "Bracket Receiver Note", 0.292, 0.120)
     # The view label below the pad's width callout and left of the receiver
     # callout's leader: at (0.205, 0.172) that leader ran through it (farm r1
     # 2026-10-16, leader-through-text).  The point is the label's top left.

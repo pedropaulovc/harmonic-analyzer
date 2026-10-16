@@ -1763,8 +1763,8 @@ JOINTS: tuple[Joint, ...] = (
             "crank, and that spring pulls the anchor out of its tap"
         ),
         axial_capture=(
-            "the trimmed 9489T111 shank crosses the full 5.08 plate and carries the MHA-CH-014 jam nut on the "
-            "plate underside, which bears the spring's upward pull; the Ø3.175 neck shoulders on the plate top "
+            "the trimmed 9489T111 shank crosses the full 7.00 padded plate tap and carries the MHA-CH-014 jam "
+            "nut on the spring-pad underside, which bears the spring's upward pull; the Ø3.175 neck shoulders on the plate top "
             "only when fully seated (calibration backs it off up to 1 counted turn), and at the worst case "
             "(shortest in-band part, whole budget backed out) two full turns still show below the nut"
         ),
