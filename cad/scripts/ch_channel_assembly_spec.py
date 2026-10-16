@@ -172,10 +172,11 @@ _BRACKET_GROUP = (BRACKET, BRACKET_SET_SCREW, BRACKET_HOLD_DOWN)
 # The north bracket's hardware and the north washer (DETAIL B's cluster): at
 # 60 north alone the bracket sat inside the hanging rocker arms. Leaders 4 and
 # 7 met on it there, and the letter B fell on the arms (r10 machinist review).
-# 60 further north and 500 up lifts the cluster, free (still inside the box),
+# 30 further north and 570 up lifts the cluster, free (still inside the box),
 # into the open space between the bank's bar column and the pulled-out
-# channel: on an r11 sheet replay the circle stands 34 px (7 mm) clear of
-# the bank, the channel and DETAIL C's circle.
+# channel. At 60/500 (r14) it sorted round the ring among the channel's lever
+# balloons and leader 4 crossed 14; a replay of the r14 ring (its 19 logged
+# attachments) clears every pair from 540 to 580 up at 10 to 40 further north.
 _NORTH_END_GROUP = (*_BRACKET_GROUP, WASHER)
 # One whole channel, pulled north out of the bank off both shafts: closed up,
 # the 20 channels print as one dark mass at 1:7 and the balloons pinned on
@@ -206,8 +207,8 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("bank spring out", (BANK_SPRING,), "z", -40.0, "south"),
     ExplodeStep("south washer out", (WASHER,), "z", -20.0, "south"),
     ExplodeStep("north washer out", (WASHER,), "z", 20.0, "north"),
-    ExplodeStep("north end further out", _NORTH_END_GROUP, "z", 60.0, "north"),
-    ExplodeStep("north end up", _NORTH_END_GROUP, "y", 500.0, "north"),
+    ExplodeStep("north end further out", _NORTH_END_GROUP, "z", 30.0, "north"),
+    ExplodeStep("north end up", _NORTH_END_GROUP, "y", 570.0, "north"),
     ExplodeStep("rods down", (ROD,), "y", -50.0),
     # Up, not along x: 50 west put each bar (pin x 72.9) on its own spring's
     # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick);
@@ -228,6 +229,11 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("fulcrum shaft out south", (FULCRUM_SHAFT,), "z", -120.0),
     ExplodeStep("north-most channel out", _CHANNEL_GROUP, "z", 300.0, "north-most"),
     ExplodeStep("its pins out", (ROD_PIN, BAR_PIN), "z", 25.0, "north-most"),
+    # Its bar and bar pin, coaxial still, 30 back down the 50 every bar went
+    # up: at 50 the bar's balloon took the ring slot past its rod's and
+    # leaders 12/13 crossed (r14 layout audit); the r14 ring replay clears
+    # every pair from 10 to 40 down (at 45-50 the pin's leader meets 17's).
+    ExplodeStep("its bar down", (BAR, BAR_PIN), "y", -30.0, "north-most"),
 )
 EXPLODED_STEMS = frozenset(stem for step in EXPLODE_STEPS for stem in step.stems)
 # The families every instance of which moves (the channel's own move only
