@@ -94,10 +94,10 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert joint.COUNTERBORE_END_WALL_MIN == pytest.approx(2.000)
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(3.840)
     assert joint.HEAD_PROTRUSION == pytest.approx(2.1082)
-    # A flush head cannot keep the full-thread envelope inside the 5.08 rib.
+    # A flush head would run the screw past the tap's full thread.
     flush_reach = joint.SCREW_LENGTH - joint.SIDE_PLATE_THICKNESS + joint.SCREW_HEAD_HEIGHT
     assert flush_reach == pytest.approx(6.8707)
-    assert flush_reach > joint.RIB_DEPTH
+    assert flush_reach > joint.THREAD_DEPTH
     head_air = (
         min(joint.SCREW_MACHINE_X) - joint.SCREW_HEAD_DIA / 2.0
         - (KNIFE[0] + knife_mount.BLK_HALF_X)
@@ -127,13 +127,15 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
     assert joint.TAP_SPEC.end == "blind"
     assert joint.TAP_SPEC.depth_mm == joint.DRILL_DEPTH == 6.05
     assert joint.TAP_SPEC.overrides_mm["ThreadDepth"] == joint.THREAD_DEPTH == 4.95
-    assert joint.THREAD_RIB_MARGIN_MIN == pytest.approx(0.03)
+    assert joint.RIB_DEPTH == 7.0
+    assert joint.RIB_DEPTH_BAND == 0.25
+    assert joint.THREAD_RIB_MARGIN_MIN == pytest.approx(1.75)
     assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0075)
     assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.042857142857)
-    assert joint.DRILL_POINT_RIB_MARGIN == pytest.approx(-1.50416454)
-    assert joint.DRILL_POINT_RIB_MARGIN_MIN == pytest.approx(-1.68420754)
-    # The user permits ONLY this small-diameter continuation in the thin plate.
-    assert joint.DRILL_LATERAL_WALL_MIN == pytest.approx(1.501)
+    # The whole tap drill, point included, stays in the deepened end rib.
+    assert joint.DRILL_POINT_RIB_MARGIN == pytest.approx(0.41583546)
+    assert joint.DRILL_POINT_RIB_MARGIN_MIN == pytest.approx(0.03579246)
+    assert joint.DRILL_WANDER_MAX == pytest.approx(0.0351558, abs=1e-7)
 
 
 @pytest.mark.parametrize(
@@ -142,9 +144,10 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
         ("SCREW_LENGTH = 7.9375", "1.5D full engagement"),
         ("FLANGE_THICKNESS_BAND = 0.13", "1.5D full engagement"),
         ("THREAD_DEPTH = 4.95", "bottoms"),
-        ("RIB_DEPTH = 5.08", "beyond the front rib"),
+        ("RIB_DEPTH = 7.0", "breaks out of the front rib"),
+        ("RIB_DEPTH_BAND = 0.25", "breaks out of the front rib"),
         ("DRILL_DEPTH = 6.05", "bottoming-tap lead"),
-        ("LEVER_PLATE_THICKNESS_BAND = 0.05", r"drawing-guidelines\.md rule 17 \(walls and webs\) wall"),
+        ("SIDE_PLATE_HEIGHT = 12.7", r"drawing-guidelines\.md rule 17 \(walls and webs\) wall"),
         ("COUNTERBORE_DIA = 3.8", "head float"),
     ),
 )
@@ -154,9 +157,10 @@ def test_joint_guards_reject_lost_margins(replacement: str, failure: str) -> Non
         "SCREW_LENGTH": 7.85,
         "FLANGE_THICKNESS_BAND": 0.20,
         "THREAD_DEPTH": 4.85,
-        "RIB_DEPTH": 5.04,
+        "RIB_DEPTH": 6.95,
+        "RIB_DEPTH_BAND": 0.30,
         "DRILL_DEPTH": 6.00,
-        "LEVER_PLATE_THICKNESS_BAND": 0.10,
+        "SIDE_PLATE_HEIGHT": 8.0,
         "COUNTERBORE_DIA": 3.70,
     }[replacement.split(" = ")[0]]
     assert source.count(replacement) == 1
