@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 import tomllib
+from types import SimpleNamespace
 
 import pytest
 
@@ -339,3 +340,166 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
                 )
             checked += 1
     assert checked
+
+
+class _SlotView:
+    """A recording IView double for detail A's place-move-crop."""
+
+    def __init__(
+        self, *, crop_status: int = 1, crops: bool = True, moves: bool = True
+    ) -> None:
+        self.ScaleRatio = tuple(float(value) for value in drawing.DETAIL_SCALE)
+        self.Position = (0.300, 0.100)
+        self.crop_status = crop_status
+        self.crops = crops
+        self.moves = moves
+        self.cropped = False
+        self.calls: list[str] = []
+        self.CropViewJaggedOutline = False
+        self.CropViewNoOutline = False
+
+    def SetViewPosition(self, target, _update) -> bool:  # noqa: N802
+        self.calls.append("SetViewPosition")
+        if self.moves:
+            self.Position = tuple(float(value) for value in target)
+        return True
+
+    def GetOutline(self):  # noqa: N802
+        if self.cropped:
+            return (0.060, 0.025, 0.090, 0.055)
+        return (-0.600, -0.050, 0.860, 0.100)
+
+    def Crop2(self, jagged, no_outline, intensity) -> int:  # noqa: N802
+        self.calls.append(f"Crop2({jagged}, {no_outline}, {intensity})")
+        self.cropped = self.crops
+        return self.crop_status
+
+    def IsCropped(self) -> bool:  # noqa: N802
+        return self.cropped
+
+    def UpdateViewDisplayGeometry(self) -> None:  # noqa: N802
+        self.calls.append("UpdateViewDisplayGeometry")
+
+
+class _SlotModel:
+    def ClearSelection2(self, _all) -> None:  # noqa: N802
+        pass
+
+    def EditRebuild3(self) -> None:  # noqa: N802
+        pass
+
+
+def _crop_slot(monkeypatch, view: _SlotView) -> list[tuple]:
+    """Place, move and crop detail A on a *Front double at 5:1 whose model
+    origin sits a fixed offset from the view's position."""
+    log: list[tuple] = []
+    offset = (-0.650, -0.030)
+    ratio = drawing.DETAIL_RATIO
+
+    def place(_adapter, _source, orientation, x, y, *, scale):
+        log.append(("place", orientation, (x, y), scale))
+        return view
+
+    def model_point(_adapter, _view, point, *, label):
+        return (
+            view.Position[0] + offset[0] + ratio * point[0],
+            view.Position[1] + offset[1] + ratio * point[1],
+        )
+
+    def circle(_adapter, _view, center, radius, *, label, add_to_db=False):
+        log.append(("circle", center, radius, add_to_db))
+        return object()
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "model_point_in_view", model_point)
+    monkeypatch.setattr(drawing, "_sketch_circle", circle)
+    monkeypatch.setattr(drawing, "_activate_view", lambda *_a, **_k: "Drawing View4")
+    adapter = SimpleNamespace(currentModel=_SlotModel())
+    assert drawing._placed_rod_slot_view(adapter) is view
+    drawing._crop_rod_slot_view(adapter, view)
+    return log
+
+
+def test_rod_slot_detail_is_a_cropped_front_model_view(monkeypatch) -> None:
+    # Farm leaf edd99d0f (5dea45dfb): the native detail imported RodSlotWidth
+    # but not RodSlotFlat, so the detail is a model view cropped after import.
+    view = _SlotView()
+    log = _crop_slot(monkeypatch, view)
+    assert log[0] == ("place", "*Front", drawing.DETAIL_CENTER, drawing.DETAIL_SCALE)
+    kind, center, radius, add_to_db = log[1]
+    assert kind == "circle" and not add_to_db
+    assert center == pytest.approx(drawing.DETAIL_CENTER, abs=1e-12)
+    assert radius == pytest.approx(drawing.DETAIL_CROP_RADIUS)
+    assert view.calls[0] == "SetViewPosition"
+    assert "Crop2(False, False, 1)" in view.calls
+    source = (
+        CAD_ROOT / "scripts" / "draw_ch_rocker_arm_tl_outline_template.py"
+    ).read_text(encoding="utf-8")
+    assert ".CreateDetailViewAt4(" not in source
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"crop_status": 0}, "not cropped"),
+        ({"crops": False}, "not cropped"),
+        ({"moves": False}, "rod slot centre sits at"),
+    ],
+)
+def test_rod_slot_detail_fails_loud_when_the_seat_does_not_obey(
+    monkeypatch, kwargs, message
+) -> None:
+    with pytest.raises(RuntimeError, match=message):
+        _crop_slot(monkeypatch, _SlotView(**kwargs))
+
+
+@pytest.mark.parametrize("crop_drops", [(), ("RodSlotFlat",)])
+def test_rod_slot_detail_is_dimensioned_before_it_is_cropped(
+    monkeypatch, crop_drops
+) -> None:
+    calls: list[str] = []
+    events: list[tuple[str, dict]] = []
+    names: list[str] = []
+
+    def curate(_adapter, _view, *, keep, view_label, dimensions_by_feature):
+        calls.append("import")
+        names[:] = sorted(keep)
+        return ["curated"]
+
+    def crop(_adapter, _view):
+        calls.append("crop")
+        names[:] = [name for name in names if name not in crop_drops]
+
+    def read(_adapter, _view):
+        calls.append("read")
+        return sorted(names)
+
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "_crop_rod_slot_view", crop)
+    monkeypatch.setattr(drawing, "_view_dimension_names", read)
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
+    )
+    if crop_drops:
+        with pytest.raises(RuntimeError, match="lost \\['RodSlotFlat'\\]"):
+            drawing._dimension_then_crop_rod_slot_view(object(), object())
+    else:
+        assert drawing._dimension_then_crop_rod_slot_view(object(), object()) == [
+            "curated"
+        ]
+    assert calls == ["import", "read", "crop", "read"]
+    assert events[0][0] == "rod_slot_detail.crop"
+    assert events[0][1]["lost"] == ",".join(crop_drops)
+
+
+def test_rod_slot_detail_circle_and_label_stay_clear_of_the_notes_and_frame() -> None:
+    x, y = drawing.DETAIL_CENTER
+    crop = drawing.DETAIL_CROP_RADIUS
+    # The circle sits under the notes and right of the frame border.
+    assert y + crop < drawing.NOTES_XY[1] - 0.010
+    assert x - crop > 0.020 and y - crop > 0.010
+    # The label's top centre is right of the circle.
+    assert drawing.DETAIL_LABEL_XY[0] - 0.010 > x + crop
+    assert drawing.DETAIL_LABEL_TEXT == "DETAIL A\nSCALE 5 : 1"

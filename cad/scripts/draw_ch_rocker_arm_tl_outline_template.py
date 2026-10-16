@@ -2,10 +2,10 @@ r"""Create the drawing for the rocker arm's outline template (MHA-CH-006-TL-13).
 
 The face view (``*Front``, 1:1) carries the whole outline from the pivot
 hole: both apex heights on the mirror line, both radii, the arc-end stations
-and the tip lands, plus the rod slot's BASIC station; a native 5:1 detail of
-the face view carries the rod slot's width (a matched fit on its pin gauge)
-and run; the right-side edge view carries the plate thickness; a shaded
-isometric at 1:4 sits above.
+and the tip lands, plus the rod slot's BASIC station; a cropped 5:1 *Front
+detail carries the rod slot's width (a matched fit on its pin gauge) and run;
+the right-side edge view carries the plate thickness; a shaded isometric at
+1:4 sits above.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -88,12 +89,32 @@ NOTES_XY = (0.020, 0.088)
 ISO_CENTER = (0.330, 0.240)
 ISO_NOTE_XY = (0.250, 0.258)
 # The rod slot's 5:1 detail sits in the open field under the notes, left of
-# the title block. Its fence takes DETAIL_RADIUS_MM of the face view about
-# the slot's centre: the whole slot and nothing else.
+# the title block. Its circle takes DETAIL_RADIUS_MM of the part about the
+# slot's centre: the whole slot and nothing else.
 DETAIL_CENTER = (0.075, 0.040)
 DETAIL_RADIUS_MM = 3.0
-# The label anchors at its top centre: right of the fence, under the width.
+DETAIL_RATIO = DETAIL_SCALE[0] / DETAIL_SCALE[1]
+DETAIL_CROP_RADIUS = DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0
+DETAIL_LETTER = "A"
+# A model view has no native label the API can show, so the label is a note
+# the view owns, in the native detail label's words, anchored at its top
+# centre: right of the crop circle, under the width.
+DETAIL_LABEL_TEXT = (
+    f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
+)
 DETAIL_LABEL_XY = (0.112, 0.050)
+# The face view's letter goes west of the slot's mark, level with its centre:
+# the plate between the pivot and the slot carries nothing else there.
+PARENT_LETTER_OFFSET = (
+    -(DETAIL_RADIUS_MM * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0 + 0.005),
+    0.0,
+)
+# swCropViewErrors_e.swCropViewErrors_NoError
+CROP_NO_ERROR = 1
+# The slot's centre must land within 0.1 mm of DETAIL_CENTER after the move.
+DETAIL_POSITION_TOL_M = 1e-4
+NOTE_CENTRING_TOL_M = 0.001
+NOTE_CENTRING_PASSES = 2
 # Radius text stays outside both circles (below the outline) and each radius
 # keeps its arrow outside the arc with no solid leader, so its leader runs
 # from the text to its arc and stops: never on to the off-sheet centre.  The
@@ -439,15 +460,13 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    detail = _rod_slot_detail(adapter, front)
+    # The detail is a standalone 5:1 *Front view, dimensioned uncropped and
+    # cropped after: the native detail (CreateDetailViewAt4) imported
+    # RodSlotWidth but not RodSlotFlat (farm leaf edd99d0f at 5dea45dfb), the
+    # cropped-view loss draw_dt_pinion_spring's _placed_kink_view records.
+    detail = _placed_rod_slot_view(adapter)
     set_hidden_lines_removed(adapter, detail)
-    annotations += curate_view_dimensions(
-        adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="rod slot detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
+    annotations += _dimension_then_crop_rod_slot_view(adapter, detail)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     for name in sorted(REFERENCE_DIMENSIONS):
@@ -464,6 +483,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # One mark on each of the slot's round ends.
     if not auto_center_marks(adapter, detail, holes=False, slots=True, size=0.0025):
         raise RuntimeError("failed to add the center marks to the template rod slot")
+    # The mark and the labels go on once every import is done, so nothing of
+    # the face view's own sketch is near its import.
+    mark = _mark_rod_slot_on_front(adapter, front)
+    _label_rod_slot_detail(adapter, detail, front, mark)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
@@ -476,23 +499,30 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
 
-def _rod_slot_detail(adapter: Any, front: Any) -> Any:
-    """A native 5:1 detail of the face view about the rod slot's centre
-    (``draw_dt_pinion_lift_rod``'s front-end detail form)."""
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(front, "IView")
-    if not drawing.ActivateView(view_name(adapter, front)):
-        raise RuntimeError("failed to activate the rod slot detail's parent")
-    draw.ClearSelection2(True)
-    center = model_point_in_view(
-        adapter,
-        front,
-        (part_spec.ROD_SLOT_X / 1000.0, part_spec.ROD_SLOT_Y / 1000.0, 0.0),
-        label="rod slot detail centre",
-    )
-    radius = DETAIL_RADIUS_MM * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
+def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
+    """Make ``view`` the active view (sketch entities and notes land in it)."""
+    name = view_name(adapter, view)
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate the {label} {name!r}")
+    adapter.currentModel.ClearSelection2(True)
+    return name
+
+
+def _sketch_circle(
+    adapter: Any,
+    view: Any,
+    center: tuple[float, float],
+    radius: float,
+    *,
+    label: str,
+    add_to_db: bool = False,
+) -> Any:
+    """Sketch a circle in the ACTIVE ``view``'s own sketch from sheet points.
+
+    The sheet points go through the view sketch's ModelToSketchTransform.
+    Without ``add_to_db`` the circle is left SELECTED, which Crop2 consumes.
+    """
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
@@ -502,51 +532,270 @@ def _rod_slot_detail(adapter: Any, front: Any) -> Any:
         )
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
-        raise RuntimeError("failed to create the rod slot detail fence")
-    detail = drawing.CreateDetailViewAt4(
-        *DETAIL_CENTER,
-        0.0,
-        0,  # swDetViewSTANDARD
-        *DETAIL_SCALE,
-        "A",
-        1,  # swDetCircleCIRCLE
-        True,
-        False,
-        False,
-        5,
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = add_to_db
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if circle is None:
+        raise RuntimeError(f"failed to sketch the {label} circle")
+    return circle
+
+
+_ROD_SLOT_CENTRE_M = (part_spec.ROD_SLOT_X / 1000.0, part_spec.ROD_SLOT_Y / 1000.0, 0.0)
+
+
+def _placed_rod_slot_view(adapter: Any) -> Any:
+    """Detail A, uncropped: a standalone 5:1 *Front model view, moved so the
+    slot's centre lands on DETAIL_CENTER (checked to DETAIL_POSITION_TOL_M)."""
+    draw = adapter.currentModel
+    view = _early_bound(
+        place_view(adapter, str(SOURCE), "*Front", *DETAIL_CENTER, scale=DETAIL_SCALE),
+        "IView",
     )
-    if detail is None:
-        raise RuntimeError("failed to create the rod slot detail")
-    detail = _early_bound(detail, "IView")
-    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if ratio != tuple(float(value) for value in DETAIL_SCALE):
+        raise RuntimeError(
+            f"rod slot detail scale {ratio!r}, expected {DETAIL_SCALE!r}"
+        )
+    center = model_point_in_view(
+        adapter, view, _ROD_SLOT_CENTRE_M, label="rod slot detail centre"
+    )
+    position = tuple(float(value) for value in view.Position)
+    target = [position[axis] + DETAIL_CENTER[axis] - center[axis] for axis in range(2)]
+    if not view.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to move the rod slot detail onto its sheet position")
+    draw.EditRebuild3()
+    center = model_point_in_view(
+        adapter, view, _ROD_SLOT_CENTRE_M, label="rod slot detail centre"
+    )
+    if math.dist(center, DETAIL_CENTER) > DETAIL_POSITION_TOL_M:
+        raise RuntimeError(f"rod slot centre sits at {center!r}, not {DETAIL_CENTER!r}")
+    return view
+
+
+def _crop_rod_slot_view(adapter: Any, view: Any) -> None:
+    """Crop detail A to its 5:1 circle round DETAIL_CENTER: the circle is
+    sketched in the view's own sketch and Crop2 consumes it while selected.
+    Crop status, IsCropped, the outline and its style are read back."""
+    draw = adapter.currentModel
+    view = _early_bound(view, "IView")
+    uncropped = tuple(float(value) for value in view.GetOutline())
+    name = _activate_view(adapter, view, label="rod slot detail")
+    _sketch_circle(
+        adapter, view, DETAIL_CENTER, DETAIL_CROP_RADIUS, label="rod-slot-detail crop"
+    )
+    status = int(view.Crop2(False, False, 1))
     draw.ClearSelection2(True)
     draw.EditRebuild3()
-    outline = tuple(float(value) for value in detail.GetOutline())
-    position = tuple(float(value) for value in detail.Position)
-    if len(outline) != 4 or len(position) != 2:
-        raise RuntimeError("rod slot detail has invalid bounds")
-    target = [
-        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
-        for axis in range(2)
+    view.UpdateViewDisplayGeometry()
+    cropped = bool(view.IsCropped())
+    outline = tuple(float(value) for value in view.GetOutline())
+    _telemetry.info(
+        f"outline-template: rod slot detail {name!r}, Crop2 status {status}, "
+        f"IsCropped {cropped}, outline "
+        f"{tuple(round(value * 1000, 1) for value in outline)} mm",
+        crop_status=status,
+        cropped=cropped,
+    )
+    if status != CROP_NO_ERROR or not cropped:
+        raise RuntimeError(
+            f"rod slot detail is not cropped: Crop2 status {status}, IsCropped {cropped}"
+        )
+    # Uncropped, the 5:1 view spans the whole 292.5 mm plate (~1.46 m of
+    # sheet), the crop 30 mm, so a crop that took at least halves the width.
+    if (
+        len(outline) != 4
+        or len(uncropped) != 4
+        or outline[2] - outline[0] > (uncropped[2] - uncropped[0]) / 2.0
+    ):
+        raise RuntimeError(
+            f"rod-slot-detail crop did not take: outline {outline!r}, before {uncropped!r}"
+        )
+    boundary = (bool(view.CropViewJaggedOutline), bool(view.CropViewNoOutline))
+    if boundary != (False, False):
+        raise RuntimeError(
+            "rod slot detail's crop boundary is not its plain circle: jagged, "
+            f"no-outline {boundary!r}"
+        )
+
+
+def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
+    """The model-dimension names ``view`` holds, sorted."""
+    return sorted(
+        name
+        for name in (
+            dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+            for annotation in (_early_bound(view, "IView").GetAnnotations() or ())
+        )
+        if name
+    )
+
+
+def _dimension_then_crop_rod_slot_view(adapter: Any, detail: Any) -> list[Any]:
+    """Import and curate detail A's pair while it is uncropped, then crop it;
+    either of the pair missing after the crop raises."""
+    annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="rod slot detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    before = _view_dimension_names(adapter, detail)
+    _crop_rod_slot_view(adapter, detail)
+    after = _view_dimension_names(adapter, detail)
+    lost = sorted(set(DETAIL_KEEP) - set(after))
+    _telemetry.event(
+        "rod_slot_detail.crop",
+        dimensions_before=",".join(before),
+        dimensions_after=",".join(after),
+        lost=",".join(lost),
+    )
+    if lost:
+        raise RuntimeError(
+            f"rod slot detail lost {lost} to its crop; before {before}, after {after}"
+        )
+    return annotations
+
+
+def _mark_rod_slot_on_front(adapter: Any, front: Any) -> tuple[float, float]:
+    """Circle detail A's region on the face view in the outline's black;
+    returns its sheet centre."""
+    _activate_view(adapter, front, label="face view")
+    center = model_point_in_view(
+        adapter, front, _ROD_SLOT_CENTRE_M, label="rod slot mark"
+    )
+    circle = _sketch_circle(
+        adapter,
+        front,
+        center,
+        DETAIL_RADIUS_MM * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0,
+        label="rod-slot-detail mark",
+        add_to_db=True,
+    )
+    segment = _early_bound(circle, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError("rod-slot-detail mark circle colour did not persist")
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+    return center
+
+
+def _plain_text(text: str) -> str:
+    """A note's words with its line breaks and spacing folded to single spaces."""
+    return " ".join(str(text).split())
+
+
+def _note_box(note: Any, *, label: str) -> tuple[float, float, float, float]:
+    """``INote.GetExtent``'s lower-left and upper-right corners, sheet metres."""
+    values = tuple(float(value) for value in (note.GetExtent() or ()))
+    if len(values) != 6 or not all(map(math.isfinite, values)):
+        raise RuntimeError(f"{label}: invalid note extent {values!r}")
+    box = (values[0], values[1], values[3], values[4])
+    if box[0] >= box[2] or box[1] >= box[3]:
+        raise RuntimeError(f"{label}: empty note extent {values!r}")
+    return box
+
+
+def _note_centring_error(
+    box: tuple[float, float, float, float],
+    center_x: float,
+    top: float | None,
+    center_y: float | None,
+) -> tuple[float, float]:
+    """How far a note's extent sits from its target: its horizontal centre
+    against ``center_x``, and its top edge against ``top`` or else its
+    vertical centre against ``center_y``."""
+    error_x = (box[0] + box[2]) / 2.0 - center_x
+    if top is not None:
+        return error_x, box[3] - top
+    if center_y is None:
+        raise ValueError("a centred note needs a top edge or a centre height")
+    return error_x, (box[1] + box[3]) / 2.0 - center_y
+
+
+def _centred_view_note(
+    adapter: Any,
+    view: Any,
+    text: str,
+    *,
+    center_x: float,
+    top: float | None = None,
+    center_y: float | None = None,
+    label: str,
+) -> None:
+    """Insert a note owned by ``view``, centred on ``center_x`` by its rendered
+    extent; ``top`` pins its top edge, ``center_y`` its middle.  A note that
+    does not centre, or lands in another view, raises."""
+    _activate_view(adapter, view, label=label)
+    y = top if top is not None else center_y
+    note = add_note(adapter, text, center_x, y)
+    if note is None:
+        raise RuntimeError(f"failed to add the {label} note")
+    note = _early_bound(note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    box = _note_box(note, label=label)
+    for _ in range(NOTE_CENTRING_PASSES):
+        error_x, error_y = _note_centring_error(box, center_x, top, center_y)
+        if max(abs(error_x), abs(error_y)) <= NOTE_CENTRING_TOL_M / 10.0:
+            break
+        position = tuple(
+            float(value) for value in _read_member(annotation, "GetPosition")
+        )
+        if not annotation.SetPosition2(
+            position[0] - error_x, position[1] - error_y, 0.0
+        ):
+            raise RuntimeError(f"failed to centre the {label} note")
+        adapter.currentModel.EditRebuild3()
+        box = _note_box(note, label=label)
+    error_x, error_y = _note_centring_error(box, center_x, top, center_y)
+    if max(abs(error_x), abs(error_y)) > NOTE_CENTRING_TOL_M:
+        raise RuntimeError(
+            f"{label} note did not centre: off by ({error_x * 1000:.2f}, "
+            f"{error_y * 1000:.2f}) mm"
+        )
+    first_line = _plain_text(text.split("\n")[0])
+    texts = [
+        _plain_text(_early_bound(found, "INote").GetText() or "")
+        for found in (_early_bound(view, "IView").GetNotes() or ())
     ]
-    if not detail.SetViewPosition(double_array(target), False):
-        raise RuntimeError("failed to position the rod slot detail")
-    draw.EditRebuild3()
-    notes = tuple(_read_member(detail, "GetNotes") or ())
-    if len(notes) != 1:
-        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
-    note = _early_bound(notes[0], "INote")
-    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    label_xyz = (*DETAIL_LABEL_XY, 0.0)
-    if not annotation.SetPosition2(*label_xyz):
-        raise RuntimeError("failed to position the rod slot detail label")
-    draw.EditRebuild3()
-    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
-    if math.dist(actual, label_xyz) > 1e-8:
-        raise RuntimeError(f"rod slot detail label did not persist: {actual}")
-    return detail
+    if sum(found.startswith(first_line) for found in texts) != 1:
+        raise RuntimeError(
+            f"{label} note did not land in its view: its notes are {texts!r}"
+        )
+
+
+def _label_rod_slot_detail(
+    adapter: Any, detail: Any, front: Any, mark: tuple[float, float]
+) -> None:
+    """Label detail A beside its crop circle and letter its mark on the face
+    view, with the sheet scale pinned first (a 5:1 view must not rescale it)."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
+    if not sheet.SetScale(*SHEET_SCALE, False, False):
+        raise RuntimeError(
+            "failed to pin sheet scale before labelling the rod slot detail"
+        )
+    _centred_view_note(
+        adapter,
+        detail,
+        DETAIL_LABEL_TEXT,
+        center_x=DETAIL_LABEL_XY[0],
+        top=DETAIL_LABEL_XY[1],
+        label="rod-slot-detail label",
+    )
+    _centred_view_note(
+        adapter,
+        front,
+        DETAIL_LETTER,
+        center_x=mark[0] + PARENT_LETTER_OFFSET[0],
+        center_y=mark[1] + PARENT_LETTER_OFFSET[1],
+        label="rod-slot-detail letter",
+    )
 
 
 def _radius_leaders_to_arc(adapter: Any, annotations: list[Any]) -> None:
