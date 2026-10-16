@@ -698,10 +698,12 @@ def _fitup_notes() -> tuple[str, str]:
             f"{KEEPER_FITUP_X_FROM_WEB_MM:.{places}f} WEST OF THE RAIL WEB "
             f"CENTRE BELOW IT, LUG INNER FACES AT Z {front_face:.{places}f} AND "
             f"{rear_face:.{places}f} FROM THE UPPER-LEFT SOCKET, EACH WITHIN "
-            f"{KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}, SO THE {fulcrum_shaft} "
-            "FLATS LIE UNDER BOTH CROWN TAPS. CLAMP; TRANSFER EACH "
-            f"FOOT HOLE INTO THE RAIL, TAP AS {top_frame}, SCREW DOWN ONE "
-            f"{foot_screw}."
+            f"{KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}: THE {fulcrum_shaft} "
+            "FLATS ARE A FIXED PITCH APART, AND THIS BAND LEAVES ONE STEP "
+            f"{steps.step_number(steps.SET_SCREWS_STAKED_KEY)} SHAFT POSITION "
+            "WITH BOTH FLATS UNDER THEIR CROWN TAPS AND NO LEVER HUB ON A FLAT. "
+            f"CLAMP; TRANSFER EACH FOOT HOLE INTO THE RAIL, TAP AS {top_frame}, "
+            f"SCREW DOWN ONE {foot_screw}."
         ),
         steps.BARS_PINNED_KEY: (
             f"AT THE BENCH: PIN EACH {bar} BAR TO ITS {lever} LEVER WITH ONE "
