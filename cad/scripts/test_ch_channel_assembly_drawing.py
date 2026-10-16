@@ -356,7 +356,7 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
 
 
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:
-    assert len(drawing.BOM_COMPONENTS) == 18
+    assert len(drawing.BOM_COMPONENTS) == 19
     assert set(drawing.BOM_PART_NUMBERS) == set(drawing.BOM_COMPONENTS)
     assert len(set(drawing.BOM_PART_NUMBERS.values())) == len(drawing.BOM_COMPONENTS)
     for stem in drawing.BOM_COMPONENTS:
@@ -367,7 +367,16 @@ def test_the_bom_covers_every_family_once_with_its_sku() -> None:
         )
         assert drawing.BOM_DESCRIPTIONS[stem]
     assert drawing.BOM_QUANTITIES[drawing.SPRING_STEM] == drawing.CHANNELS
-    assert sum(drawing.BOM_QUANTITIES.values()) == 2 + 7 * 2 + 1 + 8 * drawing.CHANNELS
+    assert sum(drawing.BOM_QUANTITIES.values()) == 2 + 7 * 2 + 1 + 9 * drawing.CHANNELS
+    # The anchor's jam nut (MHA-CH-012, made) is its own row, one per anchor.
+    nut = drawing.asm.ANCHOR_NUT
+    assert drawing.BOM_QUANTITIES[nut] == drawing.BOM_QUANTITIES[drawing.asm.HOOK]
+    assert drawing.BOM_SKUS[nut] == drawing.MADE_PART_SKU
+    body = _step_body(steps.SPRINGS_HOOKED_KEY)
+    assert (
+        f"THREADED AND JAMMED BY ITS {drawing.BOM_PART_NUMBERS[nut]} PER "
+        f"{steps.HA_ANCHORS_SET_REF}."
+    ) in body
 
 
 def test_the_explode_plan_moves_every_family_and_only_them() -> None:
@@ -544,6 +553,10 @@ def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fa
     body = _step_body(key)
     assert f"RUN ONE {set_screw} DOWN EACH APEX TAP ONTO ITS FLAT" in body
     assert "FLATS UP" in body and "NORTH FIRST" in body
+    # drawing-guidelines.md rule 23, period hardware: staked as the keeper
+    # set screws are, never threadlocked.
+    assert "SNUG, AND STAKE EACH TAP MOUTH AT 2 POINTS." in body
+    assert "LOCTITE" not in drawing.FITUP_STEPS
     assert body.endswith(" ".join(bracket_spec.SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT.split()))
     # Positive control: no other step fits the set screws or prints the fact.
     for other in steps.SEQUENCE:
