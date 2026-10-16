@@ -115,13 +115,20 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
         (fitup_number, steps.step_ref("north-ear-datum")): "PUSH THE",
     }
     found = set()
+    # MHA-HA-000's sequence is not on this branch's base: its one pointer is
+    # checked by value against steps.HA_ANCHORS_SET_REF instead.
+    foreign = set()
     for sheet, bodies in sheets.items():
         for body in bodies.values():
             for pointer in STEP_POINTER.finditer(body):
+                if pointer.group(1) not in sheets:
+                    foreign.add((sheet, pointer.group(0)))
+                    continue
                 found.add((sheet, pointer.group(0)))
                 target = sheets[pointer.group(1)][pointer.group(2)]
                 assert expected[(sheet, pointer.group(0))] in target, pointer.group(0)
     assert found == set(expected)
+    assert foreign == {(channel_number, steps.HA_ANCHORS_SET_REF)}
     north_label = str(dt_drive_train_steps.step_number(steps.NORTH_BRACKET_SET_KEY))
     north = sheets[fitup_number][north_label]
     assert "EAR INNER FACE TO Y" in north and "DRO STILL ZEROED AS 9A" in north
@@ -133,7 +140,7 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     north_ear = _step_body("north-ear-datum")
     washer = _config.parts("vn-rocker-thrust-washer")["number"]
     assert "FLATS UP" in north_ear and "SOUTH THROUGH THE EAR" in north_ear
-    assert f"ITS MICED {washer}" in north_ear
+    assert f"THE {washer} MICED AND KEPT AT THAT STEP" in north_ear
     # Positive control: the step before it is the bank's end play, not the ear.
     assert f"NORTH {bracket}" not in sheets[fitup_number]["9F"]
     # It follows 9F, the bank's last sub-step, on the bank sheet: the rig's
@@ -256,11 +263,96 @@ def test_the_package_sheets_and_settings_contract() -> None:
     for x, y in kept.values():
         assert drawing.BORDER < x < drawing.STEPS_XY[0]
         assert drawing.BORDER < y < drawing._TEMPLATE.height_m - drawing.BORDER
-    # The south-end detail's spring-set text sits inside its crop circle.
+    # The south-end detail's spring-set text sits above its crop circle,
+    # clear of the arc (r7 layout audit: inside it, the arc crossed the text).
     detail = drawing.SOUTH_END
-    x, y = drawing.SPRING_KEEP[asm.SPRING_SET_DIMENSION]
+    _, y = drawing.SPRING_KEEP[asm.SPRING_SET_DIMENSION]
     radius = detail.crop_radius_mm * detail.mm
-    assert (x - detail.centre[0]) ** 2 + (y - detail.centre[1]) ** 2 < radius**2
+    assert y > detail.centre[1] + radius
+    # The parent rocker-bank view carries the detail's boundary, about the
+    # same model point the detail is centred on, lettered outside it; the
+    # detail's title and step 5 cite the same letter.
+    (cx, cy), parent_radius = drawing.detail_boundary(drawing.ROCKER_BANK, detail)
+    assert (cx, cy) == drawing.ROCKER_BANK.sheet_xy(
+        detail.centre_xyz[2], detail.centre_xyz[1]
+    )
+    assert parent_radius == detail.crop_radius_mm / 1000.0
+    lx, ly = drawing.letter_xy((cx, cy), parent_radius)
+    assert (lx - cx) ** 2 + (ly - cy) ** 2 > parent_radius**2
+    assert drawing.BORDER < lx < drawing.STEPS_XY[0]
+    assert detail.letter == drawing.DETAIL_LETTER
+    assert detail.title.startswith(f"DETAIL {drawing.DETAIL_LETTER},")
+    assert f"(DETAIL {drawing.DETAIL_LETTER})" in _step_body("south-bracket-spring-set")
+
+
+def _iso(point: tuple[float, float, float]) -> tuple[float, float]:
+    """The *Isometric projection (eye on +x +y +z), model mm on the view."""
+    x, y, z = point
+    return (x - z) * 0.5**0.5, (2.0 * y - x - z) / 6.0**0.5
+
+
+def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> None:
+    asm = drawing.asm
+    north = "north"
+    lug_z = drawing.FULCRUM_KEEPER_CENTRE_Z + drawing.KEEPER_Z_OFF
+    assert drawing.exploded_offset(asm.BRACKET, north) == (0.0, 0.0, 60.0)
+    assert drawing.exploded_offset(asm.BRACKET_SET_SCREW, north) == (0.0, 25.0, 60.0)
+    assert drawing.exploded_offset(asm.WASHER, north) == (0.0, 0.0, 20.0)
+    assert drawing.exploded_offset(asm.KEEPER_FOOT_SCREW, north) == (0.0, 25.0, 50.0)
+    assert drawing.exploded_offset(asm.BRACKET, "south") == (0.0, 0.0, -60.0)
+    bracket, keeper = drawing.NORTH_BRACKET_DETAIL, drawing.NORTH_KEEPER_DETAIL
+    assert drawing.EXPLODED_DETAILS == (bracket, keeper)
+    # Each cluster member's exploded reference point projects inside its
+    # circle with room for the part round it: the washer (Ø10.2), the set
+    # screw above the ear apex, the hold-down over its foot hole.
+    pivot_x, pivot_y = drawing.ROCKER_PIVOT_XY
+    ear_z = bank.PIVOT_BRACKET_Z[1]
+    washer_z = sum(bank.NORTH_WASHER_Z) / 2.0
+    members = {
+        bracket: (
+            drawing._exploded((pivot_x, pivot_y, washer_z), asm.WASHER, north),
+            drawing._exploded(
+                (pivot_x, pivot_y + 15.0, ear_z), asm.BRACKET_SET_SCREW, north
+            ),
+            drawing._exploded(
+                (pivot_x, pivot_y - 15.0, ear_z + 8.0), asm.BRACKET_HOLD_DOWN, north
+            ),
+        ),
+        keeper: (
+            drawing._exploded(
+                (keeper.centre_xyz[0], drawing.LEVER_FULCRUM_XY[1] + 10.0, lug_z),
+                asm.KEEPER_SET_SCREW,
+                north,
+            ),
+            drawing._exploded(
+                (keeper.centre_xyz[0], drawing.LEVER_FULCRUM_XY[1] - 20.0, lug_z + 8.5),
+                asm.KEEPER_FOOT_SCREW,
+                north,
+            ),
+        ),
+    }
+    for detail, points in members.items():
+        assert detail.orientation == "*Isometric" and detail.exploded
+        assert detail.title == f"DETAIL {detail.letter}"
+        cu, cv = _iso(detail.centre_xyz)
+        for point in points:
+            u, v = _iso(point)
+            assert ((u - cu) ** 2 + (v - cv) ** 2) ** 0.5 < detail.crop_radius_mm - 5.0
+    # The column right of the BOM, inside the border and above the title
+    # block, the circles apart and each label (under its circle) inside it.
+    template = drawing._TEMPLATE
+    bom_right = drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values())
+    right = template.width_m - drawing.BORDER
+    previous_bottom = template.height_m - drawing.BORDER
+    for detail in drawing.EXPLODED_DETAILS:
+        (x, y), radius = detail.centre, detail.crop_radius_mm * detail.mm
+        assert bom_right + 0.004 < x - radius and x + radius < right
+        assert y + radius < previous_bottom
+        lines = detail.label_text.splitlines()
+        lx, ly = detail.crop_label_xy
+        assert lx + max(map(len, lines)) * NOTE_CHAR_WIDTH < right
+        previous_bottom = ly - len(lines) * NOTE_LINE_PITCH
+    assert previous_bottom > template.title_block_top_m
 
 
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:
