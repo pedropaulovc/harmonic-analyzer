@@ -86,6 +86,13 @@ expect(
     "sm-summing-lever",
 )
 expect("sm-summing", "vn-boss-hook-1", list(s.BOSS_HOOK_POS), IDENTITY, "vn-boss-hook")
+expect(
+    "sm-summing",
+    "vn-boss-hook-jam-nut-1",
+    list(s.JAM_NUT_POS),
+    s.JAM_NUT_ROWS,
+    "vn-boss-hook-jam-nut",
+)
 # The counter and gooseneck now seat on unchanged native supplier surfaces.
 # Their analytical insertion seeds are not their final placements and cannot
 # be compared against this historical static mirror-retirement pose dump.

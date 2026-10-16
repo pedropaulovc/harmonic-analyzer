@@ -26,9 +26,10 @@ boss-hook / counter-spring / gooseneck chain.
   Motion study. The rock is the sub's single FREED operational DOF: its
   drive spec is recorded into the DOF manifest, never authored, so the
   saved model rocks on the knife edge.
-* boss-hook (keyed to the lever's anchor eye) + counter-spring + gooseneck
-  -- the counter-balance hung from the east column; the post is gripped by
-  the top-frame rail hub's set screw (no separate clamp part).
+* boss-hook (keyed to the lever's anchor eye) + its MHA-VN-070 jam nut on the
+  boss top face + counter-spring + gooseneck -- the counter-balance hung from
+  the east column; the post is gripped by the top-frame rail hub's set screw
+  (no separate clamp part).
 * sm-gooseneck-spring-screw -- made MHA-SM-004 fillister, head outboard, clamps the
   supplier upper-eye band to the gooseneck plug face; locked to the fixed
   gooseneck with no additional operational DOF.
@@ -42,8 +43,9 @@ blind round holes and slots (fr-frame.SLDASM); the gooseneck post drops
 through the casting's rail-hub bore, gripped by its 1/4-20 set screw.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact
-final transform and fixed; the summing lever + boss-hook are left free and
-constrained by mates; transforms asserted by read-back; zero interference.
+final transform and fixed; the summing lever, boss-hook and jam nut are left
+free and constrained by mates; transforms asserted by read-back; zero
+interference.
 
 Dimensions: cad/DIMENSIONS.md ch. 18-19.
 
@@ -99,7 +101,7 @@ from _assembly import (
 )
 from _native_spring_contact import assert_assembly_spring_contacts
 from _interference_contracts import allowed_interference_pairs
-from _transforms import IDENTITY, ROT_Y_180, ROT_Y_POS90, euler_from_rows
+from _transforms import IDENTITY, ROT_X_NEG90, ROT_Y_180, ROT_Y_POS90, euler_from_rows
 from dt_cone_pivot_post_installation import SUMMING_Z
 import fr_top_frame_spec as top_frame
 import sm_knife_mount_spec as knife_mount
@@ -380,8 +382,17 @@ import sm_gooseneck_spring_joint as spring_joint  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
+import vn_boss_hook_jam_nut_spec as jam_nut  # noqa: E402
 
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
+# MHA-VN-070 on the anchor axis, its z = 0 face on the boss top face:
+# ROT_X_NEG90 turns the nut's local +Z thread axis to machine +Y.
+JAM_NUT_POS = (
+    spring_mounts.COUNTER_ANCHOR_XY[0],
+    spring_mounts.COUNTER_BOSS_TOP_Y,
+    SUMMING_Z,
+)
+JAM_NUT_ROWS = ROT_X_NEG90
 # The counter spring and gooseneck use complete calibrated placements loaded by
 # ``counter_seat`` before assembly creation.
 
@@ -550,21 +561,32 @@ def _assert_counter_spring_top_hang(
 
 
 def _assert_counter_spring_hang(pose: spring_mounts.SpringPose) -> None:
-    """Require full direct thread engagement and a tensioned supplier spring."""
+    """Require full direct thread engagement, full thread under the jam nut
+    and a tensioned supplier spring."""
     anchor = ANCHOR_9490T1
     tap = sm_summing_lever_spec.COUNTER_HOLE_SPEC
     if tap.kind != "tapped" or tap.size != anchor.thread_size:
         raise RuntimeError("counter anchor requires its matching native through tap")
+    if jam_nut.THREAD != anchor.thread_size:
+        raise RuntimeError("counter jam nut thread does not match the anchor")
     thread_top = BOSS_HOOK_POS[1] + anchor.thread_start_y_mm
-    boss_top = KNIFE[1] + sm_summing_lever_spec.ANCHOR_H / 2.0
-    if abs(thread_top - boss_top) > 1e-6:
-        raise RuntimeError("counter anchor thread start is not at the boss face")
-    if spring_mounts.COUNTER_SHANK_LENGTH_MM < sm_summing_lever_spec.ANCHOR_H - 1e-6:
-        raise RuntimeError("trimmed counter anchor does not engage the full boss")
+    boss_top = spring_mounts.COUNTER_BOSS_TOP_Y
+    exposed = spring_mounts.COUNTER_SHANK_LENGTH_MM - sm_summing_lever_spec.ANCHOR_H
+    if abs(thread_top - boss_top - exposed) > 1e-6:
+        raise RuntimeError("counter anchor cut end is not flush with the boss underside")
+    if exposed < jam_nut.THICKNESS + anchor.thread_pitch_mm - 1e-3:
+        raise RuntimeError(
+            f"counter anchor stands {exposed:.3f} mm of thread above the boss, "
+            f"under the jam nut's {jam_nut.THICKNESS:.3f} plus one pitch"
+        )
+    if 2.0 * sm_summing_lever_spec.ANCHOR_R < jam_nut.ACROSS_CORNERS:
+        raise RuntimeError("counter jam nut corners overhang the boss top face")
     counter_stock.validate_length_mm(pose.length_mm)
     log(
         f"counter lower anchor: {tap.size} direct through tap, "
-        f"{sm_summing_lever_spec.ANCHOR_H:.3f} mm engagement; "
+        f"{sm_summing_lever_spec.ANCHOR_H:.3f} mm engagement, "
+        f"{exposed:.3f} mm thread above the boss under the "
+        f"{jam_nut.THICKNESS:.3f} jam nut; "
         f"spring inside length {pose.length_mm:.4f} mm, "
         f"calibrated force {spring_mounts.counter_force_n(pose.length_mm):.3f} N"
     )
@@ -779,6 +801,25 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Axis2@{sl}", "AXIS"),
         label="boss-hook keyed",
     )
+    # The jam nut on the anchor's exposed thread, jammed on the boss top face
+    # with the eye clocked: placed at its exact pose and locked to the lever
+    # it rides -- one Lock mate, as the hook; a coaxial mate on top would only
+    # over-constrain the solve.
+    nut = await place_component(
+        adapter,
+        "vn-boss-hook-jam-nut",
+        list(JAM_NUT_POS),
+        euler_from_rows(JAM_NUT_ROWS),
+        JAM_NUT_ROWS,
+        ground=False,
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{nut}", "PLANE"),
+        named_ref(f"Front Plane@{sl}", "PLANE"),
+        label="boss-hook jam nut locked to lever",
+    )
+    assert_component_placed(adapter, nut, list(JAM_NUT_POS), JAM_NUT_ROWS)
     # Preserve the vendor +X coil frame and required half-turn clocking at the
     # complete fixed measured pose; no seed placement or corrective move follows.
     await place_component(
@@ -826,14 +867,15 @@ async def build(adapter) -> dict[str, str]:
 
     # Certify the AS-BUILT model.  The lever rock remains the sole intended
     # freed DOF; the exact allowed-stem set rejects any free screw, dowel, or
-    # other structural component.  The lock-mated boss-hook MUST read
-    # under-constrained WITH the lever -- a grounded/fixed regression would
-    # freeze the counter-spring anchor while the lever still swings.
+    # other structural component.  The lock-mated boss-hook and its jam nut
+    # MUST read under-constrained WITH the lever -- a grounded/fixed regression
+    # would freeze the counter-spring anchor while the lever still swings.
+    lever_riders = ("sm-summing-lever", "vn-boss-hook", "vn-boss-hook-jam-nut")
     assert_free_dof_necessity(
         adapter,
         1,
-        required_stems=("sm-summing-lever", "vn-boss-hook"),
-        allowed_stems=("sm-summing-lever", "vn-boss-hook"),
+        required_stems=lever_riders,
+        allowed_stems=lever_riders,
     )
     write_dof_manifest(ASM_NAME)
     check_no_interference(

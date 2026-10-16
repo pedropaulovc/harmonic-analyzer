@@ -39,6 +39,7 @@ _EXPECTED = {
     "vn-pen-adjust-nut": (("92671A115",), "MHA-VN-062", 1),
     "vn-pen-hanger-nut": (("90480A009",), "MHA-VN-063", 1),
     "vn-pen-hanger-jam-nut": (("90760A009",), "MHA-VN-064", 1),
+    "vn-boss-hook-jam-nut": (("90760A140",), "MHA-VN-070", 1),
     "vn-platen-clip-screw": (("92446A077",), "MHA-VN-059", 4),
     "vn-pinion-strap-pin": (("98296A027",), "MHA-VN-033", 3),
     "vn-post-mount-screw": (("40923906",), "MHA-VN-031", 2),

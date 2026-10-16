@@ -605,6 +605,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-VN-046, R9-31), member: 8 into the platen_guide rear through taps
         "vn_hanger_screw",  # #8-32 UNC x 1 hex head (McMaster 93075A199), member through the pen-hanger strap's clearance hole into the hanger nut and jam nut
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
+        "vn_boss_hook_jam_nut",  # McMaster 90760A140 thin #10-24 hex nut (MHA-VN-070), member: jammed on the summing-lever boss top face, locking the boss hook
         "vn_knife_hanger_stud",  # #10-24 UNC cut plain hex bolt (McMaster 92314A253 x 2), member into the knife-mount top tap
         "sm_knife_mount",  # #10-24 UNC-2B bottoming tap (9.65 full thread, 11.24 drill) in the top seat, receiver of the knife-hanger bolt; two plain reamed dowel holes
         "vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
@@ -1481,21 +1482,48 @@ JOINTS: tuple[Joint, ...] = (
             "about the shank, and the spring pulls the anchor out of its tap"
         ),
         axial_capture=(
-            "thread only: trimmed 9490T1 shank engages the full 19.05 boss height (thread starts at the boss "
-            "top face, cut end at the boss underside); no shoulder, nut or head seats -- the wire bend has "
-            "the shank diameter"
+            "trimmed 9490T1 shank engages the full 19.05 boss height (cut end at the boss underside) and "
+            "stands one jam-nut height plus a pitch of full thread above the boss top face, where the "
+            "MHA-VN-070 thin nut bears; no shoulder or head seats -- the wire bend has the shank diameter"
         ),
-        lock=Lock.THREADLOCKER_ONLY,
+        lock=Lock.JAM_NUT,
+        lock_part="vn_boss_hook_jam_nut",
+        lock_binds=("vn_boss_hook", "sm_summing_lever"),
+        lock_step="MHA-SM-000 STEP 2",
+        evidence=(
+            "coordinator ruling on #1189 (option a): thin #10-24 jam nut under the eye, tightened on the "
+            "boss top face once the eye is clocked; no threadlocker. build_sm_summing_assembly.py: "
+            "_assert_counter_spring_hang (full boss engagement, jam-nut thread above the boss), JAM_NUT_POS "
+            "and the 'boss-hook jam nut locked to lever' lock_mate; build_sm_summing_lever.py: "
+            "_counter_anchor_tap; sm_summing_lever_spec.COUNTER_HOLE_SPEC; stock_anchor_geom.ANCHOR_9490T1; "
+            "vn_boss_hook_spec.py JAM_NUT_THREAD_MM/SHANK_LENGTH_MM; vn_boss_hook_jam_nut_spec.py; "
+            "cad/config/parts/vn-boss-hook.yaml and vn-boss-hook-jam-nut.yaml (90760A140, McMaster 10-24 "
+            "narrow-profile listing read live 2026-10-16: zinc-plated steel, 5/16 wide, 7/64 high) "
+            "installation_notes; sm_summing_assembly_spec.ASSEMBLY_STEPS 2, ASSEMBLY_CHECKS 5"
+        ),
+    ),
+    Joint(
+        id="sm-summing/boss-hook-jam-nut-on-hook",
+        assembly="sm_summing",
+        member="vn_boss_hook_jam_nut",
+        receiver="vn_boss_hook",
+        thread="#10-24 UNC",
+        quantity=1,
+        installed_at="MHA-SM-000 STEP 2",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason=(
+            "the jam nut is tightened against the boss top face with the eye held clocked; nut, eyebolt "
+            "and lever then ride as one body, and the spring's twist on the eye reaches that body through "
+            "the boss thread and the nut's bearing face -- no operating torque acts on the nut's own faces"
+        ),
+        axial_capture="thin hex nut bearing on the boss top face, jammed against the eyebolt's thread flanks",
+        lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "build_sm_summing_assembly.py: _assert_counter_spring_hang, build() 'boss-hook keyed' lock_mate "
-            "(a CAD mate, not hardware); build_sm_summing_lever.py: _counter_anchor_tap ('NO NUT: this tap is "
-            "the nut'); sm_summing_lever_spec.COUNTER_HOLE_SPEC; stock_anchor_geom.ANCHOR_9490T1; vn_boss_hook_spec.py; "
-            "cad/config/parts/vn-boss-hook.yaml installation_notes ('THREAD DIRECTLY INTO ... TAPPED BOSS; NO NUT. "
-            "CLOCK EYE TO PULL PLANE. USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.'); "
-            "sm_summing_assembly_spec.ASSEMBLY_STEPS 2"
+            "build_sm_summing_assembly.py JAM_NUT_POS/JAM_NUT_ROWS and its lock_mate; "
+            "vn_boss_hook_jam_nut_spec.py; vn-boss-hook-jam-nut.yaml (90760A140)"
         ),
     ),
     Joint(
@@ -2329,6 +2357,9 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     ),
     "sm-summing/boss-hook-in-lever": Occurrence(
         "sm_summing", "build_sm_summing_assembly.py", "boss-hook keyed"
+    ),
+    "sm-summing/boss-hook-jam-nut-on-hook": Occurrence(
+        "sm_summing", "build_sm_summing_assembly.py", "JAM_NUT_POS"
     ),
     "sm-summing/gooseneck-spring-screw": Occurrence(
         "sm_summing", "build_sm_summing_assembly.py", '"sm-gooseneck-spring-screw"'
