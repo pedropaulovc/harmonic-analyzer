@@ -330,11 +330,16 @@ GEOMETRY_TOP_KEEP = {
     # baselines stack left of the west edge, shortest innermost: their 1.6 mm
     # and 3.3 mm spans are narrower than any text, so the inner one reads below
     # the corner and the outer one above its span, and neither extended line
-    # meets the other dimension's witness lines.
+    # meets the other dimension's witness lines. Each Y text prints LEFT of
+    # its dimension line (the leader meets the text box's right border, ~1.6
+    # mm short of the line), and DeckY's lower arrow, outside its span, runs
+    # ~6.4 mm below X0 Y0, down through the PadY text's rows: on the r4 render
+    # (run 20261015T235155114Z) its line at 74.0 mm struck the 6.35 text
+    # (68.8-78.9 mm). DeckY's line now stands clear left of that text.
     "PadX": (0.0960, 0.1446),
     "DeckX": (0.0975, 0.1388),
     "PadY": (0.0805, 0.1440),
-    "DeckY": (0.0740, 0.1570),
+    "DeckY": (0.0660, 0.1570),
 }
 SIDE_KEEP = {
     "BottomThickness": (0.073, 0.085),

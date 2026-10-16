@@ -1905,6 +1905,11 @@ def test_pad_deck_and_pocket_are_placed_from_x0_y0_as_baselines() -> None:
     deck_y = sheet._plan_xy(0.0, spec.DECK_HALF_Z)[1]
     assert texts["PadY"][2] < x0 - 0.0015 and texts["PadY"][3] < y0 - 0.001
     assert texts["DeckY"][1] > deck_y + 0.001
+    # PR #1468 r4 review: DeckY's lower arrow runs below X0 Y0 through the
+    # PadY text's rows, and that text prints left of its own line, ending
+    # ~1.6 mm short of it. DeckY's line must stand clear left of the text.
+    pad_y_text_left = keep["PadY"][0] - 0.0016 - len("6.35") * _DIM_CHAR_M
+    assert keep["DeckY"][0] < pad_y_text_left - 0.0015
     for a in texts:
         for b in texts:
             if a < b:
