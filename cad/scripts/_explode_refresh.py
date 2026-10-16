@@ -99,6 +99,62 @@ def _delete_exploded_views(model: Any, configuration: str) -> tuple[str, ...]:
     return names
 
 
+# --- THROWAWAY DIAGNOSTIC (farm proof only; removed before handoff) ---
+def _poses(model: Any) -> dict[str, tuple[float, ...]]:
+    asm = _early_bound(model, "IAssemblyDoc")
+    out = {}
+    for comp in asm.GetComponents(True) or ():
+        comp = _early_bound(comp, "IComponent2")
+        data = _early_bound(comp.Transform2, "IMathTransform").ArrayData
+        out[str(comp.Name2)] = tuple(round(float(v), 7) for v in data)
+    return out
+
+
+def _pose_diff(asm_name: str, when: str, base: dict, now: dict) -> None:
+    diffs = [
+        f"{name}: {base.get(name)} -> {now.get(name)}"
+        for name in sorted(base.keys() | now.keys())
+        if base.get(name) != now.get(name)
+    ]
+    _telemetry.info(
+        f"DIAG {asm_name} {when}: {len(diffs)} pose diffs; " + " | ".join(diffs[:6])
+    )
+
+
+async def _rows(adapter: Any, asm_name: str) -> tuple[str, list[str]]:
+    import _assembly
+    import hashlib
+
+    seen: list[bytes] = []
+
+    class _Capture:
+        @staticmethod
+        def sha256(data: bytes):
+            seen.append(data)
+            return hashlib.sha256(data)
+
+    real = _assembly.hashlib
+    _assembly.hashlib = _Capture
+    try:
+        digest = await assembly_geometry_digest(adapter, asm_name)
+    finally:
+        _assembly.hashlib = real
+    text = seen[-1].decode("utf-8")
+    return digest, text.split("), (")
+
+
+def _rows_diff(asm_name: str, when: str, base: list[str], now: list[str]) -> None:
+    gone = [row for row in base if row not in now]
+    new = [row for row in now if row not in base]
+    _telemetry.info(
+        f"DIAG {asm_name} {when}: rows {len(base)} -> {len(now)}; "
+        f"only before {gone[:4]!r}; only after {new[:4]!r}"
+    )
+
+
+# --- END THROWAWAY DIAGNOSTIC ---
+
+
 async def refresh_explode(
     adapter: Any, asm_name: str, author: Callable[[str], None]
 ) -> dict[str, str]:
@@ -136,7 +192,8 @@ async def refresh_explode(
         )
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     _require_collapsed(model, asm_name, "before re-authoring")
-    opened = await assembly_geometry_digest(adapter, asm_name)
+    opened, opened_rows = await _rows(adapter, asm_name)
+    opened_poses = _poses(model)
     if opened != proof:
         raise RuntimeError(
             f"{asm_name}: the saved model fingerprints {opened[:12]}, not its proof "
@@ -152,10 +209,13 @@ async def refresh_explode(
         _telemetry.info(
             f"explode refresh {asm_name}: {configuration} deleted {removed!r}"
         )
+        _pose_diff(asm_name, f"after delete {configuration}", opened_poses, _poses(model))
         author(configuration)
+        _pose_diff(asm_name, f"after author {configuration}", opened_poses, _poses(model))
 
     author_in_drawing_configurations(adapter, asm_name, reauthor)
     final_rebuild_before_save(adapter, asm_name)
+    _pose_diff(asm_name, "after final rebuild", opened_poses, _poses(model))
     assert_reference_geometry_hidden(adapter, asm_name)
     _require_collapsed(model, asm_name, "before save")
     # Retire the proof before the bytes it vouches for are replaced.
@@ -164,7 +224,14 @@ async def refresh_explode(
         set_isometric_view(adapter)
         save_assembly_in_place(adapter, asm_name, True)
     await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
-    persisted = await assembly_geometry_digest(adapter, asm_name)
+    persisted, persisted_rows = await _rows(adapter, asm_name)
+    _rows_diff(asm_name, "opened vs re-saved", opened_rows, persisted_rows)
+    _pose_diff(
+        asm_name,
+        "re-saved",
+        opened_poses,
+        _poses(_early_bound(adapter.currentModel, "IModelDoc2")),
+    )
     _telemetry.info(
         f"explode refresh {asm_name}: geometry proof {proof[:12]}, "
         f"re-saved {persisted[:12]}"
