@@ -529,9 +529,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("vn-pen-rod-set-screw-1", "pn-pen-v-block-1")): _annulus_limit(
                 2.8448, 2.261, 4.7625
             ),
-            # #0-80 adjuster stud 4.0 into the rod top.
+            # #0-80 adjuster stud 3.2 into the rod top (code review C05).
             frozenset(("pn-pen-adjust-screw-1", "pn-pen-rod-1")): _annulus_limit(
-                1.524, 1.191, 4.0
+                1.524, 1.191, 3.2
             ),
         },
         "pd-paper-drive": {

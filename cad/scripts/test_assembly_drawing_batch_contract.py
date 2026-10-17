@@ -59,7 +59,8 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     # sheet left it when it became three sheets with its own fit-up steps; the
     # measuring-stick sheet is a full fitter package (BOM, explode, steps); the
     # magnifier left it with the axle-stack details (Codex PR #1330) and is
-    # now a four-sheet fitter package (BOM, explode, steps).
+    # now a four-sheet fitter package (BOM, explode, steps); the pen sheet is a
+    # full fitter package (settings details, BOM, explode, steps).
     if drawing
     not in (
         draw_fr_frame_assembly,
@@ -68,6 +69,7 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
         draw_pd_paper_drive_assembly,
         draw_ms_measuring_stick_assembly,
         draw_mg_magnifier_assembly,
+        draw_pn_pen_assembly,
     )
 )
 
@@ -180,6 +182,19 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                 )
             } <= set(deps)
             assert str(scripts_dir / "_mg_magnifier_explode.py") not in deps
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_pn_pen_assembly:
+            scripts_dir = Path(draw_pn_pen_assembly.__file__).resolve().parent
+            # The fitting spec (inventory, explode, settings), the sheet text
+            # and the carriage geometry its settings derive from.
+            assert {
+                str(scripts_dir / name)
+                for name in (
+                    "pn_pen_assembly_spec.py",
+                    "pn_pen_assembly_notes.py",
+                    "pn_pen_carriage_geom.py",
+                )
+            } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
             assert str(Path(_assembly_drawing.__file__).resolve()) in deps
