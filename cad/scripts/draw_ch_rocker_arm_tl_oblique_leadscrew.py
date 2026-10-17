@@ -259,16 +259,21 @@ def _text_row_radius_mm() -> float:
 # C: the near end and the near KP08's two flats (0 .. 12.5), its station
 # from the near end's centre under the fence.
 _NEAR_CENTRE_MM = (FLAT_STATIONS["NearKP08"] + FLAT_LENGTH / 2.0) / 2.0
-_NEAR_XY = (0.045, DETAIL_ROW_Y)
+_NEAR_XY = (0.043, DETAIL_ROW_Y)
 # D: the far KP08's two flats (375.5 .. 383.5); its station is the main
 # view's.
 _FAR_CENTRE_MM = FLAT_STATIONS["FarKP08"]
-_FAR_XY = (0.100, DETAIL_ROW_Y)
+_FAR_XY = (0.091, DETAIL_ROW_Y)
 # E: the handwheel's flat and the far end (394.5 .. 410), the printed flat's
-# length under the fence and its across-flat right of it, square to the axis.
+# length under the fence and its across-flat left of it, square to the axis:
+# its extension line off the flat runs back along the flat and out of the
+# fence over 0.6 mm of thread (right of it, it would run 7.5 mm along the
+# unflatted thread to the far end, reading as the flat running out there).
+# The across-flat's text (about 10 mm wide, centred on its dimension line)
+# stands between D's fence and E's.
 _WHEEL_CENTRE_MM = (FLAT_STATIONS["Handwheel"] - FLAT_LENGTH / 2.0 + LENGTH) / 2.0
 _WHEEL_RADIUS_MM = 9.0
-_WHEEL_XY = (0.153, DETAIL_ROW_Y)
+_WHEEL_XY = (0.1615, DETAIL_ROW_Y)
 # The across-flat runs from the far crest (clock 180, radius -4) to the flat
 # (FLAT_AF - 4 toward clock 0): its middle stands at half their sum.
 _AF_MID_RADIUS_MM = (FLAT_AF - MAJOR_DIA) / 2.0
@@ -316,7 +321,7 @@ END_DETAILS = (
             "FlatAF": detail_xy(
                 _WHEEL_CENTRE_MM,
                 _WHEEL_XY,
-                _WHEEL_CENTRE_MM + _WHEEL_RADIUS_MM + 3.5,
+                _WHEEL_CENTRE_MM - _WHEEL_RADIUS_MM - 3.5,
                 _AF_MID_RADIUS_MM,
             ),
         },

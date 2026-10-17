@@ -663,10 +663,15 @@ def test_details_carry_the_near_station_and_the_printed_flat() -> None:
             0
         ]
     )
-    # The across-flat's dimension line stands right of the far end, its text
-    # between the far crest and the flat.
+    # The across-flat's dimension line stands left of E's fence, short of the
+    # flat's start (so its extension line leaves the fence over the flat, not
+    # along the thread to the far end), its text (about 10 mm wide) clear of
+    # D's fence and between the far crest and the flat.
     af_x, af_y = wheel.keep["FlatAF"]
-    assert af_x > draw.detail_xy(wheel.centre_mm, wheel.centre, spec.LENGTH)[0]
+    flat_start = spec.FLAT_STATIONS["Handwheel"] - spec.FLAT_LENGTH / 2.0
+    assert wheel.centre_mm - wheel.radius_mm < flat_start
+    assert af_x + 0.005 < _fence_box(wheel)[0]
+    assert af_x - 0.005 > _fence_box(by_label["D"])[2] + 0.004
     radius = spec.MAJOR_DIA / 2.0
     crest = draw.detail_xy(wheel.centre_mm, wheel.centre, 0.0, -radius)[1]
     flat = draw.detail_xy(wheel.centre_mm, wheel.centre, 0.0, spec.FLAT_AF - radius)[1]
