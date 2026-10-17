@@ -1,18 +1,24 @@
-r"""Reproduction script: magnifying-lever clamp block (book ch. 20, p. 48).
+r"""Reproduction script: magnifying-lever clamp (MHA-MG-002; book ch. 20 p. 48).
 
-The square block that slides along the magnifying lever and carries the
-vertical rod beside it; the reeded thumb screw clamps it from the top.
-The two rod bores are skew (offset across the block) so the rods pass
-without touching, as in the p.48 close-up.
+A vertical length of 7/16 in hex brass that slides along the magnifying lever
+(#1559 owner ruling): the Ø6 lever passes through it across the corners, the
+knurled #4-40 thumb screw enters the top face on the hex axis and pinches the
+lever, and the MHA-MG-004 vertical rod screws into a blind #4-40 tap in the
+bottom face, on the same axis, until its shoulder seats on that face.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 20" — all photo-scaled vs the Ø6
-lever rod (low). Bores get 0.2 mm clearance over their rods.
+Layout (part frame, ``mg_magnifying_clamp_geom``): origin at the bottom-face
+centre, hex axis +Y, corners on +/-X, flats square to +/-Z.
 
-Layout: lever bore along Z (the extrude direction) through the block's
-upper portion; vertical-rod bore along Y, offset in X; thumb-screw hole
-along Y above the lever bore. Through-holes are mid-plane blind cuts
-(MCP issue #38 workaround); the Top-plane sketch maps (x, y) ->
-global (X, -Z).
+* ``HexProfile``: the 7/16 hex on the Top plane (sketch (x, y) -> model
+  (X, -Z)), corners on the sketch's horizontal axis, extruded +Y as ``Block``
+  (``Height``).  Equal flats either side of the origin centre the hex axis,
+  so neither the bore nor the taps need a location from a flat.
+* ``LeverBoreProfile``: the Ø6.2 drilled lever bore, a Right-plane circle on
+  the hex axis at ``LeverBoreYDim``, cut mid-plane through both corners.
+* ``ThumbTap``: blind Hole Wizard #4-40 from the top face on the hex axis,
+  thread ending at the bore, drill to the bore axis.
+* ``RodTap``: blind Hole Wizard #4-40 from the bottom face on the hex axis
+  (``mg_rod_clamp_joint.ROD_TAP_SPEC``).
 
 Run (SolidWorks already open)::
 
@@ -23,52 +29,85 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import Any
 
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _dimensions import drive_dimension, set_global
-from _feature_tree import name_last_feature
-from _part_checks import report_mass_properties, volume_check
-from _part_save import save_part_and_images
-from _rebuild import force_rebuild
-from _session import run_build
-from _sketch import SketchDims, add_line_chain, ensure_fully_defined
-from _sketch_chains import define_rectilinear_chain
-from _sketch_circle import define_circle
-from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _part_pmi import author_part_pmi
+from _drawing_precision import apply_drawing_precision
+from _feature_tree import name_last_feature
+from _holes import blind_hole_volume_mm3, cross_hole_volume_mm3, wizard_holes
+from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _session import run_build
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
+from _sketch_circle import define_circle
 from mg_magnifying_clamp_geom import (
-    BLOCK_DEPTH,
     BLOCK_HEIGHT,
-    BLOCK_WIDTH,
+    HEX_AC,
+    HEX_AF,
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
-    ROD_BORE_DIA,
-    ROD_BORE_X,
+    ROD_TAP_DRILL_DIA,
+    THUMB_TAP_DRILL_DEPTH,
+    THUMB_TAP_SPEC,
 )
 from mg_magnifying_clamp_spec import (
+    AREA_HATCH_STYLE_PATTERN,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
-    SURFACE_FINISHES,
+    PREF_MATERIAL_HATCH_PATTERN,
+    PREF_MATERIAL_HATCH_STYLE,
+    PREF_NO_OPTION,
+    SECTION_HATCH_PATTERN,
 )
+from mg_rod_clamp_joint import ROD_TAP_DRILL_DEPTH, ROD_TAP_SPEC
 
 PART_NAME = "mg-magnifying-clamp"
 MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
-# Nominal geometry lives in mg_magnifying_clamp_geom (imported above): the two rod
-# bores are engineered running/slip fits (0.2 mm clearance over their rods), NOT
-# drilled fastener holes, so they stay plain dimensioned cuts. The thumb-screw
-# hole threads IN, so it IS a native #4-40 tapped Hole Wizard hole matching
-# the stock thumb screw's #4-40 external thread.
+HEX_CORNER_RADIUS = HEX_AC / 2.0
+BORE_R = LEVER_BORE_DIA / 2.0
+DRILL_R = ROD_TAP_DRILL_DIA / 2.0
+# The lever bore's mid-plane cut: past both corners.
+BORE_CUT_DEPTH = HEX_AC + 2.0
+# The corner radius is the flats over sqrt(3): the hex sketch's equation.
+_CORNER_PER_AF = 1.0 / math.sqrt(3.0)
 
-THROUGH_CUT_DEPTH = 80.0  # mid-plane total; > any extent crossed
+# --- Analytic volumes (mm^3) ---------------------------------------------------
+V_HEX = math.sqrt(3.0) / 2.0 * HEX_AF**2 * BLOCK_HEIGHT
+# The bore across the corners: over its cross-section the hex's chord along X
+# is 2(R - |z|/sqrt(3)), so it removes 2R·πr² less (2/sqrt(3))·(4/3)r³
+# (build_mg_output_fixture._bore_volume).
+V_BORE = 2.0 * math.pi * HEX_CORNER_RADIUS * BORE_R**2 - 8.0 * BORE_R**3 / (
+    3.0 * math.sqrt(3.0)
+)
+# The thumb tap drill to the bore axis, less its share of the bore's upper
+# half; its point stops in the bore's air (mg_magnifying_clamp_spec proves it).
+V_THUMB = (
+    math.pi * DRILL_R**2 * THUMB_TAP_DRILL_DEPTH
+    - cross_hole_volume_mm3(ROD_TAP_DRILL_DIA, LEVER_BORE_DIA) / 2.0
+)
+# The rod tap: a blind drill and point, wholly in solid under the bore.
+V_ROD_TAP = blind_hole_volume_mm3(ROD_TAP_DRILL_DIA, ROD_TAP_DRILL_DEPTH)
+V_TOTAL = V_HEX - V_BORE - V_THUMB - V_ROD_TAP
 
 
 async def build(adapter) -> dict[str, str]:
@@ -76,63 +115,46 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): block envelope plus the two rod-bore
-    # diameters and their in-plane stations. The mm suffix is load-bearing --
-    # this is an INCH document and the equation manager reads BARE numbers in
-    # document units (an unsuffixed 20 = 20 in, blowing the part up 25.4x).
-    await set_global(adapter, "BlockWidth", f"{BLOCK_WIDTH}mm")
-    await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
-    await set_global(adapter, "BlockDepth", f"{BLOCK_DEPTH}mm")
-    await set_global(adapter, "LeverBoreDia", f"{LEVER_BORE_DIA}mm")
-    await set_global(adapter, "LeverBoreY", f"{LEVER_BORE_Y}mm")
-    await set_global(adapter, "RodBoreDia", f"{ROD_BORE_DIA}mm")
-    await set_global(adapter, "RodBoreX", f"{ROD_BORE_X}mm")
-    # (The old ScrewHoleDia knob is gone: the thumb-screw hole is now a native
-    # Hole Wizard #4-40 tapped feature placed by point.)
+    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
+    # is an INCH document and the equation manager reads BARE numbers in
+    # document units.
+    for name, value in (
+        ("HexAf", HEX_AF),
+        ("BlockHeight", BLOCK_HEIGHT),
+        ("LeverBoreDia", LEVER_BORE_DIA),
+        ("LeverBoreY", LEVER_BORE_Y),
+    ):
+        await set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Block outline: rectangle with its bottom edge on the X axis, centred in X
-    # (corner vertex at (-W/2, 0)). NOT origin-centred, so it stays a
-    # define_rectilinear_chain. Emission order is width (bottom segment), height
-    # (one side segment), then the anchor X (anchor vertex at x=-W/2, y=0 -> only
-    # the X dim; y=0 emits no dim): three display dims.
-    block = SketchDims()
-    check("create_sketch outline", await adapter.create_sketch("Front"))
-    block_rect = [
-        (-BLOCK_WIDTH / 2.0, 0.0),
-        (BLOCK_WIDTH / 2.0, 0.0),
-        (BLOCK_WIDTH / 2.0, BLOCK_HEIGHT),
-        (-BLOCK_WIDTH / 2.0, BLOCK_HEIGHT),
-    ]
-    lines = await add_line_chain(adapter, block_rect)
-    await define_rectilinear_chain(
-        adapter, lines, block_rect, label="block", dims=block,
-        names=["Width", "Height", "AnchorX"],
-        drives=['"BlockWidth"', '"BlockHeight"', '"BlockWidth" / 2'],
-    )
-    await ensure_fully_defined(adapter, "block outline")
-    check("exit_sketch outline", await adapter.exit_sketch())
-    name_last_feature(adapter, "BlockProfile")
-    drive_jobs += block.apply(adapter, "BlockProfile")
+    # --- Hex block: the bar's section on the Top plane, extruded up +Y --------
+    drive_jobs += await _hex_profile(adapter)
     check(
         "extrude block",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_DEPTH)),
+        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
     )
     name_last_feature(adapter, "Block")
-    v_block = BLOCK_WIDTH * BLOCK_HEIGHT * BLOCK_DEPTH
-    await volume_check(adapter, "block", v_block, 0.005 * v_block)
+    (height,) = name_dimensions(adapter, "Block", ["Height"])
+    drive_jobs.append((height, '"BlockHeight"'))
+    volume = await volume_check(adapter, "hex block", V_HEX, 0.005 * V_HEX)
+    await bbox_extent_check(adapter, "block height", "y", BLOCK_HEIGHT)
+    await bbox_extent_check(adapter, "hex across the flats", "z", HEX_AF)
+    await bbox_extent_check(adapter, "hex across the corners", "x", HEX_AC)
 
-    # Lever bore along Z: a plain dimensioned slip cut (engineered 0.2 mm
-    # running fit, not a drilled hole). On-axis in X (centre x=0), off-axis in y
-    # (the bore height), so define_circle emits the Z/height dim then the
-    # diameter -- the X slot is ignored.
+    # --- Lever bore along X through both corners ---------------------------------
+    # On the hex axis (sketch x = 0 is model Z = 0), so define_circle emits the
+    # height then the diameter -- the x slot is ignored.
     lever = SketchDims()
-    check("create_sketch lever bore", await adapter.create_sketch("Front"))
+    check("create_sketch lever bore", await adapter.create_sketch("Right"))
     await define_circle(
-        adapter, 0.0, LEVER_BORE_Y, LEVER_BORE_DIA / 2.0, "lever bore",
+        adapter,
+        0.0,
+        LEVER_BORE_Y,
+        BORE_R,
+        "lever bore",
         dims=lever,
-        names=("LeverCx", "LeverBoreYDim", "LeverBoreDiaDim"),
+        names=("LeverCz", "LeverBoreYDim", "LeverBoreDiaDim"),
         drives=(None, '"LeverBoreY"', '"LeverBoreDia"'),
     )
     await ensure_fully_defined(adapter, "lever bore sketch")
@@ -142,85 +164,73 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut lever bore",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+            ExtrusionParameters(depth=BORE_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "LeverBore")
-    v_lever = math.pi * (LEVER_BORE_DIA / 2.0) ** 2 * BLOCK_DEPTH
-    await volume_check(adapter, "lever bore", v_block - v_lever, 0.005 * v_block)
+    volume = await volume_check(adapter, "lever bore", volume - V_BORE, 0.01 * V_BORE)
 
-    # Vertical-rod slip bore along Y from the Top plane (sketch y maps to global
-    # -Z; the block spans Z 0..BLOCK_DEPTH). Also a plain dimensioned slip cut.
-    # Off-axis in both x (skew station) and z (depth mid-plane), so define_circle
-    # emits X, Z, then diameter.
-    rod = SketchDims()
-    check("create_sketch rod bore", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, ROD_BORE_X, -BLOCK_DEPTH / 2.0, ROD_BORE_DIA / 2.0, "rod bore",
-        dims=rod,
-        names=("RodBoreXDim", "RodBoreZ", "RodBoreDiaDim"),
-        drives=('"RodBoreX"', '"BlockDepth" / 2', '"RodBoreDia"'),
-    )
-    await ensure_fully_defined(adapter, "rod bore sketch")
-    check("exit_sketch rod bore", await adapter.exit_sketch())
-    name_last_feature(adapter, "RodBoreProfile")
-    drive_jobs += rod.apply(adapter, "RodBoreProfile")
-    check(
-        "cut rod bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "RodBore")
-
-    # Thumb-screw hole: ONE native Hole Wizard #4-40 tapped feature along Y
-    # (through_all) from the top face (Y=BLOCK_HEIGHT, outward normal +Y).
-    # The stock screw's matching #4-40 external thread enters on the X axis,
-    # crossing the lever bore.
-    screw_cut = wizard_holes(
+    # --- Thumb-screw tap: top face, hex axis, into the lever bore ---------------
+    thumb = wizard_holes(
         adapter,
-        HoleSpec("tapped", "#4-40"),
-        [[0.0, BLOCK_HEIGHT, BLOCK_DEPTH / 2.0]],
+        THUMB_TAP_SPEC,
+        [[0.0, BLOCK_HEIGHT, 0.0]],
         (0.0, 1.0, 0.0),
-        "thumb-screw tapped hole (#4-40)", name="ScrewHole",
-        placement_dims=[((None, None), ("ScrewHoleZ", '"BlockDepth" / 2'))],
+        f"thumb-screw tap ({THUMB_TAP_SPEC.size} into the lever bore)",
+        name="ThumbTap",
+        expect_dia_mm=ROD_TAP_DRILL_DIA,
+        placement_dims=[((None, None), (None, None))],
     )
-    drive_jobs += screw_cut.placement_drive_jobs
-    # The two Y features run the full block height; the screw hole crosses the
-    # lever bore on the X axis with no clean closed form, so a loose tol absorbs
-    # the double-counted intersection while still catching a gross unit-blowup.
-    v_rod = math.pi * (ROD_BORE_DIA / 2.0) ** 2 * BLOCK_HEIGHT
-    v_screw = math.pi * (TAP_DRILL_MM["#4-40"] / 2.0) ** 2 * BLOCK_HEIGHT
-    v_final = v_block - v_lever - v_rod - v_screw
-    await volume_check(adapter, "y-bores", v_final, 80.0)
+    drive_jobs += thumb.placement_drive_jobs
+    volume = await volume_check(
+        adapter, "thumb-screw tap", volume - V_THUMB, 0.03 * V_THUMB
+    )
 
-    # Named lever-bore axis (local Z through (0, LEVER_BORE_Y)) so the clamp
-    # rides the magnifying rod as a concentric slider in the M6 assembly.
+    # --- Rod tap: bottom face (outward normal -Y), hex axis, blind -------------
+    rod = wizard_holes(
+        adapter,
+        ROD_TAP_SPEC,
+        [[0.0, 0.0, 0.0]],
+        (0.0, -1.0, 0.0),
+        f"vertical-rod tap ({ROD_TAP_SPEC.size} blind, MHA-MG-004 seat)",
+        name="RodTap",
+        expect_dia_mm=ROD_TAP_DRILL_DIA,
+        placement_dims=[((None, None), (None, None))],
+    )
+    drive_jobs += rod.placement_drive_jobs
+    volume = await volume_check(
+        adapter, "vertical-rod tap", volume - V_ROD_TAP, 0.03 * V_ROD_TAP
+    )
+
+    # Named lever-bore axis (local X through (y=LEVER_BORE_Y, z=0)) so the clamp
+    # rides the magnifying lever as a concentric slider in the assembly.
     await name_bore_axis(
-        adapter, "Top Plane", LEVER_BORE_Y, "Right Plane", 0.0, "lever bore axis"
+        adapter, "Top Plane", LEVER_BORE_Y, "Front Plane", 0.0, "lever bore axis",
+        drive_a='"LeverBoreY"', drive_jobs=drive_jobs,
     )
 
-    # Apply the deferred drive equations after the whole model + a rebuild
-    # exists, then re-check neutrality (each equation evaluates to the as-built
-    # value, so the geometry must not move).
+    # Deferred drive equations, then re-check neutrality.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven magnifying clamp (equations neutral)", v_final, 80.0)
+    await volume_check(
+        adapter, "driven magnifying clamp (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
+    )
 
     await apply_material(adapter, MATERIAL)
+    _set_section_hatch(adapter)
     # ch20 p.47 (img07) + p.46: the clamp block is BLACKENED brass (reads
     # dark against the bright lever rod and the bright thumb screw).
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
+    # Places are the tolerance statement (drawing-guidelines.md rule 3): the
+    # part carries them, the drawing reads them back.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -230,6 +240,93 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     return await save_part_and_images(adapter, PART_NAME)
+
+
+def _set_section_hatch(adapter: Any) -> None:
+    """Give the part's Material Properties crosshatch the section pattern,
+    after the material (which applies its own), and prove it by read-back:
+    the drawing's section hatches from it (mg_magnifying_clamp_spec)."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    extension.SetUserPreferenceInteger(
+        PREF_MATERIAL_HATCH_STYLE, PREF_NO_OPTION, AREA_HATCH_STYLE_PATTERN
+    )
+    extension.SetUserPreferenceString(
+        PREF_MATERIAL_HATCH_PATTERN, PREF_NO_OPTION, SECTION_HATCH_PATTERN
+    )
+    style = int(
+        extension.GetUserPreferenceInteger(PREF_MATERIAL_HATCH_STYLE, PREF_NO_OPTION)
+    )
+    pattern = str(
+        extension.GetUserPreferenceString(PREF_MATERIAL_HATCH_PATTERN, PREF_NO_OPTION)
+    )
+    if style != AREA_HATCH_STYLE_PATTERN or pattern != SECTION_HATCH_PATTERN:
+        raise RuntimeError(
+            f"clamp material crosshatch read back style {style}, pattern "
+            f"{pattern!r}; wanted {AREA_HATCH_STYLE_PATTERN}, {SECTION_HATCH_PATTERN!r}"
+        )
+
+
+async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
+    """The 7/16 hex on the Top plane, corners on the sketch's horizontal axis.
+
+    The ``build_mg_output_fixture._hex_profile`` technique turned a quarter:
+    both corners sit on the horizontal through the origin (model X), each a
+    corner radius off it; each flat is horizontal (model Z = +/-AF/2), with
+    equal sides either side of it.  The two flats equal centre the origin
+    between them; the corner radius tied to the flats makes the section
+    regular.  The flats are dimensioned point to point across the hex, between
+    the ends of the two flats at -X: in the projected top view those are its
+    upper vertices, so the dimension above it draws no extension line along a
+    flat and leaves the right-hand flat clear for the thumb tap's leader.
+    """
+    half_af, corner = HEX_AF / 2.0, HEX_CORNER_RADIUS
+    points = [
+        (corner, 0.0),
+        (corner / 2.0, half_af),
+        (-corner / 2.0, half_af),
+        (-corner, 0.0),
+        (-corner / 2.0, -half_af),
+        (corner / 2.0, -half_af),
+    ]
+    hexd = SketchDims()
+    check("create_sketch hex", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    for flat in (lines[1], lines[4]):
+        check(
+            f"hex flat {flat} horizontal",
+            await adapter.add_sketch_constraint(flat, None, "horizontal"),
+        )
+    for first, second in ((0, 1), (1, 2), (3, 4), (4, 5)):
+        check(
+            f"hex sides {first}={second}",
+            await adapter.add_sketch_constraint(lines[first], lines[second], "equal"),
+        )
+    # Equal flats, equal halves: the hex axis centred between the flats.
+    check(
+        "hex flats equal (axis centred)",
+        await adapter.add_sketch_constraint(lines[1], lines[4], "equal"),
+    )
+    corner_drive = f'"HexAf" * {_CORNER_PER_AF!r}'
+    await anchor_point_to_origin(adapter, f"{lines[0]}.start", corner, 0.0, "hex +X corner")
+    hexd.record("HexCornerPlus", corner_drive)
+    await anchor_point_to_origin(adapter, f"{lines[3]}.start", -corner, 0.0, "hex -X corner")
+    hexd.record("HexCornerMinus", corner_drive)
+    await dimension_between(
+        adapter,
+        f"{lines[1]}.end",
+        f"{lines[4]}.start",
+        "vertical_distance",
+        HEX_AF,
+        "hex across the flats",
+    )
+    hexd.record("HexAf", '"HexAf"')
+    await ensure_fully_defined(adapter, "hex profile")
+    check("exit_sketch hex", await adapter.exit_sketch())
+    name_last_feature(adapter, "HexProfile")
+    return hexd.apply(adapter, "HexProfile")
 
 
 if __name__ == "__main__":

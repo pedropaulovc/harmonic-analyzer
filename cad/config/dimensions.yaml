@@ -1341,9 +1341,9 @@ sections:
         - stated
         - high
       - - Rod diameter
-        - 'Body Ø6.00 0/−0.03, selected cold-drawn brass stock; bracket-end cylindrical press land Ø6.000 0/−0.006, SELECT OR LAP, starting 10.00 +0/−0.05 mm before the actual tip and ending at its tangent hemisphere (R3 REF from selected OD). Stock below the press-land minimum is rejected, not enlarged by lapping.'
+        - 'Body Ø6.00 0/−0.03, selected cold-drawn brass stock; bracket-end cylindrical press land Ø6.000 0/−0.006, SELECT OR LAP, starting at least 10.0 mm (10.0 MIN, covering the whole MHA-MG-001 collar) before the actual tip and ending at its tangent hemisphere (R3 REF from selected OD). Stock below the press-land minimum is rejected, not enlarged by lapping.'
         - ~0.24
-        - 'round brass rod, photo proportion; p.46 “Firmly affixed to the summing lever”; user-ruling light press plus Loctite 638, derived by mg_lever_press_fit_geom.press_fit_budget'
+        - 'round brass rod, photo proportion; p.46 “Firmly affixed to the summing lever”; user-ruling light press alone (#1570), derived by mg_lever_press_fit_geom.press_fit_budget'
         - scaled + engineered fit
         - low (photo nominal); high (specified fit)
       - - Lever rod length
@@ -1353,17 +1353,17 @@ sections:
         - scaled + specified stock envelope
         - med (photo length); high (specified overall band)
       - - Vertical rod
-        - ~Ø5 × 150, domed ends
+        - 'Ø5 brass × 132.5 overall (#1559): #4-40 UNC-2A end 7.50 ±0.25 from the shoulder (relief Ø1.85 MAX × 1.50 at the .XX ±0.51 band at the shoulder, both roots R0.2 MAX; 45° tip chamfer to the minor Ø), body 125.0 from the shoulder to a full R2.5 hemisphere, Ra 3.2 thumb-screw seat; screws into MHA-MG-002 and seats on the shoulder (no set screw, bond or lock). Worst-case full-thread engagement 7.25 − 2.01 − 0.635 = 4.605 ≥ 1.5D 4.2675; worst shoulder land 0.5275 ≥ 0.5'
         - —
-        - p.46/48 vs lever rod
-        - scaled
-        - low
+        - 'p.46/48 vs lever rod; owner ruling #1559 (threaded rod end, shoulder seat); cad/scripts/mg_rod_clamp_joint.py'
+        - scaled + engineered joint
+        - low (photo length); high (specified joint)
       - - Clamp block
-        - ~20 × 26 × 12; Ø6.2 lever bore, Ø5.2 rod bore (skew, 6.5 off-axis), Ø3 screw hole
+        - 'vertical 7/16 in hex brass (AF 11.1125, across corners 12.832) × 28.65 (#1559): Ø6.2 lever bore through the corners at 19.65 from the bottom face (bore to flat wall 2.34 worst); #4-40 thumb-screw tap from the top on the hex axis into the bore (5.9 thread, 4.58 worst engagement); blind #4-40 rod tap from the bottom on the same axis, thread 8.55 / drill 12.75 (floor 2.02 worst under the lever bore)'
         - —
-        - p.48 close-up
-        - scaled
-        - low
+        - 'p.48 close-up; owner ruling #1559 (hex block, coaxial thumb screw and rod); cad/scripts/mg_magnifying_clamp_geom.py'
+        - scaled + engineered joint
+        - low (photo size); high (specified stock and walls)
       - - Thumb screw
         - 'MHA-VN-011, McMaster 91882A221 #4-40 UNC: Ø9.525 × 2.38125 knurled head, Ø6.35 × 2.38125 collar, 11.1125 shank under collar; ×2 placed (sliding lever clamp + axial output-fixture clamp)'
         - —
@@ -1371,13 +1371,13 @@ sections:
         - stock + photo topology
         - high (stock); med (two clamp functions); low (photo-scaled original size)
       - - Output fixture
-        - 'C36000 3/8 in hex brass (AF9.525) × 11.0, horizontal axis; vertical Ø5.20 +0.03/0 sliding bore through corners, station 5.00 ±0.05 from free end; turned Ø9.0 × 6.7 spigot; R1.2 circumferential wire groove, root Ø7.00 ±0.05, centred on spigot so both axial lips remain ≥2.0 at print-worst; axial #4-40 UNC-2B tap from spigot face into rod bore'
+        - 'C36000 7/16 in hex brass (AF11.1125) × 11.3, horizontal axis; vertical Ø5.2 drilled bore through corners, centred between the flats, station 5.30 from free end; turned Ø10.1 × 6.7 spigot; R1.2 MAX circumferential wire groove centred on the spigot OD, root Ø7.70, station 3.75 from the spigot face; every wall ≥2.0 at print-worst including drill wander (owner ruling 2026-10-16); axial #4-40 UNC-2B tap from spigot face into rod bore'
         - —
         - '20_Magnifying_Lever.pdf p.46 text; ch20_images/page001_img01.jpeg, page002_img04.jpeg and page002_img07.jpeg: hex body cross-bored on vertical rod, grooved round spigot, axial knurled screw and front-hanging wire'
         - photo topology + engineered walls
         - med (topology/function); low (photo sizes); high (specified stock/walls)
       - - Mounting bracket
-        - '1018 cold-drawn low-carbon steel angle bracket: Ø12 × 10.00 +0/−0.05 collar, bore Ø5.986 +0.006/0, light-press onto Ø6.000 0/−0.006 lever land (0.002–0.014 diametral interference; 7 mm nominal straight cylinder, 7.207819 mm whole-contact envelope = longest 7.003 mm cylinder plus the partial R3 dome outside the 5.986 bore), end flush with outer face; retain with Loctite 638, alternative soft solder or braze. Press the collar onto the rod held near its end, not through the unsupported lever as a column. Steel only: brittle gray iron is rejected for the press-fit hoop load. 10-wide forward arm at machine (+40, 979.7, −128.3); vertical side plate 48 wide × 12.7 tall × 3.175 thick, machine x −3..+45, y 973.35..986.05, z −76.2874..−73.1124. Back face seats flush against summing-lever front face (SUMMING_Z − 152.4/2), not below it.'
+        - '1018 cold-drawn low-carbon steel angle bracket: Ø12 × 10.00 +0/−0.05 collar, bore reamed or honed Ra 0.8 to 0.007–0.014 diametral interference on the measured Ø6.000 0/−0.006 lever land (model Ø5.986, the tightest corner; DIN 7190 smoothing leaves 0.00188 effective, holding 241 N and 724 N·mm against 2.9 N and 70 N·mm; 7 mm nominal straight cylinder, 7.207819 mm whole-contact envelope = longest 7.003 mm cylinder plus the partial R3 dome outside the 5.986 bore), end flush with outer face; the press alone retains it (#1570). Press the collar onto the rod held near its end, not through the unsupported lever as a column. Steel only: brittle gray iron is rejected for the press-fit hoop load. 10-wide forward arm at machine (+40, 979.7, −173.51) (#1559 A1 plumb plane: arm end 103.51, mounting face 100.40 from the bore axis; was 58.30/55.19 at z −128.3); vertical side plate 48 wide × 12.7 tall × 3.175 thick, machine x −3..+45, y 973.35..986.05, z −76.2874..−73.1124. Back face seats flush against summing-lever front face (SUMMING_Z − 152.4/2), not below it.'
         - —
         - 'ch30_images/page002_img01.png, eight views front; ch20_images/page001_img01.jpeg, top-right close-up: vertical black angle side plate against the lever front face, two side-by-side slotted heads at the lever mid-plane'
         - scaled + derived
@@ -1385,13 +1385,13 @@ sections:
       - - Lever collar light-press budget
         - 'Tight fit 0.014 mm, inherited collar OD 12.00 ±0.51: strength at OD 11.49 gives contact pressure 137.23 MPa, bore hoop 240.13 MPa and von Mises 330.82 MPa < 333 MPa (0.9 × 370 MPa 1018 cold-drawn yield). Whole-contact envelope, independent corners (not one physical part): collar length maximum 10.00 minus selected hemisphere radius minimum 2.997 gives the 7.003 mm longest straight cylinder; the part of the largest hemisphere (radius 3.000) outside the smallest bore (diameter 5.986), sqrt(3.000^2 - 2.993^2) = 0.204819 mm, gives explicit contact maximum 7.207819 mm (coupled tight corner 7.204819 mm). Press force = friction over that envelope plus the normal reaction on the partial dome: at OD 12.51 the contact pressure is 143.66 MPa, friction 0.10–0.15 gives 1951.871–2927.806 N, and the projected dome axial-normal reaction bound adds 18.933819 N, so the total is 1970.804504–2946.739847 N (1.970805–2.946740 kN). The shared code derives the sheet cap by rounding the maximum total upward to 0.1 kN: 3.0 kN MAX.'
         - —
-        - 'cad/scripts/mg_lever_press_fit_geom.press_fit_budget: free-axial Lamé solid-shaft fit, named OD print corners 11.49/12.51, d6 and L7.207819 whole-contact envelope (7 mm nominal straight cylinder plus partial R3 dome), friction plus projected dome axial-normal reaction, brass E97 GPa ν0.34, steel E200 GPa ν0.29; user light-press, +0/−0.05 collar/tip-land stations and inherited OD ±0.51 rulings'
+        - 'cad/scripts/mg_lever_press_fit_geom.press_fit_budget: free-axial Lamé solid-shaft fit, named OD print corners 11.49/12.51, d6 and L7.207819 whole-contact envelope (7 mm nominal straight cylinder plus partial R3 dome), friction plus projected dome axial-normal reaction, brass E97 GPa ν0.34, steel E200 GPa ν0.29; user light-press, +0/−0.05 collar station and inherited OD ±0.51 rulings; the tip land starts 10.0 MIN from the tip, covering the longest collar (machinist review r2)'
         - engineered fit + elastic budget
         - high (specified fit; analytic result under the stated elastic/friction assumptions)
       - - Bracket flange screws ×2
-        - 'MHA-VN-050, McMaster 91794A077 #2-56 UNC × 1/4 passivated 18-8 stainless steel fillister slotted screws: head Ø3.556 × 2.1082, shank Ø2.1844 × 6.35. Axes +Z into the lever, machine x +1.0/+14.7, y 979.7 (13.7 centres). Heads seat at z −74.7374 in 2X native counterbores Ø3.8 +0.10/0 × 1.55 ±0.05 deep over normal #2 Ø2.591 thru clearance; heads protrude 0.5582 nominal, 0.6082 at the shallowest counterbore for the catalog head height. Side-plate thickness 3.175 ±0.05 gives grip 1.625 ±0.10 and engagement 4.725 nominal, 3.2975 minimum full profile (≥1.5D = 3.2766), including 0.76 conservative stock length allowance, 0.7P tip and 0.25 entry edge break. Lever #2-56 UNC-2B blind full thread 4.95 ±0.05 stays inside the -Z receiver rib, EdgeRibBack, 5.08 ±0.05 deep (0.03 minimum containment margin); 6.05 ±0.10 tap-drill plus 118° point continues into the plate at mid-height. Receiver-row 2.54 ±0.05 from lower face and lever plate 5.08 ±0.05 retain 1.501 minimum drill lateral wall. Screw-tip gap 0.075 minimum; bottoming tap has 2P lead plus 0.0429 margin. Counterbore floor 1.525 minimum, east-end wall 2.000 from the real end-face station datum and height wall 3.840 minimum at the printed .XX ±0.51 height band. Minimum head radial float 0.122 exceeds maximum station-pitch offset 0.100. Head clears the 25-wide knife mount in X by 1.722 nominal, 0.652 conservative worst case including translation with the lever free-edge datum. Sloped rib thread wall 3.413 minimum; nearest spring-tap web 6.927 minimum under the native Ø0.30 RFS position frame.'
+        - 'MHA-VN-050, McMaster 91794A078 #2-56 UNC × 5/16 18-8 stainless steel fillister slotted screws: head Ø3.556 × 2.1082, shank Ø2.1844 × 7.9375. Axes +Z into the lever, machine x +1.0/+14.7, y 979.7 (13.7 centres). Heads bear on the 1/8 stock flange''s front face at z −76.2874 (no counterbore; machinist review r1 found the 1.55 ±0.05 counterbore depth rescued a wall) over 2X plain normal #2 Ø2.591 +0.10/0 thru clearance holes at ±0.05 positions matching the lever taps; heads stand 2.1082 proud. Side-plate thickness 3.175 at the title block''s .XXX ±0.13 is the grip, 3.045 minimum, and gives engagement 4.7625 nominal, 3.305 minimum full profile (≥1.5D = 3.2766), including 0.76 conservative stock length allowance, 0.7P tip and 0.25 entry edge break. Lever #2-56 UNC-2B blind full thread 4.95 ±0.05 stays inside the -Z receiver rib, EdgeRibBack, 5.08 ±0.05 deep (0.03 minimum containment margin); 6.05 ±0.10 tap-drill plus 118° point continues into the plate at mid-height. Receiver-row 2.54 ±0.05 from lower face and lever plate 5.08 ±0.05 retain 1.501 minimum drill lateral wall. Screw-tip gap 0.0075 minimum; drill-bottom margin 1.0575; bottoming tap has 2P lead plus 0.0429 margin. Clearance-hole east-end wall 2.6045 and height wall 4.4445 minimum at the printed .XX ±0.51 height band (the Ø3.8 head-clearance circle keeps 2.000 and 3.840). Minimum shank radial float 0.2033 exceeds the √2 × 2 × 0.05 = 0.1414 worst position mismatch. Sloped rib thread wall 3.413 minimum; nearest spring-tap web 6.927 minimum under the native Ø0.30 RFS position frame. Head clearance to the knife mount awaits the farm interference check (heads now 2.108 proud of the flange).'
         - —
-        - 'ch30_images/page002_img01.png, front; ch20_images/page001_img01.jpeg, top-right close-up. McMaster 91794A077 product table and technical drawing verified live 2026-10-08; option-B user ruling permits specific depth/position bands and the smaller drill continuation inside the plate (not full-thread continuation). Joint layout in cad/scripts/magnifying_bracket_joint_layout.py.'
+        - 'ch30_images/page002_img01.png, front; ch20_images/page001_img01.jpeg, top-right close-up. McMaster 91794A078 product page verified live 2026-10-16 (18-8 stainless fillister slotted, #2-56, 5/16 in long, head Ø0.14 × 0.083 in); owner ruling 2026-10-16 option (i): stainless fillister heads on the flange face, no counterbore (brass 90114A has no #2-56 × 5/16; a 3/8 brass screw through a 3/16 flange kept only a 1.04 shank-shear margin). Joint layout in cad/scripts/magnifying_bracket_joint_layout.py.'
         - stock + scaled + derived
         - high (stock dimensions and installed stack); med (photo-scaled stations)
   - prose: |2
@@ -1409,35 +1409,41 @@ sections:
       position along the rod is the radius from THAT pivot, which is what the
       ≤4× adjustment really is. Light-press the bracket collar onto the rod
       held near its end, without column loading; leave the rod end flush with
-      the outer collar face and retain with Loctite 638. Alternative retention
-      is soft solder or braze.
+      the outer collar face; the press alone retains it (#1570).
 
       DEPTH RE-ANCHOR (2026-07-04, ch30 p.4; window re-solved 2026-08-02 with
-      the new casting): the side view shows the whole output line (fixture
-      wire → wheel → rim wire → pen rod) as one PLUMB vertical at the machine
-      front — the old z −85 (M6.4 low) hung the wire hook 50 behind the wheel
-      plane (~8° lean, photo-refuted). Lever rod z −128.3 KEPT. The whole
+      the new casting; #1559 A1 2026-10-16): the side view shows the whole
+      output line (fixture wire → wheel → rim wire → pen rod) as one PLUMB
+      vertical at the machine front. Since #1559 the lever axis, clamp,
+      vertical rod, fixture hook and the lever wire's drum end all lie in ONE
+      plane z −173.51 (= the drum wire lane, PEN_Z_MID −162.5 − 11.01, in the
+      pressed brass drum's middle), so the wire leaving the fixture and the rod
+      axis are coplanar with the wheel's wire lane and the WIRE-1 yoke point
+      sits on the wire's Top plane (no YokePlane offset). The bracket arm
+      grows from 52 to 97 to reach it from the summing-lever face. The whole
       lever/clamp/rod/fixture chain rides the summing bar −10.3 (rod at
-      LEVER_ROD_Y 979.7, ridge contact 984.834). The clamp thumb screw's
-      exact stock reach is derived from McMaster 91882A221; its tip is tangent
-      to the lever top. The casting underside is y 999.7, and the screw head
-      clears it without forcing the output line farther forward. The front
-      column face is z −124.7; a lever axis at or forward of −127.95 gives the
-      0.25 clearance, and the retained z −128.3 gives 0.6. Vertical rod z −134.8
-      (skew bore 6.5, top y 984.7); the fixture screw axis is y 919.7, with the hex body
-      spanning approximately 914.2..925.2. Both thumb screws are installed
-      backed out to tip/rod tangency so nominal CAD solids do not overlap.
+      LEVER_ROD_Y 979.7, ridge contact 984.834). The clamp is a vertical 7/16
+      hex placed unrotated: its thumb screw (top) and the rod's threaded end
+      (bottom) are coaxial at CLAMP_X on the hex axis. The thumb screw's exact
+      stock reach is derived from McMaster 91882A221; its tip is tangent to
+      the lever top. The casting underside is y 999.7, and the screw head
+      clears it without forcing the output line farther forward. The lever
+      clears the front column face (z −124.7) by about 45.8. The vertical rod
+      screws into the clamp and seats on its shoulder at y 960.05 (thread tip
+      y 967.55, bottom dome y 835.05); the fixture screw axis is y 919.7, with
+      the hex body spanning approximately 913.3..926.1. Both thumb screws are
+      installed backed out to tip/rod tangency so nominal CAD solids do not
+      overlap.
 
       The fixture screw points toward the bracket, and the wire winds in
       the spigot groove then leaves its front tangent at screw-axis height.
-      Its yaw about the vertical rod is solved from the groove station and
-      groove-root radius plus wire radius and 0.25 stand-off, preserving
-      HOOK_Z −137.95 exactly as the accepted installation datum. Hook X,
-      yaw, wire length, drum tangent and yoke offset are derived in
-      cad/scripts/mg_output_fixture_geom.py and vn_lever_wire_geom.py.
-      The drum end is at z −173.51 (PEN_Z_MID −162.5 − 11.01) in the pressed brass drum's middle.
-      The drawing-free route checks clearance behind the rim, spokes and boss.
-      The straight rest wire
+      Its yaw about the vertical rod (+26.69°) is solved from the groove
+      station and groove-root radius plus wire radius and 0.25 stand-off, so
+      the hook lands at (139.98, 919.7, −173.51) in the rod plane. Hook X,
+      yaw, wire length (354.683), drum tangent (clock 15.82°) and the yoke
+      point are derived in cad/scripts/mg_output_fixture_geom.py and
+      vn_lever_wire_geom.py. The drawing-free route checks clearance behind
+      the rim (6.61), spokes (8.61) and boss (4.10). The straight rest wire
       clears the fixture groove flanks, spigot and screw head numerically,
       and the farm assembly interference gate checks the installed solids.
       Wraps, tie-offs and wire compliance remain unmodeled.
@@ -1521,7 +1527,7 @@ sections:
       music wire (`vn-lever-wire` MHA-VN-066:
       fixture's derived spigot-groove front tangent → tangent to the drum at about
       2:25 seen from the front, on the pen side, at the drum mid-plane z −173.51;
-      hook z −137.95 is retained by mg_output_fixture_geom.py;
+      the hook lies in that same plane (#1559 A1), set by mg_output_fixture_geom.py;
       `vn-pen-wire` MHA-VN-067: rim groove 3-o'clock tangent at x 3.8 → plumb
       down 60.5 to the pen-rod adjuster stud's eye head at y 515.2). The lever-wire ARTICULATES (ball joint at the
       hook + axis-axis stand-off tangency to the drum) and carries the WIRE-1

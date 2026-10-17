@@ -292,6 +292,15 @@ _FRAME_ALLOWED_PAIRS = {
 # an envelope, not one physical part: its coupled tight corner is 7.204819 mm.
 _MG_LEVER_PRESS_TRIPLE_MM = (6.0, 5.986, 7.2078194326718075)
 _MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 10.1)
+# #1559 clamp (MHA-MG-002): the 91882A221 #4-40 shank in the thumb tap's
+# Ø2.261 drill from the top face to the lever-bore top (THUMB_TAP_LENGTH 5.9).
+_MG_CLAMP_THUMB_TRIPLE_MM = (2.8448, 2.261, 5.9)
+# The vertical rod's #4-40 end (modelled at the 2.845 major) in the clamp's
+# bottom-face Ø2.261 tap drill. Envelope 6.0 = ROD_THREAD_LEN - RELIEF_WIDTH:
+# the full-major section from the tip to the relief, which also covers the tip
+# chamfer (its cone lies inside that cylinder); the Ø1.85 MAX relief is smaller
+# than the drill and overlaps nothing.
+_MG_ROD_THREAD_TRIPLE_MM = (2.845, 2.261, 6.0)
 
 # Bound the press annulus over that whole conservative contact envelope (the
 # straight cylinder plus the partial dome: the triple's third value).
@@ -304,6 +313,8 @@ _MG_LEVER_PRESS_LIMIT = _smooth_annulus_limit_mm3(
 _MG_FIXTURE_THREAD_LIMIT = _smooth_annulus_limit_mm3(
     *_MG_FIXTURE_THREAD_TRIPLE_MM
 )
+_MG_CLAMP_THUMB_LIMIT = _smooth_annulus_limit_mm3(*_MG_CLAMP_THUMB_TRIPLE_MM)
+_MG_ROD_THREAD_LIMIT = _smooth_annulus_limit_mm3(*_MG_ROD_THREAD_TRIPLE_MM)
 
 _MAGNIFIER_ALLOWED_PAIRS = {
     # 1.25 in screw - 9.5 wheel bar - 17.4 front arc - 0.5 grip gap (the back
@@ -315,9 +326,10 @@ _MAGNIFIER_ALLOWED_PAIRS = {
         "sh-column-clamp-back",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 4.35),
     ),
-    frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1")): _smooth_annulus_limit_mm3(
-        2.8448, 2.261, 3.9
-    ),
+    frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1")): _MG_CLAMP_THUMB_LIMIT,
+    frozenset(
+        ("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")
+    ): _MG_ROD_THREAD_LIMIT,
     # MHA-MG-007 drill-rod pin (Ø4.7625, mg_wheel_axle_spec.PIN_DIA) pressed in
     # the wheel bar's Ø4.7371 reamed bore (mg_wheel_bar_geom.AXLE_BORE_DIA)
     # over at most 9.0 of the bar's 9.5 depth (its back end 0.60 sunk at
@@ -677,6 +689,12 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
     frozenset(
         ("mg-magnifier-1/vn-thumb-screw-2", "mg-magnifier-1/mg-output-fixture-1")
     ): _MG_FIXTURE_THREAD_LIMIT,
+    frozenset(
+        (
+            "mg-magnifier-1/mg-magnifying-vertical-rod-1",
+            "mg-magnifier-1/mg-magnifying-clamp-1",
+        )
+    ): _MG_ROD_THREAD_LIMIT,
     frozenset(
         (
             "mg-magnifier-1/mg-magnifying-lever-1",

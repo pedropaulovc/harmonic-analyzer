@@ -73,7 +73,7 @@ def test_spec_restates_the_replica_it_is_sized_from() -> None:
 
 
 def test_catalog_recipe_claims_no_vendor_truth() -> None:
-    """Catalogue-only (the 91794A077 precedent): no harvest, no pinned truth."""
+    """Catalogue-only (the 91794A078 precedent): no harvest, no pinned truth."""
     assert not [name for name in vars(recipe) if name.startswith("VENDOR_")]
     assert not hasattr(recipe, "_check_truth")
     source = Path(recipe.__file__).read_text(encoding="utf-8")

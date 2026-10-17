@@ -3,32 +3,159 @@ shared by the part build (``build_mg_magnifying_vertical_rod.py``) and its
 manufacturing drawing (``draw_mg_magnifying_vertical_rod.py``).
 
 PURE DATA, no SolidWorks/COM imports. Sizes live in the drawing-free geometry
-module because fixture installation also consumes the rod diameter; drawing
-notes and marks stay out of the magnifier assembly recipe closure.
+module because the magnifier assembly and the fixture installation consume
+them; the threaded joint to MHA-MG-002 lives in ``mg_rod_clamp_joint`` (#1559).
+Drawing notes and marks stay out of the magnifier assembly recipe closure.
 The offline lockstep test asserts part marks and drawing keeps.
+
+Part frame: rod axis local +X, origin at the thread tip on the axis; the
+shoulder at SHOULDER_X, the bottom dome's tip at ROD_LENGTH.
 """
 
 from __future__ import annotations
 
-from mg_magnifying_vertical_rod_geom import ROD_DIA, ROD_LENGTH
-
-# The rod is a REVOLVED capsule (hemispherical ends): a smooth tangent-continuous
-# body with NO flat face, no end-face circle and no pickable silhouette edge, so
-# coordinate picks are unreliable and ONLY the auto-imported profile marks are
-# dependable.  The far dome-centre station (from the left end) plus the dome
-# radius fully define the Ø5 x 150 rod; the outside diameter and the overall
-# length ride the dome-radius callout + the note.
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "RodProfile": {"RightDomeCentre", "DomeRadius"},
-}
-
-DRAWING_NOTES = "\n".join(
-    (
-        "Ø5 ROUND BAR, ONE PIECE; OVERALL LENGTH (150) REF.",
-        "FORM BOTH ENDS TO A FULL HEMISPHERE (R2.5 = ROD RADIUS).",
-        "OD STRAIGHT AND SMOOTH, Ra 1.6.",
-        "THE CLAMP BLOCK AND OUTPUT FIXTURE SLIDE ALONG IT.",
-    )
+from _gtol_cylinder import CylinderFace
+from _surface_finish import SEAT_UM, SurfaceFinishControl
+from mg_magnifying_vertical_rod_geom import (
+    BODY_LENGTH,
+    DOME_R,
+    RELIEF_START_X,
+    ROD_DIA,
+    ROD_LENGTH,
+    SHOULDER_X,
+    TIP_CHAMFER,
 )
-END_VIEW_NOTE = "END VIEW SCALE 4:1"
-ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
+from mg_rod_clamp_joint import (
+    DIE_RUNOUT,
+    RELIEF_DIA,
+    RELIEF_DIA_TOL_TYPE,
+    RELIEF_ROOT_R,
+    RELIEF_ROOT_R_PLACES,
+    RELIEF_ROOT_R_TOL_TYPE,
+    RELIEF_WIDTH,
+    ROD_THREAD_LEN,
+    ROD_THREAD_LEN_BAND,
+    THREAD,
+    THREAD_BASIC_MINOR,
+    THREAD_CALLOUT,
+    THREAD_MAJOR,
+    THREAD_PITCH,
+    TIP_INCOMPLETE,
+)
+
+__all__ = [
+    "BODY_LENGTH",
+    "DIE_RUNOUT",
+    "DOME_R",
+    "DRAWING_BANDS",
+    "DRAWING_DIMENSIONS",
+    "DRAWING_PRECISION",
+    "FULL_THREAD_END_X",
+    "FULL_THREAD_START_X",
+    "ISO_VIEW_NOTE",
+    "REFERENCE_DIMENSIONS",
+    "RELIEF_DIA",
+    "RELIEF_DIA_TOL_TYPE",
+    "RELIEF_ROOT_R",
+    "RELIEF_ROOT_R_TOL_TYPE",
+    "RELIEF_ROOTS_CALLOUT",
+    "RELIEF_START_X",
+    "RELIEF_WIDTH",
+    "ROD_DIA",
+    "ROD_LENGTH",
+    "ROD_THREAD_LEN",
+    "ROD_THREAD_LEN_BAND",
+    "SEAT_FINISH_REASON",
+    "SHOULDER_X",
+    "SINGLE_LIMITS",
+    "SURFACE_FINISHES",
+    "THREAD",
+    "THREAD_BASIC_MINOR",
+    "THREAD_CALLOUT",
+    "THREAD_MAJOR",
+    "THREAD_PITCH",
+    "TIP_CHAMFER",
+    "TIP_INCOMPLETE",
+]
+
+# Full thread on the rod (drawing-guidelines.md rule 18 counts full thread
+# only): from one pitch behind the tip chamfer to the relief's far edge; the
+# die's run-out lies in the relief (mg_rod_clamp_joint checks its width).
+FULL_THREAD_START_X = TIP_INCOMPLETE
+FULL_THREAD_END_X = RELIEF_START_X
+
+# ONE revolved profile. The thread end reads from the shoulder, the seating
+# face that plumbs the rod (drawing-guidelines.md rule 10, functional datum):
+# the thread length and the body length both baseline from it. The overall
+# (thread + body) is a driven reference, "(132.5)", never a third control.
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "RodProfile": {
+        "RodDia",
+        "BodyLength",
+        "OverallLength",
+        "DomeR",
+        "ThreadLength",
+        "ReliefWidth",
+        "ReliefDia",
+    },
+    # The relief's two internal corners, one fillet feature over both edges.
+    "ReliefRoots": {"ReliefRootR"},
+}
+# Only the thread length carries its own band (it keeps the tip clear of the
+# tap's incomplete thread, mg_rod_clamp_joint); the relief width prints at the
+# title block's .XX band, the relief Ø as the single limit "Ø1.85 MAX" and
+# its two roots as "R0.2 MAX".
+DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
+    ("RodProfile", "ThreadLength"): ROD_THREAD_LEN_BAND,
+}
+SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
+    ("RodProfile", "ReliefDia"): (RELIEF_DIA, RELIEF_DIA_TOL_TYPE),
+    ("ReliefRoots", "ReliefRootR"): (RELIEF_ROOT_R, RELIEF_ROOT_R_TOL_TYPE),
+}
+REFERENCE_DIMENSIONS: tuple[tuple[str, str], ...] = (("RodProfile", "OverallLength"),)
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "RodProfile": {
+        "RodDia": 1,
+        "BodyLength": 1,
+        "OverallLength": 1,
+        "DomeR": 1,
+        "ThreadLength": 2,
+        "ReliefWidth": 2,
+        "ReliefDia": 2,
+    },
+    "ReliefRoots": {"ReliefRootR": RELIEF_ROOT_R_PLACES},
+}
+# ONE radius prints for both roots (one fillet feature): its count rides
+# above the value.
+RELIEF_ROOTS_CALLOUT = "2X"
+
+# The fixture's thumb-screw seat (owner ruling 2026-10-17; drawing-guidelines.md
+# rule 6, a static seat that locates, Ra 3.2). MHA-MG-006's axial #4-40 knurled
+# thumb screw (MHA-VN-011) locks the fixture to the rod, and the operator sets
+# the fixture anywhere along the body (ch. 20 p. 46: "sliding a fixture up and
+# down on the vertical rod"). Its tip reaches from where the fixture's top hex
+# corner meets MHA-MG-002's bottom face down to where its bore reaches the
+# dome tangent: at the nominal model 5.0 under the shoulder to 7.5 over the
+# dome tip, 92% of the body's one Ø5 cylinder (the drawing test derives the
+# reach from the fixture and screw geometry). The symbol qualifies that whole
+# face: a zone stopping only where the fixture runs out of rod would add two
+# lengths and nothing the shop could act on. No clamp screw bears on the rod:
+# MHA-MG-002's thumb screw enters its top face and pinches the lever; the rod
+# is threaded into its bottom face (mg_rod_clamp_joint).
+SURFACE_FINISHES = (SurfaceFinishControl("screw_seat", SEAT_UM, CylinderFace(ROD_DIA)),)
+# The seat's reason stands beside its symbol (rule 7: say why, where it applies).
+SEAT_FINISH_REASON = "THUMB-SCREW SEAT"
+
+# No general notes (drawing-guidelines.md rule 7): the overall, the seat on
+# MHA-MG-002, the hemisphere and the screw seat each ride their own callout.
+ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+
+if (
+    abs(SHOULDER_X - ROD_THREAD_LEN) > 1e-9
+    or abs(ROD_LENGTH - SHOULDER_X - BODY_LENGTH) > 1e-9
+):
+    raise AssertionError("MHA-MG-004 printed lengths do not sum to the overall")
+if not 0.0 < TIP_CHAMFER < FULL_THREAD_START_X < FULL_THREAD_END_X < SHOULDER_X:
+    raise AssertionError("MHA-MG-004 full-thread stations out of order")
+if abs(SHOULDER_X - RELIEF_START_X - RELIEF_WIDTH) > 1e-9:
+    raise AssertionError("MHA-MG-004 relief does not end on the shoulder")

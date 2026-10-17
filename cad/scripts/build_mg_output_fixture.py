@@ -9,21 +9,27 @@ Layout (part frame, ``mg_output_fixture_geom``): the origin is the rod-bore
 centre, the hex axis local +X from the free end (x = FREE_END_X) to the
 spigot face (x = SPIGOT_FACE_X), flats facing +/-Z, corners on +/-Y.
 
-* ``HexProfile``: the 3/8 hex on the ``FreeEnd`` plane, extruded to the
+* ``HexProfile``: the 7/16 hex on the ``FreeEnd`` plane, extruded to the
   shoulder.  It carries the flats (``HexAf``); its corners sit on the
   vertical through the sketch origin (the bore axis) and its two flats are
   equal, so the rod bore is centred between the flats with no dimension to
   either one.
 * ``TurnedProfile``: the spigot as a Top-plane rectangle from the free end to
   the spigot face, revolved about local X (inside the hex it adds nothing:
-  its Ø is under the flats).  It carries every axial station from the free
-  end (``RodStation``, ``HexLength``, ``OverallLength``) and ``SpigotDia``.
+  its Ø is under the flats).  It carries the rod bore's stations, from the
+  free end (``RodStation``) and to the spigot face (``BoreStation``), the
+  shoulder from the spigot face (``SpigotLength``), ``SpigotDia``, and the
+  overall length as a DRIVEN dimension (``OverallLength``, REF on the sheet).
+  The hex's depth is the equation ``RodStation + BoreStation - SpigotLength``.
+* ``ShoulderFillet``: the spigot's internal corner at the hex shoulder,
+  ``ShoulderRadius`` (a single MAX limit: the largest tool-nose radius).
 * ``GrooveProfile``: the full-radius groove, a Top-plane circle drawn as two
-  semicircles meeting at the root, revolved as a cut.  Its centreline starts
-  on the free end, so ``GrooveStation`` runs from there; ``GrooveRadius``
-  sizes it and ``GrooveRootDia`` is the diametric dimension from the axis to
+  semicircles meeting at the root, revolved as a cut.  Its centreline runs
+  from the bore axis to the spigot face, so ``GrooveStation`` runs from the
+  face; ``GrooveRadius`` sizes it (a LIMIT band, the model value its upper
+  limit) and ``GrooveRootDia`` is the diametric dimension from the axis to
   the root point.
-* ``RodBoreProfile``: the reamed Ø5.20 cross bore along local Y.
+* ``RodBoreProfile``: the drilled Ø5.2 cross bore along local Y.
 * ``AxialTap``: one blind Hole Wizard #4-40 tap from the spigot face (the
   thumb screw's receiver): full thread to where its axis breaks into the
   rod bore, the tap drill on to the bore axis, its point in the bore.
@@ -43,7 +49,7 @@ from typing import Any
 import _telemetry
 from _appearance import apply_material
 from _check import check
-from _com import _read_member
+from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import (
@@ -51,13 +57,8 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _feature_tree import name_last_feature
-from _fit_deviations import deviations
 from _holes import cross_hole_volume_mm3, wizard_holes
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -88,6 +89,7 @@ from mg_output_fixture_geom import (
     OVERALL_LENGTH,
     ROD_BORE_DIA,
     ROD_STATION,
+    SHOULDER_FILLET_R,
     SHOULDER_X,
     SPIGOT_DIA,
     SPIGOT_FACE_X,
@@ -96,13 +98,14 @@ from mg_output_fixture_geom import (
     TAP_SPEC,
 )
 from mg_output_fixture_spec import (
+    BORE_STATION,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    DRAWING_PRECISION_BY_NAME,
     GROOVE_STATION,
-    ROD_BORE_DIA_BAND,
-    ROD_BORE_DIA_PLACES,
-    SYMMETRIC_BANDS,
+    LIMIT_BANDS,
+    SINGLE_LIMITS,
 )
 
 PART_NAME = "mg-output-fixture"
@@ -121,6 +124,14 @@ _SAVED_DRAWING_PROPERTIES = ("Manufacturing Notes",)
 # --- Analytic volumes (mm^3) -----------------------------------------------------
 V_HEX = math.sqrt(3.0) / 2.0 * HEX_AF**2 * HEX_LENGTH
 V_SPIGOT = math.pi * SPIGOT_R**2 * SPIGOT_LENGTH
+# Pappus: the shoulder corner's spandrel r^2 (1 - pi/4), its centroid
+# r (10 - 3 pi) / (3 (4 - pi)) out from the spigot's surface, revolved about
+# the hex axis (build_pn_pen_rod's shoulder root).
+_SPANDREL = SHOULDER_FILLET_R**2 * (1.0 - math.pi / 4.0)
+_SPANDREL_R = SPIGOT_R + SHOULDER_FILLET_R * (10.0 - 3.0 * math.pi) / (
+    3.0 * (4.0 - math.pi)
+)
+V_FILLET = 2.0 * math.pi * _SPANDREL_R * _SPANDREL
 
 
 def _groove_volume() -> float:
@@ -159,7 +170,7 @@ def _tap_volume() -> float:
 V_GROOVE = _groove_volume()
 V_BORE = _bore_volume()
 V_TAP = _tap_volume()
-V_TOTAL = V_HEX + V_SPIGOT - V_GROOVE - V_BORE - V_TAP
+V_TOTAL = V_HEX + V_SPIGOT + V_FILLET - V_GROOVE - V_BORE - V_TAP
 
 
 async def build(adapter) -> dict[str, str]:
@@ -177,12 +188,13 @@ async def build(adapter) -> dict[str, str]:
     for name, value in (
         ("HexAf", HEX_AF),
         ("RodStation", ROD_STATION),
-        ("HexLength", HEX_LENGTH),
-        ("OverallLength", OVERALL_LENGTH),
+        ("SpigotLength", SPIGOT_LENGTH),
+        ("BoreStation", BORE_STATION),
         ("SpigotDia", SPIGOT_DIA),
         ("GrooveStation", GROOVE_STATION),
         ("GrooveRadius", GROOVE_RADIUS),
         ("GrooveRootDia", GROOVE_ROOT_DIA),
+        ("ShoulderRadius", SHOULDER_FILLET_R),
         ("RodBoreDia", ROD_BORE_DIA),
     ):
         await set_global(adapter, name, f"{value}mm")
@@ -210,7 +222,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=HEX_LENGTH)),
     )
     name_last_feature(adapter, "Hex")
-    drive_jobs.append(("D1@Hex", '"HexLength"'))
+    drive_jobs.append(("D1@Hex", '"RodStation" + "BoreStation" - "SpigotLength"'))
     volume = await volume_check(adapter, "hex", V_HEX, 0.005 * V_HEX)
     await _centroid_x_check(adapter, "hex", (FREE_END_X + SHOULDER_X) / 2.0)
     await bbox_extent_check(adapter, "hex length", "x", HEX_LENGTH)
@@ -227,6 +239,26 @@ async def build(adapter) -> dict[str, str]:
         adapter, "hex and spigot", volume + V_SPIGOT, 0.005 * (volume + V_SPIGOT)
     )
     await bbox_extent_check(adapter, "overall length", "x", OVERALL_LENGTH)
+
+    # --- Shoulder corner: the tool-nose radius the print allows (R MAX) ---------
+    # Picked on the circular shoulder edge at model -Z (the side view's upper
+    # silhouette, where the sheet reads its radius): the only edge through
+    # that point.
+    check(
+        "fillet shoulder corner",
+        await adapter.add_fillet(SHOULDER_FILLET_R, [[SHOULDER_X, 0.0, -SPIGOT_R]]),
+    )
+    name_last_feature(adapter, "ShoulderFillet")
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, "ShoulderFillet", ["ShoulderRadius"])[0],
+            '"ShoulderRadius"',
+        )
+    )
+    # Half the fillet's own 0.25 mm^3: a missing or R0.1 corner still fails.
+    volume = await volume_check(
+        adapter, "shoulder corner fillet", volume + V_FILLET, 0.5 * V_FILLET
+    )
 
     # --- Full-radius wire groove -------------------------------------------------
     drive_jobs += await _groove_profile(adapter)
@@ -295,19 +327,13 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     # Places are the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the part carries
-    # them and the explicit bands, the drawing reads them back.
+    # them, the shoulder corner's single MAX limit and the groove radius's
+    # LIMIT band; the drawing reads them back.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "RodBoreProfile",
-        "RodBoreDia",
-        *deviations(ROD_BORE_DIA_BAND),
-        places=ROD_BORE_DIA_PLACES,
-    )
-    for dimension_name, (feature_name, tolerance) in SYMMETRIC_BANDS.items():
-        set_dimension_symmetric_tolerance(
-            adapter, feature_name, dimension_name, tolerance
-        )
+    for dimension_name, (feature_name, tol_type) in SINGLE_LIMITS.items():
+        _single_limit(adapter, feature_name, dimension_name, tol_type)
+    for dimension_name, (feature_name, limits) in LIMIT_BANDS.items():
+        _limit_band(adapter, feature_name, dimension_name, limits)
     # The last dimension edit is behind us: the saved geometry must still be
     # the analytic part.
     await force_rebuild(adapter)
@@ -324,7 +350,7 @@ async def build(adapter) -> dict[str, str]:
 
 
 async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
-    """The 3/8 hex on ``FreeEnd``, corners on the sketch's vertical axis.
+    """The 7/16 hex on ``FreeEnd``, corners on the sketch's vertical axis.
 
     On the negative-offset Right plane sketch x is model -Z (build_fr_top_frame
     module docstring).  Both corners sit on the vertical through the origin
@@ -386,16 +412,23 @@ async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
 
 async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
     """The spigot's Ø from the free end to the spigot face (Top plane: sketch
-    (x, y) is model (X, -Z)), split at the shoulder so every axial station
-    is a dimension from the free end's axis corner.
+    (x, y) is model (X, -Z)), split at the shoulder.  The rod bore (the sketch
+    origin) is the axial datum: the free end and the spigot face each carry
+    their own station from it, and the shoulder runs from the spigot face's
+    corner (the spigot's length, the lathe's own length from the faced end).
+    The profile lies under the axis (model +Z, the side view's lower
+    silhouette), so the spigot's length witnesses from the lower corners and
+    reads under the view, clear of the shoulder radius over it.
 
     The centreline merges into both axis corners at creation, so the chain's
-    own relations define it (build_pd_transgear_thumbnut's head profile)."""
+    own relations define it (build_pd_transgear_thumbnut's head profile).  The
+    overall length is made driven before the face's station exists, so the
+    sketch is never over-defined (build_pn_pen_v_block's flat height)."""
     points = [
         (FREE_END_X, 0.0),
-        (FREE_END_X, SPIGOT_R),
-        (SHOULDER_X, SPIGOT_R),
-        (SPIGOT_FACE_X, SPIGOT_R),
+        (FREE_END_X, -SPIGOT_R),
+        (SHOULDER_X, -SPIGOT_R),
+        (SPIGOT_FACE_X, -SPIGOT_R),
         (SPIGOT_FACE_X, 0.0),
     ]
     turned = SketchDims()
@@ -414,25 +447,41 @@ async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
             await adapter.add_sketch_constraint(line, None, relation),
         )
     free_end = f"{lines[0]}.start"
+    face_on_axis = f"{lines[3]}.end"
     await anchor_point_to_origin(adapter, free_end, FREE_END_X, 0.0, "free end on the axis")
     turned.record("RodStation", '"RodStation"')
     await add_diametric_linear_dimension(
-        adapter, axis, lines[2], (GROOVE_X, SPIGOT_R + 4.0), "SpigotDia"
+        adapter, axis, lines[2], (GROOVE_X, -(SPIGOT_R + 4.0)), "SpigotDia"
     )
     turned.record("SpigotDia", '"SpigotDia"')
     await dimension_between(
-        adapter, free_end, f"{lines[1]}.end", "horizontal_distance", HEX_LENGTH, "shoulder"
-    )
-    turned.record("HexLength", '"HexLength"')
-    await dimension_between(
         adapter,
-        free_end,
+        f"{lines[1]}.end",
         f"{lines[2]}.end",
         "horizontal_distance",
-        OVERALL_LENGTH,
-        "spigot face",
+        SPIGOT_LENGTH,
+        "shoulder from the spigot face",
     )
-    turned.record("OverallLength", '"OverallLength"')
+    turned.record("SpigotLength", '"SpigotLength"')
+    overall = await dimension_between(
+        adapter,
+        free_end,
+        face_on_axis,
+        "horizontal_distance",
+        OVERALL_LENGTH,
+        "overall length (REF)",
+    )
+    _make_driven(adapter, overall, "overall length")
+    turned.record("OverallLength")
+    await dimension_between(
+        adapter,
+        face_on_axis,
+        "origin",
+        "horizontal_distance",
+        BORE_STATION,
+        "spigot face from the bore axis",
+    )
+    turned.record("BoreStation", '"BoreStation"')
     await ensure_fully_defined(adapter, "turned profile")
     check("exit_sketch turned profile", await adapter.exit_sketch())
     name_last_feature(adapter, "TurnedProfile")
@@ -440,10 +489,10 @@ async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
 
 
 async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
-    """The groove circle on the Top plane, stationed from the free end.
+    """The groove circle on the Top plane, stationed from the spigot face.
 
-    The revolve axis runs from the free end to the bore axis, so its start is
-    the free end on the axis.  The circle is two semicircles meeting at the
+    The revolve axis runs from the bore axis to the spigot face, so its end is
+    the face on the axis.  The circle is two semicircles meeting at the
     root and at the crown, both plumb over the centre (the build_dt_crank_arm
     end-cap recipe), so the root is a sketch point: ``GrooveRootDia`` is a
     diametric dimension from the axis to it.  A diametric dimension to a
@@ -456,7 +505,7 @@ async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
     check("create_sketch groove", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "groove axis", await adapter.add_centerline(FREE_END_X, 0.0, 0.0, 0.0)
+        "groove axis", await adapter.add_centerline(0.0, 0.0, SPIGOT_FACE_X, 0.0)
     )
     # add_arc sweeps CCW p1 -> p2: crown -> root bulges to the free end,
     # root -> crown to the spigot face; the shared ends merge at creation.
@@ -473,11 +522,11 @@ async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
         ),
     )
     set_sketch_direct_db(adapter, False)
-    await anchor_point_to_origin(adapter, f"{axis}.end", 0.0, 0.0, "groove axis at the bore")
+    await anchor_point_to_origin(adapter, f"{axis}.start", 0.0, 0.0, "groove axis at the bore")
     await anchor_point_to_origin(
-        adapter, f"{axis}.start", FREE_END_X, 0.0, "groove axis from the free end"
+        adapter, f"{axis}.end", SPIGOT_FACE_X, 0.0, "groove axis to the spigot face"
     )
-    groove.record("GrooveDatum", '"RodStation"')
+    groove.record("GrooveDatum", '"BoreStation"')
     # Crown and root plumb over the first arc's centre make it a semicircle;
     # the root plumb over the second's makes that one concentric.
     for point, centre in (
@@ -491,11 +540,11 @@ async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
         )
     await dimension_between(
         adapter,
-        f"{axis}.start",
+        f"{axis}.end",
         f"{toward_free_end}.center",
         "horizontal_distance",
         GROOVE_STATION,
-        "groove from the free end",
+        "groove from the spigot face",
     )
     groove.record("GrooveStation", '"GrooveStation"')
     check(
@@ -515,6 +564,64 @@ async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
     check("exit_sketch groove", await adapter.exit_sketch())
     name_last_feature(adapter, "GrooveProfile")
     return groove.apply(adapter, "GrooveProfile")
+
+
+def _make_driven(adapter: Any, dimension_id: str, label: str) -> None:
+    """Turn a just-made sketch dimension into a DRIVEN (reference) one
+    (build_pn_pen_v_block._make_driven)."""
+    display = _early_bound(adapter._sketch_entities[dimension_id], "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
+    if int(dimension.DrivenState) != 1:
+        raise RuntimeError(f"{label}: dimension did not become driven")
+
+
+def _single_limit(adapter: Any, feature: str, dimension_name: str, tol_type: int) -> None:
+    """A dimension as a single limit (swTolMAX prints the model value then
+    MAX, so the model IS the limit; build_ch_rocker_arm_tl_filing_stud)."""
+    _, dimension = _named_dimension(adapter, feature, dimension_name)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = tol_type
+    if int(tolerance.Type) != tol_type:
+        raise RuntimeError(f"{dimension_name}@{feature}: single-limit type did not persist")
+
+
+def _limit_band(
+    adapter: Any, feature: str, dimension_name: str, limits: tuple[float, float]
+) -> None:
+    """A dimension as a native LIMIT band: SolidWorks prints the upper and
+    lower limits, model value plus each deviation, at the tolerance's places
+    (paper_drive_stock_native.apply_span_limits).  ``SetValues``, not
+    ``SetValues2``: SW2026 rejects the latter on some dimensions (the shared
+    tolerance helper's finding)."""
+    label = f"{dimension_name}@{feature}"
+    display, dimension = _named_dimension(adapter, feature, dimension_name)
+    lower, upper = limits  # native API order, mm
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 3  # swTolType_e.swTolLIMIT
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+    if (
+        int(tolerance.Type) != 3
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, rel_tol=0.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, rel_tol=0.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    # The limits print at the dimension's own places (rule 3), the value's.
+    places = DRAWING_PRECISION_BY_NAME[dimension_name]
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetPrecision3(-1, -1, places, -1)
+    if int(display.GetPrimaryTolPrecision2()) != places:
+        raise RuntimeError(f"{label}: LIMIT precision did not persist")
+    value = float(dimension.SystemValue) * 1000.0
+    _telemetry.success(
+        f"{label}: LIMIT {value + upper:.{places}f}/{value + lower:.{places}f}"
+    )
+
 
 
 async def _centroid_x_check(adapter: Any, label: str, expected_x: float) -> None:

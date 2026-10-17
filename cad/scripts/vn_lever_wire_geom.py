@@ -12,7 +12,8 @@ pulled the spec into both closures).
 
 The derivation: the wire runs from the output fixture's hook to the XY-tangent
 point on the brass drum (``mg_wheel_drum_geom``) pressed on the wheel's
-front spigot; the YokePlane offset linearizes the inextensible-wire coupling
+front spigot; the wire part's Top plane (through the drum end, normal to the
+wire) carrying the drum-pitch yoke point linearizes the inextensible-wire coupling
 at the rest pose. The run is a straight rest-pose line (no wrap modelling).
 """
 
@@ -51,18 +52,17 @@ if not _STOCK_DIA_MIN <= WIRE_DIA <= _STOCK_DIA_MAX:
 
 # --- endpoint anchors (magnifier frame; asserted by build_mg_magnifier_assembly)
 #
-# DEPTH RE-ANCHOR (2026-07-04, ch30 p.4): the side view shows the whole output
-# line -- this wire, the wheel, the rim wire, the pen rod -- as ONE plumb
-# vertical at the machine front. The hook hangs just behind the wheel bar's
-# front face; the wire drops to the drum on the wheel's pen side, crossing the
-# rim's axial band only outside the rim (``run_gaps``). With the wheel on the
-# pen-rod line (Option C) the drop is about a tenth of the ~356 run (~6 deg):
-# the ch21 photo's wire, slanting forward over the rim to the front drum.
+# DEPTH RE-ANCHOR (option A1, #1559, ch30 p.4): the side view shows the whole
+# output line -- the lever, its thumb screw, the vertical rod, this wire, the
+# wheel, the rim wire, the pen rod -- as ONE plumb plane at the machine front.
+# The magnifying group sits in the drum's wire lane (DRUM_END_Z), so the hook
+# and the drum end share one depth and the wire runs straight down that plane,
+# clearing the rim, spokes and boss only in XY (``run_gaps``).
 CLAMP_X = 150.0  # sliding clamp / vertical rod / fixture line
-# The wire wraps the output fixture's turned spigot groove and leaves its
-# front tangent at screw-axis height. The fixture yaws about the vertical rod
-# to retain the accepted hook depth while moving the hook toward the bracket.
-# Geometry and yaw share one drawing-free owner with the fixture part build.
+# The wire wraps the output fixture's turned spigot groove and leaves it at
+# screw-axis height, in the rod's own plane. The fixture yaws about the vertical
+# rod to put the hook there while moving it toward the bracket. Geometry and
+# yaw share one drawing-free owner with the fixture part build.
 HOOK_X = CLAMP_X + HOOK_OFFSET_X
 HOOK_Y = FIXTURE_AXIS_Y
 HOOK_Z = HOOK_TARGET_Z
@@ -74,6 +74,10 @@ WHEEL_MID_Z = PEN_Z_MID
 DRUM_DIA = DRUM_OD
 # Drum-end Z: the drum's axial middle, so the tangency sits mid-lane.
 DRUM_END_Z = round(WHEEL_MID_Z + _DRUM_MID_LOCAL_Z, 6)
+# Option A1: the hook lies in the drum lane, so the run has no depth fleet.
+assert math.isclose(HOOK_Z, DRUM_END_Z, abs_tol=1e-9), (
+    f"lever-wire hook depth {HOOK_Z} left the drum lane {DRUM_END_Z}"
+)
 
 # XY tangent from the hook to the drum circle inflated by wire r + clearance.
 # +acos picks the tangent on the drum's right seen from the front (~2:25):
@@ -148,18 +152,23 @@ for _key, _gap in RUN_GAPS.items():
 # --- WIRE-1 yoke (the coupling mate's geometry) -------------------------------
 # The wheel-side yoke point: on the drum PITCH circle (drum radius + wire
 # radius -- where the wire centreline rides) at the SAME tangency azimuth, in
-# the wheel's mid-plane (the wheel part's Front plane). Its XY radial offset
-# from the wire end is perpendicular to the wire axis by tangency, so only the
-# z step feeds the YokePlane offset below.
+# the wheel's mid-plane (the wheel part's Front plane).
 YOKE_PITCH_R = DRUM_WIRE_R  # 9.85: wire-centreline pitch
 YOKE_POINT = (
     WHEEL_X + YOKE_PITCH_R * math.cos(_THETA),
     WHEEL_BAR_Y + YOKE_PITCH_R * math.sin(_THETA),
     WHEEL_MID_Z,
 )
-# YokePlane: parallel to the part's Top plane (perpendicular to the wire axis)
-# through YOKE_POINT. Signed offset along local +Y (= the drum->hook direction).
+# The coupling plane is the wire part's own Top plane (through the drum end,
+# perpendicular to the wire axis). Option A1 makes the run coplanar with the
+# drum lane, so the yoke point has no z step from the wire end, and its XY
+# offset is radial -- perpendicular to the wire by tangency. Its signed distance
+# along the wire axis is therefore zero: the yoke point lies ON Top.
 _Y_LOCAL = [(s - e) / WIRE_LEN for s, e in zip(WIRE_START, WIRE_END, strict=True)]
-YOKE_PLANE_OFFSET = round(
-    sum((q - e) * y for q, e, y in zip(YOKE_POINT, WIRE_END, _Y_LOCAL, strict=True)), 4
+_YOKE_AXIAL = sum(
+    (q - e) * y for q, e, y in zip(YOKE_POINT, WIRE_END, _Y_LOCAL, strict=True)
 )
+if abs(_YOKE_AXIAL) >= 1e-9:
+    raise AssertionError(
+        f"WIRE-1 yoke point sits {_YOKE_AXIAL:.3e} off the lever wire's Top plane"
+    )

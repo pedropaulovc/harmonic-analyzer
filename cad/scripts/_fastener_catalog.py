@@ -119,7 +119,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "vn-magnifying-bracket-screw": _stock(
         "vn-magnifying-bracket-screw",
         "18-8 Stainless Steel Fillister Head Slotted Screw",
-        "91794A077",
+        "91794A078",
         material="AISI 304",
     ),
     "vn-ms-stop-plate-screw": _stock(

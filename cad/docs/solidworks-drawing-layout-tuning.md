@@ -543,7 +543,7 @@ one bracketed thread depth, the drill depth's `<hw-tapdrldepth>` once and
 bare (it governs), the process prefix intact
 (`draw_mg_output_fixture._reference_thread_depth`). The printed `(10.1)` stays
 the model's value and follows it; typing the number would not. The thread's
-extent is the note's business (`THREAD ENDS AT ROD BORE.`), not a band on the
+extent is the note's business (`FULL THREAD TO ROD BORE.`), not a band on the
 REF value.
 
 **e. The hidden-line regen trap after annotating.**
@@ -687,7 +687,7 @@ the magnifying lever's capsule OD on retry10 (source `644308e47`, launcher
 but its attached silhouette's face failed `IsSame` against the picked one.
 Keep that refusal. Resolve the part-owned finish-control face on the view's
 `ReferencedDocument` and attach as a FACE with the pre-insertion selection
-point (`draw_dt_pinion_arbor`, `draw_mg_magnifying_lever`): `IsSame` proves
+point (`draw_dt_pinion_arbor`): `IsSame` proves
 the actual cylinder and the 1 mm landing readback still pins its flank.
 
 **j. A fresh detail view whose readbacks lag its ink.**
@@ -981,14 +981,14 @@ view's printed dimension ink.
 
 The MG-006 hex fixture's principal `*Top` view looks down the rod bore,
 which runs through the hex corners along local Y, not normal to a flat.
-Its height is AF 9.525, with one projected corner ridge through the bore
+Its height is AF 11.1125, with one projected corner ridge through the bore
 circle. An unturned `*Right` end view instead puts Y up and shows the
-across-corners height 10.9985; that is not a third-angle projection of the
+across-corners height 12.8316; that is not a third-angle projection of the
 principal view. Turn the end view by its measured axis mapping so -Z is up
 in both views, then align their projected origins before importing any
 dimensions. The end-view bore axis now runs through the left/right corners;
 do not change the model to make a mistaken flat-entry reading true.
-The 1.97 MIN bore-to-flat wall is the ligament to the two parallel flats,
+The bore-to-flat wall is the ligament to the two parallel flats,
 not an entry-face wall. Name the through-corners orientation on the sheet,
 and hold on flats and centre-drill the 120-degree ridge before drill/ream.
 The end-view bore axis is a native centreline attached to the named

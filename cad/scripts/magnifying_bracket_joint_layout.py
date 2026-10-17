@@ -10,15 +10,19 @@ from __future__ import annotations
 
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
 
-SCREW_SKU = "91794A077"
+SCREW_SKU = "91794A078"
 SCREW_THREAD = "#2-56"
-SCREW_LENGTH = 6.35  # McMaster 91794A077, under-head 1/4 in
+# Main ruling 2026-10-16, option (i): 18-8 stainless 5/16 with the heads on
+# the flange's front face (no counterbore).  The heads were already 18-8
+# stainless; brass 90114A #2-56 has no 5/16, and its 3/8 with a 3/16 flange
+# kept only a 1.04 shank-shear margin (66.05 vs 68.9 MPa at 50 ksi).
+SCREW_LENGTH = 7.9375  # McMaster 91794A078, under-head 5/16 in
 SCREW_MAJOR_DIA = 2.1844
 SCREW_HEAD_DIA = 3.556
 SCREW_HEAD_HEIGHT = 2.1082
 SCREW_PITCH = 25.4 / 56.0
 
-BRACKET_ORIGIN = (40.0, 979.7, -128.3)
+BRACKET_ORIGIN = (40.0, 979.7, -173.51)  # A1: the collar in the drum's wire lane (#1559)
 LEVER_ORIGIN_X = -15.0
 LEVER_FRONT_LOCAL_Z = -76.2
 SEAT_PLANE_Z = -73.11241221957347
@@ -41,27 +45,21 @@ LEVER_HOLE_POINTS = tuple(
     (x - LEVER_ORIGIN_X, 0.0, LEVER_FRONT_LOCAL_Z) for x in SCREW_MACHINE_X
 )
 # A flush head would put this screw's full thread beyond the 5.08 front rib.
-# The shallow counterbore instead leaves a bearing floor and a visible head.
-COUNTERBORE_DIA = 3.8
-COUNTERBORE_DEPTH = 1.55
-CLEARANCE_DIA = blind_cut_dia_mm(HoleSpec("clearance", "#2", fit="normal"))
-CLEARANCE_SPEC = HoleSpec(
-    "counterbore_fillister",
-    "#2",
-    fit="normal",
-    overrides_mm={
-        "HoleDiameter": CLEARANCE_DIA,
-        "CounterBoreDiameter": COUNTERBORE_DIA,
-        "CounterBoreDepth": COUNTERBORE_DEPTH,
-    },
-)
+# The heads instead bear on the flange's front face, no counterbore, inside a
+# head-clearance circle (still named COUNTERBORE_DIA) that keeps their float.
+COUNTERBORE_DIA = 3.8  # no counterbore: the head-clearance circle of the wall asserts
+COUNTERBORE_DEPTH = 0.0  # no counterbore
+CLEARANCE_SPEC = HoleSpec("clearance", "#2", fit="normal")
+CLEARANCE_DIA = blind_cut_dia_mm(CLEARANCE_SPEC)
 SCREW_POSITIONS = tuple(
-    (x, BRACKET_ORIGIN[1], SIDE_PLATE_FRONT_Z + COUNTERBORE_DEPTH)
-    for x in SCREW_MACHINE_X
+    (x, BRACKET_ORIGIN[1], SIDE_PLATE_FRONT_Z) for x in SCREW_MACHINE_X
 )
-GRIP = SIDE_PLATE_THICKNESS - COUNTERBORE_DEPTH
+# The heads bear on the flange's front face, wholly proud of it.
+GRIP = SIDE_PLATE_THICKNESS
 ENGAGEMENT = SCREW_LENGTH - GRIP
-HEAD_PROTRUSION = SCREW_HEAD_HEIGHT - COUNTERBORE_DEPTH
+HEAD_PROTRUSION = SCREW_HEAD_HEIGHT
+# The flange prints 3.175 unbanded: the title block's .XXX band holds the grip.
+FLANGE_THICKNESS_BAND = 0.13
 
 # Joint-specific native bands authorized by the October 8, 2026 user ruling.
 # Default .XX bands cannot retain full thread inside this rib. The modeled
@@ -86,7 +84,7 @@ HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND
 EDGE_BREAK = 0.25
 SCREW_LENGTH_MINUS = 0.76  # conservative stock allowance, not a catalog band
 SCREW_TIP_CHAMFER = 0.7 * SCREW_PITCH
-GRIP_BAND = PLATE_THICKNESS_BAND + COUNTERBORE_DEPTH_BAND
+GRIP_BAND = FLANGE_THICKNESS_BAND
 GRIP_MIN = GRIP - GRIP_BAND
 ENGAGEMENT_MIN = (
     ENGAGEMENT - SCREW_LENGTH_MINUS - GRIP_BAND - SCREW_TIP_CHAMFER - EDGE_BREAK
