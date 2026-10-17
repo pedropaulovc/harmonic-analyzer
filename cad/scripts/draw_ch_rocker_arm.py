@@ -2056,8 +2056,8 @@ HUB_ROOT = requirement(
         "radius_nominal": (rocker.HUB_ROOT_RADIUS_MAX, ("HUB_ROOT_RADIUS_MAX",)),
         "corner_radius_max_design": (rocker.HUB_ROOT_RADIUS_MAX, _ROOT_SOURCES),
         "note": (
-            f"{rocker_notes.HUB_ROOT_PREFIX}{rocker.HUB_ROOT_RADIUS_MAX:.{_ROOT_P}f} MAX",
-            (*_ROOT_SOURCES, ("ch_rocker_arm_notes", "HUB_ROOT_PREFIX"), ("ch_rocker_arm_notes", "DRAWING_PRECISION")),
+            rocker_notes.HUB_ROOT_NOTE,
+            (*_ROOT_SOURCES, ("ch_rocker_arm_notes", "HUB_ROOT_NOTE")),
         ),
     }, precision={"radius": _ROOT_P},
 )

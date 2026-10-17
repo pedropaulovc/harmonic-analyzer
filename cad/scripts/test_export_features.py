@@ -508,7 +508,7 @@ def test_rocker_hub_root_names_both_root_fillets_with_the_printed_max_limit() ->
     assert root["radius"] == [0.0, radius] == [radius + rocker_notes.HUB_ROOT_R_BAND[1], radius + rocker_notes.HUB_ROOT_R_BAND[0]]
     assert root["radius_nominal"] == root["corner_radius_max_design"] == radius
     assert root["precision"] == {"radius": rocker_notes.DRAWING_PRECISION["HubRoot"]["HubRootRadius"]} == {"radius": 1}
-    assert root["note"] == f"{rocker_notes.HUB_ROOT_PREFIX}0.2 MAX"
+    assert root["note"] == rocker_notes.HUB_ROOT_NOTE == "2X R0.2 MAX"
     assert set(exporter._cite(rocker_notes, "HUB_ROOT_R_BAND")) <= set(root["cite"]["radius"])
     assert set(exporter._cite(rocker, "HUB_ROOT_RADIUS_MAX")) <= set(root["cite"]["corner_radius_max_design"])
     assert set(exporter._cite(rocker_notes, "DRAWING_PRECISION")) <= set(root["cite"]["precision.radius"])
