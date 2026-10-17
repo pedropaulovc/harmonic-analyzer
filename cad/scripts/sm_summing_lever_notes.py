@@ -171,3 +171,9 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
 # below).  A, B are datums; C the section; D, E the details.
 BACK_VIEW_LETTER = "F"
 BACK_VIEW_NOTE = f"VIEW {BACK_VIEW_LETTER} SCALE 1:1"
+# Sheet 1's end profile looks at the +Z end face (datum B) but stands above
+# the plan, out of third-angle order (machinist review r15 read it as the
+# -Z end, so as VIEW F's mirror missing its taps): it is a removed view too,
+# named by a letter arrow onto the +Z end.
+FRONT_VIEW_LETTER = "G"
+FRONT_VIEW_NOTE = f"VIEW {FRONT_VIEW_LETTER} SCALE 1:2"
