@@ -2402,7 +2402,7 @@ def test_settled_unbound_reply_cannot_be_used_as_a_leaf_result(
 @pytest.mark.parametrize("reason", [
     None, "", " \t", "x" * 161, "a\nb", "a\tb", "a\0b", "a\u0085b",
     "a\u2028b", "a\u2029b", "a\u061cb", "a\u200eb", "a\u202eb", "a\u2066b",
-    "a\ud800b",
+    "a\ud800b", "\u200b", "\u200c\u200d\ufeff", " \u200b\u00a0",
 ])
 def test_refresh_reason_is_required_before_any_graph_or_fleet_work(
     monkeypatch, capsys, executor, reason
@@ -2416,6 +2416,22 @@ def test_refresh_reason_is_required_before_any_graph_or_fleet_work(
         args.append(f"--force-cache-refresh-reason={reason}")
     assert build.main(args) == 2
     assert "--force-cache-refresh-reason" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("executor", ["local", "farm"])
+def test_refresh_reason_without_labels_is_rejected_before_graph_or_fleet_work(
+    monkeypatch, capsys, executor
+):
+    monkeypatch.setattr(
+        build, "_executing_command", lambda *_a: pytest.fail("parsed command before labels")
+    )
+    assert build.main([
+        "--executor", executor,
+        "--force-cache-refresh-reason", "Re-evaluate cached output", "part:x",
+    ]) == 2
+    assert "--force-cache-refresh-reason requires --force-cache-refresh labels" in (
+        capsys.readouterr().err
+    )
 
 
 @pytest.mark.parametrize("mode", ["ro", "off"])

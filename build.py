@@ -173,6 +173,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         for label in option.split(",")
     ))
     refresh_request = None
+    if options.force_cache_refresh_reason is not None and not refresh_labels:
+        print(
+            "cache refresh: --force-cache-refresh-reason requires "
+            "--force-cache-refresh labels",
+            file=sys.stderr,
+        )
+        return 2
     if refresh_labels:
         sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
         import _artifact_cache

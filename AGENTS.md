@@ -310,7 +310,8 @@ such build:
   Forced overwrites use `-ForceCacheRefresh 'part:pn_pen_rod'` together with
   `-ForceCacheRefreshReason 'Owner - Explain why the cached result is being replaced'`
   on the launcher (or the matching `build.py --force-cache-refresh` /
-  `--force-cache-refresh-reason` flags). Reasons follow the display-name rules.
+  `--force-cache-refresh-reason` flags). Reasons follow the display-name rules
+  and must contain visible text; a reason without refresh labels is refused.
   Invalid reasons, labels outside the selected closure and non-cache-keyed tasks
   exit 2 before fleet queries or actions. Farm clients and workers must both
   advertise protocol **7**; protocol 6 is refused, with no compatibility shim.

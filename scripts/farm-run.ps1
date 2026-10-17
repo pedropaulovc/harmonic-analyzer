@@ -89,11 +89,28 @@ param(
         }
         # Count Unicode scalars, matching Python len(), not UTF-16 code units.
         $scalarCount = 0
+        $hasVisibleCharacter = $false
+        $invisibleCategories = @(
+            [System.Globalization.UnicodeCategory]::Control,
+            [System.Globalization.UnicodeCategory]::Format,
+            [System.Globalization.UnicodeCategory]::Surrogate,
+            [System.Globalization.UnicodeCategory]::SpaceSeparator,
+            [System.Globalization.UnicodeCategory]::LineSeparator,
+            [System.Globalization.UnicodeCategory]::ParagraphSeparator
+        )
         foreach ($rune in $_.EnumerateRunes()) {
             $scalarCount++
             if ($scalarCount -gt 160) {
                 throw 'ForceCacheRefreshReason must be at most 160 characters'
             }
+            if (-not $hasVisibleCharacter -and
+                -not [System.Text.Rune]::IsWhiteSpace($rune) -and
+                [System.Text.Rune]::GetUnicodeCategory($rune) -notin $invisibleCategories) {
+                $hasVisibleCharacter = $true
+            }
+        }
+        if (-not $hasVisibleCharacter) {
+            throw 'ForceCacheRefreshReason must contain at least one visible character'
         }
         $true
     })]
