@@ -154,15 +154,16 @@ def test_collar_press_seat_is_native_and_reads_the_press_contract() -> None:
     # fit bore names its process; the mate is the lever part, by number and
     # name (machinist review: "rod" read as another part), and the fit is the
     # press contract's diametral interference, matched to that lever.
+    # Machinist review r2 (rule 12): the process says how far -- THRU.
     bore_callout = drawing.SIDE_CALLOUTS["CollarBore"]
     assert bore_callout is mg_magnifying_bracket_spec.COLLAR_BORE_CALLOUT
     assert bore_callout == (
-        "REAM OR BORE: 0.002-0.014\nDIAMETRAL INTERFERENCE ON\nMHA-MG-003 LEVER"
+        "REAM OR BORE THRU: 0.002-0.014\nDIAMETRAL INTERFERENCE ON\nMHA-MG-003 LEVER"
     )
     budget = press.PRESS_FIT_BUDGET
     assert f"{budget['interference_min']:.3f}-{budget['interference_max']:.3f}" in bore_callout
     assert "ROD" not in bore_callout
-    assert all(len(row) <= 25 for row in bore_callout.splitlines())
+    assert all(len(row) <= 30 for row in bore_callout.splitlines())
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_callouts(adapter, side_annotations, SIDE_CALLOUTS)" in drawing_source
     reference = (
@@ -356,7 +357,10 @@ def test_part_stamps_make_critical_properties() -> None:
     # One stock, both keys (parent ruling): the collar's press budget is
     # computed for 1018 cold-drawn (mg_lever_press_fit_geom.COLLAR_YIELD_MPA).
     assert config["material"] == config["material_specification"]
-    assert config["material"] == "LOW-CARBON STEEL (1018, COLD-DRAWN)"
+    assert config["material"] == "AISI 1018 COLD-DRAWN STEEL"
+    # One title-block line (machinist review r2: 35 characters wrapped; the
+    # Material field's first line held 29).
+    assert len(config["material_specification"]) <= 29
     assert config["finish"]
     assert int(config["quantity"]) == 1
     # The collar is a press seat, not a running fit (user ruling 2026-10-11).
@@ -429,7 +433,9 @@ def test_hole_callout_rides_the_aligned_bottom_view_and_names_its_mate() -> None
     coordinates ride the aligned bottom view.  Machinist review r1 blocker:
     the ±0.05 coordinates named no mate -- the callout now names the summing
     lever's two #2-56 taps the pattern matches, and the plain holes have no
-    entry side to name."""
+    entry side to name.  Machinist review r2 (rule 12): the size row says
+    the process, DRILL."""
+    import _drawing_hole_callout
     import magnifying_bracket_joint_layout as joint
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "*Back" not in source
@@ -438,37 +444,46 @@ def test_hole_callout_rides_the_aligned_bottom_view_and_names_its_mate() -> None
     assert "process=MOUNTING_HOLE_PROCESS" in source
     assert "COUNTERBORE_PROCESS" not in source and "C'BORE" not in source
     assert 'label="two bracket mounting holes"' in source
-    assert drawing.MOUNTING_HOLE_PROCESS.endswith("\n")
-    rows = drawing.MOUNTING_HOLE_PROCESS.rstrip("\n").split("\n")
+    assert not drawing.MOUNTING_HOLE_PROCESS.endswith("\n")
+    *rows, process = drawing.MOUNTING_HOLE_PROCESS.split("\n")
     assert rows == ["MATCHES MHA-SM-003", "SUMMING LEVER TAPS"]
+    assert process == "DRILL"
+    assert joint.CLEARANCE_SPEC.kind == "clearance"  # a drilled clearance hole
+    # No trailing break: the process word joins the native size row with one
+    # space (placeholder native text; the helper only prefixes it).
+    native = "2X <MOD-DIAM>2.59 THRU ALL"
+    composed = _drawing_hole_callout.compose_hole_callout_prefix(
+        drawing.MOUNTING_HOLE_PROCESS, native
+    )
+    assert composed.split("\n") == [*rows, f"DRILL {native}"]
     assert joint.TAP_SPEC.size == "#2-56"
     # The mate is the summing lever, by number (its own part config).
     import _config
     assert _config.parts("sm-summing-lever")["number"] == "MHA-SM-003"
-    # Two process rows over the native thru row: three physical rows, one
-    # fewer than the counterbore callout's four.
+    # Two mate rows over the drilled size row: three physical rows.
     assert 1 + len(rows) == 3
-    # The thru row (43.8 mm) is the lowest: the rows over it stay about as
-    # narrow, or the leader leaving its near end would run under them.
-    assert all(len(row) <= 18 for row in rows)
     assert "MOUNTING FACE" in drawing.SECTION_CALLOUTS["SeatToAxis"]
     assert "edge=rims[1].edge" in source  # the east hole, nearer the block
     assert '"MountingCoordinates": ("MountingX0", "MountingX1", "MountingY0")' in source
     assert "keep=BOTTOM_HOLE_KEEP" in source
-    # The callout block (retry09, requested (337, 78) mm, two rows): rows
+    # The callout block, measured on r3b (requested (162, 56) mm): each row
     # centred on the requested x, the block centred 1 mm under the requested
-    # y, the elbow 1.5 mm before the lowest row's end nearer the hole, the
-    # leader from that elbow to the hole.  Three physical rows: the two
-    # process rows over the native thru row (43.8 mm measured, the lowest).
-    # Two row pitches plus a cap height bound the block.
-    assert "callout_xy=(0.162, 0.056)" in source
-    callout_x, callout_y = 0.162, 0.056
-    pitch, text, char = 0.00556, 0.0035, 0.00262
+    # y (baselines 58.8, 53.25, 47.7 mm), the elbow on the lowest baseline
+    # 1.6 mm before the WIDEST row's near end ((134.8, 47.6) mm, "MATCHES
+    # MHA-SM-003" 51.2 mm over x 136.4..187.6 mm), the leader from that
+    # elbow to the hole.  The mate rows print 2.85 mm per letter; the native
+    # size row printed 45.1 mm and "DRILL " widens it 11.0..13.5 mm, so it is
+    # the widest row now.  Two row pitches plus a cap height bound the block.
+    assert "callout_xy=(0.168, 0.056)" in source
+    callout_x, callout_y = 0.168, 0.056
+    pitch, text, char = 0.00556, 0.0035, 0.00285
     block = 2 * pitch + text
     bottom = callout_y - 0.001 - block / 2.0
     top = bottom + block
-    widths = [len(row) * char for row in rows]  # process rows above the thru row
-    half = max(*widths, 0.048) / 2.0  # the widest row, the thru row at its widest guess
+    widths = [len(row) * char for row in rows]  # the mate rows over the size row
+    size_widths = (0.0451 + 0.0110, 0.0451 + 0.0117, 0.0451 + 0.0135)
+    assert max(widths) < min(size_widths)
+    half = max(size_widths) / 2.0
     assert bottom > 0.0127 + text  # over the drawable border
     hole = (
         drawing.BOTTOM_CENTER[0] + 0.019 + joint.BRACKET_HOLE_POINTS[1][0] / 1000.0,
@@ -492,8 +507,8 @@ def test_hole_callout_rides_the_aligned_bottom_view_and_names_its_mate() -> None
     x1_line = drawing.BOTTOM_HOLE_KEEP["MountingX1"][1] - 0.00278
     x0_line = drawing.BOTTOM_HOLE_KEEP["MountingX0"][1] - 0.00278
     lower_face = drawing.BOTTOM_CENTER[1] + part.FLANGE_Y[0] / 1000.0
-    for thru_width in (0.040, 0.0438, 0.048):
-        elbow = (callout_x - thru_width / 2.0 - 0.0015, bottom)
+    for size_width in size_widths:
+        elbow = (callout_x - size_width / 2.0 - 0.0016, bottom)
         dx, dy = hole[0] - elbow[0], hole[1] - elbow[1]
         assert dx < 0.0 < dy
 
@@ -887,14 +902,18 @@ def test_side_view_section_hangs_clear_under_the_arm_end() -> None:
     assert below_x - half_row > flange_x[1] + 2.0
     assert below_x + half_row < iso_left - text
     assert below_line + len(arm_rows) * pitch + text + text <= arm_end
-    # The labelled 3.11 hangs below this line, not beside its witnesses.
-    # Its column stops short of the 3.00's tail; the widest callout row
-    # clears the bottom view's east stack on EITHER hand of that column.
+    # The labelled 3.11 hangs below and LEFT of this line, not beside its
+    # witnesses: r3b printed its rows right-aligned on its column (x 212 mm,
+    # "MOUNTING" over x 186.6..212 mm), so the whole block stops short of the
+    # 3.00's tail by more than a text height, and its value row's top (4.5 mm
+    # over the value's baseline, a pitch over the requested y) stays within a
+    # pitch of that line's height.  The widest callout row clears the bottom
+    # view's east stack on EITHER hand of that column.
     past_x, past_y = _side_mm("ArmPastSeat", keep)
     half_row = max(len(row) for row in drawing.SECTION_CALLOUTS["ArmPastSeat"].splitlines()) * 2.85
-    assert past_x + 2.0 < tail_end
+    assert past_x + text < tail_end
     assert past_x - half_row > EAST_STACK_RIGHT + text
-    assert past_y + 4.5 + text < below_line
+    assert past_y + pitch + 4.5 < below_line + pitch
     assert past_y - 2.78 - len(drawing.SECTION_CALLOUTS["ArmPastSeat"].splitlines()) * pitch > CALLOUT_TOP + text
     assert below_line > CALLOUT_TOP + text
 
@@ -934,11 +953,16 @@ def test_side_view_axis_chain_reads_once_with_its_sum_as_reference() -> None:
     # The reference block (14.6 mm tall, centred 1 mm under the requested y)
     # keeps a text height from the 3.00's rows under the arm's end; its
     # column ends at its witness (y 147.85 mm), which the 3.00's own witness
-    # crosses (extension over extension), a text height and more over the
-    # 3.00's value row.
-    below_top = _side_mm("ArmBelowAxis", drawing.SIDE_SECTION_KEEP)[1] + text
+    # crosses (extension over extension), over the 3.00's value row.
+    # r3b measured that three-row block's value text at [122.5, 126.1] mm
+    # with the block requested at y 118.79 mm: the value's top is the
+    # requested y + 7.31 mm (2.78 mm row lift plus the 4.53 mm text box).
+    # The reference's arrow on the arm end's witness (y 126.64 mm, the head
+    # rising to 130.2 mm) then stood 0.86 mm off it; the native layout audit
+    # needs 2.0 mm between an arrow and text.
+    below_top = _side_mm("ArmBelowAxis", drawing.SIDE_SECTION_KEEP)[1] + 7.31
     assert end_y - 1.03 - 7.31 > below_top + text
-    assert arm_end > below_top + text
+    assert arm_end - below_top >= 2.0 + 1.0
     od_rows_bottom = _side_mm("CollarOd", drawing.SIDE_KEEP)[1] - 5.6
     assert seat_y - 1.03 + 7.31 < od_rows_bottom - text
     # The reference is a pure sheet dimension: linear, re-anchored to the OD
@@ -977,48 +1001,58 @@ def test_side_view_diameters_read_above_the_collar_clear_of_the_axis_witnesses()
     Both diameters now take the near-side single-arrow style (one arrow on
     the rim nearest the text, no line through the centre) and read ABOVE
     the collar, their leaders running steeply down to the near rim, which
-    is above the axis witnesses (y 206.15 mm).  Block geometry is retry09's:
-    rows centred on the requested x, the value row's bottom at the requested
-    y (1 mm higher with a tolerance stack), callout rows 5.6 mm apart under
-    it, the elbow 1.6 mm past the lowest row's near end on its baseline.
-    The bore's value is now an untoleranced REFERENCE nominal over the three
-    matched-fit rows (machinist review r1)."""
+    is above the axis witnesses (y 206.15 mm).  The OD's block geometry is
+    retry09's: rows centred on the requested x, the value row's bottom at the
+    requested y, the callout row 5.6 mm under it, the elbow 1.6 mm past the
+    lowest row's near end on its baseline.  The bore's value is an
+    untoleranced REFERENCE nominal over three matched-fit rows (machinist
+    review r1), and r3b measured that four-row block vertically CENTRED on
+    the requested y: its top 10.15 mm over it and its lowest baseline 11.15
+    mm under it, the elbow 1.6 mm before the WIDEST row's near end
+    (machinist review r2: requested at y 258.65 mm, the top crossed the
+    drawable top by 2.1 mm)."""
     text = 3.5
     collar_top = SIDE_OY + part.COLLAR_OD / 2.0
     od_x, od_y = _side_mm("CollarOd", drawing.SIDE_KEEP)
     bore_x, bore_y = _side_mm("CollarBore", drawing.SIDE_KEEP)
     od_rows = (od_x - 13.65, od_x + 13.65)  # "COLLAR OD" 27.3 mm
-    # "REAM OR BORE: PRESS SEAT" printed 61.5 mm (24 characters): the bore
-    # callout's widest row scales from it.
-    bore_width = 61.5 / 24 * max(
-        len(row) for row in drawing.SIDE_CALLOUTS["CollarBore"].splitlines()
-    )
-    bore_rows = (bore_x - bore_width / 2.0, bore_x + bore_width / 2.0)
-    bore_row_count = len(drawing.SIDE_CALLOUTS["CollarBore"].splitlines())
-    od_shoulder, bore_shoulder = od_y - 5.6, bore_y - 5.6 * bore_row_count
+    # r3b's 25-character rows printed 62.0 mm ("REAM OR BORE: 0.002-0.014")
+    # and 67.0 mm ("DIAMETRAL INTERFERENCE ON"): 2.48..2.68 mm a character.
+    bore_rows_by_pitch = []
+    widest = max(len(row) for row in drawing.SIDE_CALLOUTS["CollarBore"].splitlines())
+    for pitch in (2.48, 2.68):
+        bore_rows_by_pitch.append((bore_x - widest * pitch / 2.0, bore_x + widest * pitch / 2.0))
+    assert len(drawing.SIDE_CALLOUTS["CollarBore"].splitlines()) == 3
+    bore_top, bore_shoulder = bore_y + 10.15, bore_y - 11.15
+    od_shoulder = od_y - 5.6
     od_elbow = (od_rows[1] + 1.6, od_shoulder)
-    bore_elbow = (bore_rows[0] - 1.6, bore_shoulder)
     # Above the collar by a text height and more, the OD left, the bore right,
     # a text height apart and both over the origin's witnesses.
     assert min(od_shoulder, bore_shoulder) > collar_top + text
-    assert od_rows[1] + text < bore_rows[0]
-    assert od_elbow[0] < SIDE_OX < bore_elbow[0]
-    assert od_elbow[1] > SIDE_OY and bore_elbow[1] > SIDE_OY
-    # Steep leaders: more drop than run from each elbow to the centre, so
-    # each lands on the upper half of its rim, over the axis witnesses.
     import math
-    for elbow, radius in ((od_elbow, part.COLLAR_OD / 2.0), (bore_elbow, part.COLLAR_BORE_DIA / 2.0)):
-        dx, dy = SIDE_OX - elbow[0], SIDE_OY - elbow[1]
-        assert abs(dx) < -dy
-        reach = math.hypot(dx, dy)
-        landing_y = elbow[1] + dy * (reach - radius) / reach
-        assert landing_y > SIDE_OY + 1.0
+    for bore_rows in bore_rows_by_pitch:
+        bore_elbow = (bore_rows[0] - 1.6, bore_shoulder)
+        assert od_rows[1] + text < bore_rows[0]
+        assert od_elbow[0] < SIDE_OX < bore_elbow[0]
+        assert od_elbow[1] > SIDE_OY and bore_elbow[1] > SIDE_OY
+        # Steep leaders: more drop than run from each elbow to the centre,
+        # so each lands on the upper half of its rim, over the axis witnesses.
+        for elbow, radius in (
+            (od_elbow, part.COLLAR_OD / 2.0),
+            (bore_elbow, part.COLLAR_BORE_DIA / 2.0),
+        ):
+            dx, dy = SIDE_OX - elbow[0], SIDE_OY - elbow[1]
+            assert abs(dx) < -dy
+            reach = math.hypot(dx, dy)
+            landing_y = elbow[1] + dy * (reach - radius) / reach
+            assert landing_y > SIDE_OY + 1.0
+        # The bore's rows stay a text height left of the isometric.
+        assert bore_rows[1] + text < ISO_LEFT
     # The OD rows stay right of the front view's collar-length rows (to
-    # x 175.8 mm, retry09), the bore's rows clear of the sheet's right edge
-    # and its untoleranced value row under the sheet's top margin.
+    # x 175.8 mm, retry09), and the bore block's top 1.5 mm and more under
+    # the drawable top (266.7 mm).
     assert od_rows[0] > 175.8 + text
-    assert bore_rows[1] < 431.8 - 10.0
-    assert bore_y + text < 266.7 - 2.0  # drawable top
+    assert bore_top <= 266.7 - 1.5
     # The style and its proof: both imported diameters take the near-side
     # style before the section import, and after the rebuild their ink is
     # read back against both axis witnesses (one group per witness: the two
@@ -1042,8 +1076,9 @@ def test_collar_length_reads_banded_on_its_own_feature_and_names_its_stack() -> 
     outer face, so the band bounds the press contact the force budget uses).
     retry09 printed "ALONG BORE AXIS" (15 characters) 41.5 mm wide over a
     three-row block (y 215.7..230.3 mm pre-A1, the line at the lowest row's
-    baseline); the stack row makes four, so the value rises one row pitch
-    and the lowest row stays where it was."""
+    baseline); the stack row makes four, so the value rose one row pitch.
+    Machinist review r2: r3b then printed the stack's "0.00" upper limit
+    against the drawable top, so the block sits 1.5 mm lower."""
     import mg_lever_press_fit_geom as press
 
     callout = drawing.DIMENSION_CALLOUTS["CollarLen"]
@@ -1057,12 +1092,14 @@ def test_collar_length_reads_banded_on_its_own_feature_and_names_its_stack() -> 
     rows = callout.splitlines()
     assert len(rows) == 3
     x, y = drawing.FRONT_KEEP["CollarLen"]
-    assert y == pytest.approx(0.248 + ROW_PITCH)
-    # retry09: the lowest row's baseline 8.3 mm under the requested y with
-    # three rows; each further row lowers it one pitch more.
-    lowest_baseline = y - 0.0083 - ROW_PITCH * (len(rows) + 1 - 3)
-    assert lowest_baseline > 0.2121 + SHIFT_UP + 0.0035
-    assert y + 0.0063 < 0.2667 - 0.0045  # value row's stack top under the drawable top
+    assert y == pytest.approx(0.248 + ROW_PITCH - 0.0015)
+    # r3b (requested y 253.56 mm): the "0.00" upper limit's box top at
+    # 266.42 mm and the lowest row's baseline, the dimension line, at 240.70
+    # mm -- both 12.86 mm from the requested y.
+    stack_top, lowest_baseline = y + 0.01286, y - 0.01286
+    collar_top = 0.2121 + SHIFT_UP
+    assert lowest_baseline - collar_top >= 0.003  # the line clears the collar
+    assert stack_top <= 0.2667 - 0.0015  # under the drawable top
     half = 0.0415 / 15 * max(len(row) for row in rows) / 2.0
     assert x > 0.139 + SHIFT_X
     assert x + half < drawing.SIDE_KEEP["CollarOd"][0] - 0.01365 - 0.0035
@@ -1118,17 +1155,62 @@ def test_arm_width_hangs_below_the_arm_end_between_the_aligned_views() -> None:
 def test_flange_depth_block_clears_the_flange_width_block() -> None:
     """retry09: the flange depth's value row (top y 209.5 mm) sat 1.9 mm under
     the flange width's callout row (bottom y 211.4 mm), and the audit reads two
-    blocks within a text height (3.57 mm) as one dimension."""
+    blocks within a text height (3.57 mm) as one dimension.  Machinist review
+    r2: the .XXX depth named no function -- three rows now name the
+    MHA-VN-050 screws' grip it holds.  r3b measured an untoleranced block's
+    value row (rows - 2) half pitches over the requested y (2 rows +0, 3
+    rows +2.78 mm, 4 rows +5.56 mm) and the depth's rows centred with their
+    near end on its column (x 53 mm)."""
+    rows = drawing.DIMENSION_CALLOUTS["FlangeDepth"].splitlines()
+    assert rows == ["FLANGE DEPTH", "MHA-VN-050", "SCREW GRIP"]
     depth_x, depth_y = drawing.FRONT_KEEP["FlangeDepth"]
     width_x, width_y = drawing.FRONT_KEEP["FlangeWidth"]
-    depth_top = depth_y + ROW_BOX[1]
+    value_y = depth_y + (1 + len(rows) - 2) * ROW_PITCH / 2.0
+    assert value_y == pytest.approx(0.17879)  # r3b's value row, unmoved
+    depth_top = value_y + ROW_BOX[1]
     width_bottom = (width_y - ROW_PITCH) + ROW_BOX[0]
     assert width_bottom - depth_top > TEXT_HEIGHT + 0.0001
-    # The depth's shoulder stays over the flange's top edge (y 154.2 mm) and
-    # its column left of the width's witness at x 91 mm, as before.
-    assert depth_y - ROW_PITCH > 0.154175 + SHIFT_DOWN + TEXT_HEIGHT
+    # The depth's shoulder (its lowest row) stays over the flange's top edge
+    # (y 154.2 mm pre-A1) and its rows ("FLANGE DEPTH" 33.1 mm, the widest)
+    # left of the width's witness at x 91 mm, over the drawable left border
+    # and a text height above the arm root's block (its "R1.0 max." top
+    # ~157.3 mm, which reaches left to x 59.6 mm).
+    shoulder = value_y - len(rows) * ROW_PITCH
+    assert shoulder > 0.154175 + SHIFT_DOWN + TEXT_HEIGHT
     assert depth_x < 0.091 + SHIFT_X
+    assert depth_x - 0.0331 > 0.0127
+    root_x, root_y = drawing.FRONT_KEEP["ArmRootR"]
+    assert depth_x + TEXT_HEIGHT < root_x - 0.0124 or shoulder > root_y + 0.0073 + TEXT_HEIGHT
     assert width_x < drawing.FRONT_KEEP["CollarLen"][0]
+
+
+def test_flange_depth_names_the_screw_grip_its_third_place_holds() -> None:
+    """Machinist review r2 (over-specification): 3.175 FLANGE DEPTH printed
+    .XXX with no stated function.  The flange is the MHA-VN-050 screws'
+    grip; its title-block .XXX band (±0.13) keeps the worst-case thread
+    engagement at 1.5D and the screw tips off the tap's bottom, which the
+    .XX band (±0.51) would not.  The callout names that function from the
+    screw's own part config."""
+    import _config
+    import magnifying_bracket_joint_layout as joint
+
+    screw = _config.parts("vn-magnifying-bracket-screw")["number"]
+    assert screw == mg_magnifying_bracket_spec.SCREW_NUMBER == "MHA-VN-050"
+    callout = drawing.DIMENSION_CALLOUTS["FlangeDepth"]
+    assert callout is mg_magnifying_bracket_spec.FLANGE_DEPTH_CALLOUT
+    assert callout == f"FLANGE DEPTH\n{screw}\nSCREW GRIP"
+    assert part.DRAWING_PRECISION["FlangeProfile"]["FlangeDepth"] == 3
+    assert joint.GRIP_BAND == joint.FLANGE_THICKNESS_BAND == 0.13
+    # At .XXX: engagement 3.305 >= 1.5D 3.2766, tip gap 0.0075 > 0.
+    assert joint.ENGAGEMENT_MIN == pytest.approx(3.305, abs=5e-4)
+    assert joint.ENGAGEMENT_MIN >= 1.5 * joint.SCREW_MAJOR_DIA
+    assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0075, abs=5e-5)
+    assert joint.SCREW_TIP_GAP_MIN > 0.0
+    # At .XX the grip swings 0.38 further each way: engagement 2.925 < 1.5D
+    # on a thick flange, the tips 0.3725 into the tap's bottom on a thin one.
+    loss = joint.LINEAR_BAND - joint.GRIP_BAND
+    assert joint.ENGAGEMENT_MIN - loss < 1.5 * joint.SCREW_MAJOR_DIA
+    assert joint.SCREW_TIP_GAP_MIN - loss < 0.0
 
 
 def test_mounting_coordinates_hang_clear_on_the_bottom_view() -> None:
