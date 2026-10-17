@@ -381,7 +381,7 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) ->
     assert prefixes[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
     assert prefixes[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X "
     assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "4X "
-    callout = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromLeft"]
+    callout = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"]
     assert " ".join(callout.split()) == (
         "KNIFE EDGE SYMMETRIC TO SIDES, BOTH STUBS; SIDES IN ONE PLANE"
     )
@@ -555,7 +555,7 @@ def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -
     assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == 2.0 * spec.RIDGE_FROM_SIDE_TOL
     assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(spec.HEX_Z_INNER + spec.HEX_Z_OUTER)
     assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.077, abs=5e-4)
-    callout = " ".join(notes.DIMENSION_CALLOUTS_BELOW["RidgeFromLeft"].split())
+    callout = " ".join(notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"].split())
     assert "BOTH STUBS" in callout and "SIDES IN ONE PLANE" in callout
     assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
     assert lever_build.KNIFE_SIDE_PLANE_TOL == 1e-6
@@ -565,58 +565,122 @@ def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -
     assert not hasattr(lever_build, "_hex_collar")
 
 
-def test_the_ridge_callout_stays_left_of_detail_d() -> None:
-    """The callout hangs six lines under the 2X 4.040 ±0.05 at the left of
-    Detail D, whose fence bulges left beside its lower lines.  Measured on
-    the stack-final sheet (3.5 mm text): 2.5 mm a character, 5.5 mm a line."""
-    lines = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromLeft"].split("\n")
-    assert max(map(len, lines)) <= notes.RIDGE_CALLOUT_MAX_CHARS
-    assert max(map(len, lines)) < len("2X 4.040 ±0.05")
-    scale = drawing.DETAIL_SCALE[0] / 1000.0
-    cx, cy = drawing.DETAIL_CENTER
-    radius = drawing.DETAIL_RADIUS_MM * scale
-    text_x, text_y = drawing.DETAIL_KEEP["RidgeFromLeft"]
-    for index, line in enumerate(lines, start=1):
-        line_y = text_y - 0.0055 * index
-        right = text_x + 0.0025 * len(line) / 2.0
-        dy = min(abs(line_y - cy), radius)
-        fence_left = cx - math.sqrt(radius**2 - dy**2)
-        assert right < fence_left - 0.002, line
+# Detail D's text blocks as SolidWorks prints them (3.5 mm text, measured on
+# the stack r4 sheet): 2.5 mm a character, 5.5 mm a line, the whole block
+# (value and callout lines) centred on its keep, and a linear dimension's line
+# under the block's bottom line, 2.8 mm under the keep for one line.
+_CHAR_M = 0.0025
+_LINE_M = 0.0055
+_ONE_LINE_DROP_M = 0.0028
+_BORDER_TOP_M = 0.2794 - 0.0127
+_BORDER_LEFT_M = 0.0127
+# The boss diameter's four lines under Detail D (top, stack r4 sheet).
+_BOSS_CALLOUT_TOP_M = 0.1784
+
+
+def _detail_block(name: str, value: str) -> tuple[float, float, float, float, int]:
+    """(left, right, bottom, top, lines) of a Detail D dimension's text."""
+    lines = [value, *notes.DIMENSION_CALLOUTS_BELOW.get(name, "").split("\n")]
+    lines = [line for line in lines if line]
+    x, y = drawing.DETAIL_KEEP[name]
+    half_w = _CHAR_M * max(map(len, lines)) / 2.0
+    half_h = _LINE_M * len(lines) / 2.0
+    return x - half_w, x + half_w, y - half_h, y + half_h, len(lines)
+
+
+def _dimension_line_y(name: str, lines: int) -> float:
+    return drawing.DETAIL_KEEP[name][1] - _ONE_LINE_DROP_M - _LINE_M * (lines - 1) / 2.0
 
 
 def test_the_knife_detail_text_stands_clear_of_the_hexagon() -> None:
-    """Detail D (4:1): the ridge pair's line over the fence, each text
-    outside its own span; the flank angle's text in the wedge opposite the
-    +X shoulder's corner, so it reads 122.4, not its 57.6 supplement.
+    """Detail D (4:1): the ridge pair's one line over the fence, E's fence
+    and the flank angle's arc, each text outside its own span and every block
+    under the border; the flank angle's text outside the fence, in the wedge
+    opposite the +X shoulder's corner, so it reads 122.4, not its 57.6
+    supplement; the vertex height between the border and the fence.  Stack
+    r4 printed the -X callout 9.7 mm over the border, the pair's -X line on
+    E's fence, and the angle's text and extension through the vertex height.
     Detail E (10:1): the R MAX right of the fence and of datum A's box."""
+    spec = sm_summing_lever_spec
     scale = drawing.DETAIL_SCALE[0] / 1000.0
     cx, cy = drawing.DETAIL_CENTER
-    hw = sm_summing_lever_spec.HEX_W / 2.0 * scale
-    vertex = (cx, cy + sm_summing_lever_spec.HEX_H / 2.0 * scale)
-    shoulder = (cx + hw, cy + sm_summing_lever_spec.HEX_H / 4.0 * scale)
-    fence_top = cy + drawing.DETAIL_RADIUS_MM * scale
-    left_x, left_y = drawing.DETAIL_KEEP["RidgeFromLeft"]
-    right_x, right_y = drawing.DETAIL_KEEP["RidgeFromRight"]
-    assert left_y == right_y > fence_top + 0.004
-    assert left_y < 0.2667 - 0.004  # under the border
-    assert left_x < cx - hw - 0.015 and right_x > cx + hw + 0.015
+    fence = drawing.DETAIL_RADIUS_MM * scale
+    hw = spec.HEX_W / 2.0 * scale
+    vertex = (cx, cy + spec.HEX_H / 2.0 * scale)
+    shoulder = (cx + hw, cy + spec.HEX_H / 4.0 * scale)
+    # The fence holds the hexagon.
+    assert spec.HEX_H / 2.0 < drawing.DETAIL_RADIUS_MM - 0.5
+    blocks = {
+        "HexWidth": _detail_block("HexWidth", "2X (8.080)"),
+        "HexHeight": _detail_block("HexHeight", "2X 10.268"),
+        "RidgeFromLeft": _detail_block("RidgeFromLeft", "2X 4.040 ±0.05"),
+        "RidgeFromRight": _detail_block("RidgeFromRight", "2X 4.040 ±0.05"),
+        "FlankToSide": _detail_block("FlankToSide", "4X 122.4° ±0.5°"),
+    }
+    for name, (left, _right, _bottom, top, _lines) in blocks.items():
+        assert top < _BORDER_TOP_M - 0.004, name
+        assert left > _BORDER_LEFT_M + 0.002, name
+    # View G's 19.05 (AnchorHeight) is the nearest text to the right.
+    g_left = drawing.FRONT_KEEP["AnchorHeight"][0] - _CHAR_M * len("19.05") / 2.0
+    for name in ("RidgeFromRight", "FlankToSide", "HexWidth"):
+        assert blocks[name][1] < g_left - 0.003, name
+
+    # The ridge pair: one line, each text outside its own span.
+    left_line = _dimension_line_y("RidgeFromLeft", blocks["RidgeFromLeft"][4])
+    right_line = _dimension_line_y("RidgeFromRight", blocks["RidgeFromRight"][4])
+    assert left_line == pytest.approx(right_line, abs=2e-4)
+    assert blocks["RidgeFromLeft"][1] < cx - hw - 0.002
+    assert blocks["RidgeFromRight"][0] > cx + hw + 0.002
+    e_fence = drawing.RIDGE_DETAIL_RADIUS_MM * scale
+    assert left_line > cy + fence + 0.004
+    assert left_line > vertex[1] + e_fence + 0.004  # arrowheads clear E's fence
+
+    # The flank angle: in the wedge, its text outside the fence, its arc
+    # (and the side face's extension to it) under the ridge pair's line.
     angle_x, angle_y = drawing.DETAIL_KEEP["FlankToSide"]
     direction = math.degrees(math.atan2(angle_y - shoulder[1], angle_x - shoulder[0]))
-    flank_down = -(90.0 - sm_summing_lever_spec.RIDGE_ANGLE_DEG / 2.0)
+    flank_down = -(90.0 - spec.RIDGE_ANGLE_DEG / 2.0)
     assert flank_down < direction < 90.0
-    assert math.hypot(angle_x - cx, angle_y - cy) > drawing.DETAIL_RADIUS_MM * scale
-    # E's letter sits between the -X pair's extension lines, under its line.
+    a_left, a_right, a_bottom, a_top, _ = blocks["FlankToSide"]
+    near_x = min(max(cx, a_left), a_right)
+    near_y = min(max(cy, a_bottom), a_top)
+    assert math.hypot(near_x - cx, near_y - cy) > fence + 0.001
+    assert a_left > shoulder[0] + 0.002
+    arc = math.hypot(angle_x - shoulder[0], angle_y - shoulder[1])
+    assert shoulder[1] + arc < left_line - 0.002
+
+    # The vertex height: left of the fence at the block's height, its line
+    # and text clear of the angle's wedge.
+    h_left, h_right, h_bottom, h_top, _ = blocks["HexHeight"]
+    dy = 0.0 if h_bottom < cy < h_top else min(abs(h_bottom - cy), abs(h_top - cy))
+    assert h_right < cx - math.sqrt(max(fence**2 - dy**2, 0.0)) - 0.0015
+    assert h_right < cx - hw
+
+    # The reference width: its line under the fence, over the boss callout.
+    width_line = _dimension_line_y("HexWidth", blocks["HexWidth"][4])
+    assert _BOSS_CALLOUT_TOP_M + 0.002 < width_line < cy - fence - 0.001
+    assert blocks["HexWidth"][0] > cx + hw + 0.002
+
+    # E's letter sits between the +X pair's extension lines, under its line.
     letter = (
         vertex[0] + drawing.RIDGE_DETAIL_LETTER_OFFSET[0],
         vertex[1] + drawing.RIDGE_DETAIL_LETTER_OFFSET[1],
     )
-    assert cx - hw + 0.002 < letter[0] < cx - 0.002
-    assert vertex[1] < letter[1] < left_y - 0.004
+    assert cx + 0.002 < letter[0] < cx + hw - 0.002
+    assert vertex[1] < letter[1] < right_line - 0.004
+    assert math.hypot(letter[0] - vertex[0], letter[1] - vertex[1]) > e_fence + 0.003
     e_radius = drawing.RIDGE_DETAIL_RADIUS_MM * drawing.RIDGE_DETAIL_SCALE[0] / 1000.0
     ex, ey = drawing.RIDGE_DETAIL_CENTER
     r_x, r_y = drawing.RIDGE_DETAIL_KEEP["KnifeRidgeRadius"]
     assert math.hypot(r_x - ex, r_y - ey) > e_radius + 0.010
     assert r_x > ex + 0.020  # right of datum A's box over the vertex
+
+
+def test_the_ridge_callout_is_two_wide_lines() -> None:
+    lines = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"].split("\n")
+    assert len(lines) == 2
+    assert max(map(len, lines)) <= notes.RIDGE_CALLOUT_MAX_CHARS
+    assert "RidgeFromLeft" not in notes.DIMENSION_CALLOUTS_BELOW
 
 
 def test_notes_are_short_stated_shortfalls() -> None:
