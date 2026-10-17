@@ -3966,21 +3966,6 @@ length_in = { value = 24.03, measured = { status = "measured", by = "placeholder
 # Basis: gauges.granite-surface-plate.width_in: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1298 (gauges.granite-surface-plate.width_in) authored surface_plate geometry baseline 18 in, offset +0.02 in = 18.02 in. The slightly larger plate outline is a conservative obstruction estimate from the original 18 x 24 in note, not a tighter flatness or calibration claim.
 width_in = { value = 18.02, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "tape measure" } }
 
-# Rocker profile template (illustrative example item made to order by an outside wire-EDM
-# and grinding shop, because this shop cannot hold an R800 blade edge; every size below is
-# an example value, plausible, not measured). A 380 x 110 x 12.7 mm ground steel base
-# plate with a pressed 6.500 h6 pivot pin, a 2.000 diamond pin (flats radial) at the
-# nominal rod-hole position X133.067 Y8.456 and a 14 mm x 3 mm deep relief under the hub,
-# so the finished part lies on its lower strap face. Two 2.0 mm ground blades are doweled
-# and screwed round it, each working edge 1.00 mm outside the nominal outline: top blade
-# R799.00 and bottom blade R817.00 about the arc centre 808.00 above the pivot pin. Gaps
-# are read with the kit's 0.02-1.00 mm feeler set at stations engraved on the blades;
-# arc-length limits are lines engraved radially through the centre (top blade X+-144.808
-# and +-145.309, bottom blade X+-132.668 and +-133.172 from the pivot pin, for arc lengths
-# 291.59/292.61 and 266.19/267.21). A loose land square (40 mm convex R800.00 stock
-# face ground with the top blade, 12 mm blade square to it at its end within 0.01 over
-# 10) beds on the part's own top edge to read each tip-land angle off the template.
-
 [gauges.roughness-comparator]
 kind = "roughness_comparator"
 note = "illustrative example item: machinist's surface roughness comparator plate (ground, milled, turned, Ra 0.1-12.5 µm)"
@@ -4636,170 +4621,6 @@ oal_mm = { value = 61.82, measured = { status = "measured", by = "placeholder (r
 # Basis: tools.endmills-lms-6784.members."1-4in-4fl".projection_mm."r8-collets-lms-4860/3-8in": no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1632 (tools.endmills-lms-6784.members."1-4in-4fl".projection_mm."r8-collets-lms-4860/3-8in"); retained LittleMachineShop SKU 6784 identity (not an independent dimensional citation) authored endmill_set geometry baseline 25 mm, offset +0 mm = 25 mm. No extra reachable/cutting length is credited over the source setup.
 "r8-collets-lms-4860/3-8in" = { value = 25, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers or steel rule, installed holder exit face to cutting tip" } }
 
-# Riser bars, 63.5 mm across: they sit inside the rocker's 65 mm jaw opening (0.75 mm
-# each side) under both parallels' full footprints; a 1-2-3 block's 50.8 mm edge cannot
-# carry both parallels and its 76.2 mm edge cannot fit the opening. AUTHOR'S CHOICE: cut
-# as a pair from one bought 1 x 2-1/2 in precision-ground O1 flat-stock bar (annealed,
-# ground both broad faces), because the shop has no surface grinder and two pieces of one
-# ground bar match in height; the shop only saws them 3 in long and mills the ends square.
-
-# Shared S3/S4 profile fixture (illustrative example shop-made item). Frame: rocker
-# frame A of the CAD part (pivot axis at the origin, upper hub face Z0, rod end +X, hub
-# at the 7.0565 band minimum). Both plans pose it at setup Z -0.0235: the 7.080-aim
-# part's upper hub face (the setup Z0) stands 0.0235 higher above the same pads, so
-# as posed the pad tops are at Z-4.80175 and the hub shim top at Z-7.080. Plate X-180..180, Y-70..75, Z-40.4..-15 under the whole 340 x 65
-# blank (raw Z-11.52825..4.47175): bought 1 in Blanchard-ground steel plate. 25.4 thick
-# so that, with the S4 1/4 in finisher at 25 mm projection (Z-6.02825 deepest), the R8
-# spindle nose stays 4.4 mm above the PM-30MV's 2.4 in spindle-to-table minimum
-# (the setup Z0 is 40.4235 above the table). Twelve strap pads (tops Z-4.77825 on the lower
-# strap face, ~6 mm inside the finished outline, so outside the end mills' swept
-# bands), a bored hub stand (OD 9.4 with an 8.0 relief bore, top Z-7.1065) and a
-# per-part hub shim stack on it (0.05 nominal, top Z-7.0565 on the lower hub face; the
-# relief clears the S3 reamer exit and the S4 shoulder, which locates only in the
-# reamed hub and the plate's 6.500 bore). Pad tops stand 2.328 above the stand top
-# (±0.02, measured and recorded): 0.05 more than the 2.278 hub-proud step S1 and S2 cut
-# from each hub face, so the shim stack, built with feeler gauges after the strap
-# seats on the pads, takes up each part's actual step and the stand's actual depth.
-# Z figures here are in the fixture frame; each setup touches Z on the part, never on
-# the plate. AUTHOR'S CHOICE (Pedro ruling 5): the pads and the stand are
-# unhardened and bonded against a common granite reference with EA 9462, because the
-# shop has no surface grinder and fly-cutting cannot hold the pads coplanar to 0.005.
-# Each pad is about 0.07 and the stand about 0.09 short of its slot or counterbore floor, so its
-# top, not the floor, sets the height; the slots are 0.10 wider and longer than their
-# pads (0.05 bond gap a side). Four rail rests sit under the retained rails, the upper
-# pair at X+-30 and the lower pair at X+-130
-# (>16 mm outside the outline): a 3.0 mm rest (top Z-12) seated on its slot floor plus
-# a per-blank shim stack, nominal 0.49525 mm up to the raw rail underside (setup Z-11.52825, fixture Z-11.50475): seat B on the pads and
-# stand first, then build each stack with feeler gauges to the gap under that rail on
-# the actual blank, without lifting the part, so the rails never overconstrain the
-# strap seat. The plate has a stepped hole for the S4 shoulder screw: a 6.500 H7
-# locating bore (full size Z-20.3..-17, under the stand counterbore), a letter-D step to
-# Z-21.5 for the reamer lead, and a blind #10-24 tap under it (full thread Z-22.3..-29.5), a reamed 3.00
-# rod-pin hole for the bonded diamond-pin shank, blind 3/8-16 stud taps (13.2 deep) at
-# X+-70 Y45 (S3 hub straps), X+-30 Y45 and X+-130 Y-36 (S4 rail clamps) and four counterbored 3/8-16 socket-head hold-down screws to
-# table T-nuts (heads 0.475 below the plate top). Tapped holes are voids at the thread
-# major diameter plus a small clearance so a threaded engagement reads as mating, not
-# interference. The Y-60/+65 hold-down pitch (125 mm) is the example's assumed T-slot
-# pair: confirm on the PM-30MV table before making the plate. The diamond pin is a
-# separate item, permanently bonded in the plate's rod-pin hole and posed at the same
-# pose in both S3 and S4.
-
-# S3 hub strap (illustrative example rocker-only stepped strap clamp, one owner).
-# Frame: origin at the centre of the toe's underside on the upper strap face, +x
-# along the beam toward the heel, +z up. S3 poses two at frame-A origin [+-70, 3.27,
-# -2.27825] with x = [0, 1, 0]: toe Y0.27..6.27 over the strap pads, beam underside
-# Z6 (clears the raw rails at Z4.47175), 3/8-16 stud at Y45 in the plate tap, heel
-# Y60..70 on the plate. The beam's stud hole cuts only the beam, so the stud is
-# continuous. Toe load is ~32% of stud tension (stud 41.73 from toe, 20 from heel).
-
-# S4 rail clamp (illustrative example rocker-only flat strap, one owner). Frame:
-# origin at the centre of the toe end's contact on the rail top, +x outward along
-# the beam, +z up. S4 poses four: upper rail origin [+-30, 34.5, 4.47175] x = [0, 1,
-# 0] (contact Y32..37, stud Y45, heel Y55..65); lower rail origin [+-130, -25.5,
-# 4.47175] x = [0, -1, 0] (contact Y-28..-23, stud Y-36, heel Y-46..-56). Toes are
-# >17 mm outside the finished outline; studs clear the stock by >3.2 mm.
-# AUTHOR'S CHOICE: the clamps stand where the op 25 / op 27 1/4 in end mill's
-# Ø31.75 R8 collet nose (25 projection, so Z+18.975 at the Z-6.025 cut) passes
-# 3 mm or more beside every beam and nut, because the beam top (Z+17.15) and the
-# nut stand higher than 3 mm under the collet: the top arc is nearest the upper
-# rail away from X0 and the bottom arc nearest the lower rail near X0, so the
-# upper pair moved from X+-70 to X+-30 and the lower pair to X+-130. Each clamp
-# stays over its rail rest; the CLEARANCE table gives the distances.
-
-# S4 pivot shoulder screw with its bored washer (illustrative example rocker-only
-# fastener, one owner; the washer bore cuts only the washer). Frame: origin on the
-# pivot axis at the upper hub face, +z up; S4 poses it at frame-A origin [0, 0, 0],
-# x = [1, 0, 0], z = [0, 0, 1]. The 6.49 lapped shoulder fits the 6.50-6.53 reamed
-# bore (datum A) and the plate's 6.500 H7 locating bore; the shoulder ends 0.3 mm above
-# the end of that bore's full size, so the head clamps washer -> hub -> hub stand. Pedro ruling 2: the
-# screw is unhardened 4140, its 8 mm head and 6.49 shoulder turned and ring-lapped in
-# one chucking; head-to-shoulder TIR spec 0.01 (the S4 pickup limit), goal 0.003,
-# measured and recorded; slot drive (1.0 x 1.5). Main ruling (HA#1239): the washer is a
-# clamp washer only, as-supplied O1 drill rod with a drilled 6.6 bore.
-
-# S3/S4 rod-hole diamond pin (illustrative example rocker-only item, one owner): an
-# in-process orientation locator, not datum C. Datum C is the finished rod-side tip
-# land, cut in S4 op 40 and inspected off-machine in S4 op 50. Frame: origin on the
-# rod-hole axis at the lower strap face (the pad-top plane), +x radial from the pivot
-# to the rod hole, +z DOWN into the plate. S3 and S4 pose (same, permanently bonded
-# in the plate): origin [133.067402, 8.456064, -4.80175] (the pad-top plane: the lower
-# strap face at the 7.080 hub aim, as the profile fixture is posed), x = [0.997987, 0.063419, 0],
-# z = [0, 0, -1]. The working tip is drawn Ø2.0035, 0.0005 under the 2.004 reamed rod
-# hole the S2 reamer leaves, as its preloaded land contact; the bought pin itself is 1.9863-1.9873. Pedro ruling 3: a bought Class X gauge pin (1.9863-1.9873) is the
-# working tip, bonded with Loctite 638 into a turned, unhardened 4140 body whose
-# 2.990-2.998 shank is a bonded slip fit in the plate's reamed 3.00 hole and whose
-# Ø4.5 collar seats on the plate top (Z-15..-9.1). Flats 1.76 across along the radial
-# line: the full round lands orient the part about datum A in the reamed 2.000-2.010
-# rod hole (0.0127-0.0237 diametral clearance); the flats tolerate the rod hole's
-# radial position. Tip ends at Z-2.4, below the upper strap face. AUTHOR'S CHOICE: no
-# neck; the bare Ø1.987 pin stands from the collar top to the tip, because the S4 op
-# 25/27 end mill runs down to Z-6.02825 beside the rod hole: the old Ø3.0 neck stood
-# 0.5 nearer that cut than the pin does, and the collar top stays 3.07 below the
-# cutter tip. The pin carries no Z: the strap pads do. It is the positive tangential
-# stop for the S4 closing profile pass (op 27) only, after the retained web is cut
-# (the web reacts the earlier passes); in S3 the straps react the loads. Before
-# tightening, the part is preloaded CCW (viewed from above, looking down -Z) against
-# it. It is never a clamp or lift.
-
-# S2 adjustable support jacks (illustrative example matched pair; passive supports,
-# not clamps). Frame: origin on the jack axis at the head's bearing face under the
-# strap, +z DOWN toward the riser bar (a passive support reacting upward, so its
-# bearing face lies along -pose.z). S2 poses two at frame-B origin [+-40, -1,
-# -4.80175] (the S1-finished strap face at the 7.080 hub aim), z = [0, 0, -1],
-# x = [1, 0, 0]: at the nominal 19.45 mm working extension the base sits on the
-# riser-bar seat at Z-24.25175; the screw adjusts to the actual strap face. Run each
-# 1/4-20 screw up to touch the S1-finished strap face without lifting the part, then
-# jam the lock nut on the body. Everything wider than the 10 mm head stays below local
-# z 7.25 (world Z -12.05175), under the raw blank bottom at -11.55175. About 4 mm of exposed thread
-# between head and lock nut gives roughly +-2 mm of adjustment about nominal.
-
-# S1/S2 blank-end position stop (illustrative example rocker-only assembly, one
-# owner): a switchable rare-earth magnetic base on the fixed (rear) jaw's external
-# left end face carries a rigid steel arm. The arm runs left, behind the rear jaw's
-# inner plane, to a finger outside the blank's left end. The finger's hardened nose
-# gently touches the raw left end face (the full-height ear) at X-170. It only
-# positions the blank along X before the jaws close: no cutting or clamping load.
-# The Pedro vise is unmodified. Frame: origin at the fixed jaw's left end, on its
-# inner (gripping) plane at the jaw top, x = setup +X, y = toward the back of the
-# vise, z = up. Base placement: its magnetic face (local x = 0) flat on the jaw's left
-# end face, body local x -30..0, y 0.5..17.5 (front side 0.5 behind the gripping
-# plane), z -25..-1 (top 1.0 below the jaw top), on/off knob on its back side
-# (y 17.5). Screw axis: the one M6 SHCS runs along local x at y 9.0, z -6.0, through
-# the finger and the arm into the base's M6 back tap. AUTHOR'S CHOICE: every stop
-# dimension on the 0.1 make grid (arm 65.2, key slot 0.5, nose 4.0 proud), so the
-# nose face is at local x -90.7 and the nose axis at y -32.5 (blank centre), z -0.3.
-# The nose sets the blank end at X-170, so the jaw end sits at X-79.3: the jaws are
-# centred 0.0369 right of the blank centre (jaw_width 6.247 in = 158.6738 mm).
-# Poses (x = [1, 0, 0], z = [0, 0, 1]), z at the jaw top: S1 [-79.3, 37, -4.68295]
-# (nose at Y4.5); S2 [-79.3, 28, -4.70645] (nose at Y-4.5). The arm stays >= 3.5 mm behind the rear
-# jaw plane (outside the blank) and the finger and nose at X <= -170, so no steel
-# enters the cutter-clear region (X >= -160 inside the rails).
-
-# Hub coaxiality inspection: a precision 6.5 mm pin in the reamed bore rolled in
-# this vee under the dial indicator. Inspection accessory only, not a machine hold.
-
-# Custom calibrated GO 6.500 / NO-GO 6.530 plugs for the reamed pivot bore.
-# range_mm and resolution_mm are plain numbers in the schema (illustrative
-# example label: not measured, not a calibration certificate).
-
-# EngInspect (review round 3): three metric plugs for the rod-pin hole, each inside the
-# drawing band as the traveler prints it (2.00-2.09): GO 2.000 (drawing and process
-# hold), process NO-GO 2.010 (the shop's tighter band, so the 1.98 diamond pin's diametral
-# clearance stays 0.02-0.03) and drawing NO-GO 2.090. A GO / NO-GO check may only name
-# sizes listed in sizes_mm. range_mm, sizes_mm and resolution_mm are plain numbers in the
-# schema (illustrative example label: not measured, not a calibration certificate).
-# End EngInspect.
-
-# Rocker-only 1 µm test indicator for the 0.020 mm pilot -> ream centre control
-# (the shared 0.0005 in DTI is too coarse for that budget and stays as is).
-
-# Rocker-only digital height gauge on the granite plate for the rod hole's
-# Ø0.20 A|B|C position check (the shared 0.001 in height gauge stays as is). Its
-# 0.001 mm display is not its accuracy (example scale accuracy about
-# +-0.02-0.03 mm over the travel), so the check does not use its absolute scale:
-# it is the rigid carrier for the 1 µm test indicator, compared against wrung
-# gauges.rocker-position-blocks stacks at each pin height.
-
 # Letter D jobber drill (0.246 in) from the 115-pc index: the 6.5 reamer's pilot.
 [tools.drill-index-115.members."D"]
 # Basis: tools.drill-index-115.members."D".dia_mm: nominal declared 6.2484 mm, offset -0.0034 mm = 6.245 mm; typical HSS cutting-margin undersize under the authorized cutting-diameter manufacturing-tolerance exception. Source b757b5a76 cad/process/shop/inventory.toml:1800 (tools.drill-index-115.members."D".dia_mm); not a bore-fit or clearance pass claim.
@@ -4818,92 +4639,6 @@ oal_mm = { value = 101.52, measured = { status = "measured", by = "placeholder (
 [tools.drill-index-115.members."D".projection_mm]
 # Basis: tools.drill-index-115.members."D".projection_mm."drill-chuck-r8": no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1809 (tools.drill-index-115.members."D".projection_mm."drill-chuck-r8") authored drill_index geometry baseline 81 mm, offset +0 mm = 81 mm. No extra reachable/cutting length is credited over the source setup.
 "drill-chuck-r8" = { value = 81, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers or steel rule, installed holder exit face to cutting tip" } }
-
-# Rod-pin hole pilot: one HSS 1.85 mm stub drill (DIN 1897 proportions), rocker-only;
-# leaves 0.154 mm diametral (0.077 mm, .0030 in, radial) stock for the 2.004 reamer.
-
-
-
-# Rod-pin hole finish: one HSS 2.00 mm machine (chucking) reamer, DIN 212
-# proportions, sized for the process band 2.000-2.010; rocker-only.
-
-
-
-# Profile-plate slots: one 1.5 mm two-flute carbide stub end mill, 1/8 in shank (R8
-# collet 1/8 in), rocker-only example purchase. The narrowest pad slot is 1.5 wide;
-# the wider slots are stepped over with it on the DRO. The LMS 6784 set starts at 3/16.
-
-
-# Diamond-pin shank hole in the profile plate: one HSS 3.00 mm machine (chucking)
-# reamer, DIN 212 proportions, rocker-only example purchase; piloted with the #33
-# (2.87) drill from the 115-piece index, leaving 0.13 mm on diameter.
-# Job purchase (round 7, RK-B4): the profile plate's four hold-down counterbores.
-
-
-
-
-
-# Shim stock for the profile fixture's per-part hub shim stack and per-blank rail-rest
-# stacks (rocker-only example purchase).
-
-# Ø0.20 A|B|C rod-position inspection reference (illustrative example rocker-only
-# assembly, one owner; inspection accessory only, never a machining hold). Pedro
-# ruling 4: a bought Suburban BXP-050505-G box parallel (fixtures.box-parallel-
-# bxp-050505-g: 127 mm cube, square within 0.0083 per 100 as sold) with milled windows
-# and a lapped O1 C stop bar. AUTHOR'S CHOICE: characterise the box's actual
-# base-to-right squareness by reversal and correct the view-2 reading for it (S4 op 50),
-# because the catalogue squareness is short of the 0.003 per 100 the check needs.
-# Frame (box frame): origin at the outer corner where the left face, the front face and
-# the base meet; +x toward the right side, +y from the front face into the box (the
-# body is y >= 0), +z up. Reference faces: base z = 0, right side x = 127 (marked) and
-# front face y = 0 (datum B simulator). Walls 12.7 thick (example: confirm on
-# receipt). The C stop bar is screwed to the front face with its underside flush with
-# the base (both stand on the granite in view 1): top z = 12.70 (datum C simulator, by
-# the bar's own lapped height), projecting y = -12.7..0 so the whole 2.5 mm C land
-# thickness bears. Reading 1 (base down): part B face on y = 0, C land (outward normal
-# -z) on the bar top, pivot A at x = 0 and z ≈ 159.392 (hub clear above the box top),
-# rod hole near x = 15.843, z = 27.0, C land x = 5.43..11.02. Two light toolmaker's
-# clamps (fixtures.rocker-inspection-clamps) grip part strap + front wall (2.5 + 12.7 =
-# 15.2 mm) through the two left-side windows; they reach no further right than x = 18
-# and no lower than z = 42, never x > 127 or z < 0. Reading 2: tip the whole assembly
-# onto the marked right side x = 127 without unclamping (the bar keeps C contact). The
-# back window is access only. No base, right-side or front-face reference area is cut.
-# All primitives below are example values, not shop measurements.
-
-# Light toolmaker's parallel clamp for the inspection box (illustrative example
-# matched pair, rocker-only, one owner). Frame: origin on the outer jaw's gripping
-# face at the jaw tip, centred on the jaw section; +x from the screws toward the tip
-# (jaws lie at x <= 0), +y across the throat from the outer jaw's gripping face to
-# the inner jaw's, +z = x × y. The throat is drawn set to 15.2 mm (2.5 mm part strap
-# + 12.7 mm box front wall). The front screw threads into the inner jaw with its knob
-# outside the outer jaw; the rear screw threads through the inner jaw and bears on
-# the outer jaw. Box-frame poses (x = [1, 0, 0], z = [0, 0, 1]): lower clamp origin
-# [18.0, -2.5, 50.0], upper clamp origin [15.0, -2.5, 95.0]. The outer jaw bears on
-# the part's lower strap face (box y = -2.5), the inner jaw on the front wall's
-# inner face (box y = 12.7) inside the cavity, entering through the matching left
-# window; screws and knobs stay at box x < -3, jaws at x <= 18 and z 43.65..101.35.
-# Tighten finger-light only: the clamps hold B on the front face, never load C.
-
-# Close-fit metric gauge pins for the Ø0.20 A|B|C position check: the largest pin
-# whose actual (calibrated) diameter passes freely is chosen per part for the rod
-# hole (2.000..2.010) and for datum bore A (6.500..6.530). Illustrative example item
-# with example calibration labels, not a real certificate; the per-pin expanded
-# uncertainty has no schema field and is stated in the note. range_mm is the overall
-# envelope; coverage is only the two 0.001 mm bands listed in sizes_mm (42 pins).
-
-# Metric gauge-block set (illustrative example item, rocker-only) for the Ø0.20
-# A|B|C comparison readings: at each pin height a calibrated stack is wrung on the
-# granite beside the pin, the 1 µm test indicator (gauges.rocker-datum-indicator,
-# carried on gauges.rocker-position-height-gauge) is zeroed on the stack and the
-# pin-top deviation from it is read, so no long absolute height-gauge scale enters
-# the result: centre = actual stack height + indicator deviation - actual pin
-# radius, the same way in both box orientations. Example stacks (chosen per part,
-# not fixed measurements): reading 1 about 162.5 (100 + 50 + 12.5) at the A pin and
-# 28 (25 + 3) at the rod pin; reading 2 about 123 (100 + 23) and 105 (100 + 5).
-# Standard 103-piece metric composition: 1.005; 1.01-1.49 by 0.01; 0.5-24.5 by
-# 0.5; 25, 50, 75, 100. Grade and per-block calibration are example labels in the
-# note, not a certificate; range_mm/sizes_mm/resolution_mm/pieces are plain
-# numbers in the schema.
 
 # --- pivot-bracket additions ---
 [gauges.radius-gauge]
@@ -5026,12 +4761,9 @@ solids = [
   { name = "slot-plus-undercut", void = true, cuts = ["table"], shape = "box", at_mm = [-420.1, 51.0, -24.0], size_mm = [840.2, 25.0, 10.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centre spacing with calipers and depth gauge" } },
 ]
 
-# The template make-route kit (local://rocker-template-route.md: MDF scribing board, O1
-# template blank) is retired: the template is bought wire-EDM cut, vendor material
-# (gauges.rocker-profile-gauge). The hardening kit and bench tools below were approved by
-# Pedro 2026-10-11 for that route; none is used by an op in the plan, so no rule reads
-# them. Prices read 2026-10-11; "search listing" prices are not confirmed on the vendor
-# page.
+# Hardening kit and bench tools (approved by Pedro 2026-10-11). No op in the plan uses
+# them, so no rule reads them. Prices read 2026-10-11; "search listing" prices are not
+# confirmed on the vendor page.
 
 # Hardening (Pedro 2026-10-11: approved). Torch-harden O1 (about 1475 F, non-magnetic plus
 # a soak) and quench in warm canola oil. Canola basis: Larrin Thomas, Knife Steel Nerds,
@@ -5045,7 +4777,7 @@ name = "Bernzomatic Max Heat torch kit with MAP-Pro cylinder"
 kind = "torch"
 purchase = "Bernzomatic Max Heat torch kit with MAP-Pro cylinder (purchase approved by Pedro 2026-10-11)"
 source = "L&M Supply, $64.99 (https://www.landmsupply.com/bernzomatic-max-heat-torch-kit-w-map-pro-cylinder), read 2026-10-11"
-note = "Hardens the O1 template; temper in the kitchen oven."
+note = "Torch hardening of small O1 parts; temper in the kitchen oven."
 
 [consumables.quench-oil-canola]
 name = "canola oil (O1 quench), about 1 qt in a steel can with a lid"
@@ -5073,14 +4805,14 @@ name = "Grizzly G5114 64-1/2 x 1/2 x 0.025 in 14/18 TPI bi-metal blade"
 kind = "bandsaw_blade_spare"
 purchase = "Grizzly G5114 SuperCut 64-1/2 x 1/2 x .025 in 14/18 TPI variable-pitch bi-metal blade (purchase approved by Pedro 2026-10-11)"
 source = "Grizzly, $31.95 (https://www.grizzly.com/products/supercut-64-1-2-x-1-2-x-.025-x-14-18-tpi-vp-bi-metal-bandsaw-blade/g5114)"
-note = "For the 1/8 in template plate and thin stock; not yet a plan blade (no kerf recorded)."
+note = "Spare blade for 1/8 in plate and thin stock; not yet a plan blade (no kerf recorded)."
 
 [tools.hacksaw-starrett-k145]
 name = "Starrett K145 hacksaw frame with 12 in bi-metal blades (24 and 32 TPI)"
 kind = "hacksaw"
 purchase = "Starrett K145 frame; 5 x Starrett 12 in 24 TPI bi-metal blades; Starrett KBS1232-10 12 in 32 TPI bi-metal 10-pack (purchase approved by Pedro 2026-10-11)"
 source = "frame: DGI Supply STR67818, $57.89 (https://www.dgisupply.com/product/STR67818); 24 TPI: LittleMachineShop 1851, $1.95 each (https://littlemachineshop.com/products/hacksaw-blades-12-bi-metal-individual-sizes-starrett); 32 TPI: GreatGages KBS1232-10, $24.00 per 10 (https://www.greatgages.com/products/kbs1232-10-starrett-hack-saw-blade-12-32tpi-10-pack)"
-note = "Parts the S5 taper/land tabs (7.9 thick: 24 TPI) and the 1/8 template plate (32 TPI)."
+note = "Hand parting: 24 TPI for stock up to about 8 thick, 32 TPI for 1/8 in plate."
 
 [tools.file-nicholson-10-second-cut]
 name = "Nicholson 10 in mill second-cut file (08673)"
