@@ -375,10 +375,18 @@ def test_named_views_are_the_machine_frame() -> None:
 
 def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
     steps = {line.split(". ", 1)[0]: line for line in spec.ASSEMBLY_STEPS}
-    assert (
-        "PRESS A PIVOT PIN DOWN FROM THE BLOCK'S TOP FACE, BEARING END FIRST, "
-        "THROUGH BOTH INNER RACES UNTIL ITS COLLAR SEATS ON THE UPPER RACE."
-    ) in steps["4"]
+    # Review bought-r15: each press loads only the ring it fits, the pin
+    # still entering from the top face, collar up.
+    step4 = steps["4"]
+    for text in (
+        "PIVOT PIN (ITEM 4), BEARING END FIRST, UNTIL ITS INNER RACE SEATS ON THE "
+        "COLLAR, PUSHING ON THE INNER RACE ONLY.",
+        "PRESS THE PIN DOWN FROM THE BLOCK'S TOP FACE, PUSHING ON THE OUTER RACE ONLY",
+        "WITH A FLAT DRIVER ON BOTH RACES",
+    ):
+        assert text in step4
+    # The DRO reads the table: the alignment step zeroes it on the spindle.
+    assert "ZERO THE DRO X AND Y ON THE SPINDLE ORIGIN (SHEET 1)" in steps["6"]
     assert "A1 AND B1 (INNER PASS, TAGGED ON SHEET 1)" in steps["9"]
     step10 = steps["10"]
     assert "TRAVELER" not in " ".join(spec.ASSEMBLY_STEPS)
