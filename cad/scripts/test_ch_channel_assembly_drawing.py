@@ -310,7 +310,8 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     assert drawing.exploded_offset(asm.BRACKET, north) == (0.0, 570.0, 90.0)
     assert drawing.exploded_offset(asm.BRACKET_SET_SCREW, north) == (0.0, 595.0, 90.0)
     assert drawing.exploded_offset(asm.WASHER, north) == (0.0, 570.0, 50.0)
-    assert drawing.exploded_offset(asm.KEEPER_FOOT_SCREW, north) == (0.0, 25.0, 50.0)
+    assert drawing.exploded_offset(asm.KEEPER_FOOT_SCREW, north) == (0.0, 50.0, 50.0)
+    assert drawing.exploded_offset(asm.BRACKET_HOLD_DOWN, north) == (0.0, 630.0, 90.0)
     assert drawing.exploded_offset(asm.BRACKET, "south") == (0.0, 0.0, -60.0)
     bracket, keeper = drawing.NORTH_BRACKET_DETAIL, drawing.NORTH_KEEPER_DETAIL
     assert drawing.EXPLODED_DETAILS == (bracket, keeper)
@@ -365,6 +366,69 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
         assert lx + max(map(len, lines)) * NOTE_CHAR_WIDTH < right
         previous_bottom = ly - len(lines) * NOTE_LINE_PITCH
     assert previous_bottom > template.title_block_top_m
+
+
+def test_the_lifted_foot_screws_clear_their_uprights_in_the_isometric() -> None:
+    """r2 machinist review (sheet 2, DETAILS B/C): lifted 25, each keeper
+    foot screw and bracket hold-down hung in front of its upright (it sits
+    outboard of it, nearer the eye) and read as resting against it.  Lifted
+    straight up its foot hole's axis, each tip now projects over the
+    upright's top silhouette in the isometric (eye on +x +y +z) by 2 mm, on
+    both sides, and each north head stays inside its detail's crop."""
+    import ch_fulcrum_keeper_spec as keeper
+    import ch_pivot_bracket_sides as sides
+    import ch_pivot_bracket_spec as bracket
+    import vn_bracket_hold_down_screw_spec as hold_down
+    import vn_frame_side_screw_spec as foot_screw
+
+    asm = drawing.asm
+    root2, root5, root6 = 2.0**0.5, 5.0**0.5, 6.0**0.5
+    # 2y - x - z (the isometric's v times root 6) over a round top: the
+    # half-round of radius r about height h peaks at 2h + r * root 5, and the
+    # upright's inboard face (-z_rel = half its thickness) stands highest.
+    lug_top = 2.0 * keeper.SHAFT_AXIS_H + keeper.CROWN_R * root5 + keeper.LUG_HALF_T
+    arch_h = bracket.EAR_TOP_Y - bracket.EAR_ARCH_R
+    ear_top = 2.0 * arch_h + bracket.EAR_ARCH_R * root5 + bracket.EAR_T / 2.0
+    keeper_out = keeper.KEEPER_SCREW_Z_OFF - keeper.KEEPER_Z_OFF
+    keeper_seat = keeper.FOOT_H - keeper.CBORE_DEPTH_MM
+    keeper_case = (asm.KEEPER_FOOT_SCREW, asm.KEEPER, lug_top, keeper_out)
+    bracket_case = (asm.BRACKET_HOLD_DOWN, asm.BRACKET, ear_top, sides.HOLE_Z)
+    cases = (
+        (*keeper_case, keeper_seat, foot_screw),
+        (*bracket_case, bracket.FOOT_H, hold_down),
+    )
+    for stem, part, top, outboard, seat_y, screw in cases:
+        for side, sign in (("south", -1.0), ("north", 1.0)):
+            moved = drawing.exploded_offset(stem, side)
+            carried = drawing.exploded_offset(part, side)
+            # Straight up its foot hole's axis.
+            assert (moved[0], moved[2]) == (carried[0], carried[2])
+            tip_y = seat_y - screw.SHANK_LEN + moved[1] - carried[1]
+            tip = 2.0 * tip_y - sign * outboard - screw.SHANK_DIA / 2.0 * root2
+            assert (tip - top) / root6 > 2.0, (stem, side)
+
+    # The lifted north heads inside their details' crops.
+    pivot_x, pivot_y = drawing.ROCKER_PIVOT_XY
+    fulcrum_x, fulcrum_y = drawing.LEVER_FULCRUM_XY
+    keeper_z = drawing.FULCRUM_KEEPER_CENTRE_Z + drawing.KEEPER_Z_OFF
+    hold_down_top = (
+        pivot_x,
+        pivot_y - bracket.BORE_H + bracket.FOOT_H + hold_down.HEAD_H,
+        bank.PIVOT_BRACKET_Z[1] + sides.HOLE_Z,
+    )
+    foot_screw_top = (
+        fulcrum_x,
+        fulcrum_y - keeper.SHAFT_AXIS_H + keeper.FOOT_H,
+        keeper_z + keeper_out,
+    )
+    bracket_head = (drawing.NORTH_BRACKET_DETAIL, hold_down_top, asm.BRACKET_HOLD_DOWN)
+    keeper_head = (drawing.NORTH_KEEPER_DETAIL, foot_screw_top, asm.KEEPER_FOOT_SCREW)
+    heads = ((*bracket_head, hold_down), (*keeper_head, foot_screw))
+    for detail, head_top, stem, screw in heads:
+        cu, cv = _iso(detail.centre_xyz)
+        u, v = _iso(drawing._exploded(head_top, stem, "north"))
+        reach = ((u - cu) ** 2 + (v - cv) ** 2) ** 0.5 + screw.HEAD_DIA / 2.0
+        assert reach < detail.crop_radius_mm - 3.0, stem
 
 
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:
