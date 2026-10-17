@@ -19,7 +19,9 @@ end), a 1:1 partial section C-C of the plate's thickness, a 4:1 section H-H
 cut in the front profile along the outer receiver tap through the -Z end
 rib, and a 1:4 isometric; sheet 2 shows VIEW F at 1:1, the -Z end with the
 two bracket receiver taps and the spring-anchor pad under the plate they sit
-in, so the end rib's slant over each tap reads.  Sheet 1 runs at 1:2.
+in, so the end rib's slant over each tap reads, and the tap row's centreline
+through the hex centre with the plate top's (2.54) REF from it.  Sheet 1
+runs at 1:2.
 
 Run with SolidWorks open::
 
@@ -51,7 +53,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
-from _drawing_dimensions import set_basic_dimension, set_dimension_callouts
+from _drawing_dimensions import (
+    set_basic_dimension,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
@@ -752,29 +758,45 @@ RIDGE_AXIS_OVERRUN_MM = 2.0
 def _ridge_centerline(adapter: Any, top: Any) -> Any:
     """An owned centreline on the +Z knife ridge's theoretical sharp in the
     plan (draw_sm_knife_mount._add_section_axes's idiom): the round leaves
-    no edge on the ridge itself, and rule 16 dimensions to the sharp.
+    no edge on the ridge itself, and rule 16 dimensions to the sharp."""
+    return _owned_centerline(
+        adapter,
+        top,
+        tuple(
+            (0.0, HEX_H / 2.0, z)
+            for z in (PLATE_L / 2.0, PLATE_L / 2.0 + HEX_DEPTH + RIDGE_AXIS_OVERRUN_MM)
+        ),
+        label="ridge centreline",
+    )
+
+
+def _owned_centerline(
+    adapter: Any,
+    view: Any,
+    ends_mm: tuple[tuple[float, float, float], tuple[float, float, float]],
+    *,
+    label: str,
+) -> Any:
+    """A black centreline in ``view``'s sketch between two part-mm points.
 
     Its ends are model points projected to the sheet and taken into the
     view's sketch frame, placed direct to the database (an inferred end snaps
-    onto the round's tangent lines 0.03 sheet mm away) and read back.
+    onto nearby tangent lines 0.03 sheet mm away) and read back.
     Returns the ``ISketchSegment`` for a dimension to pick.
     """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, top)):
-        raise RuntimeError("failed to activate the plan for its ridge centreline")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate the view for its {label}")
     draw.ClearSelection2(True)
     ends = model_points_in_view(
         adapter,
-        top,
-        [
-            (0.0, HEX_H / 2000.0, z / 1000.0)
-            for z in (PLATE_L / 2.0, PLATE_L / 2.0 + HEX_DEPTH + RIDGE_AXIS_OVERRUN_MM)
-        ],
-        label="ridge centreline end",
-        names=("inboard", "outboard"),
+        view,
+        [_metres(point) for point in ends_mm],
+        label=f"{label} end",
+        names=("start", "end"),
     )
-    sketch = _early_bound(top.GetSketch(), "ISketch")
+    sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
@@ -792,7 +814,7 @@ def _ridge_centerline(adapter: Any, top: Any) -> Any:
     finally:
         manager.AddToDB = previous_add_to_db
     if segment is None:
-        raise RuntimeError("failed to create the ridge centreline")
+        raise RuntimeError(f"failed to create the {label}")
     line = _early_bound(segment, "ISketchLine")
     for expected, accessor in zip(points, ("GetStartPoint2", "GetEndPoint2")):
         placed = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
@@ -800,15 +822,15 @@ def _ridge_centerline(adapter: Any, top: Any) -> Any:
         drift = max(abs(a - b) for a, b in zip(actual, expected))
         if drift > 1e-9:
             raise RuntimeError(
-                f"ridge centreline {accessor[3:-6].lower()} point sits "
+                f"{label} {accessor[3:-6].lower()} point sits "
                 f"{drift * 1000.0:.4g} mm from where it was authored"
             )
     segment = _early_bound(segment, "ISketchSegment")
     segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
     if int(segment.Color) != 0:
-        raise RuntimeError("ridge centreline color did not persist")
+        raise RuntimeError(f"{label} color did not persist")
     draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="summing lever ridge centreline")
+    rebuild_drawing(adapter, label=f"summing lever {label}")
     return segment
 
 
@@ -1230,9 +1252,8 @@ def _log_thread_labels(adapter: Any) -> None:
     _telemetry.info(f"thread labels: {labels} in all")
 
 
-def _mounting_rims(back: Any) -> list[Any]:
+def _mounting_rims(edges: ViewEdges) -> list[Any]:
     """Back looks from -Z directly onto the blind taps' entry circles."""
-    edges = scan_view_edges(back, label="bracket receiver face")
     return [
         edges.circle_at(
             point, TAP_DRILL_DIA / 2.0, axis=(0.0, 0.0, 1.0),
@@ -1240,6 +1261,105 @@ def _mounting_rims(back: Any) -> list[Any]:
         )
         for index, point in enumerate(LEVER_HOLE_POINTS)
     ]
+
+
+# VIEW F ties the plate top face, the origin of the bracket row's 2.54 +-0.05,
+# to the trunnion axis (machinist gate 2026-10-17 on #1607: the row's
+# centreline stopped at the holes, and only section C-C's 5.08 implied the
+# plate's symmetry).  The plate is extruded mid-plane on the pivot
+# (build_sm_summing_lever._coefficients_plate), so its top stands PLATE_T/2
+# over the hex centre and the row lies on that axis.  An owned centreline
+# runs from the free-edge side through both taps and the hex centre,
+# RECEIVER_AXIS_OVERRUN_MM past the station and past the hex's flats; a
+# (2.54) REF stands from it to the plate top at RECEIVER_AXIS_STATION_MM,
+# where the -Z end shows the plate's own top edge (the end rib steps up at
+# build_sm_summing_lever.RIB_PLATE_REACH, 35.75).  Its dimension line stands
+# 2.8 mm inside the free edge, its text RECEIVER_AXIS_TEXT_RISE_MM above the
+# plate top: between the free edge's and the outer tap's extension lines,
+# under the 14.75's dimension line and above the rib's slant.
+RECEIVER_AXIS_STATION_MM = 37.5
+RECEIVER_AXIS_OVERRUN_MM = 2.0
+RECEIVER_AXIS_TEXT_RISE_MM = 7.5
+
+
+def _receiver_plate_top_edge(edges: ViewEdges) -> ViewEdge:
+    """The -Z end's plate-top line under the axis reference's station.
+
+    VIEW F looks at the -Z end face (z = -PLATE_L/2): from the end rib's step
+    to the free edge, its only visible line at y = PLATE_T/2 is the plate's
+    own top edge. Anything else is a changed model and fails loud.
+    """
+    z_mm = -PLATE_L / 2.0
+    y_mm = PLATE_T / 2.0
+    x_mm = RECEIVER_AXIS_STATION_MM
+    matches = [
+        item
+        for item in edges.lines
+        if all(abs(point[2] - z_mm) < 1e-6 and abs(point[1] - y_mm) < 1e-6 for point in item.line)
+        and min(point[0] for point in item.line) - 1e-6 <= x_mm
+        and x_mm <= max(point[0] for point in item.line) + 1e-6
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"summing lever -Z plate top: expected one visible line at "
+            f"y={y_mm:g} z={z_mm:g} spanning x={x_mm:g} in the {edges.label!r} "
+            f"scan, found {[item.line for item in matches]}"
+        )
+    return matches[0]
+
+
+def _receiver_axis_reference(adapter: Any, back: Any, edges: ViewEdges) -> Any:
+    """VIEW F's row centreline through the hex centre and the (2.54) REF from
+    it to the plate top (see RECEIVER_AXIS_STATION_MM)."""
+    z_mm = -PLATE_L / 2.0
+    station = RECEIVER_AXIS_STATION_MM
+    axis = _owned_centerline(
+        adapter,
+        back,
+        (
+            (station + RECEIVER_AXIS_OVERRUN_MM, 0.0, z_mm),
+            (-(HEX_W / 2.0 + RECEIVER_AXIS_OVERRUN_MM), 0.0, z_mm),
+        ),
+        label="receiver row centreline",
+    )
+    plate_top = _receiver_plate_top_edge(edges)
+    axis_pick, top_pick, text_xy = model_points_in_view(
+        adapter,
+        back,
+        [
+            _metres((station, 0.0, z_mm)),
+            _metres((station, PLATE_T / 2.0, z_mm)),
+            _metres((station, PLATE_T / 2.0 + RECEIVER_AXIS_TEXT_RISE_MM, z_mm)),
+        ],
+        label="receiver axis reference",
+        names=("axis", "plate top", "text"),
+    )
+    entity_types = ("SKETCHSEGMENT", "EDGE")
+    reference = add_edge_dimension(
+        adapter,
+        back,
+        p0=axis_pick,
+        p1=top_pick,
+        text_xy=text_xy,
+        label="plate top from the trunnion axis",
+        orientation="vertical",
+        entity_types=entity_types,
+        entities=(axis, plate_top.edge),
+    )
+    assert_dimension_measures(
+        adapter,
+        reference,
+        expected_mm=PLATE_T / 2.0,
+        label="plate top from the trunnion axis",
+        entities=(axis, plate_top.edge),
+        entity_types=entity_types,
+    )
+    set_reference_dimension(
+        adapter,
+        _early_bound(reference, "IDisplayDimension").GetAnnotation(),
+        label="plate top from the trunnion axis",
+    )
+    return reference
 
 
 # Front profile at 1:2 (2026-10-15 baseline render): the pivot axis prints at
@@ -1872,7 +1992,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (back, receiver_iso):
         set_hidden_lines_removed(adapter, view)
-    mounting_rims = _mounting_rims(back)
+    back_edges = scan_view_edges(back, label="bracket receiver face")
+    mounting_rims = _mounting_rims(back_edges)
     # Right of the view, where the 2026-10-09 render seated it.
     mounting_callout = add_native_hole_callout(
         adapter, back, edge=mounting_rims[0].edge,
@@ -1943,6 +2064,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
     _apply_callouts(adapter, back_annotations, label="bracket receiver")
+    _receiver_axis_reference(adapter, back, back_edges)
     # The view label below the pad's width, left of the view and the receiver
     # callout's leader: at (0.205, 0.172) that leader ran through it (farm r1
     # 2026-10-16, leader-through-text).
