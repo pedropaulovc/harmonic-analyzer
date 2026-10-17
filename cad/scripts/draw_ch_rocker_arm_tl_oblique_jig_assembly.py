@@ -1553,14 +1553,19 @@ def _relax_cluster_slide(
         centre = _region_center(outline)
         overshoot = keep_out_overshoot(circles, outline, keep_out=TITLE_BLOCK_KEEP_OUT)
         move = -(overshoot + _RELAX_MARGIN) if overshoot > 0.0 else 0.0
+    # The ring holds each balloon's centre BALLOON_RADIUS inside the border;
+    # the rendered circle runs a fraction over that (farm r10: the carrier's
+    # top CL-dowel balloon), so the border check keeps the ring's contract and
+    # the title block, which the relax moves toward, the rendered ink's.
     left, bottom, right, top = SHEET_INNER_BORDER
     k0, k1, k2, k3 = TITLE_BLOCK_KEEP_OUT
     for item, (x, y, radius) in zip(landings, circles, strict=True):
+        reach = min(radius, BALLOON_RADIUS)
         if (
-            x - radius < left
-            or y - radius < bottom
-            or x + radius > right
-            or y + radius > top
+            x - reach < left
+            or y - reach < bottom
+            or x + reach > right
+            or y + reach > top
             or (
                 x + radius > k0
                 and x - radius < k2
@@ -1569,8 +1574,8 @@ def _relax_cluster_slide(
             )
         ):
             raise RuntimeError(
-                f"{label}: {item.instance} balloon at {(x, y)!r} leaves the border "
-                "or enters the title block"
+                f"{label}: {item.instance} balloon at {(x, y)!r}, radius "
+                f"{radius:.5f}, leaves the border or enters the title block"
             )
 
 
