@@ -2,7 +2,7 @@ r"""The rocker arm's surface-profile check (plan ch_rocker_arm S7 op 97).
 
 Both printed profile zones (MHA-CH-006: the top edge's 0.5 Ⓤ0.5 and the lower
 outline's 0.5 Ⓤ0 between J and K, each to A|B|C) are read against the arm
-outline template (MHA-CH-006-TL-13, inventory gauges.arm-outline-template),
+outline template (MHA-CH-006-TL-13, inventory gauges.rocker-profile-gauge),
 pinned on the arm in datums A and C. A DTI (gauges.dti) on the height gauge's
 scriber (gauges.height-gauge) is zeroed on the template's edge and read on
 the arm's edge directly above it, so each reading o is how far the arm's edge
@@ -197,7 +197,7 @@ def method_steps() -> list[str]:
     )
     half_travel = DTI_TRAVEL_IN / 2.0
     return [
-        f"Both printed profile zones, read against the arm outline template (gauges.arm-outline-template) "
+        f"Both printed profile zones, read against the arm outline template (gauges.rocker-profile-gauge) "
         f"pinned in datums A and C: the top edge ({ZONE_MM:g}, all outside the R{rocker.R_TOP:g} BASIC arc) and "
         f"the lower outline J to K ({ZONE_MM:g}, all inside the BASIC outline: the R{rocker.R_BOTTOM:g} arc, both "
         f"tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on "

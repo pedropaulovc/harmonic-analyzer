@@ -1,18 +1,19 @@
 r"""Pure-data contract for the rocker arm's outline template (MHA-CH-006-TL-13).
 
-Shop gauge, not a machine part (cad/docs/subsystem-identities.md). An annealed
-O1 plate carrying the rocker arm's finished outline: the R800 top and R816
-bottom arcs about the pivot, the radial tip lands and the tapered ends, plus a
-locating hole for a pin gauge in the arm's reamed pivot bore and a radial slot
-for a second pin gauge in its rod-pin hole, which clocks it. The arm is
-scribed from it (S5) and its outline is checked against it (S7: top-edge
-height, radii, arc lengths, tip lands).
+Shop gauge, not a machine part (cad/docs/subsystem-identities.md), bought cut
+from this CAD by an outside wire-EDM vendor (inventory
+gauges.rocker-profile-gauge). An annealed O1 plate carrying the rocker arm's
+finished outline: the R800 top and R816 bottom arcs about the pivot, the
+radial tip lands and the tapered ends, plus a locating hole for a pin gauge
+in the arm's reamed pivot bore and a radial slot for a second pin gauge in
+its rod-pin hole, which clocks it. The arm's outline is checked against it
+(F1: top-edge height, radii, tip lands and both profile zones).
 
 Every edge derives from the rocker's own CAD source (``ch_rocker_arm_spec``),
 never from a render. The one deliberate offset: every edge aims at the middle
 of the rocker's 0.5 surface-profile zone (``ch_rocker_arm_spec.TOP_EDGE_BAND``,
 outside on the top arc, inside on the lower outline), leaving the zone's whole
-width to the filing that follows. The arc system sits 0.25 higher, on the
+width to the cut of the arm's edges. The arc system sits 0.25 higher, on the
 rocker's own radii; the tip lands and tapered ends are offset 0.25 along
 their own normals, since a +Y shift would carry the near-vertical lands out
 of the lower zone.
@@ -65,7 +66,7 @@ if (
         "template arc centre is not the rocker's, raised by the aim offset"
     )
 
-# Shop acceptance (inventory gauges.arm-outline-template, Pedro 2026-10-11):
+# Receipt acceptance (inventory gauges.rocker-profile-gauge, Pedro 2026-10-11):
 # DTI stations within +/-0.03 of nominal, taken about the pivot hole and the
 # rod slot (below) with pins in both.
 DTI_ACCEPTANCE = 0.03
@@ -365,7 +366,8 @@ _ROD_SLOT_ROUNDING = abs(
 ROD_CLOCKING_PLAY = ROD_HOLE_PLAY + ROD_SLOT_PLAY + _ROD_SLOT_ROUNDING  # 0.0674
 # The template's share of the rocker's half-zone (0.25 either side of the
 # aim): a template-gauge allocation, not a part tolerance. The other 0.09 is
-# left to filing to the scribed line (#1545, approved 2026-10-15).
+# left to cutting the arm's edges (#1545, approved 2026-10-15 for filing; route
+# v3 cuts them on the oblique trammel jig, MHA-CH-006-TL-000).
 END_STATION_SHARE = 0.16
 
 

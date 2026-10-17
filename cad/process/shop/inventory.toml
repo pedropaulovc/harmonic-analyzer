@@ -4911,33 +4911,36 @@ cite = [
 ]
 
 # --- ch_rocker_arm (trial T4) additions ---
-# Outline template for MHA-CH-006: the arm's finished outline (R800 top edge, R816
-# bottom, tapers, tip lands) with a Ø6.5 pivot hole and a radial slot at the arm's rod-pin
-# hole, laid on the part to scribe the outline and held against it to check the filed
-# edges. Shop-made (Pedro 2026-10-11), not bought:
-# a dedicated trammel bar (not the amplitude bar; Pedro 2026-10-11) with clamp-on pivot and
-# scriber blocks scribes R800/R816 on blued O1 plate, which is then cut and filed to the
-# lines. Make-route: local://rocker-template-route.md (trial T4 note). It becomes the TL CAD
-# part ch_rocker_arm_tl_outline_template; prechips has no field for that reference, so the
-# name is in `name`/`note`. Accepted on PROFILE (Pedro 2026-10-11): DTI stations within
-# +/-0.03 of the nominal arcs about the pivot; the trammel setting is the proof of R. The
-# same acceptance is taken with pins in both the pivot hole and the rod slot (#1545): the
-# slot's 0.0780 in pin is one of gauges.pin-gauges and clocks the template on the arm.
-# verify = false is an ASSUMED placeholder pending Pedro's measurement (authorized
-# 2026-10-11, see local://rocker-measurement-checklist.md B3): the template is assumed made
-# and accepted as above; set verify = true again until it really is.
-[gauges.arm-outline-template]
-name = "arm outline template (MHA-CH-006), shop-made: ch_rocker_arm_tl_outline_template"
+# Outline template for MHA-CH-006 (TL CAD part ch_rocker_arm_tl_outline_template; prechips
+# has no field for that reference, so it is in `cad`/`note`): the arm's finished outline
+# (R800 top edge, R816 bottom, tapers, tip lands) with a Ø6.5 pivot hole and a radial slot
+# at the arm's rod-pin hole, held against the arm to check its cut edges (F1).
+# Bought, cut from its CAD by an outside wire-EDM vendor (Main ruling 2026-10-17), not
+# shop-made. Not yet quoted or bought, so verify = true: Xometry's instant quote takes the
+# DXF but asks for an account e-mail before it prices it, and that account decision is
+# pending (2026-10-17). Rejected makes (read live 2026-10-17):
+#   laser, SendCutSend (DXF of this CAD, 291.967 x 29.241, 1095 .125 in; no O1 offered):
+#     USD 16.38 for one, arrives as soon as Oct 23; cut tolerance +/-0.005 in (0.127) is
+#     2.5x the 0.05 profile target and over the 0.03 receipt acceptance.
+#   laser, OSH Cut: standard tolerance +/-0.005 in (0.127), same reason.
+#   cut on the oblique trammel jig (MHA-CH-006-TL-000): a gauge cut on the jig shares the
+#     jig's common-mode errors with the strap edges it is meant to check, so it cannot
+#     catch them; the template needs an independent process.
+#   shop-made by trammel scribing and filing (Pedro 2026-10-11, local://rocker-template-route.md):
+#     retired with its trammel kit; the same common-mode objection applies to a trammel.
+[gauges.rocker-profile-gauge]
+name = "rocker profile gauge, O1 plate 1/8 in, wire-EDM cut from its TL CAD"
 kind = "profile_gauge"
 cad = "ch_rocker_arm_tl_outline_template"
-# Basis: gauges.arm-outline-template.range_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1920 (gauges.arm-outline-template.range_mm) authored profile_gauge geometry baseline [8, 817] mm, offset [+0, +0] mm = [8, 817] mm. Range endpoints are not extended beyond the declared source span; lower endpoint is a minimum, upper endpoint a maximum.
+# Basis: gauges.rocker-profile-gauge.range_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1920 (gauges.arm-outline-template.range_mm) authored profile_gauge geometry baseline [8, 817] mm, offset [+0, +0] mm = [8, 817] mm. Range endpoints are not extended beyond the declared source span; lower endpoint is a minimum, upper endpoint a maximum.
 # Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "marked gauge range and comparison against size or roughness reference"; scalar/vector-only schema.
 range_mm = [8.0, 817.0]
-# Basis: gauges.arm-outline-template.resolution_mm: authored comparison nominal 0.05 mm, offset +0 mm = 0.05 mm; source original arm-outline-template note in b757b5a76 cad/process/shop/inventory.toml, AUTHOR'S CHOICE from +/-0.03 mm profile acceptance and backlit light-gap reading. No finer comparison capability or calibration is invented.
+# Basis: gauges.rocker-profile-gauge.resolution_mm: authored comparison nominal 0.05 mm, offset +0 mm = 0.05 mm; source original arm-outline-template note in b757b5a76 cad/process/shop/inventory.toml, AUTHOR'S CHOICE from +/-0.03 mm profile acceptance and backlit light-gap reading. No finer comparison capability or calibration is invented.
 resolution_mm = { value = 0.05, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "gauge dial or digital display, smallest marked increment" } }
-shop_made = true
-verify = false
-note = "Shop-made template (CAD part ch_rocker_arm_tl_outline_template; make-route rocker-template-route.md: dedicated trammel bar scribes R800/R816 on layout-blued O1 plate, cut outside the lines, file to them). Top edge aimed 8.25 above the pivot. Accepted on profile: DTI within +/-0.03 of nominal about the pivot and rod slot (pins in both; the slot's pin is the 0.0780 in from gauges.pin-gauges) at 15 stations. range_mm spans every outline dimension it is laid against, from the top edge 8.0-8.5 above the pivot to R816 (arc lengths 266-293 between); resolution_mm 0.05 is AUTHOR'S CHOICE from that +/-0.03 acceptance and a backlit light-gap reading (a 0.02 gap shows), not a calibration. verify=false: ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see checklist B3)"
+verify = true
+purchase = "1 x wire-EDM cut of MHA-CH-006-TL-13 (outline, pivot hole and rod slot in one setup) from vendor-supplied AISI O1 precision ground flat stock 1/8 in, annealed, to the TL-13 drawing. Price and lead time unknown: no wire-EDM vendor quotes without an account (Xometry asks for an account e-mail; Fathom and eMachineShop quote by request); the quote is pending the owner's account decision (2026-10-17)."
+note = "Vendor data, read live 2026-10-17. Fathom (US) wire EDM: tolerance 0.0001 in (0.0025), kerf 0.005 in, set-up cost low, lead time 6-8 days, conductive metals; its fiber laser row 0.002-0.005 in. Xometry (US network): DXF accepted by the instant quote, priced only after an account e-mail; auto-quotable tolerances down to +/-0.001 in (0.025) for all metals, tighter after manual review. eMachineShop: wire EDM priced in its desktop CAD or by request; tolerances 'achievable down to a ten thousandth'. Price unknown. Owner choices (Main ruling 2026-10-17): bought from its CAD by an independent process (wire EDM), not cut on the oblique trammel jig; profile tolerance 0.05 or better, inside the template's 0.03 receipt acceptance below. The TL-13 drawing's arc low points print +/-0.02 and the pivot hole +0.015/0, under Xometry's +/-0.001 in auto-quote, so the order needs its manual review; wire EDM holds them. Top edge aimed 8.25 above the pivot. Accepted on receipt on profile: DTI within +/-0.03 of nominal about the pivot and rod slot (pins in both; the slot's pin is the 0.0780 in from gauges.pin-gauges) at 15 stations. range_mm spans every outline dimension it is laid against, from the top edge 8.0-8.5 above the pivot to R816 (arc lengths 266-293 between); resolution_mm 0.05 is AUTHOR'S CHOICE from that +/-0.03 acceptance and a backlit light-gap reading (a 0.02 gap shows), not a calibration."
+cite = ["Fathom wire EDM https://fathommfg.com/capabilities/cnc-machining/wire-edm/ read live 2026-10-17: WIRE EDM tolerance 0.0001 in, kerf 0.005 in, set-up cost low, lead time 6-8 days; quote by request form only", "Xometry wire EDM https://www.xometry.com/capabilities/wire-edm-machining/ and https://www.xometry.com/quoting/home/ read live 2026-10-17: DXF upload accepted, price shown only after a business e-mail; https://www.xometry.com/resources/blog/tight-tolerances/ read live 2026-10-17: auto-quotable tolerances down to +/-0.001 in for all metal materials", "eMachineShop wire EDM https://www.emachineshop.com/edm/ read live 2026-10-17: instant wire-EDM quotes in its desktop CAD, otherwise by request; tolerances achievable down to a ten thousandth", "SendCutSend (rejected) https://app.sendcutsend.com/customer#/quote read live 2026-10-17: this DXF in High Carbon 1095 .125 in, USD 16.38 for 1 (USD 7.06 each at 10), arrives as soon as Oct 23; https://sendcutsend.com/materials/1095-high-carbon-steel/ read live 2026-10-17: cut tolerance +/- 0.005 in", "OSH Cut (rejected) https://www.oshcut.com/capabilities read live 2026-10-17: standard tolerances +/- 0.005 in for most materials and thicknesses"]
 
 # The PM-30MV's own table as a holding surface for work clamped straight to it with the
 # clamping-kit straps (thin plate that the PM-6 jaws would stand above). prechips has no
@@ -4967,24 +4970,12 @@ solids = [
   { name = "slot-plus-undercut", void = true, cuts = ["table"], shape = "box", at_mm = [-420.1, 51.0, -24.0], size_mm = [840.2, 25.0, 10.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centre spacing with calipers and depth gauge" } },
 ]
 
-# Template make-route kit for MHA-CH-006 (local://rocker-template-route.md). Approved by
-# Pedro 2026-10-11 unless marked PROPOSED; none is used by an op in the plan, so no rule
-# reads them. Prices read 2026-10-11; "search listing" prices are not confirmed on the
-# vendor page. The owned flat bench (about 1.0 x 0.65 m, Pedro 2026-10-11) carries the
-# MDF scribing board.
-
-[fixtures.trammel-board-mdf]
-name = "MDF scribing board 3/4 in, 2 x 4 ft, cut to 1000 x 610 on the owned bench"
-kind = "custom"
-purchase = "ProWood 3/4 in x 2 ft x 4 ft MDF project panel (purchase approved by Pedro 2026-10-11)"
-source = "Home Depot 109098, $32.98 derived from a listing promotion (Instacart listing $34.69) (https://www.homedepot.com/p/ProWood-3-4-in-x-2-ft-x-4-ft-Medium-Density-Fiberboard-Project-Panel-109098/202093815)"
-note = "Carries the trammel pivot and the blued template plate while R800/R816 are scribed."
-
-[gauges.template-plate-o1]
-name = "O1 ground flat 1/8 x 2-1/2 x 18 in (arm-outline-template blank)"
-kind = "material"
-purchase = "O1 precision ground flat stock 1/8 x 2-1/2 x 18 in (purchase approved by Pedro 2026-10-11)"
-source = "Abrams Industries, $27.45 search listing, page returned 403 (https://us.abrams-industries.com/steel/tool-steel/o1/gfs-reg-18/o1-1-8-x-2-1-2-x-18-reg)"
+# The template make-route kit (local://rocker-template-route.md: MDF scribing board, O1
+# template blank) is retired: the template is bought wire-EDM cut, vendor material
+# (gauges.rocker-profile-gauge). The hardening kit and bench tools below were approved by
+# Pedro 2026-10-11 for that route; none is used by an op in the plan, so no rule reads
+# them. Prices read 2026-10-11; "search listing" prices are not confirmed on the vendor
+# page.
 
 # Hardening (Pedro 2026-10-11: approved). Torch-harden O1 (about 1475 F, non-magnetic plus
 # a soak) and quench in warm canola oil. Canola basis: Larrin Thomas, Knife Steel Nerds,
