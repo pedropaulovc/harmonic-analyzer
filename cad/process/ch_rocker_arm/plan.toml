@@ -11,8 +11,9 @@
 #   H1  lathe: face, turn the Ø10.2 r6 land, drill the supply bore, part off oversize
 #       (the parted-off end_face has no stock state yet: prechips #292)
 #   S0  mill: face the strap both sides 3 -> 2.5 on the taped sub-plate (S0A, S0B; user
-#       ruling 2026-10-17, shop record PR #1594)
+#       ruling 2026-10-17, shop record PR #1594)          check errors: prechips #294, #295
 #   T1  mill vise: spot, drill, ream the Ø10.2 H7 hub hole
+#       (headroom errors on the 290 mm vise base vs 222.25 mm Y travel: prechips #297)
 #       CL/CR tooling holes in the end waste                        BLOCKED: prechips #293
 #   T2  4x6 bandsaw: rough R800/R816 to the scribed line +1        BLOCKED: prechips >0.1.2 (#249, merged #286)
 #   T3  oblique trammel jig TL-000: R800 then R816                  BLOCKED: prechips #255/#269 (PRs #258/#267/#278)
