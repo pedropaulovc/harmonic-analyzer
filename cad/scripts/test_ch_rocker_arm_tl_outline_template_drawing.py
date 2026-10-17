@@ -422,6 +422,25 @@ def test_outline_profile_is_one_frame_all_around_to_a_and_c() -> None:
     assert "_add_outline_profile(adapter, front)" in build
 
 
+def test_each_slot_end_gets_its_own_centre_mark_in_the_detail() -> None:
+    """mr-tl13-1: the 0.750 run must read centre to centre. The slot option of
+    AutoInsertCenterMarks2 printed nothing on this stadium (tl13-gdt-r2), so
+    each end arc is picked on the slot axis and marked, then the detail is
+    re-rendered precise (its 5:1 ends printed as facets)."""
+    assert spec.rod_slot_points()[4:] == (
+        drawing._ROD_SLOT_OUTER,
+        drawing._ROD_SLOT_INNER,
+    )
+    source = inspect.getsource(drawing._mark_rod_slot_end_centres)
+    assert "InsertCenterMark3(CENTER_MARK_SINGLE, False, False)" in source
+    assert '("outer", _ROD_SLOT_OUTER, 0.0)' in source
+    assert '("inner", _ROD_SLOT_INNER, 180.0)' in source
+    build = inspect.getsource(drawing.build)
+    assert "slots=True" not in build
+    marked = build.index("_mark_rod_slot_end_centres(adapter, detail)")
+    assert build.index("set_hidden_lines_removed(adapter, detail)", marked) > marked
+
+
 def test_every_outline_dimension_is_basic_under_the_profile() -> None:
     """The profile is the outline's only tolerance (machinist review
     mr-tl13-1, rule 5): every dimension that fixes the outline is BASIC."""
