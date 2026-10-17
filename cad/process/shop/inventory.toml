@@ -64,6 +64,11 @@ note = "Manual mill with DRO; envelope and travel below are illustrative example
 cite = ["PM-30MV manual v3 2020-10 p.5 (https://macclab.com/wp-content/uploads/2022/01/PM-30MV-v3-2020-10.pdf): 2 HP (1.5 kW) brushless DC motor, spindle 50-1500 rpm low range and 1400-3000 rpm high range, R8"]
 
 [machines.PM-30MV.envelope]
+# PM-30MV manual v3 2020-10, specifications table, read 2026-10-16:
+# https://macclab.com/wp-content/uploads/2022/01/PM-30MV-v3-2020-10.pdf
+# Spindle centreline to column: 7-1/2 in (190.5 mm) to pleated cover,
+# governing clearance; 8-5/8 in (219.075 mm) with cover absent.
+# Comment-only pending prechips throat/column-clearance schema support (#175).
 # Basis: machines.PM-30MV.envelope.spindle_to_table_max_in: catalogue-valued placeholder; source nominal 17 in, offset +0 in = 17 in. Source b757b5a76 cad/process/shop/inventory.toml:36 (machines.PM-30MV.envelope.spindle_to_table_max_in); retained item source https://www.precisionmatthews.com/products/pm-30mv. No invented catalogue deviation or actual installed-machine/gauge metrology is claimed.
 spindle_to_table_max_in = { value = 17, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "steel rule and height gauge, installed machine limit" } }
 # Basis: machines.PM-30MV.envelope.spindle_to_table_min_in: original example nominal 2.4 in, offset +0.06 in = 2.46 in; source b757b5a76 cad/process/shop/inventory.toml:37 installed minimum spindle-nose/table clearance model. A larger minimum gap is conservative; this value is not a revised maker specification.
@@ -3387,24 +3392,26 @@ capacity_min_mm = { value = 6, measured = { status = "measured", by = "placehold
 # Basis: fixtures.v-blocks.capacity_max_mm: Generic practical maximum clamped round-bar support diameter estimate.
 capacity_max_mm = { value = 38, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "calipers and ground test pins, seating under clamp" } }
 
-[fixtures.clamping-kit-lms-1144]
+[fixtures.clamping-kit-pm-52pcck-14mm]
 kind = "clamping_kit"
-pieces = 58
-stud = "3/8-16"
-t_slot_in = "7/16"
+pieces = 52
+stud = "1/2-13"
+t_slot_in = "9/16"
+note = "PM-30MV-compatible 14 mm T-nuts; purchase candidate, not confirmed possession."
+cite = ["Precision Matthews 52PCCK-9/16-14mm https://www.precisionmatthews.com/products/52pcck-9-16-14mm read 2026-10-16: 52 pieces, 1/2-13 studs, 14 mm / 9/16 in T-nuts, $79.99"]
 
-[fixtures.clamping-kit-lms-1144.source]
-vendor = "LittleMachineShop"
-sku = 1144
-by = "lms-package"
+[fixtures.clamping-kit-pm-52pcck-14mm.source]
+vendor = "Precision Matthews"
+sku = "52PCCK-9/16-14mm"
+by = "vendor catalogue, read 2026-10-16"
 
-# Strap frame: origin at the centre of the strap's padded underside on the work, x along it.
-[fixtures.clamping-kit-lms-1144.members.strap-pad]
+# Strap frame: origin at the centre of the padded underside on the work, x along it.
+[fixtures.clamping-kit-pm-52pcck-14mm.members.strap-pad]
 kind = "strap_clamp"
-note = "illustrative example: short 40 mm strap with a soft pad, tightened through a 3/8-16 stud"
+note = "Trial padded strap envelope for 1/2-13 hardware; estimate, not a catalogue dimension or receipt measurement. Remeasure before shop use."
 solids = [
-  # Basis: fixtures.clamping-kit-lms-1144.members.strap-pad.solids.strap: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1156 (fixtures.clamping-kit-lms-1144.members.strap-pad.solids.strap); retained LittleMachineShop SKU 1144 identity (not an independent dimensional citation) authored box envelope; authored physical-size model {"size_mm":[40.0,8.0,8.0]} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
-  { name = "strap", shape = "box", at_mm = [-20.0, -4.0, 0.0], size_mm = [40.0, 8.0, 8.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
+  # Basis: former 40 x 8 x 8 mm LMS surrogate scaled 4/3 with stud diameter (3/8 -> 1/2 in), then rounded upward to 54 x 11 x 11 mm. This is only an equivalent obstruction model, not proof of clamp strength, pad contact or stud-slot clearance; PM publishes no individual strap dimensions.
+  { name = "strap", shape = "box", at_mm = [-27.0, -5.5, 0.0], size_mm = [54.0, 11.0, 11.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-16", instrument = "estimated scaled envelope; replace with caliper readings on received padded strap" } },
 ]
 
 # --- pivot-bracket additions ---
