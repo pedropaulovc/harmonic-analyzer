@@ -340,6 +340,7 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
     keeps = {
         **drawing.FRONT_KEEP,
         **drawing.DETAIL_KEEP,
+        **drawing.RIDGE_DETAIL_KEEP,
         **drawing.TOP_KEEP,
         **drawing.BACK_KEEP,
         **drawing.PLATE_SECTION_TEXT_MM,
@@ -347,6 +348,7 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
     placed = [
         *drawing.FRONT_KEEP,
         *drawing.DETAIL_KEEP,
+        *drawing.RIDGE_DETAIL_KEEP,
         *drawing.TOP_KEEP,
         *drawing.BACK_KEEP,
         *drawing.PLATE_SECTION_TEXT_MM,
@@ -362,6 +364,103 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
     assert above | below <= set(keeps)
     for name, _prefix in notes.DIMENSION_PREFIXES:
         assert name in notes.DRAWING_DIMENSIONS
+
+
+def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) -> None:
+    """Code review C09 (owner ruling T1): Detail D holds the ridge sharp
+    4.040 +/-0.05 from each side face and each upper flank 122.4 +/-0.5 deg
+    to its side face, on both stubs; the width is a reference."""
+    spec = sm_summing_lever_spec
+    knife = notes.DRAWING_DIMENSIONS["KnifeEnvelopeReference"]
+    assert knife == {"HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight", "FlankToSide"}
+    assert set(knife) <= set(drawing.DETAIL_KEEP)
+    assert set(drawing.RIDGE_DETAIL_KEEP) == {"KnifeRidgeRadius"}
+    prefixes = notes.DIMENSION_PREFIXES
+    assert prefixes[("KnifeEnvelopeReference", "HexWidth")] == "2X ("
+    assert prefixes[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
+    assert prefixes[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X "
+    assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "4X "
+    callout = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromLeft"]
+    assert " ".join(callout.split()) == "KNIFE EDGE SYMMETRIC TO SIDES, BOTH STUBS"
+    assert "MILL" not in callout and "PASS" not in callout
+    every_callout = {**notes.DIMENSION_CALLOUTS_ABOVE, **notes.DIMENSION_CALLOUTS_BELOW}
+    assert "HexWidth" not in every_callout
+    assert (spec.RIDGE_FROM_SIDE, spec.RIDGE_FROM_SIDE_TOL) == (4.040, 0.05)
+    assert (spec.KNIFE_FLANK_TO_SIDE_DEG, spec.KNIFE_FLANK_TO_SIDE_TOL_DEG) == (122.4, 0.5)
+    assert not hasattr(spec, "RIDGE_ANGLE_TOL_DEG")
+    assert not hasattr(spec, "KNIFE_SHOULDER_RISE")
+
+    calls = []
+    for name in (
+        "set_dimension_display_precision",
+        "set_dimension_symmetric_tolerance",
+        "set_dimension_symmetric_angular_tolerance",
+        "set_dimension_prefix",
+        "mark_dimensions_for_drawing",
+    ):
+        monkeypatch.setattr(
+            lever_build,
+            name,
+            lambda adapter, *args, _name=name, **kwargs: calls.append((_name, args, kwargs)),
+        )
+    monkeypatch.setattr(
+        lever_build, "_hex_width_reference", lambda adapter: calls.append(("reference", (), {}))
+    )
+    lever_build._drawing_dimension_contract(object())
+    feature = "KnifeEnvelopeReference"
+    assert ("set_dimension_display_precision", (feature, "FlankToSide", 1), {}) in calls
+    for name in ("HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight"):
+        assert ("set_dimension_display_precision", (feature, name, 3), {}) in calls
+    for name in ("RidgeFromLeft", "RidgeFromRight"):
+        assert ("set_dimension_symmetric_tolerance", (feature, name, 0.05), {}) in calls
+    assert (
+        "set_dimension_symmetric_angular_tolerance",
+        (feature, "FlankToSide", 0.5),
+        {"require_driven": True},
+    ) in calls
+    # HexWidth is never toleranced: it reads back as the reference.
+    assert ("reference", (), {}) in calls
+    assert not any(
+        name.startswith("set_dimension_symmetric") and args[1] == "HexWidth"
+        for name, args, _ in calls
+    )
+    # The model sketch's angle is the flank-to-side angle the print rounds.
+    assert round(180.0 - spec.RIDGE_ANGLE_DEG / 2.0, 1) == spec.KNIFE_FLANK_TO_SIDE_DEG
+
+
+def test_the_knife_detail_text_stands_clear_of_the_hexagon() -> None:
+    """Detail D (4:1): the ridge pair's line over the fence, each text
+    outside its own span; the flank angle's text in the wedge opposite the
+    +X shoulder's corner, so it reads 122.4, not its 57.6 supplement.
+    Detail E (10:1): the R MAX right of the fence and of datum A's box."""
+    scale = drawing.DETAIL_SCALE[0] / 1000.0
+    cx, cy = drawing.DETAIL_CENTER
+    hw = sm_summing_lever_spec.HEX_W / 2.0 * scale
+    vertex = (cx, cy + sm_summing_lever_spec.HEX_H / 2.0 * scale)
+    shoulder = (cx + hw, cy + sm_summing_lever_spec.HEX_H / 4.0 * scale)
+    fence_top = cy + drawing.DETAIL_RADIUS_MM * scale
+    left_x, left_y = drawing.DETAIL_KEEP["RidgeFromLeft"]
+    right_x, right_y = drawing.DETAIL_KEEP["RidgeFromRight"]
+    assert left_y == right_y > fence_top + 0.004
+    assert left_y < 0.2667 - 0.004  # under the border
+    assert left_x < cx - hw - 0.015 and right_x > cx + hw + 0.015
+    angle_x, angle_y = drawing.DETAIL_KEEP["FlankToSide"]
+    direction = math.degrees(math.atan2(angle_y - shoulder[1], angle_x - shoulder[0]))
+    flank_down = -(90.0 - sm_summing_lever_spec.RIDGE_ANGLE_DEG / 2.0)
+    assert flank_down < direction < 90.0
+    assert math.hypot(angle_x - cx, angle_y - cy) > drawing.DETAIL_RADIUS_MM * scale
+    # E's letter sits between the -X pair's extension lines, under its line.
+    letter = (
+        vertex[0] + drawing.RIDGE_DETAIL_LETTER_OFFSET[0],
+        vertex[1] + drawing.RIDGE_DETAIL_LETTER_OFFSET[1],
+    )
+    assert cx - hw + 0.002 < letter[0] < cx - 0.002
+    assert vertex[1] < letter[1] < left_y - 0.004
+    e_radius = drawing.RIDGE_DETAIL_RADIUS_MM * drawing.RIDGE_DETAIL_SCALE[0] / 1000.0
+    ex, ey = drawing.RIDGE_DETAIL_CENTER
+    r_x, r_y = drawing.RIDGE_DETAIL_KEEP["KnifeRidgeRadius"]
+    assert math.hypot(r_x - ex, r_y - ey) > e_radius + 0.010
+    assert r_x > ex + 0.020  # right of datum A's box over the vertex
 
 
 def test_notes_are_short_stated_shortfalls() -> None:
