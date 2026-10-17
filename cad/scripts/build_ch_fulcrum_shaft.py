@@ -4,8 +4,8 @@ Plain Ø6.35 (1/4") steel shaft: the top levers' common fulcrum at machine
 (x, y) = (+199.9, 1061.4) (2026-08-02 top-frame rederive: rail top 1036.2 +
 keeper axis rise 25.2). One diameter full length -- no journals, shoulders or
 steps -- through the reamed bores of the two end keepers (MHA-CH-007). Each
-end stands 0.5 past its keeper lug's outer face and finishes in a full
-hemisphere (the bright dome of the ch. 17 p. 40 closeup): 161.35 tip to tip.
+end stands 1.025 past its keeper lug's outer face and finishes in a full
+hemisphere (the bright dome of the ch. 17 p. 40 closeup): 162.4 tip to tip.
 One set-screw flat per end, both on +Y, sits under the keeper's crown tap;
 the two #1-72 cup-point set screws (MHA-VN-055) bearing on them are the
 shaft's only axial and rotational location.
@@ -13,12 +13,13 @@ shaft's only axial and rotational location.
 Dimensions: ``ch_fulcrum_shaft_spec`` (derived from ``ch_fulcrum_keeper_spec``);
 cad/DIMENSIONS.md "Channel & top-frame layout".
 
-Layout: shaft axis along Z, centred (tips at z +-80.675); flats face +Y. The
+Layout: shaft axis along Z, centred (tips at z +-81.2); flats face +Y. The
 body is ONE Right-plane half-profile (two quarter-arc domes on a straight
 O.D.) revolved about its on-axis close line (the mg_magnifying_lever capsule
 idiom), so the diameter and tip-to-tip length import into the side view; the
 two flats are one mid-plane cut from a second Right-plane sketch that also
-carries the across-flat size.
+carries the across-flat size, both flat stations off the -u dome tip and a
+construction arc on that dome for its reference radius.
 
 Run (SolidWorks already open)::
 
@@ -65,7 +66,7 @@ from ch_fulcrum_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    END_VIEW_NOTE,
+    FLAT_BASELINE,
     FLAT_DEPTH,
     FLAT_FROM_END,
     FLAT_HEIGHT,
@@ -82,7 +83,7 @@ from ch_fulcrum_shaft_spec import (
 PART_NAME = "ch-fulcrum-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
-TIP = SHAFT_LENGTH / 2.0  # 80.675: dome apex off the centre
+TIP = SHAFT_LENGTH / 2.0  # 81.2: dome apex off the centre
 # Capsule: the straight O.D. between the dome centres plus one full sphere.
 V_BODY = (
     math.pi * SHAFT_R**2 * (SHAFT_LENGTH - SHAFT_DIA) + 4.0 / 3.0 * math.pi * SHAFT_R**3
@@ -190,14 +191,17 @@ async def _flats(adapter) -> list[tuple[str, str]]:
     Right plane, each from the flat (v = FLAT_HEIGHT) up past the O.D.
 
     Constraint accounting (16 rectangle + 4 across-flat witness + 4 tip
-    witness unknowns = 24): eight rectangle H/V relations; the +u flat's
-    length and rise; the -u flat's length, rise, FlatFromEnd off the -u dome
-    tip and the like-edge FlatPitch to the +u flat with flat-line alignment;
-    the construction tip witness along the axis from the origin to the -u
-    tip (on the origin, horizontal, ShaftLength/2 long); and the construction
-    witness from the +u flat's -u corner straight down to the far O.D.
-    (vertical, under the corner, its foot ShaftDia/2 below the origin, its
-    top on the axis) whose AcrossFlat dim sets both flats' height."""
+    witness + 5 dome arc unknowns = 29): eight rectangle H/V relations; the
+    +u flat's length and rise; the -u flat's length and rise; both stations
+    off the -u dome tip (FlatFromEnd to the -u flat's outer edge,
+    FlatBaseline to the +u flat's inner edge) with flat-line alignment; the
+    construction tip witness along the axis from the origin to the -u tip (on
+    the origin, horizontal, ShaftLength/2 long); the construction witness
+    from the +u flat's -u corner straight down to the far O.D. (vertical,
+    under the corner, its foot ShaftDia/2 below the origin, its top on the
+    axis) whose AcrossFlat dim sets both flats' height; and the construction
+    arc over the -u dome (ending on the tip, centre on the axis, start over
+    the centre) whose DomeRadius is the drawing's reference radius."""
     dims = SketchDims()
     half = FLAT_LENGTH / 2.0
     station = FLAT_PITCH / 2.0
@@ -219,9 +223,15 @@ async def _flats(adapter) -> list[tuple[str, str]]:
     (tip_witness,) = await add_line_chain(
         adapter, [(0.0, 0.0), (-TIP, 0.0)], close=False
     )
+    # Counter-clockwise from the dome's rim on the O.D. down to the tip.
+    dome_arc = check(
+        "dome radius reference arc",
+        await adapter.add_arc(-CYLINDER_HALF, 0.0, -CYLINDER_HALF, SHAFT_R, -TIP, 0.0),
+    )
     set_sketch_direct_db(adapter, False)
     _as_construction(adapter, witness)
     _as_construction(adapter, tip_witness)
+    _as_construction(adapter, dome_arc)
     for points, lines in ((rect_pos, lines_pos), (rect_neg, lines_neg)):
         for i, line in enumerate(lines):
             (_, v1), (_, v2) = points[i], points[(i + 1) % len(points)]
@@ -242,6 +252,24 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         "tip witness starts at the origin",
         await adapter.add_sketch_constraint(
             f"{tip_witness}.start", "origin", "coincident"
+        ),
+    )
+    check(
+        "dome radius reference ends at the tip",
+        await adapter.add_sketch_constraint(
+            f"{dome_arc}.end", f"{tip_witness}.end", "coincident"
+        ),
+    )
+    check(
+        "dome radius reference centre on the axis",
+        await adapter.add_sketch_constraint(
+            f"{dome_arc}.center", "origin", "horizontal_points"
+        ),
+    )
+    check(
+        "dome radius reference starts over its centre",
+        await adapter.add_sketch_constraint(
+            f"{dome_arc}.start", f"{dome_arc}.center", "vertical_points"
         ),
     )
     await dimension_between(
@@ -322,8 +350,8 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         "flat -u rise",
     )
     dims.record("FlatRiseB")
-    # The -u flat's -u (outer) edge off the -u dome tip: the machinist's
-    # station, from which FlatPitch sets the +u flat.
+    # Both stations are baselines off the -u dome tip: the -u flat's outer
+    # edge and the +u flat's inner edge, so neither chains through the other.
     await dimension_between(
         adapter,
         f"{tip_witness}.end",
@@ -333,22 +361,28 @@ async def _flats(adapter) -> list[tuple[str, str]]:
         "FlatFromEnd",
     )
     dims.record("FlatFromEnd", '"ShaftLength" / 2 - "FlatPitch" / 2 - "FlatLength" / 2')
-    # Like edge to like edge (each flat's -u end): the flat-centre spacing.
     await dimension_between(
         adapter,
-        f"{flat_neg}.start",
+        f"{tip_witness}.end",
         corner,
         "horizontal_distance",
-        FLAT_PITCH,
-        "FlatPitch",
+        FLAT_BASELINE,
+        "FlatBaseline",
     )
-    dims.record("FlatPitch", '"FlatPitch"')
+    dims.record(
+        "FlatBaseline", '"ShaftLength" / 2 + "FlatPitch" / 2 - "FlatLength" / 2'
+    )
     check(
         "flats on one line",
         await adapter.add_sketch_constraint(
             f"{flat_neg}.start", corner, "horizontal_points"
         ),
     )
+    check(
+        "dome radius reference",
+        await adapter.add_sketch_dimension(dome_arc, None, "radial", SHAFT_R),
+    )
+    dims.record("DomeRadius", '"ShaftDia" / 2')
     await ensure_fully_defined(adapter, "flats sketch")
     check("exit_sketch flats", await adapter.exit_sketch())
     name_last_feature(adapter, "FlatProfile")
@@ -370,7 +404,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
-    # document units (an unsuffixed 161.35 = 161.35 in).
+    # document units (an unsuffixed 162.4 = 162.4 in).
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
     await set_global(adapter, "FlatLength", f"{FLAT_LENGTH}mm")
@@ -419,7 +453,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
             "Iso View Note": ISO_VIEW_NOTE,
         },
     )

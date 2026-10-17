@@ -6,12 +6,10 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -19,6 +17,7 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
+from _drawing_dimensions import set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
@@ -29,9 +28,12 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from ch_fulcrum_shaft_spec import (
+    ACROSS_FLAT_CALLOUT,
     DRAWING_DIMENSIONS,
     FLAT_FROM_END,
+    FLAT_LENGTH,
     SHAFT_DIA,
+    SHAFT_DIA_CALLOUT,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
 )
@@ -49,46 +51,93 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 1.0)
-END_VIEW_SCALE = 2.0
-FRONT_CENTER = (0.055, 0.205)
-RIGHT_CENTER = (
-    FRONT_CENTER[0] + SHAFT_LENGTH * SHEET_SCALE[0] / 2000.0 + 0.045,
-    FRONT_CENTER[1],
-)
-ISO_CENTER = (0.355, 0.205)
-# 1:2, like the near-identical 187 arbor on MHA-DT-013: at 1:1 the shaft's
-# isometric is a long diagonal bar that runs over the right zone border.
-ISO_SCALE = (1, 2)
+# One side view at 2:1: the 0.3 flats and their stations read at that size
+# and it spans most of the sheet width. No end view: from the end the dome
+# hides the flats, so it showed a bare circle (machinist review r1).
+SHEET_SCALE = (2.0, 1.0)
+VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
+AXIS_Y = 0.212
+# Left of the sheet centre: the across-flat callout block starts at its
+# dimension line right of the right tip and runs ~35 mm right (r2 crossed
+# the border at 0.216); the left tip's 5.45 still clears the zone margin.
+RIGHT_CENTER = (0.198, AXIS_Y)
+# The isometric fills the free band over the title block at 1:1 (half the
+# sheet scale, hence its note): the shaft runs lower-left to upper-right
+# about 114 x 66 mm, so x 0.261-0.375, y 0.089-0.155.
+ISO_CENTER = (0.318, 0.122)
+ISO_SCALE = (1, 1)
+
+
+def _on_sheet(mm: float) -> float:
+    """A model length in mm as sheet metres at the view scale."""
+    return mm * VIEW_SCALE / 1000.0
+
+
 # Both profile sketches lie on the Right plane, so every print dimension
 # lands in the side view.  The sketch +u axis is model -Z, which the *Right
-# view draws to sheet-RIGHT (the build_ch_pivot_shaft mapping); the flat
-# length and the across-flat witness ride the +u flat, and the -u flat's
-# station off the sheet-LEFT dome tip sits at the flat length's height,
-# under the FlatPitch.
-_TIP_X = RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0
-_MINUS_U_STATION_X = (
-    RIGHT_CENTER[0] - (SHAFT_LENGTH / 2.0 - FLAT_FROM_END / 2.0) / 1000.0
-)
-# Machinist review r8: the Ø6.350 limit text sat across the silhouette; it
-# now stands under the shaft, ~3.5 mm clear of both the shaft's lower edge and
-# the 161.35 text below it. The "2X 3.5" (wider than r8's "3.5", which the
-# 148.000 pitch's extension line ran through) stands right of its flat
-# over the dome tip. "2X 6.050" moves right to keep ~10 mm between its upper
-# arrow and that flat length's dimension line.
-SHAFT_DIA_TEXT_DROP = 0.011
-FLAT_LENGTH_TEXT_X = _TIP_X + 0.005
-ACROSS_FLAT_TEXT_X = _TIP_X + 0.022
-FRONT_KEEP: dict[str, tuple[float, float]] = {}
+# view draws to sheet-RIGHT (the build_ch_pivot_shaft mapping): both flat
+# stations run from the sheet-LEFT dome tip, the flat length and the
+# across-flat witness ride the sheet-right flat, the dome radius the left
+# dome.
+_LEFT_TIP_X = RIGHT_CENTER[0] - _on_sheet(SHAFT_LENGTH / 2.0)
+_RIGHT_TIP_X = RIGHT_CENTER[0] + _on_sheet(SHAFT_LENGTH / 2.0)
+_RIGHT_FLAT_INNER_X = _RIGHT_TIP_X - _on_sheet(FLAT_FROM_END + FLAT_LENGTH)
+# Rows above the shaft, nearest first; every text stands where no other
+# dimension's extension line runs: 5.45 outboard left of the left tip, the
+# flat length left of its flat's inner edge, and the overall length (the
+# only dimension off the right tip) on the top row.
+_ROW_1 = AXIS_Y + 0.014
+_ROW_2 = AXIS_Y + 0.026
+_ROW_3 = AXIS_Y + 0.038
+_SHAFT_BOTTOM_Y = AXIS_Y - _on_sheet(SHAFT_DIA / 2.0)
+# The bearing O.D.'s roughness rides the side view's lower silhouette right
+# of centre, its symbol below the shaft, clear of the Ø callout block (which
+# hangs left of mid-length) and of the across-flat callout at the right tip.
+FINISH_EDGE = (RIGHT_CENTER[0] + 0.060, _SHAFT_BOTTOM_Y)
+FINISH_SYMBOL = (RIGHT_CENTER[0] + 0.075, AXIS_Y - 0.024)
+# The fleet's routine finish height, not the dimension height (r1: the
+# symbol was drawn far larger than the other annotation text).
+FINISH_CHAR_HEIGHT = 0.0025
 RIGHT_KEEP = {
-    "OverallLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.020),
-    "ShaftDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] - SHAFT_DIA_TEXT_DROP),
-    # Chained, not baselined: 148 is the keeper pitch; a tip baseline stacks 2 bands.
-    "FlatPitch": (RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.024),
-    "FlatFromEnd": (_MINUS_U_STATION_X, RIGHT_CENTER[1] + 0.013),
-    "FlatLength": (FLAT_LENGTH_TEXT_X, RIGHT_CENTER[1] + 0.013),
-    "AcrossFlat": (ACROSS_FLAT_TEXT_X, RIGHT_CENTER[1]),
+    "FlatFromEnd": (_LEFT_TIP_X - 0.0065, _ROW_1),
+    "FlatLength": (_RIGHT_FLAT_INNER_X - 0.0105, _ROW_1),
+    "FlatBaseline": (RIGHT_CENTER[0] - 0.020, _ROW_2),
+    "OverallLength": (RIGHT_CENTER[0], _ROW_3),
+    # Under the shaft: the limit Ø with its fit callout at mid-length (the
+    # callout block hangs left of its dimension line, ~75 mm wide; r1 had it
+    # over the dome radius). Its stacked limits reach ~7 mm above the
+    # anchor, so 0.022 keeps the upper limit ~3 mm below the silhouette (r1
+    # printed it inside the outline). The dome's reference radius sits
+    # under the left dome.
+    "ShaftDia": (RIGHT_CENTER[0], AXIS_Y - 0.022),
+    "DomeRadius": (_LEFT_TIP_X + 0.030, AXIS_Y - 0.018),
+    # Below and right of the right tip, outside its extension lines, so the
+    # dimension line stops at the value instead of running through the
+    # two-line callout under it (r1). The block is left-aligned on the
+    # dimension line, so it ends ~35 mm right of the anchor.
+    "AcrossFlat": (_RIGHT_TIP_X + 0.010, AXIS_Y - 0.022),
 }
+
+
+def _set_dome_reference(adapter: Any, annotations: list[Any]) -> None:
+    """Print DomeRadius as ``2X (SR3.18)``: both domes, a spherical reference
+    (the full hemisphere follows from the toleranced diameter). The display's
+    own radius prefix stays behind the ``(S``; the readback proves it stuck."""
+    (annotation,) = [
+        item for item in annotations if dimension_name(adapter, item) == "DomeRadius"
+    ]
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+    prefix = "2X (S" + existing
+    display.SetText(1, prefix)
+    display.SetText(2, ")")  # swDimensionTextSuffix
+    applied = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+    _telemetry.info(f"DomeRadius: prefix {existing!r} -> {applied[0]!r}")
+    if applied != (prefix, ")"):
+        raise RuntimeError(
+            f"failed to mark DomeRadius as a spherical reference: {applied}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -105,7 +154,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
             "Iso View Note",
         ),
         required=(
@@ -114,7 +162,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
             "Iso View Note",
         ),
     )
@@ -133,50 +180,50 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (front, right, iso):
+    for view in (right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # The end view carries no dimension: it shows the flat's chord on the
-    # round, and every size is in the side view.
-    curate_view_dimensions(
+    curated = curate_view_dimensions(
         adapter,
         right,
         keep=RIGHT_KEEP,
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # SolidWorks classifies a solid circular end silhouette under the same
-    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
-    # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to shaft end view")
+    # Rule 4: each three-place size names the mate and fit it serves.
+    set_dimension_callouts(
+        adapter,
+        curated,
+        {"ShaftDia": SHAFT_DIA_CALLOUT, "AcrossFlat": ACROSS_FLAT_CALLOUT},
+    )
+    _set_dome_reference(adapter, curated)
 
-    # The bearing O.D.'s roughness: picked on the end circle's RIGHTMOST point
-    # (the flat is on top), symbol up-right so the leader comes in from the
-    # right and never crosses the circle.
-    end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
+    # The bearing O.D.'s roughness, on the cylinder's own silhouette line
+    # (a revolve's flank is a SILHOUETTE edge), not on an end-view circle
+    # that is the dome and the cylinder at once (machinist review r1).
     add_surface_finish(
         adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] + end_radius, FRONT_CENTER[1]),
-        symbol_xy=(0.075, 0.222),
+        right,
+        edge_xy=FINISH_EDGE,
+        entity_type="SILHOUETTE",
+        symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="fulcrum bearing finish",
+        char_height=FINISH_CHAR_HEIGHT,
     )
 
     # 0.020: the note is left-aligned on its anchor, so the ink starts here. The
     # left bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame
     # rule now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
-    add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
-    # The iso renders at 1:2 while the title block reads 1:1, so the pictorial
-    # needs its own scale callout or the sheet misstates it. Placed at the same
-    # offset from ISO_CENTER that cylinder-gear-shaft uses for its identical 1:2
-    # iso (dx -0.030, dy -0.048), so the two sibling shafts read alike.
-    add_property_linked_note(adapter, "Iso View Note", 0.325, 0.157)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.115)
+    # The iso renders at 1:1 while the title block reads 2:1, so the pictorial
+    # needs its own scale callout; it stands in the empty lower-right corner
+    # of the iso's bounding box, clear of the title block.
+    add_property_linked_note(
+        adapter, "Iso View Note", ISO_CENTER[0] + 0.015, ISO_CENTER[1] - 0.022
+    )
 
     return await finalize_drawing(
         adapter,

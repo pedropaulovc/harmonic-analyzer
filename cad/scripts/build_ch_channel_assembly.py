@@ -17,8 +17,8 @@ the M6.8 mirror layer is gone).
   north ear, the bank's datum; south, on rocker 0's hub) +
   vn-rocker-bank-spring x1 (MHA-VN-053, the wave disc spring between the
   south washer and the south ear that preloads the bank north; #948 ruling R)
-  + fulcrum-shaft x1 (lever bank at (199.9, 1061.4); plain Ø6.35 x 161.35,
-  domed 0.5 proud of each keeper lug, set-screw flats up)
+  + fulcrum-shaft x1 (lever bank at (199.9, 1061.4); plain Ø6.35 x 162.4,
+  domed 1.025 proud of each keeper lug, set-screw flats up)
 * pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
   black foot-and-ear brackets on the rocker-arm-support's top, at the
   fit-up-located S/N stations (the old chrome pivot-ball-mount pair is retired

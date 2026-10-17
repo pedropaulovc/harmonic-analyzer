@@ -20,7 +20,7 @@ def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
 
 def test_every_marked_model_dimension_is_shown() -> None:
     marked = set().union(*ch_fulcrum_shaft_spec.DRAWING_DIMENSIONS.values())
-    displayed = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    displayed = set(drawing.RIGHT_KEEP)
     assert displayed == marked
 
 
@@ -37,9 +37,9 @@ def test_plain_shaft_domed_proud_of_each_keeper() -> None:
     spec = ch_fulcrum_shaft_spec
     keeper = ch_fulcrum_keeper_spec
     assert spec.SHAFT_DIA == keeper.BORE_DIA
-    assert spec.CYLINDER_HALF == keeper.KEEPER_Z_OFF + keeper.LUG_HALF_T + 0.5
+    assert spec.CYLINDER_HALF == keeper.KEEPER_Z_OFF + keeper.LUG_HALF_T + 1.025
     assert spec.DOME_R == spec.SHAFT_DIA / 2.0
-    assert math.isclose(spec.SHAFT_LENGTH, 161.35)
+    assert math.isclose(spec.SHAFT_LENGTH, 162.4)
 
 
 def test_flats_sit_under_the_keeper_taps() -> None:
@@ -64,22 +64,27 @@ def test_flat_chord_guard_is_the_least_chord_over_printed_band_corners() -> None
     assert min(chords) > spec.SET_SCREW_MAJOR_DIA
 
 
-def test_flat_pair_is_located_from_the_end() -> None:
-    # The print locates the -Z flat's outer edge off its dome tip and the +Z
-    # flat by the like-edge pitch; both at .XXX keep one shaft station that
-    # seats both cups, keeps each flat inside its lug and the cylinder past
-    # both lug faces, at the worst case of every printed and fit-up band.
+def test_flat_pair_is_baselined_from_one_end() -> None:
+    # Machinist review (baseline r1, rule 10): the stations were a chain
+    # (tip -> 4.925 -> 148.000). Both now run from the -Z dome tip: the -Z
+    # flat's outer edge and the +Z flat's inner edge, at .XX, with the
+    # overall length at .X; one shaft station still seats both cups, keeps
+    # each flat inside its lug and the cylinder past both lug faces, at the
+    # worst case of every printed and fit-up band.
     spec = ch_fulcrum_shaft_spec
-    assert math.isclose(spec.FLAT_FROM_END, 4.925)
-    assert "FlatFromEnd" in spec.DRAWING_DIMENSIONS["FlatProfile"]
-    assert "FlatFromEnd" in drawing.RIGHT_KEEP
-    assert spec.DRAWING_PRECISION["FlatProfile"]["FlatFromEnd"] == 3
-    assert spec.DRAWING_PRECISION["FlatProfile"]["FlatPitch"] == 3
-    assert spec.FLAT_STATION_WINDOW_MM > 0.0
-    assert round(spec.FLAT_STATION_WINDOW_MM, 3) == 0.14
+    assert math.isclose(spec.FLAT_FROM_END, 5.45)
+    assert math.isclose(spec.FLAT_BASELINE, 153.45)
+    assert {"FlatFromEnd", "FlatBaseline"} <= spec.DRAWING_DIMENSIONS["FlatProfile"]
+    assert {"FlatFromEnd", "FlatBaseline"} <= set(drawing.RIGHT_KEEP)
+    assert spec.DRAWING_PRECISION["ShaftProfile"]["OverallLength"] == 1
+    assert spec.DRAWING_PRECISION["FlatProfile"]["FlatFromEnd"] == 2
+    assert spec.DRAWING_PRECISION["FlatProfile"]["FlatBaseline"] == 2
+    assert spec.DRAWING_PRECISION["FlatProfile"]["FlatLength"] == 2
+    assert round(spec.FLAT_STATION_WINDOW_MM, 3) == 0.152
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '\'"ShaftLength" / 2 - "FlatPitch" / 2 - "FlatLength" / 2\'' in source
-    assert "FlatStation" not in source
+    assert '\'"ShaftLength" / 2 + "FlatPitch" / 2 - "FlatLength" / 2\'' in source
+    assert 'dims.record("FlatPitch"' not in source
 
 
 def _station_window(spec) -> float:
@@ -90,21 +95,28 @@ def _station_window(spec) -> float:
     )
 
 
-def test_no_station_dimension_can_drop_a_place(monkeypatch) -> None:
-    # Machinist review r8 asked for .X on 161.35 and .XX on 4.925 / 148.000.
-    # Band sensitivity at unchanged nominals: each one-place loosening, alone,
-    # closes the flat-station window (drawing-guidelines.md rule 17 (walls and webs)). Rounding the printed
-    # nominal to fewer places does not reopen it, so all three keep their places.
+def test_no_flat_station_dimension_can_drop_a_place(monkeypatch) -> None:
+    # Band sensitivity at unchanged nominals: each one-place loosening of a
+    # flat station or the flat length, alone, closes the flat-station window
+    # (drawing-guidelines.md rule 17); the overall length is already .X.
     spec = ch_fulcrum_shaft_spec
     assert math.isclose(_station_window(spec), spec.FLAT_STATION_WINDOW_MM)
-    assert spec.DRAWING_PRECISION["ShaftProfile"]["OverallLength"] == 2
-    looser = {"length": 0.8, "flat_from_end": 0.51, "flat_pitch": 0.51}
+    looser = {
+        "flat_from_end": ("flat_from_end",),
+        "flat_baseline": ("flat_baseline",),
+        "flat_length": ("front_flat", "rear_flat"),
+    }
     closed = {}
-    for key, band in looser.items():
+    for label, keys in looser.items():
         with monkeypatch.context() as patch:
-            patch.setitem(spec._STATION_BANDS, key, band)
-            closed[key] = round(_station_window(spec), 3)
-    assert closed == {"length": -0.15, "flat_from_end": -0.24, "flat_pitch": -0.128}
+            for key in keys:
+                patch.setitem(spec._STATION_BANDS, key, 0.8)
+            closed[label] = round(_station_window(spec), 3)
+    assert closed == {
+        "flat_from_end": -0.138,
+        "flat_baseline": -0.138,
+        "flat_length": -0.428,
+    }
 
 
 def test_both_flats_print_one_length_and_one_across_flat() -> None:
@@ -127,27 +139,95 @@ def test_both_flats_print_one_length_and_one_across_flat() -> None:
     )
 
 
-def test_side_view_texts_stand_clear_of_the_shaft_and_each_other() -> None:
-    # Machinist review r8: the Ø6.350 limit text crossed the silhouette. Ink
-    # extents are r8's printed ones (mm, about the text anchor): the limit
-    # block -3.6..+4.3 tall, 161.35 to +2.0 tall, ~2.1 mm a character.
-    spec = ch_fulcrum_shaft_spec
-    cx, cy = drawing.RIGHT_CENTER
+def test_side_view_texts_stand_clear_of_extension_lines() -> None:
+    # Machinist review (baseline r1): the 4.925 text was struck by the 148
+    # pitch's extension line. ~2.1 mm a character; each station text stands
+    # where no other dimension's extension line runs.
     keep = drawing.RIGHT_KEEP
-    dia_y = keep["ShaftDia"][1]
-    assert dia_y + 0.0043 + 0.003 <= cy - spec.SHAFT_DIA / 2000.0
-    assert dia_y - 0.0036 - 0.003 >= keep["OverallLength"][1] + 0.0020
-    # "2X 3.5" stands right of its flat, clear of the 148 pitch's extension
-    # line on the flat's other edge; "2X 6.050"'s upper arrow (on its own x)
-    # stays 10 mm right of the flat length's text and dimension line.
-    flat_outer = (
-        cx + (ch_fulcrum_keeper_spec.KEEPER_Z_OFF + spec.FLAT_LENGTH / 2) / 1000
-    )
+    char = 0.0021
+    left_tip, right_tip = drawing._LEFT_TIP_X, drawing._RIGHT_TIP_X
+    from_end_x, _ = keep["FlatFromEnd"]
+    # Outboard of the left tip, inside the left zone margin.
+    assert from_end_x + len("5.45") * char / 2.0 <= left_tip - 0.001
+    assert from_end_x - len("5.45") * char / 2.0 >= 0.0127 + 0.003
+    # Left of the right flat's inner edge, whose extension line rises to the
+    # baseline row; the right tip's only extension line rises past it.
     flat_x, flat_y = keep["FlatLength"]
-    half_width = len("2X 3.5") * 0.0021 / 2.0
-    assert flat_x - half_width >= flat_outer + 0.003
-    assert keep["AcrossFlat"][0] - (flat_x + half_width) >= 0.010
-    assert flat_y == keep["FlatFromEnd"][1]
+    assert flat_x + len("2X 3.50") * char / 2.0 <= drawing._RIGHT_FLAT_INNER_X - 0.001
+    rows = [keep[name][1] for name in ("FlatLength", "FlatBaseline", "OverallLength")]
+    assert rows == sorted(rows) and flat_y == keep["FlatFromEnd"][1]
+    # Machinist review r1: the across-flat value and callout sat between its
+    # own extension lines, which struck them. They now hang below the shaft,
+    # right of the dome tip. The block is left-aligned on the dimension line
+    # (r2 render: 15 characters ran 35 mm), and stays inside the border.
+    across_x, across_y = keep["AcrossFlat"]
+    widest = max(
+        len(line) for line in ch_fulcrum_shaft_spec.ACROSS_FLAT_CALLOUT.splitlines()
+    )
+    assert across_y + 0.004 <= drawing._SHAFT_BOTTOM_Y - 0.010
+    assert across_x > right_tip + 0.005
+    assert across_x + widest * 0.00235 <= 0.4318 - 0.0127 - 0.003
+    # Machinist review r1: the Ø callout block (hanging left of its line,
+    # ~36 characters) printed over the dome radius, and its upper limit
+    # (~7 mm over the anchor) inside the outline.
+    dia_x, dia_y = keep["ShaftDia"]
+    dia_widest = max(
+        len(line) for line in ch_fulcrum_shaft_spec.SHAFT_DIA_CALLOUT.splitlines()
+    )
+    dome_x, _ = keep["DomeRadius"]
+    assert dome_x + len("2X (SR3.18)") * char / 2.0 + 0.005 <= dia_x - dia_widest * char
+    assert dia_y + 0.007 + 0.003 <= drawing._SHAFT_BOTTOM_Y
+    # The Ra symbol (~35 x 15 mm right-up of its vertex) stands right of the
+    # Ø line and left of the across-flat callout.
+    finish_x, finish_y = drawing.FINISH_SYMBOL
+    assert finish_x > dia_x + 0.005
+    assert finish_x + 0.035 < across_x
+    assert finish_y + 0.015 < drawing._SHAFT_BOTTOM_Y
+    assert math.isclose(drawing.FINISH_EDGE[1], drawing._SHAFT_BOTTOM_Y)
+    # Machinist review r2: a row's last glyph meets the dimension's vertical
+    # leader, and a trailing ';' touched it.
+    for callout in (
+        ch_fulcrum_shaft_spec.SHAFT_DIA_CALLOUT,
+        ch_fulcrum_shaft_spec.ACROSS_FLAT_CALLOUT,
+    ):
+        assert all(line[-1].isalnum() for line in callout.splitlines())
+
+
+def test_three_place_sizes_name_their_mates() -> None:
+    # Rule 4: the shaft is the first-made part of the keeper fit, so its band
+    # stays here and the callout names the bores and their clearance; the
+    # across-flat size sets the set screw's engagement.
+    spec = ch_fulcrum_shaft_spec
+    keeper = ch_fulcrum_keeper_spec
+    assert spec.SHAFT_FIT_CLEARANCE_MM == (
+        keeper.BORE_DIA_BAND[1] - spec.SHAFT_DIA_BAND[0],
+        keeper.BORE_DIA_BAND[0] - spec.SHAFT_DIA_BAND[1],
+    )
+    assert "0.035-0.070 DIAMETRAL CLEARANCE" in spec.SHAFT_DIA_CALLOUT
+    assert "MHA-CH-007" in spec.SHAFT_DIA_CALLOUT
+    assert "MHA-CH-002" in spec.SHAFT_DIA_CALLOUT
+    assert "MHA-VN-055" in spec.ACROSS_FLAT_CALLOUT
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"ShaftDia": SHAFT_DIA_CALLOUT' in source
+    assert '"AcrossFlat": ACROSS_FLAT_CALLOUT' in source
+    assert "1/4 IN GROUND STOCK OK." in spec.DRAWING_NOTES
+
+
+def test_dome_prints_as_a_spherical_reference() -> None:
+    # Rule 7: the hemisphere is drawn and dimensioned, not a note.
+    spec = ch_fulcrum_shaft_spec
+    assert "HEMISPHERE" not in spec.DRAWING_NOTES
+    assert "DomeRadius" in spec.DRAWING_DIMENSIONS["FlatProfile"]
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'dims.record("DomeRadius", \'"ShaftDia" / 2\')' in source
+    assert '"2X (S" + existing' in Path(drawing.__file__).read_text(encoding="utf-8")
+
+
+def test_every_orthographic_view_is_at_sheet_scale() -> None:
+    assert drawing.SHEET_SCALE == (2.0, 1.0)
+    assert not hasattr(ch_fulcrum_shaft_spec, "END_VIEW_NOTE")
+    assert ch_fulcrum_shaft_spec.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
+    assert drawing.ISO_SCALE == (1, 1)
 
 
 def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:

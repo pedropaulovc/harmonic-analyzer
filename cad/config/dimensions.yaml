@@ -1101,7 +1101,7 @@ sections:
         - derived
         - med
       - - Lever fulcrum
-        - 'Ø6.5 pivot hole at 0; common plain Ø6.35 × 161.35 shaft (`ch-fulcrum-shaft`, domed R3.175 ends 0.5 proud of each keeper lug, one 0.3-deep × 3.5 set-screw flat per end on +Y at ±74.0) along Z at (x, y, centre-z) = (+199.9, 1061.4, −0.504 = the lever-hub bank mid-plane), with black end keepers (`ch-fulcrum-keeper`, MHA-CH-007) on the rail top face 1036.2: 6.0-thick lugs reamed through in one pass at their installed spacing, Ø6.35 +0.050/+0.035 running fit (0.010 running clearance kept over the 0.04 flatness zone of the MHA-FR-002 faced keeper-rail top), mid-planes z −0.504 ± 74.0 = −74.504/+73.496 (0.435 float to the integral lever-hub bank each side), a #1-72 × 5/32 cup-point set screw (MHA-VN-055) down through each crown onto its flat; outboard feet screwed by #2-56 × 7/16 frame-side screws (MHA-VN-022, McMaster 91794A080: head Ø3.556 × 2.1082, length 11.1125) into #2-56 blind rail taps (drill 11.5, thread 7.6) at z −0.504 ± 82.25 = −82.754/+81.746'
+        - 'Ø6.5 pivot hole at 0; common plain Ø6.35 × 162.4 shaft (`ch-fulcrum-shaft`, domed R3.175 ends 1.025 proud of each keeper lug, one 0.3-deep × 3.5 set-screw flat per end on +Y at ±74.0) along Z at (x, y, centre-z) = (+199.9, 1061.4, −0.504 = the lever-hub bank mid-plane), with black end keepers (`ch-fulcrum-keeper`, MHA-CH-007) on the rail top face 1036.2: 6.0-thick lugs reamed through in one pass at their installed spacing, Ø6.35 +0.050/+0.035 running fit (0.010 running clearance kept over the 0.04 flatness zone of the MHA-FR-002 faced keeper-rail top), mid-planes z −0.504 ± 74.0 = −74.504/+73.496 (0.435 float to the integral lever-hub bank each side), a #1-72 × 5/32 cup-point set screw (MHA-VN-055) down through each crown onto its flat; outboard feet screwed by #2-56 × 7/16 frame-side screws (MHA-VN-022, McMaster 91794A080: head Ø3.556 × 2.1082, length 11.1125) into #2-56 blind rail taps (drill 11.5, thread 7.6) at z −0.504 ± 82.25 = −82.754/+81.746'
         - —
         - 'p.40 bottom-left clevis = the shaft END mount; rail top = 1061.4 − 25.2 = 1036.2; ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive); keeper/shaft/set-screw geometry from `cad/scripts/ch_fulcrum_keeper_spec.py` and `cad/scripts/ch_fulcrum_shaft_spec.py` (2026-10-10 outward-foot rederive); tap from ch_fulcrum_keeper_spec KEEPER_TAP_SPEC'
         - measured
@@ -1141,7 +1141,7 @@ sections:
         - ch. 14 layout table
         - med
       - - Top-lever fulcrum shaft
-        - 'Ø6.35 × 161.35 domed (`ch-fulcrum-shaft`) along Z at (+199.9, 1061.4), centred on the lever-hub bank at z −0.504 — M6.5: 228.6 tips fell inside the west columns; 2026-10-10: ends 0.5 proud of the keeper lugs'
+        - 'Ø6.35 × 162.4 domed (`ch-fulcrum-shaft`) along Z at (+199.9, 1061.4), centred on the lever-hub bank at z −0.504 — M6.5: 228.6 tips fell inside the west columns; 2026-10-10: ends 0.5 proud of the keeper lugs; 2026-10-15: 1.025 proud, so the overall length prints at .X'
         - ch. 17 rows (2026-08-02 rederive)
         - med
       - - Top frame (NEW part)
