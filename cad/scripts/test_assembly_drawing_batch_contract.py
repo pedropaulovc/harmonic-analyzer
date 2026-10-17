@@ -18,6 +18,7 @@ from _drawing_view_configuration import (
 )
 import draw_ch_channel_assembly
 import draw_dt_drive_train_assembly
+import draw_ch_rocker_arm_tl_oblique_jig_assembly
 import draw_fr_frame_assembly
 import draw_ha_harmonic_analyzer_assembly
 import draw_mg_magnifier_assembly
@@ -48,6 +49,7 @@ ASSEMBLY_DRAWINGS = (
     draw_pd_paper_drive_assembly,
     draw_sm_summing_assembly,
     draw_ms_measuring_stick_assembly,
+    draw_ch_rocker_arm_tl_oblique_jig_assembly,
     draw_ha_harmonic_analyzer_assembly,
 )
 
@@ -57,7 +59,8 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     # The channel sheet left the shared builder when it gained the rocker
     # bank's fit-up steps (#743, Codex PRRT_kwDOPHDy386mRSOK); the paper-drive
     # sheet left it when it became three sheets with its own fit-up steps; the
-    # measuring-stick sheet is a full fitter package (BOM, explode, steps); the
+    # measuring-stick sheet is a full fitter package (BOM, explode, steps), as
+    # is the rocker's oblique-trammel jig (TL-000, a shop fixture); the
     # magnifier sheet left it when it gained the axle-stack details that print
     # the press gauge and the endshake (Codex PR #1330).
     if drawing
@@ -67,12 +70,13 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
         draw_ch_channel_assembly,
         draw_pd_paper_drive_assembly,
         draw_ms_measuring_stick_assembly,
+        draw_ch_rocker_arm_tl_oblique_jig_assembly,
         draw_mg_magnifier_assembly,
     )
 )
 
 
-def test_registry_contains_exactly_the_nine_assembly_drawings() -> None:
+def test_registry_contains_exactly_the_registered_assembly_drawings() -> None:
     registered = tuple(spec for spec in DRAWINGS if spec.source_kind == "assembly")
     assert {spec.script for spec in registered} == {
         Path(drawing.__file__).resolve() for drawing in ASSEMBLY_DRAWINGS
@@ -160,6 +164,18 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "ms_stick_spec.py",
                     "_mcmaster_91882a221.py",
                     "_mcmaster_90114a124.py",
+                )
+            } <= set(deps)
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_ch_rocker_arm_tl_oblique_jig_assembly:
+            scripts_dir = Path(drawing.__file__).resolve().parent
+            # The jig spec (poses, explode plan, BOM rows, steps text) and the
+            # calculator whose alignment targets the sheets print.
+            assert {
+                str(scripts_dir / name)
+                for name in (
+                    "ch_rocker_arm_tl_oblique_jig_assembly_spec.py",
+                    "ch_rocker_arm_tl_oblique_trammel_spec.py",
                 )
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps

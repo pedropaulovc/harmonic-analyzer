@@ -139,6 +139,9 @@ _INSERTED_SOURCES = {
     "pd_transgear_removable vn_transgear_retaining_ring "
     "pd_transgear_thumbnut",
     "ms_measuring_stick": "ms_stick ms_stop_block ms_stop_plate vn_ms_stop_plate_screw vn_thumb_screw",
+    "ch_rocker_arm_tl_oblique_jig": "ch_rocker_arm_tl_oblique_base_bar ch_rocker_arm_tl_oblique_carrier "
+    "ch_rocker_arm_tl_oblique_feed_lever ch_rocker_arm_tl_oblique_hub_pin ch_rocker_arm_tl_oblique_pivot_block "
+    "ch_rocker_arm_tl_oblique_pivot_pin ch_rocker_arm_tl_oblique_riser",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }
@@ -1396,7 +1399,9 @@ def test_references_is_inverse_of_dependents():
     for s in candidates:
         direct = {a for a in ASSEMBLY_ORDER if s in references_of(a)}
         legacy = set(dependents_of(s))
-        if direct and "ha_harmonic_analyzer" not in direct:
+        # Only a machine sub flows up to the top; a shop-fixture jig never does.
+        machine_direct = {a for a in direct if not bg.is_shop_fixture(a)}
+        if machine_direct and "ha_harmonic_analyzer" not in direct:
             assert legacy == direct | {"ha_harmonic_analyzer"}, (
                 f"{s}: legacy {legacy} != direct {direct} + transitive top"
             )
@@ -1424,7 +1429,7 @@ def test_top_references_only_subassemblies():
     T24), not here -- at the top level its leaf name would collide with the
     T12/T24 instances nested in drive-train / paper-drive."""
     refs = set(references_of("ha_harmonic_analyzer"))
-    subs = set(ASSEMBLY_ORDER) - {"ha_harmonic_analyzer"}
+    subs = set(bg.MACHINE_ASSEMBLIES) - {"ha_harmonic_analyzer"}
     assert len(subs) == 8
     assert refs == subs, refs
     assert not (refs & set(part_stems())), refs & set(part_stems())
@@ -1452,7 +1457,14 @@ def test_assemblies_depend_on_assembly_helpers():
     [
         (
             "_assembly_patterns",
-            {"dt_drive_train", "fr_frame", "mg_magnifier", "pd_paper_drive", "ms_measuring_stick"},
+            {
+                "dt_drive_train",
+                "fr_frame",
+                "mg_magnifier",
+                "pd_paper_drive",
+                "ms_measuring_stick",
+                "ch_rocker_arm_tl_oblique_jig",
+            },
         ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
         # paper_drive reads its crank axis from cone_line, not the builder.

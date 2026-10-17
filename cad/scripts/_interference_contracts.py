@@ -864,6 +864,19 @@ _MS_MEASURING_STICK_ALLOWED_PAIRS = {
     ),
 }
 
+# The rocker's oblique-trammel jig (MHA-CH-006-TL-000, shop fixture): the HUB
+# locator pin's Ø10.20 x 12 p6 seat fills the carrier's HUB, which the model
+# carries only as a Ø3 centre-drill spot because it is reamed in place on the
+# running jig. The pivot pins sit coincident in the carrier's Ø10 holes, the
+# riser and lever on its top: contact, not volume. Literals, like the rows
+# above; test_ch_rocker_arm_tl_oblique_jig_assembly pins them to the specs.
+JIG_HUB_PIN_SEAT = (10.20, 12.0)  # (diameter, length)
+_ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
+    frozenset(
+        ("ch-rocker-arm-tl-oblique-hub-pin-1", "ch-rocker-arm-tl-oblique-carrier-1")
+    ): 1.10 * math.pi * JIG_HUB_PIN_SEAT[0] ** 2 * JIG_HUB_PIN_SEAT[1] / 4.0,
+}
+
 _BY_ASSEMBLY: dict[str, Mapping[frozenset[str], float]] = {
     "ch-channel": _CHANNEL_ALLOWED_PAIRS,
     "dt-drive-train": _DRIVE_TRAIN_ALLOWED_PAIRS,
@@ -873,6 +886,7 @@ _BY_ASSEMBLY: dict[str, Mapping[frozenset[str], float]] = {
     "pn-pen": _PEN_ALLOWED_PAIRS,
     "pd-paper-drive": _PAPER_DRIVE_ALLOWED_PAIRS,
     "ms-measuring-stick": _MS_MEASURING_STICK_ALLOWED_PAIRS,
+    "ch-rocker-arm-tl-oblique-jig": _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS,
     "ha-harmonic-analyzer": _HARMONIC_ANALYZER_ALLOWED_PAIRS,
 }
 
