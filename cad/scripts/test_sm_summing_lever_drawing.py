@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from types import SimpleNamespace
 
 import pytest
@@ -490,10 +491,16 @@ def test_tap_section_cuts_the_outer_tap_through_the_rib_into_solid_plate() -> No
     rib_half = lever_build.edge_rib_half_height(x)
     low, high = drawing.TAP_SECTION_LINE_Y
     assert low < -rib_half and high > rib_half
-    (near_z, top), (far_z, bottom) = drawing.TAP_SECTION_CROP
-    assert bottom < -rib_half and top > rib_half
-    # The crop holds the end face, the drill point and plate past the rib.
-    assert near_z < end_z
+    # The crop circle holds the rib's four corners (end face and inboard
+    # face, full height), and the break past the drill point and the rib.
+    _, _, centre_z = drawing._TAP_SECTION_ANCHOR_MM
+    radius = drawing.TAP_SECTION_CROP_RADIUS
+    for z in (end_z, end_z + joint.RIB_DEPTH):
+        assert math.hypot(z - centre_z, rib_half) < radius
+    far_z = drawing._TAP_SECTION_FAR_Z
     assert far_z > end_z + joint.DRILL_DEPTH + joint.DRILL_DEPTH_BAND
     assert far_z > end_z + joint.RIB_DEPTH
     assert drawing.TAP_SECTION_BREAK[0][0] == drawing.TAP_SECTION_BREAK[-1][0] == far_z
+    assert all(
+        math.hypot(z - centre_z, y) < radius for z, y in drawing.TAP_SECTION_BREAK
+    )
