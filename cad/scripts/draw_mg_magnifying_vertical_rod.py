@@ -5,9 +5,11 @@ relief at the shoulder that seats on MHA-MG-002, a full hemisphere at the
 bottom. The rod axis is local +X, so the *Front view is the long side
 elevation, thread tip left.
 
-Sheet: the side view at 2:1 (the rod 265 mm long) carries the Ø5 (stock
-as supplied), the body length from the shoulder (origin circle on the
-shoulder), the overall "(132.5)" reference and the dome R; detail A, a
+Sheet: the side view at 2:1 (the rod 265 mm long) carries the Ø5, the body
+length from the shoulder (origin circle on the shoulder), the overall
+"(132.5)" reference, the dome R and the body's Ra 3.2 thumb-screw seat
+(the output fixture's screw bears wherever the fixture is set; its reason
+beside the symbol); detail A, a
 cropped 8:1 *Front model view (draw_pd_transgear_knob_shaft's detail-B
 recipe), carries the 7.5 threaded end: the thread length from the shoulder
 (origin circle) with the seat it guards, the relief's width, its Ø MAX and
@@ -49,6 +51,7 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_finish import add_surface_finish
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -57,6 +60,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _surface_finish import surface_finish_by_key
 from mg_magnifying_vertical_rod_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -65,8 +69,11 @@ from mg_magnifying_vertical_rod_spec import (
     RELIEF_ROOT_R_TOL_TYPE,
     RELIEF_ROOTS_CALLOUT,
     RELIEF_START_X,
+    ROD_DIA,
     ROD_LENGTH,
+    SEAT_FINISH_REASON,
     SHOULDER_X,
+    SURFACE_FINISHES,
     THREAD_CALLOUT,
     THREAD_MAJOR,
     TIP_CHAMFER,
@@ -115,8 +122,9 @@ DOME_TIP_X = _sheet_x(ROD_LENGTH)
 SIDE_KEEP = {
     "BodyLength": ((SHOULDER_SHEET_X + DOME_TIP_X) / 2.0, SIDE_CENTER[1] - 0.012),
     "OverallLength": (_sheet_x(0.25 * ROD_LENGTH), SIDE_CENTER[1] - 0.027),
-    # The Ø line crosses the body three quarters along, its two-line block
-    # above the rod, clear of detail A's rows and of the body length's text.
+    # The Ø line crosses the body three quarters along, its value above the
+    # rod, clear of detail A's rows, of the seat's reason and of the body
+    # length's text; a plain title-block .X size, no callout.
     "RodDia": (_sheet_x(0.75 * ROD_LENGTH), SIDE_CENTER[1] + 0.020),
     # Above-right of the dome: the leader lands on its upper quarter.
     "DomeR": (DOME_TIP_X + 0.012, SIDE_CENTER[1] + 0.017),
@@ -209,8 +217,6 @@ DRAWING_PRECISION_BY_NAME = {
 DIMENSION_CALLOUTS = {
     "BodyLength": "FROM SHOULDER",
     "ThreadLength": "FROM SHOULDER\nSEATS ON MHA-MG-002;\nTIP CLEARS ITS TAP",
-    # drawing-guidelines.md rule 4: the bar's own OD, no finishing pass.
-    "RodDia": "STOCK OK",
     "DomeR": "TANGENT HEMISPHERE",
 }
 # The roots' count stands above their one radius.
@@ -222,6 +228,18 @@ _ORIGIN_ARROWHEAD = 4  # swArrowStyle_e.swORIGIN_ARROWHEAD
 _CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
 # A point on the body face, clear of the Ø dimension line.
 CENTERLINE_PICK = (_sheet_x(0.2 * ROD_LENGTH), SIDE_CENTER[1] + 0.002)
+# The thumb-screw seat's Ra 3.2 (SURFACE_FINISHES "screw_seat") lands on the
+# body's top silhouette 0.45 along, inside the fixture screw's reach; the
+# symbol stands just over it and its reason above that (pd_support_bar's
+# stack), both in the clear field right of detail A's thread-length block
+# (right edge ~0.147, its shoulder extension line at 0.150) and left of the
+# Ø value (~0.251).
+_ROD_TOP_Y = SIDE_CENTER[1] + ROD_DIA / 2.0 * _S / 1000.0
+SEAT_FINISH_PICK = (_sheet_x(0.45 * ROD_LENGTH), _ROD_TOP_Y)
+SEAT_FINISH_SYMBOL = (SEAT_FINISH_PICK[0] + 0.002, _ROD_TOP_Y + 0.014)
+# The reason note's top-left corner (a note's position).
+SEAT_REASON_XY = (SEAT_FINISH_PICK[0] - 0.012, _ROD_TOP_Y + 0.032)
+FINISH_CHAR_HEIGHT = 0.0025
 ISO_NOTE_XY = (0.290, 0.160)
 
 
@@ -480,11 +498,26 @@ def _plain_text(text: str) -> str:
     return " ".join(str(text).split())
 
 
+def _add_view_note(
+    adapter: Any, view: Any, text: str, xy: tuple[float, float], *, label: str
+) -> None:
+    """A free note in ``view`` at ``xy`` (its top-left corner); a note that
+    did not land in its view raises."""
+    _activate_view(adapter, view, label=label)
+    if add_note(adapter, text, *xy) is None:
+        raise RuntimeError(f"failed to add the {label} note")
+    texts = [
+        _plain_text(_early_bound(found, "INote").GetText() or "")
+        for found in (_early_bound(view, "IView").GetNotes() or ())
+    ]
+    if texts.count(_plain_text(text)) != 1:
+        raise RuntimeError(f"{label} note did not land in its view: {texts!r}")
+
+
 def _label_detail(
     adapter: Any, detail: Any, side: Any, letter_xy: tuple[float, float]
 ) -> None:
-    """Label detail A beside its crop and letter its mark on the side view;
-    a note that did not land in its view raises."""
+    """Label detail A beside its crop and letter its mark on the side view."""
     sheet = _early_bound(
         _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
     )
@@ -496,15 +529,7 @@ def _label_detail(
         (detail, DETAIL_LABEL_TEXT, DETAIL_LABEL_XY, "thread-detail label"),
         (side, DETAIL_LETTER, letter_xy, "thread-detail letter"),
     ):
-        _activate_view(adapter, view, label=label)
-        if add_note(adapter, text, *xy) is None:
-            raise RuntimeError(f"failed to add the {label} note")
-        texts = [
-            _plain_text(_early_bound(found, "INote").GetText() or "")
-            for found in (_early_bound(view, "IView").GetNotes() or ())
-        ]
-        if texts.count(_plain_text(text)) != 1:
-            raise RuntimeError(f"{label} note did not land in its view: {texts!r}")
+        _add_view_note(adapter, view, text, xy, label=label)
 
 
 def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -673,10 +698,30 @@ async def build(adapter: Any) -> dict[str, str]:
         label="vertical rod thread callout",
         entity_type="SILHOUETTE",
     )
+    # The seat's symbol lands by a coordinate pick too, so it goes on before
+    # the mark circle.
+    add_surface_finish(
+        adapter,
+        side,
+        edge_xy=spt(*SEAT_FINISH_PICK),
+        entity_type="SILHOUETTE",
+        symbol_xy=spt(*SEAT_FINISH_SYMBOL),
+        leader_attach_xy=spt(*SEAT_FINISH_PICK),
+        control=surface_finish_by_key(SURFACE_FINISHES, "screw_seat"),
+        label="vertical rod thumb-screw seat finish",
+        char_height=FINISH_CHAR_HEIGHT,
+    )
     # The mark and the labels go on once every pick is done, so no
     # coordinate pick in the side view meets the mark circle.
     _mark_detail_on_side(adapter, side)
     _label_detail(adapter, detail, side, spt(*PARENT_LETTER_XY))
+    _add_view_note(
+        adapter,
+        side,
+        SEAT_FINISH_REASON,
+        spt(*SEAT_REASON_XY),
+        label="screw-seat reason",
+    )
 
     add_property_linked_note(adapter, "Iso View Note", *ISO_NOTE_XY)
     # The shaded isometric shows the #4-40 the callout names; imported before

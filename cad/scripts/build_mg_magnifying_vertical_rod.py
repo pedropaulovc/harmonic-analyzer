@@ -18,7 +18,9 @@ and length is a named dimension in that sketch, the thread length and the
 body length both from the shoulder, so the drawing inserts them as model
 items (mg_magnifying_vertical_rod_spec.DRAWING_DIMENSIONS). The overall is a
 driven reference dimension shown "(132.5)". The #4-40 end carries a cosmetic
-thread so the pictorial matches the callout.
+thread so the pictorial matches the callout. The Ø5 body cylinder, where the
+output fixture's thumb screw bears wherever the fixture is set, carries its
+Ra 3.2 seat finish as native model PMI (SURFACE_FINISHES).
 
 Run (SolidWorks already open)::
 
@@ -36,6 +38,7 @@ from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -72,6 +75,7 @@ from mg_magnifying_vertical_rod_spec import (
     ROD_THREAD_LEN_BAND,
     SHOULDER_X,
     SINGLE_LIMITS,
+    SURFACE_FINISHES,
     THREAD,
     THREAD_BASIC_MINOR,
     THREAD_MAJOR,
@@ -366,6 +370,9 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _author_reference_dimensions(adapter)
+    # The body's thumb-screw seat finish is native model PMI on its cylinder;
+    # the side view prints the same control.
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Iso View Note": ISO_VIEW_NOTE})
     return await save_part_and_images(adapter, PART_NAME)
 
