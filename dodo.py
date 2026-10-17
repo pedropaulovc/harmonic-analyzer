@@ -3543,7 +3543,16 @@ def task_check():
                     for template in DRAWING_TEMPLATES.values()
                 ),
             ],
-            "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
+            # Repo-relative (the gate runs with cwd=REPO_ROOT): ~290 absolute
+            # paths under a farm-run snapshot root exceed Windows' 32,767-char
+            # command line (WinError 206), failing the gate before pytest runs.
+            "cmd": [
+                *pytest_cmd,
+                *(
+                    str(path.resolve().relative_to(REPO_ROOT.resolve()))
+                    for path in recipe_tests
+                ),
+            ],
             # file_dep sees additions and edits, but a source file DELETED from
             # the submodule just drops out of the list -- doit never compares it
             # -- so the stamp stayed green (codex #1101). The manifest of paths
