@@ -2788,7 +2788,10 @@ def build_or_refresh(stem, dependencies, changed, targets):
       preserves the existing configuration): only referenced parts changed;
     * EXPLODE (``refresh_assembly.py <stem> explode``): only the explode closure
       changed (``_refresh_tier.explode_plan``): its named explodes are deleted
-      and re-authored in place.
+      and re-authored in place. A failed EXPLODE falls back to FULL in the same
+      task: a failure before its save leaves the saved bytes, proof and ledger
+      as they were, so the next build (or the next farm leaf restoring the same
+      base) would otherwise pick EXPLODE again and repeat the same failure.
 
     Before a FULL build of an explode-qualified stem the explode base
     (``_explode_base_key``) is restored when the cache has it, and the tier is
@@ -2871,11 +2874,12 @@ def build_or_refresh(stem, dependencies, changed, targets):
             _tag_cache_key(sp, cache_key)
             sp.set_attribute("mode", tier.value)
             sp.set_attribute("mode_reason", why)
-            if tier is RefreshTier.FULL:
+
+            def full_build(reason: str) -> None:
                 asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
                 _exec_com(
                     [sys.executable, str(asm_script)],
-                    f"FULL build {stem} ({why})",
+                    f"FULL build {stem} ({reason})",
                     log_stem=f"assembly-{stem}",
                     task=label,
                 )
@@ -2886,14 +2890,29 @@ def build_or_refresh(stem, dependencies, changed, targets):
                         log_stem=f"hook-{stem}-{hook.stem}",
                         task=label,
                     )
+
+            if tier is RefreshTier.FULL:
+                full_build(why)
             else:
                 refresh = SCRIPTS_DIR / "refresh_assembly.py"
-                _exec_com(
-                    [sys.executable, str(refresh), stem, tier.value],
-                    f"REFRESH {tier.value} {stem} ({why})",
-                    log_stem=f"assembly-{stem}",
-                    task=label,
-                )
+                try:
+                    _exec_com(
+                        [sys.executable, str(refresh), stem, tier.value],
+                        f"REFRESH {tier.value} {stem} ({why})",
+                        log_stem=f"assembly-{stem}",
+                        task=label,
+                    )
+                except RuntimeError as failed:
+                    if tier is not RefreshTier.EXPLODE:
+                        raise
+                    _telemetry.warn(
+                        f"{label}: EXPLODE refresh failed ({failed}); "
+                        "falling back to a FULL build"
+                    )
+                    tier, why = RefreshTier.FULL, f"EXPLODE failed; {why}"
+                    sp.set_attribute("mode", tier.value)
+                    sp.set_attribute("mode_reason", why)
+                    full_build(why)
             # _exec raised if the build failed, so we only get here on success: record
             # this build's inputs for the next run's tier decision.
             _stamp_assembly_execution(stem)
