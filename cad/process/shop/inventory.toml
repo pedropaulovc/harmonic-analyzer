@@ -3507,11 +3507,15 @@ source = "https://www.mcmaster.com/5972K41/"
 present = false
 verify = true
 purchase = "4 x McMaster-Carr 5972K41, steel sealed 6200-2RS ball bearing; $7.86 each, possession unconfirmed."
-note = "Read live 2026-10-16: 6200-2RS, Buna-N seals, steel, ABEC 1, DIN 625-1; 10 mm ID (-0.008/0), 30 mm OD (-0.009/0), 9 mm width (-0.12/0), C3 radial clearance 0.008-0.023 mm. Same nominal jig envelope; catalogue tolerances are not receipt metrology."
+note = "Read live 2026-10-16: 6200-2RS, Buna-N seals, steel, ABEC 1, DIN 625-1; 10 mm ID (-0.008/0), 30 mm OD (-0.009/0), 9 mm width (-0.12/0), C3 radial clearance 0.008-0.023 mm. Same nominal jig envelope; catalogue tolerances are not receipt metrology. Main ruling 2026-10-16: accept up to 0.023 mm pivot-centre movement, under 5% of the 0.5 mm edge band (8.0 +0.5/-0); in-situ pin-pair setting absorbs a constant offset. This is not a complete pivot-position error budget."
 cite = ["McMaster-Carr 5972K41 https://www.mcmaster.com/5972K41/ read live 2026-10-16: steel sealed 6200-2RS, 10 x 30 x 9 mm, $7.86 each"]
 # Rejected live 2026-10-16: 6661K21 adds a 34.7 mm OD x 1.12 mm retaining ring,
-# changing the external envelope. 6661K101 (ABEC 3) and 6153K74 (440C stainless)
-# retain the envelope but add unnecessary cost, not required by the jig.
+# changing the external envelope. 6661K101 (ABEC 3) still has C3 0.008-0.023 mm.
+# 6153K74 is a verified normal-clearance upgrade (C0 0.002-0.013 mm, same
+# 10 x 30 x 9 envelope, 440C stainless, $31.43 each). Main rejects the upgrade:
+# $125.72 vs $31.44 for four is not justified for 0.010 mm less maximum play,
+# given the edge band and in-situ setting above. No jig design change.
+# Sources: https://www.mcmaster.com/6153K74/ and https://www.mcmaster.com/6661K101/
 
 [fixtures.trammel-cl-dowel]
 kind = "dowel_pin"
