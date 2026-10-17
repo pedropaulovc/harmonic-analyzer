@@ -689,8 +689,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the faced crossbar top; no thread
         "pd_latch_hook",  # MHA-PD-014 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "vn_lever_wire",  # wire, wrapped in the fixture's spigot groove; no thread
-        "mg_magnifying_bracket",  # 1018 steel MHA-MG-003 collar light-press seat with Loctite 638; flange has two counterbored normal #2 clearance holes, no thread
-        "mg_magnifying_lever",  # Ø6 domed brass lever; press MHA-MG-001 collar onto its east cylinder while holding the rod near its end, then retain with Loctite 638
+        "mg_magnifying_bracket",  # 1018 steel MHA-MG-003 collar light-press seat (press only, #1570); flange has two plain #2 clearance holes (heads on its front face), no thread
+        "mg_magnifying_lever",  # Ø6 domed brass lever; press MHA-MG-001 collar onto its east cylinder while holding the rod near its end; the press alone retains it
         "mg_magnifying_wheel",  # reamed .1890 running bore + two Ø1 wire-tie holes; no thread
         "mg_wheel_drum",  # MHA-MG-010 brass drum pressed on the wheel's spigot; no thread
         "mg_wheel_axle_spacer",  # MHA-MG-011 brass sleeve, drilled clearance on the wheel axle; no thread

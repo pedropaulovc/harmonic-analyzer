@@ -12,4 +12,4 @@ mg-magnifying-bracket:
   # No fit_class: the collar is a light PRESS seat for the MHA-MG-003 lever rod
   # (user ruling; limits and Lamé strength in mg_lever_press_fit_geom), not a
   # running fit; the screwed seat on the summing lever remains static.
-  process: "machined from 1018 cold-drawn solid stock; collar bore reamed or bored as the press seat for the MHA-MG-003 lever rod; press the collar onto the rod held near its end and retain with Loctite 638 at assembly"
+  process: "machined from 1018 cold-drawn solid stock; collar bore reamed or honed to Ra 0.8 as the matched press seat for the MHA-MG-003 lever rod (0.007-0.014 diametral interference); press the collar onto the rod held near its end; the press alone retains it"

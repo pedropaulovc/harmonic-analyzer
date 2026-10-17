@@ -48,6 +48,7 @@ from magnifying_bracket_joint_layout import (
     SIDE_PLATE_Z,
 )
 from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA
+from mg_lever_press_fit_geom import collar_edge_bending, press_holding
 from mg_magnifying_clamp_geom import BLOCK_HEIGHT as CLAMP_HEIGHT
 from mg_magnifying_clamp_geom import HEX_AF as CLAMP_HEX_AF
 from mg_magnifying_lever_geom import ROD_LENGTH as LEVER_ROD_LENGTH
@@ -249,3 +250,40 @@ if SCREW_SHEAR_STRESS > SCREW_SHEAR_ALLOWABLE:
 # The worst load already carries the +50 % guide friction: no separation.
 if JOINT_PRELOAD_MARGIN <= 1.0:
     raise AssertionError("magnifying bracket #2-56 joint separates under prying")
+
+# --- collar press: the lever held by the press alone (#1570, PRESS ONLY) -------
+# The lever rod runs along machine X through the collar. Wire 1 and the group's
+# weight load it in the A1 plane through its axis, so the rod sees axial _FX
+# and the bending _MZ (carried by the collar bore in bearing) but nominally no
+# twist. The twist is bounded by putting the whole wire tension and group
+# weight one lever diameter out of that plane.
+COLLAR_TWIST_OFFSET = LEVER_ROD_DIA
+COLLAR_TORQUE_DEMAND_NMM = (
+    WIRE1_TENSION_MAX_N + LEVER_GROUP_N
+) * COLLAR_TWIST_OFFSET  # 70 N mm
+PRESS_HOLDING = press_holding(abs(_FX), COLLAR_TORQUE_DEMAND_NMM)
+# 241 N against 2.9 N; 724 N mm against 70 N mm at the loosest corner, after
+# DIN 7190 smoothing (effective 0.00188 of the 0.007 minimum).
+PRESS_HOLDING_MARGIN_MIN = 3.0
+if min(PRESS_HOLDING["axial_margin"], PRESS_HOLDING["torque_margin"]) < (
+    PRESS_HOLDING_MARGIN_MIN
+):
+    raise AssertionError(
+        "the collar press alone does not hold the lever 3x at its loosest corner"
+    )
+# The bending _MZ tilts the press pressure along the straight cylinder
+# (6 M / (d L^2) at each edge). At the loosest corner it exceeds the moment
+# that just unloads one edge (890 N mm), so that edge carries the couple in
+# bearing; the pressure stays a positive part of a linear field, whose integral
+# (the friction's normal force) cannot fall below the uniform press's, so the
+# holds above stand. At the tightest, thinnest-wall corner the loaded edge's
+# Lamé von Mises is 399 MPa, past the 1018 collar's 370 yield: a local,
+# self-limiting edge yield the owner accepted (#1570 ruling b) because no
+# stock collar OD brings it under 0.9 x yield (the edge bearing does not fall
+# with OD). The uniform press stays under that limit (330.8 MPa).
+COLLAR_EDGE_BENDING = collar_edge_bending(abs(_MZ))
+COLLAR_EDGE_VON_MISES_MAX_MPA = 400.0  # the accepted edge yield's pinned ceiling
+if COLLAR_EDGE_BENDING["edge_von_mises_tight_mpa"] > COLLAR_EDGE_VON_MISES_MAX_MPA:
+    raise AssertionError(
+        "the collar edge's bending yield grew past its accepted 400 MPa"
+    )

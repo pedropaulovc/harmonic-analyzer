@@ -185,6 +185,7 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
 _PRESS_BUDGET_KEYS = {
     "interference_nominal",
     "interference_min",
+    "interference_effective_min",
     "interference_max",
     "engagement",
     "strength_outer_diameter_mm",
@@ -260,7 +261,11 @@ def test_light_press_budget_is_the_lame_collar_inside_strength() -> None:
     assert press.PRESS_ZONE_DIA == 6.0
     assert press.PRESS_ZONE_DIA_BAND == (0.0, -0.006)
     assert press.COLLAR_BORE_DIA == 5.986
-    assert press.COLLAR_BORE_BAND == (0.006, 0.0)
+    assert press.PRESS_INTERFERENCE_LIMITS == (0.007, 0.014)
+    # DIN 7190:1988 smoothing on Ra 0.8 bore and land, Rz = 4 Ra: 5.12 um.
+    assert (press.COLLAR_BORE_RA_UM, press.ROD_LAND_RA_UM) == (0.8, 0.8)
+    assert (press.RZ_PER_RA, press.SMOOTHING_FACTOR) == (4.0, 0.8)
+    assert press.SMOOTHING == pytest.approx(0.00512, abs=1e-12)
     assert press.COLLAR_ENGAGEMENT == 7.0
     assert press.COLLAR_LENGTH == 10.0
     assert press.COLLAR_LENGTH_BAND == (0.0, -0.05)
@@ -291,14 +296,16 @@ def test_light_press_budget_is_the_lame_collar_inside_strength() -> None:
     assert set(budget) == _PRESS_BUDGET_KEYS
     assert all(type(value) is float for value in budget.values())
 
-    # Corners restated from the printed limits, not from the owner's arithmetic.
-    loosest = (6.000 - 0.006) - (5.986 + 0.006)
-    tightest = 6.000 - 5.986
-    assert budget["interference_nominal"] == pytest.approx(0.014, abs=1e-12)
+    # Corners restated from the printed limits, not from the owner's arithmetic:
+    # the bore is matched to the measured land, so the interference is its own.
+    loosest, tightest = 0.007, 0.014
+    assert budget["interference_nominal"] == pytest.approx(6.000 - 5.986, abs=1e-12)
     assert budget["interference_min"] == pytest.approx(loosest, abs=1e-12)
     assert budget["interference_max"] == pytest.approx(tightest, abs=1e-12)
-    assert budget["interference_min"] == pytest.approx(0.002, abs=1e-12)
-    assert budget["interference_max"] == pytest.approx(0.014, abs=1e-12)
+    assert budget["interference_effective_min"] == pytest.approx(
+        0.007 - 0.8 * 4.0 * (0.8 + 0.8) / 1000.0, abs=1e-12
+    )
+    assert budget["interference_effective_min"] == pytest.approx(0.00188, abs=1e-12)
     # Independent radius corners: longest cylinder at Rmin, longest dome at
     # Rmax in the smallest bore, not the coupled contact of one physical rod.
     contact_envelope = (
@@ -352,7 +359,7 @@ def test_light_press_budget_is_the_lame_collar_inside_strength() -> None:
     assert budget["strength_contact_pressure_mpa"] < budget["contact_pressure_mpa"]
 
     # Every guard holds at the printed fit.
-    assert budget["interference_min"] > 0.0
+    assert budget["interference_effective_min"] > 0.0
     assert budget["interference_max"] <= 0.0010 * 25.4
     assert budget["collar_von_mises_mpa"] < 0.9 * 370.0
     assert 0.9 * 370.0 - budget["collar_von_mises_mpa"] == pytest.approx(2.175498, abs=1e-6)
@@ -368,8 +375,7 @@ def test_press_guard_rejects_a_fit_that_yields_the_collar() -> None:
     # evaluated through the owner's keyword inputs: its constants stay put.
     heavy = press.press_fit_budget(
         press_zone_dia_band=(0.0, -0.008),
-        collar_bore_dia=5.976,
-        collar_bore_band=(0.008, 0.0),
+        interference_limits=(0.008, 0.024),
     )
     # It clears the slip and FN2 guards, so only strength can refuse it.
     assert heavy["interference_min"] == pytest.approx(0.008, abs=1e-12)
@@ -392,7 +398,7 @@ def test_press_guard_rejects_a_fit_that_yields_the_collar() -> None:
         press.check_press_fit_budget(heavy)
 
     # Each of the other guards refuses on its own key.
-    slips = {**press.PRESS_FIT_BUDGET, "interference_min": 0.0}
+    slips = {**press.PRESS_FIT_BUDGET, "interference_effective_min": 0.0}
     with pytest.raises(AssertionError, match="loosest"):
         press.check_press_fit_budget(slips)
     over_fn2 = {**press.PRESS_FIT_BUDGET, "interference_max": 0.0255}
@@ -410,7 +416,9 @@ def test_candidate_slip_guard_handles_zero_or_absent_dome_contact(bore_dia: floa
 
     # Equal/oversize bores still produce a budget for the existing slip guard;
     # no partial dome exists and no negative square-root argument is evaluated.
-    slips = press.press_fit_budget(collar_bore_dia=bore_dia)
+    slips = press.press_fit_budget(
+        interference_limits=(6.0 - bore_dia - 0.012, 6.0 - bore_dia)
+    )
     assert slips["interference_min"] < 0.0
     assert slips["interference_max"] <= 0.0
     assert slips["engagement"] == pytest.approx(7.003, rel=0.0, abs=1e-12)
@@ -433,7 +441,7 @@ def test_total_press_force_includes_dome_axial_normal_bound() -> None:
     import mg_lever_press_fit_geom as press
 
     radius_max = (press.PRESS_ZONE_DIA + press.PRESS_ZONE_DIA_BAND[0]) / 2.0
-    bore_radius_min = (press.COLLAR_BORE_DIA + press.COLLAR_BORE_BAND[1]) / 2.0
+    bore_radius_min = (radius_max * 2.0 - press.PRESS_INTERFERENCE_LIMITS[1]) / 2.0
     projected_area = math.pi * (radius_max**2 - bore_radius_min**2)
     budget = press.PRESS_FIT_BUDGET
     axial_normal_bound = budget["contact_pressure_mpa"] * projected_area
@@ -465,9 +473,10 @@ def test_press_instruction_rounds_force_up_and_keeps_the_rod_out_of_column_loadi
     assert maximum_kn <= press.PRESS_FORCE_MAX_KN < maximum_kn + 0.1
     assert press.PRESS_FORCE_MAX_KN == 3.0
     lines = press.PRESS_INSTALLATION_NOTES.splitlines()
-    assert len(lines) == 3
+    assert len(lines) == 2
     assert "COLLAR ONTO LEVER; HOLD ROD NEAR END" in lines[0]
     assert "END FLUSH WITH OUTER FACE" in lines[1]
     assert f"{press.PRESS_FORCE_MAX_KN:.1f} kN MAX AT TIGHT FIT" in lines[1]
-    assert "LOCTITE 638" in lines[2]
-    assert "ALTERNATIVE: SOFT SOLDER OR BRAZE" in lines[2]
+    # #1570: the press alone retains the lever; no bond is called for.
+    assert "LOCTITE" not in press.PRESS_INSTALLATION_NOTES
+    assert "SOLDER" not in press.PRESS_INSTALLATION_NOTES

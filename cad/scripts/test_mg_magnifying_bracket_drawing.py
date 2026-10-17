@@ -154,14 +154,18 @@ def test_collar_press_seat_is_native_and_reads_the_press_contract() -> None:
     # fit bore names its process; the mate is the lever part, by number and
     # name (machinist review: "rod" read as another part), and the fit is the
     # press contract's diametral interference, matched to that lever.
-    # Machinist review r2 (rule 12): the process says how far -- THRU.
+    # Machinist review r2 (rule 12): the process says how far -- THRU.  Owner
+    # ruling (#1570): reamed or honed, the processes that hold its Ra 0.8.
     bore_callout = drawing.SIDE_CALLOUTS["CollarBore"]
     assert bore_callout is mg_magnifying_bracket_spec.COLLAR_BORE_CALLOUT
-    assert bore_callout == (
-        "REAM OR BORE THRU: 0.002-0.014\nDIAMETRAL INTERFERENCE ON\nMHA-MG-003 LEVER"
-    )
     budget = press.PRESS_FIT_BUDGET
-    assert f"{budget['interference_min']:.3f}-{budget['interference_max']:.3f}" in bore_callout
+    assert bore_callout == (
+        f"REAM OR HONE THRU: {budget['interference_min']:.3f}-"
+        f"{budget['interference_max']:.3f}\nDIAMETRAL INTERFERENCE ON\nMHA-MG-003 LEVER"
+    )
+    assert (budget["interference_min"], budget["interference_max"]) == (
+        press.PRESS_INTERFERENCE_LIMITS
+    )
     assert "ROD" not in bore_callout
     assert all(len(row) <= 30 for row in bore_callout.splitlines())
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -188,11 +192,7 @@ def test_collar_bore_matched_fit_stays_inside_the_press_budget() -> None:
         press.PRESS_ZONE_DIA + press.PRESS_ZONE_DIA_BAND[0],
     ):
         offset = rod - press.PRESS_ZONE_DIA
-        matched = press.press_fit_budget(
-            press_zone_dia_band=(offset, offset),
-            collar_bore_dia=rod - budget["interference_max"],
-            collar_bore_band=(0.0, 0.0),
-        )
+        matched = press.press_fit_budget(press_zone_dia_band=(offset, offset))
         press.check_press_fit_budget(matched)
         assert matched["interference_max"] == pytest.approx(budget["interference_max"])
         for key in ("press_force_max_n", "collar_von_mises_mpa", "engagement"):
@@ -225,7 +225,8 @@ def test_collar_bore_keeps_the_templates_one_center_mark(monkeypatch) -> None:
     assert "auto_center_marks" not in imported
     assert drawing._CENTER_MARK_ANNOTATION == 13
     assert "_prove_collar_centre_mark(adapter, side, bore_axis)" in source
-    assert "bore_axis = _collar_axis(adapter, side, _collar_bore_rim(side_edges))" in source
+    assert "bore_rim = _collar_bore_rim(side_edges)" in source
+    assert "bore_axis = _collar_axis(adapter, side, bore_rim)" in source
     assert "curate_hidden_dimensions(" in source
     assert "add_native_hole_callout(" in source
 
@@ -366,7 +367,7 @@ def test_part_stamps_make_critical_properties() -> None:
     # The collar is a press seat, not a running fit (user ruling 2026-10-11).
     assert "fit_class" not in config
     assert "1018 cold-drawn solid stock" in config["process"]
-    assert "reamed or bored" in config["process"]
+    assert "reamed or honed to Ra 0.8" in config["process"]
     assert "press seat for the MHA-MG-003 lever rod" in config["process"]
 
 
@@ -1064,6 +1065,85 @@ def test_side_view_diameters_read_above_the_collar_clear_of_the_axis_witnesses()
     assert '{name: section[name] for name in ("SeatToAxis", ARM_END_REFERENCE)}' in source
     assert drawing._OD_LANDING == (0.8, 1.2) and drawing._BORE_LANDING == (0.5, 1.5)
     assert drawing._RIM_KEEP_OUT == 0.8
+
+
+# A finish symbol's ink from its insertion point at 2.5 mm text, measured on
+# the feed pinion's run 20261001T110844152Z: left of the root by 2.1, right to
+# the "Ra" text's corner at 14.7, up 7.2; the bent leader's fixed shelf 6.35.
+_FINISH_INK_MM = (-2.1, 0.0, 14.7, 7.2)
+_FINISH_SHELF_MM = 6.35
+
+
+def test_collar_bore_prints_its_ra_on_the_side_view_rim_clear_of_the_arm() -> None:
+    """Owner ruling (#1570): the bore is reamed or honed to Ra 0.8, the press
+    budget's DIN 7190 smoothing input.  The part owns the control on the bore
+    cylinder and authors it as model PMI; the side view prints it natively on
+    the near rim the bore axis is read from, in the lower-right quadrant: the
+    ink under the axis witnesses, right of the collar, left of the arm end
+    reference's column and over its rows, the leader (its shelf run left,
+    toward the rim) leaving the OD rim clear of the arm's corner."""
+    import mg_lever_press_fit_geom as press
+    from _surface_finish import GROUND, GROUND_UM, surface_finish_by_key
+
+    finishes = mg_magnifying_bracket_spec.SURFACE_FINISHES
+    (control,) = finishes
+    assert control is surface_finish_by_key(finishes, "collar_bore")
+    assert control.roughness_um == GROUND_UM == press.COLLAR_BORE_RA_UM
+    assert control.roughness_ra == GROUND
+    assert control.face.diameter_mm == press.COLLAR_BORE_DIA
+    assert control.production_method == ""  # the callout names the process
+    assert drawing.SURFACE_FINISHES is finishes and part.SURFACE_FINISHES is finishes
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in part_source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'control=surface_finish_by_key(SURFACE_FINISHES, "collar_bore")' in source
+    assert "edge_entity=bore_rim.edge" in source
+    assert "leader_attach_xy=_collar_finish_landing(bore_axis)" in source
+    assert "char_height=COLLAR_FINISH_CHAR_HEIGHT" in source
+    assert "roughness_ra=" not in source
+    proven = source.index("_prove_collar_diameters_clear(\n")
+    assert proven < source.index("add_surface_finish(\n")
+
+    # The landing: on the bore rim, right of the axis and 1 mm and more under
+    # the axis witnesses.
+    radius = press.COLLAR_BORE_DIA / 2.0
+    landing = drawing._collar_finish_landing((SIDE_OX / 1000.0, SIDE_OY / 1000.0))
+    lx, ly = (v * 1000.0 for v in landing)
+    assert math.hypot(lx - SIDE_OX, ly - SIDE_OY) == pytest.approx(radius)
+    assert lx > SIDE_OX and SIDE_OY - ly >= 1.0
+    # The symbol's ink stands 2.0 mm (the native audit's arrow-to-text gap)
+    # off every neighbour.
+    sx, sy = (v * 1000.0 for v in drawing.COLLAR_FINISH_XY)
+    k = drawing.COLLAR_FINISH_CHAR_HEIGHT / 0.0025
+    left, bottom, right, top = (
+        sx + _FINISH_INK_MM[0] * k,
+        sy + _FINISH_INK_MM[1] * k,
+        sx + _FINISH_INK_MM[2] * k,
+        sy + _FINISH_INK_MM[3] * k,
+    )
+    od_r = part.COLLAR_OD / 2.0
+    assert top + 2.0 <= SIDE_OY
+    assert left - 2.0 >= SIDE_OX + od_r
+    # The arm end reference's line runs up its column to the witness, its
+    # arrowhead 0.6 mm either side; its rows' top is the requested y + 8.1 mm
+    # (pre-A1 rows y 170.5..185.1 mm requested at 177 mm).
+    column_x, rows_y = (v * 1000.0 for v in drawing.ARM_END_REFERENCE_XY)
+    assert right + 2.0 <= column_x - 0.6
+    assert bottom - 2.0 >= rows_y + 8.1
+    # The leader: from the shelf's left end to the landing, it leaves the OD
+    # rim right of the arm's lower face (Y -3) and over the arm's corner on
+    # the collar, 1.5 mm and more from it.
+    shelf_x = sx - _FINISH_SHELF_MM * k
+    arm_x = SIDE_OX - part.ARM_Y[0]
+    corner = (arm_x, SIDE_OY - math.sqrt(od_r**2 - (arm_x - SIDE_OX) ** 2))
+    dx, dy = lx - shelf_x, ly - sy
+    fx, fy = shelf_x - SIDE_OX, sy - SIDE_OY
+    a, b, c = dx * dx + dy * dy, 2.0 * (fx * dx + fy * dy), fx * fx + fy * fy - od_r**2
+    t = (-b - math.sqrt(b * b - 4.0 * a * c)) / (2.0 * a)
+    exit_xy = (shelf_x + t * dx, sy + t * dy)
+    assert 0.0 < t < 1.0
+    assert shelf_x > arm_x and exit_xy[0] > arm_x and exit_xy[1] > corner[1]
+    assert math.dist(exit_xy, corner) >= 1.5
 
 
 def test_collar_length_reads_banded_on_its_own_feature_and_names_its_stack() -> None:

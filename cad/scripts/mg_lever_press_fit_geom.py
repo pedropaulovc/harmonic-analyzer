@@ -13,12 +13,18 @@ geom asserts its configured collar window IS this zone, the rod's tip flush
 with the collar's outer face.
 
 p.46 "firmly affixed to the summing lever" (user ruling 2026-10-11; LIGHT PRESS
-approved by Main): the rod's last PRESS_ZONE_LENGTH seats end-flush in the
-bracket collar. Its cylindrical COLLAR_ENGAGEMENT is a LIGHT PRESS retained with
-Loctite 638. The R3 dome is not part of the banded cylindrical zone, but the
-partial hemisphere still larger than the bore contributes press contact.
-The rod is modelled at nominal diameter; the cylinder's stock-select/lap band
-and collar-bore band are native (upper, lower) ``_fit_deviations`` on their prints.
+approved by Main; #1570 PRESS ONLY, no bond): the rod's last PRESS_ZONE_LENGTH
+seats end-flush in the bracket collar. Its cylindrical COLLAR_ENGAGEMENT is a
+LIGHT PRESS that holds the joint by itself: ``press_holding`` below, which
+mg_magnifying_bracket_arm_check sets against the lever's load at the collar.
+The R3 dome is not part of the banded cylindrical zone, but the partial
+hemisphere still larger than the bore contributes press contact.
+The rod is modelled at nominal diameter; the cylinder's stock-select/lap band is
+a native (upper, lower) ``_fit_deviations`` band on MHA-MG-003. The collar bore
+is a MATCHED fit (#1570 owner ruling): MHA-MG-001 prints a reference nominal
+and PRESS_INTERFERENCE_LIMITS on the measured press zone, so the interference
+is the bore's own band, independent of the rod's. The model bore is the
+tightest corner on the nominal rod.
 ``_interference_contracts`` restates the print-worst triple
 (PRESS_ZONE_DIA, COLLAR_BORE_DIA, COLLAR_ENGAGEMENT_MAX) as literals its test pins
 to these names; the model's nominal engagement remains COLLAR_ENGAGEMENT.
@@ -55,8 +61,24 @@ COLLAR_LENGTH = PRESS_ZONE_LENGTH  # end-flush collar, modelled at its maximum l
 COLLAR_LENGTH_BAND = (0.0, -0.05)
 PRESS_ZONE_DIA = ROD_DIA  # the model's rod, 6.000
 PRESS_ZONE_DIA_BAND = (0.0, -0.006)  # (upper, lower): select or lap the stock
-COLLAR_BORE_DIA = 5.986  # bored to size on the bracket
-COLLAR_BORE_BAND = (0.006, 0.0)  # (upper, lower)
+# (min, max) diametral interference the bore is finished to on the measured
+# press zone (#1570): 0.007 so the loosest joint still grips after its surface
+# peaks flatten (SMOOTHING below); 0.014 the collar-strength ceiling.
+PRESS_INTERFERENCE_LIMITS = (0.007, 0.014)
+COLLAR_BORE_DIA = 5.986  # the model: the tightest interference on the 6.000 rod
+if abs(COLLAR_BORE_DIA - (PRESS_ZONE_DIA - PRESS_INTERFERENCE_LIMITS[1])) > 1e-12:
+    raise AssertionError("the model bore is not the tightest matched corner")
+# DIN 7190 smoothing: pressing flattens each surface's peaks, so the effective
+# interference is the measured one less SMOOTHING_FACTOR * (Rz bore + Rz rod).
+# 0.8 is DIN 7190:1988's factor, twice DIN 7190-1:2017's 0.4. Rz is taken as
+# RZ_PER_RA x Ra. The bore prints Ra 0.8 (reamed or honed; _surface_finish
+# GROUND). The rod's selected or lapped drawn-brass land is not printed and is
+# taken at the same Ra 0.8 (drawn bright stock is that or finer).
+COLLAR_BORE_RA_UM = 0.8
+ROD_LAND_RA_UM = 0.8
+RZ_PER_RA = 4.0
+SMOOTHING_FACTOR = 0.8
+SMOOTHING = SMOOTHING_FACTOR * RZ_PER_RA * (COLLAR_BORE_RA_UM + ROD_LAND_RA_UM) / 1000.0
 # End-flush: the rod's east dome tip sits flush with the collar's outer face
 # (mg_magnifying_lever_geom asserts its configured window ends there), so the
 # rod's cylinder, which ends where that dome starts (ROD_DIA / 2 back from the
@@ -93,7 +115,7 @@ def _press_contact_envelope(rod_min: float, rod_max: float, bore_min: float) -> 
 COLLAR_ENGAGEMENT_MAX = _press_contact_envelope(
     PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[1],
     PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[0],
-    COLLAR_BORE_DIA + COLLAR_BORE_BAND[1],
+    PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[0] - PRESS_INTERFERENCE_LIMITS[1],
 )
 # ANSI B4.1 table 8, class FN2 (medium drive fit) for the rod's size range
 # 0.12..0.24 in: 0.2 .. 1.0 thou of diametral interference. A CAP only: the
@@ -148,15 +170,16 @@ def _collar_lame(interference: float, collar_od: float) -> tuple[float, float, f
 def press_fit_budget(
     *,
     press_zone_dia_band: tuple[float, float] = PRESS_ZONE_DIA_BAND,
-    collar_bore_dia: float = COLLAR_BORE_DIA,
-    collar_bore_band: tuple[float, float] = COLLAR_BORE_BAND,
+    interference_limits: tuple[float, float] = PRESS_INTERFERENCE_LIMITS,
 ) -> dict[str, float]:
-    """Worst-case diametral interference of the collar press (mm) from the two
-    printed bands, the whole-contact envelope it acts over, and collar stress
-    and press-in force at the TIGHT corner. ``interference_min`` is the loosest
-    corner (smallest rod in the largest bore); ``interference_max`` the
-    tightest. The keyword arguments default to the printed fit; a caller can
-    evaluate a candidate fit without touching these constants.
+    """Worst-case diametral interference of the collar press (mm), the
+    whole-contact envelope it acts over, and collar stress and press-in force
+    at the TIGHT corner. The bore is matched to the measured rod, so
+    ``interference_min`` / ``interference_max`` are ``interference_limits``
+    themselves, on any rod in its band; ``interference_effective_min`` is the
+    loosest corner after SMOOTHING. The keyword arguments default to the
+    printed fit; a caller can evaluate a candidate fit without touching these
+    constants.
 
     The collar OD's inherited .XX band moves stress and force in opposite
     directions, so each is read at its own print corner with the tightest
@@ -186,10 +209,9 @@ def press_fit_budget(
     rod has zero dome projected area."""
     rod_max = PRESS_ZONE_DIA + press_zone_dia_band[0]
     rod_min = PRESS_ZONE_DIA + press_zone_dia_band[1]
-    bore_max = collar_bore_dia + collar_bore_band[0]
-    bore_min = collar_bore_dia + collar_bore_band[1]
+    interference_min, interference_max = interference_limits
+    bore_min = rod_max - interference_max  # the smallest bore any rod is matched to
     engagement_max = _press_contact_envelope(rod_min, rod_max, bore_min)
-    interference_max = rod_max - bore_min
     strength_pressure, collar_hoop, collar_von_mises = _collar_lame(
         interference_max, COLLAR_OD_MIN
     )
@@ -205,8 +227,9 @@ def press_fit_budget(
     dome_normal_force = force_pressure * dome_projected_area
     friction_low, friction_high = PRESS_FRICTION
     return {
-        "interference_nominal": PRESS_ZONE_DIA - collar_bore_dia,
-        "interference_min": rod_min - bore_max,
+        "interference_nominal": PRESS_ZONE_DIA - COLLAR_BORE_DIA,
+        "interference_min": interference_min,
+        "interference_effective_min": interference_min - SMOOTHING,
         "interference_max": interference_max,
         "engagement": engagement_max,
         "strength_outer_diameter_mm": COLLAR_OD_MIN,
@@ -221,11 +244,13 @@ def press_fit_budget(
 
 
 def check_press_fit_budget(budget: dict[str, float]) -> None:
-    """Refuse a press that slips at its loosest corner, exceeds the FN2 cap at
-    its tightest, or loads the collar bore past COLLAR_STRESS_LIMIT_MPA at its
-    thinnest-wall strength corner."""
-    if budget["interference_min"] <= 0.0:
-        raise AssertionError("the collar press must interfere at its loosest band corner")
+    """Refuse a press that slips at its loosest corner after smoothing,
+    exceeds the FN2 cap at its tightest, or loads the collar bore past
+    COLLAR_STRESS_LIMIT_MPA at its thinnest-wall strength corner."""
+    if budget["interference_effective_min"] <= 0.0:
+        raise AssertionError(
+            "the collar press must interfere at its loosest band corner after smoothing"
+        )
     if budget["interference_max"] > PRESS_INTERFERENCE_MAX_FN2 + 1e-9:
         raise AssertionError("the collar press exceeds ANSI FN2 at its tightest band corner")
     if not budget["collar_von_mises_mpa"] < COLLAR_STRESS_LIMIT_MPA:
@@ -254,6 +279,72 @@ PRESS_INSTALLATION_NOTES = "\n".join(
     (
         "LIGHT PRESS COLLAR ONTO LEVER; HOLD ROD NEAR END.",
         f"LEVER END FLUSH WITH OUTER FACE; {PRESS_FORCE_MAX_KN:.1f} kN MAX AT TIGHT FIT.",
-        "RETAIN WITH LOCTITE 638; ALTERNATIVE: SOFT SOLDER OR BRAZE.",
     )
 )
+
+
+def press_holding(axial_demand_n: float, torque_demand_nmm: float) -> dict[str, float]:
+    """What the press alone holds at its LOOSEST corner (#1570).
+
+    The smallest effective interference (``interference_effective_min``, after
+    smoothing) in the thinnest collar wall (COLLAR_OD_MIN, the softest, lowest
+    pressure) at low friction, over the SHORTEST straight cylinder: the
+    shortest collar less the largest dome radius; the dome's contact is not
+    counted. Axial hold is ``mu * p * pi * d * L``; torsional hold is that
+    times ``d / 2``. The demands are the caller's (the lever's load at the
+    collar). Returns each capacity and its ratio to its demand."""
+    pressure, _, _ = _collar_lame(
+        PRESS_FIT_BUDGET["interference_effective_min"], COLLAR_OD_MIN
+    )
+    length = _straight_length_min()
+    axial = PRESS_FRICTION[0] * pressure * math.pi * PRESS_ZONE_DIA * length
+    torque = axial * PRESS_ZONE_DIA / 2.0
+    return {
+        "contact_pressure_min_mpa": pressure,
+        "length_min": length,
+        "axial_hold_n": axial,
+        "torque_hold_nmm": torque,
+        "axial_margin": axial / axial_demand_n,
+        "torque_margin": torque / torque_demand_nmm,
+    }
+
+
+def _straight_length_min() -> float:
+    """The shortest straight cylinder in the collar: shortest collar less the
+    largest dome radius."""
+    return (
+        COLLAR_LENGTH
+        + COLLAR_LENGTH_BAND[1]
+        - (PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[0]) / 2.0
+    )
+
+
+def collar_edge_bending(moment_nmm: float) -> dict[str, float]:
+    """The collar's bending couple on the rod (#1570): a moment about the rod's
+    normal redistributes the press pressure linearly along the straight
+    cylinder, adding ``6 M / (d L^2)`` at one collar edge and taking it off
+    the other.
+
+    ``opening_moment_loose_nmm`` is the moment that unloads an edge at the
+    loosest effective corner, ``p d L^2 / 6``: under it the whole length
+    still grips; past it that edge carries the couple in bearing, not
+    friction. ``edge_von_mises_tight_mpa`` is the collar bore's Lamé von Mises
+    at the tightest, thinnest-wall corner with the edge's added bearing:
+    above yield it is a local, self-limiting edge yield (owner ruling b); the
+    uniform press stays under COLLAR_STRESS_LIMIT_MPA."""
+    length = _straight_length_min()
+    edge_bearing = 6.0 * moment_nmm / (PRESS_ZONE_DIA * length**2)
+    loose_pressure, _, _ = _collar_lame(
+        PRESS_FIT_BUDGET["interference_effective_min"], COLLAR_OD_MIN
+    )
+    tight_pressure, tight_hoop, _ = _collar_lame(
+        PRESS_FIT_BUDGET["interference_max"], COLLAR_OD_MIN
+    )
+    ratio = tight_hoop / tight_pressure
+    edge_pressure = tight_pressure + edge_bearing
+    return {
+        "edge_bearing_mpa": edge_bearing,
+        "opening_moment_loose_nmm": loose_pressure * PRESS_ZONE_DIA * length**2 / 6.0,
+        "edge_pressure_tight_mpa": edge_pressure,
+        "edge_von_mises_tight_mpa": edge_pressure * math.sqrt(ratio**2 + 1.0 + ratio),
+    }

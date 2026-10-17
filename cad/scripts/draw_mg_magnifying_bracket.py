@@ -23,8 +23,9 @@ front face.  One third-angle set (blind machinist review, mreview09):
   duplicate flange-to-axis reference.
 - RIGHT SIDE (``*Right`` TURNED so model +Z runs down the sheet and pinned by
   projection at the front view's origin height): the collar end-on with its
-  OD and its bore -- a reference nominal under the matched-fit callout --
-  (near-side single-arrow leaders), and, from the part's
+  OD and its bore -- a reference nominal under the matched-fit callout, its
+  Ra 0.8 finish symbol on the rim -- (near-side single-arrow leaders), and,
+  from the part's
   blanked ``ArmSection`` witness, the arm's lower face from the bore axis
   (controlling) and the bore axis' ONE toleranced chain along Z -- the
   flange's mounting face from the axis, the arm's end past that face --
@@ -66,6 +67,7 @@ from _drawing_dimensions import (
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
+from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leaders import (
@@ -99,7 +101,9 @@ from mg_magnifying_bracket_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_REFERENCE_PRECISION,
     FLANGE_DEPTH_CALLOUT,
+    SURFACE_FINISHES,
 )
+from _surface_finish import surface_finish_by_key
 from mg_magnifying_lever_geom import COLLAR_HALF_LEN
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_bracket"]
@@ -440,6 +444,22 @@ SIDE_SECTION_KEEP = {
 ARM_END_REFERENCE = "arm end from bore axis"
 ARM_END_REFERENCE_XY = (SIDE_AXIS_X + 0.031, 0.201)
 ARM_END_REFERENCE_CALLOUT = "ARM END\nFROM BORE AXIS"
+# The collar bore's Ra 0.8 (SURFACE_FINISHES "collar_bore", the press
+# budget's smoothing input): a native symbol in the side view's lower-right
+# quadrant, the one corner free of ink -- under the axis witnesses (y 230.15
+# mm), right of the arm (x <= 231 mm), left of the arm end reference's column
+# (x 259 mm, its arrowhead from y 226.6 mm up) and over its rows (top ~209.1
+# mm).  The leader lands on the near bore rim 20 deg under the axis, 1.0 mm
+# under the witnesses; the smart-side bent leader's 6.35 mm shelf runs left
+# from the symbol toward it, so the leader climbs steeply and leaves the OD
+# rim 45 deg under the axis, 1.6 mm from the arm's corner on the collar.  The
+# fleet's 2.5 mm finish text, at the feed pinion's measured ink (run
+# 20261001T110844152Z), puts the symbol over x 238.9..255.7 mm, y 220.5..
+# 227.7 mm.  add_surface_finish proves the symbol attached to the rim and the
+# leader landed where requested.
+COLLAR_FINISH_ANGLE = math.radians(-20.0)
+COLLAR_FINISH_XY = (SIDE_AXIS_X + 0.013, FRONT_ORIGIN_Y - 0.00965)
+COLLAR_FINISH_CHAR_HEIGHT = 0.0025
 # swDimensionType_e: swLinearDimension, swHorLinearDimension,
 # swVertLinearDimension. Angular type 3 is never a linear distance.
 _LINEAR_DIMENSION_TYPES = (2, 11, 12)
@@ -661,6 +681,16 @@ def _collar_axis(adapter: Any, side: Any, rim: ViewEdge) -> tuple[float, float]:
     cx, cy, cz, *_ = rim.circle
     return model_point_in_view(
         adapter, side, (cx / 1000.0, cy / 1000.0, cz / 1000.0), label="collar bore axis"
+    )
+
+
+def _collar_finish_landing(bore_axis: tuple[float, float]) -> tuple[float, float]:
+    """Where the bore finish's leader lands on the near rim (sheet metres): the
+    side view prints at 1:1, so the rim stands the bore's radius off its axis."""
+    radius = COLLAR_BORE_DIA / 2000.0
+    return (
+        bore_axis[0] + radius * math.cos(COLLAR_FINISH_ANGLE),
+        bore_axis[1] + radius * math.sin(COLLAR_FINISH_ANGLE),
     )
 
 
@@ -1201,9 +1231,11 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("ArmPastSeat: controlling dimension has no display annotation")
     _set_callout_below(overhang_display, SECTION_CALLOUTS["ArmPastSeat"], "ArmPastSeat")
     # One sweep of the side view's edges serves the sheet reference's two
-    # picks and the bore axis both proofs below measure from.
+    # picks, the bore finish's rim and the bore axis both proofs below
+    # measure from.
     side_edges = scan_view_edges(side, label="bracket collar end")
-    bore_axis = _collar_axis(adapter, side, _collar_bore_rim(side_edges))
+    bore_rim = _collar_bore_rim(side_edges)
+    bore_axis = _collar_axis(adapter, side, bore_rim)
     section[ARM_END_REFERENCE] = _arm_end_reference(adapter, side, side_edges)
     # The side view's ink is read back once it has settled: no dimension line
     # over a foreign witness under the arm, and the diameters' leaders clear
@@ -1214,6 +1246,16 @@ async def build(adapter: Any) -> dict[str, str]:
         diameters,
         {name: section[name] for name in ("SeatToAxis", ARM_END_REFERENCE)},
         axis=bore_axis,
+    )
+    add_surface_finish(
+        adapter,
+        side,
+        edge_entity=bore_rim.edge,
+        symbol_xy=COLLAR_FINISH_XY,
+        leader_attach_xy=_collar_finish_landing(bore_axis),
+        control=surface_finish_by_key(SURFACE_FINISHES, "collar_bore"),
+        label="collar bore finish",
+        char_height=COLLAR_FINISH_CHAR_HEIGHT,
     )
     bottom_edges = scan_view_edges(bottom, label="bracket mounting face")
     rims = _mounting_rims(bottom_edges)
