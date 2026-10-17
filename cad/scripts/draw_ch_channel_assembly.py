@@ -96,7 +96,12 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_Z_OFF,
     SET_SCREW_THREAD as KEEPER_SET_SCREW_THREAD,
 )
-from ch_pivot_bracket_spec import SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
+from ch_pivot_bracket_sides import FOOT_Z1 as BRACKET_FOOT_Z1
+from ch_pivot_bracket_spec import (
+    FOOT_H as BRACKET_FOOT_H,
+    FOOT_W as BRACKET_FOOT_W,
+    SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT,
+)
 from ch_pivot_shaft_spec import DOME_HEIGHT
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from frame_column_stations import COLUMN_X
@@ -170,6 +175,21 @@ EXPLODED_ISO_CENTER = (0.100, 0.140)
 # leader 14 2.1-4.4 mm off the shaft, with the ring 5 mm inside the border at
 # the top and 6 mm at the bottom.
 BALLOON_MARGIN = 0.028
+# Balloon 3 (the rocker pivot bracket) walked to its ear's apex. Lifted 60
+# straight up its foot hole, which lies in front of the ear, the hold-down
+# (item 7) now stands right over that apex in the isometric, so leader 3 ran
+# down the hold-down's head and shank to its landing (proof run
+# 20261017T222049387Z, sheet 2). Its landing is the foot's free end instead:
+# the edge drawn sheet-left of it, at half the foot's height, about 9.5 model
+# mm left of the hold-down's axis. It falls after the hold-down's landing in
+# the ring's attachment order, so leader 3 swaps ring slots with leader 7 and
+# runs left of the hold-down. Part frame (ch_pivot_bracket_spec): the foot
+# spans x -FOOT_W/2..FOOT_W/2 and z ..FOOT_Z1, the north bracket unturned.
+BRACKET_BALLOON_POINT_MM = (
+    -BRACKET_FOOT_W / 2.0,
+    BRACKET_FOOT_H / 2.0,
+    BRACKET_FOOT_Z1,
+)
 BOM_ANCHOR = (0.205, 0.262)
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
@@ -1096,7 +1116,10 @@ def _place_exploded_sheet(
         exploded,
         items=items,
         anchors={
-            stem: BalloonAnchor(instance=north_instances[stem])
+            stem: BalloonAnchor(
+                point_mm=BRACKET_BALLOON_POINT_MM if stem == asm.BRACKET else None,
+                instance=north_instances[stem],
+            )
             for stem in BOM_COMPONENTS
         },
         label="channel exploded-view BOM coverage",
