@@ -1568,19 +1568,18 @@ def _relax_cluster_slide(
         )
         for item in landings
     ]
-    # The ring holds each balloon's centre BALLOON_RADIUS inside the border;
-    # the rendered circle runs a fraction over that (farm r10: the carrier's
-    # top CL-dowel balloon), so the border check keeps the ring's contract and
-    # the title block, which the relax moves toward, the rendered ink's.
-    left, bottom, right, top = SHEET_INNER_BORDER
+    # The relax moves the ring sideways only, so it answers for the side
+    # borders, held to the ring's contract (each centre BALLOON_RADIUS
+    # inside), and the title block it moves toward, held to the rendered ink.
+    # The ring's own heights stand (farm r10/r13: the carrier's top CL-dowel
+    # balloon, its 5.20 ink 0.2 over the ring's 5.00, unmoved by the relax).
+    left, _bottom, right, _top = SHEET_INNER_BORDER
     k0, k1, k2, k3 = TITLE_BLOCK_KEEP_OUT
     for item, (x, y, radius) in zip(landings, circles, strict=True):
         reach = min(radius, BALLOON_RADIUS)
         if (
             x - reach < left
-            or y - reach < bottom
             or x + reach > right
-            or y + reach > top
             or (
                 x + radius > k0
                 and x - radius < k2
@@ -1590,7 +1589,7 @@ def _relax_cluster_slide(
         ):
             raise RuntimeError(
                 f"{label}: {item.instance} balloon at {(x, y)!r}, radius "
-                f"{radius:.5f}, leaves the border or enters the title block"
+                f"{radius:.5f}, leaves the side borders or enters the title block"
             )
     return landings
 
