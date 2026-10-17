@@ -1203,7 +1203,10 @@ def test_collar_length_reads_banded_on_its_own_feature_and_names_its_stack() -> 
     three-row block (y 215.7..230.3 mm pre-A1, the line at the lowest row's
     baseline); the stack row makes four, so the value rose one row pitch.
     Machinist review r2: r3b then printed the stack's "0.00" upper limit
-    against the drawable top, so the block sits 1.5 mm lower."""
+    against the drawable top, so the block sits 1.5 mm lower.  r4 (rule 14):
+    centred over the collar's own span the arrows sat under "MHA-MG-003" and
+    the witnesses ran up into it; the block hangs right of the span instead,
+    its near end over a text height clear of the east witness."""
     import mg_lever_press_fit_geom as press
 
     callout = drawing.DIMENSION_CALLOUTS["CollarLen"]
@@ -1231,6 +1234,12 @@ def test_collar_length_reads_banded_on_its_own_feature_and_names_its_stack() -> 
     assert x > 0.139 + SHIFT_X
     assert x + half < drawing.SIDE_KEEP["CollarOd"][0] - 0.01365 - 0.0035
     assert x - half > 0.020  # inside the sheet's left border
+    # The front view prints sheet x = 98 + X mm: the collar's witnesses stand
+    # at its end faces, X -+COLLAR_HALF_LEN.  The rows (centred on x, the
+    # widest the lowest, the one the line shelves) start past the east one.
+    east_witness = 0.098 + part.COLLAR_HALF_LEN / 1000.0
+    assert len(rows[-1]) == max(len(row) for row in rows)
+    assert x - half - east_witness > TEXT_HEIGHT + 0.002
     assert drawing.FRONT_KEEP["FlangeWidth"][0] < x
     assert "ArmDepth" not in drawing.FRONT_KEEP
 
@@ -2212,8 +2221,9 @@ def test_arm_root_corners_carry_one_max_radius() -> None:
     edges -- the arm's west face and both its Y faces on the flange's front
     face and on its mounting face (the arm's east face is flush with the
     flange's east end) -- take one fillet whose radius prints as a single MAX
-    limit (swTolMAX) over a callout naming ALL of them, the part model at the
-    printed max; the bounding box is unchanged."""
+    limit (swTolMAX) over a callout naming ALL the arm's inside corners (the
+    collar's two join it in r4: see the collar-root test), the part model at
+    the printed max; the bounding box is unchanged."""
     spec = mg_magnifying_bracket_spec
     assert spec.ARM_ROOT_R_MAX == 1.0
     assert spec.ARM_ROOT_R_BAND == (0.0, -spec.ARM_ROOT_R_MAX)
@@ -2222,7 +2232,7 @@ def test_arm_root_corners_carry_one_max_radius() -> None:
     assert spec.DRAWING_PRECISION["ArmRootFillet"] == {"ArmRootR": 1}
     assert "ArmRootR" in drawing.FRONT_KEEP
     callout = drawing.DIMENSION_CALLOUTS["ArmRootR"]
-    assert callout == "ALL ARM\nROOT\nCORNERS"
+    assert callout == "ALL ARM\nINSIDE\nCORNERS"
     # No label row wider than the value ("R1.0 max."), so the block keeps the
     # 24.8 mm width the layout comment clears.
     assert max(len(row) for row in callout.splitlines()) <= len("R1.0 max.")
@@ -2275,15 +2285,95 @@ def test_mounting_face_arm_root_fillets_clear_the_summing_lever() -> None:
     # Still clear with the lever's width and the bracket's arm each at the
     # title block's .XX extreme and the flange's position band.
     assert gap - 2.0 * joint.LINEAR_BAND - joint.POSITION_BAND > 0.0
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'name_last_feature(adapter, "ArmRootFillet")' in source
-    assert 'name_dimensions(adapter, "ArmRootFillet", ["ArmRootR"])' in source
-    assert "drive_jobs.append((arm_root[0], '\"ArmRootRMax\"'))" in source
-    assert "(1.0 - math.pi / 4.0) * ARM_ROOT_R_MAX ** 2" in source
-    assert "tolerance.Type = RADIUS_TOL_TYPE" in source
-    assert source.index("apply_drawing_precision(adapter, DRAWING_PRECISION)") < source.index(
-        "_arm_root_radius_max_limit(adapter)\n    clear_dimensions_for_drawing"
+
+
+def test_collar_root_rounds_add_only_outside_the_od() -> None:
+    """Machinist review r4 blocker (rule 16): where the arm's Y faces leave
+    the Ø12 collar OD the front-view corners printed sharp.  Owner ruling:
+    the same R1.0 MAX in the same ArmRootFillet, so the one callout covers
+    them.  A concave round adds material only in the corner outside the OD,
+    so the press bore, the collar wall and the press pair are untouched; the
+    rounds stop at the collar's end planes, and they stand ~95 mm from the
+    summing lever's seat."""
+    import _interference_contracts as contracts
+    import magnifying_bracket_joint_layout as joint
+    import mg_lever_press_fit_geom as press
+
+    spec = mg_magnifying_bracket_spec
+    od_r = part.COLLAR_OD / 2.0
+    r = spec.ARM_ROOT_R_MAX
+    edges = part.COLLAR_ROOT_EDGES
+    assert [point[1] for point, _length in edges] == list(part.ARM_Y)
+    for (x, y, z), length in edges:
+        # Each edge point lies on its arm Y face AND on the OD, mid-collar.
+        assert x == 0.0 and math.hypot(y, z) == pytest.approx(od_r)
+        assert length == 2.0 * part.COLLAR_HALF_LEN
+    # The arm's X faces are flush with the collar's end faces: the rounds run
+    # end plane to end plane, nothing past them (the clamp block may stand
+    # against that face at minimum magnification).
+    assert part.COLLAR_HALF_LEN == part.ARM_HALF_X
+    # The arm starts buried in the wall: off the bore, inside the OD at both
+    # Y faces, so each Y face leaves the OD in ONE line (at the old Z 4.0 the
+    # +Y corner stood hypot 6.021 outside it, a 0.028 notch, no single edge).
+    assert press.COLLAR_BORE_DIA / 2.0 < part.ARM_Z[0]
+    assert all(math.hypot(y, part.ARM_Z[0]) < od_r for y in part.ARM_Y)
+    assert math.hypot(part.ARM_Y[1], 4.0) > od_r
+
+    def section(offset: float, cylinder_r: float, n: int = 4000):
+        """The round's section traced point by point (shoelace, independent
+        of the build's closed form): edge E, plane tangency, the round's arc
+        about its centre to the cylinder tangency, the cylinder back to E."""
+        cu = offset + r
+        cv = math.sqrt((cylinder_r + r) ** 2 - cu * cu)
+        start = math.pi
+        stop = math.atan2(-cv, -cu) + 2.0 * math.pi
+        points = [(offset, math.sqrt(cylinder_r ** 2 - offset ** 2)), (offset, cv)]
+        points += [
+            (cu + r * math.cos(t), cv + r * math.sin(t))
+            for t in (start + (stop - start) * i / n for i in range(1, n + 1))
+        ]
+        b0 = math.atan2(points[-1][1], points[-1][0])
+        b1 = math.atan2(points[0][1], points[0][0])
+        points += [
+            (cylinder_r * math.cos(t), cylinder_r * math.sin(t))
+            for t in (b0 + (b1 - b0) * i / n for i in range(1, n))
+        ]
+        area = abs(sum(
+            x0 * y1 - x1 * y0
+            for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1])
+        )) / 2.0
+        return area, points
+
+    for (_x, y, _z), _length in edges:
+        area, points = section(abs(y), od_r)
+        assert part.plane_cylinder_fillet_area(abs(y), od_r, r) == pytest.approx(area, rel=1e-6)
+        # Every point of the round's section is at or outside the OD: no
+        # material inside it, so the bore and the wall the press loads stay.
+        assert min(math.hypot(u, v) for u, v in points) >= od_r - 1e-9
+        # The face proof's station sits inside this round's box.
+        station_y, station_z = part.collar_root_round_station(y)
+        us = [math.copysign(u, y) for u, _v in points]
+        vs = [v for _u, v in points]
+        assert min(us) < station_y < max(us) and min(vs) < station_z < max(vs)
+    # A plane-plane right angle is the limit of a huge cylinder.
+    assert part.plane_cylinder_fillet_area(0.0, 1.0e6, r) == pytest.approx(
+        (1.0 - math.pi / 4.0) * r * r, rel=1e-3
     )
+    assert part.COLLAR_ROOT_VOLUME == pytest.approx(0.5878, abs=1e-4)
+    # The press pair's allowance is the rod/bore annulus over the press
+    # envelope: its diameters are the rod's and the bore's, both inside the
+    # OD the rounds sit outside of, so the contract does not move.
+    triple = contracts._MG_LEVER_PRESS_TRIPLE_MM
+    assert triple[:2] == (press.PRESS_ZONE_DIA, press.COLLAR_BORE_DIA)
+    assert max(triple[:2]) / 2.0 < od_r
+    # The rounds stay at the collar, ~95 mm from the summing lever's seat.
+    top_z = max(part.collar_root_round_station(y)[1] for y in part.ARM_Y) + r
+    assert joint.SEAT_PLANE_Z - (joint.BRACKET_ORIGIN[2] + top_z) > 90.0
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "ARM_ROOT_EDGES + COLLAR_ROOT_EDGES" in source
+    assert "v_arm_root = v_flange_root + COLLAR_ROOT_VOLUME" in source
+    assert "contains_y_mm=collar_root_round_station(face_y)[0]" in source
+    assert "contains_z_mm=collar_root_round_station(face_y)[1]" in source
 
 
 @pytest.mark.parametrize("returned", [None, "", True, 1, object()])
