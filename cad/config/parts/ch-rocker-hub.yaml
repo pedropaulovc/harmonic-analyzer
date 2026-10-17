@@ -1,0 +1,13 @@
+ch-rocker-hub:
+  title: Rocker Hub
+  number: MHA-CH-012
+  # Component of the built-up MHA-CH-006 (ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE);
+  # test_part_coverage counts it reachable through that part.
+  component_of: ch-rocker-arm
+  material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-finish round
+  # Black oxide once, on the joined MHA-CH-006, after its bore and length are finished.
+  finish: black oxide on joined MHA-CH-006
+  quantity: 20
+  tolerance_class: machined_block
+  process: "turned from 1018 round: land turned to the p6 press band, bore drilled and length parted off long; pressed into MHA-CH-013, then bore and length finished on MHA-CH-006"

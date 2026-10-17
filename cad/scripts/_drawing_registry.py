@@ -390,6 +390,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_hub",
+        part="ch_rocker_hub",
+        artifact_stem="ch-rocker-hub",
+        script_name="draw_ch_rocker_hub.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="ch_rocker_strap",
+        part="ch_rocker_strap",
+        artifact_stem="ch-rocker-strap",
+        script_name="draw_ch_rocker_strap.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_connecting_rod",
         part="ch_connecting_rod",
         artifact_stem="ch-connecting-rod",

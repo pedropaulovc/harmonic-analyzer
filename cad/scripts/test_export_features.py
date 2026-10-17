@@ -734,7 +734,7 @@ def test_unsupported_part_is_rejected_without_a_bundle(tmp_path: Path) -> None:
         exporter.write_manifest("unrelated_part", tmp_path / "missing.STEP", revision="v40")
 
 
-@pytest.mark.parametrize("stem,module", [("ch_rocker_arm", rocker_notes), ("ch_pivot_shaft", shaft), ("dt_cone_pivot_post", cone)])
+@pytest.mark.parametrize("stem,module", [("ch_pivot_shaft", shaft), ("dt_cone_pivot_post", cone)])
 def test_construction_uses_the_actual_drawing_notes_and_explicit_permission(monkeypatch, stem, module) -> None:
     original = exporter.requirement_manifest(stem)
     assert original["construction"] == "one_piece"
@@ -750,6 +750,13 @@ def test_construction_uses_the_actual_drawing_notes_and_explicit_permission(monk
     assert manifest["construction"] == "built_up_permitted"
     assert manifest["notes"]["manufacturing"][-1] == permission
     assert manifest["cite"]["construction"] == citation
+
+
+def test_rocker_permits_its_hub_and_strap_construction_from_its_actual_notes() -> None:
+    manifest = exporter.requirement_manifest("ch_rocker_arm")
+    assert manifest["construction"] == "built_up_permitted"
+    assert rocker_notes.BUILT_UP_PERMISSION_NOTE in manifest["notes"]["manufacturing"]
+    assert set(exporter._cite(rocker_notes, "DRAWING_NOTES")) <= set(manifest["cite"]["construction"])
 
 
 @pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)

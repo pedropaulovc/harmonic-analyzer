@@ -95,9 +95,14 @@ HUB_WALL_NOTE = f"HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f} MIN"
 
 # BUILT_UP_PERMISSION_NOTE may be supplied only as exact explicit permission
 # text in DRAWING_NOTES. None/absence means one_piece, never inferred permission.
-BUILT_UP_PERMISSION_NOTE = None
+# Route v3 (user ruling, 2026-10-16): the part may be the turned hub
+# MHA-CH-012 joined to the flat strap MHA-CH-013. Permission only; the joint
+# is on those two details (ch_rocker_hub_fit), never a method here.
+BUILT_UP_PERMISSION_NOTE = (
+    "3. MAY BE BUILT UP FROM HUB MHA-CH-012 AND STRAP MHA-CH-013."
+)
 
-# Two lines (drawing-guidelines rule 7; Opus #1020 r3 C3).
+# Three lines (drawing-guidelines rule 7; Opus #1020 r3 C3).
 DRAWING_NOTES = "\n".join(
     (
         # B2-1, option 4: datum C is the rod-pin hole and the BASIC pin
@@ -111,6 +116,7 @@ DRAWING_NOTES = "\n".join(
         # (ch_rocker_arm_spec); the hub OD's position frame to A in detail D
         # (HUB_COAXIALITY_DIA) holds the named-exception wall.
         f"2. {HUB_WALL_NOTE}; OD CLEARS MHA-CH-001 FOOT CHEEKS.",
+        BUILT_UP_PERMISSION_NOTE,
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

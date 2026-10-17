@@ -202,7 +202,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "STRAP SYMMETRIC" not in notes
     assert "ARC LENGTHS" not in notes
     assert "EACH END:" not in notes
-    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2"]
+    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2", "3"]
     # The upper bar contact rides the top frame's mate row; the lower strap
     # envelope rides R816's CONCENTRIC callout.
     assert "UPPER BAR CONTACT" not in notes and "LOWER STRAP ENVELOPE" not in notes
@@ -218,8 +218,16 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "NORMAL TO LENGTH" not in notes and "NOMINAL MIRROR PLANE" not in notes
     # Named-exception wall and the mate that caps the OD.
     assert f"2. {ch_rocker_arm_notes.HUB_WALL_NOTE}; OD CLEARS MHA-CH-001 FOOT CHEEKS." in notes
+    # Route v3: permission for the hub + strap construction, and nothing more
+    # (the joint is on MHA-CH-012/-013, never a method here).
+    assert (
+        "3. MAY BE BUILT UP FROM HUB MHA-CH-012 AND STRAP MHA-CH-013." in notes.splitlines()
+    )
+    assert ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE == notes.splitlines()[2]
+    for method in ("PRESS", "LOCTITE", "ADHESIVE", "BRAZE", "SOLDER", "WELD"):
+        assert method not in notes
     assert _notes_fit_left_of_the_title_block(notes)
-    assert len(notes.splitlines()) == 2
+    assert len(notes.splitlines()) == 3
     # The hub OD's coaxiality is its native position frame in detail D
     # (regate-r1 #2), not a tolerance in a note.
     assert "COAXIAL" not in notes and "WITHIN" not in notes and "Ø" not in notes
@@ -8768,7 +8776,7 @@ def test_r24_production_wires_all_native_local_guards_without_banned_fcf_setter_
         "_r24_arc_sweep", "_r24_arc_contains", "_r24_arc_intersections",
         "_r24_no_arc_crossings", "_r24_terminals",
     }.isdisjoint(definitions)
-    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 2
+    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 3
     # Note 1 still carries the arc centre the 1:2 view cannot reach.
     assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", ch_rocker_arm_notes.DRAWING_NOTES)
     assert ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == 8.0
