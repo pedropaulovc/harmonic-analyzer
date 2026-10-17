@@ -86,6 +86,13 @@ if any(b[0] - a[1] <= 2.0 * _X for a, b in zip(_SPANS, _SPANS[1:])):
 TABLE_AT_XY = (-419.1, -97.975)
 TABLE_SIZE_XY = (838.2, 209.55)
 TABLE_DEPTH = 50.0
+# Basis: PM-30MV manual v3 2020-10 p6, read 2026-10-17:
+# https://macclab.com/wp-content/uploads/2022/01/PM-30MV-v3-2020-10.pdf
+# Three 14 mm mouths on 63.5 mm centres; neck depth 14, undercut 25 x 10.
+# Centre the slots on this table's authored Y datum, not on the work's origin.
+TABLE_SLOT_CENTRES_Y = tuple(
+    TABLE_AT_XY[1] + TABLE_SIZE_XY[1] / 2.0 + offset for offset in (-63.5, 0.0, 63.5)
+)
 
 # The inventory's physical-size provenance, kept verbatim (remeasure: #1413).
 _MEASURED = {
@@ -107,6 +114,31 @@ PRECHIPS_SOLIDS: list[dict] = [
         "note": "PM-30MV table 33 x 8.25 in (maker spec), drawing depth 50; centred under the bar",
         "measured": dict(_MEASURED),
     },
+    *(
+        {
+            "name": f"table slot {index} {section}",
+            "shape": "box",
+            "void": True,
+            "cuts": ["table"],
+            "at_mm": [
+                TABLE_AT_XY[0] - 1.0,
+                centre_y - width / 2.0,
+                -BLOCK_HEIGHT - depth,
+            ],
+            "size_mm": [TABLE_SIZE_XY[0] + 2.0, width, height],
+            "note": "PM-30MV manual p6 slot section; X/top overrun is model extent only",
+            "measured": {
+                **_MEASURED,
+                "date": "2026-10-17",
+                "instrument": "manual nominal; verify slot section and centres on the table",
+            },
+        }
+        for index, centre_y in enumerate(TABLE_SLOT_CENTRES_Y, start=1)
+        for section, width, depth, height in (
+            ("neck", 14.0, 14.0, 15.0),
+            ("undercut", 25.0, 24.0, 10.0),
+        )
+    ),
     *(
         {
             "name": name,

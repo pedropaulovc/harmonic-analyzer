@@ -704,7 +704,12 @@ def _posed_box(solid: dict, pose: dict) -> tuple[list[float], list[float]]:
     at = solid["at_mm"]
     shape = solid.get("shape")
     if shape == "cylinder":
-        axis = solid["axis"]
+        axis_length = math.sqrt(sum(component**2 for component in solid["axis"]))
+        if axis_length == 0:
+            raise ValueError(
+                f"fixture solid {solid.get('name', '?')!r}: zero cylinder axis"
+            )
+        axis = [component / axis_length for component in solid["axis"]]
         direction = [sum(axis[k] * (x, y, z)[k][a] for k in range(3)) for a in range(3)]
         start = [
             pose["origin_mm"][a] + sum(at[k] * (x, y, z)[k][a] for k in range(3))
@@ -741,6 +746,7 @@ def _posed_box(solid: dict, pose: dict) -> tuple[list[float], list[float]]:
     ("axis", "low", "high"),
     [
         ([0.0, 0.0, 1.0], [-2.0, -2.0, 0.0], [2.0, 2.0, 10.0]),
+        ([0.0, 0.0, 2.0], [-2.0, -2.0, 0.0], [2.0, 2.0, 10.0]),
         ([1.0, 0.0, 0.0], [0.0, -2.0, -2.0], [10.0, 2.0, 2.0]),
         (
             [0.6, 0.0, 0.8],
@@ -762,6 +768,13 @@ def test_posed_cylinder_bounds_include_radial_extent(axis, low, high):
     actual_low, actual_high = _posed_box(solid, pose)
     assert actual_low == pytest.approx(low)
     assert actual_high == pytest.approx(high)
+
+
+def test_posed_cylinder_rejects_a_zero_axis():
+    solid = {"name": "stud", "shape": "cylinder", "at_mm": [0, 0, 0], "axis": [0, 0, 0]}
+    pose = {"origin_mm": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "z": [0.0, 0.0, 1.0]}
+    with pytest.raises(ValueError, match="fixture solid 'stud': zero cylinder axis"):
+        _posed_box(solid, pose)
 
 
 def test_posed_unknown_primitive_names_the_solid():
