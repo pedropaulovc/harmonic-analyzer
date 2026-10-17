@@ -1167,6 +1167,40 @@ def _tap_section(adapter: Any, front: Any) -> Any:
     return native
 
 
+def _log_thread_labels(adapter: Any, *, stage: str) -> int:
+    """Log every view's cosmetic threads and "Tapped Hole" label notes (#1591).
+
+    Read only: each sheet's views come off ``ISheet::GetViews`` (as
+    finalize_drawing's display flush), so no sheet is activated.  Returns the
+    label count, the number finalize_drawing's sweep will remove.
+    """
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    labels = 0
+    for sheet_name in SHEET_NAMES:
+        sheet = _early_bound(ddoc.Sheet(sheet_name), "ISheet")
+        for raw_view in sheet.GetViews() or ():
+            view = _early_bound(raw_view, "IView")
+            threads = 0
+            found: list[str] = []
+            for raw in view.GetAnnotations() or ():
+                annotation = _early_bound(raw, "IAnnotation")
+                kind = int(annotation.GetType())
+                if kind == _COSMETIC_THREAD_ANNOTATION:
+                    threads += 1
+                elif kind == 6:  # swNote
+                    note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+                    text = str(note.GetText() or "")
+                    if "Tapped Hole" in text:
+                        found.append(f"{annotation.GetName()}={text!r}")
+            labels += len(found)
+            _telemetry.info(
+                f"thread labels {stage}: {sheet_name}/{view_name(adapter, view)} "
+                f"{threads} cosmetic threads, {len(found)} labels {found!r}"
+            )
+    _telemetry.info(f"thread labels {stage}: {labels} in all")
+    return labels
+
+
 def _mounting_rims(back: Any) -> list[Any]:
     """Back looks from -Z directly onto the blind taps' entry circles."""
     edges = scan_view_edges(back, label="bracket receiver face")
@@ -1801,6 +1835,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The isometric's view label, under the iso.
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
 
+    _log_thread_labels(adapter, stage="after sheet 1")
     if not drawing.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate bracket receiver sheet")
     back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=(1, 1))
@@ -1887,6 +1922,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The repeated isometric's label, where sheet 1 puts its own (machinist
     # review r12: unlabelled on this sheet).
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
+    _log_thread_labels(adapter, stage="before the sweep")
     return await finalize_drawing(
         adapter,
         OUTPUTS,
