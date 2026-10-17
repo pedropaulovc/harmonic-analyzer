@@ -431,6 +431,32 @@ def test_the_lifted_foot_screws_clear_their_uprights_in_the_isometric() -> None:
         assert reach < detail.crop_radius_mm - 3.0, stem
 
 
+def test_the_bracket_balloon_lands_left_of_its_lifted_hold_down() -> None:
+    """Proof run 20261017T222049387Z, sheet 2: walked to the ear's apex, the
+    bracket's leader 3 ran down the lifted hold-down (item 7) that stands
+    over it.  It lands on the foot's free-end edge instead: on the part, at
+    half the foot's height, and in the isometric well left of the
+    hold-down's head (the north bracket carries its hold-down, so their
+    offsets cancel apart from the lift, which moves v only)."""
+    import ch_pivot_bracket_sides as sides
+    import ch_pivot_bracket_spec as bracket
+    import vn_bracket_hold_down_screw_spec as hold_down
+
+    x, y, z = drawing.BRACKET_BALLOON_POINT_MM
+    assert x == -bracket.FOOT_W / 2.0
+    assert z == sides.FOOT_Z1
+    assert 0.0 < y < bracket.FOOT_H
+    # The north bracket's part frame runs with the machine's (its foot
+    # toward machine +z), so the part point projects like a machine one.
+    assert sides.OUTBOARD_SIGN["N"] == 1.0
+    moved = drawing.exploded_offset(drawing.asm.BRACKET_HOLD_DOWN, "north")
+    carried = drawing.exploded_offset(drawing.asm.BRACKET, "north")
+    assert (moved[0], moved[2]) == (carried[0], carried[2])
+    head_left = _iso((0.0, 0.0, sides.HOLE_Z))[0] - hold_down.HEAD_DIA / 2.0
+    # 6.0 model mm, 0.86 on the sheet at 1:7: a leader's width and more.
+    assert head_left - _iso((x, y, z))[0] > 5.0
+
+
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:
     assert len(drawing.BOM_COMPONENTS) == 19
     assert set(drawing.BOM_PART_NUMBERS) == set(drawing.BOM_COMPONENTS)
