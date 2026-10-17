@@ -17,6 +17,8 @@ recipes:
 |---|---|---|
 | 3088A429 | `vn-rocker-thrust-washer` (MHA-VN-070; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 1/4" ID x 3/8" OD, 0.031" Thick |
 | 3606T118 | `vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
+| 5972K41 | rocker trammel jig, `fixtures.trammel-6200-2rs` (catalogue-only; no vendor model downloaded) | Steel sealed 6200-2RS bearing, 10 × 30 × 9 mm; live verified 2026-10-16 |
+| 91595A452 | rocker trammel jig, `fixtures.trammel-cl-dowel` (catalogue-only; no vendor model downloaded) | 52100 alloy-steel dowel, Ø6 × 20 mm, DIN 6325-m6 / ISO 8734; live verified 2026-10-16 |
 | 3606T811 | `vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 6261K108 | `vn-chain-connecting-link` (the loop's one connecting link; catalogue-only, vendor model not downloaded) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
 | 6261K171 | `vn-chain-inner-link`, `vn-chain-outer-link` (cut to length; catalogue-only, vendor model not downloaded) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
