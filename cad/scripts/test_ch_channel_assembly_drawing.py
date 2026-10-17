@@ -188,7 +188,7 @@ def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> N
     assert "PULL THE BLADE" in setting
     # r10 machinist review: worded as step 10's keeper transfer.
     support = _config.parts("fr-rocker-arm-support")["number"]
-    hold_down = _config.parts("vn-pedestal-hold-down-screw")["number"]
+    hold_down = _config.parts("vn-bracket-hold-down-screw")["number"]
     assert (
         f"TRANSFER ITS FOOT HOLE INTO THE {support} RAIL, TAP AS {support}, "
         f"SCREW DOWN ONE {hold_down}, PULL THE BLADE."
@@ -486,18 +486,16 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
         in reamed
     )
     # r10 machinist blocker (Main's ruling A): the crown is finished to the
-    # keeper print's crown diameter about a pin in its own bore, then tapped,
+    # keeper print's crown radius about a pin in its own bore, then tapped,
     # and gauged over the pin. The gauge's low limit never admits a crown
-    # under the .X minimum the crown thread's 1.5D is proved at.
+    # under the least full round the crown thread's 1.5D is proved at.
     assert (
-        f"ON A 6.35 PIN IN EACH BORE, ROUND ITS CROWN TO THE {number} CROWN DIA "
-        "14.0 ABOUT THE PIN AND TAP IT #1-72 TO THE BORE." in reamed
+        f"ON A 6.35 PIN IN EACH BORE, ROUND ITS CROWN TO THE {number} CROWN R7.0 "
+        "ABOUT THE PIN AND TAP IT #1-72 TO THE BORE." in reamed
     )
     assert reamed.endswith("ACCEPT: CROWN TOP 9.8 TO 10.6 OVER THE PIN'S UNDERSIDE.")
-    least_crown = keeper.set_screw_wall_terms(keeper.CROWN_DIA)[
-        "crown radius at .X minimum"
-    ]
-    assert 9.8 - keeper.BORE_DIA / 2.0 >= least_crown
+    assert 9.8 - keeper.BORE_DIA / 2.0 >= keeper.CROWN_LEAST_R
+    assert 10.6 - keeper.BORE_DIA / 2.0 <= keeper.CROWN_MOST_R + 0.05
     assert keeper.SET_SCREW_ENGAGEMENT_D >= keeper.SET_SCREW_MIN_ENGAGEMENT_D
     fitted = _step_body(steps.KEEPERS_SET_KEY)
     assert f"{top_frame} ON THE MILL:" in fitted

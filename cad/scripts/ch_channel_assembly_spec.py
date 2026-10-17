@@ -120,8 +120,8 @@ KEEPER_SET_SCREW = "vn-fulcrum-set-screw"
 KEEPER_FOOT_SCREW = "vn-frame-side-screw"
 BRACKET = "ch-pivot-bracket"
 BRACKET_SET_SCREW = "vn-arbor-set-screw"
-BRACKET_HOLD_DOWN = "vn-pedestal-hold-down-screw"
-WASHER = "ch-rocker-thrust-washer"
+BRACKET_HOLD_DOWN = "vn-bracket-hold-down-screw"
+WASHER = "vn-rocker-thrust-washer"
 BANK_SPRING = "vn-rocker-bank-spring"
 ROD = "ch-connecting-rod"
 BAR = "ch-amplitude-bar"
@@ -305,7 +305,7 @@ BOM_DESCRIPTIONS = {
     BRACKET_SET_SCREW: "#4-40 X 1/4 CUP-POINT SET SCREW",
     WASHER: "ROCKER BANK THRUST WASHER",
     BANK_SPRING: "WAVE DISC SPRING",
-    BRACKET_HOLD_DOWN: "#8-32 X 3/4 FILLISTER HEAD SCREW",
+    BRACKET_HOLD_DOWN: "#8-32 X 5/8 FILLISTER HEAD SCREW",
     KEEPER: "FULCRUM SHAFT KEEPER",
     KEEPER_FOOT_SCREW: "#2-56 X 7/16 FILLISTER HEAD SCREW",
     KEEPER_SET_SCREW: "#1-72 X 5/32 CUP-POINT SET SCREW",
