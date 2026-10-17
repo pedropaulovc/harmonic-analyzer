@@ -112,6 +112,26 @@ def test_shoulder_land_seats_flat_all_round() -> None:
     assert land >= 0.5
 
 
+def test_relief_roots_stand_inside_the_tap_mouth_off_the_seat_annulus() -> None:
+    # r2: both relief corners "R0.2 MAX" (the model at the limit). At the
+    # largest relief Ø and radius the shoulder-side root's outer edge stays
+    # inside the tap's minor (its #43 drill, printed +0.10/0), itself inside
+    # the broken mouth where the shoulder's seat annulus starts.
+    assert (joint.RELIEF_ROOT_R, joint.RELIEF_ROOT_R_TOL_TYPE) == (0.2, 6)
+    outer = 1.85 + 2.0 * 0.2
+    assert joint.RELIEF_ROOT_OUTER_DIA == pytest.approx(outer) == pytest.approx(2.25)
+    assert joint.ROD_TAP_MINOR_DIA == TAP_DRILL_MM["#4-40"] == clamp.ROD_TAP_DRILL_DIA
+    assert outer < joint.ROD_TAP_MINOR_DIA < _D
+    seat_inner = _D + 0.05 + 0.5
+    assert outer < seat_inner
+    assert rod.SEAT_LAND_WORST == pytest.approx(((5.0 - 0.05 - 0.5) - seat_inner) / 2.0)
+    # Both roots fit the narrowest relief and sit inside it: full thread, the
+    # worst engagement and the die's run-out are unchanged.
+    assert 2.0 * joint.RELIEF_ROOT_R <= joint.RELIEF_WIDTH_MIN == pytest.approx(0.99)
+    assert joint.ENGAGEMENT_WORST == pytest.approx(7.25 - 2.01 - 0.635)
+    assert joint.DIE_RUNOUT <= joint.RELIEF_WIDTH_MIN
+
+
 def test_part_geometries_share_only_the_joint_contract() -> None:
     clamp_src = Path(clamp.__file__).read_text(encoding="utf-8")
     rod_src = Path(rod.__file__).read_text(encoding="utf-8")
@@ -135,6 +155,8 @@ def test_installed_rod_seats_coaxial_with_the_thumb_screw_in_the_wire_plane() ->
         ("ROD_THREAD_LEN = 7.50", "6.70", "1.5D"),
         ("RELIEF_WIDTH = 1.50", "1.40", "run-out"),
         ("RELIEF_DIA = 1.85", "1.95", "2A root"),
+        ("RELIEF_ROOT_R = 0.2", "0.5", "narrowest relief"),
+        ("RELIEF_ROOT_R = 0.2", "0.3", "seat annulus"),
     ),
 )
 def test_joint_guards_reject_lost_margins(

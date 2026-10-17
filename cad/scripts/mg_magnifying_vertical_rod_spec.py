@@ -27,6 +27,9 @@ from mg_rod_clamp_joint import (
     DIE_RUNOUT,
     RELIEF_DIA,
     RELIEF_DIA_TOL_TYPE,
+    RELIEF_ROOT_R,
+    RELIEF_ROOT_R_PLACES,
+    RELIEF_ROOT_R_TOL_TYPE,
     RELIEF_WIDTH,
     ROD_THREAD_LEN,
     ROD_THREAD_LEN_BAND,
@@ -51,6 +54,9 @@ __all__ = [
     "REFERENCE_DIMENSIONS",
     "RELIEF_DIA",
     "RELIEF_DIA_TOL_TYPE",
+    "RELIEF_ROOT_R",
+    "RELIEF_ROOT_R_TOL_TYPE",
+    "RELIEF_ROOTS_CALLOUT",
     "RELIEF_START_X",
     "RELIEF_WIDTH",
     "ROD_DIA",
@@ -88,15 +94,19 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ReliefWidth",
         "ReliefDia",
     },
+    # The relief's two internal corners, one fillet feature over both edges.
+    "ReliefRoots": {"ReliefRootR"},
 }
 # Only the thread length carries its own band (it keeps the tip clear of the
 # tap's incomplete thread, mg_rod_clamp_joint); the relief width prints at the
-# title block's .XX band and the relief Ø as the single limit "Ø1.85 MAX".
+# title block's .XX band, the relief Ø as the single limit "Ø1.85 MAX" and
+# its two roots as "R0.2 MAX".
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("RodProfile", "ThreadLength"): ROD_THREAD_LEN_BAND,
 }
 SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
     ("RodProfile", "ReliefDia"): (RELIEF_DIA, RELIEF_DIA_TOL_TYPE),
+    ("ReliefRoots", "ReliefRootR"): (RELIEF_ROOT_R, RELIEF_ROOT_R_TOL_TYPE),
 }
 REFERENCE_DIMENSIONS: tuple[tuple[str, str], ...] = (("RodProfile", "OverallLength"),)
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -109,7 +119,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ReliefWidth": 2,
         "ReliefDia": 2,
     },
+    "ReliefRoots": {"ReliefRootR": RELIEF_ROOT_R_PLACES},
 }
+# ONE radius prints for both roots (one fillet feature): its count rides
+# above the value.
+RELIEF_ROOTS_CALLOUT = "2X"
 
 # No general notes (drawing-guidelines.md rule 7): the stock, the overall, the
 # seat on MHA-MG-002 and the hemisphere each ride their own callout.
