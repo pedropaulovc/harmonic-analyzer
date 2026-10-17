@@ -46,6 +46,7 @@ import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import machinist_exceptions
 
 
 BUILDER = Path(__file__).with_name("build_ch_rocker_arm_tl_oblique_jig_assembly.py")
@@ -455,7 +456,9 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
         "UNCLAMP THE NUT BRACKET, DRILL AND TAP ITS 2 SPOTS #8-32 PER "
         "MHA-CH-006-TL-29; THE BLOCK'S HOLES STAY PLAIN."
     ) in steps["7D"]
-    assert "THEN THE BRACKET'S BLOCK SCREWS TO 4.4 N·m, THEN THE KP08" in steps["8"]
+    assert (
+        "TIGHTEN THE NUT SCREWS TO 1.0 N·m, THE BLOCK SCREWS TO 4.4 N·m, THEN THE KP08"
+    ) in steps["8"]
     # Review bought-r5: the turned-over bar is told by a feature its views
     # show; the lubricants are named; every set screw sits on a flat.
     assert "NEAR SLOT" not in steps["1"]
@@ -1365,6 +1368,33 @@ def test_lever_screw_torque_is_capped_by_the_carrier_thread() -> None:
     assert spec.LEVER_SCREW_PRELOAD_N <= spec._LEVER_THREAD_STRIP_N / 3.0
     assert spec.LEVER_PAIR_BEARING_MPA < 276.0
     assert spec.LEVER_SCREW_PRELOAD_N / (0.0524 * 25.4**2) < 0.5 * 1172.1
+
+
+def test_nut_flange_is_a_static_clamp() -> None:
+    # Owner ruling 2026-10-17 (review jbf-r17, rule 23): the nut's flange
+    # carries the nut's torque by clamp friction with margin, so its 4 M3
+    # screws see no operating torque; step 8 prints their torque, the brass
+    # flange's bearing under the head capping it, and the jig's exception
+    # quotes the spec's numbers.
+    assert spec.NUT_SCREW_TORQUE_NM == 1.0
+    assert spec.NUT_SCREW_PRELOAD_N == pytest.approx(1667, abs=1)
+    assert spec.NUT_SCREW_PRELOAD_N <= spec._NUT_SCREW_STRIP_N / 3.0
+    head_area = math.pi / 4.0 * (5.5**2 - 3.5**2)
+    assert spec.NUT_SCREW_PRELOAD_N / head_area < spec._BRASS_YIELD_MPA
+    assert spec.NUT_ABUSE_TORQUE_NM == pytest.approx(0.874, abs=0.001)
+    assert spec.NUT_FLANGE_SLIP_NM == pytest.approx((8.0, 10.67), abs=0.01)
+    assert spec.NUT_FLANGE_SLIP_MARGIN >= 1.5
+    # The wedge-lock pair the ruling rules out: OD 7.0 at R8 reaches the body.
+    assert 16.0 / 2.0 - 7.0 / 2.0 < 10.2 / 2.0
+    steps = " ".join(spec.ASSEMBLY_STEPS)
+    assert "8. TIGHTEN THE NUT SCREWS TO 1.0 N·m, THE BLOCK SCREWS" in steps
+    exceptions = machinist_exceptions.load_exceptions(
+        _config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
+    )
+    (static,) = [e for e in exceptions if "nut-flange" in e.finding]
+    assert static.kind == "accept"
+    for text in ("1.0 N·m", "0.87 N·m", "8.0 to 10.7 N·m", "1.67 kN", "7.0", "0.6"):
+        assert text in static.reason or text in static.where, text
 
 
 def test_handwheel_set_screw_meets_the_leadscrew_flat() -> None:

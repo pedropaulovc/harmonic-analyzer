@@ -1182,6 +1182,76 @@ if not BLOCK_JOINT_SLIP_N >= 1.25 * FEED_THRUST_N:
         f"by friction, under 1.25 x the {FEED_THRUST_N:.0f} N feed thrust"
     )
 
+# --- The nut screws: their torque; the nut's flange a static clamp ---------------
+# LOAD_CASES (owner ruling 2026-10-17, TL-000 review jbf-r17, rule 23): the 4
+# M3 screws clamp the Tr8 nut's brass flange to TL-29. The nut's reaction to
+# the screw's turning reverses with the handwheel; the flange's clamp friction
+# carries it with margin, so the flange never slips and no operating torque
+# reaches the screws: a static clamp (rule 23's last bullet). A wedge-lock
+# pair cannot seat there: an M3 pair's OD 7.0 on the Ø16 circle reaches R4.5,
+# into the nut's Ø10.2 body. The jig's machinist_exceptions record the ruling.
+# Engagement: the shortest screw (ISO 4762 length js15, ±0.29 at 10) past
+# the flange, in TL-29's 6061-T6 tap.
+_ISO4762_LENGTH_TOL_MM = 0.29  # STANDARD: ISO 4762 / ISO 4759-1 js15, l = 10
+_NUT_SCREW_ENGAGEMENT_MIN = leadscrew.NUT_SCREW_ENGAGEMENT - _ISO4762_LENGTH_TOL_MM
+_NUT_SCREW_STRIP_N = (
+    0.75
+    * math.pi
+    * fasteners.NUT_TO_NUT_BRACKET.major_mm
+    * _NUT_SCREW_ENGAGEMENT_MIN
+    * _AL_SHEAR_ULTIMATE_MPA
+)
+# The head bears on the brass flange round its Ø3.5 hole. The vendor gives no
+# temper, so the softest: C36000 free-cutting brass, O60 soft anneal, yield
+# 18 ksi = 124 MPa (SOURCED: Copper Development Association C36000 data).
+_BRASS_YIELD_MPA = 124.0
+_NUT_SCREW_HEAD_BEARING_MM2 = (
+    math.pi / 4.0 * (nut_screw.DIMS.head_dia**2 - leadscrew_nut.HOLE_DIA**2)
+)
+_NUT_SCREW_PRELOAD_CAP_N = min(
+    _NUT_SCREW_STRIP_N / _STRIP_SAFETY,
+    _BRASS_YIELD_MPA * _NUT_SCREW_HEAD_BEARING_MM2,
+)
+NUT_SCREW_TORQUE_NM = (
+    math.floor(
+        10.0
+        * _NUT_FACTOR
+        * _NUT_SCREW_PRELOAD_CAP_N
+        * fasteners.NUT_TO_NUT_BRACKET.major_mm
+        / 1000.0
+    )
+    / 10.0
+)  # rounded down to 0.1 N·m
+NUT_SCREW_PRELOAD_N = NUT_SCREW_TORQUE_NM / (
+    _NUT_FACTOR * fasteners.NUT_TO_NUT_BRACKET.major_mm / 1000.0
+)
+# The nut's torque at the 1 kN hand-abuse thrust (leadscrew LOAD_CASES):
+# T = F d2/2 tan(lead + friction), the oiled thread above.
+NUT_ABUSE_TORQUE_NM = (
+    leadscrew.HAND_ABUSE_THRUST
+    * _TR_PITCH_DIA
+    / 2000.0
+    * math.tan(_LEAD_ANGLE + _FRICTION_ANGLE)
+)
+# The flange's slip torque: the screws' clamp at the Ø16 circle, brass on
+# as-machined 6061, μ 0.15 .. 0.20.
+_FLANGE_SLIP_FRICTION = (0.15, 0.20)
+NUT_FLANGE_SLIP_NM = tuple(
+    fasteners.NUT_TO_NUT_BRACKET.count
+    * NUT_SCREW_PRELOAD_N
+    * friction
+    * leadscrew_nut.HOLE_PCD
+    / 2000.0
+    for friction in _FLANGE_SLIP_FRICTION
+)
+NUT_FLANGE_SLIP_MARGIN = NUT_FLANGE_SLIP_NM[0] / NUT_ABUSE_TORQUE_NM
+if NUT_FLANGE_SLIP_MARGIN < leadscrew.SLIP_MARGIN_MIN:
+    raise ValueError(
+        f"the nut flange slips at {NUT_FLANGE_SLIP_NM[0]:.1f} N·m, under "
+        f"{leadscrew.SLIP_MARGIN_MIN} x the nut's {NUT_ABUSE_TORQUE_NM:.2f} N·m"
+    )
+_NUT_TORQUE = f"{NUT_SCREW_TORQUE_NM:.1f} N·m"
+
 # --- The feed lever screws: their tightening torque -----------------------------------
 # Rule 23 (C3 r6 TL-000 review): the 2 5/16-18 lever screws carry the
 # operator's push and pull on the TL-26 lever, reversing through every pass.
@@ -1322,7 +1392,7 @@ ASSEMBLY_STEPS = (
     "7E. REFIT THE NUT BRACKET FROM THE BLOCK'S FAR FACE WITH 2 "
     f"{_BLOCK_SCREW} {_item(BLOCK_SCREW)} ON WEDGE-LOCK PAIRS "
     f"{_item(BLOCK_LOCK_WASHER)}, SNUG.",
-    "8. TIGHTEN THE NUT SCREWS, THEN THE BRACKET'S BLOCK SCREWS TO "
+    f"8. TIGHTEN THE NUT SCREWS TO {_NUT_TORQUE}, THE BLOCK SCREWS TO "
     f"{_BLOCK_TORQUE}, THEN THE KP08 "
     "SCREWS, SO THE SCREW TURNS FREELY OVER THE WHOLE TRAVEL. PUSH THE "
     f"HANDWHEEL {_item(HANDWHEEL)} ON, HUB {leadscrew.HUB_GAP:.0f} OFF THE FAR "

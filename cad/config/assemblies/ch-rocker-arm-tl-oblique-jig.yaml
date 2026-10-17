@@ -69,3 +69,13 @@ required_free_stems:
 # The sweep; verify's pass-sweep-interference-free gate replays the recorded
 # slide drive through both passes (the .<asm>.sweep.json sidecar).
 free_dof: 1
+# machinist_exceptions: the assembly drawing's owner-declared machinist-review
+#   exceptions (drawing-simplicity-policy.md "Named exceptions"); read by
+#   machinist_exceptions.load_exceptions for ch_rocker_arm_tl_oblique_jig_assembly,
+#   ignored by the build.
+machinist_exceptions:
+  - id: "RV-02"
+    kind: "accept"
+    where: "steps 7A and 8 (sheet 6) and sheet 4 balloons 15 and 26: the TR8X2 flanged nut's 4 M3 X 10 SHCS into the nut bracket, tightened to 1.0 N·m"
+    finding: "no mechanical lock on the nut-flange screws under the reversing nut torque (rule 23)"
+    reason: "static clamp, rule 23's last bullet: the 4 M3 SHCS clamp the Tr8 nut's flange to TL-29 and no operating torque reaches them. The nut's worst-case torque is 0.87 N·m (1 kN hand-abuse thrust, oiled Tr8x2 thread); the flange's clamp slip torque is 8.0 to 10.7 N·m (4 x M3 at 1.67 kN preload from 1.0 N·m, mu 0.15 to 0.20, on the 16 bolt circle), a 9 to 12x margin, so the flange never slips (jig spec NUT_FLANGE_SLIP_MARGIN, self-checked >= 1.5). A wedge-lock pair cannot seat: an M3 pair's OD 7.0 on the 16 bolt circle overlaps the nut's 10.2 body by 0.6 (owner ruling 2026-10-17, via coordinator) (owner-accepted)"
