@@ -1036,7 +1036,9 @@ def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(
         export_models.assert_gallery_inputs_current(manifest)
 
 
-@pytest.mark.parametrize("stem", ["ch_pivot_shaft", "ch_rocker_arm_tl_outline_template"])
+@pytest.mark.parametrize(
+    "stem", ["ch_pivot_shaft", "ch_rocker_arm_tl_outline_template"]
+)
 def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
     tmp_path: Path, monkeypatch, stem: str,
 ) -> None:
@@ -1112,7 +1114,13 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
     import features_bound
     from _export_feature_faces import face_name
 
-    stem = "ch_rocker_arm_tl_riser_block"
+    # No tracked spec declares FEATURE_STEP_CONFIGURATIONS; declare two here.
+    stem = "ch_pivot_shaft"
+    monkeypatch.setattr(
+        export_features,
+        "step_configurations",
+        lambda selected: ("L036", "L045") if selected.replace("-", "_") == stem else (),
+    )
     dashed = stem.replace("_", "-")
     native = tmp_path / "sldprt" / f"{dashed}.SLDPRT"
     native.parent.mkdir()
@@ -1197,6 +1205,35 @@ def test_single_configuration_parts_declare_no_configuration_steps() -> None:
 
     assert export_features.step_configurations("ch_pivot_shaft") == ()
     assert export_features.configuration_step_paths("ch_pivot_shaft") == {}
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ('FEATURE_STEP_CONFIGURATIONS = ("L036", "L045")\n', ("L036", "L045")),
+        ('FEATURE_STEP_CONFIGURATIONS = ("L036", "L036")\n', ValueError),
+        ("FEATURE_STEP_CONFIGURATIONS = ()\n", ValueError),
+    ],
+    ids=["declared", "duplicate", "empty"],
+)
+def test_spec_configuration_steps_are_a_static_literal_tuple(
+    monkeypatch, source: str, expected
+) -> None:
+    """The spec's literal is read without importing it, and validated."""
+    import ast
+
+    import export_features
+
+    monkeypatch.setattr(export_features, "source_tree", lambda _path: ast.parse(source))
+    export_features.step_configurations.cache_clear()
+    try:
+        if expected is ValueError:
+            with pytest.raises(ValueError, match="FEATURE_STEP_CONFIGURATIONS"):
+                export_features.step_configurations("ch_pivot_shaft")
+        else:
+            assert export_features.step_configurations("ch_pivot_shaft") == expected
+    finally:
+        export_features.step_configurations.cache_clear()
 
 
 

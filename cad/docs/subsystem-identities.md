@@ -343,3 +343,5 @@ next free Number in its category and has no old stem or old Number.
 | retired | `ch-rocker-arm-tl-filing-button` | MHA-CH-006-TL-04 | rocker hub filing tooling route v3 (#1577) no longer uses: the MHA-CH-012 hub is turned; no registry, builder or drawing |
 | retired | `ch-rocker-arm-tl-filing-stud` | MHA-CH-006-TL-05 | rocker hub filing tooling route v3 (#1577) no longer uses: the MHA-CH-012 hub is turned; no registry, builder or drawing |
 | retired | `ch-rocker-arm-tl-filing-stand` | MHA-CH-006-TL-12 | rocker filing stand route v3 (#1577) no longer uses: the strap's R800/R816 edges are cut on the MHA-CH-006-TL-000 oblique trammel jig; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-riser-block` | MHA-CH-006-TL-10 | rocker mill riser blocks route v3 (#1577) no longer uses: the strap is faced on the taped sub-plate and held in the mill vise; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-strap-shim-stack` | MHA-CH-006-TL-11 | rocker strap shim stacks route v3 (#1577) no longer uses: no setup stands the strap on shim stacks; no registry, builder or drawing |
