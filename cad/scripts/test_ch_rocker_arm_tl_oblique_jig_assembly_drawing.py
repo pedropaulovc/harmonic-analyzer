@@ -500,6 +500,8 @@ def test_keep_out_overshoot_measures_the_low_balloons() -> None:
 def test_clusters_relax_their_slide_after_ringing() -> None:
     body = inspect.getsource(drawing._balloon_cluster)
     assert body.index("_relax_cluster_slide(") > body.index("_ring_balloons(")
+    # Farm r11: the settled check must see the landings the relax moved.
+    assert "landings = _relax_cluster_slide(" in body
 
 
 def _steps_sheet_boxes(layout):
