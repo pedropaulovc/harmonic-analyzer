@@ -25,8 +25,6 @@ MODELS = {
 SHOP_MADE_IDS = frozenset(
     {
         "fixtures.angle-plate",
-        "fixtures.hub-filing-buttons",
-        "fixtures.rocker-filing-stand",
         "fixtures.rocker-riser-blocks",
         "fixtures.strap-shim-stack",
         "fixtures.trammel-pivot-plate",

@@ -4982,68 +4982,6 @@ purchase = "O1 precision ground flat stock 3/32 x 3/4 x 18 in (cut into 20 mm pi
 source = "Abrams Industries O1 3/32 x 3/4 x 18 reg, $12.05 (https://us.abrams-industries.com/buy/precision-ground-flat-stock); Precision Brand 15-piece 0.001-0.031 in steel shim sheet assortment 6 x 12 in, MSC 86798816, $136.56 web price (https://www.mscdirect.com/product/details/86798816); prices read 2026-10-11"
 cad = "ch_rocker_arm_tl_strap_shim_stack"
 
-# Hub filing buttons for MHA-CH-006 (Pedro 2026-10-11: the rotary table cannot swing the
-# 336 mm blank, so the hub OD is stair-milled and filed to buttons). Two hardened O1 buttons
-# (MHA-CH-006-TL-04) on a headed stud (MHA-CH-006-TL-05) through the reamed pivot bore. The
-# stud tail is gripped in the bench vise and a #10-24 hex coupling nut (McMaster 90264A425,
-# 3/4 in long, 5/16 in across flats) clamps the stack. The solids come from the TL specs.
-# Local frame: stud axis Z, Z0 on the upper hub face (P02), lower hub face at Z-7.0565.
-# Printed CAD bands (ch_rocker_arm_tl_filing_button_spec, ch_rocker_arm_tl_filing_stud_spec;
-# test_ch_rocker_arm_tl_filing_button_drawing keeps the limit facts below inside them),
-# against the arm's hub OD Ø9.69-10.71, hub coaxiality Ø0.10 to A and pivot bore Ø6.50-6.53:
-#   button OD 10.070-10.330; button bore 6.505-6.515 (lapped, slides on the stud by hand);
-#   stud body 6.485-6.490; button OD runout to its bore 0.025 TIR.
-#   Centre shift (docs/rules-coordinates.md manual_arc), worst case of those bands:
-#   (6.53-6.485)/2 + (6.515-6.485)/2 + 0.025/2 = 0.0225 + 0.015 + 0.0125 = 0.05, so the
-#   filed hub is Ø9.97 (10.07 - 0.10) to Ø10.43 (10.33 + 0.10), inside 9.69-10.71. The filed
-#   OD's axis is within 0.05 of the bore's, a coaxiality of Ø0.10.
-# Stack: buttons 3.87-4.13 each + hub 7.0565-7.1065 = 14.7965-15.3665 above the stud head;
-# the body runs 13.9 (13.64-14.16) from the head's seat face to the thread-relief shoulder,
-# under the stack top, so the nut seats on the upper button. The faced tip is 26.0 from the
-# seat. Head Ø9.0 x 5 and the nut corners (Ø9.17) stay inside the button OD (10.07 min), so a
-# file riding a button rim never touches them. Tail Ø8.0 x 30: 25 in the vise jaws, 5 bare
-# below the head; overall length 61.
-# Make: buttons from O1 drill rod, turned, drilled and reamed, torch-hardened (canola-oil
-# quench) and tempered, then faces, bore and OD lapped. Stud turned in one chucking from
-# 4140 pre-hardened rod (HRC 32) and left unhardened.
-# Hardening (Pedro 2026-10-11): torch kit and canola quench bought (tools.map-torch-kit,
-# consumables.quench-oil-canola). verify = false is an ASSUMED placeholder pending Pedro's
-# measurement (authorized 2026-10-11, see local://rocker-measurement-checklist.md B1): the
-# kit is assumed made and measured inside the limits below; set verify = true until it is.
-[fixtures.hub-filing-buttons]
-name = "hub filing buttons and stud, MHA-CH-006 (TL parts)"
-kind = "filing_buttons"
-cad = "ch_rocker_arm_tl_filing_stud"
-shop_made = true
-verify = false
-# Basis: fixtures.hub-filing-buttons.button_dia_limits_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1992 (fixtures.hub-filing-buttons.button_dia_limits_mm), authored filing_buttons geometry baseline [10.15, 10.25] mm, offset [+0.048, -0.043] mm = [10.198, 10.207] mm, inside the TL-04 printed OD 10.070-10.330. Retained item source: see `source` below. No shop metrology or acceptance result is asserted.
-button_dia_limits_mm = { value = [10.198, 10.207], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "0-1 in outside micrometer, extrema across both pieces" } }
-# Basis: fixtures.hub-filing-buttons.button_bore_limits_mm: no nominal; placeholder inside the TL-04 printed bore 6.505-6.515 (ch_rocker_arm_tl_filing_button_spec BORE_DIA/BORE_BAND), 0.003 mm above its low limit and 0.001 mm below its high. It was [6.512, 6.519], from the b757b5a76 trial baseline [6.5, 6.53] mm, whose high limit fell outside the printed band. Retained item source: see `source` below. No shop metrology or acceptance result is asserted.
-button_bore_limits_mm = { value = [6.508, 6.514], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "calibrated metric pin gauges, largest passing pin in each bore" } }
-# Basis: fixtures.hub-filing-buttons.pin_dia_limits_mm: no nominal; placeholder inside the TL-05 printed body 6.485-6.490 (ch_rocker_arm_tl_filing_stud_spec BODY_DIA/BODY_BAND), 0.001 mm inside each limit. It was [6.486, 6.491], from the b757b5a76 trial baseline [6.47, 6.495] mm, whose high limit fell 0.001 outside the printed band. Retained item source: see `source` below. No shop metrology or acceptance result is asserted.
-pin_dia_limits_mm = { value = [6.486, 6.489], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "0-1 in outside micrometer, extrema across both pieces" } }
-# Basis: fixtures.hub-filing-buttons.button_runout_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1995 (fixtures.hub-filing-buttons.button_runout_mm), authored filing_buttons geometry baseline 0.02 mm, offset +0 mm = 0.02 mm, inside the TL-04 printed runout 0.025 TIR. The original runout bound is retained; no improved concentricity is asserted.
-button_runout_mm = { value = 0.02, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "0.001 mm test indicator, one revolution on a close-fitting mandrel" } }
-source = "buttons: Abrams Industries O1 drill rod 7/16 in x 36 in, $17.97 (https://us.abrams-industries.com/steel/tool-steel/o1/dr-36, read 2026-10-11); stud: 4140 pre-hardened rod 7/16 in, HRC 32 (McMaster 6818T119); nut: McMaster 90264A425 #10-24 zinc-plated steel hex coupling nut, 3/4 in long, 5/16 in across flats (verified live 2026-10-14); hardening: tools.map-torch-kit + consumables.quench-oil-canola (purchase approved by Pedro 2026-10-11)"
-note = "Shop-made TL parts MHA-CH-006-TL-04 (two buttons: O1, hardened, tempered and lapped) and MHA-CH-006-TL-05 (stud: 4140 HRC 32, left unhardened), with a bought #10-24 coupling nut (McMaster 90264A425). Check each button OD with the 0-1 in micrometer and each bore and the stud with pin gauges. Check OD runout with the DTI with each button on a close-fitting mandrel (the largest pin gauge that enters its bore) in V-blocks, not on the stud, whose fit is too loose to show 0.025 TIR."
-
-# Filing stand for MHA-CH-006 S5: when the hacksaw parts the taper/land tabs, the arm and
-# the blank-end frame must each stay pressed onto a support (prechips held split). Two end
-# blocks carry the raw blank ends; a pedestal carries the lower hub face (0.4405 above the
-# raw underside), so one clamp on the 7.06 thick hub holds the arm and the 2.5 strap is
-# never clamped (shop thin-wall floor 3.0). Everything else overhangs for saw and file.
-# Local frame: Z0 = end-block tops (the raw blank underside), X along the blank, Y as the
-# rocker's frame `top` (pivot axis X0 Y0). AUTHOR'S CHOICE dimensions. verify = false is an
-# ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see
-# local://rocker-measurement-checklist.md B2): assumed made from offcuts as drawn.
-[fixtures.rocker-filing-stand]
-name = "rocker filing stand (end blocks + hub pedestal), MHA-CH-006 S5"
-kind = "custom"
-shop_made = true
-verify = false
-note = "Shop-made from steel offcuts (material not yet chosen: shop gap); end blocks 20 x 38.1 x 30, pedestal Ø9.5 x 30.44 (its top 0.4405 above the end blocks), all set on the fitting bench and clamped to it; check the pedestal top against the end blocks with the height gauge before use"
-cad = "ch_rocker_arm_tl_filing_stand"
-
 # Riser blocks for MHA-CH-006 S1-S4. With the example spindle-to-table minimum (2.4 in,
 # 60.96) the 3/8 in end mill in its collet cannot reach a 7.94 bar lying on the PM-30MV
 # table (run15: short by 9.5 to 11.7 mm), so the bar is lifted 18.50 on six blocks clamped
@@ -5192,7 +5130,7 @@ name = "Bernzomatic Max Heat torch kit with MAP-Pro cylinder"
 kind = "torch"
 purchase = "Bernzomatic Max Heat torch kit with MAP-Pro cylinder (purchase approved by Pedro 2026-10-11)"
 source = "L&M Supply, $64.99 (https://www.landmsupply.com/bernzomatic-max-heat-torch-kit-w-map-pro-cylinder), read 2026-10-11"
-note = "Hardens the O1 hub-filing buttons, trammel points and template; temper in the kitchen oven."
+note = "Hardens the O1 trammel points and template; temper in the kitchen oven."
 
 [consumables.quench-oil-canola]
 name = "canola oil (O1 quench), about 1 qt in a steel can with a lid"
@@ -5480,14 +5418,6 @@ solids = [
   # Basis: fixtures.bench-vise-4in.solids.body: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2230 (fixtures.bench-vise-4in.solids.body) authored box envelope; authored physical-size model {"size_mm":[120.0,100.0,60.0]} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
   { name = "body", supply = "existing", shape = "box", at_mm = [-60.0, -50.0, -85.0], size_mm = [120.0, 100.0, 60.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
 ]
-
-# Filing buttons: hardened lapped collars clamped on a headed lapped stud through a
-# reamed bore, one on each face of the boss; the lower button seats on the stud head and
-# a coupling nut presses the upper one directly (its hex corners turned inside the button
-# rim, so the file laid on the rim clears it), so the file stops on their rims and the boss is filed
-# round about the bore. Local frame: stud axis Z, Z0 on the upper face the top button
-# seats on; the lower button seats on the opposite face, here the rocker hub at its
-# 7.080 length aim (lower button top Z-7.080; the nut takes up the actual length).
 
 # DataBracket5 (r6) / DataBracket7 (r7): the shop has no hardening or precision grinding,
 # so the bracket kit is bought finished from a tooling catalogue that sells configurable
