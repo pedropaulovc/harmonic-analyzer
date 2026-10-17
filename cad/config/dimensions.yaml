@@ -1343,7 +1343,7 @@ sections:
       - - Rod diameter
         - 'Body Ø6.00 0/−0.03, selected cold-drawn brass stock; bracket-end cylindrical press land Ø6.000 0/−0.006, SELECT OR LAP, starting 10.00 +0/−0.05 mm before the actual tip and ending at its tangent hemisphere (R3 REF from selected OD). Stock below the press-land minimum is rejected, not enlarged by lapping.'
         - ~0.24
-        - 'round brass rod, photo proportion; p.46 “Firmly affixed to the summing lever”; user-ruling light press plus Loctite 638, derived by mg_lever_press_fit_geom.press_fit_budget'
+        - 'round brass rod, photo proportion; p.46 “Firmly affixed to the summing lever”; user-ruling light press alone (#1570), derived by mg_lever_press_fit_geom.press_fit_budget'
         - scaled + engineered fit
         - low (photo nominal); high (specified fit)
       - - Lever rod length
@@ -1377,7 +1377,7 @@ sections:
         - photo topology + engineered walls
         - med (topology/function); low (photo sizes); high (specified stock/walls)
       - - Mounting bracket
-        - '1018 cold-drawn low-carbon steel angle bracket: Ø12 × 10.00 +0/−0.05 collar, bore Ø5.986 +0.006/0, light-press onto Ø6.000 0/−0.006 lever land (0.002–0.014 diametral interference; 7 mm nominal straight cylinder, 7.207819 mm whole-contact envelope = longest 7.003 mm cylinder plus the partial R3 dome outside the 5.986 bore), end flush with outer face; retain with Loctite 638, alternative soft solder or braze. Press the collar onto the rod held near its end, not through the unsupported lever as a column. Steel only: brittle gray iron is rejected for the press-fit hoop load. 10-wide forward arm at machine (+40, 979.7, −173.51) (#1559 A1 plumb plane: arm end 103.51, mounting face 100.40 from the bore axis; was 58.30/55.19 at z −128.3); vertical side plate 48 wide × 12.7 tall × 3.175 thick, machine x −3..+45, y 973.35..986.05, z −76.2874..−73.1124. Back face seats flush against summing-lever front face (SUMMING_Z − 152.4/2), not below it.'
+        - '1018 cold-drawn low-carbon steel angle bracket: Ø12 × 10.00 +0/−0.05 collar, bore reamed or honed Ra 0.8 to 0.007–0.014 diametral interference on the measured Ø6.000 0/−0.006 lever land (model Ø5.986, the tightest corner; DIN 7190 smoothing leaves 0.00188 effective, holding 241 N and 724 N·mm against 2.9 N and 70 N·mm; 7 mm nominal straight cylinder, 7.207819 mm whole-contact envelope = longest 7.003 mm cylinder plus the partial R3 dome outside the 5.986 bore), end flush with outer face; the press alone retains it (#1570). Press the collar onto the rod held near its end, not through the unsupported lever as a column. Steel only: brittle gray iron is rejected for the press-fit hoop load. 10-wide forward arm at machine (+40, 979.7, −173.51) (#1559 A1 plumb plane: arm end 103.51, mounting face 100.40 from the bore axis; was 58.30/55.19 at z −128.3); vertical side plate 48 wide × 12.7 tall × 3.175 thick, machine x −3..+45, y 973.35..986.05, z −76.2874..−73.1124. Back face seats flush against summing-lever front face (SUMMING_Z − 152.4/2), not below it.'
         - —
         - 'ch30_images/page002_img01.png, eight views front; ch20_images/page001_img01.jpeg, top-right close-up: vertical black angle side plate against the lever front face, two side-by-side slotted heads at the lever mid-plane'
         - scaled + derived
@@ -1409,8 +1409,7 @@ sections:
       position along the rod is the radius from THAT pivot, which is what the
       ≤4× adjustment really is. Light-press the bracket collar onto the rod
       held near its end, without column loading; leave the rod end flush with
-      the outer collar face and retain with Loctite 638. Alternative retention
-      is soft solder or braze.
+      the outer collar face; the press alone retains it (#1570).
 
       DEPTH RE-ANCHOR (2026-07-04, ch30 p.4; window re-solved 2026-08-02 with
       the new casting; #1559 A1 2026-10-16): the side view shows the whole

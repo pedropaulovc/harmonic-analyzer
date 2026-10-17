@@ -3,8 +3,8 @@ r"""Reproduction script: magnifying-lever bracket (book ch. 20, pp. 46-49).
 The black fitting that affixes the magnifying lever rod to the summing
 lever: a flange butted against the coefficients plate's front edge FACE
 and a forward arm ending in a collar (O12, bore mg_lever_press_fit_geom
-.COLLAR_BORE_DIA) the O6 rod is PRESSED into and retained with Loctite 638
-(p.46 "firmly affixed"; user ruling 2026-10-11). The collar/rod sit at the
+.COLLAR_BORE_DIA) the O6 rod is PRESSED into, held by the press alone (#1570;
+p.46 "firmly affixed"; user ruling 2026-10-11). The collar/rod sit at the
 plate centreline (machine y 979.7, after the 2026-08-02 Cascade-A drop). The
 flange seats flush on the summing lever's installed front face and carries
 two native plain #2 clearance holes entering -Z, the screw heads bearing on
@@ -47,6 +47,7 @@ from _extrude import extrude_at_offset
 from _fit_deviations import deviations
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -74,6 +75,7 @@ from mg_magnifying_bracket_spec import (
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     RADIUS_TOL_TYPE,
+    SURFACE_FINISHES,
 )
 from mg_lever_press_fit_geom import COLLAR_BORE_DIA, COLLAR_LENGTH_BAND
 from mg_magnifying_lever_geom import COLLAR_HALF_LEN as LEVER_COLLAR_HALF_LEN
@@ -679,6 +681,9 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # The collar bore's Ra 0.8 (the press budget's smoothing input) is native
+    # model PMI on its cylinder; the side view prints the same control.
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
