@@ -69,11 +69,16 @@ from mg_magnifying_clamp_geom import (
     THUMB_TAP_SPEC,
 )
 from mg_magnifying_clamp_spec import (
+    AREA_HATCH_STYLE_PATTERN,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     LEVER_BORE_FROM_FLAT,
+    PREF_MATERIAL_HATCH_PATTERN,
+    PREF_MATERIAL_HATCH_STYLE,
+    PREF_NO_OPTION,
+    SECTION_HATCH_PATTERN,
 )
 from mg_rod_clamp_joint import ROD_TAP_DRILL_DEPTH, ROD_TAP_SPEC
 
@@ -251,6 +256,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await apply_material(adapter, MATERIAL)
+    _set_section_hatch(adapter)
     # ch20 p.47 (img07) + p.46: the clamp block is BLACKENED brass (reads
     # dark against the bright lever rod and the bright thumb screw).
     await apply_color(adapter, PANEL_BLACK)
@@ -271,6 +277,31 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     return await save_part_and_images(adapter, PART_NAME)
+
+
+def _set_section_hatch(adapter: Any) -> None:
+    """Give the part's Material Properties crosshatch the section pattern,
+    after the material (which applies its own), and prove it by read-back:
+    the drawing's section hatches from it (mg_magnifying_clamp_spec)."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    extension.SetUserPreferenceInteger(
+        PREF_MATERIAL_HATCH_STYLE, PREF_NO_OPTION, AREA_HATCH_STYLE_PATTERN
+    )
+    extension.SetUserPreferenceString(
+        PREF_MATERIAL_HATCH_PATTERN, PREF_NO_OPTION, SECTION_HATCH_PATTERN
+    )
+    style = int(
+        extension.GetUserPreferenceInteger(PREF_MATERIAL_HATCH_STYLE, PREF_NO_OPTION)
+    )
+    pattern = str(
+        extension.GetUserPreferenceString(PREF_MATERIAL_HATCH_PATTERN, PREF_NO_OPTION)
+    )
+    if style != AREA_HATCH_STYLE_PATTERN or pattern != SECTION_HATCH_PATTERN:
+        raise RuntimeError(
+            f"clamp material crosshatch read back style {style}, pattern "
+            f"{pattern!r}; wanted {AREA_HATCH_STYLE_PATTERN}, {SECTION_HATCH_PATTERN!r}"
+        )
 
 
 def _as_construction(adapter: Any, entity_id: str) -> None:
