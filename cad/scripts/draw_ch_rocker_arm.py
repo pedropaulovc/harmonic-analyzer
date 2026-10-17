@@ -578,6 +578,36 @@ def _detail_crop(adapter: Any, view: Any, *, label: str) -> tuple[float, float, 
     return readback.crop
 
 
+def _sheet_points_in_sketch(
+    adapter: Any, view: Any, sheet_points: Any, *, label: str, kind: str, owner: str
+) -> list[tuple[float, float, float]]:
+    """Sheet points in ``view``'s own drawing-sketch frame (ModelToSketchTransform)."""
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    if sketch is None:
+        raise RuntimeError(f"{label}: {owner} has no native drawing sketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    if transform is None or utility is None:
+        raise RuntimeError(f"{label}: missing native sketch transform or math utility")
+    mapped = []
+    for x, y in sheet_points:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        if point is None:
+            raise RuntimeError(f"{label}: cannot create native {kind} point")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        if projected is None:
+            raise RuntimeError(f"{label}: cannot map native {kind} point to sketch")
+        coordinates = tuple(float(v) for v in (projected.ArrayData or ()))
+        if len(coordinates) != 3 or not all(math.isfinite(v) for v in coordinates):
+            raise RuntimeError(
+                f"{label}: invalid native sketch {kind} point={coordinates!r}"
+            )
+        mapped.append(coordinates)
+    return mapped
+
+
 def _create_detail(
     adapter: Any, parent: Any, *, centre: tuple[float, float, float],
     radius_mm: float, target: tuple[float, float], scale: tuple[float, float], label: str,
@@ -591,25 +621,14 @@ def _create_detail(
     draw.ClearSelection2(True)
     rim = (centre[0] + radius_mm / 1000.0, centre[1], centre[2])
     sheet_points = _project(adapter, parent, (centre, rim), label=f"detail {label} fence")
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
-    if sketch is None:
-        raise RuntimeError(f"detail {label}: parent has no native drawing sketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    if transform is None or utility is None:
-        raise RuntimeError(f"detail {label}: missing native sketch transform or math utility")
-    mapped = []
-    for x, y in sheet_points:
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-        if point is None:
-            raise RuntimeError(f"detail {label}: cannot create native fence point")
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        if projected is None:
-            raise RuntimeError(f"detail {label}: cannot map native fence point to sketch")
-        coordinates = tuple(float(v) for v in (projected.ArrayData or ()))
-        if len(coordinates) != 3 or not all(math.isfinite(v) for v in coordinates):
-            raise RuntimeError(f"detail {label}: invalid native sketch fence point={coordinates!r}")
-        mapped.append(coordinates)
+    mapped = _sheet_points_in_sketch(
+        adapter,
+        parent,
+        sheet_points,
+        label=f"detail {label}",
+        kind="fence",
+        owner="parent",
+    )
     manager = _early_bound(draw.SketchManager, "ISketchManager")
     previous = bool(manager.AddToDB)
     manager.AddToDB = True
@@ -2718,6 +2737,59 @@ def _strap_position_frame(adapter: Any, view: Any, strap_thickness: Any) -> Any:
     )
 
 
+# View F's one centreline: the hub width's and the strap's shared centre plane
+# (model Z = 0), from just under the bottom arc's midpoint to just over the
+# top-arc ends. Drawn coincident, the planes take ASME Y14.5-2018's implied
+# zero basic (1.4, fundamental rules), so the strap frame's ⌖0.10|G has its
+# basic on the view. Three r6-fit reviews read G as a hub end face and asked
+# for the missing basic (#1579).
+CENTRE_PLANE_OVERSHOOT_MM = 1.0
+CENTRE_PLANE_Y_MM = (-CENTRE_PLANE_OVERSHOOT_MM, TOP_END_Y + CENTRE_PLANE_OVERSHOOT_MM)
+CENTRE_PLANE_READBACK_TOL = 1e-9
+
+
+def _strap_centre_plane(adapter: Any, view: Any) -> Any:
+    """Draw G's centre plane through the hub and the strap in view F, direct
+    to the database (an inferred end snaps onto nearby ink), and read its
+    ends and black colour back."""
+    label = "view F hub/strap centre plane"
+    draw = adapter.currentModel
+    view_f = view_name(adapter, view)
+    if _early_bound(draw, "IDrawingDoc").ActivateView(view_f) is not True:
+        raise RuntimeError(f"{label}: cannot activate view F")
+    draw.ClearSelection2(True)
+    ends = tuple((0.0, y / 1000.0, 0.0) for y in CENTRE_PLANE_Y_MM)
+    sheet_points = _project(adapter, view, ends, label=label)
+    mapped = _sheet_points_in_sketch(
+        adapter, view, sheet_points, label=label, kind="centreline", owner="view F"
+    )
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateCenterLine(*mapped[0], *mapped[1])
+    finally:
+        manager.AddToDB = previous
+    if segment is None:
+        raise RuntimeError(f"{label}: CreateCenterLine returned nothing")
+    line = _early_bound(segment, "ISketchLine")
+    for expected, accessor in zip(mapped, ("GetStartPoint2", "GetEndPoint2")):
+        point = _early_bound(getattr(line, accessor)(), "ISketchPoint")
+        actual = tuple(float(getattr(point, axis)) for axis in ("X", "Y", "Z"))
+        drift = max(abs(a - b) for a, b in zip(actual, expected, strict=True))
+        if drift > CENTRE_PLANE_READBACK_TOL:
+            raise RuntimeError(
+                f"{label}: {accessor} sits at {actual}, not the authored {expected}"
+            )
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError(f"{label}: black colour did not persist")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+    return segment
+
+
 def _hub_position_frame(adapter: Any, hub: Any, hub_dia: Any) -> Any:
     """Position the hub OD's axis to A under its Ø10.20 in detail D: the
     zone the hub wall minimum is computed with (regate-r1 #2, not a note)."""
@@ -3780,6 +3852,8 @@ async def build(adapter: Any) -> dict[str, str]:
         phase = "view F strap position frame"
         (strap_thickness,) = [ann for ann in right_annotations if dimension_name(adapter, ann) == "StrapThickness"]
         _strap_position_frame(adapter, right, strap_thickness)
+        phase = "view F hub/strap centre plane"
+        _strap_centre_plane(adapter, right)
     except Exception as exc:  # noqa: BLE001 - the imported native drawing still exists
         _capture_layout_failure(adapter, phase, exc)
         raise

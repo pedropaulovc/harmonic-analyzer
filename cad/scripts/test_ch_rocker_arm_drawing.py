@@ -3457,6 +3457,115 @@ def test_strap_position_frame_refuses_an_unproven_frame(
         drawing._strap_position_frame(env.adapter, env.view, env.imported)
 
 
+class _CentrePlaneLine:
+    _native_interfaces = ("ISketchLine", "ISketchSegment")
+
+    def __init__(self, start, end, *, keeps_colour=True):
+        self.ends = (start, end)
+        self.keeps_colour = keeps_colour
+        self._colour = 0xFF0000
+
+    def _point(self, xyz):
+        return _native("ISketchPoint", X=xyz[0], Y=xyz[1], Z=xyz[2])
+
+    def GetStartPoint2(self):
+        return self._point(self.ends[0])
+
+    def GetEndPoint2(self):
+        return self._point(self.ends[1])
+
+    @property
+    def Color(self):
+        return self._colour
+
+    @Color.setter
+    def Color(self, value):
+        if self.keeps_colour:
+            self._colour = value
+
+
+def _centre_plane_env(monkeypatch, defect=None):
+    monkeypatch.setattr(drawing, "_early_bound", _bind_owner)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "Drawing View2")
+    rebuilds = []
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing", lambda _adapter, *, label: rebuilds.append(label)
+    )
+    view = _DetailParent()
+    monkeypatch.setattr(
+        drawing,
+        "model_points_in_view",
+        lambda _adapter, native, points, **_kwargs: [native.project(p) for p in points],
+    )
+    created = []
+
+    def create(*xyz):
+        if defect == "none":
+            return None
+        start, end = tuple(xyz[:3]), tuple(xyz[3:])
+        if defect == "drift":
+            end = (end[0] + 1e-6, *end[1:])
+        line = _CentrePlaneLine(start, end, keeps_colour=defect != "colour")
+        created.append((tuple(xyz), line))
+        return line
+
+    manager = _native("ISketchManager", AddToDB=False, CreateCenterLine=create)
+    doc = _native(
+        "IModelDoc2",
+        "IDrawingDoc",
+        ActivateView=lambda _name: True,
+        ClearSelection2=lambda _all: None,
+        SketchManager=manager,
+    )
+    utility = _native("IMathUtility", CreatePoint=_DetailMathPoint)
+    adapter = SimpleNamespace(
+        currentModel=doc, swApp=_native("ISldWorks", GetMathUtility=lambda: utility)
+    )
+    return SimpleNamespace(
+        adapter=adapter, view=view, created=created, manager=manager, rebuilds=rebuilds
+    )
+
+
+def test_view_f_draws_the_hub_and_strap_centre_plane_g_frames_to(monkeypatch) -> None:
+    """The strap frame's implied zero basic to G (#1579 r6-fit reviews):
+    one black centreline on model Z = 0 over the whole view F silhouette."""
+    env = _centre_plane_env(monkeypatch)
+    line = drawing._strap_centre_plane(env.adapter, env.view)
+    ((xyz, created),) = env.created
+    assert line is created and created.Color == 0
+    assert env.manager.AddToDB is False  # restored after the direct-to-DB insert
+    assert env.rebuilds == ["view F hub/strap centre plane"]
+    assert drawing.CENTRE_PLANE_Y_MM == (-1.0, drawing.TOP_END_Y + 1.0)
+    expected = [
+        env.view.transform.apply((*env.view.project((0.0, y / 1000.0, 0.0)), 0.0))
+        for y in drawing.CENTRE_PLANE_Y_MM
+    ]
+    assert xyz == pytest.approx((*expected[0], *expected[1]))
+    # Both planes are centred on the model's Z = 0: the hub and the strap.
+    hub_lower, strap_lower = (
+        faces.fields["lower_z"][0] for faces in (drawing.HUB_FACES, drawing.STRAP_FACES)
+    )
+    assert hub_lower == -ch_rocker_arm_spec.HUB_LENGTH / 2
+    assert strap_lower == -ch_rocker_arm_spec.ARM_THICKNESS / 2
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    [
+        ("none", "CreateCenterLine returned nothing"),
+        ("drift", "GetEndPoint2 sits at"),
+        ("colour", "black colour did not persist"),
+    ],
+)
+def test_view_f_centre_plane_refuses_an_unproven_line(
+    monkeypatch, defect, message
+) -> None:
+    env = _centre_plane_env(monkeypatch, defect)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._strap_centre_plane(env.adapter, env.view)
+    assert env.rebuilds == []
+
+
 def test_hub_position_frame_locates_the_hub_od_to_a_on_its_own_diameter(view_f_dimension) -> None:
     """regate-r1 #2: the hub OD's coaxiality is a native Ø position frame to A
     under its Ø10.20 in detail D, the zone the hub wall minimum is built on."""
@@ -4955,7 +5064,8 @@ def test_hub_length_stack_callout_is_below_and_preserves_native_size(
             for target in node.targets
         )
     )
-    # View F's dressing (hub root, datum G, strap frame) is one guarded block.
+    # View F's dressing (hub root, datum G, strap frame, their shared centre
+    # plane) is one guarded block.
     stop = next(
         index for index, node in enumerate(build.body)
         if isinstance(node, ast.Try)
@@ -4986,6 +5096,7 @@ def test_hub_length_stack_callout_is_below_and_preserves_native_size(
         _dress_hub_root=drawing._dress_hub_root,
         _hub_width_datum=lambda _adapter, view, ann: placed.append(("D", view, ann)),
         _strap_position_frame=lambda _adapter, view, ann: placed.append(("frame", view, ann)),
+        _strap_centre_plane=lambda _adapter, view: placed.append(("centre plane", view)),
         _capture_layout_failure=lambda _adapter, phase, _exc: captured.append(phase),
     )
     # This label test owns the right import, its callout/readback and view F's
@@ -5002,8 +5113,13 @@ def test_hub_length_stack_callout_is_below_and_preserves_native_size(
         assert "MHA-CH-005" in drawing.HUB_LENGTH_TEXT
         assert strap.writes == [(4, ch_rocker_arm_notes.STRAP_FIT_CALLOUT)]
         assert "MHA-CH-003" in ch_rocker_arm_notes.STRAP_FIT_CALLOUT
-        # D hangs on the hub width, the position frame on the strap width.
-        assert placed == [("D", right, hub.annotation), ("frame", right, strap.annotation)]
+        # D hangs on the hub width, the position frame on the strap width,
+        # then the centre plane both share (G's implied zero basic).
+        assert placed == [
+            ("D", right, hub.annotation),
+            ("frame", right, strap.annotation),
+            ("centre plane", right),
+        ]
         assert root.ArcExtensionLineOrOppositeSide is False
         assert captured == []
     else:
