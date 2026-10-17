@@ -3554,8 +3554,8 @@ source = "https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/"
 present = false
 verify = true
 purchase = "1 x Ooznest LS-TR8-2-2P-CTS cut to 410 mm +/-0.5 mm for the final C4 trammel layout, Tr8x2 single-start screw; UK-based vendor shipping to the US, shipping cost and delivery time require checkout confirmation."
-note = "Read live 2026-10-16: A2 stainless steel, nominal diameter 8 mm, pitch 2 mm, lead 2 mm/revolution, one start; cut-to-size range 100-2000 mm, length tolerance +/-0.5 mm, ends manually deburred with a small chamfer. Fully threaded ends, not supplied with smooth or turned 8 mm journals. Thread hand is not explicitly stated; use the matching Ooznest nut, do not infer a hand specification. Owner's final C4 layout ruling selects 410 mm total length, replacing the provisional 500 mm shortlist, to fit the blind 18 mm wheel bore and spindle-side clearance. This is a custom cut request within the published length range, not a separate stocked length SKU; physical engagement, block fit and usable travel remain to verify against the jig layout."
-cite = ["Ooznest LS-TR8-2-2P-CTS https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/ read live 2026-10-16: 8 mm, single start, pitch/lead 2 mm, cut-to-size 100-2000 mm +/-0.5 mm; owner C4 order request 410 mm", "Ooznest screw drawing https://ooznest.co.uk/wp-content/uploads/2026/09/TR8x2-2P-Lead-Screw-8mm-Dia-2mm-Lead-2mm-Pitch-Cut-To-Size_drawing.png"]
+note = "Read live 2026-10-16: A2 stainless steel, nominal diameter 8 mm, pitch 2 mm, lead 2 mm/revolution, one start; cut-to-size range 100-2000 mm, length tolerance +/-0.5 mm, ends manually deburred with a small chamfer. Fully threaded ends, not supplied with smooth or turned 8 mm journals. Thread hand is not explicitly stated; use the matching Ooznest nut, do not infer a hand specification. Owner's C4 layout selects 410 mm total length, replacing the provisional 500 mm shortlist, to fit the blind 18 mm wheel bore and spindle-side clearance. Confirm the matching C4 block positions, wheel engagement and usable travel before placing the non-returnable cut order. The selected length is a custom cut request within the published range, not a separate stocked length SKU. Receipt checks of block fit and installed retention remain required."
+cite = ["Ooznest LS-TR8-2-2P-CTS https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/ read live 2026-10-16: 8 mm, single start, pitch/lead 2 mm, cut-to-size 100-2000 mm +/-0.5 mm", "Ooznest screw drawing https://ooznest.co.uk/wp-content/uploads/2026/09/TR8x2-2P-Lead-Screw-8mm-Dia-2mm-Lead-2mm-Pitch-Cut-To-Size_drawing.png", "Owner/C4 layout decision 2026-10-16 (not vendor evidence): order 410 mm; SCREW_LENGTH = 410.0 in cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py, in-flight rocker/trammel-jig-4 branch stacked on PR #1583"]
 # McMaster alternatives considered, not chosen: M8 pitch 2 / lead 4 screws
 # 97783A170/97783A180 are only 200/300 mm; too short for the final 410 mm order.
 # McMaster 2391N25 is 500 mm but pitch 2.5 / lead 10, unnecessarily coarse
@@ -3582,6 +3582,11 @@ note = "Read live page/drawing 2026-10-16: brass, 8 mm thread diameter, pitch 2 
 # Vendor requires lubrication; published thread hand/backlash remain unspecified.
 # Four plain 3.5 mm holes suit M3 clearance mounting; a shop-made nut bracket
 # is a separate jig part, not a claim of direct mounting to M4 carriage threads.
+# C4 owner identifies TL-29 (MHA-CH-006-TL-29), defined in
+# cad/scripts/ch_rocker_arm_tl_oblique_nut_bracket_spec.py, as that bracket.
+# Interface authority: NUT_ID and NUT_* in
+# cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py, in-flight
+# rocker/trammel-jig-4 branch; this sourcing branch adds no CAD geometry.
 cite = ["Ooznest LSRFN-TR8-2-2P-B https://ooznest.co.uk/product/tr8x2-2p-lead-screw-round-flanged-nut-brass/ live page and dimensioned drawing read 2026-10-16", "Ooznest nut drawing https://ooznest.co.uk/wp-content/uploads/2026/09/TR8x2-2P-Lead-Screw-Round-Flanged-Nut-8mm-Dia-2mm-Lead-2mm-Pitch-Brass_drawing.png"]
 # McMaster matching M8 lead-4 flanged nut 97783A270 is acetal (acceptable),
 # but its matching stocked screws are too short; material is not a rejection.
@@ -3600,6 +3605,9 @@ cite = ["Bearings Direct / AMPEC KP08 https://bearingsdirect.com/8mm-bore-kp08-m
 # Rejected McMaster 4491N33 and 8600N13: 8 mm rotary base-mount bearings,
 # but press-fit shaft mounting would require a turned journal on the rolled
 # screw, and does not supply the requested set-screw end locking.
+# Keep nut travel off set-screw-marked end threads; raised crest damage can
+# bind the brass nut. Inspect before running the nut across a previously
+# clamped end during assembly or servicing.
 # https://www.mcmaster.com/4491N33/ https://www.mcmaster.com/8600N13/
 # Ooznest's live KP08 product search returned no matching products; no stable
 # Ooznest KP08 SKU/drawing was verified. Other makers' KP08 hole/width values

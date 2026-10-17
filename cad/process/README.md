@@ -71,26 +71,14 @@ and the shared placeholder spelling (spec solids included), enumerates every
 `shop_made` record, and rejects any other inventory table whose id or name names
 a registered part (stem or drawing number from `cad/config/parts`).
 
-## Trammel purchased hand-feed components
+Catalogue sourcing belongs in `shop/inventory.toml`: keep the dated vendor
+specification separate from any owner-selected cut length or jig-layout
+decision. Keep unpurchased hardware at `verify = true`; catalogue dimensions
+do not establish possession, receipt metrology or assembled mechanical fit.
+Record unpublished fields and rejected substitutes beside the affected item,
+rather than duplicating their changing verification status here. CAD remains
+the authority for installed geometry and any shop-made adapter.
 
-The catalogue purchase records are `fixtures.trammel-tr8-leadscrew`,
-`fixtures.trammel-tr8-flange-nut`, `fixtures.trammel-kp08-blocks` and
-`fixtures.trammel-handwheel` in `shop/inventory.toml`. They describe matched
-Ooznest screw/nut/wheel components and AMPEC supports, not a boxed kit or
-installed hardware. The dated inventory citations own the interface dimensions
-and McMaster alternatives considered; do not substitute a different thread lead,
-nut bolt circle or wheel-bore depth from a similarly named component.
-
-These records retain `verify = true`: KP08 hole diameter and axial width,
-thread hand, nut backlash, wheel bore/retention, assembled axial location,
-screw/block fit and final usable travel still need receipt/layout verification.
-No smooth or turned end journals are supplied: thread-crest support, runout and
-axial creep under reversal remain unproven. The wheel also needs base-edge
-overhang or sufficient support lift; its rim extends below the support mounting
-plane. The nut-to-carriage bracket belongs to the jig CAD, not this shopping list.
-Ooznest is UK-based; US shipping, import/tax treatment and delivery must be
-confirmed at checkout. The inventory does not establish a finished fixture's
-geometry or approve its mechanical retention.
 
 ## Add or migrate a part
 
