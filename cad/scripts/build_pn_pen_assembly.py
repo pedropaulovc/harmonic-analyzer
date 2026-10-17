@@ -490,7 +490,9 @@ def _construction(adapter: Any, line: str, label: str) -> None:
 async def _author_stud_setting(adapter: Any) -> None:
     """STUD HEIGHT: a vertical construction line on the rod axis from the
     rod's top face to the stud's head top (Right plane, sketch = machine -Z,
-    Y), its length the toleranced setting. No solid or pose edits."""
+    Y), its length the nominal stud's setting. It carries no band: the stud
+    is set from its measured length (``spec.stud_head_setting``), so the
+    drawing prints it as a reference. No solid or pose edits."""
     (u, rod_top_y), (_u, head_top_y) = spec.STUD_LINE
     dims = SketchDims()
     check("create stud setting sketch", await adapter.create_sketch("Right"))
@@ -511,9 +513,6 @@ async def _author_stud_setting(adapter: Any) -> None:
     check("exit stud setting sketch", await adapter.exit_sketch())
     name_last_feature(adapter, spec.STUD_FEATURE)
     dims.apply(adapter, spec.STUD_FEATURE)
-    set_dimension_symmetric_tolerance(
-        adapter, spec.STUD_FEATURE, spec.STUD_DIMENSION, spec.STUD_TOLERANCE_MM
-    )
 
 
 def _add_driving_yaw_angle(adapter: Any, nib_line: str, flat_line: str) -> None:

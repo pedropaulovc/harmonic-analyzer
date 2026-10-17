@@ -429,9 +429,9 @@ _PEN_ALLOWED_PAIRS = {
     frozenset(("vn-pen-rod-set-screw-1", "pn-pen-v-block-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 4.7625
     ),
-    # #0-80 adjuster stud threaded 4.0 into the rod top (pn_pen_rod_spec.STUD_ENGAGEMENT).
+    # #0-80 adjuster stud threaded 3.2 into the rod top (pn_pen_rod_spec.STUD_ENGAGEMENT).
     frozenset(("pn-pen-adjust-screw-1", "pn-pen-rod-1")): _smooth_annulus_limit_mm3(
-        1.524, 1.191, 4.0
+        1.524, 1.191, 3.2
     ),
 }
 
