@@ -18,6 +18,7 @@ recipes:
 | 3088A429 | `vn-rocker-thrust-washer` (MHA-VN-070; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 1/4" ID x 3/8" OD, 0.031" Thick |
 | 3606T118 | `vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
 | 3606T811 | `vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
+| 5972K41 | `ch-rocker-arm-tl-oblique-bearing` (MHA-CH-006-TL-32; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Steel Ball Bearing |
 | 6261K108 | `vn-chain-connecting-link` (the loop's one connecting link; catalogue-only, vendor model not downloaded) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
 | 6261K171 | `vn-chain-inner-link`, `vn-chain-outer-link` (cut to length; catalogue-only, vendor model not downloaded) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
@@ -39,14 +40,26 @@ recipes:
 | 91247A720 | — (diagnostic recipe; a former `vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | — (catalogue-only diagnostic recipe; former `vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
+| 91251A188 | `ch-rocker-arm-tl-oblique-block-screw` (MHA-CH-006-TL-43; shop fixture; catalogue-only, CAD login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
+| 91251A196 | `ch-rocker-arm-tl-oblique-bracket-screw` (MHA-CH-006-TL-42; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91251A197 | `ch-rocker-arm-tl-oblique-rail-screw` (MHA-CH-006-TL-41; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91251A540 | `ch-rocker-arm-tl-oblique-clamp-screw` (MHA-CH-006-TL-48; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91251A583 | `ch-rocker-arm-tl-oblique-lever-screw` (MHA-CH-006-TL-49; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91812A215 | `ch-rocker-arm-tl-oblique-block-washer` (MHA-CH-006-TL-50; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
+| 91812A230 | `ch-rocker-arm-tl-oblique-lever-washer` (MHA-CH-006-TL-51; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 91255A106 | — (diagnostic recipe; a former `vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
+| 91290A115 | `ch-rocker-arm-tl-oblique-nut-screw` (MHA-CH-006-TL-46; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91290A148 | `ch-rocker-arm-tl-oblique-kp08-screw` (MHA-CH-006-TL-45; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91290A168 | `ch-rocker-arm-tl-oblique-carriage-screw` (MHA-CH-006-TL-44; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 90325A174 | `vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
 | 91375A105 | `vn-pen-rod-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91375A106 | `vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | — (diagnostic recipe; `vn-gooseneck-set-screw` until 2026-10-12) | Steel Square-Head Cup-Point Set Screw |
 | 91410A540 | `vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
+| 91595A452 | `ch-rocker-arm-tl-oblique-cl-dowel` (MHA-CH-006-TL-33; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Dowel Pin |
+| 91771A110 | `ch-rocker-arm-tl-oblique-riser-screw` (MHA-CH-006-TL-47; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Stainless Steel Phillips Flat Head Screw |
 | 91790A199 | `vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91792A108 | `vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
 | 91794A112 | `vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
@@ -92,21 +105,299 @@ recipes:
 The cone-lock and swing-stop selections follow `cad/scripts/build_vn_cone_lock_knob.py`
 and `cad/scripts/build_vn_swing_stop_screw.py`.
 
-Shop tooling catalogue verification on October 16, 2026 (not production
-fastener identities; no vendor models downloaded):
+Oblique trammel jig shop-fixture hardware (MHA-CH-006-TL-32/33 and
+TL-41 to TL-49), modelled as purchased parts so the jig assembly can run
+native interference. Their vendor models were downloaded on October 17,
+2026 (UTC) and read for dimensions only; by user ruling of that date none is
+replica-gated and no copy is kept here:
 
-- [5972K41](https://www.mcmaster.com/5972K41/) supplies
-  `fixtures.trammel-6200-2rs`: four steel sealed 6200-2RS bearings,
-  10 × 30 × 9 mm, Buna-N seals, ABEC 1, C3 radial clearance 0.008–0.023 mm.
-  Live Firecrawl spec table read October 16, 2026. The inventory records
-  the sourcing ruling on per-bearing internal play and rejected C0 upgrade;
-  combined play, mounting fits and alignment are not bounded by that ruling.
+- [5972K41](https://www.mcmaster.com/5972K41/) (`ch-rocker-arm-tl-oblique-bearing`,
+  MHA-CH-006-TL-32, four: a pair in each oblique-trammel jig pivot block) was
+  read live on October 17, 2026: steel ball bearing, sealed (Buna-N both
+  sides), trade no. 6200-2RS, ID 10 mm -0.008/0, OD 30 mm -0.009/0, width
+  9 mm -0.12/0, ABEC 1, C3 radial clearance 0.008-0.023 mm, DIN 625-1. The
+  vendor model was downloaded from the product page on October 17, 2026
+  (`5972K41_Steel Ball Bearing.SLDPRT`, SHA-256
+  `c27c3a1b09e8ca34e3191b2c345dd0b963297e5af1eb90e7d106441043c89ca9`; its
+  STEP, SHA-256
+  `617c061f9ee7b93425cf85cd29eb80eae1382ae82e6c66bfbf61f80f08754090`) and
+  read for dimensions only; no copy is kept here. The STEP read in FreeCAD
+  1.1 on October 17, 2026 has eleven solids, 3824.0143 mm³: an outer
+  ring (Ø30 OD, 0.45 x 45° OD chamfers, Ø26 lands, a raceway groove of radius
+  √13 on the Ø20 pitch circle meeting each land 2.0 from mid-width), an inner
+  ring (Ø10 bore, 0.45 x 45° bore chamfers, Ø14 lands, the same groove), two
+  seals between the lands (stepped and crowned outer face, inner face tangent
+  to the balls) and seven Ø7.2111 balls. `diag_build_5972K41.py` models those
+  eleven bodies, each its own unmerged revolve, bearing axis +Y with a side
+  face at y = 0. It is catalogue-only: NOT replica-gated (user ruling
+  October 17, 2026), and its standalone diagnostic is a catalog-only run.
+  The bore, OD and width are the calculator's
+  (`ch_rocker_arm_tl_oblique_trammel_spec` `BEARING_*`). ISO 15 gives the
+  6200 a chamfer r_s min of 0.6 (SKF 6200-2RSH page, read October 16, 2026);
+  the model carries the vendor's 0.45.
+  It also supplies `fixtures.trammel-6200-2rs`; the inventory records the
+  sourcing ruling on per-bearing internal play and the rejected C0 upgrade
+  (combined play, mounting fits and alignment are not bounded by it).
   Receipt verification remains required.
-- [91595A452](https://www.mcmaster.com/91595A452/) supplies
-  `fixtures.trammel-cl-dowel`: 52100 alloy-steel Ø6 × 20 mm dowel,
-  DIN 6325-m6 / ISO 8734, diameter 6.004–6.012 mm, minimum HRC 52.
-  Live Firecrawl spec table read October 16, 2026; length tolerance unstated.
+- [91595A452](https://www.mcmaster.com/91595A452/) (`ch-rocker-arm-tl-oblique-cl-dowel`,
+  MHA-CH-006-TL-33, one: the oblique trammel jig carrier's CL locator) was
+  read live on October 17, 2026: 52100 alloy steel dowel pin, 6 mm diameter
+  +0.004/+0.012 (DIN 6325-m6 / ISO 8734), 20 mm long, Rockwell C52 min, end
+  shape "Round x Chamfer/Round", pack of 25. The page states no end forms; the
+  vendor model does. It was downloaded from the product page on October 17,
+  2026 (`91595A452_Dowel Pin.SLDPRT`, SHA-256
+  `f5ee1a379a65051b513792b1163c4ce9fa2b664c056869bd7ffe7dd946fed855`; its
+  STEP, SHA-256
+  `e9a95f5ef80acb723ff7825b2143e070cc86b2f69f07c3cc6b44caf55fd4bfd6`) and read
+  for dimensions only; no copy is kept here. The STEP read in FreeCAD 1.1 on
+  October 17, 2026 is one revolve of four surfaces,
+  536.8453 mm³, with no flat face: at the chamfered end a cone 15° to the
+  axis, 1.17 long, from the Ø6 cylinder to Ø5.373, then an R5.0165 spherical
+  crown 0.78 high; at the round end an R5.45 spherical dome 0.9 high.
+  `diag_build_91595A452.py` models those end forms (its own section:
+  `diag_mcmaster_dowel.build_dowel` draws flat ends), chamfered tip at y = 0
+  (the pressed end), at nominal Ø6. It is catalogue-only: NOT replica-gated
+  (user ruling October 17, 2026), and its standalone diagnostic is a
+  catalog-only run.
+  It also supplies `fixtures.trammel-cl-dowel`; length tolerance unstated.
   Both purchases remain unconfirmed in `cad/process/shop/inventory.toml`.
+- [91251A197](https://www.mcmaster.com/91251A197/)
+  (`ch-rocker-arm-tl-oblique-rail-screw`, MHA-CH-006-TL-41, 14 in the oblique
+  trammel jig: the fastener table's `RAIL_TO_BAR` row) was read live on October
+  17, 2026: #8-32 UNC class 3A, 3/4 in under the head, fully threaded, head
+  Ø0.27 x 0.164 in, 9/64 in hex, Rockwell C37, ASTM A574, $18.68 per pack of
+  100.
+  The page gives no socket depth, so the model takes ASME B18.3's minimum key
+  engagement for #8, 0.077 in (the 91251A108 convention).
+  `diag_build_91251A197.py` builds it from those catalogue values on the 91251A
+  family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
+  cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
+  0, tip at y = -length). The vendor model was downloaded from the product page
+  on October 17, 2026 (the SLDPRT, SHA-256
+  `8f52201b526d02bbf56d11bebc85a329a141aade6b1b2a19bc9b0f707f8281b5`; its STEP,
+  SHA-256 `1ec8f71f860a945f6539b8540838c38dee0ea6c793ef68ca1b8b378ff64be3e5`)
+  and read for dimensions only; no copy is kept here. It shows a hex socket
+  0.082 in deep and a 50-groove knurled head, a 60 deg socket entry countersink,
+  a 20 deg thread runout cone and a 0.6P tip chamfer, which the family recipe
+  does not draw. It is NOT replica-gated (user ruling, October 17, 2026): the
+  standalone run is catalogue-only (it builds the recipe, checks the solid and
+  saves it under `cad/out/reference`).
+- [91251A196](https://www.mcmaster.com/91251A196/)
+  (`ch-rocker-arm-tl-oblique-bracket-screw`, MHA-CH-006-TL-42, 8 in the oblique
+  trammel jig: the fastener table's `BRACKET_TO_BAR` row) was read live on
+  October 17, 2026: #8-32 UNC class 3A, 5/8 in under the head, fully threaded,
+  head Ø0.27 x 0.164 in, 9/64 in hex, Rockwell C37, ASTM A574, $15.24 per pack
+  of 100.
+  The page gives no socket depth, so the model takes ASME B18.3's minimum key
+  engagement for #8, 0.077 in (the 91251A108 convention).
+  `diag_build_91251A196.py` builds it from those catalogue values on the 91251A
+  family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
+  cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
+  0, tip at y = -length). The vendor model was downloaded from the product page
+  on October 17, 2026 (the SLDPRT, SHA-256
+  `e7fe3961d447b3123ad067dc87db8d863b4452732368037f7d8080202bd771bb`; its STEP,
+  SHA-256 `5b6fb26efa1d652c8b52dd69570b3851c7ceb2381af3ce16cb2571f7f3610924`)
+  and read for dimensions only; no copy is kept here. It shows a hex socket
+  0.082 in deep and a 50-groove knurled head, a 60 deg socket entry countersink,
+  a 20 deg thread runout cone and a 0.6P tip chamfer, which the family recipe
+  does not draw. It is NOT replica-gated (user ruling, October 17, 2026): the
+  standalone run is catalogue-only (it builds the recipe, checks the solid and
+  saves it under `cad/out/reference`).
+- [91251A188](https://www.mcmaster.com/91251A188/)
+  (`ch-rocker-arm-tl-oblique-block-screw`, MHA-CH-006-TL-43, 2 in the oblique
+  trammel jig: the fastener table's `NUT_BRACKET_TO_BLOCK` row) was read live on
+  October 17, 2026 from the #8-32 black-oxide listing: #8-32 coarse, 1-7/8 in
+  under the head, partly threaded (7/8 in thread, the single-product 1-7/8
+  filter page's only Thread Length facet), head Ø0.27 x 0.164 in, 9/64 in hex
+  drive, 170,000 psi, US origin, $11.00 per pack of 10. It replaced a 1-3/4 in
+  screw once the TL-50 wedge-lock pair went under each head: at the worst-case
+  bands (ASME B18.3's -0.04 in length tolerance, TL-22's width and counterbore
+  bands, the pair's 0.080-0.100 in stack) it engages TL-29 7.83 to 10.63, over
+  1.5 D and inside the 12 full thread and its own 7/8 in thread.
+  The page gives no socket depth, so the model takes ASME B18.3's minimum key
+  engagement for #8, 0.077 in (the 91251A108 convention).
+  `diag_build_91251A188.py` builds it from those catalogue values on the 91251A
+  family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
+  cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
+  0, tip at y = -length), partially threaded over the catalogue's 7/8 in
+  thread length ([UNVERIFIED-COM] as for 91251A157). No vendor model was
+  downloaded (the CAD and 2-D drawing are behind the product page's login), so
+  it is not replica-gated: the standalone run is catalogue-only (it builds the
+  recipe, checks the solid and saves it under `cad/out/reference`).
+- [91290A168](https://www.mcmaster.com/91290A168/)
+  (`ch-rocker-arm-tl-oblique-carriage-screw`, MHA-CH-006-TL-44, 8 in the oblique
+  trammel jig: the fastener table's `BLOCK_TO_CARRIAGE` row) was read live on
+  October 17, 2026: M4 x 0.7 mm class 5g6g, 20 mm under the head, fully
+  threaded, head Ø7 x 4 mm, 3 mm hex, class 12.9, Rockwell C41, DIN 912 / ISO
+  4762, $14.47 per pack of 100.
+  The page gives no socket depth, so the model takes ISO 4762's minimum key
+  engagement (t min) for M4, 2.0 mm (the 91251A108 convention).
+  `diag_build_91290A168.py` builds it from those catalogue values on the 91251A
+  family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
+  cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
+  0, tip at y = -length). The vendor model was downloaded from the product page
+  on October 17, 2026 (the SLDPRT, SHA-256
+  `d95f5c3556da2eb440809a63d8e4511e9bf35dba2e57dafa8c55c9c5bc2a1e10`; its STEP,
+  SHA-256 `8673cceae9ae657b9f1123f3cc019893698c47f39fcc0a5c376aee0c8cc3cf71`)
+  and read for dimensions only; no copy is kept here. It shows a hex socket 3.0
+  mm deep and a 72-groove knurled head, 45 deg head edge breaks, a 90 deg socket
+  entry countersink, an under-head fillet with a 60 deg runout cone and a 0.75H
+  tip chamfer, which the family recipe does not draw. It is NOT replica-gated
+  (user ruling, October 17, 2026): the standalone run is catalogue-only (it
+  builds the recipe, checks the solid and saves it under `cad/out/reference`).
+- [91290A148](https://www.mcmaster.com/91290A148/)
+  (`ch-rocker-arm-tl-oblique-kp08-screw`, MHA-CH-006-TL-45, 4 in the
+  oblique trammel jig: the fastener table's `KP08_TO_BRACKET` row) was read live
+  on October 17, 2026: M4 x 0.7 mm class 5g6g, 12 mm under the head, fully
+  threaded, head Ø7 x 4 mm, 3 mm hex, class 12.9, Rockwell C41, DIN 912 / ISO
+  4762, $12.30 per pack of 100.
+  The page gives no socket depth, so the model takes ISO 4762's minimum key
+  engagement (t min) for M4, 2.0 mm (the 91251A108 convention).
+  `diag_build_91290A148.py` builds it from those catalogue values on the 91251A
+  family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
+  cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
+  0, tip at y = -length). The vendor model was downloaded from the product page
+  on October 17, 2026 (the SLDPRT, SHA-256
+  `3d13359e07a7c80cc5290dba1a595739c6c5182caec6dd1020aef94b79f7d4a8`; its STEP,
+  SHA-256 `0d40d024271575266eafd644858489ab44ddf1e7c18a01ee7f782b0cb5bbd7fc`)
+  and read for dimensions only; no copy is kept here. It shows a hex socket 3.0
+  mm deep and a 72-groove knurled head, 45 deg head edge breaks, a 90 deg socket
+  entry countersink, an under-head fillet with a 60 deg runout cone and a 0.75H
+  tip chamfer, which the family recipe does not draw. It is NOT replica-gated
+  (user ruling, October 17, 2026): the standalone run is catalogue-only (it
+  builds the recipe, checks the solid and saves it under `cad/out/reference`).
+- [91290A115](https://www.mcmaster.com/91290A115/)
+  (`ch-rocker-arm-tl-oblique-nut-screw`, MHA-CH-006-TL-46, 4 in the oblique
+  trammel jig: the fastener table's `NUT_TO_NUT_BRACKET` row) was read live on
+  October 17, 2026: M3 x 0.5 mm class 5g6g, 10 mm under the head, fully
+  threaded, head Ø5.5 x 3 mm, 2.5 mm hex, class 12.9, Rockwell C41, DIN 912 /
+  ISO 4762, $13.23 per pack of 100.
+  The page gives no socket depth, so the model takes ISO 4762's minimum key
+  engagement (t min) for M3, 1.3 mm (the 91251A108 convention).
+  `diag_build_91290A115.py` builds it from those catalogue values on the 91251A
+  family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
+  cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
+  0, tip at y = -length). The vendor model was downloaded from the product page
+  on October 17, 2026 (the SLDPRT, SHA-256
+  `bf8dce120aa6a6cc3414fbd419b233e3053241103812254828656946033dedd3`; its STEP,
+  SHA-256 `f33505b4b05370d959ec6f94d8770c8676f745e50dab9e06814cc470c8dcd88e`)
+  and read for dimensions only; no copy is kept here. It shows a hex socket 2.0
+  mm deep and a 72-groove knurled head, 45 deg head edge breaks, a 90 deg socket
+  entry countersink, an under-head fillet with a 60 deg runout cone and a 0.75H
+  tip chamfer, which the family recipe does not draw. It is NOT replica-gated
+  (user ruling, October 17, 2026): the standalone run is catalogue-only (it
+  builds the recipe, checks the solid and saves it under `cad/out/reference`).
+- [91771A110](https://www.mcmaster.com/91771A110/)
+  (`ch-rocker-arm-tl-oblique-riser-screw`, MHA-CH-006-TL-47, 4 in the oblique
+  trammel jig: the fastener table's `RISER_TO_CARRIER` row) was read live on
+  October 17, 2026: 18-8 stainless steel, passivated, Phillips No. 1 drive,
+  standard 82 deg flat head Ø0.212 x 0.067 in, #4-40 UNC class 2A, 1/2 in
+  overall (McMaster measures a flat head from its top), fully threaded, flat
+  tip, Rockwell B80, 80,000 psi, ASME B18.6.3, $6.63 per pack of 100.
+  The model is catalogue first: the thread, the overall length, the head Ø0.212
+  in, the 82 deg angle and the 0.067 in head height (where the thread ends) are
+  the catalogue's. The vendor model was downloaded from the product page on
+  October 17, 2026 (the SLDPRT, SHA-256
+  `170dc7d8be906f2614181b0cac013ec2542eb37e93de45b40885ff555ae5f6ab`; its STEP,
+  SHA-256 `588000b51c99935744bdd79b93fb8269cb27932f2e6086338d23bf51f9269a27`)
+  and read for dimensions only; no copy is kept here. Where the catalogue is
+  silent (the Phillips No. 1 recess form, the tip chamfer) the values are that
+  reading's (FreeCAD 1.1):
+
+  * head: the flat top Ø5.3848 (the catalogue's 0.212 in), sharp, then the
+    41 deg (to the axis) cone to the major Ø2.8448, 1.460968 below the top;
+  * thread: the family cutter (root R1.009955), cut on the shank only and
+    ending flat 1.7018 (the catalogue's 0.067 in head height) below the top; no
+    runout; tip chamfer 45 deg from R0.92075 at the tip flat (radial 0.50165);
+  * Phillips No. 1 recess: walls at 5 deg to the axis; wings 2 x 0.3556
+    (0.014 in) off their centre lines at the top; between adjacent wings a V
+    notch of two planes 0.732384 from the axis at the top (normals 22.5 deg off
+    the wings); a vertical entry cylinder R1.7907 (0.0705 in) down to 0.121008
+    below the top, then a 41 deg (to the axis) cone with its apex 2.180973
+    below the top.
+
+  `diag_build_91771A110.py` builds it on a Phillips flat head recipe of its own
+  (`diag_mcmaster_phillips_flat_head`: no existing family draws a flat top with
+  a cross recess), the flat top at y = 0, tip at y = -length. It is NOT
+  replica-gated (user ruling, October 17, 2026): the standalone run is
+  catalogue-only (it builds the recipe, checks the solid and saves it under
+  `cad/out/reference`).
+- [91251A540](https://www.mcmaster.com/91251A540/)
+  (`ch-rocker-arm-tl-oblique-clamp-screw`, MHA-CH-006-TL-48, 1 in the oblique
+  trammel jig: the fastener table's `CR_CLAMP` row) was read live on October 17,
+  2026: 1/4-20 UNRC class 3A, 3/4 in under the head, fully threaded, head Ø3/8 x
+  1/4 in, 3/16 in hex, Rockwell C37, ASTM A574, $12.42 per pack of 50.
+  The page gives no socket depth, so the model takes ASME B18.3's minimum key
+  engagement for 1/4, 0.120 in (the 91251A108 convention).
+  `diag_build_91251A540.py` builds it from those catalogue values on the 91251A
+  family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
+  cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
+  0, tip at y = -length). The vendor model was downloaded from the product page
+  on October 17, 2026 (the SLDPRT, SHA-256
+  `33e4e61fa7b6ca29e8ecb4638d9c99421b83ed0e3a0742ef8500bcd5492fb774`; its STEP,
+  SHA-256 `94ab0ed5323b88d716ad98a46626d0a9a1bb72a0503eb1d3e343e6bd841c36dd`)
+  and read for dimensions only; no copy is kept here. It shows a hex socket
+  0.125 in deep and a 50-groove knurled head, a 60 deg socket entry countersink,
+  a 20 deg thread runout cone and a 0.6P tip chamfer, which the family recipe
+  does not draw. It is NOT replica-gated (user ruling, October 17, 2026): the
+  standalone run is catalogue-only (it builds the recipe, checks the solid and
+  saves it under `cad/out/reference`).
+- [91251A583](https://www.mcmaster.com/91251A583/)
+  (`ch-rocker-arm-tl-oblique-lever-screw`, MHA-CH-006-TL-49, 2 in the oblique
+  trammel jig: the fastener table's `LEVER_TO_CARRIER` row) was read live on
+  October 17, 2026 from the 5/16-18 x 1 in socket head screw listing (the
+  product page is login-walled): 5/16-18 UNC, 1 in under the head, fully
+  threaded, head Ø15/32 x 5/16 in, 170,000 psi, $15.30 per pack of 50; the
+  family's 1/4 in hex, class 3A, Rockwell C37 and ASTM A574 are the 7/8 in
+  sibling 91251A582's page, read live the same day. It replaced 91251A582
+  when the TL-51 wedge-lock pair entered the grip.
+  The listing gives no socket depth, so the model takes ASME B18.3's minimum key
+  engagement for 5/16, 0.151 in (the 91251A108 convention).
+  `diag_build_91251A583.py` builds it from those catalogue values on the 91251A
+  family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
+  cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
+  0, tip at y = -length). No vendor model was downloaded for this length; the
+  7/8 in sibling's (SLDPRT SHA-256
+  `9feed1cd8f28f698a03478549d6f0a70b5bc99916c1e8199b3d9857b4c99b5c7`; its STEP,
+  SHA-256 `1e7b1c0ae31b76b34ea88254712024f5851b9fd953af801f633caf292272d940`)
+  was read for dimensions only; no copy is kept here. It shows a hex socket
+  0.15625 in deep and a 50-groove knurled head, a 60 deg socket entry
+  countersink, a 20 deg thread runout cone and a 0.6P tip chamfer, which the
+  family recipe does not draw. It is NOT replica-gated (user ruling, October 17,
+  2026): the standalone run is catalogue-only (it builds the recipe, checks the
+  solid and saves it under `cad/out/reference`).
+- [91812A215](https://www.mcmaster.com/91812A215/)
+  (`ch-rocker-arm-tl-oblique-block-washer`, MHA-CH-006-TL-50, 2 pairs in
+  the oblique trammel jig: the fastener table's `BLOCK_LOCK_WASHER` row, one
+  pair under each TL-43 block screw head) was read live on October 17, 2026
+  from the No. 8 wedge-lock listing; the product page and its 2-D PDF are
+  login-walled. Two-piece wedge-lock washer, reusable up to 15 times,
+  comparable to NORD-LOCK; 316 stainless steel, Rockwell C51, case hardened;
+  for No. 8 / M4; ID 0.170 in, OD 0.300 in, thickness 0.080 to 0.100 in;
+  5 per package, $11.71. UNVERIFIED: the listing does not say whether the
+  thickness is the pair's stack or one washer's, nor whether a package is 5
+  pairs; the model takes the band as the pair's stack at its 0.100 in
+  maximum. `diag_build_91812A215.py` builds the pair's envelope, one plain
+  annulus from y = 0 along +Y (no cam faces, serrations or split). No vendor
+  model was downloaded, so it is not replica-gated: the standalone run is
+  catalogue-only (it builds the recipe, checks the solid and saves it under
+  `cad/out/reference`).
+- [91812A230](https://www.mcmaster.com/91812A230/)
+  (`ch-rocker-arm-tl-oblique-lever-washer`, MHA-CH-006-TL-51, 2 pairs in
+  the oblique trammel jig: the fastener table's `LEVER_LOCK_WASHER` row, one
+  pair under each TL-49 feed lever screw head) was read live on October 17,
+  2026 from the wedge-lock listing; the product page and its 2-D PDF are
+  login-walled. Two-piece wedge-lock washer, reusable up to 15 times,
+  comparable to NORD-LOCK; 316 stainless steel, Rockwell C51, case hardened;
+  for 5/16" / M8; ID 0.340 in, OD 0.530 in, thickness 0.070 to 0.090 in;
+  5 per package, $12.40. UNVERIFIED: the listing does not say whether the
+  thickness is the pair's stack or one washer's, nor whether a package is 5
+  pairs; the model takes the band as the pair's stack at its 0.090 in
+  maximum. `diag_build_91812A230.py` builds the pair's envelope, one plain
+  annulus from y = 0 along +Y (no cam faces, serrations or split). No vendor
+  model was downloaded, so it is not replica-gated: the standalone run is
+  catalogue-only (it builds the recipe, checks the solid and saves it under
+  `cad/out/reference`).
 
 Live catalogue verification on October 12, 2026:
 

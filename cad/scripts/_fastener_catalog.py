@@ -375,6 +375,125 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Metal Round Cap",
         "9275K141",
     ),
+    # MHA-CH-006-TL-32: the oblique trammel jig's pivot bearings, a pair
+    # pressed into each pivot block (shop fixture hardware, modelled so the
+    # jig assembly can mate them and run native interference).
+    "ch-rocker-arm-tl-oblique-bearing": _stock(
+        "ch-rocker-arm-tl-oblique-bearing",
+        "Steel Ball Bearing, Sealed, Trade No. 6200-2RS",
+        "5972K41",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-006-TL-33: the oblique trammel jig's CL locator, pressed flush
+    # into the carrier's in-place-finished CL hole (shop fixture hardware,
+    # modelled so the jig assembly can mate it and run native interference).
+    "ch-rocker-arm-tl-oblique-cl-dowel": _stock(
+        "ch-rocker-arm-tl-oblique-cl-dowel",
+        "52100 Alloy Steel Dowel Pin, Ø6 x 20 mm",
+        "91595A452",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-006-TL-41: the oblique trammel jig's #8-32 X 3/4 SHCS (the
+    # fastener table's RAIL_TO_BAR row); shop fixture hardware, modelled so
+    # the jig assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-rail-screw": _stock(
+        "ch-rocker-arm-tl-oblique-rail-screw",
+        "Black-Oxide Alloy Steel Socket Head Screw",
+        "91251A197",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-006-TL-42: the oblique trammel jig's #8-32 X 5/8 SHCS (the
+    # fastener table's BRACKET_TO_BAR row); shop fixture hardware, modelled so
+    # the jig assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-bracket-screw": _stock(
+        "ch-rocker-arm-tl-oblique-bracket-screw",
+        "Black-Oxide Alloy Steel Socket Head Screw",
+        "91251A196",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-006-TL-43: the oblique trammel jig's #8-32 X 1-7/8 SHCS (the
+    # fastener table's NUT_BRACKET_TO_BLOCK row); shop fixture hardware,
+    # modelled so the jig assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-block-screw": _stock(
+        "ch-rocker-arm-tl-oblique-block-screw",
+        "Black-Oxide Alloy Steel Socket Head Screw",
+        "91251A188",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-006-TL-44: the oblique trammel jig's M4 X 20 SHCS (the
+    # fastener table's BLOCK_TO_CARRIAGE row); shop fixture hardware,
+    # modelled so the jig assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-carriage-screw": _stock(
+        "ch-rocker-arm-tl-oblique-carriage-screw",
+        "Black-Oxide Alloy Steel Socket Head Screw",
+        "91290A168",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-006-TL-45: the oblique trammel jig's M4 X 12 SHCS (the
+    # fastener table's KP08_TO_BRACKET row); shop fixture hardware, modelled
+    # so the jig assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-kp08-screw": _stock(
+        "ch-rocker-arm-tl-oblique-kp08-screw",
+        "Black-Oxide Alloy Steel Socket Head Screw",
+        "91290A148",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-006-TL-46: the oblique trammel jig's M3 X 10 SHCS (the
+    # fastener table's NUT_TO_NUT_BRACKET row); shop fixture hardware,
+    # modelled so the jig assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-nut-screw": _stock(
+        "ch-rocker-arm-tl-oblique-nut-screw",
+        "Black-Oxide Alloy Steel Socket Head Screw",
+        "91290A115",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-006-TL-47: the oblique trammel jig's #4-40 X 1/2 flat head (the
+    # fastener table's RISER_TO_CARRIER row); shop fixture hardware, modelled
+    # so the jig assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-riser-screw": _stock(
+        "ch-rocker-arm-tl-oblique-riser-screw",
+        "Stainless Steel Phillips Flat Head Screw",
+        "91771A110",
+        material="AISI 304",
+    ),
+    # MHA-CH-006-TL-48: the oblique trammel jig's 1/4-20 X 3/4 SHCS (the
+    # fastener table's CR_CLAMP row); shop fixture hardware, modelled so
+    # the jig assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-clamp-screw": _stock(
+        "ch-rocker-arm-tl-oblique-clamp-screw",
+        "Black-Oxide Alloy Steel Socket Head Screw",
+        "91251A540",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-006-TL-49: the oblique trammel jig's 5/16-18 X 1 SHCS (the
+    # fastener table's LEVER_TO_CARRIER row); shop fixture hardware, modelled
+    # so the jig assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-lever-screw": _stock(
+        "ch-rocker-arm-tl-oblique-lever-screw",
+        "Black-Oxide Alloy Steel Socket Head Screw",
+        "91251A583",
+        material="Alloy Steel",
+    ),
+    # MHA-CH-006-TL-50: the oblique trammel jig's #8 wedge-lock washer pairs
+    # under the TL-43 block screws' heads (the fastener table's
+    # BLOCK_LOCK_WASHER row); shop fixture hardware, modelled so the jig
+    # assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-block-washer": _stock(
+        "ch-rocker-arm-tl-oblique-block-washer",
+        "Extreme-Vibration-Resistant Wedge Lock Washer",
+        "91812A215",
+        material="AISI 304",  # native library stand-in; purchased grade is 316
+    ),
+    # MHA-CH-006-TL-51: the oblique trammel jig's 5/16 wedge-lock washer pairs
+    # under the TL-49 feed lever screws' heads (the fastener table's
+    # LEVER_LOCK_WASHER row); shop fixture hardware, modelled so the jig
+    # assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-lever-washer": _stock(
+        "ch-rocker-arm-tl-oblique-lever-washer",
+        "Extreme-Vibration-Resistant Wedge Lock Washer",
+        "91812A230",
+        material="AISI 304",  # native library stand-in; purchased grade is 316
+    ),
 }
 
 

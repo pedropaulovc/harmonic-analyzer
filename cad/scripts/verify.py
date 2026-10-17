@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import math
 import os
 import re
@@ -87,8 +88,10 @@ from _assembly import (
     assert_model_healthy,
     assert_saved_rebuild_clean,
     check_no_interference,
+    coincident_mate,
     component_names,
     component_transform,
+    named_ref,
     reconcile_saved_rebuild_state,
     repair_dangling_mates,
     save_assembly_in_place,
@@ -146,6 +149,12 @@ _MOTION_SWEEP_DEG = [0.0, 30.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0, 3
 # Generous vs the 5.25e-05 mm the de-risk probe achieved -- this is a fidelity
 # gate on the equation chain + doc-unit handling, not a numeric-precision race.
 _MOTION_TOL_MM = 1e-2
+# The oblique-trammel mill jig ships its sweep free (carriage 1's slide). Its
+# static battery also walks both passes' sweep from the build's
+# ``.<asm>.sweep.json`` sidecar (written from the jig spec's sweep_poses;
+# verify never imports the spec): drive the recorded slide to each pose, read
+# both carriages back, and run native interference where the pose is checked.
+SWEEP_OWNER = "ch-rocker-arm-tl-oblique-jig"
 _MOVING_CHANNEL_STEMS = (
     "ch-rocker-arm",
     "ch-connecting-rod",
@@ -221,11 +230,9 @@ _COMPONENT_BAND = {
     # the thumbscrew.
     "ms-measuring-stick": (5, 7),  # expected 6
     # The rocker's oblique-trammel jig (shop fixture, TL-000; never under the
-    # top): 2 base bars, 2 pivot blocks, 2 pivot pins, carrier, riser, HUB pin,
-    # feed lever, 2 end brackets and the nut bracket; the bought rails,
-    # carriages, bearings, dowel, leadscrew, nut, KP08 blocks and handwheel are
-    # not modelled.
-    "ch-rocker-arm-tl-oblique-jig": (12, 14),  # expected 13
+    # top): its 9 made parts (13 instances) and its 20 bought families, every
+    # screw, stud, nut and bearing inserted (jig spec QUANTITIES).
+    "ch-rocker-arm-tl-oblique-jig": (81, 83),  # expected 82
     "ha-harmonic-analyzer": (
         7,
         9,
@@ -1202,12 +1209,119 @@ async def _verify_static_one(
             adapter.currentModel = None
             return
 
+    if name == SWEEP_OWNER:
+        await _verify_pass_sweep(adapter, name, report)
+
 
 def _rebuild(adapter: Any) -> None:
     """Re-solve after a CrankDeg change so the pen-driver equation re-evaluates
     the whole partial-sum chain and the mate-driven pose updates."""
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
     adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
+
+
+def _sweep_sidecar_path(name: str) -> Path:
+    """``.<asm>.sweep.json`` beside the DOF manifest (the build writes it;
+    dodo caches it and keys verify_soundness on it)."""
+    return OUT_SLDASM / f".{name}.sweep.json"
+
+
+async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
+    """Walk every pass of the recorded sweep and return each failure.
+
+    The slide is authored transiently from the DOF manifest (DRIVE_<key>) and
+    driven pose by pose; each pose reads both carriages back against the
+    sidecar (a solver that took the other branch of the pin loop stops the
+    walk there) and runs native interference where the pose is a check pose.
+    A pass with a ``remate`` re-seats the carrier first: at the pass's first
+    pose the previous holes' coaxials are suppressed and the pass's hole axes
+    are mated on the pins' (coincident named axes, picked by name)."""
+    from solidworks_mcp.adapters.base import SuppressMateParameters
+
+    path = _sweep_sidecar_path(name)
+    if not path.exists():
+        return [f"no sweep sidecar {path.name} -- rebuild {name}"]
+    sweep = json.loads(path.read_text(encoding="utf-8"))
+    key = sweep["drive_key"]
+    specs = [s for s in load_dof_manifest(name) if s.get("key") == key]
+    if len(specs) != 1:
+        return [f"expected exactly 1 recorded {key} drive spec, found {len(specs)}"]
+    (mate,) = await author_dof_drives(adapter, specs)
+    param = adapter._attempt(
+        lambda: adapter.currentModel.Parameter(f"D1@{mate}"), default=None
+    )
+    if param is None:
+        return [f"cannot read D1@{mate} on the transient {key} drive"]
+    tolerance = float(sweep["pose_tolerance_mm"])
+
+    def _drive(drive_mm: float) -> None:
+        param.SystemValue = drive_mm / 1000.0
+        _rebuild(adapter)
+
+    failures: list[str] = []
+    for walk in sweep["passes"]:
+        remate = walk["remate"]
+        if remate:
+            _drive(walk["poses"][0]["drive_mm"])
+            for old in remate["suppress"]:
+                check(
+                    f"suppress {old}",
+                    await adapter.suppress_mate(
+                        SuppressMateParameters(name=old, suppress=True)
+                    ),
+                )
+            for pair in remate["coaxial"]:
+                await coincident_mate(
+                    adapter,
+                    named_ref(pair["hole"], "AXIS"),
+                    named_ref(pair["pin"], "AXIS"),
+                    label=pair["label"],
+                )
+            _rebuild(adapter)
+        for pose in walk["poses"]:
+            _drive(pose["drive_mm"])
+            where = (
+                f"{walk['pass']} pass, theta {math.degrees(pose['theta_rad']):+.3f} deg "
+                f"(slide {pose['drive_mm']:.3f} mm)"
+            )
+            for carriage, origin in pose["carriages"].items():
+                at = [v * 1000.0 for v in component_transform(adapter, carriage)[9:12]]
+                off = math.dist(at, origin)
+                if off > tolerance:
+                    failures.append(
+                        f"{where}: {carriage} at {[round(v, 3) for v in at]}, "
+                        f"{off:.3f} mm off its station (> {tolerance} mm)"
+                    )
+            if failures:
+                return failures
+            log(f"{name}: {where}")
+            if pose["check"]:
+                try:
+                    check_no_interference(
+                        adapter, allowed_pairs=allowed_interference_pairs(name)
+                    )
+                except Exception as exc:  # noqa: BLE001 -- collect, gate below
+                    failures.append(f"{where}: {exc}")
+    return failures
+
+
+async def _verify_pass_sweep(adapter: Any, name: str, report: Report) -> None:
+    """``<name>:pass-sweep-interference-free``: the static battery's open
+    model, swept through both passes (``_walk_pass_sweep``). The walk mutates
+    the document in memory only; it is discarded unsaved on every exit."""
+    log(f"--- {name}: pass sweep ---")
+    try:
+        try:
+            failures = await _walk_pass_sweep(adapter, name)
+        except Exception as exc:  # noqa: BLE001 -- the gate reports it
+            failures = [f"sweep walk raised: {exc}"]
+        report.gate(
+            f"{name}:pass-sweep-interference-free",
+            lambda: _expect(not failures, "; ".join(failures)),
+        )
+    finally:
+        discard_open_documents(adapter)
+        adapter.currentModel = None
 
 
 def _pen_marker_name(adapter: Any) -> str:

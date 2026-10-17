@@ -43,6 +43,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     REPORTS_DIR,
     run_replica,
 )
+from diagnostics.diag_build_5972K41 import build_5972K41  # noqa: E402
 from diagnostics.diag_build_90114A511 import build_90114A511  # noqa: E402
 from diagnostics.diag_build_90126A211 import build_90126A211  # noqa: E402
 from diagnostics.diag_build_90280A108 import build_90280A108  # noqa: E402
@@ -54,12 +55,22 @@ from diagnostics.diag_build_90280A201 import build_90280A201  # noqa: E402
 from diagnostics.diag_build_90280A203 import build_90280A203  # noqa: E402
 from diagnostics.diag_build_90280A837 import build_90280A837  # noqa: E402
 from diagnostics.diag_build_91247A720 import build_91247A720  # noqa: E402
+from diagnostics.diag_build_91251A188 import build_91251A188  # noqa: E402
+from diagnostics.diag_build_91251A196 import build_91251A196  # noqa: E402
+from diagnostics.diag_build_91251A197 import build_91251A197  # noqa: E402
+from diagnostics.diag_build_91251A540 import build_91251A540  # noqa: E402
+from diagnostics.diag_build_91251A583 import build_91251A583  # noqa: E402
+from diagnostics.diag_build_91290A115 import build_91290A115  # noqa: E402
+from diagnostics.diag_build_91290A148 import build_91290A148  # noqa: E402
+from diagnostics.diag_build_91290A168 import build_91290A168  # noqa: E402
 from diagnostics.diag_build_91375A105 import build_91375A105  # noqa: E402
 from diagnostics.diag_build_91375A106 import build_91375A106  # noqa: E402
 from diagnostics.diag_build_91375A942 import build_91375A942  # noqa: E402
+from diagnostics.diag_build_91595A452 import build_91595A452  # noqa: E402
 from diagnostics.diag_build_91255A148 import build_91255A148  # noqa: E402
 from diagnostics.diag_build_91410A538 import build_91410A538  # noqa: E402
 from diagnostics.diag_build_91410A540 import build_91410A540  # noqa: E402
+from diagnostics.diag_build_91771A110 import build_91771A110  # noqa: E402
 from diagnostics.diag_build_90325A174 import build_90325A174  # noqa: E402
 from diagnostics.diag_build_91794A080 import build_91794A080  # noqa: E402
 from diagnostics.diag_build_91794A112 import build_91794A112  # noqa: E402
@@ -121,6 +132,17 @@ REGISTRY = {
     "90325A174": build_90325A174,
     "91794A055": build_91794A055,
     "97431A260": build_97431A260,
+    "5972K41": build_5972K41,
+    "91595A452": build_91595A452,
+    "91251A197": build_91251A197,
+    "91251A196": build_91251A196,
+    "91251A188": build_91251A188,
+    "91290A168": build_91290A168,
+    "91290A148": build_91290A148,
+    "91290A115": build_91290A115,
+    "91771A110": build_91771A110,
+    "91251A540": build_91251A540,
+    "91251A583": build_91251A583,
 }
 
 

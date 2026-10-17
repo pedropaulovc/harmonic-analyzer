@@ -1,0 +1,15 @@
+ch-rocker-arm-tl-oblique-bracket-screw:
+  title: Rocker Oblique Trammel End Bracket Screw
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-42
+  stock_name: Black-Oxide Alloy Steel Socket Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: ["91251A196"]
+  material: Alloy Steel
+  material_specification: "Alloy steel, black oxide, ASTM A574, Rockwell C37; McMaster-Carr 91251A196"
+  finish: black oxide
+  # The fastener table's BRACKET_TO_BAR count (#8-32 X 5/8 SHCS).
+  quantity: 8
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

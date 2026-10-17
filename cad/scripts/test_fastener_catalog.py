@@ -63,6 +63,32 @@ _EXPECTED = {
     "vn-wheel-axle-front-washer": (("92916A250",), "MHA-VN-058", 1),
     "vn-spring-hook": (("9489T111",), "MHA-VN-012", 20),
     "vn-tube-frame-cap": (("9275K141",), "MHA-VN-028", 4),
+    # The oblique trammel jig's modelled bought hardware (shop fixture, TL Numbers).
+    "ch-rocker-arm-tl-oblique-bearing": (("5972K41",), "MHA-CH-006-TL-32", 4),
+    "ch-rocker-arm-tl-oblique-cl-dowel": (("91595A452",), "MHA-CH-006-TL-33", 1),
+    "ch-rocker-arm-tl-oblique-rail-screw": (("91251A197",), "MHA-CH-006-TL-41", 14),
+    "ch-rocker-arm-tl-oblique-bracket-screw": (("91251A196",), "MHA-CH-006-TL-42", 8),
+    "ch-rocker-arm-tl-oblique-block-screw": (("91251A188",), "MHA-CH-006-TL-43", 2),
+    "ch-rocker-arm-tl-oblique-carriage-screw": (("91290A168",), "MHA-CH-006-TL-44", 8),
+    "ch-rocker-arm-tl-oblique-kp08-screw": (
+        ("91290A148",),
+        "MHA-CH-006-TL-45",
+        4,
+    ),
+    "ch-rocker-arm-tl-oblique-nut-screw": (("91290A115",), "MHA-CH-006-TL-46", 4),
+    "ch-rocker-arm-tl-oblique-riser-screw": (("91771A110",), "MHA-CH-006-TL-47", 4),
+    "ch-rocker-arm-tl-oblique-clamp-screw": (("91251A540",), "MHA-CH-006-TL-48", 1),
+    "ch-rocker-arm-tl-oblique-lever-screw": (("91251A583",), "MHA-CH-006-TL-49", 2),
+    "ch-rocker-arm-tl-oblique-block-washer": (
+        ("91812A215",),
+        "MHA-CH-006-TL-50",
+        2,
+    ),
+    "ch-rocker-arm-tl-oblique-lever-washer": (
+        ("91812A230",),
+        "MHA-CH-006-TL-51",
+        2,
+    ),
 }
 # The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC.
 _SUPPLIERS = {"vn-post-mount-screw": "MSC Industrial Supply"}

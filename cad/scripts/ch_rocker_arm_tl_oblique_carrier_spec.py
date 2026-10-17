@@ -123,6 +123,9 @@ PLATE_HALF_LENGTH = OUTLINE_X[1]  # 260: the centreline to either end
 
 # --- Pivot-pin holes (calc) -------------------------------------------------
 PIN_HOLES = trammel.PIN_HOLES
+# Each pin hole's hidden named axis, which the jig assembly mates on the
+# pivot pin's (pivot_pin_spec.AXIS_NAME).
+PIN_HOLE_AXES = {hole: f"PinAxis{hole}" for hole in PIN_HOLES}
 D1 = trammel.D1
 A2_DX = trammel.A2[0] - trammel.A1[0]  # -7.224 (outward)
 A2_DY = trammel.A2[1] - trammel.A1[1]  # 24.481

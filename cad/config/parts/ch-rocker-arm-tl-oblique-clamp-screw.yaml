@@ -1,0 +1,15 @@
+ch-rocker-arm-tl-oblique-clamp-screw:
+  title: Rocker Oblique Trammel Clamp Screw
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-48
+  stock_name: Black-Oxide Alloy Steel Socket Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: ["91251A540"]
+  material: Alloy Steel
+  material_specification: "Alloy steel, black oxide, ASTM A574, Rockwell C37; McMaster-Carr 91251A540"
+  finish: black oxide
+  # The fastener table's CR_CLAMP count (1/4-20 X 3/4 SHCS).
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

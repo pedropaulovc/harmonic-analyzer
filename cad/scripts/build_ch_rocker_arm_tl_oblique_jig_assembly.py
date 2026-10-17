@@ -2,20 +2,28 @@ r"""Reproduction script: ch-rocker-arm-tl-oblique-jig.SLDASM (MHA-CH-006-TL-000)
 
 The rocker arm's oblique-trammel mill jig, a shop fixture (never in the
 machine tree, ``_buildgraph.is_shop_fixture``): two of the one base bar (as
-saved under rail 1 on -X, turned over under rail 2 on +X), a pivot block with
-its pressed pivot pin on each rail's carriage, the carrier riding the two
-pins with its riser, its pressed HUB locator pin and its feed lever, and the
-leadscrew feed's two end brackets on bar 1 and nut bracket on pivot
-block 1.
+saved under rail 1 on -X, turned over under rail 2 on +X) held to the table
+by hold-down studs in T-nuts under flange nuts, an HGR15 rail screwed on each
+bar with an HGH15 carriage on it, a pivot block screwed on each carriage with
+its two bearings and its pressed pivot pin, the carrier riding the two pins
+with its riser, its pressed HUB locator pin, its CL dowel, its CR clamp screw
+and its feed lever, and the leadscrew feed: two end brackets on bar 1
+carrying the KP08 blocks, the leadscrew with its handwheel, and the nut
+bracket on pivot block 1 carrying the flanged nut. Every bought item and
+every screw is inserted (``spec.BOM_ORDER``, the BOM's item order).
 
 Authored in the MACHINE frame of ``ch_rocker_arm_tl_oblique_jig_assembly_spec``
 (origin on the spindle at the table top, +X along the table, +Y toward the
-column, +Z up) at the symmetric inner pass. Every pose is the spec's, derived
-from the calculator ``ch_rocker_arm_tl_oblique_trammel_spec``. The bought
-rails, carriages, bearings, dowel, leadscrew, nut, KP08 blocks and handwheel
-are not modelled; the drawing's BOM lists them. The modelled pose is one
-position of the sweep, so every component is
-fixed (the fix-all strategy of the other sub-assemblies): 0 DOF, fully defined.
+column, +Z up) at the symmetric inner pass. Every pose is the spec's
+(``spec.PLACEMENTS``), derived from the calculator
+``ch_rocker_arm_tl_oblique_trammel_spec``. The structure is fixed; the moving
+families (``spec.MOVING``) are inserted free at that pose and mated
+(``spec.LOCKED_TO``, ``spec.PIN_MATES``): each carriage on its rail, the
+carrier on the two pins (a planar P-R-R-P loop), everything else lock-mated
+to what carries it. Carriage 1's slide is the one free DOF: recorded in the
+DOF manifest (``spec.SLIDE_KEY``), never authored, and the build writes the
+sweep sidecar (``spec.sweep_sidecar``) that verify.py's
+``pass-sweep-interference-free`` gate walks through both passes.
 
 The build names the spec's machine-frame views on the assembly
 (``spec.VIEW_AXES``: the plan, the operator's elevation and the front-right
@@ -23,8 +31,8 @@ isometric), each read back, and the fitter drawing places those; the
 standard views stay SolidWorks' own.
 
 The named explode JIG_EXPLODED (Default and Default Simplified) is the fitter
-drawing's exploded view: the disassembly order along global Z, each step
-read back in world space and the saved pose proven unchanged.
+drawing's exploded view: the disassembly order along the machine axes, each
+step read back in world space and the saved pose proven unchanged.
 
 Run (SolidWorks already open)::
 
@@ -33,6 +41,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import json
 import math
 import sys
 from pathlib import Path
@@ -42,12 +51,22 @@ import _telemetry
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 from _assembly import (
     activate_assembly_contract,
+    allowed_free_stems,
     assembly_title_properties,
-    assert_components_fully_defined,
+    assert_component_placed,
+    assert_free_dof_necessity,
     author_in_drawing_configurations,
     check_no_interference,
+    coincident_mate,
+    distance_driver,
+    dof_manifest_path,
+    lock_mate,
+    named_ref,
     place_component,
+    place_components_batch,
+    reset_dof_manifest,
     save_assembly_and_images,
+    write_dof_manifest,
 )
 from _assembly_patterns import ensure_global_pattern_axis
 from _check import check
@@ -59,32 +78,197 @@ from _named_views import octant_rotation
 from _session import run_build
 from _simplified_names import simplified_name
 from _transforms import euler_from_rows
+from _visibility import blank_reference_geometry
 
 ASM_NAME = "ch-rocker-arm-tl-oblique-jig"
 assert ASM_NAME == spec.ASM_NAME, (ASM_NAME, spec.ASM_NAME)
+# Every inserted part in BOM order, literal: the build graph reads this
+# script's insertion sources syntactically (_buildgraph._AssemblySources),
+# never the spec, so the stems are spelled here and proven to be the spec's.
+_PARTS = (
+    "ch-rocker-arm-tl-oblique-base-bar",
+    "ch-rocker-arm-tl-oblique-carrier",
+    "ch-rocker-arm-tl-oblique-pivot-block",
+    "ch-rocker-arm-tl-oblique-pivot-pin",
+    "ch-rocker-arm-tl-oblique-riser",
+    "ch-rocker-arm-tl-oblique-hub-pin",
+    "ch-rocker-arm-tl-oblique-feed-lever",
+    "ch-rocker-arm-tl-oblique-end-bracket",
+    "ch-rocker-arm-tl-oblique-nut-bracket",
+    "ch-rocker-arm-tl-oblique-rail",
+    "ch-rocker-arm-tl-oblique-carriage",
+    "ch-rocker-arm-tl-oblique-bearing",
+    "ch-rocker-arm-tl-oblique-cl-dowel",
+    "ch-rocker-arm-tl-oblique-leadscrew",
+    "ch-rocker-arm-tl-oblique-leadscrew-nut",
+    "ch-rocker-arm-tl-oblique-pillow-block",
+    "ch-rocker-arm-tl-oblique-handwheel",
+    "ch-rocker-arm-tl-oblique-hold-down-stud",
+    "ch-rocker-arm-tl-oblique-t-nut",
+    "ch-rocker-arm-tl-oblique-flange-nut",
+    "ch-rocker-arm-tl-oblique-rail-screw",
+    "ch-rocker-arm-tl-oblique-bracket-screw",
+    "ch-rocker-arm-tl-oblique-block-screw",
+    "ch-rocker-arm-tl-oblique-carriage-screw",
+    "ch-rocker-arm-tl-oblique-kp08-screw",
+    "ch-rocker-arm-tl-oblique-nut-screw",
+    "ch-rocker-arm-tl-oblique-riser-screw",
+    "ch-rocker-arm-tl-oblique-clamp-screw",
+    "ch-rocker-arm-tl-oblique-lever-screw",
+    "ch-rocker-arm-tl-oblique-block-washer",
+    "ch-rocker-arm-tl-oblique-lever-washer",
+)
+assert _PARTS == spec.BOM_ORDER, (_PARTS, spec.BOM_ORDER)
+# A family of this many instances or more goes in one AddComponents3 (one
+# family per batch: the batch matches components by origin, and no two
+# instances of one family share an origin).
+_BATCH_MIN = 4
 
 
 def _rows(rows: spec.Rows) -> list[list[float]]:
     return [list(row) for row in rows]
 
 
-async def _place_fixed(
-    adapter: Any,
-    part: str,
-    origin: tuple[float, float, float],
-    rows: spec.Rows,
-    *,
-    label: str = "",
-) -> str:
-    """One fixed component at its exact machine-frame transform."""
-    matrix = _rows(rows)
-    return await place_component(
+def sweep_sidecar_path() -> Path:
+    """``.<asm>.sweep.json`` beside the DOF manifest (verify.py and dodo name
+    the same path)."""
+    return dof_manifest_path(ASM_NAME).with_name(f".{ASM_NAME}.sweep.json")
+
+
+async def _place_family(adapter: Any, stem: str) -> None:
+    """Every instance of ``stem`` at its spec pose, in instance order: the
+    moving families free for their mates, the rest fixed. SolidWorks numbers
+    a part's instances in insertion order, and the mates name them so."""
+    ground = stem not in spec.MOVING
+    placements = spec.PLACEMENTS[stem]
+    expected = [spec.instance_name(stem, index) for index in range(len(placements))]
+    if len(placements) >= _BATCH_MIN:
+        rows_spec = []
+        for origin, rows in placements:
+            rows_spec.append(
+                {
+                    "part": stem,
+                    "position": list(origin),
+                    "rows": _rows(rows),
+                    "ground": ground,
+                }
+            )
+        names = await place_components_batch(adapter, rows_spec, label=stem)
+    else:
+        names = []
+        for name, (origin, rows) in zip(expected, placements, strict=True):
+            matrix = _rows(rows)
+            names.append(
+                await place_component(
+                    adapter,
+                    stem,
+                    list(origin),
+                    euler_from_rows(matrix),
+                    matrix,
+                    ground=ground,
+                    label=name,
+                )
+            )
+    if names != expected:
+        raise RuntimeError(f"{stem}: inserted {names!r}, expected {expected!r}")
+
+
+async def _mate_carriages(adapter: Any) -> None:
+    """Each carriage rides its rail (Front and Top planes coincident: the
+    frames coincide by construction). Carriage 1's slide is the sweep's one
+    DOF: recorded for verify's replays, never authored; carriage 2's is
+    driven through the carrier."""
+    for index, (origin, _carriage_rows) in enumerate(spec.CARRIAGE_PLACEMENTS):
+        carriage = spec.instance_name(spec.CARRIAGE, index)
+        rail = spec.instance_name(spec.RAIL, index)
+        for plane in ("Front Plane", "Top Plane"):
+            await coincident_mate(
+                adapter,
+                named_ref(f"{plane}@{carriage}", "PLANE"),
+                named_ref(f"{plane}@{rail}", "PLANE"),
+                label=f"{carriage} {plane} on {rail}",
+                verify=(carriage, list(origin)),
+            )
+    index = spec.RAILS.index(spec.SLIDE_RAIL)
+    carriage = spec.instance_name(spec.CARRIAGE, index)
+    await distance_driver(
         adapter,
-        part,
-        list(origin),
-        euler_from_rows(matrix),
-        matrix,
-        label=label,
+        named_ref(f"Right Plane@{spec.instance_name(spec.RAIL, index)}", "PLANE"),
+        named_ref(f"Right Plane@{carriage}", "PLANE"),
+        spec.slide_distance(spec.CARRIAGE_STATION),
+        label=f"carriage {spec.SLIDE_RAIL} slide on rail {spec.SLIDE_RAIL}",
+        verify=(carriage, list(spec.CARRIAGE_PLACEMENTS[index][0])),
+        free_dof_key=spec.SLIDE_KEY,
+    )
+
+
+async def _lock_families(adapter: Any, families: list[str]) -> None:
+    """Lock-mate every instance of ``families`` to what carries it."""
+    for stem in families:
+        for index in range(spec.QUANTITIES[stem]):
+            child = spec.instance_name(stem, index)
+            parent = spec.lock_parent(stem, index)
+            await lock_mate(
+                adapter,
+                named_ref(f"Front Plane@{child}", "PLANE"),
+                named_ref(f"Front Plane@{parent}", "PLANE"),
+                label=f"{child} locked to {parent}",
+            )
+
+
+async def _mate_carrier(adapter: Any) -> None:
+    """The carrier rides the two pins: each pass hole's named axis coincident
+    with its pin's (a coaxial; CreateMate takes no concentric on two axes),
+    each mate renamed (``spec.PIN_MATES``) so verify's outer pass can suppress
+    it, and its top face (its Top Plane) on a hidden assembly plane
+    ``CARRIER_TOP_Z`` up the Front Plane. With the two slides a planar P-R-R-P
+    loop: the sweep's one DOF.
+
+    Every entity is picked by name: a face point pick depends on the seat's
+    view (jig-bought-r2 missed the collar edge, r3 a hole wall). The pins
+    ride the rails at a fixed height, so the datum is the same constraint as
+    the collar top, and it stays valid through the outer pass's re-mate."""
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        RenameFeatureParameters,
+    )
+
+    carrier = spec.instance_name(spec.CARRIER, 0)
+    (carrier_at,) = spec.PLACEMENTS[spec.CARRIER]
+    for name, hole, pin in spec.PIN_MATES[spec.PASS]:
+        mate = await coincident_mate(
+            adapter,
+            named_ref(spec.carrier_hole_axis(hole), "AXIS"),
+            named_ref(spec.pin_axis(pin), "AXIS"),
+            label=name,
+            verify=(carrier, list(carrier_at[0])),
+        )
+        check(
+            f"rename {mate['name']!r} -> {name!r}",
+            await adapter.rename_feature(
+                RenameFeatureParameters(old_name=mate["name"], new_name=name)
+            ),
+        )
+    seat = check(
+        "create_plane Front Plane at the carrier top",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Front Plane",
+                offset=spec.trammel.CARRIER_TOP_Z,
+            )
+        ),
+    )
+    seat_name = getattr(seat, "name", seat)
+    # Hidden at creation: the mate selects it by name, and a shown plane
+    # prints in the assembly's renders.
+    blank_reference_geometry(adapter, ((seat_name, "PLANE"),))
+    await coincident_mate(
+        adapter,
+        named_ref(f"Top Plane@{carrier}", "PLANE"),
+        named_ref(seat_name, "PLANE"),
+        label="carrier top on the carrier-top plane",
+        verify=(carrier, list(carrier_at[0])),
     )
 
 
@@ -430,74 +614,37 @@ def name_machine_views(adapter: Any) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    # Free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
+    # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
+    # Clear the free-DOF manifest before carriage 1's slide is recorded.
+    reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
 
-    # The base bars first (SolidWorks fixes the first insert): the one bar
-    # part, as saved under rail 1 on -X and turned over (180° about its long
-    # axis) under rail 2 on +X, each from RAIL_NEAR_S along its rail.
-    for rail, (origin, rows) in zip(spec.RAILS, spec.BASE_BAR_PLACEMENTS):
-        turned = " turned over" if spec.TURNED_OVER[rail] else ""
-        await _place_fixed(
-            adapter,
-            "ch-rocker-arm-tl-oblique-base-bar",
-            origin,
-            rows,
-            label=f"base bar rail {rail}{turned}",
-        )
-    # Each pivot block on its (unmodelled) carriage's top plane, the carriage
-    # at the symmetric inner-pass station; each pivot pin pressed through the
-    # block's two bearings, collar on the upper inner race.
-    for origin, rows in spec.PIVOT_BLOCK_PLACEMENTS:
-        await _place_fixed(
-            adapter, "ch-rocker-arm-tl-oblique-pivot-block", origin, rows
-        )
-    for origin in spec.PIVOT_PIN_ORIGINS:
-        await _place_fixed(
-            adapter, "ch-rocker-arm-tl-oblique-pivot-pin", origin, spec.PIN_ROWS
-        )
-    # The leadscrew feed beside rail 1 (leadscrew_spec): an end bracket
-    # on bar 1's top under each KP08 station, and the nut bracket on pivot
-    # block 1's column-side face. The screw, nut, KP08 blocks and handwheel
-    # are bought and not modelled.
-    for which, (origin, rows) in zip(("near", "far"), spec.END_BRACKET_PLACEMENTS):
-        await _place_fixed(
-            adapter,
-            "ch-rocker-arm-tl-oblique-end-bracket",
-            origin,
-            rows,
-            label=f"end bracket {which}",
-        )
-    await _place_fixed(
-        adapter,
-        "ch-rocker-arm-tl-oblique-nut-bracket",
-        spec.NUT_BRACKET_ORIGIN,
-        spec.NUT_BRACKET_ROWS,
-    )
-    # The carrier on the two pin collars, A1/B1 on the pins; the riser on its
-    # top; the HUB pin pressed up from under it; the lever bolted on top.
-    await _place_fixed(
-        adapter,
-        "ch-rocker-arm-tl-oblique-carrier",
-        spec.CARRIER_ORIGIN,
-        spec.CARRIER_ROWS,
-    )
-    await _place_fixed(
-        adapter, "ch-rocker-arm-tl-oblique-riser", spec.RISER_ORIGIN, spec.RISER_ROWS
-    )
-    await _place_fixed(
-        adapter,
-        "ch-rocker-arm-tl-oblique-hub-pin",
-        spec.HUB_PIN_ORIGIN,
-        spec.HUB_PIN_ROWS,
-    )
-    await _place_fixed(
-        adapter,
-        "ch-rocker-arm-tl-oblique-feed-lever",
-        spec.FEED_LEVER_ORIGIN,
-        spec.FEED_LEVER_ROWS,
-    )
+    # Every family in BOM order (SolidWorks numbers a top-level BOM in
+    # FeatureManager order; the base bars come first and SolidWorks fixes the
+    # first insert), each instance at its spec pose: the structure fixed, the
+    # moving families free at the inner pass's symmetric pose.
+    for part in _PARTS:
+        await _place_family(adapter, part)
+    # The carriages on their rails; what rides a carriage, a pivot block or
+    # the nut bracket locked to it; the carrier on the pins; its riders
+    # locked to it.
+    await _mate_carriages(adapter)
+    carried = [
+        stem for stem, (parent, _n) in spec.LOCKED_TO.items() if parent != spec.CARRIER
+    ]
+    riders = [
+        stem for stem, (parent, _n) in spec.LOCKED_TO.items() if parent == spec.CARRIER
+    ]
+    await _lock_families(adapter, carried)
+    await _mate_carrier(adapter)
+    await _lock_families(adapter, riders)
+    # The mates solved in place: every moving instance is still at its pose.
+    for moving in spec.MOVING:
+        for index, (origin, rows) in enumerate(spec.PLACEMENTS[moving]):
+            assert_component_placed(
+                adapter, spec.instance_name(moving, index), list(origin), _rows(rows)
+            )
     _telemetry.info(
         f"jig at the {spec.PASS} pass, theta {spec.THETA:g}: pins at station "
         f"{spec.PIN_STATION:.3f}, carriages at {spec.CARRIAGE_STATION:.3f}; "
@@ -505,11 +652,21 @@ async def build(adapter) -> dict[str, str]:
         f"HUB pin Z {spec.HUB_HEAD_BOTTOM_Z:.1f}..{spec.HUB_PIN_TOP_Z:.1f}"
     )
 
-    assert_components_fully_defined(adapter)
-    # Only the HUB pin's seat may overlap: the carrier's HUB is a centre-drill
-    # spot reamed in place on the running jig, so the model carries no hole
-    # for the pressed seat. The pivot pins' carrier sections sit coincident in
-    # the Ø10 pin holes.
+    # One free DOF, the sweep: every moving family reads under-constrained
+    # (a rider a mate silently fixed fails) and nothing else does.
+    assert_free_dof_necessity(
+        adapter,
+        1,
+        required_stems=spec.MOVING,
+        allowed_stems=allowed_free_stems(ASM_NAME),
+    )
+    write_dof_manifest(ASM_NAME)
+    sweep_sidecar_path().write_text(
+        json.dumps(spec.sweep_sidecar(), indent=2), encoding="utf-8"
+    )
+    # This pose's check; verify.py's pass-sweep-interference-free walks both
+    # passes. The allowed pairs are the jig's exact press fits and thread
+    # envelopes (_interference_contracts).
     check_no_interference(
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
