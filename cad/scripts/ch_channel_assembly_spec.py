@@ -193,11 +193,22 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("south keeper out", _KEEPER_GROUP, "z", -50.0, "south"),
     ExplodeStep("north keeper out", _KEEPER_GROUP, "z", 50.0, "north"),
     ExplodeStep("keeper set screws up", (KEEPER_SET_SCREW,), "y", 25.0),
-    ExplodeStep("keeper foot screws up", (KEEPER_FOOT_SCREW,), "y", 25.0),
+    # Lifted past the lug's crown: at 25 each screw (8 outboard of the lug,
+    # nearer the eye) hung in front of the lug, its tip under the crown, and
+    # read as resting against it (r2 machinist review, sheet 2 and DETAIL C).
+    # At 50 its tip stands 12.6 over the crown (4.1 clear of the crown's
+    # silhouette in the isometric); its head tops out 1.0 over the lifted set
+    # screw's, so the box grows at most 1.0 up (2 of the box's 286).
+    ExplodeStep("keeper foot screws up", (KEEPER_FOOT_SCREW,), "y", 50.0),
     ExplodeStep("south bracket out", _BRACKET_GROUP, "z", -60.0, "south"),
     ExplodeStep("north bracket out", _BRACKET_GROUP, "z", 60.0, "north"),
     ExplodeStep("bracket set screws up", (BRACKET_SET_SCREW,), "y", 25.0),
-    ExplodeStep("bracket hold-downs up", (BRACKET_HOLD_DOWN,), "y", 25.0),
+    # Likewise past the ear's apex: at 25 each hold-down stood in front of the
+    # ear (r2 machinist review, sheet 2 and DETAIL B). At 60 its tip stands
+    # 15.1 over the apex (5.3 clear of the ear's silhouette in the
+    # isometric), its head inside the box (the north one rides the cluster's
+    # 570 up).
+    ExplodeStep("bracket hold-downs up", (BRACKET_HOLD_DOWN,), "y", 60.0),
     ExplodeStep("bank spring out", (BANK_SPRING,), "z", -40.0, "south"),
     ExplodeStep("south washer out", (WASHER,), "z", -20.0, "south"),
     ExplodeStep("north washer out", (WASHER,), "z", 20.0, "north"),
