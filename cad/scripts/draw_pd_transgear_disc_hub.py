@@ -269,12 +269,14 @@ def frame_position(landing: tuple[float, float]) -> tuple[float, float]:
     return FRAME_X, landing[1] + FRAME_HEIGHT / 2.0
 
 
+# machinist-exception: RV-01
 FLANGE_FACE_FRAME = FaceFrame(
     label="flange rear face perpendicularity",
     face_z_mm=0.0,
     rim_radius_mm=FLANGE_DIA / 2.0,
     landing_x_mm=-(SPIGOT_DIA + FLANGE_DIA) / 4.0,
 )
+# machinist-exception: RV-01
 SPIGOT_END_FRAME = FaceFrame(
     label="spigot end perpendicularity",
     face_z_mm=SPIGOT_LENGTH,

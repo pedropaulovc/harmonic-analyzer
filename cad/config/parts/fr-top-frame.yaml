@@ -5,9 +5,3 @@ fr-top-frame:
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the knife-hanger dowel slots and the crossbar socket position frames"
-      finding: "position frames over-specified (rule 5)"
-      reason: "keeps both knife mounts dowel lines square to the knife-edge line and bounds crossbar socket shift while retaining the screw/slot and side webs (owner-accepted knife-edge-system control)"

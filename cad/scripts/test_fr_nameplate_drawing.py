@@ -656,28 +656,30 @@ def test_screw_full_thread_is_the_accepted_rule_20_shortfall() -> None:
 
 
 def test_declared_exceptions_name_the_printed_minimums() -> None:
-    # Each owner-ruled shortfall is declared for this package, names the
-    # sheet text that states it, and that text prints the spec's worst case
-    # rounded down to two places.
-    from _paths import CAD_ROOT
-    from machinist_exceptions import load_exceptions
+    # Each owner-ruled shortfall is declared for this package, anchored on
+    # the sheet text that states it, and that text prints the spec's worst
+    # case rounded down to two places.
+    from machinist_exceptions import load_exceptions, render_anchor
 
-    declared = {
-        entry.id: entry
-        for entry in load_exceptions(CAD_ROOT / "config", "fr_nameplate", "part")
-    }
-    assert {name: entry.kind for name, entry in declared.items()} == {
+    declared = {entry.id: entry for entry in load_exceptions("fr_nameplate")}
+    assert {name: entry.kind.value for name, entry in declared.items()} == {
         "RV-01": "accept",
         "RV-02": "minor",
         "RV-03": "minor",
     }
     for entry in declared.values():
         assert entry.reason.endswith(("(owner-accepted)", "(owner-ruled shortfall)"))
+
+    def rendered(id_: str) -> str:
+        return "; ".join(
+            render_anchor(anchor, "fr_nameplate") for anchor in declared[id_].anchors
+        )
+
     floor, screws = print_spec.MINIMUM_NOTES.splitlines()
     assert floor == "FLOOR UNDER ENGRAVING 0.54 MIN"
     assert screws == "SCREWS ENGAGE 3.73 MIN FULL THREAD"
-    assert floor in declared["RV-02"].where
-    assert screws in declared["RV-03"].where
+    assert rendered("RV-02") == f'note "{floor}"'
+    assert rendered("RV-03") == f'note "{screws}"'
     # 1.500 - 0.13 - (0.700 + 0.13) = 0.540; 3.73575 rounds down to 3.73.
     assert float(floor.split()[-2]) == pytest.approx(print_spec.ENGRAVING_FLOOR_MIN)
     assert (
@@ -685,7 +687,7 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
         == math.floor(print_spec.SCREW_FULL_THREAD_MIN * 100.0) / 100.0
     )
     for note in print_spec.MANUFACTURING_NOTES.splitlines()[:3]:
-        assert note in declared["RV-01"].where
+        assert note in rendered("RV-01")
 
 
 def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:

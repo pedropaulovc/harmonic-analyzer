@@ -1,0 +1,10 @@
+# Owner-accepted machinist-review exceptions for draw_sm_summing_lever.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_sm_summing_lever.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor: "frame:sm_summing_lever_spec.GEOMETRIC_TOLERANCES_MM[spring-hole pattern position]"
+  finding: "pattern position frame over-specified (rule 5)"
+  reason: "one pattern control keeps the 20 channels spring geometry consistent (owner-accepted)"

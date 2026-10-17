@@ -5,9 +5,3 @@ sm-summing-lever:
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the knife-seat and 20-hole spring-pattern position frame"
-      finding: "pattern position frame over-specified (rule 5)"
-      reason: "one pattern control keeps the 20 channels spring geometry consistent (owner-accepted)"

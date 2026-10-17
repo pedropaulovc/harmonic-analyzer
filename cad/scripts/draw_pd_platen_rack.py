@@ -195,6 +195,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Showing EndStockProfile prints the section's real stock outline and seam;
     # it remains hidden in the source part and in the isometric/assembly views.
     for property_name, position in (
+        # machinist-exception: RV-01
         ("Incoming Rack Inspection", INCOMING_INSPECTION_XY),
         ("Gear Data", GEAR_DATA_XY),
         ("Manufacturing Notes", NOTES_XY),

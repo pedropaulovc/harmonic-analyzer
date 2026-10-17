@@ -587,9 +587,11 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0795
     assert part.PART_DATUMS is spec.PART_DATUMS
     assert part.GEOMETRIC_CONTROLS is spec.GEOMETRIC_CONTROLS
-    (exception,) = load_exceptions(_config.CONFIG_DIR, "dt_cone_pivot_post", "part")
-    assert exception.kind == "accept"
-    assert "crank-bore diametral angularity frame" in exception.where
+    (exception,) = load_exceptions("dt_cone_pivot_post")
+    assert exception.kind.value == "accept"
+    assert "frame:dt_cone_pivot_post_spec.GEOMETRIC_CONTROLS[crank_bore_angularity]" in {
+        str(anchor) for anchor in exception.anchors
+    }
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "datums=PART_DATUMS" in source
     assert "controls=GEOMETRIC_CONTROLS" in source

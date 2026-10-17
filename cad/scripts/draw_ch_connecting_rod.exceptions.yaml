@@ -1,0 +1,15 @@
+# Owner-accepted machinist-review exceptions for draw_ch_connecting_rod.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_ch_connecting_rod.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor: "frame:ch_connecting_rod_spec.GEOMETRIC_TOLERANCES_MM[rocker pin hole position]"
+  finding: "position frame over-specified on a channel part (rule 5)"
+  reason: "a coordinate plus/minus would let the 20 channels scatter; at most one control per channel part (owner-accepted channel-consistency class)"
+- id: "RV-02"
+  kind: "minor"
+  anchor: "note:ch_connecting_rod_notes.DRAWING_NOTES"
+  finding: "fork tine wall below the 2.0 mm target (rules 17, 20)"
+  reason: "each gap between neighbouring 2.5 rocker arms at the 7.0565 channel pitch holds one tine of each adjacent rod, so the tine is pitch-bound; 1.65 MIN at the worst printed limits stays above the 1.5 floor (owner-ruled shortfall)"

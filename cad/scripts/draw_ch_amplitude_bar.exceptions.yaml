@@ -1,0 +1,28 @@
+# Owner-accepted machinist-review exceptions for draw_ch_amplitude_bar.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_ch_amplitude_bar.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-02"
+  kind: "accept"
+  anchor:
+    - "dim:TopRightLedge@BarProfile"
+    - "dim:BottomLeftLedge@BarProfile"
+    - "note:ch_amplitude_bar_notes.DIMENSION_CALLOUTS[TopRightLedge]"
+    - "note:ch_amplitude_bar_notes.DIMENSION_CALLOUTS[BottomLeftLedge]"
+  finding: "tight ledge bands over-specified on centred notches (rules 4, 5)"
+  reason: "each ledge band is what holds the far cheek wall the notch-width callout states; at the title-block band the cheeks thin further under the 1.5 floor (owner-accepted: keep the bands)"
+- id: "RV-03"
+  kind: "accept"
+  anchor:
+    - "dim:TopPinX@TopPinProfile"
+    - "note:ch_amplitude_bar_notes.DIMENSION_CALLOUTS[TopPinX]"
+  finding: "three-place pin-hole location over-specified (rule 4)"
+  reason: "the tight location holds the reamed press-fit pin hole's wall to the nearer depth face at the 2.0 target on the narrowest stock; a looser band lets the wall fall under it (owner-accepted: keep the band)"
+- id: "RV-04"
+  kind: "minor"
+  anchor:
+    - "note:ch_amplitude_bar_notes.DIMENSION_CALLOUTS[TopNotchWidth]"
+    - "note:ch_amplitude_bar_notes.DIMENSION_CALLOUTS[BottomNotchWidth]"
+  finding: "notch cheek walls below the 2.0 mm target and the 1.5 floor (rules 17, 20)"
+  reason: "the book's 1/4 square bar straddles the lever and rides the 2.5 rocker arm, so its cheeks cannot reach 2.0; approved floors 1.17 MIN at the top notch and 1.21 MIN at the foot, stated as plain facts at each width (owner-ruled shortfall)"

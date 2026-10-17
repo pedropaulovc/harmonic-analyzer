@@ -1,0 +1,14 @@
+# Owner-accepted machinist-review exceptions for draw_sm_knife_mount.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_sm_knife_mount.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "frame:sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM[dowel hole pattern position]"
+    - "frame:sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM[knife-bore position]"
+    - "frame:sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM[knife-bore perpendicularity]"
+    - "frame:sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM[knife-hanger tap position]"
+  finding: "position and perpendicularity frames over-specified (rule 5)"
+  reason: "keeps the knife-edge dowel pattern and bore square consistent, and lets the crossbar clearance hole float round the bolt (owner-accepted knife-edge-system control)"

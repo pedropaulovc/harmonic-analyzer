@@ -608,6 +608,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         # Above the arm, landing on the pin bore's upper right rim, clear of
         # datum C's leader below it and of the locator frame left of it.
+        # machinist-exception: RV-01
         "feed_stud_position": PmiDrawingPlacement(
             front, (_front_x(PIN_STATION) + 0.018, FRONT_CENTER[1] + 0.0285),
             attachment_xy=_rim_point(
@@ -647,6 +648,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ),
         ),
         **{
+            # machinist-exception: RV-01
             f"arm_locator_{index}_position": PmiDrawingPlacement(
                 locator_section, _locator_frame_xy(y),
                 attachment_xy=model_point_in_view(

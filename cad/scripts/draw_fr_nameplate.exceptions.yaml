@@ -1,0 +1,20 @@
+# Owner-accepted machinist-review exceptions for draw_fr_nameplate.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_fr_nameplate.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor: "note:fr_nameplate_drawing_spec.MANUFACTURING_NOTES"
+  finding: "three surfaces are defined only by the release-bundle DXFs and not dimensioned on the sheet (rule 1): the plate outline and its corner radii (outline DXF), the sunk-field border (field DXF) and the engraved artwork (engraving DXF)"
+  reason: "the traced period artwork is the definition of all three: the outline DXF is the plate's traced outer edge and corners, the field DXF the engraving's own pinstripe inner edge, and the engraving DXF the lettering and ornament, each shipped in the release bundle beside the PDF; the acceptance covers the outline DXF as well as the field and engraving (owner ruling 2026-10-15); redrawing any of them as dimensions would restate the artwork (owner-accepted)"
+- id: "RV-02"
+  kind: "minor"
+  anchor: "note:fr_nameplate_drawing_spec.FLOOR_MINIMUM_NOTE"
+  finding: "floor under the engraving below the 1.5 mm wall floor (rules 17, 20)"
+  reason: "0.54 MIN at the worst printed thickness and engraving depth (0.800 nominal); a decorative engraving floor on a plate that carries no load (owner-ruled shortfall)"
+- id: "RV-03"
+  kind: "minor"
+  anchor: "note:fr_nameplate_drawing_spec.SCREW_ENGAGEMENT_NOTE"
+  finding: "#4-40 screw full-thread engagement below 1.5D (rules 18, 20)"
+  reason: "3.73 MIN (1.31D) for the 1/4 in 90114A511 fillister at its shortest stock length through the thickest printed plate, tip chamfer deducted; it only holds an unloaded cosmetic plate, so the screw stays (owner-ruled shortfall)"

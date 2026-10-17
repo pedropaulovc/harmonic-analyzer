@@ -84,7 +84,11 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
-from machinist_exceptions import load_exceptions as _load_exceptions  # noqa: E402
+from machinist_exceptions import (  # noqa: E402
+    load_exceptions as _load_exceptions,
+    render_anchor as _render_anchor,
+    render_exception as _render_exception,
+)
 from machinist_review_sheets_mcp import (  # noqa: E402
     PDFIUM_LOCK as _PDFIUM_LOCK,
     SheetStore,
@@ -307,21 +311,20 @@ def _review_prompt(
             f"{layers}\n"
         )
     if package.sources:
-        exceptions = _load_exceptions(CAD_ROOT / "config", package.name, package.kind)
+        exceptions = _load_exceptions(package.name)
         if exceptions:
             prompt += (
                 "\nOWNER-DECLARED MACHINIST EXCEPTIONS\n"
-                "The project owner has accepted these known departures. A "
+                "The project owner has accepted these known departures. Each "
+                "is pinned to the printed item it excuses, quoted from the "
+                "drawing's current source; it covers that item only. A "
                 "would-be finding that matches one is not a finding: do not "
                 'file it (kind "accept"), or file it at most under minor '
                 '(kind "minor"), and never let it affect the verdict. Name '
                 "the exception id in the summary when you apply one.\n"
             )
             for exception in exceptions:
-                prompt += (
-                    f"- {exception.id} [{exception.kind}] at {exception.where}: "
-                    f"{exception.finding} — {exception.reason}\n"
-                )
+                prompt += _render_exception(exception, package.name) + "\n"
     return prompt + "Return one verdict for the package as a whole.\n"
 
 
@@ -1742,12 +1745,15 @@ def review_package(
         "exceptions": [
             {
                 "id": exception.id,
-                "where": exception.where,
+                "anchor": [str(anchor) for anchor in exception.anchors],
+                "rendered": [
+                    _render_anchor(anchor, package.name) for anchor in exception.anchors
+                ],
                 "finding": exception.finding,
                 "reason": exception.reason,
-                "kind": exception.kind,
+                "kind": exception.kind.value,
             }
-            for exception in _load_exceptions(CAD_ROOT / "config", package.name, package.kind)
+            for exception in _load_exceptions(package.name)
         ],
         "context_errors": context_errors,
         "usage": _usage(

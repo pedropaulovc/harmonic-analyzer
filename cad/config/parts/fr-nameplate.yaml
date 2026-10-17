@@ -6,19 +6,3 @@ fr-nameplate:
   quantity: 1
   tolerance_class: visual_noncritical
   process: "engraved brass plate"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the three DXF notes: OUTLINE AND CORNERS PER pdf/fr-nameplate-outline.dxf (the outline DXF), SUNK FIELD PER pdf/fr-nameplate-field.dxf (the field DXF) and ENGRAVING PER pdf/fr-nameplate-engraving.dxf (the engraving DXF)"
-      finding: "three surfaces are defined only by the release-bundle DXFs and not dimensioned on the sheet (rule 1): the plate outline and its corner radii (outline DXF), the sunk-field border (field DXF) and the engraved artwork (engraving DXF)"
-      reason: "the traced period artwork is the definition of all three: the outline DXF is the plate's traced outer edge and corners, the field DXF the engraving's own pinstripe inner edge, and the engraving DXF the lettering and ornament, each shipped in the release bundle beside the PDF; the acceptance covers the outline DXF as well as the field and engraving (owner ruling 2026-10-15); redrawing any of them as dimensions would restate the artwork (owner-accepted)"
-    - id: "RV-02"
-      kind: "minor"
-      where: "the sheet note FLOOR UNDER ENGRAVING 0.54 MIN"
-      finding: "floor under the engraving below the 1.5 mm wall floor (rules 17, 20)"
-      reason: "0.54 MIN at the worst printed thickness and engraving depth (0.800 nominal); a decorative engraving floor on a plate that carries no load (owner-ruled shortfall)"
-    - id: "RV-03"
-      kind: "minor"
-      where: "the sheet note SCREWS ENGAGE 3.73 MIN FULL THREAD"
-      finding: "#4-40 screw full-thread engagement below 1.5D (rules 18, 20)"
-      reason: "3.73 MIN (1.31D) for the 1/4 in 90114A511 fillister at its shortest stock length through the thickest printed plate, tip chamfer deducted; it only holds an unloaded cosmetic plate, so the screw stays (owner-ruled shortfall)"

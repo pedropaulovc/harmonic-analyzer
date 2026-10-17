@@ -5,10 +5,10 @@ one set of numbered rules for part and assembly packages, followed by authors
 and sent verbatim to the blind machinist reviewer. This file holds what the
 reviewer must not see: how the repository implements those rules, where
 per-part adjustments live, and the review gate. Per-part and per-assembly
-adjustments are declared as `machinist_exceptions` under the package's own key
-in `cad/config/parts/<dashed-name>.yaml` or
-`cad/config/assemblies/<dashed-stem>.yaml`, and only the reviewed package's
-own declarations reach its reviewer. Cite rules by the guideline's number and
+adjustments are declared beside the drawing code, in
+`cad/scripts/draw_<name>.exceptions.yaml` next to `draw_<name>.py` (see
+[Named exceptions](#named-exceptions)), and only the reviewed package's own
+declarations reach its reviewer. Cite rules by the guideline's number and
 title, for example "rule 5 (avoid excessive GD&T)".
 
 It supersedes the "full GD&T vocabulary, applied functionally" verdict of
@@ -96,27 +96,42 @@ cannot ask for what the authors were told to leave out.
 
 A feature-control frame and its datums appear only where rule 5's functional
 classes demand one and the project owner has accepted the specific control.
-Which features may carry frames is a per-part adjustment: it is declared as a
-`machinist_exceptions` entry (kind `accept`) under the package's own key in
-its config YAML, carrying the functional reason, and only the reviewed
-package's own declarations reach its reviewer. Everything else carries no
-frames and no datums. A new entry needs a user ruling.
+Which features may carry frames is a per-drawing adjustment: it is declared
+as an exception (kind `accept`) beside the drawing code, anchored on the frame
+it permits and carrying the functional reason (see
+[Named exceptions](#named-exceptions)). Everything else carries no frames and
+no datums. A new entry needs a user ruling.
 
 ## Named exceptions
 
 A shortfall against rules 17–19 (or another numeric rule) is acceptable only
-by the user's own ruling, declared as a `machinist_exceptions` entry (kind
-`minor`) under the package's own key in its config YAML. No one else rules,
-and the thresholds are never loosened to admit a shortfall. Each entry is
-specific to the part it names; it is not precedent.
+by the user's own ruling, declared as an exception (kind `minor`). No one
+else rules, and the thresholds are never loosened to admit a shortfall. Each
+entry is specific to the drawing that declares it; it is not precedent.
+
+Exceptions live in `cad/scripts/draw_<name>.exceptions.yaml`, beside the
+`draw_<name>.py` that prints the excused item (an assembly drawing keeps its
+suffix: `draw_fr_frame_assembly.exceptions.yaml`). The file is a flat list
+of `{id, kind, anchor, finding, reason}` with `kind` `accept` or `minor`.
+`anchor` names the symbol the drawing code owns, never quoted sheet text,
+and the review renders its current text or value into the prompt
+(`machinist_exceptions.py` documents the forms): `step:<key>` for an assembly
+fit-up step, `note:<module>.<NAME>` for printed text, `frame:<module>.<TABLE>[<key>]`
+for one feature-control frame, `dim:<Dimension>@<Feature>` for an imported
+model dimension, and, only when no symbol owns the item, `sheet:<n>/<text>`
+with a reason that says `no code anchor`. The draw script tags the excused
+site with `# machinist-exception: <id>`. `test_machinist_exceptions`
+(check:recipe) fails on an orphaned or undeclared id, an unresolvable anchor,
+a duplicate id or a bad kind, and rejects a tag outside a draw script. No
+build or draw closure reads the declarations, so declaring or retiring one
+re-keys only the tagged drawing; `cad/config` never carries them.
 
 The sheet states the shortfall as a plain manufacturing fact (rule 20);
 `test_printed_text_rulings` keeps rule numbers, ruling ids and governance
 words off printed text. The blind reviewer reports a stated shortfall under
-minor. Whoever runs the gate matches each one to the part's declared entry
-(same parts, shortfall within the declared range). A stated shortfall with no
-matching declaration gates the package like a blocker. An emitter of an
-approved declaration carries a comment naming it.
+minor. Whoever runs the gate matches each one to the drawing's declared
+entry (same parts, shortfall within the declared range). A stated shortfall
+with no matching declaration gates the package like a blocker.
 
 ## The gate
 

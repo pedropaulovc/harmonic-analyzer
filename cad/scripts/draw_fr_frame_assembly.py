@@ -246,6 +246,15 @@ EXPLODED_VIEW_NAMES = {
     SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(EXPLODED_VIEW_NAME),
 }
 
+# Step 9 is owner-accepted fit-up at assembly (#1468); named so the review
+# exception anchors the printed text.
+# machinist-exception: RV-01
+NAMEPLATE_TRANSFER_STEP = (
+    "9. SET MHA-FR-004 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL TO",
+    "   AND INSET FROM THE NEAR DECK END PER SECTION B-B, SHEET 1; CLAMP.",
+    "   SPOT MHA-FR-001 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH PER ITS",
+    "   MHA-FR-001 TRANSFER CALLOUT. SEAT ALL FOUR MHA-VN-006 HEADS.",
+)
 # These instructions carry only requirements that exist at assembly: matched
 # fits, the one-setup coaxial casting threads, transfer-drilled tube holes,
 # fitted stock caps, and checks against the actual purchased components. Part
@@ -288,11 +297,7 @@ ASSEMBLY_STEPS = "\n".join(
         "   INSIDE SEAT.",
         "8. SEAT MHA-FR-005 ON DECK, WINDOWS FACING THE SHORT ENDS; INSTALL FOUR",
         "   MHA-VN-009 TOP-DOWN AND DRAW DOWN EVENLY UNTIL ALL HEADS SEAT.",
-        # Owner-accepted fit-up, declared as fr-frame RV-01 (#1468).
-        "9. SET MHA-FR-004 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL TO",
-        "   AND INSET FROM THE NEAR DECK END PER SECTION B-B, SHEET 1; CLAMP.",
-        "   SPOT MHA-FR-001 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH PER ITS",
-        "   MHA-FR-001 TRANSFER CALLOUT. SEAT ALL FOUR MHA-VN-006 HEADS.",
+        *NAMEPLATE_TRANSFER_STEP,
         "10. START MHA-VN-023 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
     )
 )

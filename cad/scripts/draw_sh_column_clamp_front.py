@@ -340,7 +340,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="ear holes",
         process=HOLE_CALLOUT_PROCESS,
     )
-    # sh-column-clamp-front RV-01 (EAR_WALL_NOTE) and RV-02 (SCREW_LINE_NOTE).
+    # machinist-exception: RV-01, RV-02 (EAR_WALL_NOTE, SCREW_LINE_NOTE)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

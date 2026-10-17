@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
 import pytest
 
@@ -13,9 +12,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
-from machinist_exceptions import load_exceptions
-
-CONFIG_ROOT = Path(__file__).resolve().parents[1] / "config"
+from machinist_exceptions import load_exceptions, render_anchor
 
 BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 TITLE_BLOCK = (0.216, 0.0127, 0.4191, 0.066)
@@ -199,19 +196,20 @@ def test_hole_row_names_the_tap_pattern_and_clears_the_rail_line():
 
 def test_hole_pattern_three_places_are_a_declared_acceptance():
     # Owner ruling 2026-10-15, option A: the hole row and stations stay .XXX
-    # for pattern float (transfer-drilling rejected).  The declaration names
-    # the stations, the hole row and the callout as the sheet prints them.
-    (entry,) = load_exceptions(CONFIG_ROOT, "pd_platen_clip", "part")
-    assert (entry.id, entry.kind) == ("RV-01", "accept")
+    # for pattern float (transfer-drilling rejected).  The declaration anchors
+    # the stations, the hole row and the callout the sheet prints.
+    (entry,) = load_exceptions("pd_platen_clip")
+    assert (entry.id, entry.kind.value) == ("RV-01", "accept")
     assert entry.reason.endswith("(owner-accepted)")
-    hole_row = draw.DIMENSION_CALLOUTS["LeftZ"].replace("\n", " ")
+    assert {str(anchor) for anchor in entry.anchors} >= {
+        f"dim:{name}@ScrewHoles" for name in clip.DRAWING_DIMENSIONS["ScrewHoles"]
+    }
+    rendered = "; ".join(render_anchor(a, "pd_platen_clip") for a in entry.anchors)
     for printed in (
-        f"{clip.HOLE_INSET:.3f}",
-        f"{clip.CLIP_LENGTH - clip.HOLE_INSET:.3f}",
-        f"2X {clip.HOLE_Y:.3f} {hole_row}",
+        draw.DIMENSION_CALLOUTS["LeftZ"].replace("\n", " / "),
         draw.HOLE_CALLOUT_PROCESS.replace("\n", " / "),
     ):
-        assert printed in entry.where, printed
+        assert printed in rendered, printed
     assert clip.HOLE_FLOAT_MIN >= 2.0 * clip.PATTERN_POSITION_ZONE
 
 

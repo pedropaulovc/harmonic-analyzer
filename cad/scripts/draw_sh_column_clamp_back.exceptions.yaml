@@ -1,0 +1,10 @@
+# Owner-accepted machinist-review exceptions for draw_sh_column_clamp_back.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_sh_column_clamp_back.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "minor"
+  anchor: "note:sh_column_clamp_back_spec.BACK_WALL_NOTE"
+  finding: "bore-to-back-face wall below the 2.0 mm target (rules 17, 20)"
+  reason: "1.97 MIN (1.9765) from the bore, on the largest A513 DOM column (25.527) at the loosest 0.30 bore clearance, to the back face at the least printed grip offset and depth, above the unchanged 1.5 floor; 2.0 needs a column of at most 25.48, inside the A513 band (owner-ruled shortfall)"

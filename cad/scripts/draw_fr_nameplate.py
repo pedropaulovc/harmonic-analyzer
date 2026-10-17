@@ -702,10 +702,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, depths, SECTION_CALLOUTS)
     _floor_reference(adapter, section)
 
+    # machinist-exception: RV-01
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     if add_note(adapter, SCREW_HEAD_NOTE, *SCREW_HEAD_NOTE_XY) is None:
         raise RuntimeError("failed to place the screw-head engraving note")
-    # Named exceptions: fr-nameplate RV-02 (floor) and RV-03 (screw thread).
+    # The stated minimums: floor (RV-02) and screw thread (RV-03).
+    # machinist-exception: RV-02, RV-03
     if add_note(adapter, MINIMUM_NOTES, *MINIMUM_NOTES_XY) is None:
         raise RuntimeError("failed to place the stated-minimum notes")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
