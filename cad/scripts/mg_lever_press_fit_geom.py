@@ -56,9 +56,15 @@ ROD_DIA = 6.0  # round brass rod, modelled at nominal end to end
 
 # --- press zone (the rod's east end) and the collar bore it enters -----------
 PRESS_ZONE_LENGTH = 10.0  # the rod's last 10 = the collar's length
-PRESS_ZONE_LENGTH_BAND = (0.0, -0.05)  # tip to the start of the selected/lapped land
+# The selected/lapped land's start from the tip is a single MIN limit at
+# PRESS_ZONE_LENGTH, not a band: the land must cover the whole end-flush
+# collar, or the bore -- finished to the MEASURED land -- would also grip
+# unselected stock that may stand above it; a longer land only laps more rod.
+# The print's swTolMIN lives in mg_magnifying_lever_spec.
 COLLAR_LENGTH = PRESS_ZONE_LENGTH  # end-flush collar, modelled at its maximum length
 COLLAR_LENGTH_BAND = (0.0, -0.05)
+if PRESS_ZONE_LENGTH < COLLAR_LENGTH + COLLAR_LENGTH_BAND[0]:
+    raise AssertionError("the press zone's minimum must cover the longest collar")
 PRESS_ZONE_DIA = ROD_DIA  # the model's rod, 6.000
 PRESS_ZONE_DIA_BAND = (0.0, -0.006)  # (upper, lower): select or lap the stock
 # (min, max) diametral interference the bore is finished to on the measured

@@ -1341,7 +1341,7 @@ sections:
         - stated
         - high
       - - Rod diameter
-        - 'Body Ø6.00 0/−0.03, selected cold-drawn brass stock; bracket-end cylindrical press land Ø6.000 0/−0.006, SELECT OR LAP, starting 10.00 +0/−0.05 mm before the actual tip and ending at its tangent hemisphere (R3 REF from selected OD). Stock below the press-land minimum is rejected, not enlarged by lapping.'
+        - 'Body Ø6.00 0/−0.03, selected cold-drawn brass stock; bracket-end cylindrical press land Ø6.000 0/−0.006, SELECT OR LAP, starting at least 10.0 mm (10.0 MIN, covering the whole MHA-MG-001 collar) before the actual tip and ending at its tangent hemisphere (R3 REF from selected OD). Stock below the press-land minimum is rejected, not enlarged by lapping.'
         - ~0.24
         - 'round brass rod, photo proportion; p.46 “Firmly affixed to the summing lever”; user-ruling light press alone (#1570), derived by mg_lever_press_fit_geom.press_fit_budget'
         - scaled + engineered fit
@@ -1385,7 +1385,7 @@ sections:
       - - Lever collar light-press budget
         - 'Tight fit 0.014 mm, inherited collar OD 12.00 ±0.51: strength at OD 11.49 gives contact pressure 137.23 MPa, bore hoop 240.13 MPa and von Mises 330.82 MPa < 333 MPa (0.9 × 370 MPa 1018 cold-drawn yield). Whole-contact envelope, independent corners (not one physical part): collar length maximum 10.00 minus selected hemisphere radius minimum 2.997 gives the 7.003 mm longest straight cylinder; the part of the largest hemisphere (radius 3.000) outside the smallest bore (diameter 5.986), sqrt(3.000^2 - 2.993^2) = 0.204819 mm, gives explicit contact maximum 7.207819 mm (coupled tight corner 7.204819 mm). Press force = friction over that envelope plus the normal reaction on the partial dome: at OD 12.51 the contact pressure is 143.66 MPa, friction 0.10–0.15 gives 1951.871–2927.806 N, and the projected dome axial-normal reaction bound adds 18.933819 N, so the total is 1970.804504–2946.739847 N (1.970805–2.946740 kN). The shared code derives the sheet cap by rounding the maximum total upward to 0.1 kN: 3.0 kN MAX.'
         - —
-        - 'cad/scripts/mg_lever_press_fit_geom.press_fit_budget: free-axial Lamé solid-shaft fit, named OD print corners 11.49/12.51, d6 and L7.207819 whole-contact envelope (7 mm nominal straight cylinder plus partial R3 dome), friction plus projected dome axial-normal reaction, brass E97 GPa ν0.34, steel E200 GPa ν0.29; user light-press, +0/−0.05 collar/tip-land stations and inherited OD ±0.51 rulings'
+        - 'cad/scripts/mg_lever_press_fit_geom.press_fit_budget: free-axial Lamé solid-shaft fit, named OD print corners 11.49/12.51, d6 and L7.207819 whole-contact envelope (7 mm nominal straight cylinder plus partial R3 dome), friction plus projected dome axial-normal reaction, brass E97 GPa ν0.34, steel E200 GPa ν0.29; user light-press, +0/−0.05 collar station and inherited OD ±0.51 rulings; the tip land starts 10.0 MIN from the tip, covering the longest collar (machinist review r2)'
         - engineered fit + elastic budget
         - high (specified fit; analytic result under the stated elastic/friction assumptions)
       - - Bracket flange screws ×2
