@@ -189,3 +189,20 @@ def test_nut_thread_interference_literal_matches_the_specs():
         )
     )
     assert jam_nut.THREAD == anchor.thread_size
+
+
+def test_chamfer_band_is_owner_accepted_with_both_functional_limits():
+    """Machinist gate 2026-10-17 read the 0.46 ±0.05 deburr as over-spec."""
+    from machinist_exceptions import load_exceptions
+
+    (entry,) = load_exceptions(_config.CONFIG_DIR, "vn_spring_hook", "part")
+    assert entry.kind == "accept"
+    band = f"{spec.CHAMFER_WIDTH_MM:.2f} ±{spec.CHAMFER_WIDTH_TOLERANCE_MM:.2f}"
+    assert band in entry.where
+    assert entry.reason.startswith("owner ruling 2026-10-17")
+    # The reason's numbers are the spec's: the tap-drill minimum and the
+    # two-pitch past-nut floor.
+    assert f"MIN_CHAMFER_WIDTH_MM {spec.MIN_CHAMFER_WIDTH_MM:.4f}" in entry.reason
+    low = spec.CHAMFER_WIDTH_MM - spec.CHAMFER_WIDTH_TOLERANCE_MM
+    assert f"the {low:.2f} low limit" in entry.reason
+    assert f"{spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm:.4f}" in entry.reason
