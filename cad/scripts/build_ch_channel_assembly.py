@@ -944,13 +944,10 @@ def _assert_spring_mount(
         )
     # The cut end crosses the plate and carries the MHA-CH-014 jam nut on the
     # underside; at the worst case (shortest in-band part under the thickest
-    # nut, backed out the whole calibration budget) full threads must still
-    # show below the nut.
+    # nut, through the thickest in-band pad, backed out the whole calibration
+    # budget) full threads must still show below the nut.
     protrusion = bottom - thread_bottom
-    nominal_protrusion = (
-        vn_spring_hook_spec.PROTRUSION_MAX_MM
-        - vn_spring_hook_spec.LENGTH_BAND_WORST_MM
-    )
+    nominal_protrusion = vn_spring_hook_spec.PROTRUSION_MM
     if abs(protrusion - nominal_protrusion) > 1e-6:
         raise RuntimeError(
             f"channel anchor cut end hangs {protrusion:.4f} mm below the plate "
