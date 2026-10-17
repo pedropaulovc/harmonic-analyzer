@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -200,24 +201,58 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert "v_built, 1e-5 * v_built" in source
 
 
-def test_receiver_rim_scan_uses_back_entry_face(monkeypatch) -> None:
+def test_receiver_rim_scan_uses_back_entry_face() -> None:
     import magnifying_bracket_joint_layout as joint
-    back = object()
     calls = []
 
     def circle_at(center, radius, *, axis, label):
         calls.append((center, radius, axis))
         return SimpleNamespace(edge=object())
 
-    def scan(view, *, label):
-        assert view is back
-        return SimpleNamespace(circle_at=circle_at)
-
-    monkeypatch.setattr(drawing, "scan_view_edges", scan)
-    assert len(drawing._mounting_rims(back)) == len(joint.LEVER_HOLE_POINTS)
+    edges = SimpleNamespace(circle_at=circle_at)
+    assert len(drawing._mounting_rims(edges)) == len(joint.LEVER_HOLE_POINTS)
     assert [call[0] for call in calls] == list(joint.LEVER_HOLE_POINTS)
     assert all(call[1] == joint.TAP_DRILL_DIA / 2.0 for call in calls)
     assert [call[2] for call in calls] == [(0.0, 0.0, 1.0)] * len(calls)
+
+
+def test_view_f_axis_reference_ties_the_plate_top_to_the_hex_centre() -> None:
+    """Machinist gate 2026-10-17 on #1607: the row's 2.54 +-0.05 needs a
+    located origin. The row lies on the hex centre's line, the plate is
+    centred on it, and the (2.54) REF stands where the -Z end shows the
+    plate's own top edge, its centreline running past the hex's flats."""
+    import magnifying_bracket_joint_layout as joint
+
+    spec = sm_summing_lever_spec
+    assert all(point[1] == 0.0 for point in joint.LEVER_HOLE_POINTS)
+    station = drawing.RECEIVER_AXIS_STATION_MM
+    overrun = drawing.RECEIVER_AXIS_OVERRUN_MM
+    outer_tap = max(point[0] for point in joint.LEVER_HOLE_POINTS)
+    assert outer_tap + joint.TAP_DRILL_DIA / 2.0 < lever_build.RIB_PLATE_REACH
+    assert lever_build.RIB_PLATE_REACH < station
+    assert station + overrun < spec.PLATE_W
+    assert overrun > 0.0 and drawing.RECEIVER_AXIS_TEXT_RISE_MM > spec.PLATE_T
+
+    z = -spec.PLATE_L / 2.0
+    half_t = spec.PLATE_T / 2.0
+    reach = lever_build.RIB_PLATE_REACH
+    plate_top = _line((reach, half_t, z), (spec.PLATE_W, half_t, z))
+    far_top = _line((reach, half_t, -z), (spec.PLATE_W, half_t, -z))
+    step = _line((reach, lever_build.edge_rib_half_height(reach), z), (reach, half_t, z))
+    underside = _line((spec.PLATE_W, -half_t, z), (reach, -half_t, z))
+    edges = ViewEdges(label="back", edges=(far_top, step, underside, plate_top))
+    assert drawing._receiver_plate_top_edge(edges) is plate_top
+    with pytest.raises(RuntimeError, match="expected one visible line"):
+        drawing._receiver_plate_top_edge(ViewEdges(label="back", edges=(far_top, step)))
+
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("def _receiver_axis_reference") :]
+    body = body[: body.index("\ndef ")]
+    assert "-(HEX_W / 2.0 + RECEIVER_AXIS_OVERRUN_MM), 0.0, z_mm" in body
+    assert "expected_mm=PLATE_T / 2.0" in body
+    assert "set_reference_dimension(" in body
+    assert 'orientation="vertical"' in body
+    assert "_receiver_axis_reference(adapter, back, back_edges)" in source
 
 
 def test_receiver_view_is_on_a_back_view_sheet_with_real_binding() -> None:
