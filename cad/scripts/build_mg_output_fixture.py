@@ -26,8 +26,9 @@ spigot face (x = SPIGOT_FACE_X), flats facing +/-Z, corners on +/-Y.
 * ``GrooveProfile``: the full-radius groove, a Top-plane circle drawn as two
   semicircles meeting at the root, revolved as a cut.  Its centreline runs
   from the bore axis to the spigot face, so ``GrooveStation`` runs from the
-  face; ``GrooveRadius`` sizes it (a single MAX limit) and ``GrooveRootDia``
-  is the diametric dimension from the axis to the root point.
+  face; ``GrooveRadius`` sizes it (a LIMIT band, the model value its upper
+  limit) and ``GrooveRootDia`` is the diametric dimension from the axis to
+  the root point.
 * ``RodBoreProfile``: the drilled Ø5.2 cross bore along local Y.
 * ``AxialTap``: one blind Hole Wizard #4-40 tap from the spigot face (the
   thumb screw's receiver): full thread to where its axis breaks into the
@@ -101,7 +102,9 @@ from mg_output_fixture_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    DRAWING_PRECISION_BY_NAME,
     GROOVE_STATION,
+    LIMIT_BANDS,
     SINGLE_LIMITS,
 )
 
@@ -324,10 +327,13 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     # Places are the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the part carries
-    # them and the groove radius's single MAX limit, the drawing reads them back.
+    # them, the shoulder corner's single MAX limit and the groove radius's
+    # LIMIT band; the drawing reads them back.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     for dimension_name, (feature_name, tol_type) in SINGLE_LIMITS.items():
         _single_limit(adapter, feature_name, dimension_name, tol_type)
+    for dimension_name, (feature_name, limits) in LIMIT_BANDS.items():
+        _limit_band(adapter, feature_name, dimension_name, limits)
     # The last dimension edit is behind us: the saved geometry must still be
     # the analytic part.
     await force_rebuild(adapter)
@@ -578,6 +584,43 @@ def _single_limit(adapter: Any, feature: str, dimension_name: str, tol_type: int
     tolerance.Type = tol_type
     if int(tolerance.Type) != tol_type:
         raise RuntimeError(f"{dimension_name}@{feature}: single-limit type did not persist")
+
+
+def _limit_band(
+    adapter: Any, feature: str, dimension_name: str, limits: tuple[float, float]
+) -> None:
+    """A dimension as a native LIMIT band: SolidWorks prints the upper and
+    lower limits, model value plus each deviation, at the tolerance's places
+    (paper_drive_stock_native.apply_span_limits).  ``SetValues``, not
+    ``SetValues2``: SW2026 rejects the latter on some dimensions (the shared
+    tolerance helper's finding)."""
+    label = f"{dimension_name}@{feature}"
+    display, dimension = _named_dimension(adapter, feature, dimension_name)
+    lower, upper = limits  # native API order, mm
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 3  # swTolType_e.swTolLIMIT
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+    if (
+        int(tolerance.Type) != 3
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, rel_tol=0.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, rel_tol=0.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    # The limits print at the dimension's own places (rule 3), the value's.
+    places = DRAWING_PRECISION_BY_NAME[dimension_name]
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetPrecision3(-1, -1, places, -1)
+    if int(display.GetPrimaryTolPrecision2()) != places:
+        raise RuntimeError(f"{label}: LIMIT precision did not persist")
+    value = float(dimension.SystemValue) * 1000.0
+    _telemetry.success(
+        f"{label}: LIMIT {value + upper:.{places}f}/{value + lower:.{places}f}"
+    )
 
 
 
