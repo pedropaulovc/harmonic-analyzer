@@ -129,6 +129,46 @@ def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
     assert vn_spring_hook_spec.ANCHOR_INSTALL_CHECK in printed
 
 
+def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
+    """Code review C08: the model and the feeler step park the nib
+    PEN_PAPER_CLEARANCE_MM off the paper, and nothing on the plumb, guided
+    carriage closes that gap, yet check 3 needs a drawn line. The fitter
+    slides the marker on in its V until the nib touches, after the parking
+    step and before any check; sheet 1 says the views show it parked."""
+    from paper_drive_geom import PEN_PAPER_CLEARANCE_MM
+
+    parked, contact = steps.step_number("nib-set"), steps.step_number("nib-on-paper")
+    assert contact == parked + 1
+    by_number = {
+        int(line.split(". ", 1)[0]): line for line in notes.ASSEMBLY_STEPS
+    }
+    feeler = f"{PEN_PAPER_CLEARANCE_MM:.2f} FEELER"
+    assert feeler in by_number[parked]
+    assert "TOUCHES THE PAPER" in by_number[contact]
+    assert "FEELER" not in by_number[contact].replace("NO FEELER", "")
+    assert f"REPEAT STEP {parked}" in by_number[contact]
+    # No later step re-parks the nib, and the checks find it on the paper
+    # before the straight-line run.
+    for number in range(contact + 1, len(notes.ASSEMBLY_STEPS) + 1):
+        assert "NIB" not in by_number[number]
+    checks = " ".join(notes.ASSEMBLY_CHECKS)
+    assert "FEELER" not in checks
+    assert "THE NIB TOUCHES THE PAPER" in notes.ASSEMBLY_CHECKS[0]
+    assert "DRAW A STRAIGHT LINE" in notes.ASSEMBLY_CHECKS[2]
+    assert notes.NIB_PARKED_NOTE in drawing.ASSEMBLED_NOTE.replace("\n   ", " ")
+    assert (
+        f"PARKED {PEN_PAPER_CLEARANCE_MM:.2f} OFF THE PAPER (STEP {parked}); "
+        f"STEP {contact} SETS IT ON."
+    ) in notes.NIB_PARKED_NOTE
+    lines = drawing.ASSEMBLED_NOTE.count("\n") + 1
+    portrait = DRAWING_TEMPLATES[DrawingLayout.PORTRAIT]
+    bottom = drawing.ASSEMBLED_NOTE_XY[1] - lines * drawing.NOTE_LINE_PITCH
+    assert bottom > portrait.title_block_top_m
+    assert max(map(len, drawing.ASSEMBLED_NOTE.splitlines())) <= (
+        drawing.ASSEMBLED_NOTE_WIDTH
+    )
+
+
 def test_integration_joints_point_at_their_integration_steps() -> None:
     rows = {joint.id: joint for joint in joint_retention.JOINTS}
     anchor = rows["ha-harmonic-analyzer/channel-anchor-in-summing-plate"]

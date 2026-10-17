@@ -31,7 +31,10 @@ SEQUENCE: tuple[str, ...] = (
     "lever-wire-fitted",
     "pen-hung",
     "pen-wire-tied",
+    # The as-modelled, parked nib (a feeler's gap off the paper); the next
+    # step brings it onto the paper for running.
     "nib-set",
+    "nib-on-paper",
     "stick-parked",
 )
 
