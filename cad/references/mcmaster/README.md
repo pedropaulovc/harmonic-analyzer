@@ -183,7 +183,7 @@ replica-gated and no copy is kept here:
   standalone run is catalogue-only (it builds the recipe, checks the solid and
   saves it under `cad/out/reference`).
 - [91251A196](https://www.mcmaster.com/91251A196/)
-  (`ch-rocker-arm-tl-oblique-bracket-screw`, MHA-CH-006-TL-42, 4 in the oblique
+  (`ch-rocker-arm-tl-oblique-bracket-screw`, MHA-CH-006-TL-42, 8 in the oblique
   trammel jig: the fastener table's `BRACKET_TO_BAR` row) was read live on
   October 17, 2026: #8-32 UNC class 3A, 5/8 in under the head, fully threaded,
   head Ø0.27 x 0.164 in, 9/64 in hex, Rockwell C37, ASTM A574, $15.24 per pack

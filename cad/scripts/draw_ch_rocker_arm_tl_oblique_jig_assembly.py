@@ -179,11 +179,11 @@ STEPS_SHEET_NUMBER = SHEET_NAMES.index(STEPS_SHEET) + 1
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the jig's primary sheet must remain landscape")
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
-# The jig is about 965 x 425 in plan: 1:4 for the arrangement, 1:15 for the
+# The jig is about 970 x 435 in plan: 1:4 for the arrangement, 1:15 for the
 # finished isometric and 1:10 for the BOM's collapsed reference. The finished
 # view sits under the continued steps and the checks; review bought-r15's
 # step 4, 6 and 7 rewrites send step 11 to the right column, which leaves its
-# room about 63 tall, short of the 93 the view needs at 1:8.
+# room about 63 tall, short of the 94 the view needs at 1:8.
 ASSEMBLED_SCALE = (1.0, 4.0)
 REFERENCE_SCALE = (1.0, 10.0)
 ISOMETRIC_SCALE = (1.0, 15.0)
@@ -458,12 +458,12 @@ BOM_ITEM_NUMBERS = dict(spec.ITEM_NUMBERS)
 # share one ring (_ring_balloons).
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
 # The base bar's walk landed on rail 2's carriage end seal (review r5): its
-# balloon lands on the bar's long edge on the operator's side (part +Y, z 0:
-# the top of the turned-over bar 2, the bottom of bar 1), 300 from the
-# spindle end, about 85 model mm clear of either carriage and 65 of the far
-# flange nut on the sheet.
+# balloon lands on the bar's long edge on the operator's side (part +Y,
+# ``HIGH_SIDE_Y``, z 0: the top of the turned-over bar 2, the bottom of bar 1),
+# 300 from the spindle end, clear of either carriage and of the far flange nut
+# on the sheet.
 BALLOON_ANCHORS[spec.BASE_BAR] = BalloonAnchor(
-    point_mm=(300.0, base_bar.HALF_WIDTH, 0.0)
+    point_mm=(300.0, base_bar.HIGH_SIDE_Y, 0.0)
 )
 
 EXPLODED_VIEW_NAMES = {
@@ -474,23 +474,25 @@ if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the jig explode is authored in Default")
 
 
-# Glues an item citation ("ITEM 22") and a value with its unit ("3.5 N·m")
-# into one word while wrapping, so the fitter never reads "ITEM" or a number
-# at a line end and what it belongs to on the next.
-_UNBROKEN = re.compile(r"\bITEM (?=\d)|(?<=\d) (?=N·m)")
+# Glues an item citation ("ITEM 22") and a value with its unit ("3.5 N·m",
+# "25 IN·LBF") into one word while wrapping, so the fitter never reads "ITEM"
+# or a number at a line end and what it belongs to on the next.
+_UNBROKEN = re.compile(r"\bITEM (?=\d)|(?<=\d) (?=N·m|IN·LBF)")
 _GLUE = "\x00"
+# A step's label: its number, or a sub-step's ("7A").
+_STEP_LABEL = re.compile(r"\d+[A-Z]?")
 
 
 def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
-    """Wrap each numbered line under its own number; one note per block. A
-    hyphenated word (HOLD-DOWNS, A1-B1), an item citation (ITEM 22) and a
-    torque (3.5 N·m) stay whole on their line."""
+    """Wrap each numbered line (a step or sub-step) under its own label; one
+    note per block. A hyphenated word (HOLD-DOWNS, A1-B1), an item citation
+    (ITEM 22) and a torque (3.5 N·m) stay whole on their line."""
     out = [heading] if heading else []
     for line in (
         _UNBROKEN.sub(lambda m: m.group(0).replace(" ", _GLUE), text) for text in lines
     ):
         number, sep, rest = line.partition(". ")
-        if sep and number.isdigit():
+        if sep and _STEP_LABEL.fullmatch(number):
             out += textwrap.wrap(
                 rest,
                 width=width,

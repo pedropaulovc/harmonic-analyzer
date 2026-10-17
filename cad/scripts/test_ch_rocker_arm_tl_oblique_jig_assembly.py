@@ -424,9 +424,27 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
     # Review bought-r6 (rule 23): the block screws seat on wedge-lock pairs
     # and are tightened, in the alignment order, to the derived torque.
     assert (
+        "REFIT THE NUT BRACKET FROM THE BLOCK'S FAR FACE WITH 2 #8-32 X 1-7/8 SHCS "
         f"(ITEM {spec.ITEM_NUMBERS[spec.BLOCK_SCREW]}) ON WEDGE-LOCK PAIRS "
-        f"(ITEM {spec.ITEM_NUMBERS[spec.BLOCK_LOCK_WASHER]}) FROM THE FAR FACE"
-    ) in steps["7"]
+        f"(ITEM {spec.ITEM_NUMBERS[spec.BLOCK_LOCK_WASHER]}), SNUG."
+    ) in steps["7E"]
+    # Review bought-r15: step 7 is one operation a line; the taps go in the
+    # nut bracket's spots, the pivot block stays on its carriage, its side
+    # holes plain.
+    assert [label for label in steps if label.startswith("7")] == [
+        "7A",
+        "7B",
+        "7C",
+        "7D",
+        "7E",
+    ]
+    assert "RAIL 1'S PIVOT BLOCK (STILL ON ITS CARRIAGE)" in steps["7C"]
+    spot = "SPOT THE NUT BRACKET THROUGH THE BLOCK'S 2 Ø4.98 SIDE HOLES"
+    assert spot in steps["7C"]
+    assert (
+        "UNCLAMP THE NUT BRACKET, DRILL AND TAP ITS 2 SPOTS #8-32 PER "
+        "MHA-CH-006-TL-29; THE BLOCK'S HOLES STAY PLAIN."
+    ) in steps["7D"]
     assert "THEN THE BRACKET'S BLOCK SCREWS TO 4.4 N·m, THEN THE KP08" in steps["8"]
     # Review bought-r5: the turned-over bar is told by a feature its views
     # show; the lubricants are named; every set screw sits on a flat.
@@ -436,7 +454,7 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
     assert (
         f"THREAD THE LEADSCREW (ITEM {spec.ITEM_NUMBERS[spec.LEADSCREW]}), OILED "
         "WITH ISO VG 32 OIL, IN FROM THE BAR'S FAR END"
-    ) in steps["7"]
+    ) in steps["7B"]
     assert "TIGHTEN ITS AND THE KP08 SET SCREWS ON THE SCREW'S FLATS." in steps["8"]
     # The limits are the parts' own fits: the HUB pin's p6 seat presses into
     # the H7, the dowel's m6 into the N7.
@@ -513,7 +531,7 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.T_NUT: 4,
         spec.FLANGE_NUT: 4,
         spec.RAIL_SCREW: 14,
-        spec.BRACKET_SCREW: 4,
+        spec.BRACKET_SCREW: 8,
         spec.BLOCK_SCREW: 2,
         spec.CARRIAGE_SCREW: 8,
         spec.PILLOW_BLOCK_SCREW: 4,
@@ -523,7 +541,7 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.LEVER_SCREW: 2,
         spec.BLOCK_LOCK_WASHER: 2,
     }
-    assert sum(spec.QUANTITIES.values()) == 84
+    assert sum(spec.QUANTITIES.values()) == 88
     assert spec.QUANTITIES[spec.END_BRACKET] == (leadscrew.END_BRACKET_QUANTITY)
     assert spec.QUANTITIES[spec.NUT_BRACKET] == leadscrew.NUT_BRACKET_QUANTITY
     assert spec.QUANTITIES[spec.BASE_BAR] == base_bar.QUANTITY
@@ -1017,9 +1035,21 @@ def test_sweep_table_edge_margins(report) -> None:
         )
         assert corner[1] == pytest.approx(85.84, abs=0.01)
         assert bar[inner] > 0.0
-    # The wider bars still leave the two apart at their near ends.
+    # The wider bars still leave the two apart at their near ends: a
+    # separating axis among the plan outlines' edge normals.
     bars = spec.fixed_outlines()
-    assert not spec._polygons_overlap(bars["base bar 1"], bars["base bar 2"])
+    one, two = bars["base bar 1"], bars["base bar 2"]
+
+    def separated(polygon: list[tuple[float, float]]) -> bool:
+        for p, q in zip(polygon, polygon[1:] + polygon[:1]):
+            nx, ny = q[1] - p[1], p[0] - q[0]
+            a = [nx * x + ny * y for x, y in one]
+            b = [nx * x + ny * y for x, y in two]
+            if max(a) <= min(b) or max(b) <= min(a):
+                return True
+        return False
+
+    assert separated(one) or separated(two)
     # The feed overhangs like the bars, above the table top: the near KP08's
     # envelope and bracket pass the back edge, the handwheel the -X end.
     feed = {
@@ -1150,8 +1180,9 @@ def test_bracket_load_cases_hold_the_hand_abuse_thrust() -> None:
     assert leadscrew.BRACKET_SLIP_THRUST >= 1.5 * leadscrew.HAND_ABUSE_THRUST
     # TL-000 step 1 prints the one torque where the bracket screws go in.
     assert (
-        "WITH 4 #8-32 X 5/8 SHCS UP FROM THE BAR'S UNDERSIDE, "
-        "TORQUE 2.8 N-M (25 IN-LBF)."
+        "STATION, 4 #8-32 X 5/8 SHCS (ITEM "
+        f"{spec.ITEM_NUMBERS[spec.BRACKET_SCREW]}) PER BRACKET FROM BELOW, "
+        "2.8 N·m (25 IN·LBF)."
     ) in spec.ASSEMBLY_STEPS[0]
 
 
