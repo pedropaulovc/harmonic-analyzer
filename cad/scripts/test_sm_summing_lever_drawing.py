@@ -263,7 +263,11 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
 
 
 def test_notes_are_short_stated_shortfalls() -> None:
-    for text in (notes.ISOMETRIC_VIEW_NOTE, notes.BACK_VIEW_NOTE):
+    for text in (
+        notes.ISOMETRIC_VIEW_NOTE,
+        notes.BACK_VIEW_NOTE,
+        notes.FRONT_VIEW_NOTE,
+    ):
         assert len(text.splitlines()) <= 4
         for word in ("RULE", "EXCEPTION", "RULING", "NYLON", "LOCTITE", "THREADLOCK"):
             assert word not in text.upper()

@@ -115,6 +115,7 @@ from sm_summing_lever_notes import (
     CYLINDER_REFERENCE_Z,
     DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
+    FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
 )
 from sm_summing_lever_spec import (
@@ -1516,6 +1517,7 @@ async def build(adapter) -> dict[str, str]:
         {
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Back View Note": BACK_VIEW_NOTE,
+            "Front View Note": FRONT_VIEW_NOTE,
         },
     )
     # Native dimension metadata must not erase the already-verified blind taps.
@@ -1533,6 +1535,7 @@ async def build(adapter) -> dict[str, str]:
             "Quantity",
             "Isometric View Note",
             "Back View Note",
+            "Front View Note",
         ),
     )
     return artefacts
