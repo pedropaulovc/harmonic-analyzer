@@ -11,12 +11,15 @@ Why round, not a stock hex: the 20 anchors stand in one row at the plate's
 centre.  A 1/4 hex collides corner to corner and no wrench reaches between
 neighbours.  The round O.D. is the only free size, pinned between two worst
 cases: rule 17's 1.5 wall floor from the #6-32 major (small O.D.) and the
-0.25 modelling clearance to the neighbour (large O.D.).  The pitch leaves no
-geometry to trade, so the O.D. prints at two places with an explicit band
-inside that window (rule 4: tightened for a function, the neighbour named at
-the callout; owner ruling 2026-10-17).  The 2.0 wall target cannot be
-met inside the pitch; the floor is.  The 1.5 MIN wall and the 0.5D
-engagement are declared owner-ruled shortfalls (``machinist_exceptions`` in
+0.25 modelling clearance to the neighbour (large O.D.), its tap and the
+neighbour's each at the far edge of the lever's spring-hole pattern position
+zone toward the other.  The pitch leaves no geometry to trade, so the O.D.
+prints at two places with an explicit band inside that window (rule 4:
+tightened for a function, the neighbour named at the callout; owner ruling
+2026-10-17), and the pattern zone is held at Ø0.15 to leave the window open
+(owner ruling on code review C06).  The 2.0 wall target cannot be met inside
+the pitch; the floor is.  The 1.5 MIN wall and the 0.5D engagement are
+declared owner-ruled shortfalls (``machinist_exceptions`` in
 ``ch-anchor-jam-nut.yaml``): a thin jam nut locks and carries no load.
 
 Drive: one saw cut across the lower face gives two diametrically opposite
@@ -37,7 +40,7 @@ import math
 
 from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
-from sm_summing_lever_spec import CHANNEL_PITCH, HOLE_SPEC
+from sm_summing_lever_spec import CHANNEL_PITCH, GEOMETRIC_TOLERANCES_MM, HOLE_SPEC
 from stock_anchor_geom import ANCHOR_9489T111
 
 # One source: the lever's tap names the thread the anchor carries.
@@ -50,11 +53,11 @@ THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]
 MIN_WALL = 1.5  # drawing-guidelines.md rule 17 floor
 NEIGHBOUR_CLEARANCE = 0.25  # spring_mount_geom.MIN_CLEARANCE_MM (asserted there)
 
-OD = 6.66
+OD = 6.58
 OD_PLACES = 2
 # Explicit, not the .XX row: the band must sit inside [wall floor, neighbour
-# clearance] = [6.505, 6.806], and the title block's ±0.51 does not.
-OD_BAND = 0.14
+# clearance] = [6.505, 6.6565], and the title block's ±0.51 does not.
+OD_BAND = 0.07
 if OD_BAND >= printed_band_mm(OD_PLACES):
     raise AssertionError("the O.D. band is no tighter than the title block's")
 OD_MAX = OD + OD_BAND
@@ -74,9 +77,13 @@ SLOT_DEPTH_MIN = SLOT_DEPTH - printed_band_mm(SLOT_PLACES)
 # Rule 17 at the worst case of the printed bands.
 WALL_WORST = (OD_MIN - THREAD_MAJOR) / 2.0
 UNDER_SLOT_WORST = THICKNESS_MIN - SLOT_DEPTH_MAX
-# The neighbour on the next tap, both nuts at their largest O.D.
+# The neighbour on the next tap, both nuts at their largest O.D. and both
+# taps displaced toward each other across their RFS position zones: the
+# centres close by the whole zone diameter (a zone radius each).
+PATTERN_POSITION = float(GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"])
+CENTRE_SPACING_WORST = CHANNEL_PITCH - PATTERN_POSITION
 NEIGHBOUR_GAP = CHANNEL_PITCH - OD
-NEIGHBOUR_GAP_WORST = CHANNEL_PITCH - OD_MAX
+NEIGHBOUR_GAP_WORST = CENTRE_SPACING_WORST - OD_MAX
 
 if WALL_WORST < MIN_WALL:
     raise AssertionError(f"MHA-CH-014 wall {WALL_WORST:.3f} < {MIN_WALL}")

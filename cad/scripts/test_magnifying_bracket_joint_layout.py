@@ -220,8 +220,8 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
     )
     assert rib_wall_min == pytest.approx(3.41324, abs=1e-5)
     assert rib_wall_min >= 2.0
-    # The native spring frame is Ø0.30 RFS, not the older assessment's
-    # proposed Ø0.15 MMC. Separate X/Z extremes are conservative.
+    # The native spring frame is Ø0.15 RFS (code review C06), not MMC.
+    # Separate X/Z extremes are conservative.
     spring_position = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]) / 2.0
     spring_dx_min = (
         lever.HOLE_X - max(point[0] for point in joint.LEVER_HOLE_POINTS)
@@ -236,7 +236,7 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
     spring_web_min = (
         math.hypot(spring_dx_min, max(spring_dz_min, 0.0)) - thread_radius - spring_radius
     )
-    assert spring_web_min == pytest.approx(6.59530, abs=1e-5)
+    assert spring_web_min == pytest.approx(6.67030, abs=1e-5)
     assert spring_web_min >= 2.0
 
 

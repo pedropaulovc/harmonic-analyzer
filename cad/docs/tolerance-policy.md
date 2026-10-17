@@ -312,7 +312,7 @@ with no clearance scatter, so no linear allowable half-width exists for it.
 | rocker rod-pin radius | 0.10 mm | 0.009 | 0.04 | 0.08 | 0.57 | DRO/CNC hole position — a Ø0.20 position zone; both radial and tangential axes are drawn |
 | lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.71 | DRO/CNC hole position — a Ø0.20 position zone; both axes are drawn |
 | lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.95 | DRO/CNC hole position — a Ø0.20 position zone; the model draws both its axes (radial arm and tangential offset) |
-| summing hook position | 0.15 mm | 0.035 | 0.19 | 0.37 | 0.20 | ½ of the 0.30 pattern-position zone |
+| summing hook position | 0.075 mm | 0.017 | 0.09 | 0.18 | 0.20 | ½ of the Ø0.15 pattern-position zone (tightened from 0.30 so neighbouring MHA-CH-014 jam nuts clear) |
 | **spring rate** | **1.25 %** | **0.109** | **0.57** | **1.15** | 0.54 | **matched by measurement** — 60/80 mm inside-hook lengths; Ø2 mm pin centres at 58/78 mm; bin the 20 springs around their measured common mean |
 | spring initial tension | 0.27 N | ≈0 | ≈0 | ≈0 | ≈2.02×10⁸ N (linearized) | rounded bound on the catalog's ±0.06 lbf; record each force-curve intercept, not a machining tolerance |
 | cam phase | 0.25° | 0.038 | 0.21 | 0.23 | 0.33 | native `NotchPhase` dimension; the nominal 1.50° offset remains #749 |
@@ -320,7 +320,7 @@ with no clearance scatter, so no linear allowable half-width exists for it.
 | cone flat clock | 0.25° cone | 0.016 | 0.12 | 0.03 | 0.77° | native `BoreFlatClock` dimension; shaft flats share one clock, teeth indexed from each gear's flat in one setup; cam phase scales by T/120 |
 | cone flat play | 0.01–0.03 mm AF clearance | 0.075 | 0.38 | 0.53 | n/a | D-bore across-flat fit; phase = (clearance / lever) × T/120, the lever being the shortest flat half-chord MHA-DT-004 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on the torque corner; minus the Ø9.525-land lag removed by the crank index; per-land residual and per-channel variation remain |
 | station setting (setup) | 0.25 mm | 0.045 | 0.27 | 0.53 | 0.24 | interpolate the released stick; zero/travel-stop errors are one-sided and their mean bias is recorded. Scored at each input's pen-forced scale |
-| **all combined** | | **0.158** | **0.80** | **1.57** | | targets 0.30 / 1.5 / 2.0 |
+| **all combined** | | **0.155** | **0.78** | **1.53** | | targets 0.30 / 1.5 / 2.0 |
 
 The scatter calculation is below its broad-input and two-channel targets. This
 does not discharge the physical operating assumptions or the two waivers below.
@@ -369,7 +369,7 @@ does not discharge the physical operating assumptions or the two waivers below.
 | ordinate readout | ±0.075 mm reading uncertainty assumes a 0.15 mm technical-pen line; the CAD marker does not establish that performance. The pen gain runs on the **wire moment arm** — the knife axis's perpendicular distance to wire 1 — not the clamp's distance from the knife: the output fixture hooks the wire 10.0 mm on the knife side of the clamp and the wire leans toward the wheel, so the arm is 56.11 mm with the clamp against the collar (66.4 mm) and 166.87 mm at the as-built 165 mm (`error_budget.wire_moment_arm`, solved from `vn_lever_wire_geom`'s own run). Loaded spring stiffness and the CAD wheel ratio then give 1.865 mm per full-scale bar at the collar, or **≈8.04141 bars** of computed ordinate capacity; the conservative operating limit is **$P(f)\le8.04$**. The report's broad input scales are approximately 0.382 (all ones), 0.760 (half rectangle/lifted square) and 0.914 (Gaussian), all with the clamp at 66.4 mm; solve the table against the operating limit rather than using the rounded scales as settings. The sparse pair uses the built 165 mm station but reaches only 14.239 mm of the 15 mm half-stroke. Each coefficient carries its own reading error and the k=0 normalizer's; `closed_form.readout` evaluates both through the actual stroke fill | 0.255 % MAE | 0.30 |
 | timebase | stop the crank at 2k turns, repeatable to ±8° (uniform). Evaluate the shifted physical trace through the readout procedure, with the correction evaluated at the intended index; do not substitute the ideal Fourier-vector slope | 0.255 % FS | 0.30 |
 | knife-edge hysteresis | rolling-resistance length 0.005 mm at each case's **rest/preload force sum**. The heaviest broad cases, half rectangle and lifted square, each conservatively load the knife to 138.683 N and require 47.622 N counter force at 351.973 mm inside length; they also give the worst broad term. The configured neutral CAD case alone is 136.615 N / 46.912 N; it is not a universal preload. The conservative numerator sums force magnitudes and the report also gives the smaller resolved vertical load. The stall denominator remains the neutral small-signal loaded lift response, not a station-exact or cycle-peak transfer. Broad-input result is 0.166%, sparse pair 0.625%. Confirm gravity, operating loads, contact material/finish and reversal trace width before treating this allowance as demonstrated hardware performance | 0.166 % FS | 0.45 |
-| **total** | residual + RSS(scatter 0.158, readout, timebase, knife), under the stated assumptions | **0.434 % MAE** (as-built cam phase: **0.730 — over the benchmark**) | **0.7 benchmark** |
+| **total** | residual + RSS(scatter 0.155, readout, timebase, knife), under the stated assumptions | **0.434 % MAE** (as-built cam phase: **0.730 — over the benchmark**) | **0.7 benchmark** |
 | **two-channel worst coefficient** | all sources drawn jointly through the sparse-pair readout. The gate compares the expected largest coefficient error, not an ensemble quantile, with the historical benchmark | **1.542 %** (p50 1.514, p90 1.993, **p99 2.383**; 9.675% of draws exceed 2%; conservative per-source envelope 2.110) | **2.0 benchmark** |
 
 `check:budget` fails if a scored term or total overruns its allowance. Readout and
@@ -387,7 +387,7 @@ root-sum-square, the systematic residual adds):
 flowchart TB
     subgraph rss["independent terms, RSS = 0.427"]
         direction LR
-        s["part scatter<br/>(Monte Carlo)<br/><b>0.158</b> / 0.30"]
+        s["part scatter<br/>(Monte Carlo)<br/><b>0.155</b> / 0.30"]
         r["ordinate readout<br/><b>0.255</b> / 0.30"]
         t["timebase<br/>(crank index)<br/><b>0.255</b> / 0.30"]
         k["knife hysteresis<br/>(worst broad rest load)<br/><b>0.166</b> / 0.45"]
