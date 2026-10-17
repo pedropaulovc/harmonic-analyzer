@@ -256,7 +256,15 @@ def test_hub_width_callout_names_the_fit_up_step_that_takes_up_the_stack() -> No
     printed = " ".join(channel_sheet.FITUP_STEPS.split())
     step = printed.split(f" {number}. ", 1)[1].split(f" {number + 1}. ", 1)[0]
     assert "RE-FACE A LONG STACK" in step
-    assert f"{bank.STACK_L20_ACCEPT[0]:.2f} TO {bank.STACK_L20_ACCEPT[1]:.2f}" in step
+    # The MHA-CH-000 fitter package prints the acceptance band on the rocker
+    # bank view's native stack dimension (drawing policy: no limits in note
+    # text), so the step names that dimension and the dimension carries
+    # STACK_L20_ACCEPT.
+    asm = channel_sheet.asm
+    assert "TO THE ROCKER BANK VIEW'S STACK DIMENSION" in step
+    lower, upper = asm.DIMENSION_TOLERANCES[asm.STACK_LENGTH_DIMENSION]
+    nominal = asm.PIVOT_CHAIN_Z[3] - asm.PIVOT_CHAIN_Z[2]
+    assert (nominal + lower, nominal + upper) == pytest.approx(bank.STACK_L20_ACCEPT)
 
 
 def test_native_gdt_and_finish_present() -> None:
