@@ -17,8 +17,8 @@ least ``INSET_MM`` from a corner):
   exactly);
 * the zone, into the material: d in [-U, t - U] (t, U the printed frame's);
 * the arm reads o = tau - d, so the zone is o in [tau - (t - U), tau + U];
-* the guard g(Q) = the template's clocking_error at Q (its +/-0.03 profile
-  acceptance plus the pins' registration) + the DTI's resolution;
+* the guard g(Q) = the template's clocking_error at Q (half its printed
+  surface profile, ``OUTLINE_PROFILE_ZONE``, plus the pins' registration) + the DTI's resolution;
 * accept: o in [max(tau - (t - U) + g), min(tau + U - g)], rounded inward to
   0.01; reject: o outside [min(tau - (t - U) - g), max(tau + U + g)], rounded
   outward; between them (or off the dial) the reading is indeterminate.
@@ -225,9 +225,9 @@ def method_steps() -> list[str]:
         f"dial either way, the station is indeterminate: re-check on a CMM. The profile is accepted only when "
         f"every station accepts.",
         f"AUTHOR'S CHOICE guard (ch_rocker_arm_profile_check): each window is the zone, offset by where the "
-        f"template's edge sits in it, shrunk at every point by the template's clocking_error (its own "
-        f"{template.DTI_ACCEPTANCE:g} mm profile acceptance plus the pins' registration, at most "
-        f"{template.ROD_CLOCKING_WORST:.3f} mm) and the DTI's {DTI_RESOLUTION_MM:.4f} mm resolution, rounded "
-        f"inward to 0.01 mm. The template's acceptance and the pin plays are #1413 placeholders, not a "
-        f"calibration; remeasure them before shop acceptance.",
+        f"template's edge sits in it, shrunk at every point by the template's clocking_error (half its own "
+        f"{template.OUTLINE_PROFILE_ZONE:g} mm surface profile to {'|'.join(template.OUTLINE_PROFILE_DATUMS)}, "
+        f"plus the pins' registration, at most {template.ROD_CLOCKING_WORST:.3f} mm) and the DTI's "
+        f"{DTI_RESOLUTION_MM:.4f} mm resolution, rounded inward to 0.01 mm. The pin plays are #1413 placeholders, "
+        f"not a calibration; remeasure them before shop acceptance.",
     ]

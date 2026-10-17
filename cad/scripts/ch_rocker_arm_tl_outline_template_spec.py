@@ -30,7 +30,7 @@ import math
 import _config
 import ch_rocker_arm_spec as rocker
 from _hole_spec import blind_cut_dia_mm
-from _printed_tolerance import printed_band_mm, printed_deviations
+from _printed_tolerance import printed_band_mm
 
 R_TOP = rocker.R_TOP
 R_BOTTOM = rocker.R_BOTTOM
@@ -68,13 +68,18 @@ if (
 
 # Receipt acceptance (inventory gauges.rocker-profile-gauge, Pedro 2026-10-11):
 # DTI stations within +/-0.03 of nominal, taken about the pivot hole and the
-# rod slot (below) with pins in both.
-DTI_ACCEPTANCE = 0.03
-# The sheet fixes each arc by its low point on the mirror line, measured from
-# the pin gauge in the hole, and prints its radius at the title block's .XX
-# band. The centre sits on the pivot centreline, so the low point and the
-# radius pin the whole arc; the end stations below check that the radius
-# band, carried out to the arc ends, stays inside DTI_ACCEPTANCE.
+# rod slot (below) with pins in both. The sheet prints it as one bilateral
+# surface profile all around the outline, to the pivot hole (datum A) and the
+# rod slot (datum C): this constant is the one source of both numbers.
+PIVOT_DATUM = "A"
+ROD_SLOT_DATUM = "C"
+OUTLINE_PROFILE_ZONE = 0.06
+OUTLINE_PROFILE_DATUMS = (PIVOT_DATUM, ROD_SLOT_DATUM)
+DTI_ACCEPTANCE = OUTLINE_PROFILE_ZONE / 2.0
+# The sheet also fixes each arc by its low point on the mirror line, measured
+# from the pin gauge in the hole; the radii print BASIC, about a centre on the
+# pivot centreline, so the profile alone bounds the arcs between the low
+# point and their ends.
 LOW_POINT_BAND = (0.02, -0.02)
 APEX_PLACES = 2
 RADIUS_PLACES = 2
@@ -196,22 +201,6 @@ def _taper_meets_bottom_arc() -> float:
 BOT_END_X = round(_taper_meets_bottom_arc(), END_PLACES)  # 132.636
 ALPHA_BOT = math.asin(BOT_END_X / R_BOTTOM)
 BOT_END_Y = CENTER_Y - R_BOTTOM * math.cos(ALPHA_BOT)  # 3.102
-# With the centre on the pivot centreline and the low point held, a radius
-# error dR moves the edge at station x by dR x^2 / (2 R^2): at the end
-# stations that drift plus the low-point band stays inside the DTI acceptance.
-END_STATION_DRIFT: dict[str, float] = {}
-for _name, _radius, _station in (
-    ("top", R_TOP, TOP_END_X),
-    ("bottom", R_BOTTOM, BOT_END_X),
-):
-    _lower, _upper = printed_deviations(_radius, RADIUS_PLACES)
-    END_STATION_DRIFT[_name] = (
-        max(-_lower, _upper) * _station**2 / (2.0 * _radius**2)
-    )  # top 0.0084, bottom 0.0067
-    if END_STATION_DRIFT[_name] + LOW_POINT_BAND[0] > DTI_ACCEPTANCE + 1e-9:
-        raise AssertionError(
-            f"title-block {_name} radius band carries the arc end outside the DTI acceptance"
-        )
 
 
 # The arcs' one residual: R800/R816 about CENTER_Y are _MID_ZONE toward the
@@ -230,10 +219,11 @@ ARC_MID_ZONE_RESIDUAL = {
     "bottom": arc_mid_zone_residual(R_BOTTOM, BOT_END_X),  # 0.0033
 }
 for _name, _residual in ARC_MID_ZONE_RESIDUAL.items():
-    if not 0.0 <= _residual <= END_STATION_DRIFT[_name] + 1e-9:
-        raise AssertionError(
-            f"the {_name} arc's mid-zone residual exceeds its budgeted end drift"
-        )
+    if _residual < 0.0:
+        raise AssertionError(f"the {_name} arc falls past mid-zone off the mirror line")
+# The low point's band is a refinement inside the profile at one point.
+if max(LOW_POINT_BAND[0], -LOW_POINT_BAND[1]) > DTI_ACCEPTANCE:
+    raise AssertionError("the low-point band is looser than the outline profile")
 # The end stations print at three places: their band is about a quarter of
 # the rocker's own two-place band on the same ends.
 if printed_band_mm(END_PLACES) > 0.26 * printed_band_mm(2):
@@ -265,12 +255,13 @@ if PIN_GAUGE_MAX >= PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]:
     raise AssertionError("pin gauge does not enter the template hole")
 if PIN_GAUGE_MAX >= _ROCKER_BORE_LOW:
     raise AssertionError("pin gauge does not enter the rocker's pivot bore")
-# Two budgets. The low-point band holds the template's own edges about its
-# hole (the DTI record checks them against DTI_ACCEPTANCE). Laid on the arm,
-# the pin's worst-case play in both bores (each at its largest, the pin at its
-# smallest) moves the edges further: low-point band plus that registration
-# stays inside the quarter of the rocker's arc zone the gauge may spend,
-# centred on the aim (0.02 + 0.0262 = 0.0462 <= 0.0625).
+# Two budgets. The outline profile holds the template's own edges within
+# DTI_ACCEPTANCE of nominal about its hole and slot (the DTI record checks
+# them). Laid on the arm, the pin's worst-case play in both bores (each at its
+# largest, the pin at its smallest) moves the edges further: the profile's
+# half-zone, the arcs' mid-zone residual and that registration stay inside the
+# quarter of the rocker's arc zone the gauge may spend, centred on the aim
+# (0.03 + 0.0041 + 0.0262 = 0.0603 <= 0.0625).
 LOCATOR_REGISTRATION_MAX = (
     math.ceil(
         1e4
@@ -282,9 +273,12 @@ LOCATOR_REGISTRATION_MAX = (
     / 1e4
 )  # 0.0262 = 0.0094 template + 0.0169 rocker, rounded up
 # The aim spends a quarter of the zone (_ROCKER_ZONE, above) at most.
-if LOW_POINT_BAND[0] + LOCATOR_REGISTRATION_MAX > 0.25 * _ROCKER_ZONE / 2.0 + 1e-9:
+if (
+    DTI_ACCEPTANCE + max(ARC_MID_ZONE_RESIDUAL.values()) + LOCATOR_REGISTRATION_MAX
+    > 0.25 * _ROCKER_ZONE / 2.0 + 1e-9
+):
     raise AssertionError(
-        "pin-gauge play in both bores plus the low-point band spends more than a"
+        "pin-gauge play in both bores plus the outline profile spends more than a"
         " quarter of the rocker zone"
     )
 
@@ -487,7 +481,7 @@ if ROD_CLOCKING_WORST > END_STATION_SHARE + 1e-9:
 
 def _rod_slot_web() -> float:
     """drawing-guidelines.md rule 17 (walls and webs): the web between the rod
-    slot, at its widest and longest, and the outline at its low-point band.
+    slot, at its widest and longest, and the outline at its profile's limit.
     The slot's core segment never crosses an outline segment, so their
     distance is the least of the four end-to-segment distances."""
     outer, inner = rod_slot_points(
@@ -503,7 +497,7 @@ def _rod_slot_web() -> float:
         )
         for a, b in zip(points, points[1:] + points[:1], strict=True)
     )
-    return core - ROD_SLOT_WIDTH_MAX / 2.0 - max(-LOW_POINT_BAND[1], LOW_POINT_BAND[0])
+    return core - ROD_SLOT_WIDTH_MAX / 2.0 - DTI_ACCEPTANCE
 
 
 ROD_SLOT_WEB_MIN = round(_rod_slot_web(), 4)
@@ -574,7 +568,10 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 }
 # The rod slot's station is BASIC (the rocker's datum C, at its BASIC
 # station); its width is the reference nominal of a matched fit on its pin.
+# Both radii are BASIC: the outline profile is their tolerance.
 BASIC_DIMENSIONS: tuple[tuple[str, str], ...] = (
+    ("OutlineProfile", "TopRadius"),
+    ("OutlineProfile", "BottomRadius"),
     ("RodSlotReference", "RodSlotX"),
     ("RodSlotReference", "RodSlotY"),
 )

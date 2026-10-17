@@ -1,11 +1,13 @@
 r"""Create the drawing for the rocker arm's outline template (MHA-CH-006-TL-13).
 
 The face view (``*Front``, 1:1) carries the whole outline from the pivot
-hole: both apex heights on the mirror line, both radii, the arc-end stations
-and the tip lands, plus the rod slot's BASIC station; a cropped 5:1 *Front
-detail carries the rod slot's width (a matched fit on its pin gauge) and run;
-the right-side edge view carries the plate thickness; a shaded isometric at
-1:4 sits above.
+hole: both apex heights on the mirror line, both BASIC radii, the arc-end
+stations and the tip lands, plus the rod slot's BASIC station; datum A on the
+pivot hole, datum C on the rod slot and one surface profile all around the
+outline to A|C (``OUTLINE_PROFILE_ZONE``); a cropped 5:1 *Front detail
+carries the rod slot's width (a matched fit on its pin gauge) and run; the
+right-side edge view carries the plate thickness; a shaded isometric at 1:4
+sits above.
 """
 
 from __future__ import annotations
@@ -42,10 +44,12 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
+from _gear_drawing_entities import visible_circle_edge
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -59,10 +63,14 @@ from ch_rocker_arm_tl_outline_template_spec import (
     DETAIL_SCALE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    OUTLINE_PROFILE_DATUMS,
+    OUTLINE_PROFILE_ZONE,
     PIVOT_CALLOUT,
+    PIVOT_DATUM,
     PROFILE_CALLOUT,
     REFERENCE_DIMENSIONS,
     ROD_SLOT_CALLOUT,
+    ROD_SLOT_DATUM,
     ROD_SLOT_FLAT_CALLOUT,
     ROD_SLOT_STATION_CALLOUT,
     SHARP_EDGE_CALLOUT,
@@ -96,7 +104,8 @@ DETAIL_CENTER = (0.075, 0.040)
 DETAIL_RADIUS_MM = 3.0
 DETAIL_RATIO = DETAIL_SCALE[0] / DETAIL_SCALE[1]
 DETAIL_CROP_RADIUS = DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0
-DETAIL_LETTER = "A"
+# Not A or C: those letters are the sheet's datums.
+DETAIL_LETTER = "D"
 # A model view has no native label the API can show, so the label is a note
 # the view owns, in the native detail label's words, anchored at its top
 # centre: right of the width's dimension line, under its callout.
@@ -158,7 +167,7 @@ RIGHT_KEEP = {"Thick": (0.370, 0.140)}
 # lands run radially from those centres.  Each scribing edge carries its
 # SHARP requirement and each apex height the rocker edge it sets.  SOLIDWORKS
 # centres each apex block on its position, so the extra line grows it upward:
-# the positions sit low enough that each +0.03 keeps its single-line height,
+# the positions sit low enough that each stacked band keeps its height,
 # clear of the bottom arc and the 144.951 line.
 CALLOUTS_BELOW = {
     "TopRadius": f"{ARC_CENTER_CALLOUT}\n{SHARP_EDGE_CALLOUT}",
@@ -190,17 +199,67 @@ CALLOUTS_ABOVE = {
     "TailTipLen": "RADIAL, SHARP",
     "RodTipLen": "RADIAL, SHARP",
 }
+# The outline's surface profile, all around, to A|C. Its leader lands on the
+# top arc's tail half (PROFILE_LANDING_X_MM off the mirror line) and the
+# frame stands above the arc, right of the tail tip's block and under the
+# 144.951 station line.
+PROFILE_LANDING_X_MM = -70.0
+PROFILE_FRAME_XY = (0.080, 0.192)
+# Datum A: on the pivot hole's upper-left rim, its tag up and left over the
+# plate, clear of the apex heights' witness lines (right) and the R800 block.
+PIVOT_DATUM_PICK_DEG = 135.0
+PIVOT_DATUM_OFFSET = (-0.012, 0.022)
+# Datum C: on the rod slot's outboard round end, its tag above the plate,
+# inboard of the rod tip's land block.
+ROD_SLOT_DATUM_PICK_DEG = 45.0
+ROD_SLOT_DATUM_OFFSET = (-0.004, 0.022)
 
 _Z = [0.0, 0.0, 1.0]
 _PRECISION = DRAWING_PRECISION_BY_NAME
 
-part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
+part_metadata(
+    precision_sources=("DRAWING_PRECISION_BY_NAME",),
+    datums={
+        PIVOT_DATUM: (
+            {"feature": "pivot_hole", "surface": "pivot hole"},
+            ("PIVOT_DATUM", ("draw_ch_rocker_arm_tl_outline_template", "_add_datums")),
+        ),
+        ROD_SLOT_DATUM: (
+            {"feature": "rod_slot", "surface": "rod slot"},
+            (
+                "ROD_SLOT_DATUM",
+                ("draw_ch_rocker_arm_tl_outline_template", "_add_datums"),
+            ),
+        ),
+    },
+)
+
+# The outline's one profile frame, all around, as its own printed strings.
+OUTLINE_PROFILE_TEXT = f"{OUTLINE_PROFILE_ZONE:.2f}"
+_PROFILE_SOURCES = (
+    "OUTLINE_PROFILE_ZONE",
+    ("draw_ch_rocker_arm_tl_outline_template", "_add_outline_profile"),
+)
+
+
+def _profile_zone(governs: dict[str, str]) -> dict[str, tuple[Any, tuple[Any, ...]]]:
+    """The all-around frame's zone and datums; ``governs`` names this
+    feature's own BASICs and the way added material moves each."""
+    return {
+        "surface_profile": (OUTLINE_PROFILE_ZONE, _PROFILE_SOURCES),
+        "surface_profile_datums": (
+            list(OUTLINE_PROFILE_DATUMS),
+            ("OUTLINE_PROFILE_DATUMS", _PROFILE_SOURCES[1]),
+        ),
+        "surface_profile_governs": (governs, ("BASIC_DIMENSIONS",)),
+    }
+
 
 requirement(
     "top_edge",
     kind="profile",
     faces=(CylinderFace(2.0 * part_spec.R_TOP),),
-    requirements=("height_above_pivot", "radius", "station"),
+    requirements=("height_above_pivot", "radius", "station", "surface_profile"),
     fields={
         "height_above_pivot": (
             limits(
@@ -219,7 +278,11 @@ requirement(
             "pivot_hole",
             (("draw_ch_rocker_arm_tl_outline_template", "build"),),
         ),
-        "radius": (limits(part_spec.R_TOP, _PRECISION["TopRadius"]), ("R_TOP",)),
+        # BASIC: the outline profile is the radius's tolerance.
+        "radius": (part_spec.R_TOP, ("R_TOP", "BASIC_DIMENSIONS")),
+        "dimension_type": ("basic", ("BASIC_DIMENSIONS",)),
+        # Material added on the top edge moves it toward the arcs' centre.
+        **_profile_zone({"radius": "decreases"}),
         "radius_nominal": (part_spec.R_TOP, ("R_TOP",)),
         "arc_centre": ([0.0, part_spec.CENTER_Y, 0.0], ("CENTER_Y",)),
         "station": (
@@ -247,7 +310,7 @@ requirement(
     "bottom_edge",
     kind="profile",
     faces=(CylinderFace(2.0 * part_spec.R_BOTTOM),),
-    requirements=("depth", "radius", "station"),
+    requirements=("depth", "radius", "station", "surface_profile"),
     fields={
         # The bottom apex's depth below the pivot, on the mirror line.
         "depth": (
@@ -266,10 +329,10 @@ requirement(
             "pivot_hole",
             (("draw_ch_rocker_arm_tl_outline_template", "build"),),
         ),
-        "radius": (
-            limits(part_spec.R_BOTTOM, _PRECISION["BottomRadius"]),
-            ("R_BOTTOM",),
-        ),
+        "radius": (part_spec.R_BOTTOM, ("R_BOTTOM", "BASIC_DIMENSIONS")),
+        "dimension_type": ("basic", ("BASIC_DIMENSIONS",)),
+        # Material added on the bottom edge moves it away from the centre.
+        **_profile_zone({"radius": "increases"}),
         "radius_nominal": (part_spec.R_BOTTOM, ("R_BOTTOM",)),
         "arc_centre": ([0.0, part_spec.CENTER_Y, 0.0], ("CENTER_Y",)),
         "station": (
@@ -300,6 +363,7 @@ requirement(
     requirements=("dia", "thru"),
     fields={
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "datum": (PIVOT_DATUM, ("PIVOT_DATUM",)),
         "axis": (_Z, ("__frame__",)),
         "dia": (
             limits(
@@ -339,6 +403,7 @@ requirement(
             ("ROD_SLOT_X", "ROD_SLOT_Y"),
         ),
         "axis": (_Z, ("__frame__",)),
+        "datum": (ROD_SLOT_DATUM, ("ROD_SLOT_DATUM",)),
         "end": (
             [_ROD_SLOT_OUTER[0], _ROD_SLOT_OUTER[1], 0.0],
             ("ROD_SLOT_AXIS", "ROD_SLOT_FLAT"),
@@ -375,7 +440,7 @@ for _side, _sign in (("rod", 1.0), ("tail", -1.0)):
                 part_spec.CENTER_Y * math.sin(part_spec.ALPHA_TOP),
             ),
         ),
-        requirements=("length",),
+        requirements=("length", "surface_profile"),
         fields={
             "length": (
                 limits(part_spec.TIP_FACE, _PRECISION["RodTipLen"]),
@@ -387,6 +452,8 @@ for _side, _sign in (("rod", 1.0), ("tail", -1.0)):
                 [_sign * part_spec.TIP_X, part_spec.TIP_Y, 0.0],
                 ("TIP_X", "TIP_Y"),
             ),
+            # The land's length is toleranced: the zone governs no BASIC here.
+            **_profile_zone({}),
         },
         precision={"length": _PRECISION["RodTipLen"]},
     )
@@ -494,6 +561,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # the face view's own sketch is near its import.
     mark = _mark_rod_slot_on_front(adapter, front)
     _label_rod_slot_detail(adapter, detail, front, mark)
+    _add_datums(adapter, front)
+    _add_outline_profile(adapter, front)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
@@ -802,6 +871,98 @@ def _label_rod_slot_detail(
         center_x=mark[0] + PARENT_LETTER_OFFSET[0],
         center_y=mark[1] + PARENT_LETTER_OFFSET[1],
         label="rod-slot-detail letter",
+    )
+
+
+def _rim_point(
+    centre: tuple[float, float], axis: tuple[float, float], radius: float, deg: float
+) -> tuple[float, float, float]:
+    """Model point (m) on a round rim of ``radius`` (mm) about ``centre`` (mm),
+    ``deg`` from ``axis`` toward its left-hand normal, on the face laid on the arm."""
+    a = math.radians(deg)
+    normal = (-axis[1], axis[0])
+    return (
+        (centre[0] + radius * (math.cos(a) * axis[0] + math.sin(a) * normal[0]))
+        / 1000.0,
+        (centre[1] + radius * (math.cos(a) * axis[1] + math.sin(a) * normal[1]))
+        / 1000.0,
+        0.0,
+    )
+
+
+def _add_datums(adapter: Any, front: Any) -> None:
+    """Datum A on the pivot hole and datum C on the rod slot, each picked on
+    its own rim by sheet point (an edge-object tag ignores SetPosition2)."""
+    pivot = model_point_in_view(adapter, front, (0.0, 0.0, 0.0), label="datum A centre")
+    pick = model_point_in_view(
+        adapter,
+        front,
+        _rim_point(
+            (0.0, 0.0), (1.0, 0.0), part_spec.PIVOT_HOLE_DIA / 2.0, PIVOT_DATUM_PICK_DEG
+        ),
+        label="datum A rim",
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=pick,
+        symbol_xy=(pivot[0] + PIVOT_DATUM_OFFSET[0], pivot[1] + PIVOT_DATUM_OFFSET[1]),
+        datum=PIVOT_DATUM,
+        label="pivot hole datum feature",
+        shoulder=True,
+    )
+    slot = model_point_in_view(
+        adapter, front, _ROD_SLOT_CENTRE_M, label="datum C centre"
+    )
+    pick = model_point_in_view(
+        adapter,
+        front,
+        _rim_point(
+            _ROD_SLOT_OUTER,
+            part_spec.ROD_SLOT_AXIS,
+            part_spec.ROD_SLOT_WIDTH / 2.0,
+            ROD_SLOT_DATUM_PICK_DEG,
+        ),
+        label="datum C rim",
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=pick,
+        symbol_xy=(
+            slot[0] + ROD_SLOT_DATUM_OFFSET[0],
+            slot[1] + ROD_SLOT_DATUM_OFFSET[1],
+        ),
+        datum=ROD_SLOT_DATUM,
+        label="rod slot datum feature",
+        shoulder=True,
+    )
+
+
+def _add_outline_profile(adapter: Any, front: Any) -> Any:
+    """One native surface-profile frame, all around the outline, to A|C."""
+    x = PROFILE_LANDING_X_MM
+    landing = model_point_in_view(
+        adapter,
+        front,
+        (
+            x / 1000.0,
+            (part_spec.CENTER_Y - math.sqrt(part_spec.R_TOP**2 - x**2)) / 1000.0,
+            0.0,
+        ),
+        label="outline profile landing",
+    )
+    return add_feature_control_frame(
+        adapter,
+        front,
+        edge_entity=visible_circle_edge(adapter, front, 2.0 * part_spec.R_TOP),
+        leader_attach_xy=landing,
+        frame_xy=PROFILE_FRAME_XY,
+        characteristic="profile_surface",
+        tolerance=OUTLINE_PROFILE_TEXT,
+        datums=OUTLINE_PROFILE_DATUMS,
+        all_around=True,
+        label="outline surface profile",
     )
 
 

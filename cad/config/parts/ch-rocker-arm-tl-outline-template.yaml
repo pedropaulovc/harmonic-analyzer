@@ -12,5 +12,5 @@ ch-rocker-arm-tl-outline-template:
     - id: "TL-01"
       kind: "accept"
       where: "the rod slot station, BASIC 133.067 and 8.456 from the pivot centreline"
-      finding: "basic dimensions with no feature-control frame (rule 5)"
-      reason: "the slot clocks the gauge: it is laid on the rocker with pin gauges in its pivot hole and this slot, and its receipt acceptance (inventory rocker-profile-gauge: DTI stations within 0.03) is taken with pins in both, so the station has no band of its own; a title-block +/-0.13 across the slot would rotate the outline by up to 2.08 x 0.13 at the tail end and break the 0.16 gauge share of the rocker zone (#1545 option 4)"
+      finding: "basic dimensions with no position frame of their own (rule 5)"
+      reason: "the slot is datum C: the gauge is laid on the rocker with pin gauges in its pivot hole (datum A) and this slot, and the outline's surface profile is to A|C, so the station from A to C sets the profile's datum frame and has no band of its own; a title-block +/-0.13 across the slot would rotate the outline by up to 2.08 x 0.13 at the tail end and break the 0.16 gauge share of the rocker zone (#1545 option 4)"
