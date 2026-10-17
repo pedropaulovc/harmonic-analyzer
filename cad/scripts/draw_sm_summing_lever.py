@@ -108,6 +108,7 @@ from sm_summing_lever_spec import (
     GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
     HEX_H,
+    HEX_W,
     HOLE_COUNT,
     HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
@@ -1370,8 +1371,9 @@ TOP_KEEP = {
     "SummationArcRadius": (0.2096, 0.162),
     # Left of the -Z stub, under the 20X frame, its text centred on its line:
     # 2.8 mm left of the stub (at x 0.226 it touched datum A's old arrow, r6), its
-    # lower arrow 2.5 mm right of the R138.85.
-    "HexKnifeBackDepth": (0.2235, 0.1735),
+    # lower arrow 2.5 mm right of the R138.85.  Both stubs are one prism, so the
+    # stub's length is the hidden KnifeStubReference's, along its -X side.
+    "KnifeStubLength": (0.2235, 0.1735),
     # Left of the +Z end rib, above its span: below it the finish symbol and
     # the 76.20/39.85 row leave no room, and the web's lower arc reaches the
     # cylinder at x 0.226 there.  The text spans x 0.1979..0.2095, right of
@@ -1605,7 +1607,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # (_ridge_datum).  One sweep of the plan's visible edges serves every
     # named pick below.  The ridge is the hexagon's top vertex line, y =
     # HEX_H/2 (vertex-up sketch centred on the pivot axis,
-    # build_summing_lever._hex_collar), rounded at R0.1 MAX: the plan shows
+    # build_sm_summing_lever._hex_knife), rounded at R0.1 MAX: the plan shows
     # the round's two tangent lines 0.05 sheet mm either side of it, and the
     # finish names the +X one (the edge of the upper-right face it controls)
     # by entity.  A SolidWorks Top view reverses model Z on the sheet: the
