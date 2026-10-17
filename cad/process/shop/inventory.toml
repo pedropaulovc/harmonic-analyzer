@@ -3544,6 +3544,82 @@ cite = ["McMaster-Carr 91595A452 https://www.mcmaster.com/91595A452/ read live 2
 # Supersedes AndyMark am-1501 under the same McMaster sourcing preference;
 # not a claim that the prior unclassed pin failed its application.
 
+# Trammel hand-feed purchases: catalogue candidates, not possession or fit proof.
+# Matched Tr8x2 screw/nut and direct-fit wheel avoid turned journals and hub boring.
+[fixtures.trammel-tr8-leadscrew]
+kind = "lead_screw"
+make = "Ooznest"
+sku = "LS-TR8-2-2P-CTS"
+source = "https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/"
+present = false
+verify = true
+purchase = "1 x Ooznest LS-TR8-2-2P-CTS cut to 500 mm, Tr8x2 single-start screw; UK-based vendor shipping to the US, shipping cost and delivery time require checkout confirmation."
+note = "Read live 2026-10-16: A2 stainless steel, nominal diameter 8 mm, pitch 2 mm, lead 2 mm/revolution, one start; cut-to-size range 100-2000 mm, length tolerance +/-0.5 mm, ends manually deburred with a small chamfer. Fully threaded ends, not supplied with turned 8 mm journals. Thread hand is not explicitly stated; use the matching Ooznest nut, do not infer a hand specification. Selected 500 mm total length follows the jig's provisional 480-500 mm layout allowance; final block positions and usable travel require layout/receipt verification."
+cite = ["Ooznest LS-TR8-2-2P-CTS https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/ read live 2026-10-16: 8 mm, single start, pitch/lead 2 mm, cut 500 +/-0.5 mm", "Ooznest screw drawing https://ooznest.co.uk/wp-content/uploads/2026/09/TR8x2-2P-Lead-Screw-8mm-Dia-2mm-Lead-2mm-Pitch-Cut-To-Size_drawing.png"]
+# McMaster alternatives considered, not chosen: M8 pitch 2 / lead 4 screws
+# 97783A170/97783A180 are only 200/300 mm; too short for the ~500 mm layout.
+# McMaster 2391N25 is 500 mm but pitch 2.5 / lead 10, unnecessarily coarse
+# compared with the available no-journal-machining Ooznest lead-2 matched pair.
+# https://www.mcmaster.com/97783A170/ https://www.mcmaster.com/97783A180/
+# https://www.mcmaster.com/2391N25/
+# McMaster M8 pitch/lead 1.5 screws 7549K55/7549K56/7549K57 are only
+# 100/200/300 mm. M10x2 screw 7549K72 (500 mm) with nut 7549K16 would
+# require changing shaft diameter/turning journals: rejected by Main as needless
+# machining when the matched 8 mm Ooznest pair is available.
+# https://www.mcmaster.com/7549K55/ https://www.mcmaster.com/7549K56/
+# https://www.mcmaster.com/7549K57/ https://www.mcmaster.com/7549K72/
+# https://www.mcmaster.com/7549K16/
+
+[fixtures.trammel-tr8-flange-nut]
+kind = "lead_screw_nut"
+make = "Ooznest"
+sku = "LSRFN-TR8-2-2P-B"
+source = "https://ooznest.co.uk/product/tr8x2-2p-lead-screw-round-flanged-nut-brass/"
+present = false
+verify = true
+purchase = "1 x Ooznest LSRFN-TR8-2-2P-B brass round-flanged nut matching the Ooznest Tr8x2 screw; UK-based vendor shipping to the US, confirm shipping at checkout."
+note = "Read live page/drawing 2026-10-16: brass, 8 mm thread diameter, pitch 2 mm, lead 2 mm/revolution, one start. Flange OD 22 mm, thickness 3.5 mm; body OD 10 mm; four 3.5 mm through holes on 16.1 mm bolt circle, shown at 45-degree quadrants. Body projects 10 mm above and 1.5 mm below the flange, giving total axial length 15 mm. Mounting holes are not threaded. Thread hand, backlash and dimensional tolerances are not published; this is catalogue geometry, not measured fit or backlash acceptance."
+# Vendor requires lubrication; published thread hand/backlash remain unspecified.
+cite = ["Ooznest LSRFN-TR8-2-2P-B https://ooznest.co.uk/product/tr8x2-2p-lead-screw-round-flanged-nut-brass/ live page and dimensioned drawing read 2026-10-16", "Ooznest nut drawing https://ooznest.co.uk/wp-content/uploads/2026/09/TR8x2-2P-Lead-Screw-Round-Flanged-Nut-8mm-Dia-2mm-Lead-2mm-Pitch-Brass_drawing.png"]
+# McMaster matching M8 lead-4 flanged nut 97783A270 is acetal (acceptable),
+# but its matching stocked screws are too short; material is not a rejection.
+# https://www.mcmaster.com/97783A270/
+
+[fixtures.trammel-kp08-blocks]
+kind = "pillow_block_bearing"
+make = "AMPEC"
+sku = "KP08"
+source = "https://bearingsdirect.com/8mm-bore-kp08-mini-zinc-pillow-set-screw-block-bearing-kp8uu/"
+present = false
+verify = true
+purchase = "2 x AMPEC KP08 from Bearings Direct, $9.18 each on the live listing; possession unconfirmed."
+note = "Read live 2026-10-16: 8 mm bore rotary insert ball bearing in mini zinc pillow housing; shaft axis height 15 mm, mounting bolt spacing 42 mm, overall length 55 mm and height 29 mm. Two inner-ring set screws 120 degrees apart provide shaft locking; not a press-fit-only bearing. Vendor does not publish bolt-hole diameter or axial housing/inner-ring width: verify these on receipt, do not copy another maker's KP08 drawing. Main directs M4 mounting screws at 42 mm spacing. Catalogue gives 3500 rpm and 292/742 lbf static/dynamic load, but no axial-load or endplay rating; assembled bidirectional axial location is not proven by this listing. Check screw crest passage, locking and physical fit before use; no turned journals are specified by this sourcing entry."
+cite = ["Bearings Direct / AMPEC KP08 https://bearingsdirect.com/8mm-bore-kp08-mini-zinc-pillow-set-screw-block-bearing-kp8uu/ read live 2026-10-16: 8 mm bore, axis 15 mm, bolt spacing 42 mm, length 55 mm, height 29 mm, two set screws"]
+# Rejected McMaster 4491N33 and 8600N13: 8 mm rotary base-mount bearings,
+# but press-fit shaft mounting would require a turned journal on the rolled
+# screw, and does not supply the requested set-screw end locking.
+# https://www.mcmaster.com/4491N33/ https://www.mcmaster.com/8600N13/
+# Ooznest's live KP08 product search returned no matching products; no stable
+# Ooznest KP08 SKU/drawing was verified. Other makers' KP08 hole/width values
+# are deliberately not transferred to AMPEC.
+
+[fixtures.trammel-handwheel]
+kind = "handwheel"
+make = "Ooznest"
+sku = "HW-8"
+source = "https://ooznest.co.uk/product/8mm-handwheel/"
+present = false
+verify = true
+purchase = "1 x Ooznest HW-8, includes two M4 x 4 mm grub screws; live price GBP 13.74 including VAT, UK-based vendor shipping to the US; checkout tax/shipping may differ."
+note = "Read live page/drawing 2026-10-16: black-anodised 6061-T6 aluminium, wheel OD 40 mm x 12 mm axial thickness; hub OD 25 mm projects 13 mm behind the wheel. Blind 8 mm bore has 18 mm cylindrical depth from the hub end, with drill point beyond; not a through bore. Two radial M4 x 0.7 set-screw holes 90 degrees apart, axial centres 6.5 mm from rear hub end; includes two M4 x 4 grub screws. Handle max OD 9.6 mm projects 19 mm forward, giving calculated total axial envelope 44 mm (13+12+19); add hand clearance. Vendor explicitly permits direct attachment to 8 mm lead screws; no hub boring or retention drilling is required. Bore tolerance, retention torque and revolving-handle function are not stated; receipt and installed engagement remain to verify."
+cite = ["Ooznest HW-8 https://ooznest.co.uk/product/8mm-handwheel/ live page and dimensioned drawing read 2026-10-16: OD 40, blind bore 8 x 18 deep, two included M4 x 4 grub screws", "Ooznest HW-8 drawing https://files.plytix.com/api/v1.1/file/public_files/pim/assets/8f/b1/02/66/6602b18f974b5800018ecc4d/images/b7/47/d6/68/68d647b754aa28d095d65da9/Handwheel-8mm-Drawing.png"]
+# McMaster 6547N15 crank is acceptable in principle, with ready 8 mm bore,
+# but requires drilling/tapping its hub for set-screw retention; HW-8 does not.
+# McMaster 6024K81/6024K107 wheels have 6.35 mm pilot bores and require
+# bore enlargement plus retention machining. Avoid that work with HW-8.
+# https://www.mcmaster.com/6547N15/ https://www.mcmaster.com/6024K81/
+# https://www.mcmaster.com/6024K107/
+
 # --- pivot-bracket additions ---
 # Illustrative angle plate. Local XY is the table plane; the front upright face
 # is Y=0. TC outer-face Z0 sits 4 mm above its top, so the table is TC Z=-92.9.

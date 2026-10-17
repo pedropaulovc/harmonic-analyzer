@@ -71,6 +71,23 @@ and the shared placeholder spelling (spec solids included), enumerates every
 `shop_made` record, and rejects any other inventory table whose id or name names
 a registered part (stem or drawing number from `cad/config/parts`).
 
+## Trammel purchased hand-feed components
+
+The catalogue purchase records are `fixtures.trammel-tr8-leadscrew`,
+`fixtures.trammel-tr8-flange-nut`, `fixtures.trammel-kp08-blocks` and
+`fixtures.trammel-handwheel` in `shop/inventory.toml`. They describe matched
+Ooznest screw/nut/wheel components and AMPEC supports, not a boxed kit or
+installed hardware. The dated inventory citations own the interface dimensions
+and McMaster alternatives considered; do not substitute a different thread lead,
+nut bolt circle or wheel-bore depth from a similarly named component.
+
+These records retain `verify = true`: KP08 hole diameter and axial width,
+assembled axial location, screw/block fit and final usable travel still need
+receipt/layout verification. No turned end journals are specified. Ooznest is
+UK-based; US shipping, import/tax treatment and delivery must be confirmed at
+checkout. The inventory does not establish a finished fixture's geometry or
+approve its mechanical retention.
+
 ## Add or migrate a part
 
 1. Ensure the part is supported by `export_features.SUPPORTED_PARTS` and obtain
