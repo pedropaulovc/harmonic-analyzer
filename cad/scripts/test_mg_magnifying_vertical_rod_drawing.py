@@ -179,7 +179,7 @@ def test_tolerances_are_native_on_the_model() -> None:
 
 def test_relief_root_radius_reads_clear_in_detail_a() -> None:
     """The "2X R0.2 MAX" stands under the thread, opposite the shoulder's
-    lower root arc; its leader through the root centre passes under the Ø's
+    lower root arc; its leader toward the root centre passes under the Ø's
     lower arrow stub and the Ø's line stays off the thread-side root."""
     x_mm, y_mm = drawing.RELIEF_ROOT_CENTRE_MM
     assert (x_mm, y_mm) == pytest.approx(
@@ -188,7 +188,7 @@ def test_relief_root_radius_reads_clear_in_detail_a() -> None:
     cx, cy = drawing._detail_xy(x_mm, y_mm)
     tx, ty = drawing.DETAIL_KEEP["ReliefRootR"]
     # Down-left of the centre: opposite the arc's up-right quarter, so the
-    # leader runs on through the centre to the arc.
+    # arrow lands on the arc's extension, the circle's down-left side.
     assert tx < cx and ty < cy
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "display.ArcExtensionLineOrOppositeSide = True" in source
