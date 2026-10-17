@@ -1353,7 +1353,7 @@ sections:
         - scaled + specified stock envelope
         - med (photo length); high (specified overall band)
       - - Vertical rod
-        - 'Ø5 brass × 132.5 overall (#1559): #4-40 UNC-2A end 7.50 ±0.25 from the shoulder (relief Ø1.75 ±0.10 × 1.40 ±0.20 at the shoulder, 45° tip chamfer), body 125.0 from the shoulder to a full R2.5 hemisphere; screws into MHA-MG-002 and seats on the shoulder (no set screw, bond or lock). Worst-case full-thread engagement 5.015 ≥ 1.5D 4.2675; shoulder land 0.53 MIN'
+        - 'Ø5 brass × 132.5 overall (#1559): #4-40 UNC-2A end 7.50 ±0.25 from the shoulder (relief Ø1.85 MAX × 1.50 at the .XX ±0.51 band at the shoulder, both roots R0.2 MAX; 45° tip chamfer to the minor Ø), body 125.0 from the shoulder to a full R2.5 hemisphere, Ra 3.2 thumb-screw seat; screws into MHA-MG-002 and seats on the shoulder (no set screw, bond or lock). Worst-case full-thread engagement 7.25 − 2.01 − 0.635 = 4.605 ≥ 1.5D 4.2675; worst shoulder land 0.5275 ≥ 0.5'
         - —
         - 'p.46/48 vs lever rod; owner ruling #1559 (threaded rod end, shoulder seat); cad/scripts/mg_rod_clamp_joint.py'
         - scaled + engineered joint
