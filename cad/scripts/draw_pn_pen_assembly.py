@@ -26,6 +26,7 @@ import _config
 import _telemetry
 import pn_pen_adjust_screw_spec as stud
 import pn_pen_assembly_spec as spec
+import pn_pen_hanger_spec as hanger
 import pn_pen_rod_spec as rod
 import vn_pen_wire_geom as wire
 from _check import check
@@ -331,11 +332,24 @@ BOM_NORMALIZED_ALIASES = {
 # (revolved about +Y; the octant's sheet-right is (sz, 0, -sx)). The wire's
 # takes the sheet-leftmost point of its top end (extruded up +Y from the
 # origin, unrotated): walked, it took the end by the strap's corner and its
-# leader crossed the strap and the hanger screw (machinist review r3).
+# leader crossed the strap and the hanger screw (machinist review r3). The
+# hanger's takes the strap's sheet-rightmost long edge at mid-length (part mm:
+# Front-plane outline, top edge y 0, extruded from the bar seat z 0 to -T;
+# placed unrotated): walked, it took the strap's top corner, its leader ran
+# along screw 11's shank and landed beside balloon 11's arrow (machinist gate
+# 2026-10-17). Sheet-right (-1, 0, 1) makes that edge the strap's -x side on
+# its bar-seat face: a silhouette, clear of the screw, nuts and U guides.
 _OCTANT_X, _, _OCTANT_Z = spec.EXPLODED_OCTANT
 _ROD_ANCHOR_Y = 40.0
 _HEAD_R = stud.HEAD_DIA / 2.0
 _WIRE_R = wire.WIRE_DIA / 2.0
+if (_OCTANT_Z, -_OCTANT_X) != (-1, 1):
+    raise AssertionError("the hanger anchor assumes sheet-right is (-x, +z)")
+HANGER_ANCHOR_MM = (
+    (hanger.STRAP_TOP_X[0] + hanger.STRAP_BOT_X[0]) / 2.0,
+    hanger.STRAP_BOT_Y / 2.0,
+    hanger.STRAP_Z[1],
+)
 BALLOON_ANCHORS = {
     **{stem: BalloonAnchor() for stem in BOM_COMPONENTS},
     spec.ROD: BalloonAnchor(
@@ -359,6 +373,7 @@ BALLOON_ANCHORS = {
             _OCTANT_X * _WIRE_R * math.sqrt(0.5),
         )
     ),
+    spec.HANGER: BalloonAnchor(point_mm=HANGER_ANCHOR_MM),
 }
 EXPLODED_ORIENTATION = octant_view_name(*spec.EXPLODED_OCTANT)
 
