@@ -3469,12 +3469,14 @@ present = false
 verify = true
 purchase = "Special order / vendor quote required: 2 x HGR15R rails cut to 440 mm. Current authored request is seven holes at 60 mm pitch, symmetric E = 40 mm; confirm the supplied pattern before drilling the shop-made base. E40 / seven holes is not a sourcing invariant."
 note = "Read live 2026-10-16: reseller lists HGR15RXXXC, 15 mm rail, 60 mm pitch, and says Order Rails in any Length. The selector does not offer 440 mm. Main-approved 440 replaces brief 420: carriage centre reaches 412.3 plus half-length 30.7 from spindle, requiring rail to reach 443 from near end 15. Custom length and supplied hole pattern require a vendor quote; the shop-made base can be tapped to match the rail. Keep this rail with its HIWIN carriage only because the matched McMaster pair's preload is unstated, not because of the hole pattern."
-cite = ["Motion Constrained part 172270559990, read 2026-10-16", "Rejected live 2026-10-16: https://www.mcmaster.com/6709K26/", "Rejected live 2026-10-16: https://www.mcmaster.com/6709K33/"]
+cite = ["Motion Constrained part 172270559990, read 2026-10-16", "Rejected matched pair, preload unstated, live 2026-10-16: https://www.mcmaster.com/6709K26/", "Compared stock rail, live 2026-10-16: https://www.mcmaster.com/6709K33/", "Compared long-life rail; matching carriage unverified, live 2026-10-16: https://www.mcmaster.com/6688K18/"]
 # McMaster matched pair, live 2026-10-16: 6709K26 permits custom 440 mm,
 # 15 x 15 mm section / 60 mm pitch, paired with 6709K12 carriage.
 # The base is shop-made and can be tapped to its pattern; E40/seven holes
 # is not required for equivalence. The sole reason to keep the HIWIN pair
 # is unstated preload/clearance for the McMaster carriage.
+# 6709K33 is the stock rail family: no 440 mm option (460 mm is listed);
+# 6709K26 is the appropriate custom-length candidate, not rejected for end spacing.
 # Sources: https://www.mcmaster.com/6709K26/ and https://www.mcmaster.com/6709K33/
 
 [fixtures.trammel-hgh15ca-carriages]
@@ -3486,7 +3488,7 @@ present = false
 verify = true
 purchase = "2 x HIWIN HGH-15-CA-Z0-C carriages for HGR15R, DigiKey/Midwest 4433-HGH-15-CA-Z0-C."
 note = "Read live 2026-10-16: DigiKey Marketplace lists HIWIN, HGH15CA series, 61.4 mm length, Z0 part number and 92 in stock. Rejected eBay 127866788929: photos show H15C/HG15 but not full Z0 part number. Rejected Motion Constrained HGH15CAZAC: published medium preload, not requested Z0."
-cite = ["DigiKey/Midwest 4433-HGH-15-CA-Z0-C, read 2026-10-16", "Rejected: https://www.ebay.com/itm/127866788929", "Rejected: https://motionconstrained.com/store/hiwin-linear-guides/hiwin-hg-series-linear-guides/hg-blocks-only/hiwin-hgh15cazac-square-block/", "Rejected live 2026-10-16: https://www.mcmaster.com/6709K12/", "Rejected live 2026-10-16: https://www.mcmaster.com/6709K11/", "Rejected live 2026-10-16: https://www.mcmaster.com/6688K18/"]
+cite = ["DigiKey/Midwest 4433-HGH-15-CA-Z0-C, read 2026-10-16", "Rejected: https://www.ebay.com/itm/127866788929", "Rejected: https://motionconstrained.com/store/hiwin-linear-guides/hiwin-hg-series-linear-guides/hg-blocks-only/hiwin-hgh15cazac-square-block/", "Rejected live 2026-10-16: https://www.mcmaster.com/6709K12/", "Compared flanged alternative, live 2026-10-16: https://www.mcmaster.com/6709K11/"]
 # McMaster matched pair, live 2026-10-16: 6709K12 with corresponding 6709K26.
 # Drawing matches 26 x 26 M4 x 5 mm mounting, 34 mm width, 28 mm assembled height.
 # Length 56.6 mm (table: 57) versus HIWIN 61.4 is acceptable: on a 440 rail,
@@ -3499,7 +3501,8 @@ cite = ["DigiKey/Midwest 4433-HGH-15-CA-Z0-C, read 2026-10-16", "Rejected: https
 # Sources: https://www.mcmaster.com/6709K12/ and https://www.mcmaster.com/6709K11/
 # HIWIN manufacturer Z0/interface reference (not a substitute order code):
 # https://www.hiwin.de/en/Products/Linear-guideways/Blocks/Ball-guides/Series-HG-QH/HGH-QHH/HGH15CAZ0H/p/5-001622
-# Long-life alternative 6688K18 has a 13 mm-high rail (-2 mm).
+# Long-life alternative 6688K18 has a 13 mm-high rail (-2 mm); not rejected
+# solely for section height. Its matching 6688K784 carriage remains unverified.
 # 6688K784 direct page returned HTTP 200 homepage shell, not a verified SKU table;
 # no dimensions from that unverified SKU page are relied on for selection.
 # Verified rail source: https://www.mcmaster.com/6688K18/
@@ -3507,13 +3510,13 @@ cite = ["DigiKey/Midwest 4433-HGH-15-CA-Z0-C, read 2026-10-16", "Rejected: https
 
 [fixtures.trammel-6200-2rs]
 kind = "ball_bearing"
-make = "Unspecified by distributor"
+make = "generic"
 sku = "5972K41"
 source = "https://www.mcmaster.com/5972K41/"
 present = false
 verify = true
 purchase = "4 x McMaster-Carr 5972K41, steel sealed 6200-2RS ball bearing, two per pivot block for two blocks; $7.86 each, possession unconfirmed."
-note = "Read live 2026-10-16: distributor McMaster-Carr, manufacturer not stated; 6200-2RS, Buna-N seals, steel, ABEC 1, DIN 625-1; 10 mm ID (-0.008/0), 30 mm OD (-0.009/0), 9 mm width (-0.12/0), C3 radial clearance 0.008-0.023 mm. Same nominal jig envelope; catalogue tolerances are not receipt metrology. Main ruling 2026-10-16: accept the internal-bearing-play contribution up to 0.023 mm, under 5% of the 0.5 mm edge band (8.0 +0.5/-0); in-situ pin-pair setting absorbs a constant offset. Shaft/housing fit and two-bearing alignment are separate contributions, not bounded here; this is not a complete pivot-position error budget or an acceptance of those fits."
+note = "Read live 2026-10-16: distributor McMaster-Carr, manufacturer not stated; 6200-2RS, Buna-N seals, steel, ABEC 1, DIN 625-1; 10 mm ID (-0.008/0), 30 mm OD (-0.009/0), 9 mm width (-0.12/0), C3 radial clearance 0.008-0.023 mm per bearing. Same nominal jig envelope; catalogue tolerances are not receipt metrology. Main sourcing ruling 2026-10-16: retain C3 rather than the fourfold-price C0 upgrade; 0.023 mm per-bearing internal play is under 5% of the 0.5 mm edge band (8.0 +0.5/-0). In-situ pin-pair setting absorbs a constant offset, not load-dependent play reversal. Combined bearing play, shaft/housing fits and axis tilt/alignment are not bounded here; this is not a complete pivot-position error budget or physical fit acceptance."
 cite = ["McMaster-Carr 5972K41 https://www.mcmaster.com/5972K41/ read live 2026-10-16: steel sealed 6200-2RS, 10 x 30 x 9 mm, $7.86 each", "Rejected live 2026-10-16: https://www.mcmaster.com/6661K21/", "Rejected live 2026-10-16: https://www.mcmaster.com/6661K101/", "Rejected live 2026-10-16: https://www.mcmaster.com/6153K74/"]
 # Rejected live 2026-10-16: 6661K21 adds a 34.7 mm OD x 1.12 mm retaining ring,
 # changing the external envelope. 6661K101 (ABEC 3) still has C3 0.008-0.023 mm.
@@ -3522,10 +3525,12 @@ cite = ["McMaster-Carr 5972K41 https://www.mcmaster.com/5972K41/ read live 2026-
 # $125.72 vs $31.44 for four is not justified for 0.010 mm less maximum play,
 # given the edge band and in-situ setting above. No jig design change.
 # Sources: https://www.mcmaster.com/6153K74/ and https://www.mcmaster.com/6661K101/
+# Supersedes VXB 1111-4398 solely to follow the user's McMaster sourcing
+# preference when an equivalent meets the nominal spec, not because VXB failed.
 
 [fixtures.trammel-cl-dowel]
 kind = "dowel_pin"
-make = "Unspecified by distributor"
+make = "generic"
 sku = "91595A452"
 source = "https://www.mcmaster.com/91595A452/"
 present = false
@@ -3536,6 +3541,8 @@ cite = ["McMaster-Carr 91595A452 https://www.mcmaster.com/91595A452/ read live 2
 # Rejected live 2026-10-16: 97049A219/97049A119 are undersized ISO 2338-h8
 # (-0.018/0 mm), not the selected m6 fit; 5429N133 is grooved, max OD 6.3 mm.
 # 98380A153 is 416 stainless with +0.006/+0.015 mm diameter, not stated as m6.
+# Supersedes AndyMark am-1501 under the same McMaster sourcing preference;
+# not a claim that the prior unclassed pin failed its application.
 
 # --- pivot-bracket additions ---
 # Illustrative angle plate. Local XY is the table plane; the front upright face

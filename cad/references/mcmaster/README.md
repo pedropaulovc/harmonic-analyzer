@@ -99,7 +99,9 @@ fastener identities; no vendor models downloaded):
   `fixtures.trammel-6200-2rs`: four steel sealed 6200-2RS bearings,
   10 × 30 × 9 mm, Buna-N seals, ABEC 1, C3 radial clearance 0.008–0.023 mm.
   Live Firecrawl spec table read October 16, 2026. The inventory records
-  the accepted play and rejected C0 upgrade; receipt verification is required.
+  the sourcing ruling on per-bearing internal play and rejected C0 upgrade;
+  combined play, mounting fits and alignment are not bounded by that ruling.
+  Receipt verification remains required.
 - [91595A452](https://www.mcmaster.com/91595A452/) supplies
   `fixtures.trammel-cl-dowel`: 52100 alloy-steel Ø6 × 20 mm dowel,
   DIN 6325-m6 / ISO 8734, diameter 6.004–6.012 mm, minimum HRC 52.
