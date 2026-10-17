@@ -115,12 +115,10 @@ from spring_mount_geom import COLUMN_X, KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # --- knife bearing supports (build_sm_knife_mount) -----------------------------
 from sm_summing_lever_spec import (  # noqa: E402
-    HEX_BAND,
-    HEX_H,
-    HEX_W,
     HEX_Z_INNER,
     HEX_Z_OUTER,
-    KNIFE_SHOULDER_RISE,
+    KNIFE_SHOULDER_DROP_MIN,
+    KNIFE_SHOULDER_X_MAX,
 )
 
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
@@ -214,10 +212,11 @@ HANGER_SCREW_FLOAT_SPARE = top_frame.HANGER_SCREW_FLOAT - (
 # (absorb stacks), and the 2026-10-09 ruling: >=5.0 deg).
 # The pair's worst transverse shift acts over its shortest 15.134 span.
 # Across the deepest .X block (14.8) that yaw walks the bore's far end;
-# the bore's perpendicularity zone adds another 0.05. Judge the trunnion
-# at its widest, lowest .XXX section in the smallest reamed bore, with one
-# flank at the ridge angle's band limit raising its shoulder
-# (``sm_summing_lever_spec.KNIFE_SHOULDER_RISE``).
+# the bore's perpendicularity zone adds another 0.05. Judge the trunnion in
+# the smallest reamed bore at the shoulder its printed controls allow worst:
+# the ridge farthest from that side face, the flank at its flattest
+# (code review C09: ``sm_summing_lever_spec.KNIFE_SHOULDER_X_MAX`` and
+# ``KNIFE_SHOULDER_DROP_MIN``).
 KNIFE_DOWEL_SPAN_MIN = knife_mount.PIN_HOLE_SPAN - knife_mount.PIN_HOLE_SPAN_TOL
 KNIFE_MOUNT_YAW_DEG = math.degrees(
     math.atan(_KNIFE_DOWEL_PAIR_SHIFT / KNIFE_DOWEL_SPAN_MIN)
@@ -227,10 +226,9 @@ KNIFE_BORE_FAR_END_OFFSET = (
 ) * math.tan(math.radians(KNIFE_MOUNT_YAW_DEG)) + knife_mount.KNIFE_BORE_ORIENTATION_TOL
 KNIFE_FREE_ROCK_WORST_DEG = knife_mount.free_rock_deg(
     KNIFE_BORE_FAR_END_OFFSET,
-    hex_w=HEX_W + HEX_BAND,
-    hex_h=HEX_H - HEX_BAND,
+    hex_w=2.0 * KNIFE_SHOULDER_X_MAX,
     r_bore=knife_mount.BORE_R_MIN,
-    shoulder_drop=(HEX_H - HEX_BAND) / 4.0 - KNIFE_SHOULDER_RISE,
+    shoulder_drop=KNIFE_SHOULDER_DROP_MIN,
 )
 KNIFE_FREE_ROCK_FLOOR_DEG = spec.KNIFE_FREE_ROCK_FLOOR_DEG
 
