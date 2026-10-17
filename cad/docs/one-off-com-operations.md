@@ -77,7 +77,7 @@ preflight refuses to start unless:
 - the remote cache is `ro` or `rw` (`_artifact_cache.enabled()`) — the farm
   hands results back **through the cache**, so `off` cannot work;
 - `farm.py agents --json` reports the client's required farm protocol (currently
-  6) and no known worker reports an incompatible or unreadable protocol;
+  7) and no known worker reports an incompatible or unreadable protocol;
 - would-be leaves pass the selected pool's `agent.protocol.leaf_admitted`, and
   that pool's canonical identity tag matches the reported fleet identities.
 
@@ -101,9 +101,9 @@ from acknowledged registration through closure, without polling build status
 or waiting for allocation. That lease and the 180-second idle-capacity timer are
 different clocks. Closure
 or lease expiry releases idle reservations but preserves accepted work and
-physical-drain obligations. Protocol 6 requires paired producer/pool/worker
-deployment to an idle, physically drained fleet; protocol-5 coordinator state
-is not replayed into the new protocol-6 singleton.
+physical-drain obligations. Protocol 7 requires paired producer/pool/worker
+deployment to an idle, physically drained fleet; protocol-6 coordinator state
+is not replayed into the new protocol-7 singleton.
 The coordinator and leaf workflow types are versioned as `BuildFifo7` and
 `BuildLeaf7`, without legacy aliases. Fresh protocol-7 histories cannot execute
 on an old controller, and a protocol-7 controller never replays the protocol-6
@@ -117,7 +117,7 @@ coordinated idle-fleet cutover.
 
 Old-protocol native logs are unsupported by the new launcher. Finish or cancel
 their runs with matched old tools **before** that coordinated idle-fleet
-cutover; the protocol-6 launcher provides no runtime legacy support.
+cutover; the protocol-7 launcher provides no runtime legacy support.
 
 The preflight stamps only the committed local `HEAD`; it does not fetch or
 update a shared `origin/*` ref and does not publish source files. Each worker
