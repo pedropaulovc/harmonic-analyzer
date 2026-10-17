@@ -1938,7 +1938,7 @@ def test_run_leaf_submits_to_coordinator_and_waits_exact_binding(temporal_bounda
         f"leaf:{BUILD_ID}:part:pen_rod:" + "k" * 64 + ":900s",
         {"run_id": "exact-run", "result_type": _farm.LeafResult},
     )
-    assert calls["handles"][0] == ("solidworks-build-fifo-6", {})
+    assert calls["handles"][0] == ("solidworks-build-fifo-7", {})
     assert calls["queries"]
     assert update_options["id"]
 
@@ -1995,7 +1995,7 @@ def test_concurrent_identical_leaves_have_build_scoped_identity(
         for build_id in build_ids
     }
     attached = [(workflow_id, options) for workflow_id, options in calls["handles"]
-                if workflow_id != "solidworks-build-fifo-6"]
+                if workflow_id != "solidworks-build-fifo-7"]
     assert len(attached) == 2
     assert {workflow_id for workflow_id, _options in attached} == expected_ids
     assert len(bindings) == (1 if same_build else 2)
@@ -2038,7 +2038,7 @@ def test_ready_leaf_is_submitted_with_zero_reserved_capacity(
 
     async def guarded_connect(*args, **kwargs):
         client = await fake_connect(*args, **kwargs)
-        coordinator = client.get_workflow_handle("solidworks-build-fifo-6")
+        coordinator = client.get_workflow_handle("solidworks-build-fifo-7")
         submit = coordinator.execute_update
         query_leaf = coordinator.query
 
@@ -2071,7 +2071,7 @@ def test_ready_leaf_is_submitted_with_zero_reserved_capacity(
         coordinator.query = query
         get_handle = client.get_workflow_handle
         client.get_workflow_handle = lambda workflow_id, **options: (
-            coordinator if workflow_id == "solidworks-build-fifo-6"
+            coordinator if workflow_id == "solidworks-build-fifo-7"
             else get_handle(workflow_id, **options)
         )
         return client
@@ -2167,7 +2167,7 @@ def test_a_launcher_run_names_each_workflow_before_creating_it(
 
     async def observing_connect(*args, **kwargs):
         client = await fake_connect(*args, **kwargs)
-        handle = client.get_workflow_handle("solidworks-build-fifo-6")
+        handle = client.get_workflow_handle("solidworks-build-fifo-7")
         submit = handle.execute_update
 
         async def execute_update(*update_args, **update_options):
@@ -2180,7 +2180,7 @@ def test_a_launcher_run_names_each_workflow_before_creating_it(
         handle.execute_update = execute_update
         get_handle = client.get_workflow_handle
         client.get_workflow_handle = lambda workflow_id, **options: (
-            handle if workflow_id == "solidworks-build-fifo-6" else get_handle(workflow_id, **options)
+            handle if workflow_id == "solidworks-build-fifo-7" else get_handle(workflow_id, **options)
         )
         return client
 
@@ -2262,7 +2262,7 @@ def test_uncertain_submission_preserves_request_for_reconciliation(
         "farm_run": None,
         "refresh_reason": None,
     }]
-    assert calls["handles"][-1] == ("solidworks-build-fifo-6", {})
+    assert calls["handles"][-1] == ("solidworks-build-fifo-7", {})
 
 
 def test_dispatch_without_build_ownership_never_connects(temporal_boundary, monkeypatch):
@@ -2335,7 +2335,7 @@ def test_foreign_binding_fails_closed_before_result(
     monkeypatch.setattr(_farm, "STATUS_POLL_INTERVAL_S", 0)
     with pytest.raises(_farm.BuildOwnershipError, match="foreign leaf binding"):
         _farm.run_leaf("part:pen_rod", "k" * 64)
-    assert calls["handles"] == [("solidworks-build-fifo-6", {})]
+    assert calls["handles"] == [("solidworks-build-fifo-7", {})]
 
 
 def test_mismatched_child_build_id_is_refused_before_connection(
@@ -2378,7 +2378,7 @@ def test_reservation_recovery_failure_stops_dispatch_before_attaching(
         _farm.run_leaf("part:pen_rod", "k" * 64)
 
     assert len(calls["submit"]) == 1
-    assert calls["handles"] == [("solidworks-build-fifo-6", {})]
+    assert calls["handles"] == [("solidworks-build-fifo-7", {})]
 
 
 @pytest.mark.parametrize("state", ["missing_closed", "drained"])
@@ -2395,7 +2395,7 @@ def test_settled_unbound_reply_cannot_be_used_as_a_leaf_result(
     with pytest.raises(_farm.BuildOwnershipError, match="closed without a proven run binding"):
         _farm.run_leaf("part:pen_rod", "k" * 64)
 
-    assert calls["handles"] == [("solidworks-build-fifo-6", {})]
+    assert calls["handles"] == [("solidworks-build-fifo-7", {})]
 
 
 @pytest.mark.parametrize("executor", ["local", "farm"])

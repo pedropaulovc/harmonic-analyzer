@@ -367,7 +367,7 @@ task still leaves the run nonzero.
 After successful preflight, the parent build creates a fresh timestamp-and-GUID
 `build_id` (`YYYYMMDDTHHMMSS.ffffffZ-32hex`), ignoring any inherited
 `HARMONIC_FARM_BUILD_ID`, and registers with the protocol-7 fleet's singleton
-`solidworks-build-fifo-6` coordinator. After registration
+`solidworks-build-fifo-7` coordinator. After registration
 is acknowledged with an open, valid producer lease, its doit scheduler starts
 immediately, even with zero reserved capacity or ownership reported as waiting.
 Local/cache work and dependency preparation can progress in every build; native-ready
@@ -474,10 +474,14 @@ Protocol **7** is a hard wire cutover from protocol 6: both repositories adverti
 7 and exact-equality admission refuses older clients or workers. `LeafRequest`
 adds optional `refresh_reason`, validated before any work; only that leaf's child
 process receives the refresh carrier. No protocol-6 compatibility shim is provided.
-The existing coordinator/workflow identities are unchanged:
-`solidworks-build-fifo-6`, workflow type `BuildFifo6`, and native type `BuildLeaf6`.
-The producer still describes the coordinator under the bounded RPC deadline and
-requires exactly `BuildFifo6`; a reused ID with any other workflow type is refused
+Protocol 7 also moves the coordinator/workflow identities:
+`solidworks-build-fifo-7`, workflow type `BuildFifo7`, and native type `BuildLeaf7`.
+A protocol-7 controller must never replay the protocol-6 coordinator: its accepted
+protocol-6 `submit_leaf` updates fail protocol-7 validation on replay, which is a
+nondeterminism error (seen 2026-10-17 when protocol 7 first shipped under the old
+identity). The producer still describes the coordinator under the bounded RPC
+deadline and requires exactly `BuildFifo7`; a reused ID with any other workflow
+type is refused
 without updates, termination or replay. The handle remains unpinned across
 continue-as-new. This type identity check does not replace wire-protocol
 preflight or the required coordinated cutover.

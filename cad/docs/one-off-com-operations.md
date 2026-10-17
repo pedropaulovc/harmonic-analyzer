@@ -77,15 +77,15 @@ preflight refuses to start unless:
 - the remote cache is `ro` or `rw` (`_artifact_cache.enabled()`) — the farm
   hands results back **through the cache**, so `off` cannot work;
 - `farm.py agents --json` reports the client's required farm protocol (currently
-  6) and no known worker reports an incompatible or unreadable protocol;
+  7) and no known worker reports an incompatible or unreadable protocol;
 - would-be leaves pass the selected pool's `agent.protocol.leaf_admitted`, and
   that pool's canonical identity tag matches the reported fleet identities.
 
 A preflight failure prints `farm: <reason>` and exits 2, also before any action
 runs.
 
-After preflight, protocol 6 registers a fresh build with
-`solidworks-build-fifo-6` and starts the scheduler as soon as registration is
+After preflight, protocol 7 registers a fresh build with
+`solidworks-build-fifo-7` and starts the scheduler as soon as registration is
 acknowledged with an open, valid producer lease. There is no exclusive-ownership
 or capacity wait before local/cache work; native-ready leaves can be submitted
 at zero allocation and wait for coordinator admission. Usable workers are
@@ -101,22 +101,23 @@ from acknowledged registration through closure, without polling build status
 or waiting for allocation. That lease and the 180-second idle-capacity timer are
 different clocks. Closure
 or lease expiry releases idle reservations but preserves accepted work and
-physical-drain obligations. Protocol 6 requires paired producer/pool/worker
-deployment to an idle, physically drained fleet; protocol-5 coordinator state
-is not replayed into the new protocol-6 singleton.
-The coordinator and leaf workflow types are versioned as `BuildFifo6` and
-`BuildLeaf6`, without legacy aliases. Fresh protocol-6 histories cannot execute
-on an old controller, even though the control queue is unchanged. Before any
+physical-drain obligations. Protocol 7 requires paired producer/pool/worker
+deployment to an idle, physically drained fleet; protocol-6 coordinator state
+is not replayed into the new protocol-7 singleton.
+The coordinator and leaf workflow types are versioned as `BuildFifo7` and
+`BuildLeaf7`, without legacy aliases. Fresh protocol-7 histories cannot execute
+on an old controller, and a protocol-7 controller never replays the protocol-6
+coordinator. Before any
 registration or leaf submission/observation, the producer describes the current
-`solidworks-build-fifo-6` coordinator under its RPC deadline and requires
-`BuildFifo6`; a wrong-type existing ID is refused without updating, terminating
+`solidworks-build-fifo-7` coordinator under its RPC deadline and requires
+`BuildFifo7`; a wrong-type existing ID is refused without updating, terminating
 or replaying it. Do not invoke an old coordinator with new tools. This check
 also protects direct API callers, but does not replace CLI preflight or the
 coordinated idle-fleet cutover.
 
 Old-protocol native logs are unsupported by the new launcher. Finish or cancel
 their runs with matched old tools **before** that coordinated idle-fleet
-cutover; the protocol-6 launcher provides no runtime legacy support.
+cutover; the protocol-7 launcher provides no runtime legacy support.
 
 The preflight stamps only the committed local `HEAD`; it does not fetch or
 update a shared `origin/*` ref and does not publish source files. Each worker

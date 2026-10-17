@@ -39,8 +39,8 @@ FARM_PROTOCOL_VERSION = 7
 
 TASK_QUEUE_CONTROL = "solidworks-control"  # coordinator and parked leaf workflows
 TASK_QUEUE_COM = "solidworks-com"  # build_leaf activity tasks
-WORKFLOW_BUILD_FIFO = "BuildFifo6"
-WORKFLOW_BUILD_FIFO_ID = "solidworks-build-fifo-6"
+WORKFLOW_BUILD_FIFO = "BuildFifo7"
+WORKFLOW_BUILD_FIFO_ID = "solidworks-build-fifo-7"
 ACTIVITY_BUILD_LEAF = "build_leaf"
 NAMESPACE = "solidworks"
 
