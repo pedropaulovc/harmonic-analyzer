@@ -3458,7 +3458,8 @@ solids = [
 ]
 
 # Rocker route-v3 purchased jig hardware. Candidate purchases only: no possession,
-# receipt dimensions, preload certificate or clearance acceptance is asserted.
+# receipt metrology, preload certificate or physical fit acceptance is asserted.
+# The bearing note records a design-level acceptance of internal C3 play only.
 [fixtures.trammel-hgr15-rails]
 kind = "linear_rail"
 make = "HIWIN"
@@ -3497,7 +3498,8 @@ cite = ["DigiKey/Midwest 4433-HGH-15-CA-Z0-C, read 2026-10-16", "Rejected: https
 # Long-life alternative 6688K18 has a 13 mm-high rail (-2 mm).
 # 6688K784 direct page returned HTTP 200 homepage shell, not a verified SKU table;
 # no dimensions from that unverified SKU page are relied on for selection.
-# Sources: https://www.mcmaster.com/6688K18/ and https://www.mcmaster.com/6688K784/
+# Verified rail source: https://www.mcmaster.com/6688K18/
+# Failed carriage fetch (unverified): https://www.mcmaster.com/6688K784/
 
 [fixtures.trammel-6200-2rs]
 kind = "ball_bearing"
