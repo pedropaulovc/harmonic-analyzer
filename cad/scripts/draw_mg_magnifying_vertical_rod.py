@@ -10,8 +10,9 @@ as supplied), the body length from the shoulder (origin circle on the
 shoulder), the overall "(132.5)" reference and the dome R; detail A, a
 cropped 8:1 *Front model view (draw_pd_transgear_knob_shaft's detail-B
 recipe), carries the 7.5 threaded end: the thread length from the shoulder
-(origin circle) with the seat it guards, the relief's width and its Ø MAX,
-and the thread callout. A 1:1 shaded isometric shows the cosmetic thread.
+(origin circle) with the seat it guards, the relief's width, its Ø MAX and
+its two root radii (one "2X R MAX"), and the thread callout. A 1:1 shaded
+isometric shows the cosmetic thread.
 No general notes: every requirement rides its own callout.
 
 Run with SolidWorks open::
@@ -59,6 +60,10 @@ import _telemetry
 from mg_magnifying_vertical_rod_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    RELIEF_DIA,
+    RELIEF_ROOT_R,
+    RELIEF_ROOT_R_TOL_TYPE,
+    RELIEF_ROOTS_CALLOUT,
     RELIEF_START_X,
     ROD_LENGTH,
     SHOULDER_X,
@@ -129,8 +134,9 @@ DETAIL_LABEL_TEXT = (
 )
 # The fence, model mm (x, y): mid-thread-end, 0.5 over the axis. Radius 5.0
 # holds the tip face and its axis point (3.78 off), the shoulder's outer
-# corner (4.25 off) and the relief: every reference the three dimensions
-# take, since a crop drops a dimension whose reference it cuts away.
+# corner (4.25 off), the relief and the shoulder's lower root (4.09 off at
+# its far edge): every reference the four dimensions take, since a crop
+# drops a dimension whose reference it cuts away.
 DETAIL_FOCUS_MM = (SHOULDER_X / 2.0, 0.5)
 _DETAIL_FOCUS_M = (DETAIL_FOCUS_MM[0] / 1000.0, DETAIL_FOCUS_MM[1] / 1000.0, 0.0)
 DETAIL_RADIUS_MM = 5.0
@@ -151,17 +157,32 @@ def _detail_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
 
 _DETAIL_TOP = DETAIL_CENTER[1] + DETAIL_CROP_RADIUS
 _DETAIL_BOTTOM = DETAIL_CENTER[1] - DETAIL_CROP_RADIUS
-_RELIEF_MID_X = (RELIEF_START_X + SHOULDER_X) / 2.0
 DETAIL_SHOULDER_X = _detail_xy(SHOULDER_X, 0.0)[0]
+# The radius lands on its first pick's edge (build_mg_magnifying_vertical_rod)
+# under the axis, as the filing stud's did: the shoulder's lower root, its
+# arc the up-right quarter round this centre (model mm; sheet 0.1484, 0.1920).
+RELIEF_ROOT_CENTRE_MM = (
+    SHOULDER_X - RELIEF_ROOT_R,
+    -(RELIEF_DIA / 2.0 + RELIEF_ROOT_R),
+)
+ROOT_TIP_TOL_M = 0.0002
 DETAIL_KEEP = {
-    # Its line rises through the relief's air to text over the crop.
-    "ReliefDia": (_detail_xy(_RELIEF_MID_X, 0.0)[0], _DETAIL_TOP + 0.008),
+    # Its line rises through the relief's air to text over the crop, 0.5
+    # (4 mm) off the thread end: right of the thread-side root's tangent
+    # (2.4 mm), and left of the root radius's leader under the relief.
+    "ReliefDia": (_detail_xy(RELIEF_START_X + 0.5, 0.0)[0], _DETAIL_TOP + 0.008),
     # Under the crop, nearest the part, its text right of the shoulder's
     # extension line (outside both of its own) and over the thread length's
     # block, which it no longer shares a column with.
     "ReliefWidth": (DETAIL_SHOULDER_X + 0.013, _DETAIL_BOTTOM - 0.003),
     # The next row down: the thread end from the shoulder to the tip.
     "ThreadLength": (_detail_xy(SHOULDER_X / 2.0, 0.0)[0], _DETAIL_BOTTOM - 0.020),
+    # "2X / R0.2 MAX" under the thread, opposite its arc: x ~0.108-0.128,
+    # 22 mm under the thread's silhouette and ~7 mm over the thread length's
+    # "+0.25". Its leader rises up-right at ~51 deg through the root centre
+    # to the arc, crossing only the relief width's thread-end extension line
+    # (y ~0.179) and passing ~3.5 mm under the Ø's lower arrow stub.
+    "ReliefRootR": (DETAIL_SHOULDER_X - 0.032, _DETAIL_BOTTOM + 0.003),
 }
 # The thread callout's leader lands on the major-diameter silhouette mid-
 # thread; the note stands up and left of the crop.
@@ -189,6 +210,8 @@ DIMENSION_CALLOUTS = {
     "RodDia": "STOCK OK",
     "DomeR": "TANGENT HEMISPHERE",
 }
+# The roots' count stands above their one radius.
+DIMENSION_CALLOUTS_ABOVE = {"ReliefRootR": RELIEF_ROOTS_CALLOUT}
 # ASME Y14.5 dimension origin (swArrowStyle_e): both lengths read from the
 # shoulder, the seating face that plumbs the rod.
 ORIGIN_DIMENSIONS = ("BodyLength", "ThreadLength")
@@ -488,6 +511,69 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
     return matches[0]
 
 
+def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> None:
+    """Prove detail A's imported ReliefRootR prints the roots' R MAX under
+    its "2X", and land its leader on the shoulder's lower root.
+
+    Read back: radial, measuring RELIEF_ROOT_R, the part's native swTolMAX
+    and the count above the value. The text stands down-left of the root,
+    opposite the arc's own (up-right) quarter, so
+    ``ArcExtensionLineOrOppositeSide`` True runs the leader on through the
+    centre to the arc (draw_pn_pen_rod's shoulder radius, text beside its
+    arc, sets it False). The rebuilt arrow tip must sit on that arc.
+    """
+    annotation = _early_bound(
+        _named(adapter, annotations, "ReliefRootR"), "IAnnotation"
+    )
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("the imported relief root radius is not radial")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != RELIEF_ROOT_R_TOL_TYPE:
+        raise RuntimeError(
+            f"ReliefRootR lost its native MAX type: {int(tolerance.Type)}"
+        )
+    if not math.isclose(
+        float(dimension.SystemValue), RELIEF_ROOT_R / 1000.0, abs_tol=1e-9
+    ):
+        raise RuntimeError("ReliefRootR does not measure the relief roots")
+    callout = str(display.GetText(3) or "")  # swDimensionTextCalloutAbove
+    if callout != RELIEF_ROOTS_CALLOUT:
+        raise RuntimeError(f"ReliefRootR count did not persist: {callout!r}")
+    display.ArcExtensionLineOrOppositeSide = True
+    if display.ArcExtensionLineOrOppositeSide is not True:
+        raise RuntimeError("ReliefRootR leader does not run through its centre")
+    rebuild_drawing(adapter, label="relief roots radius leader")
+    raw = display.GetDisplayData()
+    if raw is None:
+        raise RuntimeError("ReliefRootR has no rebuilt display data")
+    data = _early_bound(raw, "IDisplayData")
+    if int(data.GetArrowHeadCount()) != 1:
+        raise RuntimeError("ReliefRootR must draw exactly one radial arrow")
+    arrow = tuple(float(v) for v in data.GetArrowHeadAtIndex2(0))
+    if len(arrow) != 12 or not all(math.isfinite(v) for v in arrow):
+        raise RuntimeError("ReliefRootR has incomplete arrow-head coordinates")
+    tip = (arrow[0], arrow[1])
+    centre = model_point_in_view(
+        adapter,
+        detail,
+        (RELIEF_ROOT_CENTRE_MM[0] / 1000.0, RELIEF_ROOT_CENTRE_MM[1] / 1000.0, 0.0),
+        label="shoulder's lower relief root centre",
+    )
+    radius = RELIEF_ROOT_R * _DS / 1000.0
+    off = (tip[0] - centre[0], tip[1] - centre[1])
+    if abs(math.hypot(*off) - radius) > ROOT_TIP_TOL_M or min(off) < -ROOT_TIP_TOL_M:
+        raise RuntimeError(
+            f"ReliefRootR's arrow tip {tip} is not on the shoulder's lower root "
+            f"arc (centre {centre}, R {radius})"
+        )
+    _telemetry.info(
+        f"relief roots radius: text {display.GetText(1)!r}, MAX type, count "
+        f"{callout!r}, arrow tip {tip} on the shoulder's lower root"
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -554,6 +640,10 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*side_annotations, *detail_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
+    _dress_relief_roots(adapter, detail, annotations)
     for name, origin_x in (
         ("BodyLength", spt(SHOULDER_SHEET_X, 0.0)[0]),
         ("ThreadLength", DETAIL_SHOULDER_X),

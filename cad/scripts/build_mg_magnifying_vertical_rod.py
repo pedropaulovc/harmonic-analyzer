@@ -10,7 +10,8 @@ The bottom end is a full hemisphere.
 Layout: rod axis local +X, origin at the thread tip on the axis (the
 assembly turns +X straight down). Stations: tip chamfer to TIP_CHAMFER,
 thread at the basic major to RELIEF_START_X, relief to the shoulder at
-SHOULDER_X, Ø5 body to the dome's tip at ROD_LENGTH.
+SHOULDER_X (both its internal corners filleted R0.2 MAX, ReliefRoots), Ø5
+body to the dome's tip at ROD_LENGTH.
 
 Built as ONE Front-plane revolve (RodProfile -> Rod): every printed diameter
 and length is a named dimension in that sketch, the thread length and the
@@ -32,7 +33,7 @@ import sys
 from _appearance import apply_material
 from _check import check
 from _com import _early_bound
-from _dimensions import drive_dimension, set_global
+from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -62,6 +63,7 @@ from mg_magnifying_vertical_rod_spec import (
     ISO_VIEW_NOTE,
     REFERENCE_DIMENSIONS,
     RELIEF_DIA,
+    RELIEF_ROOT_R,
     RELIEF_START_X,
     RELIEF_WIDTH,
     ROD_DIA,
@@ -89,7 +91,13 @@ V_THREAD = math.pi * THREAD_R**2 * (RELIEF_START_X - TIP_CHAMFER)
 V_RELIEF = math.pi * RELIEF_R**2 * RELIEF_WIDTH
 V_BODY = math.pi * R**2 * (BODY_LENGTH - R)
 V_DOME = 2.0 / 3.0 * math.pi * R**3
-V_TOTAL = V_CHAMFER + V_THREAD + V_RELIEF + V_BODY + V_DOME
+V_PROFILE = V_CHAMFER + V_THREAD + V_RELIEF + V_BODY + V_DOME
+# Each relief root fills its corner's spandrel, (1 - pi/4) R^2, turned about
+# the axis at its centroid, (10 - 3 pi) / (12 - 3 pi) R off both legs (Pappus).
+_ROOT_SPANDREL = (1.0 - math.pi / 4.0) * RELIEF_ROOT_R**2
+_ROOT_CENTROID_R = RELIEF_R + (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi) * RELIEF_ROOT_R
+V_RELIEF_ROOTS = 2.0 * 2.0 * math.pi * _ROOT_CENTROID_R * _ROOT_SPANDREL
+V_TOTAL = V_PROFILE + V_RELIEF_ROOTS
 
 
 def _make_driven(adapter, dimension_id: str, label: str) -> None:
@@ -160,6 +168,7 @@ async def build(adapter) -> dict[str, str]:
         ("ThreadLength", ROD_THREAD_LEN),
         ("ReliefWidth", RELIEF_WIDTH),
         ("ReliefDia", RELIEF_DIA),
+        ("ReliefRootR", RELIEF_ROOT_R),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -294,7 +303,29 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += profile.apply(adapter, "RodProfile")
     check("revolve rod", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Rod")
-    await volume_check(adapter, "rod", V_TOTAL, 0.005 * V_TOTAL)
+    await volume_check(adapter, "rod", V_PROFILE, 0.005 * V_PROFILE)
+
+    # The relief's two internal corners (rules 11 and 16), ONE fillet over
+    # both circular edges, each picked on the floor's radius at its corner:
+    # the shoulder's at SHOULDER_X (the shoulder's outer edge 1.58 away), the
+    # thread end's at RELIEF_START_X (the step's outer edge 0.50 away). The
+    # shoulder's comes FIRST: the drawing's inserted radius lands on the first
+    # pick's edge (draw_mg_magnifying_vertical_rod's detail A lays its leader
+    # out for that root). The two add ~0.1 mm^3 to ~2440 mm^3: the gate
+    # checks no step was eaten.
+    check(
+        "fillet relief roots",
+        await adapter.add_fillet(
+            RELIEF_ROOT_R,
+            [[SHOULDER_X, RELIEF_R, 0.0], [RELIEF_START_X, RELIEF_R, 0.0]],
+            propagate=False,
+        ),
+    )
+    name_last_feature(adapter, "ReliefRoots")
+    drive_jobs.append(
+        (name_dimensions(adapter, "ReliefRoots", ["ReliefRootR"])[0], '"ReliefRootR"')
+    )
+    await volume_check(adapter, "relief roots", V_TOTAL, 0.005 * V_TOTAL)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
