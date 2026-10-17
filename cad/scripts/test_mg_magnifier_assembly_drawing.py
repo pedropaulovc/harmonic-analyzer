@@ -4,6 +4,7 @@ import ast
 import asyncio
 import math
 import re
+from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -672,6 +673,62 @@ def test_the_bom_rows_are_the_registry_parts_with_their_skus() -> None:
     assert drawing.BOM_SKUS["vn-thumb-screw"] == "91882A221"
     assert drawing.BOM_SKUS["mg-magnifying-lever"] == "-"
     assert stack.QUANTITIES["vn-thumb-screw"] == 2
+
+
+def test_the_bom_screw_lengths_are_the_vendor_specs_fractions() -> None:
+    import vn_clamp_screw_spec as clamp_screw
+    import vn_magnifying_bracket_screw_spec as bracket_screw
+    from _mcmaster_91882a221 import SHANK_LEN as thumb_len
+
+    for stem, length_mm, printed in (
+        (stack.CLAMP_SCREW, clamp_screw.SHANK_LEN, "1-1/4"),
+        (stack.BRACKET_SCREW, bracket_screw.LENGTH, "5/16"),
+        (stack.THUMB_SCREW, thumb_len, "7/16"),
+    ):
+        assert f" X {printed} " in stack.BOM_DESCRIPTIONS[stem]
+        assert float(sum(Fraction(p) for p in printed.split("-"))) == pytest.approx(
+            length_mm / 25.4
+        )
+
+
+@pytest.mark.parametrize(
+    ("length_mm", "printed"), ((1.5 * 25.4, "1-1/2"), (3.0 / 8.0 * 25.4, "3/8"))
+)
+def test_a_stock_screw_length_change_reprints_its_bom_fraction(
+    monkeypatch, length_mm: float, printed: str
+) -> None:
+    # Code review C04: a canonical stock-length change must move the printed
+    # fraction, not fail the spec's import on a duplicated expected length.
+    import importlib
+
+    import vn_clamp_screw_spec as clamp_screw
+
+    monkeypatch.setattr(clamp_screw, "SHANK_LEN", length_mm)
+    try:
+        importlib.reload(stack)
+        assert (
+            stack.BOM_DESCRIPTIONS[stack.CLAMP_SCREW]
+            == f"#8-32 X {printed} FILLISTER SCREW"
+        )
+    finally:
+        monkeypatch.undo()
+        importlib.reload(stack)
+
+
+def test_a_screw_length_off_the_sixty_fourths_refuses_the_bom(monkeypatch) -> None:
+    # A metric 8 mm stock (0.31496 in, 0.0625 mm off 5/16) has no catalogue
+    # fraction: the spec refuses rather than print a rounded one.
+    import importlib
+
+    import vn_magnifying_bracket_screw_spec as bracket_screw
+
+    monkeypatch.setattr(bracket_screw, "LENGTH", 8.0)
+    try:
+        with pytest.raises(ValueError, match="vn-magnifying-bracket-screw length.*1/64"):
+            importlib.reload(stack)
+    finally:
+        monkeypatch.undo()
+        importlib.reload(stack)
 
 
 def _inside(inner, outer) -> bool:
