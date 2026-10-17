@@ -120,10 +120,102 @@ def test_no_gdt_one_section_and_native_tap_callouts() -> None:
     assert "add_surface_finish" not in source
     assert "auto_center_marks" not in source
     assert source.count("create_section_view(") == 1
-    assert drawing.SECTION_HATCH_PATTERN == "ANSI31"
+    # The section hatches in the part's material crosshatch (IFaceHatch's
+    # pattern is get-only): the part sets it, the sheet only reads it back.
+    assert spec.SECTION_HATCH_PATTERN == "ANSI31 (Iron BrickStone)"
+    assert "SECTION_HATCH_PATTERN =" not in source
+    assert "UseMaterialHatch =" not in source
+    assert "_solid_line_hatch" not in source
     # Both #4-40 taps print native Hole Wizard callouts at the .XX depth places.
     assert source.count("add_native_hole_callout(") == 2
     assert set(spec.TAP_CALLOUT_PRECISION.values()) == {joint.HOLE_DEPTH_PLACES}
+
+
+class _Extension:
+    def __init__(self) -> None:
+        self.integers: dict[tuple[int, int], int] = {}
+        self.strings: dict[tuple[int, int], str] = {}
+
+    def SetUserPreferenceInteger(self, pref: int, option: int, value: int) -> bool:
+        self.integers[pref, option] = value
+        return True
+
+    def GetUserPreferenceInteger(self, pref: int, option: int) -> int:
+        return self.integers.get((pref, option), 0)
+
+    def SetUserPreferenceString(self, pref: int, option: int, value: str) -> bool:
+        self.strings[pref, option] = value
+        return True
+
+    def GetUserPreferenceString(self, pref: int, option: int) -> str:
+        return self.strings.get((pref, option), "ANSI33 (Bronze Brass)")
+
+
+class _Model:
+    def __init__(self) -> None:
+        self.Extension = _Extension()
+
+
+class _Hatch:
+    def __init__(self, material: bool, pattern: str) -> None:
+        self.UseMaterialHatch = material
+        self.Pattern = pattern
+
+
+class _Section:
+    def __init__(self, part: _Model, hatches: tuple[object, ...]) -> None:
+        self.ReferencedDocument = part
+        self._hatches = hatches
+
+    def GetFaceHatches(self) -> tuple[object, ...]:
+        return self._hatches
+
+    def GetFaceHatchCount(self) -> int:
+        return len(self._hatches)
+
+
+def test_part_sets_the_section_crosshatch_and_the_sheet_reads_it_back() -> None:
+    model = _Model()
+
+    class _Adapter:
+        currentModel = model
+
+    part._set_section_hatch(_Adapter())
+    ext = model.Extension
+    assert ext.integers == {
+        (spec.PREF_MATERIAL_HATCH_STYLE, 0): spec.AREA_HATCH_STYLE_PATTERN
+    }
+    assert ext.strings == {
+        (spec.PREF_MATERIAL_HATCH_PATTERN, 0): spec.SECTION_HATCH_PATTERN
+    }
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert source.index("apply_material(adapter, MATERIAL)") < source.index(
+        "_set_section_hatch(adapter)"
+    )
+    # Null slots are skipped; a real slot must be the ANSI31 material hatch.
+    hatch = _Hatch(True, "ANSI31")
+    drawing._assert_material_hatch(_Section(model, (None, hatch, None)))
+    drawing._assert_material_hatch(_Section(model, (None, None, None)))
+    with pytest.raises(RuntimeError, match="face hatch is not the ANSI31"):
+        drawing._assert_material_hatch(
+            _Section(model, (_Hatch(True, "ANSI33 (Bronze Brass)"),))
+        )
+    with pytest.raises(RuntimeError, match="face hatch is not the ANSI31"):
+        drawing._assert_material_hatch(_Section(model, (_Hatch(False, "ANSI31"),)))
+    # A part whose crosshatch was never set (the Brass default) is refused.
+    with pytest.raises(RuntimeError, match="clamp part crosshatch"):
+        drawing._assert_material_hatch(_Section(_Model(), (hatch,)))
+
+
+def test_part_refuses_a_crosshatch_that_does_not_read_back() -> None:
+    model = _Model()
+    model.Extension.SetUserPreferenceString = lambda *_args: False  # type: ignore[method-assign]
+
+    class _Adapter:
+        currentModel = model
+
+    with pytest.raises(RuntimeError, match="crosshatch read back"):
+        part._set_section_hatch(_Adapter())
 
 
 def test_end_views_are_third_angle_projections_of_the_front() -> None:

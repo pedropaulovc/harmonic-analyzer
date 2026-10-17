@@ -282,3 +282,20 @@ SEAT_NOTE = "MHA-MG-004 SHOULDER SEAT:\nNO CHAMFER OR SPOTFACE AT TAP"
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the stock.
 DRAWING_NOTES = STOCK_NOTE
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
+
+# --- Section hatch ----------------------------------------------------------------
+# Section A-A hatches the brass in ANSI31's continuous 45 deg lines, not the
+# Brass material's dashed ANSI33 (Bronze Brass).  IFaceHatch's Pattern and
+# Definition are get-only, so the PART's Material Properties crosshatch
+# carries it (set after the material: assigning a material applies its own
+# crosshatch) and the section view's material hatch picks it up.  The name is
+# the Sldwks.ptn entry's.
+SECTION_HATCH_PATTERN = "ANSI31 (Iron BrickStone)"
+# IModelDocExtension preferences, swDetailingNoOptionSpecified (0):
+# swUserPreferenceIntegerValue_e.swMaterialPropertyAreaHatchFillStyle = 268
+# takes swAreaHatchFillStyle_e.swAreaHatchFillStyle_Pattern = 2;
+# swUserPreferenceStringValue_e.swMaterialPropertyCrosshatchPattern = 13.
+PREF_MATERIAL_HATCH_STYLE = 268
+PREF_MATERIAL_HATCH_PATTERN = 13
+PREF_NO_OPTION = 0
+AREA_HATCH_STYLE_PATTERN = 2

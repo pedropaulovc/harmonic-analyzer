@@ -15,8 +15,9 @@ Views (3:1, hidden lines removed throughout, drawing-guidelines.md rule 9):
   flats (stock REF) over the top view, and each tap's native callout.
 * SECTION A-A, cut on the hex axis through the corners from the front: the
   bore through the corners, both blind taps in solid lines and the floor
-  between the rod tap and the bore, under a solid-line hatch with the
-  cosmetic threads kept off it; the bottom seat carries its flag note.
+  between the rod tap and the bore, under the part's material crosshatch
+  (ANSI31's continuous lines, read back) with the cosmetic threads kept off
+  it; the bottom seat carries its flag note.
 * Shaded isometric, 2:1.
 
 Run with SolidWorks open::
@@ -66,6 +67,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from mg_magnifying_clamp_spec import (
+    AREA_HATCH_STYLE_PATTERN,
     BLOCK_HEIGHT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -73,10 +75,14 @@ from mg_magnifying_clamp_spec import (
     HEX_AF,
     LEVER_BORE_CALLOUT,
     LEVER_BORE_Y,
+    PREF_MATERIAL_HATCH_PATTERN,
+    PREF_MATERIAL_HATCH_STYLE,
+    PREF_NO_OPTION,
     REFERENCE_DIMENSIONS,
     ROD_TAP_DRILL_DIA,
     ROD_TAP_PROCESS,
     SEAT_NOTE,
+    SECTION_HATCH_PATTERN,
     TAP_CALLOUT_PRECISION,
     TAP_DRILL_DEPTH_VARIABLE,
     TAP_THREAD_DEPTH_VARIABLE,
@@ -177,9 +183,6 @@ PROJECTION_SLOP_M = 1e-5
 _COSMETIC_THREAD_ANNOTATION = 1
 _CENTER_MARK_ANNOTATION = 13
 _SECTION_THREAD_LAYER = "MG-CLAMP-SECTION-THREADS-HIDDEN"
-# The section's hatch: ANSI31's continuous 45 deg lines, not the brass
-# material's dashed ANSI33.
-SECTION_HATCH_PATTERN = "ANSI31"
 
 # swDimensionTextParts_e definitions (5-8) and the writable part each is set
 # through (1-4) -- the draw_mg_output_fixture convention.
@@ -300,35 +303,43 @@ def _face_hatches(section: Any) -> list[Any]:
     ]
 
 
-def _solid_line_hatch(adapter: Any, section: Any) -> None:
-    """Swap the brass material hatch (dashed ANSI33) for continuous lines.
+def _assert_material_hatch(section: Any) -> None:
+    """Prove section A-A hatches in the part's material crosshatch, ANSI31.
 
-    IFaceHatch.Pattern is get-only (setting it raises "Unable to write
-    read-only property"); clearing UseMaterialHatch falls back to the
-    document's area hatch, which must read back as ANSI31."""
-    hatches = _face_hatches(section)
-    if not hatches:
-        view = _early_bound(section, "IView")
+    IFaceHatch's Pattern and Definition are get-only, so the part build sets
+    the crosshatch (mg_magnifying_clamp_spec.SECTION_HATCH_PATTERN); this only
+    reads back.  The referenced part's two preferences must hold it, and every
+    face hatch the view returns (GetFaceHatches may give only null slots on a
+    fresh section) must use the material hatch in that pattern."""
+    view = _early_bound(section, "IView")
+    part = _early_bound(view.ReferencedDocument, "IModelDoc2")
+    extension = _early_bound(part.Extension, "IModelDocExtension")
+    style = int(
+        extension.GetUserPreferenceInteger(PREF_MATERIAL_HATCH_STYLE, PREF_NO_OPTION)
+    )
+    pattern = str(
+        extension.GetUserPreferenceString(PREF_MATERIAL_HATCH_PATTERN, PREF_NO_OPTION)
+    )
+    if style != AREA_HATCH_STYLE_PATTERN or pattern != SECTION_HATCH_PATTERN:
         raise RuntimeError(
-            "section A-A has no face hatch: GetFaceHatchCount "
-            f"{view.GetFaceHatchCount()}, slots {len(view.GetFaceHatches() or ())}"
+            f"clamp part crosshatch is style {style}, pattern {pattern!r}; "
+            f"wanted {AREA_HATCH_STYLE_PATTERN}, {SECTION_HATCH_PATTERN!r}"
         )
-    for hatch in hatches:
-        hatch.UseMaterialHatch = False
-    rebuild_drawing(adapter, label="section A-A solid-line hatch")
+    pattern_id = SECTION_HATCH_PATTERN.split()[0]
     read = [
         (bool(hatch.UseMaterialHatch), str(hatch.Pattern))
         for hatch in _face_hatches(section)
     ]
-    if len(read) != len(hatches) or any(
-        material or not pattern.upper().startswith(SECTION_HATCH_PATTERN)
-        for material, pattern in read
+    if any(
+        not material or not hatch_pattern.upper().startswith(pattern_id)
+        for material, hatch_pattern in read
     ):
         raise RuntimeError(
-            f"section A-A hatch is not {SECTION_HATCH_PATTERN}: {read!r}"
+            f"section A-A face hatch is not the {pattern_id} material hatch: {read!r}"
         )
     _telemetry.success(
-        f"section A-A: {len(read)} face hatch(es) {SECTION_HATCH_PATTERN}"
+        f"section A-A material crosshatch {pattern!r} (style {style}); "
+        f"{view.GetFaceHatchCount()} face hatch(es), read {read!r}"
     )
 
 
@@ -456,7 +467,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="hex-axis section through the corners",
     )
     set_hidden_lines_removed(adapter, section)
-    _solid_line_hatch(adapter, section)
+    _assert_material_hatch(section)
     hidden = _hide_cosmetic_threads(adapter, section, label="section A-A")
     _telemetry.info(f"hid {hidden} cosmetic thread(s) in section A-A")
 
