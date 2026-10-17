@@ -3,7 +3,8 @@ r"""Create the MHA-CH-000 channel assembly fitter package (four sheets).
 1. ASSEMBLED VIEWS: Front, Right and the full-detail isometric at 1:7.
 2. EXPLODED VIEW + BOM: the builder-owned CHANNEL_EXPLODED isometric
    (ch_channel_assembly_spec), the native BOM with the registry's part
-   numbers and vendor SKUs, and one balloon per BOM row.
+   numbers, vendor SKUs and ch_channel_assembly_notes' descriptions, and one
+   balloon per BOM row.
 3. ROCKER BANK FIT-UP: the bank isolated at 1:1 with the closed-up stack
    length, a cropped 4:1 detail of the south end with the spring set, and
    steps 1-8. The south bracket is set off a wave disc spring that preloads
@@ -77,6 +78,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
+import ch_channel_assembly_notes as notes
 import ch_channel_assembly_spec as asm
 import ch_channel_assembly_steps as steps
 from ch_fulcrum_keeper_spec import (
@@ -263,7 +265,7 @@ BOM_SKUS = {
     for stem, row in PART_ROWS.items()
 }
 BOM_DESCRIPTIONS = {
-    stem: asm.BOM_DESCRIPTIONS[
+    stem: notes.BOM_DESCRIPTIONS[
         "vn-channel-spring-installed" if stem == SPRING_STEM else stem
     ]
     for stem in BOM_COMPONENTS
@@ -511,7 +513,7 @@ LUG_KEEP = {asm.LUG_SPAN_DIMENSION: LEVER_BANK.sheet_xy(_LUG_MID, _FULCRUM_Y + 3
 CALLOUT_TEXT_PART = 3  # swDimensionTextCalloutAbove
 REFERENCE_PREFIX_PART = 1  # swDimensionTextPrefix
 REFERENCE_SUFFIX_PART = 2  # swDimensionTextSuffix
-if any("\n" in text for text in asm.DIMENSION_CALLOUTS.values()):
+if any("\n" in text for text in notes.DIMENSION_CALLOUTS.values()):
     raise AssertionError("an above-callout with a line break does not print")
 
 
@@ -1344,7 +1346,7 @@ def _assert_settings(displays: dict[str, Any]) -> None:
                     f"{name}: band is not {asm.DIMENSION_TOLERANCES[name]}"
                 )
         text = str(display.GetText(CALLOUT_TEXT_PART) or "").replace("\r\n", "\n")
-        if text != asm.DIMENSION_CALLOUTS[name]:
+        if text != notes.DIMENSION_CALLOUTS[name]:
             raise RuntimeError(f"{name}: callout reads {text!r}")
 
 
@@ -1372,7 +1374,7 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     _place_labels(adapter, SHEET_NAMES[3], LEVER_END_LABELS)
     _place_steps(adapter, SHEET_NAMES[3], FITUP_NOTES[1], label="lever-bank steps")
 
-    for name, text in asm.DIMENSION_CALLOUTS.items():
+    for name, text in notes.DIMENSION_CALLOUTS.items():
         set_dimension_callouts(adapter, annotations, {name: text}, location="above")
     displays = _displays(adapter, annotations)
     for annotation in annotations:
