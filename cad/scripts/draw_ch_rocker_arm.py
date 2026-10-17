@@ -46,7 +46,11 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _check import check
 from _com import _early_bound
-from _drawing_attachment import _assert_attached_to, _assert_leader_lands
+from _drawing_attachment import (
+    _assert_attached_to,
+    _assert_leader_lands,
+    _is_same_attachment,
+)
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -97,7 +101,7 @@ from _layout_audit import (
     calibrate_sheet_advance,
 )
 from _layout_geometry import (
-    Box, Segment, clip_segment_to_circle, point_segment_distance,
+    ARROW_TEXT_CLEARANCE_M, Box, Segment, clip_segment_to_circle, point_segment_distance,
     segment_box_distance, segment_circle_distance, text_overlap, union_boxes,
 )
 from _gtol_frame import gtol_frame_signature, gtol_frame_xml
@@ -230,7 +234,7 @@ ROD_CALLOUT_XY = (0.279, 0.115)
 # from 0.183: the r1 render put the strap thickness value on its baseline.
 ISO_CAPTION_XY = (0.325, 0.189)
 # View F's own label (Opus review #1020: unlabeled at a scale other than the
-# sheet's): under the view, below the hub width's row and its datum G.
+# sheet's): under the view, below the hub width's row.
 RIGHT_CAPTION_XY = (0.052, 0.119)
 # Its viewing arrow (Opus #1020 r1: an enlarged view off the 1:2 front's
 # projection line reads as a removed view only with one): a letter note whose
@@ -577,6 +581,36 @@ def _detail_crop(adapter: Any, view: Any, *, label: str) -> tuple[float, float, 
     return readback.crop
 
 
+def _sheet_points_in_sketch(
+    adapter: Any, view: Any, sheet_points: Any, *, label: str, kind: str, owner: str
+) -> list[tuple[float, float, float]]:
+    """Sheet points in ``view``'s own drawing-sketch frame (ModelToSketchTransform)."""
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    if sketch is None:
+        raise RuntimeError(f"{label}: {owner} has no native drawing sketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    if transform is None or utility is None:
+        raise RuntimeError(f"{label}: missing native sketch transform or math utility")
+    mapped = []
+    for x, y in sheet_points:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        if point is None:
+            raise RuntimeError(f"{label}: cannot create native {kind} point")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        if projected is None:
+            raise RuntimeError(f"{label}: cannot map native {kind} point to sketch")
+        coordinates = tuple(float(v) for v in (projected.ArrayData or ()))
+        if len(coordinates) != 3 or not all(math.isfinite(v) for v in coordinates):
+            raise RuntimeError(
+                f"{label}: invalid native sketch {kind} point={coordinates!r}"
+            )
+        mapped.append(coordinates)
+    return mapped
+
+
 def _create_detail(
     adapter: Any, parent: Any, *, centre: tuple[float, float, float],
     radius_mm: float, target: tuple[float, float], scale: tuple[float, float], label: str,
@@ -590,25 +624,14 @@ def _create_detail(
     draw.ClearSelection2(True)
     rim = (centre[0] + radius_mm / 1000.0, centre[1], centre[2])
     sheet_points = _project(adapter, parent, (centre, rim), label=f"detail {label} fence")
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
-    if sketch is None:
-        raise RuntimeError(f"detail {label}: parent has no native drawing sketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    if transform is None or utility is None:
-        raise RuntimeError(f"detail {label}: missing native sketch transform or math utility")
-    mapped = []
-    for x, y in sheet_points:
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-        if point is None:
-            raise RuntimeError(f"detail {label}: cannot create native fence point")
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        if projected is None:
-            raise RuntimeError(f"detail {label}: cannot map native fence point to sketch")
-        coordinates = tuple(float(v) for v in (projected.ArrayData or ()))
-        if len(coordinates) != 3 or not all(math.isfinite(v) for v in coordinates):
-            raise RuntimeError(f"detail {label}: invalid native sketch fence point={coordinates!r}")
-        mapped.append(coordinates)
+    mapped = _sheet_points_in_sketch(
+        adapter,
+        parent,
+        sheet_points,
+        label=f"detail {label}",
+        kind="fence",
+        owner="parent",
+    )
     manager = _early_bound(draw.SketchManager, "ISketchManager")
     previous = bool(manager.AddToDB)
     manager.AddToDB = True
@@ -1935,8 +1958,7 @@ END_KEEP = {"RodTipLen": (0.377, 0.128)}
 # * the strap thickness with its fork-fit rows high, so its line (~0.214,
 #   model y ~21) crosses the strap alone, above the hub (Opus #1020 r2 C3);
 #   its position frame to G hangs under that line, over the hub;
-# * the hub length low, its line (~0.142) under the strap's bottom edge, where
-#   datum G stands on it (Main's 2026-10-15 option B).
+# * the hub length low, its line (~0.142) under the strap's bottom edge.
 # The root fillets' single limit reads left of the view between the two
 # blocks, under the strap's position frame and over the hub, its leader short
 # down-right to the +Z hub-root corner it measures (r3 run: requested right of
@@ -1953,17 +1975,19 @@ HUB_LENGTH_TEXT = (
 # widest row ("MHA-CH-000 STEP 1") clears the hub end.
 HUB_LENGTH_TEXT_XY = (0.040, 0.1578)
 HUB_ROOT_TEXT_XY = (0.047, 0.199)
-# Datum G's tag on the hub width's line (~0.142). SolidWorks keeps a
-# dimension-attached tag ON its dimension line, honouring only the requested
-# x, and leads it from the -Z arrow end (x 0.0856): requested inboard (r3b run
-# 20261015T155506221Z, x 0.080) its leader lay 5.6 mm along the line. So it
-# stands in line just outboard of that arrow (ASME Y14.5's datum feature on
-# the dimension line's extension), short of the front view's 132.8 left
-# witness (x ~0.105).
-HUB_WIDTH_DATUM_XY = (
-    RIGHT_CENTER[0] + rocker.HUB_LENGTH / 2.0 * RIGHT_SCALE[0] / RIGHT_SCALE[1] / 1000.0 + 0.008,
-    0.142,
-)
+# Datum G is the hub's -Z end face (#1579 owner ruling, option 1): the face
+# each arm registers on in the 20X stack, one a shop can set up on, where the
+# hub-width centre plane it replaces could only be derived. The strap frame's
+# ⌖0.10|G holds the strap's centre plane at a BASIC from that face to view
+# F's centreline. Both stand in the view's one free column, right of the -Z
+# face (x ~0.0856) and short of the front view's 132.8 left witness
+# (FRONT_LEFT_WITNESS_X): G's triangle on the face's lower half, its box
+# straight out right; the BASIC's line above the hub (top ~0.190), its boxed
+# text out right of the face.
+HUB_FACE_DATUM_LANDING_Y_MM = rocker.PIVOT_MID_Y - rocker.HUB_DIA / 4.0
+HUB_FACE_DATUM_STANDOFF_M = 0.0075
+HUB_FACE_BASIC_TEXT_XY = (0.0945, 0.199)
+FRONT_LEFT_WITNESS_X = 0.105
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
     "HubLength": HUB_LENGTH_TEXT_XY,
     "StrapThickness": STRAP_THICKNESS_TEXT_XY,
@@ -1985,7 +2009,7 @@ HUB_FACES = requirement(
         "length_nominal": (rocker.HUB_LENGTH, ("HUB_LENGTH",)),
         "upper_z": (rocker.HUB_LENGTH / 2, ("HUB_LENGTH",)),
         "lower_z": (-rocker.HUB_LENGTH / 2, ("HUB_LENGTH",)),
-        "datum": ("G", (("draw_ch_rocker_arm", "_hub_width_datum"),)),
+        "datum": ("G", (("draw_ch_rocker_arm", "_hub_face_datum"),)),
     }, precision={"length": _HUB_P},
 )
 STRAP_FACES = requirement(
@@ -2007,10 +2031,21 @@ STRAP_DATUM_B = requirement(
         "datum": ("B", (("draw_ch_rocker_arm", "build"),)),
     }, precision={"thickness": _STRAP_P},
 )
-part_metadata(datums={
-    "B": ({"feature": "strap_datum_b", "surface": "+Z broad strap face"}, (("draw_ch_rocker_arm", "build"),)),
-    "G": ({"feature": "hub_faces", "surface": "hub width centre plane"}, (("draw_ch_rocker_arm", "_hub_width_datum"),)),
-})
+part_metadata(
+    datums={
+        "B": (
+            {"feature": "strap_datum_b", "surface": "+Z broad strap face"},
+            (("draw_ch_rocker_arm", "build"),),
+        ),
+        "G": (
+            {
+                "feature": "hub_faces",
+                "surface": "-Z hub end face (20X stack registration)",
+            },
+            (("draw_ch_rocker_arm", "_hub_face_datum"),),
+        ),
+    }
+)
 BASIC_PROFILE_DIMENSIONS = {"TopRadius", "BottomRadius", "TopAbovePivot"}
 
 
@@ -2530,7 +2565,6 @@ def _select_view_dimension(adapter: Any, view: Any, annotation: Any, *, label: s
 
 def _attach_to_dimension(
     adapter: Any, annotation: Any, display: Any, dimension_annotation: Any, *, label: str,
-    position: tuple[float, float] | None = None,
 ) -> None:
     """Hold ``annotation`` on the selected dimension, then prove it after a rebuild.
 
@@ -2547,12 +2581,6 @@ def _attach_to_dimension(
             attempts.append(f"{kind}:{accepted}:{attached}")
             if accepted and attached:
                 break
-    # Left where InsertDatumTag2 drops it, D's leader ran 10 mm along the hub
-    # width's dimension line (r3 run 20261015T142035980Z layout audit,
-    # line-on-dimension-line); the tag keeps to its line, so only its x is
-    # chosen (HUB_WIDTH_DATUM_XY).
-    if position is not None and not annotation.SetPosition2(*position, 0.0):
-        raise RuntimeError(f"{label}: failed to position it")
     adapter.currentModel.ClearSelection2(True)
     rebuild_drawing(adapter, label=label)
     kinds = tuple(int(value) for value in annotation.GetAttachedEntityTypes() or ())
@@ -2563,29 +2591,6 @@ def _attach_to_dimension(
     attached = _early_bound(entities[0], "IDisplayDimension")
     if int(adapter.swApp.IsSame(attached, display)) != 1:
         raise RuntimeError(f"{label}: attached to another dimension")
-
-
-def _hub_width_datum(adapter: Any, view: Any, hub_length: Any) -> Any:
-    """Datum G on the native hub width: the centre plane of both hub end
-    faces (Main's 2026-10-15 option B), its tag in line with the dimension
-    line at HUB_WIDTH_DATUM_XY. G, not D: detail D already uses that letter
-    (Opus #1020 r3 C4)."""
-    label = "hub width datum G"
-    display, dimension_annotation = _select_view_dimension(adapter, view, hub_length, label=label)
-    raw_tag = adapter.currentModel.InsertDatumTag2()
-    if raw_tag is None:
-        raise RuntimeError(f"{label}: InsertDatumTag2 returned nothing")
-    tag = _early_bound(raw_tag, "IDatumTag")
-    letter = HUB_FACES.fields["datum"][0]
-    if not tag.SetLabel(letter):
-        raise RuntimeError(f"{label}: failed to label it {letter}")
-    _attach_to_dimension(
-        adapter, _early_bound(tag.GetAnnotation(), "IAnnotation"), display,
-        dimension_annotation, label=label, position=HUB_WIDTH_DATUM_XY,
-    )
-    if str(tag.GetLabel()) != letter:
-        raise RuntimeError(f"{label}: label did not persist")
-    return tag
 
 
 def _dimension_position_frame(
@@ -2631,12 +2636,280 @@ def _dimension_position_frame(
 
 def _strap_position_frame(adapter: Any, view: Any, strap_thickness: Any) -> Any:
     """Position the strap width's centre plane to G under its 2.500 size
-    (#948 ruling R's symmetry; Main's 2026-10-15 option B)."""
+    (#948 ruling R's symmetry), at the BASIC from G view F prints
+    (_hub_face_basic)."""
     return _dimension_position_frame(
         adapter, view, strap_thickness, label="strap position to G",
         tolerance=GEOMETRIC_TOLERANCES_MM["strap position to hub"],
         datums=tuple(STRAP_FACES.fields["position_datums"][0]),
     )
+
+
+# View F's one centreline: the strap's centre plane (model Z = 0), from just
+# under the bottom arc's midpoint to just over the top-arc ends. The strap
+# frame's ⌖0.10|G locates that plane, so its BASIC from G (the hub's -Z end
+# face) is dimensioned to this line (#1579: reviews read the frame with no
+# basic as a defect, drawing-guidelines.md's complete-frame rule).
+CENTRE_PLANE_OVERSHOOT_MM = 1.0
+CENTRE_PLANE_Y_MM = (-CENTRE_PLANE_OVERSHOOT_MM, TOP_END_Y + CENTRE_PLANE_OVERSHOOT_MM)
+CENTRE_PLANE_READBACK_TOL = 1e-9
+
+
+def _strap_centre_plane(adapter: Any, view: Any) -> Any:
+    """Draw the strap's centre plane through the hub and the strap in view
+    F, direct to the database (an inferred end snaps onto nearby ink), and
+    read its ends and black colour back."""
+    label = "view F hub/strap centre plane"
+    draw = adapter.currentModel
+    view_f = view_name(adapter, view)
+    if _early_bound(draw, "IDrawingDoc").ActivateView(view_f) is not True:
+        raise RuntimeError(f"{label}: cannot activate view F")
+    draw.ClearSelection2(True)
+    ends = tuple((0.0, y / 1000.0, 0.0) for y in CENTRE_PLANE_Y_MM)
+    sheet_points = _project(adapter, view, ends, label=label)
+    mapped = _sheet_points_in_sketch(
+        adapter, view, sheet_points, label=label, kind="centreline", owner="view F"
+    )
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateCenterLine(*mapped[0], *mapped[1])
+    finally:
+        manager.AddToDB = previous
+    if segment is None:
+        raise RuntimeError(f"{label}: CreateCenterLine returned nothing")
+    line = _early_bound(segment, "ISketchLine")
+    for expected, accessor in zip(mapped, ("GetStartPoint2", "GetEndPoint2")):
+        point = _early_bound(getattr(line, accessor)(), "ISketchPoint")
+        actual = tuple(float(getattr(point, axis)) for axis in ("X", "Y", "Z"))
+        drift = max(abs(a - b) for a, b in zip(actual, expected, strict=True))
+        if drift > CENTRE_PLANE_READBACK_TOL:
+            raise RuntimeError(
+                f"{label}: {accessor} sits at {actual}, not the authored {expected}"
+            )
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError(f"{label}: black colour did not persist")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+    return segment
+
+
+# G's BASIC: the -Z hub face to the strap's centre plane, both off the face
+# requirements (the half hub length, 3.52825, printed at its places).
+HUB_FACE_BASIC_MM = (
+    STRAP_FACES.fields["upper_z"][0] + STRAP_FACES.fields["lower_z"][0]
+) / 2.0 - HUB_FACES.fields["lower_z"][0]
+_SEL_EDGES = 1  # swSelectType_e.swSelEDGES
+
+
+def _hub_face_datum_g(
+    adapter: Any,
+    view: Any,
+    centre_plane: Any,
+    hub_length: Any,
+) -> tuple[Any, Any]:
+    """Datum G on the hub's -Z end face, its BASIC to the strap's centre
+    plane, then both read back from their printed ink."""
+    label = "hub -Z end face datum G"
+    face_z = HUB_FACES.fields["lower_z"][0]
+    face = (
+        scan_view_edges(view, label="view F hub -Z end face")
+        .circle_at(
+            (0.0, rocker.PIVOT_MID_Y, face_z),
+            rocker.HUB_DIA / 2.0,
+            axis=(0.0, 0.0, 1.0),
+            label=label,
+        )
+        .edge
+    )
+    landing, plane_point = _project(
+        adapter,
+        view,
+        (
+            (0.0, HUB_FACE_DATUM_LANDING_Y_MM / 1000.0, face_z / 1000.0),
+            (0.0, HUB_FACE_DATUM_LANDING_Y_MM / 1000.0, 0.0),
+        ),
+        label=f"{label} landing",
+    )
+    tag = _hub_face_datum(adapter, view, face, landing)
+    basic = _hub_face_basic(
+        adapter, view, centre_plane, face, picks=(plane_point, landing)
+    )
+    _assert_hub_face_datum_clear(
+        adapter,
+        tag,
+        {"G BASIC": basic.GetAnnotation(), "hub width": hub_length},
+        face_x=landing[0],
+        label=label,
+    )
+    return tag, basic
+
+
+def _hub_face_datum(
+    adapter: Any,
+    view: Any,
+    face: Any,
+    landing: tuple[float, float],
+) -> Any:
+    """Datum G's tag on the hub's -Z end face, picked by the face's own rim
+    (edge-on in view F), its triangle landed on the face's lower half and
+    proved there from ink, its box straight out right."""
+    return add_datum_feature(
+        adapter,
+        view,
+        edge_entity=face,
+        leader_attach_xy=landing,
+        symbol_xy=(landing[0] + HUB_FACE_DATUM_STANDOFF_M, landing[1]),
+        datum=HUB_FACES.fields["datum"][0],
+        label="hub -Z end face datum G",
+    )
+
+
+def _hub_face_basic(
+    adapter: Any,
+    view: Any,
+    centre_plane: Any,
+    face: Any,
+    *,
+    picks: tuple[tuple[float, float], tuple[float, float]],
+) -> Any:
+    """The BASIC from G to the strap's centre plane: view F's centreline to
+    the -Z face's rim, each picked by entity, boxed at the hub length's places.
+
+    The +Z face stands the same distance off the centreline, so the value
+    alone cannot tell the faces apart: the one attached edge must BE the -Z
+    rim (IsSame), beside one other attachment, the centreline.
+    """
+    label = "datum G to strap centre plane BASIC"
+    display = _early_bound(
+        add_edge_dimension(
+            adapter,
+            view,
+            p0=picks[0],
+            p1=picks[1],
+            text_xy=HUB_FACE_BASIC_TEXT_XY,
+            label=label,
+            orientation="horizontal",
+            entity_types=("SKETCHSEGMENT", "EDGE"),
+            entities=(centre_plane, face),
+        ),
+        "IDisplayDimension",
+    )
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    entities = tuple(annotation.GetAttachedEntities3() or ())
+    types = tuple(int(kind) for kind in annotation.GetAttachedEntityTypes() or ())
+    edges = [item for item, kind in zip(entities, types) if kind == _SEL_EDGES]
+    dangling = bool(annotation.IsDangling())
+    if (
+        len(entities) != 2
+        or len(types) != 2
+        or len(edges) != 1
+        or dangling
+        or not _is_same_attachment(adapter, edges[0], face, "EDGE")
+    ):
+        raise RuntimeError(
+            f"{label}: not the dimension from the centreline to the -Z face: "
+            f"entities={len(entities)}, types={types}, dangling={dangling}"
+        )
+    assert_dimension_measures(
+        adapter, display, expected_mm=HUB_FACE_BASIC_MM, label=label
+    )
+    places = HUB_FACES.precision["length"]
+    display.SetPrecision3(places, -1, -1, -1)  # -1: swDoNotChangePrecisionSetting
+    if display.GetPrimaryPrecision2() != places:
+        raise RuntimeError(f"{label}: did not take {places} places")
+    set_basic_dimension(adapter, display, label=label)
+    return display
+
+
+def _assert_hub_face_datum_clear(
+    adapter: Any,
+    tag: Any,
+    neighbours: dict[str, Any],
+    *,
+    face_x: float,
+    label: str,
+) -> Box:
+    """Read G back from its printed ink, as the layout audit measures it, and
+    fail unless it stands where it was put.
+
+    Its letter must stand out right of the -Z face and short of the front
+    view's 132.8 left witness, ARROW_TEXT_CLEARANCE_M clear of each
+    neighbour's arrows (``find_arrows_near_text``'s arrow and outside-arrow
+    tail segments) and text, its triangle as clear of their text, every
+    neighbour's text short of that witness, and the tag still attached. The
+    hub-width tag G replaces rebuilt 1.89 mm onto an arrow from a placement
+    main printed clear (run 20261017T024838726Z), and an edge-attached tag
+    re-solves along its edge (add_datum_feature), so no unread placement ships.
+    """
+    tag_annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    if tag_annotation.IsDangling():
+        raise RuntimeError(f"{label}: dangling after its placement")
+    names = list(neighbours)
+    reader = _Reader(adapter)
+    records = [
+        _dump_annotation(reader, tag_annotation),
+        *(_dump_annotation(reader, neighbours[name]) for name in names),
+    ]
+    errors = reader.take_errors()
+    if any(record is None for record in records) or errors:
+        raise RuntimeError(f"{label}: cannot measure its ink: {errors!r}")
+    advance = calibrate_sheet_advance(records)
+    datum, *others = (
+        annotation_geometry(record, owner="right", advance=advance)
+        for record in records
+    )
+    letter = union_boxes(list(datum.text_boxes)) if datum is not None else None
+    if letter is None or any(other is None for other in others):
+        raise RuntimeError(f"{label}: no printed letter or neighbour to measure")
+    triangle = [segment for segment in datum.segments if segment.role == "arrow"]
+    witness = FRONT_LEFT_WITNESS_X - ARROW_TEXT_CLEARANCE_M
+    problems = []
+    if letter.xmin - face_x < ARROW_TEXT_CLEARANCE_M:
+        problems.append("letter not out right of the -Z face")
+    if letter.xmax > witness:
+        problems.append("letter runs onto the front view's left witness")
+    readings = [
+        f"letter_mm={letter.format_mm()}",
+        f"face_x={face_x:.5f}",
+        f"xmax_limit={witness:.5f}",
+    ]
+    for name, geometry in zip(names, others):
+        arrows = [
+            *(segment for segment in geometry.segments if segment.role == "arrow"),
+            *getattr(geometry, "arrow_tails", ()),
+        ]
+        gap = min(
+            (segment_box_distance(segment, letter) for segment in arrows),
+            default=math.inf,
+        )
+        text_air = min(
+            (_box_air(letter, box) for box in geometry.text_boxes), default=math.inf
+        )
+        crowding = min(
+            (
+                segment_box_distance(segment, box)
+                for segment in triangle
+                for box in geometry.text_boxes
+            ),
+            default=math.inf,
+        )
+        readings.append(
+            f"{name}: arrow_gap_mm={gap * 1000.0:.3f}, text_air_mm={text_air * 1000.0:.3f}, "
+            f"triangle_air_mm={crowding * 1000.0:.3f}"
+        )
+        if min(gap, text_air, crowding) < ARROW_TEXT_CLEARANCE_M:
+            problems.append(f"crowds the {name}")
+        if any(box.xmax > witness for box in geometry.text_boxes):
+            problems.append(f"the {name} text runs onto the front view's left witness")
+    detail = f"{label}: " + "; ".join(readings)
+    _telemetry.info(detail)
+    if problems:
+        raise RuntimeError(f"{label}: {', '.join(problems)}: {detail}")
+    return letter
 
 
 def _hub_position_frame(adapter: Any, hub: Any, hub_dia: Any) -> Any:
@@ -3595,7 +3868,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale (an auto-scaled view shifts every coordinate pick).
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
     # View F, the 3:1 removed right end view: the 2.50 x ~29 strap section --
-    # prints the strap thickness, the hub width (datum G) and the hub-root
+    # prints the strap thickness, the hub width, datum G on the hub's -Z end
+    # face with its BASIC to the strap's centre plane, and the hub-root
     # fillets, gives the through direction, and carries datum B (the broad
     # face) so the rod-pin position frame has an orientation datum.
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=RIGHT_SCALE)
@@ -3695,12 +3969,18 @@ async def build(adapter: Any) -> dict[str, str]:
     try:
         phase = "view F hub-root radius"
         _dress_hub_root(adapter, right_annotations)
-        phase = "view F datum G"
-        (hub_length,) = [ann for ann in right_annotations if dimension_name(adapter, ann) == "HubLength"]
-        _hub_width_datum(adapter, right, hub_length)
         phase = "view F strap position frame"
         (strap_thickness,) = [ann for ann in right_annotations if dimension_name(adapter, ann) == "StrapThickness"]
         _strap_position_frame(adapter, right, strap_thickness)
+        phase = "view F hub/strap centre plane"
+        centre_plane = _strap_centre_plane(adapter, right)
+        phase = "view F datum G"
+        (hub_length,) = [
+            ann
+            for ann in right_annotations
+            if dimension_name(adapter, ann) == "HubLength"
+        ]
+        _hub_face_datum_g(adapter, right, centre_plane, hub_length)
     except Exception as exc:  # noqa: BLE001 - the imported native drawing still exists
         _capture_layout_failure(adapter, phase, exc)
         raise

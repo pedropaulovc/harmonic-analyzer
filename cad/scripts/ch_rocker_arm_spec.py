@@ -135,7 +135,8 @@ HUB_LENGTH_BAND = (0.05, 0.0)
 # The strap symmetric to the hub within this (total; #948 ruling R, PR #1292):
 # the hub stack places the arm, the strap carries the rod's fork, so a flat
 # rod's float on the arm is measured from the hub's mid-plane. The sheet
-# prints it as a position zone on the strap width to datum G, the hub width.
+# prints it as a position zone on the strap width to datum G, the hub's -Z
+# end face (the 20X stack registration), at a BASIC to the strap mid-plane.
 STRAP_HUB_SYMMETRY = 0.10
 # The hub-to-strap root fillet (drawing-guidelines rule 16), printed as the
 # single limit "R0.2 MAX" (Opus #1020 r2 C2). The MHA-CH-001 foot cheeks pass

@@ -2338,6 +2338,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "dt_crank_pinion_spec",
         # Drilled-hole row bounds the rocker's #47 hole the rod-slot pin enters.
         "ch_rocker_arm_tl_outline_template_spec",
+        # Drilled-hole row bounds the hub's supply bore under the Ø6.50 ream.
+        "ch_rocker_hub_spec",
         "dt_crankshaft_spec",
         "error_budget",
         "export_features",

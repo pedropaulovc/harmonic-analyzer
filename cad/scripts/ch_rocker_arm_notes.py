@@ -50,8 +50,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # The strap thickness, +/-0.025 natively at three places (Main ruling
     # 2026-10, option b; ch_rocker_arm_spec.ARM_THICKNESS_BAND): the Strap
     # extrude's depth, printed in the end view where the section reads. Its
-    # mid-plane is located by a position frame to datum G, the hub width
-    # (#948 ruling R; Main's 2026-10-15 option B over the old 2X StrapOffset).
+    # mid-plane is located by a position frame to datum G, the hub's -Z end
+    # face, at a BASIC to that plane (#948 ruling R; #1579 option 1).
     "Strap": {"StrapThickness"},
     # The hub-to-strap root fillets' single limit (HUB_ROOT_RADIUS_MAX).
     "HubRoot": {"HubRootRadius"},
@@ -95,9 +95,16 @@ HUB_WALL_NOTE = f"HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f} MIN"
 
 # BUILT_UP_PERMISSION_NOTE may be supplied only as exact explicit permission
 # text in DRAWING_NOTES. None/absence means one_piece, never inferred permission.
-BUILT_UP_PERMISSION_NOTE = None
+# Route v3 (user ruling, 2026-10-16): the part may be the turned hub
+# MHA-CH-012 joined to the flat strap MHA-CH-013. Permission only; the joint
+# (its fit) is on those two details (ch_rocker_hub_fit), never a method here
+# -- the note points at them so the joint is defined, not left open (r1
+# machinist review of "MAY BE BUILT UP FROM ...").
+BUILT_UP_PERMISSION_NOTE = (
+    "3. MAY BE HUB MHA-CH-012 JOINED TO STRAP MHA-CH-013 PER THEIR DWGS."
+)
 
-# Two lines (drawing-guidelines rule 7; Opus #1020 r3 C3).
+# Three lines (drawing-guidelines rule 7; Opus #1020 r3 C3).
 DRAWING_NOTES = "\n".join(
     (
         # B2-1, option 4: datum C is the rod-pin hole and the BASIC pin
@@ -111,12 +118,13 @@ DRAWING_NOTES = "\n".join(
         # (ch_rocker_arm_spec); the hub OD's position frame to A in detail D
         # (HUB_COAXIALITY_DIA) holds the named-exception wall.
         f"2. {HUB_WALL_NOTE}; OD CLEARS MHA-CH-001 FOOT CHEEKS.",
+        BUILT_UP_PERMISSION_NOTE,
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
 # The end view prints at 3:1, not the sheet's 1:2, off the front's projection
 # line: a removed view named by its viewing arrow (Opus #1020 r1), enlarged
-# so the hub width, its datum and the strap's position read apart (r2).
+# so the hub width, datum G and the strap's position read apart (r2).
 VIEW_ARROW_LETTER = "F"
 RIGHT_VIEW_SCALE = 3
 RIGHT_VIEW_NOTE = f"VIEW {VIEW_ARROW_LETTER} SCALE {RIGHT_VIEW_SCALE}:1"

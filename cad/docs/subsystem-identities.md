@@ -10,10 +10,12 @@ Drawing Numbers use `MHA-<CATEGORY>-<NNN>`. `000` is the category's assembly dra
 
 Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<nn>`, sequenced per parent from `01`: `MHA-DT-005-TL-01` is the cone pivot post's bond cradle. The stem is the parent stem plus `-tl-<name>`, such as `dt-cone-pivot-post-tl-bond-cradle`. Fixtures are parts only. They never enter a machine assembly or BOM, and the table's part counts exclude them. Bought finished fixture hardware, such as dowels, screws and magnetic bases, is not modelled.
 
+Components of a built-up part are the detail parts a finished part may be made from when its own drawing notes permit it (`BUILT_UP_PERMISSION_NOTE` in its notes module). They are ordinary machine parts: each takes the next free Number in its category and its own stem, such as `ch-rocker-hub` (MHA-CH-012) and `ch-rocker-strap` (MHA-CH-013) for the rocker arm MHA-CH-006, and the table's part counts include them. The finished part stays the assembly's part, so a component never enters an assembly or BOM. Its registry row instead names its parent's stem in `component_of`, and the coverage contract (`test_part_coverage.py`) counts it reachable through that parent and refuses a `component_of` parent whose notes do not permit the built-up route. A component's drawing gives it as supplied to the joint; sizes finished after joining print on the parent's drawing only.
+
 | Prefix | Category | Parts |
 |---|---|---:|
 | `ha` / `HA` | Harmonic analyzer | 0 |
-| `ch` / `CH` | Channel | 10 |
+| `ch` / `CH` | Channel | 12 |
 | `dt` / `DT` | Drive train | 35 |
 | `fr` / `FR` | Frame | 5 |
 | `mg` / `MG` | Magnifier | 10 |
@@ -336,3 +338,5 @@ next free Number in its category and has no old stem or old Number.
 | added | `vn-rocker-thrust-washer` | MHA-VN-070 | carbon-steel ring shim, 1/4 ID x 3/8 OD x 0.031 in, McMaster-Carr 3088A429; one each end of the rocker bank on the MHA-CH-005 pivot shaft, the north one against the datum MHA-CH-008 ear |
 | retired | `dt-crank-seat-washer` | MHA-DT-036 | deleted, owner ruling D1 2026-10-15: collar bears on the post boss |
 | added | `vn-bracket-hold-down-screw` | MHA-VN-071 | McMaster 90280A196 #8-32 x 5/8 slotted narrow fillister, zinc-plated steel; one per MHA-CH-008 foot into MHA-FR-005's top-face seat (owner Q13c), so the transferred seat stays 11.5 thread / 14.7 drill; MHA-VN-032 keeps the arbor pedestals |
+| added | `ch-rocker-hub` | MHA-CH-012 | turned 1018 hub of the built-up MHA-CH-006 rocker arm (`component_of: ch-rocker-arm`); its Ø10.20 r6 land is pressed into the MHA-CH-013 strap's H7 hole, then the bore and length are finished on MHA-CH-006 |
+| added | `ch-rocker-strap` | MHA-CH-013 | 1018 flat strap of the built-up MHA-CH-006 rocker arm (`component_of: ch-rocker-arm`); finished outline and 2.5 thickness with the Ø10.20 H7 hole for the MHA-CH-012 hub |

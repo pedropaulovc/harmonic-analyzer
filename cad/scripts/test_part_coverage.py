@@ -3,11 +3,42 @@
 from __future__ import annotations
 
 import _buildgraph as bg
+import _config
 import _drawing_registry as registry
+import export_features
 
 PART_DRAWING_EXEMPTIONS = {
     "pd_platen_paper": "consumable recording paper sheet; not manufactured",
 }
+
+
+def _components() -> dict[str, str]:
+    """``component_of`` rows: a detail part a parent part may be built up from
+    (subsystem-identities.md, "Components of a built-up part"). Stems in the
+    build's underscore form."""
+    return {
+        stem.replace("-", "_"): str(row["component_of"]).replace("-", "_")
+        for stem, row in _config.parts().items()
+        if "component_of" in row
+    }
+
+
+def test_components_name_a_built_part_whose_notes_permit_the_construction():
+    """A component is in the machine only through its parent, so the parent
+    must exist and its own drawing notes must permit the built-up route
+    (export_features: explicit BUILT_UP_PERMISSION_NOTE text)."""
+    parts = set(bg.part_stems())
+    components = _components()
+    for component, parent in components.items():
+        assert component in parts, f"{component}: component row without a build"
+        assert parent in parts, (
+            f"{component}: component_of names no built part {parent}"
+        )
+        assert parent not in components, f"{component}: nested component {parent}"
+        assert (
+            export_features.requirement_manifest(parent)["construction"]
+            == "built_up_permitted"
+        ), f"{component}: {parent}'s notes do not permit a built-up part"
 
 
 def test_part_and_assembly_coverage():
@@ -42,6 +73,8 @@ def test_part_and_assembly_coverage():
     }
     exemptions = set(PART_DRAWING_EXEMPTIONS)
     referenced_fixtures = fixtures & set().union(*references.values())
+    components = _components()
+    reachable |= {stem for stem, parent in components.items() if parent in reachable}
     violations = {
         "orphans": parts - fixtures - reachable,
         "shop fixtures referenced by assemblies (#1239)": referenced_fixtures,
