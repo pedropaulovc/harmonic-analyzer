@@ -378,7 +378,7 @@ def test_the_bom_covers_every_family_once_with_its_sku() -> None:
         assert drawing.BOM_DESCRIPTIONS[stem]
     assert drawing.BOM_QUANTITIES[drawing.SPRING_STEM] == drawing.CHANNELS
     assert sum(drawing.BOM_QUANTITIES.values()) == 2 + 7 * 2 + 1 + 9 * drawing.CHANNELS
-    # The anchor's jam nut (MHA-CH-012, made) is its own row, one per anchor.
+    # The anchor's jam nut (MHA-CH-014, made) is its own row, one per anchor.
     nut = drawing.asm.ANCHOR_NUT
     assert drawing.BOM_QUANTITIES[nut] == drawing.BOM_QUANTITIES[drawing.asm.HOOK]
     assert drawing.BOM_SKUS[nut] == drawing.MADE_PART_SKU
