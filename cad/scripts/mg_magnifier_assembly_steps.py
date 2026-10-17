@@ -3,7 +3,7 @@
 The ch_channel_assembly_steps pattern: a step's number is its position in
 SEQUENCE, so inserting a step renumbers every later one and every pointer
 that cites a step by key follows. The sheet prints the step text
-(mg_magnifier_assembly_spec.STEP_TEXT); this module holds only the order.
+(mg_magnifier_assembly_notes.STEP_TEXT); this module holds only the order.
 Pure data: no SolidWorks, no config reads.
 
 The bench builds the wheel group and the lever group apart. The wheel bar is
