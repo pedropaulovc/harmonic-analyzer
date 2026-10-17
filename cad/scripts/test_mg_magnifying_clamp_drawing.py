@@ -67,20 +67,29 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     assert spec.WALLS["rod-tap drill point to the lever bore"][1] == pytest.approx(
         spec.ROD_TAP_FLOOR_WALL_WORST
     )
-    assert spec.BORE_WALL[1] == pytest.approx(1.6289, abs=1e-4)
-    assert spec.BORE_WALL_STATED_MIN == 1.62
-    assert spec.WALL_FLOOR <= spec.BORE_WALL_STATED_MIN <= spec.BORE_WALL[1]
-    assert spec.BORE_WALL_STATED_MIN < spec.WALL_TARGET
-    assert spec.LEVER_BORE_FROM_FLAT == pytest.approx(spec.HEX_AF / 2.0)
-    assert spec.LEVER_BORE_FROM_FLAT_PLACES == spec.HEIGHT_PLACES
-    # The printed 5.56's band about the true half-flats, the stock's half band
-    # and the drill's wander to mid-block.
-    printed = round(spec.LEVER_BORE_FROM_FLAT, spec.HEIGHT_PLACES)
-    band = spec.printed_band_mm(spec.HEIGHT_PLACES)
-    offset = printed - spec.LEVER_BORE_FROM_FLAT
-    assert spec.BORE_OFFSET_MAX == pytest.approx(
-        abs(offset) + band + spec.HEX_AF_BAND / 2.0 + spec.BORE_WANDER
+    # The bore centred between the flats by symmetry: its largest drilled Ø
+    # on the thinnest stock, off centre by the drill's run-off to mid-block.
+    bore_nominal, bore_worst = spec.WALLS["lever bore to a flat"]
+    assert bore_nominal == pytest.approx((spec.HEX_AF - 6.2) / 2.0)
+    wander = 0.10 + spec.HEX_AC / 2.0 * math.tan(math.radians(0.3))
+    assert bore_worst == pytest.approx(
+        (spec.HEX_AF - spec.HEX_AF_BAND) / 2.0 - (6.2 + 0.10) / 2.0 - wander
     )
+    assert bore_worst == pytest.approx(2.2077, abs=1e-4)
+    assert bore_worst >= spec.WALL_TARGET
+    # No printed location from a flat: the bore's only offset is its wander.
+    assert spec.BORE_OFFSET_MAX == spec.BORE_WANDER == pytest.approx(wander)
+    for gone in (
+        "LEVER_BORE_FROM_FLAT",
+        "LEVER_BORE_FROM_FLAT_PLACES",
+        "BORE_WALL",
+        "BORE_WALL_STATED_MIN",
+    ):
+        assert not hasattr(spec, gone), gone
+    for module in (part, drawing, spec):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "BoreFromFlat" not in source, module.__name__
+        assert "FlatWitness" not in source, module.__name__
     assert spec.THUMB_ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert joint.ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert spec.TAP_REACH_NEEDED <= spec.PLUG_TAP_USABLE_LENGTH
@@ -89,14 +98,16 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     assert spec.ROD_TAP_SPEC is joint.ROD_TAP_SPEC
 
 
-def test_linked_notes_state_stock_only_and_the_bore_states_its_wall() -> None:
+def test_linked_notes_state_stock_only_and_the_bore_states_no_wall() -> None:
     notes = spec.DRAWING_NOTES
     assert notes == "7/16 HEX BAR, FLATS AS SUPPLIED."
     for gone in ("CENTRED", "PLUG TAP", "CHAMFER", "WALL", "SEAT", "THREAD ENDS"):
         assert gone not in notes
     assert not hasattr(spec, "TAP_TOOL_NOTE")
     assert not hasattr(spec, "BORE_WALL_NOTE")
-    assert "WALL TO FLAT 1.62 MIN" in spec.LEVER_BORE_CALLOUT
+    # The bore's wall to a flat holds the target: the sheet states none (rule 20).
+    assert "WALL" not in spec.LEVER_BORE_CALLOUT
+    assert spec.LEVER_BORE_CALLOUT == "DRILL THRU CORNERS\nSLIP ON Ø6 LEVER MHA-MG-003"
     assert "MHA-MG-003" in spec.LEVER_BORE_CALLOUT
     assert spec.SEAT_NOTE.startswith("MHA-MG-004 SHOULDER SEAT")
     assert "NO CHAMFER OR SPOTFACE" in spec.SEAT_NOTE
