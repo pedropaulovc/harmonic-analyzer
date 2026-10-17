@@ -244,11 +244,22 @@ CENTROID = (
 # mass-property evaluation (well under one through hole, 154 mm^3).
 VOLUME_TOL_MM3 = 5e-4 * VOLUME_MM3
 
-# The special order's hole pattern, stated for the supplier and checked on
-# receipt: it must land on the TL-20 base bar's tapped holes.
-DRAWING_NOTES = (
-    f"SPECIAL ORDER: {HOLE_COUNT} HOLES AT {HOLE_PITCH:.0f} PITCH,"
-    f" {HOLE_END:.0f} FROM EACH END, TO SUIT TL-20."
-)
+# The special order's receipt check: the received rail must land on the
+# TL-20 base bar's tapped holes. The print states it as native model
+# dimensions on the hole face, parenthesised as reference (the rail is used
+# as supplied): the cut length is the Rail extrusion's depth, and the hole
+# sketch places the first hole from the -X end face and each next one a
+# pitch on from the one before, so one pitch prints for all of them.
+DRAWING_DIMENSIONS = {
+    "Rail": {"Length"},
+    "BoltHoleProfile": {"HoleEnd", "HolePitch"},
+}
+# Whole millimetres: the order's own values.
+DRAWING_PRECISION = {
+    feature: dict.fromkeys(names, 0) for feature, names in DRAWING_DIMENSIONS.items()
+}
+# The one printed pitch stands for every gap between the holes.
+HOLE_PITCH_CALLOUT = f"{HOLE_COUNT - 1}X"
+DRAWING_NOTES = "SPECIAL ORDER CUT LENGTH AND HOLE PATTERN, TO SUIT TL-20."
 if abs(LENGTH - (2.0 * HOLE_END + (HOLE_COUNT - 1) * HOLE_PITCH)) > 1e-9:
     raise AssertionError("the rail's hole pattern is not symmetric on its length")
