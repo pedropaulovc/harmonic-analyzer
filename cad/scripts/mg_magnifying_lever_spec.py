@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from _fit_deviations import deviations
 from _gtol_cylinder import CylinderFace
-from _surface_finish import SEAT_UM, SurfaceFinishControl
+from _surface_finish import GROUND_UM, SEAT_UM, SurfaceFinishControl
 from mg_lever_press_fit_geom import (
     COLLAR_BORE_DIA,
     COLLAR_LENGTH,
@@ -26,6 +26,7 @@ from mg_lever_press_fit_geom import (
     PRESS_ZONE_DIA_BAND,
     PRESS_ZONE_LENGTH,
     ROD_DIA,
+    ROD_LAND_RA_UM,
 )
 from mg_magnifying_lever_geom import ROD_LENGTH  # noqa: F401 (re-export)
 
@@ -109,9 +110,22 @@ if not _stock_low <= _zone_low <= _zone_high <= _stock_high:
 # shop could act on.  The revolve's one top line makes the body ONE Ø6
 # cylindrical face from dome tangent to dome tangent, so the press zone is
 # the same face: the zone keeps its own diameter band (PRESS_ZONE_DIA_BAND),
-# the Ra 3.2 governs the face's finish.
+# and the Ra 3.2 governs the face everywhere but the press land below.
+#
+# --- the MHA-MG-001 press land: Ra 0.8 over the press zone --------------------
+# #1570 PRESS ONLY (owner ruling, no bond): the matched fit's 0.007 minimum
+# diametral interference still grips after DIN 7190 smoothing only at Ra 0.8
+# on BOTH the collar bore and this land (mg_lever_press_fit_geom
+# .ROD_LAND_RA_UM).  Under the face's general Ra 3.2 the loosest press would
+# smooth by 0.8 x 4 x (3.2 + 0.8) um = 0.0128, past that minimum.  So the land
+# carries its own symbol: the stricter grade overrides the Ra 3.2 over the
+# press zone the PressZone sketch bounds (its start line to the dome
+# tangent), and its reason names the collar at the symbol.
+if ROD_LAND_RA_UM != GROUND_UM:
+    raise AssertionError("the press land's printed Ra must be the smoothing budget's")
 SURFACE_FINISHES = (
     SurfaceFinishControl("clamp_screw_seat", SEAT_UM, CylinderFace(ROD_DIA)),
+    SurfaceFinishControl("press_land", GROUND_UM, CylinderFace(ROD_DIA)),
 )
 # The seat's reason stands at its symbol (rule 7: say why, where it applies),
 # naming the clamp whose screw bears there.
@@ -121,6 +135,9 @@ SCREW_SEAT_CALLOUT = f"{CLAMP_NUMBER} SCREW SEAT"
 # The mate both banded zone callouts name: the bracket whose collar the zone
 # is pressed into.
 MATE_NUMBER = "MHA-MG-001"
+# The land's reason stands at its symbol too (rule 7), naming the collar it is
+# pressed into; two rows, so it fits between the stock diameter and the symbol.
+PRESS_LAND_CALLOUT = f"{MATE_NUMBER}\nPRESS LAND"
 
 # Dimension callouts that state a manufacturing fact (the mate, the
 # interference) are derived here from the fit contract -- never typed on the
