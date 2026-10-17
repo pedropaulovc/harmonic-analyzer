@@ -174,6 +174,8 @@ def test_sensitivities_match_the_brief() -> None:
     assert f"{trammel.RADIUS_PER_TENTH_DEG:.1f}" == "4.7"
     # A spacing error of 0.1 changes R by about 0.18.
     assert f"{0.1 * trammel.RADIUS_PER_SPACING:.2f}" == "0.18"
+    # C3 radial play, unmounted worst case, on the cut radius.
+    assert f"{trammel.RADIUS_FROM_BEARING_PLAY:.3f}" == "0.041"
 
 
 def test_hold_down_studs_land_on_t_slots_inside_the_table() -> None:

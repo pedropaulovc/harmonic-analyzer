@@ -852,6 +852,27 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_base_bar",
+        part="ch_rocker_arm_tl_oblique_base_bar",
+        artifact_stem="ch-rocker-arm-tl-oblique-base-bar",
+        script_name="draw_ch_rocker_arm_tl_oblique_base_bar.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_pivot_block",
+        part="ch_rocker_arm_tl_oblique_pivot_block",
+        artifact_stem="ch-rocker-arm-tl-oblique-pivot-block",
+        script_name="draw_ch_rocker_arm_tl_oblique_pivot_block.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_pivot_pin",
+        part="ch_rocker_arm_tl_oblique_pivot_pin",
+        artifact_stem="ch-rocker-arm-tl-oblique-pivot-pin",
+        script_name="draw_ch_rocker_arm_tl_oblique_pivot_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_rocker_arm_tl_outline_template",
         part="ch_rocker_arm_tl_outline_template",
         artifact_stem="ch-rocker-arm-tl-outline-template",
