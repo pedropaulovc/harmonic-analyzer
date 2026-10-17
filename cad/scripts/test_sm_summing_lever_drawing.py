@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -381,7 +382,9 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) ->
     assert prefixes[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X "
     assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "4X "
     callout = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromLeft"]
-    assert " ".join(callout.split()) == "KNIFE EDGE SYMMETRIC TO SIDES, BOTH STUBS"
+    assert " ".join(callout.split()) == (
+        "KNIFE EDGE SYMMETRIC TO SIDES, BOTH STUBS; SIDES IN ONE PLANE"
+    )
     assert "MILL" not in callout and "PASS" not in callout
     every_callout = {**notes.DIMENSION_CALLOUTS_ABOVE, **notes.DIMENSION_CALLOUTS_BELOW}
     assert "HexWidth" not in every_callout
@@ -426,6 +429,159 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) ->
     )
     # The model sketch's angle is the flank-to-side angle the print rounds.
     assert round(180.0 - spec.RIDGE_ANGLE_DEG / 2.0, 1) == spec.KNIFE_FLANK_TO_SIDE_DEG
+
+
+def _builder_function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
+    tree = ast.parse(Path(lever_build.__file__).read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+            return node
+    raise AssertionError(f"build_sm_summing_lever has no {name}()")
+
+
+def _calls_in_order(node: ast.AST) -> list[ast.Call]:
+    calls = [call for call in ast.walk(node) if isinstance(call, ast.Call)]
+    return sorted(calls, key=lambda call: (call.lineno, call.col_offset))
+
+
+def _call_name(call: ast.Call) -> str:
+    func = call.func
+    return func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+
+
+def test_both_knife_stubs_are_one_prism_read_back_coplanar() -> None:
+    """Code review C09: the stubs are ONE sketch extruded mid-plane through
+    the body, so each side face of the -Z stub is the +Z stub's plane by
+    construction, and the build reads that back once the model is final."""
+    assert not hasattr(lever_build, "_hex_collar")
+    order = [_call_name(call) for call in _calls_in_order(_builder_function("build"))]
+    for name in ("_hex_knife", "_knife_stub_reference", "_assert_knife_sides_coplanar"):
+        assert order.count(name) == 1, name
+    knife = order.index("_hex_knife")
+    reference = order.index("_knife_stub_reference")
+    readback = order.index("_assert_knife_sides_coplanar")
+    assert knife < reference < readback
+    assert "volume_check" in order[reference:readback]
+
+    prism = [_call_name(call) for call in _calls_in_order(_builder_function("_hex_knife"))]
+    assert prism.count("create_sketch") == 1
+    assert prism.count("create_extrusion") == 1
+    assert "extrude_at_offset" not in prism
+    [params] = [
+        call
+        for call in _calls_in_order(_builder_function("_hex_knife"))
+        if _call_name(call) == "ExtrusionParameters"
+    ]
+    keywords = {keyword.arg: ast.unparse(keyword.value) for keyword in params.keywords}
+    assert keywords == {"depth": "2.0 * HEX_Z_OUTER", "both_directions": "True"}
+
+
+def test_the_knife_prism_merges_into_the_pivot_between_the_stubs() -> None:
+    """One prism leaves the solid unchanged only if the hexagon lies inside
+    the solid cylinder between the body ends and each stub keeps its own
+    21.717 overhang."""
+    spec = sm_summing_lever_spec
+    w2, h2, h4 = spec.HEX_W / 2.0, spec.HEX_H / 2.0, spec.HEX_H / 4.0
+    vertices = [(0.0, h2), (-w2, h4), (-w2, -h4), (0.0, -h2), (w2, -h4), (w2, h4)]
+    assert max(math.hypot(x, y) for x, y in vertices) < spec.CYL_R
+    assert spec.HEX_Z_INNER == spec.PLATE_L / 2.0
+    assert spec.HEX_Z_OUTER - spec.HEX_Z_INNER == pytest.approx(spec.HEX_DEPTH)
+    for name in ("HEX_W", "HEX_H", "HEX_DEPTH", "HEX_Z_INNER", "HEX_Z_OUTER", "CYL_R"):
+        assert getattr(lever_build, name) == getattr(spec, name), name
+    assert notes.DRAWING_DIMENSIONS["KnifeStubReference"] == {"KnifeStubLength"}
+    assert notes.DIMENSION_PREFIXES[("KnifeStubReference", "KnifeStubLength")] == "2X "
+
+
+def _knife_faces(shift_minus_z_side_m: float = 0.0) -> list[SimpleNamespace]:
+    """Fake IFace2s for the HexKnife prism: per stub, its six lateral faces
+    (split once, as a boolean may), its outboard end and a ridge round."""
+    spec = sm_summing_lever_spec
+    w2, h2, h4 = spec.HEX_W / 2000.0, spec.HEX_H / 2000.0, spec.HEX_H / 4000.0
+    vertices = [(0.0, h2), (-w2, h4), (-w2, -h4), (0.0, -h2), (w2, -h4), (w2, h4)]
+
+    def face(normal, root, z_range, *, plane: bool = True) -> SimpleNamespace:
+        surface = SimpleNamespace(
+            IsPlane=lambda: plane, PlaneParams=(*normal, *root)
+        )
+        return SimpleNamespace(
+            Normal=normal,
+            GetSurface=lambda: surface,
+            GetBox=lambda: (-w2, -h2, z_range[0], w2, h2, z_range[1]),
+        )
+
+    faces = []
+    for sign in (1.0, -1.0):
+        inner, outer = sign * spec.HEX_Z_INNER / 1000.0, sign * spec.HEX_Z_OUTER / 1000.0
+        mid = (inner + outer) / 2.0
+        for index, (a, b) in enumerate(zip(vertices, vertices[1:] + vertices[:1])):
+            # The chain runs CCW, so (dy, -dx) points out of the prism.
+            nx, ny = b[1] - a[1], a[0] - b[0]
+            length = math.hypot(nx, ny)
+            normal = (nx / length, ny / length, 0.0)
+            root = list(a) + [mid]
+            if sign < 0.0 and index == 1:  # the -Z stub's -X side face
+                root[0] -= shift_minus_z_side_m
+            for span in ((inner, mid), (mid, outer)):
+                faces.append(face(normal, tuple(root), sorted(span)))
+        faces.append(face((0.0, 0.0, sign), (0.0, 0.0, outer), (outer, outer)))
+        faces.append(face((0.0, 1.0, 0.0), (0.0, h2, mid), sorted((inner, outer)), plane=False))
+    return faces
+
+
+def _knife_adapter(faces: list[SimpleNamespace]) -> SimpleNamespace:
+    feature = SimpleNamespace(GetFaces=lambda: faces)
+    model = SimpleNamespace(FeatureByName=lambda name: feature if name == "HexKnife" else None)
+    return SimpleNamespace(currentModel=model)
+
+
+def test_the_coplanarity_readback_passes_one_prism_and_fails_a_stepped_side() -> None:
+    lever_build._assert_knife_sides_coplanar(_knife_adapter(_knife_faces()))
+    stepped = _knife_adapter(_knife_faces(shift_minus_z_side_m=1e-5))
+    with pytest.raises(RuntimeError, match="not one plane each"):
+        lever_build._assert_knife_sides_coplanar(stepped)
+    # Within KNIFE_SIDE_PLANE_TOL (1e-6 m, the API's unit) the planes are one.
+    lever_build._assert_knife_sides_coplanar(
+        _knife_adapter(_knife_faces(shift_minus_z_side_m=0.5e-6))
+    )
+
+
+def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -> None:
+    """Each ridge is 4.040 +/-0.05 from its stub's sides.  Only with both
+    stubs' sides the same planes does that hold the two ridges within 0.10
+    of each other (0.077 of hook-arm spread over the hole column); the bound,
+    the callout and the one-prism build stand or fall together."""
+    spec = sm_summing_lever_spec
+    assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == pytest.approx(0.10)
+    assert spec.KNIFE_STUB_RIDGE_OFFSET_MAX == 2.0 * spec.RIDGE_FROM_SIDE_TOL
+    assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(spec.HEX_Z_INNER + spec.HEX_Z_OUTER)
+    assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.077, abs=5e-4)
+    callout = " ".join(notes.DIMENSION_CALLOUTS_BELOW["RidgeFromLeft"].split())
+    assert "BOTH STUBS" in callout and "SIDES IN ONE PLANE" in callout
+    assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
+    assert lever_build.KNIFE_SIDE_PLANE_TOL == 1e-6
+    assert "_assert_knife_sides_coplanar" in [
+        _call_name(call) for call in _calls_in_order(_builder_function("build"))
+    ]
+    assert not hasattr(lever_build, "_hex_collar")
+
+
+def test_the_ridge_callout_stays_left_of_detail_d() -> None:
+    """The callout hangs six lines under the 2X 4.040 ±0.05 at the left of
+    Detail D, whose fence bulges left beside its lower lines.  Measured on
+    the stack-final sheet (3.5 mm text): 2.5 mm a character, 5.5 mm a line."""
+    lines = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromLeft"].split("\n")
+    assert max(map(len, lines)) <= notes.RIDGE_CALLOUT_MAX_CHARS
+    assert max(map(len, lines)) < len("2X 4.040 ±0.05")
+    scale = drawing.DETAIL_SCALE[0] / 1000.0
+    cx, cy = drawing.DETAIL_CENTER
+    radius = drawing.DETAIL_RADIUS_MM * scale
+    text_x, text_y = drawing.DETAIL_KEEP["RidgeFromLeft"]
+    for index, line in enumerate(lines, start=1):
+        line_y = text_y - 0.0055 * index
+        right = text_x + 0.0025 * len(line) / 2.0
+        dy = min(abs(line_y - cy), radius)
+        fence_left = cx - math.sqrt(radius**2 - dy**2)
+        assert right < fence_left - 0.002, line
 
 
 def test_the_knife_detail_text_stands_clear_of_the_hexagon() -> None:
