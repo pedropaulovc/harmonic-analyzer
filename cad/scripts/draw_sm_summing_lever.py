@@ -15,10 +15,11 @@ shows a 1:2 front profile (the boss, web and the rib outline every rib
 shares), a 4:1 detail of the trunnion envelope and its knife-edge round, a
 1:2 top plan (plate, ribs, cylinder, summation web, trunnion length, the
 anchor taps and their pattern control, and the VIEW F arrow onto the -Z
-end), a 1:1 partial section C-C of the plate's thickness and a 1:4
-isometric; sheet 2 shows VIEW F at 1:1, the -Z end with the two bracket
-receiver taps and the spring-anchor pad under the plate they sit in, so the
-end rib's slant over each tap reads.  Sheet 1 runs at 1:2.
+end), a 1:1 partial section C-C of the plate's thickness, a 1:1 section H-H
+cut in the front profile along the outer receiver tap through the -Z end
+rib, and a 1:4 isometric; sheet 2 shows VIEW F at 1:1, the -Z end with the
+two bracket receiver taps and the spring-anchor pad under the plate they sit
+in, so the end rib's slant over each tap reads.  Sheet 1 runs at 1:2.
 
 Run with SolidWorks open::
 
@@ -78,6 +79,7 @@ from magnifying_bracket_joint_layout import (
     DRILL_DEPTH,
     DRILL_DEPTH_BAND,
     LEVER_HOLE_POINTS,
+    RIB_DEPTH,
     TAP_DRILL_DIA,
     THREAD_DEPTH,
 )
@@ -212,6 +214,56 @@ PLATE_SECTION_CAPTION_XY = (0.075, 0.150)
 # past the cut's inboard end on that mid-plane.
 _PLATE_SECTION_ANCHOR_MM = (sum(PLATE_SECTION_X) / 2.0, 0.0, PLATE_SECTION_Z)
 PLATE_SECTION_TEXT_MM = {"PlateThickness": (PLATE_SECTION_X[0] - 6.0, 0.0, PLATE_SECTION_Z)}
+
+# Section H-H: the outer bracket receiver tap (x 29.7, 14.75 from the free
+# edge) cut along its axis, so the thread reads inside the -Z end rib's full
+# height with the solid plate beyond the drill point (machinist review r16
+# read the taps as centred in section C-C's bare 5.08 plate).  The cut is
+# taken in VIEW G, the end profile, where the line crosses only the rib and
+# plate: in the plan its arrows would cross VIEW F's arrow or the 20X frame's
+# leader, and in VIEW F its letters would sit on the 14.75/28.45 extension
+# lines.  The line runs from 11 mm under the mid-plane (3 mm below the rib)
+# to 16 mm over it and looks +X (arrows pointing right, letters right of the
+# line), so the upper letter stands over the 0.44 step's extension lines
+# (sheet y 0.2363) and under 35.75's dimension line (0.2484), the lower one
+# in open field; looking -X, both would print on the boss.  The removed
+# section, cut face only at 1:1, is
+# cropped to the end rib and TAP_SECTION_PLATE_BEYOND of plate past the rib,
+# a break line where the plate is cut off, in the free field right of the
+# plan above the 152.40/7.30 extension lines (0.1681), its caption above it
+# clear of VIEW G's label and the isometric's.
+TAP_SECTION_LETTER = "H"
+TAP_SECTION_HOLE = max(LEVER_HOLE_POINTS, key=lambda point: point[0])
+TAP_SECTION_LINE_Y = (-11.0, 16.0)
+TAP_SECTION_SCALE = (1, 1)
+TAP_SECTION_PLATE_BEYOND = 7.0
+# Model (z, y) crop corners: 1 mm past the end face, the rib's full height
+# (5.06 half-height at x 29.7) with margin, and the plate beyond the rib.
+_TAP_SECTION_FAR_Z = TAP_SECTION_HOLE[2] + RIB_DEPTH + TAP_SECTION_PLATE_BEYOND
+TAP_SECTION_CROP = (
+    (TAP_SECTION_HOLE[2] - 1.0, 7.0),
+    (_TAP_SECTION_FAR_Z, -7.0),
+)
+# The printed cut face's centre (end face to the break, on the mid-plane)
+# lands on TAP_SECTION_CENTER.
+_TAP_SECTION_ANCHOR_MM = (
+    TAP_SECTION_HOLE[0],
+    0.0,
+    (TAP_SECTION_HOLE[2] + _TAP_SECTION_FAR_Z) / 2.0,
+)
+TAP_SECTION_CENTER = (0.295, 0.177)
+TAP_SECTION_CAPTION_XY = (0.295, 0.2015)
+# A long-break line (thin, one Z at mid-thickness) across the cut-off plate,
+# overrunning both faces (model z, y), draw_fr_nameplate's SECTION_BREAK.
+_TAP_BREAK_OVERRUN = 0.8
+TAP_SECTION_BREAK = (
+    (_TAP_SECTION_FAR_Z, PLATE_T / 2.0 + _TAP_BREAK_OVERRUN),
+    (_TAP_SECTION_FAR_Z, 0.8),
+    (_TAP_SECTION_FAR_Z + 0.6, 0.3),
+    (_TAP_SECTION_FAR_Z - 0.6, -0.3),
+    (_TAP_SECTION_FAR_Z, -0.8),
+    (_TAP_SECTION_FAR_Z, -PLATE_T / 2.0 - _TAP_BREAK_OVERRUN),
+)
 
 # The -Z end rib's banded depth is named by
 # build_sm_summing_lever._receiver_model_bands, and the receiver stations by
@@ -866,6 +918,192 @@ def _plate_section(adapter: Any, top: Any) -> list[Any]:
     return annotations
 
 
+def _sheet_to_view_sketch(
+    adapter: Any, view: Any, sheet_points: list[tuple[float, float]]
+) -> list[tuple[float, ...]]:
+    """Sheet points in ``view``'s own sketch (its ModelToSketchTransform),
+    for fences and lines sketched into a view."""
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_points:
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    return points
+
+
+def _tap_section(adapter: Any, front: Any) -> Any:
+    """Section H-H along the outer receiver tap (TAP_SECTION_* above), cut in
+    VIEW G: cut face only, looking +X, turned +Y up, cropped to the end rib
+    and the plate beyond (draw_fr_nameplate's ``_crop_section``), its centre
+    landed on TAP_SECTION_CENTER, and a break line where the plate is cut
+    off."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    x_mm, _, end_z = TAP_SECTION_HOLE
+    line = model_points_in_view(
+        adapter,
+        front,
+        [_metres((x_mm, y, end_z)) for y in TAP_SECTION_LINE_Y],
+        label="section H-H line",
+        names=("below", "above"),
+    )
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=line[0],
+        line_end=line[1],
+        view_xy=TAP_SECTION_CENTER,
+        section_label=TAP_SECTION_LETTER,
+        scale=TAP_SECTION_SCALE,
+        partial=True,
+        label="receiver tap section",
+    )
+    native = _early_bound(section, "IView")
+    cut = _early_bound(native.GetSection(), "IDrSection")
+    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
+    # dedicated bool getter may be truth-tested.
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="section H-H cut face only")
+    if not cut.GetDisplayOnlySurfaceCut():
+        raise RuntimeError("section H-H retained geometry beyond the cutting plane")
+
+    def arrows_point_right() -> bool:
+        # GetArrowInfo: each arrow's start (on the line) then its tip, in
+        # sheet space; the tips point the direction of sight.
+        info = [float(value) for value in (cut.GetArrowInfo() or ())]
+        if len(info) != 12:
+            raise RuntimeError(f"section H-H arrow info has {len(info)} values")
+        return all(
+            info[i + 3] - info[i] > 0.0 and abs(info[i + 4] - info[i + 1]) <= 1e-6
+            for i in (0, 6)
+        )
+
+    if not arrows_point_right():
+        reversed_cut = not bool(cut.GetReversedCutDirection())
+        cut.SetReversedCutDirection(reversed_cut)
+        rebuild_drawing(adapter, label="section H-H looks +X")
+        if bool(cut.GetReversedCutDirection()) != reversed_cut:
+            raise RuntimeError("section H-H cut direction did not persist")
+        if not arrows_point_right():
+            raise RuntimeError("section H-H arrows do not point right")
+    _telemetry.info(
+        f"section H-H arrows {tuple(cut.GetArrowInfo() or ())!r}, "
+        f"letters {tuple(cut.GetTextInfo() or ())!r}"
+    )
+    set_hidden_lines_removed(adapter, native)
+    anchor = _metres(_TAP_SECTION_ANCHOR_MM)
+    above = _metres((_TAP_SECTION_ANCHOR_MM[0], 1.0, _TAP_SECTION_ANCHOR_MM[2]))
+    for attempt in range(3):
+        origin = model_point_in_view(adapter, native, anchor, label="H-H anchor")
+        up = model_point_in_view(adapter, native, above, label="H-H +Y")
+        dx, dy = up[0] - origin[0], up[1] - origin[1]
+        if dy > 0.0 and abs(dx) <= 1e-7:
+            break
+        native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(dy, dx)
+        rebuild_drawing(adapter, label=f"section H-H turned, pass {attempt}")
+    else:
+        raise RuntimeError(f"section H-H does not run +Y up: ({dx:g}, {dy:g})")
+
+    # Crop2(jagged, no outline, intensity) round a corner-rectangle fence in
+    # the section's own sketch; it returns swCropViewErrors_e, 1 NoError.
+    rebuild_drawing(adapter, label="section H-H before crop")
+    fence = model_points_in_view(
+        adapter,
+        native,
+        [_metres((x_mm, y, z)) for z, y in TAP_SECTION_CROP],
+        label="section H-H crop corners",
+    )
+    if not ddoc.ActivateView(view_name(adapter, native)):
+        raise RuntimeError("failed to activate section H-H for its crop")
+    draw.ClearSelection2(True)
+    before = tuple(float(value) for value in native.GetOutline())
+    corners = _sheet_to_view_sketch(adapter, native, fence)
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    segments = tuple(
+        sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
+    )
+    if len(segments) != 4:
+        raise RuntimeError(f"section H-H crop fence has {len(segments)} segments")
+    for segment in segments:
+        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
+            raise RuntimeError("failed to select the section H-H crop fence")
+    status = int(native.Crop2(False, True, 0))
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="section H-H crop")
+    native.UpdateViewDisplayGeometry()
+    outline = tuple(float(value) for value in native.GetOutline())
+    _telemetry.info(
+        f"section H-H Crop2 status {status}: outline {before!r} -> {outline!r}, "
+        f"fence corners {fence!r}"
+    )
+    # The outline carries a margin past the fence (draw_fr_nameplate r3: a
+    # 68.8 mm fence read back 88.0 mm); the proof is the shrink.
+    width = abs(fence[1][0] - fence[0][0])
+    if (
+        status != 1
+        or not bool(native.IsCropped())
+        or outline[2] - outline[0] > width + 0.025
+        or outline[2] - outline[0] > 0.25 * (before[2] - before[0])
+    ):
+        raise RuntimeError(
+            f"section H-H did not crop to {width * 1000.0:.1f} mm: status {status}, "
+            f"outline {before!r} -> {outline!r}"
+        )
+
+    for attempt in range(4):
+        native.UpdateViewDisplayGeometry()
+        projected = model_point_in_view(
+            adapter, native, anchor, label=f"H-H centre, pass {attempt}"
+        )
+        if math.dist(projected, TAP_SECTION_CENTER) <= 1e-4:
+            break
+        position = tuple(float(value) for value in native.Position)
+        moved = [
+            position[axis] + TAP_SECTION_CENTER[axis] - projected[axis]
+            for axis in (0, 1)
+        ]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to re-centre section H-H")
+        rebuild_drawing(adapter, label=f"section H-H re-centred, pass {attempt}")
+    else:
+        raise RuntimeError(
+            f"section H-H centre stands at {projected}, not {TAP_SECTION_CENTER}"
+        )
+
+    # The break line, thin, in the section's own sketch; AddToDB keeps sketch
+    # inference from snapping its short segments onto the cut face's edges.
+    break_points = model_points_in_view(
+        adapter,
+        native,
+        [_metres((x_mm, y, z)) for z, y in TAP_SECTION_BREAK],
+        label="section H-H break line",
+    )
+    if not ddoc.ActivateView(view_name(adapter, native)):
+        raise RuntimeError("failed to activate section H-H for its break line")
+    draw.ClearSelection2(True)
+    points = _sheet_to_view_sketch(adapter, native, break_points)
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        for index in range(len(points) - 1):
+            if sketch_manager.CreateLine(*points[index], *points[index + 1]) is None:
+                raise RuntimeError(f"section H-H break line segment {index} failed")
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="section H-H break line")
+    position_section_caption(
+        adapter, native, TAP_SECTION_CAPTION_XY, label="receiver tap section H-H"
+    )
+    return native
+
+
 def _mounting_rims(back: Any) -> list[Any]:
     """Back looks from -Z directly onto the blind taps' entry circles."""
     edges = scan_view_edges(back, label="bracket receiver face")
@@ -1488,6 +1726,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole pattern position",
     )
     _plate_section(adapter, top)
+    _tap_section(adapter, front)
     _add_view_arrow(adapter, top, BACK_VIEW_LETTER, VIEW_F_ARROW)
     _add_view_arrow(adapter, top, FRONT_VIEW_LETTER, VIEW_G_ARROW)
     add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
@@ -1590,8 +1829,9 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         redundant_note_substrings=("Tapped Hole",),
         # main's 3, plus the bracket taps' per-hole cosmetic threads (2) in the
-        # receiver sheet's two views: 7 observed on the farm 2026-10-09.
-        expected_redundant_notes=7,
+        # receiver sheet's two views: 7 observed on the farm 2026-10-09; and
+        # the outer tap's own in section H-H, which cuts its thread.
+        expected_redundant_notes=8,
     )
 
 
