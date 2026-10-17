@@ -94,10 +94,10 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert joint.COUNTERBORE_END_WALL_MIN == pytest.approx(2.000)
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(3.840)
     assert joint.HEAD_PROTRUSION == pytest.approx(2.1082)
-    # A flush head cannot keep the full-thread envelope inside the 5.08 rib.
+    # A flush head would run the screw past the tap's full thread.
     flush_reach = joint.SCREW_LENGTH - joint.SIDE_PLATE_THICKNESS + joint.SCREW_HEAD_HEIGHT
     assert flush_reach == pytest.approx(6.8707)
-    assert flush_reach > joint.RIB_DEPTH
+    assert flush_reach > joint.THREAD_DEPTH
     head_air = (
         min(joint.SCREW_MACHINE_X) - joint.SCREW_HEAD_DIA / 2.0
         - (KNIFE[0] + knife_mount.BLK_HALF_X)
@@ -127,13 +127,16 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
     assert joint.TAP_SPEC.end == "blind"
     assert joint.TAP_SPEC.depth_mm == joint.DRILL_DEPTH == 6.05
     assert joint.TAP_SPEC.overrides_mm["ThreadDepth"] == joint.THREAD_DEPTH == 4.95
-    assert joint.THREAD_RIB_MARGIN_MIN == pytest.approx(0.03)
+    assert joint.RIB_DEPTH == 7.3
+    assert joint.RIB_DEPTH_BAND == joint.LINEAR_BAND == 0.51
+    assert joint.THREAD_RIB_MARGIN_MIN == pytest.approx(1.79)
     assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0075)
     assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.042857142857)
-    assert joint.DRILL_POINT_RIB_MARGIN == pytest.approx(-1.50416454)
-    assert joint.DRILL_POINT_RIB_MARGIN_MIN == pytest.approx(-1.68420754)
-    # The user permits ONLY this small-diameter continuation in the thin plate.
-    assert joint.DRILL_LATERAL_WALL_MIN == pytest.approx(1.501)
+    # The whole tap drill, point included, stays in the deepened end rib at
+    # the title block's band, its wander counted as if axial.
+    assert joint.DRILL_POINT_RIB_MARGIN == pytest.approx(0.71583546)
+    assert joint.DRILL_POINT_RIB_MARGIN_MIN == pytest.approx(0.0406367, abs=1e-6)
+    assert joint.DRILL_WANDER_MAX == pytest.approx(0.0351558, abs=1e-7)
 
 
 @pytest.mark.parametrize(
@@ -142,9 +145,10 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
         ("SCREW_LENGTH = 7.9375", "1.5D full engagement"),
         ("FLANGE_THICKNESS_BAND = 0.13", "1.5D full engagement"),
         ("THREAD_DEPTH = 4.95", "bottoms"),
-        ("RIB_DEPTH = 5.08", "beyond the front rib"),
+        ("RIB_DEPTH = 7.3", "breaks out of the front rib"),
+        ("RIB_DEPTH_BAND = LINEAR_BAND", "breaks out of the front rib"),
         ("DRILL_DEPTH = 6.05", "bottoming-tap lead"),
-        ("LEVER_PLATE_THICKNESS_BAND = 0.05", r"drawing-guidelines\.md rule 17 \(walls and webs\) wall"),
+        ("SIDE_PLATE_HEIGHT = 12.7", r"drawing-guidelines\.md rule 17 \(walls and webs\) wall"),
         ("COUNTERBORE_DIA = 3.8", "head float"),
     ),
 )
@@ -154,9 +158,10 @@ def test_joint_guards_reject_lost_margins(replacement: str, failure: str) -> Non
         "SCREW_LENGTH": 7.85,
         "FLANGE_THICKNESS_BAND": 0.20,
         "THREAD_DEPTH": 4.85,
-        "RIB_DEPTH": 5.04,
+        "RIB_DEPTH": 7.2,
+        "RIB_DEPTH_BAND": 0.60,
         "DRILL_DEPTH": 6.00,
-        "LEVER_PLATE_THICKNESS_BAND": 0.10,
+        "SIDE_PLATE_HEIGHT": 8.0,
         "COUNTERBORE_DIA": 3.70,
     }[replacement.split(" = ")[0]]
     assert source.count(replacement) == 1
@@ -213,12 +218,15 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
     arc_min = rise - joint.LINEAR_BAND
     width_max = slant_reach + joint.LINEAR_BAND
     from_slant_end_min = slant_reach - tap_x - joint.POSITION_BAND
-    row_max = joint.POSITION_BAND + joint.LEVER_PLATE_THICKNESS_BAND / 2.0
+    # The row is located from the plate top, which the plate's title-block
+    # thickness band moves by half that band about the pivot mid-plane; the
+    # drill wanders laterally at its deepest reach.
+    row_max = joint.POSITION_BAND + joint.LINEAR_BAND / 2.0
     rib_wall_min = (
         (arc_min * from_slant_end_min - width_max * row_max)
-        / math.hypot(arc_min, width_max) - thread_radius
+        / math.hypot(arc_min, width_max) - thread_radius - joint.DRILL_WANDER_MAX
     )
-    assert rib_wall_min == pytest.approx(3.41324, abs=1e-5)
+    assert rib_wall_min == pytest.approx(3.15952, abs=1e-5)
     assert rib_wall_min >= 2.0
     # The native spring frame is Ø0.15 RFS (code review C06), not MMC.
     # Separate X/Z extremes are conservative.
@@ -234,9 +242,10 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
     )
     assert spring_dz_min < 0.0  # the j=0 station overlaps the drill's depth
     spring_web_min = (
-        math.hypot(spring_dx_min, max(spring_dz_min, 0.0)) - thread_radius - spring_radius
+        math.hypot(spring_dx_min, max(spring_dz_min, 0.0))
+        - thread_radius - spring_radius - joint.DRILL_WANDER_MAX
     )
-    assert spring_web_min == pytest.approx(6.67030, abs=1e-5)
+    assert spring_web_min == pytest.approx(6.63514, abs=1e-5)
     assert spring_web_min >= 2.0
 
 

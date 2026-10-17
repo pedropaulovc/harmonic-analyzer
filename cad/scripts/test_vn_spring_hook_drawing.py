@@ -22,11 +22,11 @@ def test_cut_end_crosses_the_plate_and_carries_the_jam_nut():
     cut_end = anchor.eye_od_mm / 2 - spec.FINISHED_OVERALL_MM
     assert cut_end == pytest.approx(spec.TRIM.shank_end_y_mm)
     # Installed and seated, the Ø3.175 neck shoulders on the plate's top face,
-    # so the thread starts there, engages the whole plate, and the cut end
-    # hangs below the underside far enough to carry the jam nut.
+    # so the thread starts there, engages the whole padded tap, and the cut
+    # end hangs below the pad underside far enough to carry the jam nut.
     installed_end = mounts.CHANNEL_ANCHOR_XY[1] + spec.TRIM.shank_end_y_mm
-    underside = mounts.PLATE_TOP_Y - lever.PLATE_T
-    assert spec.THREAD_ENGAGEMENT_MM == lever.PLATE_T
+    underside = mounts.PLATE_TOP_Y - lever.SPRING_SEAT_T
+    assert spec.THREAD_ENGAGEMENT_MM == lever.SPRING_SEAT_T
     thread_start = (
         mounts.CHANNEL_ANCHOR_XY[1]
         + spec.TRIM.shank_end_y_mm
@@ -34,9 +34,7 @@ def test_cut_end_crosses_the_plate_and_carries_the_jam_nut():
     )
     assert thread_start == pytest.approx(mounts.PLATE_TOP_Y)
     protrusion = underside - installed_end
-    assert protrusion == pytest.approx(
-        spec.PROTRUSION_MAX_MM - spec.LENGTH_BAND_WORST_MM
-    )
+    assert protrusion == pytest.approx(spec.PROTRUSION_MM)
     assert protrusion > jam_nut.THICKNESS_MAX + spec.ADJUSTMENT_TRAVEL_MM
 
 
@@ -54,18 +52,22 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
     assert spec.CHAMFER_AXIAL_MAX_MM == pytest.approx(maximum_axial)
     floor = spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm
     assert spec.FULL_THREADS_PAST_NUT == 2
+    assert spec.PAST_NUT_FLOOR_MM == pytest.approx(floor)
+    assert floor == pytest.approx(1.5875)
     worst = spec.full_threads_past_nut_mm(spec.ADJUSTMENT_TRAVEL_MM, -band)
-    assert worst >= floor
-    # The trim is sized to that floor, not past it: only the round-up that
-    # puts the printed one-place overall on the model's own number.
-    assert worst - floor < 0.1
+    assert worst >= floor + spec.PAST_NUT_MARGIN_MM
+    # The trim is sized to that floor and the ruled margin, not past it: only
+    # the round-up that puts the printed one-place overall on the model's
+    # own number.
+    assert worst - floor - spec.PAST_NUT_MARGIN_MM < 0.1
     assert spec.FINISHED_OVERALL_MM == pytest.approx(round(spec.FINISHED_OVERALL_MM, 1))
-    # Hand-checked: thread below the seated neck, less plate, nut and deburr.
+    # Hand-checked: thread below the seated neck, less the thickest padded
+    # tap, nut, deburr.
     short_part = spec.SHANK_LENGTH_MM - band - anchor.unthreaded_shank_length_mm
     assert worst == pytest.approx(
         short_part
         - spec.ADJUSTMENT_TRAVEL_MM
-        - lever.PLATE_T
+        - (lever.SPRING_SEAT_T + spec.SEAT_BAND_MM)
         - jam_nut.THICKNESS_MAX
         - maximum_axial
     )
@@ -73,6 +75,49 @@ def test_shortest_part_backed_out_keeps_two_full_threads_past_the_nut():
     assert spec.full_threads_past_nut_mm(0.0, 0.0) == pytest.approx(
         worst + band + spec.ADJUSTMENT_TRAVEL_MM
     )
+
+
+def test_the_anchor_is_sized_at_the_pad_thickness_extremes():
+    """Code review C10: the lever's 7.00 plate-and-pad prints at the title
+    block's .XX band, so the jam nut seats anywhere from 6.49 to 7.51 under
+    the plate top.  Sized at the nominal 7.00, the thickest pad left the
+    shortest part, backed out, 1.09 of thread past the nut; owner ruling:
+    cut shank 18.6, overall 31.3, one 0.1 step over the 1.5875 floor."""
+    from sm_summing_lever_notes import LINEAR_BAND
+
+    assert spec.SEAT_BAND_MM == LINEAR_BAND == pytest.approx(0.51)
+    thin, thick = 6.49, 7.51
+    assert (spec.SEAT_T_MIN_MM, spec.SEAT_T_MAX_MM) == pytest.approx((thin, thick))
+    assert (spec.SHANK_LENGTH_MM, spec.FINISHED_OVERALL_MM) == pytest.approx(
+        (18.6, 31.3)
+    )
+    band, budget = spec.LENGTH_BAND_WORST_MM, spec.ADJUSTMENT_TRAVEL_MM
+    floor = spec.PAST_NUT_FLOOR_MM
+    # Thickest pad, shortest part, backed out: the floor plus the margin.
+    at_thick = spec.full_threads_past_nut_mm(budget, -band, thick)
+    assert at_thick == pytest.approx(1.6876071730)
+    assert at_thick >= floor + spec.PAST_NUT_MARGIN_MM
+    assert spec.full_threads_past_nut_mm(budget, -band) == pytest.approx(at_thick)
+    # The thinner pads only add thread.
+    assert spec.full_threads_past_nut_mm(budget, -band, thin) == pytest.approx(
+        at_thick + 2 * spec.SEAT_BAND_MM
+    )
+    # The old nominal-pad trim (18.0) fails at the thick pad by 0.50.
+    old = spec.full_threads_past_nut_mm(budget, -band, thick) - (
+        spec.SHANK_LENGTH_MM - 18.0
+    )
+    assert old == pytest.approx(1.0876071730)
+    assert old < floor
+    # Deepest cut end: the longest part under the thinnest pad.  The band's
+    # upper half stops at the uncut 19.05 stock (only 0.45 is cut off).
+    assert spec.SHANK_LENGTH_MM + band > anchor.shank_length_mm
+    assert anchor.shank_length_mm - spec.SHANK_LENGTH_MM == pytest.approx(0.45)
+    assert spec.PROTRUSION_MAX_MM == pytest.approx(
+        anchor.shank_length_mm - anchor.unthreaded_shank_length_mm - thin
+    )
+    assert spec.PROTRUSION_MAX_MM == pytest.approx(9.385)
+    # Modelled at the nominal pad, the cut end hangs 8.425 below it.
+    assert spec.PROTRUSION_MM == pytest.approx(8.425)
 
 
 def test_install_step_locks_the_anchor_with_its_jam_nut():

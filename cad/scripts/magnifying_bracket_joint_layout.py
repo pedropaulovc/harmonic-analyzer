@@ -8,6 +8,8 @@ view and ch20 page001_img01, top-right close-up.
 
 from __future__ import annotations
 
+import math
+
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
 
 SCREW_SKU = "91794A078"
@@ -44,7 +46,7 @@ BRACKET_HOLE_POINTS = tuple(
 LEVER_HOLE_POINTS = tuple(
     (x - LEVER_ORIGIN_X, 0.0, LEVER_FRONT_LOCAL_Z) for x in SCREW_MACHINE_X
 )
-# A flush head would put this screw's full thread beyond the 5.08 front rib.
+# A flush head would run this screw past the tap's full thread and bottom it.
 # The heads instead bear on the flange's front face, no counterbore, inside a
 # head-clearance circle (still named COUNTERBORE_DIA) that keeps their float.
 COUNTERBORE_DIA = 3.8  # no counterbore: the head-clearance circle of the wall asserts
@@ -61,24 +63,27 @@ HEAD_PROTRUSION = SCREW_HEAD_HEIGHT
 # The flange prints 3.175 unbanded: the title block's .XXX band holds the grip.
 FLANGE_THICKNESS_BAND = 0.13
 
-# Joint-specific native bands authorized by the October 8, 2026 user ruling.
-# Default .XX bands cannot retain full thread inside this rib. The modeled
-# thread stays in the rib; only the smaller tap drill continues into the plate.
+# Joint-specific native bands authorized by the October 8, 2026 user ruling
+# on the thread and drill depths: the stack below leaves 0.04-0.08 of margin
+# at them, so neither can take the title block's .XX band.
+# The -Z end rib was 5.08 deep, so the drill's tip ran past it into the 5.08
+# plate and held the plate to +/-0.05 for its wall.  Owner ruling 2026-10-16
+# (option A; the user's ask timed out and the recommended option was
+# auto-selected) deepened the rib to 7.0 at a 0.25 band, so the whole tap
+# drill, point and wander stay in the rib.  Machinist review r12 read that
+# band as tightening to rescue a wall, with no mate; per the standing user
+# preference (move the nominal so the title block holds, coordinator
+# 2026-10-16) the rib is 7.3, the least one-place depth whose drill-point
+# margin holds at the title block's .XX band, so it takes no native band.
 PLATE_THICKNESS_BAND = 0.05
 COUNTERBORE_DEPTH_BAND = 0.05
 THREAD_DEPTH_BAND = 0.05
 DRILL_DEPTH_BAND = 0.10
-RIB_DEPTH = 5.08
-RIB_DEPTH_BAND = 0.05
-LEVER_PLATE_THICKNESS = 5.08
-LEVER_PLATE_THICKNESS_BAND = 0.05
-RECEIVER_DIMENSION_BANDS = {
-    "CoefficientsPlate": {"D1": LEVER_PLATE_THICKNESS_BAND},
-    "EdgeRibBack": {"D1": RIB_DEPTH_BAND},  # -Z entry; Front is the opposite rib
-}
+RIB_DEPTH = 7.3
 POSITION_BAND = 0.05
 DRILLED_DIAMETER_PLUS = 0.10
 LINEAR_BAND = 0.51  # PRINTED title-block .XX band, not the unrounded .02 in
+RIB_DEPTH_BAND = LINEAR_BAND  # the title block's: the rib takes no native band
 HEAD_FLOAT_MIN = (COUNTERBORE_DIA - SCREW_HEAD_DIA) / 2.0
 HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND
 EDGE_BREAK = 0.25
@@ -112,16 +117,18 @@ TAP_LEAD_MARGIN_MIN = (
     - THREAD_DEPTH - THREAD_DEPTH_BAND - 2.0 * SCREW_PITCH
 )
 DRILL_POINT_RIB_MARGIN = RIB_DEPTH - DRILL_DEPTH - DRILL_POINT_DEPTH
+# Lateral drift of the drill at its deepest reach (fr_top_frame_spec's 0.3
+# deg realistic wander, restated so the joint stays a pure leaf module): the
+# rib walls round the tap are judged with it.
+DRILL_WANDER_DEG = 0.3
+DRILL_WANDER_MAX = math.tan(math.radians(DRILL_WANDER_DEG)) * (
+    DRILL_DEPTH + DRILL_DEPTH_BAND + DRILL_POINT_DEPTH_MAX
+)
+# The drill point's floor margin also takes the whole wander, as if it were
+# axial (it is lateral: an upper bound, so the 7.3 rib holds even then).
 DRILL_POINT_RIB_MARGIN_MIN = (
     RIB_DEPTH - RIB_DEPTH_BAND - DRILL_DEPTH - DRILL_DEPTH_BAND
-    - DRILL_POINT_DEPTH_MAX
-)
-# The print locates the row from the real lower face, not a derived mid-plane.
-# The opposite wall therefore takes the FULL plate-thickness band.
-DRILL_LATERAL_WALL_MIN = (
-    LEVER_PLATE_THICKNESS - LEVER_PLATE_THICKNESS_BAND
-    - (LEVER_PLATE_THICKNESS / 2.0 + POSITION_BAND)
-    - (TAP_DRILL_DIA + DRILLED_DIAMETER_PLUS) / 2.0
+    - DRILL_POINT_DEPTH_MAX - DRILL_WANDER_MAX
 )
 COUNTERBORE_END_WALL_MIN = (
     min(SCREW_MACHINE_X) - SIDE_PLATE_MACHINE_X[0]
@@ -140,10 +147,11 @@ if THREAD_RIB_MARGIN_MIN < 0.0:
     raise AssertionError("magnifying bracket full thread runs beyond the front rib")
 if TAP_LEAD_MARGIN_MIN < 0.0:
     raise AssertionError("magnifying bracket tap drill loses bottoming-tap lead")
+if DRILL_POINT_RIB_MARGIN_MIN < 0.0:
+    raise AssertionError("magnifying bracket tap drill breaks out of the front rib")
 if HEAD_FLOAT_MIN < HEAD_POSITION_MISMATCH_MAX:
     raise AssertionError("magnifying bracket counterbore loses head float")
 if min(
-    GRIP_MIN, DRILL_LATERAL_WALL_MIN,
-    COUNTERBORE_END_WALL_MIN, COUNTERBORE_HEIGHT_WALL_MIN,
+    GRIP_MIN, COUNTERBORE_END_WALL_MIN, COUNTERBORE_HEIGHT_WALL_MIN,
 ) < 1.5:
     raise AssertionError("magnifying bracket joint loses a drawing-guidelines.md rule 17 (walls and webs) wall")
