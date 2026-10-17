@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import ast
 import builtins
+from collections import Counter
 from dataclasses import replace
 import hashlib
 import importlib
@@ -495,6 +496,32 @@ def test_rocker_datum_domains_are_only_the_drawing_bore_broad_face_and_rod_pin_h
     assert "datum" not in manifest["features"]["tip_land_pos_x"]
 
 
+def _torus(centre_mm: tuple[float, float, float], major_mm: float, minor_mm: float) -> FaceGeometry:
+    return FaceGeometry(None, 4005, (*(v / 1000 for v in centre_mm), 0, 0, 1, major_mm / 1000, minor_mm / 1000), None, ())
+
+
+def test_rocker_hub_root_names_both_root_fillets_with_the_printed_max_limit() -> None:
+    features = exporter.requirement_manifest("ch_rocker_arm")["features"]
+    root = features["hub_root"]
+    radius = rocker.HUB_ROOT_RADIUS_MAX
+    # View F's "2X R0.2 MAX": sharp up to the modelled radius, at its one place.
+    assert root["requirements"] == ["radius"]
+    assert root["radius"] == [0.0, radius] == [radius + rocker_notes.HUB_ROOT_R_BAND[1], radius + rocker_notes.HUB_ROOT_R_BAND[0]]
+    assert root["radius_nominal"] == root["corner_radius_max_design"] == radius
+    assert root["precision"] == {"radius": rocker_notes.DRAWING_PRECISION["HubRoot"]["HubRootRadius"]} == {"radius": 1}
+    assert root["note"] == rocker_notes.HUB_ROOT_NOTE == "2X R0.2 MAX"
+    assert set(exporter._cite(rocker_notes, "HUB_ROOT_R_BAND")) <= set(root["cite"]["radius"])
+    assert set(exporter._cite(rocker, "HUB_ROOT_RADIUS_MAX")) <= set(root["cite"]["corner_radius_max_design"])
+    assert set(exporter._cite(rocker_notes, "DRAWING_PRECISION")) <= set(root["cite"]["precision.radius"])
+    # Each fillet's tube centre stands one radius off the hub wall and the strap face.
+    major = rocker.HUB_DIA / 2 + radius
+    for sign in (-1, 1):
+        centre = (0.0, rocker.PIVOT_MID_Y, sign * (rocker.ARM_THICKNESS / 2 + radius))
+        assert _owners("ch_rocker_arm", _torus(centre, major, radius)) == ["hub_root"]
+        assert _owners("ch_rocker_arm", _torus((0.0, rocker.PIVOT_MID_Y, sign * rocker.ARM_THICKNESS / 2), major, radius)) == []
+    assert _owners("ch_rocker_arm", _torus((0.0, rocker.PIVOT_MID_Y, rocker.ARM_THICKNESS / 2 + radius), major, 2 * radius)) == []
+
+
 def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
     manifest = exporter.requirement_manifest("dt_cone_pivot_post")
     features = manifest["features"]
@@ -697,6 +724,20 @@ def test_raw_step_face_sets_and_values_satisfy_installed_consumer_schema(tmp_pat
     assert manifest["cite"]["step_sha256"] == [f"harmonic-analyzer/cad/out/features/{stem}/{step.name}"]
     assert {file.name for file in path.parent.iterdir()} == {step.name, "features.toml"}
     assert step.read_bytes() == content
+
+
+def test_rocker_hub_root_carries_both_native_fillets_each_split_in_two(tmp_path: Path) -> None:
+    # One native face per strap side (P01, P02); STEP splits each periodic
+    # torus into two ADVANCED_FACEs, so the manifest lists each label twice.
+    step = _step(tmp_path, "ch_rocker_arm")
+    one = face_name("hub_root", 1)
+    rows = step.read_bytes().decode("utf-8").split("\r\n")
+    at = next(index for index, row in enumerate(rows) if f"'{one}'" in row)
+    split = [one, one, face_name("hub_root", 2), face_name("hub_root", 2)]
+    rows[at : at + 1] = [f"#{900 + index} = ADVANCED_FACE('{label}',(#1),#2,.T.);" for index, label in enumerate(split)]
+    step.write_bytes("\r\n".join(rows).encode("utf-8"))
+    faces = _load(exporter.write_manifest("ch_rocker_arm", step, revision="v40"))["features"]["hub_root"]["faces"]
+    assert Counter(face.rsplit("/", 1)[1] for face in faces) == {one: 2, face_name("hub_root", 2): 2}
 
 
 def test_raw_step_ansi_metadata_and_line_endings_are_never_rewritten(tmp_path: Path) -> None:

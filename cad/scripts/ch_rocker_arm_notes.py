@@ -74,6 +74,11 @@ DRAWING_PRECISION = {
 HUB_ROOT_R_BAND = (0.0, -HUB_ROOT_RADIUS_MAX)  # (upper, lower)
 HUB_ROOT_R_TOL_TYPE = 6  # swTolType_e.swTolMAX
 HUB_ROOT_PREFIX = "2X R"
+# The callout as printed, for the offline requirement exporter (features note).
+HUB_ROOT_NOTE = (
+    f"{HUB_ROOT_PREFIX}"
+    f"{HUB_ROOT_RADIUS_MAX:.{DRAWING_PRECISION['HubRoot']['HubRootRadius']}f} MAX"
+)
 # Detail E's BASIC tip land counts both ends: the J land is the K land's
 # mirror, so its length rides this 2X rather than a mirror note.
 TIP_LAND_PREFIX = "2X "

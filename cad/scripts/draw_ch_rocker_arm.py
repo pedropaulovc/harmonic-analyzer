@@ -44,6 +44,7 @@ from _printed_limits import drilled_limits as _drilled_band
 from _printed_limits import limits as _band
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
+from _gtol_torus import TorusFace
 from _check import check
 from _com import _early_bound
 from _drawing_attachment import (
@@ -2030,6 +2031,35 @@ STRAP_DATUM_B = requirement(
         "plane": ({"frame": "model", "axis": "z", "value": rocker.ARM_THICKNESS / 2}, ("ARM_THICKNESS",)),
         "datum": ("B", (("draw_ch_rocker_arm", "build"),)),
     }, precision={"thickness": _STRAP_P},
+)
+# The hub-to-strap root fillets, both strap faces: a torus about the pivot
+# axis whose tube centre stands HUB_ROOT_RADIUS_MAX off the hub wall and off
+# the strap face. View F prints the single limit "2X R0.2 MAX", so the band
+# runs from sharp to the modelled radius, and that radius is the largest
+# corner the work may leave there (prechips corner_radius_max_design).
+_ROOT_P = rocker_notes.DRAWING_PRECISION["HubRoot"]["HubRootRadius"]
+_ROOT_SOURCES = ("HUB_ROOT_RADIUS_MAX", ("ch_rocker_arm_notes", "HUB_ROOT_R_TOL_TYPE"), ("draw_ch_rocker_arm", "_dress_hub_root"))
+HUB_ROOT = requirement(
+    "hub_root", kind="fillet",
+    faces=tuple(
+        TorusFace(
+            rocker.HUB_DIA / 2 + rocker.HUB_ROOT_RADIUS_MAX, rocker.HUB_ROOT_RADIUS_MAX,
+            center_mm=(0.0, rocker.PIVOT_MID_Y, sign * (rocker.ARM_THICKNESS / 2 + rocker.HUB_ROOT_RADIUS_MAX)),
+        )
+        for sign in (-1, 1)
+    ),
+    requirements=("radius",), fields={
+        "radius": (
+            _band(rocker.HUB_ROOT_RADIUS_MAX, _ROOT_P, rocker_notes.HUB_ROOT_R_BAND),
+            (*_ROOT_SOURCES, ("ch_rocker_arm_notes", "HUB_ROOT_R_BAND")),
+        ),
+        "radius_nominal": (rocker.HUB_ROOT_RADIUS_MAX, ("HUB_ROOT_RADIUS_MAX",)),
+        "corner_radius_max_design": (rocker.HUB_ROOT_RADIUS_MAX, _ROOT_SOURCES),
+        "note": (
+            rocker_notes.HUB_ROOT_NOTE,
+            (*_ROOT_SOURCES, ("ch_rocker_arm_notes", "HUB_ROOT_NOTE")),
+        ),
+    }, precision={"radius": _ROOT_P},
 )
 part_metadata(
     datums={
