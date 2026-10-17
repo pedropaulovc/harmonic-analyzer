@@ -12,9 +12,11 @@ the flange's front face. Joint geometry and hole specifications are owned by
 magnifying_bracket_joint_layout, independently of assemblies; the press fit
 (bore nominal, band, engagement, budget, installation notes) by the
 config-free mg_lever_press_fit_geom, which the lever print and this one share.
-``ArmRootFillet`` breaks all six arm-to-flange inside corners at the print's
-single MAX radius: three on the flange's front face, where the arm leaves it,
-and three on the mounting face, where the arm's 3.11 stub stands past it.
+``ArmRootFillet`` breaks every inside corner at the print's single MAX
+radius: the six arm-to-flange corners (three on the flange's front face,
+where the arm leaves it, three on the mounting face, where the arm's 3.11
+stub stands past it) and the two where the arm's Y faces leave the collar's
+OD.
 
 ``ArmSection`` (blanked, on the Right plane): the arm's section in the
 profile the RIGHT view prints -- its lower face from the bore axis, the seat
@@ -47,6 +49,8 @@ from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
 from _fit_deviations import deviations
 from _feature_tree import name_last_feature
+from _gtol_cylinder import CylinderFace
+from _gtol_face_resolve import resolve_faces
 from _part_checks import report_mass_properties, volume_check
 from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
@@ -109,7 +113,18 @@ ARM_Y = (-3.0, 4.5)
 # so its length follows the joint layout's seat station: the A1 pose (#1559)
 # moved the collar 45.21 forward of the plate, 58.30 -> 103.51 from the axis.
 ARM_PAST_SEAT = 3.11
-ARM_Z = (4.0, round(FLANGE_Z[1] + ARM_PAST_SEAT, 2))
+# The arm starts buried in the collar's wall: its start face lies wholly
+# between the bore and the OD, so the arm's two Y faces leave the OD in one
+# clean line each.  At Z 4.0 its +Y corner (Y 4.5) stood 0.021 outside the
+# Ø12 OD (hypot 6.021): a 0.028-wide sliver of the start face stepped the
+# collar's +Y root, which left no single edge for that root's fillet
+# (machinist review r4) to run along.  At 3.5 the face spans hypot
+# 3.50..5.70 from the axis: 0.51 outside the bore, 0.30 inside the OD.
+ARM_Z = (3.5, round(FLANGE_Z[1] + ARM_PAST_SEAT, 2))
+if not COLLAR_BORE_DIA / 2.0 < ARM_Z[0] < math.sqrt(
+    (COLLAR_OD / 2.0) ** 2 - max(y * y for y in ARM_Y)
+):
+    raise AssertionError("the arm's start face must lie wholly inside the collar's wall")
 # The arm passes through the flange: it leaves the front face (FLANGE_Z[0])
 # and its stub stands ARM_PAST_SEAT past the mounting face (FLANGE_Z[1]), so
 # each face meets it in three inside corners (the arm's west face and both
@@ -132,6 +147,67 @@ ARM_ROOT_EDGES = tuple(
         ((0.0, ARM_Y[1], face_z), 2.0 * ARM_HALF_X),
     )
 )
+# The arm leaves the collar where its two Y faces meet the Ø12 OD: two
+# concave lines along the bore axis, over the collar's whole length (the
+# arm's X faces are flush with the collar's end faces, so no corner there).
+# Rule 16 again (machinist review r4 blocker): the same fillet, the same one
+# MAX radius, so the one callout covers them.  A concave round only ADDS
+# material outside the OD, so the bore and the collar wall the press fit
+# loads are untouched; each round runs between the collar's end planes.
+COLLAR_ROOT_EDGES = tuple(
+    ((0.0, face_y, math.sqrt((COLLAR_OD / 2.0) ** 2 - face_y ** 2)), 2.0 * COLLAR_HALF_LEN)
+    for face_y in ARM_Y
+)
+if COLLAR_HALF_LEN != ARM_HALF_X:
+    raise AssertionError("the collar-root rounds end on the collar's end faces only when flush")
+
+
+def plane_cylinder_fillet_area(offset: float, cylinder_r: float, fillet_r: float) -> float:
+    """Section area (mm^2) a concave round of ``fillet_r`` adds in the corner
+    where a plane ``offset`` from a cylinder's axis (``offset`` <
+    ``cylinder_r``) leaves the cylinder outward.
+
+    In the section (u across the plane's normal, v along it) the round's
+    centre C stands ``fillet_r`` off the plane and ``cylinder_r + fillet_r``
+    from the axis; the area is Green's theorem around the edge point E, the
+    plane tangency T1, the round's arc about C to the cylinder tangency T2,
+    and the cylinder's arc back to E (exact: no small-angle estimate)."""
+    cu = offset + fillet_r
+    cv = math.sqrt((cylinder_r + fillet_r) ** 2 - cu * cu)
+    edge = (offset, math.sqrt(cylinder_r * cylinder_r - offset * offset))
+    scale = cylinder_r / (cylinder_r + fillet_r)
+    plane = 0.5 * (edge[0] * cv - edge[1] * offset)
+    a0, a1 = math.pi, math.atan2(-cv, -cu) + 2.0 * math.pi
+    round_arc = 0.5 * (
+        cu * fillet_r * (math.sin(a1) - math.sin(a0))
+        - cv * fillet_r * (math.cos(a1) - math.cos(a0))
+        + fillet_r * fillet_r * (a1 - a0)
+    )
+    b0, b1 = math.atan2(cv * scale, cu * scale), math.atan2(edge[1], edge[0])
+    cylinder_arc = 0.5 * cylinder_r * cylinder_r * (b1 - b0)
+    return abs(plane + round_arc + cylinder_arc)
+
+
+COLLAR_ROOT_VOLUME = sum(
+    plane_cylinder_fillet_area(abs(point[1]), COLLAR_OD / 2.0, ARM_ROOT_R_MAX) * length
+    for point, length in COLLAR_ROOT_EDGES
+)
+
+
+def collar_root_round_station(face_y: float) -> tuple[float, float]:
+    """(Y, Z) mm midway between a collar-root round's two tangency lines --
+    on the arm's Y face and on the OD -- inside that round's face box and no
+    other R``ARM_ROOT_R_MAX`` face's (the flange's rounds stand ~90 mm away)."""
+    offset, cylinder_r = abs(face_y), COLLAR_OD / 2.0
+    cu = offset + ARM_ROOT_R_MAX
+    cv = math.sqrt((cylinder_r + ARM_ROOT_R_MAX) ** 2 - cu * cu)
+    scale = cylinder_r / (cylinder_r + ARM_ROOT_R_MAX)
+    return (
+        math.copysign((offset + cu * scale) / 2.0, face_y),
+        (cv + cv * scale) / 2.0,
+    )
+
+
 if not ARM_ROOT_R_MAX < min(FLANGE_Y[1] - ARM_Y[1], ARM_Y[0] - FLANGE_Y[0]):
     raise AssertionError("the arm-root fillet would leave no flat on the flange's faces")
 if not ARM_ROOT_R_MAX < ARM_PAST_SEAT:
@@ -433,27 +509,44 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"flange: added {added:.1f}, expected {v_net:.1f}")
     expected = vol
 
-    # Arm-to-flange inside corners on both flange faces: the arm's west face
-    # and both its Y faces meet the front (-Z) face where the arm leaves it
-    # and the mounting (+Z) face where its stub stands past it.  Filleted AT
-    # the print's MAX radius; each straight edge adds (1 - pi/4) R^2 per
-    # length (the four blends at the arm's west corners are within the
-    # tolerance).
+    # Every inside corner in one fillet at the print's MAX radius: the six
+    # arm-to-flange corners on both flange faces (the arm's west face and both
+    # its Y faces meet the front (-Z) face where the arm leaves it and the
+    # mounting (+Z) face where its stub stands past it) and the two where the
+    # arm's Y faces leave the collar's OD.  Each flange edge adds (1 - pi/4)
+    # R^2 per length (the four blends at the arm's west corners are within
+    # the tolerance); each collar edge adds its exact plane-to-cylinder
+    # section (COLLAR_ROOT_VOLUME, 0.59 mm^3 in all) -- too small for the
+    # volume check to see, so each collar round is proven by its own face.
     check(
-        "fillet arm-to-flange inside corners on both faces",
+        "fillet every arm-root inside corner",
         await adapter.add_fillet(
-            ARM_ROOT_R_MAX, [list(point) for point, _length in ARM_ROOT_EDGES], propagate=False
+            ARM_ROOT_R_MAX,
+            [list(point) for point, _length in ARM_ROOT_EDGES + COLLAR_ROOT_EDGES],
+            propagate=False,
         ),
     )
     name_last_feature(adapter, "ArmRootFillet")
     arm_root = name_dimensions(adapter, "ArmRootFillet", ["ArmRootR"])
     drive_jobs.append((arm_root[0], '"ArmRootRMax"'))
-    v_arm_root = (1.0 - math.pi / 4.0) * ARM_ROOT_R_MAX ** 2 * sum(
+    v_flange_root = (1.0 - math.pi / 4.0) * ARM_ROOT_R_MAX ** 2 * sum(
         length for _point, length in ARM_ROOT_EDGES
     )
+    v_arm_root = v_flange_root + COLLAR_ROOT_VOLUME
     expected += v_arm_root
     await volume_check(
-        adapter, "arm-to-flange inside corner fillets (both faces)", expected, 0.15 * v_arm_root
+        adapter, "arm-root inside corner fillets", expected, 0.15 * v_flange_root
+    )
+    resolve_faces(
+        adapter.currentModel,
+        {
+            f"collar root round at Y {face_y:g}": CylinderFace(
+                2.0 * ARM_ROOT_R_MAX,
+                contains_y_mm=collar_root_round_station(face_y)[0],
+                contains_z_mm=collar_root_round_station(face_y)[1],
+            )
+            for face_y in ARM_Y
+        },
     )
 
     # Plain clearance holes through the flange, entering its front (-Z) face,

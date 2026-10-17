@@ -169,6 +169,18 @@ SIDE_AXIS_X = 0.228
 # The block now sits 1.5 mm lower: the "0.00" top ~264.9 mm (1.8 mm under
 # the drawable top), the line at ~239.2 mm, 3.05 mm over the collar's top
 # (y 236.15 mm), its witnesses from 237.15 mm.
+# Machinist review r4 (rule 14): centred on x 119 mm the rows stood over the
+# collar's own span (x 93..103 mm), so its arrows sat on the shelf right
+# under "MHA-MG-003" and its witnesses ran up into the letters.  The block
+# cannot rise off the line: a hung block's line always runs on its lowest
+# row's baseline, and its top already stands 1.8 mm under the drawable top.
+# So it hangs RIGHT of the span instead, the ARM WIDTH's pattern below: the
+# rows (widest ~74.7 mm) centred on x 146 mm print over x ~108.6..183.4 mm,
+# their near end 5.6 mm (over a text height) right of the east witness (x
+# 103 mm), so the arrows and both witnesses' overshoot stand in clear paper
+# and the line runs on under the rows as their shelf; the far end stays a
+# text height left of the Ø12 COLLAR OD block (x >= 189.2 mm).  Same height:
+# the top and the line keep their r3b..r6 stations.
 # A HORIZONTAL dimension's rows requested beyond its span print centred on
 # the requested x, and its dimension line runs on under the lowest row to that
 # row's far end (retry09 native audit).  The arm width therefore reads BELOW
@@ -190,21 +202,23 @@ SIDE_AXIS_X = 0.228
 # +5.56 mm), so the four-row block is requested one pitch under its value.
 # The arm-to-flange inside corner at the arm's west face (X -5, the flange's
 # front face Z 97.22: sheet (93, 132.93) mm) prints as an arc; its MAX
-# radius reads up-left of it.  Its callout covers ALL six arm-root corners,
-# the stub's three on the mounting face too (machinist review r3: the leader
-# on one front-face corner left the stub's corners in doubt), in three label
-# rows no wider than the "R1.0 max." value (~24.8 mm): the four-row block,
-# centred on x 72 mm, its value row a pitch over the requested y, spans y
-# ~138.9..160.1 mm over x ~59.6..84.4 mm: right of the flange width's west
-# witness (x 55 mm), left of the arm (x 93 mm), over the flange's front face
-# (y 132.93 mm) and under the flange width's line (y ~189 mm).
-# The arm's length from its buried start (Z 4, inside the collar) is not
-# dimensioned: the arm's end is located from the bore axis in the side view.
+# radius reads up-left of it.  Its callout covers ALL the arm's inside
+# corners: the stub's three on the mounting face (machinist review r3: the
+# leader on one front-face corner left the stub's corners in doubt) and the
+# two where the arm leaves the collar (r4), in three label rows no wider
+# than the "R1.0 max." value (~24.8 mm): the four-row block, centred on x
+# 72 mm, its value row a pitch over the requested y, spans y ~138.9..160.1
+# mm over x ~59.6..84.4 mm: right of the flange width's west witness (x 55
+# mm), left of the arm (x 93 mm), over the flange's front face (y 132.93
+# mm) and under the flange width's line (y ~189 mm).
+# The arm's length from its buried start (Z 3.5, inside the collar's wall)
+# is not dimensioned: the arm's end is located from the bore axis in the
+# side view.
 FRONT_KEEP = {
     "ArmWidth": (0.077, 0.11679),
     "FlangeWidth": (0.068, 0.19479),
     "FlangeDepth": (0.053, 0.17879 - 0.00556),
-    "CollarLen": (0.119, 0.248 + 0.00556 - 0.0015),
+    "CollarLen": (0.146, 0.248 + 0.00556 - 0.0015),
     "ArmRootR": (0.072, 0.150),
 }
 # VIEW A's letter arrow on the front view: the bottom view looks up the
@@ -505,14 +519,14 @@ BOTTOM_WEST_AXES = {
 # title block's .XXX band, because it is the MHA-VN-050 screws' grip
 # (machinist review r2: the third place named no function); the callout,
 # derived in the spec with the stack that needs it, says so.  The
-# arm-to-flange inside corners' MAX radius names the corners it controls:
-# all six, front face and mounting face alike (rule 16).
+# inside corners' one MAX radius names the corners it controls: all of the
+# arm's, at the flange's two faces and at the collar alike (rule 16).
 DIMENSION_CALLOUTS = {
     "ArmWidth": "ARM WIDTH",
     "FlangeWidth": "FLANGE WIDTH",
     "FlangeDepth": FLANGE_DEPTH_CALLOUT,
     "CollarLen": COLLAR_LENGTH_CALLOUT,
-    "ArmRootR": "ALL ARM\nROOT\nCORNERS",
+    "ArmRootR": "ALL ARM\nINSIDE\nCORNERS",
 }
 # The bore names its process (drawing-guidelines.md rule 7 (notes: few,
 # flagged, never a method)), the part it seats and the matched fit it needs.
