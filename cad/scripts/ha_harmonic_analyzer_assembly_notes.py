@@ -150,12 +150,23 @@ _STEP_TEXT: dict[str, str] = {
         "MHA-PN-007 STUD HEAD TOP HANGS THE SHEET 1 STEP "
         f"{_n('pen-wire-tied')} DROP BELOW THE MHA-MG-008 BAR TOP. TRIM THE TAIL."
     ),
+    # The parked, as-modelled nib: the views show it here, a feeler's gap
+    # off the paper (PEN_PAPER_CLEARANCE_MM). Nothing on the carriage brings
+    # it nearer -- it hangs plumb and CG-balanced on the wire, the rod
+    # guided -- so "nib-on-paper" closes the gap by sliding the marker on in
+    # the V (code review C08).
     "nib-set": (
-        "NIB TO PAPER, WITH PAPER CLIPPED ON THE PLATEN: SLACKEN THE MHA-VN-010 "
+        "NIB PARKED, WITH PAPER CLIPPED ON THE PLATEN: SLACKEN THE MHA-VN-010 "
         "THUMB SCREW, SLIDE THE MHA-VN-065 MARKER UNTIL A "
         f"{NIB_CLEARANCE_TEXT} FEELER JUST DRAGS BETWEEN NIB AND PAPER, THEN "
         "RE-TIGHTEN THE THUMB SCREW FINGER-TIGHT. THE MHA-PN-007 STUD KEEPS "
         "ITS MHA-PN-000 SETTING."
+    ),
+    "nib-on-paper": (
+        "NIB ON PAPER, BEFORE RUNNING: SLACKEN THE MHA-VN-010 THUMB SCREW, "
+        "PUSH THE MHA-VN-065 MARKER ON ALONG ITS AXIS UNTIL THE NIB JUST "
+        "TOUCHES THE PAPER, NO FEELER, THEN RE-TIGHTEN THE THUMB SCREW "
+        f"FINGER-TIGHT. TO PARK THE PEN, REPEAT STEP {_n('nib-set')}."
     ),
     "stick-parked": (
         "MEASURING STICK: PARK MHA-MS-000 ON THE MHA-FR-001 AS-CAST TOP BETWEEN "
@@ -171,8 +182,8 @@ ASSEMBLY_STEPS: tuple[str, ...] = tuple(
 )
 
 ASSEMBLY_CHECKS: tuple[str, ...] = (
-    "1. THE SHEET 1 BAR TOP AND STUD DROP READ AS DIMENSIONED; A "
-    f"{NIB_CLEARANCE_TEXT} FEELER JUST DRAGS BETWEEN NIB AND PAPER.",
+    "1. THE SHEET 1 BAR TOP AND STUD DROP READ AS DIMENSIONED; THE NIB "
+    "TOUCHES THE PAPER.",
     f"2. {vn_spring_hook_spec.ANCHOR_INSTALL_CHECK}",
     "3. WITH EVERY CHANNEL AMPLITUDE AT ZERO THE PLATE TOP READS LEVEL, AND "
     "TWO CRANK TURNS DRAW A STRAIGHT LINE ALONG THE PAPER.",
@@ -183,4 +194,10 @@ ASSEMBLY_CHECKS: tuple[str, ...] = (
 EXPLODED_CAPTION = "EXPLODED VIEW - INTEGRATION STEPS ON SHEET 4"
 ORIENTATION_NOTE = (
     "FRONT = PAPER SIDE. WEST IS LEFT IN THE FRONT VIEW; THE CRANK IS EAST."
+)
+# The model holds the pen parked (step "nib-set"); running needs it on the
+# paper (step "nib-on-paper").
+NIB_PARKED_NOTE = (
+    f"VIEWS SHOW THE NIB PARKED {NIB_CLEARANCE_TEXT} OFF THE PAPER (STEP "
+    f"{_n('nib-set')}); STEP {_n('nib-on-paper')} SETS IT ON."
 )
