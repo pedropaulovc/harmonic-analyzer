@@ -6,7 +6,8 @@ detail carrying the free-rock acceptance, and the notes. Sheet 2 is the
 builder-owned SM_EXPLODED isometric with its BOM (vendor SKU added) and one
 balloon per BOM row. Sheet 3 is the finished isometric beside the numbered
 assembly steps and checks. Both settings are the assembly's own sketch
-dimensions (``build_sm_summing_assembly._author_settings``), imported here.
+dimensions (``build_sm_summing_assembly._author_settings``), imported here;
+every printed text comes from ``sm_summing_assembly_notes``.
 
 Usage:
     uv run python cad\scripts\draw_sm_summing_assembly.py sm-summing-assembly
@@ -31,6 +32,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 import _config
 import _telemetry
+import sm_summing_assembly_notes as notes
 import sm_summing_assembly_spec as spec
 from _check import check
 from _com import _early_bound
@@ -197,7 +199,7 @@ BOM_SKUS = {
     or MADE_PART_SKU
     for stem, row in PART_ROWS.items()
 }
-BOM_DESCRIPTIONS = dict(spec.BOM_DESCRIPTIONS)
+BOM_DESCRIPTIONS = dict(notes.BOM_DESCRIPTIONS)
 BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
@@ -240,17 +242,17 @@ def _wrapped(lines: tuple[str, ...], *, width: int) -> str:
     return "\n".join(out)
 
 
-ASSEMBLED_NOTES = _wrapped(spec.ASSEMBLED_NOTES, width=NOTES_WIDTH)
+ASSEMBLED_NOTES = _wrapped(notes.ASSEMBLED_NOTES, width=NOTES_WIDTH)
 # Steps and checks share one note so the checks can never overlap the steps.
 STEPS_AND_CHECKS = "\n".join(
     (
         "ASSEMBLY SEQUENCE",
-        _wrapped(spec.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH),
+        _wrapped(notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH),
         "",
-        _wrapped(spec.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH),
+        _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH),
     )
 )
-DETAIL_LABEL = f"{spec.DETAIL_TITLE}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
+DETAIL_LABEL = f"{notes.DETAIL_TITLE}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -378,9 +380,9 @@ def _validate_source(source_model: Any) -> None:
 
 def _assert_callout(display: Any, name: str) -> None:
     text = str(display.GetText(CALLOUT_TEXT_PART) or "").replace("\r\n", "\n")
-    if text != spec.DIMENSION_CALLOUTS[name]:
+    if text != notes.DIMENSION_CALLOUTS[name]:
         raise RuntimeError(
-            f"{name}: callout reads {text!r}, not {spec.DIMENSION_CALLOUTS[name]!r}"
+            f"{name}: callout reads {text!r}, not {notes.DIMENSION_CALLOUTS[name]!r}"
         )
 
 
@@ -408,7 +410,7 @@ def _imported_setting(
     set_dimension_callouts(
         adapter,
         annotations,
-        {dimension: spec.DIMENSION_CALLOUTS[dimension]},
+        {dimension: notes.DIMENSION_CALLOUTS[dimension]},
         location=CALLOUT_LOCATION,
     )
     assert_imported_precision(adapter, annotations, {dimension: PRECISION[dimension]})
@@ -472,7 +474,7 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
 def _placed_detail(adapter: Any) -> Any:
     """The uncropped 1:1 *Front model view, moved so the crop circle's model
     centre lands on ``DETAIL_CENTRE``."""
-    label = spec.DETAIL_TITLE
+    label = notes.DETAIL_TITLE
     view = _early_bound(
         place_view(adapter, str(SOURCE), "*Front", *DETAIL_CENTRE, scale=DETAIL_SCALE),
         "IView",
@@ -499,7 +501,7 @@ def _placed_detail(adapter: Any) -> Any:
 def _crop_detail(adapter: Any, view: Any) -> None:
     """Crop ``view`` to the circle round ``DETAIL_CENTRE``: sketch the circle
     in the active view's own sketch and Crop2 while it is still selected."""
-    label = spec.DETAIL_TITLE
+    label = notes.DETAIL_TITLE
     view = _early_bound(view, "IView")
     _activate_view(adapter, view, label=label)
     sketch = _early_bound(view.GetSketch(), "ISketch")
@@ -542,7 +544,7 @@ def _crop_detail(adapter: Any, view: Any) -> None:
 
 def _knife_detail(adapter: Any) -> Callable[[], None]:
     """The 1:1 knife-edge detail with the boss's minimum rock travel."""
-    label = spec.DETAIL_TITLE
+    label = notes.DETAIL_TITLE
     view = _placed_detail(adapter)
     face, knife = (
         model_point_in_view(
@@ -806,7 +808,7 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     _add_note_block(
         adapter,
         SHEET_NAMES[1],
-        spec.EXPLODED_CAPTION,
+        notes.EXPLODED_CAPTION,
         EXPLODED_CAPTION_XY,
         label="exploded-view caption",
     )
