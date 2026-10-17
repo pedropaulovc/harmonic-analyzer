@@ -104,21 +104,22 @@ BRACKET_SCREW_NUMBER = "MHA-VN-050"  # vn-magnifying-bracket-screw
 # the plate's length.  The ridge-to-side pair and the flank-to-side angle
 # hold the knife edge for the trunnion's worst-case free rock in the knife
 # mount's bore (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``, code
-# review C09); the -X one says so, six lines left of its extension lines.
+# review C09); the +X one says so, two lines under its value, right of its
+# extension lines.
 # Both stubs are one prism, so their side faces share two planes
 # (``build_sm_summing_lever._hex_knife``), which ties the -Z ridge to datum A
 # within ``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``.  No view can
 # show that: the pivot cylinder hides the planes between the stubs, so the
-# callout states it (owner: symmetry is critical).  Its lines stay short
-# (RIDGE_CALLOUT_MAX_CHARS), so the lower ones, beside Detail D's fence where
-# it bulges left, stay clear of it.
-RIDGE_CALLOUT_MAX_CHARS = 11
+# callout states it (owner: symmetry is critical).  Two lines of at most
+# RIDGE_CALLOUT_MAX_CHARS keep the block under the border and left of view G
+# (stack r4: six short lines on the -X one rose over the border).
+RIDGE_CALLOUT_MAX_CHARS = 30
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "EdgeRibFrontEndTopX": "ALL RIBS",
     "ReceiverY0": f"LOCATES {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
-    "RidgeFromLeft": "KNIFE EDGE\nSYMMETRIC\nTO SIDES,\nBOTH STUBS;\nSIDES IN\nONE PLANE",
+    "RidgeFromRight": "KNIFE EDGE SYMMETRIC TO SIDES,\nBOTH STUBS; SIDES IN ONE PLANE",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
