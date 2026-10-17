@@ -306,45 +306,44 @@ def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
     assert "0.0344 minimum tip air" in row.axial_capture
 
 
-def test_the_channel_apex_set_screws_are_waived_only_by_their_ruling() -> None:
+def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None:
     """PR #1317 Codex review: the MHA-VN-034 cups hold the rocked MHA-CH-005
-    shaft, an exposed joint. The user waived drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) for it (2026-10-10): snug
-    with Loctite 222, the step that drives them says so."""
+    shaft, an exposed joint. Its Loctite 222 waiver was retired (2026-10-16,
+    the user's standing no-threadlocker rule): each is snugged and its tap
+    mouth staked at 2 points, as the fulcrum keeper set screws are."""
     import draw_ch_channel_assembly as channel
 
     joint_id = "ch-channel/pivot-bracket-apex-set-screw"
     (row,) = [j for j in jr.JOINTS if j.id == joint_id]
     assert row.exposure is Exposure.OSCILLATING
-    assert row.lock is Lock.THREADLOCKER_ONLY
+    assert row.lock is Lock.STAKED
     assert row.lock_step == row.installed_at == "set-screws-driven"
-    ruling = jr.RULINGS[row.exception]
-    assert ruling.joint == joint_id
-    assert "waived; light spring preload and small hub drag; Loctite 222" in ruling.granted
-    # This waiver belongs to the pivot bank, not the separate fulcrum stack:
-    # the latter tightens its crown screws and positively stakes both mouths.
-    rocker_fitup, fulcrum_fitup = channel.FITUP_NOTES
-    assert "WITH LOCTITE 222; SNUG." in rocker_fitup
-    assert "TIGHTEN" not in rocker_fitup
-    assert "TIGHTEN" in fulcrum_fitup
-    assert "STAKE" in fulcrum_fitup
+    assert row.exception == ""
+    assert "U-MHA-VN-034-channel-threadlocker" not in jr.RULINGS
+    assert not [r for r in jr.RULINGS.values() if r.joint == joint_id]
+    (keeper,) = [
+        j for j in jr.JOINTS if j.id == "ch-channel/fulcrum-shaft-set-screw-in-keeper"
+    ]
+    assert keeper.lock is Lock.STAKED
+    rocker_fitup, fulcrum_fitup = (" ".join(n.split()) for n in channel.FITUP_NOTES)
+    assert "SNUG, AND STAKE EACH TAP MOUTH AT 2 POINTS." in rocker_fitup
+    assert "STAKE EACH TAP MOUTH AT 2 POINTS." in fulcrum_fitup
+    for banned in ("LOCTITE", "THREADLOCK"):
+        assert banned not in rocker_fitup.upper()
+        assert banned not in row.evidence.upper()
     assert jr._config.parts("vn-arbor-set-screw")["number"] not in fulcrum_fitup
 
-    def unlocked(rulings) -> set[str]:
-        findings = jr.audit(
-            jr.JOINTS,
-            jr.build_inventory(),
-            threaded=jr.THREADED_PARTS,
-            unthreaded=jr.UNTHREADED_PARTS,
-            purchased=jr.purchased_parts(),
-            unthreaded_stock=jr.UNTHREADED_STOCK,
-            required=jr.REQUIRED_JOINTS,
-            rulings=rulings,
-        )
-        return {f.subject for f in findings if f.kind is Kind.UNLOCKED}
-
-    assert joint_id not in unlocked(jr.RULINGS)
-    without = {k: v for k, v in jr.RULINGS.items() if k != row.exception}
-    assert joint_id in unlocked(without)
+    findings = jr.audit(
+        jr.JOINTS,
+        jr.build_inventory(),
+        threaded=jr.THREADED_PARTS,
+        unthreaded=jr.UNTHREADED_PARTS,
+        purchased=jr.purchased_parts(),
+        unthreaded_stock=jr.UNTHREADED_STOCK,
+        required=jr.REQUIRED_JOINTS,
+        rulings=jr.RULINGS,
+    )
+    assert joint_id not in {f.subject for f in findings if f.kind is Kind.UNLOCKED}
 
 
 def test_the_gooseneck_set_screw_is_waived_only_by_its_ruling() -> None:

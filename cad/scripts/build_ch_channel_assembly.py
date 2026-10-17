@@ -157,9 +157,28 @@ from _check import check, log
 from _com import UNDER_CONSTRAINED, _early_bound
 from _custom_properties import apply_custom_properties
 from _session import run_build
-from _drawing_marks import DRAWN_BY
+from _dimensions import drive_dimension, set_global
+from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
+from _drawing_precision import apply_drawing_precision, _named_dimension
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+    _set_tolerance_precision,
+)
+from _feature_tree import name_last_feature
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
+from _ch_channel_explode import create_channel_explode
+import ch_channel_assembly_spec as settings_spec
 from _assembly import (
     activate_assembly_contract,
+    author_in_drawing_configurations,
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
@@ -977,6 +996,146 @@ def _assert_spring_mount(
         f"({vn_spring_hook_spec.ADJUSTMENT_TURNS} turn), "
         f"{nut_gap:.3f} mm between neighbouring jam nuts"
     )
+
+
+async def _settings_legs(adapter, xs: list[float], y: float, label: str) -> list[str]:
+    """Horizontal construction legs chained through ``xs`` at height ``y``."""
+    set_sketch_direct_db(adapter, True)
+    legs = [
+        check(f"{label} leg {index}", await adapter.add_line(x0, y, x1, y))
+        for index, (x0, x1) in enumerate(zip(xs, xs[1:]))
+    ]
+    set_sketch_direct_db(adapter, False)
+    for index, leg in enumerate(legs):
+        segment = _early_bound(adapter._sketch_entities[leg], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{label} leg {index} is not construction")
+        check(
+            f"{label} leg {index} horizontal",
+            await adapter.add_sketch_constraint(leg, None, "horizontal"),
+        )
+    for index, (leg, after) in enumerate(zip(legs, legs[1:])):
+        check(
+            f"{label} leg {index} chained",
+            await adapter.add_sketch_constraint(
+                f"{leg}.end", f"{after}.start", "coincident"
+            ),
+        )
+    return legs
+
+
+def _finish_settings_feature(adapter, feature: str, dims: SketchDims) -> list:
+    name_last_feature(adapter, feature)
+    return list(dims.apply(adapter, feature))
+
+
+async def _author_settings_reference(adapter) -> None:
+    """The fit-up's settings as model dimensions: no solid or pose edits, one
+    construction sketch per bank view (ch_channel_assembly_spec) -- a chain on
+    the pivot axis (south ear inner face, south washer, hub 0, hub 19) and a
+    leg on the fulcrum axis between the keeper lugs' inner faces -- each
+    dimensioned from globals, banded, marked for the drawing and blanked (the
+    mg AxleStackReference pattern). On the Right plane, sketch x is machine
+    -z and sketch y is machine y."""
+    spec = settings_spec
+    pivot_xs = [-z for z in spec.PIVOT_CHAIN_Z]
+    lug_xs = [-z for z in spec.LUG_INNER_FACE_Z]
+    washer_t = spec.PIVOT_CHAIN_Z[2] - spec.PIVOT_CHAIN_Z[1]
+    for name, value in (
+        ("ChSouthEarInnerX", pivot_xs[0]),
+        ("ChPivotAxisY", spec.PIVOT_Y),
+        ("ChRockerSpringSet", spec.PIVOT_CHAIN_Z[1] - spec.PIVOT_CHAIN_Z[0]),
+        ("ChSouthWasherThickness", washer_t),
+        ("ChRockerStackLength", spec.PIVOT_CHAIN_Z[3] - spec.PIVOT_CHAIN_Z[2]),
+        ("ChSouthLugInnerX", lug_xs[0]),
+        ("ChFulcrumAxisY", spec.FULCRUM_Y),
+        ("ChKeeperLugSpan", spec.LUG_INNER_FACE_Z[1] - spec.LUG_INNER_FACE_Z[0]),
+    ):
+        await set_global(adapter, name, f"{value}mm")
+    drives = []
+
+    dims = SketchDims()
+    check("create rocker-bank settings sketch", await adapter.create_sketch("Right"))
+    pivot_legs = await _settings_legs(adapter, pivot_xs, spec.PIVOT_Y, "pivot chain")
+    await anchor_point_to_origin(
+        adapter, f"{pivot_legs[0]}.start", pivot_xs[0], spec.PIVOT_Y, "south ear face"
+    )
+    dims.record("SouthEarInnerX", '"ChSouthEarInnerX"')
+    dims.record("PivotAxisY", '"ChPivotAxisY"')
+    for leg, length, (name, drive) in zip(
+        pivot_legs,
+        (x0 - x1 for x0, x1 in zip(pivot_xs, pivot_xs[1:])),
+        (
+            (spec.SPRING_SET_DIMENSION, '"ChRockerSpringSet"'),
+            ("SouthWasherThickness", '"ChSouthWasherThickness"'),
+            (spec.STACK_LENGTH_DIMENSION, '"ChRockerStackLength"'),
+        ),
+        strict=True,
+    ):
+        await dimension_between(
+            adapter, f"{leg}.start", f"{leg}.end", "horizontal_distance", length, name
+        )
+        dims.record(name, drive)
+    await ensure_fully_defined(adapter, "rocker-bank settings")
+    check("exit rocker-bank settings sketch", await adapter.exit_sketch())
+    drives += _finish_settings_feature(adapter, spec.PIVOT_FEATURE, dims)
+
+    dims = SketchDims()
+    check("create lever-bank settings sketch", await adapter.create_sketch("Right"))
+    (lug_leg,) = await _settings_legs(adapter, lug_xs, spec.FULCRUM_Y, "lug span")
+    await anchor_point_to_origin(
+        adapter, f"{lug_leg}.start", lug_xs[0], spec.FULCRUM_Y, "south lug face"
+    )
+    dims.record("SouthLugInnerX", '"ChSouthLugInnerX"')
+    dims.record("FulcrumAxisY", '"ChFulcrumAxisY"')
+    await dimension_between(
+        adapter,
+        f"{lug_leg}.start",
+        f"{lug_leg}.end",
+        "horizontal_distance",
+        lug_xs[0] - lug_xs[1],
+        spec.LUG_SPAN_DIMENSION,
+    )
+    dims.record(spec.LUG_SPAN_DIMENSION, '"ChKeeperLugSpan"')
+    await ensure_fully_defined(adapter, "lever-bank settings")
+    check("exit lever-bank settings sketch", await adapter.exit_sketch())
+    drives += _finish_settings_feature(adapter, spec.FULCRUM_FEATURE, dims)
+
+    for name, expression in drives:
+        await drive_dimension(adapter, name, expression)
+    for name, (lower, upper) in spec.DIMENSION_TOLERANCES.items():
+        feature = spec.DIMENSION_FEATURE[name]
+        if abs(lower + upper) < 1e-12:
+            set_dimension_symmetric_tolerance(adapter, feature, name, upper)
+        else:
+            set_dimension_bilateral_tolerance(
+                adapter,
+                feature,
+                name,
+                lower,
+                upper,
+                places=spec.TOLERANCE_PRECISION,
+            )
+        display, _ = _named_dimension(adapter, feature, name)
+        _set_tolerance_precision(
+            display,
+            (lower, upper),
+            label=f"channel settings {name}",
+            places=spec.TOLERANCE_PRECISION,
+        )
+    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    for feature in spec.FEATURES:
+        mark_dimensions_for_drawing(
+            adapter, feature, set(spec.DRAWING_DIMENSIONS[feature])
+        )
+        # Blanked so no view of this assembly or of the top assembly renders
+        # the chain; the MHA-CH-000 fit-up views show it in their view only.
+        blank_sketch(adapter, feature)
+        visible = _early_bound(assembly.FeatureByName(feature), "IFeature").Visible
+        if int(visible) != 1:  # swVisibilityStateHide
+            raise RuntimeError(f"{feature} still visible after BlankSketch")
 
 
 async def _prepare_native_spring_specs(adapter, amplitudes: list[float]) -> list[dict]:
@@ -2123,6 +2282,7 @@ async def build(adapter) -> dict[str, str]:
     # The pins' modelled press in their reams and the set screws' threads in
     # the ears' taps are the intended overlaps.
     check_no_interference(adapter, allowed_pairs=allowed_interference_pairs(ASM_NAME))
+    await _author_settings_reference(adapter)
     # Title-block identity for the assembly drawing (draw_ch_channel_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;
@@ -2138,6 +2298,13 @@ async def build(adapter) -> dict[str, str]:
             "Quantity": "1",
             "Drawn By": DRAWN_BY,
         },
+    )
+    # Both drawing configurations own the explode: the exploded sheet's view
+    # at 1:7 references Default Simplified.
+    author_in_drawing_configurations(
+        adapter,
+        ASM_NAME,
+        lambda configuration: create_channel_explode(adapter, configuration),
     )
     return await save_assembly_and_images(
         adapter,
