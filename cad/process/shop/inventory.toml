@@ -4842,6 +4842,54 @@ resolution_mm = { value = 0.1, measured = { status = "measured", by = "placehold
 # Basis: gauges.radius-gauge.note: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1902 original metric leaf-gauge note: named R7.0 leaf within the authored 1.0..7.5 mm set; range and R7.0 label unchanged (zero offset). Comparator capability is a comment/prose-backed trial estimate, not a calibration certificate.
 note = 'Illustrative metric leaf radius gauge, including R7.0; compare the upper ear crown against the 7 mm leaf under backlight. Capability provenance: measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "optical comparator against a calibrated radius master" }. Range/resolution are plain scalars under the gauge schema, not measured LengthMeasurement fields.'
 
+# Small-radius leaf gauge for internal-corner MAX limits under the R1 leaf of
+# gauges.radius-gauge, first for a pressed hub-to-strap corner drawn R0.2 MAX. Candidate
+# purchase only: not owned, no receipt metrology. Shortlist read live 2026-10-17. No US
+# distributor read that day lists a leaf at or under R0.2 (0.008 in): McMaster-Carr's
+# smallest is Mitutoyo 186-906 at 0.010 in (0.254 mm), Starrett's .010 in or 0.5 mm,
+# MSC's 0.5 mm, Amazon US's R0.3, and MISUMI USA's Fuji Tool 178MAA and 272MAA
+# pages return its PAGE NOT FOUND page. Fuji Tool (Japan) makes the only sets found with an
+# R0.2 leaf. Rejected:
+#   Fuji Tool 272MAA, R0.1-R1.0 by 0.1, 10 leaves, edenki via ZenPlus USD 117.89, in stock:
+#     SPCC mild-steel leaves held to +/-0.03 mm, so the R0.2 leaf may be R0.23, and a soft
+#     R0.2 tip dents in use.
+#   Fuji Tool 178MAA, R0.1-R1.0 by 0.1, 20 leaves (separate convex and concave), SPCC,
+#     +/-0.03 mm: AXEL Global (AS ONE 61-1858-97) USD 140.89, made to order; eBay
+#     366065242483 USD 131.10, ships from Shenzhen, so authenticity is unproven.
+#   Mitutoyo 186-906, McMaster-Carr 2204A65, USD 228.36: 0.010-0.500 in, smallest 0.254 mm.
+#   Mitutoyo 186-110, Global Test Supply USD 48.53, 2-3 weeks: smallest leaf R0.4.
+#   Glarks R0.3-1.5 set, Amazon B0823B97NV, USD 15.95: smallest leaf R0.3, unbranded maker.
+# prechips 0.1.2 reads a radius band [0, 0.2] against range_mm and needs range_mm[0] <= 0.
+# No leaf reaches R0, so the [0.2, 1.0] leaf span below does not span that band even though
+# the R0.2 leaf decides it; the range is not stretched to 0 to make the check pass.
+[gauges.radius-gauge-small]
+name = "small radius gauge: Fuji Tool 272HRMAA, R0.2-R1.0 by 0.1 mm, 9 leaves"
+kind = "radius_gauge"
+make = "Fuji Tool"
+sku = "272HRMAA"
+source = "https://zenplus.jp/en/fuji-tool-272hrmaa-radius-gauge-272-type-0-2r-to-1-0r-0-1-increments-9-piece-set/p/edenki:1af9f394-9e21-4959-a507-4c0c82d53a1d"
+verify = true
+purchase = "1 x Fuji Tool 272HRMAA (maker code 01-445) Grade A radius gauge, R0.2-R1.0 by 0.1 mm, 9 leaves, from edenki via ZenPlus: USD 150.60 each, 9999 in stock, ships from Japan (express DHL/UPS/FedEx 3-4 days, standard 2-4 weeks; shipping quoted at checkout), on the live ZenPlus listing 2026-10-17. Candidate purchase, not owned."
+# Basis: gauges.radius-gauge-small.range_mm: catalogue leaf span R0.2..R1.0 mm (Fuji Tool Grade A specification, 272HRMAA leaves 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0, read live 2026-10-17), offset [+0, +0] mm = [0.2, 1.0] mm. Range endpoints are not extended beyond the leaf span; lower endpoint is a minimum, upper endpoint a maximum.
+# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "leaf size markings checked against the catalogue set list on receipt"; scalar/vector-only schema.
+range_mm = [0.2, 1.0]
+# Basis: gauges.radius-gauge-small.resolution_mm: catalogue increment 0.1 mm between adjacent leaves, offset +0 mm = 0.1 mm. This is the comparison increment, not a display step; the maker's leaf accuracy is +/-0.01 mm for 0.2R-1.0R, not a calibration certificate.
+resolution_mm = { value = 0.1, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "leaf size markings, smallest increment between adjacent leaves" } }
+note = "Vendor data. Fuji Tool Grade A radius gauges, read live 2026-10-17 on the maker's English and Japanese pages and the ZenPlus/edenki listing: 272HRMAA is 9 leaves, R0.2 to R1.0 by 0.1 mm, carbon tool steel (SK) hardened to HRC 50 +/-2, leaf accuracy +/-0.01 mm for 0.2R-1.0R. The 272 type is the corner-groove gauge: each leaf carries one R for internal inspection (a fillet in a corner) and one for external inspection (a rounded edge), stored by size at both ends of the case. Selection (agent recommendation 2026-10-17, not an owner ruling): the hardened Grade A set over the SPCC 272MAA, because its R0.2 leaf is held to +/-0.01 mm and its tip resists denting. Use: check that the pressed hub-to-strap corner is at most R0.2, any fillet or burr in it included. Wipe the corner clean, set the R0.2 leaf's internal-inspection R into the corner in a plane through the hub axis and sight it against a backlight. Both straight flanks seat on the hub wall and the strap face with no light: the corner is no larger than the leaf's own radius. The leaf rides on the corner with light along a flank: the corner exceeds the leaf's actual radius; reject only if that radius is known to be 0.200 mm or more, otherwise the result is inconclusive and needs another qualified method. The R0.3 leaf brackets the limit from above. The set has no leaf under R0.2, so a sharp corner reads only as at most the leaf's radius. Decision rule: the maker holds the leaf to R0.2 +/-0.01 mm, so a seat alone proves only R0.21 or less against the R0.2 MAX limit. Before this gauge accepts the limit, establish the R0.2 leaf's actual tip radius (maker inspection data, or a comparator or measuring-microscope reading) and accept on a seat only if it is 0.200 mm or less; with a larger leaf a seat is inconclusive and the corner needs another qualified method. Receipt: checking the leaf markings and that the R0.2 and R0.3 tips are undamaged under a 10x loupe establishes identity and condition only, not leaf size; no calibration certificate is claimed."
+cite = [
+  "Fuji Tool Radius Gauges Grade A https://www.fujitool.co.jp/eng/products/measuring_tools/000085.html read live 2026-10-17: 272HRMAA (code 01-445) 9 leaves 0.2-1.0 mm; carbon tool steel HRC50 +/-2; accuracy 0.2R-1.0R +/-0.01 mm, 1.25R-15.0R +/-0.02 mm",
+  "Fuji Tool radius gauge 272 type https://www.fujitool.co.jp/products/measuring_tools/000084.html read live 2026-10-17: corner-groove type; one leaf carries an R for internal and an R for external inspection; 272MAA 10 leaves 0.1-1.0 mm, SPCC, 0.1R-3.0R +/-0.03 mm",
+  "ZenPlus (seller edenki) 272HRMAA https://zenplus.jp/en/fuji-tool-272hrmaa-radius-gauge-272-type-0-2r-to-1-0r-0-1-increments-9-piece-set/p/edenki:1af9f394-9e21-4959-a507-4c0c82d53a1d read live 2026-10-17: USD 150.60, 9999 in stock; from Japan express 3-4 days, standard 2-4 weeks, shipping at checkout",
+  "ZenPlus (seller edenki) 272MAA https://zenplus.jp/en/fuji-tool-272maa-radius-gauge-272-type-0-1r-to-1-0r-0-1-increments-10-piece-set-2/p/edenki:64fc0bd4-d8ed-4d84-ae01-08d2801b6887 read live 2026-10-17 (rejected): USD 117.89, 9999 in stock, SPCC",
+  "Fuji Tool radius gauge 178 type https://www.fujitool.co.jp/products/measuring_tools/000083.html read live 2026-10-17 (rejected 178MAA): 20 leaves 0.1-1.0 mm, separate convex and concave leaves, SPCC, 0.1R-3.0R +/-0.03 mm",
+  "AXEL Global (AS ONE) https://www.axel-gl.com/en/asone/g/TR61-1858-97/ read live 2026-10-17 (rejected): 178MAA 61-1858-97 and 272MAA 61-1859-03 each JPY 22,460 / USD 140.89, made to order",
+  "eBay 366065242483 https://www.ebay.com/itm/366065242483 read live 2026-10-17 (rejected): FUJITOOL 178MAA 0.1-1 mm, USD 131.10, 9 available, ships from Shenzhen, China",
+  "McMaster-Carr radius gauges https://www.mcmaster.com/products/radius-gauges/ read live 2026-10-17 (rejected): smallest leaf 0.01 in on 2204A65 (Mitutoyo 186-906, 26 leaves 0.01-1/2 in, USD 228.36); 21275A49 (Starrett S167MCHZ) 0.5-15 mm, USD 262.41; 2204A3 (Starrett S167CHZ) 1/64-1/2 in, USD 286.16; 8625A78 1-7 mm, USD 41.67",
+  "Global Test Supply Mitutoyo 186-110 https://www.globaltestsupply.com/product/mitutoyo-186-110-radius-gauge-set read live 2026-10-17 (rejected): 18 leaves 0.4-6 mm, USD 48.53, 2 to 3 weeks",
+  "Amazon Glarks R0.3-1.5 https://www.amazon.com/clp/B0823B97NV read live 2026-10-17 (rejected): smallest leaf R0.3, USD 15.95",
+  "MISUMI USA https://us.misumi-ec.com/vona2/detail/223000803547/?HissuCode=272MAA and https://us.misumi-ec.com/vona2/detail/223000803536/?HissuCode=178MAA read live 2026-10-17: both return MISUMI PAGE NOT FOUND",
+]
+
 # --- ch_rocker_arm (trial T4) additions ---
 # Outline template for MHA-CH-006: the arm's finished outline (R800 top edge, R816
 # bottom, tapers, tip lands) with a Ø6.5 pivot hole and a radial slot at the arm's rod-pin
