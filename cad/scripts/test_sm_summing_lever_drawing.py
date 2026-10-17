@@ -492,7 +492,8 @@ def test_tap_section_cuts_the_outer_tap_through_the_rib_into_solid_plate() -> No
     low, high = drawing.TAP_SECTION_LINE_Y
     assert low < -rib_half and high > rib_half
     # The crop circle holds the rib's four corners (end face and inboard
-    # face, full height), and the break past the drill point and the rib.
+    # face, full height), and the break past the drill point and the rib;
+    # the plate's faces leave the circle just past the break.
     _, _, centre_z = drawing._TAP_SECTION_ANCHOR_MM
     radius = drawing.TAP_SECTION_CROP_RADIUS
     for z in (end_z, end_z + joint.RIB_DEPTH):
@@ -501,6 +502,6 @@ def test_tap_section_cuts_the_outer_tap_through_the_rib_into_solid_plate() -> No
     assert far_z > end_z + joint.DRILL_DEPTH + joint.DRILL_DEPTH_BAND
     assert far_z > end_z + joint.RIB_DEPTH
     assert drawing.TAP_SECTION_BREAK[0][0] == drawing.TAP_SECTION_BREAK[-1][0] == far_z
-    assert all(
-        math.hypot(z - centre_z, y) < radius for z, y in drawing.TAP_SECTION_BREAK
-    )
+    face_exit = centre_z + math.sqrt(radius**2 - (lever_build.PLATE_T / 2.0) ** 2)
+    assert far_z < face_exit < far_z + 0.5
+    assert drawing.TAP_SECTION_SCALE == (4, 1)
