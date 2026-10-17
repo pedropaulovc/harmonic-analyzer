@@ -99,8 +99,8 @@ SHOULDER_RADIUS_PLACES = 1
 SHOULDER_RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # The tap's drill and thread depths (native Hole Wizard variables): one place,
 # the general .X.  The drill depth governs; the thread depth is REF -- the
-# callout prints it in parentheses, and the note's FULL THREAD TO ROD BORE
-# governs the thread's extent, not a .X band.
+# callout prints it in parentheses, and the callout's own FULL THREAD TO ROD
+# BORE row governs the thread's extent, not a .X band.
 TAP_DEPTH_PLACES = 1
 # The overall length is the sum of the bore's two stations: REF, so the sheet
 # never closes a loop of three toleranced lengths.
@@ -354,8 +354,9 @@ if abs(FREE_END_X + ROD_STATION) > 1e-9:
 # band), across the corners as the end view's centreline draws it.
 ROD_BORE_CALLOUT = "DRILL THRU"
 # Ahead of the native thread row: the tap runs from the spigot face into the
-# bore (no THRU: the tap stops in the bore, short of the far wall).
-TAP_PROCESS = "TAP INTO BORE"
+# bore (no THRU: the tap stops in the bore, short of the far wall); the
+# extent row under the thread says where, so the prefix only names the work.
+TAP_PROCESS = "TAP"
 # The controlling drill depth and the reference thread depth, by their native
 # Hole Wizard variable names: the sheet brackets the thread depth's variable in
 # the callout's own definition, so the printed (10.1) stays the model's.
@@ -366,8 +367,12 @@ TAP_CALLOUT_PRECISION = {
     TAP_THREAD_DEPTH_VARIABLE: TAP_DEPTH_PLACES,
 }
 STOCK_NOTE = "7/16 HEX BAR, FLATS AS SUPPLIED."
-# The thread's extent: the rod bore ends it; the callout prints the native
-# thread depth, its nominal, as (REF).
-TAP_EXTENT_NOTE = "FULL THREAD TO ROD BORE."
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): two rows.
-DRAWING_NOTES = "\n".join((STOCK_NOTE, TAP_EXTENT_NOTE))
+# The thread's extent, on the callout's below row, under the thread it
+# governs (drawing-guidelines.md rule 7: a requirement of one feature reads at
+# that feature, not in a general note the shop must match to it; review r3).
+# The rod bore ends the thread; the thread row prints the native thread
+# depth, its nominal, as (REF).  Words only: the bore's Ø is its own native
+# dimension on the side view, and a typed Ø5.2 here would not follow it.
+TAP_EXTENT_CALLOUT = "FULL THREAD TO ROD BORE"
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): one row.
+DRAWING_NOTES = STOCK_NOTE
