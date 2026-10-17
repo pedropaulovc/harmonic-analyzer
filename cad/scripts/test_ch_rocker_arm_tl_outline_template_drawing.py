@@ -437,6 +437,16 @@ def test_each_slot_end_gets_its_own_centre_mark_in_the_detail() -> None:
     build = inspect.getsource(drawing.build)
     assert "slots=True" not in build
     assert "_mark_rod_slot_end_centres(adapter, detail)" in build
+    # The run the marks explain is dimensioned between those centres (the
+    # slot axis's ends), not along one side (mr-tl13-4).
+    builder = (
+        CAD_ROOT / "scripts" / "build_ch_rocker_arm_tl_outline_template.py"
+    ).read_text(encoding="utf-8")
+    run = builder[: builder.index('"rod slot run"')]
+    assert run.rstrip().endswith(
+        'f"{axis}.start",\n        f"{axis}.end",\n        "distance",\n'
+        "        ROD_SLOT_FLAT,"
+    )
 
 
 def test_every_outline_dimension_is_basic_under_the_profile() -> None:
@@ -677,16 +687,37 @@ def test_rod_slot_detail_circle_and_label_stay_clear_of_the_notes_and_frame() ->
     # The circle sits under the notes and right of the frame border.
     assert y + crop < drawing.NOTES_XY[1] - 0.010
     assert x - crop > 0.020 and y - crop > 0.010
-    # The width's dimension line stands outside the circle, and the label's
-    # top centre is right of it.
+    # The width's dimension line stands outside the circle; the label's top
+    # centre is left of the circle, where nothing else of the detail prints.
     width_x = drawing.DETAIL_KEEP["RodSlotWidth"][0]
     assert width_x > x + crop
-    assert drawing.DETAIL_LABEL_XY[0] - 0.010 > width_x
+    assert drawing.DETAIL_LABEL_XY[0] + 0.015 < x - crop
+    assert drawing.DETAIL_LABEL_XY[0] - 0.015 > 0.010
     assert drawing.DETAIL_LABEL_TEXT == "DETAIL D\nSCALE 5 : 1"
-    # The run's value and flag sit right of the circle, under the label. Its
+    # The run's value and flag sit right of and below the circle. Its
     # widest line, "PIN REACH TO ROD-PIN", printed 51.4 mm wide and centred on
     # the dimension (farm run 3111b8f0a's layout audit: text-on-line against
     # the circle at +0.037), so the whole line must clear the circle's extent.
     flat_x, flat_y = drawing.DETAIL_KEEP["RodSlotFlat"]
     assert flat_x - 0.0514 / 2.0 > x + crop and flat_y < y - 0.010
-    assert flat_y < drawing.DETAIL_LABEL_XY[1] - 0.015
+    # Datum C's tag is asked for right of the width's dimension line, above
+    # the run's flag and under the width's callout.
+    datum_x, datum_y = drawing.ROD_SLOT_DATUM_XY
+    assert (
+        datum_x > width_x and flat_y < datum_y < drawing.DETAIL_KEEP["RodSlotWidth"][1]
+    )
+
+
+def test_datum_c_is_the_slot_width_not_one_side() -> None:
+    """mr-tl13-4: a tag on one slot edge names that surface; on the width's
+    size dimension it names the centre plane the pin gauge locates."""
+    assert drawing.ROD_SLOT_WIDTH_DIMENSION in spec.DRAWING_DIMENSIONS["RodSlotProfile"]
+    assert drawing.ROD_SLOT_WIDTH_DIMENSION in drawing.DETAIL_KEEP
+    source = inspect.getsource(drawing._rod_slot_width_datum)
+    assert "InsertDatumTag2()" in source
+    assert "SetLabel(ROD_SLOT_DATUM)" in source
+    assert "SetAttachedEntities" in source
+    assert "kinds != (14,)" in source
+    datums = inspect.getsource(drawing._add_datums)
+    assert "_rod_slot_width_datum(adapter, detail)" in datums
+    assert datums.count("add_datum_feature(") == 1
