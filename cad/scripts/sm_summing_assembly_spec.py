@@ -1,11 +1,13 @@
 """Pure fitting contract for sm-summing.SLDASM (MHA-SM-000): inventory, the
-native explode, the two assembly settings and the fitter's text.
+native explode and the two assembly settings.
 
 The builder (``build_sm_summing_assembly``) authors the explode and the two
 setting sketches from these values; the package drawing
 (``draw_sm_summing_assembly``) proves the BOM against ``QUANTITIES`` and
-prints the settings as those sketches' own model dimensions. No SolidWorks
-imports.
+prints the settings as those sketches' own model dimensions. The BOM
+descriptions, callouts, notes, steps and checks the sheets print live in
+``sm_summing_assembly_notes``, which only the drawing reads, so a wording
+edit does not rebuild the assembly. No SolidWorks imports.
 
 Assembly frame: machine coordinates (Y up, output side -Z). The lever rocks
 on the hex trunnions' top ridge (the knife edge) at ``KNIFE_POINT``; the two
@@ -51,26 +53,11 @@ QUANTITIES = {
     SPRING_SCREW: 1,
 }
 BOM_ORDER = tuple(QUANTITIES)
-# The DESCRIPTION cell is drawing wording: the part numbers and vendor SKUs
-# print in their own columns, so no size the part drawings own is restated.
-BOM_DESCRIPTIONS = {
-    KNIFE_MOUNT: "KNIFE-EDGE MOUNT",
-    HANGER_WASHER: "#10 SAE FLAT WASHER",
-    HANGER_BOLT: "#10-24 HEX BOLT, CUT",
-    DOWEL: "1/8 DOWEL PIN",
-    LEVER: "SUMMING LEVER",
-    BOSS_HOOK: "#10-24 OPEN EYEBOLT, TRIMMED",
-    BOSS_JAM_NUT: "#10-24 THIN HEX JAM NUT",
-    COUNTER_SPRING: "COUNTER SPRING",
-    GOOSENECK: "COUNTER-SPRING GOOSENECK",
-    SPRING_SCREW: "GOOSENECK SPRING SCREW",
-}
-if set(BOM_DESCRIPTIONS) != set(QUANTITIES):
-    raise AssertionError("summing BOM description coverage is incomplete")
 
 # --- Native explode (SM_EXPLODED) ---------------------------------------------
-# ASSEMBLY_STEPS read back to front: the gooseneck and its screw lift off the
-# spring, the screw backs out of the plug, the spring lifts off the boss hook
+# The notes' ASSEMBLY_STEPS read back to front: the gooseneck and its screw
+# lift off the spring, the screw backs out of the plug, the spring lifts off
+# the boss hook
 # and the hook unscrews from the lever boss, its jam nut left standing between
 # the cut end and the boss (the nut goes on from the cut end before the hook
 # enters the boss); then each knife-mount station (mount, its two dowels, its
@@ -167,73 +154,6 @@ DRAWING_PRECISION = {
 LEVEL_TOLERANCE_DEG = float(_config.title_block("angular")["value_deg"])
 if LEVEL_TOLERANCE_DEG + 1.0 >= KNIFE_FREE_ROCK_FLOOR_DEG:
     raise AssertionError("the level tolerance eats the knife edge's free rock")
-LEVEL_CRITERION = f"LEVEL WITHIN ±{LEVEL_TOLERANCE_DEG:g}°"
-DETAIL_TITLE = "KNIFE-EDGE DETAIL (FRONT, CROPPED)"
-# Callouts print below the value, where line breaks print.
-DIMENSION_CALLOUTS = {
-    COUNTER_DIMENSION: "SET AT ASSEMBLY:\nGOOSENECK HEIGHT\nFOR LEVER LEVEL",
-    ROCK_DIMENSION: "MIN EACH WAY\nFROM LEVEL",
-}
-
-# --- Fitter package text ----------------------------------------------------------
-EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
-ASSEMBLED_NOTES = (
-    "NOTES:",
-    "1. NOT SHOWN: TOP FRAME MHA-FR-002. EACH KNIFE-MOUNT TOP SEAT CLAMPS TO "
-    "ITS CROSSBAR UNDERSIDE; EACH WASHER SEATS ON THE CROSSBAR'S FACED TOP. "
-    "THE GOOSENECK POST STANDS IN THE FRAME'S GOOSENECK HUB.",
-    "2. LEVER SHOWN LEVEL, RESTING ON THE KNIFE EDGE (TOP RIDGE OF EACH HEX "
-    "TRUNNION) UNDER THE TOP OF EACH MOUNT BORE.",
-    f"3. LEVEL SETTING: {LEVEL_CRITERION}, SHEET 3 STEP 9.",
-)
-# The fitter's order; the explode above runs it backwards. Steps 4-9 are done
-# on the top frame, steps 8-9 at final assembly (MHA-HA-000).
-ASSEMBLY_STEPS = (
-    "1. PRESS TWO MHA-VN-051 DOWELS, CHAMFER END FIRST, INTO THE TOP-SEAT "
-    "HOLES OF EACH MHA-SM-002 KNIFE MOUNT, EACH TO THE HOLE FLOOR.",
-    "2. SPIN THE MHA-VN-072 JAM NUT ONTO MHA-VN-001 FROM ITS CUT END UP TO THE "
-    "EYE. THREAD MHA-VN-001 INTO THE TAPPED BOSS OF MHA-SM-003 UNTIL ITS CUT "
-    "END IS WITHIN HALF A TURN OF FLUSH WITH THE BOSS UNDERSIDE, FINISHING "
-    "WITH THE EYE OPENING TOWARD THE KNIFE EDGE AND THE EYE PLANE SQUARE TO IT. "
-    "RUN THE JAM NUT DOWN TO THE BOSS TOP FACE AND, HOLDING THE EYE CLOCKED, "
-    "TIGHTEN IT.",
-    "3. SLIDE ONE MHA-SM-002 ONTO EACH HEX TRUNNION OF MHA-SM-003 FROM ITS "
-    "OUTER END, DOWELS UP, SO THE TOP RIDGE OF THE HEX RESTS UNDER THE TOP OF "
-    "THE BORE.",
-    "4. ON THE TOP FRAME: LIFT THE LEVER WITH BOTH MOUNTS UP TO THE CROSSBAR "
-    "UNDERSIDE, ENTERING EACH MOUNT'S DOWELS IN THE CROSSBAR'S ROUND HOLE AND "
-    "SLOT.",
-    "5. PUT ONE MHA-VN-060 WASHER UNDER THE HEAD OF EACH MHA-VN-024, PASS IT "
-    "DOWN THROUGH THE CROSSBAR INTO ITS MOUNT AND TIGHTEN UNTIL THE MOUNT'S "
-    "TOP SEAT IS DRAWN UP FLAT TO THE CROSSBAR UNDERSIDE.",
-    "6. CHECK THE FREE ROCK (CHECK 2, KNIFE-EDGE DETAIL) BEFORE THE COUNTER SPRING GOES "
-    "ON.",
-    "7. CLAMP THE UPPER LOOP OF MHA-VN-005 TO THE PLUG FACE OF MHA-SM-001 WITH "
-    "MHA-SM-004: TIGHTEN UNTIL THE LOOP IS CLAMPED AND CANNOT SWIVEL.",
-    "8. AT FINAL ASSEMBLY (MHA-HA-000): DROP THE MHA-SM-001 POST INTO THE "
-    "FRAME'S GOOSENECK HUB WITH THE HUB SET SCREW MHA-VN-023 (FITTED PER "
-    "MHA-FR-000) BACKED CLEAR, AND HOOK THE LOWER LOOP OF MHA-VN-005 INTO THE "
-    "EYE OF MHA-VN-001.",
-    "9. LEVEL SETTING, WITH THE CHANNEL SPRINGS FITTED AND EVERY CHANNEL "
-    "AMPLITUDE SET TO ZERO: SLIDE THE GOOSENECK POST IN ITS HUB UNTIL THE "
-    f"LEVER PLATE TOP IS {LEVEL_CRITERION} (DIGITAL ANGLE GAUGE ACROSS THE "
-    "PLATE), THEN TIGHTEN THE HUB SET SCREW MHA-VN-023 ON THE POST. THE "
-    "GOOSENECK HEIGHT REFERENCE DIMENSION ON SHEET 1 IS THE NOMINAL START.",
-)
-ASSEMBLY_CHECKS = (
-    "CHECKS:",
-    "1. EACH MOUNT'S TOP SEAT IS FLAT TO THE CROSSBAR UNDERSIDE: A 0.05 FEELER "
-    "ENTERS NOWHERE ROUND IT.",
-    "2. COUNTER SPRING OFF, THE LEVER ROCKS FREELY ON ITS KNIFE EDGE: THE "
-    "OUTER EDGE OF THE BOSS TOP FACE MOVES AT LEAST THE KNIFE-EDGE DETAIL DISTANCE UP "
-    "AND DOWN FROM LEVEL "
-    "BEFORE A HEX FLANK TOUCHES A BORE.",
-    "3. THE UPPER LOOP OF MHA-VN-005 CANNOT SWIVEL ON MHA-SM-004.",
-    f"4. AFTER STEP 9 THE LEVER PLATE TOP READS {LEVEL_CRITERION} AND THE "
-    "GOOSENECK POST DOES NOT TURN OR SLIDE IN ITS HUB.",
-    "5. THE EYE OF MHA-VN-001 CANNOT BE TURNED BY HAND: MHA-VN-072 IS TIGHT ON "
-    "THE BOSS TOP FACE.",
-)
 
 assert 0.0 < COUNTER_SCREW_RISE, COUNTER_SCREW_RISE
 assert 0.0 < COUNTER_SCREW_OFFSET_X, COUNTER_SCREW_OFFSET_X

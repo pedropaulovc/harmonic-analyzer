@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+from pathlib import Path
 
 import pytest
 
@@ -11,8 +12,10 @@ import _config
 import build_sm_summing_assembly as builder
 import draw_sm_summing_assembly as drawing
 import joint_retention
+import sm_summing_assembly_notes as notes
 import sm_summing_assembly_spec as spec
 from _assembly_contract import assembly_contract
+from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _sm_summing_explode import station_of, summing_exploded_view_name
 from dt_cone_pivot_post_installation import SUMMING_Z
@@ -24,9 +27,9 @@ def _printed_text() -> str:
             drawing.ASSEMBLED_NOTES,
             drawing.STEPS_AND_CHECKS,
             drawing.DETAIL_LABEL,
-            spec.EXPLODED_CAPTION,
-            *spec.DIMENSION_CALLOUTS.values(),
-            *spec.BOM_DESCRIPTIONS.values(),
+            notes.EXPLODED_CAPTION,
+            *notes.DIMENSION_CALLOUTS.values(),
+            *notes.BOM_DESCRIPTIONS.values(),
         )
     )
 
@@ -48,6 +51,27 @@ def test_package_keeps_registry_outputs_and_three_landscape_sheets() -> None:
     assert spec.DRAWING_NUMBER == assembly_contract(spec.ASM_NAME).number
 
 
+def test_sheet_text_stays_out_of_the_assembly_recipe() -> None:
+    # Recipe closures are file-granular: a wording edit in the notes must
+    # re-key only the drawing, never the native summing assembly (code
+    # review C03).
+    def closure(module: object) -> set[str]:
+        return {Path(path).name for path in module_deps_of(Path(module.__file__))}
+
+    assembly = closure(builder)
+    assert "sm_summing_assembly_spec.py" in assembly
+    assert "sm_summing_assembly_notes.py" not in assembly
+    assert "sm_summing_assembly_notes.py" in closure(drawing)
+    for name in (
+        "BOM_DESCRIPTIONS",
+        "DIMENSION_CALLOUTS",
+        "ASSEMBLED_NOTES",
+        "ASSEMBLY_STEPS",
+        "ASSEMBLY_CHECKS",
+    ):
+        assert not hasattr(spec, name), name
+
+
 def test_bom_rows_come_from_the_part_registry() -> None:
     assert drawing.BOM_COMPONENTS == spec.BOM_ORDER == tuple(spec.QUANTITIES)
     for stem in spec.BOM_ORDER:
@@ -62,11 +86,11 @@ def test_bom_rows_come_from_the_part_registry() -> None:
 
 
 def test_every_bom_part_is_installed_by_a_numbered_step() -> None:
-    steps = " ".join(spec.ASSEMBLY_STEPS)
+    steps = " ".join(notes.ASSEMBLY_STEPS)
     for stem in spec.BOM_ORDER:
         assert drawing.BOM_PART_NUMBERS[stem] in steps, stem
-    numbers = [line.split(".", 1)[0] for line in spec.ASSEMBLY_STEPS]
-    assert numbers == [str(index) for index in range(1, len(spec.ASSEMBLY_STEPS) + 1)]
+    numbers = [line.split(".", 1)[0] for line in notes.ASSEMBLY_STEPS]
+    assert numbers == [str(index) for index in range(1, len(notes.ASSEMBLY_STEPS) + 1)]
 
 
 def test_explode_moves_only_contracted_families_with_split_stations() -> None:
@@ -134,7 +158,7 @@ def test_setting_drives_reproduce_the_sketch_values() -> None:
         spec.COUNTER_FEATURE: {spec.COUNTER_DIMENSION},
         spec.ROCK_FEATURE: {spec.ROCK_DIMENSION},
     }
-    assert set(drawing.PRECISION) == set(spec.DIMENSION_CALLOUTS)
+    assert set(drawing.PRECISION) == set(notes.DIMENSION_CALLOUTS)
 
 
 def test_printed_text_carries_no_rule_numbers_or_rulings() -> None:
@@ -175,11 +199,11 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert hook.lock_step == "MHA-SM-000 STEP 2"
     nut = rows["sm-summing/boss-hook-jam-nut-on-hook"]
     assert nut.installed_at == "MHA-SM-000 STEP 2"
-    steps = {line.split(".", 1)[0]: line for line in spec.ASSEMBLY_STEPS}
+    steps = {line.split(".", 1)[0]: line for line in notes.ASSEMBLY_STEPS}
     assert "MHA-VN-024" in steps["5"]
     assert "MHA-VN-001" in steps["2"] and "MHA-VN-072" in steps["2"]
     assert "MHA-SM-004" in steps["7"]
     # Period hardware: no step leans on a threadlocker, or even names one.
     banned = ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC", "PATCH")
-    printed = (*spec.ASSEMBLY_STEPS, *spec.ASSEMBLY_CHECKS)
+    printed = (*notes.ASSEMBLY_STEPS, *notes.ASSEMBLY_CHECKS)
     assert not [line for line in printed for word in banned if word in line]
