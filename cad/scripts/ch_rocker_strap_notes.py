@@ -91,12 +91,14 @@ TIP_LAND_PREFIX = "2X "
 # The hole's two edges stay sharp, overriding the title block's R0.25 /
 # C0.25 break for this hole only: a break would leave a ring groove round the
 # pressed hub's root, where MHA-CH-006 prints the hub-to-strap root as
-# "2X R0.2 MAX" (a corner, not a groove).
-HOLE_EDGE_CALLOUT = "BOTH EDGES SHARP, NO BURR"
+# "2X R0.2 MAX" (a corner, not a groove). Its reason row answers the r1
+# machinist review (an unexplained override on a press-fit bore reads as
+# arbitrary, rule 7); it follows the fit rows, which name the hub.
+HOLE_EDGE_CALLOUT = "BOTH EDGES SHARP, NO BURR\n(NO GROOVE AT HUB ROOT)"
 # drawing-guidelines.md rule 4: the H7 band names its mate and the fit. Below
 # rows (an ABOVE-compartment line break never prints).
 HOLE_CALLOUT = (
-    f"REAM THRU\n{HOLE_EDGE_CALLOUT}\nPRESS FIT ON {HUB_NUMBER} HUB\n{INTERFERENCE_TEXT}"
+    f"REAM THRU\nPRESS FIT ON {HUB_NUMBER} HUB\n{INTERFERENCE_TEXT}\n{HOLE_EDGE_CALLOUT}"
 )
 # The bottom edge's one-sided band is the joined part's lower profile (rule 4:
 # the need it serves), and that edge is the R800's concentric arc. Two short

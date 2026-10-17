@@ -104,12 +104,15 @@ def test_every_band_is_native_and_names_its_mate() -> None:
     assert spec.BOTTOM_EDGE_BAND == (0.0, -0.5)
     # The hole's edges override the title block's break: a groove round the
     # pressed hub's root would replace MHA-CH-006's R0.2 MAX corner.
-    assert notes.HOLE_EDGE_CALLOUT == "BOTH EDGES SHARP, NO BURR"
+    assert notes.HOLE_EDGE_CALLOUT.splitlines() == [
+        "BOTH EDGES SHARP, NO BURR",
+        "(NO GROOVE AT HUB ROOT)",
+    ]
     assert notes.HOLE_CALLOUT.splitlines() == [
         "REAM THRU",
-        notes.HOLE_EDGE_CALLOUT,
         "PRESS FIT ON MHA-CH-012 HUB",
         "0.005-0.034 DIAMETRAL INTERFERENCE",
+        *notes.HOLE_EDGE_CALLOUT.splitlines(),
     ]
     assert notes.DIMENSION_CALLOUTS["HoleDia"] == notes.HOLE_CALLOUT
     # The finished part's mates, worded as on its own print.
