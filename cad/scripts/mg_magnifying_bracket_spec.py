@@ -39,7 +39,11 @@ from magnifying_bracket_joint_layout import (
     SCREW_MAJOR_DIA,
     SCREW_TIP_GAP_MIN,
 )
+from _gtol_cylinder import CylinderFace
+from _surface_finish import GROUND_UM, SurfaceFinishControl
 from mg_lever_press_fit_geom import (
+    COLLAR_BORE_DIA,
+    COLLAR_BORE_RA_UM,
     COLLAR_LENGTH,
     COLLAR_LENGTH_BAND,
     PRESS_FIT_BUDGET,
@@ -143,8 +147,6 @@ for _rod in (
 ):
     _matched = press_fit_budget(
         press_zone_dia_band=(_rod - PRESS_ZONE_DIA, _rod - PRESS_ZONE_DIA),
-        collar_bore_dia=_rod - PRESS_FIT_BUDGET["interference_max"],
-        collar_bore_band=(0.0, 0.0),
     )
     check_press_fit_budget(_matched)
     for _key in ("press_force_max_n", "collar_von_mises_mpa", "engagement"):
@@ -153,12 +155,21 @@ for _rod in (
                 f"a matched collar bore exceeds the press budget's {_key}"
             )
 # The bore runs through the collar (rule 12: the callout says what to do and
-# how far), so the process row says THRU.
+# how far), so the process row says THRU.  Reamed or honed: the processes that
+# hold the bore's Ra 0.8 (owner ruling, #1570).
 COLLAR_BORE_CALLOUT = (
-    f"REAM OR BORE THRU: {PRESS_FIT_BUDGET['interference_min']:.3f}-"
+    f"REAM OR HONE THRU: {PRESS_FIT_BUDGET['interference_min']:.3f}-"
     f"{PRESS_FIT_BUDGET['interference_max']:.3f}\n"
     "DIAMETRAL INTERFERENCE ON\n"
     "MHA-MG-003 LEVER"
+)
+# The bore's printed Ra is the one the press budget's DIN 7190 smoothing takes
+# (mg_lever_press_fit_geom.COLLAR_BORE_RA_UM); the bore is the part's only
+# cylinder of its diameter.
+if COLLAR_BORE_RA_UM != GROUND_UM:
+    raise AssertionError("the bore's printed Ra must be the smoothing budget's")
+SURFACE_FINISHES = (
+    SurfaceFinishControl("collar_bore", GROUND_UM, CylinderFace(COLLAR_BORE_DIA)),
 )
 # The collar's length band sets a stack: the lever's end sits flush with the
 # collar's outer face, so the collar spans exactly the lever's banded press

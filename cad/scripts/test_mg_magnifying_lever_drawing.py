@@ -148,7 +148,7 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
     # Max-material model nominals (Main's 2026-10-12 press ruling).
     assert press.PRESS_ZONE_DIA_BAND == (0.0, -0.006)
     assert press.COLLAR_BORE_DIA == 5.986
-    assert press.COLLAR_BORE_BAND == (0.006, 0.0)
+    assert press.PRESS_INTERFERENCE_LIMITS == (0.007, 0.014)  # #1570 matched fit
     # The configured collar window is the zone, and the rod ends flush with it.
     assert geom.PRESS_ZONE_X == (
         geom.COLLAR_LOCAL_X - geom.COLLAR_HALF_LEN,
@@ -165,7 +165,7 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
     for key in ("interference_nominal", "interference_min", "interference_max", "engagement"):
         assert budget[key] == press.PRESS_FIT_BUDGET[key]
     assert budget["interference_nominal"] == pytest.approx(0.014)
-    assert budget["interference_min"] == pytest.approx(0.002)
+    assert budget["interference_min"] == pytest.approx(0.007)
     assert budget["interference_max"] == pytest.approx(0.014)
     assert budget["engagement"] == press.COLLAR_ENGAGEMENT_MAX
     # Whole-contact envelope with independent, deliberately conservative corners:
@@ -389,7 +389,7 @@ def test_press_zone_callout_ties_the_zone_to_the_bracket_bore() -> None:
     callout = mg_magnifying_lever_spec.PRESS_ZONE_DIA_CALLOUT
     assert drawing.REFERENCE_CALLOUTS["PressZoneDia"] is callout
     assert callout == (
-        "IN MHA-MG-001 (<MOD-DIAM>5.986) BORE:\n0.002-0.014 DIAMETRAL INTERFERENCE"
+        "IN MHA-MG-001 (<MOD-DIAM>5.986) BORE:\n0.007-0.014 DIAMETRAL INTERFERENCE"
     )
     assert f"(<MOD-DIAM>{press.COLLAR_BORE_DIA:.3f})" in callout
     assert "/" not in callout and "+0.006" not in callout

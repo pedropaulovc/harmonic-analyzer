@@ -6,4 +6,4 @@ mg-magnifying-lever:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing   # the clamp block slides along the rod
-  process: "selected cold-drawn brass rod, body Ø6.00 0/−0.03; 165.0 ±0.8 tip-to-tip with tangent hemispherical ends; select or lap the bracket-end land to Ø6.000 0/−0.006, starting 10.00 +0/−0.05 mm before the tip and ending at its dome tangent (7 mm nominal cylindrical engagement); light-press the MHA-MG-001 collar onto the rod held near its end and retain with Loctite 638, alternative soft solder or braze"
+  process: "selected cold-drawn brass rod, body Ø6.00 0/−0.03; 165.0 ±0.8 tip-to-tip with tangent hemispherical ends; select or lap the bracket-end land to Ø6.000 0/−0.006, starting 10.00 +0/−0.05 mm before the tip and ending at its dome tangent (7 mm nominal cylindrical engagement); light-press the MHA-MG-001 collar onto the rod held near its end; the press alone retains it"
