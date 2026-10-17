@@ -25,6 +25,7 @@ _MARKED = {
     "ThreadLength",
     "ReliefWidth",
     "ReliefDia",
+    "ReliefRootR",
 }
 
 
@@ -65,6 +66,29 @@ def test_rod_is_the_threaded_bar_of_the_joint_contract() -> None:
     assert joint.RELIEF_WIDTH_MIN >= joint.DIE_RUNOUT
     assert joint.RELIEF_DIA_MAX <= joint.THREAD_ROOT_2A_MIN
     assert geom.SEAT_LAND_WORST >= geom.SEAT_LAND_MIN
+    # Both relief roots "R0.2 MAX" (r2): the model at the printed limit.
+    assert spec.RELIEF_ROOT_R == joint.RELIEF_ROOT_R == 0.2
+    assert spec.RELIEF_ROOT_R_TOL_TYPE == 6  # swTolType_e.swTolMAX
+
+
+def test_relief_roots_are_one_fillet_over_both_corners() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert source.count("add_fillet(") == 1
+    assert 'name_last_feature(adapter, "ReliefRoots")' in source
+    # The shoulder's pick FIRST: the drawing's radius lands on its edge.
+    assert (
+        "[[SHOULDER_X, RELIEF_R, 0.0], [RELIEF_START_X, RELIEF_R, 0.0]]" in source
+    )
+    assert "propagate=False" in source
+    assert '("ReliefRootR", RELIEF_ROOT_R)' in source
+    assert '["ReliefRootR"])[0], \'"ReliefRootR"\')' in source
+    # Each root fills a (1 - pi/4) R^2 spandrel turned about the axis at its
+    # centroid (Pappus): ~0.1 mm^3, far inside the 0.5 % volume gate.
+    rr, q = spec.RELIEF_ROOT_R, spec.RELIEF_DIA / 2.0
+    centroid = q + rr * (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi)
+    roots = 2.0 * 2.0 * math.pi * centroid * (1.0 - math.pi / 4.0) * rr * rr
+    assert part.V_TOTAL - part.V_PROFILE == pytest.approx(roots)
+    assert 0.0 < roots < 0.005 * part.V_PROFILE
 
 
 def test_rod_is_one_front_plane_revolve() -> None:
@@ -74,7 +98,7 @@ def test_rod_is_one_front_plane_revolve() -> None:
     assert 'name_last_feature(adapter, "RodProfile")' in source
     assert 'name_last_feature(adapter, "Rod")' in source
     assert "create_extrusion(" not in source
-    for name in _MARKED:
+    for name in spec.DRAWING_DIMENSIONS["RodProfile"]:
         assert re.search(rf'profile\.record\(\s*"{name}"', source), name
     assert "add_thread(" in source
     r, t, m, q = (
@@ -91,7 +115,7 @@ def test_rod_is_one_front_plane_revolve() -> None:
         + math.pi * r * r * (spec.BODY_LENGTH - r)
         + 2.0 / 3.0 * math.pi * r**3
     )
-    assert part.V_TOTAL == pytest.approx(v)
+    assert part.V_PROFILE == pytest.approx(v)
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -100,9 +124,18 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert marked == _MARKED
     assert set(drawing.SIDE_KEEP).isdisjoint(drawing.DETAIL_KEEP)
     assert set(drawing.SIDE_KEEP) | set(drawing.DETAIL_KEEP) == marked
-    assert set(drawing.DETAIL_KEEP) == {"ThreadLength", "ReliefWidth", "ReliefDia"}
+    assert set(drawing.DETAIL_KEEP) == {
+        "ThreadLength",
+        "ReliefWidth",
+        "ReliefDia",
+        "ReliefRootR",
+    }
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
-    assert drawing.DRAWING_PRECISION_BY_NAME == spec.DRAWING_PRECISION["RodProfile"]
+    assert set(drawing.DIMENSION_CALLOUTS_ABOVE) <= marked
+    assert drawing.DRAWING_PRECISION_BY_NAME == {
+        **spec.DRAWING_PRECISION["RodProfile"],
+        **spec.DRAWING_PRECISION["ReliefRoots"],
+    }
 
 
 def test_tolerances_are_native_on_the_model() -> None:
@@ -110,13 +143,17 @@ def test_tolerances_are_native_on_the_model() -> None:
         ("RodProfile", "ThreadLength"): "*deviations(ROD_THREAD_LEN_BAND)",
     }
     assert set(spec.DRAWING_BANDS) == {("RodProfile", "ThreadLength")}
-    assert spec.SINGLE_LIMITS == {("RodProfile", "ReliefDia"): (1.85, 6)}
+    assert spec.SINGLE_LIMITS == {
+        ("RodProfile", "ReliefDia"): (1.85, 6),
+        ("ReliefRoots", "ReliefRootR"): (0.2, 6),
+    }
     precision = spec.DRAWING_PRECISION["RodProfile"]
     assert (precision["ThreadLength"], precision["ReliefWidth"], precision["ReliefDia"]) == (
         2,
         2,
         2,
     )
+    assert spec.DRAWING_PRECISION["ReliefRoots"] == {"ReliefRootR": 1}
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
     assert "_single_limits(adapter)" in source
@@ -129,10 +166,55 @@ def test_tolerances_are_native_on_the_model() -> None:
         "RodDia": "STOCK OK",
         "DomeR": "TANGENT HEMISPHERE",
     }
+    # One radius stands for both roots: its count rides above the value.
+    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ReliefRootR": "2X"}
+    assert 'DIMENSION_CALLOUTS_ABOVE, location="above"' in Path(
+        drawing.__file__
+    ).read_text(encoding="utf-8")
     for callout in drawing.DIMENSION_CALLOUTS.values():
         lines = callout.splitlines()
         assert len(lines) <= 4 and all(len(line) <= 20 for line in lines), callout
         assert not any(ch.isdigit() for ch in callout.replace("MHA-MG-002", ""))
+
+
+def test_relief_root_radius_reads_clear_in_detail_a() -> None:
+    """The "2X R0.2 MAX" stands under the thread, opposite the shoulder's
+    lower root arc; its leader through the root centre passes under the Ø's
+    lower arrow stub and the Ø's line stays off the thread-side root."""
+    x_mm, y_mm = drawing.RELIEF_ROOT_CENTRE_MM
+    assert (x_mm, y_mm) == pytest.approx(
+        (spec.SHOULDER_X - spec.RELIEF_ROOT_R, -(spec.RELIEF_DIA / 2.0 + spec.RELIEF_ROOT_R))
+    )
+    cx, cy = drawing._detail_xy(x_mm, y_mm)
+    tx, ty = drawing.DETAIL_KEEP["ReliefRootR"]
+    # Down-left of the centre: opposite the arc's up-right quarter, so the
+    # leader runs on through the centre to the arc.
+    assert tx < cx and ty < cy
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "display.ArcExtensionLineOrOppositeSide = True" in source
+    assert "_dress_relief_roots(adapter, detail, annotations)" in source
+    # Under the thread's lower silhouette, over the thread length's block and
+    # right of its tip extension line.
+    thread_bottom = drawing._detail_xy(0.0, -spec.THREAD_MAJOR / 2.0)[1]
+    assert thread_bottom - ty >= 0.015
+    assert ty - drawing.DETAIL_KEEP["ThreadLength"][1] >= 0.020
+    assert tx - 0.012 > drawing._detail_xy(0.0, 0.0)[0]
+    # The leader from the text's right end (~10 mm from its centre) passes
+    # >= 8 mm under the relief's lower silhouette at the Ø's line.
+    dia_x = drawing.DETAIL_KEEP["ReliefDia"][0]
+    end_x = tx + 0.010
+    leader_y = cy + (cy - ty) / (cx - end_x) * (dia_x - cx)
+    relief_bottom = drawing._detail_xy(0.0, -spec.RELIEF_DIA / 2.0)[1]
+    assert end_x < dia_x < cx
+    assert relief_bottom - leader_y >= 0.008
+    # The Ø's line meets the floor >= 2 mm (sheet) clear of the thread-side
+    # root's tangent.
+    tangent_x = drawing._detail_xy(spec.RELIEF_START_X + spec.RELIEF_ROOT_R, 0.0)[0]
+    assert dia_x - tangent_x >= 0.002
+    # The root's far edge (its tangent on the shoulder face) stays inside the
+    # fence, so the crop keeps it.
+    fx, fy = drawing.DETAIL_FOCUS_MM
+    assert math.hypot(spec.SHOULDER_X - fx, y_mm - fy) < drawing.DETAIL_RADIUS_MM
 
 
 def test_overall_is_a_driven_reference_dimension() -> None:
