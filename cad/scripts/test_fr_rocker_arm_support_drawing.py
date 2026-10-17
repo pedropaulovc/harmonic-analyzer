@@ -32,8 +32,8 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "CavityEndStation",
         "CavityTopStation",
         "PocketEndStation",
+        "PocketBottomStation",
         "WebFaceStation",
-        "TopFlatMinusZStation",
         "TopFlatPlusZStation",
     }
     expected = {
@@ -61,7 +61,8 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "RimChamferSize": RIM_CHAMFER_CALLOUT,
         "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
         "PocketEndStation": "BOTH SIDES",
-        "TopFlatPlusZStation": "CENTERS MHA-CH-008\nSEAT TAPS IN WEB",
+        "PocketBottomStation": "BOTH SIDES",
+        "TopFlatPlusZStation": "BOTH SIDES\nKEEPS MHA-CH-008\nSEAT TAPS IN WEB",
     }
     part_owned = {
         "PocketFloorRadius",
@@ -712,11 +713,11 @@ def _imported(name: str, places: int) -> SimpleNamespace:
         "RimChamferSize",
         "SeatEastStation",
         "SeatWestStation",
-        "TopFlatMinusZStation",
         "TopFlatPlusZStation",
         "CavityEndStation",
         "CavityTopStation",
         "PocketEndStation",
+        "PocketBottomStation",
         "WebFaceStation",
     ],
 )
@@ -743,10 +744,10 @@ def test_part_owned_places_are_the_parts_and_the_sheet_reads_them_back(
             "CavityEndStation": support.CAVITY_LOCATION_PLACES,
             "CavityTopStation": support.CAVITY_LOCATION_PLACES,
             "PocketEndStation": support.POCKET_END_PLACES,
+            "PocketBottomStation": support.POCKET_END_PLACES,
         },
         "WebLocationReference": {
             "WebFaceStation": support.SECTION_LOCATION_PLACES,
-            "TopFlatMinusZStation": seats.TOP_FLAT_PLACES,
             "TopFlatPlusZStation": seats.TOP_FLAT_PLACES,
         },
     }
@@ -1026,14 +1027,16 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
     corner = support.CHAMFER
     cavity_run = support.CAV - support.FILLET_R
     pocket_run = support.BIG - support.POCKET_FILLET_R
-    # Front plane (X, Y): on the end face, the top face and the walls'
-    # straight runs, clear of every chamfer and corner radius.
+    # Front plane (X, Y): on the end face, the top and bottom faces and the
+    # walls' straight runs, clear of every chamfer and corner radius.
     on_line = {
         "EndChord": (0, end_x, top_y - corner),
         "TopChord": (1, top_y, support.BOSS_DEPTH / 2.0 - corner),
+        "BottomChord": (1, -top_y, support.BOSS_DEPTH / 2.0 - corner),
         "CavitySideChord": (0, -support.CAV, cavity_run),
         "PocketSideChord": (0, -support.BIG, pocket_run),
         "CavityTopChord": (1, support.CAV, cavity_run),
+        "PocketBottomChord": (1, -support.BIG, pocket_run),
     }
     assert set(front_chords) == set(on_line)
     for name, (axis, at, run) in on_line.items():
@@ -1079,6 +1082,8 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         "CavityEndStation": (front_dims, "EndChord", "CavitySideChord"),
         "PocketEndStation": (front_dims, "EndChord", "PocketSideChord"),
         "CavityTopStation": (front_dims, "TopChord", "CavityTopChord"),
+        # r6 review: the pockets' vertical location, off the mounting face.
+        "PocketBottomStation": (front_dims, "BottomChord", "PocketBottomChord"),
         "WebFaceStation": (right_dims, "BaseChord", "WebChord"),
         "TopFlatMinusZStation": (
             right_dims,
@@ -1101,7 +1106,9 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
     # the main stack's render; mm-side half-even rounding would say 26.8).
     # The top flat's 2.1165 is no tie at .XX: the r5 render's solved sketch
     # printed 2.116 at .XXX, its metre value just under the tie, while this
-    # replay's lies just over it; both print 2.12.
+    # replay's lies just over it; both print 2.12. One flat edge prints (its
+    # BOTH SIDES covers the other, r6 review); the -Z one stays unprinted.
+    assert "TopFlatMinusZStation" not in drawing.PART_PRECISION
     printed = {
         name: str(
             (Decimal(dims[name][3] / 1000.0) * 1000).quantize(
@@ -1109,13 +1116,14 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
             )
         )
         for name, (dims, _face, _feature) in spans.items()
+        if name in drawing.PART_PRECISION
     }
     assert printed == {
         "CavityEndStation": "26.7",
         "PocketEndStation": "7.70",
         "CavityTopStation": "25.4",
+        "PocketBottomStation": "6.35",
         "WebFaceStation": "25.40",
-        "TopFlatMinusZStation": "2.12",
         "TopFlatPlusZStation": "2.12",
     }
 
@@ -1133,7 +1141,7 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
     }
     assert set(front_jobs) == {
         f"{name}@CavityLocationReference"
-        for name in ("EndChordX", "TopChordY", *list(spans)[:3])
+        for name in ("EndChordX", "TopChordY", "BottomChordY", *list(spans)[:4])
     }
     assert set(right_jobs) == {
         f"{name}@WebLocationReference"
@@ -1162,6 +1170,8 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
             "CavityEndStation": values["WallWidth"] / 2.0 - values["CavHalf"],
             "PocketEndStation": values["WallWidth"] / 2.0 - values["WindowOuter"],
             "CavityTopStation": values["HalfHeight"] - values["CavHalf"],
+            "BottomChordY": values["HalfHeight"],
+            "PocketBottomStation": values["HalfHeight"] - values["WindowOuter"],
             "BaseChordZ": values["FootHalf"],
             "BaseChordY": values["HalfHeight"],
             # The window cuts start WEB off the centre plane: no global.
@@ -1238,27 +1248,25 @@ def test_pocket_floor_radius_text_stands_right_of_the_section_level_with_its_cor
     assert radius[1] < corner_y < radius[3] + 0.003
 
 
-FLAT_PLUS_TEXT = "2.12\nCENTERS MHA-CH-008\nSEAT TAPS IN WEB"
+FLAT_PLUS_TEXT = "2.12\nBOTH SIDES\nKEEPS MHA-CH-008\nSEAT TAPS IN WEB"
 
 
 def test_section_locations_stand_off_the_section_and_its_texts() -> None:
-    """The top flat's two edges print on one row above the section, each
-    text outboard of its own edge (owner Q13d); WebFaceStation's row stands
-    between the base and the 63.5, whose text sits right of the web face's
-    extension line; the front view's locations clear its other texts."""
+    """One top-flat edge prints above the section, its text outboard of the
+    +Z edge and its BOTH SIDES covering the other (owner Q13d, r6 review);
+    WebFaceStation's row stands between the base and the 63.5, whose text
+    sits right of the web face's extension line; the front view's locations
+    clear its other texts."""
     scale = drawing.VIEW_SCALE / 1000
     centre_x, centre_y = drawing.RIGHT_CENTER
-    top_left = centre_x - support.NARROW * scale
     top_right = centre_x + support.NARROW * scale
     base_left = centre_x - support.WIDE * scale
     web_left = centre_x - support.WEB * scale
     section_top = centre_y + support.HALF_Y * scale
-    taper = _text_box("2.12", drawing.RIGHT_KEEP["TopFlatMinusZStation"])
     top_span = _text_box(FLAT_PLUS_TEXT, drawing.RIGHT_KEEP["TopFlatPlusZStation"])
-    assert taper[2] < top_left - 0.002
+    assert "TopFlatMinusZStation" not in drawing.RIGHT_KEEP
     assert top_span[0] > top_right + 0.002
-    assert min(taper[1], top_span[1]) > section_top + 0.002
-    assert _boxes_clear(taper, top_span, 0.003)
+    assert top_span[1] > section_top + 0.002
     web_face = _text_box("25.40", drawing.RIGHT_KEEP["WebFaceStation"])
     foot = _text_box("63.5", drawing.RIGHT_KEEP["FootSpan"])
     assert web_face[3] < centre_y - support.HALF_Y * scale
@@ -1268,17 +1276,22 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     # r10 review: one mm lower than r8's row, the 63.5's left extension line
     # overshot its line into the SECTION A-A label's E.
     assert drawing.RIGHT_KEEP["FootSpan"][1] >= 0.133
-    for other in (
-        _text_box("R12.7\n4X", drawing.FRONT_KEEP["CavityRadius"]),
-        _rim_chamfer_box(),
-    ):
-        assert _boxes_clear(taper, other, 0.003)
+    front_bottom = drawing.FRONT_CENTER[1] - support.HALF_Y * scale
     front_left = drawing.FRONT_CENTER[0] - support.BOSS_DEPTH / 2.0 * scale
     front_top = drawing.FRONT_CENTER[1] + support.HALF_Y * scale
     pocket = _text_box("7.70\nBOTH SIDES", drawing.FRONT_KEEP["PocketEndStation"])
     cavity = _text_box("26.7", drawing.FRONT_KEEP["CavityEndStation"])
     cavity_top = _text_box("25.4", drawing.FRONT_KEEP["CavityTopStation"])
     assert pocket[2] < front_left and cavity_top[2] < front_left
+    # r6 review: the pockets' 6.35 up from the mounting face, left of the
+    # view under the face's extension line, clear of the R6.35's text and
+    # of the 165.1's left extension line (the pocket's -X wall).
+    pocket_bottom = _text_box(
+        "6.35\nBOTH SIDES", drawing.FRONT_KEEP["PocketBottomStation"]
+    )
+    assert pocket_bottom[2] < drawing.FRONT_CENTER[0] - support.BIG * scale - 0.003
+    assert pocket_bottom[3] < front_bottom - 0.003
+    assert pocket_bottom[0] > 0.0128 + 0.003  # the sheet's left border
     # Clear of the 25.4's dimension line and of its outside arrow tail above
     # the top face (r9 review: the tail struck BOTH SIDES): on r9's render
     # the tail reached 5.7 mm above the face.
@@ -1294,8 +1307,9 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     for other in (
         _text_box("180.5", drawing.FRONT_KEEP["Depth"]),
         _text_box("R6.35\n8X", drawing.FRONT_KEEP["PocketRadius"]),
+        _text_box("165.1\nSQ POCKET BOTH SIDES", drawing.FRONT_KEEP["WinWidth"]),
     ):
-        for box in (pocket, cavity, cavity_top):
+        for box in (pocket, cavity, cavity_top, pocket_bottom):
             assert _boxes_clear(box, other, 0.002)
 
 
@@ -1495,7 +1509,6 @@ def test_cavity_radius_callout_sits_on_its_corner_bisector_outside_the_view() ->
     front_right = drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2 * scale
     assert label[0] > front_right + 0.003
     for other in (
-        _text_box("2.12", drawing.RIGHT_KEEP["TopFlatMinusZStation"]),
         _rim_chamfer_box(),
         _text_box("177.8", drawing.FRONT_KEEP["Depth"]),
     ):

@@ -289,10 +289,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "CavityEndStation",
         "CavityTopStation",
         "PocketEndStation",
+        "PocketBottomStation",
     },
+    # The section is symmetric about the web: one top-flat edge prints, its
+    # BOTH SIDES covering the other (r6 review); TopFlatMinusZStation stays
+    # in the sketch, unprinted.
     "WebLocationReference": {
         "WebFaceStation",
-        "TopFlatMinusZStation",
         "TopFlatPlusZStation",
     },
 }
@@ -327,10 +330,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "CavityEndStation": CAVITY_LOCATION_PLACES,
         "CavityTopStation": CAVITY_LOCATION_PLACES,
         "PocketEndStation": POCKET_END_PLACES,
+        "PocketBottomStation": POCKET_END_PLACES,
     },
     "WebLocationReference": {
         "WebFaceStation": SECTION_LOCATION_PLACES,
-        "TopFlatMinusZStation": TOP_FLAT_PLACES,
         "TopFlatPlusZStation": TOP_FLAT_PLACES,
     },
 }
@@ -403,8 +406,9 @@ SEAT_STATION_DRIVES = {
 # from a real feature); nothing models them, so two blanked reference
 # sketches do, each printed location one driving dimension:
 # * CavityLocationReference (Front plane, sketch (u, v) = model (X, Y)): the
-#   -X end face to the cavity's and to the pocket's side wall, and the top
-#   face down to the cavity's top wall;
+#   -X end face to the cavity's and to the pocket's side wall, the top face
+#   down to the cavity's top wall, and the bottom (mounting) face up to the
+#   pocket's bottom wall (r6 review: the pocket had no vertical location);
 # * WebLocationReference (Right plane, sketch (u, v) = model (-Z, Y)): the
 #   base's -Z edge to the web's -Z face, and each web face out to the top
 #   flat's edge on its side (owner Q13d, 2026-10-16: a real surface, not the
@@ -426,11 +430,13 @@ REFERENCE_EDGE_STATION = 5.0
 CAVITY_END_STATION = BOSS_DEPTH / 2.0 - CAV  # 26.75, printed 26.7
 CAVITY_TOP_STATION = HALF_Y - CAV  # 25.4
 POCKET_END_STATION = BOSS_DEPTH / 2.0 - BIG  # 7.70
+POCKET_BOTTOM_STATION = HALF_Y - BIG  # 6.35
 WEB_FACE_STATION = WIDE - WEB  # 25.40
 LOCATION_DRIVES = {
     "CavityEndStation": f'{END_FACE_DRIVE} - "CavHalf"',
     "CavityTopStation": '"HalfHeight" - "CavHalf"',
     "PocketEndStation": f'{END_FACE_DRIVE} - "WindowOuter"',
+    "PocketBottomStation": '"HalfHeight" - "WindowOuter"',
     "WebFaceStation": f'"FootHalf" - {WEB}mm',
     "TopFlatMinusZStation": f'"TopHalf" - {WEB}mm',
     "TopFlatPlusZStation": f'"TopHalf" - {WEB}mm',
@@ -648,14 +654,15 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
     """CavityLocationReference on the Front plane, sketch (u, v) = model
     (X, Y); returns the drive jobs.
 
-    Chords down the -X end face and along the top face, each
+    Chords down the -X end face and along the top and bottom faces, each
     REFERENCE_EDGE_STATION from their corner; down the cavity's and the
-    pocket's -X side walls and along the cavity's top wall, each that far
-    into the wall's straight run. The end chord's start locates both side
-    walls (CavityEndStation, PocketEndStation), the top chord's the cavity's
-    top wall (CavityTopStation). 5 x 4 DOF less: two anchored starts (4),
-    five square relations and lengths (10), three locations and three places
-    along a wall (6) = 0.
+    pocket's -X side walls and along the cavity's top wall and the pocket's
+    bottom wall, each that far into the wall's straight run. The end chord's
+    start locates both side walls (CavityEndStation, PocketEndStation), the
+    top chord's the cavity's top wall (CavityTopStation), the bottom chord's
+    the pocket's bottom wall (PocketBottomStation). 7 x 4 DOF less: three
+    anchored starts (6), seven square relations and lengths (14), four
+    locations and four places along a wall (8) = 0.
     """
     sketch = REFERENCE_SKETCHES[1]
     dims = SketchDims()
@@ -742,6 +749,51 @@ async def _cavity_location_reference(adapter) -> list[tuple[str, str]]:
         "origin",
         "horizontal_distance",
         cavity_run,
+    )
+    # The pocket's bottom wall up from the bottom (mounting) face, the
+    # pocket's vertical location (r6 review).
+    bottom = await _reference_chord(
+        adapter,
+        sketch,
+        dims,
+        "BottomChord",
+        (top_x, -HALF_Y),
+        (top_x + chord, -HALF_Y),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{bottom}.start", top_x, -HALF_Y, f"{sketch} bottom face chord"
+    )
+    dims.record("BottomChordX")
+    dims.record("BottomChordY", '"HalfHeight"')
+    pocket_run = BIG - POCKET_FILLET_R - station
+    pocket_bottom = await _reference_chord(
+        adapter,
+        sketch,
+        dims,
+        "PocketBottomChord",
+        (-pocket_run, -BIG),
+        (-pocket_run + chord, -BIG),
+    )
+    await _location(
+        adapter,
+        sketch,
+        dims,
+        "PocketBottomStation",
+        f"{bottom}.start",
+        f"{pocket_bottom}.start",
+        "vertical_distance",
+        POCKET_BOTTOM_STATION,
+        LOCATION_DRIVES["PocketBottomStation"],
+    )
+    await _location(
+        adapter,
+        sketch,
+        dims,
+        "PocketBottomChordX",
+        f"{pocket_bottom}.start",
+        "origin",
+        "horizontal_distance",
+        pocket_run,
     )
     await ensure_fully_defined(adapter, f"{sketch} sketch")
     check(f"exit_sketch {sketch}", await adapter.exit_sketch())

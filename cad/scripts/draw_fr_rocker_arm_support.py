@@ -123,7 +123,10 @@ ISO_CENTER = (0.350, 0.201)
 # overall size above, nested pocket sizes below, radii beside their corners.
 FRONT_KEEP = {
     "Depth": (0.105, 0.258),
-    "PocketRadius": (0.035, 0.150),
+    # Its leader's shelf stands 7 mm above the pocket's bottom wall, whose
+    # PocketBottomStation extension line runs out left under it (r6 render:
+    # at 0.150 the shelf sat 0.8 mm above that line).
+    "PocketRadius": (0.035, 0.157),
     # CornerFillet's dimension belongs to the cavity's top-right corner (the
     # fix3 render), so the text sits up-right of that corner, on the arc's
     # own bisector. From the left column its leader crossed the whole cavity
@@ -155,6 +158,12 @@ FRONT_KEEP = {
     "PocketEndStation": (0.0365, 0.244),
     "CavityEndStation": (0.0668, 0.249),
     "CavityTopStation": (0.052, 0.2231),
+    # The pockets' bottom wall up from the mounting face (r6 review: the
+    # pocket had no vertical location). Its 6.35 spans only 3.2 mm of sheet,
+    # so the text and its BOTH SIDES stand left of the view just under the
+    # mounting face's extension line, below the R6.35's leader and left of
+    # the 165.1's extension line.
+    "PocketBottomStation": (0.036, 0.132),
 }
 # The cavity corner CornerFillet's dimension attaches to, as sheet signs.
 CAVITY_RADIUS_CORNER = (1, 1)
@@ -177,10 +186,14 @@ DIMENSION_CALLOUTS = {
     "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
     # One location covers both opposed pockets, as the SQ size does.
     "PocketEndStation": "BOTH SIDES",
-    # Each flat edge off its nearer web face holds the transferred seats
-    # clear of the web's faces (owner Q13d, rocker_bracket_seat_layout's stack).
+    "PocketBottomStation": "BOTH SIDES",
+    # One flat edge prints for both (the section is symmetric about the web);
+    # off its nearer web face it keeps the transferred seats clear of the
+    # web's faces (owner Q13d, rocker_bracket_seat_layout's stack). r6 review:
+    # "CENTERS" read as the mating part being centred, not what the 2.12 is.
     "TopFlatPlusZStation": (
-        f"CENTERS {_config.parts('ch-pivot-bracket')['number']}\nSEAT TAPS IN WEB"
+        "BOTH SIDES\n"
+        f"KEEPS {_config.parts('ch-pivot-bracket')['number']}\nSEAT TAPS IN WEB"
     ),
 }
 # The sheet's own places. RimChamferSize's, PocketFloorRadius's, the seat REF
@@ -305,13 +318,12 @@ FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
 # top-rail floor corner (build_fr_rocker_arm_support.POCKET_FLOOR_FILLET_EDGES),
 # which the section shows in profile at its upper right. The text stands
 # level with it right of the section, between the slanted wall and the
-# 177.8, which moves out to clear it. The top flat's two edges print off
-# their nearer web faces (WebLocationReference, blanked in the part; owner
-# Q13d), both on the row above the section: each span is only about 1 mm of
-# sheet, so each text stands outboard of its own edge (the right one at
-# least 2 mm clear of the left span's outboard arrow, the audit's arrow
-# clearance), and the right one's reason rows hang below it, above the
-# R0.8 MAX's block. The 63.5 prints
+# 177.8, which moves out to clear it. One top-flat edge prints off its
+# nearer web face (WebLocationReference, blanked in the part; owner Q13d),
+# its BOTH SIDES covering the other (r6 review), on the row above the
+# section: the span is only about 1 mm of sheet, so its text stands outboard
+# of the +Z edge, its reason rows hanging below the value, above the R0.8
+# MAX's block. The 63.5 prints
 # right of the web face's extension line WebFaceStation runs down to just
 # above it, its row no lower than r8's (r10 review: 1 mm lower, its left
 # extension line's overshoot struck the SECTION A-A label's E).
@@ -320,7 +332,6 @@ FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
 RIGHT_KEEP = {
     "WallHeight": (0.256, 0.185),
     "FootSpan": (0.2125, 0.133),
-    "TopFlatMinusZStation": (0.191, 0.2475),
     "TopFlatPlusZStation": (0.2385, 0.2475),
     "WebFaceStation": (0.1958, 0.1375),
     "PocketFloorRadius": (0.2335, 0.2195),
