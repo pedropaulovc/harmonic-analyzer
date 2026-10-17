@@ -423,6 +423,40 @@ def _pin_dimension_text_and_leader_style(draw: Any) -> None:
     )
 
 
+# Document Properties > Drafting Standard > Uppercase > "All uppercase for
+# dimensions and hole callouts" (swUserPreferenceToggle_e = 754) and its
+# "Exclusion list" (swUserPreferenceStringValue_e = 96), read off swconst.tlb
+# R2026x; docs/swconst/DP_DraftingStandard.md. SolidWorks spells the
+# swTolMAX / swTolMIN suffix 'max.' / 'min.'; ASME Y14.5 drawings and every
+# hand-written note on these sheets say MAX / MIN. The exclusion list keeps
+# case-meaningful tokens (units) lowercase; it is recorded, not replaced.
+_PREF_UPPERCASE_DIMENSIONS = 754
+_PREF_UPPERCASE_EXCLUSION_LIST = 96
+_DETAILING_NO_OPTION = 0  # swUserPreferenceOption_e.swDetailingNoOptionSpecified
+
+
+def _pin_uppercase_dimensions(draw: Any) -> None:
+    """Print dimension and hole-callout text on ``draw`` in uppercase."""
+    ext = draw.Extension
+    ok = ext.SetUserPreferenceToggle(
+        _PREF_UPPERCASE_DIMENSIONS, _DETAILING_NO_OPTION, True
+    )
+    applied = bool(
+        ext.GetUserPreferenceToggle(_PREF_UPPERCASE_DIMENSIONS, _DETAILING_NO_OPTION)
+    )
+    if not ok or not applied:
+        raise RuntimeError(
+            "failed to pin all-uppercase dimensions and hole callouts (set "
+            f"returned {ok!r}, document reads {applied})"
+        )
+    exclusions = str(
+        ext.GetUserPreferenceString(
+            _PREF_UPPERCASE_EXCLUSION_LIST, _DETAILING_NO_OPTION
+        )
+    )
+    _telemetry.info(f"uppercase dimensions on; exclusion list {exclusions!r}")
+
+
 @_telemetry.traced("drawing.new_from_template")
 def new_project_drawing(
     adapter: Any,
@@ -470,6 +504,7 @@ def new_project_drawing(
     # display (an exact inch conversion like 9.525) can pass decimals=3.
     set_units_mm(adapter, decimals=decimals)
     _pin_dimension_text_and_leader_style(draw)
+    _pin_uppercase_dimensions(draw)
     _pin_annotation_ink(adapter)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(
