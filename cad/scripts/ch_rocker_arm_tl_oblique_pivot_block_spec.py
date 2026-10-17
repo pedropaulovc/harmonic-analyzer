@@ -102,7 +102,7 @@ they set: 2.10 at two places, 1.81 at one (under the 2.0 target), stated on
 both.
 
 Side screws (PR C4). Two Ø4.98 THRU along Y with a Ø7.94 counterbore
-4.40 deep from the +Y face, at (X, Z) = (+/-5, 9), for #8-32 x 1-3/4 SHCS
+4.40 deep from the +Y face, at (X, Z) = (+/-5, 9), for #8-32 x 1-7/8 SHCS
 into the tapped holes of the leadscrew nut bracket (MHA-CH-006-TL-29) on
 the -Y face. TL-22 owns the positions (``SIDE_SCREW_*``); the leadscrew spec
 aliases them, so TL-29's tapped pattern follows them. The row is measured
@@ -268,7 +268,7 @@ CBORE_FLOOR_CALLOUT = (
 )
 
 # --- Side screws (PR C4): the TL-29 nut bracket ------------------------------
-# 2 x #8-32 x 1-3/4 SHCS from the +Y face, through the block along Y, into the
+# 2 x #8-32 x 1-7/8 SHCS from the +Y face, through the block along Y, into the
 # nut bracket's tapped holes on the -Y face. The leadscrew spec aliases these.
 SIDE_SCREW = "#8-32"
 SIDE_SCREW_X = (-5.0, 5.0)

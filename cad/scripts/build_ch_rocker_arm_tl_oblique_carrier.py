@@ -22,7 +22,9 @@ Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
   plane through its axis parallel to the Front plane (the plane's offset is
   the spot's Y station) as the pivot plate's seat cone;
 * the CR, riser and feed-lever taps are UNC Hole Wizard features from the
-  top face, through.
+  top face, through;
+* each pin hole carries a hidden reference axis (``PIN_HOLE_AXES``), two
+  offset planes' intersection, which the jig assembly mates on.
 
 Run (SolidWorks already open)::
 
@@ -37,6 +39,7 @@ from collections.abc import Callable
 from typing import Any
 
 from _appearance import apply_material
+from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions
@@ -88,6 +91,7 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     LEVER_TAP_DRILL,
     OUTLINE_X,
     OUTLINE_Y,
+    PIN_HOLE_AXES,
     PIN_HOLE_BAND,
     PIN_HOLE_DIA,
     PIN_HOLES,
@@ -357,6 +361,34 @@ async def _spot_reference(adapter) -> list[tuple[str, str]]:
     check("exit_sketch spot reference", await adapter.exit_sketch())
     name_last_feature(adapter, SPOT_REFERENCE)
     return ref.apply(adapter, SPOT_REFERENCE)
+
+
+def _pin_dim(name: str) -> str:
+    return f'"{name}@PinHoleProfile"'
+
+
+# Each pin-hole axis's |X| and |Y| offsets from the PinHoleProfile chain
+# (_pin_holes): A1 at -A1X, B1 PinSpacing on, A2/B2 out by their dX and up by
+# their dY. ``name_bore_axis`` ignores the Y drive on the Y = 0 holes.
+_PIN_AXIS_DRIVES = {
+    "A1": (_pin_dim("A1X"), None),
+    "B1": (f"{_pin_dim('PinSpacing')} - {_pin_dim('A1X')}", None),
+    "A2": (f"{_pin_dim('A1X')} + {_pin_dim('A2DX')}", _pin_dim("A2DY")),
+    "B2": (
+        f"{_pin_dim('PinSpacing')} - {_pin_dim('A1X')} + {_pin_dim('B2DX')}",
+        _pin_dim("B2DY"),
+    ),
+}
+_A1, _B1, _A2, _B2 = (PIN_HOLES[key] for key in ("A1", "B1", "A2", "B2"))
+if not (
+    _A1[0] < 0.0 < _B1[0]
+    and _A2[0] < _A1[0]
+    and _B2[0] > _B1[0]
+    and _A1[1] == _B1[1] == 0.0
+    and _A2[1] > 0.0
+    and _B2[1] > 0.0
+):
+    raise AssertionError("the pin-axis drives no longer match the hole chain's signs")
 
 
 async def _pin_holes(adapter, dims: SketchDims) -> None:
@@ -700,6 +732,24 @@ async def build(adapter) -> dict[str, str]:
     v_lever = len(LEVER_HOLES) * math.pi * (lever.hole_dia_mm / 2.0) ** 2 * THICKNESS
     volume = await volume_check(adapter, "lever taps", volume - v_lever, 0.03 * v_lever)
     _require_one_solid_body(adapter, label="carrier")
+    # Model X = carrier X and model Z = -carrier Y: each axis is a Right-plane
+    # offset by its X and a Front-plane offset by its -Y, each offset driven by
+    # the PinHoleProfile dimensions that place its hole (an offset plane's
+    # distance is unsigned), so an edit of the holes moves the jig's mate axes.
+    for hole, (x, y) in PIN_HOLES.items():
+        drive_x, drive_y = _PIN_AXIS_DRIVES[hole]
+        await name_bore_axis(
+            adapter,
+            "Right Plane",
+            x,
+            "Front Plane",
+            -y,
+            f"pin hole {hole}",
+            drive_a=drive_x,
+            drive_b=drive_y,
+            drive_jobs=drive_jobs,
+        )
+        name_last_feature(adapter, PIN_HOLE_AXES[hole])
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:

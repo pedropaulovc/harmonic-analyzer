@@ -864,19 +864,174 @@ _MS_MEASURING_STICK_ALLOWED_PAIRS = {
     ),
 }
 
-# The rocker's oblique-trammel jig (MHA-CH-006-TL-000, shop fixture): the HUB
-# locator pin's Ø10.20 x 12 p6 seat fills the carrier's HUB, which the model
-# carries only as a Ø3 centre-drill spot because it is reamed in place on the
-# running jig. The pivot pins sit coincident in the carrier's Ø10 holes, the
-# riser and lever on its top, the end brackets on bar 1's top and the
-# nut bracket on pivot block 1's face (their screws are not modelled):
-# contact, not volume. Literals, like the rows above;
-# test_ch_rocker_arm_tl_oblique_jig_assembly pins them to the specs.
+# The rocker's oblique-trammel jig (MHA-CH-006-TL-000, shop fixture). The
+# HUB locator pin's Ø10.20 x 12 p6 seat fills the carrier's HUB, which the
+# model carries only as a Ø3 centre-drill spot because it is reamed in place
+# on the running jig; the CL dowel's Ø6 m6 x 12 section in the carrier is the
+# same press, bounded by the full seat cylinder. Every screw, stud and nut is
+# a smooth major-diameter envelope in a tap-drill bore over its engagement
+# (major, tap drill, engagement); the bearings' 6200 rings press on the pivot
+# pins (the Ø10.001 k5 journal low limit in the Ø10 bore) and into the blocks
+# (Ø30 OD in the N6 seat's Ø29.976 low limit), each over the 9 mm ring width.
+# Everything else is contact: the pins coincident in the carrier holes, the
+# screw heads on their seats, the block screws' wedge-lock pairs between the
+# heads and TL-22's counterbore floor (Ø4.318 ID round the Ø4.166 major, Ø7.62
+# OD in the Ø7.94 bore), the brackets, nut, KP08 blocks and rails on their
+# faces. Literals, like the rows above;
+# test_ch_rocker_arm_tl_oblique_jig_assembly pins them to the specs, and
+# verify's pass-sweep-interference-free holds them at every sweep pose.
+_JIG = "ch-rocker-arm-tl-oblique"
 JIG_HUB_PIN_SEAT = (10.20, 12.0)  # (diameter, length)
+JIG_CL_DOWEL_PRESS = (6.0, 12.0)  # (diameter, carrier thickness)
+JIG_RAIL_SCREW_THREAD = (4.1656, 3.454, 9.35)  # #8-32 into each base bar
+JIG_BRACKET_SCREW_THREAD = (4.1656, 3.454, 7.975)  # #8-32 into a end bracket
+JIG_BLOCK_SCREW_THREAD = (4.1656, 3.454, 9.485)  # #8-32 into the nut bracket
+JIG_CARRIAGE_SCREW_THREAD = (4.0, 3.242, 4.4)  # M4 into each HGH15 carriage
+JIG_PILLOW_BLOCK_SCREW_THREAD = (4.0, 3.3, 7.0)  # M4 into a end bracket
+JIG_NUT_SCREW_THREAD = (3.0, 2.5, 6.5)  # M3 into the nut bracket
+JIG_RISER_SCREW_THREAD = (2.8448, 2.261, 6.7)  # #4-40 into the carrier
+JIG_CLAMP_SCREW_THREAD = (6.35, 5.105, 10.55)  # 1/4-20 into the carrier
+JIG_LEVER_SCREW_THREAD = (7.9375, 6.528, 9.525)  # 5/16-18 into the carrier
+JIG_T_NUT_THREAD = (12.7, 10.716, 14.0)  # 1/2-13 stud in its T-nut
+JIG_FLANGE_NUT_THREAD = (12.7, 10.716, 13.0)  # 1/2-13 stud in its flange nut
+JIG_LEADSCREW_NUT_THREAD = (8.0, 6.0, 15.0)  # Tr8 screw in its flanged nut
+JIG_BEARING_ON_PIN = (10.001, 10.0, 9.0)  # (pin, bore, ring width)
+JIG_BEARING_IN_BLOCK = (30.0, 29.976, 9.0)  # (ring OD, block bore, ring width)
 _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
-    frozenset(
-        ("ch-rocker-arm-tl-oblique-hub-pin-1", "ch-rocker-arm-tl-oblique-carrier-1")
-    ): 1.10 * math.pi * JIG_HUB_PIN_SEAT[0] ** 2 * JIG_HUB_PIN_SEAT[1] / 4.0,
+    frozenset((f"{_JIG}-hub-pin-1", f"{_JIG}-carrier-1")): (
+        1.10 * math.pi * JIG_HUB_PIN_SEAT[0] ** 2 * JIG_HUB_PIN_SEAT[1] / 4.0
+    ),
+    frozenset((f"{_JIG}-cl-dowel-1", f"{_JIG}-carrier-1")): (
+        1.10 * math.pi * JIG_CL_DOWEL_PRESS[0] ** 2 * JIG_CL_DOWEL_PRESS[1] / 4.0
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-rail-screw",
+        range(1, 8),
+        f"{_JIG}-base-bar",
+        _smooth_annulus_limit_mm3(*JIG_RAIL_SCREW_THREAD),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-rail-screw",
+        range(8, 15),
+        f"{_JIG}-base-bar",
+        _smooth_annulus_limit_mm3(*JIG_RAIL_SCREW_THREAD),
+        second_number=2,
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-bracket-screw",
+        range(1, 3),
+        f"{_JIG}-end-bracket",
+        _smooth_annulus_limit_mm3(*JIG_BRACKET_SCREW_THREAD),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-bracket-screw",
+        range(3, 5),
+        f"{_JIG}-end-bracket",
+        _smooth_annulus_limit_mm3(*JIG_BRACKET_SCREW_THREAD),
+        second_number=2,
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-block-screw",
+        range(1, 3),
+        f"{_JIG}-nut-bracket",
+        _smooth_annulus_limit_mm3(*JIG_BLOCK_SCREW_THREAD),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-carriage-screw",
+        range(1, 5),
+        f"{_JIG}-carriage",
+        _smooth_annulus_limit_mm3(*JIG_CARRIAGE_SCREW_THREAD),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-carriage-screw",
+        range(5, 9),
+        f"{_JIG}-carriage",
+        _smooth_annulus_limit_mm3(*JIG_CARRIAGE_SCREW_THREAD),
+        second_number=2,
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-kp08-screw",
+        range(1, 3),
+        f"{_JIG}-end-bracket",
+        _smooth_annulus_limit_mm3(*JIG_PILLOW_BLOCK_SCREW_THREAD),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-kp08-screw",
+        range(3, 5),
+        f"{_JIG}-end-bracket",
+        _smooth_annulus_limit_mm3(*JIG_PILLOW_BLOCK_SCREW_THREAD),
+        second_number=2,
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-nut-screw",
+        range(1, 5),
+        f"{_JIG}-nut-bracket",
+        _smooth_annulus_limit_mm3(*JIG_NUT_SCREW_THREAD),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-riser-screw",
+        range(1, 5),
+        f"{_JIG}-carrier",
+        _smooth_annulus_limit_mm3(*JIG_RISER_SCREW_THREAD),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-clamp-screw",
+        range(1, 2),
+        f"{_JIG}-carrier",
+        _smooth_annulus_limit_mm3(*JIG_CLAMP_SCREW_THREAD),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-lever-screw",
+        range(1, 3),
+        f"{_JIG}-carrier",
+        _smooth_annulus_limit_mm3(*JIG_LEVER_SCREW_THREAD),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-hold-down-stud",
+        range(1, 5),
+        f"{_JIG}-t-nut",
+        _smooth_annulus_limit_mm3(*JIG_T_NUT_THREAD),
+        second_number=None,
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-hold-down-stud",
+        range(1, 5),
+        f"{_JIG}-flange-nut",
+        _smooth_annulus_limit_mm3(*JIG_FLANGE_NUT_THREAD),
+        second_number=None,
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-leadscrew-nut",
+        range(1, 2),
+        f"{_JIG}-leadscrew",
+        _smooth_annulus_limit_mm3(*JIG_LEADSCREW_NUT_THREAD),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-bearing",
+        range(1, 3),
+        f"{_JIG}-pivot-pin",
+        _smooth_annulus_limit_mm3(*JIG_BEARING_ON_PIN),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-bearing",
+        range(3, 5),
+        f"{_JIG}-pivot-pin",
+        _smooth_annulus_limit_mm3(*JIG_BEARING_ON_PIN),
+        second_number=2,
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-bearing",
+        range(1, 3),
+        f"{_JIG}-pivot-block",
+        _smooth_annulus_limit_mm3(*JIG_BEARING_IN_BLOCK),
+    ),
+    **_numbered_pairs(
+        f"{_JIG}-bearing",
+        range(3, 5),
+        f"{_JIG}-pivot-block",
+        _smooth_annulus_limit_mm3(*JIG_BEARING_IN_BLOCK),
+        second_number=2,
+    ),
 }
 
 _BY_ASSEMBLY: dict[str, Mapping[frozenset[str], float]] = {

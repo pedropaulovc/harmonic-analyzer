@@ -261,9 +261,11 @@ WHEEL_S = (
     HUB_END_S + HANDWHEEL_HUB_LENGTH + HANDWHEEL_WHEEL_LENGTH,
 )
 # Block screws: 2 x #8-32 SHCS through pivot block 1 from its +Y face into
-# #8-32 tapped holes in the bracket's Y = 0 face.
+# #8-32 tapped holes in the bracket's Y = 0 face, each head on a wedge-lock
+# washer pair (MHA-CH-006-TL-50) on the floor of TL-22's counterbore: the
+# screws carry the reversing feed thrust.
 BLOCK_SCREW = "#8-32"
-BLOCK_SCREW_LENGTH = "1-3/4"
+BLOCK_SCREW_LENGTH = "1-7/8"
 # TL-22 owns the hole positions (pivot_block.SIDE_SCREW_*); aliased here.
 BLOCK_SCREW_X = pivot_block.SIDE_SCREW_X  # pivot-block frame X
 BLOCK_SCREW_BLOCK_Z = pivot_block.SIDE_SCREW_Z  # pivot-block frame Z
@@ -272,7 +274,13 @@ NUT_BRACKET_BLOCK_HOLES_Z = (
 )
 NUT_BRACKET_TAP_DEPTH = 12.0  # minimum full thread in the bracket
 BLOCK_SCREW_GRIP = pivot_block.SIDE_UNDER_HEAD  # TL-22 under the head: 35.6
-BLOCK_SCREW_ENGAGEMENT = 1.75 * INCH - BLOCK_SCREW_GRIP  # 8.85 in TL-29
+# The TL-50 pair's stack under each head: McMaster 91812A215's 0.080-0.100 in
+# band at its maximum (the worst case for engagement). A literal, so this
+# calculator imports no bought-part module; the TL-50 spec pins it.
+BLOCK_SCREW_LOCK_STACK = 0.100 * INCH  # 2.54
+# 1-7/8 in less TL-22 and the pair: 9.49 in TL-29, over the 1.5 D 6.249 and
+# inside the 12 thread; the TL-50 spec holds it at the worst-case bands.
+BLOCK_SCREW_ENGAGEMENT = 1.875 * INCH - BLOCK_SCREW_GRIP - BLOCK_SCREW_LOCK_STACK
 
 # --- Additions to sibling parts -------------------------------------------------
 # TL-20 base bar (both bars, single configuration): 4 x #8 SHCS clearance

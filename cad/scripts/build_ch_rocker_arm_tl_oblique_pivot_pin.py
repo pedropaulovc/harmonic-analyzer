@@ -11,6 +11,8 @@ A stepped turned pin (``ch_rocker_arm_tl_oblique_pivot_pin_spec``). Layout:
   band; the lengths read from the top end (rule 11).
 * ``SeatFillet`` / ``CarrierFillet``: R0.2 MAX at the collar's two
   shoulder corners.
+* ``PinAxis``: a hidden reference axis on the turned axis (the Right and Top
+  planes' intersection), which the jig assembly mates the carrier on.
 
 Run (SolidWorks already open)::
 
@@ -23,6 +25,7 @@ import math
 import sys
 
 from _appearance import apply_material
+from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
@@ -49,6 +52,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from ch_rocker_arm_tl_oblique_pivot_pin_spec import (
+    AXIS_NAME,
     BEARING_DIA,
     BEARING_PRINT_BAND,
     BEARING_LENGTH,
@@ -289,6 +293,8 @@ async def build(adapter) -> dict[str, str]:
             (name_dimensions(adapter, feature, [dimension])[0], '"FilletR"')
         )
     await volume_check(adapter, "filleted pin", V_TOTAL, 0.005 * V_TOTAL)
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pin axis")
+    name_last_feature(adapter, AXIS_NAME)
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
