@@ -452,6 +452,23 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
     assert "RAIL 1'S PIVOT BLOCK (STILL ON ITS CARRIAGE)" in steps["7C"]
     spot = "SPOT THE NUT BRACKET THROUGH THE BLOCK'S 2 Ø4.98 SIDE HOLES"
     assert spot in steps["7C"]
+    # Owner ruling 2026-10-17 (review jbf-r17): the set takes the title
+    # block's .XXX band with its reason; no explicit band; the wall at that
+    # band (exception RV-02) holds the 1.5 floor.
+    assert (
+        "CENTRE 50.000 FROM THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS);"
+    ) in steps["7C"]
+    assert "±" not in steps["7C"]
+    assert spec.X_SET_BAND == pytest.approx(0.13)
+    assert spec.NUT_BRACKET_END_WALL_MIN == pytest.approx(1.544, abs=0.001)
+    (set_rule,) = [
+        e
+        for e in machinist_exceptions.load_exceptions(
+            _config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
+        )
+        if e.id == "RV-02"
+    ]
+    assert "CENTRE 50.000" in set_rule.where and "1.544" in set_rule.reason
     assert (
         "UNCLAMP THE NUT BRACKET, DRILL AND TAP ITS 2 SPOTS #8-32 PER "
         "MHA-CH-006-TL-29; THE BLOCK'S HOLES STAY PLAIN."

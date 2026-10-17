@@ -79,6 +79,8 @@ import math
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from _printed_tolerance import printed_band_mm
+
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_bearing_spec as bearing
 import ch_rocker_arm_tl_oblique_block_washer_spec as block_washer
@@ -1252,6 +1254,23 @@ if NUT_FLANGE_SLIP_MARGIN < leadscrew.SLIP_MARGIN_MIN:
     )
 _NUT_TORQUE = f"{NUT_SCREW_TORQUE_NM:.1f} N·m"
 
+# --- Step 7C's nut bracket set: its printed band -------------------------------
+# Owner ruling 2026-10-17 (review jbf-r17, rules 4/17): TL-29 cannot grow
+# (FEED_GAP, its 3/4 stock), so 7C prints the centre at three places, the
+# title block's .XXX band, with its reason, and no explicit band. Each #8
+# tap's end wall at that band, every other band worst case, holds the 1.5
+# floor; the jig's machinist_exceptions RV-02 states the value.
+X_SET_PLACES = 3
+X_SET_BAND = printed_band_mm(X_SET_PLACES)  # 0.13
+NUT_BRACKET_END_WALL_MIN = nut_bracket.END_WALL_MIN - (
+    X_SET_BAND - nut_bracket.X_SET_BAND
+)  # 1.544
+if NUT_BRACKET_END_WALL_MIN < nut_bracket.WALL_FLOOR:
+    raise ValueError(
+        f"TL-29's #8 tap end wall falls to {NUT_BRACKET_END_WALL_MIN:.3f} at "
+        f"the .XXX band, under the {nut_bracket.WALL_FLOOR} floor"
+    )
+
 # --- The feed lever screws: their tightening torque -----------------------------------
 # Rule 23 (C3 r6 TL-000 review): the 2 5/16-18 lever screws carry the
 # operator's push and pull on the TL-26 lever, reversing through every pass.
@@ -1381,9 +1400,9 @@ ASSEMBLY_STEPS = (
     "FROM THE BAR'S FAR END THROUGH BOTH BLOCKS AND THE NUT, "
     f"{leadscrew.NEAR_STUB:.0f} PAST THE NEAR BLOCK; IT TURNS FREELY.",
     "7C. CLAMP THE NUT BRACKET ON THE COLUMN SIDE OF RAIL 1'S PIVOT BLOCK (STILL "
-    f"ON ITS CARRIAGE), CENTRE {nut_bracket.X_SET_MID:.2f} "
-    f"±{nut_bracket.X_SET_BAND:.2f} FROM THE BLOCK'S SPINDLE END (HOLDS THE TAP "
-    "END WALLS); SPOT THE NUT BRACKET THROUGH THE BLOCK'S 2 "
+    f"ON ITS CARRIAGE), CENTRE {nut_bracket.X_SET_MID:.{X_SET_PLACES}f} FROM "
+    "THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS); SPOT THE NUT BRACKET "
+    "THROUGH THE BLOCK'S 2 "
     f"Ø{pivot_block.SIDE_HOLE_DIA:.2f} SIDE HOLES ({nut_bracket.TRANSFER_PUNCH} "
     "TRANSFER PUNCH).",
     "7D. RUN THE SCREW OUT, UNCLAMP THE NUT BRACKET, DRILL AND TAP ITS 2 "
