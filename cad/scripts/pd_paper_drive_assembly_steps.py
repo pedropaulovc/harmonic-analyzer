@@ -11,24 +11,21 @@ rolling diameter. The collar rear-face fit, wheel/pilot float and stud cut
 come from MHA-PD-022 (its sheet shares the fit phrases, R9-30). Its actual
 loaded overlap inspection precedes final platen installation and does not
 turn the static F-to-disc setting into a clearance certificate.
-The frozen finite-rack reader requires the exact source-derived measured-datum
-physical stack. Its configured operating-domain wrapper additionally guards
-the actual cut ends and the entire located, graded recording-paper sweep;
-no hardware stop or reduced paper stroke is implied. No SolidWorks or live proof.
+The feed rack's datum setup and its closed-form gates live in
+``paper_drive_rack_setup`` (the builder gates on them); this module only
+prints them. Drawing-only: no assembly builder imports it. No SolidWorks or
+live proof.
 """
 
 from __future__ import annotations
 
-import math
 import textwrap
 
 import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import pd_transgear_arm_geometry as arm_geometry
-import pd_transgear_feed_pinion_spec as feed_pinion
 import paper_drive_mesh_check as mesh_check
-import paper_drive_rack_travel as rack_travel
-import transgear_hanger_joints as joints
+import paper_drive_rack_setup as rack_setup
 import pd_transgear_removable_spec as removable
 import paper_drive_geom as paper_geometry
 
@@ -201,84 +198,9 @@ BAR_TOP_ABOVE_DECK = 266.934
 # solder joint. The feed mesh's datum pitch-line distance sets the crest drop.
 RACK_CREST_DROP = paper_geometry.RACK_CREST_DROP
 RACK_CREST_TOL = 0.05
-# The feed owner's range is a tooth-centred rack-normal DATUM setup. The
-# platen's endpoint-to-endpoint shake equals this band only with a feed tooth
-# bisector directly below a rack-space bisector.
-RACK_DATUM_BACKLASH_RANGE = feed_pinion.RACK_BACKLASH_RANGE
+# The feed rack's datum setup band and its gates are the builder's too:
+# paper_drive_rack_setup owns them; this module only prints them.
 RACK_ROOT_CLEARANCE_FLOOR = mesh_check.RACK_ROOT_CLEARANCE_FLOOR_MM
-# The model's pitch-line distance at the nominal translation, across the
-# datum band (pd_transgear_feed_pinion_spec's backlash law).
-RACK_DATUM_MODEL_AXIS_DISTANCE_RANGE = tuple(
-    mesh_check.feed_rack_axis_distance_mm(backlash, feed_pinion.RADIAL_SETTING)
-    for backlash in RACK_DATUM_BACKLASH_RANGE
-)
-
-# Codex P1 on b2eb9a0e1: the hook's Ø3.3 pin hole is match-drilled from the
-# MHA-VN-042 pin with the largest pin on its lower edge
-# ("hook-pin-hole-match-drilled"), so the unclamped arm cannot fall through
-# the hole. With no slack the latch adds no opening to the rack mesh's loose
-# datum end.
-LATCH_SLACK_ALONG = 0.0
-
-
-def require_feed_rack_datum_axis_distance(
-    axis_distance_mm: float,
-    datum_backlash_band: tuple[float, float] = RACK_DATUM_BACKLASH_RANGE,
-) -> None:
-    """The model's pitch-line distance must give a datum backlash in band."""
-    low, high = datum_backlash_band
-    specified_low, specified_high = RACK_DATUM_BACKLASH_RANGE
-    if not specified_low <= low <= high <= specified_high:
-        raise ValueError("rack datum setup band leaves its specified limits")
-    near = mesh_check.feed_rack_axis_distance_mm(low, feed_pinion.RADIAL_SETTING)
-    far = mesh_check.feed_rack_axis_distance_mm(high, feed_pinion.RADIAL_SETTING)
-    # 1e-6 mm absorbs the native model's length round trip only.
-    if not near - 1e-6 <= axis_distance_mm <= far + 1e-6:
-        raise ValueError(
-            f"rack pitch line {axis_distance_mm:.6f} mm from the feed axis is "
-            f"outside the datum band {near:.6f}..{far:.6f} mm"
-        )
-
-
-def require_feed_rack_mesh(
-    datum_backlash_band: tuple[float, float] = RACK_DATUM_BACKLASH_RANGE,
-    latch_slack_along: float = LATCH_SLACK_ALONG,
-) -> mesh_check.MeshCheck:
-    """Closed-form gates for the set rack mesh over the printed corners.
-
-    The latch pin's drop with ``latch_slack_along`` of travel left opens the
-    loose end of the datum band.
-    """
-    low, high = datum_backlash_band
-    specified_low, specified_high = RACK_DATUM_BACKLASH_RANGE
-    if not specified_low <= low <= high <= specified_high:
-        raise ValueError("rack datum setup band leaves its specified limits")
-    if not math.isfinite(latch_slack_along) or latch_slack_along < 0.0:
-        raise ValueError("latch opening must be finite and nonnegative")
-    return mesh_check.feed_rack_mesh(
-        datum_backlash_band, joints.latch_pinion_drop(latch_slack_along)
-    ).require()
-
-
-def feed_rack_operating_domain() -> rack_travel.RackOperatingDomain:
-    """The engaged-feed window, checked against the located paper sweep."""
-    domain = rack_travel.rack_operating_domain_mm(
-        contact_half_width_mm=mesh_check.feed_rack_contact_half_width_mm(
-            RACK_DATUM_BACKLASH_RANGE
-        ),
-        lateral_deviation_mm=paper_geometry.feed_lateral_deviation_mm(),
-        profilecentre_x_offset_band_mm=(
-            paper_geometry.feed_profilecentre_x_offset_band_mm()
-        ),
-        cut_end_section_maxima_mm=(
-            paper_geometry.feed_rack_cut_end_section_maxima_mm()
-        ),
-    )
-    domain.require_recording_paper_sweep_mm(
-        **paper_geometry.recording_paper_sweep_bands_mm()
-    )
-    return domain
-
 
 # The collar is set to pd_transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and
 # accepted within OFFSET_ACCEPT_TOL of the same target at the re-check
@@ -327,5 +249,6 @@ KNOB_HELD_BACK_TEXT = f"{removable.KNOB_CONFIG} HELD BACK ON ITS SEAT"
 COLLAR_DISC_AIR_TEXT = f"{COLLAR_DISC_AIR_MIN:.2f} MIN"
 RACK_CREST_TEXT = f"{RACK_CREST_DROP:.2f} \u00b1{RACK_CREST_TOL:.2f}"
 RACK_DATUM_BACKLASH_TEXT = (
-    f"{RACK_DATUM_BACKLASH_RANGE[0]:.2f} TO {RACK_DATUM_BACKLASH_RANGE[1]:.2f}"
+    f"{rack_setup.RACK_DATUM_BACKLASH_RANGE[0]:.2f} TO "
+    f"{rack_setup.RACK_DATUM_BACKLASH_RANGE[1]:.2f}"
 )

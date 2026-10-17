@@ -282,9 +282,9 @@ def test_purchase_and_joint_properties_do_not_prescribe_tooth_manufacture() -> N
     # carries no measuring method.
     assert "FLANK" not in installation
     assembly = importlib.import_module("draw_pd_paper_drive_assembly")
-    steps_module = importlib.import_module("pd_paper_drive_assembly_steps")
+    rack_setup = importlib.import_module("paper_drive_rack_setup")
     soldered = assembly._step_text(
-        operating_domain=steps_module.feed_rack_operating_domain()
+        operating_domain=rack_setup.feed_rack_operating_domain()
     )["rack-soldered"]
     for method in ("WIRE", "SECANT", "INDICATOR", "U +/-"):
         assert method not in soldered

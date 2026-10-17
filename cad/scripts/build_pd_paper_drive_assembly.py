@@ -1775,13 +1775,13 @@ def _assert_rack_mesh() -> RackOperatingDomain:
     # Closed-form gates at the datum band over every printed corner: contact
     # ratio, backlash, root and tip clearance, the interference point; then
     # the engaged-feed window on the finite rack against the paper sweep.
-    import pd_paper_drive_assembly_steps as steps
+    import paper_drive_rack_setup as rack_setup
 
     if abs(RACK_ADDENDUM - FEED.MODULE_MM) > 1e-9:
         raise RuntimeError("the purchased rack must retain its 1/P addendum")
-    steps.require_feed_rack_datum_axis_distance(RACK_PITCH_Y - STUD_XY[1])
-    mesh = steps.require_feed_rack_mesh()
-    domain = steps.feed_rack_operating_domain()
+    rack_setup.require_feed_rack_datum_axis_distance(RACK_PITCH_Y - STUD_XY[1])
+    mesh = rack_setup.require_feed_rack_mesh()
+    domain = rack_setup.feed_rack_operating_domain()
     log(
         f"rack mesh: pitch line y {RACK_PITCH_Y:.2f}, extension {ext:.2f}; "
         f"{mesh.summary}; {domain.operating_window_text}"
@@ -1799,7 +1799,7 @@ def _assert_native_rack_operating_pose(
     or the nominal FIRST_GAP_X phase. This is native model/accepted-grade
     evidence, not a replacement for the drawn operator's end-limit duty.
     """
-    import pd_paper_drive_assembly_steps as steps
+    import paper_drive_rack_setup as rack_setup
 
     rack_left = world_point(adapter, rack, [0.0, 0.0, 0.0])
     rack_x = world_point(adapter, rack, [1.0, 0.0, 0.0])
@@ -1813,7 +1813,7 @@ def _assert_native_rack_operating_pose(
         adapter, rack,
         [0.0, RACK_BAR_HEIGHT - RACK_ADDENDUM, RACK_BACK_Z - feed_mid_z],
     )
-    steps.require_feed_rack_datum_axis_distance(pitch_line[1] - axis[1])
+    rack_setup.require_feed_rack_datum_axis_distance(pitch_line[1] - axis[1])
     displacement = PAPER_GEOMETRY.feed_running_axis_x_displacement_band_mm()
     domain.require_machine_travel_mm(
         rack_left_end_x_band_mm=(rack_left[0], rack_left[0]),

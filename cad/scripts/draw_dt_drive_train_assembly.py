@@ -97,12 +97,10 @@ import dt_cylinder_gear_spec as drum
 from dt_drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
-    FIT_LIMIT_PLACES,
     PENDING_STEMS,
     SOURCE_CONFIGURATION,
     Cluster,
     Instance,
-    cluster_members,
     unclassified_stems,
 )
 import dt_drive_train_steps as steps
@@ -580,6 +578,10 @@ def _split_sequence_notes(text: str, key: str, heading: str) -> tuple[str, str]:
     if not separator:
         raise ValueError(f"assembly sequence has no head for {key!r}")
     return first, f"{heading}\n{head}{rest}"
+
+
+# Acceptance limits on the assembly sheets round inward at these places.
+FIT_LIMIT_PLACES = 2
 
 
 def _inward_limits(low: float, high: float) -> str:
@@ -1353,6 +1355,21 @@ def bom_extent_violations(
 def bom_reference_iso_violations(outline: tuple[float, ...]) -> list[str]:
     """Hold the reference view within its reserved field below BOM piece 1."""
     return note_field_violations(tuple(outline), BOM_REFERENCE_VIEW_FIELD)
+
+
+def cluster_members(
+    instances: Sequence[Instance],
+) -> dict[Cluster, tuple[str, ...]]:
+    """Component names per drawing cluster; every family sits in exactly one."""
+    members: dict[Cluster, list[str]] = {cluster: [] for cluster in CLUSTERS}
+    for instance in instances:
+        owners = [c for c, stems in CLUSTERS.items() if instance.stem in stems]
+        if not owners:
+            raise ValueError(f"{instance.name}: family {instance.stem!r} has no cluster")
+        if len(owners) != 1:
+            raise ValueError(f"{instance.name}: family in clusters {owners!r}")
+        members[owners[0]].append(instance.name)
+    return {cluster: tuple(sorted(names)) for cluster, names in members.items()}
 
 
 def instance_counts(instances: Sequence[Instance]) -> dict[str, int]:
