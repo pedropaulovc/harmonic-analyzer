@@ -1167,12 +1167,38 @@ def _tap_section(adapter: Any, front: Any) -> Any:
     return native
 
 
-def _log_thread_labels(adapter: Any, *, stage: str) -> int:
-    """Log every view's cosmetic threads and "Tapped Hole" label notes (#1591).
+_SW_HIDDEN = 2  # swDisplayMode_e.swHIDDEN: hidden lines removed
+
+
+def _hidden_lines_removed_without_greyed_pass(view: Any) -> None:
+    """Set ``view`` hidden-lines-removed straight from its placed mode.
+
+    set_hidden_lines_removed passes through hidden-lines-visible to force a
+    regen, and that pass reveals the bracket taps' threads, hidden behind the
+    plate in the plan and the iso, in both.  Their "#2-56 Tapped Hole" label,
+    which no sheet-1 view shows at placement, then sometimes grows on the plan
+    and sometimes not: farm 2026-10-17, ba33167e put it there, 2fa756e1 did
+    not (#1591).  Straight after placement nothing is attached yet, so the
+    regen is not needed; a same-mode set is a no-op that reads back HLR.
+    """
+    bound = _early_bound(view, "IView")
+    placed = int(bound.GetDisplayMode2())
+    bound.SetDisplayMode4(False, _SW_HIDDEN, False, False, True)
+    mode = int(bound.GetDisplayMode2())
+    if mode != _SW_HIDDEN:
+        raise RuntimeError(
+            f"failed to set hidden-lines-removed drawing view (mode reads {mode})"
+        )
+    _telemetry.info(f"{bound.GetName2()} placed in display mode {placed}, now HLR")
+
+
+def _log_thread_labels(adapter: Any) -> None:
+    """Log every view's cosmetic threads and "Tapped Hole" label notes, the
+    notes finalize_drawing's sweep removes, so a drift in its count names
+    the view that grew one (#1591).
 
     Read only: each sheet's views come off ``ISheet::GetViews`` (as
-    finalize_drawing's display flush), so no sheet is activated.  Returns the
-    label count, the number finalize_drawing's sweep will remove.
+    finalize_drawing's display flush), so no sheet is activated.
     """
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     labels = 0
@@ -1194,11 +1220,10 @@ def _log_thread_labels(adapter: Any, *, stage: str) -> int:
                         found.append(f"{annotation.GetName()}={text!r}")
             labels += len(found)
             _telemetry.info(
-                f"thread labels {stage}: {sheet_name}/{view_name(adapter, view)} "
+                f"thread labels: {sheet_name}/{view_name(adapter, view)} "
                 f"{threads} cosmetic threads, {len(found)} labels {found!r}"
             )
-    _telemetry.info(f"thread labels {stage}: {labels} in all")
-    return labels
+    _telemetry.info(f"thread labels: {labels} in all")
 
 
 def _mounting_rims(back: Any) -> list[Any]:
@@ -1433,14 +1458,10 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate lever geometry sheet")
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
-    _log_thread_labels(adapter, stage="front placed")
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
-    _log_thread_labels(adapter, stage="top placed")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    _log_thread_labels(adapter, stage="iso placed")
     for view in (top, iso):
-        set_hidden_lines_removed(adapter, view)
-    _log_thread_labels(adapter, stage="HLR")
+        _hidden_lines_removed_without_greyed_pass(view)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -1449,7 +1470,6 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
-    _log_thread_labels(adapter, stage="front curated")
     # The cylinder's diameter lives in a reference sketch the part saves
     # hidden (its band shows no silhouette to dimension): the hidden-owner
     # curate shows it in the plan, the one view that dimensions it.
@@ -1460,7 +1480,6 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="top",
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
-    _log_thread_labels(adapter, stage="top curated")
     # The trunnion width and vertex height live in a reference sketch the
     # part saves hidden (no single hexagon dimension is either).  The detail
     # is cut and dimensioned while the part shows it; the front view shows it
@@ -1841,20 +1860,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # The isometric's view label, under the iso.
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
 
-    _log_thread_labels(adapter, stage="after sheet 1")
-    import_cosmetic_threads(adapter, iso)
-    _log_thread_labels(adapter, stage="iso threads imported")
     if not drawing.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate bracket receiver sheet")
     back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=(1, 1))
-    _log_thread_labels(adapter, stage="back placed")
     receiver_iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4),
     )
-    _log_thread_labels(adapter, stage="receiver iso placed")
     for view in (back, receiver_iso):
         set_hidden_lines_removed(adapter, view)
-    _log_thread_labels(adapter, stage="sheet 2 HLR")
     mounting_rims = _mounting_rims(back)
     # Right of the view, where the 2026-10-09 render seated it.
     mounting_callout = add_native_hole_callout(
@@ -1933,9 +1946,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The repeated isometric's label, where sheet 1 puts its own (machinist
     # review r12: unlabelled on this sheet).
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
-    _log_thread_labels(adapter, stage="sheet 2 done")
-    import_cosmetic_threads(adapter, receiver_iso)
-    _log_thread_labels(adapter, stage="before the sweep")
+    _log_thread_labels(adapter)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -1944,9 +1955,10 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         redundant_note_substrings=("Tapped Hole",),
-        # main's 3, plus the bracket taps' per-hole cosmetic threads (2) in the
-        # receiver sheet's two views: 7 observed on the farm 2026-10-09; section
-        # H-H's cosmetic-thread import adds one more (farm r18 2026-10-17).
+        # main's 3 on the plan's lever taps, the bracket taps' one on the back
+        # view and the receiver iso's 3 (7, farm 2026-10-09), plus section
+        # H-H's cosmetic-thread import (farm r18 2026-10-17).  No sheet-1 view
+        # shows the bracket taps' threads, so none can grow their label (#1591).
         expected_redundant_notes=8,
     )
 

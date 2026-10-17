@@ -235,6 +235,47 @@ def test_receiver_view_is_on_a_back_view_sheet_with_real_binding() -> None:
     assert 'length = _early_bound(raw, "ICalloutLengthVariable")' in source
 
 
+def test_sheet_one_views_never_pass_through_hidden_lines_visible(monkeypatch) -> None:
+    """#1591: the greyed pass reveals the bracket taps' hidden threads on
+    sheet 1, whose label then grows there on some builds only."""
+    import ast
+    from pathlib import Path
+
+    class View:
+        def __init__(self) -> None:
+            self.mode = 4
+            self.sets: list[int] = []
+
+        def GetDisplayMode2(self) -> int:
+            return self.mode
+
+        def SetDisplayMode4(self, use_parent, mode, faceted, edges, update) -> bool:
+            self.sets.append(mode)
+            self.mode = mode
+            return True
+
+        def GetName2(self) -> str:
+            return "Drawing View2"
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    view = View()
+    drawing._hidden_lines_removed_without_greyed_pass(view)
+    assert view.sets == [2]  # swHIDDEN only, never swHIDDEN_GREYED (1)
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    loops = {
+        tuple(element.id for element in node.iter.elts): ast.unparse(node.body[0])
+        for node in ast.walk(build)
+        if isinstance(node, ast.For) and isinstance(node.iter, ast.Tuple)
+    }
+    assert loops[("top", "iso")] == "_hidden_lines_removed_without_greyed_pass(view)"
+
+
 def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
     keeps = {
         **drawing.FRONT_KEEP,
