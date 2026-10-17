@@ -1174,12 +1174,12 @@ def _hidden_lines_removed_without_greyed_pass(view: Any) -> None:
     """Set ``view`` hidden-lines-removed straight from its placed mode.
 
     set_hidden_lines_removed passes through hidden-lines-visible to force a
-    regen, and that pass reveals the bracket taps' threads, hidden behind the
-    plate in the plan and the iso, in both.  Their "#2-56 Tapped Hole" label,
-    which no sheet-1 view shows at placement, then sometimes grows on the plan
-    and sometimes not: farm 2026-10-17, ba33167e put it there, 2fa756e1 did
-    not (#1591).  Straight after placement nothing is attached yet, so the
-    regen is not needed; a same-mode set is a no-op that reads back HLR.
+    regen, and that pass is where the bracket taps' "#2-56 Tapped Hole" label,
+    their threads hidden behind the plate, sometimes grew on the plan and
+    sometimes not: farm 2026-10-17, ba33167e logged it first right after the
+    pass, 2fa756e1 never had it (#1591).  Straight after placement nothing is
+    attached yet, so the regen is not needed; farm seats place these views in
+    HLR already (802e4117), where the set is a no-op that reads back HLR.
     """
     bound = _early_bound(view, "IView")
     placed = int(bound.GetDisplayMode2())
