@@ -468,7 +468,7 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     front, rear = keeper.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
     reamed = _step_body(steps.KEEPERS_PAIR_REAMED_KEY)
     # The controlling operation: installed spacing (KEEPERS_SET_KEY's two faces),
-    # one common flat, axis set to it, one pass with a reamer that reaches.
+    # one common flat, axis set to it, one pass to the keeper print's bore band.
     assert keeper.KEEPER_INNER_FACE_SPAN_MM == pytest.approx(rear - front) == 142.0
     assert f"CLAMP BOTH {number}, FEET OUTBOARD ON ONE FLAT" in reamed
     assert "INNER LUG FACES AT THE LEVER BANK VIEW'S LUG SPAN" in reamed
@@ -476,15 +476,21 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
         drawing.asm.LUG_INNER_FACE_Z[1] - drawing.asm.LUG_INNER_FACE_Z[0]
     )
     assert "BORE AXIS PARALLEL TO THE FLAT" in reamed
-    assert (
-        "DRILL AND REAM BOTH IN ONE PASS WITH A 0.2515 IN DIA REAMER, 12 IN LONG."
-        in reamed
+    # Machinist gate 2026-10-17 (rule 7): the step states the bores it leaves,
+    # the keeper print's 6.350 +0.050/+0.038, and their acceptance, never the
+    # operation or the made-to-order reamer (still sized against that band in
+    # ch_fulcrum_keeper_spec).
+    upper, lower = keeper.BORE_DIA_BAND
+    assert (keeper.BORE_DIA + lower, keeper.BORE_DIA + upper) == pytest.approx(
+        (6.388, 6.400)
     )
+    assert (
+        f"FLAT. BOTH {number} BORES 6.388 TO 6.400 DIA, IN LINE: THE "
+        f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED." in reamed
+    )
+    for method in ("REAM", "0.2515", " IN LONG", " PASS"):
+        assert method not in reamed
     assert keeper.PAIR_REAMER_REACH_MARGIN_MM > 0.0
-    assert (
-        f"ACCEPT IF THE {fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED."
-        in reamed
-    )
     # r10 machinist blocker (Main's ruling A): the crown is finished to the
     # keeper print's crown radius about a pin in its own bore, then tapped,
     # and gauged over the pin. The gauge's low limit never admits a crown
