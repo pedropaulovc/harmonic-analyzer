@@ -188,7 +188,111 @@ def test_build_extrudes_the_section_then_drills_and_counterbores() -> None:
         assert needle in source, needle
 
 
-def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
+def test_build_names_and_marks_the_receipt_dimensions() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    for needle in (
+        'name_dimensions(adapter, "Rail", ["Length"])',
+        'end_name="HoleEnd"',
+        'pitch_name="HolePitch"',
+        'hole_dims.apply(adapter, "BoltHoleProfile")',
+        "apply_drawing_precision(adapter, DRAWING_PRECISION)",
+        "mark_dimensions_for_drawing(adapter, feature_name, names)",
+    ):
+        assert needle in source, needle
+    assert spec.DRAWING_DIMENSIONS == {
+        "Rail": {"Length"},
+        "BoltHoleProfile": {"HoleEnd", "HolePitch"},
+    }
+    assert spec.DRAWING_PRECISION == {
+        "Rail": {"Length": 0},
+        "BoltHoleProfile": {"HoleEnd": 0, "HolePitch": 0},
+    }
+    # The one printed pitch counts every gap between the seven holes.
+    assert spec.HOLE_PITCH_CALLOUT == f"{spec.HOLE_COUNT - 1}X" == "6X"
+
+
+class _Result:
+    def __init__(self, data=None) -> None:
+        self.is_success = True
+        self.error = None
+        self.data = data
+
+
+class _SketchAdapter:
+    """Records the hole sketch's circles, relations and dimensions."""
+
+    def __init__(self) -> None:
+        self.currentSketchManager = type("SketchManager", (), {"AddToDB": False})()
+        self.circles: list[tuple[float, float, float]] = []
+        self.relations: list[tuple[str, str, str]] = []
+        self.dimensions: list[tuple[str, str | None, str, float]] = []
+
+    async def create_sketch(self, plane):
+        return _Result(plane)
+
+    async def add_circle(self, x, y, radius):
+        self.circles.append((x, y, radius))
+        return _Result(f"circle{len(self.circles)}")
+
+    async def add_sketch_constraint(self, ref1, ref2, kind):
+        self.relations.append((ref1, ref2, kind))
+        return _Result()
+
+    async def add_sketch_dimension(self, ref1, ref2, kind, value):
+        self.dimensions.append((ref1, ref2, kind, value))
+        return _Result()
+
+    async def exit_sketch(self):
+        return _Result()
+
+
+def test_hole_sketch_places_the_end_distance_then_one_pitch_per_gap(
+    monkeypatch,
+) -> None:
+    adapter = _SketchAdapter()
+    monkeypatch.setattr(
+        part, "_sketch_mapper", lambda *_a, **_k: lambda point: (point[0], point[1])
+    )
+
+    async def fully_defined(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(part, "ensure_fully_defined", fully_defined)
+    dims = asyncio.run(
+        part._hole_circles(
+            adapter,
+            "Front",
+            0.0,
+            spec.HOLE_DIA,
+            "bolt hole",
+            end_name="HoleEnd",
+            pitch_name="HolePitch",
+        )
+    )
+    assert [x for x, _, _ in adapter.circles] == list(spec.HOLE_X)
+    distances = [
+        (ref1, ref2, value)
+        for ref1, ref2, kind, value in adapter.dimensions
+        if kind == "horizontal_distance"
+    ]
+    # The first hole from the origin (the -X end face), each next one from
+    # the hole before it: the chain the drawing prints as 40 and 6X 60.
+    assert distances[0] == ("circle1.center", "origin", spec.HOLE_END)
+    assert distances[1:] == [
+        (f"circle{k}.center", f"circle{k + 1}.center", spec.HOLE_PITCH)
+        for k in range(1, spec.HOLE_COUNT)
+    ]
+    assert all(kind == "horizontal_points" for _, _, kind in adapter.relations)
+    assert [value for *_, kind, value in adapter.dimensions if kind == "diameter"] == [
+        spec.HOLE_DIA
+    ] * spec.HOLE_COUNT
+    names = [name for name, _ in dims._rows]
+    assert len(names) == 2 * spec.HOLE_COUNT == len(adapter.dimensions)
+    assert names[0] == "HoleEnd" and names[2] == "HolePitch"
+    assert sum(name is not None for name in names) == 2
+
+
+def test_sheet_is_the_registered_purchased_part_reference() -> None:
     sheet = DRAWINGS_BY_NAME[NAME]
     assert draw.SPEC is sheet
     assert (sheet.part, sheet.artifact_stem, sheet.script_name) == (
@@ -197,22 +301,78 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
         f"draw_{NAME}.py",
     )
     assert sheet.layout is DrawingLayout.LANDSCAPE
-    calls = []
-
-    async def fake(adapter, drawn, *, item, cut_to_suit=False):
-        calls.append((adapter, drawn, item, cut_to_suit))
-        return {"pdf": "x"}
-
-    monkeypatch.setattr(draw, "build_purchased_part_drawing", fake)
-    adapter = object()
-    assert asyncio.run(draw.build(adapter)) == {"pdf": "x"}
-    # Bought already cut to 440, so not cut to suit at assembly.
-    assert calls == [(adapter, sheet, draw.ITEM, False)]
+    assert sheet.source_kind == "part"
     assert "HGR15R" in draw.ITEM
+    # The cut length is the FRONT view's dimension, never the item's text.
+    assert f"{spec.LENGTH:.0f}" not in draw.ITEM
+    assert {name for name, *_ in draw.VIEWS} == {
+        "*Front",
+        "*Top",
+        "*Right",
+        "*Isometric",
+    }
+    source = Path(draw.__file__).read_text(encoding="utf-8")
+    # Every view, the isometric included, is hidden-lines-removed.
+    assert "for name, center, _, scale in VIEWS:" in source
+    assert "set_hidden_lines_removed(adapter, view)" in source
 
 
-def test_note_orders_the_base_bar_hole_pattern() -> None:
+def test_receipt_dimensions_are_the_marked_model_dimensions() -> None:
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert set(draw.RECEIPT_DIMENSIONS) == marked
+    assert set(draw.FRONT_DIMENSION_PRECISION) == marked
+    assert set(draw.FRONT_DIMENSION_PRECISION.values()) == {0}
+    assert draw.DIMENSION_PREFIXES == {"HolePitch": spec.HOLE_PITCH_CALLOUT}
+    # Each spans its own stations from the -X end face (rule 10).
+    assert draw.RECEIPT_DIMENSIONS["Length"][:2] == (0.0, spec.LENGTH)
+    assert draw.RECEIPT_DIMENSIONS["HoleEnd"][:2] == (0.0, spec.HOLE_END)
+    start, end, _ = draw.RECEIPT_DIMENSIONS["HolePitch"]
+    assert end - start == spec.HOLE_PITCH
+    # The hole row nearest the part, the length row under it, the caption
+    # under both.
+    assert 0.0 < draw.HOLE_ROW_DROP < draw.LENGTH_ROW_DROP
+    assert draw.FRONT_CENTER[1] - draw.LENGTH_ROW_DROP - 0.003 > draw.CAPTIONS[0][2]
+    rail_edge = draw.FRONT_CENTER[1] - draw._FRONT_HALF[1]
+    assert draw.FRONT_CENTER[1] - draw.HOLE_ROW_DROP + 0.003 < rail_edge
+
+
+def test_views_and_captions_fit_the_sheet() -> None:
+    from _purchased_fastener_drawing import footer_top
+
+    border = (0.0127, 0.0127, 0.4191, 0.2667)
+    title_block = (0.2159, 0.0127, 0.4191, 0.0651)
+    footer = footer_top(spec.DRAWING_NOTES, label=NAME)
+
+    def overlaps(a, b) -> bool:
+        return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+    cells = {name: draw.view_cell(center, half) for name, center, half, _ in draw.VIEWS}
+    for name, cell in cells.items():
+        assert border[0] <= cell[0] and cell[2] <= border[2], name
+        assert footer < cell[1] and cell[3] <= border[3], name
+        assert not overlaps(cell, title_block), name
+    names = sorted(cells)
+    for i, first in enumerate(names):
+        for second in names[i + 1 :]:
+            assert not overlaps(cells[first], cells[second]), (first, second)
+    # TOP over FRONT and RIGHT beside it, in projection.
+    assert draw.TOP_CENTER[0] == draw.FRONT_CENTER[0]
+    assert draw.RIGHT_CENTER[1] == draw.FRONT_CENTER[1]
+    for label, x, y, scale in draw.CAPTIONS:
+        cell = cells[f"*{label.title()}"]
+        assert y < cell[1] and cell[0] < x < cell[2], label
+        assert y - 0.006 > footer, label
+        assert draw.caption_text(label, scale).startswith(label)
+
+
+def test_note_says_special_order_without_its_dimensions() -> None:
+    from _purchased_fastener_drawing import note_lines
+
     assert spec.DRAWING_NOTES == (
-        "SPECIAL ORDER: 7 HOLES AT 60 PITCH, 40 FROM EACH END, TO SUIT TL-20."
+        "SPECIAL ORDER CUT LENGTH AND HOLE PATTERN, TO SUIT TL-20."
     )
+    # Rule 7: the cut length and hole pattern are FRONT's dimensions; the
+    # note's only number is the base bar it suits.
+    assert not re.search(r"\d", spec.DRAWING_NOTES.replace("TL-20", ""))
+    assert len(note_lines(spec.DRAWING_NOTES, label=NAME)) == 1
     assert len(spec.DRAWING_NOTES) <= 80

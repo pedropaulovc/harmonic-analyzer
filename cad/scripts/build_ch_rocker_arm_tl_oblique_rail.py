@@ -3,7 +3,10 @@ r"""Purchased HIWIN HGR15R linear rail, cut to 440 (MHA-CH-006-TL-30).
 The oblique trammel jig's two rails (vendor-checked against HIWIN's own
 HGR15R440C STEP; ``ch_rocker_arm_tl_oblique_rail_spec`` records every source):
 the end-face ``SECTION`` on the Right plane extruded 440 along +X, then the
-seven Ø4.5 holes through and their Ø7.5 counterbores down from the top.
+seven Ø4.5 holes through and their Ø7.5 counterbores down from the top. Each
+hole sketch places its first hole from the -X end face and every next one a
+pitch on from the one before; the extrusion's ``Length`` and the bolt holes'
+``HoleEnd`` and ``HolePitch`` are marked for the drawing's receipt check.
 
 Frame: origin at the -X end face, on the seat (bottom) face, on the rail
 centreline; +X along the rail, +Z up. The Right plane's sketch reads model
@@ -27,13 +30,21 @@ from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
-from _drawing_marks import apply_drawing_properties
+from _dimensions import name_dimensions
+from _drawing_marks import apply_drawing_properties, mark_dimensions_for_drawing
+from _drawing_precision import apply_drawing_precision
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
-from _sketch import add_line_chain, ensure_fully_defined, set_sketch_direct_db
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_point,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_chains import define_polygon_chain
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
@@ -41,7 +52,9 @@ from ch_rocker_arm_tl_oblique_rail_spec import (
     CBORE_DEPTH,
     CBORE_DIA,
     CENTROID,
+    DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     HEIGHT,
     HOLE_DIA,
     HOLE_X,
@@ -150,17 +163,61 @@ async def _centroid_check(
 
 
 async def _hole_circles(
-    adapter: Any, plane: str, z: float, dia: float, label: str
-) -> None:
-    """One circle per rail hole station, on ``plane`` at model height ``z``."""
+    adapter: Any,
+    plane: str,
+    z: float,
+    dia: float,
+    label: str,
+    *,
+    end_name: str | None = None,
+    pitch_name: str | None = None,
+) -> SketchDims:
+    """One circle per rail hole station, on ``plane`` at model height ``z``:
+    the first placed ``HOLE_END`` from the -X end face (``end_name``), every
+    next one ``HOLE_PITCH`` on from the one before (the first gap
+    ``pitch_name``), the way the drawing states the order."""
+    dims = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch(plane))
     to_sketch = _sketch_mapper(adapter, u_axis=0, v_axis=1, label=label)
-    for index, x in enumerate(HOLE_X, start=1):
-        await define_circle(
-            adapter, *to_sketch((x, 0.0, z)), dia / 2.0, f"{label} {index}"
+    previous = await define_circle(
+        adapter,
+        *to_sketch((HOLE_X[0], 0.0, z)),
+        dia / 2.0,
+        f"{label} 1",
+        dims=dims,
+        names=(end_name, None, None),
+    )
+    sketch_manager = adapter.currentSketchManager
+    for index, (before, x) in enumerate(zip(HOLE_X, HOLE_X[1:]), start=2):
+        # define_circle's draw, without its origin anchor: inference off so
+        # the new circle never snaps to its neighbour.
+        add_to_db = bool(sketch_manager.AddToDB)
+        sketch_manager.AddToDB = True
+        try:
+            circle = check(
+                f"add_circle {label} {index}",
+                await adapter.add_circle(*to_sketch((x, 0.0, z)), dia / 2.0),
+            )
+        finally:
+            sketch_manager.AddToDB = add_to_db
+        await anchor_point_to_point(
+            adapter,
+            f"{previous}.center",
+            f"{circle}.center",
+            x - before,
+            0.0,
+            f"{label} {index} pitch",
         )
+        dims.record(pitch_name if index == 2 else None)
+        check(
+            f"dimension {label} {index} diameter",
+            await adapter.add_sketch_dimension(circle, None, "diameter", dia),
+        )
+        dims.record(None)
+        previous = circle
     await ensure_fully_defined(adapter, label)
     check(f"exit_sketch {label}", await adapter.exit_sketch())
+    return dims
 
 
 async def build(adapter) -> dict[str, str]:
@@ -185,6 +242,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=LENGTH)),
     )
     name_last_feature(adapter, "Rail")
+    name_dimensions(adapter, "Rail", ["Length"])
     volume = await volume_check(adapter, "rail prism", V_PRISM, 5e-4 * V_PRISM)
     # The prism's centroid catches a profile mapped to the wrong side of an
     # axis or extruded the wrong way along X.
@@ -193,8 +251,17 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # --- Holes: Ø4.5 through, from the seat face both ways ---------------------
-    await _hole_circles(adapter, "Front", 0.0, HOLE_DIA, "bolt hole")
+    hole_dims = await _hole_circles(
+        adapter,
+        "Front",
+        0.0,
+        HOLE_DIA,
+        "bolt hole",
+        end_name="HoleEnd",
+        pitch_name="HolePitch",
+    )
     name_last_feature(adapter, "BoltHoleProfile")
+    hole_dims.apply(adapter, "BoltHoleProfile")
     check(
         "cut bolt holes",
         await adapter.create_cut_extrude(
@@ -235,6 +302,12 @@ async def build(adapter) -> dict[str, str]:
     await bbox_extent_check(adapter, "rail width", "y", WIDTH)
     await bbox_extent_check(adapter, "rail height", "z", HEIGHT)
     _require_one_solid_body(adapter, label="rail")
+
+    # The drawing's receipt check of the special order (the spec's
+    # DRAWING_DIMENSIONS): whole millimetres, imported into the hole face.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    for feature_name, names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, names)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
