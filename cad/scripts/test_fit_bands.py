@@ -267,11 +267,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the title block's drilled-hole row, indexed for the slide-clearance, "
         "wall and pin-end-depth stacks (not printed on the bore)"
     ),
-    ("mg_lever_press_fit_geom", "COLLAR_BORE_BAND"): (
-        "matched-fit bore: MHA-MG-001 prints a reference nominal and the "
-        "diametral interference on the finished MHA-MG-003 press zone; the "
-        "band only bounds the press budget's bore corners (not printed)"
-    ),
     ("mg_lever_press_fit_geom", "COLLAR_OD_BAND"): (
         "inherited title-block .XX band, indexed into the collar's independent "
         "Lamé strength and press-force corners; not a new native fit band"

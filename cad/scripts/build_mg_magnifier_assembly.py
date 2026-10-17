@@ -6,7 +6,7 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
 
 * magnifying-bracket -- the fitting that AFFIXES the lever rod to the pivoted
   summing bar, so it RIDES the lever (locked, like the clamp chain), its collar
-  carrying the rod with a press fit and Loctite 638 at every rock angle. The
+  carrying the rod with a press fit alone (#1570) at every rock angle. The
   lever EXTENDS FROM the pivoted summing bar and pivots WITH it about the
   knife-edge ridge line (engineerguy video 2/4 + 4/4; tip arc ~6 mm), so its
   one DOF is the rock about that Z line; the clamp + thumb screw + vertical rod
