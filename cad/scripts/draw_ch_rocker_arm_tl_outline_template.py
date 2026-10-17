@@ -157,10 +157,11 @@ FRONT_KEEP = {
 # run's value and its two-line function flag sit right of and below the
 # circle: left of the circle the flag would cross it.
 # The flag's widest line prints 51.4 mm wide (farm run 3111b8f0a), so its
-# centre stands far enough right that the whole line clears the circle.
+# centre stands far enough right that the whole line clears the circle and
+# datum C's tag, which hangs below the width's dimension line.
 DETAIL_KEEP = {
     "RodSlotWidth": (DETAIL_CENTER[0] + 0.020, DETAIL_CENTER[1] + 0.028),
-    "RodSlotFlat": (DETAIL_CENTER[0] + 0.042, DETAIL_CENTER[1] - 0.012),
+    "RodSlotFlat": (DETAIL_CENTER[0] + 0.058, DETAIL_CENTER[1] - 0.012),
 }
 # Below the edge view and left of its extension lines (the text is far wider
 # than the 3.175 span), clear of the front view's rod tip and the isometric.
@@ -212,11 +213,13 @@ PIVOT_DATUM_OFFSET = (-0.012, 0.022)
 # Datum C: on the 5:1 detail, where the slot is drawn large (at 1:1 its tag
 # would sit inside the detail's mark circle, farm run tl13-gdt-r1), attached
 # to the width's size dimension so it names the slot's centre plane
-# (mr-tl13-4). Its tag is asked for right of the width's dimension line,
-# between the width's callout (above) and the run's (below); SolidWorks may
-# not honour the request for a dimension-attached tag, so the render says.
+# (mr-tl13-4). SolidWorks keeps a dimension-attached tag on the dimension
+# line's axis (tl13-gdt-r6 asked for x 107 and got 96.6, on the line), and
+# above the lower arrow its leader ran along that line (layout audit
+# line-on-dimension-line). So it hangs below the lower arrow, extending the
+# line: between it and the run's dimension line, left of the run's flag.
 ROD_SLOT_WIDTH_DIMENSION = "RodSlotWidth"
-ROD_SLOT_DATUM_XY = (DETAIL_CENTER[0] + 0.032, DETAIL_CENTER[1] + 0.004)
+ROD_SLOT_DATUM_XY = (DETAIL_CENTER[0] + 0.022, DETAIL_CENTER[1] - 0.009)
 
 _Z = [0.0, 0.0, 1.0]
 _PRECISION = DRAWING_PRECISION_BY_NAME

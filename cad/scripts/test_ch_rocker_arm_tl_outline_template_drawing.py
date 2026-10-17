@@ -700,12 +700,14 @@ def test_rod_slot_detail_circle_and_label_stay_clear_of_the_notes_and_frame() ->
     # the circle at +0.037), so the whole line must clear the circle's extent.
     flat_x, flat_y = drawing.DETAIL_KEEP["RodSlotFlat"]
     assert flat_x - 0.0514 / 2.0 > x + crop and flat_y < y - 0.010
-    # Datum C's tag is asked for right of the width's dimension line, above
-    # the run's flag and under the width's callout.
+    # Datum C's tag hangs below the width's lower arrow (the slot's lower
+    # side, 5:1), on the dimension line's axis (SolidWorks holds it there),
+    # above the run's dimension line, its ~7 mm box left of the run's flag.
     datum_x, datum_y = drawing.ROD_SLOT_DATUM_XY
-    assert (
-        datum_x > width_x and flat_y < datum_y < drawing.DETAIL_KEEP["RodSlotWidth"][1]
-    )
+    lower_arrow_y = y - drawing.DETAIL_RATIO * spec.ROD_SLOT_WIDTH / 2.0 / 1000.0
+    assert flat_y < datum_y < lower_arrow_y
+    assert abs(datum_x - width_x) < 0.005
+    assert datum_x + 0.0035 < flat_x - 0.0514 / 2.0
 
 
 def test_datum_c_is_the_slot_width_not_one_side() -> None:
