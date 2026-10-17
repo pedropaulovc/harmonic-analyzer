@@ -56,25 +56,24 @@ def test_notes_follow_the_simplicity_policy() -> None:
     assert not re.search(r"SCRIBE THE|FILE TO|SAW|TRAMMEL", spec.DRAWING_NOTES.upper())
 
 
-def test_apex_bands_sit_mid_zone_inside_the_rocker_arc_zone() -> None:
+def test_apex_profile_sits_mid_zone_inside_the_rocker_arc_zone() -> None:
     """Both arcs of the rocker may come out 0..+0.5 high; the template's
-    printed apex limits sit in the middle quarter of that zone."""
+    BASIC apex heights, held by the outline profile's half-zone either side,
+    sit in the middle quarter of that zone."""
     features = _features()
     top = features["top_edge"]["height_above_pivot"]
     bottom = features["bottom_edge"]["depth"]
-    assert top == [8.23, 8.27]
-    assert bottom == [7.73, 7.77]
+    assert (top, bottom) == (8.25, 7.75)
+    half = spec.OUTLINE_PROFILE_ZONE / 2.0
     zone_top = (
         rocker.TOP_EDGE_ABOVE_PIVOT,
         rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[0],
     )
     zone_bottom = (rocker.ARM_DEPTH - zone_top[1], rocker.ARM_DEPTH - zone_top[0])
-    for (low, high), (zone_low, zone_high) in ((top, zone_top), (bottom, zone_bottom)):
-        assert zone_low < low < high < zone_high
-        assert math.isclose(
-            (low + high) / 2.0, (zone_low + zone_high) / 2.0, abs_tol=1e-9
-        )
-        assert high - low <= 0.25 * (zone_high - zone_low) + 1e-9
+    for nominal, (zone_low, zone_high) in ((top, zone_top), (bottom, zone_bottom)):
+        assert zone_low < nominal - half < nominal + half < zone_high
+        assert math.isclose(nominal, (zone_low + zone_high) / 2.0, abs_tol=1e-9)
+        assert 2.0 * half <= 0.25 * (zone_high - zone_low) + 1e-9
 
 
 _ROCKER_BOT_END_Y = rocker.CENTER_Y - rocker.R_BOTTOM * math.cos(rocker._ALPHA_BOT)
@@ -358,7 +357,7 @@ def test_inventory_acceptance_is_the_drawings_one_profile_zone() -> None:
     note = _inventory_note()
     printed = re.search(
         r"surface profile (\d+\.\d+) all around the outline to A\|C \(datum A the"
-        r" pivot hole, C the rod slot\) about BASIC R800/R816",
+        r" pivot hole, C the rod slot\) about a wholly BASIC outline",
         note,
     )
     assert printed, note
@@ -401,18 +400,40 @@ def test_outline_profile_is_one_frame_all_around_to_a_and_c() -> None:
     assert "_add_outline_profile(adapter, front)" in build
 
 
-def test_both_radii_are_basic_under_the_profile() -> None:
-    basic = set(spec.BASIC_DIMENSIONS)
-    assert {
-        ("OutlineProfile", "TopRadius"),
-        ("OutlineProfile", "BottomRadius"),
-    } <= basic
+def test_every_outline_dimension_is_basic_under_the_profile() -> None:
+    """The profile is the outline's only tolerance (machinist review
+    mr-tl13-1, rule 5): every dimension that fixes the outline is BASIC."""
+    outline = {
+        ("OutlineProfile", name) for name in spec.DRAWING_DIMENSIONS["OutlineProfile"]
+    } | {("ApexReference", name) for name in spec.DRAWING_DIMENSIONS["ApexReference"]}
+    assert outline <= set(spec.BASIC_DIMENSIONS)
+    assert not outline & set(spec.DRAWING_BANDS)
     features = _features()
-    for name, radius in (("top_edge", spec.R_TOP), ("bottom_edge", spec.R_BOTTOM)):
+    expected = {
+        "top_edge": {
+            "radius": spec.R_TOP,
+            "height_above_pivot": spec.TOP_ABOVE_PIVOT,
+            "station": spec.TOP_END_X,
+        },
+        "bottom_edge": {
+            "radius": spec.R_BOTTOM,
+            "depth": spec.BOTTOM_BELOW_PIVOT,
+            "station": spec.BOT_END_X,
+        },
+        "rod_tip_land": {"length": spec.TIP_FACE},
+        "tail_tip_land": {"length": spec.TIP_FACE},
+    }
+    for name, values in expected.items():
         assert features[name]["dimension_type"] == "basic"
-        assert features[name]["radius"] == radius == features[name]["radius_nominal"]
-    assert features["top_edge"]["surface_profile_governs"] == {"radius": "decreases"}
-    assert features["bottom_edge"]["surface_profile_governs"] == {"radius": "increases"}
+        assert {key: features[name][key] for key in values} == values
+    assert features["top_edge"]["surface_profile_governs"] == {
+        "radius": "decreases",
+        "height_above_pivot": "increases",
+    }
+    assert features["bottom_edge"]["surface_profile_governs"] == {
+        "radius": "increases",
+        "depth": "increases",
+    }
 
 
 def test_the_profile_zone_has_one_literal() -> None:

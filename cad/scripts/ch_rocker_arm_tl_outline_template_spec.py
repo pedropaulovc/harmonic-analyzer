@@ -76,23 +76,22 @@ ROD_SLOT_DATUM = "C"
 OUTLINE_PROFILE_ZONE = 0.06
 OUTLINE_PROFILE_DATUMS = (PIVOT_DATUM, ROD_SLOT_DATUM)
 DTI_ACCEPTANCE = OUTLINE_PROFILE_ZONE / 2.0
-# The sheet also fixes each arc by its low point on the mirror line, measured
-# from the pin gauge in the hole; the radii print BASIC, about a centre on the
-# pivot centreline, so the profile alone bounds the arcs between the low
-# point and their ends.
-LOW_POINT_BAND = (0.02, -0.02)
+# Every outline dimension prints BASIC (each arc's low point on the mirror
+# line, from the pin gauge in the hole; the radii about a centre on the pivot
+# centreline; the end stations and the tip lands), so the profile alone
+# tolerances the outline (machinist review mr-tl13-1, rule 5).
 APEX_PLACES = 2
 RADIUS_PLACES = 2
 for _low, _high, _nominal in (
     (_ROCKER_TOP_LOW, _ROCKER_TOP_HIGH, TOP_ABOVE_PIVOT),
     (_ROCKER_BOTTOM_LOW, _ROCKER_BOTTOM_HIGH, BOTTOM_BELOW_PIVOT),
 ):
-    if not _low < _nominal + LOW_POINT_BAND[1] < _nominal + LOW_POINT_BAND[0] < _high:
-        raise AssertionError("template low-point band leaves the rocker's arc zone")
+    if not _low < _nominal - DTI_ACCEPTANCE < _nominal + DTI_ACCEPTANCE < _high:
+        raise AssertionError("template profile leaves the rocker's arc zone")
     # The gauge spends at most a quarter of the zone it sets.
-    if LOW_POINT_BAND[0] - LOW_POINT_BAND[1] > 0.25 * (_high - _low) + 1e-9:
+    if OUTLINE_PROFILE_ZONE > 0.25 * (_high - _low) + 1e-9:
         raise AssertionError(
-            "template low-point band spends more than a quarter of the rocker zone"
+            "template profile spends more than a quarter of the rocker zone"
         )
 
 # The rocker's lower outline (the R816 arc, both tapers and both tip lands,
@@ -221,15 +220,7 @@ ARC_MID_ZONE_RESIDUAL = {
 for _name, _residual in ARC_MID_ZONE_RESIDUAL.items():
     if _residual < 0.0:
         raise AssertionError(f"the {_name} arc falls past mid-zone off the mirror line")
-# The low point's band is a refinement inside the profile at one point.
-if max(LOW_POINT_BAND[0], -LOW_POINT_BAND[1]) > DTI_ACCEPTANCE:
-    raise AssertionError("the low-point band is looser than the outline profile")
-# The end stations print at three places: their band is about a quarter of
-# the rocker's own two-place band on the same ends.
-if printed_band_mm(END_PLACES) > 0.26 * printed_band_mm(2):
-    raise AssertionError(
-        "template end-station band spends more than a quarter of the rocker's"
-    )
+
 
 # Pivot locating hole: the rocker's Ø6.5 bore, reamed to H7 (+0.015/0) so
 # one bought 0.2558 in Class X minus pin gauge (inventory
@@ -385,9 +376,7 @@ THICK_PLACES = 3
 THICK_CALLOUT = "GROUND FLAT STOCK"
 # drawing-guidelines.md rule 17 (walls and webs): the thinnest web, between the hole and the bottom arc.
 WEB_MIN = round(
-    BOTTOM_BELOW_PIVOT
-    + LOW_POINT_BAND[1]
-    - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) / 2.0,
+    BOTTOM_BELOW_PIVOT - DTI_ACCEPTANCE - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) / 2.0,
     4,
 )
 if min(WEB_MIN, THICK - printed_band_mm(THICK_PLACES)) < 1.5 - 1e-9:
@@ -562,16 +551,23 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     )
 # Bands other than the title block's, keyed (feature, dimension).
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
-    ("ApexReference", "TopAbovePivot"): LOW_POINT_BAND,
-    ("ApexReference", "BottomBelowPivot"): LOW_POINT_BAND,
     ("PivotHoleProfile", "PivotDia"): PIVOT_HOLE_BAND,
 }
-# The rod slot's station is BASIC (the rocker's datum C, at its BASIC
-# station); its width is the reference nominal of a matched fit on its pin.
-# Both radii are BASIC: the outline profile is their tolerance.
+# The outline is BASIC throughout: the surface profile to A|C is its only
+# tolerance. The rod slot's station is BASIC too (datum C, at the rocker's
+# BASIC station); its width is the reference nominal of a matched fit on its
+# pin.
 BASIC_DIMENSIONS: tuple[tuple[str, str], ...] = (
     ("OutlineProfile", "TopRadius"),
     ("OutlineProfile", "BottomRadius"),
+    ("OutlineProfile", "TopTailX"),
+    ("OutlineProfile", "TopRodX"),
+    ("OutlineProfile", "BottomTailX"),
+    ("OutlineProfile", "BottomRodX"),
+    ("OutlineProfile", "RodTipLen"),
+    ("OutlineProfile", "TailTipLen"),
+    ("ApexReference", "TopAbovePivot"),
+    ("ApexReference", "BottomBelowPivot"),
     ("RodSlotReference", "RodSlotX"),
     ("RodSlotReference", "RodSlotY"),
 )

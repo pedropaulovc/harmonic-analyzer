@@ -1,13 +1,13 @@
 r"""Create the drawing for the rocker arm's outline template (MHA-CH-006-TL-13).
 
 The face view (``*Front``, 1:1) carries the whole outline from the pivot
-hole: both apex heights on the mirror line, both BASIC radii, the arc-end
-stations and the tip lands, plus the rod slot's BASIC station; datum A on the
-pivot hole, datum C on the rod slot and one surface profile all around the
+hole, every outline dimension BASIC: both apex heights on the mirror line,
+both radii, the arc-end stations and the tip lands, plus the rod slot's
+station; datum A on the pivot hole and one surface profile all around the
 outline to A|C (``OUTLINE_PROFILE_ZONE``); a cropped 5:1 *Front detail
-carries the rod slot's width (a matched fit on its pin gauge) and run; the
-right-side edge view carries the plate thickness; a shaded isometric at 1:4
-sits above.
+carries datum C on the rod slot, its width (a matched fit on its pin gauge)
+and its run; the right-side edge view carries the plate thickness; a shaded
+isometric at 1:4 sits above.
 """
 
 from __future__ import annotations
@@ -165,10 +165,7 @@ RIGHT_KEEP = {"Thick": (0.370, 0.140)}
 # Both arc centres lie on the bore's vertical centreline, off the sheet
 # above; the apex heights land on each arc's low point there, and the tip
 # lands run radially from those centres.  Each scribing edge carries its
-# SHARP requirement and each apex height the rocker edge it sets.  SOLIDWORKS
-# centres each apex block on its position, so the extra line grows it upward:
-# the positions sit low enough that each stacked band keeps its height,
-# clear of the bottom arc and the 144.951 line.
+# SHARP requirement and each apex height the rocker edge it sets.
 CALLOUTS_BELOW = {
     "TopRadius": f"{ARC_CENTER_CALLOUT}\n{SHARP_EDGE_CALLOUT}",
     "BottomRadius": f"{ARC_CENTER_CALLOUT}\n{SHARP_EDGE_CALLOUT}",
@@ -263,15 +260,12 @@ requirement(
     faces=(CylinderFace(2.0 * part_spec.R_TOP),),
     requirements=("height_above_pivot", "radius", "station", "surface_profile"),
     fields={
+        # Every outline dimension is BASIC: the profile is their tolerance.
         "height_above_pivot": (
-            limits(
-                part_spec.TOP_ABOVE_PIVOT,
-                _PRECISION["TopAbovePivot"],
-                part_spec.LOW_POINT_BAND,
-            ),
+            part_spec.TOP_ABOVE_PIVOT,
             (
                 "TOP_ABOVE_PIVOT",
-                "LOW_POINT_BAND",
+                "BASIC_DIMENSIONS",
                 ("ch_rocker_arm_spec", "TOP_EDGE_BAND"),
             ),
         ),
@@ -280,17 +274,14 @@ requirement(
             "pivot_hole",
             (("draw_ch_rocker_arm_tl_outline_template", "build"),),
         ),
-        # BASIC: the outline profile is the radius's tolerance.
         "radius": (part_spec.R_TOP, ("R_TOP", "BASIC_DIMENSIONS")),
         "dimension_type": ("basic", ("BASIC_DIMENSIONS",)),
-        # Material added on the top edge moves it toward the arcs' centre.
-        **_profile_zone({"radius": "decreases"}),
+        # Material added on the top edge moves it toward the arcs' centre:
+        # up, away from the pivot.
+        **_profile_zone({"radius": "decreases", "height_above_pivot": "increases"}),
         "radius_nominal": (part_spec.R_TOP, ("R_TOP",)),
         "arc_centre": ([0.0, part_spec.CENTER_Y, 0.0], ("CENTER_Y",)),
-        "station": (
-            limits(part_spec.TOP_END_X, _PRECISION["TopRodX"]),
-            ("TOP_END_X", "END_PLACES"),
-        ),
+        "station": (part_spec.TOP_END_X, ("TOP_END_X", "BASIC_DIMENSIONS")),
         "station_nominal": (part_spec.TOP_END_X, ("TOP_END_X",)),
         "end": (
             [part_spec.TOP_END_X, part_spec.TOP_END_Y, 0.0],
@@ -316,14 +307,10 @@ requirement(
     fields={
         # The bottom apex's depth below the pivot, on the mirror line.
         "depth": (
-            limits(
-                part_spec.BOTTOM_BELOW_PIVOT,
-                _PRECISION["BottomBelowPivot"],
-                part_spec.LOW_POINT_BAND,
-            ),
+            part_spec.BOTTOM_BELOW_PIVOT,
             (
                 "BOTTOM_BELOW_PIVOT",
-                "LOW_POINT_BAND",
+                "BASIC_DIMENSIONS",
                 ("ch_rocker_arm_spec", "TOP_EDGE_BAND"),
             ),
         ),
@@ -333,14 +320,12 @@ requirement(
         ),
         "radius": (part_spec.R_BOTTOM, ("R_BOTTOM", "BASIC_DIMENSIONS")),
         "dimension_type": ("basic", ("BASIC_DIMENSIONS",)),
-        # Material added on the bottom edge moves it away from the centre.
-        **_profile_zone({"radius": "increases"}),
+        # Material added on the bottom edge moves it away from the centre:
+        # down, away from the pivot.
+        **_profile_zone({"radius": "increases", "depth": "increases"}),
         "radius_nominal": (part_spec.R_BOTTOM, ("R_BOTTOM",)),
         "arc_centre": ([0.0, part_spec.CENTER_Y, 0.0], ("CENTER_Y",)),
-        "station": (
-            limits(part_spec.BOT_END_X, _PRECISION["BottomRodX"]),
-            ("BOT_END_X", "END_PLACES"),
-        ),
+        "station": (part_spec.BOT_END_X, ("BOT_END_X", "BASIC_DIMENSIONS")),
         "station_nominal": (part_spec.BOT_END_X, ("BOT_END_X",)),
         "bottom_end": (
             [part_spec.BOT_END_X, part_spec.BOT_END_Y, 0.0],
@@ -445,17 +430,16 @@ for _side, _sign in (("rod", 1.0), ("tail", -1.0)):
         ),
         requirements=("length", "surface_profile"),
         fields={
-            "length": (
-                limits(part_spec.TIP_FACE, _PRECISION["RodTipLen"]),
-                ("TIP_FACE", "END_PLACES"),
-            ),
+            "length": (part_spec.TIP_FACE, ("TIP_FACE", "BASIC_DIMENSIONS")),
+            "dimension_type": ("basic", ("BASIC_DIMENSIONS",)),
             "length_nominal": (part_spec.TIP_FACE, ("TIP_FACE",)),
             "top_edge_feature": ("top_edge", ("ALPHA_TOP", "CENTER_Y")),
             "end": (
                 [_sign * part_spec.TIP_X, part_spec.TIP_Y, 0.0],
                 ("TIP_X", "TIP_Y"),
             ),
-            # The land's length is toleranced: the zone governs no BASIC here.
+            # The length ends where the land meets the arc and the taper, so
+            # its sense under an offset face is theirs: no BASIC of its own.
             **_profile_zone({}),
         },
         precision={"length": _PRECISION["RodTipLen"]},
