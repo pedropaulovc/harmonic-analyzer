@@ -39,19 +39,30 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "MiddleRib": {"MiddleRibThickness"},
     "HexKnifeBack": {"HexKnifeBackDepth"},
     "KnifeRidgeFillet": {"KnifeRidgeRadius"},
-    "KnifeEnvelopeReference": {"HexWidth", "HexHeight"},
+    "KnifeEnvelopeReference": {
+        "HexWidth",
+        "HexHeight",
+        "RidgeFromLeft",
+        "RidgeFromRight",
+        "FlankToSide",
+    },
 }
 
 # Model-owned text the part writes onto its own dimensions (prefix compartment).
 # The summation web's two sides share one radius; both trunnions one length,
-# one knife-edge radius and one hexagon (Detail D shows the +Z one).  A radial
-# prefix replaces the native R, so a radius prefix carries its own.
+# one knife-edge radius and one hexagon (Detail D shows the +Z one), whose two
+# upper flanks each make the one flank-to-side angle.  A radial prefix
+# replaces the native R, so a radius prefix carries its own; the width's
+# opening parenthesis marks it a reference (its suffix closes it).
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("SummationPlateProfile", "SummationArcRadius"): "2X R",
     ("HexKnifeBack", "HexKnifeBackDepth"): "2X ",
     ("KnifeRidgeFillet", "KnifeRidgeRadius"): "2X R",
-    ("KnifeEnvelopeReference", "HexWidth"): "2X ",
+    ("KnifeEnvelopeReference", "HexWidth"): "2X (",
     ("KnifeEnvelopeReference", "HexHeight"): "2X ",
+    ("KnifeEnvelopeReference", "RidgeFromLeft"): "2X ",
+    ("KnifeEnvelopeReference", "RidgeFromRight"): "2X ",
+    ("KnifeEnvelopeReference", "FlankToSide"): "4X ",
     # A linear dimension across the plan's cylinder band prints no Ø itself.
     ("CylinderReference", "CylinderDia"): "<MOD-DIAM>",
 }
@@ -90,15 +101,16 @@ BRACKET_SCREW_NUMBER = "MHA-VN-050"  # vn-magnifying-bracket-screw
 # not tell from MATCHES whether the screws locate or only clamp).  The two
 # left of VIEW F have room for one line only.  The spring-anchor pad is on
 # the underside, which no view shows full length, so its width says it runs
-# the plate's length.  The hexagon's
-# width holds .XXX for the trunnion's worst-case free rock in the knife
-# mount's bore (``sm_knife_mount_spec``), so it names that.
+# the plate's length.  The ridge-to-side pair and the flank-to-side angle
+# hold the knife edge for the trunnion's worst-case free rock in the knife
+# mount's bore (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``, code
+# review C09); the -X one says so, four lines left of its extension lines.
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "EdgeRibFrontEndTopX": "ALL RIBS",
     "ReceiverY0": f"LOCATES {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
-    "HexWidth": f"SETS FREE ROCK\nIN {KNIFE_MOUNT_NUMBER}",
+    "RidgeFromLeft": "KNIFE EDGE\nSYMMETRIC\nTO SIDES,\nBOTH STUBS",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
