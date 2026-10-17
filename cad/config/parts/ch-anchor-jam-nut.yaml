@@ -7,3 +7,14 @@ ch-anchor-jam-nut:
   quantity: 20
   tolerance_class: machined_block
   process: "turned from bar (brass): turn the O.D., drill and tap #6-32 through, part off and face to thickness, saw the drive cut across the driven face"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "side view, under the 3.60 thickness: ENGAGEMENT 1.9 MIN (0.5D)"
+      finding: "thread engagement below 1.5D (rule 18)"
+      reason: "owner ruling 2026-10-17: a thin jam nut only locks the MHA-VN-012 anchor against the MHA-SM-003 plate underside and carries no working load (the anchor's own tap engagement carries the spring pull); about 0.5D is the normal jam-nut proportion. 1.9 MIN is the full thread left at the thinnest printed thickness less a through tap's 1.5 incomplete threads"
+    - id: "RV-02"
+      kind: "minor"
+      where: "side view, above the O.D.: WALL 1.5 MIN"
+      finding: "wall from the #6-32 major to the O.D. below the 2.0 mm target (rule 17)"
+      reason: "owner ruling 2026-10-17: the twenty nuts stand side by side at the 7.06 channel pitch, so the O.D. band sits between the 1.5 wall floor and the 0.25 clearance to the neighbouring MHA-CH-014; 1.5 MIN at the smallest printed O.D. holds the rule 17 floor, and a jam nut that carries no load needs no more"
