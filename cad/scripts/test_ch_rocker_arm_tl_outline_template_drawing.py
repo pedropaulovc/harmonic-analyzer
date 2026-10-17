@@ -344,11 +344,33 @@ def test_inventory_record_binds_this_part_without_hand_solids() -> None:
     assert "solids" not in records[0]
 
 
-def _inventory_note() -> str:
+def _inventory_record() -> dict:
     inventory = tomllib.loads(
         (CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8")
     )
-    return inventory["gauges"]["rocker-profile-gauge"]["note"]
+    return inventory["gauges"]["rocker-profile-gauge"]
+
+
+def _inventory_note() -> str:
+    return _inventory_record()["note"]
+
+
+def test_inventory_buys_to_the_sheets_profile_and_stays_unverified() -> None:
+    """The purchase spec is the TL-13 sheet's profile (user 2026-10-17); no
+    vendor is selected, so the record keeps verify = true."""
+    record = _inventory_record()
+    bought = re.fullmatch(
+        r"1 x MHA-CH-006-TL-13 .*: bought, wire EDM or precision CNC to the"
+        r" TL-13 sheet's (\d+\.\d+) profile; vendor not yet selected"
+        r" \(user 2026-10-17: assume feasible\)\.",
+        record["purchase"],
+    )
+    assert bought, record["purchase"]
+    assert float(bought.group(1)) == spec.OUTLINE_PROFILE_ZONE
+    assert record["verify"] is True
+    assert record["note"].startswith(
+        "Vendor data, read live 2026-10-17, context only (none is the selected source)."
+    )
 
 
 def test_inventory_acceptance_is_the_drawings_one_profile_zone() -> None:
