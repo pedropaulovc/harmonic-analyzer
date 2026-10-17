@@ -177,7 +177,7 @@ def test_retention_rows_cite_the_package_steps() -> None:
     assert nut.installed_at == "MHA-SM-000 STEP 2"
     steps = {line.split(".", 1)[0]: line for line in spec.ASSEMBLY_STEPS}
     assert "MHA-VN-024" in steps["5"]
-    assert "MHA-VN-001" in steps["2"] and "MHA-VN-070" in steps["2"]
+    assert "MHA-VN-001" in steps["2"] and "MHA-VN-072" in steps["2"]
     assert "MHA-SM-004" in steps["7"]
     # Period hardware: no step leans on a threadlocker, or even names one.
     banned = ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC", "PATCH")

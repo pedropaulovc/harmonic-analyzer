@@ -1,7 +1,7 @@
 """Create the manufacturing drawing for the modified McMaster 9489T111 anchor.
 
 The anchor is purchased by SKU but is NOT installed as supplied: the captive
-hex nut is discarded (the MHA-CH-012 round jam nut locks it) and the shank is cut to
+hex nut is discarded (the MHA-CH-014 round jam nut locks it) and the shank is cut to
 cross the summing-lever plate and carry that nut, so the sheet carries the
 same two cutting controls as the counter anchor (``draw_boss_hook``) -- the
 finished overall length to the eye crown and the restored 45 deg deburr at the
@@ -52,7 +52,7 @@ from vn_spring_hook_spec import (
 SPEC = DRAWINGS_BY_NAME["vn_spring_hook"]
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
-# The finished part is 28.8 x 12.7 mm since its shank carries the MHA-CH-012
+# The finished part is 28.8 x 12.7 mm since its shank carries the MHA-CH-014
 # jam nut under the plate: 5:1 keeps the front view inside the counter
 # anchor's 4:1 sheet band, raised so the cut end's deburr dimensions clear
 # the notes.  The deburr is dimensioned on the front view itself, as on the
@@ -78,7 +78,7 @@ FRONT_KEEP = {
 # keeps past the jam nut.  The callout names both mates.
 CHAMFER_CALLOUT = {
     "ChamferWidth": (
-        "MIN: CUT END STARTS IN MHA-SM-003 TAP\nMAX: KEEPS FULL THREAD PAST MHA-CH-012"
+        "MIN: CUT END STARTS IN MHA-SM-003 TAP\nMAX: KEEPS FULL THREAD PAST MHA-CH-014"
     )
 }
 EXPECTED_CONTROLS = {

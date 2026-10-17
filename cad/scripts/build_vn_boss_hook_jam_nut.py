@@ -1,4 +1,4 @@
-r"""Purchased MHA-VN-070 counter-anchor jam nut: McMaster 90760A140.
+r"""Purchased MHA-VN-072 counter-anchor jam nut: McMaster 90760A140.
 
 A thin zinc-plated steel #10-24 narrow-profile hex nut
 (``vn_boss_hook_jam_nut_spec``) on the MHA-VN-001 counter anchor, jammed
