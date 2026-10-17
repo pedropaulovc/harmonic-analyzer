@@ -299,9 +299,9 @@ def test_rod_slot_run_takes_the_pin_wherever_the_rocker_puts_its_hole() -> None:
     reach = spec.ROD_HOLE_RADIAL + spec.ROD_HOLE_PLAY + band[1]
     assert run[0] / 2.0 >= reach
     assert spec.ROD_SLOT_WEB_MIN >= 1.5
-    # The three-place run states its function and the hole it reaches.
+    # The three-place run names the feature it spans and its function.
     assert drawing.CALLOUTS_BELOW["RodSlotFlat"] == spec.ROD_SLOT_FLAT_CALLOUT
-    assert spec.ROD_SLOT_FLAT_CALLOUT == "PIN REACH TO ROD-PIN\nHOLE, MHA-CH-006"
+    assert spec.ROD_SLOT_FLAT_CALLOUT == "SLOT END CENTRES;\nPIN REACH, MHA-CH-006"
     # The station's flag says the slot is radial (its axis passes the pivot).
     assert drawing.CALLOUTS_BELOW["RodSlotX"] == "ROD SLOT, RADIAL TO PIVOT"
     assert spec.ROD_SLOT_AXIS == pytest.approx(
@@ -432,6 +432,9 @@ def test_each_slot_end_gets_its_own_centre_mark_in_the_detail() -> None:
     )
     source = inspect.getsource(drawing._mark_rod_slot_end_centres)
     assert "InsertCenterMark3(CENTER_MARK_SINGLE, False, False)" in source
+    # Crosses only (mr-tl13-5): extended lines lay along the run's extension
+    # lines.
+    assert "mark.ShowLines = False" in source
     assert '("outer", _ROD_SLOT_OUTER, 0.0)' in source
     assert '("inner", _ROD_SLOT_INNER, 180.0)' in source
     build = inspect.getsource(drawing.build)
@@ -694,12 +697,16 @@ def test_rod_slot_detail_circle_and_label_stay_clear_of_the_notes_and_frame() ->
     assert drawing.DETAIL_LABEL_XY[0] + 0.015 < x - crop
     assert drawing.DETAIL_LABEL_XY[0] - 0.015 > 0.010
     assert drawing.DETAIL_LABEL_TEXT == "DETAIL D\nSCALE 5 : 1"
-    # The run's value and flag sit right of and below the circle. Its
-    # widest line, "PIN REACH TO ROD-PIN", printed 51.4 mm wide and centred on
-    # the dimension (farm run 3111b8f0a's layout audit: text-on-line against
-    # the circle at +0.037), so the whole line must clear the circle's extent.
+    # The run's value and flag sit right of and below the circle. The old
+    # flag's widest line, "PIN REACH TO ROD-PIN" (20 characters), printed
+    # 51.4 mm wide, centred on the dimension (farm run 3111b8f0a's layout
+    # audit: text-on-line against the circle at +0.037). The flag's widest line
+    # now has 21 characters, so pro rata it needs 54 mm, and the whole line
+    # must clear the circle's extent.
+    flag = max(spec.ROD_SLOT_FLAT_CALLOUT.splitlines(), key=len)
+    half = 0.0514 / 20 * len(flag) / 2.0
     flat_x, flat_y = drawing.DETAIL_KEEP["RodSlotFlat"]
-    assert flat_x - 0.0514 / 2.0 > x + crop and flat_y < y - 0.010
+    assert flat_x - half > x + crop and flat_y < y - 0.010
     # Datum C's tag hangs below the width's lower arrow (the slot's lower
     # side, 5:1), on the dimension line's axis (SolidWorks holds it there),
     # above the run's dimension line, its ~7 mm box left of the run's flag.
@@ -707,7 +714,7 @@ def test_rod_slot_detail_circle_and_label_stay_clear_of_the_notes_and_frame() ->
     lower_arrow_y = y - drawing.DETAIL_RATIO * spec.ROD_SLOT_WIDTH / 2.0 / 1000.0
     assert flat_y < datum_y < lower_arrow_y
     assert abs(datum_x - width_x) < 0.005
-    assert datum_x + 0.0035 < flat_x - 0.0514 / 2.0
+    assert datum_x + 0.0035 < flat_x - half
 
 
 def test_datum_c_is_the_slot_width_not_one_side() -> None:

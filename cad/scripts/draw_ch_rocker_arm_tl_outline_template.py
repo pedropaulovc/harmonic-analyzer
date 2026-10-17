@@ -161,7 +161,7 @@ FRONT_KEEP = {
 # datum C's tag, which hangs below the width's dimension line.
 DETAIL_KEEP = {
     "RodSlotWidth": (DETAIL_CENTER[0] + 0.020, DETAIL_CENTER[1] + 0.028),
-    "RodSlotFlat": (DETAIL_CENTER[0] + 0.058, DETAIL_CENTER[1] - 0.012),
+    "RodSlotFlat": (DETAIL_CENTER[0] + 0.058, DETAIL_CENTER[1] - 0.0155),
 }
 # Below the edge view and left of its extension lines (the text is far wider
 # than the 3.175 span), clear of the front view's rod tip and the isometric.
@@ -189,7 +189,7 @@ CALLOUTS_BELOW = {
     # print gives its reference nominal and the clearance on the named pin.
     "RodSlotWidth": ROD_SLOT_CALLOUT,
     # The run prints at three places for its minimum's reach: the flag
-    # names that function and the hole it reaches (rule 3).
+    # names the feature it spans and that function (rules 3 and 12).
     "RodSlotFlat": ROD_SLOT_FLAT_CALLOUT,
 }
 # The top stations take their profile flag above the value: below, it would
@@ -219,7 +219,7 @@ PIVOT_DATUM_OFFSET = (-0.012, 0.022)
 # line-on-dimension-line). So it hangs below the lower arrow, extending the
 # line: between it and the run's dimension line, left of the run's flag.
 ROD_SLOT_WIDTH_DIMENSION = "RodSlotWidth"
-ROD_SLOT_DATUM_XY = (DETAIL_CENTER[0] + 0.022, DETAIL_CENTER[1] - 0.009)
+ROD_SLOT_DATUM_XY = (DETAIL_CENTER[0] + 0.022, DETAIL_CENTER[1] - 0.007)
 
 _Z = [0.0, 0.0, 1.0]
 _PRECISION = DRAWING_PRECISION_BY_NAME
@@ -892,7 +892,9 @@ CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
 def _mark_rod_slot_end_centres(adapter: Any, detail: Any) -> None:
     """Centre-mark each round end of the rod slot in its 5:1 detail, each
     arc picked at its far point along the slot axis (the draw_dt_cone_gear
-    D-bore recipe)."""
+    D-bore recipe). Each mark is the cross alone: its extended lines lay
+    along the run's extension lines, so the run read as one from a
+    centreline and a converging line (mr-tl13-5)."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     extension = _early_bound(draw.Extension, "IModelDocExtension")
@@ -917,6 +919,13 @@ def _mark_rod_slot_end_centres(adapter: Any, detail: Any) -> None:
         draw.ClearSelection2(True)
         if mark is None:
             raise RuntimeError(f"failed to centre-mark the rod slot {label} end")
+        mark = _early_bound(mark, "ICenterMark")
+        mark.UseDocDisplaySettings = False
+        mark.ShowLines = False
+        if mark.UseDocDisplaySettings or mark.ShowLines:
+            raise RuntimeError(
+                f"rod slot {label} end's centre mark still shows its extended lines"
+            )
 
 
 def _add_datums(adapter: Any, front: Any, detail: Any) -> None:
