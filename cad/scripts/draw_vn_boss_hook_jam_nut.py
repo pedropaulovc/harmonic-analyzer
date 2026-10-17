@@ -16,11 +16,9 @@ SPEC = DRAWINGS_BY_NAME["vn_boss_hook_jam_nut"]
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    # Hidden lines removed: the dashed bore in the TOP/RIGHT views told the
-    # machinist nothing the FRONT view and the isometric do not (review r6/r7).
-    return await build_purchased_fastener_drawing(
-        adapter, SPEC, hidden_lines_removed=True
-    )
+    # Every purchased view is hidden-lines-removed (rule 9), which also clears
+    # the dashed bore the r6/r7 reviews flagged in the TOP/RIGHT views.
+    return await build_purchased_fastener_drawing(adapter, SPEC)
 
 
 def _parse_args() -> argparse.Namespace:
