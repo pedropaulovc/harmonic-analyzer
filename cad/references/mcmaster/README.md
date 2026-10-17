@@ -92,6 +92,22 @@ recipes:
 The cone-lock and swing-stop selections follow `cad/scripts/build_vn_cone_lock_knob.py`
 and `cad/scripts/build_vn_swing_stop_screw.py`.
 
+Shop tooling catalogue verification on October 16, 2026 (not production
+fastener identities; no vendor models downloaded):
+
+- [5972K41](https://www.mcmaster.com/5972K41/) supplies
+  `fixtures.trammel-6200-2rs`: four steel sealed 6200-2RS bearings,
+  10 × 30 × 9 mm, Buna-N seals, ABEC 1, C3 radial clearance 0.008–0.023 mm.
+  Live Firecrawl spec table read October 16, 2026. The inventory records
+  the sourcing ruling on per-bearing internal play and rejected C0 upgrade;
+  combined play, mounting fits and alignment are not bounded by that ruling.
+  Receipt verification remains required.
+- [91595A452](https://www.mcmaster.com/91595A452/) supplies
+  `fixtures.trammel-cl-dowel`: 52100 alloy-steel Ø6 × 20 mm dowel,
+  DIN 6325-m6 / ISO 8734, diameter 6.004–6.012 mm, minimum HRC 52.
+  Live Firecrawl spec table read October 16, 2026; length tolerance unstated.
+  Both purchases remain unconfirmed in `cad/process/shop/inventory.toml`.
+
 Live catalogue verification on October 12, 2026:
 
 - [91410A540](https://www.mcmaster.com/91410A540/) replaces 91410A538 as the
