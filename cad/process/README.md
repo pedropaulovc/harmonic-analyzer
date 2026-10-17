@@ -82,11 +82,15 @@ and McMaster alternatives considered; do not substitute a different thread lead,
 nut bolt circle or wheel-bore depth from a similarly named component.
 
 These records retain `verify = true`: KP08 hole diameter and axial width,
-assembled axial location, screw/block fit and final usable travel still need
-receipt/layout verification. No turned end journals are specified. Ooznest is
-UK-based; US shipping, import/tax treatment and delivery must be confirmed at
-checkout. The inventory does not establish a finished fixture's geometry or
-approve its mechanical retention.
+thread hand, nut backlash, wheel bore/retention, assembled axial location,
+screw/block fit and final usable travel still need receipt/layout verification.
+No smooth or turned end journals are supplied: thread-crest support, runout and
+axial creep under reversal remain unproven. The wheel also needs base-edge
+overhang or sufficient support lift; its rim extends below the support mounting
+plane. The nut-to-carriage bracket belongs to the jig CAD, not this shopping list.
+Ooznest is UK-based; US shipping, import/tax treatment and delivery must be
+confirmed at checkout. The inventory does not establish a finished fixture's
+geometry or approve its mechanical retention.
 
 ## Add or migrate a part
 
