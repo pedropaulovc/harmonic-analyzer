@@ -241,6 +241,9 @@ C = [37, 39, 41, 43, 47, 49]
 [tools]
 
 [tools.endmills-lms-6784]
+# Existing set confirmed live 2026-10-16, SKU 6784: each size includes 2 and 4 flutes;
+# 3/8 in cutter has 3/8 in shank; 9/16 in cutter has 1/2 in shank.
+# https://littlemachineshop.com/products/end-mill-set-20-pieces-2-4-flute-tin-coated-hss-premium
 kind = "endmill_set"
 material = "HSS"
 coating = "TiN"
@@ -3414,6 +3417,52 @@ solids = [
   { name = "strap", shape = "box", at_mm = [-27.0, -5.5, 0.0], size_mm = [54.0, 11.0, 11.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-16", instrument = "estimated scaled envelope; replace with caliper readings on received padded strap" } },
 ]
 
+# Rocker route-v3 purchased jig hardware. Candidate purchases only: no possession,
+# receipt dimensions, preload certificate or clearance acceptance is asserted.
+[fixtures.trammel-hgr15-rails]
+kind = "linear_rail"
+make = "HIWIN"
+sku = "172270559990"
+source = "https://motionconstrained.com/store/hiwin-linear-guides/hiwin-hg-series-linear-guides/hg-rails-only/hiwin-hgr15r-linear-guideway-rail/"
+present = false
+verify = true
+purchase = "2 x HGR15R rails, custom cut to 440 mm; confirm cut end distances on order."
+note = "Read live 2026-10-16: reseller lists HGR15RXXXC, 15 mm rail, 60 mm pitch, cut-to-size orders. Main-approved 440 replaces brief 420: carriage centre reaches 412.3 plus half-length 30.7 from spindle, requiring rail to reach 443 from near end 15. Custom length, not a listed stock variant; no assumed hole-end pattern."
+cite = ["Motion Constrained part 172270559990, read 2026-10-16"]
+
+[fixtures.trammel-hgh15ca-carriages]
+kind = "linear_carriage"
+make = "HIWIN"
+sku = "HGH-15-CA-Z0-C"
+source = "https://www.digikey.com/en/products/detail/midwest-machine-tool-supply/HGH-15-CA-Z0-C/16622864"
+present = false
+verify = true
+purchase = "2 x HIWIN HGH-15-CA-Z0-C carriages for HGR15R, DigiKey/Midwest 4433-HGH-15-CA-Z0-C."
+note = "Read live 2026-10-16: DigiKey Marketplace lists HIWIN, HGH15CA series, 61.4 mm length, Z0 part number and 92 in stock. Rejected eBay 127866788929: photos show H15C/HG15 but not full Z0 part number. Rejected Motion Constrained HGH15CAZAC: published medium preload, not requested Z0."
+cite = ["DigiKey/Midwest 4433-HGH-15-CA-Z0-C, read 2026-10-16", "Rejected: https://www.ebay.com/itm/127866788929", "Rejected: https://motionconstrained.com/store/hiwin-linear-guides/hiwin-hg-series-linear-guides/hg-blocks-only/hiwin-hgh15cazac-square-block/"]
+
+[fixtures.trammel-6200-2rs]
+kind = "ball_bearing"
+make = "VXB"
+sku = "1111-4398"
+source = "https://vxb.com/products/6200-2rs-10x30x9-sealed-bearing-pack-of-10"
+present = false
+verify = true
+purchase = "One 10-pack 6200-2RS; four bearings required for the two pivot blocks."
+note = "Read live 2026-10-16: 10 mm bore x 30 mm OD x 9 mm wide, chrome steel, double rubber sealed. Catalogue identity, not actual race metrology."
+cite = ["VXB product 1111-4398, 6200-2RS 10-pack, $29.99, read 2026-10-16"]
+
+[fixtures.trammel-cl-dowel]
+kind = "dowel_pin"
+make = "AndyMark"
+sku = "am-1501"
+source = "https://andymark.com/products/steel-dowel-pin-6-mm-x-20-mm"
+present = false
+verify = true
+purchase = "1 x steel dowel pin 6 mm x 20 mm, CL locator in strap end waste."
+note = "Read live 2026-10-16: product title and image identity am-1501 specify 6 x 20 mm. Inch summary is rounded/inconsistent; no fit class is published. Verify diameter and usable engagement before use."
+cite = ["AndyMark am-1501, Steel Dowel Pin 6 mm x 20 mm, $0.60, read 2026-10-16"]
+
 # --- pivot-bracket additions ---
 # Illustrative angle plate. Local XY is the table plane; the front upright face
 # is Y=0. TC outer-face Z0 sits 4 mm above its top, so the table is TC Z=-92.9.
@@ -5952,3 +6001,24 @@ section_mm = [304.8, 12.7]
 length_mm = 304.8
 on_hand = true
 cite = ["Online Metals pid 24273 https://www.onlinemetals.com/en/buy/aluminum/0-5-aluminum-plate-6061-t651-domestic/pid/24273"]
+
+# Rocker route v3 stock purchases: catalogue nominals, not receipt measurements.
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "MHA-CH-013 strap: 3 x 40 mm, 60 in +/-2 in; vendor title 1005/1018, product information alloy 1018. Require 1018 material certification on purchase. Four 350 mm blanks fit even at the 58 in low length limit; mill to drawing thickness after receipt."
+# Basis: OnlineMetals 22381 catalogue nominal [40, 3] mm and 60 x 25.4 = 1524 mm, zero offsets; not metrology.
+section_mm = [40.0, 3.0]
+length_mm = 1524.0
+on_hand = false
+cite = ["OnlineMetals part 22381 https://www.onlinemetals.com/en/buy/carbon-steel/3mm-x-40mm-carbon-steel-rectangle-bar-1005-1018-metric-60-length/pid/22381 read live 2026-10-16, $70.12"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "MHA-CH-012 hub: 7/16 in (11.1125 mm) round, closest listed OnlineMetals standard diameter >=11 mm (10 mm below, 12 mm above). Order 12 in length; turn the joint land and leave finish allowance per hub drawing."
+# Basis: OnlineMetals 20743 catalogue nominal 0.4375 x 25.4 = 11.1125 mm; 12 x 25.4 = 304.8 mm, zero offsets; not metrology.
+dia_mm = 11.1125
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 20743 https://www.onlinemetals.com/en/buy/carbon-steel/0-4375-carbon-steel-round-bar-1018-cold-finish/pid/20743 read live 2026-10-16"]

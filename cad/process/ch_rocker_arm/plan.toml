@@ -120,8 +120,8 @@ rod_hole = 7.9375                 # raw bar at the arm tip
 fixture = "rocker-riser-blocks"
 pose = { origin_mm = [0.0, 0.0, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
   { ref = "strap-shim-stack", restraint = "locate", note = "under the left blank end, below its clamp; seats the work at Z0 (prechips#184: locate, not none)", pose = { origin_mm = [-158.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
   { ref = "strap-shim-stack", restraint = "locate", note = "under the bar at X-60", pose = { origin_mm = [-60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
   { ref = "strap-shim-stack", restraint = "locate", note = "under the bar at X+60", pose = { origin_mm = [60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
@@ -317,8 +317,8 @@ bottom_z = 0.0
 fixture = "rocker-riser-blocks"
 pose = { origin_mm = [0.0, 0.0, 0.0], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
 ]
 clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
@@ -413,8 +413,8 @@ bottom_z = 0.0
 fixture = "rocker-riser-blocks"
 pose = { origin_mm = [0.0, 0.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [164.0, 6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
 ]
 clamp_order = [1, 2]
 fixed_jaw = "not_applicable"
@@ -551,8 +551,8 @@ bottom_z = 0.0
 fixture = "rocker-riser-blocks"
 pose = { origin_mm = [0.0, 0.0, 0.0], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [-164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [164.0, -6.65, 7.9375], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] } },
   { ref = "strap-shim-stack", restraint = "locate", note = "under the strap at X-120; seats datum B (prechips#184: locate, not none)", pose = { origin_mm = [-120.0, -8.96, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
   { ref = "strap-shim-stack", restraint = "locate", note = "under the strap at X-45", pose = { origin_mm = [-45.0, -1.26, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
   { ref = "strap-shim-stack", restraint = "locate", note = "under the strap at X+45", pose = { origin_mm = [45.0, -1.26, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
@@ -642,9 +642,9 @@ bottom_z = -7.4970
 fixture = "rocker-filing-stand"
 pose = { origin_mm = [0.0, 0.0, -7.497], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 clamps = [
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [-158.0, 6.65, 0.4405], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "across the left raw blank end, over the end block" },
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [158.0, 6.65, 0.4405], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "across the right raw blank end, over the end block" },
-  { ref = "clamping-kit-lms-1144/strap-pad", restraint = "press", pose = { origin_mm = [0.0, 0.0, 0.0], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "on the upper hub face (7.06 thick), over the hub pedestal" },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [-158.0, 6.65, 0.4405], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "across the left raw blank end, over the end block" },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [158.0, 6.65, 0.4405], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "across the right raw blank end, over the end block" },
+  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [0.0, 0.0, 0.0], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "on the upper hub face (7.06 thick), over the hub pedestal" },
 ]
 clamp_order = [1, 2, 3]
 fixed_jaw = "not_applicable"
