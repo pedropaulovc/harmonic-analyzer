@@ -217,8 +217,8 @@ def test_every_banded_length_says_what_its_band_holds() -> None:
     and names the shaft)."""
     banded = {name for _feature, name in model_toleranced_dimensions(part)}
     assert banded <= set(drawing.DIMENSION_CALLOUTS)
-    washer = _config.parts("ch-rocker-thrust-washer")["number"]
-    assert washer == "MHA-CH-009"
+    washer = _config.parts("vn-rocker-thrust-washer")["number"]
+    assert washer == "MHA-VN-070"
     assert drawing.DIMENSION_CALLOUTS["EarThick"] == f"THRUST FACES ON {washer}"
     shaft = _config.parts("ch-pivot-shaft")["number"]
     assert drawing.DIMENSION_CALLOUTS["SetScrewLocation"] == (

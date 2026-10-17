@@ -19,7 +19,7 @@ import ch_rocker_arm_notes as arm_notes
 import cylinder_bank_layout as drum_bank
 import ch_pivot_bracket_spec as bracket
 import ch_pivot_shaft_spec as shaft
-import ch_rocker_thrust_washer_spec as washer
+import vn_rocker_thrust_washer_spec as washer
 import ch_rocker_arm_spec as arm
 import rocker_bank_layout as bank
 from _buildgraph import config_files_of, module_deps_of
@@ -74,10 +74,12 @@ def test_the_bank_is_preloaded_by_its_spring() -> None:
 def test_the_rocker_spring_fits_the_shaft_and_under_the_bar_foot() -> None:
     import vn_rocker_bank_spring_spec as spring
 
-    # The ch0 bar's foot passes over it as over the washer and the hubs.
-    assert spring.OD + spring.OD_BAND[0] <= washer.OD == arm.HUB_DIA
+    # The ch0 bar's foot passes over it as over the hubs; the washer is
+    # smaller still.
+    assert spring.OD + spring.OD_BAND[0] <= arm.HUB_DIA
+    assert washer.OD_MAX <= arm.HUB_DIA
     # It bears on the washer's face clear of the washer's bore.
-    assert spring.OD + spring.OD_BAND[1] > washer.BORE_DIA + washer.BORE_BAND[0]
+    assert spring.OD + spring.OD_BAND[1] > washer.ID_MAX
     # Nominal ID clears the shaft; the catalogue's -0.02 in reaches under it,
     # which the channel assembly's slide-free check catches.
     assert spring.SHAFT_CLEARANCE_NOMINAL == pytest.approx(0.1905)
@@ -99,7 +101,7 @@ def test_hub_mid_planes_are_the_channel_arm_planes() -> None:
 
 def test_stack_closes_north_on_a_washer_against_the_north_ear() -> None:
     """User, 2026-10-10: the shaft's shoulder is gone; hub 19 bears on a
-    MHA-CH-009 thrust washer against the north ear's inner face, the bank's
+    MHA-VN-070 thrust washer against the north ear's inner face, the bank's
     datum."""
     assert bank.HUB19_NORTH_FACE_Z == pytest.approx(
         bank.hub_mid_z(19) + arm.HUB_LENGTH / 2
@@ -111,7 +113,7 @@ def test_stack_closes_north_on_a_washer_against_the_north_ear() -> None:
     assert bank.NORTH_EAR_OUTER_Z == pytest.approx(
         bank.NORTH_EAR_INNER_Z + bracket.EAR_T
     )
-    assert bank.NORTH_EAR_INNER_Z == pytest.approx(70.851, abs=5e-4)
+    assert bank.NORTH_EAR_INNER_Z == pytest.approx(70.848, abs=5e-4)
     assert not hasattr(bank, "SHOULDER_Z")
 
 
@@ -128,15 +130,21 @@ def test_south_bracket_is_set_off_the_thrust_washer_by_the_spring() -> None:
     assert bank.SOUTH_EAR_OUTER_Z == pytest.approx(
         bank.SOUTH_EAR_INNER_Z - bracket.EAR_T
     )
-    assert bank.SOUTH_EAR_INNER_Z == pytest.approx(-72.459, abs=5e-4)
+    assert bank.SOUTH_EAR_INNER_Z == pytest.approx(-72.456, abs=5e-4)
 
 
-def test_the_washers_are_cut_from_1_32_stock() -> None:
-    """User, 2026-10-10: 1/32 stock (was 1/16) keeps the south bracket's
-    foot room for its hold-down beside the 8-thick ear."""
-    assert washer.STOCK_THICKNESS == pytest.approx(25.4 / 32)
-    assert washer.THICKNESS == 0.79
-    assert washer.STOCK_THICKNESS_RANGE == pytest.approx((0.7175, 0.8700), abs=5e-4)
+def test_the_washers_are_purchased_0_031_ring_shims() -> None:
+    """Owner, 2026-10-15: every washer is a purchased part. McMaster
+    3088A429's 0.031 in nominal is within 0.003 of the retired 1/32 sheet
+    washer, so the south bracket keeps its foot room beside the 8-thick ear,
+    and its +/-0.002 in band is inside the sheet's."""
+    assert washer.SKU == "3088A429"
+    assert washer.COUNT == 2
+    assert washer.THICKNESS == pytest.approx(0.031 * 25.4)
+    assert (washer.THICKNESS_MIN, washer.THICKNESS_MAX) == pytest.approx(
+        (0.7366, 0.8382), abs=5e-5
+    )
+    assert _config.parts("vn-rocker-thrust-washer")["number"] == "MHA-VN-070"
 
 
 def test_brackets_sit_on_their_ears_and_move_in_from_78() -> None:
@@ -144,7 +152,7 @@ def test_brackets_sit_on_their_ears_and_move_in_from_78() -> None:
     assert south == pytest.approx(bank.SOUTH_EAR_INNER_Z - bracket.EAR_T / 2)
     assert north == pytest.approx(bank.NORTH_EAR_INNER_Z + bracket.EAR_T / 2)
     assert bracket.EAR_T == 8.0
-    assert (south, north) == pytest.approx((-76.459, 74.851), abs=5e-4)
+    assert (south, north) == pytest.approx((-76.456, 74.848), abs=5e-4)
     assert bank.STACK_MID_Z - south < 78.0
     assert north - bank.STACK_MID_Z < 78.0
     # Both feet stay on the rocker-arm-support's +-88.9 top.
@@ -158,7 +166,7 @@ def test_shaft_is_a_plain_rod_spanning_both_ears() -> None:
     assert bank.PIVOT_SHAFT_LENGTH == pytest.approx(
         bank.NORTH_EAR_OUTER_Z - bank.SOUTH_EAR_OUTER_Z
     )
-    assert bank.PIVOT_SHAFT_LENGTH == pytest.approx(159.31, abs=5e-3)
+    assert bank.PIVOT_SHAFT_LENGTH == pytest.approx(159.305, abs=5e-3)
     assert bank.PIVOT_SHAFT_OVERALL_LENGTH == pytest.approx(
         bank.PIVOT_SHAFT_LENGTH + 2 * shaft.DOME_HEIGHT
     )
@@ -170,11 +178,14 @@ def test_shaft_is_a_plain_rod_spanning_both_ears() -> None:
         assert not hasattr(shaft, gone)
 
 
-def test_hub_and_washer_share_one_od_over_each_wall_floor() -> None:
-    """Hub and washer retain O10.20; PR #1354 includes coaxial eccentricity
-    in the hub's own rule-12 diameter floor, without changing the nominal."""
+def test_hub_keeps_its_od_over_each_wall_floor_and_the_washer_rides_the_shaft() -> None:
+    """The hub retains O10.20; PR #1354 includes coaxial eccentricity in the
+    hub's own rule-12 diameter floor, without changing the nominal. The
+    purchased washer's catalogue bore floor is the shaft's nominal, so it
+    slides on the h-band shaft at worst line on line, and its OD stays under
+    the hub's."""
     assert arm.LINEAR_2PL == pytest.approx(_BAND_2PL)
-    assert washer.OD == arm.HUB_DIA == pytest.approx(10.20)
+    assert arm.HUB_DIA == pytest.approx(10.20)
     bore_max = arm.PIVOT_HOLE_DIA + arm.PIVOT_HOLE_BAND[0]
     eccentricity = arm.HUB_COAXIALITY_DIA / 2.0
     required_od = bore_max + 2.0 * (arm.RULE12_WALL_FLOOR + eccentricity) + _BAND_2PL
@@ -182,8 +193,9 @@ def test_hub_and_washer_share_one_od_over_each_wall_floor() -> None:
     assert required_od == pytest.approx(10.138)
     assert arm.HUB_DIA >= arm.HUB_DIA_MIN == pytest.approx(ceiling)
     assert arm.HUB_DIA_MIN == pytest.approx(10.14)
-    assert washer.OD >= washer.OD_MIN == pytest.approx(10.11)
-    assert washer.BORE_DIA == bracket.BORE_DIA
+    assert washer.ID_MIN == pytest.approx(shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[0])
+    assert washer.ID_MIN <= washer.ID <= washer.ID_MAX
+    assert washer.OD_MAX < arm.HUB_DIA_MIN
 
 
 def test_hub_wall_covers_the_worst_printed_limits_and_eccentricity() -> None:
@@ -245,21 +257,21 @@ def test_the_set_screws_bite_flats_clear_of_the_hubs() -> None:
     assert bank.PIVOT_SHAFT_FLAT_STATIONS == pytest.approx(
         (bank.PIVOT_SHAFT_NORTH_Z - south, bank.PIVOT_SHAFT_NORTH_Z - north)
     )
-    assert bank.PIVOT_SHAFT_FLAT_STATIONS == pytest.approx((155.31, 4.0), abs=5e-3)
+    assert bank.PIVOT_SHAFT_FLAT_STATIONS == pytest.approx((155.305, 4.0), abs=5e-3)
     assert shaft.NORTH_FLAT_STATION == bracket.EAR_T / 2
     # Each from its own tip: the bar is the same either way round.
     assert shaft.FLAT_TIP_STATION == pytest.approx(
         bank.PIVOT_SHAFT_OVERALL_LENGTH - (bank.PIVOT_SHAFT_FLAT_STATIONS[0] + shaft.DOME_HEIGHT)
     )
     assert shaft.FLAT_TIP_STATION == pytest.approx(5.5)
-    # 0.25 tip set + 0.10 north-ear thickness + 0.3599 south-ear set.
-    assert bank.FLAT_OFFSET_MAX == pytest.approx((0.7099, 0.25), abs=5e-4)
+    # 0.25 tip set + 0.10 north-ear thickness + 0.3016 south-ear set.
+    assert bank.FLAT_OFFSET_MAX == pytest.approx((0.6516, 0.25), abs=5e-4)
     station_error = (
         shaft.FLAT_STATION_BAND + shaft.LENGTH_BAND,
         shaft.FLAT_STATION_BAND,
     )
     assert bank.FLAT_STATION_ERROR == pytest.approx(station_error)
-    washer_thin = washer.STOCK_THICKNESS_RANGE[0]
+    washer_thin = washer.THICKNESS_MIN
     # The taps run from each ear's inboard face, the shaft from the north
     # ear's outboard face. South: the south ear's own thickness cancels (its
     # inboard face carries both the tap and the hub run), the north ear's is
@@ -298,10 +310,10 @@ def test_south_apex_stays_on_the_support_at_the_worst_case() -> None:
     so its end is the bound. The set screws hold the shaft, so it never
     floats south."""
     assert bank.SOUTH_APEX_REACH_MAX == pytest.approx(
-        1.5 + 0.25 + 0.51 + 2 * bracket.EAR_T_BAND + 0.3599, abs=5e-4
+        1.5 + 0.25 + 0.51 + 2 * bracket.EAR_T_BAND + 0.3016, abs=5e-4
     )
     apex_z = bank.SOUTH_EAR_OUTER_Z - bank.SOUTH_APEX_REACH_MAX
-    assert apex_z == pytest.approx(-83.279, abs=5e-4)
+    assert apex_z == pytest.approx(-83.218, abs=5e-4)
     assert apex_z - (-88.9) >= 2.0
 
 
@@ -311,11 +323,11 @@ def test_amplitude_bars_clear_both_thrust_faces_at_the_worst_case(
     """The bar straddles its arm plate (z_mid +- BAR_WIDTH/2) while the hub
     face's offset from the plate prints at .XX. A plate-wide thrust face on
     an end hub would reach the end bar; the washers (under the bar foot, like
-    the hubs) stand both ears off. The washer is 1/32 stock, so the mill's
-    band is its thin side; the south ear stands a spring set further off."""
+    the hubs) stand both ears off. The washer is 0.031 stock, so its catalogue
+    band's thin side counts; the south ear stands a spring set further off."""
     proud_min = (arm.HUB_LENGTH - arm.ARM_THICKNESS) / 2 - _BAND_2PL
     face_offset_min = arm.ARM_THICKNESS / 2 + proud_min
-    standoff_min = washer.STOCK_THICKNESS_RANGE[0]
+    standoff_min = washer.THICKNESS_MIN
     clearance = {
         "north": standoff_min + face_offset_min - bar.BAR_WIDTH / 2,
         "south": standoff_min
@@ -325,7 +337,7 @@ def test_amplitude_bars_clear_both_thrust_faces_at_the_worst_case(
     }
     for air in clearance.values():
         assert air >= bank.RUNNING_FLOOR + bank.MARGIN_SPARE
-    assert clearance["north"] == pytest.approx(0.5625, abs=5e-4)
+    assert clearance["north"] == pytest.approx(0.5816, abs=5e-4)
     # Without a stand-off the bar would reach the ear.
     assert face_offset_min - bar.BAR_WIDTH / 2 < 0.0
     assert bank.BAR_TO_THRUST_EAR == pytest.approx(
@@ -361,7 +373,7 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     """At d = 0 each amplitude bar's foot cheeks pass over its own rocker's
     hub (the washers sit axially outboard of the end bars' cheeks,
     test_amplitude_bars_clear_both_thrust_faces_at_the_worst_case, and are
-    held no larger than the hub). Worst case: the notch at its deepest, the
+    smaller than the hub). Worst case: the notch at its deepest, the
     rocker's top edge at its lowest, and the hub at maximum material and off
     the bore axis by the printed coaxiality's radius. The one-sided bands
     (user ruling 2026-09-26) put no term on the notch or the edge; PR #1354's
@@ -415,7 +427,9 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     # Bilateral .XX on either formerly one-sided feature also closes the air.
     assert _cheek_cap(monkeypatch, _BAND_2PL, 0.0) - hub_top < 0.0
     assert _cheek_cap(monkeypatch, 0.0, _BAND_2PL) - hub_top < 0.0
-    assert (washer.OD + _BAND_2PL) / 2.0 <= hub_max_material_r
+    # The washer's edge, off the axis by its bore's float on the thinnest shaft.
+    washer_float = (washer.ID_MAX - (shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[1])) / 2.0
+    assert washer.OD_MAX / 2.0 + washer_float <= hub_max_material_r
 
 
 def test_hub_root_fillet_clears_a_cheek_running_on_the_strap_face(

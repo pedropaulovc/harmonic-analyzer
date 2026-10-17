@@ -2,7 +2,7 @@ r"""MHA-VN-053 rocker-bank-spring: McMaster 9714K24 stock wave disc spring.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  One wave disc spring sits on the MHA-CH-005 pivot shaft between the
-south MHA-CH-009 thrust washer on hub 0 and the south MHA-CH-008 ear's inner
+south MHA-VN-070 thrust washer on hub 0 and the south MHA-CH-008 ear's inner
 face, where the 0.45 end-play leaf used to be (#948 ruling R, PR #1292).
 Squeezed to INSTALLED_HEIGHT there, it holds the 20-hub stack north through the
 north washer on the DRO-set north ear, so the bank has no end play; the set
@@ -17,7 +17,7 @@ SolidWorks model is offered but none was fetched, so the part is
 catalogue-only.
 
 The OD at its catalogue maximum stays under the rocker hub's O10.2, so the
-ch0 amplitude bar's foot passes over the spring as it does over MHA-CH-009.
+ch0 amplitude bar's foot passes over the spring as it does over the hubs.
 The nominal ID clears the O6.35 shaft by 0.19 a side, but the catalogue's
 -0.02 in ID tolerance reaches under it: the channel assembly slides each
 spring onto the shaft before fitting it and rejects one that does not run

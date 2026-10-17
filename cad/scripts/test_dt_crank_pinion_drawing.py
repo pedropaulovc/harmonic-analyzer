@@ -117,7 +117,7 @@ def test_the_blank_sizes_are_native_model_dimensions() -> None:
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     # drawing-simplicity-policy.md `How the repository implements the guidelines`: the places a dimension prints are part of the tolerance it
     # claims, so the model owns them. The overall length is a look (the shaft
-    # end recessed inside the boss), not a fit: one place like the face width.
+    # end stands proud of the boss), not a fit: one place like the face width.
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "OutsideDia": 2,
         "FaceWidth": 1,
@@ -137,19 +137,15 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
 
 
 def test_grown_teeth_keep_the_south_seat_and_boss_length() -> None:
-    # The tooth length follows the part spec; the W15 boss is sized from the
-    # published pin, recess and printed allowances, not a former face pin.
+    # The tooth length follows the part spec; the W15 boss (ruling D1) is the
+    # shortest printable one whose pin wall to its north face holds the floor.
     assert spec.FACE_WIDTH == part.FACE_WIDTH
-    assert spec.BOSS_LENGTH == spec.ceil_to_places(
-        2.0
-        * (
-            spec.PIN_EDGE_MIN_WORST
-            + spec.SHAFT_END_RECESS_MAX
-            + spec.PIN_DIA / 2.0
-            + spec._PIN_EDGE_CLOSING_TERMS
-        ),
-        spec.BOSS_LENGTH_PLACES,
-    )
+    step = 10.0**-spec.BOSS_LENGTH_PLACES
+    assert spec.BOSS_LENGTH == round(spec.BOSS_LENGTH, spec.BOSS_LENGTH_PLACES)
+    assert spec.pin_axial_ligament_worst(spec.BOSS_LENGTH) >= spec.PIN_EDGE_MIN_WORST - 1e-9
+    assert spec.pin_axial_ligament_worst(spec.BOSS_LENGTH - step) < spec.PIN_EDGE_MIN_WORST
+    assert spec.BOSS_LENGTH == pytest.approx(9.4)
+    assert spec.OVERALL_LENGTH == pytest.approx(21.0)
     assert spec.OVERALL_LENGTH == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH)
     assert spec.PIN_STATION == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH / 2.0)
     # The turned band is a real band at every accepted size.
@@ -603,9 +599,11 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None:
+def test_w15_boss_walls_the_pin_and_the_shaft_end_stands_proud_at_every_limit() -> None:
     # The photo asks for the shortest printable boss, but neither the
     # match-drilled pin nor the existing W15 print-worst floors may change.
+    # Ruling D1: the collar bears on the boss and the shaft end stands proud of
+    # the 16T, so the binding wall is the pin's to the boss's north face.
     import build_dt_drive_train_assembly as bdt
 
     printed = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
@@ -614,26 +612,26 @@ def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None
     assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == spec.FACE_WIDTH_PLACES
     # Both lengths print exactly, so no rounded nominal eats the margin.
     assert spec.OVERALL_LENGTH == round(spec.OVERALL_LENGTH, spec.OVERALL_LENGTH_PLACES)
-    assert spec.SHAFT_END_RECESS_MIN <= bdt.PINION_RECESS_NOMINAL <= spec.SHAFT_END_RECESS_MAX
-    assert sum(bdt.PINION_PIN_EDGE_STACK.values()) >= spec.PIN_EDGE_MIN_WORST
-    assert dt_crankshaft_spec._SHORTER_PIN_EDGE_WORST < spec.PIN_EDGE_MIN_WORST
-    assert spec.PIN_AXIAL_LIGAMENT_WORST >= spec.PIN_AXIAL_LIGAMENT_FLOOR_MM
+    assert spec.PIN_AXIAL_LIGAMENT_WORST == pytest.approx(
+        spec.pin_axial_ligament_worst(spec.BOSS_LENGTH)
+    )
+    assert spec.PIN_AXIAL_LIGAMENT_WORST == pytest.approx(2.0125)
+    assert spec.PIN_AXIAL_LIGAMENT_WORST >= spec.PIN_EDGE_MIN_WORST
+    # A boss 0.1 shorter loses the wall.
+    assert spec.pin_axial_ligament_worst(spec.BOSS_LENGTH - 0.1) < spec.PIN_EDGE_MIN_WORST
+    # The shaft past the pin is the boss's wall plus the proud end, never less.
+    proud_least = dt_crankshaft_spec.SHAFT_END_PROUD_RANGE[0]
+    assert proud_least >= 0.0
+    assert dt_crankshaft_spec.PINION_PIN_EDGE_TO_END_WORST == pytest.approx(
+        spec.PIN_AXIAL_LIGAMENT_WORST + proud_least
+    )
+    assert dt_crankshaft_spec.PINION_PIN_EDGE_TO_END_WORST >= spec.PIN_EDGE_MIN_WORST
     # The seat feeler is directly against the restored boss north face.
     assert spec.SEAT_FEELER_MM == pytest.approx(0.25)
     concentric = bdt.PINION_T120_CONCENTRIC
     assert concentric["shoulder air"] >= bdt.T120_PINION_AIR_FLOOR
     assert concentric["turned band radial"] >= bdt.T120_TURNED_BAND_RADIAL_FLOOR
     assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION_WORST >= bdt.CRANK_ROW_ENGAGEMENT_FLOOR
-    assert sum(bdt.PINION_RECESS_STACK.values()) >= spec.SHAFT_END_RECESS_MIN_WORST
-    # The unfaced recess cannot be justified by a former inch stock grade.
-    # Carry the actual printed allowance and the current shaft/pinion sizes.
-    edge_recess = spec.SHAFT_END_RECESS_MIN_WORST + spec.OVERALL_LENGTH_GRADE_MM
-    under = bdt.pinion_recess_stack(
-        edge_recess - spec.printed_band_mm(spec.OVERALL_LENGTH_PLACES),
-        dt_crankshaft_spec.SHAFT_LENGTH,
-        spec.OVERALL_LENGTH,
-    )
-    assert sum(under.values()) < spec.SHAFT_END_RECESS_MIN_WORST
 
 
 def test_root_diameter_boss_meets_the_current_printed_wall_target() -> None:

@@ -15,9 +15,10 @@ The bank is a SOLID STACK: each MHA-CH-006 arm's integral hub is one station
 pitch long, and neighbouring hubs bear face on face. #948 ruling R (PR #1292)
 preloads it with a keeper spring, reversing #743 Q4 (Reading 1, "no keeper"):
 
-* Hub 19 bears on a MHA-CH-009 thrust washer against the NORTH bracket
-  ear's inner face (user, 2026-10-10: the shaft's shoulder is gone and the
-  washer, kept, goes at both ends). That ear is the bank's axial datum:
+* Hub 19 bears on a MHA-VN-070 thrust washer (McMaster 3088A429, a 0.031
+  ring shim) against the NORTH bracket ear's inner face (user, 2026-10-10:
+  the shaft's shoulder is gone and the washer, kept, goes at both ends).
+  That ear is the bank's axial datum:
   fit-up offsets its DRO target by the measured north washer's deviation
   from nominal (MIC_RESIDUAL is what is left of that band), as the cylinder
   bank does for its back washer.
@@ -47,9 +48,9 @@ from cam_plane import CAM_MID_DZ
 import ch_amplitude_bar_spec as _bar
 import ch_pivot_bracket_spec as _bracket
 import ch_pivot_shaft_spec as _shaft
-import ch_rocker_thrust_washer_spec as _washer
 import vn_rocker_bank_spring_spec as _spring
-from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
+import vn_rocker_thrust_washer_spec as _washer
+from ch_rocker_arm_spec import HUB_DIA, HUB_LENGTH, HUB_LENGTH_BAND
 
 COUNT = 20  # the full bank (the brackets never follow active_count)
 
@@ -108,10 +109,11 @@ if not PRELOAD_LIMITS[0] <= ROCKER_PRELOAD[0] < ROCKER_PRELOAD[1] < PRELOAD_LIMI
     raise AssertionError(
         f"the rocker preload {ROCKER_PRELOAD} N leaves {PRELOAD_LIMITS}"
     )
-# The ch0 amplitude bar's foot passes over the spring as over the washer.
-if _spring.OD + _spring.OD_BAND[0] > _washer.OD:
+# The ch0 amplitude bar's foot passes over the spring as over the hub; the
+# washer is smaller still.
+if not (_spring.OD + _spring.OD_BAND[0] <= HUB_DIA and _washer.OD_MAX <= HUB_DIA):
     raise AssertionError(
-        "the rocker-bank spring's OD stands proud of the hub and washer"
+        "the rocker-bank spring or a thrust washer stands proud of the hub"
     )
 
 # Fit-up compensation (#948 ruling R): the fitter mics the north thrust washer
@@ -184,8 +186,8 @@ if abs(PIVOT_SHAFT_FLAT_STATIONS[1] - _shaft.NORTH_FLAT_STATION) > 1e-9:
 # south flat off its ear.
 SHAFT_TIP_SET_BAND = 0.25
 _WASHER_DEV = (
-    _washer.STOCK_THICKNESS_RANGE[0] - _washer.THICKNESS,
-    _washer.STOCK_THICKNESS_RANGE[1] - _washer.THICKNESS,
+    _washer.THICKNESS_MIN - _washer.THICKNESS,
+    _washer.THICKNESS_MAX - _washer.THICKNESS,
 )
 SOUTH_EAR_SET_RANGE = (
     -(STACK_L20_ACCEPT_BAND[0] + ROCKER_SPRING_SET_BAND + 2.0 * _WASHER_DEV[1]),
@@ -222,9 +224,9 @@ SOUTH_APEX_REACH_MAX = (
 # the hub runs on closes by the whole ear-thickness band, not half of it.
 FLAT_RUN_MAX = (
     (_bracket.EAR_T - _bracket.EAR_T_BAND) / 2.0
-    + _washer.STOCK_THICKNESS_RANGE[0]
+    + _washer.THICKNESS_MIN
     + ROCKER_SPRING_HEIGHT[0],
-    _bracket.EAR_T / 2.0 - _bracket.EAR_T_BAND + _washer.STOCK_THICKNESS_RANGE[0],
+    _bracket.EAR_T / 2.0 - _bracket.EAR_T_BAND + _washer.THICKNESS_MIN,
 )  # (south, north)
 # The tap is held from the ear's inboard face. At the south ear that face is
 # the flat's reference too; at the north ear the flat is set from the

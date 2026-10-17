@@ -702,15 +702,14 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     assert base.DECK_HALF_Z - RIG.BACK_BLOCK_OUTER_Z >= 25.0
 
 
-def test_crank_seat_stack_keeps_its_air_and_fits_the_washer(monkeypatch) -> None:
+def test_crank_collar_bears_on_the_boss_and_the_end_stands_proud(monkeypatch) -> None:
     """Worst case over the collar's functional bands: the T12 plate, seated on
-    the collar, keeps air to the hub rear face.  Behind it, MHA-DT-036 is faced at
-    assembly to fill the collar-to-boss gap (user ruling 2026-09-30, floor 0.5):
-    the layout seats it on both faces at the spec's nominal fit, every accepted
-    part set is faced from the blank above the floor, and the shaft's only end
-    play is the 16T's feeler gap."""
+    the collar, keeps air to the hub rear face.  Behind it (owner ruling D1,
+    2026-10-15: no washer) the collar's rear face bears on the post boss's
+    south face, within its two-place print; the shaft's end play is the 16T's
+    feeler gap to the boss's north face, and the shaft end stands proud of the
+    16T by the spec's stack, clear of the inclined cone stack."""
     import dt_crank_pinion_spec as pinion
-    import dt_crank_seat_washer_spec as washer
     import dt_crankshaft_spec as cs
     import pd_transgear_removable_spec as removable
 
@@ -719,23 +718,50 @@ def test_crank_seat_stack_keeps_its_air_and_fits_the_washer(monkeypatch) -> None
         pytest.approx(0.7)
     )
     assert seat_face_fwd - removable.PLATE - drive.CRANK_HUB_REAR_Z > 0.0
-    # (1) Seated on both faces at the nominal fit.
-    assert drive._POST_BOSS_SOUTH - drive.CRANK_SEAT_WASHER_Z0 == pytest.approx(
-        washer.GAP_NOMINAL
+    # (1) The collar's rear face sits on the boss's south face.
+    assert drive.CRANK_COLLAR_REAR_Z == drive.CRANK_COLLAR_Z1
+    assert drive.CRANK_COLLAR_REAR_Z == pytest.approx(drive.CRANKSHAFT_Z0 + cs.COLLAR_REAR)
+    assert 0.0 <= drive._POST_BOSS_SOUTH - drive.CRANK_COLLAR_REAR_Z < 0.01
+    assert drive.CRANK_COLLAR_BOSS_AIR == pytest.approx(cs.COLLAR_BOSS_AIR)
+    # (2) The end play is the 16T's feeler gap to the boss's north face.
+    assert (
+        pinion.SEAT_FEELER_MM - 1e-6
+        <= drive.CRANK_SHAFT_END_PLAY
+        < pinion.SEAT_GAP_MAX_MM
     )
-    assert drive.CRANK_SEAT_WASHER_REAR_Z == pytest.approx(drive._POST_BOSS_SOUTH)
-    # (2) Faced from the blank, never under the floor.
-    assert washer.THICKNESS_FLOOR - 1e-9 <= washer.GAP_MIN
-    assert washer.GAP_MAX <= washer.BLANK_THICKNESS_MIN - washer.FACING_ALLOWANCE + 1e-9
-    # (3) The end play is the feeler.
-    assert drive.CRANK_SHAFT_END_PLAY == pytest.approx(pinion.SEAT_FEELER_MM)
-    # Negative control: a layout off the washer's nominal fit is refused.
-    with pytest.raises(AssertionError, match="nominal fit"):
-        _drive_with(monkeypatch, washer, "GAP_NOMINAL", washer.GAP_NOMINAL + 0.5)
+    # (3) The modelled end stands proud of the 16T inside the spec's range,
+    # the stack's nominal less the collar's model air.
+    least, most = cs.SHAFT_END_PROUD_RANGE
+    assert 0.0 <= least <= drive.CRANK_SHAFT_END_PROUD_NOMINAL_MODEL <= most
+    assert drive.CRANK_SHAFT_END_PROUD_NOMINAL_MODEL == pytest.approx(
+        cs.SHAFT_END_PROUD_NOMINAL
+        - drive.CRANK_COLLAR_BOSS_AIR
+        - (drive.CRANK_SHAFT_END_PLAY - pinion.SEAT_FEELER_MM),
+        abs=1e-6,
+    )
+    assert drive._PINION_NORTH == pytest.approx(
+        drive.PINION_Z0 + drive.PINION_OVERALL_LENGTH
+    )
+    # (4) The proud end's print-worst top keeps the radial floor to every
+    # stacked cone gear; T120 and T114 pass nearest.
+    assert drive.CRANK_SHAFT_END_Z_MAX >= drive.CRANKSHAFT_Z0 + cs.SHAFT_LENGTH - 1e-9
+    assert {"T120", "T114"} <= set(drive.CRANK_SHAFT_END_CONE_NEAREST)
+    nearest = min(drive.CRANK_SHAFT_END_CONE_NEAREST.values())
+    assert drive.CRANK_SHAFT_END_NORTH_NEIGHBOUR.startswith("inclined cone gear T")
+    air = drive.CRANK_SHAFT_END_NORTH_AIR_WORST
+    assert air == pytest.approx(
+        nearest - drive.T120_POSE_RADIAL - drive.CRANK_SHAFT_END_RADIUS_MAX
+    )
+    assert air >= drive.T120_TURNED_BAND_RADIAL_FLOOR
+    # Negative control: a collar standing off the boss is refused.
+    with pytest.raises(AssertionError, match="off the post boss in the layout"):
+        _drive_with(monkeypatch, cs, "COLLAR_BOSS_AIR", cs.COLLAR_BOSS_AIR + 0.5)
     monkeypatch.undo()
-    # Negative control: a blank too thin to face to the widest gap is refused.
-    with pytest.raises(AssertionError, match="fit range"):
-        _drive_with(monkeypatch, washer, "BLANK_THICKNESS_MIN", washer.GAP_MAX)
+    # Negative control: a model off the spec's proud stack is refused.
+    with pytest.raises(AssertionError, match="off the spec's proud stack"):
+        _drive_with(
+            monkeypatch, cs, "SHAFT_END_PROUD_NOMINAL", cs.SHAFT_END_PROUD_NOMINAL + 0.5
+        )
 
 
 def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
@@ -757,10 +783,13 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
     assert knob_seat == pytest.approx(crank_seat)
     assert paper.KNOB_SHAFT_Z0 - collar.SET_NOMINAL == pytest.approx(knob_seat)
     assert paper.CHAIN_MID_Z == pytest.approx(crank_seat - removable.PLATE / 2.0)
-    # The spigot stays put (-154.3..-148.5); the body ends at -144.5 (MHA-DT-036
-    # floor 0.5 took 0.5 off its rear).
+    # The spigot stays put (-154.3..-148.5); the body runs on to the boss's
+    # south face (owner ruling D1: no washer).
     assert drive.CRANK_SPIGOT_FRONT_Z == pytest.approx(-148.5)
-    assert drive.CRANK_SEAT_WASHER_Z0 == pytest.approx(-144.5)
+    assert drive.CRANK_COLLAR_Z1 == pytest.approx(drive._POST_BOSS_SOUTH, abs=0.01)
+    assert drive.CRANK_COLLAR_Z1 == pytest.approx(-141.67)
+    body = next(band for band in drive.CRANK_COLUMN_BANDS if band[3] == "crank collar body")
+    assert body[:3] == (drive.CRANK_SPIGOT_FRONT_Z, drive.CRANK_COLLAR_Z1, cs.COLLAR_DIA)
     assert drive.CRANK_HUB_REAR_Z == pytest.approx(-157.8)
     # Stack C grew by the 1.8: 5.8 - 0.05 - 3.5865.
     assert drive.CHAIN_SPIGOT_AXIAL_AIR_WORST == pytest.approx(2.1635)

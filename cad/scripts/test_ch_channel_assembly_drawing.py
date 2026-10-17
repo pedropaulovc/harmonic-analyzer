@@ -129,9 +129,9 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     # and the channel sheet threads the shaft and the miced washer from the
     # north.
     assert "LIFT IT OFF" not in north
-    assert "MIC ONE MHA-CH-009, W" in north
+    assert "MIC ONE MHA-VN-070, W" in north
     north_ear = _step_body("north-ear-datum")
-    washer = _config.parts("ch-rocker-thrust-washer")["number"]
+    washer = _config.parts("vn-rocker-thrust-washer")["number"]
     assert "FLATS UP" in north_ear and "SOUTH THROUGH THE EAR" in north_ear
     assert f"ITS MICED {washer}" in north_ear
     # Positive control: the step before it is the bank's end play, not the ear.
@@ -166,7 +166,7 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
 
 
 def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> None:
-    """#948 ruling R (PR #1292): the south bracket is set off the MHA-CH-009
+    """#948 ruling R (PR #1292): the south bracket is set off the MHA-VN-070
     washer by the spring's set blade, beside the MHA-VN-053 spring, which is
     first run along the shaft (its catalogue ID can bind). drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the blade
     comes from rocker_bank_layout, never typed; the acceptance is the preload."""

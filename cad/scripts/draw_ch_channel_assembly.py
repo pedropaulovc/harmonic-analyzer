@@ -121,7 +121,7 @@ def _fitup_notes() -> tuple[str, str]:
     pin = _config.parts("ch-rod-pivot-pin")["number"]
     shaft = _config.parts("ch-pivot-shaft")["number"]
     bracket = _config.parts("ch-pivot-bracket")["number"]
-    washer = _config.parts("ch-rocker-thrust-washer")["number"]
+    washer = _config.parts("vn-rocker-thrust-washer")["number"]
     spring = _config.parts("vn-rocker-bank-spring")["number"]
     pivot_set_screw = _config.parts("vn-arbor-set-screw")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]

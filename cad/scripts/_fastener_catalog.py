@@ -344,6 +344,11 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Wave Disc Spring",
         "9714K24",
     ),
+    "vn-rocker-thrust-washer": _stock(
+        "vn-rocker-thrust-washer",
+        "Carbon Steel Ring Shim, 1/4 ID x 3/8 OD x 0.031",
+        "3088A429",
+    ),
     # MHA-VN-025 / -054 / -055 (mg wheel rev 10): the magnifying wheel's
     # brass #4-40 nut and locknut and the two brass washers either side of
     # its hub.

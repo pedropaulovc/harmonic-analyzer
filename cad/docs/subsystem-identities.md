@@ -13,15 +13,15 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | Prefix | Category | Parts |
 |---|---|---:|
 | `ha` / `HA` | Harmonic analyzer | 0 |
-| `ch` / `CH` | Channel | 11 |
-| `dt` / `DT` | Drive train | 36 |
+| `ch` / `CH` | Channel | 10 |
+| `dt` / `DT` | Drive train | 35 |
 | `fr` / `FR` | Frame | 5 |
 | `mg` / `MG` | Magnifier | 10 |
 | `pd` / `PD` | Paper drive | 23 |
 | `pn` / `PN` | Pen | 5 |
 | `ms` / `MS` | Measuring stick | 3 |
 | `sm` / `SM` | Summing | 4 |
-| `vn` / `VN` | Vendor parts | 66 |
+| `vn` / `VN` | Vendor parts | 67 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
 Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. Wheel axle nut is VN by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
@@ -78,10 +78,10 @@ the callout within its existing field when wrapping alone is insufficient.
 The package recipes own sheet counts and locations:
 
 - [`draw_dt_drive_train_assembly.py`](../scripts/draw_dt_drive_train_assembly.py)
-  retains sheets 1–10 and appends sheet 11 for assembly continuations and the
-  MHA-DT-036 washer fit. Its local BOM uses a 48 mm Number column and a 118 mm
-  description column in two 190 mm pieces. The reference isometric and scale
-  metadata occupy separate fields below the first piece.
+  retains sheets 1–10 and appends sheet 11 for assembly continuations. Its
+  local BOM uses a 48 mm Number column and a 118 mm description column in two
+  190 mm pieces. The reference isometric and scale metadata occupy separate
+  fields below the first piece.
 - [`draw_pd_paper_drive_assembly.py`](../scripts/draw_pd_paper_drive_assembly.py)
   retains sheets 1–5 and appends sheet 6 for the complete BOM. Its 48 mm Number
   column and 118 mm description column form two 190 mm pieces, split using
@@ -118,7 +118,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `rocker-arm` | `ch-rocker-arm` | MHA-071 | MHA-CH-006 |
 | part | `fulcrum-keeper` | `ch-fulcrum-keeper` | MHA-120 | MHA-CH-007 |
 | part | `pivot-bracket` | `ch-pivot-bracket` | MHA-123 | MHA-CH-008 |
-| part | `rocker-thrust-washer` | `ch-rocker-thrust-washer` | MHA-148 | MHA-CH-009 |
+| retired part | `rocker-thrust-washer` | `ch-rocker-thrust-washer` | MHA-148 | MHA-CH-009 (retired; never reissued) |
 | part | — | `ch-rod-pivot-pin` | — | MHA-CH-010 |
 | part | — | `ch-bar-pivot-pin` | — | MHA-CH-011 |
 | part | `alignment-pinion` | `dt-alignment-pinion` | MHA-002 | MHA-DT-001 |
@@ -157,7 +157,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `pinion-arbor-collar` | `dt-pinion-arbor-collar` | MHA-144 | MHA-DT-033 |
 | part | `crank-handle-ferrule` | `dt-crank-handle-ferrule` | MHA-152 | MHA-DT-034 |
 | part | `crank-handle-butt-cup` | `dt-crank-handle-butt-cup` | MHA-153 | MHA-DT-035 |
-| part | `crank-seat-washer` | `dt-crank-seat-washer` | MHA-172 | MHA-DT-036 |
+| retired part | `crank-seat-washer` | `dt-crank-seat-washer` | MHA-172 | MHA-DT-036 (retired; never reissued) |
 | part | `harmonic-base` | `fr-harmonic-base` | MHA-035 | MHA-FR-001 |
 | part | `top-frame` | `fr-top-frame` | MHA-077 | MHA-FR-002 |
 | part | `tube-frame` | `fr-tube-frame` | MHA-083 | MHA-FR-003 |
@@ -276,6 +276,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | `vn-lever-wire` | — | MHA-VN-066 |
 | part | — | `vn-pen-wire` | — | MHA-VN-067 |
 | part | — | `vn-transgear-pivot-shim` | — | MHA-VN-069 |
+| part | — | `vn-rocker-thrust-washer` | — | MHA-VN-070 |
 | part | — | `vn-bracket-hold-down-screw` | — | MHA-VN-071 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
@@ -331,4 +332,7 @@ next free Number in its category and has no old stem or old Number.
 | added | `vn-pen-wire` | MHA-VN-067 | ASTM A228 music wire, 0.031 in, cut from the same McMaster-Carr 9666K56 coil; runs from the MHA-MG-005 wheel rim groove to the MHA-PN-007 adjuster stud's eye |
 | added | `vn-chain-connecting-link` | MHA-VN-068 | McMaster 6261K108 clip-retained connecting link that joins the cut 6261K171 chain's two inner-link ends; MHA-VN-003 keeps only the cut chain's 33 outer links |
 | added | `vn-transgear-pivot-shim` | MHA-VN-069 | DIN 988 spring-steel shim 98055A098 (5 x 10 x 0.5) on the MHA-VN-041 shoulder under its head, on the MHA-VN-049 spring; restores the spring room the 9.5 MHA-PD-007 bar took when it grew rearward |
+| retired | `ch-rocker-thrust-washer` | MHA-CH-009 | replaced by the purchased MHA-VN-070 rocker thrust washer (owner, 2026-10-15: every washer is a purchased part) |
+| added | `vn-rocker-thrust-washer` | MHA-VN-070 | carbon-steel ring shim, 1/4 ID x 3/8 OD x 0.031 in, McMaster-Carr 3088A429; one each end of the rocker bank on the MHA-CH-005 pivot shaft, the north one against the datum MHA-CH-008 ear |
+| retired | `dt-crank-seat-washer` | MHA-DT-036 | deleted, owner ruling D1 2026-10-15: collar bears on the post boss |
 | added | `vn-bracket-hold-down-screw` | MHA-VN-071 | McMaster 90280A196 #8-32 x 5/8 slotted narrow fillister, zinc-plated steel; one per MHA-CH-008 foot into MHA-FR-005's top-face seat (owner Q13c), so the transferred seat stays 11.5 thread / 14.7 drill; MHA-VN-032 keeps the arbor pedestals |

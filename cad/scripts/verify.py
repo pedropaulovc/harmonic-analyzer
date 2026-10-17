@@ -173,7 +173,7 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # The channel + drive-train bands scale with the built channel count N (the
 # active_count build-speed knob): channel = 8N + 17 (N×{rocker,rod,rod-pivot-pin,
 # bar,bar-pivot-pin,lever,spring,spring-hook} + pivot shaft + 2 thrust washers
-# (MHA-CH-009, south and north) + fulcrum shaft + 2 pivot brackets
+# (MHA-VN-070, south and north) + fulcrum shaft + 2 pivot brackets
 # + 2 bracket hold-down screws (MHA-VN-032) + 2 pivot-arbor apex set screws
 # (MHA-VN-034) + 2 fulcrum keepers + 2 keeper foot screws (MHA-VN-022)
 # + 2 keeper crown set screws (MHA-VN-055) + the MHA-VN-053 rocker-bank

@@ -2103,47 +2103,6 @@
       ]
     },
     {
-      "id": 28,
-      "name": "dt-crank-seat-washer-rules",
-      "package": "dt_crank_seat_washer",
-      "kind": "part",
-      "release": "v40",
-      "prompt": "Blind machinist review of the dt-crank-seat-washer part package.",
-      "expected_output": "Rule-coverage case (rules 1, 2, 19): reports each negative finding in the stated category and raises no positive-case item.",
-      "expectations": [
-        {
-          "text": "No blocker says the washer thickness is missing or untoleranced: '(2.3) SET AT ASSEMBLY 0.50-4.00 FACED TO FIT, PER MHA-DT-000 STEP 4' plus 'SUPPLY 4.30 MIN THICK' defines it",
-          "check": {
-            "absent_from": "blockers"
-          },
-          "rule": 1,
-          "polarity": "positive",
-          "confidence": "high",
-          "evidence": "Sheet 1 side view: reference '(2.3)' with 'SET AT ASSEMBLY 0.50-4.00 FACED TO FIT, PER MHA-DT-000 STEP 4'; notes 'SUPPLY 4.30 MIN THICK. ONE FACE IS FACED TO FIT AT ASSEMBLY.' Reviewer prompt: a blank to be finished at assembly is a valid print when the print says so."
-        },
-        {
-          "text": "An over_specification finding flags 'Ø11.60 +0.1/0.0 DRILL THRU' for restating the title-block DRILLED HOLES +0.10/0 band",
-          "check": {
-            "category": "over_specification"
-          },
-          "rule": 2,
-          "polarity": "negative",
-          "confidence": "medium",
-          "evidence": "Sheet 1 callout 'Ø11.60 +0.1 0.0 DRILL THRU' duplicates the 'DRILLED HOLES +0.10 / 0' title-block row (rule 2)."
-        },
-        {
-          "text": "No blocker objects to the washer thickness being given as 'SET AT ASSEMBLY 0.50-4.00 FACED TO FIT, PER MHA-DT-000 STEP 4 / SUPPLY 4.30 MIN THICK' instead of a toleranced thickness.",
-          "check": {
-            "absent_from": "blockers"
-          },
-          "rule": 19,
-          "polarity": "positive",
-          "confidence": "high",
-          "evidence": "Sheet 1 thickness callout: 'SET AT ASSEMBLY 0.50-4.00 FACED TO FIT, PER MHA-DT-000 STEP 4 / SUPPLY 4.30 MIN THICK'. This is the rule 19 fit-up form: the stack is absorbed by facing the washer at assembly; the named step exists on dt-drive-train-assembly sheet 6 (step 4, 'FIT MHA-DT-036 PER SHEET 11')."
-        }
-      ]
-    },
-    {
       "id": 29,
       "name": "dt-crankshaft-rules",
       "package": "dt_crankshaft",

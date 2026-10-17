@@ -57,6 +57,7 @@ _EXPECTED = {
     "vn-transgear-pivot-shim": (("98055A098",), "MHA-VN-069", 1),
     "vn-cylinder-bank-spring": (("9714K392",), "MHA-VN-052", 1),
     "vn-rocker-bank-spring": (("9714K24",), "MHA-VN-053", 1),
+    "vn-rocker-thrust-washer": (("3088A429",), "MHA-VN-070", 2),
     "vn-wheel-axle-nut": (("92671A005",), "MHA-VN-025", 2),
     "vn-wheel-axle-back-washer": (("92916A480",), "MHA-VN-057", 1),
     "vn-wheel-axle-front-washer": (("92916A250",), "MHA-VN-058", 1),

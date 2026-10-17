@@ -76,7 +76,7 @@ from ch_channel_assembly_steps import (
     RODS_PINNED_REF,
     step_ref as channel_step_ref,
 )
-import ch_rocker_thrust_washer_spec as rocker_washer
+import vn_rocker_thrust_washer_spec as rocker_washer
 import cone_line
 import cone_set_stack as set_stack
 from cone_stack_end_play import COLLAR_FEELER, SHAFT_END_PLAY
@@ -89,14 +89,9 @@ from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
 import dt_crank_pinion_spec as pinion
 from dt_crank_pinion_spec import (
     SEAT_FEELER_MM as PINION_SEAT_FEELER,
-    SHAFT_END_RECESS_MAX as PINION_RECESS_MAX,
-    SHAFT_END_RECESS_MIN as PINION_RECESS_MIN,
     T120_FITUP_ASSEMBLY_CHECK,
 )
-from dt_crank_seat_washer_spec import (
-    GAP_MAX as WASHER_GAP_MAX,
-    GAP_MIN as WASHER_GAP_MIN,
-)
+from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
 from dt_drive_train_assembly_spec import (
@@ -435,7 +430,6 @@ BOM_PART_NUMBERS = {
     "dt-crank-handle-pivot-screw": "MHA-DT-032",
     "dt-crank-hub": "MHA-DT-031",
     "vn-crank-hub-pin": "MHA-VN-029",
-    "dt-crank-seat-washer": "MHA-DT-036",
     "vn-crank-seat-drive-pin": "MHA-VN-044",
     "dt-alignment-pinion": "MHA-DT-001",
     "dt-pinion-bracket": "MHA-DT-014",
@@ -492,7 +486,6 @@ BOM_DESCRIPTIONS = {
     "dt-crank-handle-pivot-screw": "CRANK HANDLE PIVOT SCREW",
     "dt-crank-hub": "CRANK HUB",
     "vn-crank-hub-pin": "CRANK HUB AXIAL PIN",
-    "dt-crank-seat-washer": "CRANK SEAT THRUST WASHER",
     "vn-crank-seat-drive-pin": "3/32 X 1/4 DOWEL PIN, MCMASTER 98381A434",
     "dt-alignment-pinion": "ALIGNMENT PINION",
     "dt-pinion-bracket": "PINION BRACKET STRAP",
@@ -679,11 +672,11 @@ CONE_CRANK_STEPS = _note_text(
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # CONTRACT-crank: MHA-VN-044 press to the blind-hole floor (their proud
-        # length is the result).  User ruling 2026-09-30 (MHA-DT-036 floor 0.5):
-        # MHA-DT-036 is faced to fit at assembly; it goes on from the rear end
-        # before the journal enters the bore, and MHA-DT-010's pin is
-        # match-drilled, so the gap is taken in a trial fit before either
-        # (CRANK_WASHER_FIT_NOTES, on the continuation sheet).
+        # length is the result).  Owner ruling D1 (2026-10-15): no crank-seat
+        # washer -- the collar is held hard on the boss's south face, the 16T
+        # set on its feeler off the north face, and only then is its pin
+        # match-drilled, so the end play is the feeler and the shaft end is
+        # left proud (CRANK_END_FIT_NOTES, on the continuation sheet).
         # User ruling 2026-09-30 (#1154): the 16T's shoulder and turned band
         # are feeler-checked against T120 before the pin is drilled.  The
         # pair may rub on T120 until that check closes, so the seat and the
@@ -692,7 +685,7 @@ CONE_CRANK_STEPS = _note_text(
         # short; the step carries on after it.
         "4. PRESS 2X MHA-VN-044 TO THE MHA-DT-011 COLLAR HOLE FLOORS. FIT MHA-DT-011 IN",
         "   THE MHA-DT-005 CRANK BORE; SLIDE MHA-DT-010 ON UNPINNED, TOOTH IN GAP",
-        f"   WITH MHA-DT-007. FIT MHA-DT-036 PER SHEET {CONTINUATION_SHEET}. WITH MHA-DT-036 SEATED,",
+        "   WITH MHA-DT-007. HOLD THE MHA-DT-011 COLLAR HARD ON THE BOSS SOUTH FACE;",
         f"   SET MHA-DT-010 {PINION_SEAT_FEELER:.2f} OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER.",
         T120_FITUP_ASSEMBLY_CHECK + " THEN",
         "   TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
@@ -815,21 +808,21 @@ BANK_STEPS = _note_text(
         # is the rocker bank's axial datum (rocker_bank_layout), set here on
         # the 9A DRO zero so the cams and the rocker stations share one datum.
         # Y is the hole-table rear-face distance of the ear inner face,
-        # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z = 72.749, held to the
-        # NORTH_EAR_LOCATE_BAND edge-find. Hub 19 bears on the north MHA-CH-009
+        # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z, held to the
+        # NORTH_EAR_LOCATE_BAND edge-find. Hub 19 bears on the north MHA-VN-070
         # washer against that face (user, 2026-10-10), so the target moves
-        # north (LESS Y) by the miced washer's excess, W - 0.790, and hub 19
+        # north (LESS Y) by the miced washer's excess, W - 0.787, and hub 19
         # stays at nominal. The plain shaft threads through the set ear, so
         # the bracket stays screwed down. Channel assembly MHA-CH-000 cites
         # this step by key (channel_steps.NORTH_BRACKET_SET_REF).
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-005 SCREWED DOWN ON THE BASE"
         " (FRAME ASSEMBLY MHA-FR-000 STEP 8),",
         "   DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-CH-008 ON THE MHA-FR-005",
-        "   RAIL, FOOT TO THE BACK. MIC ONE MHA-CH-009, W. SET THE EAR",
+        "   RAIL, FOOT TO THE BACK. MIC ONE MHA-VN-070, W. SET THE EAR",
         f"   INNER FACE TO Y {NORTH_EAR_Y_LIMITS} LESS "
         f"(W - {rocker_washer.THICKNESS:.3f});",
         "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FOOT PER THE MHA-FR-005 SEAT",
-        "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y. KEEP THAT MHA-CH-009",
+        "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y. KEEP THAT MHA-VN-070",
         f"   FOR THE NORTH END OF {channel_step_ref('north-ear-datum')}.",
         # NBSP keeps the continuation pointer on one printed line.
         f"   PINION\u00a0RIG:\u00a0CONT.\u00a0ON\u00a0SHEET {FIT_SHEET}.",
@@ -1042,27 +1035,21 @@ FIT_PLACEHOLDER = _note_text(
     heading=False,
 )
 
-# User ruling 2026-09-30 (MHA-DT-036 floor 0.5): MHA-DT-036 goes on from the rear
-# before MHA-DT-011 enters the bore and MHA-DT-010's pin is match-drilled, so the
-# gap is measured in a trial fit without either, at the pinion's feeler and
-# the shaft end's mid-window recess; the washer is faced to it and slid on,
-# and the parts refitted.  Seated, the washer leaves the feeler as the end
-# play, and the recess lands in the window the 16T boss was sized for.
-_RECESS_MID = (PINION_RECESS_MIN + PINION_RECESS_MAX) / 2.0
-CRANK_WASHER_FIT_NOTES = _note_text(
+# Owner ruling D1 (2026-10-15): the collar bears on the boss with no washer,
+# the 16T's feeler is the end play, and the shaft end stands proud of the
+# 16T by dt_crankshaft_spec.SHAFT_END_PROUD_RANGE at every accepted part set;
+# it is left as it comes, not faced.
+CRANK_END_FIT_NOTES = _note_text(
     (
-        f"MHA-DT-036 THRUST WASHER FIT (STEP {steps.step_number('crank-mesh-checked')})",
-        "A. TRIAL FIT WITHOUT MHA-DT-036, MHA-DT-010 UNPINNED ON THE "
-        f"{PINION_SEAT_FEELER:.2f} FEELER,",
-        f"   MHA-DT-011 END {_RECESS_MID:.2f} BELOW MHA-DT-010 NORTH FACE: MEASURE MHA-DT-011 "
-        "COLLAR",
-        "   REAR FACE TO MHA-DT-005 BOSS SOUTH FACE "
-        f"({WASHER_GAP_MIN:.2f}-{WASHER_GAP_MAX:.2f}).",
-        "B. WITHDRAW BOTH. FACE MHA-DT-036 TO THAT GAP; SLIDE IT ONTO MHA-DT-011",
-        "   FROM THE REAR, FLAT ON THE COLLAR. REFIT MHA-DT-011 AND MHA-DT-010.",
-        "C. MHA-DT-036 SEATED ON THE BOSS AND MHA-DT-010 ON THE FEELER: MHA-DT-011 END",
-        f"   {PINION_RECESS_MIN:.2f}-{PINION_RECESS_MAX:.2f} BELOW MHA-DT-010 NORTH FACE, "
-        f"END PLAY {PINION_SEAT_FEELER:.2f}.",
+        f"MHA-DT-011 CRANK END FIT (STEP {steps.step_number('crank-mesh-checked')})",
+        "A. MHA-DT-011 COLLAR REAR FACE HARD ON THE MHA-DT-005 BOSS SOUTH FACE;",
+        "   NO WASHER.",
+        f"B. MHA-DT-010 ON THE {PINION_SEAT_FEELER:.2f} FEELER OFF THE BOSS NORTH FACE, "
+        "THEN",
+        "   MATCH-DRILL/REAM MHA-DT-029 AT BOSS MID-LENGTH. END PLAY = THE FEELER.",
+        f"C. MHA-DT-011 END STANDS {max(CRANK_END_PROUD_RANGE[0], 0.0):.2f}-"
+        f"{CRANK_END_PROUD_RANGE[1]:.2f} PROUD OF MHA-DT-010 NORTH FACE;",
+        "   LEAVE IT PROUD, DO NOT FACE.",
     )
 )
 
@@ -1528,7 +1515,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             (
                 ("cone station table", station_table_text(facts.cone_rows())),
                 ("fit placeholder", FIT_PLACEHOLDER),
-                ("crank fit pointer", f"MHA-DT-036 THRUST WASHER FIT: SHEET {CONTINUATION_SHEET}."),
+                ("crank fit pointer", f"MHA-DT-011 CRANK END FIT: SHEET {CONTINUATION_SHEET}."),
             ),
         ),
         NoteField(
@@ -1566,7 +1553,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             CONTINUATION_SHEET,
             f"sheet {CONTINUATION_SHEET} right note field",
             ISO_RIGHT_FIELD,
-            (("crank washer fit", CRANK_WASHER_FIT_NOTES),),
+            (("crank end fit", CRANK_END_FIT_NOTES),),
         ),
     )
 

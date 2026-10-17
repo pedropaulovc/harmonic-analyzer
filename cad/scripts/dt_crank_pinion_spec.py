@@ -3,9 +3,10 @@ r"""Pure-data dimensional contract shared by the crank pinion and its drawing.
 The 16T straight-spur pinion on the crankshaft that meshes the 64T crank-drive
 gear (4:1 crank-to-cone reduction), with the plain hub boss on its outboard
 face that the ch. 12 p. 19 photos show (page002_img02 / img06): a cylinder at
-the tooth root, a little over half a face long, edge rounded, the crankshaft
-end recessed inside it, and the small head of a radial retention pin on its
-side. The pin is what keeps the "removable" pinion on the shaft.
+the tooth root, a little over half a face long, edge rounded, and the small
+head of a radial retention pin on its side (the photo's crankshaft end sits
+inside the boss; owner ruling D1 leaves it proud of the north face). The pin
+is what keeps the "removable" pinion on the shaft.
 
 Recreated under ``cad/docs/drawing-guidelines.md``. The sizes a
 machinist turns, bores and drills -- outside diameter, face width, bore, boss
@@ -236,9 +237,10 @@ SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
 # length, retaining the photo's root-matched tool runout without replacing the
 # translated stock floor by a concentric circle. Actual mating-tip air is a
 # crossed-mesh requirement, not a standard ideal-N clearance assertion.
-# It runs to the overall length, covering the crankshaft's outboard overhang past the
-# north face and leaves its end recessed inside the boss as photographed; its
-# length is derived below (W15). The boss is
+# It runs to the overall length past the toothed length; the crankshaft fills
+# it and stands proud of its north face (owner ruling D1, 2026-10-15:
+# dt_crankshaft_spec.SHAFT_END_PROUD_RANGE); its length is derived below
+# (W15). The boss is
 # extruded from the SAME faced end as the teeth, so the print carries one
 # overall length from that end (drawing-guidelines.md rule 11 (turned parts read like the lathe): lengths from one faced end, the overall
 # length real and conspicuous), and the toothed length is FaceWidth.
@@ -313,24 +315,22 @@ PIN_HOLE_SPEC = HoleSpec("drilled_fractional", "1/8")
 PIN_DIA = FRACTIONAL_DRILL_MM["1/8"]  # 3.175
 PIN_LENGTH = BOSS_DIA  # flush both sides
 
-# --- W15: shortest boss that still protects the match-drilled shaft end ----
+# --- W15: shortest boss that still protects the match-drilled pin ----------
 #
-# The ch12 photograph suggests a compact hub, but its length is controlled
-# by the pin's print-worst 2.0-mm ligament to the recessed crankshaft end,
-# not by a nominal 4.5-mm wall. The Ø3.175 pin stays at the actual boss
+# Owner ruling D1 (2026-10-15): the crankshaft's collar is pulled onto the
+# MHA-DT-005 boss's south face, this pinion is set on its feeler off the north
+# face and only then is the pin match-drilled, and the shaft is long enough
+# that its end stands proud of this boss's north face at every accepted part
+# set (dt_crankshaft_spec.SHAFT_END_PROUD_RANGE).  The shaft therefore fills
+# the boss, and its wall past the pin is never shorter than the boss's own:
+# the binding ligament is the pin's to the boss's north face, held at
+# PIN_EDGE_MIN_WORST at print-worst.  The Ø3.175 pin stays at the actual boss
 # mid-length, with the existing layout allowance.
 PIN_EDGE_MIN_WORST = 2.0
 PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
-# The shaft end stays recessed inside the boss in the worst case too.  The
-# overall length prints at OVERALL_LENGTH_PLACES, so an accepted pinion is as
-# short as the printed row allows (.X +/-0.8).  Nothing else can shallow the
-# recess: the pinion seats at the boss-north gap FLOOR
-# (build_dt_drive_train_assembly), so the seat can only move it north, and the
-# shaft length is +0/-0.40, so the shaft can only get shorter.  Both lengths
-# are sized to print EXACTLY at their places, so no rounding of a printed
-# nominal can eat the margin (Codex P2 on #892): dt_crankshaft_spec floors the
-# shaft length to SHAFT_LENGTH_PLACES, which leaves the nominal recess between
-# its minimum and one printed unit more, and the boss is sized for the most.
+# The overall length prints at OVERALL_LENGTH_PLACES (.X +/-0.8), and the
+# pin is laid out at the actual boss's middle, so a short boss splits its
+# shortfall between the two ligaments.
 OVERALL_LENGTH_PLACES = 1
 SHAFT_LENGTH_PLACES = 1  # dt_crankshaft_spec prints its Depth here
 FACE_WIDTH_PLACES = 1
@@ -338,39 +338,37 @@ SHOULDER_LENGTH_PLACES = FACE_WIDTH_PLACES  # stated like FaceWidth
 TURNED_DIA_PLACES = 2  # stated like the OutsideDia it cuts into
 OVERALL_LENGTH_GRADE_MM = printed_band_mm(OVERALL_LENGTH_PLACES)
 # W15 sizes the boss for a face accepted anywhere in the .X row. The printed
-# band sits inside that row, so the boss keeps its length (no geometry change
-# under the ruling) and every W15 stack only gains margin.
+# band sits inside that row, so every W15 stack only gains margin.
 W15_FACE_ALLOWANCE_MM = printed_band_mm(FACE_WIDTH_PLACES)
 _FACE_LOWER, _FACE_UPPER = FACE_WIDTH_LIMITS
 if _FACE_LOWER < -W15_FACE_ALLOWANCE_MM or _FACE_UPPER > W15_FACE_ALLOWANCE_MM:
     raise AssertionError("the 16T face band left the .X row W15 sizes the boss for")
-SHAFT_LENGTH_SHORT_MM = 0.40  # preserved W15 unilateral +0/-0.40 shaft band
-SHAFT_END_RECESS_MIN_WORST = 0.25
-SHAFT_END_RECESS_MIN = SHAFT_END_RECESS_MIN_WORST + OVERALL_LENGTH_GRADE_MM
-SHAFT_END_RECESS_MAX = SHAFT_END_RECESS_MIN + 10.0**-SHAFT_LENGTH_PLACES
 # The pin's drilled-hole grade grows its radius by half the printed oversize.
-# At boss mid-length, each accepted face/overall row can shift the pin north
-# by half its allowance; the seat gap can also open to its stated maximum.
 _PIN_HOLE_RADIUS_GROWTH = float(_config.title_block("drilled_hole")["plus_mm"]) / 2.0
-_PIN_EDGE_CLOSING_TERMS = (
-    SHAFT_LENGTH_SHORT_MM
-    + SEAT_GAP_MAX_MM - SEAT_FEELER_MM
-    + (W15_FACE_ALLOWANCE_MM + OVERALL_LENGTH_GRADE_MM) / 2.0
-    + PIN_STATION_LAYOUT_ALLOWANCE_MM
-    + _PIN_HOLE_RADIUS_GROWTH
-)
-# The exact shaft recess depends on its one-place floor and installed post
-# station; SHAFT_END_RECESS_MAX is the safe ceiling of that range. The shaft
-# spec independently checks the actual floor and proves that the next shorter
-# printable boss fails it. No tolerance or pin size is tightened for the photo.
+
+
+def pin_axial_ligament_worst(boss_length: float) -> float:
+    """Print-worst wall from the pin hole to the boss's north face: the boss
+    short by its face and overall rows, halved at the laid-out middle, less
+    the pin's radius, the drill's oversize and the layout allowance."""
+    return (
+        (boss_length - W15_FACE_ALLOWANCE_MM - OVERALL_LENGTH_GRADE_MM) / 2.0
+        - PIN_DIA / 2.0
+        - _PIN_HOLE_RADIUS_GROWTH
+        - PIN_STATION_LAYOUT_ALLOWANCE_MM
+    )
+
+
 BOSS_LENGTH_PLACES = OVERALL_LENGTH_PLACES
 BOSS_LENGTH = ceil_to_places(
     2.0 * (
         PIN_EDGE_MIN_WORST
-        + SHAFT_END_RECESS_MAX
         + PIN_DIA / 2.0
-        + _PIN_EDGE_CLOSING_TERMS
-    ),
+        + _PIN_HOLE_RADIUS_GROWTH
+        + PIN_STATION_LAYOUT_ALLOWANCE_MM
+    )
+    + W15_FACE_ALLOWANCE_MM
+    + OVERALL_LENGTH_GRADE_MM,
     BOSS_LENGTH_PLACES,
 )
 OVERALL_LENGTH = round(FACE_WIDTH + BOSS_LENGTH, OVERALL_LENGTH_PLACES)
@@ -397,17 +395,14 @@ if not (
 if not PITCH_DIA < TURNED_DIA_FITUP_MIN < TURNED_DIA - TURNED_DIA_TOLERANCE_MM:
     raise AssertionError("the 16T fit-up turn-down must stay over the pitch circle")
 PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0
-PIN_AXIAL_LIGAMENT_FLOOR_MM = 0.5
-PIN_AXIAL_LIGAMENT_WORST = (
-    (BOSS_LENGTH - W15_FACE_ALLOWANCE_MM - OVERALL_LENGTH_GRADE_MM) / 2.0
-    - PIN_DIA / 2.0
-    - _PIN_HOLE_RADIUS_GROWTH
-    - PIN_STATION_LAYOUT_ALLOWANCE_MM
-)
-if PIN_AXIAL_LIGAMENT_WORST < PIN_AXIAL_LIGAMENT_FLOOR_MM:
-    raise AssertionError("match-drilled pin breaks through the boss end at print-worst")
-if SHAFT_END_RECESS_MAX <= SHAFT_END_RECESS_MIN:
-    raise AssertionError("the pinion boss needs a positive printed shaft-recess range")
+PIN_AXIAL_LIGAMENT_WORST = pin_axial_ligament_worst(BOSS_LENGTH)
+if PIN_AXIAL_LIGAMENT_WORST < PIN_EDGE_MIN_WORST - 1e-9:
+    raise AssertionError("match-drilled pin's wall to the boss end falls below its print-worst floor")
+if (
+    pin_axial_ligament_worst(BOSS_LENGTH - 10.0**-BOSS_LENGTH_PLACES)
+    >= PIN_EDGE_MIN_WORST - 1e-9
+):
+    raise AssertionError("a boss one print step shorter still holds W15: not the shortest")
 
 
 def pitch_point_azimuths(
@@ -577,7 +572,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # The boss diameter is routine .XX, not a running surface. The match-drilled
 # pin station is absent: its callout locates it at boss mid-length and the
 # crankshaft/pinion stack sets it. The overall length prints one place like
-# the face, with the W15 boss sized for the recessed shaft-end condition.
+# the face, with the W15 boss sized for the pin's wall to its north face.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "BossProfile": {

@@ -87,7 +87,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 PIVOT_SHAFT_NUMBER = str(_config.parts("ch-pivot-shaft")["number"])
-THRUST_WASHER_NUMBER = str(_config.parts("ch-rocker-thrust-washer")["number"])
+THRUST_WASHER_NUMBER = str(_config.parts("vn-rocker-thrust-washer")["number"])
 
 # 35 mm tall: 2:1 keeps the bore and the tap legible and lets the right view
 # stand at the sheet scale, level with the elevation, clear of the title block
