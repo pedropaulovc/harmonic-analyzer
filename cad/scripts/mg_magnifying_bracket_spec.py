@@ -22,8 +22,9 @@ which names the lever's press zone it matches; the blanked ``ArmSection``
 witness carries the arm's section and the bore axis's one datum chain (the
 mounting face and the arm's end, both from the axis) in the side view.  A
 native plain clearance-hole callout names the summing lever's tapped holes
-the banded hole pattern matches.  ``ArmRootFillet`` breaks all six
-arm-to-flange inside corners, on both flange faces, at a single MAX radius
+the banded hole pattern matches.  ``ArmRootFillet`` breaks every inside
+corner -- the six arm-to-flange corners on both flange faces and the two
+where the arm leaves the collar's OD -- at a single MAX radius
 (drawing-guidelines.md rule 16).
 """
 
@@ -55,15 +56,17 @@ from mg_lever_press_fit_geom import (
     press_fit_budget,
 )
 
-# Arm-to-flange inside corners (drawing-guidelines.md rule 16): the arm passes
-# through the flange, so its west face and both Y faces meet the flange's
-# front (-Z) face and, at the 3.11 stub past the mounting face, the mounting
-# (+Z) face -- six concave edges, all filleted AT the largest radius the
-# print allows, a single MAX limit, so the shop may leave any smaller corner
-# a Ø2 end mill cuts.  One place: rule 3, no extra places on a radius.  The
-# build proves the fillet leaves each face a flat beside the arm on both
-# sides; the offline drawing test proves the mounting face's three stand
-# clear of the summing lever's end.
+# Inside corners (drawing-guidelines.md rule 16): the arm passes through the
+# flange, so its west face and both Y faces meet the flange's front (-Z) face
+# and, at the 3.11 stub past the mounting face, the mounting (+Z) face -- six
+# concave edges -- and its two Y faces leave the collar's Ø12 OD in two more
+# along the bore axis (machinist review r4 blocker).  All eight are filleted
+# AT the largest radius the print allows, a single MAX limit, so the shop may
+# leave any smaller corner a Ø2 end mill cuts.  One place: rule 3, no extra
+# places on a radius.  The build proves the fillet leaves each flange face a
+# flat beside the arm on both sides; the offline drawing test proves the
+# mounting face's three stand clear of the summing lever's end and the
+# collar's two only add material outside the OD, never the bore's wall.
 ARM_ROOT_R_PLACES = 1
 ARM_ROOT_R_MAX = 1.0
 ARM_ROOT_R_BAND = (0.0, -ARM_ROOT_R_MAX)  # (upper, lower)
@@ -94,9 +97,10 @@ RADIUS_TOL_TYPE = 6
 # arm's thickness and its lower face from the flange's hole-datum edge (both
 # controlling: the arm face is the machinist's measurable datum for the
 # holes' row, mreview10 blocker 1), toleranced where the footprint is seen,
-# not edge-on.  The arm-to-flange inside corners' fillet radius (ArmRootFillet)
+# not edge-on.  The inside corners' one fillet radius (ArmRootFillet)
 # imports to the front view, where the corner at the arm's west face prints
-# as an arc; its callout says it covers ALL six. ---
+# as an arc; its callout says it covers ALL the arm's inside corners, at the
+# flange and at the collar. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarBore"},
     "Collar": {"CollarLen"},
