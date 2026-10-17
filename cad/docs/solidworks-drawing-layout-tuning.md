@@ -981,14 +981,14 @@ view's printed dimension ink.
 
 The MG-006 hex fixture's principal `*Top` view looks down the rod bore,
 which runs through the hex corners along local Y, not normal to a flat.
-Its height is AF 9.525, with one projected corner ridge through the bore
+Its height is AF 11.1125, with one projected corner ridge through the bore
 circle. An unturned `*Right` end view instead puts Y up and shows the
-across-corners height 10.9985; that is not a third-angle projection of the
+across-corners height 12.8316; that is not a third-angle projection of the
 principal view. Turn the end view by its measured axis mapping so -Z is up
 in both views, then align their projected origins before importing any
 dimensions. The end-view bore axis now runs through the left/right corners;
 do not change the model to make a mistaken flat-entry reading true.
-The 1.97 MIN bore-to-flat wall is the ligament to the two parallel flats,
+The bore-to-flat wall is the ligament to the two parallel flats,
 not an entry-face wall. Name the through-corners orientation on the sheet,
 and hold on flats and centre-drill the 120-degree ridge before drill/ream.
 The end-view bore axis is a native centreline attached to the named

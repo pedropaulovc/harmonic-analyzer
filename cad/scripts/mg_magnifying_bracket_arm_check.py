@@ -85,10 +85,10 @@ _LEVER_G = (
 )  # 39.7 g
 _CLAMP_G = _HEX_AREA * CLAMP_HEX_AF**2 * CLAMP_HEIGHT * BRASS_G_PER_MM3  # 26.0 g
 _VROD_G = math.pi / 4.0 * VROD_DIA**2 * VROD_LENGTH * BRASS_G_PER_MM3  # 22.1 g
-_FIXTURE_G = _HEX_AREA * FIXTURE_HEX_AF**2 * FIXTURE_LENGTH * BRASS_G_PER_MM3  # 11.8 g
+_FIXTURE_G = _HEX_AREA * FIXTURE_HEX_AF**2 * FIXTURE_LENGTH * BRASS_G_PER_MM3  # 16.4 g
 _THUMB_SCREWS_G = 2.0 * 3.0  # two 91882A221 knurled #4-40, generous
-LEVER_GROUP_G = _LEVER_G + _CLAMP_G + _VROD_G + _FIXTURE_G + _THUMB_SCREWS_G  # 105.6 g
-LEVER_GROUP_N = LEVER_GROUP_G * G  # 1.04 N
+LEVER_GROUP_G = _LEVER_G + _CLAMP_G + _VROD_G + _FIXTURE_G + _THUMB_SCREWS_G  # 110.2 g
+LEVER_GROUP_N = LEVER_GROUP_G * G  # 1.08 N
 # Every gram placed at the farthest station, the lever's free tip (machine x
 # 200, the lever spanning x 35..200 with the collar at x 40): 160 mm.
 LEVER_GROUP_ARM_X = 160.0
@@ -107,7 +107,7 @@ if abs(HOOK[2] - COLLAR[2]) > 1e-9 or abs(WIRE_DIR[2]) > 1e-9:
     raise AssertionError(
         "arm check assumes the A1 plumb plane: hook, wire and collar at one z"
     )
-HOOK_DX = HOOK[0] - COLLAR[0]  # 99.77
+HOOK_DX = HOOK[0] - COLLAR[0]  # 99.98
 HOOK_DY = HOOK[1] - COLLAR[1]  # -60.0
 
 
@@ -157,11 +157,11 @@ def hook_deflection_along_wire(span: float, tension: float, weight: float) -> fl
 
 HOOK_OFFSET_NEW = abs(
     hook_deflection_along_wire(ARM_SPAN, WIRE1_TENSION_MAX_N, LEVER_GROUP_N)
-)  # 0.274 mm
+)  # 0.276 mm
 HOOK_OFFSET_OLD = abs(
     hook_deflection_along_wire(OLD_ARM_SPAN, WIRE1_TENSION_MAX_N, LEVER_GROUP_N)
 )  # 0.123 mm
-PEN_OFFSET_NEW = WIRE_RATIO * HOOK_OFFSET_NEW  # 1.37 mm, static, zeroed at setup
+PEN_OFFSET_NEW = WIRE_RATIO * HOOK_OFFSET_NEW  # 1.38 mm, static, zeroed at setup
 PEN_OFFSET_OLD = WIRE_RATIO * HOOK_OFFSET_OLD  # 0.61 mm
 ARM_COMPLIANCE_MM_PER_N = abs(
     hook_deflection_along_wire(ARM_SPAN, 1.0, 0.0)
