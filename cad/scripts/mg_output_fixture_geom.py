@@ -47,10 +47,11 @@ HEX_CORNER_RADIUS = HEX_AF / math.sqrt(3.0)
 # --- Stations along the hex axis (local x; origin on the rod-bore axis) ----------
 ROD_STATION = 5.0  # free end to the rod-bore axis
 FREE_END_X = -ROD_STATION
-HEX_LENGTH = 11.0  # free end to the shoulder
+HEX_LENGTH = 11.0  # free end to the shoulder (modelled; printed via the spigot)
 SHOULDER_X = FREE_END_X + HEX_LENGTH
-# Long enough that the groove's face-side lip and its root over the tap hold
-# the floor at the worst case of the printed bands
+# Spigot face back to the shoulder: the lathe's own length from the faced
+# end.  Long enough that the groove's face-side lip and its root over the
+# tap hold the floor at the worst case of the printed bands
 # (mg_output_fixture_spec.WALLS states each one the target cannot reach).
 SPIGOT_LENGTH = 6.7
 SPIGOT_FACE_X = SHOULDER_X + SPIGOT_LENGTH
@@ -65,6 +66,10 @@ ROD_BORE_DIA = 5.2  # drilled: running clearance on the Ø5 vertical rod
 SPIGOT_DIA = 9.0
 GROOVE_RADIUS = 1.2
 GROOVE_ROOT_DIA = 7.0
+# The internal corner where the spigot turns up to the hex shoulder: the
+# tool-nose radius, modelled at the largest the print allows (R MAX).  It
+# stays on the shoulder face inside the flats and short of the groove.
+SHOULDER_FILLET_R = 0.2
 GROOVE_X = SHOULDER_X + SPIGOT_LENGTH / 2.0  # centred on the spigot
 # The groove arc's centre stands outside the spigot OD, so the arc meets the
 # OD at a definite mouth on each side, GROOVE_HALF_OPENING from GROOVE_X.
@@ -146,6 +151,10 @@ if not SHOULDER_X < GROOVE_MOUTHS[0] < GROOVE_MOUTHS[1] < SPIGOT_FACE_X:
     raise AssertionError("MHA-MG-006 groove runs off the spigot")
 if not SPIGOT_DIA < HEX_AF:
     raise AssertionError("MHA-MG-006 spigot leaves no shoulder inside the flats")
+if not SHOULDER_FILLET_R < (HEX_AF - SPIGOT_DIA) / 2.0:
+    raise AssertionError("MHA-MG-006 shoulder fillet runs off the shoulder onto a flat")
+if not SHOULDER_X + SHOULDER_FILLET_R < GROOVE_MOUTHS[0]:
+    raise AssertionError("MHA-MG-006 shoulder fillet runs into the groove")
 if not ROD_BORE_DIA < HEX_AF:
     raise AssertionError("MHA-MG-006 rod bore breaks through a flat")
 if not TAP_DRILL_DIA < ROD_BORE_DIA:

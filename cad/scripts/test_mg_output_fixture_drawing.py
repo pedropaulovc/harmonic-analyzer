@@ -43,14 +43,17 @@ def test_sheet_prints_exactly_the_marked_dimensions() -> None:
 def test_no_printed_dimension_carries_its_own_band() -> None:
     # r1 review: every explicit ±0.05 was a band the part's function never
     # asked for.  The places carry the title block's band (rule 3); the
-    # groove's radius is a single MAX limit (rule 16); the drilled bore's
-    # band is the DRILLED HOLES row.
+    # groove's radius and the shoulder's corner are single MAX limits (rule
+    # 16); the drilled bore's band is the DRILLED HOLES row.
     for retired in ("SYMMETRIC_BANDS", "ROD_BORE_DIA_BAND", "POSITION_TOLERANCE", "SIZE_TOLERANCE"):
         assert not hasattr(spec, retired), retired
     assert {
         name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2
-    } == {"HexAf": 3, "GrooveRadius": 1, "RodBoreDia": 1}
-    assert spec.SINGLE_LIMITS == {"GrooveRadius": ("GrooveProfile", 6)}
+    } == {"HexAf": 3, "GrooveRadius": 1, "ShoulderRadius": 1, "RodBoreDia": 1}
+    assert spec.SINGLE_LIMITS == {
+        "GrooveRadius": ("GrooveProfile", 6),
+        "ShoulderRadius": ("ShoulderFillet", 6),
+    }
     assert part.SINGLE_LIMITS is spec.SINGLE_LIMITS
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "_single_limit(adapter, feature_name, dimension_name, tol_type)" in source
@@ -334,10 +337,16 @@ def test_the_groove_station_from_the_face_holds_the_face_lip() -> None:
     via_free_end = (12.70 - 0.51) + (5.00 - 0.51) - (14.35 + 0.51) - 1.2
     assert via_free_end < spec.WALL_FLOOR
     # The groove stays on the spigot: its shoulder-side mouth clears the hex
-    # shoulder at the worst case (a step up to the hex, not a wall).
-    clearance = (12.70 - 0.51) + (5.00 - 0.51) - (11.00 + 0.51) - (3.35 + 0.51 + 1.2)
+    # shoulder at the worst case (a step up to the hex, not a wall), and the
+    # shoulder's R MAX corner too.  r2 review: the spigot's own length from
+    # the face, one .XX band, not the hex from the free end (three bands).
+    clearance = (6.70 - 0.51) - (3.35 + 0.51 + 1.2)
     assert spec.GROOVE_SHOULDER_CLEARANCE == pytest.approx(clearance, abs=1e-9)
-    assert clearance > 0.0
+    assert clearance == pytest.approx(1.13)
+    assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(clearance - 0.2, abs=1e-9)
+    assert spec.GROOVE_FILLET_CLEARANCE > 0.0
+    via_free_end = (12.70 - 0.51) + (5.00 - 0.51) - (11.00 + 0.51) - (3.35 + 0.51 + 1.2)
+    assert via_free_end == pytest.approx(0.11)
     # The wire stays in it at the smallest OD over the largest root.
     assert spec.GROOVE_DEPTH_MIN == pytest.approx(((9.00 - 0.51) - (7.00 + 0.51)) / 2.0)
     assert spec.GROOVE_DEPTH_MIN > geom.WIRE_DIA / 2.0
@@ -365,6 +374,69 @@ def test_the_spigot_cleans_up_inside_the_thinnest_flats() -> None:
     # A route check, not a band: the shop turns Ø9.00 inside 9.395 flats.
     assert geom.SPIGOT_DIA < geom.HEX_AF - spec.HEX_STOCK_AF_BAND
     assert geom.HEX_AF - spec.HEX_STOCK_AF_BAND - geom.SPIGOT_DIA == pytest.approx(0.395)
+
+
+def test_the_spigot_prints_its_own_length_and_the_hex_is_the_stations_less_it() -> None:
+    # r2 review: the hex from the free end (11.00) left the turner to find
+    # the shoulder through the stations; the lathe faces the spigot and
+    # measures back to its shoulder.  The hex stays modelled, unprinted.
+    assert "HexLength" not in spec.DRAWING_PRECISION_BY_NAME
+    assert spec.DRAWING_PRECISION_BY_NAME["SpigotLength"] == spec.SPIGOT_LENGTH_PLACES == 2
+    assert spec.DRAWING_DIMENSIONS["TurnedProfile"] >= {"SpigotLength", "RodStation", "BoreStation"}
+    assert geom.SPIGOT_LENGTH == pytest.approx(6.70)
+    assert geom.HEX_LENGTH == pytest.approx(5.00 + 12.70 - 6.70)
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"D1@Hex", \'"RodStation" + "BoreStation" - "SpigotLength"\'' in source
+    turned = ast.unparse(_function(ast.parse(source), "_turned_profile"))
+    assert "'shoulder from the spigot face'" in turned
+    assert "turned.record('SpigotLength', '\"SpigotLength\"')" in turned
+    # The profile lies under the axis, so the spigot's length witnesses from
+    # the side view's lower corners, away from the shoulder radius over it.
+    assert "(SHOULDER_X, -SPIGOT_R)" in turned and "(SPIGOT_FACE_X, -SPIGOT_R)" in turned
+
+
+def test_the_shoulder_corner_is_a_max_radius_inside_the_flats_clear_of_the_groove() -> None:
+    # r2 review: the internal corner had no radius; the print allows the
+    # tool's nose as a single limit (rule 16), modelled at the limit.
+    assert spec.SHOULDER_RADIUS_PLACES == 1 and spec.SHOULDER_RADIUS_TOL_TYPE == 6
+    assert spec.SHOULDER_FILLET_R_MAX == geom.SHOULDER_FILLET_R == pytest.approx(0.2)
+    assert spec.DRAWING_DIMENSIONS["ShoulderFillet"] == {"ShoulderRadius"}
+    # Inside the shoulder's annulus on 3/8 flats...
+    annulus = (geom.HEX_AF - geom.SPIGOT_DIA) / 2.0
+    assert annulus == pytest.approx(0.2625)
+    assert spec.SHOULDER_ANNULUS == pytest.approx(annulus)
+    assert geom.SHOULDER_FILLET_R < annulus
+    # ...and on the thinnest stock it may run 0.0025 onto a flat, inside the
+    # title block's R0.25 edge break.
+    overrun = geom.SHOULDER_FILLET_R - (
+        geom.HEX_AF - spec.HEX_STOCK_AF_BAND - geom.SPIGOT_DIA
+    ) / 2.0
+    assert spec.SHOULDER_FILLET_FLAT_OVERRUN_MAX == pytest.approx(overrun)
+    assert overrun == pytest.approx(0.0025)
+    assert overrun < spec.TITLE_BLOCK_EDGE_BREAK == 0.25
+    # Clear of the groove's shoulder-side mouth, nominal and worst case.
+    nominal = geom.GROOVE_MOUTHS[0] - (geom.SHOULDER_X + geom.SHOULDER_FILLET_R)
+    assert nominal == pytest.approx(1.9668, abs=1e-4)
+    assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(0.93)
+
+
+def test_the_builder_fillets_the_shoulder_and_its_volume_is_the_swept_spandrel() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "add_fillet(SHOULDER_FILLET_R, [[SHOULDER_X, 0.0, -SPIGOT_R]])" in source
+    assert 'name_last_feature(adapter, "ShoulderFillet")' in source
+    assert 'name_dimensions(adapter, "ShoulderFillet", ["ShoulderRadius"])' in source
+    steps = 20000
+    r = geom.SHOULDER_FILLET_R
+    swept = sum(
+        _fillet_annulus(geom.SHOULDER_X + (index + 0.5) * r / steps) * r / steps
+        for index in range(steps)
+    )
+    assert part.V_FILLET == pytest.approx(swept, rel=1e-4)
+    assert part.V_FILLET == pytest.approx(0.245, abs=1e-3)
+    assert part.V_TOTAL == pytest.approx(
+        part.V_HEX + part.V_SPIGOT + part.V_FILLET - part.V_GROOVE - part.V_BORE - part.V_TAP
+    )
+
 
 
 def _code_strings(tree: ast.Module) -> list[str]:
@@ -627,13 +699,15 @@ def test_final_sheet_census_expects_no_tapped_hole_note_from_the_blind_tap() -> 
     # Hole" note; retry08's blind tap, on the same views and imports, swept
     # none and failed the stale census of one.  The census is the tap's.
     assert drawing.AUTO_TAPPED_HOLE_NOTES == 0
-    # The topology it was measured on: a blind tap no targeted import selects.
+    # The topology it was measured on: a blind tap no targeted import selects
+    # (r2's shoulder fillet imports only its radius, far from the tap).
     assert geom.TAP_SPEC.end == "blind"
     assert set(spec.DRAWING_DIMENSIONS) == {
         "TurnedProfile",
         "GrooveProfile",
         "HexProfile",
         "RodBoreProfile",
+        "ShoulderFillet",
     }
     build = _build_function(ast.parse(Path(drawing.__file__).read_text(encoding="utf-8")))
     finalizes = [
@@ -658,6 +732,17 @@ def test_final_sheet_census_expects_no_tapped_hole_note_from_the_blind_tap() -> 
     assert note not in native_callout.lower()
 
 
+def _fillet_annulus(x: float) -> float:
+    """The shoulder fillet's ring at axial station ``x``: the arc's height
+    over the spigot, the arc centred R out from the shoulder and the OD."""
+    r, spigot_r = geom.SHOULDER_FILLET_R, geom.SPIGOT_DIA / 2.0
+    dx = x - (geom.SHOULDER_X + r)
+    if not geom.SHOULDER_X <= x <= geom.SHOULDER_X + r:
+        return 0.0
+    top = spigot_r + r - math.sqrt(r**2 - dx**2)
+    return math.pi * (top**2 - spigot_r**2)
+
+
 def _slice_area(x: float) -> float:
     """The part's cross-section at axial station ``x``, from the shapes alone."""
     af, corner = geom.HEX_AF, geom.HEX_CORNER_RADIUS
@@ -667,7 +752,7 @@ def _slice_area(x: float) -> float:
         area = math.sqrt(3.0) / 2.0 * af**2
     else:
         spigot_r = geom.SPIGOT_DIA / 2.0
-        area = math.pi * spigot_r**2
+        area = math.pi * spigot_r**2 + _fillet_annulus(x)
         dx = x - geom.GROOVE_X
         if abs(dx) < geom.GROOVE_RADIUS:
             cut_r = geom.GROOVE_CENTRE_R - math.sqrt(geom.GROOVE_RADIUS**2 - dx**2)
@@ -985,24 +1070,26 @@ def test_groove_root_proof_refuses_retry09s_ink(monkeypatch: pytest.MonkeyPatch)
 
 def test_bore_callout_reads_over_the_hex_between_its_witnesses() -> None:
     # The free end carries witnesses over its whole height, so the bore's Ø
-    # reads over the hex, inside the hex length's span, under its line.
+    # reads over the hex, between the free end and the shoulder.
     x, y = drawing.SIDE_KEEP["RodBoreDia"]
     half_width = drawing.BORE_CALLOUT_HALF_WIDTH
     half_height = drawing.BORE_CALLOUT_HALF_HEIGHT
     assert x - half_width > drawing._side_x(geom.FREE_END_X) + 0.005
     assert x + half_width < drawing._side_x(geom.SHOULDER_X) - 0.005
     assert y - half_height > drawing._SIDE_TOP + 0.003
-    hex_line = drawing.SIDE_KEEP["HexLength"][1] - _TEXT_OVER_LINE
-    assert hex_line > y + half_height + _TEXT_HEIGHT
-    # The groove's station, from the spigot face, reads over the spigot,
-    # clear of the hex length's span; the bore's two stations share a row
-    # under the view.
+    # The groove's station, from the spigot face, reads over the spigot; the
+    # spigot's length reads under it, then the bore's two stations on one
+    # row, then the overall REF.
     station_x = drawing.SIDE_KEEP["GrooveStation"][0]
     assert station_x - 0.005 > drawing._side_x(geom.SHOULDER_X) + 0.003
     assert station_x == pytest.approx(
         drawing._side_x((geom.GROOVE_X + geom.SPIGOT_FACE_X) / 2.0)
     )
+    spigot_x, spigot_y = drawing.SIDE_KEEP["SpigotLength"]
+    assert drawing._side_x(geom.SHOULDER_X) < spigot_x < drawing._side_x(geom.SPIGOT_FACE_X)
+    assert spigot_y < drawing._SIDE_BOTTOM - 0.005
     assert drawing.SIDE_KEEP["RodStation"][1] == drawing.SIDE_KEEP["BoreStation"][1]
+    assert drawing.SIDE_KEEP["BoreStation"][1] < spigot_y - 0.010
     assert drawing.SIDE_KEEP["OverallLength"][1] < drawing.SIDE_KEEP["BoreStation"][1] - 0.010
 
 
@@ -1339,12 +1426,14 @@ def test_wall_notes_are_model_owned_and_state_each_min_as_a_fact() -> None:
 def test_projection_precedes_import_and_all_native_ink_proofs_follow_rebuild() -> None:
     assert _build_calls_in_order({
         "_project_end_view", "curate_view_dimensions", "_add_rod_bore_axis",
-        "_place_groove_radius", "_prove_end_stock_reference", "_prove_rod_bore_axis",
-        "_prove_groove_radius", "_prove_groove_root_diameter",
+        "_place_groove_radius", "_place_shoulder_radius", "_prove_end_stock_reference",
+        "_prove_rod_bore_axis", "_prove_groove_radius", "_prove_shoulder_radius",
+        "_prove_groove_root_diameter",
     }) == [
         "_project_end_view", "curate_view_dimensions", "curate_view_dimensions",
-        "_add_rod_bore_axis", "_place_groove_radius", "_prove_end_stock_reference",
-        "_prove_rod_bore_axis", "_prove_groove_radius", "_prove_groove_root_diameter",
+        "_add_rod_bore_axis", "_place_groove_radius", "_place_shoulder_radius",
+        "_prove_end_stock_reference", "_prove_rod_bore_axis", "_prove_groove_radius",
+        "_prove_shoulder_radius", "_prove_groove_root_diameter",
     ]
 
 
@@ -2697,3 +2786,318 @@ def test_bore_axis_dangling_method_requires_measured_false(
     axis.GetAnnotation().dangling = readback
     with pytest.raises(RuntimeError, match="dangling state is not measured False"):
         drawing._prove_rod_bore_axis(adapter, view, axis, face, tap_mark)
+
+
+# The r2 sheet's GrooveStation line, arrows outside its witnesses, ran from
+# x 130.58 mm to 156.74 mm (PNG at 0.084667 mm/px).
+_R2_STATION_LINE_X = (0.13058, 0.15674)
+# An elbow 16 mm right of the upper arc's centre: its leader cuts that line.
+_ACROSS_STATION_ELBOW = (
+    drawing.SHOULDER_ARC_CENTRES["upper"][0] + 0.016,
+    drawing.SHOULDER_RADIUS_ELBOWS["upper"][1],
+)
+
+
+def _shoulder_radial_tip(
+    side: str, elbow: tuple[float, float] | None = None
+) -> tuple[float, float]:
+    """Where a radial leader from the elbow, run on through the fillet arc's
+    centre, meets the arc (the native radius leader for a small fillet)."""
+    ex, ey = elbow or drawing.SHOULDER_RADIUS_ELBOWS[side]
+    cx, cy = drawing.SHOULDER_ARC_CENTRES[side]
+    scale = drawing.SHOULDER_SHEET_RADIUS / math.dist((ex, ey), (cx, cy))
+    return (cx + (cx - ex) * scale, cy + (cy - ey) * scale)
+
+
+def _shoulder_radius_ink(
+    side: str, elbow: tuple[float, float] | None = None
+) -> tuple[list, tuple[float, float]]:
+    """The leader from the arc to the elbow and the shoulder on to past the
+    text, at the r2 sheet's R1.2 MAX run-in and overrun."""
+    elbow = elbow or drawing.SHOULDER_RADIUS_ELBOWS[side]
+    tip = _shoulder_radial_tip(side, elbow)
+    end = (
+        elbow[0]
+        + drawing.SHOULDER_RADIUS_RUN_IN
+        + drawing.SHOULDER_RADIUS_TEXT_HALF_WIDTH
+        + drawing.SHOULDER_RADIUS_OVERRUN
+    )
+    return [(tip, elbow), (elbow, (end, elbow[1]))], tip
+
+
+def _shoulder_radius_text_box(side: str) -> Box:
+    x, y = drawing.SHOULDER_RADIUS_TEXT_XY[side]
+    half = drawing.SHOULDER_RADIUS_TEXT_HALF_WIDTH
+    old = _NATIVE15_RADIUS_TEXT_BOX
+    return Box(
+        x - half,
+        y + old.ymin - _NATIVE15_RADIUS_KEEP[1],
+        x + half,
+        y + old.ymax - _NATIVE15_RADIUS_KEEP[1],
+    )
+
+
+def _shoulder_neighbour_ink(side: str) -> dict[str, list]:
+    """The other dimensions' ink near the shoulder, from the model and the
+    keeps (1 mm start gaps, 1 mm overrun past the line)."""
+    gap = drawing.EXTENSION_START_GAP
+    face_x, axis_y = _FACE_ON_AXIS
+    shoulder_x, od_low = drawing.SHOULDER_CORNERS["lower"]
+    od_high = drawing.SHOULDER_CORNERS["upper"][1]
+    spigot_line = drawing.SIDE_KEEP["SpigotLength"][1] - _TEXT_OVER_LINE
+    under_line = drawing.SIDE_KEEP["BoreStation"][1] - _TEXT_OVER_LINE
+    station_line = drawing.SIDE_KEEP["GrooveStation"][1] - _TEXT_OVER_LINE
+    shoulder_gap = drawing.SPIGOT_LENGTH_LOWER_ARC_GAP if side == "lower" else gap
+    root_low, root_high = drawing.GROOVE_ROOT_SHEET_YS
+    root_x = drawing.SIDE_KEEP["GrooveRootDia"][0]
+    spigot_x = drawing.SIDE_KEEP["SpigotDia"][0]
+    return {
+        "GrooveStation": [
+            *_station_ink()[:2],
+            ((_R2_STATION_LINE_X[0], station_line), (_R2_STATION_LINE_X[1], station_line)),
+        ],
+        "SpigotLength": [
+            ((shoulder_x, od_low - shoulder_gap), (shoulder_x, spigot_line - 0.001)),
+            ((face_x, od_low - gap), (face_x, spigot_line - 0.001)),
+            ((shoulder_x, spigot_line), (face_x, spigot_line)),
+        ],
+        "BoreStation": [
+            ((face_x, axis_y - gap), (face_x, under_line - 0.001)),
+            ((drawing._side_x(0.0), under_line), (face_x, under_line)),
+        ],
+        "SpigotDia": [
+            ((face_x + gap, od_low), (spigot_x + gap, od_low)),
+            ((face_x + gap, od_high), (spigot_x + gap, od_high)),
+            ((spigot_x, od_low), (spigot_x, od_high)),
+        ],
+        "GrooveRootDia": [
+            ((_GROOVE_CENTRE[0] + gap, root_low), (root_x + gap, root_low)),
+            ((root_x, root_low), (root_x, root_high)),
+        ],
+    }
+
+
+def _leader_x_at(ink: list, y: float) -> float:
+    (x0, y0), (x1, y1) = ink[0]
+    return x0 + (x1 - x0) * (y - y0) / (y1 - y0)
+
+
+def test_shoulder_corners_and_arcs_come_from_the_model() -> None:
+    r = geom.SHOULDER_FILLET_R * drawing._S / 1000.0
+    assert drawing.SHOULDER_SHEET_RADIUS == pytest.approx(0.0008)
+    x = drawing._side_x(geom.SHOULDER_X)
+    top, bottom = drawing._side_y(geom.SPIGOT_DIA / 2.0), drawing._side_y(-geom.SPIGOT_DIA / 2.0)
+    assert drawing.SHOULDER_CORNERS == {"upper": (x, top), "lower": (x, bottom)}
+    # The fillet's centre stands in the air outside the internal corner.
+    assert drawing.SHOULDER_ARC_CENTRES["upper"] == pytest.approx((x + r, top + r))
+    assert drawing.SHOULDER_ARC_CENTRES["lower"] == pytest.approx((x + r, bottom - r))
+    # An arrow on the arc is within (1 + sqrt 2) R of its corner, the other
+    # corner far outside the tolerance.
+    assert (1.0 + math.sqrt(2.0)) * r < drawing.SHOULDER_CORNER_TOL < top - bottom
+    for side in ("upper", "lower"):
+        assert drawing._shoulder_radius_side(_shoulder_radial_tip(side)) == side
+    assert drawing._shoulder_radius_side((x, drawing.SIDE_CENTER[1])) is None
+
+
+def test_shoulder_radius_reads_over_the_groove_station_left_of_its_line() -> None:
+    # r2 review: the corner's R MAX; it reads up-right of the upper corner,
+    # its leader rising left of the station's line to a shoulder over the
+    # station's text.
+    assert drawing.SIDE_KEEP["ShoulderRadius"] == drawing.SHOULDER_RADIUS_TEXT_XY["upper"]
+    ink, tip = _shoulder_radius_ink("upper")
+    station_x, station_y = drawing.SIDE_KEEP["GrooveStation"]
+    station_line = station_y - _TEXT_OVER_LINE
+    assert _leader_x_at(ink, station_line) < _R2_STATION_LINE_X[0] - 0.003
+    elbow = drawing.SHOULDER_RADIUS_ELBOWS["upper"]
+    assert elbow[1] >= station_y + drawing._GROOVE_STATION_TEXT_TOP + 0.003 - 1e-12
+    box = _shoulder_radius_text_box("upper")
+    bore_x, _bore_y = drawing.SIDE_KEEP["RodBoreDia"]
+    assert box.xmin > bore_x + drawing.BORE_CALLOUT_HALF_WIDTH + 0.003
+    assert box.ymin > elbow[1]
+    # Right of the shoulder, so the leader never runs over the hex.
+    assert min(x for stroke in ink for x, _y in stroke) > drawing._side_x(geom.SHOULDER_X)
+    assert (
+        drawing._shoulder_radius_ink_problem(
+            ink, tip, "upper", drawing.SHOULDER_ARC_CENTRES["upper"],
+            _shoulder_neighbour_ink("upper"),
+        )
+        is None
+    )
+
+
+def test_shoulder_radius_on_the_lower_arc_crosses_only_the_face_witnesses() -> None:
+    ink, tip = _shoulder_radius_ink("lower")
+    box = _shoulder_radius_text_box("lower")
+    face_x, _axis_y = _FACE_ON_AXIS
+    od_low = drawing.SHOULDER_CORNERS["lower"][1]
+    assert drawing.LOWER_ARC_KEEP == {"ShoulderRadius": drawing.SHOULDER_RADIUS_TEXT_XY["lower"]}
+    assert box.xmin > face_x + 0.003
+    assert box.ymax < od_low - 0.002
+    spigot_line = drawing.SIDE_KEEP["SpigotLength"][1] - _TEXT_OVER_LINE
+    assert min(y for stroke in ink for _x, y in stroke) > spigot_line + 0.003
+    # The spigot's length's shoulder witness starts well under the arrow.
+    assert tip[1] - (od_low - drawing.SPIGOT_LENGTH_LOWER_ARC_GAP) > 0.002
+    neighbours = _shoulder_neighbour_ink("lower")
+    assert any(drawing.segments_cross(ink[0], stroke) for stroke in neighbours["SpigotLength"])
+    centre = drawing.SHOULDER_ARC_CENTRES["lower"]
+    assert drawing._shoulder_radius_ink_problem(ink, tip, "lower", centre, neighbours) is None
+    # Only the face's witnesses are waived: a line 5 mm short of the face is not.
+    (x0, y0), (x1, y1) = ink[0]
+    x = face_x - 0.005
+    y = y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    problem = drawing._shoulder_radius_ink_problem(
+        ink, tip, "lower", centre, {"Other": [((x, y - 0.002), (x, y + 0.002))]}
+    )
+    assert problem == "radius leader crosses Other's ink"
+
+
+@pytest.mark.parametrize(
+    ("side", "case", "message"),
+    [
+        ("upper", "corner", "not on the shoulder corner's arc"),
+        ("upper", "far-quarter", "not on the shoulder corner's arc"),
+        ("lower", "far-quarter", "not on the shoulder corner's arc"),
+        ("upper", "detached", "no attached leader ink"),
+        ("upper", "across-station", "crosses GrooveStation's ink"),
+        ("lower", "across-spigot-length", "crosses SpigotLength's ink"),
+    ],
+)
+def test_shoulder_radius_ink_refuses_off_arc_detached_or_crossing_leaders(
+    side: str, case: str, message: str
+) -> None:
+    ink, tip = _shoulder_radius_ink(side)
+    centre = drawing.SHOULDER_ARC_CENTRES[side]
+    if case == "corner":
+        tip = drawing.SHOULDER_CORNERS[side]
+    elif case == "far-quarter":
+        tip = (2.0 * centre[0] - tip[0], 2.0 * centre[1] - tip[1])
+    elif case == "detached":
+        ink = [((a[0] + 0.002, a[1]), (b[0] + 0.002, b[1])) for a, b in ink]
+    elif case == "across-station":
+        ink, tip = _shoulder_radius_ink(side, _ACROSS_STATION_ELBOW)
+    elif case == "across-spigot-length":
+        ink, tip = _shoulder_radius_ink(side, (_FACE_ON_AXIS[0] + 0.002, 0.140))
+    problem = drawing._shoulder_radius_ink_problem(
+        ink, tip, side, centre, _shoulder_neighbour_ink(side)
+    )
+    assert problem is not None and message in problem
+
+
+class _ShoulderRadiusAnnotation(_RadialAnnotation):
+    def __init__(self, display: _NativeDisplay) -> None:
+        super().__init__(display)
+        self.positions: list[tuple[float, float, float]] = []
+        self.ink: list = []
+
+    def SetPosition2(self, x: float, y: float, z: float) -> bool:
+        self.positions.append((x, y, z))
+        return True
+
+
+def _shoulder_radius_fakes(
+    monkeypatch: pytest.MonkeyPatch, side: str, **options
+) -> tuple[_ShoulderRadiusAnnotation, _NativeDisplay, dict[str, SimpleNamespace]]:
+    display = _NativeDisplay("ShoulderRadius", "ShoulderFillet", geom.SHOULDER_FILLET_R, **options)
+    ink, tip = _shoulder_radius_ink(side)
+    display.data = _ArrowData(tip)
+    radius = _ShoulderRadiusAnnotation(display)
+    radius.ink = ink
+    length = _NativeDisplay("SpigotLength", "TurnedProfile", geom.SPIGOT_LENGTH, kind=2)
+    others = {
+        name: SimpleNamespace(ink=strokes)
+        for name, strokes in _shoulder_neighbour_ink(side).items()
+    }
+    monkeypatch.setattr(drawing, "dimension_segments", lambda annotation: annotation.ink)
+    return radius, length, others
+
+
+def test_shoulder_radius_on_the_upper_arc_keeps_its_layout(monkeypatch: pytest.MonkeyPatch) -> None:
+    rebuilds = _projection_fakes(monkeypatch)
+    radius, length, _others = _shoulder_radius_fakes(monkeypatch, "upper")
+    side = drawing._place_shoulder_radius(object(), radius, _RootAnnotation(length))
+    assert side == "upper"
+    assert radius.display.ArcExtensionLineOrOppositeSide is False
+    assert radius.positions == [] and length.gaps == []
+    assert rebuilds == ["settle fixture shoulder radius"]
+
+
+def test_shoulder_radius_on_the_lower_arc_moves_and_gaps_the_shoulder_witness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rebuilds = _projection_fakes(monkeypatch)
+    radius, length, _others = _shoulder_radius_fakes(monkeypatch, "lower")
+    side = drawing._place_shoulder_radius(object(), radius, _RootAnnotation(length))
+    assert side == "lower"
+    assert radius.positions == [(*drawing.LOWER_ARC_KEEP["ShoulderRadius"], 0.0)]
+    assert length.gaps == [(0, False, drawing.SPIGOT_LENGTH_LOWER_ARC_GAP)]
+    assert rebuilds == [
+        "settle fixture shoulder radius",
+        "lay out fixture shoulder radius on the lower arc",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("options", "tip", "message"),
+    [
+        ({"diametric": True}, None, "genuine radial"),
+        ({"kind": 2}, None, "genuine radial"),
+        ({"arc_persists": False}, None, "arc extension"),
+        ({}, "axis", "neither shoulder corner"),
+    ],
+)
+def test_shoulder_radius_placement_refuses_a_foreign_style_or_a_stray_arrow(
+    monkeypatch: pytest.MonkeyPatch, options: dict, tip: str | None, message: str
+) -> None:
+    _projection_fakes(monkeypatch)
+    radius, length, _others = _shoulder_radius_fakes(monkeypatch, "upper", **options)
+    if tip == "axis":
+        radius.display.data = _ArrowData((drawing._side_x(geom.SHOULDER_X), drawing.SIDE_CENTER[1]))
+    with pytest.raises(RuntimeError, match=message):
+        drawing._place_shoulder_radius(object(), radius, _RootAnnotation(length))
+
+
+# The side view's projection as the sheet keeps assume it: model -Z up.
+_SIDE_VIEW = SimpleNamespace(
+    project=lambda xyz: (drawing._side_x(xyz[0] * 1000.0), drawing._side_y(-xyz[2] * 1000.0))
+)
+
+
+@pytest.mark.parametrize("side", ["upper", "lower"])
+def test_rebuilt_shoulder_radius_proof_passes_on_either_arc(
+    monkeypatch: pytest.MonkeyPatch, side: str
+) -> None:
+    _projection_fakes(monkeypatch)
+    radius, _length, others = _shoulder_radius_fakes(monkeypatch, side)
+    radius.display.ArcExtensionLineOrOppositeSide = False
+    drawing._prove_shoulder_radius(object(), _SIDE_VIEW, radius, side, others)
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    [
+        ("lost-max", "single MAX limit"),
+        ("other-arc", "left the shoulder's lower arc"),
+        ("dangling", "dangling"),
+        ("crossing", "crosses GrooveStation's ink"),
+        ("other-value", "wrong model dimension"),
+    ],
+)
+def test_rebuilt_shoulder_radius_proof_refuses(
+    monkeypatch: pytest.MonkeyPatch, case: str, message: str
+) -> None:
+    _projection_fakes(monkeypatch)
+    side = "upper"
+    options = {"tol_type": 0} if case == "lost-max" else {}
+    radius, _length, others = _shoulder_radius_fakes(monkeypatch, side, **options)
+    radius.display.ArcExtensionLineOrOppositeSide = False
+    if case == "other-arc":
+        side = "lower"
+    elif case == "dangling":
+        radius.dangling = True
+    elif case == "crossing":
+        radius.ink, tip = _shoulder_radius_ink("upper", _ACROSS_STATION_ELBOW)
+        radius.display.data = _ArrowData(tip)
+    elif case == "other-value":
+        radius.display.dimension.SystemValue = geom.GROOVE_RADIUS / 1000.0
+    with pytest.raises(RuntimeError, match=message):
+        drawing._prove_shoulder_radius(object(), _SIDE_VIEW, radius, side, others)
