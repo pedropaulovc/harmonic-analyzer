@@ -961,7 +961,10 @@ def test_one_step_spots_the_riser_holes_before_screwing_it_down() -> None:
     ) in step
     assert "MHA-CH-006-TL-24" in step
     # Codex (#1583): only the B18.6.3 machine-screw head fits the countersinks.
-    assert "WITH 4 #4-40 X 1/2 B18.6.3 FLAT HEADS." in step
+    assert (
+        f"WITH 4 #4-40 X 1/2 B18.6.3 FLAT HEADS (ITEM {spec.ITEM_NUMBERS[spec.RISER_SCREW]})."
+        in step
+    )
     assert step.index("SPOT") < step.index("SCREW IT DOWN")
     # Codex (#1583): the pins would plug the holes the riser is spotted
     # through, so they press in only after the riser is screwed down.
