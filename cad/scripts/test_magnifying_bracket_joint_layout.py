@@ -61,7 +61,7 @@ def test_side_plate_is_flush_and_taller_without_moving_the_arm() -> None:
     assert front > mount_back
 
 
-def test_side_by_side_stations_have_counterbore_and_head_bearing() -> None:
+def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert joint.SCREW_MACHINE_X == (1.0, 14.7)
     assert joint.SCREW_PITCH_X == pytest.approx(13.7)
     assert joint.LEVER_HOLE_POINTS == ((16.0, 0.0, -76.2), (29.7, 0.0, -76.2))

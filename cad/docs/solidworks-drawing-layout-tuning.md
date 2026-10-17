@@ -543,7 +543,7 @@ one bracketed thread depth, the drill depth's `<hw-tapdrldepth>` once and
 bare (it governs), the process prefix intact
 (`draw_mg_output_fixture._reference_thread_depth`). The printed `(10.1)` stays
 the model's value and follows it; typing the number would not. The thread's
-extent is the note's business (`THREAD ENDS AT ROD BORE.`), not a band on the
+extent is the note's business (`FULL THREAD TO ROD BORE.`), not a band on the
 REF value.
 
 **e. The hidden-line regen trap after annotating.**
