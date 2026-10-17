@@ -3491,11 +3491,11 @@ solids = [
 # is a typical 1/2-13 kit selection (Main ruling 2026-10-17), not a measured PM length.
 # Strap/slot/flange dimensions retain the Basis estimates above. T-nut estimates:
 # 24 x 24 x 8 foot and 24 x 13 x 6 neck fit the manual p6 25/14 mm slot section.
-# The two selections differ only in T-nut seating height: S1 adds 2.71875 mm shims.
+# The two selections differ only in T-nut seating height: -raised carries work lifted 2.71875 mm.
 # Foot tops meet the undercut ceiling; neither is an invented table through-hole.
 [fixtures.clamping-kit-pm-52pcck-14mm.members.strap-pad-mill-raised]
 kind = "strap_clamp"
-note = "S1 selection: 4 in stud at local Z-50..51.6, T-nut seated under the slot lip with the shim-raised work. Generic component estimates; verify kit dimensions and thread engagement before use."
+note = "Raised-work selection: 4 in stud at local Z-50..51.6, T-nut seated under the slot lip with the work lifted 2.71875 mm. Generic component estimates; verify kit dimensions and thread engagement before use."
 solids = [
   { name = "strap", shape = "box", at_mm = [-12.7, -12.7, 0.0], size_mm = [76.2, 25.4, 12.7], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic catalogue-size estimate; replace with caliper readings" } },
   { name = "stud-slot", shape = "box", at_mm = [23.1, -6.75, -1.0], size_mm = [30.0, 13.5, 14.7], void = true, cuts = ["strap"], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic clearance-slot estimate; replace with caliper readings" } },
@@ -3507,7 +3507,7 @@ solids = [
 
 [fixtures.clamping-kit-pm-52pcck-14mm.members.strap-pad-mill]
 kind = "strap_clamp"
-note = "S2-S4 selection: 4 in stud at local Z-50..51.6, T-nut seated under the slot lip with the work on the risers. Generic component estimates; verify kit dimensions and thread engagement before use."
+note = "Mill selection: 4 in stud at local Z-50..51.6, T-nut seated under the slot lip. Generic component estimates; verify kit dimensions and thread engagement before use."
 solids = [
   { name = "strap", shape = "box", at_mm = [-12.7, -12.7, 0.0], size_mm = [76.2, 25.4, 12.7], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic catalogue-size estimate; replace with caliper readings" } },
   { name = "stud-slot", shape = "box", at_mm = [23.1, -6.75, -1.0], size_mm = [30.0, 13.5, 14.7], void = true, cuts = ["strap"], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic clearance-slot estimate; replace with caliper readings" } },
@@ -5322,12 +5322,13 @@ kind = "bench"
 note = "AUTHOR'S CHOICE: illustrative fitter's bench beside the surface plate with a 4 in bench vise, layout blue, scriber, spring dividers, second-cut and smooth hand files with a safe edge, file card and deburring stones; no spindle, DRO or cutting axes. Layout, filing to a line, deburr, coating hand-off and inspection are done here."
 cite = ["AUTHOR'S CHOICE: illustrative fitting station"]
 
-# A 4 in bench vise closed on the ground stud of a filing-button kit. Local frame: the
-# stud axis is Z, the jaw tops are Z0 and the jaws close along X on an 8.0 mm stud tail.
+# A 4 in bench vise on the fitting bench; J1 presses the turned hub into the strap hole
+# between soft jaws closed on the hub's two supply ends. Local frame: the jaw tops are Z0
+# and the jaws close along X; the drawn 8.0 mm jaw gap is an authored pose, not a reading.
 [fixtures.bench-vise-4in]
 name = "4 in bench vise"
 kind = "custom"
-note = "illustrative example item: 4 in machinist's bench vise bolted to the fitting bench, smooth hardened jaw plates closed on the 8.0 mm turned tail of a filing-button stud; the work never touches the jaws"
+note = "illustrative example item: 4 in machinist's bench vise bolted to the fitting bench; with soft jaws fitted it presses the hub into the strap hole, closing on the hub's two supply ends"
 # Basis: fixtures.bench-vise-4in.length_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2224 (fixtures.bench-vise-4in.length_mm) authored custom geometry baseline 160 mm, offset +0 mm = 160 mm. Obstruction/stack dimensions are not reduced below their source baseline; catalogue conversions are not fabricated physical readings.
 length_mm = { value = 160.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "steel rule" } }
 # Basis: fixtures.bench-vise-4in.width_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2225 (fixtures.bench-vise-4in.width_mm) authored custom geometry baseline 100 mm, offset +0 mm = 100 mm. Obstruction/stack dimensions are not reduced below their source baseline; catalogue conversions are not fabricated physical readings.
@@ -5335,10 +5336,10 @@ width_mm = { value = 100.0, measured = { status = "measured", by = "placeholder 
 # Basis: fixtures.bench-vise-4in.height_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2226 (fixtures.bench-vise-4in.height_mm) authored custom geometry baseline 85 mm, offset +0 mm = 85 mm. Obstruction/stack dimensions are not reduced below their source baseline; catalogue conversions are not fabricated physical readings.
 height_mm = { value = 85.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "height gauge, bench to jaw tops" } }
 solids = [
-  # Basis: fixtures.bench-vise-4in.solids.fixed-jaw: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2228 (fixtures.bench-vise-4in.solids.fixed-jaw) filing-button stud tail; authored physical-size model {"size_mm":[25.0,100.0,25.0]} mm, offsets zero. at_mm x re-posed to close on the Ø8.0 filing-stud tail (Main's round-3 ruling, PR #1447); the rest of at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
-  { name = "fixed-jaw", supply = "existing", shape = "box", at_mm = [-29.0, -50.0, -25.0], size_mm = [25.0, 100.0, 25.0], locates = "filing-button stud tail", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
-  # Basis: fixtures.bench-vise-4in.solids.moving-jaw: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2229 (fixtures.bench-vise-4in.solids.moving-jaw) filing-button stud tail; authored physical-size model {"size_mm":[25.0,100.0,25.0]} mm, offsets zero. at_mm x re-posed to close on the Ø8.0 filing-stud tail (Main's round-3 ruling, PR #1447); the rest of at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
-  { name = "moving-jaw", supply = "existing", shape = "box", at_mm = [4.0, -50.0, -25.0], size_mm = [25.0, 100.0, 25.0], locates = "filing-button stud tail", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
+  # Basis: fixtures.bench-vise-4in.solids.fixed-jaw: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2228 (fixtures.bench-vise-4in.solids.fixed-jaw) authored physical-size model {"size_mm":[25.0,100.0,25.0]} mm, offsets zero. at_mm x re-posed to an 8.0 mm jaw gap (Main's round-3 ruling, PR #1447); the rest of at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
+  { name = "fixed-jaw", supply = "existing", shape = "box", at_mm = [-29.0, -50.0, -25.0], size_mm = [25.0, 100.0, 25.0], locates = "hub supply ends", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
+  # Basis: fixtures.bench-vise-4in.solids.moving-jaw: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2229 (fixtures.bench-vise-4in.solids.moving-jaw) authored physical-size model {"size_mm":[25.0,100.0,25.0]} mm, offsets zero. at_mm x re-posed to an 8.0 mm jaw gap (Main's round-3 ruling, PR #1447); the rest of at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
+  { name = "moving-jaw", supply = "existing", shape = "box", at_mm = [4.0, -50.0, -25.0], size_mm = [25.0, 100.0, 25.0], locates = "hub supply ends", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   # Basis: fixtures.bench-vise-4in.solids.body: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2230 (fixtures.bench-vise-4in.solids.body) authored box envelope; authored physical-size model {"size_mm":[120.0,100.0,60.0]} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
   { name = "body", supply = "existing", shape = "box", at_mm = [-60.0, -50.0, -85.0], size_mm = [120.0, 100.0, 60.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
 ]
@@ -5675,32 +5676,25 @@ width_in = { value = 12.0, measured = { status = "measured", by = "placeholder (
 height_in = { value = 4.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "steel rule, plate thickness" } }
 
 # Split ring laps made in the shop from the brass rod below (MH p.1236): a bored sleeve
-# with a split and a clamp screw, run on the part in the lathe at low speed. One per
-# lapped OD the rulings name: button OD 10.20, stud and screw shoulder 6.49, screw head 8.00.
+# with a split and a clamp screw, run on the part in the lathe at low speed, one per
+# lapped OD (6.49 and 8.00).
 [tools.ring-laps]
 name = "split brass ring laps"
 kind = "ring_lap_set"
 shop_made = true
 material = "C360 free-machining brass"
-note = "illustrative example shop-made item: three split brass ring laps, each a bored sleeve about 20 mm long with a saw split and a clamp screw, bored to the lapped size and closed onto the work with the screw; charged with the SiC compounds and run in the lathe at low speed. Ring laps follow each diameter's own axis: they correct size and roundness, never coaxiality (shop-additions.md item 2)."
+note = "illustrative example shop-made item: two split brass ring laps, each a bored sleeve about 20 mm long with a saw split and a clamp screw, bored to the lapped size and closed onto the work with the screw; charged with the SiC compounds and run in the lathe at low speed. Ring laps follow each diameter's own axis: they correct size and roundness, never coaxiality (shop-additions.md item 2)."
 cite = ["MH 27th p.1236 (external ring and split laps)"]
 
-[tools.ring-laps.members."10.20mm"]
-note = "filing-button OD lap"
-# Basis: tools.ring-laps.members."10.20mm".dia_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2591 (tools.ring-laps.members."10.20mm".dia_mm) authored ring_lap_set geometry baseline 10.2 mm, offset +0 mm = 10.2 mm. No shop metrology or acceptance result is asserted.
-dia_mm = { value = 10.2, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
-# Basis: tools.ring-laps.members."10.20mm".length_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2592 (tools.ring-laps.members."10.20mm".length_mm) authored ring_lap_set geometry baseline 20 mm, offset +0 mm = 20 mm. No shop metrology or acceptance result is asserted.
-length_mm = { value = 20.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "calipers" } }
-
 [tools.ring-laps.members."6.49mm"]
-note = "stud body and pivot-screw shoulder lap"
+note = "6.49 mm OD lap"
 # Basis: tools.ring-laps.members."6.49mm".dia_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2596 (tools.ring-laps.members."6.49mm".dia_mm) authored ring_lap_set geometry baseline 6.49 mm, offset +0 mm = 6.49 mm. No shop metrology or acceptance result is asserted.
 dia_mm = { value = 6.49, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
 # Basis: tools.ring-laps.members."6.49mm".length_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2597 (tools.ring-laps.members."6.49mm".length_mm) authored ring_lap_set geometry baseline 20 mm, offset +0 mm = 20 mm. No shop metrology or acceptance result is asserted.
 length_mm = { value = 20.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "calipers" } }
 
 [tools.ring-laps.members."8.00mm"]
-note = "pivot-screw head lap"
+note = "8.00 mm OD lap"
 # Basis: tools.ring-laps.members."8.00mm".dia_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2601 (tools.ring-laps.members."8.00mm".dia_mm) authored ring_lap_set geometry baseline 8 mm, offset +0 mm = 8 mm. No shop metrology or acceptance result is asserted.
 dia_mm = { value = 8.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
 # Basis: tools.ring-laps.members."8.00mm".length_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2602 (tools.ring-laps.members."8.00mm".length_mm) authored ring_lap_set geometry baseline 20 mm, offset +0 mm = 20 mm. No shop metrology or acceptance result is asserted.
@@ -6029,11 +6023,11 @@ note = "illustrative example item: die stock (handle) for the 1 in OD round dies
 [[stock]]
 form = "round_bar"
 material = "O1 oil-hardening tool steel drill rod, annealed"
-note = "illustrative example item: Ø11 mm O1 drill rod, ±0.013 mm, 3 ft; hub filing buttons (Pedro ruling 1: O1, torch-hardened, lapped). Example reading: measured = { by = \"example (plausible, not measured)\", date = \"2026-10-05\", instrument = \"micrometer, Ø at both ends\" } (dia_mm/length_mm are plain numbers in the stock schema)"
-# Basis: stock.5.dia_mm: declared nominal 11 mm, offset +0 mm = 11 mm; illustrative example item: Ø11 mm O1 drill rod, ±0.013 mm, 3 ft; hub filing buttons (Pedro ruling 1: O1, torch-hardened, lapped); source b757b5a76 cad/process/shop/inventory.toml:2861 (stock.5.dia_mm). Scalar/vector-only receipt placeholder, not a material certificate or new purchase.
+note = "illustrative example item: Ø11 mm O1 drill rod, ±0.013 mm, 3 ft. Example reading: measured = { by = \"example (plausible, not measured)\", date = \"2026-10-05\", instrument = \"micrometer, Ø at both ends\" } (dia_mm/length_mm are plain numbers in the stock schema)"
+# Basis: stock.5.dia_mm: declared nominal 11 mm, offset +0 mm = 11 mm; illustrative example item: Ø11 mm O1 drill rod, ±0.013 mm, 3 ft; source b757b5a76 cad/process/shop/inventory.toml:2861 (stock.5.dia_mm). Scalar/vector-only receipt placeholder, not a material certificate or new purchase.
 # Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "outside micrometer at both ends"; scalar-only stock schema.
 dia_mm = 11.0
-# Basis: stock.5.length_mm: declared nominal 914.4 mm, offset +0 mm = 914.4 mm; illustrative example item: Ø11 mm O1 drill rod, ±0.013 mm, 3 ft; hub filing buttons (Pedro ruling 1: O1, torch-hardened, lapped); source b757b5a76 cad/process/shop/inventory.toml:2862 (stock.5.length_mm). Scalar/vector-only receipt placeholder, not a material certificate or new purchase.
+# Basis: stock.5.length_mm: declared nominal 914.4 mm, offset +0 mm = 914.4 mm; illustrative example item: Ø11 mm O1 drill rod, ±0.013 mm, 3 ft; source b757b5a76 cad/process/shop/inventory.toml:2862 (stock.5.length_mm). Scalar/vector-only receipt placeholder, not a material certificate or new purchase.
 # Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "steel tape and digital calipers on received bar"; scalar-only stock schema.
 length_mm = 914.4
 on_hand = true
