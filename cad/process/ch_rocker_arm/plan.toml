@@ -35,10 +35,10 @@ z = "up"
 form = "flat_bar"
 form_verify = false
 material = "1018 cold-rolled steel"
-drawing_material = "LOW-CARBON STEEL OR GRAY IRON"
+drawing_material = "AISI 1018 low-carbon steel" # the drawing's single named grade (Opus review #1020 removed "OR GRAY IRON")
 material_verify = false
 material_cite = [
-  "features.toml material: LOW-CARBON STEEL OR GRAY IRON",
+  "harmonic-analyzer/cad/config/parts/ch-rocker-arm.yaml:ch-rocker-arm.material_specification",
   "https://www.onlinemetals.com/en/buy/carbon-steel/0-3125-x-1-5-tool-steel-rectangle-bar-1018/pid/12035 (1018 cold finish rectangle 0.3125 x 1.5 in)",
 ]
 on_hand = false
@@ -901,7 +901,7 @@ do = "inspect"
 feature = "profile_outer"
 checks = { bottom_radius = "arm-outline-template", mirror_symmetric = "arm-outline-template" }
 
-# v43 dimensions the +X tip land's station (X146.25 BASIC from the pivot, "LAND") on that land only.
+# Each tip land's station is its own BASIC 146.25 "LAND" row from the pivot (the J row added after main-r1).
 [[setups.ops]]
 op = 90
 do = "inspect"
@@ -912,7 +912,7 @@ checks = { land_angle_deg = "arm-outline-template", station = "height-gauge" }
 op = 95
 do = "inspect"
 feature = "tip_land_neg_x"
-checks = { land_angle_deg = "arm-outline-template" }
+checks = { land_angle_deg = "arm-outline-template", station = "height-gauge" }
 
 # Both printed profile zones (top edge, and the lower outline J to K with both tip lands), read
 # with a DTI against the arm outline template. The accept/reject windows are computed in

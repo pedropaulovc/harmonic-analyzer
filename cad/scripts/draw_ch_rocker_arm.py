@@ -8,7 +8,7 @@ Dimension import and curation live in ``_drawing_dimension_import``.
 The strap is a long thin curved seesaw (~292 mm tip to tip, 16 mm deep, 2.5 mm
 thick). The front carries the BASIC arc system and A-to-pin coordinates;
 parent-linked D (4:1) and E (2:1) carry the hub and rod-end controls. The
-1:1 side carries thickness/hub length; the 1:4 isometric supplements them.
+3:1 view F carries thickness/hub width; the 1:4 isometric supplements them.
 
 Run with SolidWorks open::
 
@@ -28,7 +28,8 @@ import struct
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
@@ -99,26 +100,26 @@ from _layout_geometry import (
     Box, Segment, clip_segment_to_circle, point_segment_distance,
     segment_box_distance, segment_circle_distance, text_overlap, union_boxes,
 )
-from _gtol_frame import gtol_frame_signature
+from _gtol_frame import gtol_frame_signature, gtol_frame_xml
+from _gtol_symbols import GTOL_SYMBOLS
 from _hole_spec import blind_cut_dia_mm, drill_process
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _seat_forensics
 import _telemetry
+from ch_channel_assembly_steps import step_ref as channel_step_ref
 from ch_rocker_arm_notes import (
     DEFAULT_DRAWING_PRECISION,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
 )
 from ch_rocker_arm_spec import (
-    ARM_DEPTH,
     ARM_THICKNESS,
     BOT_END_X,
     CENTER_Y,
     GEOMETRIC_TOLERANCES_MM,
     HUB_DIA,
-    HUB_LENGTH,
     PIVOT_HOLE_DIA,
     PIVOT_HOLE_BAND,
     PIVOT_MID_Y,
@@ -168,7 +169,10 @@ part_metadata(
 )
 
 FRONT_CENTER = (0.180, 0.175)
-RIGHT_CENTER = (0.300, 0.165)
+# View F (3:1) stands alone in the free band left of the front view, between
+# the 292.5 row's left witness (x 0.107) and the border, above the notes.
+RIGHT_CENTER = (0.075, 0.195)
+RIGHT_SCALE = (rocker_notes.RIGHT_VIEW_SCALE, 1)
 ISO_CENTER = (0.345, 0.205)
 ROD_HOLE = requirement(
     "rod_hole", kind="hole", faces=(CylinderFace(blind_cut_dia_mm(rocker.ROD_HOLE_SPEC)),),
@@ -191,10 +195,17 @@ HUB_CENTER = (0.180, 0.095)
 END_CENTER = (0.330, 0.110)
 HUB_SCALE = (4.0, 1.0)
 END_SCALE = (2.0, 1.0)
-DETAIL_LETTER_XY = {"D": (0.167, 0.155), "E": (0.264, 0.155)}
+# D's letter sits below-right of its small parent fence around A, clear of the
+# R800/R816 texts below the strap's left half; DETAIL_STYLE leads it to the fence.
+DETAIL_LETTER_XY = {"D": (0.188, 0.161), "E": (0.264, 0.155)}
 # D's crop is a view boundary, not a third concentric manufactured diameter.
 # Keep its persisted circular fence; omit only the printed detail-view outline.
 DETAIL_NO_OUTLINE = {"D": True, "E": False}
+# swDetViewStyle_e. D's fence prints 0.8 mm outside the hub OD on the 1:2
+# front; with a free letter it read as a third concentric circle (regate-r1
+# #3). The leader style draws a leader from the fence to its letter. E's
+# fence stands apart from every feature, so it keeps the standard style.
+DETAIL_STYLE = {"D": 2, "E": 0}  # swDetViewLEADER, swDetViewSTANDARD
 # DOT on the printed south centre-mark arm, at the actual hole's south rim.
 # Keep the circular model edge attached; never move an FCF attachment by setter.
 FCF_XY = (0.262, 0.1001)
@@ -215,13 +226,28 @@ ROD_DATUM_C_XY = (
 ROD_CALLOUT_XY = (0.279, 0.115)
 # The iso caption's top-left, under the iso's right half and right of the end
 # view. Beside the end view (0.315, 0.150) it read as that
-# view's label, 0.4 mm from HubLength's "+0.05" (r743-p1s-B2 render).
-ISO_CAPTION_XY = (0.325, 0.183)
+# view's label, 0.4 mm from HubLength's "+0.05" (r743-p1s-B2 render). Raised
+# from 0.183: the r1 render put the strap thickness value on its baseline.
+ISO_CAPTION_XY = (0.325, 0.189)
+# View F's own label (Opus review #1020: unlabeled at a scale other than the
+# sheet's): under the view, below the hub width's row and its datum G.
+RIGHT_CAPTION_XY = (0.052, 0.119)
+# Its viewing arrow (Opus #1020 r1: an enlarged view off the 1:2 front's
+# projection line reads as a removed view only with one): a letter note whose
+# straight leader points -X at the rod tip's radial land, level with the
+# land's midpoint, the tip just outside E's parent circle (right edge ~0.255
+# at that level). The letter (centred on that level, ~0.181) sits over the
+# 8.46 pin witness (~0.176) and left of the 8.46 dimension line (PIN_Y_TEXT_XY
+# x): r4's leader, from right of that line, crossed its outside-arrow tail.
+VIEW_ARROW_TEXT_X = 0.2625
+VIEW_ARROW_TIP_GAP = 0.0035
+VIEW_LETTER_HEIGHT = 0.005
 
 # Re-express the part-owned one-sided height envelope as a normal profile zone:
 # no second numeric tolerance lives in the drawing prose. The zero lower limit
 # is pinned by the rocker contract; it is Ⓤ0 on the lower (inside-material)
-# outline: the R816 arc, both tapers and both tip lands, between J and K.
+# outline: the R816 arc, both tapers and both tip lands, between J and K. The
+# amplitude bar's foot rides the top edge (its named mate, below the frame).
 ARC_PROFILE_ZONE_MM = f"{TOP_EDGE_BAND[0]:g}"
 ARC_PROFILE_OUTSIDE_MM = {
     "TopRadius": ARC_PROFILE_ZONE_MM,
@@ -232,18 +258,28 @@ ARC_PROFILE_DATUMS = ("A", "B", "C")
 # The two frames control one nominal concentric arc system. Their material
 # sides differ: top outside is +Y, bottom inside is +Y. A single shared frame
 # would put one of the zones on the wrong side of its basic arc.
+# Top-lefts. The top frame's below-frame mate row (1.1 mm under, 3.4 mm tall)
+# clears the BASIC 8.00 box (top ~0.195), the frame's top the raised overall
+# width line (~0.2185). View F holds the sheet's left band, so the lower frame
+# sits under the strap's right half, between the D and E letters and above the
+# 132.76 R816/TAPER row; its leader rises left of the frame to R816.
 ARC_PROFILE_FRAME_XY = {
-    "TopRadius": (0.130, 0.207),
-    "BottomRadius": (0.020, 0.160),
+    "TopRadius": (0.130, 0.211),
+    "BottomRadius": (0.207, 0.163),
 }
-ARC_PROFILE_PICK_X_MM = {"TopRadius": -130.0, "BottomRadius": -110.0}
+ARC_PROFILE_PICK_X_MM = {"TopRadius": -130.0, "BottomRadius": 40.0}
+# Both arcs keep the exterior radius-leader dressing.
+ARC_RADIUS_NAMES = ("TopRadius", "BottomRadius")
 # The lower frame's between symbol: its zone runs from the top-arc end at -X
 # (J), down the land and taper, along R816, and up to the top-arc end at +X (K).
 # Both letters point at their corners in the front view, the frame's view.
 # Sheet offsets from the projected corner (v43 render): J sits left of the
-# (292.51) witness; K sits right of the E circle, clear of the 8.46 dim line.
+# (292.51) witness. K's outboard side is view F's arrow letter: any K text right
+# of its corner puts K's leader box over F's (main-r1 farm audit, 0.9 mm), so K
+# sits above its corner, centred between the 133.07 and (292.51) extension
+# lines (2.2 mm each side) and 2 mm above the E circle.
 PROFILE_BETWEEN = ("J", "K")
-BETWEEN_POINT_OFFSET = {"J": (-0.007, 0.002), "K": (0.009, 0.002)}
+BETWEEN_POINT_OFFSET = {"J": (-0.007, 0.002), "K": (-0.0039, 0.008)}
 LAND_LABEL = "LAND"
 # Sheet-layout clearance, NOT a manufacturing tolerance. SIDE_SMART may put
 # the native junction on either frame edge; prove its rebuilt route, not a
@@ -259,7 +295,9 @@ ARC_PROFILE_TEXT_CLEARANCE_M = 0.001
 NOTES_LEFT = 0.020
 NOTES_BORDER_CLEARANCE = 0.003
 NOTES_CEILING = 0.110
-NOTES_SEAT_PASSES = 3
+# The shorter (9-line) block starts farther above its seat: a fourth pass keeps
+# a lagging native move (0.8 tracking) inside the settle tolerance.
+NOTES_SEAT_PASSES = 4
 NOTES_SEAT_SETTLE = 0.00005
 # Below any note text height this sheet prints (the linked block pitches ~4.1).
 NOTES_MIN_LINE_PITCH = 0.0025
@@ -271,15 +309,26 @@ _TIP_FACE_MID_Y = TOP_END_Y - (TIP_FACE / 2.0) * math.cos(TOP_ARC_LEN / 2.0 / R_
 _ROD_TIP_Y = TOP_END_Y - TIP_FACE * math.cos(_ALPHA_TOP)
 _BOT_END_Y = CENTER_Y - math.sqrt(R_BOTTOM**2 - BOT_END_X**2)
 
-# Full witnesses connect the overall row to the actual physical tips.
-OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.215)
-TAPER_INTERSECTION_TEXT_XY = (0.219, 0.132)
-LAND_LOCATION_TEXT_XY = (0.219, 0.235)
+# Full witnesses connect the overall row to the actual physical tips. The
+# overall row and both A-to-land rows sit above the top-edge profile frame (top
+# 0.211); the left taper vertex gets its own row from A, under the left half,
+# below the R800/R816 texts.
+OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.221)
+# Right taper: its BASIC box at 0.132 printed 1.6 mm into Detail D's view box
+# (r3 layout audit; D's top ~0.1309); at 0.137 it clears it.
+# Left taper: a full row clear of the R800/R816 texts, and left of R816's
+# two CONCENTRIC rows (down to ~0.146 over x 0.148-0.172).
+TAPER_INTERSECTION_TEXT_XY = (0.219, 0.137)
+LEFT_TAPER_TEXT_XY = (0.127, 0.142)
+LAND_LOCATION_TEXT_XY = (0.219, 0.242)
+# The J land's row mirrors the K land's about A (FRONT_CENTER x 0.180): both
+# ends are dimensioned on the view, not left to a mirror note (main-r1 Opus).
+LEFT_LAND_LOCATION_TEXT_XY = (0.141, 0.242)
 PIN_X_TEXT_XY = (0.219, 0.197)
-PIN_Y_TEXT_XY = (0.267, 0.162)
+# Its dimension line runs at the text's x, right of the view-F letter.
+PIN_Y_TEXT_XY = (0.2715, 0.162)
 TAPER_WITNESS_LENGTH = 0.008
-STRAP_OFFSET_TEXT_XY = (RIGHT_CENTER[0] - 0.018, RIGHT_CENTER[1] + 0.030)
-STRAP_OFFSET_WITNESS_LENGTH = 0.010
+
 
 
 def _plane_between(
@@ -374,7 +423,7 @@ def _profile_zone(frame: str, governs: dict[str, Any], governs_sources: tuple[An
 # its own BASICs; no requirement is read through two zones.
 for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x", -1, _TIPS[0])):
     requirement(
-        _name, kind="face", faces=(_face,), requirements=("land_angle_deg",) + (("station",) if _sign == 1 else ()) + ("surface_profile",), fields={
+        _name, kind="face", faces=(_face,), requirements=("land_angle_deg", "station", "surface_profile"), fields={
             # BASIC with no acceptance of its own: the J↔K zone bounds the land.
             "tip_land": (rocker.TIP_FACE, ("TIP_FACE", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
             "land_angle_deg": (round(_LAND_ANGLE, _P), ("_ALPHA_TOP", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
@@ -382,18 +431,17 @@ for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x",
             "dimension_type": ("basic", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
             "radial_tip_end": ([_sign * _TIP[0], _TIP[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
             "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
-            **({
-                "station": (rocker.ROD_TIP_X, ("ROD_TIP_X", ("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"))),
-                "station_nominal": (rocker.ROD_TIP_X, ("ROD_TIP_X",)),
-            } if _sign == 1 else {}),
+            # Each land's own BASIC LAND row from A (the J row, main-r1 Opus).
+            "station": (rocker.ROD_TIP_X, ("ROD_TIP_X", ("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"))),
+            "station_nominal": (rocker.ROD_TIP_X, ("ROD_TIP_X",)),
             # The land angle is read across the shortest land the zones allow.
             # The station is read along X, off the land's normal by the land
             # angle; material added on the land moves it outward.
             **_profile_zone("BottomRadius", {
                 "land_angle_deg": {"tilt_across": TIP_LAND_LEAST_MM},
-                **({"station": {"sense": "increases", "obliquity_deg": _LAND_ANGLE}} if _sign == 1 else {}),
+                "station": {"sense": "increases", "obliquity_deg": _LAND_ANGLE},
             }, (("draw_ch_rocker_arm", "TIP_LAND_LEAST_MM"), ("draw_ch_rocker_arm", "_least_tip_land_mm"), "_ALPHA_TOP")),
-        }, precision={"tip_land": _P, "land_angle_deg": _P, **({"station": _P} if _sign == 1 else {})},
+        }, precision={"tip_land": _P, "land_angle_deg": _P, "station": _P},
     )
 
 part_metadata(datums={
@@ -468,13 +516,14 @@ def _detail_crop(adapter: Any, view: Any, *, label: str) -> tuple[float, float, 
     if no_outline is not required_no_outline:
         raise RuntimeError(f"detail {label}: actual circle NoOutline={no_outline!r}, "
                            f"required={required_no_outline!r}, native_view_bbox={bbox}")
-    actual_flags = (detail_circle.GetLabel(), int(detail_circle.GetDisplay()), no_outline)
-    required_flags = (label, 1, required_no_outline)
+    actual_flags = (detail_circle.GetLabel(), int(detail_circle.GetDisplay()),
+                    int(detail_circle.GetStyle()), no_outline)
+    required_flags = (label, 1, DETAIL_STYLE[label], required_no_outline)
     if not no_outline:
         actual_flags += (detail_circle.JaggedOutline, detail_circle.HasFullOutline())
         required_flags += (False, True)
     if actual_flags != required_flags:
-        raise RuntimeError(f"detail {label}: actual circle label/display/outline flags={actual_flags!r}, "
+        raise RuntimeError(f"detail {label}: actual circle label/display/style/outline flags={actual_flags!r}, "
                            f"required={required_flags!r}, native_view_bbox={bbox}")
     if readback.label != label:
         raise RuntimeError(f"detail {label}: persisted native circle label changed to {readback.label!r}")
@@ -593,13 +642,19 @@ def _create_detail(
     if _early_bound(circle, "ISketchSegment").Select4(False, data) is not True:
         raise RuntimeError(f"detail {label}: cannot select parent fence")
     no_outline = DETAIL_NO_OUTLINE[label]
+    style = DETAIL_STYLE[label]
     native = drawing.CreateDetailViewAt4(
-        *target, 0.0, 0, *scale, label, 1, not no_outline, False, no_outline, 5,
+        *target, 0.0, style, *scale, label, 1, not no_outline, False, no_outline, 5,
     )
     draw.ClearSelection2(True)
     if native is None:
         raise RuntimeError(f"detail {label}: CreateDetailViewAt4 returned no view")
     detail = _early_bound(native, "IView")
+    # IDetailCircle::SetStyle is the documented setter; _detail_crop reads
+    # the persisted style back on every settling pass.
+    fence = _early_bound(detail.GetDetail(), "IDetailCircle")
+    if fence is None or (int(fence.GetStyle()) != style and fence.SetStyle(style) is not True):
+        raise RuntimeError(f"detail {label}: native detail circle refused style {style}")
     detail.UseParentScale = False
     detail.UseSheetScale = 0
     detail.ScaleRatio = double_array(list(scale))
@@ -1802,9 +1857,12 @@ def _pivot_finish_placement(
 
 
 # Every marked model dimension has exactly one face-view owner.
+# The radius texts sit below the strap's left half, outside both parent
+# circles, between the left taper row and the strap: R816's leader lands on
+# the lower arc well left of A's centreline (Opus review #1020).
 FRONT_KEEP = {
-    "TopRadius": (0.145, 0.136),
-    "BottomRadius": (0.169, 0.128),
+    "TopRadius": (0.132, 0.156),
+    "BottomRadius": (0.160, 0.156),
     "TopAbovePivot": (0.165, 0.191),
 }
 
@@ -1840,7 +1898,7 @@ PROFILE_OUTER = requirement(
         **_profile_zone("BottomRadius", {"bottom_radius": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)), "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
         "bottom_arc_len": (rocker.BOT_ARC_LEN, ("BOT_ARC_LEN",)),
-        "mirror_symmetric": (True, (("ch_rocker_arm_notes", "DRAWING_NOTES"),)), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH",)),
+        "mirror_symmetric": (True, (("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"), ("draw_ch_rocker_arm", "_dress_detail_dimensions"))), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH",)),
         "bottom_end": (list(_BOTTOM), ("BOT_END_X", "R_BOTTOM", "CENTER_Y")),
         "radial_tip_end": (list(_TIP), ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
     }, precision={"bottom_radius": _P},
@@ -1851,25 +1909,70 @@ HUB_OD = requirement(
         "at": _CENTRE, "axis": _AXIS,
         "dia": (_band(rocker.HUB_DIA, _P), ("HUB_DIA",)),
         "dia_nominal": (rocker.HUB_DIA, ("HUB_DIA",)),
-        "coaxiality_dia": (rocker.HUB_COAXIALITY_DIA, ("HUB_COAXIALITY_DIA", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
-        "coaxial_to": ("pivot_bore", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
+        # A position frame to A under the Ø10.20 in detail D carries the zone.
+        "coaxiality_dia": (rocker.HUB_COAXIALITY_DIA, ("HUB_COAXIALITY_DIA", ("draw_ch_rocker_arm", "_hub_position_frame"))),
+        "coaxial_to": ("pivot_bore", (("draw_ch_rocker_arm", "_hub_position_frame"),)),
+        "position_datums": (["A"], (("draw_ch_rocker_arm", "_hub_position_frame"),)),
     }, precision={"dia": _P, "coaxiality_dia": _P},
 )
+# The Ø10.20's attached position frame takes its leader shoulder and lifts the
+# value ~11 mm above the requested point (main-r1 farm screen: from 0.122 onto
+# the 132.76 R816/TAPER row). Requested lower, the stack lands in the free
+# band right of D's crop and under that dimension line (~0.131) either way.
 HUB_KEEP = {
     "PivotDia": (0.120, 0.086),
-    "HubDia": (0.210, 0.122),
+    "HubDia": (0.212, 0.108),
 }
-END_KEEP = {"RodTipLen": (0.377, 0.130)}
-# Hub length's entire value/tolerance/above-label stack sits left of both native
-# witnesses and E's full-outline circle. Adding the above row shifts the value
-# down natively; the left corridor accommodates that complete three-row block.
-# Strap thickness stays right of the end view and below the isometric caption;
-# datum B sits above the pin text but below the strap-offset reference witnesses.
-STRAP_THICKNESS_TEXT_XY = (RIGHT_CENTER[0] + 0.017, RIGHT_CENTER[1] + 0.010)
+# The 2X 5.59 box sits between its own witnesses: the upper one passes its
+# top-left corner (0.05 mm at the plain 5.59, main-r1 PDF), so the widened
+# text is requested 2 mm lower, centred in the 124.0-133.4 mm clear band.
+END_KEEP = {"RodTipLen": (0.377, 0.128)}
+# View F at 3:1 (RIGHT_CENTER; strap faces x 0.0713/0.0788, hub ends
+# 0.0644/0.0856, part y 0.151-0.239, hub y 0.160-0.190). Native centres each
+# value-plus-three-row block on its request and runs the dimension line under
+# the block (r4: the 2.500 line at the block's bottom, 158 mm, through the
+# hub). Both blocks sit left of the view, clear of the border (0.0125):
+# * the strap thickness with its fork-fit rows high, so its line (~0.214,
+#   model y ~21) crosses the strap alone, above the hub (Opus #1020 r2 C3);
+#   its position frame to G hangs under that line, over the hub;
+# * the hub length low, its line (~0.142) under the strap's bottom edge, where
+#   datum G stands on it (Main's 2026-10-15 option B).
+# The root fillets' single limit reads left of the view between the two
+# blocks, under the strap's position frame and over the hub, its leader short
+# down-right to the +Z hub-root corner it measures (r3 run: requested right of
+# the view, the leader crossed the strap to that corner).
+STRAP_THICKNESS_TEXT_XY = (0.044, 0.2246)
+# The hub width's below rows end on the fit-up step that takes up the 20-hub
+# stack's excess (r5 Opus C2, drawing-guidelines.md rule 19 (absorb stacks at
+# fit-up)): MHA-CH-000 step "rocker-stack-accepted" re-faces a long stack.
+ROCKER_STACK_STEP_KEY = "rocker-stack-accepted"
+HUB_LENGTH_TEXT = (
+    f"{rocker_notes.HUB_LENGTH_CALLOUT} PER\n{channel_step_ref(ROCKER_STACK_STEP_KEY)}"
+)
+# Half a row up for that fourth row keeps the line (~0.142) where it was; the
+# widest row ("MHA-CH-000 STEP 1") clears the hub end.
+HUB_LENGTH_TEXT_XY = (0.040, 0.1578)
+HUB_ROOT_TEXT_XY = (0.047, 0.199)
+# Datum G's tag on the hub width's line (~0.142). SolidWorks keeps a
+# dimension-attached tag ON its dimension line, honouring only the requested
+# x, and leads it from the -Z arrow end (x 0.0856): requested inboard (r3b run
+# 20261015T155506221Z, x 0.080) its leader lay 5.6 mm along the line. So it
+# stands in line just outboard of that arrow (ASME Y14.5's datum feature on
+# the dimension line's extension), short of the front view's 132.8 left
+# witness (x ~0.105).
+HUB_WIDTH_DATUM_XY = (
+    RIGHT_CENTER[0] + rocker.HUB_LENGTH / 2.0 * RIGHT_SCALE[0] / RIGHT_SCALE[1] / 1000.0 + 0.008,
+    0.142,
+)
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
-    "HubLength": (0.280, 0.137),
+    "HubLength": HUB_LENGTH_TEXT_XY,
     "StrapThickness": STRAP_THICKNESS_TEXT_XY,
+    "HubRootRadius": HUB_ROOT_TEXT_XY,
 }
+# Datum B on the +Z strap face (view F's left line) near the strap's top
+# end, above the thickness block; its box up-left of the pick.
+DATUM_B_PICK_MODEL_Y = 28.0
+DATUM_B_SYMBOL_XY = (0.057, 0.247)
 
 _HUB_P = rocker_notes.DRAWING_PRECISION["Hub"]["HubLength"]
 _STRAP_P = rocker_notes.DRAWING_PRECISION["Strap"]["StrapThickness"]
@@ -1882,6 +1985,7 @@ HUB_FACES = requirement(
         "length_nominal": (rocker.HUB_LENGTH, ("HUB_LENGTH",)),
         "upper_z": (rocker.HUB_LENGTH / 2, ("HUB_LENGTH",)),
         "lower_z": (-rocker.HUB_LENGTH / 2, ("HUB_LENGTH",)),
+        "datum": ("G", (("draw_ch_rocker_arm", "_hub_width_datum"),)),
     }, precision={"length": _HUB_P},
 )
 STRAP_FACES = requirement(
@@ -1891,6 +1995,7 @@ STRAP_FACES = requirement(
         "thickness_nominal": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
         "upper_z": (rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
         "lower_z": (-rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
+        "position_datums": (["G"], (("draw_ch_rocker_arm", "_strap_position_frame"),)),
     }, precision={"thickness": _STRAP_P},
 )
 STRAP_DATUM_B = requirement(
@@ -1904,6 +2009,7 @@ STRAP_DATUM_B = requirement(
 )
 part_metadata(datums={
     "B": ({"feature": "strap_datum_b", "surface": "+Z broad strap face"}, (("draw_ch_rocker_arm", "build"),)),
+    "G": ({"feature": "hub_faces", "surface": "hub width centre plane"}, (("draw_ch_rocker_arm", "_hub_width_datum"),)),
 })
 BASIC_PROFILE_DIMENSIONS = {"TopRadius", "BottomRadius", "TopAbovePivot"}
 
@@ -1917,25 +2023,42 @@ def _basic_profile_dimensions(adapter: Any, annotations: list[Any]) -> None:
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         set_basic_dimension(adapter, display, label=f"arc-system {name}")
-        if name in ARC_PROFILE_OUTSIDE_MM:
-            # Dress exterior radius callouts with the pinion-arbor and
-            # arbor-pedestal leader pattern. The text must also be outside
-            # its parent circle: these flags alone did not remove the centre
-            # line when the R800 text was inside that circle.
-            display.ShortenedRadius = False
-            display.ArcExtensionLineOrOppositeSide = False
-            display.ArrowSide = 1  # swDimArrowsOutside
-            display.SolidLeader = False
-            if (
-                bool(display.ShortenedRadius)
-                or bool(display.ArcExtensionLineOrOppositeSide)
-                or int(display.ArrowSide) != 1
-                or bool(display.SolidLeader)
-            ):
-                raise RuntimeError(f"{name} retained its centre-directed radius leader")
         remaining.remove(name)
     if remaining:
         raise RuntimeError(f"arc-system BASIC dimensions missing: {sorted(remaining)}")
+
+
+def _dress_arc_radii(adapter: Any, annotations: list[Any]) -> None:
+    """Exterior leaders on both BASIC radii; R816 states its shared centre with
+    R800 (Opus #1020 r2 B1) in below-text rows, set after the BASIC box."""
+    remaining = set(ARC_RADIUS_NAMES)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        # Dress exterior radius callouts with the pinion-arbor and
+        # arbor-pedestal leader pattern. The text must also be outside
+        # its parent circle: these flags alone did not remove the centre
+        # line when the R800 text was inside that circle.
+        display.ShortenedRadius = False
+        display.ArcExtensionLineOrOppositeSide = False
+        display.ArrowSide = 1  # swDimArrowsOutside
+        display.SolidLeader = False
+        if (
+            bool(display.ShortenedRadius)
+            or bool(display.ArcExtensionLineOrOppositeSide)
+            or int(display.ArrowSide) != 1
+            or bool(display.SolidLeader)
+        ):
+            raise RuntimeError(f"{name} retained its centre-directed radius leader")
+        if name == "BottomRadius":
+            display.SetText(4, rocker_notes.BOTTOM_RADIUS_CALLOUT)
+            if str(display.GetText(4) or "") != rocker_notes.BOTTOM_RADIUS_CALLOUT:
+                raise RuntimeError("R816 concentric callout did not persist")
+        remaining.remove(name)
+    if remaining:
+        raise RuntimeError(f"arc radius dimensions missing: {sorted(remaining)}")
 
 
 def _dress_detail_dimensions(
@@ -1955,6 +2078,11 @@ def _dress_detail_dimensions(
         if name == "RodTipLen":
             # The land runs inside the J↔K profile: BASIC, the zone is its band.
             set_basic_dimension(adapter, display, label="tip land length")
+            # Both tip lands are this BASIC: the J land is counted here, not
+            # left to a mirror note (main-r1 Opus).
+            display.SetText(1, rocker_notes.TIP_LAND_PREFIX)
+            if str(display.GetText(1) or "") != rocker_notes.TIP_LAND_PREFIX:
+                raise RuntimeError("tip land length lost its 2X count")
             continue
         # Single exterior arrows, not diametral lines through both concentric
         # circles: otherwise the new hub OD and pivot bore leaders intersect.
@@ -1979,6 +2107,10 @@ def _dress_detail_dimensions(
         ):
             raise RuntimeError(f"pivot bore lost its part-owned ream tolerance: {band}")
         tolerance_type = int(model_dimension.GetToleranceType())
+        # The ream band reads as clearance on its named mate (Opus #1020).
+        display.SetText(4, rocker_notes.PIVOT_FIT_CALLOUT)
+        if str(display.GetText(4) or "") != rocker_notes.PIVOT_FIT_CALLOUT:
+            raise RuntimeError("pivot bore fit callout did not persist")
         prefix = str(display.GetText(5) or "")  # native prefix definition
         suffix = str(display.GetText(6) or "")  # native suffix definition
         callouts = (str(display.GetText(7) or ""), str(display.GetText(8) or ""))
@@ -2014,6 +2146,7 @@ def _add_rocker_outline_dimensions(
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _basic_profile_dimensions(adapter, annotations)
+    _dress_arc_radii(adapter, annotations)
     edges = scan_view_edges(front, label="rocker front outline")
     width_points = (
         (-ROD_TIP_X, _ROD_TIP_Y, ARM_THICKNESS / 2.0),
@@ -2071,6 +2204,36 @@ def _add_rocker_outline_dimensions(
     if (not _native_finite_scalar(taper_dimension.MaxWitnessLineLength)
             or abs(taper_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
         raise RuntimeError("132.76 retained full-height witnesses through parent E")
+    # The mirrored left taper vertex gets its own BASIC row from A: the same
+    # J↔K profile station as the right one.
+    left_taper_point = (-BOT_END_X, _BOT_END_Y, ARM_THICKNESS / 2.0)
+    left_taper = edges.exact_vertex_at(
+        left_taper_point, label="+Z left taper/lower-arc intersection"
+    )
+    (left_taper_xy,) = model_points_in_view(
+        adapter, front, [tuple(v / 1000.0 for v in left_taper_point)],
+        label="left taper intersection",
+    )
+    left_taper_dimension = add_edge_dimension(
+        adapter, front, p0=pivot_xy, p1=left_taper_xy,
+        text_xy=LEFT_TAPER_TEXT_XY, label="left taper intersection X",
+        orientation="horizontal", entities=(pivot, left_taper),
+        entity_types=("EDGE", "VERTEX"),
+    )
+    set_arc_endpoints_to_center(adapter, left_taper_dimension, label="left taper mirror-axis origin")
+    assert_dimension_measures(
+        adapter, left_taper_dimension, expected_mm=BOT_END_X, label="left taper intersection X",
+        entities=(pivot, left_taper), entity_types=("EDGE", "VERTEX"),
+    )
+    set_basic_dimension(adapter, left_taper_dimension, label="left taper intersection X")
+    left_taper_dimension = _early_bound(left_taper_dimension, "IDisplayDimension")
+    left_taper_dimension.SetText(4, "R816/TAPER")
+    if str(left_taper_dimension.GetText(4) or "") != "R816/TAPER":
+        raise RuntimeError("left taper endpoint identity label did not persist")
+    left_taper_dimension.MaxWitnessLineLength = TAPER_WITNESS_LENGTH
+    if (not _native_finite_scalar(left_taper_dimension.MaxWitnessLineLength)
+            or abs(left_taper_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
+        raise RuntimeError("left 132.76 retained full-height witnesses")
     land_entities = (pivot, vertices[1])
     land_dimension = add_edge_dimension(
         adapter, front, p0=pivot_xy, p1=width_xy[1],
@@ -2094,6 +2257,29 @@ def _add_rocker_outline_dimensions(
     if (not _native_finite_scalar(land_dimension.MaxWitnessLineLength)
             or abs(land_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
         raise RuntimeError("tip land X location retained full-height witnesses")
+    # The J land's own BASIC row from A: the K land's mirror, on the view.
+    left_land_entities = (pivot, vertices[0])
+    left_land_dimension = add_edge_dimension(
+        adapter, front, p0=pivot_xy, p1=width_xy[0],
+        text_xy=LEFT_LAND_LOCATION_TEXT_XY, label="left tip land X location",
+        orientation="horizontal", entities=left_land_entities, entity_types=("EDGE", "VERTEX"),
+    )
+    set_arc_endpoints_to_center(adapter, left_land_dimension, label="left tip land X location")
+    left_land_dimension = _early_bound(left_land_dimension, "IDisplayDimension")
+    if _early_bound(left_land_dimension.GetDimension2(0), "IDimension").GetArcEndCondition(1) != 1:
+        raise RuntimeError("left tip land X location: physical A endpoint must be centred")
+    assert_dimension_measures(
+        adapter, left_land_dimension, expected_mm=ROD_TIP_X, label="left tip land X location",
+        entities=left_land_entities, entity_types=("EDGE", "VERTEX"),
+    )
+    set_basic_dimension(adapter, left_land_dimension, label="left tip land X location")
+    left_land_dimension.SetText(4, LAND_LABEL)
+    if str(left_land_dimension.GetText(4) or "") != LAND_LABEL:
+        raise RuntimeError("left tip land X location: native label did not persist")
+    left_land_dimension.MaxWitnessLineLength = TAPER_WITNESS_LENGTH
+    if (not _native_finite_scalar(left_land_dimension.MaxWitnessLineLength)
+            or abs(left_land_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
+        raise RuntimeError("left tip land X location retained full-height witnesses")
     return annotations, taper_dimension, (pivot, taper), land_dimension, land_entities
 
 
@@ -2134,7 +2320,7 @@ def _add_pin_coordinates(adapter: Any, front: Any) -> None:
 def _require_land_location(
     adapter: Any, views: Any, dimension: Any, entities: tuple[Any, Any],
 ) -> None:
-    """Recheck the sole front-view BASIC locator after the final rebuild."""
+    """Recheck the K land's front-view BASIC locator after the final rebuild."""
     display = _early_bound(dimension, "IDisplayDimension")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     name = dimension_name(adapter, annotation)
@@ -2275,51 +2461,192 @@ def _require_radius_exterior(adapter: Any, front: Any) -> None:
                 raise RuntimeError(detail)
 
 
-def _add_strap_offset_dimension(adapter: Any, right: Any) -> Any:
-    """Measure hub +Z end to strap +Z face, as a band-free parenthesized reference."""
-    edges = scan_view_edges(right, label="rocker right offset")
-    strap = edges.exact_line_through(
-        (_TIP_FACE_MID_X, _TIP_FACE_MID_Y, ARM_THICKNESS / 2.0),
-        label="+Z strap face at radial land",
+def _dress_hub_root(adapter: Any, annotations: list[Any]) -> None:
+    """Prove view F's HubRootRadius prints the part's 2X R MAX and stop its
+    leader at the arc (draw_ch_pivot_bracket._dress_corner_radius)."""
+    found = [ann for ann in annotations if dimension_name(adapter, ann) == "HubRootRadius"]
+    if len(found) != 1:
+        raise RuntimeError(f"view F must import one HubRootRadius, found {len(found)}")
+    display = _early_bound(found[0].GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("the imported hub root radius is not radial")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != rocker_notes.HUB_ROOT_R_TOL_TYPE:
+        raise RuntimeError(f"HubRootRadius lost its native MAX type: {int(tolerance.Type)}")
+    if not math.isclose(float(dimension.SystemValue), rocker.HUB_ROOT_RADIUS_MAX / 1000.0, abs_tol=1e-9):
+        raise RuntimeError("HubRootRadius does not measure the hub root fillet")
+    if str(display.GetText(1) or "") != rocker_notes.HUB_ROOT_PREFIX:
+        raise RuntimeError("hub root radius lost its part-owned 2X")
+    display.ArcExtensionLineOrOppositeSide = False
+    if bool(display.ArcExtensionLineOrOppositeSide):
+        raise RuntimeError("HubRootRadius leader still runs to the opposite side")
+
+
+def _select_view_dimension(adapter: Any, view: Any, annotation: Any, *, label: str) -> tuple[Any, Any]:
+    """Re-resolve one imported dimension in ``view`` and select it alone.
+
+    draw_fr_top_frame._crossbar_median_datum's recipe: the view's own display
+    dimension (same selection name and FullName), selected on the documented
+    DIMENSION channel and read back as one swSelDIMENSIONS item.
+    """
+    wanted = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    name = str(wanted.GetNameForSelection() or "")
+    full_name = str(_early_bound(wanted.GetDimension2(0), "IDimension").FullName or "")
+    if not name or not full_name:
+        raise RuntimeError(f"{label}: dimension has no selection name / FullName")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    where = view_name(adapter, view)
+    if not _early_bound(model, "IDrawingDoc").ActivateView(where):
+        raise RuntimeError(f"{label}: failed to activate {where}")
+    model.ClearSelection2(True)
+    matches = [
+        display for display in (
+            _early_bound(raw, "IDisplayDimension")
+            for raw in _early_bound(view, "IView").GetDisplayDimensions() or ()
+        )
+        if display.GetNameForSelection() == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"{label}: expected one {name!r} in {where}, found {len(matches)}")
+    display = matches[0]
+    dimension_annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if (int(dimension_annotation.GetType()) != 4  # swDisplayDimension
+            or str(_early_bound(display.GetDimension2(0), "IDimension").FullName) != full_name):
+        raise RuntimeError(f"{label}: {name!r} re-resolved to another dimension")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    if extension.SelectByID2(name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0) is not True:
+        raise RuntimeError(f"{label}: failed to select {name!r}")
+    selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+    count = int(selection.GetSelectedObjectCount2(-1))
+    kind = int(selection.GetSelectedObjectType3(count, -1)) if count else 0
+    picked = selection.GetSelectedObject6(count, -1) if count else None
+    if (count != 1 or kind != 14 or picked is None  # swSelDIMENSIONS
+            or _early_bound(picked, "IDisplayDimension").GetNameForSelection() != name):
+        model.ClearSelection2(True)
+        raise RuntimeError(f"{label}: selecting {name!r} gave {count} object(s) of type {kind}")
+    return display, dimension_annotation
+
+
+def _attach_to_dimension(
+    adapter: Any, annotation: Any, display: Any, dimension_annotation: Any, *, label: str,
+    position: tuple[float, float] | None = None,
+) -> None:
+    """Hold ``annotation`` on the selected dimension, then prove it after a rebuild.
+
+    InsertDatumTag2 on a selected dimension leaves the tag attached to nothing
+    (draw_fr_top_frame, runs 20261009T155421516Z and 20261014T032231012Z);
+    IAnnotation::SetAttachedEntities takes the display dimension, else its
+    annotation. The proof is one swSelDIMENSIONS attachment that IS it.
+    """
+    attempts = []
+    if int(annotation.GetAttachedEntityCount3()) == 0:
+        for kind, target in (("display_dimension", display), ("annotation", dimension_annotation)):
+            accepted = bool(annotation.SetAttachedEntities(dispatch_array([target])))
+            attached = int(annotation.GetAttachedEntityCount3())
+            attempts.append(f"{kind}:{accepted}:{attached}")
+            if accepted and attached:
+                break
+    # Left where InsertDatumTag2 drops it, D's leader ran 10 mm along the hub
+    # width's dimension line (r3 run 20261015T142035980Z layout audit,
+    # line-on-dimension-line); the tag keeps to its line, so only its x is
+    # chosen (HUB_WIDTH_DATUM_XY).
+    if position is not None and not annotation.SetPosition2(*position, 0.0):
+        raise RuntimeError(f"{label}: failed to position it")
+    adapter.currentModel.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+    kinds = tuple(int(value) for value in annotation.GetAttachedEntityTypes() or ())
+    entities = tuple(annotation.GetAttachedEntities3() or ())
+    _telemetry.info(f"{label}: attach attempts={attempts}, types={kinds}")
+    if kinds != (14,) or len(entities) != 1 or entities[0] is None or annotation.IsDangling():
+        raise RuntimeError(f"{label}: not attached to its dimension: types={kinds}, attempts={attempts}")
+    attached = _early_bound(entities[0], "IDisplayDimension")
+    if int(adapter.swApp.IsSame(attached, display)) != 1:
+        raise RuntimeError(f"{label}: attached to another dimension")
+
+
+def _hub_width_datum(adapter: Any, view: Any, hub_length: Any) -> Any:
+    """Datum G on the native hub width: the centre plane of both hub end
+    faces (Main's 2026-10-15 option B), its tag in line with the dimension
+    line at HUB_WIDTH_DATUM_XY. G, not D: detail D already uses that letter
+    (Opus #1020 r3 C4)."""
+    label = "hub width datum G"
+    display, dimension_annotation = _select_view_dimension(adapter, view, hub_length, label=label)
+    raw_tag = adapter.currentModel.InsertDatumTag2()
+    if raw_tag is None:
+        raise RuntimeError(f"{label}: InsertDatumTag2 returned nothing")
+    tag = _early_bound(raw_tag, "IDatumTag")
+    letter = HUB_FACES.fields["datum"][0]
+    if not tag.SetLabel(letter):
+        raise RuntimeError(f"{label}: failed to label it {letter}")
+    _attach_to_dimension(
+        adapter, _early_bound(tag.GetAnnotation(), "IAnnotation"), display,
+        dimension_annotation, label=label, position=HUB_WIDTH_DATUM_XY,
     )
-    hub = edges.circle_at(
-        (0.0, PIVOT_MID_Y, HUB_LENGTH / 2.0), HUB_DIA / 2.0,
-        axis=(0.0, 0.0, 1.0), label="+Z hub end rim",
+    if str(tag.GetLabel()) != letter:
+        raise RuntimeError(f"{label}: label did not persist")
+    return tag
+
+
+def _dimension_position_frame(
+    adapter: Any, view: Any, size: Any, *, label: str, tolerance: str,
+    datums: tuple[str, ...], diameter: bool = False,
+) -> Any:
+    """A native position frame on the selected size dimension, never a
+    leader to one face; read back before and after its attaching rebuild."""
+    xml = gtol_frame_xml("position", tolerance, datums=datums, diameter=diameter)
+    expected = gtol_frame_signature(xml)
+    display, dimension_annotation = _select_view_dimension(adapter, view, size, label=label)
+    raw = adapter.currentModel.InsertGtol()
+    if raw is None:
+        raise RuntimeError(f"{label}: InsertGtol returned nothing")
+    gtol = _early_bound(raw, "IGtol")
+    if int(gtol.GetFrameCount() or 0) == 0 and gtol.AddFrame() is not True:
+        raise RuntimeError(f"{label}: failed to create a frame")
+    frame = gtol.GetFrame(1)
+    if frame is None:
+        # An old-format empty frame from the template: seed, then convert
+        # (_drawing_gdt.add_feature_control_frame's migration order).
+        gtol.SetFrameSymbols2(1, f"<{GTOL_SYMBOLS['position']}>", diameter, "", False, "", "", "", "")
+        if gtol.SetFrameValues2(1, tolerance, "", *[*datums, "", ""][:3]) is not True:
+            raise RuntimeError(f"{label}: failed to seed the frame for migration")
+        if gtol.CanConvertFormat() is not True or int(gtol.ConvertFormat()) != 0:
+            raise RuntimeError(f"{label}: frame migration failed")
+        frame = _early_bound(gtol.GetFrame(1), "IGtolFrame")
+    else:
+        frame = _early_bound(frame, "IGtolFrame")
+        if frame.SetSymbolXml(xml) is not True:
+            raise RuntimeError(f"{label}: SOLIDWORKS rejected the frame XML")
+    if gtol_frame_signature(str(frame.GetSymbolXml() or "")) != expected or int(gtol.GetFormat()) != 2:
+        raise RuntimeError(f"{label}: frame did not persist: {frame.GetSymbolXml()!r}")
+    _attach_to_dimension(
+        adapter, _early_bound(gtol.GetAnnotation(), "IAnnotation"), display,
+        dimension_annotation, label=label,
     )
-    points = model_points_in_view(
-        adapter, right,
-        [
-            (0.0, (PIVOT_MID_Y + HUB_DIA / 2.0) / 1000.0, HUB_LENGTH / 2000.0),
-            tuple(v / 1000.0 for v in strap.midpoint_mm),
-        ],
-        label="hub end and strap face offset",
+    applied = _early_bound(gtol.GetFrame(1), "IGtolFrame").GetSymbolXml()
+    if gtol_frame_signature(str(applied or "")) != expected:
+        raise RuntimeError(f"{label}: frame changed after rebuild: {applied!r}")
+    return gtol
+
+
+def _strap_position_frame(adapter: Any, view: Any, strap_thickness: Any) -> Any:
+    """Position the strap width's centre plane to G under its 2.500 size
+    (#948 ruling R's symmetry; Main's 2026-10-15 option B)."""
+    return _dimension_position_frame(
+        adapter, view, strap_thickness, label="strap position to G",
+        tolerance=GEOMETRIC_TOLERANCES_MM["strap position to hub"],
+        datums=tuple(STRAP_FACES.fields["position_datums"][0]),
     )
-    dimension = add_edge_dimension(
-        adapter, right, p0=points[0], p1=points[1],
-        text_xy=STRAP_OFFSET_TEXT_XY, label="strap offset from hub end",
-        orientation="horizontal", entities=(hub.edge, strap.edge),
+
+
+def _hub_position_frame(adapter: Any, hub: Any, hub_dia: Any) -> Any:
+    """Position the hub OD's axis to A under its Ø10.20 in detail D: the
+    zone the hub wall minimum is computed with (regate-r1 #2, not a note)."""
+    return _dimension_position_frame(
+        adapter, hub, hub_dia, label="hub OD position to A",
+        tolerance=GEOMETRIC_TOLERANCES_MM["hub OD position to bore"],
+        datums=tuple(HUB_OD.fields["position_datums"][0]), diameter=True,
     )
-    # In the right view the end rim projects to a straight, constant-Z line;
-    # it has no drawing circular endpoint to centre. The native X measurement
-    # and attachment readbacks below prove the end-plane offset directly.
-    assert_dimension_measures(
-        adapter, dimension, expected_mm=(HUB_LENGTH - ARM_THICKNESS) / 2.0,
-        label="strap offset from hub end", entities=(hub.edge, strap.edge),
-    )
-    display = _early_bound(dimension, "IDisplayDimension")
-    model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    if int(model_dimension.GetToleranceType()) != 0:  # swTolNONE
-        raise RuntimeError("strap offset reference acquired an acceptance band")
-    display.SetPrecision3(DEFAULT_DRAWING_PRECISION, -1, -1, -1)
-    if int(display.GetPrimaryPrecision2()) != DEFAULT_DRAWING_PRECISION:
-        raise RuntimeError("strap offset reference lost normal drawing precision")
-    display.MaxWitnessLineLength = STRAP_OFFSET_WITNESS_LENGTH
-    if abs(float(display.MaxWitnessLineLength) - STRAP_OFFSET_WITNESS_LENGTH) > 1e-9:
-        raise RuntimeError("strap offset retained crossing full-height witnesses")
-    set_reference_dimension(
-        adapter, display.GetAnnotation(), label="strap offset from hub end"
-    )
-    return display
 
 
 def _add_between_points(adapter: Any, front: Any) -> dict[str, Any]:
@@ -2366,7 +2693,7 @@ def _arc_profile_point(name: str) -> tuple[float, float, float]:
 
 
 def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
-    """Attach and retain native frames: Ⓤ0.5 top, Ⓤ0 bottom J↔K, total zone 0.5."""
+    """Attach and retain native frames: Ⓤ0.5 top (its mate below it), Ⓤ0 bottom J↔K, total zone 0.5."""
     profiles = {}
     for name, radius in (("TopRadius", R_TOP), ("BottomRadius", R_BOTTOM)):
         edge = visible_circle_edge(adapter, front, 2.0 * radius)
@@ -2381,11 +2708,52 @@ def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
             tolerance=ARC_PROFILE_ZONE_MM,
             outside_disposition=ARC_PROFILE_OUTSIDE_MM[name],
             datums=ARC_PROFILE_DATUMS,
+            # The amplitude bar's foot rides the top edge (rule 4: name the mate).
+            quantity=rocker_notes.TOP_EDGE_MATE_CALLOUT if name == "TopRadius" else "",
             label=f"arc-system {name} profile",
         )
     _set_profile_between(adapter, profiles["BottomRadius"])
     _add_between_points(adapter, front)
     return profiles
+
+
+def _add_view_arrow(adapter: Any, front: Any) -> None:
+    """Letter-note viewing arrow naming the 3:1 removed view F.
+
+    The native projected-view arrow is not switchable through the API
+    (``IProjectionArrow.Visible`` is get-only; draw_dt_cone_tip_block's C1
+    verdict), so a letter note's straight leader is the arrow.
+    """
+    land_mid = (
+        (TOP_END_X + ROD_TIP_X) / 2000.0, (TOP_END_Y + _ROD_TIP_Y) / 2000.0, 0.0,
+    )
+    ((land_x, land_y),) = _project(adapter, front, (land_mid,), label="view F arrow land")
+    tip_xy = (max(land_x, _project(
+        adapter, front, ((ROD_TIP_X / 1000.0, _ROD_TIP_Y / 1000.0, 0.0),),
+        label="view F arrow rod tip",
+    )[0][0]) + VIEW_ARROW_TIP_GAP, land_y)
+    letter = rocker_notes.VIEW_ARROW_LETTER
+    note = add_leader_note(
+        adapter,
+        letter,
+        text_xy=(VIEW_ARROW_TEXT_X, land_y + VIEW_LETTER_HEIGHT / 2.0),
+        attach_xy=tip_xy,
+        view=front,
+        label=f"view {letter} viewing arrow",
+    )
+    # add_note leaves text at the document height; size the letter (the
+    # draw_dt_cone_tip_block recipe) and prove the leader tip did not move.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"view {letter} arrow note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"failed to size the view {letter} arrow letter")
+    rebuild_drawing(adapter, label=f"view {letter} arrow letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError(f"view {letter} arrow tip moved when its letter was sized")
 
 
 def _native_finite_scalar(value: Any) -> bool:
@@ -3197,6 +3565,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "Right View Note",
         ),
         required=(
             "Number",
@@ -3205,6 +3574,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "Right View Note",
         ),
     )
     drawing_model, sheet = new_project_drawing(
@@ -3224,10 +3594,11 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Explicit per-view scale (an auto-scaled view shifts every coordinate pick).
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
-    # 1:1 right end view: the 2.50 x ~29 strap section -- prints the strap
-    # thickness and hub length, gives the through direction, and carries datum B
-    # (the broad face) so the rod-pin position frame has an orientation datum.
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    # View F, the 3:1 removed right end view: the 2.50 x ~29 strap section --
+    # prints the strap thickness, the hub width (datum G) and the hub-root
+    # fillets, gives the through direction, and carries datum B (the broad
+    # face) so the rod-pin position frame has an orientation datum.
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=RIGHT_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
     for view in (right, iso):
         set_hidden_lines_removed(adapter, view)
@@ -3300,17 +3671,39 @@ async def build(adapter: Any) -> dict[str, str]:
             "TopAbovePivot": TOP_EDGE.precision["height_above_pivot"],
             "HubLength": HUB_FACES.precision["length"],
             "StrapThickness": STRAP_DATUM_B.precision["thickness"],
+            "HubRootRadius": rocker_notes.DRAWING_PRECISION["HubRoot"]["HubRootRadius"],
         },
     )
+    # Each band names what it serves (Opus #1020): hub length spaces the
+    # pivot-shaft stack; the strap's thickness is the rod fork's side clearance.
+    # Both multi-row callouts sit below their values: above-text line breaks
+    # print as one run.
     set_dimension_callouts(
-        adapter, right_annotations, {"HubLength": "HUB LENGTH"}, location="above",
+        adapter, right_annotations, {
+            "HubLength": HUB_LENGTH_TEXT,
+            "StrapThickness": rocker_notes.STRAP_FIT_CALLOUT,
+        },
+        location="below",
     )
     for annotation in right_annotations:
-        if dimension_name(adapter, annotation) == "HubLength":
-            display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-            if str(display.GetText(3) or "") != "HUB LENGTH":
-                raise RuntimeError("hub length identity callout did not persist")
-    _add_strap_offset_dimension(adapter, right)
+        name = dimension_name(adapter, annotation)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        if name == "HubLength" and str(display.GetText(4) or "") != HUB_LENGTH_TEXT:
+            raise RuntimeError("hub length stack callout did not persist")
+        if name == "StrapThickness" and str(display.GetText(4) or "") != rocker_notes.STRAP_FIT_CALLOUT:
+            raise RuntimeError("strap thickness fork-fit callout did not persist")
+    try:
+        phase = "view F hub-root radius"
+        _dress_hub_root(adapter, right_annotations)
+        phase = "view F datum G"
+        (hub_length,) = [ann for ann in right_annotations if dimension_name(adapter, ann) == "HubLength"]
+        _hub_width_datum(adapter, right, hub_length)
+        phase = "view F strap position frame"
+        (strap_thickness,) = [ann for ann in right_annotations if dimension_name(adapter, ann) == "StrapThickness"]
+        _strap_position_frame(adapter, right, strap_thickness)
+    except Exception as exc:  # noqa: BLE001 - the imported native drawing still exists
+        _capture_layout_failure(adapter, phase, exc)
+        raise
 
     # Template marks already exist. Count printed primitives, not type-13
     # objects: native detail arrays also retain readable, zero-ink off-crop
@@ -3324,7 +3717,8 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, view, label=label, required=required, detail=detail,
         )
 
-    # E's native wizard-hole callout keeps the source through condition.
+    # E's native wizard-hole callout keeps the source through condition; its
+    # first row names the pin that runs in it (Opus #1020 r3 C5).
     rod_hole_edge = visible_circle_edge(adapter, end, _ROD_HOLE_DIA)
     rod_callout = add_native_hole_callout(
         adapter,
@@ -3332,7 +3726,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=rod_hole_edge,
         callout_xy=ROD_CALLOUT_XY,
         label="rod-pin hole",
-        process=drill_process(ROD_HOLE_SPEC) + "\n",
+        process=rocker_notes.ROD_PIN_MATE_CALLOUT + "\n" + drill_process(ROD_HOLE_SPEC) + "\n",
     )
     _require_rod_through_callout(rod_callout)
 
@@ -3366,23 +3760,30 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot bore finish",
         char_height=PIVOT_FINISH_CHAR_HEIGHT,
     )
+    # The hub OD's coaxiality to A rides its own Ø10.20 in D (regate-r1 #2).
+    try:
+        (hub_dia,) = [ann for ann in hub_annotations if dimension_name(adapter, ann) == "HubDia"]
+        _hub_position_frame(adapter, hub, hub_dia)
+    except Exception as exc:  # noqa: BLE001 - the imported native drawing still exists
+        _capture_layout_failure(adapter, "detail D hub OD position frame", exc)
+        raise
     # Then a position FCF tying the rod-pin hole to A|B: B (broad face, on the
     # end view) orients the hole axes, and the BASIC X/Y above hold its 133.34
     # from A. Rotation about A is free -- the hole itself is datum C, which
     # clocks the profile frames (Pedro, option 4).
-    # Datum B on the strap's broad face in the end view, picked ABOVE the hub
-    # band (the O10 hub hides the flank over y 3..13 since 2026-09-02); the
-    # end view is centred on the strap's mid-depth (PIVOT_MID_Y).
-    broad_face = (
-        RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0,
-        RIGHT_CENTER[1]
-        + (ARM_DEPTH - 1.0 - PIVOT_MID_Y) / 1000.0,  # right view is 1:1,
+    # Datum B on the strap's broad face in view F, picked ABOVE the hub band
+    # (the O10 hub hides the flank over y 3..13 since 2026-09-02) and above the
+    # thickness block's line, projected natively at the view's 3:1.
+    (broad_face,) = _project(
+        adapter, right,
+        ((0.0, DATUM_B_PICK_MODEL_Y / 1000.0, ARM_THICKNESS / 2000.0),),
+        label="datum B broad-face pick",
     )
     add_datum_feature(
         adapter,
         right,
         edge_xy=broad_face,
-        symbol_xy=(broad_face[0] - 0.016, broad_face[1] + 0.004),
+        symbol_xy=DATUM_B_SYMBOL_XY,
         datum=STRAP_DATUM_B.fields["datum"][0],
         label="broad face",
     )
@@ -3420,8 +3821,10 @@ async def build(adapter: Any) -> dict[str, str]:
         _capture_layout_failure(adapter, "R24 datum C on the rod-pin frame", exc)
         raise
     arc_profiles = _add_arc_profiles(adapter, front)
+    _add_view_arrow(adapter, front)
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_XY)
+    add_property_linked_note(adapter, "Right View Note", *RIGHT_CAPTION_XY)
     _place_detail_letters(adapter, front)
     _normalize_detail_caption_styles(adapter, front, hub, end, caption_font_source)
     # Record BOTH native labels before D can abort and discard E's evidence.

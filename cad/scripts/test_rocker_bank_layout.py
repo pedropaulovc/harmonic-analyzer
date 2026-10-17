@@ -207,9 +207,10 @@ def test_hub_wall_covers_the_worst_printed_limits_and_eccentricity() -> None:
     stated_wall = math.floor(wall * scale + 1e-9) / scale
     assert arm_notes.HUB_WALL_MIN == pytest.approx(stated_wall)
     assert stated_wall <= wall + 1e-9
-    assert arm_notes.HUB_WALL_NOTE == f"MIN HUB WALL {stated_wall:.{places}f}"
+    assert arm_notes.HUB_WALL_NOTE == f"HUB WALL {stated_wall:.{places}f} MIN"
     assert arm_notes.HUB_WALL_NOTE in arm_notes.DRAWING_NOTES
-    assert f"WITHIN Ø{arm.HUB_COAXIALITY_DIA:.{places}f}" in arm_notes.DRAWING_NOTES
+    # The eccentricity is the hub OD's printed position zone to A.
+    assert float(arm.GEOMETRIC_TOLERANCES_MM["hub OD position to bore"]) == arm.HUB_COAXIALITY_DIA
     # The spec's pessimistic hundredth-mm ceiling also covers the rounded
     # printed class; lowering that floor by one printed step does not.
     floor_wall = (arm.HUB_DIA_MIN - display_band - bore_max) / 2.0 - eccentricity
@@ -398,6 +399,42 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     assert _cheek_cap(monkeypatch, _BAND_2PL, 0.0) - hub_top < 0.0
     assert _cheek_cap(monkeypatch, 0.0, _BAND_2PL) - hub_top < 0.0
     assert (washer.OD + _BAND_2PL) / 2.0 <= hub_max_material_r
+
+
+def test_hub_root_fillet_clears_a_cheek_running_on_the_strap_face(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Opus #1020 r2 C2 (rule 16): the hub-to-strap roots carry a fillet up to
+    HUB_ROOT_RADIUS_MAX. The bar floats axially in its foot notch, so at d = 0
+    a cheek can run on the strap face, where the fillet stands its full radius
+    proud of the hub wall. At the worst hub (maximum material, off the bore
+    axis by the coaxiality's radius) that radius must still pass under the
+    cheeks' underside."""
+    worst = _cheek_cap(
+        monkeypatch, bar.BOTTOM_NOTCH_DEPTH_BAND[0], -arm.TOP_EDGE_BAND[1]
+    )
+    places = arm_notes.DRAWING_PRECISION["HubProfile"]["HubDia"]
+    hub_top = (
+        round(arm.HUB_DIA, places) + printed_band_mm(places)
+    ) / 2.0 + arm.HUB_COAXIALITY_DIA / 2.0
+    air = worst - hub_top
+    radius = arm.HUB_ROOT_RADIUS_MAX
+
+    def proud(gap: float, r: float) -> float:
+        """Fillet surface height over the hub wall ``gap`` out from the strap face."""
+        return r - math.sqrt(r * r - (r - gap) ** 2) if gap < r else 0.0
+
+    # The cheek's inner face anywhere from on the strap face out past the
+    # fillet: the worst is on the face, the full radius.
+    worst_proud = max(proud(gap, radius) for gap in np.linspace(0.0, radius, 41))
+    assert worst_proud == pytest.approx(radius)
+    assert radius <= air
+    # Negative control: r2's R0.5 proposal, sized for a centred bar, would
+    # reach a cheek running on the strap face.
+    assert proud(0.0, 0.5) > air
+    # The print states it as a single MAX limit (sharp is acceptable).
+    assert arm_notes.HUB_ROOT_R_BAND == (0.0, -radius)
+    assert arm_notes.HUB_ROOT_R_TOL_TYPE == 6  # swTolType_e.swTolMAX
 
 
 def test_the_one_sided_bands_lift_the_bar_at_most_1_mm_at_rest(

@@ -20,6 +20,7 @@ import draw_ch_rocker_arm as drawing
 import build_ch_rocker_arm as arm
 import _drawing_detail_crop as detail_crop
 from _drawing_layout_check import DrawableRegion
+from _gtol_frame import gtol_frame_signature, gtol_frame_xml
 from _layout_geometry import AnnotationGeometry, Box, Segment, segment_box_distance, text_overlap
 from _drawing_registry import DRAWINGS_BY_NAME
 from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
@@ -113,54 +114,116 @@ def test_sheet_runs_at_1_to_2() -> None:
     assert "scale=(1, 2)" in source
     assert ch_rocker_arm_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    # View F is labelled as its own removed view (MR #1020), from a stamped
+    # part property the drawing requires, right after the iso caption; its
+    # caption names the front's viewing arrow and the scale the view is placed
+    # at (3:1 since Opus #1020 r2, so the hub width and datum G read apart).
+    assert "scale=RIGHT_SCALE" in source
+    assert drawing.RIGHT_SCALE == (ch_rocker_arm_notes.RIGHT_VIEW_SCALE, 1)
+    assert ch_rocker_arm_notes.RIGHT_VIEW_NOTE.endswith(
+        f"SCALE {drawing.RIGHT_SCALE[0]}:{drawing.RIGHT_SCALE[1]}"
+    )
+    assert f"VIEW {ch_rocker_arm_notes.VIEW_ARROW_LETTER} " in ch_rocker_arm_notes.RIGHT_VIEW_NOTE
+    # The caption sits under view F's silhouette, inside the sheet border.
+    scale = drawing.RIGHT_SCALE[0] / drawing.RIGHT_SCALE[1]
+    view_bottom = drawing.RIGHT_CENTER[1] - ch_rocker_arm_spec.TOP_END_Y * scale / 2000.0
+    assert drawing.RIGHT_CAPTION_XY[1] < view_bottom - 0.02
+    assert drawing.RIGHT_CAPTION_XY[0] > 0.0125
+    assert (
+        'add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_XY)\n'
+        '    add_property_linked_note(adapter, "Right View Note", *RIGHT_CAPTION_XY)'
+    ) in source
+    build = next(
+        node for node in ast.parse(source).body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    reads = [
+        node for node in ast.walk(build)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "read_required_properties"
+    ]
+    assert len(reads) == 1
+    (_model, names), keywords = reads[0].args, {k.arg: k.value for k in reads[0].keywords}
+    assert "Right View Note" in ast.literal_eval(names)
+    assert "Right View Note" in ast.literal_eval(keywords["required"])
+    part = Path(arm.__file__).read_text(encoding="utf-8")
+    assert '"Right View Note"' in part and "RIGHT_VIEW_NOTE" in part
+
+
+def test_view_arrow_names_the_removed_right_view_from_the_notes_letter() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    build = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    statements = [ast.unparse(node) for node in build.body]
+    profiles = statements.index("arc_profiles = _add_arc_profiles(adapter, front)")
+    assert statements[profiles + 1] == "_add_view_arrow(adapter, front)"
+    # The caption and the arrow share one letter, owned by the notes module.
+    letter = ch_rocker_arm_notes.VIEW_ARROW_LETTER
+    assert f"VIEW {letter} " in ch_rocker_arm_notes.RIGHT_VIEW_NOTE
+    arrow = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_add_view_arrow"
+    )
+    assert "rocker_notes.VIEW_ARROW_LETTER" in ast.unparse(arrow)
+    assert not any(
+        isinstance(node, ast.Constant) and node.value == letter
+        for node in ast.walk(arrow)
+    )
+    assert drawing.add_leader_note.__module__ == "_drawing_leader_notes"
 
 
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
     notes = ch_rocker_arm_notes.DRAWING_NOTES
-    # One common nominal centre on the plane, explicitly above physical A.
-    assert "COMMON ARC CENTRE ABOVE A ON THE PLANE;" in notes
+    flat = " ".join(line.strip() for line in notes.splitlines())
+    # One common nominal centre, directly above physical A; lands radial to it.
+    assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", flat)
     assert "R800" not in notes
     assert "R816" not in notes
-    # Processes and through conditions belong to the native size callouts.
-    assert "ROD-PIN HOLE, 1X" in notes
+    # Processes and through conditions belong to the native size callouts; the
+    # views name datum C, so no note explains it (rule 7, main-r1 Opus).
+    assert "ROD-PIN HOLE" not in notes and "DATUM C" not in notes
     assert "#47" not in notes
     assert "PIVOT HOLE: REAM" not in notes
     assert "16.00 REF" not in notes
     assert "ALL HOLES THRU" not in notes
-    # Native BASIC nominals stay authoritative; the note identifies the 8.00.
+    # Native BASIC nominals stay authoritative; no note restates the 8.00.
     assert "808.00 REF FROM THE PIVOT" not in notes
+    assert "TOP ARC ABOVE A" not in notes
+    assert f"{ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT:.2f}" not in notes
     assert "INTEGRAL HUB DIA" not in notes
-    assert "HUB LENGTH SETS THE PITCH" in " ".join(notes.split())
+    # Integral hub length (no spacers) sets the pitch: that rides the native
+    # hub-length callout, naming the stack's mate; strap symmetry moved onto
+    # its native right-view 2X offset band.
+    assert "HUB LENGTH SETS" not in notes
+    assert "MHA-CH-005" in ch_rocker_arm_notes.HUB_LENGTH_CALLOUT
+    assert "STRAP SYMMETRIC" not in notes
     assert "ARC LENGTHS" not in notes
     assert "EACH END:" not in notes
-    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2", "3", "4"]
-    assert "UPPER BAR CONTACT; LOWER STRAP ENVELOPE" in notes
+    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2"]
+    # The upper bar contact rides the top frame's mate row; the lower strap
+    # envelope rides R816's CONCENTRIC callout.
+    assert "UPPER BAR CONTACT" not in notes and "LOWER STRAP ENVELOPE" not in notes
     assert "ROD-PIN SETS CONNECTING-ROD GEOMETRY." not in notes
     # Option 4: datum C is the rod-pin hole; the old note 5 (C on the land) is gone.
     assert "STRAP END LAND" not in notes and "DEFINED BY NOTE 1" not in notes
-    assert (
-        "1. MIRROR PLANE: THROUGH DATUM AXIS A, PERPENDICULAR TO DATUM B, "
-        "CLOCKED BY DATUM C (ROD-PIN HOLE, 1X, END SHOWN)."
-        in " ".join(notes.split())
-    )
+    # Both ends are dimensioned on the views (J LAND row, 2X 5.59), not
+    # mirrored by a note (rule 7, main-r1 Opus).
+    assert "MIRROR" not in notes
+    assert "1. ARC CENTRE DIRECTLY ABOVE A; TIP LANDS RADIAL TO IT." in flat
     # The lands' 10.46° is derived (radial to the arc centre), never a note number.
-    assert "2. COMMON ARC CENTRE ABOVE A ON THE PLANE; TIP LANDS RADIAL TO IT." in " ".join(notes.split())
     assert "°" not in notes
     assert "NORMAL TO LENGTH" not in notes and "NOMINAL MIRROR PLANE" not in notes
-    assert f"{ch_rocker_arm_notes.HUB_WALL_NOTE}." in notes
-    assert max(map(len, notes.splitlines())) <= 42
-    assert len(notes.splitlines()) == 11
-    assert (
-        f"HUB OD COAXIAL WITH PIVOT BORE WITHIN Ø{ch_rocker_arm_spec.HUB_COAXIALITY_DIA:.2f}."
-        in " ".join(line.strip() for line in notes.splitlines())
-    )
+    # Named-exception wall and the mate that caps the OD.
+    assert f"2. {ch_rocker_arm_notes.HUB_WALL_NOTE}; OD CLEARS MHA-CH-001 FOOT CHEEKS." in notes
+    assert _notes_fit_left_of_the_title_block(notes)
+    assert len(notes.splitlines()) == 2
+    # The hub OD's coaxiality is its native position frame in detail D
+    # (regate-r1 #2), not a tolerance in a note.
+    assert "COAXIAL" not in notes and "WITHIN" not in notes and "Ø" not in notes
     assert "TURN HUB" not in notes and "ONE SETUP" not in notes
-    assert (
-        f"BASIC {ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT:.2f}: TOP ARC ABOVE A."
-        in notes
-    )
-    assert "11.5 IN" not in notes
-    assert "0.22 IN" not in notes
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
     assert not re.search(r"\b(?:\d+\s*)?BA\b", notes)
@@ -168,6 +231,23 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert re.search(
         r'add_property_linked_note\(\s*adapter, "Manufacturing Notes"', source
     )
+
+
+def test_hub_width_callout_names_the_fit_up_step_that_takes_up_the_stack() -> None:
+    """r5 Opus C2 (rule 19): 20 hubs at +0.05/0 can run 1.0 long; the sheet
+    names the MHA-CH-000 step whose stack acceptance re-faces a long stack."""
+    import ch_channel_assembly_steps as channel_steps
+    import draw_ch_channel_assembly as channel_sheet
+    import rocker_bank_layout as bank
+
+    key = drawing.ROCKER_STACK_STEP_KEY
+    assert drawing.HUB_LENGTH_TEXT.startswith(ch_rocker_arm_notes.HUB_LENGTH_CALLOUT)
+    assert drawing.HUB_LENGTH_TEXT.endswith(f"PER\n{channel_steps.step_ref(key)}")
+    number = channel_steps.step_number(key)
+    printed = " ".join(channel_sheet.FITUP_STEPS.split())
+    step = printed.split(f" {number}. ", 1)[1].split(f" {number + 1}. ", 1)[0]
+    assert "RE-FACE A LONG STACK" in step
+    assert f"{bank.STACK_L20_ACCEPT[0]:.2f} TO {bank.STACK_L20_ACCEPT[1]:.2f}" in step
 
 
 def test_native_gdt_and_finish_present() -> None:
@@ -278,40 +358,65 @@ def test_basic_radius_text_positions_are_outside_their_parent_circles() -> None:
     assert math.dist(centre, (0.130, 0.218)) < top_rendered_radius
 
 
+def test_radius_text_positions_are_outside_their_parent_circles() -> None:
+    """Inside-circle R800 placement retained a centre tail on the native sheet."""
+    centre_model_y = (
+        drawing.PIVOT_MID_Y + ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT + drawing.R_TOP
+    )
+    centre = _front_xy(0.0, centre_model_y)
+    for name, radius in (
+        ("TopRadius", drawing.R_TOP),
+        ("BottomRadius", drawing.R_BOTTOM),
+    ):
+        rendered_radius = math.dist(
+            centre, _front_xy(0.0, centre_model_y + radius)
+        )
+        assert math.dist(centre, drawing.FRONT_KEEP[name]) > rendered_radius
+    # Negative control: the former top label lay inside the same nominal circle.
+    top_rendered_radius = math.dist(
+        centre, _front_xy(0.0, centre_model_y + drawing.R_TOP)
+    )
+    assert math.dist(centre, (0.130, 0.218)) < top_rendered_radius
+
+
 def test_radius_text_and_profile_requests_use_the_approved_clearance_corridors() -> None:
     """Source placement hypotheses, NOT current native clearance evidence."""
-    assert drawing.FRONT_KEEP["TopRadius"] == (0.145, 0.136)
-    assert drawing.FRONT_KEEP["BottomRadius"] == (0.169, 0.128)
+    assert drawing.FRONT_KEEP["TopRadius"] == (0.132, 0.156)
+    assert drawing.FRONT_KEEP["BottomRadius"] == (0.160, 0.156)
+    # Both radius texts sit on one row above the new left taper row, with at
+    # least two text rows (2 x 4.2 mm) of air; R816 stays left of D's letter.
+    left_taper_y = drawing.LEFT_TAPER_TEXT_XY[1]
+    for name in ("TopRadius", "BottomRadius"):
+        assert drawing.FRONT_KEEP[name][1] - left_taper_y >= 2 * 0.0042
+    assert drawing.DETAIL_LETTER_XY["D"][0] - drawing.FRONT_KEEP["BottomRadius"][0] >= 0.020
+    # R816's CONCENTRIC rows hang under its value (Opus #1020 r2 B1); the left
+    # taper's value stays left of that block.
+    concentric = _callout_block(drawing.FRONT_KEEP["BottomRadius"], ch_rocker_arm_notes.BOTTOM_RADIUS_CALLOUT)
+    taper_right = drawing.LEFT_TAPER_TEXT_XY[0] + len("132.8") * CAPTION_CHAR_WIDTH / 2.0
+    assert concentric.xmin - taper_right >= 0.003
     assert drawing.ARC_PROFILE_FRAME_XY == {
-        "TopRadius": (0.130, 0.207), "BottomRadius": (0.020, 0.160),
+        "TopRadius": (0.130, 0.211), "BottomRadius": (0.207, 0.163),
     }
-    assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": -110.0}
+    assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": 40.0}
+    # The frame's top stays under the raised overall-width row's text.
+    assert drawing.OVERALL_WIDTH_TEXT_XY[1] > drawing.ARC_PROFILE_FRAME_XY["TopRadius"][1]
 
 
 def test_r20_local_requests_leave_views_geometry_and_strict_caption_air_unchanged() -> None:
     """Placement hypotheses from R19 ink, not proof of the next native render."""
     assert drawing.FRONT_CENTER == (0.180, 0.175)
-    assert drawing.RIGHT_CENTER == (0.300, 0.165)
     assert drawing.ISO_CENTER == (0.345, 0.205)
     assert drawing.HUB_CENTER == (0.180, 0.095)
     assert drawing.END_CENTER == (0.330, 0.110)
     assert drawing.HUB_SCALE == (4.0, 1.0)
     assert drawing.END_SCALE == (2.0, 1.0)
     assert drawing.DETAIL_NO_OUTLINE == {"D": True, "E": False}
-    assert drawing.DETAIL_LETTER_XY == {"D": (0.167, 0.155), "E": (0.264, 0.155)}
+    assert drawing.DETAIL_STYLE == {"D": 2, "E": 0}  # swDetViewLEADER / swDetViewSTANDARD
+    assert drawing.DETAIL_LETTER_XY == {"D": (0.188, 0.161), "E": (0.264, 0.155)}
     assert drawing.ROD_CALLOUT_XY == (0.279, 0.115)
     assert drawing.FCF_XY == (0.262, 0.1001)
-    assert drawing.RIGHT_KEEP["HubLength"] == (0.280, 0.137)
     assert drawing._DETAIL_CAPTION_TARGET_AIR_M == 0.004
     assert drawing.DETAIL_GEOMETRY_TOL_M == 0.00005
-    # A native above row shifts the value downward. The complete three-row
-    # block is left of both witnesses AND E's printed full-outline circle.
-    hub_x = drawing.RIGHT_KEEP["HubLength"][0]
-    predicted_block = Box(hub_x - 0.014, 0.1306, hub_x + 0.014, 0.1432)
-    assert 0.2964718 - predicted_block.xmax >= 0.002
-    assert 0.3061619 - predicted_block.xmax >= 0.010
-    assert predicted_block.ymin - 0.1195 >= 0.010  # Moved drill's top.
-    assert 0.1515 - predicted_block.ymax >= 0.008  # Moved E letter's bottom.
     # R816 moves left; the RD2 arrow and full witness stay at physical A's X.
     radius_dx = drawing.FRONT_KEEP["BottomRadius"][0] - 0.170
     assert 0.180 - (0.1784 + radius_dx) >= 0.002
@@ -320,7 +425,16 @@ def test_r20_local_requests_leave_views_geometry_and_strict_caption_air_unchange
     assert math.dist(drawing.ROD_CALLOUT_XY, pin_xy) < math.dist((0.270, 0.145), pin_xy)
 
 
-def test_datum_b_moves_above_pin_text_without_changing_its_broad_face_attachment() -> None:
+def _view_f_xy(z_mm: float, y_mm: float) -> tuple[float, float]:
+    """View F (Right view) sheet point of model (z, y): +Z prints left."""
+    scale = drawing.RIGHT_SCALE[0] / drawing.RIGHT_SCALE[1]
+    return (
+        drawing.RIGHT_CENTER[0] - z_mm * scale / 1000.0,
+        drawing.RIGHT_CENTER[1] + (y_mm - ch_rocker_arm_spec.TOP_END_Y / 2.0) * scale / 1000.0,
+    )
+
+
+def test_datum_b_sits_on_the_projected_broad_face_above_the_hub_and_thickness_block() -> None:
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(
         node for node in tree.body
@@ -330,8 +444,8 @@ def test_datum_b_moves_above_pin_text_without_changing_its_broad_face_attachment
         node for node in build.body
         if isinstance(node, ast.Assign)
         and any(
-            isinstance(target, ast.Name) and target.id == "broad_face"
-            for target in node.targets
+            isinstance(name, ast.Name) and name.id == "broad_face"
+            for target in node.targets for name in ast.walk(target)
         )
     )
     call = next(
@@ -346,11 +460,19 @@ def test_datum_b_moves_above_pin_text_without_changing_its_broad_face_attachment
             for keyword in node.keywords
         )
     )
-    calls = []
+    calls, projected = [], []
+    right = object()
+
+    def project(_adapter, view, points, **_kwargs):
+        assert view is right
+        projected.extend(points)
+        return [_view_f_xy(z * 1000.0, y * 1000.0) for _x, y, z in points]
+
     namespace = dict(
-        adapter=object(), right=object(), RIGHT_CENTER=drawing.RIGHT_CENTER,
-        ARM_THICKNESS=drawing.ARM_THICKNESS, ARM_DEPTH=drawing.ARM_DEPTH,
-        PIVOT_MID_Y=drawing.PIVOT_MID_Y,
+        adapter=object(), right=right, _project=project,
+        ARM_THICKNESS=drawing.ARM_THICKNESS,
+        DATUM_B_PICK_MODEL_Y=drawing.DATUM_B_PICK_MODEL_Y,
+        DATUM_B_SYMBOL_XY=drawing.DATUM_B_SYMBOL_XY,
         STRAP_DATUM_B=drawing.STRAP_DATUM_B,
         add_datum_feature=lambda *_args, **kwargs: calls.append(kwargs),
     )
@@ -358,19 +480,22 @@ def test_datum_b_moves_above_pin_text_without_changing_its_broad_face_attachment
     exec(compile(ast.fix_missing_locations(module), drawing.__file__, "exec"), namespace)
     assert len(calls) == 1
     assert calls[0]["datum"] == drawing.STRAP_DATUM_B.fields["datum"][0] == "B"
-    edge_xy = (
-        drawing.RIGHT_CENTER[0] - drawing.ARM_THICKNESS / 2000.0,
-        drawing.RIGHT_CENTER[1] + (drawing.ARM_DEPTH - 1.0 - drawing.PIVOT_MID_Y) / 1000.0,
-    )
-    assert calls[0]["edge_xy"] == edge_xy
-    assert calls[0]["symbol_xy"] == (edge_xy[0] - 0.016, edge_xy[1] + 0.004)
-    # Predicted native B frame stays above PIN AXIS's BASIC frame and below
-    # the existing strap-offset witnesses, on the printed broad-face edge.
-    symbol_y = calls[0]["symbol_xy"][1]
-    assert symbol_y - 0.0035 - 0.1697787 >= 0.002
-    assert 0.1832219 - (symbol_y + 0.0035) >= 0.003
-    assert symbol_y + 0.0035 < 0.17975
-    assert symbol_y - 0.1722219 >= 0.003
+    # The pick is a model point on the +Z broad face, projected natively at
+    # view F's scale, above the hub band (the hub hides the flank there) and
+    # inside the strap's height.
+    ((_x, pick_y, pick_z),) = projected
+    assert pick_z * 1000.0 == pytest.approx(ch_rocker_arm_spec.ARM_THICKNESS / 2.0)
+    hub_top = ch_rocker_arm_spec.PIVOT_MID_Y + ch_rocker_arm_spec.HUB_DIA / 2.0
+    assert hub_top + 5.0 < pick_y * 1000.0 < ch_rocker_arm_spec.TOP_END_Y - 0.5
+    assert calls[0]["edge_xy"] == _view_f_xy(pick_z * 1000.0, pick_y * 1000.0)
+    # The tag box (~7 mm) hangs up-left of the pick, above the strap
+    # thickness block (value + three mate rows, centred on its request).
+    symbol_x, symbol_y = calls[0]["symbol_xy"]
+    assert symbol_x < calls[0]["edge_xy"][0]
+    rows = 1 + len(ch_rocker_arm_notes.STRAP_FIT_CALLOUT.splitlines())
+    block_top = drawing.STRAP_THICKNESS_TEXT_XY[1] + (rows - 1) * RENDERED_ROW_PITCH / 2 + 0.00175
+    assert symbol_y - 0.0035 - block_top >= 0.003
+    assert symbol_y + 0.0035 < DRAWABLE.ymax
 
 
 
@@ -382,6 +507,7 @@ class _ProfileDisplay:
     def __init__(self, ignored: str | None = None) -> None:
         self.ignored = ignored
         self.writes: list[tuple[str, object]] = []
+        object.__setattr__(self, "text", {})
         object.__setattr__(self, "ShortenedRadius", True)
         object.__setattr__(self, "ArcExtensionLineOrOppositeSide", True)
         object.__setattr__(self, "ArrowSide", 0)
@@ -394,6 +520,14 @@ class _ProfileDisplay:
                 return
         object.__setattr__(self, name, value)
 
+    def SetText(self, which: int, value: str) -> None:
+        self.writes.append((f"text{which}", value))
+        if self.ignored != "text":
+            self.text[which] = value
+
+    def GetText(self, which: int) -> str:
+        return self.text.get(which, "")
+
 
 def _profile_annotations(monkeypatch: pytest.MonkeyPatch, displays: dict) -> list:
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann.name)
@@ -403,7 +537,7 @@ def _profile_annotations(monkeypatch: pytest.MonkeyPatch, displays: dict) -> lis
     ]
 
 
-def test_basic_profile_dimensions_converts_all_three_and_trims_only_radius_leaders(
+def test_basic_profile_dimensions_converts_all_three_nominals_only(
     bound: None, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter = object()
@@ -422,19 +556,8 @@ def test_basic_profile_dimensions_converts_all_three_and_trims_only_radius_leade
         ((adapter, displays[name]), {"label": f"arc-system {name}"})
         for name in ("TopRadius", "BottomRadius", "TopAbovePivot")
     ]
-    for name in ("TopRadius", "BottomRadius"):
-        assert displays[name].writes == [
-            ("ShortenedRadius", False),
-            ("ArcExtensionLineOrOppositeSide", False),
-            ("ArrowSide", 1),
-            ("SolidLeader", False),
-        ]
-        assert displays[name].ShortenedRadius is False
-        assert displays[name].ArcExtensionLineOrOppositeSide is False
-        assert displays[name].ArrowSide == 1
-        assert displays[name].SolidLeader is False
-    assert displays["TopAbovePivot"].writes == []
-    assert displays["PivotDia"].writes == []
+    # Leader dressing is _dress_arc_radii's job, not the BASIC conversion's.
+    assert all(display.writes == [] for display in displays.values())
 
 
 @pytest.mark.parametrize("missing", ["TopRadius", "BottomRadius", "TopAbovePivot"])
@@ -452,11 +575,73 @@ def test_basic_profile_dimensions_rejects_each_missing_nominal(
         drawing._basic_profile_dimensions(object(), annotations)
 
 
+def test_dress_arc_radii_trims_both_radius_leaders_only(
+    bound: None, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    displays = {
+        name: _ProfileDisplay()
+        for name in ("TopRadius", "BottomRadius", "TopAbovePivot", "PivotDia")
+    }
+    annotations = _profile_annotations(monkeypatch, displays)
+    monkeypatch.setattr(
+        drawing, "set_basic_dimension",
+        lambda *_args, **_kwargs: pytest.fail("radius dressing never makes a value BASIC"),
+    )
+    drawing._dress_arc_radii(object(), annotations)
+    for name in ("TopRadius", "BottomRadius"):
+        flags = [
+            ("ShortenedRadius", False),
+            ("ArcExtensionLineOrOppositeSide", False),
+            ("ArrowSide", 1),
+            ("SolidLeader", False),
+        ]
+        if name == "BottomRadius":
+            # Opus #1020 r2 B1: R816 states its shared centre with R800.
+            flags.append(("text4", ch_rocker_arm_notes.BOTTOM_RADIUS_CALLOUT))
+        assert displays[name].writes == flags
+        assert displays[name].ShortenedRadius is False
+        assert displays[name].ArcExtensionLineOrOppositeSide is False
+        assert displays[name].ArrowSide == 1
+        assert displays[name].SolidLeader is False
+    assert displays["TopRadius"].text == {}
+    callout = displays["BottomRadius"].GetText(4)
+    assert "CONCENTRIC" in callout
+    assert f"R{ch_rocker_arm_spec.R_TOP:.0f}" in callout
+    assert displays["TopAbovePivot"].writes == []
+    assert displays["PivotDia"].writes == []
+
+
+def test_dress_arc_radii_rejects_an_unpersisted_concentric_callout(
+    bound: None, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    displays = {
+        "TopRadius": _ProfileDisplay(),
+        "BottomRadius": _ProfileDisplay("text"),
+    }
+    annotations = _profile_annotations(monkeypatch, displays)
+    with pytest.raises(RuntimeError, match="R816 concentric callout did not persist"):
+        drawing._dress_arc_radii(object(), annotations)
+
+
+@pytest.mark.parametrize("missing", ["TopRadius", "BottomRadius"])
+def test_dress_arc_radii_rejects_each_missing_radius(
+    bound: None, monkeypatch: pytest.MonkeyPatch, missing: str,
+) -> None:
+    displays = {
+        name: _ProfileDisplay()
+        for name in ("TopRadius", "BottomRadius", "TopAbovePivot")
+        if name != missing
+    }
+    annotations = _profile_annotations(monkeypatch, displays)
+    with pytest.raises(RuntimeError, match=f"arc radius dimensions missing:.*{missing}"):
+        drawing._dress_arc_radii(object(), annotations)
+
+
 @pytest.mark.parametrize("radius", ["TopRadius", "BottomRadius"])
 @pytest.mark.parametrize("ignored", [
     "ShortenedRadius", "ArcExtensionLineOrOppositeSide", "ArrowSide", "SolidLeader",
 ])
-def test_basic_profile_dimensions_rejects_ignored_radius_flags(
+def test_dress_arc_radii_rejects_ignored_radius_flags(
     bound: None, monkeypatch: pytest.MonkeyPatch, radius: str, ignored: str,
 ) -> None:
     displays = {
@@ -464,9 +649,8 @@ def test_basic_profile_dimensions_rejects_ignored_radius_flags(
         for name in ("TopRadius", "BottomRadius", "TopAbovePivot")
     }
     annotations = _profile_annotations(monkeypatch, displays)
-    monkeypatch.setattr(drawing, "set_basic_dimension", lambda *_args, **_kwargs: None)
     with pytest.raises(RuntimeError, match=f"{radius} retained its centre-directed radius leader"):
-        drawing._basic_profile_dimensions(object(), annotations)
+        drawing._dress_arc_radii(object(), annotations)
 
 
 def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
@@ -510,15 +694,22 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         assert kwargs["attach_xy"] == pytest.approx(_front_xy(sign * drawing.TOP_END_X, drawing.TOP_END_Y))
         dx, dy = drawing.BETWEEN_POINT_OFFSET[letter]
         assert kwargs["text_xy"] == pytest.approx((kwargs["attach_xy"][0] + dx, kwargs["attach_xy"][1] + dy))
-        assert math.copysign(1.0, dx) == sign  # each letter sits outboard of its corner
+    # J sits outboard of its corner; K's outboard side holds view F's arrow
+    # letter, so K rises above its corner with its text left of the corner.
+    assert drawing.BETWEEN_POINT_OFFSET["J"][0] < 0.0
+    k_dx, k_dy = drawing.BETWEEN_POINT_OFFSET["K"]
+    assert k_dx + 0.0025 < 0.0 < k_dy  # K's ~2.2 mm glyph ends left of its corner
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
-    for (args, kwargs), name, radius, model_x, frame_xy, outside in zip(
+    for (args, kwargs), name, radius, model_x, frame_xy, outside, quantity in zip(
         frames,
         ("TopRadius", "BottomRadius"),
         (800.0, 816.0),
-        (-130.0, -110.0),
-        ((0.130, 0.207), (0.020, 0.160)),
+        (-130.0, 40.0),
+        # View F holds the sheet's left band: the lower frame sits under the
+        # strap's right half, between the D and E detail letters.
+        ((0.130, 0.211), (0.207, 0.163)),
         ("0.5", "0"),
+        (ch_rocker_arm_notes.TOP_EDGE_MATE_CALLOUT, ""),
     ):
         assert args == (adapter, front)
         assert kwargs["edge_entity"] is edges[2.0 * radius]
@@ -530,6 +721,9 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         assert not kwargs.get("all_around", False)
         assert "edge_xy" not in kwargs
         assert kwargs["label"] == f"arc-system {name} profile"
+        # The top frame names the mate that rides the edge, below the frame.
+        assert kwargs["quantity"] == quantity
+        assert ("MHA-CH-001" in kwargs["quantity"]) is (name == "TopRadius")
         assert kwargs["frame_xy"] == frame_xy
         sheet_x, sheet_y = kwargs["leader_attach_xy"]
         x = (sheet_x - drawing.FRONT_CENTER[0]) / scale
@@ -1105,7 +1299,7 @@ def test_native_profile_guard_logs_actual_position_frame_and_leaders(native_prof
     case.bottom.position = (0.021, 0.130, 0.00125)  # request != native readback
     drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
     text = "\n".join(case.logs)
-    assert "requested_frame_mm=(20.0, 160.0)" in text
+    assert "requested_frame_mm=(207.0, 163.0)" in text
     assert "actual_GetPosition_mm=(21.0, 130.0, 1.25)" in text
     assert "native_frame_ink_bbox_mm=" in text
     assert "native_leader_points_mm=" in text
@@ -1334,7 +1528,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("ch-rocker-arm")
-    assert spec["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
+    assert spec["material_specification"] == "AISI 1018 low-carbon steel"
     assert spec["finish"] == "matte black oxide"
     assert int(spec["quantity"]) == 20
 
@@ -1430,21 +1624,77 @@ def test_strap_thickness_prints_its_band_natively() -> None:
     assert "GROUND" not in joined  # the strap faces are milled (plan op 20)
 
 
-def test_strap_thickness_text_clears_datum_b_the_frame_and_the_iso_caption() -> None:
-    x, y = drawing.STRAP_THICKNESS_TEXT_XY
-    # Right of the end view's strap and its hub (1:1).
-    assert x - drawing.RIGHT_CENTER[0] > ch_rocker_arm_spec.HUB_LENGTH / 2000.0 + 0.010
-    # Its line runs above datum B's attachment on the broad face ...
-    datum_b_y = drawing.RIGHT_CENTER[1] + (
-        ch_rocker_arm_spec.ARM_DEPTH - 1.0 - drawing.PIVOT_MID_Y
-    ) / 1000.0
-    assert y >= datum_b_y + 0.003
-    # ... and inside the strap's height above the hub, so it crosses no hub line.
-    view_top = drawing.RIGHT_CENTER[1] + ch_rocker_arm_spec.TOP_END_Y / 2000.0
-    assert y < view_top
-    # Under the iso caption and the rod-pin frame.
-    assert y < drawing.ISO_CAPTION_XY[1] - 0.006
-    assert y < drawing.ISO_CENTER[1]
+def _callout_block(xy: tuple[float, float], callout: str) -> Box:
+    """Predicted native block: value row plus below-text rows, centred on the request."""
+    rows = [""] + callout.splitlines()
+    half_w = max(len(row) for row in rows) * CAPTION_CHAR_WIDTH / 2.0
+    half_h = (len(rows) - 1) * RENDERED_ROW_PITCH / 2.0 + 0.00175
+    return Box(xy[0] - half_w, xy[1] - half_h, xy[0] + half_w, xy[1] + half_h)
+
+
+def test_view_f_size_blocks_stand_left_of_the_view_on_the_strap_and_under_it() -> None:
+    """Opus #1020 r2 C3: the 2.500 line crosses the strap alone, not the hub;
+    the hub width's line runs under the view where datum G stands on it."""
+    assert drawing.RIGHT_KEEP == {
+        "HubLength": drawing.HUB_LENGTH_TEXT_XY,
+        "StrapThickness": drawing.STRAP_THICKNESS_TEXT_XY,
+        "HubRootRadius": drawing.HUB_ROOT_TEXT_XY,
+    }
+    strap = _callout_block(drawing.STRAP_THICKNESS_TEXT_XY, ch_rocker_arm_notes.STRAP_FIT_CALLOUT)
+    hub = _callout_block(drawing.HUB_LENGTH_TEXT_XY, drawing.HUB_LENGTH_TEXT)
+    hub_end_x, _ = _view_f_xy(ch_rocker_arm_spec.HUB_LENGTH / 2.0, 0.0)
+    strap_left_x, _ = _view_f_xy(ch_rocker_arm_spec.ARM_THICKNESS / 2.0, 0.0)
+    _, view_bottom = _view_f_xy(0.0, 0.0)
+    _, view_top = _view_f_xy(0.0, ch_rocker_arm_spec.TOP_END_Y)
+    _, hub_top = _view_f_xy(0.0, ch_rocker_arm_spec.PIVOT_MID_Y + ch_rocker_arm_spec.HUB_DIA / 2.0)
+    for block in (strap, hub):
+        assert block.xmin - DRAWABLE.xmin >= 0.005
+    # Each block clears the ink level with it: the strap's (above the hub)
+    # only the strap face, the hub width's the hub end.
+    assert strap_left_x - strap.xmax >= 0.002
+    assert hub_end_x - hub.xmax >= 0.002
+    # Native runs each dimension line along the block's bottom: the strap's
+    # crosses the strap above the hub, the hub width's runs under the view.
+    assert strap.ymin - hub_top >= 0.010
+    assert strap.ymin < view_top
+    assert hub.ymin < view_bottom
+    assert strap.ymin - hub.ymax >= 0.020
+    # The hub-root radius reads left of the view between the two blocks: under
+    # the strap's position frame (one ~5 mm row under its line), over the hub
+    # block and the hub top, and left of the hub end, so its leader runs
+    # short down-right to the +Z root corner it measures, crossing no part.
+    root_x, root_y = drawing.HUB_ROOT_TEXT_XY
+    root_text = f"{ch_rocker_arm_notes.HUB_ROOT_PREFIX}{ch_rocker_arm_spec.HUB_ROOT_RADIUS_MAX:.1f} MAX"
+    half_w = len(root_text) * CAPTION_CHAR_WIDTH / 2.0
+    root = Box(root_x - half_w, root_y - 0.00175, root_x + half_w, root_y + 0.00175)
+    assert root.xmin - DRAWABLE.xmin >= 0.005
+    assert hub_end_x - root.xmax >= 0.002
+    assert (strap.ymin - 0.005) - root.ymax >= 0.003
+    assert root.ymin - hub.ymax >= 0.010
+    assert hub_top < root.ymin
+
+
+def test_right_view_caption_sits_under_view_f_clear_of_the_hub_width_and_datum_g() -> None:
+    caption = ch_rocker_arm_notes.RIGHT_VIEW_NOTE
+    left, top = drawing.RIGHT_CAPTION_XY
+    right = left + len(caption) * CAPTION_CHAR_WIDTH
+    assert left > DRAWABLE.xmin
+    # Under the view, its row spanning the view's centre line.
+    assert left < drawing.RIGHT_CENTER[0] < right
+    hub = _callout_block(drawing.HUB_LENGTH_TEXT_XY, drawing.HUB_LENGTH_TEXT)
+    # The caption reads well under the hub width's line.
+    assert hub.ymin - top >= 0.020
+    # G stands in line with that line just outboard of its -Z arrow end: a
+    # dimension-attached tag stays on its line and leads from that end, so
+    # inboard its leader would lie along the line (r3b run's audit). Its box
+    # (~7 mm) clears the arrow and stops short of the front view's 132.8 left
+    # witness.
+    d_x, _ = drawing.HUB_WIDTH_DATUM_XY
+    hub_right_x, _ = _view_f_xy(-ch_rocker_arm_spec.HUB_LENGTH / 2.0, 0.0)
+    assert d_x - 0.0035 - hub_right_x >= 0.003
+    assert d_x + 0.0035 < 0.105
+    # Inside the bottom border.
+    assert top - 0.0035 > BORDER_BOTTOM
 
 
 def test_top_edge_model_band_is_unchanged_by_the_basic_drawing_override() -> None:
@@ -1519,8 +1769,8 @@ def test_top_basic_height_is_off_the_pin_x_witness() -> None:
     assert drawing.FRONT_KEEP["TopAbovePivot"] == (0.165, 0.191)
     assert drawing.FRONT_KEEP["TopAbovePivot"][0] != drawing.FRONT_CENTER[0]
     assert drawing.PIN_X_TEXT_XY[1] == 0.197
-    assert drawing.TAPER_INTERSECTION_TEXT_XY[1] == 0.132
-    assert drawing.OVERALL_WIDTH_TEXT_XY[1] == 0.215
+    assert drawing.TAPER_INTERSECTION_TEXT_XY[1] == 0.137
+    assert drawing.OVERALL_WIDTH_TEXT_XY[1] == 0.221
 
 
 _PIVOT_CENTRE = drawing.HUB_CENTER
@@ -1751,11 +2001,21 @@ def test_build_keeps_pivot_out_of_strict_part_precision() -> None:
         and isinstance(node.func, ast.Name)
         and node.func.id == "assert_imported_precision"
     )
-    assert {ast.literal_eval(key) for key in strict_call.args[2].keys} == {
+    precision = dict(zip(
+        (ast.literal_eval(key) for key in strict_call.args[2].keys),
+        (ast.unparse(value) for value in strict_call.args[2].values),
+    ))
+    assert set(precision) == {
         "TopAbovePivot",
         "HubLength",
         "StrapThickness",
+        "HubRootRadius",
     }
+    # The hub-root single limit prints the part's one place ("R0.2 MAX").
+    assert precision["HubRootRadius"] == (
+        "rocker_notes.DRAWING_PRECISION['HubRoot']['HubRootRadius']"
+    )
+    assert ch_rocker_arm_notes.DRAWING_PRECISION["HubRoot"] == {"HubRootRadius": 1}
     front_import = next(
         node for node in build.body
         if isinstance(node, ast.Assign)
@@ -1878,7 +2138,7 @@ def test_detail_d_leaders_use_four_separate_quadrants(bound, monkeypatch) -> Non
     assert math.dist(rim, _PIVOT_CENTRE) == pytest.approx(_DETAIL_BORE_R)
     assert symbol[0] > rim[0] and symbol[1] < rim[1]
     assert drawing.HUB_KEEP["PivotDia"] == (0.120, 0.086)
-    assert drawing.HUB_KEEP["HubDia"] == (0.210, 0.122)
+    assert drawing.HUB_KEEP["HubDia"] == (0.212, 0.108)
 
 
 def test_both_bores_are_picked_by_diameter_not_by_a_rim_coordinate() -> None:
@@ -1930,6 +2190,21 @@ def test_both_bores_are_picked_by_diameter_not_by_a_rim_coordinate() -> None:
 BORDER_BOTTOM = 0.0127
 NOTE_LINE_PITCH = 0.0042
 CAPTION_CHAR_WIDTH = 0.0026
+# The general notes' rendered advance: r3c's 40-character row spans ~106 mm.
+NOTES_CHAR_WIDTH = 0.0027
+
+
+def _notes_fit_left_of_the_title_block(notes: str) -> bool:
+    """Opus #1020 r3 C3 (rule 7's four lines): the notes run full width under
+    the front view, every row ending 10 mm short of the title block."""
+    widest = max(map(len, notes.splitlines()))
+    title_left = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_left_m
+    return drawing.NOTES_LEFT + widest * NOTES_CHAR_WIDTH <= title_left - 0.010
+
+
+# Dimension value + callout rows as the r1 farm render printed them (strap
+# thickness: value ~0.183 to last row ~0.166 over three pitches).
+RENDERED_ROW_PITCH = 0.0056
 RIGHT_BORDER = 0.415
 DRAWABLE = DrawableRegion(0.0127, BORDER_BOTTOM, 0.4191, 0.2667)
 
@@ -2023,9 +2298,9 @@ def test_general_notes_leave_a_full_line_of_headroom() -> None:
     lines = len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines())
     band = drawing.NOTES_CEILING - DRAWABLE.ymin - drawing.NOTES_BORDER_CLEARANCE
     assert (lines + 1) * R743_3_RENDERED_PITCH <= band
-    # Every line stays within the widest line r743-2R already rendered
-    # clear of the front view.
-    assert max(len(line) for line in ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) <= 42
+    # Every row ends short of the title block.
+    assert _notes_fit_left_of_the_title_block(ch_rocker_arm_notes.DRAWING_NOTES)
+    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) <= 4
 
 
 def test_general_notes_too_tall_for_the_band_fail_the_build(
@@ -2072,8 +2347,19 @@ def test_land_and_hub_sizes_are_marked_model_dimensions_at_normal_precision() ->
     assert ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION == 2
     assert ch_rocker_arm_spec.LINEAR_2PL == pytest.approx(0.508)
     assert ch_rocker_arm_spec.STRAP_HUB_SYMMETRY == pytest.approx(0.10)
+    # Strap symmetry is a position zone on the strap width to the hub width's
+    # datum (Main's option B): no chained hub-end-to-strap offset survives.
+    assert ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["strap position to hub"] == "0.10"
+    letter = drawing.HUB_FACES.fields["datum"][0]
+    assert drawing.STRAP_FACES.fields["position_datums"][0] == [letter]
+    # Its letter names nothing else on the sheet (Opus #1020 r3 C4: datum D
+    # read against detail D) and avoids ASME's barred I, O and Q.
+    taken = {"A", "B", "C", *drawing.DETAIL_LETTER_XY, ch_rocker_arm_notes.VIEW_ARROW_LETTER}
+    assert letter not in taken | {"I", "O", "Q"}
+    assert not any("Offset" in name for names in ch_rocker_arm_notes.DRAWING_DIMENSIONS.values() for name in names)
+    assert "StrapOffset" not in drawing.RIGHT_KEEP
     joined = " ".join(ch_rocker_arm_notes.DRAWING_NOTES.split())
-    assert "STRAP SYMMETRIC TO HUB WITHIN 0.10" in joined
+    assert "STRAP SYMMETRIC" not in joined
 
 
 def test_new_measured_quantities_follow_the_source_geometry_equations() -> None:
@@ -2143,7 +2429,11 @@ def test_rod_drill_identifier_and_native_callout_process_share_the_hole_spec() -
     ]
     assert len(calls) == 1
     keywords = {keyword.arg: ast.unparse(keyword.value) for keyword in calls[0].keywords}
-    assert keywords["process"] == "drill_process(ROD_HOLE_SPEC) + '\\n'"
+    assert keywords["process"] == (
+        "rocker_notes.ROD_PIN_MATE_CALLOUT + '\\n' + drill_process(ROD_HOLE_SPEC) + '\\n'"
+    )
+    # The pin that runs in the hole is named over the drill (Opus #1020 r3 C5).
+    assert "MHA-CH-010" in ch_rocker_arm_notes.ROD_PIN_MATE_CALLOUT
     assert drawing.ROD_HOLE_SPEC is ch_rocker_arm_spec.ROD_HOLE_SPEC
 
 
@@ -2254,7 +2544,7 @@ def test_imported_hub_diameter_cannot_lose_the_model_two_place_size_band(
 
 @pytest.mark.parametrize("name", [
     "ROD_TIP_X", "TIP_FACE", "_ALPHA_TOP", "BOT_END_X", "HUB_DIA",
-    "HUB_LENGTH", "ARM_THICKNESS",
+    "ARM_THICKNESS",
 ])
 def test_measured_dimension_expectations_import_the_geometry_source(name: str) -> None:
     assert getattr(drawing, name) == getattr(ch_rocker_arm_spec, name)
@@ -2372,7 +2662,7 @@ def _imported_native_quantities(monkeypatch: pytest.MonkeyPatch):
 
     displays = {
         "PivotDia": _NativeQuantity("PivotDia", ch_rocker_arm_spec.PIVOT_HOLE_DIA),
-        "RodTipLen": _NativeQuantity("RodTipLen", ch_rocker_arm_spec.TIP_FACE),
+        "RodTipLen": _NativeQuantity("RodTipLen", ch_rocker_arm_spec.TIP_FACE, precision=1),
         "HubDia": _NativeQuantity("HubDia", ch_rocker_arm_spec.HUB_DIA),
     }
     adapter = SimpleNamespace(
@@ -2409,8 +2699,15 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
     assert displays["HubDia"].precision == 2
     assert pivot.band == tuple(v / 1000.0 for v in ch_rocker_arm_spec.PIVOT_HOLE_BAND)
     assert pivot.model.GetToleranceType() == 4
+    # Both tip lands ride the one BASIC 5.59 (main-r1: no mirror note).
+    assert displays["RodTipLen"].text[1] == ch_rocker_arm_notes.TIP_LAND_PREFIX == "2X "
+    assert displays["RodTipLen"].model.GetToleranceType() == 1
     assert pivot.ShowDimensionValue is True
-    assert (pivot.text[3], pivot.text[4]) == ("<native-upper>", "<native-lower>")
+    # The ream band reads as clearance on its named mate (MR #1020).
+    assert (pivot.text[3], pivot.text[4]) == ("<native-upper>", ch_rocker_arm_notes.PIVOT_FIT_CALLOUT)
+    assert ch_rocker_arm_notes.PIVOT_FIT_CALLOUT == (
+        "(0.15-0.20 DIAMETRAL\nCLEARANCE ON PIVOT\nSHAFT MHA-CH-005)"
+    )
 
 
 @pytest.mark.parametrize("name", ["PivotDia", "RodTipLen", "HubDia"])
@@ -2432,13 +2729,15 @@ def test_imported_front_sizes_require_each_sourced_native_readback(
         drawing._dress_detail_dimensions(adapter, [display.GetAnnotation() for display in displays.values()], keep={**drawing.HUB_KEEP, **drawing.END_KEEP})
 
 
-@pytest.mark.parametrize("ignored", ["prefix", "suffix", "hub_precision"])
+@pytest.mark.parametrize("ignored", ["prefix", "suffix", "hub_precision", "fit_callout"])
 def test_front_native_dressing_rejects_ignored_text_or_lost_hub_precision(
     monkeypatch: pytest.MonkeyPatch, ignored: str,
 ) -> None:
     adapter, displays = _imported_native_quantities(monkeypatch)
     if ignored == "hub_precision":
         displays["HubDia"].precision = 1
+    elif ignored == "fit_callout":
+        displays["PivotDia"].ignored_text = 4
     else:
         displays["PivotDia"].ignored_text = 1 if ignored == "prefix" else 2
     with pytest.raises(RuntimeError):
@@ -2473,7 +2772,7 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
     pivot = object()
     state = SimpleNamespace(
         adapter=adapter, imported=imported, scan=scan, land=land,
-        displays={}, calls=[], basic_calls=[],
+        displays={}, calls=[], basic_calls=[], radius_calls=[],
         defect_label=None, defect=None,
     )
 
@@ -2486,7 +2785,7 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
         entities = kwargs["entities"]
         if label == "rocker overall width":
             value_mm = abs(vertex_points[entities[1]][0] - vertex_points[entities[0]][0])
-        elif label in {"taper intersection X", "tip land X location"}:
+        elif label in {"taper intersection X", "left taper intersection X", "tip land X location", "left tip land X location"}:
             value_mm = abs(vertex_points[entities[1]][0])
         else:
             pytest.fail(f"unowned native dimension {label}")
@@ -2521,6 +2820,10 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
         drawing, "_basic_profile_dimensions",
         lambda _adapter, annotations: state.basic_calls.append(annotations),
     )
+    monkeypatch.setattr(
+        drawing, "_dress_arc_radii",
+        lambda _adapter, annotations: state.radius_calls.append(annotations),
+    )
     monkeypatch.setattr(drawing, "scan_view_edges", lambda *_a, **_k: scan)
     monkeypatch.setattr(drawing, "model_points_in_view", project)
     monkeypatch.setattr(drawing, "_project", project)
@@ -2539,22 +2842,35 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
     state = native_front
     drawing._add_rocker_outline_dimensions(state.adapter, object())
     assert state.basic_calls
+    assert state.radius_calls == state.basic_calls
     assert all(point[2] == ch_rocker_arm_spec.ARM_THICKNESS / 2.0 for point in state.land.line)
     expected = {
         "rocker overall width": 2.0 * ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
         "taper intersection X": ch_rocker_arm_spec.BOT_END_X / 1000.0,
+        "left taper intersection X": ch_rocker_arm_spec.BOT_END_X / 1000.0,
         "tip land X location": ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
+        "left tip land X location": ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
     }
     assert {
         label: display.model.SystemValue for label, display in state.displays.items()
     } == pytest.approx(expected)
-    width, taper, land = state.calls
+    width, taper, left_taper, land, left_land = state.calls
     assert width["entity_types"] == ("VERTEX", "VERTEX")
     assert "entity_type" not in width
     assert taper["entity_types"] == ("EDGE", "VERTEX")
     assert state.displays["taper intersection X"].arc_conditions[1] == 1
+    # The mirrored left taper vertex: its own one-place row from centred A.
+    assert left_taper["orientation"] == "horizontal"
+    assert left_taper["text_xy"] == drawing.LEFT_TAPER_TEXT_XY
+    assert left_taper["entity_types"] == ("EDGE", "VERTEX")
+    assert left_taper["entities"][0] is taper["entities"][0]
+    assert left_taper["p0"] == taper["p0"]
+    assert left_taper["entities"][1] is not taper["entities"][1]
+    assert state.scan.exact_vertex_at(
+        (-drawing.BOT_END_X, drawing._BOT_END_Y, drawing.ARM_THICKNESS / 2.0), label="left taper",
+    ) is left_taper["entities"][1]
     assert land["orientation"] == "horizontal"
-    assert land["text_xy"] == drawing.LAND_LOCATION_TEXT_XY == (0.219, 0.235)
+    assert land["text_xy"] == drawing.LAND_LOCATION_TEXT_XY == (0.219, 0.242)
     assert land["entity_types"] == ("EDGE", "VERTEX")
     assert land["entities"] == (taper["entities"][0], width["entities"][1])
     assert land["p0"] == taper["p0"] and land["p1"] == width["p1"]
@@ -2566,14 +2882,35 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
     assert locator.text[4] == drawing.LAND_LABEL == "LAND"
     assert locator.writes[-2:] == [(4, ""), (4, "LAND")]
     assert locator.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
+    # The J land's mirrored BASIC LAND row from the same centred A (main-r1).
+    assert left_land["orientation"] == "horizontal"
+    assert left_land["text_xy"] == drawing.LEFT_LAND_LOCATION_TEXT_XY == (0.141, 0.242)
+    assert left_land["entity_types"] == ("EDGE", "VERTEX")
+    assert left_land["entities"] == (taper["entities"][0], width["entities"][0])
+    assert left_land["p0"] == taper["p0"] and left_land["p1"] == width["p0"]
+    assert 2.0 * drawing.FRONT_CENTER[0] - drawing.LEFT_LAND_LOCATION_TEXT_XY[0] == pytest.approx(drawing.LAND_LOCATION_TEXT_XY[0])
+    left_locator = state.displays["left tip land X location"]
+    assert left_locator.arc_conditions[1] == 1
+    assert left_locator.model.GetToleranceType() == 1
+    assert left_locator.text[1] == left_locator.text[2] == ""
+    assert left_locator.writes[-2:] == [(4, ""), (4, "LAND")]
+    assert left_locator.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
     width_display = state.displays["rocker overall width"]
     assert (width_display.text[1], width_display.text[2]) == ("(", ")")
     assert width_display.model.GetToleranceType() == 0
-    assert state.displays["taper intersection X"].text[4] == "R816/TAPER"
+    # Both taper feet are J↔K profile stations: BASIC, the zone is their band.
+    for label in ("taper intersection X", "left taper intersection X"):
+        display = state.displays[label]
+        assert display.arc_conditions[1] == 1
+        assert display.model.GetToleranceType() == 1
+        assert display.text[4] == "R816/TAPER"
+        assert display.writes[-1] == (4, "R816/TAPER")
+        assert display.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
 
 
 @pytest.mark.parametrize("label", [
-    "rocker overall width", "taper intersection X", "tip land X location",
+    "rocker overall width", "taper intersection X", "left taper intersection X",
+    "tip land X location", "left tip land X location",
 ])
 @pytest.mark.parametrize("defect", ["creation", "wrong", "missing", "nan", "inf", "attachment"])
 def test_each_new_outline_measurement_fails_closed(native_front, label, defect) -> None:
@@ -2583,9 +2920,13 @@ def test_each_new_outline_measurement_fails_closed(native_front, label, defect) 
         drawing._add_rocker_outline_dimensions(native_front.adapter, object())
 
 
+@pytest.mark.parametrize("label", [
+    "taper intersection X", "left taper intersection X", "tip land X location",
+    "left tip land X location",
+])
 @pytest.mark.parametrize("defect", ["uncentred", "basic", "text", "cap"])
-def test_land_locator_rejects_ignored_native_setters(native_front, defect):
-    native_front.defect_label = "tip land X location"
+def test_land_locator_rejects_ignored_native_setters(native_front, label, defect):
+    native_front.defect_label = label
     native_front.defect = defect
     with pytest.raises(RuntimeError):
         drawing._add_rocker_outline_dimensions(native_front.adapter, object())
@@ -2686,7 +3027,7 @@ def test_land_locator_guard_runs_after_final_rebuild_and_preserves_marked_census
     census = next(node for node in calls if node.func.id == "_require_dimension_census")
     assert final_rebuild.lineno < census.lineno < guard.lineno
     assert [ast.unparse(arg) for arg in guard.args[2:]] == ["land_dimension", "land_entities"]
-    assert set(drawing.FRONT_KEEP) == drawing.BASIC_PROFILE_DIMENSIONS
+    assert set(drawing.FRONT_KEEP) == drawing.BASIC_PROFILE_DIMENSIONS | set(drawing.ARC_RADIUS_NAMES)
 
 
 @pytest.mark.parametrize("source", ["ROD_TIP_X", "TIP_FACE", "BOT_END_X", "HUB_DIA"])
@@ -2725,109 +3066,287 @@ def test_datum_c_hangs_under_the_rod_pin_frame_after_its_dot_is_configured() -> 
     assert not hasattr(drawing, "_add_land_datum") and not hasattr(drawing, "LAND_DATUM_STANDOFF")
 
 
+class _HubRootDisplay(_NativeQuantity):
+    """View F's imported HubRootRadius: a radial display with a native MAX band."""
+
+    def __init__(self) -> None:
+        super().__init__("HubRootRadius", ch_rocker_arm_spec.HUB_ROOT_RADIUS_MAX, precision=1)
+        self.Diametric = False
+        self.ignore_leader = False
+        self.ArcExtensionLineOrOppositeSide = True
+        self.text[1] = ch_rocker_arm_notes.HUB_ROOT_PREFIX  # stamped by the part
+        self.model.Tolerance = _native("IDimensionTolerance", Type=ch_rocker_arm_notes.HUB_ROOT_R_TOL_TYPE)
+
+    def __setattr__(self, name, value):
+        if name == "ArcExtensionLineOrOppositeSide" and getattr(self, "ignore_leader", False):
+            return
+        super().__setattr__(name, value)
+
+
 @pytest.fixture
-def native_offset(monkeypatch: pytest.MonkeyPatch):
-    import _drawing_edge_dimensions
-    from _drawing_edges import ViewEdge, ViewEdges
-
+def native_hub_root(monkeypatch: pytest.MonkeyPatch):
     adapter, _imported = _imported_native_quantities(monkeypatch)
-    a = (drawing.TOP_END_X, drawing.TOP_END_Y, drawing.ARM_THICKNESS / 2.0)
-    b = (drawing.ROD_TIP_X, drawing._ROD_TIP_Y, drawing.ARM_THICKNESS / 2.0)
-    strap = ViewEdge(object(), (a, b), None, (object(), object()))
-    rear = ViewEdge(
-        object(), ((a[0], a[1], -a[2]), (b[0], b[1], -b[2])), None,
-        (object(), object()),
+    root = _HubRootDisplay()
+    neighbours = [
+        _NativeQuantity("HubLength", ch_rocker_arm_spec.HUB_LENGTH),
+        _NativeQuantity("StrapThickness", ch_rocker_arm_spec.ARM_THICKNESS),
+    ]
+    return SimpleNamespace(
+        adapter=adapter, display=root,
+        annotations=[neighbours[0].annotation, root.annotation, neighbours[1].annotation],
     )
-    hub = ViewEdge(
-        object(), None,
-        (0.0, drawing.PIVOT_MID_Y, drawing.HUB_LENGTH / 2.0, 0.0, 0.0, 1.0, drawing.HUB_DIA / 2.0),
-        None,
-    )
-    back_hub = ViewEdge(
-        object(), None,
-        (0.0, drawing.PIVOT_MID_Y, -drawing.HUB_LENGTH / 2.0, 0.0, 0.0, 1.0, drawing.HUB_DIA / 2.0),
-        None,
-    )
-    scan = ViewEdges("right native CAD", (rear, back_hub, strap, hub))
-    state = SimpleNamespace(adapter=adapter, scan=scan, strap=strap, hub=hub, display=None, defect=None)
 
-    def create(_adapter, _view, **kwargs):
-        assert kwargs["entities"] == (hub.edge, strap.edge)
-        assert kwargs["orientation"] == "horizontal"
-        mm = hub.circle[2] - strap.midpoint_mm[2]
-        display = _NativeQuantity("offset", mm, precision=3)
-        display.attached = kwargs["entities"]
-        if state.defect == "creation":
-            raise RuntimeError("offset native creation refused")
-        if state.defect == "wrong":
-            display.model.SystemValue += 0.0001
-        elif state.defect in {"nan", "inf"}:
-            display.model.SystemValue = float(state.defect)
-        elif state.defect == "missing":
-            display.model.SystemValue = None
-        elif state.defect == "attachment":
-            display.attached = (hub.edge, object())
-        elif state.defect == "band":
-            display.tolerance_type = 2
-        elif state.defect == "precision":
-            display.ignored_precision = True
-        elif state.defect in {"prefix", "suffix"}:
-            display.ignored_text = 1 if state.defect == "prefix" else 2
-        state.display = display
-        return display
 
-    monkeypatch.setattr(drawing, "scan_view_edges", lambda *_a, **_k: scan)
+def test_hub_root_prints_the_part_max_limit_with_a_trimmed_leader(native_hub_root) -> None:
+    """Opus #1020 r2 C2 (rule 16): the hub-to-strap roots carry 2X R0.2 MAX."""
+    drawing._dress_hub_root(native_hub_root.adapter, native_hub_root.annotations)
+    display = native_hub_root.display
+    assert display.ArcExtensionLineOrOppositeSide is False
+    # The part owns the value, its MAX type and the 2X; the sheet writes none.
+    assert display.writes == []
+    assert ch_rocker_arm_notes.HUB_ROOT_R_BAND == (0.0, -ch_rocker_arm_spec.HUB_ROOT_RADIUS_MAX)
+
+
+@pytest.mark.parametrize("defect", ["zero", "two", "diametric", "type", "value", "prefix", "leader"])
+def test_hub_root_refuses_a_lost_limit_or_leader(native_hub_root, defect: str) -> None:
+    display = native_hub_root.display
+    annotations = native_hub_root.annotations
+    if defect == "zero":
+        annotations = [ann for ann in annotations if ann is not display.annotation]
+    elif defect == "two":
+        annotations = [*annotations, _HubRootDisplay().annotation]
+    elif defect == "diametric":
+        display.Diametric = True
+    elif defect == "type":
+        display.model.Tolerance.Type = 0  # swTolNONE: the MAX band did not import
+    elif defect == "value":
+        display.model.SystemValue += 0.0001
+    elif defect == "prefix":
+        display.text[1] = ""
+    else:
+        display.ignore_leader = True
+    with pytest.raises(RuntimeError, match="HubRootRadius|hub root"):
+        drawing._dress_hub_root(native_hub_root.adapter, annotations)
+
+
+@pytest.fixture
+def view_f_dimension(monkeypatch: pytest.MonkeyPatch):
+    """View F's imported hub width / strap width, re-resolved and selected
+    natively, with a datum tag or frame annotation to attach to it."""
+    calls: list = []
+    state: dict = {}
+
+    def display(selection: str, full_name: str):
+        annotation = _native("IAnnotation", GetType=lambda: state["annotation_type"])
+        dimension = _native("IDimension", FullName=full_name)
+        return _native(
+            "IDisplayDimension", GetNameForSelection=lambda: selection,
+            GetDimension2=lambda _index: dimension, GetAnnotation=lambda: annotation,
+        )
+
+    wanted = display("RD3@Drawing View2", "HubLength@Hub@ch-rocker-arm.Part")
+    fresh = display("RD3@Drawing View2", "HubLength@Hub@ch-rocker-arm.Part")
+    other = display("RD4@Drawing View2", "StrapThickness@Strap@ch-rocker-arm.Part")
+    imported = _native("IAnnotation", GetSpecificAnnotation=lambda: wanted)
+
+    def set_attached(entities) -> bool:
+        (target,) = entities
+        calls.append(("SetAttachedEntities", target))
+        if target in state["accepts"]:
+            state["attached_count"] = 1
+            return True
+        return False
+
+    def set_position(x: float, y: float, z: float) -> bool:
+        calls.append(("SetPosition2", (x, y, z)))
+        return state["position_ok"]
+
+    attached = _native(
+        "IAnnotation",
+        GetAttachedEntityCount3=lambda: state["attached_count"],
+        SetAttachedEntities=set_attached,
+        GetAttachedEntityTypes=lambda: state["types"],
+        GetAttachedEntities3=lambda: (state["attached"],),
+        IsDangling=lambda: state["dangling"],
+        SetPosition2=set_position,
+    )
+    tag = _native(
+        "IDatumTag", SetLabel=lambda text: state["label_ok"] and state.update(label=text) is None,
+        GetLabel=lambda: state["label"], GetAnnotation=lambda: attached,
+    )
+
+    def set_xml(xml: str) -> bool:
+        calls.append("SetSymbolXml")
+        if state["xml_ok"]:
+            state["xml"] = xml
+        return state["xml_ok"]
+
+    frame = _native("IGtolFrame", SetSymbolXml=set_xml, GetSymbolXml=lambda: state["xml"])
+    gtol = _native(
+        "IGtol", GetFrameCount=lambda: 1, GetFrame=lambda _index: frame,
+        GetFormat=lambda: state["format"], GetAnnotation=lambda: attached,
+    )
+
+    def select(*args):
+        calls.append(("SelectByID2", args[:2]))
+        return state["selected"]
+
+    def insert(kind: str):
+        def call():
+            calls.append(kind)
+            return state[kind]
+        return call
+
+    model = _native(
+        "IModelDoc2", "IDrawingDoc",
+        ActivateView=lambda name: name == "Drawing View2",
+        ClearSelection2=lambda _all: calls.append("ClearSelection2"),
+        InsertDatumTag2=insert("InsertDatumTag2"), InsertGtol=insert("InsertGtol"),
+        Extension=_native("IModelDocExtension", SelectByID2=select),
+        SelectionManager=_native(
+            "ISelectionMgr",
+            GetSelectedObjectCount2=lambda _mark: state["count"],
+            GetSelectedObjectType3=lambda _index, _mark: state["kind"],
+            GetSelectedObject6=lambda _index, _mark: state["picked"],
+        ),
+    )
+    adapter = SimpleNamespace(currentModel=model, swApp=_APP)
+    view = _native("IView", GetDisplayDimensions=lambda: state["displays"])
+    monkeypatch.setattr(drawing, "_early_bound", _bind_owner)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "Drawing View2")
+    monkeypatch.setattr(drawing, "null_callout", lambda: None)
+    monkeypatch.setattr(drawing, "dispatch_array", tuple)
     monkeypatch.setattr(
-        drawing, "model_points_in_view",
-        lambda _adapter, _view, points, **_kwargs: [
-            (drawing.RIGHT_CENTER[0] - z, drawing.RIGHT_CENTER[1] + y)
-            for _x, y, z in points
-        ],
+        drawing, "rebuild_drawing", lambda _adapter, *, label: calls.append(("rebuild", label)),
     )
-    monkeypatch.setattr(drawing, "add_edge_dimension", create)
-    monkeypatch.setattr(
-        drawing, "set_arc_endpoints_to_center",
-        lambda *_a, **_k: pytest.fail("projected hub end rim is not a circular endpoint"),
+
+    def reset(**changes) -> None:
+        state.update(
+            displays=(other, fresh), annotation_type=4, selected=True, count=1, kind=14,
+            picked=fresh, types=(14,), attached=fresh, attached_count=1, accepts=(),
+            dangling=False, label_ok=True, label="", InsertDatumTag2=tag, InsertGtol=gtol,
+            xml_ok=True, xml="", format=2, position_ok=True,
+        )
+        state.update(changes)
+        calls.clear()
+
+    reset()
+    return SimpleNamespace(
+        adapter=adapter, view=view, imported=imported, fresh=fresh, other=other,
+        tag=tag, gtol=gtol, calls=calls, state=state, reset=reset,
     )
-    monkeypatch.setattr(
-        _drawing_edge_dimensions, "_is_same_attachment",
-        lambda _adapter, actual, wanted, _kind: actual is wanted,
-    )
-    return state
 
 
-def test_offset_is_the_measured_hub_end_to_strap_face_reference(native_offset) -> None:
-    display = drawing._add_strap_offset_dimension(native_offset.adapter, object())
-    assert display is native_offset.display
-    assert display.model.SystemValue * 1000.0 == pytest.approx(
-        (ch_rocker_arm_spec.HUB_LENGTH - ch_rocker_arm_spec.ARM_THICKNESS) / 2.0,
-    )
-    assert display.model.GetToleranceType() == 0
-    assert display.precision == 2
-    assert display.text[1] == "(" and display.text[2] == ")"
-    assert display.writes == [(1, "("), (2, ")")]
-    assert ch_rocker_arm_spec.STRAP_HUB_SYMMETRY == 0.10
+def test_hub_width_datum_attaches_to_the_reselected_native_hub_width(view_f_dimension) -> None:
+    """Main's option B: G is the hub width's centre plane, on its own size."""
+    env = view_f_dimension
+    assert drawing._hub_width_datum(env.adapter, env.view, env.imported) is env.tag
+    assert env.state["label"] == drawing.HUB_FACES.fields["datum"][0] == "G"
+    assert env.calls == [
+        "ClearSelection2", ("SelectByID2", ("RD3@Drawing View2", "DIMENSION")),
+        "InsertDatumTag2", ("SetPosition2", (*drawing.HUB_WIDTH_DATUM_XY, 0.0)),
+        "ClearSelection2", ("rebuild", "hub width datum G"),
+    ]
+    # An unattached tag is offered the display dimension, then its annotation.
+    env.reset(attached_count=0, accepts=(env.fresh.GetAnnotation(),))
+    drawing._hub_width_datum(env.adapter, env.view, env.imported)
+    assert [call[1] for call in env.calls if call[0] == "SetAttachedEntities"] == [
+        env.fresh, env.fresh.GetAnnotation(),
+    ]
 
 
-@pytest.mark.parametrize("defect", [
-    "creation", "wrong", "missing", "nan", "inf", "attachment",
-    "band", "precision", "prefix", "suffix",
+@pytest.mark.parametrize("defect,message", [
+    ({"displays": ()}, "found 0"),
+    ({"displays": "two"}, "found 2"),
+    ({"annotation_type": 1}, "re-resolved to another dimension"),
+    ({"selected": False}, "failed to select"),
+    ({"count": 2}, "gave 2 object"),
+    ({"kind": 1}, "of type 1"),
+    ({"InsertDatumTag2": None}, "InsertDatumTag2 returned nothing"),
+    ({"label_ok": False}, "failed to label it G"),
+    ({"position_ok": False}, "failed to position it"),
+    ({"types": (1,)}, "not attached to its dimension"),
+    ({"dangling": True}, "not attached to its dimension"),
+    ({"attached": "other"}, "attached to another dimension"),
+    ({"attached_count": 0}, "not attached to its dimension"),
 ])
-def test_offset_cannot_ship_a_wrong_or_unchecked_reference(native_offset, defect) -> None:
-    native_offset.defect = defect
-    with pytest.raises(RuntimeError):
-        drawing._add_strap_offset_dimension(native_offset.adapter, object())
-
-
-@pytest.mark.parametrize("source,delta", [("HUB_LENGTH", 0.001), ("ARM_THICKNESS", 0.0001)])
-def test_offset_formula_change_invalidates_stale_native_measurement(
-    native_offset, monkeypatch: pytest.MonkeyPatch, source: str, delta: float,
+def test_hub_width_datum_refuses_an_unproven_dimension_attachment(
+    view_f_dimension, defect: dict, message: str,
 ) -> None:
-    # Both changed picks remain within exact/circle selector tolerances; it is
-    # the formula readback, not a missing entity, that must reject the stale CAD.
-    monkeypatch.setattr(drawing, source, getattr(drawing, source) + delta)
-    with pytest.raises(RuntimeError, match="strap offset from hub end measures"):
-        drawing._add_strap_offset_dimension(native_offset.adapter, object())
+    env = view_f_dimension
+    changes = {
+        key: (env.fresh, env.fresh) if value == "two" else env.other if value == "other" else value
+        for key, value in defect.items()
+    }
+    if changes.get("attached_count") == 0:
+        changes["types"] = ()
+    env.reset(**changes)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._hub_width_datum(env.adapter, env.view, env.imported)
+
+
+def test_strap_position_frame_locates_the_strap_width_to_g_on_its_size(view_f_dimension) -> None:
+    """#948 ruling R's 0.10 symmetry as a native position frame to G."""
+    env = view_f_dimension
+    assert drawing._strap_position_frame(env.adapter, env.view, env.imported) is env.gtol
+    expected = gtol_frame_signature(gtol_frame_xml(
+        "position", ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["strap position to hub"],
+        datums=("G",),
+    ))
+    assert gtol_frame_signature(env.state["xml"]) == expected
+    assert ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["strap position to hub"] == (
+        f"{ch_rocker_arm_spec.STRAP_HUB_SYMMETRY:.2f}"
+    )
+    assert env.calls == [
+        "ClearSelection2", ("SelectByID2", ("RD3@Drawing View2", "DIMENSION")),
+        "InsertGtol", "SetSymbolXml", "ClearSelection2", ("rebuild", "strap position to G"),
+    ]
+
+
+@pytest.mark.parametrize("defect,message", [
+    ({"InsertGtol": None}, "InsertGtol returned nothing"),
+    ({"xml_ok": False}, "rejected the frame XML"),
+    ({"format": 1}, "frame did not persist"),
+    ({"types": (1,)}, "not attached to its dimension"),
+    ({"attached": "other"}, "attached to another dimension"),
+])
+def test_strap_position_frame_refuses_an_unproven_frame(
+    view_f_dimension, defect: dict, message: str,
+) -> None:
+    env = view_f_dimension
+    env.reset(**{key: env.other if value == "other" else value for key, value in defect.items()})
+    with pytest.raises(RuntimeError, match=message):
+        drawing._strap_position_frame(env.adapter, env.view, env.imported)
+
+
+def test_hub_position_frame_locates_the_hub_od_to_a_on_its_own_diameter(view_f_dimension) -> None:
+    """regate-r1 #2: the hub OD's coaxiality is a native Ø position frame to A
+    under its Ø10.20 in detail D, the zone the hub wall minimum is built on."""
+    env = view_f_dimension
+    assert drawing._hub_position_frame(env.adapter, env.view, env.imported) is env.gtol
+    zone = ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM["hub OD position to bore"]
+    assert zone == f"{ch_rocker_arm_spec.HUB_COAXIALITY_DIA:.2f}" == "0.10"
+    assert drawing.HUB_OD.fields["position_datums"][0] == ["A"]
+    expected = gtol_frame_signature(gtol_frame_xml("position", zone, datums=("A",), diameter=True))
+    assert gtol_frame_signature(env.state["xml"]) == expected
+    # The zone is diametral: the same frame without Ø is a different signature.
+    assert expected != gtol_frame_signature(gtol_frame_xml("position", zone, datums=("A",)))
+    assert env.calls == [
+        "ClearSelection2", ("SelectByID2", ("RD3@Drawing View2", "DIMENSION")),
+        "InsertGtol", "SetSymbolXml", "ClearSelection2", ("rebuild", "hub OD position to A"),
+    ]
+
+
+@pytest.mark.parametrize("defect,message", [
+    ({"InsertGtol": None}, "hub OD position to A: InsertGtol returned nothing"),
+    ({"format": 1}, "frame did not persist"),
+    ({"attached": "other"}, "attached to another dimension"),
+])
+def test_hub_position_frame_refuses_an_unproven_frame(view_f_dimension, defect: dict, message: str) -> None:
+    env = view_f_dimension
+    env.reset(**{key: env.other if value == "other" else value for key, value in defect.items()})
+    with pytest.raises(RuntimeError, match=message):
+        drawing._hub_position_frame(env.adapter, env.view, env.imported)
 
 
 def test_projection_barrier_is_void_and_precedes_native_math(bound, monkeypatch):
@@ -2997,12 +3516,23 @@ class _DetailProfile:
 
 class _DetailCropCircle:
     _native_interfaces = ("IDetailCircle",)
-    __slots__ = ("label", "profiles", "NoOutline", "_jagged", "full", "display")
+    __slots__ = ("label", "profiles", "NoOutline", "_jagged", "full", "display", "style", "style_ok", "style_writes")
 
-    def __init__(self, label, profile):
+    def __init__(self, label, profile, *, style=None):
         self.label, self.profiles = label, (profile,)
         self.NoOutline = label == "D"
         self._jagged, self.full, self.display = False, True, 1
+        self.style = drawing.DETAIL_STYLE[label] if style is None else style
+        self.style_ok, self.style_writes = True, []
+
+    def GetStyle(self):
+        return self.style
+
+    def SetStyle(self, style):
+        self.style_writes.append(style)
+        if self.style_ok is True:
+            self.style = style
+        return self.style_ok is not False
 
     @property
     def JaggedOutline(self):
@@ -3124,7 +3654,7 @@ class _DetailView:
 
 
 @pytest.mark.parametrize("label", ["D", "E"])
-@pytest.mark.parametrize("defect", [None, "activation", "parent", "scale", "move", "ignored-move", "stale", "missing-position", "fence", "selection", "creation", "source-radius", "source-centre", "profile-radius", "profile-centre", "near-profile-centre", "partial", "missing-profile", "outline-flags", "projection-scale"])
+@pytest.mark.parametrize("defect", [None, "activation", "parent", "scale", "move", "ignored-move", "stale", "missing-position", "fence", "selection", "creation", "source-radius", "source-centre", "profile-radius", "profile-centre", "near-profile-centre", "partial", "missing-profile", "outline-flags", "projection-scale", "ignored-style", "refused-style", "lost-style"])
 def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, monkeypatch, label, defect):
     parent = _DetailParent()
     if defect == "projection-scale":
@@ -3164,11 +3694,18 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
             profile.centre = (profile.centre[0] + shift, profile.centre[1], profile.centre[2])
         elif defect == "partial":
             profile.complete = 0
-        detail.crop_circle = _DetailCropCircle(label, profile)
+        # The style argument persists unless the defect says it was ignored.
+        detail.crop_circle = _DetailCropCircle(
+            label, profile, style=1 if defect in ("ignored-style", "refused-style", "lost-style") else args[3],
+        )
         if defect == "missing-profile":
             detail.crop_circle.profiles = ()
         elif defect == "outline-flags":
             detail.crop_circle.NoOutline = label != "D"
+        elif defect == "refused-style":
+            detail.crop_circle.style_ok = False
+        elif defect == "lost-style":
+            detail.crop_circle.style_ok = "lost"  # reports success, keeps the wrong style
         return None if defect == "creation" else detail
     doc = _native("IModelDoc2", "IDrawingDoc", ActivateView=lambda _name: defect != "activation", ClearSelection2=lambda _all: None,
     SketchManager=manager,
@@ -3186,7 +3723,7 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
     target = drawing.HUB_CENTER if label == "D" else drawing.END_CENTER
     scale = drawing.HUB_SCALE if label == "D" else drawing.END_SCALE
     kwargs = dict(centre=centre, radius_mm=radius_mm, target=target, scale=scale, label=label)
-    if defect is None:
+    if defect in (None, "ignored-style"):
         assert drawing._create_detail(adapter, parent, **kwargs) is detail
         assert detail.Position == pytest.approx(target, rel=0.0, abs=1e-12)
         assert detail.physical == pytest.approx(target, rel=0.0, abs=1e-12)
@@ -3196,7 +3733,13 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
         assert detail.GetOutline()[3] > target[1] + detail.radius
         assert created[0].radius == pytest.approx(radius_mm / 1000.0)  # Nonidentity sketch scale 2.
         assert parent.transform.inverse_calls >= 2
+        # D leads its letter to the fence (regate-r1 #3); E stays standard.
+        assert calls[0][3] == drawing.DETAIL_STYLE[label] == {"D": 2, "E": 0}[label]
         assert calls[0][7:] == (1, label == "E", False, label == "D", 5)
+        # The documented setter runs only when creation ignored the style.
+        expected_writes = [drawing.DETAIL_STYLE[label]] if defect == "ignored-style" else []
+        assert detail.crop_circle.style_writes == expected_writes
+        assert detail.crop_circle.GetStyle() == drawing.DETAIL_STYLE[label]
     else:
         with pytest.raises(RuntimeError):
             drawing._create_detail(adapter, parent, **kwargs)
@@ -3357,7 +3900,7 @@ def test_crop_accepts_shared_box_drift_only_within_unchanged_tolerance(bound, mo
 @pytest.mark.parametrize("defect", [
     "radius", "nan-radius", "zero-radius", "centre", "off-sheet-plane", "missing-centre", "partial", "segment",
     "empty", "missing-items", "multiple", "missing-segment",
-    "missing-circle", "missing-parent", "no-outline", "display", "label",
+    "missing-circle", "missing-parent", "no-outline", "display", "label", "style",
     "inverse", "matrix", "missing-sketch", "missing-transform", "missing-utility", "parent-scale", "parent-scale-shape", "projection-scale",
     "detail-scale", "detail-scale-shape", "parent-scale-link", "sheet-scale-link", "invalid-bbox",
 ])
@@ -3395,6 +3938,8 @@ def test_native_crop_refuses_wrong_persisted_geometry_flags_or_coordinate_frame(
         circle.display = 0
     elif defect == "label":
         circle.label = "X"
+    elif defect == "style":
+        circle.style = 0  # D's leader lost: the fence no longer names its detail
     elif defect == "inverse":
         parent.transform.bad_inverse = True
     elif defect == "matrix":
@@ -4233,8 +4778,10 @@ def test_each_face_retains_only_its_template_marks_without_batch_reinsertion(
         assert reads == views[:view_index + 1]
 
 
-@pytest.mark.parametrize("defect", [None, "missing", "null-display", "ignored"])
-def test_hub_identity_label_is_above_the_whole_stack_and_preserves_native_size(
+@pytest.mark.parametrize("defect", [
+    None, "missing", "null-display", "ignored", "strap-missing", "strap-ignored", "root-missing",
+])
+def test_hub_length_stack_callout_is_below_and_preserves_native_size(
     monkeypatch, defect,
 ):
     adapter, _imported = _imported_native_quantities(monkeypatch)
@@ -4242,14 +4789,21 @@ def test_hub_identity_label_is_above_the_whole_stack_and_preserves_native_size(
     hub.band = tuple(value / 1000.0 for value in ch_rocker_arm_spec.HUB_LENGTH_BAND)
     hub.tolerance_type = 4
     strap = _NativeQuantity("StrapThickness", ch_rocker_arm_spec.ARM_THICKNESS, precision=3)
-    before = (hub.model.SystemValue, hub.band, hub.tolerance_type, hub.precision)
+    strap.tolerance_type = 4
+    root = _HubRootDisplay()
+    before = [
+        (d.model.SystemValue, d.band, d.tolerance_type, d.precision) for d in (hub, strap, root)
+    ]
     if defect == "null-display":
         hub.annotation.GetSpecificAnnotation = lambda: None
     elif defect == "ignored":
-        hub.ignored_text = 3
-    annotations = [strap.GetAnnotation()] if defect == "missing" else [
-        hub.GetAnnotation(), strap.GetAnnotation(),
-    ]
+        hub.ignored_text = 4
+    elif defect == "strap-ignored":
+        strap.ignored_text = 4
+    displays = {
+        "missing": (strap, root), "strap-missing": (hub, root), "root-missing": (hub, strap),
+    }.get(defect, (hub, strap, root))
+    annotations = [display.GetAnnotation() for display in displays]
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(
         node for node in tree.body
@@ -4263,12 +4817,15 @@ def test_hub_identity_label_is_above_the_whole_stack_and_preserves_native_size(
             for target in node.targets
         )
     )
+    # View F's dressing (hub root, datum G, strap frame) is one guarded block.
     stop = next(
         index for index, node in enumerate(build.body)
-        if isinstance(node, ast.Expr)
-        and isinstance(node.value, ast.Call)
-        and isinstance(node.value.func, ast.Name)
-        and node.value.func.id == "_add_strap_offset_dimension"
+        if isinstance(node, ast.Try)
+        and any(
+            isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+            and call.func.id == "_strap_position_frame"
+            for call in ast.walk(node)
+        )
     )
     label_start = next(
         index for index, node in enumerate(build.body)
@@ -4280,27 +4837,43 @@ def test_hub_identity_label_is_above_the_whole_stack_and_preserves_native_size(
         and node.value.args[1].id == "right_annotations"
     )
     assert start < label_start < stop
+    right, placed, captured = object(), [], []
     namespace = dict(
-        adapter=adapter, right=object(), RIGHT_KEEP=drawing.RIGHT_KEEP,
+        adapter=adapter, right=right, RIGHT_KEEP=drawing.RIGHT_KEEP,
         DRAWING_DIMENSIONS=drawing.DRAWING_DIMENSIONS,
         curate_view_dimensions=lambda *_args, **_kwargs: annotations,
         set_dimension_callouts=drawing.set_dimension_callouts,
         dimension_name=drawing.dimension_name, _early_bound=drawing._early_bound,
+        rocker_notes=ch_rocker_arm_notes, HUB_LENGTH_TEXT=drawing.HUB_LENGTH_TEXT,
+        _dress_hub_root=drawing._dress_hub_root,
+        _hub_width_datum=lambda _adapter, view, ann: placed.append(("D", view, ann)),
+        _strap_position_frame=lambda _adapter, view, ann: placed.append(("frame", view, ann)),
+        _capture_layout_failure=lambda _adapter, phase, _exc: captured.append(phase),
     )
-    # This label test owns the right import and identity/readback block, not
-    # the preceding all-view precision checks and their other-view inputs.
+    # This label test owns the right import, its callout/readback and view F's
+    # dressing, not the preceding all-view precision checks and other views.
     module = ast.Module(
-        body=[build.body[start], *build.body[label_start:stop]], type_ignores=[],
+        body=[build.body[start], *build.body[label_start:stop + 1]], type_ignores=[],
     )
     code = compile(ast.fix_missing_locations(module), drawing.__file__, "exec")
     if defect is None:
         exec(code, namespace)
-        assert hub.writes == [(3, "HUB LENGTH")]
-        assert strap.writes == []
+        # Hub length names its stack mate and the strap its fork fit, both in
+        # below rows (above-text line breaks print as one run).
+        assert hub.writes == [(4, drawing.HUB_LENGTH_TEXT)]
+        assert "MHA-CH-005" in drawing.HUB_LENGTH_TEXT
+        assert strap.writes == [(4, ch_rocker_arm_notes.STRAP_FIT_CALLOUT)]
+        assert "MHA-CH-003" in ch_rocker_arm_notes.STRAP_FIT_CALLOUT
+        # D hangs on the hub width, the position frame on the strap width.
+        assert placed == [("D", right, hub.annotation), ("frame", right, strap.annotation)]
+        assert root.ArcExtensionLineOrOppositeSide is False
+        assert captured == []
     else:
-        with pytest.raises(RuntimeError):
+        with pytest.raises((RuntimeError, ValueError)):
             exec(code, namespace)
-    assert (hub.model.SystemValue, hub.band, hub.tolerance_type, hub.precision) == before
+    assert [
+        (d.model.SystemValue, d.band, d.tolerance_type, d.precision) for d in (hub, strap, root)
+    ] == before
 
 
 def test_details_keep_native_scale_source_census_and_unclipped_overall_contract():
@@ -4320,14 +4893,17 @@ def test_details_keep_native_scale_source_census_and_unclipped_overall_contract(
             if isinstance(node, ast.Assign)
             and any(isinstance(target, ast.Attribute) and target.attr == "MaxWitnessLineLength"
                     for target in node.targets)]
-    assert len(caps) == 2
+    assert len(caps) == 4
     assert [ast.unparse(cap.targets[0]) for cap in caps] == [
-        "taper_dimension.MaxWitnessLineLength", "land_dimension.MaxWitnessLineLength",
+        "taper_dimension.MaxWitnessLineLength",
+        "left_taper_dimension.MaxWitnessLineLength",
+        "land_dimension.MaxWitnessLineLength",
+        "left_land_dimension.MaxWitnessLineLength",
     ]
     assert all(ast.unparse(cap.value) == "TAPER_WITNESS_LENGTH" for cap in caps)  # Overall remains full-length.
     assert not hasattr(drawing, "OVERALL_WITNESS_LENGTH")
     assert not hasattr(drawing, "PIVOT_PICK_ZOOM_HALF")
-    assert set(drawing.FRONT_KEEP) == drawing.BASIC_PROFILE_DIMENSIONS
+    assert set(drawing.FRONT_KEEP) == drawing.BASIC_PROFILE_DIMENSIONS | set(drawing.ARC_RADIUS_NAMES)
     assert not hasattr(drawing, "_sheet_xy")
     crop_calls = {"_seat_detail_caption": 1, "_require_ream_clearance": 1, "_require_front_detail_air": 2}
     for name, count in crop_calls.items():
@@ -4352,21 +4928,24 @@ def test_details_keep_native_scale_source_census_and_unclipped_overall_contract(
     wrapper_calls = [node.func.id for node in ast.walk(definitions["_detail_crop"])
                      if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
     assert wrapper_calls.count("read_circular_detail_crop") == 1 and "_outline" not in wrapper_calls
-    # GetText is valid only on the ordinary HubLength display, not the native
-    # wizard-hole callout. Retain the guard while admitting its audited label.
-    hub_label_branch = next(
-        node for node in ast.walk(definitions["build"])
-        if isinstance(node, ast.If)
-        and ast.unparse(node.test) == "dimension_name(adapter, annotation) == 'HubLength'"
-    )
+    # GetText is valid only on the ordinary right-view HubLength/StrapThickness
+    # displays, not the native wizard-hole callout: each read is name-guarded.
     build_text_calls = [
         node for node in ast.walk(definitions["build"])
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
         and node.func.attr == "GetText"
     ]
-    assert len(build_text_calls) == 1
-    assert build_text_calls[0] in list(ast.walk(hub_label_branch))
-    assert ast.unparse(build_text_calls[0]) == "display.GetText(3)"
+    # Both multi-row callouts are below text (row 4), read back by name.
+    assert [ast.unparse(call) for call in build_text_calls] == [
+        "display.GetText(4)", "display.GetText(4)",
+    ]
+    for call, name in zip(build_text_calls, ("HubLength", "StrapThickness"), strict=True):
+        guard = next(
+            node for node in ast.walk(definitions["build"])
+            if isinstance(node, ast.If) and call in list(ast.walk(node.test))
+        )
+        assert isinstance(guard.test, ast.BoolOp) and isinstance(guard.test.op, ast.And)
+        assert ast.unparse(guard.test.values[0]) == f"name == {name!r}"
     assert sum(node.func.id == "_require_rod_through_callout" for node in build_calls) == 1
     through_attributes = {node.attr for node in ast.walk(definitions["_require_rod_through_callout"]) if isinstance(node, ast.Attribute)}
     assert {"GetDisplayData", "GetTextCount", "GetTextAtIndex"} <= through_attributes
@@ -4562,6 +5141,42 @@ def test_native_projection_fails_closed_on_missing_or_invalid_coordinates(bound,
 
 @pytest.mark.parametrize("defect", [None, "inside-circle", "missing-radius", "zero-projection", "invalid-position"])
 def test_basic_radius_ink_uses_native_parent_circle_projection(native_profile_clearance, bound, monkeypatch, defect):
+    case = native_profile_clearance
+    annotations = []
+    for name in ("TopRadius", "BottomRadius"):
+        xy = drawing.FRONT_KEEP[name]
+        text = _ClearanceDisplayData([{"t": "R800" if name == "TopRadius" else "R816",
+                                      "pos": [*xy, 0.0], "h": 0.0035}], [])
+        annotations.append(_ClearanceAnnotation(name, (*xy, 0.0), text, kind=4, hole_callout=False))
+    if defect == "inside-circle":
+        annotations[0].data.texts[0]["pos"][:2] = [0.130, 0.218]
+    elif defect == "missing-radius":
+        annotations.pop(0)
+    elif defect == "invalid-position":
+        annotations[0].position = (float("nan"), 0.136, 0.0)
+    case.front.GetAnnotations = lambda: annotations
+    case.front.GetAnnotationCount = lambda: len(annotations)
+    events = []
+    case.front.UpdateViewDisplayGeometry = lambda: events.append("barrier")
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann.name)
+    def native_project(_adapter, _view, points, **_kwargs):
+        assert events == ["barrier"]
+        return [_front_xy(0.0 if defect == "zero-projection" else x * 1000.0, y * 1000.0)
+                for x, y, _z in points]
+    monkeypatch.setattr(drawing, "model_points_in_view", native_project)
+    if defect is None:
+        drawing._require_radius_exterior(case.adapter, case.front)
+        logs = "\n".join(case.logs)
+        assert "native_circle_radius_mm=400.000" in logs
+        assert "native_circle_radius_mm=408.000" in logs
+        assert logs.count("actual_exterior_air_mm=") == 2
+    else:
+        with pytest.raises((RuntimeError, ValueError)):
+            drawing._require_radius_exterior(case.adapter, case.front)
+
+
+@pytest.mark.parametrize("defect", [None, "inside-circle", "missing-radius", "zero-projection", "invalid-position"])
+def test_radius_ink_uses_native_parent_circle_projection(native_profile_clearance, bound, monkeypatch, defect):
     case = native_profile_clearance
     annotations = []
     for name in ("TopRadius", "BottomRadius"):
@@ -6049,25 +6664,17 @@ def test_overall_width_refuses_null_annotation_before_reference_or_taper(
     assert native_front.displays["rocker overall width"].writes == []
 
 
-@pytest.mark.parametrize("stage", ["annotation", "specific-display"])
-def test_overall_width_refuses_wrong_produced_interface_owner(
-    native_front, monkeypatch, stage,
-):
+def test_overall_width_refuses_wrong_produced_interface_owner(native_front, monkeypatch):
     original_create = drawing.add_edge_dimension
 
     def create(*args, **kwargs):
         display = original_create(*args, **kwargs)
         if kwargs["label"] == "rocker overall width":
-            if stage == "annotation":
-                display.GetAnnotation = lambda: display
-            else:
-                annotation = display.GetAnnotation()
-                annotation.GetSpecificAnnotation = lambda: annotation
+            display.GetAnnotation = lambda: display
         return display
 
     monkeypatch.setattr(drawing, "add_edge_dimension", create)
-    interface = "IAnnotation" if stage == "annotation" else "IDisplayDimension"
-    with pytest.raises(RuntimeError, match=f"native owner mismatch.*{interface}"):
+    with pytest.raises(RuntimeError, match="native owner mismatch.*IAnnotation"):
         drawing._add_rocker_outline_dimensions(native_front.adapter, object())
     assert [call["label"] for call in native_front.calls] == ["rocker overall width"]
     assert native_front.displays["rocker overall width"].writes == []
@@ -6469,7 +7076,7 @@ def actual_rocker_gdt(native_annotation_binding, monkeypatch):
     return state
 
 
-def _author_actual_rocker_gdt(case, kind, *, coordinate=False, arc="BottomRadius"):
+def _author_actual_rocker_gdt(case, kind, *, coordinate=False, arc="TopRadius"):
     import _drawing_gdt
 
     pick = (
@@ -6558,17 +7165,17 @@ def test_actual_datum_landing_refuses_unreadable_or_moved_triangle(actual_rocker
         )
 
 
-@pytest.mark.parametrize("arc", ["TopRadius", "BottomRadius"])
 @pytest.mark.parametrize("legacy", [False, True])
 @pytest.mark.parametrize("coordinate", [False, True])
 def test_actual_profile_frame_helper_preserves_unequal_xml_on_frame_owner(
-    actual_rocker_gdt, arc, legacy, coordinate,
+    actual_rocker_gdt, legacy, coordinate,
 ):
     from _gtol_frame import gtol_frame_signature
 
     case = actual_rocker_gdt
     case.gtol.format = 1 if legacy else 2
     case.gtol.count = 1 if legacy else 0
+    arc = "TopRadius"  # The drawing's one profile frame.
     assert _author_actual_rocker_gdt(case, "frame", arc=arc, coordinate=coordinate) is case.gtol
     signature = gtol_frame_signature(case.frame.GetSymbolXml())
     assert signature.tolerance == "0.5"
@@ -7748,7 +8355,7 @@ def test_r24_5_point_59_observed_sp4_true_true_one_mm_gap_has_real_visible_corne
     assert case.annotation.attached == before
     assert case.model.SystemValue == drawing.TIP_FACE / 1000.0
     assert not hasattr(case.annotation.display, "SetWitnessLineGap")
-    assert drawing.END_KEEP == {"RodTipLen": (0.377, 0.130)}
+    assert drawing.END_KEEP == {"RodTipLen": (0.377, 0.128)}
 
 
 @pytest.mark.parametrize("gaps,use_doc", [
@@ -8161,10 +8768,11 @@ def test_r24_production_wires_all_native_local_guards_without_banned_fcf_setter_
         "_r24_arc_sweep", "_r24_arc_contains", "_r24_arc_intersections",
         "_r24_no_arc_crossings", "_r24_terminals",
     }.isdisjoint(definitions)
-    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 11
-    assert "COMMON ARC CENTRE ABOVE A" in ch_rocker_arm_notes.DRAWING_NOTES
+    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 2
+    # Note 1 still carries the arc centre the 1:2 view cannot reach.
+    assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", ch_rocker_arm_notes.DRAWING_NOTES)
     assert ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == 8.0
-    assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": -110.0}
+    assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": 40.0}
 
 
 
@@ -8242,8 +8850,14 @@ def r24_radii(bound, monkeypatch):
 
 def test_r26_actual_r23_radius_pair_passes_restored_exterior_guard_and_has_no_crossing(r24_radii):
     case = r24_radii
-    assert drawing.FRONT_KEEP["TopRadius"] == (0.145, 0.136)
-    assert drawing.FRONT_KEEP["BottomRadius"] == (0.169, 0.128)
+    # These rows are R23's ink for its (0.145, 0.136)/(0.169, 0.128) requests:
+    # a replay of the guard and crossing checks, NOT evidence for the MR #1020
+    # requests below the strap's left half, which only a native render proves
+    # (the same guard runs live after the final rebuild).
+    assert case.annotations["TopRadius"].position[:2] == (0.145, 0.136)
+    assert case.annotations["BottomRadius"].position[:2] == (0.169, 0.128)
+    assert drawing.FRONT_KEEP["TopRadius"] != (0.145, 0.136)
+    assert drawing.FRONT_KEEP["BottomRadius"] != (0.169, 0.128)
     drawing._require_radius_exterior(case.adapter, case.view)
     top, top_geometry = drawing._r24_record(case.adapter, case.annotations["TopRadius"], label="actual R23 R800")
     bottom, bottom_geometry = drawing._r24_record(case.adapter, case.annotations["BottomRadius"], label="actual R23 R816")
@@ -8321,6 +8935,23 @@ def test_r24_taper_native_capped_witnesses_clear_parent_e_without_changing_measu
     drawing._require_taper_witnesses(case.adapter, object(), case.taper, case.entities)
     assert case.taper.model.SystemValue == pytest.approx(drawing.BOT_END_X / 1000.0)
     assert case.taper.annotation.GetAttachedEntities3() == case.entities
+
+
+def test_r24_taper_box_sides_are_not_witnesses(r24_taper):
+    # r1/r2 farm: the then-BASIC box's two vertical sides were counted as witnesses.
+    case = r24_taper
+    _record, geometry = drawing._r24_record(case.adapter, case.taper.GetAnnotation(), label="t")
+    value = geometry.text_boxes[0]
+    x0, y0, x1, y1 = value.xmin - 0.0005, value.ymin - 0.0005, value.xmax + 0.0005, value.ymax + 0.0005
+    case.data.lines.extend([
+        _native_line(x0, y0, x1, y0), _native_line(x1, y0, x1, y1),
+        _native_line(x1, y1, x0, y1), _native_line(x0, y1, x0, y0),
+    ])
+    drawing._require_taper_witnesses(case.adapter, object(), case.taper, case.entities)
+    # A frame cannot stand in for a missing witness.
+    case.data.lines.pop(1)
+    with pytest.raises(RuntimeError, match="witness pair"):
+        drawing._require_taper_witnesses(case.adapter, object(), case.taper, case.entities)
 
 
 @pytest.mark.parametrize("defect", ["property", "nan-property", "long-ink", "cross-parent-circle", "wrong-nominal",
@@ -8455,22 +9086,22 @@ def test_r24_raw_native_text_metric_scalar_types_refuse_before_using_the_dump(r2
         drawing._r24_record(r24_tip.adapter, r24_tip.annotation, label="native text metrics")
 
 
-def test_option_four_notes_carry_no_angle_and_name_datum_c_as_the_rod_pin_hole():
+def test_option_four_notes_carry_no_angle_and_leave_datum_c_to_the_views():
     notes = ch_rocker_arm_notes.DRAWING_NOTES
     flat = " ".join(notes.split())
     # The 10.46° land angle is derived (lands radial to the arc centre), so no
-    # note carries a number for it; C clocks the plane from the rod-pin hole.
+    # note carries a number for it; datum C is named on the rod-pin frame.
     assert "°" not in notes and "BASIC TO DATUM" not in notes
-    assert flat.startswith(
-        "1. MIRROR PLANE: THROUGH DATUM AXIS A, PERPENDICULAR TO DATUM B, "
-        "CLOCKED BY DATUM C (ROD-PIN HOLE, 1X, END SHOWN)."
-    )
-    assert "2. COMMON ARC CENTRE ABOVE A ON THE PLANE; TIP LANDS RADIAL TO IT." in flat
-    assert "BASIC 8.00: TOP ARC ABOVE A." in notes
+    assert flat.startswith("1. ARC CENTRE DIRECTLY ABOVE A; TIP LANDS RADIAL TO IT.")
+    assert "DATUM C" not in notes and "ENDS MIRROR" not in notes
+    # Both ends' locations from A are on the views: no 8.00 restatement, no
+    # datum C land narration in the notes.
+    assert "TOP ARC ABOVE A" not in notes
+    assert "DATUM C: STRAP END LAND" not in notes
     assert "5." not in re.findall(r"^\d+\.", notes, re.MULTILINE)
     assert notes.count(ch_rocker_arm_notes.HUB_WALL_NOTE) == 1
-    assert len(notes.splitlines()) == 11
-    assert max(map(len, notes.splitlines())) <= 42
+    assert "MHA-CH-001" in notes
+    assert _notes_fit_left_of_the_title_block(notes)
 
 
 def test_r24_final_attachment_reproof_does_not_require_unproven_annotation_is_same(r24_final_layout):

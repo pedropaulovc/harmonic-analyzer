@@ -113,7 +113,7 @@ TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
 # (channel_kinematics ``bar_bottom``); test_rocker_bank_layout pins the slack.
 PIVOT_HOLE_BAND = (0.03, 0.0)  # (upper, lower): reamed; native on PivotDia
 RULE12_WALL_FLOOR = 1.5  # drawing-guidelines.md rule 17 (walls and webs)
-HUB_COAXIALITY_DIA = 0.10  # authoritative diametral zone; notes print this source
+HUB_COAXIALITY_DIA = 0.10  # authoritative diametral zone; the hub OD's position frame prints it
 LINEAR_2PL = 0.508  # raw .XX class; notes judge the actual printed ±0.51
 _HUB_FLOOR = (
     PIVOT_HOLE_DIA
@@ -134,10 +134,24 @@ HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the bui
 HUB_LENGTH_BAND = (0.05, 0.0)
 # The strap symmetric to the hub within this (total; #948 ruling R, PR #1292):
 # the hub stack places the arm, the strap carries the rod's fork, so a flat
-# rod's float on the arm is measured from the hub's mid-plane.
+# rod's float on the arm is measured from the hub's mid-plane. The sheet
+# prints it as a position zone on the strap width to datum G, the hub width.
 STRAP_HUB_SYMMETRY = 0.10
+# The hub-to-strap root fillet (drawing-guidelines rule 16), printed as the
+# single limit "R0.2 MAX" (Opus #1020 r2 C2). The MHA-CH-001 foot cheeks pass
+# over the hub at d = 0 and the bar floats axially in its foot notch, so a
+# cheek can run on the strap face, where the fillet stands its full radius
+# proud of the hub wall: the radius is capped by the cheeks' radial air over
+# the hub (test_rocker_bank_layout pins the worst case).
+HUB_ROOT_RADIUS_MAX = 0.2
 
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "rod-pin hole position": "0.20",
+    "strap position to hub": "0.10",
+    "hub OD position to bore": "0.10",
 }
+if float(GEOMETRIC_TOLERANCES_MM["strap position to hub"]) != STRAP_HUB_SYMMETRY:
+    raise AssertionError("the strap position zone must print STRAP_HUB_SYMMETRY")
+if float(GEOMETRIC_TOLERANCES_MM["hub OD position to bore"]) != HUB_COAXIALITY_DIA:
+    raise AssertionError("the hub OD position zone must print HUB_COAXIALITY_DIA")
