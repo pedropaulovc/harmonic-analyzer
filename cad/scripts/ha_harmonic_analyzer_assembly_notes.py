@@ -130,7 +130,7 @@ _STEP_TEXT: dict[str, str] = {
     "magnifier-bracket-screwed": (
         "MAGNIFIER BRACKET: SEAT THE MHA-MG-001 BRACKET FLANGE ON ITS SEATS ON "
         "MHA-SM-003 AND DRIVE BOTH MHA-VN-050 #2-56 SCREWS UNTIL THE HEADS SEAT "
-        "ON THE COUNTERBORE FLOORS."
+        "ON THE FLANGE."
     ),
     "lever-wire-fitted": "LEVER WIRE: PER MHA-MG-000 SHEET 4.",
     "pen-hung": (
