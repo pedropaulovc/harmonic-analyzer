@@ -14,6 +14,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
+import _config
 import _surface_finish
 import ch_pivot_shaft_spec as shaft
 import rocker_bank_layout as bank
@@ -32,11 +33,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import (
-    assert_imported_precision,
-    set_dimension_callouts,
-    set_reference_dimension,
-)
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -52,7 +49,7 @@ from ch_pivot_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLAT_LENGTH,
-    LENGTH_CALLOUT,
+    FLAT_STATION_CALLOUT,
     NORTH_FLAT_STATION,
     SHAFT_DIA,
     SURFACE_FINISHES,
@@ -75,11 +72,12 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 # The side view is "*Right": the axis horizontal, as the bar sits in the lathe.
 # Model -Z runs to the sheet's right: the north end (the part origin) is on
-# the LEFT, the plain cut-to-fit end on the right. It carries the diameter,
-# the length and the south flat's station (drawing-guidelines.md rule 11 (turned parts read like the lathe)), all authored on
+# the LEFT, the south end on the right. It carries the diameter and the
+# overall length, tip to tip (drawing-guidelines.md rule 11 (turned parts read like the lathe)), both authored on
 # Right-plane sketches, so the view imports them natively, both flats edge-on
 # on its top silhouette. An end view would carry nothing, so this sheet has
-# none; the north end's flat and dome go to DETAIL A.
+# none; the north end's flat and dome go to DETAIL A, and the bar is the same
+# either way round, so they print once for BOTH ENDS.
 PROFILE_CENTER = (0.150, 0.190)
 _MM = SHEET_SCALE[0] / 1000.0
 # The view centres on the bar's bounding box, domes included.
@@ -110,13 +108,13 @@ def _left_of_witness(witness_x: float, callout: str) -> float:
 
 
 # The flats' length and across-flat print once, on the north flat, as 2X:
-# the south flat is the same cut (FlatProfile), placed by its own station.
+# the south flat is the same cut (FlatProfile). Its station prints once too,
+# from the north tip, for BOTH ENDS: each flat is stationed from its own tip.
 FLATS_CALLOUT = "2X"
 
 _P = shaft.DRAWING_PRECISION_BY_NAME
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_surface_finish", "ra")))
 for _side, _station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, strict=True):
-    _dimension = f"{_side.capitalize()}FlatStation"
     requirement(
         f"{_side}_flat", kind="face",
         faces=(PlanarFace((0, 1, 0), shaft.FLAT_AF - shaft.SHAFT_DIA / 2, contains_z_mm=-_station),),
@@ -126,19 +124,25 @@ for _side, _station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, s
             "height_from": ("pivot_bearing", (("draw_ch_pivot_shaft", "build"),)),
             "length": (_band(shaft.FLAT_LENGTH, _P["FlatLength"]), ("FLAT_LENGTH",)),
             "length_nominal": (shaft.FLAT_LENGTH, ("FLAT_LENGTH",)),
-            "station": (_band(_station, _P[_dimension]), ("NORTH_FLAT_STATION", ("rocker_bank_layout", "PIVOT_SHAFT_FLAT_STATIONS"))),
-            "station_nominal": (_station, ("NORTH_FLAT_STATION", ("rocker_bank_layout", "PIVOT_SHAFT_FLAT_STATIONS"))),
+            "station": (_band(shaft.FLAT_TIP_STATION, _P["FlatStation"]), ("FLAT_TIP_STATION",)),
+            "station_nominal": (shaft.FLAT_TIP_STATION, ("FLAT_TIP_STATION",)),
+            # Each from its own end's dome tip.
+            "note": (shaft.FLAT_STATION_CALLOUT, ("FLAT_STATION_CALLOUT",)),
             "plane": ({"frame": "model", "axis": "y", "value": shaft.FLAT_AF - shaft.SHAFT_DIA / 2}, ("FLAT_AF", "SHAFT_DIA")),
-        }, precision={"height": _P["FlatAF"], "length": _P["FlatLength"], "station": _P[_dimension]},
+        }, precision={"height": _P["FlatAF"], "length": _P["FlatLength"], "station": _P["FlatStation"]},
     )
 
+# The O.D.'s band is for the 20 rocker hubs it runs in; the callout names
+# them (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
+SHAFT_FIT_CALLOUT = f"RUNNING FIT IN\n{_config.parts('ch-rocker-arm')['number']} HUBS"
+
 PROFILE_KEEP = {
-    # Under the bar, centred: the REF span the cut-to-fit callout governs.
-    "ShaftLength": (PROFILE_CENTER[0], 0.158),
-    # The diameter stands clear of the plain end it measures.
-    "ShaftDia": (SOUTH_END_X + 0.018, PROFILE_CENTER[1]),
-    # The south flat's station from the north end, across the whole bar.
-    "SouthFlatStation": (PROFILE_CENTER[0], 0.242),
+    # Over the bar, centred: the overall length, tip to tip.
+    "OverallLength": (PROFILE_CENTER[0], 0.242),
+    # Right of the south end and under the bar's lower flank: inside the
+    # witness pair the toleranced text and its fit callout sat on the lower
+    # extension line (baseline machinist review).
+    "ShaftDia": (SOUTH_END_X + 0.030, PROFILE_CENTER[1] - 0.012),
 }
 
 PIVOT_BEARING = requirement(
@@ -149,19 +153,17 @@ PIVOT_BEARING = requirement(
         "dia": (_band(shaft.SHAFT_DIA, _P["ShaftDia"], shaft.SHAFT_DIA_BAND), ("SHAFT_DIA", "SHAFT_DIA_BAND")),
         "dia_nominal": (shaft.SHAFT_DIA, ("SHAFT_DIA",)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-        "length_ref": (bank.PIVOT_SHAFT_LENGTH, ("LENGTH_CALLOUT", ("rocker_bank_layout", "PIVOT_SHAFT_LENGTH"))),
-        "note": (shaft.LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
-        # Nominal turned-axis extent, not the cut-to-fit length requirement.
+        # The cylinder's extent; the domes run on to the tips.
         "z_mm": ([round(-bank.PIVOT_SHAFT_LENGTH, 12), 0.0], (("rocker_bank_layout", "PIVOT_SHAFT_LENGTH"),)),
     }, precision={"dia": _P["ShaftDia"], "finish_ra": 1},
 )
 
-# DETAIL A: the north flat (5.0 x 0.5 deep), its station and the dome are
-# 1.5-5 mm features. At 1:1 their dimensions crammed the north end, text on
+# DETAIL A: the north flat (6.0 long, 0.9 deep), its station and the dome are
+# 1.5-6 mm features. At 1:1 their dimensions crammed the north end, text on
 # the witness lines and against the dome (PR #1317 eye pass), so a native 5:1
 # detail carries them. The fence centres on the axis midway between the dome
 # tip and the flat's far end and takes in both; the detail stands right of
-# the profile's diameter callout (x <= 0.263), clear of the right border
+# the profile's diameter callout (x <= 0.29), clear of the right border
 # (0.419) with its dimensions.
 DETAIL_SCALE = (5, 1)
 DETAIL_RADIUS_MM = 6.0
@@ -178,7 +180,7 @@ if DETAIL_RADIUS_MM <= abs(DOME_HEIGHT - DETAIL_FENCE_Z_MM) or DETAIL_RADIUS_MM 
 # The label anchors at its top centre, under the dome's callout.
 DETAIL_LABEL_XY = (DETAIL_CENTER[0], DETAIL_CENTER[1] - _DETAIL_FENCE_R - 0.027)
 # The circle's letter on the profile: up-left of the 6 mm circle, left of the
-# north end's witness line (both station dimensions start there), 2 mm or more
+# north tip's witness line (the overall length starts there), 2 mm or more
 # off both whichever corner SolidWorks anchors. Left where SolidWorks put it,
 # the 6.35 mm "A" sat on the bar (cd4151166 render).
 DETAIL_LETTER_XY = (NORTH_END_X - 0.014, PROFILE_CENTER[1] + 0.010)
@@ -191,11 +193,11 @@ def _detail_x(z_mm: float) -> float:
 
 DETAIL_KEEP = {
     # The station and the flat's length stack above the fence. The length is
-    # centred over the flat; the station's text stands left of the end
-    # face's witness: centred on its span it sat on the flat's near witness
-    # (cd4151166 render).
-    "NorthFlatStation": (
-        _left_of_witness(_detail_x(0.0), f"{NORTH_FLAT_STATION:.2f}"),
+    # centred over the flat; the station's text, with its BOTH ENDS callout,
+    # stands left of the tip's witness: centred on its span it sat on the
+    # flat's near witness (cd4151166 render).
+    "FlatStation": (
+        _left_of_witness(_detail_x(DOME_HEIGHT), FLAT_STATION_CALLOUT),
         DETAIL_CENTER[1] + _DETAIL_FENCE_R + 0.008,
     ),
     "FlatLength": (
@@ -222,9 +224,15 @@ for _name, _z, _centre in (
     ("north_dome", 0.0, shaft.DOME_HEIGHT - shaft.DOME_SPHERE_RADIUS),
     ("south_dome", -bank.PIVOT_SHAFT_LENGTH, -bank.PIVOT_SHAFT_LENGTH + shaft.DOME_SPHERE_RADIUS - shaft.DOME_HEIGHT),
 ):
+    _south = _name == "south_dome"
+    # The overall length runs tip to tip; the south tip carries it.
+    _overall = {
+        "length": (_band(bank.PIVOT_SHAFT_OVERALL_LENGTH, _P["OverallLength"]), (("rocker_bank_layout", "PIVOT_SHAFT_OVERALL_LENGTH"),)),
+        "length_nominal": (bank.PIVOT_SHAFT_OVERALL_LENGTH, (("rocker_bank_layout", "PIVOT_SHAFT_OVERALL_LENGTH"),)),
+    } if _south else {}
     requirement(
         _name, kind="dome", faces=(SphereFace(2 * shaft.DOME_SPHERE_RADIUS, (0, 0, _centre)),),
-        requirements=("height",), fields={
+        requirements=("height", "length") if _south else ("height",), fields={
             "height": (_band(shaft.DOME_HEIGHT, _P["DomeHeight"]), ("DOME_HEIGHT",)),
             "height_nominal": (shaft.DOME_HEIGHT, ("DOME_HEIGHT",)),
             "sphere_radius": (shaft.DOME_SPHERE_RADIUS, ("DOME_SPHERE_RADIUS",)),
@@ -236,7 +244,8 @@ for _name, _z, _centre in (
                 else [round(_z - shaft.DOME_HEIGHT, 12), round(_z, 12)],
                 ("DOME_HEIGHT", ("rocker_bank_layout", "PIVOT_SHAFT_LENGTH")),
             ),
-        }, precision={"height": _P["DomeHeight"]},
+            **_overall,
+        }, precision={"height": _P["DomeHeight"], **({"length": _P["OverallLength"]} if _south else {})},
     )
 # Ra on the running face: the body the 20 hubs rock on and the two ears
 # journal. A revolved flank is a drawing SILHOUETTE, not a model edge, so the
@@ -422,9 +431,14 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter,
         detail_annotations,
-        {"FlatLength": FLATS_CALLOUT, "FlatAF": FLATS_CALLOUT},
+        {
+            "FlatLength": FLATS_CALLOUT,
+            "FlatAF": FLATS_CALLOUT,
+            "FlatStation": FLAT_STATION_CALLOUT,
+            "DomeHeight": DOME_CALLOUT,
+        },
     )
-    set_dimension_callouts(adapter, detail_annotations, {"DomeHeight": DOME_CALLOUT})
+    set_dimension_callouts(adapter, profile_annotations, {"ShaftDia": SHAFT_FIT_CALLOUT})
     radius_annotations = [
         annotation
         for annotation in detail_annotations
@@ -433,18 +447,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if len(radius_annotations) != 1:
         raise RuntimeError("north-end detail does not carry exactly one dome radius")
     _set_spherical_reference(adapter, radius_annotations[0], label="pivot shaft dome radius")
-    # #743 PR2: the plain end is cut to fit the installed brackets, so the
-    # modelled length prints as a REFERENCE value and the callout under it is
-    # the requirement. Keyed on the parametric name.
-    length_annotations = [
-        annotation
-        for annotation in profile_annotations
-        if dimension_name(adapter, annotation) == "ShaftLength"
-    ]
-    if len(length_annotations) != 1:
-        raise RuntimeError("profile view does not carry exactly one shaft length")
-    set_reference_dimension(adapter, length_annotations[0], label="pivot shaft length")
-    set_dimension_callouts(adapter, length_annotations, {"ShaftLength": LENGTH_CALLOUT})
 
     # The axis says which pairs of lines are diameters and is what the shop
     # indicates the bar on. The face pick sits mid-body, clear of every

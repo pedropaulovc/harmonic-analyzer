@@ -234,24 +234,37 @@ def test_hub_wall_covers_the_worst_printed_limits_and_eccentricity() -> None:
 def test_the_set_screws_bite_flats_clear_of_the_hubs() -> None:
     """User, 2026-10-10: one #4-40 set screw down through each ear's apex onto
     a flat at that ear's mid-plane holds the shaft. At the fit-up's worst
-    axial wander (the north end set flush on the north ear's outboard face; the
+    axial wander (the north tip set on the north ear's outboard face; the
     south ear moved by the north ear's thickness, the stack's acceptance, the
-    blade's set and both washers' stock bands) each cup stays
-    wholly on its flat, and no hub's bore rides over a flat's edge (the ear,
-    the washer and the spring may: none of them runs on the shaft)."""
+    blade's set and both washers' stock bands; each flat stationed from its
+    own tip, so the south one also carries the overall length's band) each
+    cup stays wholly on its flat, and no hub's bore rides over a flat's edge
+    (the ear, the washer and the spring may: none of them runs on the
+    shaft)."""
     south, north = bank.PIVOT_BRACKET_Z
     assert bank.PIVOT_SHAFT_FLAT_STATIONS == pytest.approx(
         (bank.PIVOT_SHAFT_NORTH_Z - south, bank.PIVOT_SHAFT_NORTH_Z - north)
     )
     assert bank.PIVOT_SHAFT_FLAT_STATIONS == pytest.approx((155.31, 4.0), abs=5e-3)
     assert shaft.NORTH_FLAT_STATION == bracket.EAR_T / 2
-    # 0.25 flush + 0.10 north-ear thickness + 0.3599 south-ear set.
+    # Each from its own tip: the bar is the same either way round.
+    assert shaft.FLAT_TIP_STATION == pytest.approx(
+        bank.PIVOT_SHAFT_OVERALL_LENGTH - (bank.PIVOT_SHAFT_FLAT_STATIONS[0] + shaft.DOME_HEIGHT)
+    )
+    assert shaft.FLAT_TIP_STATION == pytest.approx(5.5)
+    # 0.25 tip set + 0.10 north-ear thickness + 0.3599 south-ear set.
     assert bank.FLAT_OFFSET_MAX == pytest.approx((0.7099, 0.25), abs=5e-4)
+    station_error = (
+        shaft.FLAT_STATION_BAND + shaft.LENGTH_BAND,
+        shaft.FLAT_STATION_BAND,
+    )
+    assert bank.FLAT_STATION_ERROR == pytest.approx(station_error)
     washer_thin = washer.STOCK_THICKNESS_RANGE[0]
-    # The taps run from each ear's inboard face, the flats from the shaft's
-    # north end. South: the south ear's own thickness cancels (its inboard face
-    # carries both the tap and the hub run), the north ear's is in the offset.
-    # North: the inboard face and the tap both lose the whole ear band.
+    # The taps run from each ear's inboard face, the shaft from the north
+    # ear's outboard face. South: the south ear's own thickness cancels (its
+    # inboard face carries both the tap and the hub run), the north ear's is
+    # in the offset. North: the inboard face and the tap both lose the whole
+    # ear band.
     hub_free = (
         (bracket.EAR_T - bracket.EAR_T_BAND) / 2
         + washer_thin
@@ -263,28 +276,32 @@ def test_the_set_screws_bite_flats_clear_of_the_hubs() -> None:
         bracket.SET_SCREW_STATION_BAND + bracket.EAR_T_BAND,
     )
     assert bank.FLAT_RUN_MAX == pytest.approx(hub_free)
-    for offset, run_max, band in zip(
-        bank.FLAT_OFFSET_MAX, hub_free, tap_band, strict=True
+    for offset, error, run_max, band in zip(
+        bank.FLAT_OFFSET_MAX, station_error, hub_free, tap_band, strict=True
     ):
-        reach = offset + shaft.FLAT_STATION_BAND + band
+        reach = offset + error + band
         assert reach + shaft.SET_SCREW_CUP_DIA / 2 <= shaft.FLAT_LENGTH_RANGE[0] / 2
         assert (
-            offset + shaft.FLAT_STATION_BAND + shaft.FLAT_LENGTH_RANGE[1] / 2
+            offset + error + shaft.FLAT_LENGTH_RANGE[1] / 2
             <= run_max - bank.RUNNING_FLOOR
         )
     assert shaft.flat_chord(shaft.FLAT_DEPTH_RANGE[0]) > shaft.SET_SCREW_CUP_DIA + 1.0
 
 
 def test_south_apex_stays_on_the_support_at_the_worst_case() -> None:
-    """Main (a): both ends domed. The plain end is cut flush to +0.5 past the
-    south ear, then domed; the apex must stay over the rocker-arm-support's
-    -88.9 end. Outboard of the south ear at the shaft's height there is only
-    the support's own top, so its end is the bound. The set screws hold the
-    shaft, so it never floats south."""
-    assert bank.PLAIN_END_CUT_BAND == (0.5, 0.0)
-    assert bank.SOUTH_APEX_REACH_MAX == pytest.approx(0.5 + 1.5)
+    """Main (a): both ends domed. The shaft comes finished to its overall
+    length and its north tip is set DOME_HEIGHT proud of the north ear, so
+    the south tip stands DOME_HEIGHT past the south ear give or take the
+    tip's set, the length's band, both ears' thicknesses and the south ear's
+    set; it must stay over the rocker-arm-support's -88.9 end. Outboard of
+    the south ear at the shaft's height there is only the support's own top,
+    so its end is the bound. The set screws hold the shaft, so it never
+    floats south."""
+    assert bank.SOUTH_APEX_REACH_MAX == pytest.approx(
+        1.5 + 0.25 + 0.51 + 2 * bracket.EAR_T_BAND + 0.3599, abs=5e-4
+    )
     apex_z = bank.SOUTH_EAR_OUTER_Z - bank.SOUTH_APEX_REACH_MAX
-    assert apex_z == pytest.approx(-82.459, abs=5e-4)
+    assert apex_z == pytest.approx(-83.279, abs=5e-4)
     assert apex_z - (-88.9) >= 2.0
 
 

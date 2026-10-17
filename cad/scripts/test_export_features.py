@@ -453,7 +453,10 @@ def test_shaft_flats_are_coplanar_faces_named_by_their_stations() -> None:
     for side, station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS):
         name = f"{side}_flat"
         assert features[name]["kind"] == "face"
-        assert features[name]["station_nominal"] == station
+        # Printed from its own end's tip (BOTH ENDS); the face sits at the
+        # layout's station from the north cylinder end.
+        assert features[name]["station_nominal"] == shaft.FLAT_TIP_STATION
+        assert features[name]["note"] == shaft.FLAT_STATION_CALLOUT
         assert features[name]["height_nominal"] == shaft.FLAT_AF
         assert selectors[name][0].contains_z_mm == -station
         box = (

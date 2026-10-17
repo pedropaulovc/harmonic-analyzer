@@ -158,17 +158,13 @@ PIVOT_BRACKET_Z = (
 )
 
 # --- the pivot shaft -----------------------------------------------------------
-# Its cylinder spans both ears' outer faces (the fitter's measurement). The
-# part's origin is the north end, set flush with the north ear's outer face.
+# Its cylinder spans both ears' outer faces; the shop makes it to the overall
+# length, tip to tip, and fit-up sets its north tip DOME_HEIGHT proud of the
+# north ear's outer face. The part's origin is the north cylinder end.
 PIVOT_SHAFT_LENGTH = NORTH_EAR_OUTER_Z - SOUTH_EAR_OUTER_Z
 PIVOT_SHAFT_SOUTH_Z = SOUTH_EAR_OUTER_Z
 PIVOT_SHAFT_NORTH_Z = NORTH_EAR_OUTER_Z
 PIVOT_SHAFT_OVERALL_LENGTH = PIVOT_SHAFT_LENGTH + 2.0 * _shaft.DOME_HEIGHT
-# The plain (south) end is cut flush with the south ear's outer face to 0.5
-# proud, then domed: the set screws hold the shaft, so its apex stands at
-# most this far south of the ear.
-PLAIN_END_CUT_BAND = (0.5, 0.0)  # (upper, lower) past the south ear's outer face
-SOUTH_APEX_REACH_MAX = PLAIN_END_CUT_BAND[0] + _shaft.DOME_HEIGHT
 
 # Set-screw flats (user, 2026-10-10): one under each ear's apex screw, at the
 # ear's mid-plane, as stations from the shaft's north end (south, north).
@@ -178,15 +174,15 @@ PIVOT_SHAFT_FLAT_STATIONS = (
 )
 if abs(PIVOT_SHAFT_FLAT_STATIONS[1] - _shaft.NORTH_FLAT_STATION) > 1e-9:
     raise AssertionError("the north flat is not under the north ear's set screw")
-# Where each flat may sit off its screw at fit-up: the shaft's north end set
-# flush by straightedge, and at the south ear the stack's acceptance excess,
-# the spring blade's set error and both washers' stock bands (the north one
-# moves the datum ear with the shaft's flush end, the south one the blade-set
-# ear), which move the south ear along the shaft. Both flats are stationed
-# from the north end, set on the north ear's OUTBOARD face, while the south
-# ear is set from the north ear's INBOARD face (through the stack), so the
-# north ear's thickness band also moves the south flat off its ear.
-SHAFT_FLUSH_SET_BAND = 0.25
+# Where each flat may sit off its screw at fit-up: the shaft's north tip set
+# by depth gauge, and at the south ear the stack's acceptance excess, the
+# spring blade's set error and both washers' stock bands (the north one moves
+# the datum ear with the shaft's set tip, the south one the blade-set ear),
+# which move the south ear along the shaft. The shaft is set on the north
+# ear's OUTBOARD face, while the south ear is set from the north ear's INBOARD
+# face (through the stack), so the north ear's thickness band also moves the
+# south flat off its ear.
+SHAFT_TIP_SET_BAND = 0.25
 _WASHER_DEV = (
     _washer.STOCK_THICKNESS_RANGE[0] - _washer.THICKNESS,
     _washer.STOCK_THICKNESS_RANGE[1] - _washer.THICKNESS,
@@ -196,16 +192,33 @@ SOUTH_EAR_SET_RANGE = (
     ROCKER_SPRING_SET_BAND - 2.0 * _WASHER_DEV[0],
 )
 FLAT_OFFSET_MAX = (
-    SHAFT_FLUSH_SET_BAND
+    SHAFT_TIP_SET_BAND
     + _bracket.EAR_T_BAND
     + max(abs(v) for v in SOUTH_EAR_SET_RANGE),
-    SHAFT_FLUSH_SET_BAND,
+    SHAFT_TIP_SET_BAND,
 )  # (south, north)
+# Each flat is stationed from its own end's tip, so the bar goes in either
+# way round; the north one from the tip fit-up sets, the south one from the
+# far tip, which the overall length's band also moves (south, north).
+FLAT_STATION_ERROR = (
+    _shaft.FLAT_STATION_BAND + _shaft.LENGTH_BAND,
+    _shaft.FLAT_STATION_BAND,
+)
+# The south tip stands DOME_HEIGHT past the south ear's outer face, give or
+# take the tip's set, the length's band, both ears' thickness bands and the
+# south ear's set: at most this far.
+SOUTH_APEX_REACH_MAX = (
+    _shaft.DOME_HEIGHT
+    + SHAFT_TIP_SET_BAND
+    + _shaft.LENGTH_BAND
+    + 2.0 * _bracket.EAR_T_BAND
+    + max(abs(v) for v in SOUTH_EAR_SET_RANGE)
+)
 # How far a flat may run from its ear's mid-plane before a hub's bore rides
 # over its edge: half the thinnest ear, the thinnest washer, and at the south
 # ear the shortest spring set. Under the ear, the washer and the spring the
 # flat is harmless (none of them runs on the shaft). The north flat is set
-# from the ear's OUTBOARD face (the shaft's flush end), so the inboard face
+# from the ear's OUTBOARD face (the shaft's set tip), so the inboard face
 # the hub runs on closes by the whole ear-thickness band, not half of it.
 FLAT_RUN_MAX = (
     (_bracket.EAR_T - _bracket.EAR_T_BAND) / 2.0
@@ -220,16 +233,16 @@ SET_SCREW_TO_FLAT_BAND = (
     _bracket.SET_SCREW_STATION_BAND,
     _bracket.SET_SCREW_STATION_BAND + _bracket.EAR_T_BAND,
 )  # (south, north)
-for _offset, _run_max, _tap_band in zip(
-    FLAT_OFFSET_MAX, FLAT_RUN_MAX, SET_SCREW_TO_FLAT_BAND, strict=True
+for _offset, _station_error, _run_max, _tap_band in zip(
+    FLAT_OFFSET_MAX, FLAT_STATION_ERROR, FLAT_RUN_MAX, SET_SCREW_TO_FLAT_BAND, strict=True
 ):
-    _reach = _offset + _shaft.FLAT_STATION_BAND + _tap_band
+    _reach = _offset + _station_error + _tap_band
     # The cup lands wholly on the flat...
     if _reach + _shaft.SET_SCREW_CUP_DIA / 2.0 > _shaft.FLAT_LENGTH_RANGE[0] / 2.0:
         raise AssertionError("a set-screw cup runs off its flat at worst case")
     # ...and no hub rides over the flat's edge.
     if (
-        _offset + _shaft.FLAT_STATION_BAND + _shaft.FLAT_LENGTH_RANGE[1] / 2.0
+        _offset + _station_error + _shaft.FLAT_LENGTH_RANGE[1] / 2.0
         > _run_max - RUNNING_FLOOR
     ):
         raise AssertionError("a shaft flat runs under a rocker hub at worst case")
@@ -249,6 +262,7 @@ __all__ = [
     "HUB19_NORTH_FACE_Z",
     "FLAT_OFFSET_MAX",
     "FLAT_RUN_MAX",
+    "FLAT_STATION_ERROR",
     "MARGIN_SPARE",
     "MIC_RESIDUAL",
     "NORTH_DATUM_STACK",
@@ -257,7 +271,6 @@ __all__ = [
     "NORTH_EAR_OUTER_Z",
     "NORTH_WASHER_Z",
     "PITCH",
-    "PLAIN_END_CUT_BAND",
     "PIVOT_BRACKET_Z",
     "PIVOT_SHAFT_LENGTH",
     "PIVOT_SHAFT_NORTH_Z",
@@ -271,7 +284,7 @@ __all__ = [
     "ROCKER_SPRING_SET_BAND",
     "ROCKER_SPRING_Z",
     "RUNNING_FLOOR",
-    "SHAFT_FLUSH_SET_BAND",
+    "SHAFT_TIP_SET_BAND",
     "SOUTH_EAR_INNER_Z",
     "SOUTH_APEX_REACH_MAX",
     "SOUTH_EAR_OUTER_Z",

@@ -1358,8 +1358,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header; rocker_bracket_seat_layout.SEAT_SPEC; "
             "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-spring-set' (MHA-CH-000 STEP 5: 'TRANSFER ITS SEAT ... "
-            "SCREW DOWN, PULL THE BLADE'), left screwed down through 'shaft-cut-to-fit' (STEP 6: 'DRAW IT OUT NORTH ... "
-            "REFIT AS STEP 3, WASHERS AND SPRING IN PLACE; SOUTH EAR AT ITS STEP 5 SETTING')"
+            "SCREW DOWN, PULL THE BLADE')"
         ),
     ),
     Joint(

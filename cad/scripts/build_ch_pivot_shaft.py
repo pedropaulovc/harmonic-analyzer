@@ -14,12 +14,11 @@ ear's apex onto a flat milled under it; both flats face +Y, in line.
 Layout: axis along Z with the origin on the axis at the NORTH end of the
 cylinder; the body runs toward -Z. The body is ONE Right-plane half-profile
 (a plain rectangle) revolved (sketch +u -> model -Z, +v -> model Y), so the
-diameter and length import into the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe), the
-crank-pinion boss idiom). Each dome is its own revolved cap (the
+diameter imports into the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe), the
 pinion-pivot-shaft crown idiom), sketched on the same plane. Both flats are
 ONE Right-plane cut (``FlatProfile``, the cone-gear-shaft flat idiom turned
 into the side view), so their length, across-flat and stations import there
-too.
+too, with the overall length on a construction axis drawn tip to tip.
 
 Run (SolidWorks already open)::
 
@@ -68,6 +67,7 @@ from ch_pivot_shaft_spec import (
     FLAT_AF,
     FLAT_DEPTH,
     FLAT_LENGTH,
+    FLAT_TIP_STATION,
     ISOMETRIC_VIEW_NOTE,
     NORTH_FLAT_STATION,
     SHAFT_DIA,
@@ -82,10 +82,10 @@ PART_NAME = "ch-pivot-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 SHAFT_R = SHAFT_DIA / 2.0
-SHAFT_LENGTH = PIVOT_SHAFT_LENGTH  # the cylinder: the span over both ears (REF)
+SHAFT_LENGTH = PIVOT_SHAFT_LENGTH  # the cylinder: the span over both ears
 V_BODY = math.pi * SHAFT_R**2 * SHAFT_LENGTH
-# Each flat's centre from the north end: the south one is driven off the
-# length (ShaftLength - NorthFlatStation), which must be the layout's station.
+# Each flat's centre from the north cylinder end (the sketch's u), which must
+# be the layout's station; each is DIMENSIONED from its own end's tip.
 FLAT_STATIONS = (SHAFT_LENGTH - NORTH_FLAT_STATION, NORTH_FLAT_STATION)
 if any(
     abs(built - laid) > 1e-6
@@ -97,8 +97,9 @@ if any(
 
 
 async def _shaft_profile(adapter) -> list[tuple[str, str]]:
-    """The plain half-profile, revolved into the body. The printed length
-    and diameter are its driving dimensions."""
+    """The plain half-profile, revolved into the body. The printed diameter
+    and the cylinder's length (the overall length less both domes) are its
+    driving dimensions."""
     from solidworks_mcp.adapters.base import RevolveParameters
 
     dims = SketchDims()
@@ -163,15 +164,53 @@ async def _flats(adapter) -> list[tuple[str, str]]:
     flat, at v = SHAFT_R - FLAT_DEPTH (model +Y), its other three edges 1 mm
     clear of the rod; a construction line from the rod's far side (v =
     -SHAFT_R) to the flat's midpoint has the across-flat ``FlatAF`` as its
-    length, and its end's distance from the origin along the axis is the
-    flat's station from the north end. A mid-plane cut 1 mm past the rod each
-    side of the Right plane takes the whole segment."""
+    length. A construction axis runs from the north dome's tip to the south
+    one's: its length is the overall length, and each flat's station runs
+    from its own end's tip, as the shop measures it. A mid-plane cut 1 mm
+    past the rod each side of the Right plane takes the whole segment."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     offset = SHAFT_R - FLAT_DEPTH
     reach = SHAFT_R + 1.0
+    overall = SHAFT_LENGTH + 2.0 * DOME_HEIGHT
     dims = SketchDims()
     check("create_sketch flats", await adapter.create_sketch("Right"))
+    # Tip to tip on the axis. Off the inference engine: both ends lie on the
+    # domes' apex vertices, which a snapped relation would over-define.
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "flats tip-to-tip axis",
+        await adapter.add_centerline(-DOME_HEIGHT, 0.0, SHAFT_LENGTH + DOME_HEIGHT, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "flats axis horizontal",
+        await adapter.add_sketch_constraint(axis, None, "horizontal"),
+    )
+    check(
+        "flats axis on the shaft axis",
+        await adapter.add_sketch_constraint(
+            f"{axis}.start", "origin", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        "origin",
+        "horizontal_distance",
+        DOME_HEIGHT,
+        "flats north tip",
+    )
+    dims.record("NorthTip", '"DomeHeight"')
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        f"{axis}.end",
+        "horizontal_distance",
+        overall,
+        "flats overall length",
+    )
+    dims.record("OverallLength", '"ShaftLength" + 2 * "DomeHeight"')
     drawn = []
     for tag, station in zip(("South", "North"), FLAT_STATIONS, strict=True):
         u0, u1 = station - FLAT_LENGTH / 2.0, station + FLAT_LENGTH / 2.0
@@ -239,18 +278,16 @@ async def _flats(adapter) -> list[tuple[str, str]]:
             f"{tag} flat across flat",
         )
         dims.record("FlatAF" if north else "SouthFlatAF", '"FlatAF"')
+        tip = f"{axis}.start" if north else f"{axis}.end"
         await dimension_between(
             adapter,
             f"{across}.end",
-            "origin",
+            tip,
             "horizontal_distance",
-            NORTH_FLAT_STATION if north else SHAFT_LENGTH - NORTH_FLAT_STATION,
+            FLAT_TIP_STATION,
             f"{tag} flat station",
         )
-        dims.record(
-            f"{tag}FlatStation",
-            '"NorthFlatStation"' if north else '"ShaftLength" - "NorthFlatStation"',
-        )
+        dims.record("FlatStation" if north else "SouthFlatStation", '"FlatStation"')
     await ensure_fully_defined(adapter, "flats sketch")
     check("exit_sketch flats", await adapter.exit_sketch())
     name_last_feature(adapter, "FlatProfile")
@@ -373,7 +410,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "DomeHeight", f"{DOME_HEIGHT}mm")
     await set_global(adapter, "FlatLength", f"{FLAT_LENGTH}mm")
     await set_global(adapter, "FlatAF", f"{FLAT_AF}mm")
-    await set_global(adapter, "NorthFlatStation", f"{NORTH_FLAT_STATION}mm")
+    await set_global(adapter, "FlatStation", f"{FLAT_TIP_STATION}mm")
 
     drive_jobs = await _shaft_profile(adapter)
     volume = await volume_check(adapter, "shaft", V_BODY, 0.005 * V_BODY)
