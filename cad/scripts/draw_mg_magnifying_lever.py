@@ -4,18 +4,20 @@ The rod is a revolved Ø6 x 165 brass capsule with hemispherical ends -- a
 smooth, tangent-continuous body with NO flat face and no end-face circle, so
 the print rests on the auto-imported profile marks (the overall length tip to
 tip and the dome radius, a radial reference "(R3.0)": each end is a tangent
-full hemisphere on the selected bar) plus two blanked reference sketches the
+full hemisphere on the selected bar) plus three blanked reference sketches the
 FRONT view shows and dimensions: ``RodStock`` (the Ø6 as plain bar stock at
-mid-length, ``STOCK OK``) and ``PressZone`` (the cylinder the bracket collar
-grips -- its start back from the east tip a single MIN limit covering the
-MHA-MG-001 collar, its length to the dome tangent as a reference, and its
-banded diameter, tied to the MHA-MG-001 bore it enters).  The zone's start is
-a solid line across the bar, so the zone reads between it and the dome's
-tangent edge; every other reference entity lies on the silhouette.  The OD
-carries no finish and the sheet no note block: pressing the collar on is the
-MHA-MG-000 assembly's step.  The rod axis is local +X, so the FRONT view is
-the long side elevation; an end view of a plain round would show nothing the
-Ø does not, so there is none.
+mid-length, at the title block's .X), ``PressZone`` (the cylinder the bracket
+collar grips -- its start back from the east tip a single MIN limit covering
+the MHA-MG-001 collar, its length to the dome tangent as a reference, and its
+banded diameter, tied to the MHA-MG-001 bore it enters) and ``ScrewSeat``
+(the OD the MHA-MG-002 clamp's screw can bear on: its start from the west tip
+and its length, the extent of the OD's one finish, the part-owned Ra 3.2
+seat).  The zone's start is a solid line across the bar, so the zone reads
+between it and the dome's tangent edge; every other reference entity lies on
+the silhouette.  The sheet carries no note block: pressing the collar on is
+the MHA-MG-000 assembly's step.  The rod axis is local +X, so the FRONT view
+is the long side elevation; an end view of a plain round would show nothing
+the Ø does not, so there is none.
 
 Run with SolidWorks open::
 
@@ -43,6 +45,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
 from _drawing_notes import add_property_linked_note
@@ -51,6 +54,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _surface_finish import surface_finish_by_key
 from mg_lever_press_fit_geom import ROD_DIA
 from mg_magnifying_lever_spec import (
     DRAWING_DIMENSIONS,
@@ -59,8 +63,10 @@ from mg_magnifying_lever_spec import (
     PRESS_ZONE_START_CALLOUT,
     RADIAL_REFERENCE_DIMENSIONS,
     REFERENCE_DIMENSIONS,
-    ROD_DIA_CALLOUT,
     ROD_LENGTH,
+    SCREW_SEAT_CALLOUT,
+    SCREW_SEAT_X,
+    SURFACE_FINISHES,
 )
 
 
@@ -81,14 +87,20 @@ FRONT_CENTER = (0.115, 0.150)
 ISO_CENTER = (0.350, 0.185)
 ISO_SCALE = (1, 2)
 
-# Sheet stations of the rod's east end, from the model's own constants: the
-# tip, the press zone's start (PRESS_ZONE_LENGTH back from the tip), the dome
-# tangent (one radius back) and the zone cylinder's mid-length; the rod's
+# Sheet stations of the rod's ends, from the model's own constants: the west
+# tip (the part origin), the east tip, the press zone's start
+# (PRESS_ZONE_LENGTH back from the tip), the dome tangent (one radius back)
+# and the zone cylinder's mid-length; the screw seat's mid-length; the rod's
 # top outline.
+_ROD_WEST_TIP_X = FRONT_CENTER[0] - ROD_LENGTH * SHEET_SCALE[0] / 2000.0
 _ROD_TIP_X = FRONT_CENTER[0] + ROD_LENGTH * SHEET_SCALE[0] / 2000.0
 _PRESS_ZONE_START_X = _ROD_TIP_X - PRESS_ZONE_LENGTH * SHEET_SCALE[0] / 1000.0
 _DOME_TANGENT_X = _ROD_TIP_X - ROD_DIA / 2.0 * SHEET_SCALE[0] / 1000.0
 _PRESS_ZONE_MID_X = (_PRESS_ZONE_START_X + _DOME_TANGENT_X) / 2.0
+_SCREW_SEAT_MID_X = (
+    _ROD_WEST_TIP_X
+    + (SCREW_SEAT_X[0] + SCREW_SEAT_X[1]) / 2.0 * SHEET_SCALE[0] / 1000.0
+)
 _ROD_TOP_Y = FRONT_CENTER[1] + ROD_DIA / 2.0 * SHEET_SCALE[1] / 1000.0
 
 # The two native profile dims the print keeps: the tip-to-tip length below the
@@ -104,7 +116,8 @@ FRONT_KEEP = {
     "DomeRadius": (_ROD_TIP_X + 0.040, FRONT_CENTER[1] + 0.008),
 }
 # The reference sketches' dims.  The stock diameter above the rod at
-# mid-length, its dimension line just right of its points on the outlines.
+# mid-length, its dimension line just right of its points on the outlines; a
+# plain Ø, no callout.
 # The press zone's lengths hang below the rod off the witness on its bottom
 # outline and the tip (layout doc: a horizontal dim's rows centre on the
 # requested x and y, its line at the lowest row's baseline): the cylinder's
@@ -116,21 +129,37 @@ FRONT_KEEP = {
 # zone-start line and the dome's tangent edge, and its rows hang ABOVE the
 # rod, right of that line: the line rises to the shoulder under the block,
 # never alongside a row of text, and the two-row mate callout stays short of
-# the isometric.
+# the isometric.  The screw seat's start and length chain ABOVE the rod, over
+# the stock diameter's lone row (y ~171 mm) and left of the zone diameter's
+# shoulder (x ~191 mm): the length's two rows (value, the clamp it seats)
+# centred on the seat, its line at the lower row's baseline ~183.5 mm; the
+# start's lone row left of its 4.5 mm span, requested 1.75 mm lower so its
+# line (2.78 mm under a lone row's requested y) runs on the length's.
 REFERENCE_KEEP = {
     "RodDia": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.020),
     "PressZoneLen": (_PRESS_ZONE_START_X - 0.010, FRONT_CENTER[1] - 0.012),
     "PressZoneStart": (_ROD_TIP_X + 0.030, FRONT_CENTER[1] - 0.024),
     "PressZoneDia": (_PRESS_ZONE_MID_X, FRONT_CENTER[1] + 0.030),
+    "ScrewSeatLen": (_SCREW_SEAT_MID_X, FRONT_CENTER[1] + 0.038),
+    "ScrewSeatStart": (_ROD_WEST_TIP_X - 0.0065, FRONT_CENTER[1] + 0.03625),
 }
 DIMENSION_CALLOUTS = {
     "DomeRadius": "BOTH ENDS\nTANGENT HEMISPHERE",
 }
 REFERENCE_CALLOUTS = {
-    "RodDia": ROD_DIA_CALLOUT,
     "PressZoneStart": PRESS_ZONE_START_CALLOUT,
     "PressZoneDia": PRESS_ZONE_DIA_CALLOUT,
+    "ScrewSeatLen": SCREW_SEAT_CALLOUT,
 }
+# The seat's Ra 3.2 (SURFACE_FINISHES "clamp_screw_seat"): a native symbol
+# whose leader lands on the OD's top silhouette 40 mm in from the west tip,
+# inside the seat and clear of the stock diameter's station (82.5 mm); the
+# symbol stands above-left of the landing, under the seat's dimension line,
+# between its west extension lines and the stock diameter's row.
+# add_surface_finish proves the symbol attached to that silhouette's face
+# (the part's control) and the leader landed where requested.
+SEAT_FINISH_PICK = (_ROD_WEST_TIP_X + 0.040, _ROD_TOP_Y)
+SEAT_FINISH_SYMBOL = (_ROD_WEST_TIP_X + 0.030, _ROD_TOP_Y + 0.014)
 
 
 def _set_radial_reference(adapter: Any, annotation: Any, *, label: str) -> None:
@@ -211,8 +240,9 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one lever {name} radial reference")
         _set_radial_reference(adapter, matches[0], label=f"lever {name}")
-    # The part saves PressZone and RodStock blanked (they would print in every
-    # assembly render); shown here per view, their dimensions import and stay.
+    # The part saves PressZone, RodStock and ScrewSeat blanked (they would
+    # print in every assembly render); shown here per view, their dimensions
+    # import and stay.
     reference_annotations = curate_hidden_dimensions(
         adapter,
         front,
@@ -230,6 +260,17 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one lever {name} reference dimension")
         set_reference_dimension(adapter, matches[0], label=f"lever {name}")
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=SEAT_FINISH_PICK,
+        entity_type="SILHOUETTE",
+        symbol_xy=SEAT_FINISH_SYMBOL,
+        leader_attach_xy=SEAT_FINISH_PICK,
+        control=surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat"),
+        label="lever clamp screw seat finish",
+        char_height=0.0025,
+    )
     add_property_linked_note(adapter, "Iso View Note", 0.320, 0.140)
 
     return await finalize_drawing(
