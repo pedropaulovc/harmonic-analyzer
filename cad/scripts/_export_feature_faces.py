@@ -238,15 +238,13 @@ def assign_feature_patches(
     return assigned
 
 
-def name_feature_faces(doc: Any, stem: str, *, reuse: bool = False) -> dict[str, list[str]]:
+def name_feature_faces(doc: Any, stem: str) -> dict[str, list[str]]:
     """Name every face of ``stem``'s requirement features on the open part.
 
     Returns ``{feature: [names]}``, the exact claim :func:`step_face_sets`
     verifies after the STEP export.  Never renames: a face that already carries
     a name (SolidWorks auto-names a face a mate references) fails, because
     ``SetEntityName`` refuses it and overwriting would break that reference.
-    ``reuse`` (a later configuration of a part already named) accepts a face
-    that already carries exactly the name it would get.
     """
     import _telemetry  # noqa: PLC0415
     from _com import _bind, _com_invoke, _early_bound  # noqa: PLC0415
@@ -278,9 +276,6 @@ def name_feature_faces(doc: Any, stem: str, *, reuse: bool = False) -> dict[str,
                 name = face_name(feature, patch)
                 face = _bind(geometries[index].face, "IFace2")
                 existing = part.GetEntityName(face)
-                if reuse and existing == name:
-                    names[feature].append(name)
-                    continue
                 if existing:
                     raise FeatureFaceError(
                         f"{stem}.{feature}: face already named {existing!r}; "

@@ -90,15 +90,6 @@ def _validated_bundles(out: Path) -> tuple[tuple[Path, bytes], ...]:
             if actual != expected:
                 _fail(stem, f"{feature} must be exactly {expected} STEP faces, found {actual} ({digests})")
         pending.extend(((step_path, step_bytes), (manifest_path, manifest_bytes)))
-        # A multi-configuration part's per-configuration STEPs label the same features.
-        for cfg_path in export_features.configuration_step_paths(stem, out).values():
-            cfg_bytes = _read(cfg_path)
-            cfg_digests = f"scoped sha256 {hashlib.sha256(cfg_bytes).hexdigest()}"
-            cfg_faces = _face_sets(cfg_path, cfg_bytes, features, cfg_digests)
-            unlabelled = sorted(feature for feature, refs in cfg_faces.items() if not refs)
-            if unlabelled:
-                _fail(str(cfg_path), f"labels no face for {unlabelled} ({cfg_digests})")
-            pending.append((cfg_path, cfg_bytes))
     return tuple(pending)
 
 
