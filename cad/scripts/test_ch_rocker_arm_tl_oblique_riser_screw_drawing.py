@@ -55,7 +55,7 @@ def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
     )
     assert dims.DIMS.length == pytest.approx(row.length_mm)
     assert dims.DIMS.major_dia == pytest.approx(row.major_mm, abs=1e-3)
-    assert spec.CALLOUT == fasteners.callout(row) == "#4-40 X 1/2 FLAT HEAD"
+    assert spec.CALLOUT == fasteners.callout(row) == "#4-40 X 1/2 B18.6.3 FLAT HEAD"
 
 
 def test_standalone_recipe_run_is_catalog_only() -> None:
