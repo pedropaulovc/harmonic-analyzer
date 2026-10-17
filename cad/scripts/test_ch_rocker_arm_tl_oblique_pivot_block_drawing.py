@@ -11,11 +11,14 @@ import pytest
 
 import _config
 import build_ch_rocker_arm_tl_oblique_pivot_block as part
+import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as spec
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_pivot_block as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
+from _paths import CAD_ROOT
+from machinist_exceptions import load_exceptions
 
 STEM = "ch_rocker_arm_tl_oblique_pivot_block"
 
@@ -26,7 +29,12 @@ def _features() -> dict:
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    keeps = (drawing.PLAN_KEEP, drawing.SECTION_A_KEEP, drawing.SECTION_B_KEEP)
+    keeps = (
+        drawing.PLAN_KEEP,
+        drawing.SECTION_A_KEEP,
+        drawing.SECTION_B_KEEP,
+        drawing.SIDE_KEEP,
+    )
     assert set().union(*keeps) == marked
     assert sum(len(keep) for keep in keeps) == len(marked)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
@@ -229,16 +237,22 @@ def test_walls_hold_rule_17_from_the_spec_values() -> None:
         "counterbore to +X end": spec.BLOCK_X1 - spec.BOLT_X - spec.CBORE_DIA / 2.0,
         "bore to -X end": trammel.PIN_OFFSET - r - spec.BLOCK_X0,
     }
-    assert nominal == spec.WALLS_MM
+    assert {name: spec.WALLS_MM[name] for name in nominal} == nominal
     assert min(nominal.values()) >= 2.0
     assert math.isclose(nominal["bore to counterbore"], 4.02, abs_tol=0.005)
     assert math.isclose(nominal["bore to hole"], 5.77, abs_tol=0.005)
-    # At the printed bands every wall keeps the 2.0 target, the shoulder web
-    # included: 23.49 - 2 x 10.13 (the puller gap).
-    assert min(spec.WORST_WALLS.values()) >= spec.WALL_TARGET
+    # At the printed bands every wall keeps the 1.5 floor and the shoulder
+    # web, the puller gap, 23.49 - 2 x 10.13. Only the side counterbores'
+    # two pinch walls fall short (stated at the side callout).
+    assert min(spec.WORST_WALLS.values()) >= spec.WALL_FLOOR
     assert math.isclose(spec.WORST_WALLS["bearing shoulder"], 3.23, abs_tol=0.005)
-    # The one rule-20 entry is the carriage screws' engagement (review r5).
-    assert spec.RULE_20_SHORTFALLS == {"M4 engagement in carriage": 3.85}
+    assert set(spec.RULE_20_SHORTFALLS) == {
+        "side counterbore to side counterbore",
+        "side counterbore to carriage hole",
+        "M4 engagement in carriage",
+    }
+    # The carriage screws' engagement (review r5): the vendor's 5 deep thread.
+    assert spec.RULE_20_SHORTFALLS["M4 engagement in carriage"] == 3.85
     # The 70 and 40 hold the counterbores' end and side walls at two places
     # (1.81 at one, under the target), and say so (review r6); the 70, a
     # horizontal dimension, carries it in one row over its value (review r7).
@@ -262,6 +276,115 @@ def test_horizontal_dimensions_keep_their_rows_off_their_lines() -> None:
     keep = drawing.PLAN_KEEP
     assert keep["BlockLength"][1] <= keep["HoleColumn2X"][1] - 4.5
     assert "\n" not in spec.CALLOUTS_ABOVE["BlockLength"]
+
+
+def test_side_screw_walls_at_worst_case() -> None:
+    worst = spec.WORST_WALLS
+    # 10 - 2 x 0.13 - (7.94 + 0.13): the two counterbores at .XXX.
+    assert math.isclose(
+        worst["side counterbore to side counterbore"], 1.67, abs_tol=1e-9
+    )
+    # Counterbore corner (59.165, 34.96) to the Ø4.6 carriage hole at
+    # (62.87, 33.13), stations from the -X end and -Y side.
+    expected = math.hypot(62.87 - 55.13 - 4.035, 39.49 - 4.53 - 33.13) - 2.3
+    assert math.isclose(
+        worst["side counterbore to carriage hole"], expected, abs_tol=1e-9
+    )
+    assert math.isclose(
+        worst["side hole to carriage hole"], 7.74 - 2.539 - 2.3, abs_tol=1e-9
+    )
+    # The carriage counterbore's floor prints from the bottom face (15.6 at
+    # .XXX), so its lowest edge is 15.47 over the side holes' highest row.
+    for name in (
+        "side counterbore to carriage counterbore",
+        "side hole to carriage counterbore",
+        "side counterbore to bottom face",
+        "side counterbore to top face",
+        "side hole to bore",
+    ):
+        assert worst[name] >= spec.WALL_TARGET, name
+    # 23.49 - 9.13 - 4.035 on the 24 mm block.
+    assert math.isclose(worst["side counterbore to top face"], 10.325, abs_tol=1e-9)
+    assert spec.SIDE_WALL_CALLOUT == "SETS C'BORE WALL 1.67 MIN"
+    assert spec.SIDE_CALLOUT_BELOW == (
+        "MATCHES MHA-CH-006-TL-29\nSETS C'BORE WALL 1.67 MIN"
+    )
+    # c4 review: the row's 9.000 says which face it reads from.
+    assert spec.CALLOUTS_BELOW["SideScrewRowZ"] == "FROM FACE\nON CARRIAGE"
+    side_hole = _features()["side_screw_hole_1"]
+    assert side_hole["height_from"] == "bottom_face"
+    # RV-05: the owner accepted the three-place counterbores that hold the
+    # side walls under the target.
+    exceptions = {
+        e.id: e
+        for e in load_exceptions(
+            CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_pivot_block", "part"
+        )
+    }
+    accepted = exceptions["RV-05"]
+    assert accepted.kind == "accept"
+    assert "7.940" in accepted.where and "4.400" in accepted.where
+    for name in (
+        "side counterbore to side counterbore",
+        "side counterbore to carriage hole",
+    ):
+        assert f"{worst[name]:.2f} min" in accepted.finding, name
+
+
+def test_side_view_is_a_named_removed_view_with_a_point_reference() -> None:
+    # Review c4r3: out of projection, so lettered on the plan's +Y edge (the
+    # face it looks at) and captioned; its reference sketch holds points,
+    # not the corner-to-hole construction line that printed as a diagonal.
+    assert drawing.SIDE_VIEW_CAPTION == "VIEW C"
+    x, y, z = drawing.SIDE_VIEW_ARROW_TIP
+    assert y == spec.BLOCK_WIDTH / 2.0 and z == spec.BLOCK_HEIGHT
+    assert spec.BLOCK_X0 < x < spec.BLOCK_X1
+    assert drawing.SIDE_VIEW_LETTER_OFFSET[1] > 0.0
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    body = source.split("async def _side_screw_reference", 1)[1].split(
+        "\nasync def ", 1
+    )[0]
+    assert "add_line_chain" not in body and "_add_reference_point" in body
+
+
+def test_side_screws_are_tl22_owned_and_aliased_by_the_leadscrew_spec() -> None:
+    assert spec.SIDE_SCREW_HOLES == ((-5.0, 9.0), (5.0, 9.0))
+    assert leadscrew.PIVOT_BLOCK_HOLES == spec.SIDE_SCREW_HOLES
+    assert leadscrew.PIVOT_BLOCK_HOLE_SPEC is spec.SIDE_SCREW_HOLE_SPEC
+    assert leadscrew.BLOCK_SCREW_X == spec.SIDE_SCREW_X
+    assert leadscrew.BLOCK_SCREW_BLOCK_Z == spec.SIDE_SCREW_Z
+    assert leadscrew.BLOCK_SCREW_GRIP == spec.SIDE_UNDER_HEAD == 35.6
+    hole = spec.SIDE_SCREW_HOLE_SPEC
+    assert (hole.kind, hole.size, hole.fit) == ("counterbore_socket", "#8", "normal")
+    assert hole.overrides_mm == {
+        "HoleDiameter": 4.978,
+        "CounterBoreDiameter": 7.94,
+        "CounterBoreDepth": 4.40,
+    }
+    assert spec.SIDE_CALLOUT_PRECISION == {
+        "hw-thruholedia": 2,
+        "hw-cbdia": 3,
+        "hw-cbdepth": 3,
+    }
+
+
+def test_side_screw_head_sinks_and_spacing_fits_the_float() -> None:
+    assert 0.1 <= spec.SIDE_HEAD_RECESS_MIN < spec.SIDE_HEAD_RECESS_MAX < 0.4
+    cbore = _features()["side_screw_hole_1_counterbore"]
+    assert cbore["dia"][0] > spec.SIDE_SCREW_HEAD_DIA
+    assert cbore["depth"] == [4.27, 4.53]
+    assert _features()["side_screw_hole_1"]["dia"] == [4.98, 5.08]
+    # TL-22's two .XXX stations take 0.26 of the pair's 0.812 float.
+    assert 2.0 * 0.13 <= spec.SIDE_SCREW_FLOAT
+    features = _features()
+    assert sorted(
+        (
+            features[f"side_screw_hole_{i}"]["station_nominal"],
+            features[f"side_screw_hole_{i}"]["height_nominal"],
+        )
+        for i in (1, 2)
+    ) == [(45.0, 9.0), (55.0, 9.0)]
+    assert "MHA-CH-006-TL-29" in features["side_screw_hole_1"]["note"]
 
 
 def test_carriage_screws_seat_and_reach_the_carriage_thread() -> None:
@@ -298,7 +421,10 @@ def test_carriage_screws_seat_and_reach_the_carriage_thread() -> None:
 
 
 def test_floor_reference_lies_in_section_b_and_is_saved_hidden() -> None:
-    assert spec.REFERENCE_SKETCHES == (spec.CBORE_FLOOR_REFERENCE,)
+    assert spec.REFERENCE_SKETCHES == (
+        spec.CBORE_FLOOR_REFERENCE,
+        spec.SIDE_SCREW_REFERENCE,
+    )
     assert spec.DRAWING_PRECISION[spec.CBORE_FLOOR_REFERENCE] == {"CboreFloor": 3}
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "blank_reference_sketches(adapter, REFERENCE_SKETCHES)" in source
@@ -315,6 +441,8 @@ def test_floor_reference_lies_in_section_b_and_is_saved_hidden() -> None:
     # Rule 14 (review r5): the whole line stands clear of the Ø29.976 bore,
     # and so do its letters, which stand on its +X side.
     assert -spec.BOLT_X - spec.BORE_X > trammel.BEARING_OD / 2.0 + 3.0
+    # Clear of the side counterbores (X -5 +/- 3.97) the plane cuts past.
+    assert -spec.BOLT_X < spec.SIDE_SCREW_X[0] - spec.SIDE_CBORE_DIA / 2.0 - 2.0
     # Aligned (review r6): +Y up, so the floor text over the strip stands on
     # the reference line's (+Y) side, past the block's +Y face.
     x, y, z = drawing.SECTION_B_KEEP["CboreFloor"]
@@ -335,7 +463,7 @@ def test_carriage_screws_are_one_native_counterbore_at_the_spec_sizes() -> None:
     }
     assert part.SCREW_HOLE_SPEC is hole
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count("wizard_holes(") == 1
+    assert source.count("wizard_holes(") == 2
 
 
 def test_stations_print_from_the_minus_x_end_and_minus_y_side() -> None:
@@ -364,13 +492,17 @@ def test_screw_callout_puts_drill_in_the_thru_row_and_the_mate_below() -> None:
         7: "<NUM_INST>X <MOD-DIAM><HOLE-DIA> THRU ALL",
         8: "",
     }
-    updated = drawing.screw_hole_callout_definitions(native)
+    updated = drawing.screw_hole_callout_definitions(
+        native, spec.SCREW_MATE_CALLOUT, reference_depth=True
+    )
     assert updated[7] == "<NUM_INST>X DRILL <MOD-DIAM><HOLE-DIA> THRU ALL"
     # The counterbore depth prints as the floor's reference complement.
     assert updated[5] == "<MOD-CBORE><HOLE-DIA-CBORE> <HOLE-DEPTH>(<CBORE-DEPTH>)"
     assert updated[8] == spec.SCREW_MATE_CALLOUT
     with pytest.raises(RuntimeError):
-        drawing.screw_hole_callout_definitions({**native, 8: "TAKEN"})
+        drawing.screw_hole_callout_definitions(
+            {**native, 8: "TAKEN"}, "MATE", reference_depth=True
+        )
     for refused in (
         # Already bracketed, no depth, or two depths.
         {**native, 5: "<MOD-CBORE><HOLE-DIA-CBORE> <HOLE-DEPTH>(<CBORE-DEPTH>)"},
@@ -378,7 +510,16 @@ def test_screw_callout_puts_drill_in_the_thru_row_and_the_mate_below() -> None:
         {**native, 6: "<HOLE-DEPTH><CBORE-DEPTH>"},
     ):
         with pytest.raises(RuntimeError):
-            drawing.screw_hole_callout_definitions(refused)
+            drawing.screw_hole_callout_definitions(
+                refused, spec.SCREW_MATE_CALLOUT, reference_depth=True
+            )
+    # The side screws print their counterbore depth as a dimension.
+    side = drawing.screw_hole_callout_definitions(
+        native, spec.SIDE_CALLOUT_BELOW, reference_depth=False
+    )
+    assert side[5] == native[5]
+    assert side[7] == updated[7]
+    assert side[8] == spec.SIDE_CALLOUT_BELOW
 
 
 def test_seat_corners_carry_one_max_radius_under_the_race_chamfer() -> None:

@@ -11,7 +11,10 @@ each located from the corner on its own side (the near slot from (0, -50.8),
 the far from (0, +50.8)) -- extruded +Z by the
 stock thickness; the rail holes are one Hole Wizard feature tapped THRU from
 the top face. The row's printed lateral station (50.80 from the -Y edge)
-lives on a hidden reference sketch, ``RailRowReference``.
+lives on a hidden reference sketch, ``RailRowReference``. The leadscrew
+brackets' four #8 holes are one counterbored Hole Wizard feature from the
+underside, one printed station per pair; their two rows print from the -Y
+edge on a second hidden reference sketch, ``BracketRowReference``.
 
 Run (SolidWorks already open)::
 
@@ -34,7 +37,7 @@ from _drawing_marks import (
 )
 from _drawing_precision import apply_drawing_precision
 from _feature_tree import name_last_feature
-from _holes import wizard_holes
+from _holes import SharedCoordinate, wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -55,6 +58,11 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     BAR_LENGTH,
     BAR_THICK,
     BAR_WIDTH,
+    BRACKET_CBORE_DEPTH,
+    BRACKET_CBORE_DIA,
+    BRACKET_HOLE_DIA,
+    BRACKET_HOLE_SPEC,
+    BRACKET_WALL_MIN,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FAR_SLOT_DROP,
@@ -72,7 +80,9 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     TAP_DRILL,
     TAP_SPEC,
     TOLERANCES,
+    bracket_hole_walls,
 )
+import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 PART_NAME = "ch-rocker-arm-tl-oblique-base-bar"
@@ -88,8 +98,41 @@ _SAVED_DRAWING_PROPERTIES = (
 SLOT_AREA = SLOT_RUN * SLOT_WIDTH + math.pi * (SLOT_WIDTH / 2.0) ** 2
 V_BAR = (BAR_LENGTH * BAR_WIDTH - 2.0 * SLOT_AREA) * BAR_THICK
 V_TAPPED = V_BAR - len(RAIL_HOLE_X) * math.pi * (TAP_DRILL / 2.0) ** 2 * BAR_THICK
-# Tight enough that a missing tap (~119 mm^3) fails; the slots (~2.8e3 mm^3
-# each) are far above it.
+
+# The leadscrew layout's four bracket holes, pair by pair (near, far), inner
+# row then outer: each pair shares one printed station, each row one printed
+# height.
+BRACKET_HOLES = leadscrew.BASE_BAR_HOLES
+BRACKET_NEAR_X, BRACKET_INNER_Y = BRACKET_HOLES[0]
+BRACKET_FAR_X, BRACKET_OUTER_Y = BRACKET_HOLES[3]
+if BRACKET_HOLES != (
+    (BRACKET_NEAR_X, BRACKET_INNER_Y),
+    (BRACKET_NEAR_X, BRACKET_OUTER_Y),
+    (BRACKET_FAR_X, BRACKET_INNER_Y),
+    (BRACKET_FAR_X, BRACKET_OUTER_Y),
+):
+    raise AssertionError("bracket placement assumes two pairs on two shared rows")
+BRACKET_ROW_INNER = HALF_WIDTH + BRACKET_INNER_Y  # 24.8 from the -Y edge
+BRACKET_ROW_OUTER = HALF_WIDTH + BRACKET_OUTER_Y  # 6.8
+_walls = bracket_hole_walls(BRACKET_HOLES)
+if min(_walls.values()) < BRACKET_WALL_MIN:
+    raise AssertionError(f"bracket hole walls under rule 17: {_walls}")
+V_BRACKETED = V_TAPPED - len(BRACKET_HOLES) * math.pi * (
+    (BRACKET_HOLE_DIA / 2.0) ** 2 * BAR_THICK
+    + ((BRACKET_CBORE_DIA / 2.0) ** 2 - (BRACKET_HOLE_DIA / 2.0) ** 2)
+    * BRACKET_CBORE_DEPTH
+)
+_BRACKET_PLACEMENT = [
+    (
+        ("BracketHole1X", '"BracketNearX"'),
+        ("BracketHole1Y", '"BarWidth" / 2 - "BracketRowInner"'),
+    ),
+    (SharedCoordinate(0), ("BracketHole2Y", '"BarWidth" / 2 - "BracketRowOuter"')),
+    (("BracketHole3X", '"BracketFarX"'), SharedCoordinate(0)),
+    (SharedCoordinate(2), SharedCoordinate(1)),
+]
+# Tight enough that a missing tap (~119 mm^3) or counterbore (~140 mm^3)
+# fails; the slots (~2.8e3 mm^3 each) are far above it.
 _V_TOL = 40.0
 
 
@@ -236,6 +279,10 @@ async def build(adapter) -> dict[str, str]:
         ("FarSlotDrop", FAR_SLOT_DROP),
         ("RailHoleEnd", trammel.RAIL_HOLE_END),
         ("RailHolePitch", trammel.RAIL_HOLE_PITCH),
+        ("BracketNearX", BRACKET_NEAR_X),
+        ("BracketFarX", BRACKET_FAR_X),
+        ("BracketRowInner", BRACKET_ROW_INNER),
+        ("BracketRowOuter", BRACKET_ROW_OUTER),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -328,11 +375,88 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "RailRowReference")
     drive_jobs += row_station.apply(adapter, "RailRowReference")
 
+    # --- End bracket holes: one counterbored wizard feature from the
+    # underside, one station per pair (the pair's second hole shares it).
+    brackets = wizard_holes(
+        adapter,
+        BRACKET_HOLE_SPEC,
+        [[x, y, 0.0] for x, y in BRACKET_HOLES],
+        (0.0, 0.0, -1.0),
+        "end bracket holes (#8 counterbored from the underside)",
+        name="BracketHoles",
+        expect_dia_mm=BRACKET_HOLE_DIA,
+        placement_dims=_BRACKET_PLACEMENT,
+    )
+    drive_jobs += brackets.placement_drive_jobs
+    await volume_check(adapter, "bar with bracket holes", V_BRACKETED, _V_TOL)
+
+    # --- The bracket rows from the faced -Y edge: a reference sketch ----------
+    # The wizard dimensions each row from the origin (the bar's mid-air
+    # centreline), so the printed rows live here: one construction line up
+    # from the -Y edge at the far pair's station, and one construction line
+    # along each row through both pairs; both rows dimension from the line's
+    # edge end.
+    rows = SketchDims()
+    check("create_sketch bracket row reference", await adapter.create_sketch("Front"))
+    station, inner_row = await add_line_chain(
+        adapter,
+        [
+            (BRACKET_FAR_X, -HALF_WIDTH),
+            (BRACKET_FAR_X, BRACKET_INNER_Y),
+            (BRACKET_NEAR_X, BRACKET_INNER_Y),
+        ],
+        close=False,
+    )
+    (outer_row,) = await add_line_chain(
+        adapter,
+        [(BRACKET_FAR_X, BRACKET_OUTER_Y), (BRACKET_NEAR_X, BRACKET_OUTER_Y)],
+        close=False,
+    )
+    for line in (station, inner_row, outer_row):
+        _as_construction(adapter, line)
+    edge = f"{station}.start"
+    await anchor_point_to_origin(
+        adapter, edge, BRACKET_FAR_X, -HALF_WIDTH, "bracket rows' edge point"
+    )
+    rows.record("BracketRowEdgeX", '"BracketFarX"')
+    rows.record("BracketRowEdgeY", '"BarWidth" / 2')
+    for row_start, row_end, value, name in (
+        (f"{station}.end", f"{inner_row}.end", BRACKET_ROW_INNER, "Inner"),
+        (f"{outer_row}.start", f"{outer_row}.end", BRACKET_ROW_OUTER, "Outer"),
+    ):
+        check(
+            f"vertical_points bracket row {name} -> edge point",
+            await adapter.add_sketch_constraint(row_start, edge, "vertical_points"),
+        )
+        await dimension_between(
+            adapter, edge, row_start, "vertical_distance", value, f"BracketRow{name}Y"
+        )
+        rows.record(f"BracketRow{name}Y", f'"BracketRow{name}"')
+        check(
+            f"horizontal_points bracket row {name}",
+            await adapter.add_sketch_constraint(
+                row_end, row_start, "horizontal_points"
+            ),
+        )
+        await dimension_between(
+            adapter,
+            row_end,
+            "origin",
+            "horizontal_distance",
+            BRACKET_NEAR_X,
+            f"bracket row {name} near end",
+        )
+        rows.record(f"BracketRow{name}NearX", '"BracketNearX"')
+    await ensure_fully_defined(adapter, "bracket row reference sketch")
+    check("exit_sketch bracket row reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "BracketRowReference")
+    drive_jobs += rows.apply(adapter, "BracketRowReference")
+
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
         await drive_dimension(adapter, dimension_name, expression)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven bar (equations neutral)", V_TAPPED, _V_TOL)
+    await volume_check(adapter, "driven bar (equations neutral)", V_BRACKETED, _V_TOL)
 
     # Every model edit -- material, marked set, model-owned places -- precedes
     # the save.
@@ -349,10 +473,11 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
-    # The reference sketch owns a printed dimension but no geometry: hide it
-    # so no assembly renders it; the drawing shows it in the plan that
-    # imports its dimension (_drawing_hidden_sketches).
+    # The reference sketches own printed dimensions but no geometry: hide them
+    # so no assembly renders them; the drawing shows them in the plan that
+    # imports their dimensions (_drawing_hidden_sketches).
     blank_sketch(adapter, "RailRowReference")
+    blank_sketch(adapter, "BracketRowReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

@@ -9,7 +9,11 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    dimension_name,
+    place_view,
+)
 
 from _check import check
 from _com import _early_bound
@@ -25,8 +29,13 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_dimension_import import curate_view_dimensions
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_hole_callout import add_native_hole_callout, compose_hole_callout_prefix
+from _drawing_hole_callout import (
+    add_native_hole_callout,
+    compose_hole_callout_prefix,
+    set_hole_callout_precision,
+)
 from _drawing_leaders import set_near_side_diameter
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -56,6 +65,11 @@ from ch_rocker_arm_tl_oblique_pivot_block_spec import (
     DRAWING_PRECISION_BY_NAME,
     GEOMETRIC_TOLERANCES_MM,
     SCREW_MATE_CALLOUT,
+    SIDE_CALLOUT_BELOW,
+    SIDE_CALLOUT_PRECISION,
+    SIDE_CBORE_DIA,
+    SIDE_HOLE_DIA,
+    SIDE_SCREW_HOLES,
 )
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_pivot_block"]
@@ -72,9 +86,11 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # side face (a stack right of it), plus the screw holes' one native
 # counterbore callout above it. Section A-A on the bore axis, below the
 # plan, shows the two-sided seats, their depths and corners, the shoulder
-# hole and the height. Full section B-B through the -X counterbores, right
-# of A under the isometric, carries the counterbore floor's height from the
-# carriage seat. The shaded isometric stands at the top right.
+# hole and the height. Full section B-B through the -X counterbores,
+# right of the plan, carries the counterbore floor's height
+# from the carriage seat. The side view (*Top, the +Y face) right of A
+# carries the nut-bracket screws' stations and their native counterbore
+# callout; the shaded isometric stands at the upper right.
 #
 # Section arrows point away from their view (A's up), and SolidWorks prints
 # each letter 15-22 mm past its arrow's tail (draw_fr_top_frame
@@ -91,12 +107,13 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # the Ø27 inside section A (now under it). r5: the counterbore floor, the
 # face that sets the M4 x 20's engagement in the carriage, prints from the
 # carriage seat in B-B (part_spec.CBORE_FLOOR), and the native callout's
-# depth is its reference "(8.40)". r6: the web hole (now Ø25) and the
-# two-place sizes print their functions with their values
+# depth is its reference "(8.40)". PR C4 adds the side view under the Y
+# stack, so the isometric drops to 1:2 in the corner. r6: the web hole (now
+# Ø25) and the two-place sizes print their functions with their values
 # (part_spec.CALLOUTS_BELOW/ABOVE), and B-B stands aligned with its cutting
-# line. r7: B-B is a full section (its partial cut's open end broke the
-# hatch into dashes), so it moves under the isometric, now 1:2, and the 70
-# drops to its own tier.
+# line between the plan's width and the isometric. r7: B-B is a full
+# section (its partial cut's open end broke the hatch into dashes), and the
+# 70 drops to its own tier.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 2)
@@ -127,6 +144,27 @@ ISO_NOTE_XY = (0.355, 0.200)
 # outside arrow (to x ~127.3; tl22-r1 put the caption's left end on it),
 # under A-A: the ~46 mm caption at x ~132..178.
 CAPTION_A_XY = (0.155, 0.024)
+# Side view (*Top: looking at the +Y face, X right, model +Z DOWN): outline
+# x 234..374, y 76..124, so a model point maps to sheet (334 + 2x, 124 - 2z);
+# 11 mm over the title block (y 65) and 19 mm right of section A's height
+# (x <= 215), whose one row (y ~70..76) stands under its stations (y >= 115).
+# c4 review: 4 mm further right than c4r3, so the row's three-row block
+# fits between the plan's +X witness line (x 200) and the view.
+SIDE_CENTER = (0.304, 0.102)
+# Review c4r3: the side view stands out of projection (above the plan there
+# is no room for its 48 mm), so it is a removed view: "VIEW C" under it and a
+# letter arrow on the plan's +Y edge, the face it looks at (the cone tip
+# block's VIEW B/C recipe: a pointer note whose straight leader is the
+# viewing arrow). The tip at model X -30 (sheet x 100), the 5 mm letter
+# 10.5 mm over it (y ~237..243): right of the bore callout (x <= 55), left
+# of B-B's upper letter (x ~149) and the screw callout (x >= 158).
+SIDE_VIEW_LETTER = "C"
+SIDE_VIEW_LETTER_HEIGHT = 0.005
+SIDE_VIEW_ARROW_TIP = (-30.0, BLOCK_WIDTH / 2.0, BLOCK_HEIGHT)
+SIDE_VIEW_LETTER_OFFSET = (-0.0018, 0.0105)
+# Under the view's centre (outline bottom y 76), over the title block (65).
+SIDE_VIEW_CAPTION = f"VIEW {SIDE_VIEW_LETTER}"
+SIDE_VIEW_CAPTION_XY = (0.2965, 0.0775)
 # Cutting line on the top face, past the outline (model mm).
 CUT_A_X = (BLOCK_X0 - 4.0, BLOCK_X1 + 4.0)
 # Section B-B's full cut along Y through both -X counterbores, on the
@@ -148,20 +186,24 @@ CUT_B_Y = (-BLOCK_WIDTH / 2.0 - 4.0, BLOCK_WIDTH / 2.0 + 4.0)
 # aligned with its cutting line: the line runs +Y up the plan, so +Y runs
 # up the section, and seen along the +X arrows +Z reads right
 # (_orient_section_b proves both). The strip (Z 0..24 across, Y -20..20
-# up: 48 x 80 mm at 2:1) centred at x 330, y 120, so x 306..354, y 80..160:
-# right of the plan's BlockWidth text (x <= 273), under the isometric's
-# note (y 198), over the title block (y 64.5).
-SECTION_B_CENTER = (0.330, 0.120)
+# up: 48 x 80 mm at 2:1) centred at x 320, y 193, so x 296..344, y 153..233:
+# right of the plan's BlockWidth text (x <= 281), left of the isometric
+# (x 361) and its note (x 355), over the side view's stations (y <= 141).
+SECTION_B_CENTER = (0.320, 0.193)
 SECTION_B_ANCHOR = (-BOLT_X, 0.0, BLOCK_HEIGHT / 2.0)
-# Under the strip (y 80), over the title block (y 64.5): text y ~70..77.
-CAPTION_B_XY = (0.330, 0.077)
-# The floor height runs across the strip from the carriage seat (x 306)
+# Under the strip (y 153): x ~297..343, y ~143..150, 2 mm over the side
+# stations' lines (y <= 141), right of their text (x <= 295) and left of
+# the side callout (x 352).
+CAPTION_B_XY = (0.320, 0.150)
+# The floor height runs across the strip from the carriage seat (x 296)
 # on witness lines rising from the reference line (the Ø4.5 hole's +Y
-# wall, Y 15.25, y 150.5). Its one engagement row stands over the value
+# wall, Y 15.25, y 223.5). Its one engagement row stands over the value
 # (part_spec.CALLOUTS_ABOVE), so the line runs under "15.600" (review r7:
 # under the rows, it struck "(5 DEEP THREAD)"; review r8: the three-row
-# block never printed). The ~11 x 76 mm block: line y ~166 (6 mm over the
-# strip's top, y 160), top y ~177, x ~284..360, centred on the 15.6 span.
+# block never printed). The ~11 x 76 mm block: line y ~239 (6 mm over the
+# strip's top, y 233), top y ~250 (under the top border, 267), x ~274..350,
+# right of the BlockWidth text and the screw callout (x <= 218), centred on
+# the 15.6 span.
 SECTION_B_KEEP: dict[str, tuple[float, float, float]] = {
     "CboreFloor": (-BOLT_X, BLOCK_WIDTH / 2.0 + 8.5, CBORE_FLOOR / 2.0),
 }
@@ -194,16 +236,17 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     # 165 (x ~131..199), inside the +X end's witness line (x 200).
     "BlockLength": (2.5, -_HW - 17.0, _H),
     # Y stations from the -Y side, a stack right of the view at a 10 mm
-    # (sheet) pitch (x 212, 222, 232), each text centred in its span,
+    # (sheet) pitch (x 220, 230, 240), each text centred in its span,
     # off the witness lines of the stations beyond it. The datum is the
     # top face's -Y/+X corner; the bore's witness line runs on line A as
-    # BoltY's did (jig-r3), its text 6 mm right of A's letter (x ~205..210).
-    "HoleRow1Y": (26.0, -16.5, _H),
-    "BoreStationY": (31.0, -10.0, _H),
-    "HoleRow2Y": (36.0, -3.5, _H),
-    # The width, outermost at x 256: its three ~35 mm rows (x ~239..273)
-    # stand 7 mm right of HoleRow2Y's line (x 232).
-    "BlockWidth": (48.0, 8.0, _H),
+    # BoltY's did (jig-r3). c4 review: 8 mm further right, so line A's
+    # right arrow and letter (x ~205..210) stand left of the whole stack.
+    "HoleRow1Y": (30.0, -16.5, _H),
+    "BoreStationY": (35.0, -10.0, _H),
+    "HoleRow2Y": (40.0, -3.5, _H),
+    # The width, outermost at x 264: its three ~35 mm rows (x ~247..281)
+    # stand 7 mm right of HoleRow2Y's line (x 240).
+    "BlockWidth": (52.0, 8.0, _H),
     # The bore left of the view: "2X", the value and five rows under it, a
     # 40.3 mm (sheet) block about 35 mm wide (the value row with its
     # tolerance stack). Its shoulder at y 202 mm stands 10 mm over line A
@@ -258,6 +301,21 @@ def _hung_clear(callouts: dict[str, str]) -> dict[str, str]:
     }
 
 
+SIDE_KEEP: dict[str, tuple[float, float, float]] = {
+    # X stations from the -X end over the view (model -Z is sheet up), rows
+    # y 132 and 140, each text left of the +X hole's witness line (x 344);
+    # sheet x as in c4r3 (x <= 295), left of section B-B's caption.
+    "SideScrew1X": (-29.5, _HW, -4.0),
+    "SideScrew2X": (-24.5, _HW, -8.0),
+    # Left of the -X end (x ~217), its three rows (the value, then FROM FACE
+    # ON CARRIAGE, part_spec.CALLOUTS_BELOW) ~28 x 15 mm at x ~203..231,
+    # y ~108..123: between the view (x 234) and the plan's +X witness line
+    # (x 200, down to y ~111), over section A's height (y <= 97), inside
+    # the row's 18 mm span; the datum witness line leaves the -X end's
+    # bottom corner.
+    "SideScrewRowZ": (BLOCK_X0 - 8.5, _HW, 4.5),
+}
+
 # The screw holes' native callout over the plan, right of section B-B's
 # upper letter (x ~149..153) and under the top border: four rows (4X DRILL
 # Ø4.50 THRU ALL, the counterbore, the two mate rows), ~60 x 22 mm (x
@@ -306,14 +364,30 @@ SEAT_FRAME_EDGE = (
 SEAT_FRAME_CORNER = (BORE_X + part_spec.SHOULDER_HOLE_DIA / 2.0 + 1.0, 0.0, _H + 2.0)
 _SEAT_GDT_SOURCE = ("draw_ch_rocker_arm_tl_oblique_pivot_block", "_seat_gdt")
 
+# The side screws' native callout right of the side view, over it and under
+# the isometric's note (y 200): four rows (2X DRILL Ø4.98 THRU ALL, the
+# counterbore, the mate, the walls' shortfall), ~60 x 22 mm at x ~352..412,
+# y ~135..157. Its leader drops to the +X counterbore's upper-right rim
+# (x ~350), right of the 55.000 station's witness line (x 344).
+SIDE_CALLOUT_XY = (0.382, 0.146)
+_SIDE_CBORE_R = SIDE_CBORE_DIA / 2.0
+SIDE_CALLOUT_EDGE = (
+    SIDE_SCREW_HOLES[1][0] + _SIDE_CBORE_R * math.sqrt(0.5),
+    _HW,
+    SIDE_SCREW_HOLES[1][1] - _SIDE_CBORE_R * math.sqrt(0.5),
+)
+
 _UP = [0.0, 0.0, 1.0]
 _DOWN = [0.0, 0.0, -1.0]
+_INTO_Y = [0.0, -1.0, 0.0]
 
 
 part_metadata(
     precision_sources=(
         "DRAWING_PRECISION_BY_NAME",
+        "SIDE_CALLOUT_PRECISION",
         ("_drawing_hole_callout", "add_native_hole_callout"),
+        ("_drawing_hole_callout", "set_hole_callout_precision"),
     )
 )
 part_metadata(
@@ -546,19 +620,102 @@ for _index, (_x, _y) in enumerate(part_spec.BOLT_POINTS, start=1):
     )
 
 
-def screw_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """DRILL in the native THRU row, the counterbore depth as a reference,
-    and the mate row under the callout.
+_SIDE_PLACES = part_spec.SIDE_STATION_PLACES
+_SIDE_CBORE_PLACES = part_spec.SIDE_CBORE_PLACES
+_SIDE_DIA_PRINTED = round(SIDE_HOLE_DIA, part_spec.SIDE_THRU_PLACES)
+for _index, (_x, _z) in enumerate(SIDE_SCREW_HOLES, start=1):
+    # Stations from the -X end and the bottom face at .XXX: the pair holds
+    # TL-29's tapped pair inside the #8 screws' float (spec SIDE_SCREW_FLOAT).
+    requirement(
+        f"side_screw_hole_{_index}",
+        kind="hole",
+        faces=(CylinderFace(SIDE_HOLE_DIA, contains_x_mm=_x, contains_z_mm=_z),),
+        requirements=("station", "height", "dia", "thru", "note"),
+        fields={
+            "at": ([_x, _HW, _z], ("SIDE_SCREW_HOLES", "BLOCK_WIDTH")),
+            "axis": (_INTO_Y, ("__frame__",)),
+            "station": (
+                limits(_x - part_spec.DATUM_X, _SIDE_PLACES),
+                ("SIDE_SCREW_HOLES", "DATUM_X", "SIDE_SCREW_FLOAT"),
+            ),
+            "station_nominal": (
+                _x - part_spec.DATUM_X,
+                ("SIDE_SCREW_HOLES", "DATUM_X"),
+            ),
+            "height": (
+                limits(_z, _SIDE_PLACES),
+                ("SIDE_SCREW_HOLES", "SIDE_SCREW_FLOAT"),
+            ),
+            "height_nominal": (_z, ("SIDE_SCREW_HOLES",)),
+            # The row's dimension says so (CALLOUTS_BELOW, c4 review).
+            "height_from": ("bottom_face", ("SIDE_ROW_CALLOUT", "CALLOUTS_BELOW")),
+            "dia": (
+                limits(
+                    _SIDE_DIA_PRINTED,
+                    part_spec.SIDE_THRU_PLACES,
+                    part_spec.DRILLED_BAND,
+                ),
+                ("SIDE_HOLE_DIA", "SIDE_SCREW_HOLE_SPEC", "DRILLED_BAND"),
+            ),
+            "dia_nominal": (_SIDE_DIA_PRINTED, ("SIDE_HOLE_DIA",)),
+            "thru": (True, ("SIDE_SCREW_HOLE_SPEC",)),
+            # The pair's tight band names its mate; the walls' shortfall
+            # (rule 20) prints under it.
+            "note": (
+                " ".join(SIDE_CALLOUT_BELOW.split("\n")),
+                ("SIDE_CALLOUT_BELOW", "SIDE_SCREW_MATE", "SIDE_WALL_CALLOUT"),
+            ),
+        },
+        precision={
+            "station": _SIDE_PLACES,
+            "height": _SIDE_PLACES,
+            "dia": part_spec.SIDE_THRU_PLACES,
+        },
+    )
+    requirement(
+        f"side_screw_hole_{_index}_counterbore",
+        kind="counterbore",
+        faces=(CylinderFace(SIDE_CBORE_DIA, contains_x_mm=_x, contains_z_mm=_z),),
+        requirements=("dia", "depth"),
+        fields={
+            "parent": (
+                f"side_screw_hole_{_index}",
+                (
+                    "SIDE_HOLE_DIA",
+                    ("draw_ch_rocker_arm_tl_oblique_pivot_block", "build"),
+                ),
+            ),
+            "dia": (
+                limits(SIDE_CBORE_DIA, _SIDE_CBORE_PLACES),
+                ("SIDE_CBORE_DIA", "SIDE_SCREW_HEAD_DIA", "WORST_WALLS"),
+            ),
+            "dia_nominal": (SIDE_CBORE_DIA, ("SIDE_CBORE_DIA",)),
+            "depth": (
+                limits(part_spec.SIDE_CBORE_DEPTH, _SIDE_CBORE_PLACES),
+                ("SIDE_CBORE_DEPTH", "SIDE_SCREW_HEAD_HEIGHT", "WORST_WALLS"),
+            ),
+            "depth_ref": (part_spec.SIDE_CBORE_DEPTH, ("SIDE_CBORE_DEPTH",)),
+        },
+        precision={"dia": _SIDE_CBORE_PLACES, "depth": _SIDE_CBORE_PLACES},
+    )
+
+
+def screw_hole_callout_definitions(
+    definitions: dict[int, str], below: str, *, reference_depth: bool
+) -> dict[int, str]:
+    """DRILL in the native THRU row, ``below`` under the callout and, with
+    ``reference_depth``, the counterbore depth as a reference.
 
     A counterbored callout prints its THRU row from the CalloutAbove part (7)
     and its counterbore row from the Prefix part (5), so a Prefix process
     would read "DRILL ⌴Ø8.00" (draw_ch_fulcrum_keeper). The process goes into
     the THRU part instead, after its instance count ("4X DRILL Ø4.50 THRU
-    ALL"); the CalloutBelow part (8) carries the mate the three-place hole
-    stations serve (rule 4). The counterbore row's one depth variable is
-    bracketed, "↧ (8.40)": the floor's height from the carriage seat
-    (section B-B) is the dimension (draw_mg_output_fixture's reference
-    thread depth).
+    ALL"); the CalloutBelow part (8) carries ``below``: the mate the
+    three-place hole stations serve (rule 4), and for the side screws the
+    counterbore walls' rule-20 shortfall. For the carriage screws the
+    counterbore row's one depth variable is bracketed, "↧ (8.40)": the
+    floor's height from the carriage seat (section B-B) is the dimension
+    (draw_mg_output_fixture's reference thread depth).
     """
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected screw-hole callout parts: {definitions!r}")
@@ -570,40 +727,40 @@ def screw_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str
     if definitions[8].strip():
         raise RuntimeError(f"screw-hole callout already prints below: {definitions!r}")
     part = thru_parts[0]
-    depth_parts = [p for p, text in definitions.items() if "<HOLE-DEPTH>" in text]
-    depth = (
-        _CBORE_DEPTH_TOKEN.search(definitions[depth_parts[0]])
-        if len(depth_parts) == 1
-        else None
-    )
-    if (
-        depth is None
-        or depth_parts[0] in (part, 8)
-        or definitions[depth_parts[0]].count("<HOLE-DEPTH>") != 1
-    ):
-        raise RuntimeError(
-            f"screw-hole callout has no single bare counterbore depth: {definitions!r}"
+    bracketed: dict[int, str] = {}
+    if reference_depth:
+        depth_parts = [p for p, text in definitions.items() if "<HOLE-DEPTH>" in text]
+        depth = (
+            _CBORE_DEPTH_TOKEN.search(definitions[depth_parts[0]])
+            if len(depth_parts) == 1
+            else None
         )
-    depth_text = definitions[depth_parts[0]]
-    bracketed = f"{depth_text[: depth.start(2)]}({depth[2]})"
+        if (
+            depth is None
+            or depth_parts[0] in (part, 8)
+            or definitions[depth_parts[0]].count("<HOLE-DEPTH>") != 1
+        ):
+            raise RuntimeError(
+                "screw-hole callout has no single bare counterbore depth: "
+                f"{definitions!r}"
+            )
+        depth_text = definitions[depth_parts[0]]
+        bracketed = {depth_parts[0]: f"{depth_text[: depth.start(2)]}({depth[2]})"}
     text = definitions[part]
     count = re.match(r"\s*<NUM_INST>X ", text)
     if count:
         updated = f"{text[: count.end()]}{SCREW_HOLE_PROCESS} {text[count.end() :]}"
     else:
         updated = compose_hole_callout_prefix(SCREW_HOLE_PROCESS, text)
-    return {
-        **definitions,
-        part: updated,
-        depth_parts[0]: bracketed,
-        8: SCREW_MATE_CALLOUT,
-    }
+    return {**definitions, part: updated, **bracketed, 8: below}
 
 
-@_telemetry.traced("drawing.pivot_block.screw_hole_callout")
-def _set_screw_hole_callout(display: Any) -> None:
-    """Write the screw holes' process, reference depth and mate rows; prove
-    they persisted."""
+@_telemetry.traced("drawing.pivot_block.screw_hole_callout", label_param="label")
+def _set_screw_hole_callout(
+    display: Any, below: str, *, reference: str | None, label: str
+) -> None:
+    """Write a screw callout's process and lower rows, and its reference
+    depth when ``reference`` names it; prove they persisted."""
     native = _early_bound(display, "IDisplayDimension")
 
     def read(parts: tuple[int, ...]) -> dict[int, str]:
@@ -613,25 +770,26 @@ def _set_screw_hole_callout(display: Any) -> None:
         }
 
     definitions = read((5, 6, 7, 8))
-    updated = screw_hole_callout_definitions(definitions)
+    updated = screw_hole_callout_definitions(
+        definitions, below, reference_depth=reference is not None
+    )
     for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
         if updated[definition_part] != definitions[definition_part]:
             native.SetText(writable_part, updated[definition_part])
     persisted = read((5, 6, 7, 8))
     resolved = read((1, 2, 3, 4))
     joined = "\n".join(resolved.values())
-    reference = f"({part_spec.CBORE_DEPTH:.{part_spec.CALLOUT_PLACES}f})"
     if (
         persisted != updated
         or SCREW_HOLE_PROCESS not in (resolved[3] + resolved[1])
-        or joined.count(reference) != 1
+        or (reference is not None and joined.count(reference) != 1)
     ):
         raise RuntimeError(
-            "screw-hole callout rows did not persist: "
+            f"{label}: callout rows did not persist: "
             f"definitions={persisted!r}, resolved={resolved!r}, "
             f"expected reference depth {reference}"
         )
-    _telemetry.info(f"screw-hole callout: {resolved!r}")
+    _telemetry.info(f"{label} callout: {resolved!r}")
 
 
 def _view_mapper(adapter: Any, view: Any):
@@ -771,6 +929,28 @@ def _cbore_floor_section(adapter: Any, source_model: Any, plan: Any) -> list[Any
     return annotations
 
 
+def _label_side_view(adapter: Any, plan: Any, on_plan: Any) -> None:
+    """Name the removed side view: its letter arrow on the plan's +Y edge
+    and its caption (review c4r3: out of projection, unlabelled)."""
+    tip = on_plan(SIDE_VIEW_ARROW_TIP)
+    note = add_leader_note(
+        adapter,
+        SIDE_VIEW_LETTER,
+        text_xy=(
+            tip[0] + SIDE_VIEW_LETTER_OFFSET[0],
+            tip[1] + SIDE_VIEW_LETTER_OFFSET[1],
+        ),
+        attach_xy=tip,
+        view=plan,
+        height=SIDE_VIEW_LETTER_HEIGHT,
+        label=f"view {SIDE_VIEW_LETTER} viewing arrow",
+    )
+    if note is None:
+        raise RuntimeError(f"failed to add the view {SIDE_VIEW_LETTER} arrow")
+    if add_note(adapter, SIDE_VIEW_CAPTION, *SIDE_VIEW_CAPTION_XY) is None:
+        raise RuntimeError(f"failed to add the {SIDE_VIEW_CAPTION!r} caption")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -817,10 +997,12 @@ async def build(adapter: Any) -> dict[str, str]:
     position_section_caption(adapter, section_a, CAPTION_A_XY, label="pivot block A")
     # finalize_drawing shades the pictorial isometric with edges.
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (plan, section_a, iso):
+    side = place_view(adapter, str(SOURCE), "*Top", *SIDE_CENTER, scale=VIEW_SCALE)
+    for view in (plan, section_a, iso, side):
         set_hidden_lines_removed(adapter, view)
 
     on_a = _view_mapper(adapter, section_a)
+    on_side = _view_mapper(adapter, side)
     annotations = []
     for view, keep, mapper, view_label in (
         (plan, PLAN_KEEP, on_plan, "plan view"),
@@ -833,6 +1015,15 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=view_label,
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
+    # The side stations live on SideScrewReference, a sketch the part saves
+    # hidden: the side view shows it per view (_drawing_hidden_sketches).
+    annotations += hidden_sketches.curate_view_dimensions(
+        adapter,
+        side,
+        keep={name: on_side(xyz) for name, xyz in SIDE_KEEP.items()},
+        view_label="side view",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     # The floor height lives on CboreFloorReference, a sketch the part saves
     # hidden: _drawing_hidden_sketches shows it while B-B is cut and curated.
     annotations += _cbore_floor_section(adapter, source_model, plan)
@@ -855,9 +1046,27 @@ async def build(adapter: Any) -> dict[str, str]:
             edge_xy=on_plan(SCREW_CALLOUT_EDGE),
             callout_xy=SCREW_CALLOUT_XY,
             label="carriage screw counterbores",
-        )
+        ),
+        SCREW_MATE_CALLOUT,
+        reference=f"({part_spec.CBORE_DEPTH:.{part_spec.CALLOUT_PLACES}f})",
+        label="carriage screw holes",
+    )
+    side_callout = add_native_hole_callout(
+        adapter,
+        side,
+        edge_xy=on_side(SIDE_CALLOUT_EDGE),
+        callout_xy=SIDE_CALLOUT_XY,
+        label="nut-bracket screw counterbores",
+    )
+    _set_screw_hole_callout(
+        side_callout, SIDE_CALLOUT_BELOW, reference=None, label="side screw holes"
+    )
+    # The counterbore's walls take three places; the THRU size the template's two.
+    set_hole_callout_precision(
+        side_callout, SIDE_CALLOUT_PRECISION, label="nut-bracket screw counterbores"
     )
     _seat_gdt(adapter, section_a, on_a)
+    _label_side_view(adapter, plan, on_plan)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

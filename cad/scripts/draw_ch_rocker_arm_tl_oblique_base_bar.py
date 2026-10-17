@@ -4,10 +4,12 @@ One part, one configuration, two off (the title block's quantity); the
 second bar is the same part turned over. Its plan (the *Front view, looking
 down on the top face) carries the bar's length and stock width, the rail
 holes' baseline stations and the row's lateral station from the -Y edge
-under one native tap callout, and both slots' stations, rises, width and
-centre-to-centre run (slot centre marks); the end view, projected right of
-the plan on its centreline, carries the stock thickness; the shaded
-isometric rides bottom right above the title block.
+under one native tap callout, the end brackets' four counterbored
+holes (stations from the end face, rows from the -Y edge, one native callout
+naming the far-side counterbores and the TL-28 mate), and both slots'
+stations, rises, width and centre-to-centre run (slot centre marks); the end
+view, projected right of the plan on its centreline, carries the stock
+thickness; the shaded isometric rides bottom left under the plan's stack.
 
 Run with SolidWorks open::
 
@@ -38,7 +40,7 @@ from _drawing_common import (
 )
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -54,6 +56,9 @@ from _printed_limits import limits
 from _printed_tolerance import drilled_oversize_mm
 from ch_rocker_arm_tl_oblique_base_bar_spec import (
     BAR_LENGTH,
+    BRACKET_CALLOUT_PRECISION,
+    BRACKET_CALLOUT_PROCESS,
+    BRACKET_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FAR_SLOT_DROP,
@@ -66,11 +71,11 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     RAIL_MATE_CALLOUT,
     RAIL_ROW_CALLOUT,
     SLOT_RUN,
-    SLOT_WIDTH,
     STOCK_DIMENSIONS,
     TAP_DRILL,
     TAP_SPEC,
 )
+import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_base_bar"]
 PART_STEM = SPEC.artifact_stem
@@ -81,21 +86,25 @@ OUTPUTS = DrawingOutputs(
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 # A 440 x 101.6 x 12.7 bar: 1:2 puts the 220-wide plan on the B sheet, its end
-# view projected right of it on the same centreline (third angle); the iso
-# rides bottom right at 1:5, its note under it above the title block (top at
-# about 65 sheet mm). The vertical budget: the rail-hole stack tops out at
-# about 262 under the 267 border. The plan sits right of centre so the three
-# side lanes (the row's three-line callout the widest) and the stock width's
-# text clear the left border (about 12); r3 moved plan and end view 8 right,
-# r4 another 3.5 (the row's block measured wider than estimated).
+# view projected right of it on the same centreline (third angle). The
+# vertical budget: the rail-hole stack tops out at about 262 under the 267
+# border. The plan sits right of centre so the three side lanes (the row's
+# three-line callout the widest) and the stock width's text clear the left
+# border (about 12); r3 moved plan and end view 8 right, r4 another 3.5 (the
+# row's block measured wider than estimated). C4: the bracket
+# holes' callout takes the bottom-right corner under the end view, so the
+# 1:5 iso (about 64 x 53) and its note move to the free bottom-left corner,
+# under the plan's six-lane stack (lowest text about 121) and left of the
+# title block (x from about 216).
 SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 ISO_SCALE = (1, 5)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 FRONT_CENTER = (0.1835, 0.1835)
 END_CENTER = (0.3365, FRONT_CENTER[1])
-ISO_CENTER = (0.365, 0.112)
-ISO_NOTE_XY = (0.335, 0.080)
+ISO_CENTER = (0.090, 0.072)
+ISO_NOTE_XY = (0.060, 0.038)
+ISO_HALF = (0.033, 0.027)  # measured on the r3 sheet
 
 
 def _sheet_x(center: tuple[float, float], model_x_mm: float) -> float:
@@ -115,6 +124,11 @@ _BOTTOM = FRONT_CENTER[1] - _HALF_W_SHEET
 _LEFT = FRONT_CENTER[0] - _HALF_L_SHEET
 _RIGHT = FRONT_CENTER[0] + _HALF_L_SHEET
 TAP_R_SHEET = TAP_DRILL * _S / 2000.0
+BRACKET_R_SHEET = BRACKET_HOLE_DIA * _S / 2000.0
+# The leadscrew layout's bracket holes: (near, far) pairs, inner row first.
+BRACKET_HOLES = leadscrew.BASE_BAR_HOLES
+BRACKET_NEAR_X, BRACKET_INNER_Y = BRACKET_HOLES[0]
+BRACKET_FAR_X, BRACKET_OUTER_Y = BRACKET_HOLES[3]
 LANE = 0.008  # one side-dimension lane
 # Stacked dimensions (the rail-hole baselines above the plan, the stations
 # and length below it): first dimension line STACK_FIRST off the part, then
@@ -145,24 +159,33 @@ def _below_line(k: int) -> float:
 # that line).
 #
 # Below it, nearest first: the near slot's width (its extension lines then
-# cross no other dimension), the two slot stations, the length. A span
-# shorter than its text prints the text beside it, clear of both extension
-# lines (r2 struck "2X 13.50" and "20.9" with their own lines): the width's
-# right of the slot (r5: "2X 13.50 THRU", the slots' depth on one line, no
-# other line crossing lane 0 before the far slot), the near station's right
-# of the slot's centre line.
+# cross no other dimension), the near slot's station, the near bracket pair's
+# station, the far slot's, the far pair's, the length. A span shorter than
+# its text prints the text beside it, clear of both extension lines (r2
+# struck "2X 13.50" and "20.9" with their own lines): the near station's
+# right of the slot's centre line; the near pair's station sits at its
+# span's right end, clear of the slot's lines. The width's "2X 13.50 THRU"
+# (r5: the slots' depth) sits right of the near pair's extension line, which
+# runs down through lane 0 too close to the slot for the text to fit
+# between them (Y14.5 lets an extension line cross a dimension line).
 #
 # Left of it, shortest nearest: the near rise, the rail row's lateral station
 # (50.80, from the -Y edge to the row's centreline, its function on two
 # callout lines under it; r3), the stock width, whose text rides above the
 # centreline so the row's upper extension line ends short of it. The row's
 # three-line block sits above the near rise's text and extension line.
-# Right of it: the far slot's run (2X; the far slot so the dimension lands
-# off the part), its text below the 3 mm span (r2 struck "2X 6.00" with its
-# arrows; the drop's upper extension line now runs along the bar's top edge,
-# where the text sat above), then the far slot's drop from the +Y edge
+# Right of it: the bracket rows from the -Y edge (the outer row's 6.800
+# below the bar, its span too short, its text right of its line on a
+# shoulder; the inner row's 24.800 mid-span, its line far enough out that
+# its outside arrow under the bar's edge clears the 6.800's text: c4-r2
+# struck the "8" and bunched the two lines), the far slot's run (2X; the far
+# slot so the dimension lands off the part), its text below the 3 mm span
+# (r2 struck "2X 6.00" with its arrows; c4-r2's drop puts the bar's top edge
+# line where the text sat above), then the far slot's drop from the +Y edge
 # (c4-r2: located from the -Y edge, its wall to the +Y edge carried the stock
-# width's band).
+# width's band). The bracket callout's leader leaves the far outer hole down
+# and right, crossing only the length's extension line, to a block in the
+# bottom-right corner.
 _TEXT_GAP = 0.0025  # a text's clearance from the line it sits beside
 # Half text widths (sheet m, measured on the r2 sheet's 3.5 mm text).
 _SLOT_WIDTH_TEXT_HALF = 0.017  # "2X 13.50 THRU", 13 glyphs at r4's 2.6
@@ -171,6 +194,12 @@ _SLOT_RUN_TEXT_HALF = 0.008  # "2X 6.00"
 # "FOR HGR15R RAIL", its widest line (15 glyphs): 38.8 wide on the r4 sheet.
 _RAIL_ROW_TEXT_HALF = 0.0195
 _BAR_WIDTH_TEXT_HALF = 0.0074  # "101.6" over "STOCK": 14.8 wide on r4
+_BRACKET_NEAR_X_TEXT_HALF = 0.0066  # "57.000"
+_BRACKET_ROW_TEXT_HALF = 0.0066  # "24.800"
+_BRACKET_OUTER_TEXT_BELOW = 0.004  # "6.800"'s centre under the bar's -Y edge
+# SolidWorks sets an outside text right of its own line on a shoulder: the
+# 6.800 spans from about 1.5 to 14.2 right of its line (c4-r2 sheet).
+_SHOULDER_TEXT_SPAN = (0.0015, 0.0142)
 _SLOT_RUN_TEXT_LOW = 0.0055  # text centre below the run's lower line
 # The row's block: three lines, about 17 tall; its bottom line clears the
 # near rise's "10.3" (top about 4.5 above the bar's -Y edge) and its upper
@@ -183,7 +212,10 @@ _RAIL_ROW_TEXT_FLOOR = 0.006  # block bottom above the bar's -Y edge
 _RAIL_ROW_LANE = LANE + 0.0025 + _RAIL_ROW_TEXT_HALF
 _BAR_WIDTH_LANE = _RAIL_ROW_LANE + _RAIL_ROW_TEXT_HALF + 0.002
 _SLOT_RUN_LANE = 0.011  # its text's left end clears the bar's end face
-_FAR_DROP_LANE = 0.021
+_BRACKET_OUTER_LANE = LANE
+# The 24.800's line clears the 6.800's shouldered text by 3.8.
+_BRACKET_INNER_LANE = LANE + _SHOULDER_TEXT_SPAN[1] + 0.0038  # 0.026
+_FAR_DROP_LANE = 0.021  # above the bracket rows' texts, clear of the end view
 _LAST_HOLE = len(RAIL_HOLE_X)
 _HOLE_TEXT_X = (
     (RAIL_HOLE_X[0] + RAIL_HOLE_X[1]) / 2.0,
@@ -197,23 +229,37 @@ FRONT_KEEP = {
         )
         for k, text_x in enumerate(_HOLE_TEXT_X, start=1)
     },
-    "BarLength": (FRONT_CENTER[0], _below_line(3) + TEXT_DROP),
+    "BarLength": (FRONT_CENTER[0], _below_line(5) + TEXT_DROP),
     "BarWidth": (_LEFT - _BAR_WIDTH_LANE, FRONT_CENTER[1] + 0.010),
     "RailRowY": (
         _LEFT - _RAIL_ROW_LANE,
         _BOTTOM + _RAIL_ROW_TEXT_FLOOR + _RAIL_ROW_TEXT_HALF_HIGH,
     ),
     "SlotWidth": (
-        _sheet_x(FRONT_CENTER, NEAR_SLOT_X + SLOT_WIDTH / 2.0)
-        + _TEXT_GAP
-        + _SLOT_WIDTH_TEXT_HALF,
+        _sheet_x(FRONT_CENTER, BRACKET_NEAR_X) + _TEXT_GAP + _SLOT_WIDTH_TEXT_HALF,
         _below_line(0) + TEXT_DROP,
     ),
     "NearSlotX": (
         _sheet_x(FRONT_CENTER, NEAR_SLOT_X) + _TEXT_GAP + _NEAR_SLOT_X_TEXT_HALF,
         _below_line(1) + TEXT_DROP,
     ),
-    "FarSlotX": (_sheet_x(FRONT_CENTER, FAR_SLOT_X / 2.0), _below_line(2) + TEXT_DROP),
+    "BracketHole1X": (
+        _sheet_x(FRONT_CENTER, BRACKET_NEAR_X) - _TEXT_GAP - _BRACKET_NEAR_X_TEXT_HALF,
+        _below_line(2) + TEXT_DROP,
+    ),
+    "FarSlotX": (_sheet_x(FRONT_CENTER, FAR_SLOT_X / 2.0), _below_line(3) + TEXT_DROP),
+    "BracketHole3X": (
+        _sheet_x(FRONT_CENTER, BRACKET_FAR_X / 2.0),
+        _below_line(4) + TEXT_DROP,
+    ),
+    "BracketRowOuterY": (
+        _RIGHT + _BRACKET_OUTER_LANE,
+        _BOTTOM - _BRACKET_OUTER_TEXT_BELOW,
+    ),
+    "BracketRowInnerY": (
+        _RIGHT + _BRACKET_INNER_LANE,
+        _sheet_y(FRONT_CENTER, (-HALF_WIDTH + BRACKET_INNER_Y) / 2.0),
+    ),
     "SlotRun": (
         _RIGHT + _SLOT_RUN_LANE,
         _sheet_y(FRONT_CENTER, FAR_SLOT_Y - SLOT_RUN / 2.0) - _SLOT_RUN_TEXT_LOW,
@@ -242,6 +288,10 @@ CALLOUTS_BELOW = dict.fromkeys(sorted(STOCK_DIMENSIONS), "STOCK") | {
 # The tap callout's two lines, centred about here, clear the 267 border by
 # about 6 (r3 printed its first line touching it).
 TAP_CALLOUT_XY = (0.318, 0.256)
+# The bracket callout's four lines (two process, two native), centred about
+# here: right of the length's extension line, under the end view, above the
+# title block.
+BRACKET_CALLOUT_XY = (0.335, 0.125)
 
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
 
@@ -314,6 +364,82 @@ for _index, _x in enumerate(part_spec.RAIL_HOLE_X, start=1):
             ),
         },
         precision={"dia": 2, "station": _PLACES, "height": _PLACES},
+    )
+
+_BRACKET_PLACES = part_spec.BRACKET_HOLE_PLACES
+_CBORE_PLACES = part_spec.BRACKET_CBORE_PLACES
+_BRACKET_DIA_PRINTED = round(BRACKET_HOLE_DIA, 2)
+_FROM_UNDERSIDE = ([0.0, 0.0, 1.0], ("__frame__",))
+_BRACKET_SOURCE = (("ch_rocker_arm_tl_oblique_leadscrew_spec", "BASE_BAR_HOLES"),)
+for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
+    # Stations from the spindle-end face, rows from the faced -Y side, at
+    # .XXX: each pair holds TL-28's tapped pair inside the screws' float.
+    requirement(
+        f"bracket_hole_{_index}",
+        kind="hole",
+        faces=(CylinderFace(BRACKET_HOLE_DIA, contains_x_mm=_x, contains_y_mm=_y),),
+        requirements=("station", "height", "dia", "thru", "note"),
+        fields={
+            "at": ([_x, _y, 0.0], _BRACKET_SOURCE),
+            "axis": _FROM_UNDERSIDE,
+            "station": (
+                limits(_x, _BRACKET_PLACES),
+                (*_BRACKET_SOURCE, "BRACKET_HOLE_PLACES"),
+            ),
+            "station_nominal": (_x, _BRACKET_SOURCE),
+            "height": (
+                limits(part_spec.HALF_WIDTH + _y, _BRACKET_PLACES),
+                (*_BRACKET_SOURCE, "HALF_WIDTH", "BRACKET_HOLE_PLACES"),
+            ),
+            "height_nominal": (
+                part_spec.HALF_WIDTH + _y,
+                (*_BRACKET_SOURCE, "HALF_WIDTH"),
+            ),
+            "height_from": _FROM_LOW_SIDE,
+            "dia": (
+                limits(_BRACKET_DIA_PRINTED, 2, _DRILLED),
+                ("BRACKET_HOLE_DIA", "BRACKET_HOLE_SPEC"),
+            ),
+            "dia_nominal": (_BRACKET_DIA_PRINTED, ("BRACKET_HOLE_DIA",)),
+            "thru": (True, ("BRACKET_HOLE_SPEC",)),
+            # The pattern's tight band names its mate; the counterbores open
+            # on the face the plan does not show.
+            "note": (
+                " ".join(BRACKET_CALLOUT_PROCESS.split("\n")).strip(),
+                ("BRACKET_CALLOUT_PROCESS", "BRACKET_MATE"),
+            ),
+        },
+        precision={"station": _BRACKET_PLACES, "height": _BRACKET_PLACES, "dia": 2},
+    )
+    requirement(
+        f"bracket_hole_{_index}_counterbore",
+        kind="counterbore",
+        faces=(
+            CylinderFace(
+                part_spec.BRACKET_CBORE_DIA, contains_x_mm=_x, contains_y_mm=_y
+            ),
+        ),
+        requirements=("dia", "depth"),
+        fields={
+            "parent": (
+                f"bracket_hole_{_index}",
+                (
+                    "BRACKET_HOLE_DIA",
+                    ("draw_ch_rocker_arm_tl_oblique_base_bar", "build"),
+                ),
+            ),
+            "dia": (
+                limits(part_spec.BRACKET_CBORE_DIA, _CBORE_PLACES),
+                ("BRACKET_CBORE_DIA", "BRACKET_SCREW_HEAD_DIA"),
+            ),
+            "dia_nominal": (part_spec.BRACKET_CBORE_DIA, ("BRACKET_CBORE_DIA",)),
+            "depth": (
+                limits(part_spec.BRACKET_CBORE_DEPTH, _CBORE_PLACES),
+                ("BRACKET_CBORE_DEPTH", "BRACKET_SCREW_HEAD_HEIGHT"),
+            ),
+            "depth_ref": (part_spec.BRACKET_CBORE_DEPTH, ("BRACKET_CBORE_DEPTH",)),
+        },
+        precision={"dia": _CBORE_PLACES, "depth": _CBORE_PLACES},
     )
 
 
@@ -396,7 +522,8 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, end, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # The plan shows the hidden RailRowReference sketch, whose 50.80 it prints.
+    # The plan shows the hidden RailRowReference and BracketRowReference
+    # sketches, whose 50.80, 24.800 and 6.800 it prints.
     annotations = [
         *curate_view_dimensions(
             adapter,
@@ -438,6 +565,22 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rail screw taps",
     )
     _omit_tap_thread_class(tap_callout)
+    # The far outer hole's edge, down and right of its centre: the leader
+    # leaves away from the far pair's station line.
+    bracket_callout = add_native_hole_callout(
+        adapter,
+        front,
+        edge_xy=(
+            _sheet_x(FRONT_CENTER, BRACKET_FAR_X) + 0.6 * BRACKET_R_SHEET,
+            _sheet_y(FRONT_CENTER, BRACKET_OUTER_Y) - 0.8 * BRACKET_R_SHEET,
+        ),
+        callout_xy=BRACKET_CALLOUT_XY,
+        label="end bracket holes",
+        process=BRACKET_CALLOUT_PROCESS,
+    )
+    set_hole_callout_precision(
+        bracket_callout, BRACKET_CALLOUT_PRECISION, label="end bracket holes"
+    )
 
     # The property-linked blocks land in the active view: the plan.
     _activate_view(adapter, front, label="plan")

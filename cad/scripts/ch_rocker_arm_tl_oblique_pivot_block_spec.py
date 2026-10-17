@@ -100,6 +100,24 @@ the Ø25's "THRU WEB" callout. The 70 and 40 print two
 places for the counterbores' walls to the +X end and the +Y side, which
 they set: 2.10 at two places, 1.81 at one (under the 2.0 target), stated on
 both.
+
+Side screws (PR C4). Two Ø4.98 THRU along Y with a Ø7.94 counterbore
+4.40 deep from the +Y face, at (X, Z) = (+/-5, 9), for #8-32 x 1-3/4 SHCS
+into the tapped holes of the leadscrew nut bracket (MHA-CH-006-TL-29) on
+the -Y face. TL-22 owns the positions (``SIDE_SCREW_*``); the leadscrew spec
+aliases them, so TL-29's tapped pattern follows them. The row is measured
+from the bottom face, which stays on the carriage when the block grows
+upward, so the 24 mm block leaves it where it was. One native Hole Wizard
+counterbore, the base bar's #8 sizes (MHA-CH-006-TL-20) with the
+counterbore depth cut to 4.40 so the head (0.164 in) sits 0.10 .. 0.36
+below the face. Their walls run against the carriage holes, which stand
+along Z at (+/-13, +13): the counterbore and both stations print three
+places, and the pinch walls under the 2.0 target are rule-20 shortfalls
+the side callout states (``SIDE_WALL_CALLOUT``). The stations print from
+the -X end and the bottom face, carried by a hidden reference sketch the
+same knobs drive; TL-29's taps are spotted through these holes at assembly
+(TL-000), so the pair's spacing need only stay inside the screws' float,
+and the callout names the mate.
 """
 
 from __future__ import annotations
@@ -108,7 +126,7 @@ import math
 
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _fit_deviations import deviations
-from _hole_spec import HoleSpec
+from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 # drawing-guidelines.md rule 17 (walls and webs): 2.0 target, 1.5 floor.
@@ -199,7 +217,6 @@ CBORE_FLOOR = 15.6
 CBORE_FLOOR_PLACES = 3
 CBORE_FLOOR_REFERENCE = "CboreFloorReference"
 CBORE_SECTION_PLANE = "CboreSectionPlane"
-REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE,)
 CBORE_DEPTH = round(BLOCK_HEIGHT - CBORE_FLOOR, 6)  # 8.4, printed (8.40) reference
 UNDER_HEAD = CBORE_FLOOR
 THREAD_IN_CARRIAGE = round(SCREW_LENGTH - UNDER_HEAD, 6)  # 4.4
@@ -250,6 +267,48 @@ CBORE_FLOOR_CALLOUT = (
     f" IN {CARRIAGE_THREAD_DEPTH:.1f} DEEP THREAD"
 )
 
+# --- Side screws (PR C4): the TL-29 nut bracket ------------------------------
+# 2 x #8-32 x 1-3/4 SHCS from the +Y face, through the block along Y, into the
+# nut bracket's tapped holes on the -Y face. The leadscrew spec aliases these.
+SIDE_SCREW = "#8-32"
+SIDE_SCREW_X = (-5.0, 5.0)
+SIDE_SCREW_Z = 9.0
+SIDE_SCREW_HOLES: tuple[tuple[float, float], ...] = tuple(
+    (x, SIDE_SCREW_Z) for x in SIDE_SCREW_X
+)
+SIDE_HOLE_DIA = CLEARANCE_MM[("#8", "normal")]  # 4.978
+SIDE_SCREW_MAJOR = THREAD_MAJOR_MM[SIDE_SCREW]  # 4.166
+SIDE_SCREW_HEAD_DIA = 0.270 * trammel.INCH  # ASME B18.3 #8 SHCS head, max
+SIDE_SCREW_HEAD_HEIGHT = 0.164 * trammel.INCH
+# The base bar's #8 counterbore diameter (TL-20); the depth is cut from its
+# 4.80 to 4.40 for the walls to the carriage holes (docstring).
+SIDE_CBORE_DIA = 7.94
+SIDE_CBORE_DEPTH = 4.40
+SIDE_UNDER_HEAD = BLOCK_WIDTH - SIDE_CBORE_DEPTH  # 35.6 of block under the head
+SIDE_SCREW_HOLE_SPEC = HoleSpec(
+    "counterbore_socket",
+    "#8",
+    fit="normal",
+    overrides_mm={
+        "HoleDiameter": SIDE_HOLE_DIA,
+        "CounterBoreDiameter": SIDE_CBORE_DIA,
+        "CounterBoreDepth": SIDE_CBORE_DEPTH,
+    },
+)
+SIDE_SCREW_MATE = "MHA-CH-006-TL-29"
+SIDE_SCREW_REFERENCE = "SideScrewReference"
+# Stations and the counterbore print three places (walls, hole to hole); the
+# THRU diameter prints the template's two (base bar BRACKET_CALLOUT_PRECISION).
+SIDE_STATION_PLACES = 3
+SIDE_CBORE_PLACES = 3
+SIDE_THRU_PLACES = 2
+SIDE_CALLOUT_PRECISION = {
+    "hw-thruholedia": SIDE_THRU_PLACES,
+    "hw-cbdia": SIDE_CBORE_PLACES,
+    "hw-cbdepth": SIDE_CBORE_PLACES,
+}
+REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, SIDE_SCREW_REFERENCE)
+
 # --- Seat corner (rule 16) ---------------------------------------------------
 BEARING_OD_CHAMFER_MIN = 0.6  # 6200 outer ring r1,2 min
 SEAT_FILLET_RADIUS = 0.4  # a standard boring-insert nose
@@ -280,6 +339,9 @@ BORE_STATION_X = BORE_X - DATUM_X  # 18
 BORE_STATION_Y = 0.0 - DATUM_Y  # 20
 HOLE_COLUMNS_X = (-BOLT_X - DATUM_X, BOLT_X - DATUM_X)  # 37, 63
 HOLE_ROWS_Y = (-BOLT_Y - DATUM_Y, BOLT_Y - DATUM_Y)  # 7, 33
+# The side screws: X from the -X end, Z from the bottom face (45, 55; 9).
+SIDE_STATIONS_X = tuple(x - DATUM_X for x in SIDE_SCREW_X)
+SIDE_ROW_Z = SIDE_SCREW_Z
 # The model's origin-relative knobs (build globals), unprinted.
 MODEL_KNOBS: dict[str, float] = {
     "BlockEndX": -BLOCK_X0,
@@ -287,6 +349,8 @@ MODEL_KNOBS: dict[str, float] = {
     "BoreX": abs(BORE_X),
     "BoltX": BOLT_X,
     "BoltY": BOLT_Y,
+    "SideScrewX": abs(SIDE_SCREW_X[1]),
+    "SideScrewZ": SIDE_SCREW_Z,
 }
 
 # --- Printed places ----------------------------------------------------------
@@ -316,6 +380,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShoulderHoleProfile": {"ShoulderHoleDia": 1},
     "SeatFillets": {"SeatFilletR": 1},
     CBORE_FLOOR_REFERENCE: {"CboreFloor": CBORE_FLOOR_PLACES},
+    SIDE_SCREW_REFERENCE: {
+        "SideScrew1X": SIDE_STATION_PLACES,
+        "SideScrew2X": SIDE_STATION_PLACES,
+        "SideScrewRowZ": SIDE_STATION_PLACES,
+    },
 }
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     feature: set(names) for feature, names in DRAWING_PRECISION.items()
@@ -341,6 +410,9 @@ DRAWING_VALUES: dict[str, float] = {
     "ShoulderHoleDia": SHOULDER_HOLE_DIA,
     "SeatFilletR": SEAT_FILLET_RADIUS,
     "CboreFloor": CBORE_FLOOR,
+    "SideScrew1X": SIDE_STATIONS_X[0],
+    "SideScrew2X": SIDE_STATIONS_X[1],
+    "SideScrewRowZ": SIDE_ROW_Z,
 }
 if set(DRAWING_VALUES) != set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("every marked pivot block dimension needs a value")
@@ -360,6 +432,97 @@ if (
     > 2.0 * SCREW_FLOAT
 ):
     raise AssertionError("the hole stations' band exceeds the M4 screws' float")
+
+
+# --- Side screws: head, float and walls ----------------------------------------
+if SIDE_SCREW_X[0] != -SIDE_SCREW_X[1]:
+    raise AssertionError("the side screws are no longer symmetric about X = 0")
+_SIDE_BAND = _BAND[SIDE_STATION_PLACES]
+_SIDE_CBORE_BAND = _BAND[SIDE_CBORE_PLACES]
+# The head sinks at the shallowest counterbore, clears the smallest, and
+# bears on the ring outside the largest drilled hole.
+SIDE_HEAD_RECESS_MIN = SIDE_CBORE_DEPTH - _SIDE_CBORE_BAND - SIDE_SCREW_HEAD_HEIGHT
+SIDE_HEAD_RECESS_MAX = SIDE_CBORE_DEPTH + _SIDE_CBORE_BAND - SIDE_SCREW_HEAD_HEIGHT
+if SIDE_HEAD_RECESS_MIN < 0.1:
+    raise AssertionError("the #8 head stands within 0.1 of the +Y face")
+if SIDE_CBORE_DIA - _SIDE_CBORE_BAND <= SIDE_SCREW_HEAD_DIA:
+    raise AssertionError("the #8 head does not clear its counterbore")
+SIDE_HEAD_BEARING = (SIDE_SCREW_HEAD_DIA - SIDE_HOLE_DIA - DRILLED_BAND[0]) / 2.0
+if SIDE_HEAD_BEARING < 0.5:
+    raise AssertionError("the #8 head bears on too thin a ring")
+# Hole to hole: TL-29's taps are spotted through these holes, so TL-22's two
+# stations, held for their walls, still take at most half the pair's float.
+SIDE_SCREW_FLOAT = (SIDE_HOLE_DIA - SIDE_SCREW_MAJOR) / 2.0  # each side
+if 2.0 * _SIDE_BAND > SIDE_SCREW_FLOAT:
+    raise AssertionError("the side stations' band exceeds half the #8 float")
+
+
+def _rim_to_counterbore(
+    x: float,
+    z: float,
+    r: float,
+    dy: float,
+    cbore_x: float,
+    cbore_r: float,
+    floor_z: float,
+) -> float:
+    """Least gap from a Y-axis circle (centre ``x``, ``z``, radius ``r``), ``dy``
+    off the carriage hole's axis in Y, to that hole's counterbore (axis at
+    ``cbore_x``, radius ``cbore_r``, open upward from ``floor_z``)."""
+    gap = math.inf
+    for step in range(3600):
+        angle = math.tau * step / 3600
+        px, pz = x + r * math.cos(angle), z + r * math.sin(angle)
+        radial = max(0.0, math.hypot(px - cbore_x, dy) - cbore_r)
+        gap = min(gap, math.hypot(radial, max(0.0, floor_z - pz)))
+    return gap
+
+
+def _side_walls(worst: bool) -> dict[str, float]:
+    """The side holes' walls, nominal or at the printed bands' worst case.
+
+    The +X side hole against the +X, +Y carriage hole (the -X pair mirrors
+    it); stations from the -X end, Z from the bottom, Y from the -Y side. The
+    carriage counterbore's floor prints from the bottom face (CBORE_FLOOR).
+    """
+    k = 1.0 if worst else 0.0
+    band = k * _SIDE_BAND
+    station = SIDE_STATIONS_X[1] + band
+    column = HOLE_COLUMNS_X[1] - k * _band("HoleColumn1X")
+    row = HOLE_ROWS_Y[1] + k * _band("HoleRow1Y")
+    height = BLOCK_HEIGHT - k * _band("BlockHeight")
+    floor_y = (
+        BLOCK_WIDTH - k * _band("BlockWidth") - SIDE_CBORE_DEPTH - k * _SIDE_CBORE_BAND
+    )
+    cbore_r = (SIDE_CBORE_DIA + k * _SIDE_CBORE_BAND) / 2.0
+    hole_r = (SIDE_HOLE_DIA + k * DRILLED_BAND[0]) / 2.0
+    carriage_hole_r = (HOLE_DIA + k * DRILLED_BAND[0]) / 2.0
+    carriage_cbore_r = (CBORE_DIA + k * _BAND[CALLOUT_PLACES]) / 2.0
+    carriage_floor = CBORE_FLOOR - k * _band("CboreFloor")
+    z_high, z_low = SIDE_ROW_Z + band, SIDE_ROW_Z - band
+    bore_edge = (
+        BORE_STATION_X + k * _band("BoreStationX") + (BORE_DIA + k * BORE_BAND[0]) / 2.0
+    )
+    cbore_dy = max(0.0, floor_y - row)
+    return {
+        "side counterbore to side counterbore": (
+            SIDE_STATIONS_X[1] - SIDE_STATIONS_X[0] - 2.0 * band - 2.0 * cbore_r
+        ),
+        "side counterbore to carriage hole": math.hypot(
+            max(0.0, column - station - cbore_r), cbore_dy
+        )
+        - carriage_hole_r,
+        "side hole to carriage hole": column - station - hole_r - carriage_hole_r,
+        "side counterbore to carriage counterbore": _rim_to_counterbore(
+            station, z_high, cbore_r, cbore_dy, column, carriage_cbore_r, carriage_floor
+        ),
+        "side hole to carriage counterbore": _rim_to_counterbore(
+            station, z_high, hole_r, 0.0, column, carriage_cbore_r, carriage_floor
+        ),
+        "side counterbore to bottom face": z_low - cbore_r,
+        "side counterbore to top face": height - z_high - cbore_r,
+        "side hole to bore": SIDE_STATIONS_X[0] - band - hole_r - bore_edge,
+    }
 
 
 # The outer race seats on the shoulder, so the web hole must stay within the
@@ -387,6 +550,7 @@ WALLS_MM: dict[str, float] = {
     "counterbore to block side": BLOCK_WIDTH / 2.0 - BOLT_Y - CBORE_DIA / 2.0,
     "counterbore to +X end": BLOCK_X1 - BOLT_X - CBORE_DIA / 2.0,
     "bore to -X end": (BORE_X - _BORE_R) - BLOCK_X0,
+    **_side_walls(worst=False),
 }
 for _wall, _mm in WALLS_MM.items():
     if _mm < WALL_TARGET:
@@ -422,6 +586,7 @@ WORST_WALLS: dict[str, float] = {
     "bearing shoulder": BLOCK_HEIGHT
     - _band("BlockHeight")
     - 2.0 * (BORE_DEPTH + _band("TopBoreDepth")),
+    **_side_walls(worst=True),
 }
 for _wall, _mm in WORST_WALLS.items():
     if _mm < WALL_FLOOR:
@@ -436,6 +601,12 @@ RULE_20_SHORTFALLS = {
 if "bearing shoulder" in RULE_20_SHORTFALLS:
     raise AssertionError("the bearing shoulder web is under the 2.0 target")
 RULE_20_SHORTFALLS["M4 engagement in carriage"] = ENGAGEMENT_MIN
+# The side counterbores' shortfall, stated in their callout (rule 20).
+SIDE_WALL_MIN = min(
+    wall for name, wall in RULE_20_SHORTFALLS.items() if name.startswith("side ")
+)
+# The three-place counterbore sizes set these walls (review c4r3: say so).
+SIDE_WALL_CALLOUT = f"SETS C'BORE WALL {SIDE_WALL_MIN:.2f} MIN"
 
 # Each bearing seats fully below its face at the shallowest printed seat.
 if BORE_DEPTH - _band("TopBoreDepth") < trammel.BEARING_WIDTH:
@@ -477,6 +648,11 @@ CALLOUTS_ABOVE = {
     "BlockLength": LENGTH_WALL_CALLOUT,
     "CboreFloor": CBORE_FLOOR_CALLOUT,
 }
+# The side row's 9.000 reads from the bottom face (c4 review), named by the
+# carriage it seats on (close-c4 review); two rows of at most 11 characters,
+# as "BOTTOM FACE", stay between the dimension's extension lines (close-c4-r2:
+# a third row ran across them).
+SIDE_ROW_CALLOUT = "FROM FACE\nON CARRIAGE"
 CALLOUTS_BELOW = {
     "BlockWidth": WIDTH_WALL_CALLOUT,
     # No row on the 24.00 (review r8): the web's 3.23 is the depths'.
@@ -484,8 +660,12 @@ CALLOUTS_BELOW = {
     "BottomBoreDepth": PULLER_GAP_CALLOUT,
     "BoreDia": BORE_CALLOUT,
     "ShoulderHoleDia": SHOULDER_HOLE_CALLOUT,
+    "SideScrewRowZ": SIDE_ROW_CALLOUT,
 }
 SURFACE_FINISHES = ()
+# The side screws' callout rows under the native hole callout: the mate the
+# three-place stations serve (rule 4) and the counterbore walls' shortfall.
+SIDE_CALLOUT_BELOW = f"MATCHES {SIDE_SCREW_MATE}\n{SIDE_WALL_CALLOUT}"
 # The fit is on the seat callout; the burr line is the title block's.
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
