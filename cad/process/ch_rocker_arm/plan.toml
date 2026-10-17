@@ -445,10 +445,10 @@ check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
-# Before op 10 the end mill touches the raw top at X+150. The larger PM strap
-# leaves no safe drill-touch corridor on the raw right end after facing.
-# Both drills instead touch the op 10 finished face over the X+60 support,
-# with its known setup Z5.21875; op 20's outer chain lies below Y+2.6.
+# Before op 10 the whole top is raw: the end mill (r 4.76) touches at X+150, 4.2 clear of the
+# clamp (X 160-168). The drills touch after op 10 on the raw strip it leaves (box |X| <= 156.2)
+# at X+157, 0.8 outside the box and >= 1.27 clear of the clamp; both spots are the same raw
+# top 7 mm apart, so the drills keep the end mill's Z.
 edge = "raw top of the right blank end, at X+150.0 Y+6.65"
 # Catalogue-valued placeholder (realistic, remeasure: #1413): status="measured", date="2026-10-13", instrument="0-25 mm micrometer, 0.001 mm"; raw thickness 7.9375 mm exactly from Online Metals pid 12035, 5/16 in (checklist A1); see S1 zero.z.
 method = "paper"
@@ -462,20 +462,20 @@ retouch_after = []
 [[setups.zero.tool_touches]]
 tool = "drill-index-115/#33"
 z_face = "top"
-edge_mm = 5.21875
+edge_mm = 7.9375
 # Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
 paper_mm = 0.05
-method = "spindle stopped; lower the tool on the op 10 finished strap face over the X+60 shim stack, at X+60.0 Y+6.65, through cigarette paper (0.05) until the paper drags, then Axis Set Z to the finished-face coordinate plus paper thickness"
+method = "spindle stopped; lower the tool on the raw top of the right blank end, between the op 10 facing and the clamp, at X+157.0 Y+6.65, through cigarette paper (0.05) until the paper drags, then Axis Set Z"
 after_op = 10
 before_ops = [20]
 
 [[setups.zero.tool_touches]]
 tool = "drill-index-115/#29"
 z_face = "top"
-edge_mm = 5.21875
+edge_mm = 7.9375
 # Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
 paper_mm = 0.05
-method = "spindle stopped; lower the tool on the op 10 finished strap face over the X+60 shim stack, at X+60.0 Y+6.65, through cigarette paper (0.05) until the paper drags, then Axis Set Z to the finished-face coordinate plus paper thickness"
+method = "spindle stopped; lower the tool on the raw top of the right blank end, between the op 10 facing and the clamp, at X+157.0 Y+6.65, through cigarette paper (0.05) until the paper drags, then Axis Set Z"
 after_op = 20
 before_ops = [30]
 
