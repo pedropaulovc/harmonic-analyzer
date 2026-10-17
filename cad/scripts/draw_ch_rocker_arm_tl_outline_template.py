@@ -209,10 +209,12 @@ PROFILE_FRAME_XY = (0.080, 0.192)
 # plate, clear of the apex heights' witness lines (right) and the R800 block.
 PIVOT_DATUM_PICK_DEG = 135.0
 PIVOT_DATUM_OFFSET = (-0.012, 0.022)
-# Datum C: on the rod slot's outboard round end, its tag above the plate,
-# inboard of the rod tip's land block.
-ROD_SLOT_DATUM_PICK_DEG = 45.0
-ROD_SLOT_DATUM_OFFSET = (-0.004, 0.022)
+# Datum C: on the 5:1 detail, where the slot is drawn large (at 1:1 its tag
+# would sit inside the detail's mark circle, farm run tl13-gdt-r1): on the
+# inboard round end's lower-left rim, its tag down and left, clear of the
+# run's extension lines (below the slot) and the width's callout (above).
+ROD_SLOT_DATUM_PICK_DEG = 225.0
+ROD_SLOT_DATUM_OFFSET = (-0.020, -0.014)
 
 _Z = [0.0, 0.0, 1.0]
 _PRECISION = DRAWING_PRECISION_BY_NAME
@@ -387,6 +389,7 @@ requirement(
 # on the radial from the pivot; its width is a matched fit on the pin, its
 # length the end-centre run.
 _ROD_SLOT_OUTER = part_spec.rod_slot_points()[4]
+_ROD_SLOT_INNER = part_spec.rod_slot_points()[5]
 requirement(
     "rod_slot",
     kind="slot",
@@ -561,7 +564,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the face view's own sketch is near its import.
     mark = _mark_rod_slot_on_front(adapter, front)
     _label_rod_slot_detail(adapter, detail, front, mark)
-    _add_datums(adapter, front)
+    _add_datums(adapter, front, detail)
     _add_outline_profile(adapter, front)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
@@ -653,7 +656,7 @@ def _placed_rod_slot_view(adapter: Any) -> Any:
 
 
 def _crop_rod_slot_view(adapter: Any, view: Any) -> None:
-    """Crop detail A to its 5:1 circle round DETAIL_CENTER: the circle is
+    """Crop detail D to its 5:1 circle round DETAIL_CENTER: the circle is
     sketched in the view's own sketch and Crop2 consumes it while selected.
     Crop status, IsCropped, the outline and its style are read back."""
     draw = adapter.currentModel
@@ -711,7 +714,7 @@ def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
 
 
 def _dimension_then_crop_rod_slot_view(adapter: Any, detail: Any) -> list[Any]:
-    """Import and curate detail A's pair while it is uncropped, then crop it;
+    """Import and curate detail D's pair while it is uncropped, then crop it;
     either of the pair missing after the crop raises."""
     annotations = curate_view_dimensions(
         adapter,
@@ -738,7 +741,7 @@ def _dimension_then_crop_rod_slot_view(adapter: Any, detail: Any) -> list[Any]:
 
 
 def _mark_rod_slot_on_front(adapter: Any, front: Any) -> tuple[float, float]:
-    """Circle detail A's region on the face view in the outline's black;
+    """Circle detail D's region on the face view in the outline's black;
     returns its sheet centre."""
     _activate_view(adapter, front, label="face view")
     center = model_point_in_view(
@@ -848,7 +851,7 @@ def _centred_view_note(
 def _label_rod_slot_detail(
     adapter: Any, detail: Any, front: Any, mark: tuple[float, float]
 ) -> None:
-    """Label detail A beside its crop circle and letter its mark on the face
+    """Label detail D beside its crop circle and letter its mark on the face
     view, with the sheet scale pinned first (a 5:1 view must not rescale it)."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
@@ -890,9 +893,10 @@ def _rim_point(
     )
 
 
-def _add_datums(adapter: Any, front: Any) -> None:
-    """Datum A on the pivot hole and datum C on the rod slot, each picked on
-    its own rim by sheet point (an edge-object tag ignores SetPosition2)."""
+def _add_datums(adapter: Any, front: Any, detail: Any) -> None:
+    """Datum A on the pivot hole (face view) and datum C on the rod slot (its
+    5:1 detail), each picked on its own rim by sheet point (an edge-object
+    tag ignores SetPosition2)."""
     pivot = model_point_in_view(adapter, front, (0.0, 0.0, 0.0), label="datum A centre")
     pick = model_point_in_view(
         adapter,
@@ -912,13 +916,13 @@ def _add_datums(adapter: Any, front: Any) -> None:
         shoulder=True,
     )
     slot = model_point_in_view(
-        adapter, front, _ROD_SLOT_CENTRE_M, label="datum C centre"
+        adapter, detail, _ROD_SLOT_CENTRE_M, label="datum C centre"
     )
     pick = model_point_in_view(
         adapter,
-        front,
+        detail,
         _rim_point(
-            _ROD_SLOT_OUTER,
+            _ROD_SLOT_INNER,
             part_spec.ROD_SLOT_AXIS,
             part_spec.ROD_SLOT_WIDTH / 2.0,
             ROD_SLOT_DATUM_PICK_DEG,
@@ -927,7 +931,7 @@ def _add_datums(adapter: Any, front: Any) -> None:
     )
     add_datum_feature(
         adapter,
-        front,
+        detail,
         edge_xy=pick,
         symbol_xy=(
             slot[0] + ROD_SLOT_DATUM_OFFSET[0],

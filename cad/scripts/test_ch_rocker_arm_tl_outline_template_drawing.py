@@ -397,7 +397,7 @@ def test_outline_profile_is_one_frame_all_around_to_a_and_c() -> None:
     assert "datums=OUTLINE_PROFILE_DATUMS" in source
     assert "tolerance=OUTLINE_PROFILE_TEXT" in source
     build = inspect.getsource(drawing.build)
-    assert "_add_datums(adapter, front)" in build
+    assert "_add_datums(adapter, front, detail)" in build
     assert "_add_outline_profile(adapter, front)" in build
 
 
@@ -460,7 +460,7 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
 
 
 class _SlotView:
-    """A recording IView double for detail A's place-move-crop."""
+    """A recording IView double for detail D's place-move-crop."""
 
     def __init__(
         self, *, crop_status: int = 1, crops: bool = True, moves: bool = True
@@ -507,7 +507,7 @@ class _SlotModel:
 
 
 def _crop_slot(monkeypatch, view: _SlotView) -> list[tuple]:
-    """Place, move and crop detail A on a *Front double at 5:1 whose model
+    """Place, move and crop detail D on a *Front double at 5:1 whose model
     origin sits a fixed offset from the view's position."""
     log: list[tuple] = []
     offset = (-0.650, -0.030)
