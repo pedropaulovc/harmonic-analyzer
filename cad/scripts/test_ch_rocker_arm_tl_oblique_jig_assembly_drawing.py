@@ -55,9 +55,9 @@ def _inside_sheet(box) -> bool:
 
 
 # jig-r5 read the exploded isometric's outline (IView.GetOutline) at 127.4 x
-# 113.2 mm at 1:8, against the 116.3 x 101.6 this extent projects: SolidWorks'
-# outline is looser than the parts' silhouette. The layout tests grow the
-# projected size by that measured ratio.
+# 113.2 mm at 1:8, against the 116.3 x 101.6 the -3 tree's extent projects:
+# SolidWorks' outline is looser than the parts' silhouette. The layout tests
+# grow the projected size by that measured ratio.
 OUTLINE_GROWTH = (1.10, 1.12)
 
 
@@ -107,7 +107,7 @@ def test_sheet_text_is_the_spec_text_wrapped() -> None:
         (drawing.ASSEMBLED_CAPTION, drawing.CAPTION_WIDTH),
         (drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_WIDTH),
         (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),
-        (drawing.ASSEMBLY_CHECKS, drawing.STEPS_LINE_WIDTH),
+        (drawing.ASSEMBLY_CHECKS, drawing.CHECKS_LINE_WIDTH),
     ):
         assert max(len(line) for line in text.split("\n")) <= width
     # Each alignment station prints whole on one line.
@@ -236,7 +236,7 @@ def test_exploded_sheet_regions_fit_apart() -> None:
             assert not _overlap(a, b)
     assert bom[2] == pytest.approx(drawing.SHEET_INNER_BORDER[2])
     # The ringed view stays in the room the drawing asserts at run time, with
-    # room to spare for a wider explode (the leadscrew feed's parts).
+    # room to spare.
     region = drawing.EXPLODED_REGION
     assert region[0] <= exploded[0] and exploded[2] <= region[2]
     assert region[1] <= exploded[1] and exploded[3] <= region[3]
@@ -258,7 +258,12 @@ def test_steps_sheet_regions_fit_apart() -> None:
 
 def test_every_modelled_component_carries_a_balloon() -> None:
     assert set(drawing.BALLOON_ANCHORS) == set(spec.QUANTITIES)
-    assert set(drawing.TWO_OFF) == {spec.BASE_BAR, spec.PIVOT_BLOCK, spec.PIVOT_PIN}
+    assert set(drawing.TWO_OFF) == {
+        spec.BASE_BAR,
+        spec.PIVOT_BLOCK,
+        spec.PIVOT_PIN,
+        spec.END_BRACKET,
+    }
     for stem in drawing.TWO_OFF:
         pinned = {
             drawing.BALLOON_ANCHORS[stem].instance,
@@ -268,7 +273,7 @@ def test_every_modelled_component_carries_a_balloon() -> None:
     singles = [stem for stem, count in spec.QUANTITIES.items() if count == 1]
     assert all(drawing.BALLOON_ANCHORS[stem].instance is None for stem in singles)
     assert (
-        len(singles) + 2 * len(drawing.TWO_OFF) == sum(spec.QUANTITIES.values()) == 10
+        len(singles) + 2 * len(drawing.TWO_OFF) == sum(spec.QUANTITIES.values()) == 13
     )
 
 
@@ -308,7 +313,9 @@ def test_bom_identity_is_the_registry_and_the_inventory() -> None:
     for stem in spec.QUANTITIES:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
     assert drawing.BOM_PART_NUMBERS[spec.BASE_BAR] == "MHA-CH-006-TL-20"
-    assert drawing.BOUGHT_ITEM_NUMBERS == ("8", "9", "10", "11", "12")
+    assert drawing.BOM_PART_NUMBERS[spec.END_BRACKET] == "MHA-CH-006-TL-28"
+    assert drawing.BOM_PART_NUMBERS[spec.NUT_BRACKET] == "MHA-CH-006-TL-29"
+    assert drawing.BOUGHT_ITEM_NUMBERS == tuple(str(n) for n in range(10, 19))
     assert drawing.BOM_INVENTORY_TITLE == "INVENTORY ID"
     # The column holds the longest id whole: ids do not wrap.
     longest = max(len(item.inventory_id) for item in spec.BOUGHT_ITEMS)

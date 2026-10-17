@@ -901,6 +901,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_end_bracket",
+        part="ch_rocker_arm_tl_oblique_end_bracket",
+        artifact_stem="ch-rocker-arm-tl-oblique-end-bracket",
+        script_name="draw_ch_rocker_arm_tl_oblique_end_bracket.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_nut_bracket",
+        part="ch_rocker_arm_tl_oblique_nut_bracket",
+        artifact_stem="ch-rocker-arm-tl-oblique-nut-bracket",
+        script_name="draw_ch_rocker_arm_tl_oblique_nut_bracket.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_rocker_arm_tl_outline_template",
         part="ch_rocker_arm_tl_outline_template",
         artifact_stem="ch-rocker-arm-tl-outline-template",

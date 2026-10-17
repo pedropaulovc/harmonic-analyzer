@@ -15,6 +15,9 @@ counterbores are one native Hole Wizard feature drilled from the top face.
 The printed counterbore floor height lives in the hidden
 ``CboreFloorReference`` sketch on ``CboreSectionPlane`` (Right plane carried
 to X = -13), which section B-B cuts (``_cbore_floor_reference``).
+The two nut-bracket screw counterbores (PR C4) are a second, drilled along Y
+from the +Y face; their printed stations, from the -X end and the bottom
+face, live on the hidden Top-plane sketch ``SideScrewReference``.
 
 Run (SolidWorks already open)::
 
@@ -41,7 +44,7 @@ from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
-from _holes import wizard_holes
+from _holes import SharedCoordinate, wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -90,6 +93,10 @@ from ch_rocker_arm_tl_oblique_pivot_block_spec import (
     SEAT_FILLET_RADIUS,
     SHOULDER,
     SHOULDER_HOLE_DIA,
+    SIDE_HOLE_DIA,
+    SIDE_SCREW_HOLE_SPEC,
+    SIDE_SCREW_HOLES,
+    SIDE_SCREW_REFERENCE,
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-block"
@@ -219,7 +226,68 @@ _STATION_DRIVES = {
     "HoleColumn2X": '"BlockEndX" + "BoltX"',
     "HoleRow1Y": '"BlockSideY" - "BoltY"',
     "HoleRow2Y": '"BlockSideY" + "BoltY"',
+    "SideScrew1X": '"BlockEndX" - "SideScrewX"',
+    "SideScrew2X": '"BlockEndX" + "SideScrewX"',
+    "SideScrewRowZ": '"SideScrewZ"',
 }
+
+
+def _add_reference_point(adapter: Any, uv: tuple[float, float], label: str) -> str:
+    """One sketch point straight into the sketch DB (no inference snap),
+    registered for the adapter's dimension refs (the TL-29 builder's)."""
+    sketch_manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    previous = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        point = sketch_manager.CreatePoint(uv[0] / 1000.0, uv[1] / 1000.0, 0.0)
+    finally:
+        sketch_manager.AddToDB = previous
+    if point is None:
+        raise RuntimeError(f"cannot create the {label} reference point")
+    return adapter._register_sketch_entity("Point", point)
+
+
+async def _side_screw_reference(adapter: Any) -> SketchDims:
+    """The side screws' printed stations, from the -X end and the bottom face.
+
+    The wizard dimensions its placement points from the origin (the carriage
+    centre, mid-air on the +Y face), so the printed stations live here, on
+    the Top plane (Y = 0, normal +Y, the side view's direction). Three
+    points, no lines: the -X end's bottom corner anchors to the origin
+    (unprinted), both X stations and the hole row's Z dimension from it, and
+    a horizontal relation holds the second hole on the first's Z. The side
+    view shows this sketch to import its dimensions, and a construction line
+    from the corner to the hole printed there as a stray diagonal (review
+    c4r3).
+    """
+    label = "side screw reference"
+    dims = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch("Top"))
+    to_top = _sketch_mapper(adapter, u_axis=0, v_axis=2, label=label)
+    corner = to_top((DATUM_X, 0.0, 0.0))
+    corner_ref = _add_reference_point(adapter, corner, f"{label} corner")
+    near, far = (
+        _add_reference_point(adapter, to_top((x, 0.0, z)), f"{label} hole {i}")
+        for i, (x, z) in enumerate(SIDE_SCREW_HOLES, start=1)
+    )
+    await anchor_point_to_origin(adapter, corner_ref, *corner, f"{label} corner")
+    dims.record("SideRefEndX", '"BlockEndX"')
+    check(
+        f"horizontal_points {label} row",
+        await adapter.add_sketch_constraint(near, far, "horizontal_points"),
+    )
+    for ref, kind, name in (
+        (near, "horizontal_distance", "SideScrew1X"),
+        (far, "horizontal_distance", "SideScrew2X"),
+        (near, "vertical_distance", "SideScrewRowZ"),
+    ):
+        await dimension_between(
+            adapter, corner_ref, ref, kind, DRAWING_VALUES[name], f"{label} {name}"
+        )
+        dims.record(name, _STATION_DRIVES[name])
+    await ensure_fully_defined(adapter, label)
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    return dims
 
 
 async def _bore_sketch(
@@ -579,8 +647,40 @@ async def build(adapter) -> dict[str, str]:
         volume - len(BOLT_POINTS) * v_hole,
         0.01 * len(BOLT_POINTS) * v_hole,
     )
+
+    # --- Nut-bracket screws (PR C4): ONE native counterbore feature along Y --
+    # Drilled from the +Y face (placement sketch u = model X, v = model Z, the
+    # feed lever's +Y-face precedent); the origin dimensions are unprinted
+    # and the second hole's Z repeats the first's. The printed stations live
+    # on SideScrewReference.
+    side = wizard_holes(
+        adapter,
+        SIDE_SCREW_HOLE_SPEC,
+        [[x, BLOCK_WIDTH / 2.0, z] for x, z in SIDE_SCREW_HOLES],
+        (0.0, 1.0, 0.0),
+        "nut-bracket screw counterbores (#8 normal clearance, from +Y)",
+        name="SideScrewHoles",
+        expect_dia_mm=SIDE_HOLE_DIA,
+        placement_dims=[
+            (("SideScrewHole1X", '"SideScrewX"'), ("SideScrewHole1Z", '"SideScrewZ"')),
+            (("SideScrewHole2X", '"SideScrewX"'), SharedCoordinate(0)),
+        ],
+    )
+    drive_jobs += side.placement_drive_jobs
+    v_side = math.pi * (side.cbore_dia_mm / 2.0) ** 2 * side.cbore_depth_mm + (
+        math.pi * (side.hole_dia_mm / 2.0) ** 2 * (BLOCK_WIDTH - side.cbore_depth_mm)
+    )
+    volume = await volume_check(
+        adapter,
+        "nut-bracket screw counterbores",
+        volume - len(SIDE_SCREW_HOLES) * v_side,
+        0.01 * len(SIDE_SCREW_HOLES) * v_side,
+    )
     _require_one_solid_body(adapter, label="pivot block")
     drive_jobs += await _cbore_floor_reference(adapter)
+    reference = await _side_screw_reference(adapter)
+    name_last_feature(adapter, SIDE_SCREW_REFERENCE)
+    drive_jobs += reference.apply(adapter, SIDE_SCREW_REFERENCE)
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:

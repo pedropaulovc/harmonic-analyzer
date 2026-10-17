@@ -5,12 +5,13 @@ frame: the plan (camera down Z) above the operator's elevation, each titled,
 the plan tagging the carrier's pass holes A1-B2, both rails and the spindle
 origin, beside the pose caption and the rail-alignment targets the fitter
 indicates the pivot pins to. Sheet 2 is the builder-owned ``JIG_EXPLODED``
-presentation with the BOM: the seven made parts from the part registry, each
-ballooned (both base bars, both pivot blocks and both pivot pins included),
-then the bought items the model does not carry, by shop-inventory id. Sheet 3
-is the finished isometric beside the assembly order and checks. Every view is
-one the builder named in the machine frame (``spec.VIEW_AXES``), its mapping
-proven on the sheet before anything is placed by it. Every text,
+presentation with the BOM: the nine made parts from the part registry, each
+ballooned (both base bars, both pivot blocks, both pivot pins and both
+end brackets included), then the bought items the model does not carry,
+by shop-inventory id. Sheet 3 is the finished isometric beside the assembly
+order and checks. Every view is one the builder named in the machine frame
+(``spec.VIEW_AXES``), its mapping proven on the sheet before anything is
+placed by it. Every text,
 pose and reference value comes from
 ``ch_rocker_arm_tl_oblique_jig_assembly_spec`` (and through it the calculator
 ``ch_rocker_arm_tl_oblique_trammel_spec``) or the part registry; this recipe
@@ -61,10 +62,10 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
 )
 from _drawing_view_display import set_hidden_lines_removed
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
-from _simplified_names import simplified_name
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_points_in_view
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _simplified_names import simplified_name
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -121,7 +122,7 @@ TITLE_BLOCK = (
 
 # Sheet 1: the plan over the operator's elevation, third-angle and on one
 # vertical, right of the pose caption; the alignment targets under the
-# elevation, left of the title block. At 1:4 the plan is about 229 x 100 and
+# elevation, left of the title block. At 1:4 the plan is about 229 x 106 and
 # the elevation 229 x 22. Each view's title stands centred under it.
 PLAN_CENTER = (0.270, 0.205)
 ELEVATION_CENTER = (0.270, 0.125)
@@ -187,11 +188,13 @@ EXPLODED_ISO_CENTER = (
     (EXPLODED_REGION[1] + EXPLODED_REGION[3]) / 2.0,
 )
 
-# Sheet 3: the order and checks down the left; the finished isometric right.
+# Sheet 3: the 12 steps down the left, to over the title block's top; the
+# finished isometric right, the checks under it, over the title block.
 ASSEMBLY_ISO_CENTER = (0.340, 0.175)
 STEPS_XY = (0.018, 0.262)
-CHECKS_XY = (0.018, 0.122)  # under the steps, over the title block's top
-STEPS_LINE_WIDTH = 80  # characters; stops left of the isometric
+CHECKS_XY = (0.278, 0.125)
+STEPS_LINE_WIDTH = 86  # characters; stops left of the isometric
+CHECKS_LINE_WIDTH = 46  # characters; stops inside the right border
 
 BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in spec.BOM_ORDER}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
@@ -215,6 +218,12 @@ PART_ROWS = {
     ),
     "ch-rocker-arm-tl-oblique-feed-lever": _config.parts(
         "ch-rocker-arm-tl-oblique-feed-lever"
+    ),
+    "ch-rocker-arm-tl-oblique-end-bracket": _config.parts(
+        "ch-rocker-arm-tl-oblique-end-bracket"
+    ),
+    "ch-rocker-arm-tl-oblique-nut-bracket": _config.parts(
+        "ch-rocker-arm-tl-oblique-nut-bracket"
     ),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
@@ -280,7 +289,7 @@ ALIGNMENT_NOTE = _wrapped(spec.ALIGNMENT_NOTE_LINES, width=ALIGNMENT_WIDTH)
 ASSEMBLY_STEPS = _wrapped(
     spec.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
-ASSEMBLY_CHECKS = _wrapped(spec.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
+ASSEMBLY_CHECKS = _wrapped(spec.ASSEMBLY_CHECKS, width=CHECKS_LINE_WIDTH)
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:

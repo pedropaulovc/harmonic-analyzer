@@ -1,9 +1,10 @@
 """Offline contract for the oblique-trammel jig assembly (MHA-CH-006-TL-000).
 
-The poses close on the calculator's rail and carrier geometry, the builder
-places exactly the seven made families, the jig stays a shop fixture outside
-the machine tree, and the sweep of both passes clears the table, the studs and
-the column cover by the pinned margins.
+The poses close on the calculator's rail and carrier geometry and the leadscrew
+feed's layout, the builder places exactly the nine made families, the jig
+stays a shop fixture outside the machine tree, and the sweep of both passes
+clears the table, the studs, the column cover and the feed's fixed hardware by
+the pinned margins.
 """
 
 from __future__ import annotations
@@ -11,7 +12,9 @@ from __future__ import annotations
 import dataclasses
 import ast
 import math
+import re
 import tomllib
+import types
 from pathlib import Path
 
 import pytest
@@ -22,9 +25,11 @@ import _config
 import _interference_contracts as contracts
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
+import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import ch_rocker_arm_tl_oblique_hub_pin_spec as hub_pin
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
+import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
 import ch_rocker_arm_tl_oblique_riser_spec as riser
@@ -44,6 +49,8 @@ PART_STEMS = {
     "ch_rocker_arm_tl_oblique_riser",
     "ch_rocker_arm_tl_oblique_hub_pin",
     "ch_rocker_arm_tl_oblique_feed_lever",
+    "ch_rocker_arm_tl_oblique_end_bracket",
+    "ch_rocker_arm_tl_oblique_nut_bracket",
 }
 
 
@@ -58,12 +65,14 @@ def _image(rows, origin, point):
 def _all_rows():
     yield from (rows for _origin, rows in spec.BASE_BAR_PLACEMENTS)
     yield from (rows for _origin, rows in spec.PIVOT_BLOCK_PLACEMENTS)
+    yield from (rows for _origin, rows in spec.END_BRACKET_PLACEMENTS)
     yield from (
         spec.PIN_ROWS,
         spec.CARRIER_ROWS,
         spec.RISER_ROWS,
         spec.HUB_PIN_ROWS,
         spec.FEED_LEVER_ROWS,
+        spec.NUT_BRACKET_ROWS,
     )
 
 
@@ -186,6 +195,75 @@ def test_carrier_riser_hub_pin_and_lever_close_on_the_carrier_frame() -> None:
     assert spec.FEED_LEVER_ROWS[1] == pytest.approx((0.0, 0.0, 1.0))
 
 
+def test_end_brackets_stand_on_bar_1_under_the_screw() -> None:
+    """Each TL-28 stands on bar 1's top at its KP08 station: its M4 pair
+    straddles the screw axis, its two tapped holes land on the bar's
+    counterbored #8 holes."""
+    assert leadscrew.RAIL == 1 and not spec.TURNED_OVER[leadscrew.RAIL]
+    bar_holes = sorted(
+        tuple(round(c, 9) for c in spec.bar_point(1, (x, y, 0.0))[:2])
+        for x, y in leadscrew.BASE_BAR_HOLES
+    )
+    bracket_holes = []
+    assert len(spec.END_BRACKET_PLACEMENTS) == spec.QUANTITIES[spec.END_BRACKET]
+    for s, (origin, rows) in zip(leadscrew.KP08_S, spec.END_BRACKET_PLACEMENTS):
+        assert origin[2] == trammel.BASE_BAR_THICK
+        # +X outward (rail 1's +lateral), +Y along the rail away from the spindle.
+        outward = _image(rows, (0.0, 0.0, 0.0), (1.0, 0.0, 0.0))
+        assert outward[:2] == pytest.approx(
+            tuple(
+                b - a
+                for a, b in zip(
+                    leadscrew.point(s, 0.0), leadscrew.point(s, 1.0), strict=True
+                )
+            )
+        )
+        mid = sum(leadscrew.BRACKET_KP08_HOLES_X) / 2.0
+        axis = _image(rows, origin, (mid, 0.0, leadscrew.BRACKET_THICK))
+        assert axis[:2] == pytest.approx(leadscrew.point(s, leadscrew.SCREW_LATERAL))
+        assert axis[2] == pytest.approx(leadscrew.KP08_BASE_Z)
+        assert axis[2] + leadscrew.KP08_AXIS_HEIGHT == pytest.approx(
+            leadscrew.SCREW_AXIS_Z
+        )
+        bracket_holes += [
+            tuple(round(c, 9) for c in _image(rows, origin, (x, 0.0, 0.0))[:2])
+            for x in leadscrew.BRACKET_BAR_HOLES_X
+        ]
+    assert [c for hole in sorted(bracket_holes) for c in hole] == pytest.approx(
+        [c for hole in bar_holes for c in hole], abs=1e-6
+    )
+
+
+def test_nut_bracket_hangs_on_pivot_block_1_round_the_screw() -> None:
+    """TL-29 takes pivot block 1's axes, flat on the block's column-side (-Y)
+    face: its tapped pair lands on the block's counterbored #8 pair and its nut
+    bore on the screw axis at the carriage."""
+    block_origin, block_rows = spec.PIVOT_BLOCK_PLACEMENTS[leadscrew.RAIL - 1]
+    for row, block_row in zip(spec.NUT_BRACKET_ROWS, block_rows, strict=True):
+        assert row == pytest.approx(block_row)
+    face = -pivot_block.BLOCK_WIDTH / 2.0
+    assert leadscrew.BLOCK_SIDE_LATERAL == -face
+    for x, z in leadscrew.PIVOT_BLOCK_HOLES:
+        on_block = _image(block_rows, block_origin, (x, face, z))
+        on_bracket = _image(
+            spec.NUT_BRACKET_ROWS,
+            spec.NUT_BRACKET_ORIGIN,
+            (x, 0.0, leadscrew.NUT_BRACKET_BLOCK_HOLES_Z),
+        )
+        assert on_bracket == pytest.approx(on_block)
+    bore = _image(
+        spec.NUT_BRACKET_ROWS, spec.NUT_BRACKET_ORIGIN, (0.0, *leadscrew.NUT_BORE_YZ)
+    )
+    assert bore[:2] == pytest.approx(
+        leadscrew.point(spec.CARRIAGE_STATION, leadscrew.SCREW_LATERAL)
+    )
+    assert bore[2] == pytest.approx(leadscrew.SCREW_AXIS_Z)
+    # The bore runs along the rail: the screw's direction.
+    along = _image(spec.NUT_BRACKET_ROWS, (0.0, 0.0, 0.0), (1.0, 0.0, 0.0))
+    assert along[:2] == pytest.approx(spec.rail_rows(leadscrew.RAIL)[0][:2])
+    assert spec.NUT_BRACKET_ORIGIN[2] == leadscrew.NUT_BRACKET_BOTTOM_Z
+
+
 def test_explode_stands_every_layer_clear_and_in_sight() -> None:
     assert spec.EXPLODED_VIEW_NAME == "JIG_EXPLODED"
     for _label, families, axis, distance in spec.EXPLODE_STEPS:
@@ -196,11 +274,15 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
         for _label, families, _axis, _d in spec.EXPLODE_STEPS
         for family in families
     }
-    assert moved == set(spec.QUANTITIES) - {spec.BASE_BAR}
+    # The end brackets stay screwed to bar 1; the nut bracket lifts with
+    # pivot block 1, which it is bolted to.
+    assert moved == set(spec.QUANTITIES) - {spec.BASE_BAR, spec.END_BRACKET}
     lift = {family: spec.explode_lift(family) for family in spec.QUANTITIES}
     assert lift == {
         spec.BASE_BAR: 0.0,
+        spec.END_BRACKET: 0.0,
         spec.PIVOT_BLOCK: 60.0,
+        spec.NUT_BRACKET: 60.0,
         spec.PIVOT_PIN: 120.0,
         spec.CARRIER: 190.0,
         spec.HUB_PIN: 40.0,
@@ -219,7 +301,7 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
     assert underside - pin[1] > -carrier.OUTLINE_Y[0]
     assert underside - hub_top > trammel.HUB[1] - carrier.OUTLINE_Y[0]
     assert spec.HUB_HEAD_BOTTOM_Z + lift[spec.HUB_PIN] > trammel.BASE_BAR_THICK
-    # The HUB pin leaves downward, the way step 8 presses it in from below;
+    # The HUB pin leaves downward, the way step 10 presses it in from below;
     # the pivot pins leave upward, the way step 4 presses them in from above.
     hub_steps = [d for _l, fams, _a, d in spec.EXPLODE_STEPS if fams == (spec.HUB_PIN,)]
     pin_steps = [
@@ -255,10 +337,10 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
         "PRESS A PIVOT PIN DOWN FROM THE BLOCK'S TOP FACE, BEARING END FIRST, "
         "THROUGH BOTH INNER RACES UNTIL ITS COLLAR SEATS ON THE UPPER RACE."
     ) in steps["4"]
-    assert "A1 AND B1 (INNER PASS, TAGGED ON SHEET 1)" in steps["7"]
-    step8 = steps["8"]
+    assert "A1 AND B1 (INNER PASS, TAGGED ON SHEET 1)" in steps["9"]
+    step10 = steps["10"]
     assert "TRAVELER" not in " ".join(spec.ASSEMBLY_STEPS)
-    assert "GAUGE" not in step8
+    assert "GAUGE" not in step10
     for text in (
         "HUB Ø10.20 H7 (10.200/10.218) THRU",
         "CL Ø6 N7 (5.984/5.996) THRU",
@@ -271,16 +353,17 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
         # Codex (#1582): the title block sets no minimum break.
         "BREAK THE HUB HOLE BELOW 0.3 MIN X 45°.",
     ):
-        assert text in step8
+        assert text in step10
     assert hub_pin.SHOULDER_FILLET_RADIUS <= hub_pin.HUB_HOLE_UNDERSIDE_BREAK_MIN
     # Review r11 (TL-000): the change to the outer pass, the alignment it
-    # keeps, and the pass the jig ships on.
+    # keeps, and the pass the jig ships on; the handwheel holds carriage 1.
     for text in (
-        "SLIDE THE CARRIAGES UNTIL THE PINS MEET A2/B2",
+        "RUN CARRIAGE 1 BY THE HANDWHEEL",
+        "SLIDE CARRIAGE 2 UNTIL THE PINS MEET A2/B2",
         "THE STEP 6 READINGS STAND",
         "SHIP ON A1/B1.",
     ):
-        assert text in steps["11"]
+        assert text in steps["13"]
     # The limits are the parts' own fits: the HUB pin's p6 seat presses into
     # the H7, the dowel's m6 into the N7.
     assert hub_pin.HUB_HOLE_BAND == (0.018, 0.0)
@@ -340,7 +423,12 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.RISER: 1,
         spec.HUB_PIN: 1,
         spec.FEED_LEVER: 1,
+        spec.END_BRACKET: 2,
+        spec.NUT_BRACKET: 1,
     }
+    assert spec.BOM_ORDER[-2:] == (spec.END_BRACKET, spec.NUT_BRACKET)
+    assert spec.QUANTITIES[spec.END_BRACKET] == (leadscrew.END_BRACKET_QUANTITY)
+    assert spec.QUANTITIES[spec.NUT_BRACKET] == leadscrew.NUT_BRACKET_QUANTITY
     assert spec.QUANTITIES[spec.BASE_BAR] == base_bar.QUANTITY
     # TL-20 is one part in one configuration: no placement names one.
     tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
@@ -399,7 +487,15 @@ def test_bom_rows_name_every_made_and_bought_item() -> None:
         "fixtures.trammel-6200-2rs": 4,
         "fixtures.trammel-cl-dowel": 1,
         "fixtures.clamping-kit-pm-52pcck-14mm": 4,
+        leadscrew.SCREW_ID: 1,
+        leadscrew.NUT_ID: 1,
+        leadscrew.KP08_ID: 2,
+        leadscrew.HANDWHEEL_ID: 1,
     }
+    assert spec.BOM_DESCRIPTIONS[spec.END_BRACKET] == "END BRACKET"
+    assert spec.BOM_DESCRIPTIONS[spec.NUT_BRACKET] == "NUT BRACKET"
+    descriptions = {item.inventory_id: item.description for item in spec.BOUGHT_ITEMS}
+    assert descriptions[leadscrew.SCREW_ID] == "TR8X2 LEADSCREW, 410 LONG"
     # The fitter text names every bought item and the screws it consumes.
     steps = " ".join(spec.ASSEMBLY_STEPS)
     for name in (
@@ -410,9 +506,31 @@ def test_bom_rows_name_every_made_and_bought_item() -> None:
         "HOLD-DOWN",
         "#8-32",
         "M4",
+        "KP08",
+        "LEADSCREW",
+        "FLANGED NUT",
+        "HANDWHEEL",
+        *(
+            fasteners.callout(row)
+            for row in fasteners.FASTENERS
+            if row is not fasteners.CR_CLAMP  # fitted per the traveler
+        ),
+        "#8-32 X 3/4 SHCS",
+        "#8-32 X 5/8 SHCS",
+        "#8-32 X 1-3/4 SHCS",
+        "M4 X 20 SHCS",
+        "M4 X 12 SHCS",
+        "M3 X 10 SHCS",
+        "#4-40 X 1/2 B18.6.3 FLAT HEAD",
+        "5/16-18 X 7/8 SHCS",
     ):
         assert name in steps
-    assert "3 IN" in steps and "3 IN" in spec.BOUGHT_ITEMS[-1].description
+    assert "3 IN" in steps
+    assert "3 IN" in descriptions["fixtures.clamping-kit-pm-52pcck-14mm"]
+    # The nut does not back-drive: the lever check runs with the block screws
+    # out, the handwheel check with them in.
+    checks = " ".join(spec.ASSEMBLY_CHECKS)
+    assert "BLOCK SCREWS OUT" in checks and "HANDWHEEL" in checks
 
 
 def _inventory_entry(inventory: dict, inventory_id: str) -> dict:
@@ -469,6 +587,15 @@ def test_sweep_clears_the_column_cover(report) -> None:
             "pivot block 2": 178.89,
             "carriage 1": 184.61,
             "carriage 2": 184.61,
+            "nut bracket": 135.28,
+            # Ruling A′: each bracket's outer end moved 4.4 out to bar 1's
+            # column-side edge (lateral 88.9).
+            "end bracket near": 111.45,
+            "end bracket far": 164.49,
+            "KP08 near": 114.81,
+            "KP08 far": 167.86,
+            "screw": 141.19,
+            "handwheel": 179.91,
         },
         abs=0.01,
     )
@@ -521,11 +648,52 @@ def test_sweep_keeps_every_moving_item_off_the_fixed_ones(report) -> None:
             assert _gap(report.height_gaps, "carrier", f"{which} stud {rail}") == (
                 pytest.approx(13.5, abs=0.01)
             )
-    assert min(report.plan_gaps.values()) == pytest.approx(6.50, abs=0.01)
+    # The feed: the nut bracket (centred on the pivot block's side screws)
+    # rides 2.88 past the far KP08's envelope (its 3 margin included) at the
+    # travel's far end, its flipped nut 2.97 past the near one's at the near
+    # end; carriage 1 passes 3 inside each leadscrew
+    # bracket; the HUB pin head clears the near KP08's envelope by 6.3 and the
+    # nut bracket stops 5 under the carrier.
+    assert _gap(report.plan_gaps, "nut bracket", "KP08 far") == pytest.approx(
+        2.88, abs=0.01
+    )
+    assert _gap(report.plan_gaps, "nut bracket", "KP08 near") == pytest.approx(
+        2.97, abs=0.01
+    )
+    for which in ("near", "far"):
+        assert _gap(
+            report.plan_gaps, "carriage 1", f"end bracket {which}"
+        ) == pytest.approx(3.0, abs=0.01)
+        assert _gap(report.plan_gaps, "pivot block 1", f"KP08 {which}") == (
+            pytest.approx(4.5, abs=0.01)
+        )
+    # The pivot pin's collar is the bar's own Ø12.70 (review r11, TL-23).
+    assert _gap(report.plan_gaps, "pivot pin 1", "nut bracket") == pytest.approx(
+        15.69, abs=0.01
+    )
+    assert _gap(report.plan_gaps, "carriage 1", "handwheel") == pytest.approx(
+        16.85, abs=0.01
+    )
+    assert _gap(report.height_gaps, "HUB pin head", "KP08 near") == pytest.approx(
+        6.3, abs=0.01
+    )
+    assert _gap(report.height_gaps, "nut bracket", "carrier") == pytest.approx(
+        5.0, abs=0.01
+    )
+    assert _gap(report.height_gaps, "carrier", "KP08 near") == pytest.approx(
+        10.3, abs=0.01
+    )
+    assert _gap(report.height_gaps, "nut bracket", "base bar 1") == pytest.approx(
+        14.7, abs=0.01
+    )
+    assert min(report.plan_gaps.values()) == pytest.approx(2.88, abs=0.01)
     assert min(report.height_gaps.values()) == pytest.approx(4.30, abs=0.01)
     assert report.stud_length_max == pytest.approx(89.7, abs=1e-6)
-    assert spec.STUD_LENGTH < report.stud_length_max < spec.STUD_LENGTH_LONG
-    # Step 2 states the sweep's own limit, rounded down to 1/8 in.
+    # The 1/2-13 x 3 in stud is the only stud; step 2 states the sweep's own
+    # limit, rounded down to 1/8 in.
+    assert spec.STUD_LENGTH == fasteners.HOLD_DOWN_STUD_LENGTH_MM
+    assert spec.STUD_LENGTH == pytest.approx(3.0 * trammel.INCH)
+    assert spec.STUD_LENGTH < report.stud_length_max
     assert spec.STUD_LENGTH_MAX == pytest.approx(report.stud_length_max)
     step2 = spec.ASSEMBLY_STEPS[1]
     assert "1/2-13 X 3 IN STUDS ONLY" in step2
@@ -534,9 +702,9 @@ def test_sweep_keeps_every_moving_item_off_the_fixed_ones(report) -> None:
 
 def test_inch_eighths_down() -> None:
     assert spec.inch_eighths_down(89.7) == "3-1/2"
-    assert spec.inch_eighths_down(3.0 * spec.trammel.INCH) == "3"
-    assert spec.inch_eighths_down(3.874 * spec.trammel.INCH) == "3-3/4"
-    assert spec.inch_eighths_down(0.25 * spec.trammel.INCH) == "1/4"
+    assert spec.inch_eighths_down(3.0 * trammel.INCH) == "3"
+    assert spec.inch_eighths_down(3.874 * trammel.INCH) == "3-3/4"
+    assert spec.inch_eighths_down(0.25 * trammel.INCH) == "1/4"
 
 
 def test_one_step_spots_the_riser_holes_before_screwing_it_down() -> None:
@@ -552,7 +720,7 @@ def test_one_step_spots_the_riser_holes_before_screwing_it_down() -> None:
     ) in step
     assert "MHA-CH-006-TL-24" in step
     # Codex (#1583): only the B18.6.3 machine-screw head fits the countersinks.
-    assert "WITH 4 B18.6.3 #4-40 X 1/2 FLAT HEADS." in step
+    assert "WITH 4 #4-40 X 1/2 B18.6.3 FLAT HEADS." in step
     assert step.index("SPOT") < step.index("SCREW IT DOWN")
     # Codex (#1583): the pins would plug the holes the riser is spotted
     # through, so they press in only after the riser is screwed down.
@@ -593,3 +761,255 @@ def test_sweep_table_edge_margins(report) -> None:
     # The wider bars still leave the two apart at their near ends.
     bars = spec.fixed_outlines()
     assert not spec._polygons_overlap(bars["base bar 1"], bars["base bar 2"])
+    # The feed overhangs like the bars, above the table top: the near KP08's
+    # envelope and bracket pass the back edge, the handwheel the -X end.
+    feed = {
+        family: edges[family]
+        for family in (
+            "nut bracket",
+            "end bracket near",
+            "end bracket far",
+            "KP08 near",
+            "KP08 far",
+            "screw",
+            "handwheel",
+        )
+    }
+    assert feed["KP08 near"]["back"] == pytest.approx(-2.43, abs=0.01)
+    # Ruling A′: flush with the bar's column-side edge, the bracket passes
+    # the back edge by 5.80 (the bar's own corner by 12.59).
+    assert feed["end bracket near"]["back"] == pytest.approx(-5.80, abs=0.01)
+    assert feed["handwheel"]["-X end"] == pytest.approx(-88.19, abs=0.01)
+    assert feed["handwheel"]["back"] == pytest.approx(62.67, abs=0.01)
+    assert feed["screw"]["-X end"] == pytest.approx(-57.97, abs=0.01)
+    assert feed["nut bracket"]["-X end"] == pytest.approx(-16.81, abs=0.01)
+    assert min(margin["front"] for margin in feed.values()) > 90.0
+
+
+# Fastener table: (callout, count, engagement, protrusion). Protrusion is the
+# engagement less the receiving thread's depth; below zero, the screw stops
+# inside the part (THRU tap) or short of the full thread (blind tap).
+FASTENER_TABLE = {
+    "RAIL_TO_BAR": ("#8-32 X 3/4 SHCS", 14, 9.35, -3.35),
+    "BRACKET_TO_BAR": ("#8-32 X 5/8 SHCS", 8, 7.975, -4.725),
+    "NUT_BRACKET_TO_BLOCK": ("#8-32 X 1-3/4 SHCS", 2, 8.85, -3.15),
+    "BLOCK_TO_CARRIAGE": ("M4 X 20 SHCS", 8, 4.4, -0.6),
+    "KP08_TO_BRACKET": ("M4 X 12 SHCS", 4, 7.0, -5.7),
+    "NUT_TO_NUT_BRACKET": ("M3 X 10 SHCS", 4, 6.5, -0.8),
+    "RISER_TO_CARRIER": ("#4-40 X 1/2 B18.6.3 FLAT HEAD", 4, 6.7, -5.3),
+    "CR_CLAMP": ("1/4-20 X 3/4 SHCS", 1, 10.55, -1.45),
+    "LEVER_TO_CARRIER": ("5/16-18 X 7/8 SHCS", 2, 9.525, -2.475),
+}
+
+
+def test_fastener_table_engagement_and_protrusion() -> None:
+    rows = {name: getattr(fasteners, name) for name in FASTENER_TABLE}
+    assert tuple(rows.values()) == fasteners.FASTENERS
+    for name, (callout, count, engagement, protrusion) in FASTENER_TABLE.items():
+        row = rows[name]
+        assert fasteners.callout(row) == callout, name
+        assert row.count == count, name
+        assert row.engagement_mm == pytest.approx(engagement, abs=1e-3), name
+        assert row.protrusion_mm == pytest.approx(protrusion, abs=1e-3), name
+    # Counts follow the parts: 7 rail holes on each of 2 rails, a 4-hole
+    # pattern on each carriage, 2 KP08 screws on each of 2 brackets.
+    assert fasteners.RAIL_TO_BAR.count == trammel.RAIL_HOLE_COUNT * 2
+    assert fasteners.BLOCK_TO_CARRIAGE.count == 4 * 2
+    assert fasteners.KP08_TO_BRACKET.count == 2 * leadscrew.END_BRACKET_QUANTITY
+    assert fasteners.LEVER_TO_CARRIER.count == len(carrier.LEVER_HOLES)
+    # Metric only where the bought part is metric; the rest ANSI UNC.
+    assert {row.thread for row in fasteners.FASTENERS if row.metric} == {"M3", "M4"}
+    # Under 1.5 D only where the carriage's or the carrier's thread limits it.
+    short = {
+        row.joint
+        for row in fasteners.FASTENERS
+        if row.engagement_mm < 1.5 * row.major_mm
+    }
+    assert short == {
+        fasteners.BLOCK_TO_CARRIAGE.joint,
+        fasteners.LEVER_TO_CARRIER.joint,
+    }
+    assert fasteners.BLOCK_TO_CARRIAGE.engagement_mm == pytest.approx(
+        pivot_block.CARRIAGE_THREAD_DEPTH - 0.6
+    )
+    # A 1 in lever screw would stand out of the carrier's underside.
+    assert fasteners.inch_mm("1") - feed_lever.LEVER_THICK > carrier.THICKNESS
+    # The bar screws' worst case at TL-20's bands stays inside 1.5 D .. TL-28.
+    low, high = leadscrew.BAR_SCREW_ENGAGEMENT_RANGE
+    assert (low, high) == pytest.approx((6.955, 8.995), abs=1e-3)
+    assert 1.5 * leadscrew.SHCS_8_MAJOR < low and high < leadscrew.BRACKET_THICK
+    assert leadscrew.KP08_FOOT_THICK == 5.0  # UNVERIFIED: verify on receipt
+    assert fasteners.WASHERS == ()
+    assert fasteners.HOLD_DOWN_STUD_THREAD == "1/2-13"
+    assert fasteners.HOLD_DOWN_STUD_COUNT == 4
+
+
+def test_turned_over_bar_counterbores_clear_the_flange_nuts() -> None:
+    # Bar 2 goes on turned over, so its 8 bracket counterbores face up, empty.
+    # No flange nut seats over one, and the rail's footprint misses them.
+    reach = spec.FLANGE_NUT_DIA / 2.0 + base_bar.BRACKET_CBORE_DIA / 2.0
+    studs = [c for name, c in spec.stud_centres().items() if name.endswith("2")]
+    gaps = []
+    for hole in leadscrew.BASE_BAR_HOLES:
+        x, y, _ = spec.bar_point(2, (*hole, 0.0))
+        gaps.append(min(math.hypot(x - c[0], y - c[1]) for c in studs) - reach)
+        assert (
+            abs(hole[1]) - base_bar.BRACKET_CBORE_DIA / 2.0 > trammel.RAIL_WIDTH / 2.0
+        )
+    # Ruling A′'s 8 holes: the near 44 hole stays the closest (the new 27.5
+    # one 19.47, the 66 and 82.5 ones farther out).
+    assert min(gaps) == pytest.approx(18.69, abs=0.01)
+    assert sorted(gaps)[1] == pytest.approx(19.47, abs=0.01)
+
+
+def test_bracket_bar_screws_sit_in_their_rule_17_window() -> None:
+    # Ruling A′ (2026-10-17): two pairs about the screw axis, the outer
+    # half-span the round value between TL-28's #8-to-M4 wall and TL-20's
+    # counterbore-to-edge wall, both at the 2.0 target at worst case.
+    assert leadscrew.BAR_SCREW_LATERALS == (27.5, 44.0, 66.0, 82.5)
+    assert leadscrew.BAR_SCREW_OUTER_HALF_SPAN_MIN == pytest.approx(27.343, abs=1e-3)
+    assert leadscrew.BAR_SCREW_OUTER_HALF_SPAN_MAX == pytest.approx(27.545, abs=1e-3)
+    assert leadscrew.BRACKET_LENGTH == pytest.approx(
+        trammel.BASE_BAR_COLUMN_EDGE - leadscrew.BRACKET_INNER_LATERAL
+    )
+    assert leadscrew.BRACKET_LENGTH == pytest.approx(68.9)
+
+
+def test_bracket_load_cases_hold_the_hand_abuse_thrust() -> None:
+    # LOAD_CASES: 1 kN along the screw at its axis on 4 x #8 at 25 in-lbf.
+    assert leadscrew.BAR_SCREW_TORQUE_NM == 2.8
+    assert leadscrew.BAR_SCREW_PRELOAD == pytest.approx(3360.9, abs=0.1)
+    assert leadscrew.BAR_SCREW_THRUST_ECCENTRICITY == pytest.approx(0.0)
+    assert leadscrew.BRACKET_SLIP_THRUST == pytest.approx(2688.7, abs=0.1)
+    assert leadscrew.BRACKET_OPENING_THRUST == pytest.approx(1540.9, abs=0.1)
+    assert leadscrew.BRACKET_SLIP_THRUST >= 1.5 * leadscrew.HAND_ABUSE_THRUST
+    # TL-000 step 1 prints the one torque where the bracket screws go in.
+    assert (
+        "WITH 4 #8-32 X 5/8 SHCS UP FROM THE BAR'S UNDERSIDE, "
+        "TORQUE 2.8 N-M (25 IN-LBF)."
+    ) in spec.ASSEMBLY_STEPS[0]
+
+
+def _leadscrew_with(**bought: float) -> types.ModuleType:
+    """The leadscrew spec re-run with bought dims changed (a vendor swap).
+    Every name must be assigned once inside the ``# --- Bought items`` block;
+    the module's own self-checks run on the new numbers."""
+    source = Path(leadscrew.__file__).read_text(encoding="utf-8")
+    head, mark, tail = source.partition("# --- Bought items")
+    block, layout, rest = tail.partition("# --- Layout")
+    assert mark and layout
+    for name, value in bought.items():
+        block, count = re.subn(
+            rf"^{name} = .*$", f"{name} = {value!r}", block, flags=re.MULTILINE
+        )
+        assert count == 1, name
+    module = types.ModuleType("perturbed_leadscrew")
+    module.__file__ = leadscrew.__file__
+    code = compile(head + mark + block + layout + rest, leadscrew.__file__, "exec")
+    exec(code, module.__dict__)
+    return module
+
+
+def _drilled(feed: types.ModuleType) -> tuple:
+    """What the drilled parts fix: KP08 stations, bar holes, screw length."""
+    return (feed.KP08_S, feed.BASE_BAR_HOLES, feed.SCREW_LENGTH)
+
+
+def _nut_interface_follows(feed: types.ModuleType) -> None:
+    """TL-29's nut interface follows the bought nut, whatever its numbers."""
+    assert feed.NUT_X[0] == pytest.approx(
+        feed.NUT_BRACKET_X[0] - feed.NUT_FLANGE_THICK - feed.NUT_BODY_LONG
+    )
+    assert feed.NUT_BORE_DIA == pytest.approx(feed.NUT_BODY_DIA + 0.5)
+    assert feed.NUT_SCREW_ENGAGEMENT >= 2.0 * feed.NUT_SCREW_MAJOR
+    assert feed.NUT_SCREW_TAP_DEPTH > feed.NUT_SCREW_ENGAGEMENT
+    assert feed.NUT_BRACKET_DEPTH == pytest.approx(
+        feed.SCREW_LATERAL
+        + feed.NUT_FLANGE_DIA / 2.0
+        + feed.NUT_FLANGE_MARGIN
+        - feed.BLOCK_SIDE_LATERAL
+    )
+
+
+def test_vendor_swap_moves_no_drilled_part() -> None:
+    # The stations and the screw length are fixed; the self-checks guard them
+    # against the bought block. A swap changes TL-29's nut interface only, or
+    # trips a self-check: a redesign decision, never a silent move.
+    assert _drilled(leadscrew) == (
+        (72.0, 443.0),
+        tuple((x, -lateral) for x in (57.0, 428.0) for lateral in (27.5, 44, 66, 82.5)),
+        410.0,
+    )
+    assert leadscrew.NEAR_STUB == pytest.approx(2.0)
+    assert leadscrew.HANDWHEEL_ENGAGEMENT == pytest.approx(18.0)
+    assert leadscrew.HANDWHEEL_STUB == pytest.approx(24.0)
+    # The screw end stops 7 inside the wheel's outer face (THRU bore).
+    assert leadscrew.WHEEL_S[1] - leadscrew.SCREW_FAR_END_S == pytest.approx(7.0)
+    lo, hi = trammel.CARRIAGE_TRAVEL
+    near = leadscrew.nut_bracket_box(lo)[0] - leadscrew.KP08_BOXES["KP08 near"][1]
+    far = leadscrew.KP08_BOXES["KP08 far"][0] - leadscrew.nut_bracket_box(hi)[1]
+    assert (near, far) == pytest.approx((2.97, 2.88), abs=0.01)
+    _nut_interface_follows(leadscrew)
+    assert leadscrew.NUT_BODY_LONG == pytest.approx(10.0)
+    assert leadscrew.NUT_BORE_DIA == pytest.approx(10.7)
+    assert (leadscrew.NUT_SCREW_LENGTH, leadscrew.NUT_SCREW_TAP_DEPTH) == (
+        10.0,
+        pytest.approx(7.3),
+    )
+    # Swaps the layout absorbs: a shorter nut, a bigger flange, a longer hub.
+    for bought in (
+        {"NUT_LENGTH": 13.5, "NUT_BODY_DIA": 10.0, "NUT_HOLE_PCD": 16.1},
+        {"NUT_FLANGE_DIA": 25.0, "NUT_FLANGE_THICK": 5.0, "NUT_HOLE_PCD": 19.0},
+        _LONG_HUB,
+    ):
+        feed = _leadscrew_with(**bought)
+        assert _drilled(feed) == _drilled(leadscrew), bought
+        _nut_interface_follows(feed)
+        for name, value in bought.items():
+            assert getattr(feed, name) == value
+    short_nut = _leadscrew_with(NUT_LENGTH=13.5, NUT_BODY_DIA=10.0)
+    assert short_nut.NUT_BORE_DIA == pytest.approx(10.5)
+    big_flange = _leadscrew_with(NUT_FLANGE_DIA=25.0, NUT_FLANGE_THICK=5.0)
+    assert big_flange.NUT_SCREW_LENGTH == 12.0
+    assert big_flange.NUT_BRACKET_DEPTH == pytest.approx(
+        leadscrew.NUT_BRACKET_DEPTH + 1.5
+    )
+    long_hub = _leadscrew_with(**_LONG_HUB)
+    assert long_hub.WHEEL_S[1] == pytest.approx(leadscrew.WHEEL_S[1] + 7.0)
+    assert long_hub.HANDWHEEL_S[1] == pytest.approx(leadscrew.HANDWHEEL_S[1] + 7.0)
+    # Swaps that trip a self-check. With the nut on -X no bought number moves
+    # the bracket's +X end alone: a swap reaches the near KP08 first.
+    for bought, message in (
+        ({"NUT_LENGTH": 17.5}, "reaches the near KP08"),
+        ({"KP08_WIDTH": 16.0}, "reaches the near KP08"),
+        # The flat's far end (6.5 + 4) binds, not the grub's far flank: at
+        # 14.5 the grub alone (17.0) would pass the screw's 18.
+        (
+            {"HANDWHEEL_GRUB_FROM_HUB": 14.5},
+            "short of the handwheel's grub or its flat",
+        ),
+        (
+            {"HANDWHEEL_GRUB_FROM_HUB": 17.0},
+            "short of the handwheel's grub or its flat",
+        ),
+        (
+            {
+                "HANDWHEEL_HUB_LENGTH": 2.0,
+                "HANDWHEEL_BORE_LENGTH": 14.0,
+                "HANDWHEEL_LENGTH": 35.0,
+            },
+            "proud of the wheel's outer face",
+        ),
+        ({"HANDWHEEL_GRIP_OFFSET": 30.0}, "swept grip reaches the bar top"),
+        ({"HANDWHEEL_GRIP_LENGTH": 20.0}, "hub, rim and grip miss its length"),
+    ):
+        with pytest.raises(AssertionError, match=message):
+            _leadscrew_with(**bought)
+
+
+# A handwheel with a hub 7 longer: bore and overall length grow with it.
+_LONG_HUB = {
+    "HANDWHEEL_HUB_LENGTH": 20.0,
+    "HANDWHEEL_BORE_LENGTH": 32.0,
+    "HANDWHEEL_LENGTH": 53.0,
+}
