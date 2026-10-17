@@ -108,6 +108,7 @@ from sm_summing_lever_spec import (
     GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
     HEX_H,
+    HEX_W,
     HOLE_COUNT,
     HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
