@@ -30,7 +30,7 @@ import sys
 import textwrap
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -1504,7 +1504,7 @@ def ring_right_slack(
 
 def _relax_cluster_slide(
     adapter: Any, view: Any, landings: Sequence[BalloonLanding], *, label: str
-) -> None:
+) -> list[BalloonLanding]:
     """Move a ringed cluster view, its balloons with it, back right by its
     placed balloons' slack (:func:`ring_right_slack`) less ``_RELAX_MARGIN``,
     never past the ring's centred position; then every balloon must clear the
@@ -1512,10 +1512,15 @@ def _relax_cluster_slide(
 
     The balloons do not ride with the view exactly (farm r9: 9.54 to 10.02 for
     a 9.70 move), so a balloon the move still left in the keep-out sends the
-    view back left by its overshoot, at most ``_RELAX_PASSES`` times."""
+    view back left by its overshoot, at most ``_RELAX_PASSES`` times.
+
+    Returns ``landings`` with each proven leader landing carried by the
+    view's move (the leaders end on model edges, which move with it; farm
+    r11: the final check held them to their pre-move points), for the
+    drawing's settled balloon check."""
     outline = _view_outline(view, label=label)
     circles = [rendered_balloon_circle(item.note, label=label) for item in landings]
-    centre = _region_center(outline)
+    centre = start = _region_center(outline)
     move = max(
         0.0,
         ring_right_slack(
@@ -1553,6 +1558,16 @@ def _relax_cluster_slide(
         centre = _region_center(outline)
         overshoot = keep_out_overshoot(circles, outline, keep_out=TITLE_BLOCK_KEEP_OUT)
         move = -(overshoot + _RELAX_MARGIN) if overshoot > 0.0 else 0.0
+    shift = (centre[0] - start[0], centre[1] - start[1])
+    landings = [
+        item
+        if item.sheet_xy is None
+        else replace(
+            item,
+            sheet_xy=(item.sheet_xy[0] + shift[0], item.sheet_xy[1] + shift[1]),
+        )
+        for item in landings
+    ]
     # The ring holds each balloon's centre BALLOON_RADIUS inside the border;
     # the rendered circle runs a fraction over that (farm r10: the carrier's
     # top CL-dowel balloon), so the border check keeps the ring's contract and
@@ -1577,6 +1592,7 @@ def _relax_cluster_slide(
                 f"{label}: {item.instance} balloon at {(x, y)!r}, radius "
                 f"{radius:.5f}, leaves the border or enters the title block"
             )
+    return landings
 
 
 def _place_cluster_view(
@@ -1624,7 +1640,7 @@ def _balloon_cluster(
             margin=BALLOON_MARGIN,
         )
     _ring_balloons(adapter, view, landings, label=f"{label} balloons")
-    _relax_cluster_slide(adapter, view, landings, label=f"{label} ring")
+    landings = _relax_cluster_slide(adapter, view, landings, label=f"{label} ring")
     if sorted(landing.stem for landing in landings) != sorted(cluster.stems):
         raise RuntimeError(
             f"{label} carries balloons for "
