@@ -1,0 +1,11 @@
+ch-rocker-arm-tl-oblique-base-bar:
+  title: Rocker Oblique Trammel Base Bar
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-20
+  description: "BASE BAR"
+  material: 6061-T6 aluminium
+  material_specification: 6061-T6 aluminum flat bar, 1/2 x 4 in; width and thickness as supplied
+  finish: as machined
+  quantity: 2
+  tolerance_class: machined_block
+  process: "saw and face to length; drill and tap the seven #8-32 rail holes through; mill the two hold-down slots through; break edges"

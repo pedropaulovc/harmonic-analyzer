@@ -1,0 +1,362 @@
+r"""Build the oblique trammel's base bar (MHA-CH-006-TL-20; shop fixture).
+
+A 6061-T6 1/2 x 4 in flat bar, rail-length long, with the HIWIN rail's seven
+#8-32 tapped holes on its centreline and two hold-down slots across it
+(``ch_rocker_arm_tl_oblique_base_bar_spec``). One part, one configuration,
+two off: the second bar is the same part turned over.
+
+Layout: ONE Front-plane profile -- the bar rectangle from its spindle-end
+face (model x 0) about the centreline, with the two slot stadiums inside it,
+each located from the corner on its own side (the near slot from (0, -50.8),
+the far from (0, +50.8)) -- extruded +Z by the
+stock thickness; the rail holes are one Hole Wizard feature tapped THRU from
+the top face. The row's printed lateral station (50.80 from the -Y edge)
+lives on a hidden reference sketch, ``RailRowReference``.
+
+Run (SolidWorks already open)::
+
+    uv run python cad\scripts\build_ch_rocker_arm_tl_oblique_base_bar.py
+"""
+
+from __future__ import annotations
+
+import math
+import sys
+
+from _appearance import apply_material
+from _check import check
+from _com import _early_bound
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _drawing_precision import apply_drawing_precision
+from _feature_tree import name_last_feature
+from _holes import wizard_holes
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _saved_part_guard import require_saved_drawing_properties
+from _session import run_build
+from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
+from _sketch_chains import define_rectilinear_chain
+from ch_rocker_arm_tl_oblique_base_bar_spec import (
+    BAR_LENGTH,
+    BAR_THICK,
+    BAR_WIDTH,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    FAR_SLOT_DROP,
+    FAR_SLOT_X,
+    FAR_SLOT_Y,
+    HALF_WIDTH,
+    ISOMETRIC_VIEW_NOTE,
+    NEAR_SLOT_RISE,
+    NEAR_SLOT_X,
+    NEAR_SLOT_Y,
+    RAIL_HOLE_X,
+    RAIL_ROW_Y,
+    SLOT_RUN,
+    SLOT_WIDTH,
+    TAP_DRILL,
+    TAP_SPEC,
+    TOLERANCES,
+)
+import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+
+PART_NAME = "ch-rocker-arm-tl-oblique-base-bar"
+MATERIAL = "6061 Alloy"  # the registry row names the 6061-T6 flat bar
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Isometric View Note",
+)
+
+SLOT_AREA = SLOT_RUN * SLOT_WIDTH + math.pi * (SLOT_WIDTH / 2.0) ** 2
+V_BAR = (BAR_LENGTH * BAR_WIDTH - 2.0 * SLOT_AREA) * BAR_THICK
+V_TAPPED = V_BAR - len(RAIL_HOLE_X) * math.pi * (TAP_DRILL / 2.0) ** 2 * BAR_THICK
+# Tight enough that a missing tap (~119 mm^3) fails; the slots (~2.8e3 mm^3
+# each) are far above it.
+_V_TOL = 40.0
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry (rebind to the
+    base ISketchSegment, which declares ``ConstructionGeometry``)."""
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+def _stadium(x: float, y_centre: float) -> tuple[tuple[float, float], ...]:
+    """One slot across the bar in Front-plane (x, y), counter-clockwise.
+
+    ``y_centre`` is the slot's mid-run centre. Returns
+    ``(p1, p2, p3, p4, centre_top, centre_bottom)``: side a runs p1 -> p2 up
+    the +X side, the top end arcs about centre_top from p2 to p3, side b runs
+    p3 -> p4 down the -X side and the bottom end arcs about centre_bottom from
+    p4 back to p1 (build_fr_top_frame's slot_stadium_points, along v).
+    """
+    r = SLOT_WIDTH / 2.0
+    y0 = y_centre - SLOT_RUN / 2.0
+    y1 = y0 + SLOT_RUN
+    return ((x + r, y0), (x + r, y1), (x - r, y1), (x - r, y0), (x, y1), (x, y0))
+
+
+async def _slot(
+    adapter,
+    corner: str,
+    x: float,
+    y_centre: float,
+    located: float,
+    prefix: str,
+    dims: SketchDims,
+) -> None:
+    """Draw one closed stadium and locate its outer end centre from ``corner``.
+
+    The near slot's bottom end centre takes its station and rise from the
+    -Y side's corner; the far slot's top end centre its station and drop from
+    the +Y side's (each slot from its nearest side: the stock width's band
+    stays out of both walls). Emission order: the width across the sides, the
+    +X side's straight run, then the end centre's x and ``located`` height
+    from the corner. The far slot's run is the printed ``SlotRun`` (2X): its
+    dimension lands right of the bar, off the part; the near slot's width is
+    the printed ``SlotWidth``."""
+    p1, p2, p3, p4, c_top, c_bottom = _stadium(x, y_centre)
+    label = f"{prefix} slot"
+    set_sketch_direct_db(adapter, True)
+    side_a = check(f"{label} side a", await adapter.add_line(*p1, *p2))
+    end_top = check(f"{label} top end", await adapter.add_arc(*c_top, *p2, *p3))
+    side_b = check(f"{label} side b", await adapter.add_line(*p3, *p4))
+    end_bottom = check(
+        f"{label} bottom end", await adapter.add_arc(*c_bottom, *p4, *p1)
+    )
+    set_sketch_direct_db(adapter, False)
+    for join, a, b in (
+        ("side a - top end", f"{side_a}.end", f"{end_top}.start"),
+        ("top end - side b", f"{end_top}.end", f"{side_b}.start"),
+        ("side b - bottom end", f"{side_b}.end", f"{end_bottom}.start"),
+        ("bottom end - side a", f"{end_bottom}.end", f"{side_a}.start"),
+    ):
+        check(
+            f"{label} {join}", await adapter.add_sketch_constraint(a, b, "coincident")
+        )
+    for side in (side_a, side_b):
+        check(
+            f"{label} {side} vertical",
+            await adapter.add_sketch_constraint(side, None, "vertical"),
+        )
+    # Tangency closes the shape: both ends' radii follow from the sides'
+    # spacing, side b's length from side a's.
+    for a, b in (
+        (side_a, end_top),
+        (end_top, side_b),
+        (side_b, end_bottom),
+        (end_bottom, side_a),
+    ):
+        check(
+            f"{label} {a} tangent {b}",
+            await adapter.add_sketch_constraint(a, b, "tangent"),
+        )
+    await dimension_between(
+        adapter,
+        f"{side_b}.end",
+        f"{side_a}.start",
+        "horizontal_distance",
+        SLOT_WIDTH,
+        f"{label} width",
+    )
+    await dimension_between(
+        adapter,
+        f"{side_a}.start",
+        f"{side_a}.end",
+        "vertical_distance",
+        SLOT_RUN,
+        f"{label} run",
+    )
+    located_end = f"{end_bottom}.center" if prefix == "near" else f"{end_top}.center"
+    await dimension_between(
+        adapter,
+        corner,
+        located_end,
+        "horizontal_distance",
+        x,
+        f"{label} station",
+    )
+    await dimension_between(
+        adapter,
+        corner,
+        located_end,
+        "vertical_distance",
+        located,
+        f"{label} {'rise' if prefix == 'near' else 'drop'}",
+    )
+    if prefix == "near":
+        dims.record("SlotWidth", '"SlotWidth"')
+        dims.record("NearSlotRun", '"SlotRun"')
+        dims.record("NearSlotX", '"NearSlotX"')
+        dims.record("NearSlotRise", '"NearSlotRise"')
+    else:
+        dims.record("FarSlotWidth", '"SlotWidth"')
+        dims.record("SlotRun", '"SlotRun"')
+        dims.record("FarSlotX", '"FarSlotX"')
+        dims.record("FarSlotDrop", '"FarSlotDrop"')
+
+
+async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    check("create_part", await adapter.create_part())
+
+    # The mm suffix is load-bearing: the equation manager reads bare numbers
+    # in document units.
+    for name, value in (
+        ("BarLength", BAR_LENGTH),
+        ("BarWidth", BAR_WIDTH),
+        ("BarThick", BAR_THICK),
+        ("SlotWidth", SLOT_WIDTH),
+        ("SlotRun", SLOT_RUN),
+        ("NearSlotX", NEAR_SLOT_X),
+        ("FarSlotX", FAR_SLOT_X),
+        ("NearSlotRise", NEAR_SLOT_RISE),
+        ("FarSlotDrop", FAR_SLOT_DROP),
+        ("RailHoleEnd", trammel.RAIL_HOLE_END),
+        ("RailHolePitch", trammel.RAIL_HOLE_PITCH),
+    ):
+        await set_global(adapter, name, f"{value}mm")
+
+    # --- Bar profile with both slots, extruded +Z ----------------------------
+    profile = SketchDims()
+    check("create_sketch bar", await adapter.create_sketch("Front"))
+    points = [
+        (0.0, -HALF_WIDTH),
+        (BAR_LENGTH, -HALF_WIDTH),
+        (BAR_LENGTH, HALF_WIDTH),
+        (0.0, HALF_WIDTH),
+    ]
+    lines = await add_line_chain(adapter, points)
+    await define_rectilinear_chain(
+        adapter,
+        lines,
+        points,
+        label="bar profile",
+        dims=profile,
+        names=["BarLength", "BarWidth", "BarHalfWidth"],
+        drives=['"BarLength"', '"BarWidth"', '"BarWidth" / 2'],
+    )
+    low_corner = f"{lines[0]}.start"  # (0, -HALF_WIDTH)
+    high_corner = f"{lines[2]}.end"  # (0, +HALF_WIDTH)
+    await _slot(
+        adapter,
+        low_corner,
+        NEAR_SLOT_X,
+        NEAR_SLOT_Y,
+        NEAR_SLOT_RISE,
+        "near",
+        profile,
+    )
+    await _slot(
+        adapter, high_corner, FAR_SLOT_X, FAR_SLOT_Y, FAR_SLOT_DROP, "far", profile
+    )
+    await ensure_fully_defined(adapter, "bar profile")
+    check("exit_sketch bar", await adapter.exit_sketch())
+    name_last_feature(adapter, "BarProfile")
+    drive_jobs = profile.apply(adapter, "BarProfile")
+    check(
+        "extrude bar",
+        await adapter.create_extrusion(ExtrusionParameters(depth=BAR_THICK)),
+    )
+    name_last_feature(adapter, "Bar")
+    drive_jobs.append((name_dimensions(adapter, "Bar", ["BarThick"])[0], '"BarThick"'))
+    await volume_check(adapter, "slotted bar", V_BAR, _V_TOL)
+
+    # --- Rail holes: one wizard feature tapped THRU from the top face --------
+    taps = wizard_holes(
+        adapter,
+        TAP_SPEC,
+        [[x, 0.0, BAR_THICK] for x in RAIL_HOLE_X],
+        (0.0, 0.0, 1.0),
+        "rail screw taps (#8-32 through)",
+        name="RailHoles",
+        expect_dia_mm=TAP_DRILL,
+        placement_dims=[
+            (
+                (f"RailHole{k + 1}X", f'"RailHoleEnd" + {k} * "RailHolePitch"'),
+                (None, None),
+            )
+            for k in range(len(RAIL_HOLE_X))
+        ],
+    )
+    drive_jobs += taps.placement_drive_jobs
+    await volume_check(adapter, "bar with rail taps", V_TAPPED, _V_TOL)
+
+    # --- The row's lateral station: a reference sketch -----------------------
+    # The wizard sets the row on y 0 by an origin relation (a zero coordinate
+    # takes no dimension), so the printed 50.80 from the faced -Y edge lives
+    # on one construction line down the end face from the origin to that
+    # edge, driven by the width the edge itself reads
+    # (build_ch_rocker_arm_tl_outline_template's RodSlotReference).
+    row_station = SketchDims()
+    check("create_sketch rail row reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    row_line = check(
+        "rail row station line", await adapter.add_line(0.0, 0.0, 0.0, -RAIL_ROW_Y)
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, row_line)
+    await anchor_point_to_origin(adapter, f"{row_line}.start", 0.0, 0.0, "rail row")
+    await anchor_point_to_origin(
+        adapter, f"{row_line}.end", 0.0, -RAIL_ROW_Y, "rail row station RailRowY"
+    )
+    row_station.record("RailRowY", '"BarWidth" / 2')
+    await ensure_fully_defined(adapter, "rail row reference sketch")
+    check("exit_sketch rail row reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "RailRowReference")
+    drive_jobs += row_station.apply(adapter, "RailRowReference")
+
+    await force_rebuild(adapter)
+    for dimension_name, expression in drive_jobs:
+        await drive_dimension(adapter, dimension_name, expression)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven bar (equations neutral)", V_TAPPED, _V_TOL)
+
+    # Every model edit -- material, marked set, model-owned places -- precedes
+    # the save.
+    await apply_material(adapter, MATERIAL)
+    await report_mass_properties(adapter)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # The rail holes' tight bands, stations and row, live on the model's own
+    # dimensions.
+    for (feature_name, dimension_name), band in TOLERANCES.items():
+        set_dimension_symmetric_tolerance(adapter, feature_name, dimension_name, band)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
+    )
+    # The reference sketch owns a printed dimension but no geometry: hide it
+    # so no assembly renders it; the drawing shows it in the plan that
+    # imports its dimension (_drawing_hidden_sketches).
+    blank_sketch(adapter, "RailRowReference")
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
+
+
+if __name__ == "__main__":
+    sys.exit(run_build(build))

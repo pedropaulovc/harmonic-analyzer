@@ -52,6 +52,17 @@ Error sensitivity (printed next to the bands that carry it):
   of spacing error. The spacing is held by one DRO setting.
 * pin and bearing clearance: any clearance appears 1:1 as edge position
   error.
+* bearing radial play: the 6200-2RS bought (inventory
+  ``fixtures.trammel-6200-2rs``) is C3, 0.008-0.023 radial internal
+  clearance unmounted. Each pin axis can float up to that play against its
+  block, so the pin spacing can open or close by up to the play, and R moves
+  by ``RADIUS_FROM_BEARING_PLAY`` = 1.77 x 0.023 = 0.041 at worst, the
+  unmounted bound. Mounted, the pivot pin's k5 press (MHA-CH-006-TL-23) and
+  the pivot block's N6 seat (MHA-CH-006-TL-22) only shrink the play: at their
+  loosest limits the seat takes 0.0012 off (0.039 on R), at their tightest
+  the bearings run at a 0.012 preload with no play. The feed load takes the
+  remainder up to one side, so the real error is smaller and repeats from
+  pass to pass.
 
 Sweep (Main, 2026-10-16). The brief swept the cutter over the whole 350
 blank, +/-13 degrees about C. Here each pass covers the part only. The
@@ -306,6 +317,8 @@ RADIUS_PER_TENTH_DEG = (
     D1 * math.cos(ALPHA) / (2.0 * math.sin(ALPHA) ** 2) * math.radians(0.1)
 )
 RADIUS_PER_SPACING = 1.0 / (2.0 * math.sin(ALPHA))  # dR/dD
+BEARING_RADIAL_PLAY = (0.008, 0.023)  # C3, unmounted: (min, max)
+RADIUS_FROM_BEARING_PLAY = RADIUS_PER_SPACING * BEARING_RADIAL_PLAY[1]
 
 # --- Bought hardware (catalogue values; not modelled in detail) --------------
 # HIWIN HGR15R rail, cut to 440 (inventory, Main 2026-10-16). The cut is a
@@ -317,9 +330,11 @@ RAIL_HEIGHT = 15.0
 RAIL_HOLE_PITCH = 60.0
 RAIL_HOLE_COUNT = 7
 RAIL_HOLE_END = (RAIL_LENGTH - (RAIL_HOLE_COUNT - 1) * RAIL_HOLE_PITCH) / 2.0
-RAIL_SCREW = "M4"
-# M4 x 16 rail screws: the rail's counterbore floor sits 9.7 above its seat.
-RAIL_SCREW_LENGTH = 16.0
+# The rails' M4 holes (Ø4.5, Ø7.5 counterbore) take #8-32 UNC socket screws
+# (Ø4.17), keeping the repo's UNC thread policy. A 3/4 in screw seats on the
+# counterbore floor 9.7 above the rail base, so 9.35 of it engages the bar.
+RAIL_SCREW = "#8-32"
+RAIL_SCREW_LENGTH = round(0.75 * INCH, 9)
 RAIL_SCREW_SEAT_ABOVE_BASE = 9.7
 # HIWIN HGH15CA carriage (Z0 preload).
 CARRIAGE_HEIGHT = 28.0  # rail seat to carriage top (H)
@@ -328,7 +343,10 @@ CARRIAGE_WIDTH = 34.0
 CARRIAGE_LENGTH = 61.4  # over the end seals
 CARRIAGE_BOLT_SPAN = (26.0, 26.0)  # (along, across), four M4 tapped
 CARRIAGE_BOLT = "M4"
-# 6200-2RS deep-groove ball bearing.
+# 6200-2RS deep-groove ball bearing (inventory fixtures.trammel-6200-2rs):
+# bore 10 0/-0.008, OD 30 0/-0.009, width 9 0/-0.12. The pivot pin's k5
+# press reads the bore band and the pivot block's N6 seat reads the OD band;
+# a narrow bearing only lowers the carrier by up to 0.12 (title block).
 BEARING_BORE = 10.0
 BEARING_OD = 30.0
 BEARING_WIDTH = 9.0
@@ -371,7 +389,8 @@ PIN_COLLAR_PROUD = 3.0
 PIN_COLLAR_HEIGHT = BEARING_RECESS + PIN_COLLAR_PROUD
 CARRIER_THICK = 12.0
 RISER_THICK = 6.0
-STRAP_BLANK_THICK = 3.0
+# The strap is faced to its finished 2.5 (S0) before it goes on the jig (T3).
+STRAP_THICK = rocker.ARM_THICKNESS
 RAIL_SEAT_Z = BASE_BAR_THICK
 CARRIAGE_TOP_Z = RAIL_SEAT_Z + CARRIAGE_HEIGHT
 PIVOT_BLOCK_TOP_Z = CARRIAGE_TOP_Z + PIVOT_BLOCK_HEIGHT
