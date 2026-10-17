@@ -345,7 +345,7 @@ def _dti_acceptance() -> float:
     inventory = tomllib.loads(
         (CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8")
     )
-    note = inventory["gauges"]["arm-outline-template"]["note"]
+    note = inventory["gauges"]["rocker-profile-gauge"]["note"]
     match = re.search(
         r"DTI within \+/-(\d+\.\d+) of nominal about the pivot and rod slot"
         r" \(pins in both; the slot's pin is the (\d\.\d{4}) in from"

@@ -996,26 +996,26 @@ checks = { thickness = "micrometers/0-1in" }
 op = 70
 do = "inspect"
 feature = "top_edge"
-checks = { height_above_pivot = "arm-outline-template", radius = "arm-outline-template" }
+checks = { height_above_pivot = "rocker-profile-gauge", radius = "rocker-profile-gauge" }
 
 [[setups.ops]]
 op = 80
 do = "inspect"
 feature = "profile_outer"
-checks = { bottom_radius = "arm-outline-template", mirror_symmetric = "arm-outline-template" }
+checks = { bottom_radius = "rocker-profile-gauge", mirror_symmetric = "rocker-profile-gauge" }
 
 # Each tip land's station is its own BASIC 146.25 "LAND" row from the pivot.
 [[setups.ops]]
 op = 90
 do = "inspect"
 feature = "tip_land_pos_x"
-checks = { land_angle_deg = "arm-outline-template", station = "height-gauge" }
+checks = { land_angle_deg = "rocker-profile-gauge", station = "height-gauge" }
 
 [[setups.ops]]
 op = 95
 do = "inspect"
 feature = "tip_land_neg_x"
-checks = { land_angle_deg = "arm-outline-template", station = "height-gauge" }
+checks = { land_angle_deg = "rocker-profile-gauge", station = "height-gauge" }
 
 # Both printed profile zones (top edge, and the lower outline J to K with both tip lands), read
 # with a DTI against the arm outline template. The accept/reject windows are computed in
@@ -1028,7 +1028,7 @@ feature = ["top_edge", "profile_outer", "tip_land_pos_x", "tip_land_neg_x"]
 checks = { surface_profile = "dti" }
 [setups.ops.inspection_methods]
 surface_profile = [
-  "Both printed profile zones, read against the arm outline template (gauges.arm-outline-template) pinned in datums A and C: the top edge (0.5, all outside the R800 BASIC arc) and the lower outline J to K (0.5, all inside the BASIC outline: the R816 arc, both tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on the granite surface plate (gauges.granite-surface-plate), off the rest plate.",
+  "Both printed profile zones, read against the arm outline template (gauges.rocker-profile-gauge) pinned in datums A and C: the top edge (0.5, all outside the R800 BASIC arc) and the lower outline J to K (0.5, all inside the BASIC outline: the R816 arc, both tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on the granite surface plate (gauges.granite-surface-plate), off the rest plate.",
   "Clean the arm, the template and both pins and leave them on the granite for 30 min to reach its temperature.",
   "Lay the template flat on the granite, the face that is laid on the arm up.",
   "Seating: lower the arm onto it with strap datum B (the +Z strap face) down, so its +Z hub face rests on the template and the rod-pin hole sits over the rod slot. Datum A: push the 0.2558 in Class X pin (gauges.vermont-class-x-2558-minus) down through the pivot bore and the template's pivot hole to the granite. Datum C: push the 0.0780 in pin (gauges.pin-gauges) down through the rod-pin hole into the slot to the granite. Press on the hub: the arm must not rock; if it does, clean and reseat.",
