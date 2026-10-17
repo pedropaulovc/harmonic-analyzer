@@ -111,6 +111,28 @@ def test_wire_explodes_up_then_straight_to_the_sheet_left() -> None:
     assert drawing.BALLOON_ANCHORS[spec.WIRE].point_mm is not None
 
 
+def test_hanger_balloon_lands_mid_strap_clear_of_the_hanger_screw() -> None:
+    """Machinist gate 2026-10-17: walked, the hanger's leader ran along screw
+    11's shank to the strap's top corner, beside balloon 11's arrow."""
+    import pn_pen_hanger_spec as hanger
+
+    x, y, z = drawing.BALLOON_ANCHORS[spec.HANGER].point_mm
+    sx, _sy, sz = spec.EXPLODED_OCTANT
+    # On the strap's sheet-rightmost long edge: the -x side's straight line
+    # from the top corner to the foot corner, on the bar-seat face. The
+    # octant's sheet-right is (sz, 0, -sx), so -x and +z both run sheet-right.
+    assert (sz, -sx) == (-1, 1)
+    (top_x, top_y), (foot_x, foot_y) = hanger.STRAP_OUTLINE[1], hanger.STRAP_OUTLINE[2]
+    assert top_x == min(hanger.STRAP_TOP_X) and foot_x == min(hanger.STRAP_BOT_X)
+    t = (y - top_y) / (foot_y - top_y)
+    assert x == top_x + t * (foot_x - top_x)
+    assert z == max(hanger.STRAP_Z)
+    # Mid-length: well below the screw hole and above the upper U guide.
+    assert t == 0.5
+    assert y < hanger.SCREW_HOLE_XY[1] - 50.0
+    assert y > max(hanger.GUIDE_PLATE_YS) + hanger.GUIDE_PLATE_T + 30.0
+
+
 def test_every_setting_is_printed_with_a_callout_beside_its_detail() -> None:
     printed = {
         name for points in drawing.DIMENSION_TEXT_POINTS.values() for name in points
