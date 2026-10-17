@@ -24,9 +24,11 @@ Seven features (the six .cs features + the hex knife edge):
    y 0). Machine-y registration (M6.4 plate-top-at-998) is set at placement.
 2. Pivot cylinder      -- Front-plane solid circle at the origin, symmetric
    extrude along the long edge (the pivot/rock axis = local Z).
-3. Hex knife edges     -- two hexagonal trunnion stubs PROTRUDING beyond the
-   body ends (one per side), vertex-up; the pivot overhangs the body so each
-   knife edge rests on a bearing support on the top plate (ch30-p003).
+3. Hex knife edges     -- ONE vertex-up hexagonal prism through the pivot,
+   extruded mid-plane out past both body ends: the two trunnion stubs it
+   leaves PROTRUDE beyond the body (one per side), so each knife edge rests
+   on a bearing support on the top plate (ch30-p003), and the stubs share
+   every side face's plane by construction (code review C09).
 4. Edge ribs (x2)      -- Front-plane line/line/semicircle wrapping the cylinder
    at the plate ends, blind-extruded at a start offset.
 5. Summation plate     -- Top-plane leaf on the -X (counter-spring) arm: vertical
@@ -181,11 +183,22 @@ PLATE_TOP_Y = 982.24
 # Knife-edge trunnion cross-section: vertex-up hex, 8.080 wide (X) x 10.268 tall
 # (Y, vertex to vertex) x 21.717 deep (Z protrusion). The top vertex ridge is
 # the knife edge (= the rock axis, above the cylinder centreline).
+# Both stubs are one prism (``_hex_knife``): one sketch extruded through the
+# body from -HEX_Z_OUTER to +HEX_Z_OUTER.  Every vertex lies inside the
+# solid pivot cylinder (circumradius HEX_H/2 < CYL_R), so between the body
+# ends the prism merges into it and the solid is the two stubs' alone.
 HEX_W = 8.080  # across-flats width (X); = sm_summing_lever_spec.HEX_W
 HEX_H = 10.268  # vertex-to-vertex height (Y) -- vertex-up
 HEX_DEPTH = 21.717  # axial length each stub protrudes past the body end
 HEX_Z_INNER = PLATE_L / 2.0  # inboard face flush with the body end (76.20)
 HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
+if not HEX_H / 2.0 < CYL_R:
+    raise AssertionError("the knife prism must lie inside the pivot cylinder")
+# The readback (``_assert_knife_sides_coplanar``) holds each lateral face of
+# one stub and its twin on the other to one plane: unit-normal components
+# and plane offset (metres, the API's unit) within KNIFE_SIDE_PLANE_TOL.
+KNIFE_SIDE_PLANE_TOL = 1e-6
+KNIFE_LATERAL_FACES = 6  # per stub: two flanks, two sides, two lower faces
 
 # --- derived ---------------------------------------------------------------
 SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
@@ -508,19 +521,23 @@ async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     name_last_feature(adapter, "PivotCylinder")
 
 
-async def _hex_collar(
-    adapter, flip: bool, name: str, stem: str, drive_jobs: list[tuple[str, str]]
-) -> None:
-    """One hexagonal knife-edge trunnion stub PROTRUDING beyond a body end,
-    vertex-up, blind-extruded along Z over |z| HEX_Z_INNER..HEX_Z_OUTER -- i.e.
-    from the body end face out into open air (flip = the -Z end). The overhang
-    lets the knife edge rest on a bearing support standing on the top plate.
+async def _hex_knife(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+    """Both hexagonal knife-edge trunnion stubs as ONE prism: a Front-plane
+    vertex-up hexagon (HEX_W x HEX_H bounding box) centred on the pivot axis,
+    a vertex at the top (the knife edge runs along Z at that top vertex
+    line), extruded mid-plane to |z| HEX_Z_OUTER.  Inside the body it merges
+    into the solid pivot cylinder; past each body end it is a stub, the
+    overhang the knife edge rests on a bearing support with.
 
-    Front-plane vertex-up hexagon (HEX_W x HEX_H bounding box) centred on the
-    pivot axis, a vertex at the top (the knife edge runs along Z at that top
-    vertex line)."""
+    One sketch and one extrude, so each side face, flank and lower face of
+    the +Z stub lies in the same plane as its -Z twin by construction (code
+    review C09): the symmetry Detail D prints for each stub then holds the two
+    ridges to each other (``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``).
+    ``_assert_knife_sides_coplanar`` reads that back."""
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
     hexd = SketchDims()
-    check(f"create_sketch {name}", await adapter.create_sketch("Front"))
+    check("create_sketch hex knife", await adapter.create_sketch("Front"))
     # Vertex-up hexagon fit to the measured box: top/bottom vertices on the
     # y-axis, shoulders at +-W/2 and +-H/4 (CCW from the top vertex).
     w2, h2, h4 = HEX_W / 2.0, HEX_H / 2.0, HEX_H / 4.0
@@ -542,11 +559,12 @@ async def _hex_collar(
     _hw = '"HexW" / 2'
     _hh2 = '"HexH" / 2'
     _hh4 = '"HexH" / 4'
+    stem = "HexKnife"
     await define_polygon_chain(
         adapter,
         lines,
         verts,
-        label=name,
+        label="hex knife",
         dims=hexd,
         names=[
             f"{stem}TopY",
@@ -561,18 +579,97 @@ async def _hex_collar(
         ],
         drives=[_hh2, _hw, _hh4, _hh2, _hw, _hh4, _hw, _hh4, _hh2],
     )
-    await ensure_fully_defined(adapter, f"{name} sketch")
-    check(f"exit_sketch {name}", await adapter.exit_sketch())
+    await ensure_fully_defined(adapter, "hex knife sketch")
+    check("exit_sketch hex knife", await adapter.exit_sketch())
     name_last_feature(adapter, f"{stem}Profile")
     drive_jobs += hexd.apply(adapter, f"{stem}Profile")
-    extrude_at_offset(adapter, HEX_Z_OUTER - HEX_Z_INNER, HEX_Z_INNER, flip=flip)
+    check(
+        "extrude hex knife",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=2.0 * HEX_Z_OUTER, both_directions=True)
+        ),
+    )
     name_last_feature(adapter, stem)
-    if stem == "HexKnifeBack":
-        # Both trunnions share one length; the print sizes it once (2X), on
-        # the -Z stub: its plan-view left side is open (datum A's tag stands
-        # to its right; the +Z stub carries the finish and datum B).
-        [depth] = name_dimensions(adapter, stem, [f"{stem}Depth"])
-        drive_jobs.append((depth, '"HexDepth"'))
+    # The total length is the body plus both stubs; the print sizes a stub's
+    # own length from the hidden KnifeStubReference (``_knife_stub_reference``).
+    [length] = name_dimensions(adapter, stem, [f"{stem}Length"])
+    drive_jobs.append((length, '"PlateL" + 2 * "HexDepth"'))
+
+
+def knife_side_plane_mismatch(
+    faces: list[tuple[tuple[float, ...], float, float]],
+) -> str | None:
+    """Why the knife prism's lateral faces are NOT one plane per side, or None.
+
+    ``faces`` holds each planar lateral face as (unit normal, plane offset
+    in metres along it, face mid z in mm).  Each stub (the sign of z) must
+    carry KNIFE_LATERAL_FACES distinct planes, every plane of one stub must
+    be a plane of the other within KNIFE_SIDE_PLANE_TOL, and the side pair
+    must stand HEX_W/2 either side of the pivot axis."""
+    tol = KNIFE_SIDE_PLANE_TOL
+
+    def same(
+        a: tuple[tuple[float, ...], float], b: tuple[tuple[float, ...], float]
+    ) -> bool:
+        return (
+            all(abs(p - q) <= tol for p, q in zip(a[0], b[0], strict=True))
+            and abs(a[1] - b[1]) <= tol
+        )
+
+    stubs: dict[str, list[tuple[tuple[float, ...], float]]] = {"+Z": [], "-Z": []}
+    for normal, offset, z_mid in faces:
+        planes = stubs["+Z" if z_mid > 0.0 else "-Z"]
+        if not any(same((normal, offset), plane) for plane in planes):
+            planes.append((tuple(normal), offset))
+    for stub, planes in stubs.items():
+        if len(planes) != KNIFE_LATERAL_FACES:
+            return (
+                f"the {stub} stub has {len(planes)} lateral planes, not "
+                f"{KNIFE_LATERAL_FACES}: {planes}"
+            )
+    for plane in stubs["+Z"]:
+        if not any(same(plane, twin) for twin in stubs["-Z"]):
+            return f"+Z stub plane {plane} is no plane of the -Z stub: {stubs['-Z']}"
+    for side in (1.0, -1.0):
+        wanted = ((side, 0.0, 0.0), HEX_W / 2000.0)
+        if not any(same(wanted, plane) for plane in stubs["+Z"]):
+            return f"no side face at x {side * HEX_W / 2.0:+.3f}: {stubs['+Z']}"
+    return None
+
+
+def _assert_knife_sides_coplanar(adapter) -> None:
+    """Read HexKnife's planar lateral faces back from the finished body and
+    prove both stubs share each one's plane (``knife_side_plane_mismatch``).
+    The outboard end faces (normal along Z) and the ridge rounds (cylindrical,
+    KnifeRidgeFillet's) are not lateral planes."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    raw = _early_bound(model, "IPartDoc").FeatureByName("HexKnife")
+    if raw is None:
+        raise RuntimeError("knife sides: the HexKnife feature is missing")
+    feature = _early_bound(raw, "IFeature")
+    faces: list[tuple[tuple[float, ...], float, float]] = []
+    for raw_face in feature.GetFaces() or ():
+        face = _early_bound(raw_face, "IFace2")
+        surface = _early_bound(face.GetSurface(), "ISurface")
+        if surface is None or not surface.IsPlane():
+            continue
+        normal = tuple(float(value) for value in face.Normal)
+        if len(normal) != 3 or not all(math.isfinite(value) for value in normal):
+            raise RuntimeError(f"knife sides: invalid face normal {normal}")
+        if abs(normal[2]) > KNIFE_SIDE_PLANE_TOL:
+            continue  # an outboard end face
+        root = tuple(float(value) for value in surface.PlaneParams)[3:6]
+        offset = sum(n * r for n, r in zip(normal, root, strict=True))
+        box = tuple(float(value) for value in face.GetBox())
+        z_mid_mm = (box[2] + box[5]) * 500.0
+        faces.append((normal, offset, z_mid_mm))
+    mismatch = knife_side_plane_mismatch(faces)
+    if mismatch is not None:
+        raise RuntimeError(f"knife stubs' sides are not one plane each: {mismatch}")
+    _telemetry.success(
+        f"knife sides: {len(faces)} lateral faces, {KNIFE_LATERAL_FACES} planes "
+        f"shared by both stubs within {KNIFE_SIDE_PLANE_TOL:g}"
+    )
 
 
 async def _knife_ridge_fillet(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -1332,6 +1429,50 @@ async def _cylinder_reference(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     blank_reference_sketches(adapter, ("CylinderReference",))
 
 
+async def _knife_stub_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+    """Hidden Top-plane reference: one trunnion stub's length for the plan.
+
+    Both stubs are one prism through the body (``_hex_knife``), so no feature
+    dimension is a stub's own length.  A construction line down the -Z
+    stub's -X side, from the body end (|z| HEX_Z_INNER) to the stub's
+    outboard face, carries it as a driving dimension off "HexDepth"; the part
+    saves the sketch hidden and the plan shows it as the stubs' "2X".  The
+    Top-plane sketch maps world Z to -sketchY."""
+    reference = SketchDims()
+    check("create knife-stub reference", await adapter.create_sketch("Top"))
+    start = (-HEX_W / 2.0, HEX_Z_INNER)
+    set_sketch_direct_db(adapter, True)
+    length = check(
+        "knife-stub length reference",
+        await adapter.add_line(*start, start[0], HEX_Z_OUTER),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, length)
+    check(
+        "knife-stub length reference vertical",
+        await adapter.add_sketch_constraint(length, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{length}.start",
+        f"{length}.end",
+        "vertical_distance",
+        HEX_DEPTH,
+        "knife-stub length reference",
+    )
+    reference.record("KnifeStubLength", '"HexDepth"')
+    await anchor_point_to_origin(
+        adapter, f"{length}.start", *start, "knife-stub length reference start"
+    )
+    reference.record("KnifeStubRefX", '"HexW" / 2')
+    reference.record("KnifeStubRefZ", '"PlateL" / 2')
+    await ensure_fully_defined(adapter, "knife-stub reference sketch")
+    check("exit knife-stub reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "KnifeStubReference")
+    drive_jobs += reference.apply(adapter, "KnifeStubReference")
+    blank_reference_sketches(adapter, ("KnifeStubReference",))
+
+
 def _hex_width_reference(adapter) -> None:
     """HexWidth prints as a reference, "2X (8.080)": untoleranced, the
     parentheses its native prefix (DIMENSION_PREFIXES) and suffix."""
@@ -1512,9 +1653,10 @@ async def build(adapter) -> dict[str, str]:
     # an INCH document and the equation manager evaluates BARE numbers in document
     # units, so an unsuffixed "152.4" would read as 152.4 inches and blow the part
     # up 25.4x. Derived globals (ArcR, RibReach, RibEndH) reference others as
-    # equation strings so a primitive edit propagates. PlateT/RibT/AnchorH/HexDepth
+    # equation strings so a primitive edit propagates. PlateT/RibT/AnchorH
     # are extrude depths/offsets -- feature params, not sketch dims, so nothing
     # drives them, but they stay editable knobs (matches the exemplars).
+    # HexDepth drives the knife prism's length and the stub reference.
     await set_global(adapter, "PlateW", f"{PLATE_W}mm")
     await set_global(adapter, "PlateL", f"{PLATE_L}mm")
     await set_global(adapter, "PlateT", f"{PLATE_T}mm")
@@ -1553,20 +1695,7 @@ async def build(adapter) -> dict[str, str]:
 
     await _coefficients_plate(adapter, drive_jobs)
     await _pivot_cylinder(adapter, drive_jobs)
-    await _hex_collar(
-        adapter,
-        flip=False,
-        name="hex knife edge front",
-        stem="HexKnifeFront",
-        drive_jobs=drive_jobs,
-    )
-    await _hex_collar(
-        adapter,
-        flip=True,
-        name="hex knife edge back",
-        stem="HexKnifeBack",
-        drive_jobs=drive_jobs,
-    )
+    await _hex_knife(adapter, drive_jobs)
     await _knife_ridge_fillet(adapter, drive_jobs)
     await _edge_rib(
         adapter,
@@ -1589,6 +1718,7 @@ async def build(adapter) -> dict[str, str]:
     await _bracket_mounting_taps(adapter)
     await _knife_envelope_reference(adapter, drive_jobs)
     await _cylinder_reference(adapter, drive_jobs)
+    await _knife_stub_reference(adapter, drive_jobs)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -1606,6 +1736,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven summing lever (equations neutral)", v_built, 1e-3 * v_built
     )
+    _assert_knife_sides_coplanar(adapter)
 
     # pivot axis (Axis1) = cylinder centreline along Z -- the static mate
     # reference to the knife-mount (keeps the lever at the knife line with no
