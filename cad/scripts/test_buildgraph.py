@@ -142,7 +142,17 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_oblique_jig": "ch_rocker_arm_tl_oblique_base_bar ch_rocker_arm_tl_oblique_carrier "
     "ch_rocker_arm_tl_oblique_feed_lever ch_rocker_arm_tl_oblique_hub_pin "
     "ch_rocker_arm_tl_oblique_end_bracket ch_rocker_arm_tl_oblique_nut_bracket "
-    "ch_rocker_arm_tl_oblique_pivot_block ch_rocker_arm_tl_oblique_pivot_pin ch_rocker_arm_tl_oblique_riser",
+    "ch_rocker_arm_tl_oblique_pivot_block ch_rocker_arm_tl_oblique_pivot_pin ch_rocker_arm_tl_oblique_riser "
+    "ch_rocker_arm_tl_oblique_rail ch_rocker_arm_tl_oblique_carriage ch_rocker_arm_tl_oblique_bearing "
+    "ch_rocker_arm_tl_oblique_cl_dowel ch_rocker_arm_tl_oblique_leadscrew "
+    "ch_rocker_arm_tl_oblique_leadscrew_nut ch_rocker_arm_tl_oblique_pillow_block "
+    "ch_rocker_arm_tl_oblique_handwheel ch_rocker_arm_tl_oblique_hold_down_stud "
+    "ch_rocker_arm_tl_oblique_t_nut ch_rocker_arm_tl_oblique_flange_nut "
+    "ch_rocker_arm_tl_oblique_rail_screw ch_rocker_arm_tl_oblique_bracket_screw "
+    "ch_rocker_arm_tl_oblique_block_screw ch_rocker_arm_tl_oblique_carriage_screw "
+    "ch_rocker_arm_tl_oblique_kp08_screw ch_rocker_arm_tl_oblique_nut_screw "
+    "ch_rocker_arm_tl_oblique_riser_screw ch_rocker_arm_tl_oblique_clamp_screw "
+    "ch_rocker_arm_tl_oblique_lever_screw ch_rocker_arm_tl_oblique_block_washer",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }
