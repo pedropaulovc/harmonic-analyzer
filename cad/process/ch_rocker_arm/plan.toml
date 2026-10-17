@@ -444,8 +444,8 @@ id = "T1"
 machine = "PM-30MV"
 frame = "SU"
 coolant = "cutting oil, brushed on"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
+deburr_mm = 0.0
+deburr_cite = ["AUTHOR'S CHOICE: the hub hole's two entry edges stay sharp, burrs removed with no break, so the pressed hub root is a corner (R0.2 MAX), not a groove (prechips#301)"]
 stock_in = "S0B"
 
 [setups.stock_state]
@@ -528,6 +528,7 @@ tool = "reamers-metric/10.2mm"
 holder = "drill-chuck-r8"
 exit_mm = 1.0
 approach_mm = 3.0
+note = "Leave both edges of the reamed hole sharp: remove the drill and reamer burrs without breaking the edge. A break here leaves a groove round the pressed hub root, which R0.2 MAX does not admit."
 
 [setups.ops.checks]
 dia = "bore-gauge-small"
