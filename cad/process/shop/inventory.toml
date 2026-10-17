@@ -3408,13 +3408,20 @@ vendor = "Precision Matthews"
 sku = "52PCCK-9/16-14mm"
 by = "vendor catalogue, read 2026-10-16"
 
-# Strap frame: origin at the centre of the padded underside on the work, x along it.
+# Strap frame: origin at the centre of the padded toe underside on the work;
+# local +X runs back toward the stud and heel, local +Z is above the work.
 [fixtures.clamping-kit-pm-52pcck-14mm.members.strap-pad]
 kind = "strap_clamp"
-note = "Trial padded strap envelope for 1/2-13 hardware; estimate, not a catalogue dimension or receipt measurement. Remeasure before shop use."
+note = "Full trial clamp obstruction: strap, stud and flange nut; 1 in wide body, not the old narrow toe-only surrogate. Generic unmeasured dimensions, not PM individual-component specifications. Poses and clearance findings must be reviewed for every setup."
 solids = [
-  # Basis: former 40 x 8 x 8 mm LMS surrogate scaled 4/3 with stud diameter (3/8 -> 1/2 in), then rounded upward to 54 x 11 x 11 mm. This is only an equivalent obstruction model, not proof of clamp strength, pad contact or stud-slot clearance; PM publishes no individual strap dimensions.
-  { name = "strap", shape = "box", at_mm = [-27.0, -5.5, 0.0], size_mm = [54.0, 11.0, 11.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-16", instrument = "estimated scaled envelope; replace with caliper readings on received padded strap" } },
+  # Basis: PM listing photograph (source above, read 2026-10-16) shows slotted strap clamps, studs and flanged nuts. Typical 1/2-13 kit short strap estimate: 3 x 1 x 1/2 in = 76.2 x 25.4 x 12.7 mm. Toe at X0, stud at X38.1; these are authored placeholder poses, not surveyed hardware.
+  { name = "strap", shape = "box", at_mm = [-12.7, -12.7, 0.0], size_mm = [76.2, 25.4, 12.7], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-16", instrument = "generic catalogue-size estimate; replace with caliper readings" } },
+  # Basis: 13.5 mm slot width clears nominal 12.7 mm stud by 0.8 mm; 30 mm slot length is a generic estimate. Overrun in Z only ensures a through void; cuts only the strap.
+  { name = "stud-slot", shape = "box", at_mm = [23.1, -6.75, -1.0], size_mm = [30.0, 13.5, 14.7], void = true, cuts = ["strap"], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-16", instrument = "generic clearance-slot estimate; replace with caliper readings" } },
+  # Basis: published 1/2-13 nominal stud diameter 12.7 mm; selected 3 in / 76.2 mm stud length is a typical kit-member estimate, not a published PM length. Stud projects 36.2 mm above work and extends 40 mm below; thread crests modeled by bounding cylinder.
+  { name = "stud", shape = "cylinder", at_mm = [38.1, 0.0, -40.0], axis = [0.0, 0.0, 1.0], dia_mm = 12.7, length_mm = 76.2, supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-16", instrument = "catalogue stud nominal and generic length estimate; replace with caliper readings" } },
+  # Basis: typical 1/2-13 flange-nut envelope estimate, rounded up: 28 mm flange OD x 13 mm height. Bounding cylinder includes hex corners; nut sits on strap top Z12.7, reaching Z25.7.
+  { name = "flange-nut", shape = "cylinder", at_mm = [38.1, 0.0, 12.7], axis = [0.0, 0.0, 1.0], dia_mm = 28.0, length_mm = 13.0, supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-16", instrument = "generic flange-nut envelope estimate; replace with caliper readings" } },
 ]
 
 # Rocker route-v3 purchased jig hardware. Candidate purchases only: no possession,
