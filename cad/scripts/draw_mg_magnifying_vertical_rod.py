@@ -161,6 +161,9 @@ DETAIL_SHOULDER_X = _detail_xy(SHOULDER_X, 0.0)[0]
 # The radius lands on its first pick's edge (build_mg_magnifying_vertical_rod)
 # under the axis, as the filing stud's did: the shoulder's lower root, its
 # arc the up-right quarter round this centre (model mm; sheet 0.1484, 0.1920).
+# Its text stands opposite that quarter, so the arrow lands on the root
+# circle's down-left side, on the arc's extension (farm r4, 0676a2115: tip
+# (0.14757, 0.19063), R 1.6 mm off the centre).
 RELIEF_ROOT_CENTRE_MM = (
     SHOULDER_X - RELIEF_ROOT_R,
     -(RELIEF_DIA / 2.0 + RELIEF_ROOT_R),
@@ -517,10 +520,11 @@ def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> No
 
     Read back: radial, measuring RELIEF_ROOT_R, the part's native swTolMAX
     and the count above the value. The text stands down-left of the root,
-    opposite the arc's own (up-right) quarter, so
-    ``ArcExtensionLineOrOppositeSide`` True runs the leader on through the
-    centre to the arc (draw_pn_pen_rod's shoulder radius, text beside its
-    arc, sets it False). The rebuilt arrow tip must sit on that arc.
+    opposite the arc's own (up-right) quarter. SolidWorks ends a radial
+    leader at the circle point facing its text and does not carry it through
+    the centre (farm r4, 0676a2115), so ``ArcExtensionLineOrOppositeSide``
+    True draws the arc's extension out to that point. The rebuilt arrow tip
+    must sit on the root's circle, on the text's side of its centre.
     """
     annotation = _early_bound(
         _named(adapter, annotations, "ReliefRootR"), "IAnnotation"
@@ -543,7 +547,7 @@ def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> No
         raise RuntimeError(f"ReliefRootR count did not persist: {callout!r}")
     display.ArcExtensionLineOrOppositeSide = True
     if display.ArcExtensionLineOrOppositeSide is not True:
-        raise RuntimeError("ReliefRootR leader does not run through its centre")
+        raise RuntimeError("ReliefRootR refused its arc extension line")
     rebuild_drawing(adapter, label="relief roots radius leader")
     raw = display.GetDisplayData()
     if raw is None:
@@ -563,10 +567,10 @@ def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> No
     )
     radius = RELIEF_ROOT_R * _DS / 1000.0
     off = (tip[0] - centre[0], tip[1] - centre[1])
-    if abs(math.hypot(*off) - radius) > ROOT_TIP_TOL_M or min(off) < -ROOT_TIP_TOL_M:
+    if abs(math.hypot(*off) - radius) > ROOT_TIP_TOL_M or max(off) > ROOT_TIP_TOL_M:
         raise RuntimeError(
             f"ReliefRootR's arrow tip {tip} is not on the shoulder's lower root "
-            f"arc (centre {centre}, R {radius})"
+            f"circle's text side (centre {centre}, R {radius})"
         )
     _telemetry.info(
         f"relief roots radius: text {display.GetText(1)!r}, MAX type, count "
