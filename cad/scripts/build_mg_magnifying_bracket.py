@@ -12,8 +12,9 @@ the flange's front face. Joint geometry and hole specifications are owned by
 magnifying_bracket_joint_layout, independently of assemblies; the press fit
 (bore nominal, band, engagement, budget, installation notes) by the
 config-free mg_lever_press_fit_geom, which the lever print and this one share.
-``ArmRootFillet`` breaks the three arm-to-flange inside corners on the
-flange's front face at the print's single MAX radius.
+``ArmRootFillet`` breaks all six arm-to-flange inside corners at the print's
+single MAX radius: three on the flange's front face, where the arm leaves it,
+and three on the mounting face, where the arm's 3.11 stub stands past it.
 
 ``ArmSection`` (blanked, on the Right plane): the arm's section in the
 profile the RIGHT view prints -- its lower face from the bore axis, the seat
@@ -109,16 +110,32 @@ ARM_Y = (-3.0, 4.5)
 # moved the collar 45.21 forward of the plate, 58.30 -> 103.51 from the axis.
 ARM_PAST_SEAT = 3.11
 ARM_Z = (4.0, round(FLANGE_Z[1] + ARM_PAST_SEAT, 2))
-# The arm-root fillet leaves the flange's front face a flat beside the arm on
-# both sides (above the arm 1.85, below it 3.35), so the print's MAX radius
-# never runs the fillet onto the flange's edges.
-ARM_ROOT_EDGES = (
-    ((-ARM_HALF_X, (ARM_Y[0] + ARM_Y[1]) / 2.0, FLANGE_Z[0]), ARM_Y[1] - ARM_Y[0]),
-    ((0.0, ARM_Y[0], FLANGE_Z[0]), 2.0 * ARM_HALF_X),
-    ((0.0, ARM_Y[1], FLANGE_Z[0]), 2.0 * ARM_HALF_X),
+# The arm passes through the flange: it leaves the front face (FLANGE_Z[0])
+# and its stub stands ARM_PAST_SEAT past the mounting face (FLANGE_Z[1]), so
+# each face meets it in three inside corners (the arm's west face and both
+# its Y faces; its east face is flush with the flange's east end).  All six
+# take the print's one MAX radius (drawing-guidelines.md rule 16; machinist
+# review r3: the stub's corners printed sharp under an "ARM ROOT CORNERS"
+# callout that could not say whether it covered them).  The fillet leaves
+# each face a flat beside the arm on both sides (above the arm 1.85, below it
+# 3.35), so the MAX radius never runs onto the flange's edges.  The mounting
+# face's three stay off the summing lever: the stub's fillets reach machine
+# x 34.0, 4.55 past the lever plate's free +X end (29.45), so they never
+# touch the lever or the seat the flange bears on there
+# (test_mg_magnifying_bracket_drawing pins it from the lever's own spec).
+ARM_ROOT_EDGES = tuple(
+    edge
+    for face_z in FLANGE_Z
+    for edge in (
+        ((-ARM_HALF_X, (ARM_Y[0] + ARM_Y[1]) / 2.0, face_z), ARM_Y[1] - ARM_Y[0]),
+        ((0.0, ARM_Y[0], face_z), 2.0 * ARM_HALF_X),
+        ((0.0, ARM_Y[1], face_z), 2.0 * ARM_HALF_X),
+    )
 )
 if not ARM_ROOT_R_MAX < min(FLANGE_Y[1] - ARM_Y[1], ARM_Y[0] - FLANGE_Y[0]):
-    raise AssertionError("the arm-root fillet would leave no flat on the flange's front face")
+    raise AssertionError("the arm-root fillet would leave no flat on the flange's faces")
+if not ARM_ROOT_R_MAX < ARM_PAST_SEAT:
+    raise AssertionError("the mounting-face arm-root fillet would run off the arm's stub")
 
 
 async def _volume(adapter) -> float:
@@ -416,12 +433,14 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"flange: added {added:.1f}, expected {v_net:.1f}")
     expected = vol
 
-    # Arm-to-flange inside corners on the flange's front (-Z) face: the arm's
-    # west face and both its Y faces meet the flange there.  Filleted AT the
-    # print's MAX radius; each straight edge adds (1 - pi/4) R^2 per length
-    # (the two blends at the arm's west corners are within the tolerance).
+    # Arm-to-flange inside corners on both flange faces: the arm's west face
+    # and both its Y faces meet the front (-Z) face where the arm leaves it
+    # and the mounting (+Z) face where its stub stands past it.  Filleted AT
+    # the print's MAX radius; each straight edge adds (1 - pi/4) R^2 per
+    # length (the four blends at the arm's west corners are within the
+    # tolerance).
     check(
-        "fillet arm-to-flange inside corners",
+        "fillet arm-to-flange inside corners on both faces",
         await adapter.add_fillet(
             ARM_ROOT_R_MAX, [list(point) for point, _length in ARM_ROOT_EDGES], propagate=False
         ),
@@ -433,7 +452,9 @@ async def build(adapter) -> dict[str, str]:
         length for _point, length in ARM_ROOT_EDGES
     )
     expected += v_arm_root
-    await volume_check(adapter, "arm-to-flange inside corner fillet", expected, 0.15 * v_arm_root)
+    await volume_check(
+        adapter, "arm-to-flange inside corner fillets (both faces)", expected, 0.15 * v_arm_root
+    )
 
     # Plain clearance holes through the flange, entering its front (-Z) face,
     # where the screw heads bear.
@@ -462,25 +483,30 @@ async def build(adapter) -> dict[str, str]:
     # construction lines, each on an edge the view already draws: the arm's
     # end face (its full thickness, past the seat face) and the seat face's
     # two visible pieces -- below the arm, from the flange's lower (hole-datum)
-    # face up to the arm; above it, from the arm up to the flange's top -- so
-    # the sketch, shown in that view to import its dimensions, prints nothing
-    # new but the bore axis: a centerline from the arm's end station to the
-    # collar's centre, the axis extended for dimensioning (ASME Y14.5), so the
-    # arm's 3.00 from the axis reads off the centerline's end at the arm's end
-    # face, its two witnesses 3 mm long, not 60 mm back through the arm to the
-    # collar's centre. The dimensions the print keeps all take the arm's END
-    # corners, so their extension lines run away from the part instead of
-    # along the arm's faces. Six dimensions in creation order: the thickness
-    # (ArmThickness, unmarked: the print controls it in the bottom view, from
-    # ArmFootprint below), the arm's lower face from the bore axis
-    # (ArmBelowAxis), the arm's end past the seat face (ArmPastSeat: the
-    # arm's end corner to the seat piece's hole-datum corner, so the bore
-    # axis has ONE toleranced chain along Z -- SeatToAxis, then this -- and
-    # the sheet prints the arm's end from the axis as its parenthesised sum,
-    # mreview10 blocker 2), the arm's lower face from the hole-datum flange
-    # face (ArmOffset, unmarked: controlled in the bottom view too), the
-    # flange above the arm (unmarked) and the seat face from the bore axis
-    # (SeatToAxis, the flange's top corner to the origin).
+    # face up to the arm-root fillet; above it, from that fillet up to the
+    # flange's top -- so the sketch, shown in that view to import its
+    # dimensions, prints nothing new but the bore axis: a centerline from the
+    # arm's end station to the collar's centre, the axis extended for
+    # dimensioning (ASME Y14.5), so the arm's 3.00 from the axis reads off the
+    # centerline's end at the arm's end face, its two witnesses 3 mm long, not
+    # 60 mm back through the arm to the collar's centre.  Each seat piece
+    # stops ArmRootRMax short of the arm, where the stub's root fillet leaves
+    # the seat face: run on to the arm, its last millimetre would print a
+    # grey sharp corner inside the fillet the view draws.  The dimensions
+    # the print keeps all take the arm's END corners, so their extension
+    # lines run away from the part instead of along the arm's faces.  Eight
+    # dimensions in creation order: the thickness (ArmThickness, unmarked:
+    # the print controls it in the bottom view, from ArmFootprint below), the
+    # arm's lower face from the bore axis (ArmBelowAxis), the arm's end past
+    # the seat face (ArmPastSeat: the arm's end corner to the seat piece's
+    # hole-datum corner, so the bore axis has ONE toleranced chain along Z --
+    # SeatToAxis, then this -- and the sheet prints the arm's end from the
+    # axis as its parenthesised sum, mreview10 blocker 2), each seat piece's
+    # arm-side end from its arm face (SeatFilletBelow, SeatFilletAbove, the
+    # fillet's MAX radius, unmarked), the arm's lower face from the
+    # hole-datum flange face (ArmOffset, unmarked: controlled in the bottom
+    # view too), the flange above the arm (unmarked) and the seat face from
+    # the bore axis (SeatToAxis, the flange's top corner to the origin).
     section = SketchDims()
     check("create_sketch arm section", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
@@ -496,11 +522,11 @@ async def build(adapter) -> dict[str, str]:
     )
     below = check(
         "arm section seat face below the arm",
-        await adapter.add_line(seat_u, FLANGE_Y[0], seat_u, ARM_Y[0]),
+        await adapter.add_line(seat_u, FLANGE_Y[0], seat_u, ARM_Y[0] - ARM_ROOT_R_MAX),
     )
     above = check(
         "arm section seat face above the arm",
-        await adapter.add_line(seat_u, ARM_Y[1], seat_u, FLANGE_Y[1]),
+        await adapter.add_line(seat_u, ARM_Y[1] + ARM_ROOT_R_MAX, seat_u, FLANGE_Y[1]),
     )
     set_sketch_direct_db(adapter, False)
     for line in (end, below, above):
@@ -531,27 +557,27 @@ async def build(adapter) -> dict[str, str]:
         ARM_Z[1] - FLANGE_Z[1], "arm section ArmPastSeat",
     )
     section.record("ArmPastSeat", '"ArmZ1" - "FlangeZ1"')
-    # Each seat piece's arm-side corner sits on the arm face it was drawn at:
-    # below.end on the arm's LOWER face (end.start), above.start on its upper
-    # face (end.end).  Pairing same-named corners (below.end with end.end)
-    # dragged the piece below the arm up to the arm's top, and ArmOffset's
-    # 3.35 then re-solved its seat-face witness to Y +0.35, above the bore
-    # axis (retry08 native layout audit: that extension line printed at sheet
-    # y 180.4 mm instead of on the hole-datum face at 173.65 mm).
-    for piece, corner, arm_corner in (
-        (below, "end", "start"),
-        (above, "start", "end"),
+    # Each seat piece's arm-side end stands the fillet's radius off the arm
+    # face it was drawn at: below.end under the arm's LOWER face (end.start),
+    # above.start over its upper face (end.end).  Pairing same-named corners
+    # (below.end with end.end) dragged the piece below the arm up to the arm's
+    # top, and ArmOffset's 3.35 then re-solved its seat-face witness to Y
+    # +0.35, above the bore axis (retry08 native layout audit: that extension
+    # line printed at sheet y 180.4 mm instead of on the hole-datum face at
+    # 173.65 mm).
+    for piece, corner, arm_corner, name in (
+        (below, "end", "start", "SeatFilletBelow"),
+        (above, "start", "end", "SeatFilletAbove"),
     ):
         check(
             f"arm section {piece} vertical",
             await adapter.add_sketch_constraint(piece, None, "vertical"),
         )
-        check(
-            f"arm section {piece}.{corner} on the arm's face",
-            await adapter.add_sketch_constraint(
-                f"{piece}.{corner}", f"{end}.{arm_corner}", "horizontal_points"
-            ),
+        await dimension_between(
+            adapter, f"{piece}.{corner}", f"{end}.{arm_corner}", "vertical_distance",
+            ARM_ROOT_R_MAX, f"arm section {name}",
         )
+        section.record(name, '"ArmRootRMax"')
     check(
         "arm section seat pieces on one station",
         await adapter.add_sketch_constraint(
@@ -564,7 +590,7 @@ async def build(adapter) -> dict[str, str]:
     )
     section.record("ArmOffset", '"ArmY0" - "FlangeY0"')
     await dimension_between(
-        adapter, f"{above}.start", f"{above}.end", "vertical_distance",
+        adapter, f"{end}.end", f"{above}.end", "vertical_distance",
         FLANGE_Y[1] - ARM_Y[1], "arm section FlangeAboveArm",
     )
     section.record("FlangeAboveArm", '"FlangeY1" - "ArmY1"')

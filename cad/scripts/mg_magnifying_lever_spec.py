@@ -23,7 +23,6 @@ from mg_lever_press_fit_geom import (
     PRESS_FIT_BUDGET,
     PRESS_ZONE_DIA_BAND,
     PRESS_ZONE_LENGTH,
-    PRESS_ZONE_LENGTH_BAND,
 )
 from mg_magnifying_lever_geom import ROD_LENGTH  # noqa: F401 (re-export)
 
@@ -40,10 +39,11 @@ from mg_magnifying_lever_geom import ROD_LENGTH  # noqa: F401 (re-export)
 # no band.  The press zone -- the cylinder the bracket collar grips, from
 # PRESS_ZONE_LENGTH before the east tip to the dome tangent -- is a tighter
 # band on the same unstepped Ø6, so it lives on the blanked ``PressZone``
-# reference sketch: its start from the tip carrying PRESS_ZONE_LENGTH_BAND,
-# its cylinder length to the tangent (a REFERENCE: start minus the dome
-# radius), and its diameter carrying PRESS_ZONE_DIA_BAND, both bands native
-# (drawing-guidelines.md rule 3 (decimal places carry the tolerance)).  The
+# reference sketch: its start from the tip a single MIN limit
+# (PRESS_ZONE_START_TOL_TYPE), its cylinder length to the tangent (a
+# REFERENCE: start minus the dome radius), and its diameter carrying
+# PRESS_ZONE_DIA_BAND, both limits native (drawing-guidelines.md rule 3
+# (decimal places carry the tolerance)).  The
 # zone's start is a solid line across the bar, so the zone reads between it
 # and the dome tangent.  The drawing shows both sketches in the front view
 # (_drawing_hidden_sketches). ---
@@ -55,14 +55,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # The tip-to-tip length is checked at .X (+/-0.8): the rod's west end only
 # bounds the clamp's travel.  The stock diameter reads at .X too: the bar's
 # own OD, held by no band of the print (drawing-guidelines.md rule 4: stock
-# that is good enough stays stock).  The zone's start carries its axial band
-# at .XX, matched to the collar's length band, so the selected zone covers the
-# collar's true contact (the collar length less the dome radius).  The zone
-# diameter carries its band at three places; the two references read at .X.
+# that is good enough stays stock).  The zone's start is a MIN at .X: the
+# selected land only has to cover the longest collar, so no tighter places
+# (rule 4).  The zone diameter carries its band at three places; the two
+# references read at .X.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RodProfile": {"OverallLength": 1, "DomeRadius": 1},
     "RodStock": {"RodDia": 1},
-    "PressZone": {"PressZoneStart": 2, "PressZoneLen": 1, "PressZoneDia": 3},
+    "PressZone": {"PressZoneStart": 1, "PressZoneLen": 1, "PressZoneDia": 3},
 }
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != {
     name for names in DRAWING_PRECISION.values() for name in names
@@ -109,15 +109,19 @@ PRESS_ZONE_DIA_CALLOUT = (
     f"{PRESS_FIT_BUDGET['interference_min']:.3f}-"
     f"{PRESS_FIT_BUDGET['interference_max']:.3f} DIAMETRAL INTERFERENCE"
 )
-# The zone's start from the tip carries the collar's length band: the rod's
-# tip sits flush with the collar's outer face, so the zone is exactly the
-# collar's length (mg_magnifying_bracket_spec.COLLAR_LENGTH_CALLOUT names this
-# zone from the other side).  The callout names that mate (rule 4).
-if (PRESS_ZONE_LENGTH, PRESS_ZONE_LENGTH_BAND) != (COLLAR_LENGTH, COLLAR_LENGTH_BAND):
-    raise AssertionError(
-        "the press zone's start must match the collar's length, band and all"
-    )
-PRESS_ZONE_START_CALLOUT = f"PRESS ZONE START\nMATCHES {MATE_NUMBER}\nCOLLAR LENGTH"
+# The zone's start from the tip is a single MIN limit, "10.0 MIN", at the
+# collar's MAXIMUM length: the rod's tip sits flush with the collar's outer
+# face, so the selected land must reach past the collar's inner face on the
+# longest collar (mg_lever_press_fit_geom: the bore is finished to the
+# measured land, never to unselected stock), and a longer land only laps more
+# rod (machinist review r2: the old 0/-0.05 band bought no function).  The
+# model nominal IS the limit; mg_magnifying_bracket_spec.COLLAR_LENGTH_CALLOUT
+# names this zone from the other side.  The callout names the mate the zone
+# must cover (rule 4), two rows so the block stays narrow right of the tip.
+PRESS_ZONE_START_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "10.0 MIN"
+if PRESS_ZONE_LENGTH != COLLAR_LENGTH + COLLAR_LENGTH_BAND[0]:
+    raise AssertionError("the press zone's minimum must be the collar's maximum length")
+PRESS_ZONE_START_CALLOUT = f"PRESS ZONE COVERS\n{MATE_NUMBER} COLLAR"
 
 # No note block (drawing-guidelines.md rule 7): the stock, the zone and its
 # mate are callouts at their features.  Pressing the collar on, how to hold

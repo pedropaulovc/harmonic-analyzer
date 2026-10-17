@@ -29,8 +29,8 @@ zone reads between that line and the dome's tangent edge) and carries the
 zone's diameter; a construction witness along the rod's bottom outline from
 the zone start to the tangent carries its cylinder length; a construction arc
 along the east dome's lower outline from the tangent to the tip carries the
-tip, so the zone's start is dimensioned from the tip with the press band
-natively (drawing-simplicity-policy.md `How the repository implements the
+tip, so the zone's start is dimensioned from the tip as a native single MIN
+limit (drawing-simplicity-policy.md `How the repository implements the
 guidelines`: the model, not a note, owns it; ch_rod_pivot_pin's
 ``BlankReference``). Every other entity lies ON the silhouette, so the shown
 sketch adds no stray line inside the rod.
@@ -71,12 +71,13 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
+import _telemetry
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from mg_lever_press_fit_geom import (
@@ -84,7 +85,6 @@ from mg_lever_press_fit_geom import (
     PRESS_ZONE_DIA,
     PRESS_ZONE_DIA_BAND,
     PRESS_ZONE_LENGTH,
-    PRESS_ZONE_LENGTH_BAND,
     ROD_DIA,
 )
 from mg_magnifying_lever_geom import (
@@ -97,6 +97,7 @@ from mg_magnifying_lever_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISO_VIEW_NOTE,
+    PRESS_ZONE_START_TOL_TYPE,
 )
 
 PART_NAME = "mg-magnifying-lever"
@@ -168,6 +169,32 @@ def _make_construction(adapter, entity: str) -> None:
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError(f"{entity}: failed to become construction geometry")
+
+
+def _press_zone_start_min_limit(adapter) -> None:
+    """PressZoneStart as the single limit "10.0 MIN" (build_vn_knife_hanger_stud's
+    ThreadLengthMin recipe, with the bracket's _arm_root_radius_max_limit
+    readback): swTolMIN prints the model value then MIN, so the nominal IS the
+    limit and carries no deviations; the readback proves the type and the zero
+    values stuck."""
+    _, dimension = _named_dimension(adapter, "PressZone", "PressZoneStart")
+    label = "PressZoneStart@PressZone"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, PRESS_ZONE_LENGTH / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the minimum {PRESS_ZONE_LENGTH}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = PRESS_ZONE_START_TOL_TYPE
+    if not tolerance.SetValues(0.0, 0.0):
+        raise RuntimeError(f"{label}: SetValues rejected the MIN limit's 0/0")
+    if (
+        int(tolerance.Type) != PRESS_ZONE_START_TOL_TYPE
+        or not math.isclose(float(tolerance.GetMinValue()), 0.0, abs_tol=1e-12)
+        or not math.isclose(float(tolerance.GetMaxValue()), 0.0, abs_tol=1e-12)
+    ):
+        raise RuntimeError(f"{label}: MIN-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {PRESS_ZONE_LENGTH:g} MIN")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -468,7 +495,7 @@ async def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: the stock diameter is plain bar stock
     # (no band; the title block's .X governs it), the press zone's diameter
     # carries the geom's tighter (upper, lower) band and its start from the tip
-    # the collar length's axial band, both natively
+    # a single MIN limit at the longest collar's length, both natively
     # (drawing-simplicity-policy.md `How the repository implements the
     # guidelines`), places come from the spec, then mark exactly the print's
     # dimensions (the drawing recipe imports the marked set and must find
@@ -479,9 +506,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "PressZone", "PressZoneDia", *deviations(PRESS_ZONE_DIA_BAND)
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "PressZone", "PressZoneStart", *deviations(PRESS_ZONE_LENGTH_BAND)
-    )
+    _press_zone_start_min_limit(adapter)
     # A linear dimension across a side-view sketch prints no Ø by itself
     # (build_dt_pinion_arbor's journals; the v41 sheet read "6.000 0/-0.008").
     set_dimension_prefix(adapter, "PressZone", "PressZoneDia", "<MOD-DIAM>")
