@@ -90,7 +90,8 @@ def test_explode_moves_every_subassembly_but_the_frame_once_each() -> None:
 
 def test_settings_are_derived_from_the_pose_sources() -> None:
     assert spec.BAR_HEIGHT_MM == pytest.approx(529.9)
-    assert spec.STUD_DROP_MM == pytest.approx(62.5)
+    # The pen stud stands 0.8 higher since its 3.2 engagement (code review C05).
+    assert spec.STUD_DROP_MM == pytest.approx(61.7)
     assert {line.dimension: line.length for line in spec.SETTING_LINES} == {
         spec.BAR_HEIGHT_DIMENSION: spec.BAR_HEIGHT_MM,
         spec.STUD_DROP_DIMENSION: spec.STUD_DROP_MM,
