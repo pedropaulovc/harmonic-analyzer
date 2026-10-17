@@ -26,6 +26,7 @@ import mg_wheel_bar_geom as _bar
 import mg_wheel_group as _group
 import vn_clamp_screw_spec as _clamp_screw
 import vn_magnifying_bracket_screw_spec as _bracket_screw
+from _inch_fraction import inch_fraction
 from _mcmaster_91882a221 import SHANK_LEN as _THUMB_SHANK_LEN
 from _mcmaster_91882a221 import THREAD as _THUMB_THREAD
 from vn_lever_wire_geom import WIRE_DIA as _WIRE_DIA
@@ -163,13 +164,18 @@ QUANTITIES = {stem: 1 for stem in BOM_ORDER} | {
     THUMB_SCREW: 2,
 }
 # BOM DESCRIPTION cells (the parts carry no Description property); the steps
-# below name the parts the same way, with their part numbers.
+# below name the parts the same way, with their part numbers. The screw
+# lengths print as the vendor parts' own inch fractions, read from their specs.
 BOM_DESCRIPTIONS = {
     AXLE: "WHEEL AXLE",
     WHEEL_BAR: "WHEEL BAR",
     CLAMP_FRONT: "COLUMN CLAMP, FRONT",
     CLAMP_BACK: "COLUMN CLAMP, BACK",
-    CLAMP_SCREW: "#8-32 X 1-1/4 FILLISTER SCREW",
+    CLAMP_SCREW: (
+        "#8-32 X "
+        f"{inch_fraction(_clamp_screw.SHANK_LEN, what=f'{CLAMP_SCREW} length')} "
+        "FILLISTER SCREW"
+    ),
     DRUM: "WHEEL DRUM",
     WHEEL: "MAGNIFYING WHEEL",
     SPACER: "WHEEL AXLE SPACER",
@@ -178,23 +184,23 @@ BOM_DESCRIPTIONS = {
     NUT: "#4-40 HEX NUT",
     LEVER: "MAGNIFYING LEVER",
     BRACKET: "MAGNIFYING BRACKET",
-    BRACKET_SCREW: f"{_bracket_screw.THREAD} X 5/16 FILLISTER SCREW",
+    BRACKET_SCREW: (
+        f"{_bracket_screw.THREAD} X "
+        f"{inch_fraction(_bracket_screw.LENGTH, what=f'{BRACKET_SCREW} length')} "
+        "FILLISTER SCREW"
+    ),
     CLAMP: "MAGNIFYING CLAMP",
-    THUMB_SCREW: f"{_THUMB_THREAD} X 7/16 KNURLED THUMB SCREW",
+    THUMB_SCREW: (
+        f"{_THUMB_THREAD} X "
+        f"{inch_fraction(_THUMB_SHANK_LEN, what=f'{THUMB_SCREW} length')} "
+        "KNURLED THUMB SCREW"
+    ),
     ROD: "VERTICAL ROD",
     FIXTURE: "OUTPUT FIXTURE",
     WIRE: f"LEVER WIRE, DIA {_WIRE_DIA:.1f}",
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_ORDER) or len(set(BOM_ORDER)) != len(BOM_ORDER):
     raise AssertionError("every BOM family needs exactly one description")
-# The printed lengths are the vendor parts' own (inch stock, 25.4 mm/in).
-for _length_mm, _inches in (
-    (_clamp_screw.SHANK_LEN, 1.25),
-    (_bracket_screw.LENGTH, 5.0 / 16.0),
-    (_THUMB_SHANK_LEN, 7.0 / 16.0),
-):
-    if abs(_length_mm - _inches * 25.4) > 1e-6:
-        raise AssertionError(f"a BOM screw length no longer reads {_inches} in")
 
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 4"
 
