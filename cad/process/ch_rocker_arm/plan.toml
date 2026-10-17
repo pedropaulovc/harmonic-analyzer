@@ -878,12 +878,20 @@ marks = [
   { label = "BASE 10: BASE BOTTOM AT 10", at_mm = [155.759, -27.682, 52.0] },
   { label = "BASE 110: BASE BOTTOM AT 110", at_mm = [137.604, 70.656, 52.0] },
 ]
+
 [[setups.ops]]
 op = 40
 do = "inspect"
 feature = "hub_od"
 checks = { dia = "micrometers/0-1in", coaxiality_dia = "dti" }
 inspection_methods = { coaxiality_dia = "Datum A: arm on a Ø6.5 pin gauge in the reamed bore, pin held in V-blocks on the surface plate; sweep each hub OD half with the DTI while turning the arm on the pin; coaxiality = full indicator movement" }
+
+[[setups.ops]]
+op = 45
+do = "inspect"
+feature = "hub_root"
+checks = { radius = "radius-gauge-small" }
+note = "Both hub roots, each side of the strap: the press leaves the hub-to-strap corner sharp, which R0.2 MAX admits. Seat the R0.2 inside-corner leaf in the corner at four places round the hub; it must bear on both walls without rocking on a larger fillet or burr."
 
 [[setups.ops]]
 op = 50
