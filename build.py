@@ -303,12 +303,9 @@ def _validate_farm_selection(
     return control
 
 
-def _require_cache_refresh(task_list, control: TaskControl, labels: list[str]) -> None:
-    """Admit exact remote-keyed leaves in the closure, never task-name prefixes."""
+def _require_cache_refresh(task_list, selected: set[str], labels: list[str]) -> None:
+    """Admit exact remote-keyed leaves that doit will actually execute."""
     tasks = {task.name: task for task in task_list}
-    selected = {
-        task.name for task in tasks_and_deps_iter(control.tasks, control.selected_tasks)
-    }
     for label in labels:
         task = tasks.get(label)
         if task is None:
@@ -351,7 +348,19 @@ def _refresh_commands(commands, labels):
                             self.sel_tasks,
                             auto_delayed_regex=kwargs.get("auto_delayed_regex", False),
                         )
-                        _require_cache_refresh(self.task_list, control, labels)
+                        if kwargs.get("single", False):
+                            # Run reparses single-mode selectors; mirror its
+                            # task-option consumption on the isolated graph.
+                            control.process(self.sel_tasks)
+                            selected = set(control.selected_tasks)
+                        else:
+                            selected = {
+                                task.name
+                                for task in tasks_and_deps_iter(
+                                    control.tasks, control.selected_tasks
+                                )
+                            }
+                        _require_cache_refresh(self.task_list, selected, labels)
                     except BaseException as problem:
                         self.dep_manager.close()
                         if isinstance(problem, CacheRefreshError):

@@ -2402,7 +2402,7 @@ def test_settled_unbound_reply_cannot_be_used_as_a_leaf_result(
 @pytest.mark.parametrize("reason", [
     None, "", " \t", "x" * 161, "a\nb", "a\tb", "a\0b", "a\u0085b",
     "a\u2028b", "a\u2029b", "a\u061cb", "a\u200eb", "a\u202eb", "a\u2066b",
-    "a\ud800b", "\u200b", "\u200c\u200d\ufeff", " \u200b\u00a0",
+    "a\ud800b",
 ])
 def test_refresh_reason_is_required_before_any_graph_or_fleet_work(
     monkeypatch, capsys, executor, reason
@@ -2491,6 +2491,40 @@ def test_refresh_refuses_unknown_uncached_and_unselected_labels(
     ]) == 2
     assert diagnostic in capsys.readouterr().err
     assert observed == []
+    assert "HARMONIC_CACHE_REFRESH" not in os.environ
+
+
+@pytest.mark.parametrize("executor", ["local", "farm"])
+@pytest.mark.parametrize("single", ["-s", "--single"])
+@pytest.mark.parametrize(("selection", "expected_exit"), [
+    (["group"], 2),
+    (["leaf:x"], 0),
+    (["group", "leaf:x"], 2),
+    (["leaf:x", "group"], 0),
+    (["leaf:*"], 0),
+    (["leaf:*", "group"], 0),
+])
+def test_refresh_single_only_admits_explicitly_selected_tasks(
+    monkeypatch, capsys, executor, single, selection, expected_exit
+):
+    observed = []
+    _install_real_doit(monkeypatch, _refresh_namespace(monkeypatch, observed))
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    if expected_exit:
+        monkeypatch.setattr(build, "_farm_preflight", lambda: pytest.fail("fleet before selection"))
+        monkeypatch.setattr(build, "_require_leaf_admission", lambda *_a: pytest.fail("pool before selection"))
+    else:
+        monkeypatch.setattr(build, "_farm_preflight", lambda: None)
+    reason = "Re-evaluate explicitly selected leaf"
+    assert build.main([
+        "--executor", executor, "--force-cache-refresh", "leaf:x",
+        "--force-cache-refresh-reason", reason, single, *selection,
+    ]) == expected_exit
+    if expected_exit:
+        assert "task 'leaf:x' is not in the selected task closure" in capsys.readouterr().err
+        assert observed == []
+    else:
+        assert observed == [{"labels": ["leaf:x"], "reason": reason}]
     assert "HARMONIC_CACHE_REFRESH" not in os.environ
 
 

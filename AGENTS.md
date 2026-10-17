@@ -310,8 +310,8 @@ such build:
   Forced overwrites use `-ForceCacheRefresh 'part:pn_pen_rod'` together with
   `-ForceCacheRefreshReason 'Owner - Explain why the cached result is being replaced'`
   on the launcher (or the matching `build.py --force-cache-refresh` /
-  `--force-cache-refresh-reason` flags). Reasons follow the display-name rules
-  and must contain visible text; a reason without refresh labels is refused.
+  `--force-cache-refresh-reason` flags). Reasons follow the display-name rules;
+  a reason without refresh labels is refused.
   Invalid reasons, labels outside the selected closure and non-cache-keyed tasks
   exit 2 before fleet queries or actions. Farm clients and workers must both
   advertise protocol **7**; protocol 6 is refused, with no compatibility shim.
@@ -888,6 +888,8 @@ The label option is repeatable and accepts comma-separated exact task names.
 Only remote-cache-keyed leaves in the selected dependency closure qualify; ordinary
 stamped `check:*` tasks, aggregators, `prechips` and `gallery` do not. New cached
 actions declare this contract with `@_cache.keyed_action`, not a task-name prefix.
+With `-s`/`--single`, only explicitly selected leaves qualify; doit omits their
+dependencies, so a dependency-only label cannot be refreshed.
 Refresh requires `rw`, bypasses doit freshness and every pre-build restore,
 including the under-seat re-probe, and fails unless publication returns `stored`.
 Forced assembly refreshes rerun the full recipe and hooks, not a reload of the

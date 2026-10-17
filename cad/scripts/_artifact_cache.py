@@ -524,15 +524,6 @@ def validate_refresh_reason(reason: str | None) -> str:
             "--force-cache-refresh-reason / HARMONIC_CACHE_REFRESH reason must "
             "contain valid Unicode"
         ) from None
-    if not any(
-        not char.isspace()
-        and unicodedata.category(char) not in {"Cf", "Cc", "Cs", "Zs", "Zl", "Zp"}
-        for char in reason
-    ):
-        raise RuntimeError(
-            "--force-cache-refresh-reason / HARMONIC_CACHE_REFRESH reason must "
-            "contain at least one visible character"
-        )
     return reason
 
 

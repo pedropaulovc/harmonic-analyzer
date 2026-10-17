@@ -283,7 +283,7 @@ explicit way to stop a run, `-Cancel` (see
 | `-LeafTimeout` | yes | per-attempt remote leaf budget in minutes, 1–180 |
 | `-DisplayName` | yes, Launch only | short owner/session plus reason; nonblank, single-line, no control characters, at most 160 characters; tracking commands such as `-Watch` do not require it |
 | `-ForceCacheRefresh` | no, Launch only | string array of exact remote-cache leaf task names; each string may also be comma-separated |
-| `-ForceCacheRefreshReason` | with refresh labels only | why these cached outputs must be overwritten; `-DisplayName` text/Unicode rules plus at least one visible character |
+| `-ForceCacheRefreshReason` | with refresh labels only | why these cached outputs must be overwritten; same text/Unicode rules as `-DisplayName` |
 | `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
 
 An explicit `HARMONIC_AGENT_SCRATCHPAD` always wins. Otherwise, an OMP
@@ -1420,12 +1420,13 @@ must be an exact remote-cache-keyed leaf in the selected task closure. A plain
 stamped check, aggregator, traveler or gallery task is refused. The declaration
 is the action's `@_cache.keyed_action` marker, so cache-keyed non-COM leaves
 qualify without a prefix allowlist.
+With doit `-s`/`--single`, refresh labels must be explicitly selected: dependency
+tasks are not executed and therefore cannot be refreshed through a parent.
 
 A reason is mandatory: nonblank single-line text, no controls or bidi-control
-characters, valid Unicode, at most 160 code points, and at least one visible
-character. Whitespace and invisible format characters alone are not a reason;
-joiners inside visible text remain valid. A reason without refresh labels is
-also refused. Invalid reasons, unknown/non-cached/out-of-closure labels and cache
+characters, valid Unicode, at most 160 code points (the display-name rules).
+A reason without refresh labels is refused. Invalid reasons,
+unknown/non-cached/out-of-closure labels and cache
 mode other than `rw` exit 2 before any fleet query or action. The request is scoped
 to this invocation, overriding doit freshness as well as both cache probes; every
 dispatch of a listed label refreshes again. A successful execution must publish

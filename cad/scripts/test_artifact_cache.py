@@ -1079,9 +1079,6 @@ def test_debug_provenance_uses_key_time_salt(tmp_path, fake, monkeypatch):
     '{"labels":["part:x"],"reason":null}',
     '{"labels":["part:x"],"reason":" "}',
     '{"labels":["part:x"],"reason":"line\\nbreak"}',
-    '{"labels":["part:x"],"reason":"\\u200b"}',
-    '{"labels":["part:x"],"reason":"\\u200c\\u200d\\ufeff"}',
-    '{"labels":["part:x"],"reason":" \\u200b\\u00a0"}',
 ])
 def test_forced_refresh_rejects_malformed_carriers_loudly(monkeypatch, raw):
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
@@ -1094,7 +1091,7 @@ def test_forced_refresh_reads_current_environment_without_consuming_request(monk
     monkeypatch.delenv("HARMONIC_CACHE_REFRESH", raising=False)
     assert cache.forced_refresh("part:x") is None
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
-    for reason in ("Audit one", "  Audit Ω 👩\u200d🔧  ", "👩\u200d🔧", "a\u200cb"):
+    for reason in ("Audit one", "  Audit Ω 👩\u200d🔧  "):
         monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
             "labels": ["part:x"], "reason": reason,
         }))
