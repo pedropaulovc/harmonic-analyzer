@@ -34,8 +34,6 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         "PressZoneStart",
         "PressZoneLen",
         "PressZoneDia",
-        "ScrewSeatStart",
-        "ScrewSeatLen",
     }
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= set(drawing.FRONT_KEEP)
@@ -49,10 +47,6 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         "PressZoneStart",
         "PressZoneLen",
         "PressZoneDia",
-    }
-    assert mg_magnifying_lever_spec.DRAWING_DIMENSIONS["ScrewSeat"] == {
-        "ScrewSeatStart",
-        "ScrewSeatLen",
     }
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "curate_hidden_dimensions(" in source
@@ -86,10 +80,7 @@ def test_stock_diameter_is_plain_stock_on_the_side_view() -> None:
         '        "vertical_distance",\n        ROD_DIA,\n        "rod stock RodDia",'
     ) in source
     assert 'set_dimension_prefix(adapter, "RodStock", "RodDia", "<MOD-DIAM>")' in source
-    assert (
-        'blank_reference_sketches(adapter, ("PressZone", "RodStock", "ScrewSeat"))'
-        in source
-    )
+    assert 'blank_reference_sketches(adapter, ("PressZone", "RodStock"))' in source
     assert "add_centerline(\n            ROD_DIA_STATION" not in source
     assert part.ROD_DIA_STATION == part.ROD_LENGTH / 2.0
     assert part.R == press.ROD_DIA / 2.0
@@ -541,8 +532,9 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 def test_sheet_carries_no_note_block() -> None:
     """r1 review over-specification: the zone's selection, how to hold the
     rod and the press force are the MHA-MG-000 assembly's step, the stock is a
-    plain Ø and the zone and the screw seat are callouts at their features --
-    so the sheet carries no note block (drawing-guidelines.md rule 7)."""
+    plain Ø, the zone carries callouts at its features and the screw seat's
+    reason stands at its Ra symbol -- so the sheet carries no note block
+    (drawing-guidelines.md rule 7)."""
     assert not hasattr(mg_magnifying_lever_spec, "DRAWING_NOTES")
     for script in (part.__file__, drawing.__file__):
         assert "Manufacturing Notes" not in Path(script).read_text(encoding="utf-8")
@@ -565,12 +557,13 @@ def test_view_scales_are_explicit() -> None:
 
 
 def test_rod_od_carries_one_clamp_screw_seat_finish() -> None:
-    """Owner ruling (supersedes r1's "no finish"): the MHA-MG-002 clamp's
-    thumb screw pinches the OD where the clamp is set, a static locating seat
-    -- Ra 3.2 (drawing-guidelines.md rule 6).  The seat is every station the
-    screw's tip can bear on over the block's travel between the west tip and
-    the collar, from the live output.yaml stations and the clamp geometry,
-    rounded outward; the part owns the one control, the sheet consumes it."""
+    """Owner rulings 2026-10-17 (supersede r1's "no finish"): the MHA-MG-002
+    clamp's thumb screw pinches the Ø6 body where the clamp is set, a static
+    locating seat -- Ra 3.2 (drawing-guidelines.md rule 6), on the WHOLE Ø6
+    face as on the MHA-MG-004 vertical rod, no seat-zone lengths.  The screw's
+    reach over the block's travel, from the live output.yaml stations and the
+    clamp geometry, lies on that one face; the part owns the one control, the
+    sheet consumes it."""
     import mg_lever_press_fit_geom as press
     import mg_magnifying_clamp_geom as clamp
     import mg_magnifying_lever_geom as geom
@@ -578,38 +571,48 @@ def test_rod_od_carries_one_clamp_screw_seat_finish() -> None:
     from _surface_finish import SEAT_UM
 
     spec = mg_magnifying_lever_spec
+    # Screw on the hex axis = the block's centre along the rod, which slides
+    # from flush with the west tip to against the collar face.
     half_block = clamp.BLOCK_DEPTH / 2.0
-    # Screw on the hex axis = the block's centre along the rod.
+    _r_min, _r_as_built, r_max = geom.clamp_radius_band(clamp.BLOCK_DEPTH)
+    farthest = geom.KNIFE_LOCAL_X - r_max
     nearest = geom.COLLAR_LOCAL_X - geom.COLLAR_HALF_LEN - half_block
-    assert spec.CLAMP_SCREW_TRAVEL == pytest.approx((half_block, nearest))
-    assert (
-        spec.CLAMP_SCREW_TRAVEL[0] <= geom.CLAMP_LOCAL_X <= spec.CLAMP_SCREW_TRAVEL[1]
-    )
-    low, high = spec.SCREW_SEAT_X
-    assert low <= half_block - SHANK_DIA / 2.0 < low + spec.SCREW_SEAT_STEP
-    assert high - spec.SCREW_SEAT_STEP < nearest + SHANK_DIA / 2.0 <= high
-    assert spec.SCREW_SEAT_X == (4.5, 150.5)  # the current stations
-    assert spec.SCREW_SEAT_LENGTH == pytest.approx(high - low)
-    # On the straight OD, short of the press zone's land.
-    assert press.ROD_DIA / 2.0 <= low and high <= geom.PRESS_ZONE_X[0]
+    assert farthest == pytest.approx(half_block)
+    assert farthest <= geom.CLAMP_LOCAL_X <= nearest
+    reach = (farthest - SHANK_DIA / 2.0, nearest + SHANK_DIA / 2.0)
+    assert reach == pytest.approx((4.993, 150.007), abs=1e-3)  # the current stations
+    # The reach lies on the body's one Ø6 face: the revolve's single top line
+    # runs dome tangent to dome tangent, through the press zone.
+    assert "await adapter.add_line(R, R, ROD_LENGTH - R, R)" in Path(
+        part.__file__
+    ).read_text(encoding="utf-8")
+    assert part.R <= reach[0] < reach[1] <= part.ROD_LENGTH - part.R
+    assert geom.PRESS_ZONE_X[0] < part.ROD_LENGTH - part.R
     (control,) = spec.SURFACE_FINISHES
     assert control.key == "clamp_screw_seat"
     assert control.roughness_um == SEAT_UM == 3.2
     assert control.production_method == ""
     assert control.face.diameter_mm == press.ROD_DIA
-    assert low < control.face.contains_x_mm < high
+    # The whole face: no station narrows it to a zone.
+    assert control.face.contains_x_mm is None
+    assert control.face.contains_y_mm is None and control.face.contains_z_mm is None
     assert spec.SCREW_SEAT_CALLOUT == "MHA-MG-002 SCREW SEAT"
-    assert drawing.REFERENCE_CALLOUTS["ScrewSeatLen"] is spec.SCREW_SEAT_CALLOUT
-    assert spec.DRAWING_PRECISION["ScrewSeat"] == {
-        "ScrewSeatStart": 1,
-        "ScrewSeatLen": 1,
-    }
+    # Clean cutover from the r15 seat zone: no sketch, dims or plumbing left.
+    for name in (
+        "SCREW_SEAT_X",
+        "SCREW_SEAT_LENGTH",
+        "SCREW_SEAT_STEP",
+        "CLAMP_SCREW_TRAVEL",
+    ):
+        assert not hasattr(spec, name), name
+    assert "ScrewSeat" not in spec.DRAWING_DIMENSIONS
+    assert "ScrewSeat" not in spec.DRAWING_PRECISION
+    assert not hasattr(part, "SCREW_SEAT_LINE")
     build_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in build_source
-    assert 'name_last_feature(adapter, "ScrewSeat")' in build_source
-    assert 'seat.record("ScrewSeatTop", \'"RodDia" / 2\')' in build_source
-    assert part.SCREW_SEAT_LINE == ((low, part.R), (high, part.R))
     sheet_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for source in (build_source, sheet_source):
+        assert "ScrewSeat" not in source and "SCREW_SEAT_X" not in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in build_source
     assert sheet_source.count("add_surface_finish(\n") == 1
     assert 'surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat")' in sheet_source
     # Attached to the OD's face, not its top silhouette: the front view lies
@@ -621,57 +624,54 @@ def test_rod_od_carries_one_clamp_screw_seat_finish() -> None:
     assert 'entity_type="SILHOUETTE"' not in sheet_source
     assert "edge_xy=SEAT_FINISH_PICK" in sheet_source
     assert "leader_attach_xy=SEAT_FINISH_PICK" in sheet_source
-    # The leader lands on the OD's face, inside the seat.
+    # The leader lands on the OD's face, inside the screw's reach.
     pick_x, pick_y = drawing.SEAT_FINISH_PICK
     assert drawing.FRONT_CENTER[1] < pick_y < drawing._ROD_TOP_Y
     assert pick_y == pytest.approx((drawing.FRONT_CENTER[1] + drawing._ROD_TOP_Y) / 2)
     station = (pick_x - drawing._ROD_WEST_TIP_X) * 1000.0
-    assert low < station < high
+    assert reach[0] < station < reach[1]
     # Clear of the stock diameter's points (mid-length +/- R).
     assert abs(station - part.ROD_DIA_STATION) > part.R + 5.0
 
 
-def test_screw_seat_text_clears_the_other_blocks() -> None:
-    """The seat's start and length chain on one line above the rod, over the
-    stock diameter's row and left of the zone diameter's block; the start's
-    lone row clear left of the west tip's extension line; the finish symbol
-    between the rod and that line, west of the stock diameter."""
+def test_screw_seat_reason_stands_at_its_symbol() -> None:
+    """Machinist review r4: the seat's reason, a callout on the old seat
+    length 15 mm over the symbol, read as detached from it.  It is now one
+    free row in the front view directly over the Ra 3.2 symbol, left-aligned
+    with it, clear of the Ø6.0's row and west of the zone diameter's block;
+    its text is the spec's, no dimension and no method."""
     spec = mg_magnifying_lever_spec
-    places = spec.DRAWING_PRECISION["ScrewSeat"]
-    len_x, len_y = drawing.REFERENCE_KEEP["ScrewSeatLen"]
-    start_x, start_y = drawing.REFERENCE_KEEP["ScrewSeatStart"]
-    len_rows = [
-        f"{spec.SCREW_SEAT_LENGTH:.{places['ScrewSeatLen']}f}",
-        *spec.SCREW_SEAT_CALLOUT.split("\n"),
-    ]
-    start_rows = [f"{spec.SCREW_SEAT_X[0]:.{places['ScrewSeatStart']}f}"]
-    assert len_rows[0] == "146.0" and start_rows == ["4.5"]
-    len_half_w, len_half_h = _block_half_extent(len_rows)
-    start_half_w, _ = _block_half_extent(start_rows)
-    # One dimension line: the length's lowest baseline, the start's lone row.
-    len_line = len_y - len_half_h
-    assert start_y - _LONE_ROW_DROP == pytest.approx(len_line, abs=1e-5)
-    # The length's rows sit inside the seat's extension lines.
-    west = drawing._ROD_WEST_TIP_X + spec.SCREW_SEAT_X[0] / 1000.0
-    east = drawing._ROD_WEST_TIP_X + spec.SCREW_SEAT_X[1] / 1000.0
-    assert west < len_x - len_half_w and len_x + len_half_w < east
-    # The start's row clear left of the west tip's line by an arrow's air.
-    assert start_x + start_half_w <= drawing._ROD_WEST_TIP_X - 0.002
-    # Above the stock diameter's lone row, by >= 10 mm.
-    dia_x, dia_y = drawing.REFERENCE_KEEP["RodDia"]
-    assert len_line - (dia_y + _TEXT_HEIGHT / 2.0) >= 0.010
-    # The seat's east extension line stays >= 4 mm west of the zone-start
-    # line, itself west of the zone diameter's line (its block hangs right).
-    assert (
-        east + 0.004
-        < drawing._PRESS_ZONE_START_X
-        < drawing.REFERENCE_KEEP["PressZoneDia"][0]
+    text = spec.SCREW_SEAT_CALLOUT
+    assert "\n" not in text
+    assert not set("()±/").intersection(text) and "MIN" not in text
+    sheet_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "add_note(adapter, SCREW_SEAT_CALLOUT, *SEAT_REASON_XY)" in sheet_source
+    # Placed after the symbol, in the front view.
+    assert sheet_source.index("_add_seat_reason(adapter, front)") > sheet_source.index(
+        "add_surface_finish(\n"
     )
-    # The finish symbol: above the rod, under the seat's line, between the
-    # west extension lines and the stock diameter.
+    assert "ActivateView(name)" in sheet_source
+    assert text not in drawing.REFERENCE_CALLOUTS.values()
+    # A note's position is its top-left corner.
+    left, top = drawing.SEAT_REASON_XY
+    right = left + _CHAR_WIDTH * len(text)
+    bottom = top - _TEXT_HEIGHT
     sym_x, sym_y = drawing.SEAT_FINISH_SYMBOL
-    assert drawing._ROD_TOP_Y + 0.008 < sym_y < len_line - 0.010
-    assert west + 0.010 < sym_x < dia_x - 0.030
+    # The symbol's ink reached 7.2 mm over its root on r15: the row stands
+    # just over it (>= 1.5 mm air, <= 15 mm from the root) and starts within
+    # 3 mm of the symbol's x.
+    assert sym_y + 0.0072 + 0.0015 <= bottom
+    assert top - sym_y <= 0.015
+    assert abs(left - sym_x) <= 0.003
+    # The symbol itself: above the rod, west of the stock diameter.
+    dia_x, dia_y = drawing.REFERENCE_KEEP["RodDia"]
+    assert drawing._ROD_TOP_Y + 0.008 < sym_y
+    assert drawing._ROD_WEST_TIP_X + 0.010 < sym_x < dia_x - 0.030
+    # Over the Ø6.0's lone row by >= 3 mm, on the sheet right of the west tip,
+    # and west of the zone diameter's line (its block hangs right of it).
+    assert bottom - (dia_y + _TEXT_HEIGHT / 2.0) >= 0.003
+    assert left > drawing._ROD_WEST_TIP_X
+    assert right + 0.020 < drawing.REFERENCE_KEEP["PressZoneDia"][0]
 
 
 def test_reference_sketches_print_only_the_zone_start_inside_the_rod() -> None:
@@ -694,11 +694,7 @@ def test_reference_sketches_print_only_the_zone_start_inside_the_rod() -> None:
     assert part.R < bottom[0] < part.ROD_LENGTH - part.R
     assert offset(*bottom) == offset(*top) == 0.0
     assert bottom[1] == -part.R and top[1] == part.R
-    for start, end in (
-        part.PRESS_ZONE_WITNESS,
-        *part.ROD_STOCK_LINES,
-        part.SCREW_SEAT_LINE,
-    ):
+    for start, end in (part.PRESS_ZONE_WITNESS, *part.ROD_STOCK_LINES):
         assert start[1] == end[1]
         assert part.R <= start[0] < end[0] <= part.ROD_LENGTH - part.R
         assert offset(*start) == offset(*end) == 0.0
@@ -734,3 +730,18 @@ def test_part_stamps_make_critical_properties() -> None:
     # The clamp block still slides along the rod; the tip end is pressed.
     assert config["fit_class"] == "shaft_in_bushing"
     assert "MHA-MG-001" in config["process"]
+
+
+def test_machinist_exception_accepts_the_owner_ruled_seat_finish() -> None:
+    """Owner ruling 2026-10-17: the Ra 3.2 on the Ø6 body is the MHA-MG-002
+    clamp screw's functional seat (rule 6), declared so the reviewer does not
+    re-file it as a symbol on a clamp face."""
+    from machinist_exceptions import load_exceptions
+
+    config_root = Path(part.__file__).resolve().parents[1] / "config"
+    (entry,) = load_exceptions(config_root, "mg_magnifying_lever", "part")
+    assert (entry.id, entry.kind) == ("RV-01", "accept")
+    assert "Ra 3.2" in entry.where and "Ø6 body" in entry.where
+    assert "rule 6" in entry.finding and "rule 6" in entry.reason
+    assert "owner ruling 2026-10-17" in entry.reason
+    assert "MHA-MG-002" in entry.reason
