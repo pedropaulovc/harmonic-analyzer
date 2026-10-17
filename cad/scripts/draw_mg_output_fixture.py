@@ -20,11 +20,11 @@ to the corner's arc.  The end view looks at the spigot face: its ``*Right``
 orientation is turned by the measured projected axes until -Z points up,
 matching the side view, and -Y points right.  Its origin is pinned to the
 side view's origin height.  The flats' stock reference, (11.113), stands
-vertically, and the #4-40 native callout states the controlling drill depth
-and reference thread depth, (10.1), INTO BORE.  One native centreline
-identifies the rod bore's Y axis through the corners, independently of the
-axial tap's small centre mark.  Hidden lines stay off: the standard holes'
-callouts define them.
+vertically, and the #4-40 native callout states the controlling drill depth,
+the reference thread depth, (10.1), and, on its own row under the thread,
+FULL THREAD TO ROD BORE.  One native centreline identifies the rod bore's Y
+axis through the corners, independently of the axial tap's small centre
+mark.  Hidden lines stay off: the standard holes' callouts define them.
 
 Run with SolidWorks open::
 
@@ -39,6 +39,7 @@ import math
 import re
 import sys
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -108,6 +109,7 @@ from mg_output_fixture_spec import (
     TAP_CALLOUT_PRECISION,
     TAP_DEPTH_PLACES,
     TAP_DRILL_DEPTH_VARIABLE,
+    TAP_EXTENT_CALLOUT,
     TAP_PROCESS,
     TAP_SPEC,
     TAP_THREAD_DEPTH_VARIABLE,
@@ -357,15 +359,22 @@ END_KEEP = {
 }
 # The tap callout reads right of the end view at the hole's height.  Its
 # shoulder clears the corner and the small tap cross; AF witnesses run left.
-# ``callout_xy`` is the text's centre; the shoulder sits under the bottom
-# row, ~5.6 mm below it (the v1 sheet's ink: centre
-# (292, 134), shoulder end (254.0, 128.4)).  The v1 sheet's 28-glyph thread
-# row, TAP TO BORE 4-40 UNC-2B THRU, ran ~76 mm; retry09's
-# TAP INTO BORE 4-40 UNC - 2B (depth) 10.1 printed 81.7 mm, centred on
-# callout_xy (20261012T124257186Z).  The reference brackets, (10.1), add two
-# ~1.2 mm glyphs: ~84 mm, inside the ~87 mm this half width holds.
-_TAP_CALLOUT_HALF_WIDTH = 0.0435
-_TAP_CALLOUT_SHOULDER_DROP = 0.0056
+# ``callout_xy`` is the text block's centre both ways (the r3 sheet,
+# 20261017T032030239Z: two rows inked centred at (336.9, 189.35) mm for
+# (337.2, 189.6)), and the shoulder sits under the bottom row: 5.6 mm under a
+# two-row block's centre (the v1 and r3 sheets' ink).  The rows pitch 6.0 mm
+# (r3), so the extent row, FULL THREAD TO ROD BORE, grows the block a pitch
+# about its centre: the centre rises half a pitch more and the shoulder stays
+# 4 mm over the hole, its leader rising to it, not lying along the bore's
+# centreline.  Widths, in r3's 3.4 mm capitals: TAP INTO BORE 4-40 UNC - 2B
+# (depth) (10.1) printed 85.0 mm; less INTO BORE, the thread row is ~59.3 mm;
+# r3's general note FULL THREAD TO ROD BORE. printed 61.2 mm in the same
+# capitals, so the extent row is ~60.2 mm without its full stop.  This half
+# width holds ~63 mm, the widest row and the 1.5 mm a side the two-row half
+# width (87 mm over ~84) kept, so the text still starts ~6 mm off the corner.
+_TAP_CALLOUT_HALF_WIDTH = 0.0316
+_TAP_CALLOUT_ROW_PITCH = 0.0060
+_TAP_CALLOUT_SHOULDER_DROP = 0.0056 + _TAP_CALLOUT_ROW_PITCH / 2.0
 TAP_CALLOUT_XY = (
     END_CENTER[0] + _END_HALF_WIDTH + 0.006 + _TAP_CALLOUT_HALF_WIDTH,
     END_CENTER[1] + 0.004 + _TAP_CALLOUT_SHOULDER_DROP,
@@ -842,21 +851,32 @@ def _states_depth(text: str, depth_mm: float, *, reference: bool) -> bool:
 
 def _tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
     """Whether the thumb-screw tap's callout reads as a blind tap into the
-    bore: one thread row carries the process, the thread, its class and its
-    nominal thread depth as a reference, (10.1), never bare; the drill row
-    its controlling depth, bare; nothing is banded; and nothing says THRU
-    (the tap stops in the bore, short of its far wall)."""
+    bore: the prefix row opens with the process and carries the thread, its
+    class and its nominal thread depth as a reference, (10.1), never bare;
+    the below row, under it, the thread's extent, FULL THREAD TO ROD BORE,
+    stated nowhere else; the drill row its controlling depth, bare; nothing
+    is banded; and nothing says THRU (the tap stops in the bore, short of its
+    far wall)."""
     lines = [text for text in resolved_parts.values() if text.strip()]
     thread = [text for text in lines if _TAP_THREAD_TEXT in text]
-    drill = [text for text in lines if _TAP_THREAD_TEXT not in text]
+    drill = [
+        text
+        for text in lines
+        if _TAP_THREAD_TEXT not in text and TAP_EXTENT_CALLOUT not in text
+    ]
+    prefix = resolved_parts.get(_CALLOUT_DEFINITION_PARTS[_CALLOUT_PREFIX_DEFINITION], "")
+    below = resolved_parts.get(_CALLOUT_DEFINITION_PARTS[_CALLOUT_BELOW_DEFINITION], "")
     return (
         not any("THRU" in text for text in lines)
         and not any(mark in text for text in lines for mark in _BAND_MARKS)
         and len(thread) == 1
-        and TAP_PROCESS in thread[0]
+        and thread[0] == prefix
+        and thread[0].lstrip().startswith(f"{TAP_PROCESS} ")
         and TAP_SPEC.thread_class in thread[0]
         and _states_depth(thread[0], TAP_LENGTH, reference=True)
         and not _states_depth(thread[0], TAP_LENGTH, reference=False)
+        and below.strip() == TAP_EXTENT_CALLOUT
+        and sum(TAP_EXTENT_CALLOUT in text for text in lines) == 1
         and any(_states_depth(text, TAP_DRILL_DEPTH, reference=False) for text in drill)
         and not any(_states_depth(text, TAP_DRILL_DEPTH, reference=True) for text in lines)
     )
@@ -865,8 +885,11 @@ def _tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
 # swDimensionTextParts_e: a hole callout's definitions (5-8: prefix, suffix,
 # callout above, callout below) and the writable part each is set through
 # (1-4), as draw_fr_harmonic_base._set_cross_tap_callout_text writes 3 and
-# reads back 7.
+# reads back 7.  The native thread row is the prefix's (retry09), so the
+# below definition prints the extent row directly under the thread.
 _CALLOUT_DEFINITION_PARTS = {5: 1, 6: 2, 7: 3, 8: 4}
+_CALLOUT_PREFIX_DEFINITION = 5
+_CALLOUT_BELOW_DEFINITION = 8
 _THREAD_DEPTH_TOKEN = f"<{TAP_THREAD_DEPTH_VARIABLE}>"
 _DRILL_DEPTH_TOKEN = f"<{TAP_DRILL_DEPTH_VARIABLE}>"
 
@@ -897,36 +920,90 @@ def reference_thread_depth_definitions(definitions: dict[int, str]) -> dict[int,
     }
 
 
+def thread_extent_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """The callout's definitions with the thread's extent,
+    ``TAP_EXTENT_CALLOUT``, written into the empty below definition, so it
+    prints as a row under the thread, and every other definition as it was.
+
+    The prefix definition must hold the thread depth (the row the extent
+    reads under is the thread's), the below definition must be empty, and
+    nothing may state the extent yet (draw_sm_knife_mount's reason row).
+    """
+    if (
+        _THREAD_DEPTH_TOKEN not in definitions[_CALLOUT_PREFIX_DEFINITION]
+        or definitions[_CALLOUT_BELOW_DEFINITION].strip()
+        or any(TAP_EXTENT_CALLOUT in text for text in definitions.values())
+    ):
+        raise RuntimeError(
+            f"expected {_THREAD_DEPTH_TOKEN} in the prefix definition, an empty "
+            f"below definition and no {TAP_EXTENT_CALLOUT!r} in the tap callout's "
+            f"definitions: {definitions!r}"
+        )
+    return {**definitions, _CALLOUT_BELOW_DEFINITION: TAP_EXTENT_CALLOUT}
+
+
+def _write_tap_definition(
+    display: Any,
+    wanted_of: Callable[[dict[int, str]], dict[int, str]],
+    *,
+    failure: str,
+    success: str,
+) -> None:
+    """Write the one callout definition ``wanted_of`` changes and read all
+    four back: every other definition, the process prefix and the bare drill
+    depth included, must hold as it was."""
+    before = {part: str(display.GetText(part) or "") for part in _CALLOUT_DEFINITION_PARTS}
+    wanted = wanted_of(before)
+    (part,) = [part for part in before if wanted[part] != before[part]]
+    display.SetText(_CALLOUT_DEFINITION_PARTS[part], wanted[part])
+    after = {part: str(display.GetText(part) or "") for part in _CALLOUT_DEFINITION_PARTS}
+    if after != wanted:
+        raise RuntimeError(
+            f"thumb-screw tap {failure}: wanted {wanted!r}, read {after!r}"
+        )
+    _telemetry.success(f"thumb-screw tap {success}: definition {part} {wanted[part]!r}")
+
+
 def _reference_thread_depth(display: Any) -> None:
     """Bracket the native callout's thread depth as REF, in the definition.
 
     Only the definition holding the thread depth is written; the readback
     must hold all four, the process prefix and the bare drill depth included.
     """
-    before = {part: str(display.GetText(part) or "") for part in _CALLOUT_DEFINITION_PARTS}
-    wanted = reference_thread_depth_definitions(before)
-    (part,) = [part for part in before if wanted[part] != before[part]]
-    display.SetText(_CALLOUT_DEFINITION_PARTS[part], wanted[part])
-    after = {part: str(display.GetText(part) or "") for part in _CALLOUT_DEFINITION_PARTS}
-    if after != wanted:
-        raise RuntimeError(
-            f"thumb-screw tap thread depth did not persist as REF: wanted {wanted!r}, "
-            f"read {after!r}"
-        )
-    _telemetry.success(
-        f"thumb-screw tap thread depth bracketed REF: definition {part} {wanted[part]!r}"
+    _write_tap_definition(
+        display,
+        reference_thread_depth_definitions,
+        failure="thread depth did not persist as REF",
+        success="thread depth bracketed REF",
+    )
+
+
+def _state_thread_extent(display: Any) -> None:
+    """Write the thread's extent as the callout's row under the thread
+    (drawing-guidelines.md rule 7: on the feature, not a general note).
+
+    Only the below definition is written; the readback must hold all four,
+    the bracketed REF thread depth included.
+    """
+    _write_tap_definition(
+        display,
+        thread_extent_definitions,
+        failure="extent row did not persist",
+        success="extent row stated",
     )
 
 
 def _check_tap_callout(display: Any) -> None:
-    """Prove the callout states the tap, its depths and its process."""
+    """Prove the callout states the tap, its depths, its process and the
+    thread's extent."""
     resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
     if not _tap_callout_resolved(resolved):
         raise RuntimeError(
             f"thumb-screw tap callout does not state {TAP_PROCESS} "
             f"{_TAP_THREAD_TEXT}-{TAP_SPEC.thread_class} to "
             f"({TAP_LENGTH:.{TAP_DEPTH_PLACES}f}) REF over a bare "
-            f"{TAP_DRILL_DEPTH:.{TAP_DEPTH_PLACES}f} drill: {resolved!r}"
+            f"{TAP_DRILL_DEPTH:.{TAP_DEPTH_PLACES}f} drill, {TAP_EXTENT_CALLOUT} "
+            f"under the thread: {resolved!r}"
         )
     _telemetry.success(f"thumb-screw tap callout reads {resolved!r}")
 
@@ -1375,9 +1452,9 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add the rod bore's center mark to the side view")
     # The tap drill's edge on the spigot face: the one visible circle of the
     # Hole Wizard feature from the end.  Its axis carries the view's one
-    # centre mark, and the native callout prints the drill row and, under
-    # it, the process on the thread row; both depths print at one place, the
-    # thread's bracketed as REF.
+    # centre mark, and the native callout prints the drill row, under it the
+    # process on the thread row, and under that the thread's extent; both
+    # depths print at one place, the thread's bracketed as REF.
     tap_drill = visible_circle_edge(adapter, end, TAP_DRILL_DIA)
     tap_mark = _prove_tap_centre_mark(adapter, end, tap_drill)
     bore_axis, bore_face = _add_rod_bore_axis(adapter, end, tap_mark)
@@ -1390,6 +1467,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process=TAP_PROCESS,
     )
     _reference_thread_depth(tap_callout)
+    _state_thread_extent(tap_callout)
     set_hole_callout_precision(
         tap_callout, TAP_CALLOUT_PRECISION, label="#4-40 thumb-screw tap depths"
     )

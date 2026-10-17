@@ -217,9 +217,10 @@ def test_bore_is_centred_and_its_walls_take_the_drill_run_off() -> None:
     assert spec.WALLS["rod bore to the free end"][1] == pytest.approx(
         5.30 - 0.51 - largest_bore_r - wander, abs=1e-9
     )
+    # Review r3 (rule 7): the thread's extent reads on the tap callout, so the
+    # general notes keep only the stock.
     assert spec.DRAWING_NOTES.splitlines() == [
         "7/16 HEX BAR, FLATS AS SUPPLIED.",
-        "FULL THREAD TO ROD BORE.",
     ]
     # Nothing locates the bore from a flat any longer: the hex sketch centres
     # it by equal flats.
@@ -248,7 +249,9 @@ def test_thumb_screw_tap_runs_axially_into_the_rod_bore() -> None:
     assert geom.TAP_DRILL_DIA < geom.ROD_BORE_DIA
     # Full thread from the face to the bore, well over 1.5D.
     assert geom.TAP_LENGTH >= 1.5 * geom.THREAD_MAJOR
-    assert spec.TAP_PROCESS == "TAP INTO BORE"
+    # The extent row under the thread says INTO the bore; the prefix only
+    # names the work.
+    assert spec.TAP_PROCESS == "TAP"
     assert spec.TAP_DEPTH_PLACES == 1
     assert spec.TAP_CALLOUT_PRECISION == {"hw-tapdrldepth": 1, "hw-threaddepth": 1}
 
@@ -287,7 +290,8 @@ def test_a_bottoming_tap_reaches_full_thread_through_the_wall_and_stops_short() 
     # The plug tap the sheet asked for before (3-5 thread chamfer) cannot
     # reach full thread at the worst case: 11.146 + 3.175 = 14.32 > 14.29.
     assert deepest_wall + 5.0 * pitch > reach
-    assert spec.TAP_EXTENT_NOTE in spec.DRAWING_NOTES.splitlines()
+    assert spec.TAP_EXTENT_CALLOUT == "FULL THREAD TO ROD BORE"
+    assert spec.TAP_EXTENT_CALLOUT not in spec.DRAWING_NOTES
     for retired in ("PLUG_TAP_USABLE_LENGTH", "PLUG_TAP_LEAD", "TAP_TOOL_NOTE"):
         assert not hasattr(spec, retired), retired
     # The tap drill's full Ø clears the near wall; its point stops short of
@@ -484,11 +488,16 @@ def _code_strings(tree: ast.Module) -> list[str]:
 def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
     # The native thread depth is the nominal wall on the tap's axis; the
     # callout brackets it as REF, so no .X band (10.1 +/-0.8 would admit 9.3)
-    # governs the thread's extent: the rod bore does (the note).  Review09:
-    # a bare 10.1 in the callout read as controlling while the note said REF.
-    assert spec.TAP_EXTENT_NOTE == "FULL THREAD TO ROD BORE."
+    # governs the thread's extent: the rod bore does (the callout's extent
+    # row).  Review09: a bare 10.1 in the callout read as controlling while the
+    # note said REF.  Review r3 (rule 7): the extent sat in a general note far
+    # from the tap; it is the callout's own row now, words only (the bore's Ø
+    # is its own native dimension; a typed Ø5.2 would not follow the model).
+    assert spec.TAP_EXTENT_CALLOUT == "FULL THREAD TO ROD BORE"
+    assert not any(ch.isdigit() for ch in spec.TAP_EXTENT_CALLOUT)
+    assert not hasattr(spec, "TAP_EXTENT_NOTE")
     assert "REF" not in spec.DRAWING_NOTES
-    assert spec.TAP_EXTENT_NOTE in spec.DRAWING_NOTES.splitlines()
+    assert "FULL THREAD" not in spec.DRAWING_NOTES
     assert geom.TAP_SPEC.overrides_mm["ThreadDepth"] == geom.TAP_LENGTH
     assert geom.TAP_LENGTH == pytest.approx(geom.SPIGOT_FACE_X - geom.ROD_BORE_DIA / 2.0)
     assert set(spec.TAP_CALLOUT_PRECISION) == {
@@ -517,55 +526,57 @@ def _build_calls_in_order(names: set[str]) -> list[str]:
 
 
 def test_the_thread_depth_is_bracketed_between_the_callout_and_its_checks() -> None:
-    # Bracketed before the precision write and the resolved-text proof, so
-    # both run on the definition that prints.
+    # Bracketed and the extent row written before the precision write and the
+    # resolved-text proof, so both run on the definitions that print.
     assert _build_calls_in_order(
         {
             "add_native_hole_callout",
             "_reference_thread_depth",
+            "_state_thread_extent",
             "set_hole_callout_precision",
             "_check_tap_callout",
         }
     ) == [
         "add_native_hole_callout",
         "_reference_thread_depth",
+        "_state_thread_extent",
         "set_hole_callout_precision",
         "_check_tap_callout",
     ]
 
 
 # Retry09's definitions, as the resolved parts imply (prefix 5 carries the
-# process and the thread row, callout-above 7 the drill row).
-_RETRY09_DEFINITIONS = {
-    5: "TAP INTO BORE <hw-thread> <HOLE-DEPTH> <hw-threaddepth>",
+# process and the thread row, callout-above 7 the drill row), under today's
+# process.
+_NATIVE_DEFINITIONS = {
+    5: "TAP <hw-thread> <HOLE-DEPTH> <hw-threaddepth>",
     6: "",
     7: "<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH> <hw-tapdrldepth>",
     8: "",
 }
+_REFERENCED_DEFINITIONS = {
+    **_NATIVE_DEFINITIONS,
+    5: "TAP <hw-thread> <HOLE-DEPTH> (<hw-threaddepth>)",
+}
 
 
 def test_thread_depth_definition_gains_reference_brackets_only() -> None:
-    updated = drawing.reference_thread_depth_definitions(dict(_RETRY09_DEFINITIONS))
-    assert updated == {
-        5: "TAP INTO BORE <hw-thread> <HOLE-DEPTH> (<hw-threaddepth>)",
-        6: "",
-        7: "<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH> <hw-tapdrldepth>",
-        8: "",
-    }
+    updated = drawing.reference_thread_depth_definitions(dict(_NATIVE_DEFINITIONS))
+    assert updated == _REFERENCED_DEFINITIONS
 
 
 @pytest.mark.parametrize(
     "definitions",
     [
         # Already bracketed: someone else's edit, not the native definition.
-        {**_RETRY09_DEFINITIONS, 5: "TAP INTO BORE <hw-thread> <HOLE-DEPTH> (<hw-threaddepth>)"},
+        _REFERENCED_DEFINITIONS,
         # No thread depth to bracket.
-        {**_RETRY09_DEFINITIONS, 5: "TAP INTO BORE <hw-thread>"},
+        {**_NATIVE_DEFINITIONS, 5: "TAP <hw-thread>"},
         # Two thread depths: which one is the reference is a guess.
-        {**_RETRY09_DEFINITIONS, 8: "<hw-threaddepth>"},
+        {**_NATIVE_DEFINITIONS, 8: "<hw-threaddepth>"},
         # The controlling drill depth missing, or bracketed.
-        {**_RETRY09_DEFINITIONS, 7: "<MOD-DIAM><hw-tapdrldia>"},
-        {**_RETRY09_DEFINITIONS, 7: "<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH> (<hw-tapdrldepth>)"},
+        {**_NATIVE_DEFINITIONS, 7: "<MOD-DIAM><hw-tapdrldia>"},
+        {**_NATIVE_DEFINITIONS, 7: "<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH> (<hw-tapdrldepth>)"},
     ],
 )
 def test_thread_depth_definition_refuses_anything_but_one_bare_variable(
@@ -594,17 +605,66 @@ class _CalloutDisplay:
 
 
 def test_reference_thread_depth_writes_one_definition_and_reads_all_back() -> None:
-    display = _CalloutDisplay(_RETRY09_DEFINITIONS)
+    display = _CalloutDisplay(_NATIVE_DEFINITIONS)
     drawing._reference_thread_depth(display)
-    assert display.writes == [
-        (1, "TAP INTO BORE <hw-thread> <HOLE-DEPTH> (<hw-threaddepth>)")
-    ]
-    assert display.definitions[7] == _RETRY09_DEFINITIONS[7]
+    assert display.writes == [(1, _REFERENCED_DEFINITIONS[5])]
+    assert display.definitions == _REFERENCED_DEFINITIONS
 
 
 def test_reference_thread_depth_fails_when_the_write_does_not_persist() -> None:
     with pytest.raises(RuntimeError, match="did not persist as REF"):
-        drawing._reference_thread_depth(_CalloutDisplay(_RETRY09_DEFINITIONS, persist=False))
+        drawing._reference_thread_depth(_CalloutDisplay(_NATIVE_DEFINITIONS, persist=False))
+
+
+def test_thread_extent_is_the_below_definition_under_the_thread() -> None:
+    # The prefix carries the thread row, so the below definition prints the
+    # extent directly under it; nothing else changes.
+    assert drawing.thread_extent_definitions(dict(_REFERENCED_DEFINITIONS)) == {
+        **_REFERENCED_DEFINITIONS,
+        8: "FULL THREAD TO ROD BORE",
+    }
+
+
+@pytest.mark.parametrize(
+    "definitions",
+    [
+        # The below row already holds text: someone else's row.
+        {**_REFERENCED_DEFINITIONS, 8: "BREAK EDGE"},
+        # The extent already stated, here or on another row.
+        {**_REFERENCED_DEFINITIONS, 8: "FULL THREAD TO ROD BORE"},
+        {**_REFERENCED_DEFINITIONS, 6: " FULL THREAD TO ROD BORE"},
+        # The thread row is not the prefix's: the below row would sit under
+        # something else.
+        {
+            **_REFERENCED_DEFINITIONS,
+            5: "TAP",
+            7: "<hw-thread> <HOLE-DEPTH> (<hw-threaddepth>)",
+        },
+    ],
+)
+def test_thread_extent_refuses_anything_but_an_empty_below_row_under_the_thread(
+    definitions: dict[int, str],
+) -> None:
+    with pytest.raises(RuntimeError, match="empty below definition"):
+        drawing.thread_extent_definitions(definitions)
+
+
+def test_state_thread_extent_writes_the_below_definition_and_reads_all_back() -> None:
+    display = _CalloutDisplay(_REFERENCED_DEFINITIONS)
+    drawing._state_thread_extent(display)
+    assert display.writes == [(4, "FULL THREAD TO ROD BORE")]
+    assert display.definitions == {
+        **_REFERENCED_DEFINITIONS,
+        8: "FULL THREAD TO ROD BORE",
+    }
+
+
+def test_state_thread_extent_fails_when_the_write_does_not_persist() -> None:
+    with pytest.raises(RuntimeError, match="extent row did not persist"):
+        drawing._state_thread_extent(_CalloutDisplay(_REFERENCED_DEFINITIONS, persist=False))
+
+
+_EXTENT = "FULL THREAD TO ROD BORE"
 
 
 @pytest.mark.parametrize(
@@ -612,14 +672,25 @@ def test_reference_thread_depth_fails_when_the_write_does_not_persist() -> None:
     [
         (
             {
-                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
                 2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
                 3: "",
-                4: "",
+                4: _EXTENT,
             },
             True,
         ),
-        # Retry09's native reading (20261012T124257186Z), bracketed.
+        # Retry09's native reading (20261012T124257186Z), bracketed, under
+        # today's process and with the extent row under the thread.
+        (
+            {
+                1: "TAP 4-40 UNC - 2B <HOLE-DEPTH> (10.1)",
+                2: "",
+                3: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
+                4: _EXTENT,
+            },
+            True,
+        ),
+        # Review r3's print: the extent only in a general note, not here.
         (
             {
                 1: "TAP INTO BORE 4-40 UNC - 2B <HOLE-DEPTH> (10.1)",
@@ -627,35 +698,65 @@ def test_reference_thread_depth_fails_when_the_write_does_not_persist() -> None:
                 3: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
                 4: "",
             },
-            True,
+            False,
+        ),
+        # The extent over the drill row, not under the thread.
+        (
+            {
+                1: "TAP 4-40 UNC - 2B <HOLE-DEPTH> (10.1)",
+                2: "",
+                3: f"<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7\n{_EXTENT}",
+                4: "",
+            },
+            False,
+        ),
+        # The extent stated twice.
+        (
+            {
+                1: f"TAP 4-40 UNC - 2B <HOLE-DEPTH> (10.1) {_EXTENT}",
+                2: "",
+                3: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
+                4: _EXTENT,
+            },
+            False,
+        ),
+        # The thread row off the prefix: the below row would not sit under it.
+        (
+            {
+                1: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
+                2: "",
+                3: "TAP 4-40 UNC - 2B <HOLE-DEPTH> (10.1)",
+                4: _EXTENT,
+            },
+            False,
         ),
         # Retry09 as printed: a bare 10.1 reads as controlling (review09).
         (
             {
-                1: "TAP INTO BORE 4-40 UNC - 2B <HOLE-DEPTH> 10.1",
+                1: "TAP 4-40 UNC - 2B <HOLE-DEPTH> 10.1",
                 2: "",
                 3: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
-                4: "",
+                4: _EXTENT,
             },
             False,
         ),
         # The reference stated twice, once bare.
         (
             {
-                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.1) 10.1",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.1) 10.1",
                 2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
                 3: "",
-                4: "",
+                4: _EXTENT,
             },
             False,
         ),
         # The controlling drill depth bracketed as if it were REF.
         (
             {
-                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
                 2: "<MOD-DIAM>2.26 <HOLE-DEPTH> (12.7)",
                 3: "",
-                4: "",
+                4: _EXTENT,
             },
             False,
         ),
@@ -665,47 +766,47 @@ def test_reference_thread_depth_fails_when_the_write_does_not_persist() -> None:
                 1: "TAP TO BORE 4-40 UNC-2B THRU",
                 2: "<MOD-DIAM>2.26 THRU",
                 3: "",
-                4: "",
+                4: _EXTENT,
             },
             False,
         ),
         # Two places on the thread depth asks for the .XX band.
         (
             {
-                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.10)",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.10)",
                 2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
                 3: "",
-                4: "",
+                4: _EXTENT,
             },
             False,
         ),
-        # The thread without its extent.
+        # The thread without its process.
         (
             {
                 1: "4-40 UNC-2B <HOLE-DEPTH> (10.1)",
                 2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
                 3: "",
-                4: "",
+                4: _EXTENT,
             },
             False,
         ),
         # The drill row without its depth.
         (
             {
-                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.1)",
                 2: "<MOD-DIAM>2.26",
                 3: "",
-                4: "",
+                4: _EXTENT,
             },
             False,
         ),
         # A band on the REF thread depth.
         (
             {
-                1: "TAP INTO BORE 4-40 UNC-2B <HOLE-DEPTH> (10.1)<MOD-PM>0.8",
+                1: "TAP 4-40 UNC-2B <HOLE-DEPTH> (10.1)<MOD-PM>0.8",
                 2: "<MOD-DIAM>2.26 <HOLE-DEPTH> 12.7",
                 3: "",
-                4: "",
+                4: _EXTENT,
             },
             False,
         ),
@@ -749,8 +850,9 @@ def test_final_sheet_census_expects_no_tapped_hole_note_from_the_blind_tap() -> 
     note = drawing.TAPPED_HOLE_NOTE.lower()
     assert note in f"{geom.TAP_SPEC.size} Tapped Hole".lower()
     native_callout = (
-        "TAP INTO BORE 4-40 UNC - 2B <HOLE-DEPTH> (10.1)\n"
-        "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7"
+        "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7\n"
+        "TAP 4-40 UNC - 2B <HOLE-DEPTH> (10.1)\n"
+        "FULL THREAD TO ROD BORE"
     )
     assert note not in native_callout.lower()
 
@@ -1126,6 +1228,18 @@ def test_end_view_flats_read_vertically_left_of_the_hex_clear_of_the_tap() -> No
     text_left = drawing.TAP_CALLOUT_XY[0] - drawing._TAP_CALLOUT_HALF_WIDTH
     assert text_left > drawing.END_CENTER[0] + drawing._END_HALF_WIDTH + 0.005
     assert drawing.TAP_CALLOUT_XY[1] - drawing._TAP_CALLOUT_SHOULDER_DROP > af_y
+    # Three rows (drill, thread, FULL THREAD TO ROD BORE): the block grows a
+    # 6.0 mm pitch about its centre, so the centre rises half a pitch over
+    # the two-row 5.6 mm drop and the shoulder stays 4 mm over the hole.
+    assert drawing._TAP_CALLOUT_SHOULDER_DROP == pytest.approx(0.0056 + 0.0030)
+    assert drawing.TAP_CALLOUT_XY[1] - drawing._TAP_CALLOUT_SHOULDER_DROP == pytest.approx(
+        drawing.END_CENTER[1] + 0.004
+    )
+    # The widest row, the extent, holds inside the half width: r3 printed the
+    # same words with a full stop, in the same capitals, 61.2 mm wide.
+    assert 2.0 * drawing._TAP_CALLOUT_HALF_WIDTH > 0.0612
+    # Right of the hex and clear of the sheet's right border zone.
+    assert drawing.TAP_CALLOUT_XY[0] + drawing._TAP_CALLOUT_HALF_WIDTH < 0.400
 
 
 # Calls that add a centre mark; a comment naming one adds nothing.
@@ -1407,9 +1521,10 @@ def test_tap_centre_mark_unmeasured_fails(
 
 def test_notes_are_short() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
-    assert len(lines) == 2
+    # Review r3 (rule 7): the thread's extent is the tap callout's row, so
+    # the stock is the one general note.
+    assert lines == [spec.STOCK_NOTE]
     assert max(map(len, lines)) <= 68
-    assert spec.TAP_EXTENT_NOTE in lines
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
@@ -1433,7 +1548,7 @@ def test_notes_are_model_owned_and_state_no_wall() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '{"Manufacturing Notes": DRAWING_NOTES}' in source
     # Every wall holds the target (rule 20): no wall note survives.
-    assert spec.DRAWING_NOTES == "\n".join((spec.STOCK_NOTE, spec.TAP_EXTENT_NOTE))
+    assert spec.DRAWING_NOTES == spec.STOCK_NOTE
     for word in ("WALL", "MIN"):
         assert word not in spec.DRAWING_NOTES, word
     # r1: the corner-to-corner bore is drawn (the end view's centreline
