@@ -3548,18 +3548,18 @@ cite = ["McMaster-Carr 91595A452 https://www.mcmaster.com/91595A452/ read live 2
 # Matched Tr8x2 screw/nut and direct-fit wheel avoid turned journals and hub boring.
 [fixtures.trammel-tr8-leadscrew]
 kind = "lead_screw"
-make = "Ooznest"
-sku = "LS-TR8-2-2P-CTS"
-source = "https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/"
+make = "ZYLtech Engineering"
+sku = "HW-SC-T8x2-600"
+source = "https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/"
 present = false
 verify = true
-purchase = "1 x Ooznest LS-TR8-2-2P-CTS cut to 410 mm +/-0.5 mm for the final C4 trammel layout, Tr8x2 single-start screw; UK-based vendor shipping to the US, shipping cost and delivery time require checkout confirmation."
-note = "Read live 2026-10-16: A2 stainless steel, nominal diameter 8 mm, pitch 2 mm, lead 2 mm/revolution, one start; cut-to-size range 100-2000 mm, length tolerance +/-0.5 mm, ends manually deburred with a small chamfer. Fully threaded ends, not supplied with smooth or turned 8 mm journals. Thread hand is not explicitly stated; use the matching Ooznest nut, do not infer a hand specification. Owner's C4 layout selects 410 mm total length, replacing the provisional 500 mm shortlist, to fit the blind 18 mm wheel bore and spindle-side clearance. Confirm the matching C4 block positions, wheel engagement and usable travel before placing the non-returnable cut order. The selected length is a custom cut request within the published range, not a separate stocked length SKU. Receipt checks of block fit and installed retention remain required."
-cite = ["Ooznest LS-TR8-2-2P-CTS https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/ read live 2026-10-16: 8 mm, single start, pitch/lead 2 mm, cut-to-size 100-2000 mm +/-0.5 mm", "Ooznest screw drawing https://ooznest.co.uk/wp-content/uploads/2026/09/TR8x2-2P-Lead-Screw-8mm-Dia-2mm-Lead-2mm-Pitch-Cut-To-Size_drawing.png", "Owner/C4 layout decision 2026-10-16 (not vendor evidence): order 410 mm; SCREW_LENGTH = 410.0 in cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py, in-flight rocker/trammel-jig-4 branch stacked on PR #1583"]
+purchase = "1 x ZYLtech HW-SC-T8x2-600, select 600 mm pre-cut length; USD 14.95 and in stock in the live variant response 2026-10-16. Includes one regular brass flange nut recorded at fixtures.trammel-tr8-flange-nut; do not buy a second nut. Houston, Texas vendor with domestic shipping and will-call pickup."
+note = "Read live 2026-10-16: nominal diameter 8 mm, T8x2 single-start right-hand trapezoidal thread, pitch 2 mm and lead 2 mm/revolution, 304 stainless steel. Ordered stock length is 600 mm, not the installed length; vendor length tolerance and straightness are unpublished. Owner's C4 layout retains 410 mm +/-0.5 mm installed total length. Shop step: confirm the matching C4 support positions and wheel engagement, cut the stock screw to 410 mm +/-0.5 mm, deburr and lightly chamfer the cut end, and check that the brass nut runs freely over it before assembly. Do not turn end journals; the KP08 and wheel set screws grip the threaded ends. Receipt checks of crest fit, runout, installed travel and bidirectional axial retention remain required."
+cite = ["ZYLtech pre-cut screw/regular nut kit https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/ read live 2026-10-16: T8x2 single start, pitch/lead 2 mm, right hand, 304 stainless; product 197 length variant HW-SC-T8x2-600 USD 14.95 in stock", "Owner/C4 layout decision 2026-10-16 (not vendor tolerance): cut to 410 mm +/-0.5 mm; SCREW_LENGTH = 410.0 in cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py, rocker/trammel-jig-4 branch stacked on PR #1583"]
 # McMaster alternatives considered, not chosen: M8 pitch 2 / lead 4 screws
 # 97783A170/97783A180 are only 200/300 mm; too short for the final 410 mm order.
 # McMaster 2391N25 is 500 mm but pitch 2.5 / lead 10, unnecessarily coarse
-# compared with the available no-journal-machining Ooznest lead-2 matched pair.
+# compared with the available no-journal-machining ZYLtech lead-2 matched pair.
 # https://www.mcmaster.com/97783A170/ https://www.mcmaster.com/97783A180/
 # https://www.mcmaster.com/2391N25/
 # McMaster M8 pitch/lead 1.5 screws 7549K55/7549K56/7549K57 are only
@@ -3569,17 +3569,27 @@ cite = ["Ooznest LS-TR8-2-2P-CTS https://ooznest.co.uk/product/tr8x2-2p-lead-scr
 # https://www.mcmaster.com/7549K55/ https://www.mcmaster.com/7549K56/
 # https://www.mcmaster.com/7549K57/ https://www.mcmaster.com/7549K72/
 # https://www.mcmaster.com/7549K16/
+# Ooznest LS-TR8-2-2P-CTS was dimensionally acceptable but superseded by
+# this US vendor: owner logistics ruling 2026-10-16 reports UK DHL shipping
+# only, with the inexpensive mail service suspended.
+# https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/
+# ZYLtech 500 mm HW-SC-T8x2-500 was out of stock. Custom 410 mm
+# HW-SC-T8x2-REG-CUTSMALL had conflicting stock flags and no published
+# cut tolerance; choose in-stock 600 mm and perform the specified shop cut.
+# Misumi straight D8 MTSR/MTSBR and matching brass nuts are pitch 1.5,
+# not Tr8x2; MTSRW/MTSBRW also add stepped ends. Roton starts at Tr10.
+# Helix 8 mm trapezoidal families offer 1.5/4/8 lead, not exact lead 2.
 
 [fixtures.trammel-tr8-flange-nut]
 kind = "lead_screw_nut"
-make = "Ooznest"
-sku = "LSRFN-TR8-2-2P-B"
-source = "https://ooznest.co.uk/product/tr8x2-2p-lead-screw-round-flanged-nut-brass/"
+make = "ZYLtech Engineering"
+sku = "HW-SC-T8x2-NUT"
+source = "https://www.zyltech.com/zyltech-brass-nut-only-various-diameters-and-pitches-available/"
 present = false
 verify = true
-purchase = "1 x Ooznest LSRFN-TR8-2-2P-B brass round-flanged nut matching the Ooznest Tr8x2 screw; UK-based vendor shipping to the US, confirm shipping at checkout."
-note = "Read live page/drawing 2026-10-16: brass, 8 mm thread diameter, pitch 2 mm, lead 2 mm/revolution, one start. Flange OD 22 mm, thickness 3.5 mm; body OD 10 mm; four 3.5 mm through holes on 16.1 mm bolt circle, shown at 45-degree quadrants. Body projects 10 mm above and 1.5 mm below the flange, giving total axial length 15 mm. Mounting holes are not threaded. Thread hand, backlash and dimensional tolerances are not published; this is catalogue geometry, not measured fit or backlash acceptance."
-# Vendor requires lubrication; published thread hand/backlash remain unspecified.
+purchase = "One regular brass T8x2 flange nut is included with the HW-SC-T8x2-600 screw purchase; do not order separately. HW-SC-T8x2-NUT is the vendor's standalone replacement SKU (USD 2.95 in stock live 2026-10-16), not a second required purchase."
+note = "Read live page/drawings 2026-10-16: brass regular nut matching the ZYLtech T8x2 single-start right-hand screw, pitch/lead 2 mm. Flange OD 22 mm, thickness 3.5 mm; body OD 10.2 mm; four non-threaded 3.5 mm through holes on 16 mm bolt circle. Body projects 10 mm on the long side and 1.5 mm past the flange outer face as a short spigot, giving total axial length 15 mm. No angular datum is specified on the round flange. Compared with the superseded Ooznest nut, only the stated body OD (10 to 10.2 mm) and PCD (16.1 to 16 mm) change; the 1.5 + 3.5 + 10 axial split is unchanged. Backlash, dimensional tolerances and received fit remain unverified."
+# Lubrication and backlash acceptance remain shop checks, not catalogue proof.
 # Four plain 3.5 mm holes suit M3 clearance mounting; a shop-made nut bracket
 # is a separate jig part, not a claim of direct mounting to M4 carriage threads.
 # C4 owner identifies TL-29 (MHA-CH-006-TL-29), defined in
@@ -3587,10 +3597,13 @@ note = "Read live page/drawing 2026-10-16: brass, 8 mm thread diameter, pitch 2 
 # Interface authority: NUT_ID and NUT_* in
 # cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py, in-flight
 # rocker/trammel-jig-4 branch; this sourcing branch adds no CAD geometry.
-cite = ["Ooznest LSRFN-TR8-2-2P-B https://ooznest.co.uk/product/tr8x2-2p-lead-screw-round-flanged-nut-brass/ live page and dimensioned drawing read 2026-10-16", "Ooznest nut drawing https://ooznest.co.uk/wp-content/uploads/2026/09/TR8x2-2P-Lead-Screw-Round-Flanged-Nut-8mm-Dia-2mm-Lead-2mm-Pitch-Brass_drawing.png"]
+cite = ["ZYLtech nut-only https://www.zyltech.com/zyltech-brass-nut-only-various-diameters-and-pitches-available/ read live 2026-10-16: T8x2 single-start option resolves to HW-SC-T8x2-NUT; included regular nut geometry is published with screw kit product 197", "ZYLtech front drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16129/s136714152818872222_p75_i6_w500__21913__97391.1698349316.jpg?c=2 : flange 22, body 10.2, PCD 16, four 3.5 holes", "ZYLtech side drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16130/s136714152818872222_p75_i5_w1005__99935__02876.1698349316.jpg?c=2 : short spigot 1.5, flange 3.5, long projection 10"]
 # McMaster matching M8 lead-4 flanged nut 97783A270 is acetal (acceptable),
 # but its matching stocked screws are too short; material is not a rejection.
 # https://www.mcmaster.com/97783A270/
+# Ooznest LSRFN-TR8-2-2P-B was a matched dimensional candidate, not a
+# material failure; superseded with its screw to avoid UK-only DHL logistics.
+# https://ooznest.co.uk/product/tr8x2-2p-lead-screw-round-flanged-nut-brass/
 
 [fixtures.trammel-kp08-blocks]
 kind = "pillow_block_bearing"
@@ -3615,23 +3628,30 @@ cite = ["Bearings Direct / AMPEC KP08 https://bearingsdirect.com/8mm-bore-kp08-m
 
 [fixtures.trammel-handwheel]
 kind = "handwheel"
-make = "Ooznest"
-sku = "HW-8"
-source = "https://ooznest.co.uk/product/8mm-handwheel/"
+make = "MISUMI"
+sku = "HOK40-HC8"
+source = "https://us.misumi-ec.com/vona2/detail/110300515660/?HissuCode=HOK40-HC8"
 present = false
 verify = true
-purchase = "1 x Ooznest HW-8, includes two M4 x 4 mm grub screws; live price GBP 13.74 including VAT, UK-based vendor shipping to the US; checkout tax/shipping may differ."
-note = "Read live page/drawing 2026-10-16: black-anodised 6061-T6 aluminium, wheel OD 40 mm x 12 mm axial thickness; hub OD 25 mm projects 13 mm behind the wheel. Blind 8 mm bore has 18 mm cylindrical depth from the hub end, with drill point beyond; not a through bore. Two radial M4 x 0.7 set-screw holes 90 degrees apart, axial centres 6.5 mm from rear hub end; includes two M4 x 4 grub screws. Handle max OD 9.6 mm projects 19 mm forward, giving calculated total axial envelope 44 mm (13+12+19); add hand clearance. Vendor explicitly permits direct attachment to 8 mm lead screws; no hub boring or retention drilling is required. Bore tolerance, retention torque and revolving-handle function are not stated; receipt and installed engagement remain to verify."
-# Layout condition: radius 20 mm versus KP08 axis height 15 mm puts the wheel
-# 5 mm below the block mounting plane; overhang the base edge or provide at
-# least 5 mm lift plus running clearance. This purchase record proves no layout.
-cite = ["Ooznest HW-8 https://ooznest.co.uk/product/8mm-handwheel/ live page and dimensioned drawing read 2026-10-16: OD 40, blind bore 8 x 18 deep, two included M4 x 4 grub screws", "Ooznest HW-8 drawing https://files.plytix.com/api/v1.1/file/public_files/pim/assets/8f/b1/02/66/6602b18f974b5800018ecc4d/images/b7/47/d6/68/68d647b754aa28d095d65da9/Handwheel-8mm-Drawing.png"]
+purchase = "1 x MISUMI HOK40-HC8 with factory HC8 alteration, USD 47.92 and estimated ship date 2026-10-26 on the live configured page; includes one M5 set screw, not two. MISUMI USA's shipping FAQ specifies domestic warehouses and default UPS Ground; confirm price and delivery at checkout."
+note = "Read live 2026-10-16 (2026-10-17 UTC): black-anodised 5056 aluminium knurled wheel OD 40 mm x 12 mm rim thickness; hub OD 22 mm projects 13 mm, body axial length 25 mm. Factory HC8 alteration specifies an 8 mm H8 through bore across the body, plus two radial M5 tapped set-screw holes 90 degrees apart, centres 6.5 mm from the hub end. One set screw is included; its length and retention torque are not stated. Revolving black Nylon 6 grip has diameter 13 mm, axis offset 14.5 mm and forward projection 18.8 mm, giving calculated total axial envelope 43.8 mm (25+18.8) and grip swept radius 21 mm (14.5+13/2); add hand clearance. No shop boring, tapping or turned screw journals are required. Compared with Ooznest HW-8, hub OD changes 25 to 22 mm, blind 8 x 18 bore becomes 8 H8 through x 25, M4 holes become M5 with only one supplied screw, and axial envelope changes 44 to 43.8 mm. Receipt fit, screw engagement and installed retention remain to verify against C4; factory machining is included in the ordered SKU."
+# Layout condition: wheel radius 20 mm and grip swept radius 21 mm versus
+# KP08 axis height 15 mm require base-edge overhang or at least 6 mm lift
+# plus running/hand clearance. This purchase record proves no installed layout.
+cite = ["MISUMI HOK40-HC8 https://us.misumi-ec.com/vona2/detail/110300515660/?HissuCode=HOK40-HC8 live configured SKU/price/specification read 2026-10-17 UTC", "MISUMI catalogue page 3210 https://us.misumi-ec.com/pdf/fa/2019/2019_US_3210.pdf and drawing https://us.misumi-ec.com/linked/item/10300515660/img/drw_01.gif : D40, H25, A12, S13, D1 22, h6.5, P14.5, B13, G18.8", "MISUMI HC alteration table https://us.misumi-ec.com/linked/item/10300515660/img/alt_01.gif : through H8 bore, two tapped holes, one set screw included; HC8 uses M5", "MISUMI USA shipping https://us.misumi-ec.com/guide/faq/shipping.html : Illinois/Ohio/California warehouses, default UPS Ground"]
 # McMaster 6547N15 crank is acceptable in principle, with ready 8 mm bore,
-# but requires drilling/tapping its hub for set-screw retention; HW-8 does not.
+# but requires drilling/tapping its hub for set-screw retention; HOK40-HC8 does not.
 # McMaster 6024K81/6024K107 wheels have 6.35 mm pilot bores and require
-# bore enlargement plus retention machining. Avoid that work with HW-8.
+# bore enlargement plus retention machining. Avoid shop machining with HC8.
 # https://www.mcmaster.com/6547N15/ https://www.mcmaster.com/6024K81/
 # https://www.mcmaster.com/6024K107/
+# Ooznest HW-8 was dimensionally acceptable but superseded by this US
+# vendor after the owner reported UK-only DHL / suspended cheap mail service.
+# https://ooznest.co.uk/product/8mm-handwheel/
+# MISUMI HOK40-8 costs less but its blind-bore depth is unpublished; HC8
+# explicitly supplies the through bore and tapped holes at the factory.
+# StepperOnline HWA40-D8 offered China/Germany dispatch, no documented
+# retaining screw. ZYLtech's identified NEMA 17 wheel has a 5 mm bore.
 
 # --- pivot-bracket additions ---
 # Illustrative angle plate. Local XY is the table plane; the front upright face
