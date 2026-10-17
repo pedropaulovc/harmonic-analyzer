@@ -7,9 +7,9 @@ blind #4-40 rod tap from the bottom face, both on the hex axis.
 Views (3:1, hidden lines removed throughout, drawing-guidelines.md rule 9):
 
 * FRONT (``*Right``, looking along the lever bore at a corner): the block
-  height, the bore's height from the bottom seat, its distance from the flat
-  on the right (along the bore's centreline) and its Ø callout, which states
-  the wall that location leaves.
+  height, the bore's height from the bottom seat and its Ø callout.  The bore
+  is centred between the flats by symmetry: its centre stands on the corner's
+  line and the A-A cutting line, with no location from a flat.
 * TOP and BOTTOM, turned and pinned into third-angle projection above and
   below the front (corners up and down, the flats square to the sheet): the
   flats (stock REF) over the top view, and each tap's native callout.
@@ -134,17 +134,12 @@ def _elev_y(center: tuple[float, float], model_y_mm: float) -> float:
 
 
 _BORE_SHEET_Y = _elev_y(RIGHT_CENTER, LEVER_BORE_Y)
-_RIGHT_FLAT_X = RIGHT_CENTER[0] + _HALF_AF
 _RIGHT_LEFT_X = RIGHT_CENTER[0] - _HALF_AF
 
-# The front view: both heights to the left; the bore's distance from the
-# right-hand flat along its own centreline (the A-A line stands on the hex
-# axis, so a vertical witness from the bore centre would run along it); the
-# Ø callout up and to the right, its leader above that dimension.
+# The front view: both heights to the left; the Ø callout up and to the right.
 RIGHT_KEEP = {
     "Height": (_RIGHT_LEFT_X - 0.028, RIGHT_CENTER[1]),
     "LeverBoreYDim": (_RIGHT_LEFT_X - 0.012, _elev_y(RIGHT_CENTER, LEVER_BORE_Y / 2.0)),
-    "LeverBoreFromFlat": (_RIGHT_FLAT_X + 0.010, _BORE_SHEET_Y),
     "LeverBoreDiaDim": (0.150, _BORE_SHEET_Y + 0.037),
 }
 # The top view: the flats (Z, sheet horizontal) above it, between its upper

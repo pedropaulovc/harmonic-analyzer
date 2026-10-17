@@ -8,18 +8,17 @@ case of the printed bands and the stock, the plug taps' reach and the sheet
 text.
 
 Sheet datums: the heights run from the bottom face (the MHA-MG-004 shoulder
-seat); the lever bore's axis is located from one flat (``LeverBoreFromFlat``,
-.XX), and the bore callout states the bore-to-flat wall that location leaves.
-Both #4-40 taps sit on the hex axis: the thumb-screw tap from the top face
-into the lever bore, the rod tap blind from the bottom face
-(``mg_rod_clamp_joint``).
+seat).  The lever bore and both #4-40 taps sit on the hex axis, centred
+between the flats by symmetry (the MHA-MG-006 rod bore's precedent), with no
+location from a flat: the thumb-screw tap from the top face into the lever
+bore, the rod tap blind from the bottom face (``mg_rod_clamp_joint``).
 """
 
 from __future__ import annotations
 
 import math
 
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from mg_magnifying_clamp_geom import (  # noqa: F401 (re-export)
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
@@ -88,11 +87,21 @@ def _wander(depth_mm: float) -> float:
 
 
 # --- Walls at the printed worst case (drawing-guidelines.md rule 17 (walls and webs)) --
-# (nominal, worst).  The taps run on the hex axis: their thread major (tap
-# oversize included) to a flat on the thinnest stock, less the drill's linear
-# and angular wander over the deepest printed thread.  Each holds the target.
-WALL_FLOOR = 1.5
+# The lever bore is centred between the flats by symmetry, so its axis stands
+# off the hex axis only by the drill's run-off over its half-length to the
+# middle of the block.
+BORE_WANDER = _wander(HEX_AC / 2.0)
+BORE_OFFSET_MAX = BORE_WANDER
+# (nominal, worst).  The bore to a flat: its largest drilled Ø on the thinnest
+# stock, off centre by its wander.  The taps run on the hex axis: their thread
+# major (tap oversize included) to a flat on the thinnest stock, less the
+# drill's linear and angular wander over the deepest printed thread.  Each
+# holds the target, so the sheet states none (rule 20).
 WALLS: dict[str, tuple[float, float]] = {
+    "lever bore to a flat": (
+        (HEX_AF - LEVER_BORE_DIA) / 2.0,
+        _THIN_HALF_AF - _LEVER_BORE_R_MAX - BORE_WANDER,
+    ),
     "rod-tap drill point to the lever bore": (
         LEVER_BORE_Y
         - LEVER_BORE_DIA / 2.0
@@ -117,46 +126,6 @@ for _name, (_nominal, _worst) in WALLS.items():
         )
 
 
-def floor_2(value: float) -> float:
-    """A MIN on the sheet never rounds up past the arithmetic."""
-    return math.floor(value * 100.0 + 1e-9) / 100.0
-
-
-# --- The lever bore's location from a flat ------------------------------------
-# The bore axis prints its distance from one flat at .XX (5.56): half the
-# flats, the corners' line.  An accepted part holds that number's band; the
-# bore then wanders over its half-length to the middle of the block.  The far
-# flat is the thinnest stock's, so the far wall is the worst one.
-LEVER_BORE_FROM_FLAT = HEX_AF / 2.0
-LEVER_BORE_FROM_FLAT_PLACES = HEIGHT_PLACES
-_FROM_FLAT_LOW, _FROM_FLAT_HIGH = printed_deviations(
-    LEVER_BORE_FROM_FLAT, LEVER_BORE_FROM_FLAT_PLACES
-)
-BORE_WANDER = _wander(HEX_AC / 2.0)
-BORE_WALL = (
-    (HEX_AF - LEVER_BORE_DIA) / 2.0,
-    min(
-        LEVER_BORE_FROM_FLAT + _FROM_FLAT_LOW - _LEVER_BORE_R_MAX,
-        (HEX_AF - HEX_AF_BAND)
-        - (LEVER_BORE_FROM_FLAT + _FROM_FLAT_HIGH)
-        - _LEVER_BORE_R_MAX,
-    )
-    - BORE_WANDER,
-)
-# Under the 2.0 target, over the 1.5 floor: the sheet states it at the bore
-# (drawing-guidelines.md rule 20); at or over the target it would say nothing.
-BORE_WALL_STATED_MIN = floor_2(BORE_WALL[1])
-if not WALL_FLOOR <= BORE_WALL_STATED_MIN < WALL_TARGET:
-    raise AssertionError(
-        f"MHA-MG-002 bore-to-flat wall {BORE_WALL[1]:.3f} at worst left "
-        f"{WALL_FLOOR}..{WALL_TARGET}: drop or rework its stated MIN"
-    )
-# The farthest the bore axis may stand off the hex axis on an accepted part:
-# the location's band against half the stock's band, plus the wander.
-BORE_OFFSET_MAX = (
-    max(_FROM_FLAT_HIGH, -_FROM_FLAT_LOW) + HEX_AF_BAND / 2.0 + BORE_WANDER
-)
-
 # --- The thumb-screw tap's reach (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)) --
 # The reach a stock #4-40 plug tap gives (Morse item 30000: usable length
 # 9/16 in on a shank over the major, a 3-5 thread chamfer); the sheet names
@@ -169,7 +138,7 @@ if abs(PLUG_TAP_CHAMFER_THREADS[1] * THREAD_PITCH - PLUG_TAP_LEAD) > 1e-9:
 _TOP_TO_AXIS_MAX = TOP_TO_BORE + 2.0 * _HEIGHT_BAND
 _TOP_TO_AXIS_MIN = TOP_TO_BORE - 2.0 * _HEIGHT_BAND
 # The bore's half-chord at the thread's widest reach off the bore axis: the
-# major envelope, with the bore off centre by all its location allows.
+# major envelope, with the bore off centre by its wander.
 _THREAD_HALF_CHORD = math.sqrt(
     _LEVER_BORE_R_MIN**2 - (_THREAD_R_MAX + BORE_OFFSET_MAX) ** 2
 )
@@ -232,15 +201,14 @@ if not ROD_TAP_DRILL_DEPTH_MAX < LEVER_BORE_Y - _HEIGHT_BAND - _LEVER_BORE_R_MAX
 # --- Marked model dimensions and the places the model authors on them --------
 # The hex sketch (Top plane) carries the flats, a stock reference; the block
 # extrude its height from the bottom seat; the lever-bore sketch (Right plane)
-# its height from the bottom seat, its distance from a flat (a construction
-# witness on the flat's line) and its Ø.  Both taps are Hole Wizard features:
+# its height from the bottom seat and its Ø (the bore sits on the hex axis by
+# a relation, centred between the flats).  Both taps are Hole Wizard features:
 # their native callouts print them.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HexProfile": {"HexAf": HEX_AF_PLACES},
     "Block": {"Height": HEIGHT_PLACES},
     "LeverBoreProfile": {
         "LeverBoreYDim": HEIGHT_PLACES,
-        "LeverBoreFromFlat": LEVER_BORE_FROM_FLAT_PLACES,
         "LeverBoreDiaDim": LEVER_BORE_DIA_PLACES,
     },
 }
@@ -256,15 +224,9 @@ if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("MHA-MG-002 reference dimension is unprinted")
 
 # --- Sheet text ----------------------------------------------------------------
-# The lever bore's Ø: drilled, the mate it slides on (rule 4), and the wall
-# its location leaves (rule 20), one row each under the Ø.
-LEVER_BORE_CALLOUT = "\n".join(
-    (
-        "DRILL THRU CORNERS",
-        "SLIP ON Ø6 LEVER MHA-MG-003",
-        f"WALL TO FLAT {BORE_WALL_STATED_MIN:.2f} MIN",
-    )
-)
+# The lever bore's Ø: drilled and the mate it slides on (rule 4), one row each
+# under the Ø.  Its wall to a flat holds the target, so the sheet states none.
+LEVER_BORE_CALLOUT = "\n".join(("DRILL THRU CORNERS", "SLIP ON Ø6 LEVER MHA-MG-003"))
 # Ahead of each native thread row.
 THUMB_TAP_PROCESS = "TAP INTO BORE"
 ROD_TAP_PROCESS = "TAP"
