@@ -152,21 +152,22 @@ REFERENCE_CALLOUTS = {
     "ScrewSeatLen": SCREW_SEAT_CALLOUT,
 }
 # The seat's Ra 3.2 (SURFACE_FINISHES "clamp_screw_seat"): a native symbol
-# whose leader lands just inside the OD's top outline 40 mm in from the west
-# tip, inside the seat and clear of the stock diameter's station (82.5 mm);
-# the symbol stands above-left of the landing, under the seat's dimension
-# line, between its west extension lines and the stock diameter's row.
+# whose leader lands on the OD's face 40 mm in from the west tip, inside the
+# seat and clear of the stock diameter's station (82.5 mm); the symbol
+# stands above-left of the landing, under the seat's dimension line, between
+# its west extension lines and the stock diameter's row.
 # The symbol is attached to the OD's FACE: the front view lies in the
 # revolve's profile plane, so its top outline is the cylinder's seam, and a
 # silhouette pick there re-solved onto the other half-face on rebuild (r12
 # leaf 20261017T061433Z-1-6db3cfe0: types=(46,), same_entity=False). A face
 # picked by coordinate keeps its leader at the pick, not at a separate
-# landing (r13 leaf 20261017T065000Z-1-a58d0439: a midway pick landed 1.39 mm
-# below the requested outline point), so the pick IS the landing, 0.4 mm
-# inside the outline.
+# landing (r13 leaf 20261017T065000Z-1-a58d0439), and a pick 0.4 mm inside
+# the outline selected nothing (r14 leaf 20261017T070332Z-1-45a1d3b0), so the
+# pick and the landing are one point midway between the axis and the top
+# outline, where r13 selected and attached the face.
 # add_surface_finish proves the symbol attached to that face (the part's
 # control) and the leader landed where requested.
-SEAT_FINISH_PICK = (_ROD_WEST_TIP_X + 0.040, _ROD_TOP_Y - 0.0004)
+SEAT_FINISH_PICK = (_ROD_WEST_TIP_X + 0.040, (FRONT_CENTER[1] + _ROD_TOP_Y) / 2.0)
 SEAT_FINISH_SYMBOL = (_ROD_WEST_TIP_X + 0.030, _ROD_TOP_Y + 0.014)
 
 
