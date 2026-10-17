@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the channel anchor jam nut (MHA-CH-012).
+r"""Create the manufacturing drawing for the channel anchor jam nut (MHA-CH-014).
 
 The face view is ``*Front``, looking at the driven face: the drive cut runs
 across it, and it carries the slot width and the native #6-32 UNC-2B

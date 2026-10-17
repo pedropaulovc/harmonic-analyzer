@@ -1,7 +1,7 @@
 """Manufacturing controls for the modified McMaster 9489T111 anchor.
 
 The anchor threads down through the summing lever's coefficient plate and is
-locked by the MHA-CH-012 round jam nut run up its cut end and jammed against
+locked by the MHA-CH-014 round jam nut run up its cut end and jammed against
 the plate's underside (rule 23: the anchor rides the rocking lever under a
 cycling spring, and per-channel calibration turns it, so a seated thread
 alone is not a lock).

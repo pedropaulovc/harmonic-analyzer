@@ -605,7 +605,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-VN-046, R9-31), member: 8 into the platen_guide rear through taps
         "vn_hanger_screw",  # #8-32 UNC x 1 hex head (McMaster 93075A199), member through the pen-hanger strap's clearance hole into the hanger nut and jam nut
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
-        "vn_boss_hook_jam_nut",  # McMaster 90760A140 thin #10-24 hex nut (MHA-VN-070), member: jammed on the summing-lever boss top face, locking the boss hook
+        "vn_boss_hook_jam_nut",  # McMaster 90760A140 thin #10-24 hex nut (MHA-VN-072), member: jammed on the summing-lever boss top face, locking the boss hook
         "vn_knife_hanger_stud",  # #10-24 UNC cut plain hex bolt (McMaster 92314A253 x 2), member into the knife-mount top tap
         "sm_knife_mount",  # #10-24 UNC-2B bottoming tap (9.65 full thread, 11.24 drill) in the top seat, receiver of the knife-hanger bolt; two plain reamed dowel holes
         "vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
@@ -636,7 +636,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "fr_rocker_arm_support",  # receiver only of channel screws: 4x #8-32 BracketSeats (top-level rows); its own foot holes are 5/16 clearance
         "vn_slotted_screw",  # #8-32 x 1-1/2 fillister (90280A203, MHA-VN-019), member into harmonic_base tapped seat
         "vn_spring_hook",  # #6-32 eyebolt (McMaster 9489T111, MHA-VN-012); member, x20 into summing_lever tapped plate (top-level row), receiver of its jam nut; no channel-internal joint
-        "ch_anchor_jam_nut",  # MHA-CH-012 made brass round nut, #6-32 tapped through, member: x20 jammed on the summing-lever plate underside, locking each channel anchor (top-level row)
+        "ch_anchor_jam_nut",  # MHA-CH-014 made brass round nut, #6-32 tapped through, member: x20 jammed on the summing-lever plate underside, locking each channel anchor (top-level row)
         "sm_summing_lever",  # receiver: #10-24 counter-anchor, 20x #6-32 channel anchors, two blind #2-56 magnifying-bracket seats
         "pd_support_bar",  # #8-32 blind pivot tap + 2x #4-40 through latch-hook taps (pd_support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
         "vn_swing_stop_screw",  # #4-40 fillister (90280A108), member into harmonic_base (top level)
@@ -1487,7 +1487,7 @@ JOINTS: tuple[Joint, ...] = (
         axial_capture=(
             "trimmed 9490T1 shank engages the full 19.05 boss height (cut end at the boss underside) and "
             "stands one jam-nut height plus a pitch of full thread above the boss top face, where the "
-            "MHA-VN-070 thin nut bears; no shoulder or head seats -- the wire bend has the shank diameter"
+            "MHA-VN-072 thin nut bears; no shoulder or head seats -- the wire bend has the shank diameter"
         ),
         lock=Lock.JAM_NUT,
         lock_part="vn_boss_hook_jam_nut",
@@ -1766,7 +1766,7 @@ JOINTS: tuple[Joint, ...] = (
             "crank, and that spring pulls the anchor out of its tap"
         ),
         axial_capture=(
-            "the trimmed 9489T111 shank crosses the full 5.08 plate and carries the MHA-CH-012 jam nut on the "
+            "the trimmed 9489T111 shank crosses the full 5.08 plate and carries the MHA-CH-014 jam nut on the "
             "plate underside, which bears the spring's upward pull; the Ø3.175 neck shoulders on the plate top "
             "only when fully seated (calibration backs it off up to 1 counted turn), and at the worst case "
             "(shortest in-band part, whole budget backed out) two full turns still show below the nut"

@@ -1,4 +1,4 @@
-r"""MHA-VN-070 counter-anchor jam nut: McMaster 90760A140 thin #10-24 hex nut.
+r"""MHA-VN-072 counter-anchor jam nut: McMaster 90760A140 thin #10-24 hex nut.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: the summing assembly reads the nut from here, so the stock recipe

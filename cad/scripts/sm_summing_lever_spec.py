@@ -69,7 +69,7 @@ SURFACE_FINISHES = (
 
 # The 20 channel-spring lower anchors (McMaster 9489T111, part ``vn-spring-hook``)
 # thread DIRECTLY into the coefficient plate -- the supplied nut is discarded
-# and each is locked by an MHA-CH-012 jam nut on the plate underside -- so
+# and each is locked by an MHA-CH-014 jam nut on the plate underside -- so
 # each station is a through tap, not a bore:
 # one native seed + a linear pattern. The size is the anchor's own thread, so a
 # supplier change can never leave the lever tapped for the wrong screw.

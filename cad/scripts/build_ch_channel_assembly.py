@@ -590,7 +590,7 @@ def rot_z_rows(deg: float) -> list[list[float]]:
     return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
 
 
-# MHA-CH-012 on each anchor axis, its z = 0 bearing face on the plate
+# MHA-CH-014 on each anchor axis, its z = 0 bearing face on the plate
 # underside: ROT_X_POS90 turns the nut's local +Z thread axis to machine -Y,
 # so the round nut hangs below the plate around the anchor's protruding shank.
 CHANNEL_ANCHOR_NUT_XY = (
@@ -923,7 +923,7 @@ def _assert_spring_mount(
             f"channel anchor engages {engagement:.4f} mm of plate, expected "
             f"{vn_spring_hook_spec.THREAD_ENGAGEMENT_MM:.4f}"
         )
-    # The cut end crosses the plate and carries the MHA-CH-012 jam nut on the
+    # The cut end crosses the plate and carries the MHA-CH-014 jam nut on the
     # underside; at the worst case (shortest in-band part under the thickest
     # nut, backed out the whole calibration budget) full threads must still
     # show below the nut.
