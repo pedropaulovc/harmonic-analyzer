@@ -34,19 +34,25 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         "PressZoneStart",
         "PressZoneLen",
         "PressZoneDia",
+        "ScrewSeatStart",
+        "ScrewSeatLen",
     }
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= set(drawing.FRONT_KEEP)
     assert set(drawing.REFERENCE_CALLOUTS) <= set(drawing.REFERENCE_KEEP)
     assert drawing.ROD_LENGTH == mg_magnifying_lever_spec.ROD_LENGTH
     # The reference sketches' dims are the hidden-sketch path's, never the
-    # entire-model import's (the part saves PressZone and RodStock blanked).
+    # entire-model import's (the part saves its reference sketches blanked).
     assert not set(drawing.REFERENCE_KEEP) & set(drawing.FRONT_KEEP)
     assert mg_magnifying_lever_spec.DRAWING_DIMENSIONS["RodStock"] == {"RodDia"}
     assert mg_magnifying_lever_spec.DRAWING_DIMENSIONS["PressZone"] == {
         "PressZoneStart",
         "PressZoneLen",
         "PressZoneDia",
+    }
+    assert mg_magnifying_lever_spec.DRAWING_DIMENSIONS["ScrewSeat"] == {
+        "ScrewSeatStart",
+        "ScrewSeatLen",
     }
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "curate_hidden_dimensions(" in source
@@ -60,9 +66,10 @@ def test_stock_diameter_is_plain_stock_on_the_side_view() -> None:
     is already the dome radius's height, so a second diameter there
     over-defines the capsule), between two construction lines ON the top and
     bottom outlines, with the Ø prefix a linear dim needs (v41 sheet).  r1
-    review blocker: it is plain bar stock -- "Ø6.0 STOCK OK" at the title
-    block's .X, no band, like MHA-MG-004's rod.  The bar's h9 band stays in
-    the spec as the procurement contract the press zone is selected from."""
+    review blocker: it is plain bar stock at the title block's .X, no band,
+    like MHA-MG-004's rod.  Owner ruling: the Ø prints bare -- no "STOCK OK"
+    callout and no replacement note.  The bar's h9 band stays in the spec as
+    the procurement contract the press zone is selected from."""
     import mg_lever_press_fit_geom as press
     from _fit_deviations import deviations
 
@@ -79,7 +86,10 @@ def test_stock_diameter_is_plain_stock_on_the_side_view() -> None:
         '        "vertical_distance",\n        ROD_DIA,\n        "rod stock RodDia",'
     ) in source
     assert 'set_dimension_prefix(adapter, "RodStock", "RodDia", "<MOD-DIAM>")' in source
-    assert 'blank_reference_sketches(adapter, ("PressZone", "RodStock"))' in source
+    assert (
+        'blank_reference_sketches(adapter, ("PressZone", "RodStock", "ScrewSeat"))'
+        in source
+    )
     assert "add_centerline(\n            ROD_DIA_STATION" not in source
     assert part.ROD_DIA_STATION == part.ROD_LENGTH / 2.0
     assert part.R == press.ROD_DIA / 2.0
@@ -88,14 +98,15 @@ def test_stock_diameter_is_plain_stock_on_the_side_view() -> None:
         ((part.ROD_DIA_STATION - part.R, part.R), (part.ROD_DIA_STATION + part.R, part.R)),
         ((part.ROD_DIA_STATION - part.R, -part.R), (part.ROD_DIA_STATION + part.R, -part.R)),
     )
-    # Plain stock: .X, no band, the callout from the spec.
+    # Plain stock: .X, no band, no callout.
     assert mg_magnifying_lever_spec.DRAWING_PRECISION["RodStock"] == {"RodDia": 1}
     assert '"RodStock", "RodDia"' not in source.replace(
         'set_dimension_prefix(adapter, "RodStock", "RodDia"', ""
     )
     assert "ROD_DIA_BAND" not in source
-    assert mg_magnifying_lever_spec.ROD_DIA_CALLOUT == "STOCK OK"
-    assert drawing.REFERENCE_CALLOUTS["RodDia"] is mg_magnifying_lever_spec.ROD_DIA_CALLOUT
+    assert not hasattr(mg_magnifying_lever_spec, "ROD_DIA_CALLOUT")
+    assert "RodDia" not in drawing.REFERENCE_CALLOUTS
+    assert "STOCK OK" not in Path(drawing.__file__).read_text(encoding="utf-8")
     # The procurement band contains the zone's tighter band on the same bar.
     assert mg_magnifying_lever_spec.ROD_DIA_BAND == (0.0, -0.03)
     stock_low, stock_high = deviations(mg_magnifying_lever_spec.ROD_DIA_BAND)
@@ -435,7 +446,6 @@ def test_press_zone_text_clears_its_lines_and_the_isometric() -> None:
     assert drawing.ISO_CENTER == (0.350, 0.185)
 
 
-
 def test_press_zone_callout_ties_the_zone_to_the_bracket_bore() -> None:
     """Review item 5 / code-review nit: the banded zone's callout names the
     mating MHA-MG-001 bore as the REFERENCE nominal that sheet prints and the
@@ -495,6 +505,7 @@ def test_final_forced_volume_guard_follows_annotations_before_publication() -> N
         "apply_drawing_precision",
         "clear_dimensions_for_drawing",
         "mark_dimensions_for_drawing",
+        "author_part_pmi",
         "apply_drawing_properties",
         "blank_reference_sketches",
     ):
@@ -529,9 +540,9 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
 def test_sheet_carries_no_note_block() -> None:
     """r1 review over-specification: the zone's selection, how to hold the
-    rod and the press force are the MHA-MG-000 assembly's step, and the stock
-    and the zone are callouts at their features -- so the sheet carries no
-    note block (drawing-guidelines.md rule 7)."""
+    rod and the press force are the MHA-MG-000 assembly's step, the stock is a
+    plain Ø and the zone and the screw seat are callouts at their features --
+    so the sheet carries no note block (drawing-guidelines.md rule 7)."""
     assert not hasattr(mg_magnifying_lever_spec, "DRAWING_NOTES")
     for script in (part.__file__, drawing.__file__):
         assert "Manufacturing Notes" not in Path(script).read_text(encoding="utf-8")
@@ -553,15 +564,105 @@ def test_view_scales_are_explicit() -> None:
     assert "End View Note" not in Path(part.__file__).read_text(encoding="utf-8")
 
 
-def test_rod_od_carries_no_finish() -> None:
-    """r1 review over-specification: the clamp block slides on the OD only to
-    be set, then pinches it, so the OD's turned finish is the default; no
-    part-owned finish symbol, no PMI."""
-    assert not hasattr(mg_magnifying_lever_spec, "SURFACE_FINISHES")
-    assert "author_part_pmi" not in Path(part.__file__).read_text(encoding="utf-8")
+def test_rod_od_carries_one_clamp_screw_seat_finish() -> None:
+    """Owner ruling (supersedes r1's "no finish"): the MHA-MG-002 clamp's
+    thumb screw pinches the OD where the clamp is set, a static locating seat
+    -- Ra 3.2 (drawing-guidelines.md rule 6).  The seat is every station the
+    screw's tip can bear on over the block's travel between the west tip and
+    the collar, from the live output.yaml stations and the clamp geometry,
+    rounded outward; the part owns the one control, the sheet consumes it."""
+    import mg_lever_press_fit_geom as press
+    import mg_magnifying_clamp_geom as clamp
+    import mg_magnifying_lever_geom as geom
+    from _mcmaster_91882a221 import SHANK_DIA
+    from _surface_finish import SEAT_UM
+
+    spec = mg_magnifying_lever_spec
+    half_block = clamp.BLOCK_DEPTH / 2.0
+    # Screw on the hex axis = the block's centre along the rod.
+    nearest = geom.COLLAR_LOCAL_X - geom.COLLAR_HALF_LEN - half_block
+    assert spec.CLAMP_SCREW_TRAVEL == pytest.approx((half_block, nearest))
+    assert (
+        spec.CLAMP_SCREW_TRAVEL[0] <= geom.CLAMP_LOCAL_X <= spec.CLAMP_SCREW_TRAVEL[1]
+    )
+    low, high = spec.SCREW_SEAT_X
+    assert low <= half_block - SHANK_DIA / 2.0 < low + spec.SCREW_SEAT_STEP
+    assert high - spec.SCREW_SEAT_STEP < nearest + SHANK_DIA / 2.0 <= high
+    assert spec.SCREW_SEAT_X == (4.5, 150.5)  # the current stations
+    assert spec.SCREW_SEAT_LENGTH == pytest.approx(high - low)
+    # On the straight OD, short of the press zone's land.
+    assert press.ROD_DIA / 2.0 <= low and high <= geom.PRESS_ZONE_X[0]
+    (control,) = spec.SURFACE_FINISHES
+    assert control.key == "clamp_screw_seat"
+    assert control.roughness_um == SEAT_UM == 3.2
+    assert control.production_method == ""
+    assert control.face.diameter_mm == press.ROD_DIA
+    assert low < control.face.contains_x_mm < high
+    assert spec.SCREW_SEAT_CALLOUT == "MHA-MG-002 SCREW SEAT"
+    assert drawing.REFERENCE_CALLOUTS["ScrewSeatLen"] is spec.SCREW_SEAT_CALLOUT
+    assert spec.DRAWING_PRECISION["ScrewSeat"] == {
+        "ScrewSeatStart": 1,
+        "ScrewSeatLen": 1,
+    }
+    build_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in build_source
+    assert 'name_last_feature(adapter, "ScrewSeat")' in build_source
+    assert 'seat.record("ScrewSeatTop", \'"RodDia" / 2\')' in build_source
+    assert part.SCREW_SEAT_LINE == ((low, part.R), (high, part.R))
     sheet_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_surface_finish" not in sheet_source
-    assert not hasattr(drawing, "FINISH_SYMBOL")
+    assert sheet_source.count("add_surface_finish(\n") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat")' in sheet_source
+    assert 'entity_type="SILHOUETTE"' in sheet_source
+    # The leader lands on the OD's top silhouette inside the seat.
+    pick_x, pick_y = drawing.SEAT_FINISH_PICK
+    assert pick_y == pytest.approx(drawing._ROD_TOP_Y)
+    station = (pick_x - drawing._ROD_WEST_TIP_X) * 1000.0
+    assert low < station < high
+    # Clear of the stock diameter's points (mid-length +/- R).
+    assert abs(station - part.ROD_DIA_STATION) > part.R + 5.0
+
+
+def test_screw_seat_text_clears_the_other_blocks() -> None:
+    """The seat's start and length chain on one line above the rod, over the
+    stock diameter's row and left of the zone diameter's block; the start's
+    lone row clear left of the west tip's extension line; the finish symbol
+    between the rod and that line, west of the stock diameter."""
+    spec = mg_magnifying_lever_spec
+    places = spec.DRAWING_PRECISION["ScrewSeat"]
+    len_x, len_y = drawing.REFERENCE_KEEP["ScrewSeatLen"]
+    start_x, start_y = drawing.REFERENCE_KEEP["ScrewSeatStart"]
+    len_rows = [
+        f"{spec.SCREW_SEAT_LENGTH:.{places['ScrewSeatLen']}f}",
+        *spec.SCREW_SEAT_CALLOUT.split("\n"),
+    ]
+    start_rows = [f"{spec.SCREW_SEAT_X[0]:.{places['ScrewSeatStart']}f}"]
+    assert len_rows[0] == "146.0" and start_rows == ["4.5"]
+    len_half_w, len_half_h = _block_half_extent(len_rows)
+    start_half_w, _ = _block_half_extent(start_rows)
+    # One dimension line: the length's lowest baseline, the start's lone row.
+    len_line = len_y - len_half_h
+    assert start_y - _LONE_ROW_DROP == pytest.approx(len_line, abs=1e-5)
+    # The length's rows sit inside the seat's extension lines.
+    west = drawing._ROD_WEST_TIP_X + spec.SCREW_SEAT_X[0] / 1000.0
+    east = drawing._ROD_WEST_TIP_X + spec.SCREW_SEAT_X[1] / 1000.0
+    assert west < len_x - len_half_w and len_x + len_half_w < east
+    # The start's row clear left of the west tip's line by an arrow's air.
+    assert start_x + start_half_w <= drawing._ROD_WEST_TIP_X - 0.002
+    # Above the stock diameter's lone row, by >= 10 mm.
+    dia_x, dia_y = drawing.REFERENCE_KEEP["RodDia"]
+    assert len_line - (dia_y + _TEXT_HEIGHT / 2.0) >= 0.010
+    # The seat's east extension line stays >= 4 mm west of the zone-start
+    # line, itself west of the zone diameter's line (its block hangs right).
+    assert (
+        east + 0.004
+        < drawing._PRESS_ZONE_START_X
+        < drawing.REFERENCE_KEEP["PressZoneDia"][0]
+    )
+    # The finish symbol: above the rod, under the seat's line, between the
+    # west extension lines and the stock diameter.
+    sym_x, sym_y = drawing.SEAT_FINISH_SYMBOL
+    assert drawing._ROD_TOP_Y + 0.008 < sym_y < len_line - 0.010
+    assert west + 0.010 < sym_x < dia_x - 0.030
 
 
 def test_reference_sketches_print_only_the_zone_start_inside_the_rod() -> None:
@@ -584,7 +685,11 @@ def test_reference_sketches_print_only_the_zone_start_inside_the_rod() -> None:
     assert part.R < bottom[0] < part.ROD_LENGTH - part.R
     assert offset(*bottom) == offset(*top) == 0.0
     assert bottom[1] == -part.R and top[1] == part.R
-    for start, end in (part.PRESS_ZONE_WITNESS, *part.ROD_STOCK_LINES):
+    for start, end in (
+        part.PRESS_ZONE_WITNESS,
+        *part.ROD_STOCK_LINES,
+        part.SCREW_SEAT_LINE,
+    ):
         assert start[1] == end[1]
         assert part.R <= start[0] < end[0] <= part.ROD_LENGTH - part.R
         assert offset(*start) == offset(*end) == 0.0

@@ -15,7 +15,12 @@ drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
+import math
+
 from _fit_deviations import deviations
+from _gtol_cylinder import CylinderFace
+from _mcmaster_91882a221 import SHANK_DIA as CLAMP_SCREW_DIA
+from _surface_finish import SEAT_UM, SurfaceFinishControl
 from mg_lever_press_fit_geom import (
     COLLAR_BORE_DIA,
     COLLAR_LENGTH,
@@ -23,8 +28,10 @@ from mg_lever_press_fit_geom import (
     PRESS_FIT_BUDGET,
     PRESS_ZONE_DIA_BAND,
     PRESS_ZONE_LENGTH,
+    ROD_DIA,
 )
-from mg_magnifying_lever_geom import ROD_LENGTH  # noqa: F401 (re-export)
+from mg_magnifying_clamp_geom import BLOCK_DEPTH as CLAMP_BLOCK_DEPTH
+from mg_magnifying_lever_geom import KNIFE_LOCAL_X, ROD_LENGTH, clamp_radius_band
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The rod is a REVOLVED capsule (hemispherical ends): a smooth
@@ -35,8 +42,9 @@ from mg_magnifying_lever_geom import ROD_LENGTH  # noqa: F401 (re-export)
 # REFERENCE: each dome is a full hemisphere tangent to the bar, so its radius
 # is half the selected press-zone diameter.  The stock diameter prints once
 # from the blanked ``RodStock`` reference sketch (the profile cannot carry a
-# second diameter: its top line's height IS the dome radius) as plain stock,
-# no band.  The press zone -- the cylinder the bracket collar grips, from
+# second diameter: its top line's height IS the dome radius) as a plain Ø at
+# the title block's .X, no band and no callout.  The press zone -- the
+# cylinder the bracket collar grips, from
 # PRESS_ZONE_LENGTH before the east tip to the dome tangent -- is a tighter
 # band on the same unstepped Ø6, so it lives on the blanked ``PressZone``
 # reference sketch: its start from the tip a single MIN limit
@@ -45,12 +53,15 @@ from mg_magnifying_lever_geom import ROD_LENGTH  # noqa: F401 (re-export)
 # PRESS_ZONE_DIA_BAND, both limits native (drawing-guidelines.md rule 3
 # (decimal places carry the tolerance)).  The
 # zone's start is a solid line across the bar, so the zone reads between it
-# and the dome tangent.  The drawing shows both sketches in the front view
-# (_drawing_hidden_sketches). ---
+# and the dome tangent.  The MHA-MG-002 clamp screw's seat (SCREW_SEAT_X) is
+# the blanked ``ScrewSeat`` reference sketch: its start from the west tip and
+# its length, the extent the Ra 3.2 symbol on the OD applies to.  The drawing
+# shows all three sketches in the front view (_drawing_hidden_sketches). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"OverallLength", "DomeRadius"},
     "RodStock": {"RodDia"},
     "PressZone": {"PressZoneStart", "PressZoneLen", "PressZoneDia"},
+    "ScrewSeat": {"ScrewSeatStart", "ScrewSeatLen"},
 }
 # The tip-to-tip length is checked at .X (+/-0.8): the rod's west end only
 # bounds the clamp's travel.  The stock diameter reads at .X too: the bar's
@@ -58,11 +69,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # that is good enough stays stock).  The zone's start is a MIN at .X: the
 # selected land only has to cover the longest collar, so no tighter places
 # (rule 4).  The zone diameter carries its band at three places; the two
-# references read at .X.
+# references read at .X.  The screw seat's extent reads at .X: its ends only
+# bound where the finish applies.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RodProfile": {"OverallLength": 1, "DomeRadius": 1},
     "RodStock": {"RodDia": 1},
     "PressZone": {"PressZoneStart": 1, "PressZoneLen": 1, "PressZoneDia": 3},
+    "ScrewSeat": {"ScrewSeatStart": 1, "ScrewSeatLen": 1},
 }
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != {
     name for names in DRAWING_PRECISION.values() for name in names
@@ -89,8 +102,55 @@ if not _stock_low <= _zone_low <= _zone_high <= _stock_high:
         "the press-zone band must lie inside the purchased stock's band, "
         "so the zone can be selected from that stock"
     )
-# The stock diameter's callout: no turned band, the bar as bought.
-ROD_DIA_CALLOUT = "STOCK OK"
+
+# --- the MHA-MG-002 clamp screw's seat on the OD -----------------------------
+# Owner ruling: the clamp's thumb screw (MHA-VN-011) pinches the lever where
+# the operator sets the clamp, so the OD it bears on is a static locating seat,
+# Ra 3.2 (drawing-guidelines.md rule 6, SEAT_UM).  The screw stands on the
+# hex axis, i.e. at the block's centre along the rod, and the block slides
+# between the rod's west tip and the collar face (clamp_radius_band: the
+# block flush with the tip, the block against the collar), so the screw's
+# centre travels CLAMP_SCREW_TRAVEL; its shank diameter on each side of that
+# travel bounds where its tip can bear.  The seat rounds outward to
+# SCREW_SEAT_STEP so its printed .X ends stay shop numbers; it must lie on the
+# straight OD, west of the press zone (the land is finished on its own).
+_r_min, _r_as_built, _r_max = clamp_radius_band(CLAMP_BLOCK_DEPTH)
+CLAMP_SCREW_TRAVEL = (KNIFE_LOCAL_X - _r_max, KNIFE_LOCAL_X - _r_min)  # 6.42..148.58
+SCREW_SEAT_STEP = 0.5
+SCREW_SEAT_X = (
+    round(
+        math.floor((CLAMP_SCREW_TRAVEL[0] - CLAMP_SCREW_DIA / 2.0) / SCREW_SEAT_STEP)
+        * SCREW_SEAT_STEP,
+        6,
+    ),
+    round(
+        math.ceil((CLAMP_SCREW_TRAVEL[1] + CLAMP_SCREW_DIA / 2.0) / SCREW_SEAT_STEP)
+        * SCREW_SEAT_STEP,
+        6,
+    ),
+)  # (4.5, 150.5)
+SCREW_SEAT_LENGTH = SCREW_SEAT_X[1] - SCREW_SEAT_X[0]  # 146.0
+if (
+    not ROD_DIA / 2.0
+    <= SCREW_SEAT_X[0]
+    < SCREW_SEAT_X[1]
+    <= ROD_LENGTH - PRESS_ZONE_LENGTH
+):
+    raise AssertionError(
+        "the clamp screw's seat must lie on the straight OD, west of the press zone"
+    )
+# The seat's length names the clamp whose screw bears there (rule 4).
+CLAMP_NUMBER = "MHA-MG-002"
+SCREW_SEAT_CALLOUT = f"{CLAMP_NUMBER} SCREW SEAT"
+# The OD is ONE cylindrical face from dome tangent to dome tangent; the seat's
+# mid-station names it, and the ScrewSeat dimensions bound the symbol's reach.
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "clamp_screw_seat",
+        SEAT_UM,
+        CylinderFace(ROD_DIA, contains_x_mm=(SCREW_SEAT_X[0] + SCREW_SEAT_X[1]) / 2.0),
+    ),
+)
 
 # The mate both banded zone callouts name: the bracket whose collar the zone
 # is pressed into.
