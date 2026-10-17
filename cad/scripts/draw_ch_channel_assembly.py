@@ -81,6 +81,7 @@ import ch_channel_assembly_spec as asm
 import ch_channel_assembly_steps as steps
 from ch_fulcrum_keeper_spec import (
     BORE_DIA as KEEPER_BORE_DIA,
+    BORE_DIA_BAND as KEEPER_BORE_DIA_BAND,
     CROWN_LEAST_R,
     CROWN_MOST_R,
     CROWN_R,
@@ -91,8 +92,6 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
     KEEPER_INNER_FACE_SPAN_MM,
     KEEPER_Z_OFF,
-    PAIR_REAMER_DIA_IN,
-    PAIR_REAMER_OAL_IN,
     SET_SCREW_THREAD as KEEPER_SET_SCREW_THREAD,
 )
 from ch_pivot_bracket_spec import SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
@@ -684,8 +683,9 @@ def _fitup_notes() -> tuple[str, str]:
         steps.KEEPERS_PAIR_REAMED_KEY: (
             f"CLAMP BOTH {keeper}, FEET OUTBOARD ON ONE FLAT, INNER LUG FACES "
             "AT THE LEVER BANK VIEW'S LUG SPAN, BORE AXIS PARALLEL TO THE "
-            f"FLAT; DRILL AND REAM BOTH IN ONE PASS WITH A {PAIR_REAMER_DIA_IN:.4f} "
-            f"IN DIA REAMER, {PAIR_REAMER_OAL_IN:.0f} IN LONG. ACCEPT IF THE "
+            f"FLAT. BOTH {keeper} BORES "
+            f"{KEEPER_BORE_DIA + KEEPER_BORE_DIA_BAND[1]:.3f} TO "
+            f"{KEEPER_BORE_DIA + KEEPER_BORE_DIA_BAND[0]:.3f} DIA, IN LINE: THE "
             f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED. THEN, ON "
             f"A {KEEPER_BORE_DIA:.2f} PIN IN EACH BORE, ROUND ITS CROWN TO THE "
             f"{keeper} CROWN R{CROWN_R:.1f} ABOUT THE PIN AND TAP IT "
