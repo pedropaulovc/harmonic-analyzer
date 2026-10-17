@@ -214,7 +214,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick);
     # 50 east put bar 3 over the bank spring (r4 balloon pick, shared edge).
     ExplodeStep("bars up", (BAR, BAR_PIN), "y", 50.0),
-    # Each anchor's MHA-CH-012 jam nut goes down with it, then a further 30
+    # Each anchor's MHA-CH-014 jam nut goes down with it, then a further 30
     # off the shank's bottom. On the shank, the 6.66-diameter nut is under 1 mm
     # at 1:7 and shares the anchor's outline. 30 (3.5 mm on the sheet) orders
     # its balloon round the ring clear of the anchor's (ring replay).
