@@ -470,3 +470,30 @@ def test_receiver_row_sits_inside_the_end_rib_height() -> None:
     wall = rib_half_min - row_offset_max - drill_radius_max - joint.DRILL_WANDER_MAX
     assert wall == pytest.approx(3.18390, abs=1e-5)
     assert wall >= 2.0
+
+
+def test_tap_section_cuts_the_outer_tap_through_the_rib_into_solid_plate() -> None:
+    import magnifying_bracket_joint_layout as joint
+
+    x, y, end_z = drawing.TAP_SECTION_HOLE
+    assert (x, y, end_z) == max(joint.LEVER_HOLE_POINTS)
+    assert drawing.TAP_SECTION_LETTER not in {
+        "A",
+        "B",
+        "C",
+        drawing.DETAIL_LETTER,
+        drawing.RIDGE_DETAIL_LETTER,
+        notes.BACK_VIEW_LETTER,
+        notes.FRONT_VIEW_LETTER,
+    }
+    # The line spans the rib's full height at the tap, outside both faces.
+    rib_half = lever_build.edge_rib_half_height(x)
+    low, high = drawing.TAP_SECTION_LINE_Y
+    assert low < -rib_half and high > rib_half
+    (near_z, top), (far_z, bottom) = drawing.TAP_SECTION_CROP
+    assert bottom < -rib_half and top > rib_half
+    # The crop holds the end face, the drill point and plate past the rib.
+    assert near_z < end_z
+    assert far_z > end_z + joint.DRILL_DEPTH + joint.DRILL_DEPTH_BAND
+    assert far_z > end_z + joint.RIB_DEPTH
+    assert drawing.TAP_SECTION_BREAK[0][0] == drawing.TAP_SECTION_BREAK[-1][0] == far_z
