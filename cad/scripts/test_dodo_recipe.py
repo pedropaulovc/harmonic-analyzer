@@ -3479,7 +3479,7 @@ def test_produced_bundle_edits_rekey_full_export_without_invalidating_native_led
 
 
 @pytest.mark.parametrize("source", [
-    "draw_ch_rocker_arm.py", "draw_ch_rocker_arm_tl_filing_button.py",
+    "draw_ch_rocker_arm.py", "draw_ch_rocker_arm_tl_outline_template.py",
     "_drawing_layout_audit.py", "_pdf_ink.py",
 ])
 def test_draw_source_edits_do_not_rekey_full_export_before_producing_bundles(
@@ -3540,11 +3540,11 @@ def synthetic_prechips_task(tmp_path, monkeypatch):
     for name in _process_plans.SHOP_FILES:
         (shop / name).write_text("version = 1\n")
     (shop / "inventory.toml").write_text(
-        '[fixtures.test]\ncad = "ch_rocker_arm_tl_filing_button"\n'
+        '[fixtures.test]\ncad = "ch_rocker_arm_tl_outline_template"\n'
     )
     monkeypatch.setattr(_process_plans, "PROCESS_ROOT", root)
     monkeypatch.setattr(_process_plans, "TRAVELER_STEMS", (stem,))
-    spec = dodo.SCRIPTS_DIR / "ch_rocker_arm_tl_filing_button_spec.py"
+    spec = dodo.SCRIPTS_DIR / "ch_rocker_arm_tl_outline_template_spec.py"
     helper = dodo.SCRIPTS_DIR / "_synthetic_fixture_dimensions.py"
     original = dodo._executed_closure
 

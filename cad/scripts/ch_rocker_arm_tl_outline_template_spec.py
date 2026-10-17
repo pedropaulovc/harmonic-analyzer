@@ -1,19 +1,20 @@
 r"""Pure-data contract for the rocker arm's outline template (MHA-CH-006-TL-13).
 
-Shop gauge, not a machine part (cad/docs/subsystem-identities.md). An annealed
-O1 plate carrying the rocker arm's finished outline: the R800 top and R816
-bottom arcs about the pivot, the radial tip lands and the tapered ends, plus a
-locating hole for a pin gauge in the arm's reamed pivot bore and a radial slot
-for a second pin gauge in its rod-pin hole, which clocks it. The arm is
-scribed from it (S5) and its outline is checked against it (S7: top-edge
-height, radii, arc lengths, tip lands).
+Shop gauge, not a machine part (cad/docs/subsystem-identities.md), bought cut
+from this CAD by an outside wire-EDM vendor (inventory
+gauges.rocker-profile-gauge). An annealed O1 plate carrying the rocker arm's
+finished outline: the R800 top and R816 bottom arcs about the pivot, the
+radial tip lands and the tapered ends, plus a locating hole for a pin gauge
+in the arm's reamed pivot bore and a radial slot for a second pin gauge in
+its rod-pin hole, which clocks it. The arm's outline is checked against it
+(F1: top-edge height, radii, tip lands and both profile zones).
 
 Every edge derives from the rocker's own CAD source (``ch_rocker_arm_spec``),
 never from a render. The one deliberate offset: every edge aims at the middle
 of the rocker's 0.5 surface-profile zone (``ch_rocker_arm_spec.TOP_EDGE_BAND``,
 outside on the top arc, inside on the lower outline), leaving the zone's whole
-width to the filing that follows. The arc system sits 0.25 higher, on the
-trammel's own radii; the tip lands and tapered ends are offset 0.25 along
+width to the cut of the arm's edges. The arc system sits 0.25 higher, on the
+rocker's own radii; the tip lands and tapered ends are offset 0.25 along
 their own normals, since a +Y shift would carry the near-vertical lands out
 of the lower zone.
 
@@ -29,7 +30,7 @@ import math
 import _config
 import ch_rocker_arm_spec as rocker
 from _hole_spec import blind_cut_dia_mm
-from _printed_tolerance import printed_band_mm, printed_deviations
+from _printed_tolerance import printed_band_mm
 
 R_TOP = rocker.R_TOP
 R_BOTTOM = rocker.R_BOTTOM
@@ -65,28 +66,32 @@ if (
         "template arc centre is not the rocker's, raised by the aim offset"
     )
 
-# Shop acceptance (inventory gauges.arm-outline-template, Pedro 2026-10-11):
+# Receipt acceptance (inventory gauges.rocker-profile-gauge, Pedro 2026-10-11):
 # DTI stations within +/-0.03 of nominal, taken about the pivot hole and the
-# rod slot (below) with pins in both.
-DTI_ACCEPTANCE = 0.03
-# The sheet fixes each arc by its low point on the mirror line, measured from
-# the pin gauge in the hole, and prints its radius at the title block's .XX
-# band. The centre sits on the pivot centreline, so the low point and the
-# radius pin the whole arc; the end stations below check that the radius
-# band, carried out to the arc ends, stays inside DTI_ACCEPTANCE.
-LOW_POINT_BAND = (0.02, -0.02)
+# rod slot (below) with pins in both. The sheet prints it as one bilateral
+# surface profile all around the outline, to the pivot hole (datum A) and the
+# rod slot (datum C): this constant is the one source of both numbers.
+PIVOT_DATUM = "A"
+ROD_SLOT_DATUM = "C"
+OUTLINE_PROFILE_ZONE = 0.06
+OUTLINE_PROFILE_DATUMS = (PIVOT_DATUM, ROD_SLOT_DATUM)
+DTI_ACCEPTANCE = OUTLINE_PROFILE_ZONE / 2.0
+# Every outline dimension prints BASIC (each arc's low point on the mirror
+# line, from the pin gauge in the hole; the radii about a centre on the pivot
+# centreline; the end stations and the tip lands), so the profile alone
+# tolerances the outline (machinist review mr-tl13-1, rule 5).
 APEX_PLACES = 2
 RADIUS_PLACES = 2
 for _low, _high, _nominal in (
     (_ROCKER_TOP_LOW, _ROCKER_TOP_HIGH, TOP_ABOVE_PIVOT),
     (_ROCKER_BOTTOM_LOW, _ROCKER_BOTTOM_HIGH, BOTTOM_BELOW_PIVOT),
 ):
-    if not _low < _nominal + LOW_POINT_BAND[1] < _nominal + LOW_POINT_BAND[0] < _high:
-        raise AssertionError("template low-point band leaves the rocker's arc zone")
+    if not _low < _nominal - DTI_ACCEPTANCE < _nominal + DTI_ACCEPTANCE < _high:
+        raise AssertionError("template profile leaves the rocker's arc zone")
     # The gauge spends at most a quarter of the zone it sets.
-    if LOW_POINT_BAND[0] - LOW_POINT_BAND[1] > 0.25 * (_high - _low) + 1e-9:
+    if OUTLINE_PROFILE_ZONE > 0.25 * (_high - _low) + 1e-9:
         raise AssertionError(
-            "template low-point band spends more than a quarter of the rocker zone"
+            "template profile spends more than a quarter of the rocker zone"
         )
 
 # The rocker's lower outline (the R816 arc, both tapers and both tip lands,
@@ -96,7 +101,7 @@ for _low, _high, _nominal in (
 # put each tip land 0.0453 OUTSIDE that zone (#1544). So the straight edges are
 # offset along their own normals instead, through the three printed stations:
 # the top-arc end, the tip-land length and the bottom-arc end. The arcs stay
-# on the trammel's R800/R816 about CENTER_Y (MHA-CH-006-TL-14..19 scribe them).
+# on the rocker's R800/R816 about CENTER_Y.
 _MID_ZONE = _ROCKER_ZONE / 2.0  # 0.25 into the material on the lower outline
 END_PLACES = 3
 _ROCKER_CENTRE = (0.0, rocker.CENTER_Y - rocker.PIVOT_MID_Y)
@@ -195,22 +200,6 @@ def _taper_meets_bottom_arc() -> float:
 BOT_END_X = round(_taper_meets_bottom_arc(), END_PLACES)  # 132.636
 ALPHA_BOT = math.asin(BOT_END_X / R_BOTTOM)
 BOT_END_Y = CENTER_Y - R_BOTTOM * math.cos(ALPHA_BOT)  # 3.102
-# With the centre on the pivot centreline and the low point held, a radius
-# error dR moves the edge at station x by dR x^2 / (2 R^2): at the end
-# stations that drift plus the low-point band stays inside the DTI acceptance.
-END_STATION_DRIFT: dict[str, float] = {}
-for _name, _radius, _station in (
-    ("top", R_TOP, TOP_END_X),
-    ("bottom", R_BOTTOM, BOT_END_X),
-):
-    _lower, _upper = printed_deviations(_radius, RADIUS_PLACES)
-    END_STATION_DRIFT[_name] = (
-        max(-_lower, _upper) * _station**2 / (2.0 * _radius**2)
-    )  # top 0.0084, bottom 0.0067
-    if END_STATION_DRIFT[_name] + LOW_POINT_BAND[0] > DTI_ACCEPTANCE + 1e-9:
-        raise AssertionError(
-            f"title-block {_name} radius band carries the arc end outside the DTI acceptance"
-        )
 
 
 # The arcs' one residual: R800/R816 about CENTER_Y are _MID_ZONE toward the
@@ -229,16 +218,9 @@ ARC_MID_ZONE_RESIDUAL = {
     "bottom": arc_mid_zone_residual(R_BOTTOM, BOT_END_X),  # 0.0033
 }
 for _name, _residual in ARC_MID_ZONE_RESIDUAL.items():
-    if not 0.0 <= _residual <= END_STATION_DRIFT[_name] + 1e-9:
-        raise AssertionError(
-            f"the {_name} arc's mid-zone residual exceeds its budgeted end drift"
-        )
-# The end stations print at three places: their band is about a quarter of
-# the rocker's own two-place band on the same ends.
-if printed_band_mm(END_PLACES) > 0.26 * printed_band_mm(2):
-    raise AssertionError(
-        "template end-station band spends more than a quarter of the rocker's"
-    )
+    if _residual < 0.0:
+        raise AssertionError(f"the {_name} arc falls past mid-zone off the mirror line")
+
 
 # Pivot locating hole: the rocker's Ø6.5 bore, reamed to H7 (+0.015/0) so
 # one bought 0.2558 in Class X minus pin gauge (inventory
@@ -264,12 +246,13 @@ if PIN_GAUGE_MAX >= PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]:
     raise AssertionError("pin gauge does not enter the template hole")
 if PIN_GAUGE_MAX >= _ROCKER_BORE_LOW:
     raise AssertionError("pin gauge does not enter the rocker's pivot bore")
-# Two budgets. The low-point band holds the template's own edges about its
-# hole (the DTI record checks them against DTI_ACCEPTANCE). Laid on the arm,
-# the pin's worst-case play in both bores (each at its largest, the pin at its
-# smallest) moves the edges further: low-point band plus that registration
-# stays inside the quarter of the rocker's arc zone the gauge may spend,
-# centred on the aim (0.02 + 0.0262 = 0.0462 <= 0.0625).
+# Two budgets. The outline profile holds the template's own edges within
+# DTI_ACCEPTANCE of nominal about its hole and slot (the DTI record checks
+# them). Laid on the arm, the pin's worst-case play in both bores (each at its
+# largest, the pin at its smallest) moves the edges further: the profile's
+# half-zone, the arcs' mid-zone residual and that registration stay inside the
+# quarter of the rocker's arc zone the gauge may spend, centred on the aim
+# (0.03 + 0.0041 + 0.0262 = 0.0603 <= 0.0625).
 LOCATOR_REGISTRATION_MAX = (
     math.ceil(
         1e4
@@ -281,9 +264,12 @@ LOCATOR_REGISTRATION_MAX = (
     / 1e4
 )  # 0.0262 = 0.0094 template + 0.0169 rocker, rounded up
 # The aim spends a quarter of the zone (_ROCKER_ZONE, above) at most.
-if LOW_POINT_BAND[0] + LOCATOR_REGISTRATION_MAX > 0.25 * _ROCKER_ZONE / 2.0 + 1e-9:
+if (
+    DTI_ACCEPTANCE + max(ARC_MID_ZONE_RESIDUAL.values()) + LOCATOR_REGISTRATION_MAX
+    > 0.25 * _ROCKER_ZONE / 2.0 + 1e-9
+):
     raise AssertionError(
-        "pin-gauge play in both bores plus the low-point band spends more than a"
+        "pin-gauge play in both bores plus the outline profile spends more than a"
         " quarter of the rocker zone"
     )
 
@@ -365,7 +351,8 @@ _ROD_SLOT_ROUNDING = abs(
 ROD_CLOCKING_PLAY = ROD_HOLE_PLAY + ROD_SLOT_PLAY + _ROD_SLOT_ROUNDING  # 0.0674
 # The template's share of the rocker's half-zone (0.25 either side of the
 # aim): a template-gauge allocation, not a part tolerance. The other 0.09 is
-# left to filing to the scribed line (#1545, approved 2026-10-15).
+# left to cutting the arm's edges (#1545, approved 2026-10-15 for filing; route
+# v3 cuts them on the oblique trammel jig, MHA-CH-006-TL-000).
 END_STATION_SHARE = 0.16
 
 
@@ -389,9 +376,7 @@ THICK_PLACES = 3
 THICK_CALLOUT = "GROUND FLAT STOCK"
 # drawing-guidelines.md rule 17 (walls and webs): the thinnest web, between the hole and the bottom arc.
 WEB_MIN = round(
-    BOTTOM_BELOW_PIVOT
-    + LOW_POINT_BAND[1]
-    - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) / 2.0,
+    BOTTOM_BELOW_PIVOT - DTI_ACCEPTANCE - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) / 2.0,
     4,
 )
 if min(WEB_MIN, THICK - printed_band_mm(THICK_PLACES)) < 1.5 - 1e-9:
@@ -485,7 +470,7 @@ if ROD_CLOCKING_WORST > END_STATION_SHARE + 1e-9:
 
 def _rod_slot_web() -> float:
     """drawing-guidelines.md rule 17 (walls and webs): the web between the rod
-    slot, at its widest and longest, and the outline at its low-point band.
+    slot, at its widest and longest, and the outline at its profile's limit.
     The slot's core segment never crosses an outline segment, so their
     distance is the least of the four end-to-segment distances."""
     outer, inner = rod_slot_points(
@@ -501,7 +486,7 @@ def _rod_slot_web() -> float:
         )
         for a, b in zip(points, points[1:] + points[:1], strict=True)
     )
-    return core - ROD_SLOT_WIDTH_MAX / 2.0 - max(-LOW_POINT_BAND[1], LOW_POINT_BAND[0])
+    return core - ROD_SLOT_WIDTH_MAX / 2.0 - DTI_ACCEPTANCE
 
 
 ROD_SLOT_WEB_MIN = round(_rod_slot_web(), 4)
@@ -566,13 +551,23 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     )
 # Bands other than the title block's, keyed (feature, dimension).
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
-    ("ApexReference", "TopAbovePivot"): LOW_POINT_BAND,
-    ("ApexReference", "BottomBelowPivot"): LOW_POINT_BAND,
     ("PivotHoleProfile", "PivotDia"): PIVOT_HOLE_BAND,
 }
-# The rod slot's station is BASIC (the rocker's datum C, at its BASIC
-# station); its width is the reference nominal of a matched fit on its pin.
+# The outline is BASIC throughout: the surface profile to A|C is its only
+# tolerance. The rod slot's station is BASIC too (datum C, at the rocker's
+# BASIC station); its width is the reference nominal of a matched fit on its
+# pin.
 BASIC_DIMENSIONS: tuple[tuple[str, str], ...] = (
+    ("OutlineProfile", "TopRadius"),
+    ("OutlineProfile", "BottomRadius"),
+    ("OutlineProfile", "TopTailX"),
+    ("OutlineProfile", "TopRodX"),
+    ("OutlineProfile", "BottomTailX"),
+    ("OutlineProfile", "BottomRodX"),
+    ("OutlineProfile", "RodTipLen"),
+    ("OutlineProfile", "TailTipLen"),
+    ("ApexReference", "TopAbovePivot"),
+    ("ApexReference", "BottomBelowPivot"),
     ("RodSlotReference", "RodSlotX"),
     ("RodSlotReference", "RodSlotY"),
 )
@@ -593,8 +588,10 @@ SHARP_EDGE_CALLOUT = "SHARP EDGE"
 PROFILE_CALLOUT = "ROCKER PROFILE"
 ROCKER_NUMBER = "MHA-CH-006"
 STATION_CALLOUT = f"{PROFILE_CALLOUT}, {ROCKER_NUMBER}"
-# The run's function (its three-place minimum is what must reach), no method.
-ROD_SLOT_FLAT_CALLOUT = f"PIN REACH TO ROD-PIN\nHOLE, {ROCKER_NUMBER}"
+# The run's feature (the slot's end centres, mr-tl13-5 could not tell what it
+# landed on) and its function (its three-place minimum is what must reach),
+# no method.
+ROD_SLOT_FLAT_CALLOUT = f"SLOT END CENTRES;\nPIN REACH, {ROCKER_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:4"
 
 # The #1413 placeholder provenance every solid carries: ``by`` is

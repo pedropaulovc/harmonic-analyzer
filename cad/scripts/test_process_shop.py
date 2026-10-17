@@ -25,15 +25,7 @@ MODELS = {
 SHOP_MADE_IDS = frozenset(
     {
         "fixtures.angle-plate",
-        "fixtures.hub-filing-buttons",
-        "fixtures.rocker-filing-stand",
-        "fixtures.rocker-riser-blocks",
-        "fixtures.strap-shim-stack",
-        "fixtures.trammel-pivot-plate",
-        "gauges.arm-outline-template",
-        "gauges.rocker-trammel-setting-bar",
         "tools.ring-laps",
-        "tools.rocker-trammel",
     }
 )
 
@@ -231,8 +223,8 @@ def test_shop_made_records_are_enumerated():
 
 
 def test_part_identities_catch_a_part_named_gauge():
-    gauge = _shop("inventory.toml")["gauges"]["arm-outline-template"]
-    assert _names_part("arm-outline-template", gauge, _part_identities())
+    gauge = {"name": "arm outline template (MHA-CH-006-TL-13)"}
+    assert _names_part("outline-template", gauge, _part_identities())
 
 
 def test_no_inventory_table_names_a_part():

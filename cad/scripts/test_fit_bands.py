@@ -64,7 +64,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # Fixture builders apply the same bands their specs publish on the sheet.
     ("build_ch_rocker_arm_tl_outline_template", "band"): ("DRAWING_BANDS", "values"),
-    ("build_ch_rocker_arm_tl_trammel_setting_bar", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_v_block", "band"): ("DRAWING_BANDS", "values"),
@@ -314,12 +313,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ),
     ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"): (
         "indexed by _printed_limits.limits for the stud-drill inspection limits"
-    ),
-    ("ch_rocker_arm_tl_filing_button_spec", "BORE_BAND"): (
-        "matched-fit design intent, indexed by filing_stud_spec for bore clearance"
-    ),
-    ("ch_rocker_arm_tl_filing_stud_spec", "BODY_BAND"): (
-        "matched-fit design intent, indexed for the rocker and filing-button clearances"
     ),
     ("ch_rocker_arm_tl_outline_template_spec", "ROD_SLOT_WIDTH_BAND"): (
         "matched-fit design intent, indexed into ROD_SLOT_WIDTH_MAX for the "

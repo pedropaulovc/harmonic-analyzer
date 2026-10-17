@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import math
 import re
 import tomllib
@@ -12,7 +13,6 @@ import pytest
 import _config
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_outline_template_spec as spec
-import ch_rocker_arm_tl_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_outline_template as drawing
 import export_features
 from _paths import CAD_ROOT
@@ -56,25 +56,24 @@ def test_notes_follow_the_simplicity_policy() -> None:
     assert not re.search(r"SCRIBE THE|FILE TO|SAW|TRAMMEL", spec.DRAWING_NOTES.upper())
 
 
-def test_apex_bands_sit_mid_zone_inside_the_rocker_arc_zone() -> None:
+def test_apex_profile_sits_mid_zone_inside_the_rocker_arc_zone() -> None:
     """Both arcs of the rocker may come out 0..+0.5 high; the template's
-    printed apex limits sit in the middle quarter of that zone."""
+    BASIC apex heights, held by the outline profile's half-zone either side,
+    sit in the middle quarter of that zone."""
     features = _features()
     top = features["top_edge"]["height_above_pivot"]
     bottom = features["bottom_edge"]["depth"]
-    assert top == [8.23, 8.27]
-    assert bottom == [7.73, 7.77]
+    assert (top, bottom) == (8.25, 7.75)
+    half = spec.OUTLINE_PROFILE_ZONE / 2.0
     zone_top = (
         rocker.TOP_EDGE_ABOVE_PIVOT,
         rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[0],
     )
     zone_bottom = (rocker.ARM_DEPTH - zone_top[1], rocker.ARM_DEPTH - zone_top[0])
-    for (low, high), (zone_low, zone_high) in ((top, zone_top), (bottom, zone_bottom)):
-        assert zone_low < low < high < zone_high
-        assert math.isclose(
-            (low + high) / 2.0, (zone_low + zone_high) / 2.0, abs_tol=1e-9
-        )
-        assert high - low <= 0.25 * (zone_high - zone_low) + 1e-9
+    for nominal, (zone_low, zone_high) in ((top, zone_top), (bottom, zone_bottom)):
+        assert zone_low < nominal - half < nominal + half < zone_high
+        assert math.isclose(nominal, (zone_low + zone_high) / 2.0, abs_tol=1e-9)
+        assert 2.0 * half <= 0.25 * (zone_high - zone_low) + 1e-9
 
 
 _ROCKER_BOT_END_Y = rocker.CENTER_Y - rocker.R_BOTTOM * math.cos(rocker._ALPHA_BOT)
@@ -128,11 +127,12 @@ def test_straight_edges_sit_mid_zone_along_their_own_normals(
         )
 
 
-def test_arcs_stay_on_the_trammel_and_their_mid_zone_residual_is_bounded() -> None:
-    """Both arcs keep the trammel's radii about a centre raised by half the
+def test_arcs_keep_the_rocker_radii_and_their_mid_zone_residual_is_bounded() -> None:
+    """Both arcs keep the rocker's R800/R816 about a centre raised by half the
     zone: mid-zone on the mirror line, short of it by half the zone times
-    (1 - cos phi) off it, within the printed radius's budgeted end drift."""
-    assert (spec.R_TOP, spec.R_BOTTOM) == trammel.TEMPLATE_RADII
+    (1 - cos phi) off it, never past it."""
+    assert (spec.R_TOP, spec.R_BOTTOM) == (rocker.R_TOP, rocker.R_BOTTOM)
+    assert (spec.R_TOP, spec.R_BOTTOM) == (800.0, 816.0)
     assert math.isclose(spec.CENTER_Y - _ROCKER_CENTRE_Y, _MID_ZONE, abs_tol=1e-9)
     for name, radius, end_x in (
         ("top", spec.R_TOP, spec.TOP_END_X),
@@ -152,7 +152,7 @@ def test_arcs_stay_on_the_trammel_and_their_mid_zone_residual_is_bounded() -> No
         phi = math.asin(end_x / radius)
         assert math.isclose(worst, _MID_ZONE * (1.0 - math.cos(phi)), abs_tol=1e-5)
         assert math.isclose(worst, spec.ARC_MID_ZONE_RESIDUAL[name], abs_tol=1e-12)
-        assert 0.0 < worst <= spec.END_STATION_DRIFT[name]
+        assert 0.0 < worst
 
 
 def test_outline_corners_lie_on_their_arcs() -> None:
@@ -176,9 +176,10 @@ def test_outline_corners_lie_on_their_arcs() -> None:
 def test_locator_play_and_edge_band_fit_a_quarter_of_the_rocker_zone() -> None:
     """The pin's worst-case play in BOTH bores (template and rocker, each at
     its largest, the pin at its smallest) moves the template off the arm's
-    pivot; with the edge acceptance about the template's own hole it stays
-    inside the quarter of the rocker's arc zone the gauge may spend, centred
-    on the aim: half of that quarter either side."""
+    pivot; with the outline profile's half-zone about the template's own hole
+    and slot, and the arcs' mid-zone residual, it stays inside the quarter of
+    the rocker's arc zone the gauge may spend, centred on the aim: half of
+    that quarter either side."""
     hole = _features()["pivot_hole"]
     assert hole["dia"] == [6.5, 6.515]
     rocker_bore = (
@@ -191,7 +192,11 @@ def test_locator_play_and_edge_band_fit_a_quarter_of_the_rocker_zone() -> None:
         rocker_bore[1] - spec.PIN_GAUGE_MIN
     ) / 2.0
     zone = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
-    assert spec.LOW_POINT_BAND[0] + registration <= 0.25 * zone / 2.0 + 1e-9
+    residual = max(spec.ARC_MID_ZONE_RESIDUAL.values())
+    assert (
+        spec.OUTLINE_PROFILE_ZONE / 2.0 + residual + registration
+        <= 0.25 * zone / 2.0 + 1e-9
+    )
     assert spec.LOCATOR_REGISTRATION_MAX >= registration
 
 
@@ -294,9 +299,9 @@ def test_rod_slot_run_takes_the_pin_wherever_the_rocker_puts_its_hole() -> None:
     reach = spec.ROD_HOLE_RADIAL + spec.ROD_HOLE_PLAY + band[1]
     assert run[0] / 2.0 >= reach
     assert spec.ROD_SLOT_WEB_MIN >= 1.5
-    # The three-place run states its function and the hole it reaches.
+    # The three-place run names the feature it spans and its function.
     assert drawing.CALLOUTS_BELOW["RodSlotFlat"] == spec.ROD_SLOT_FLAT_CALLOUT
-    assert spec.ROD_SLOT_FLAT_CALLOUT == "PIN REACH TO ROD-PIN\nHOLE, MHA-CH-006"
+    assert spec.ROD_SLOT_FLAT_CALLOUT == "SLOT END CENTRES;\nPIN REACH, MHA-CH-006"
     # The station's flag says the slot is radial (its axis passes the pivot).
     assert drawing.CALLOUTS_BELOW["RodSlotX"] == "ROD SLOT, RADIAL TO PIVOT"
     assert spec.ROD_SLOT_AXIS == pytest.approx(
@@ -339,45 +344,165 @@ def test_inventory_record_binds_this_part_without_hand_solids() -> None:
     assert "solids" not in records[0]
 
 
-def _dti_acceptance() -> float:
-    """The inventory record's profile acceptance, DTI stations about the pivot
-    and the rod slot with pins in both."""
+def _inventory_record() -> dict:
     inventory = tomllib.loads(
         (CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8")
     )
-    note = inventory["gauges"]["arm-outline-template"]["note"]
-    match = re.search(
+    return inventory["gauges"]["rocker-profile-gauge"]
+
+
+def _inventory_note() -> str:
+    return _inventory_record()["note"]
+
+
+def test_inventory_buys_to_the_sheets_profile_and_stays_unverified() -> None:
+    """The purchase spec is the TL-13 sheet's profile (user 2026-10-17); no
+    vendor is selected, so the record keeps verify = true."""
+    record = _inventory_record()
+    bought = re.fullmatch(
+        r"1 x MHA-CH-006-TL-13 .*: bought, wire EDM or precision CNC to the"
+        r" TL-13 sheet's (\d+\.\d+) profile; vendor not yet selected"
+        r" \(user 2026-10-17: assume feasible\)\.",
+        record["purchase"],
+    )
+    assert bought, record["purchase"]
+    assert float(bought.group(1)) == spec.OUTLINE_PROFILE_ZONE
+    assert record["verify"] is True
+    assert record["note"].startswith(
+        "Vendor data, read live 2026-10-17, context only (none is the selected source)."
+    )
+
+
+def test_inventory_acceptance_is_the_drawings_one_profile_zone() -> None:
+    """TOML cannot import the spec: the note's printed zone and its DTI
+    half-zone must equal OUTLINE_PROFILE_ZONE, and the slot pin the spec's."""
+    note = _inventory_note()
+    printed = re.search(
+        r"surface profile (\d+\.\d+) all around the outline to A\|C \(datum A the"
+        r" pivot hole, C the rod slot\) about a wholly BASIC outline",
+        note,
+    )
+    assert printed, note
+    assert float(printed.group(1)) == spec.OUTLINE_PROFILE_ZONE
+    dti = re.search(
         r"DTI within \+/-(\d+\.\d+) of nominal about the pivot and rod slot"
         r" \(pins in both; the slot's pin is the (\d\.\d{4}) in from"
         r" gauges\.pin-gauges\) at (\d+) stations",
         note,
     )
-    assert match, note
-    assert float(match.group(2)) == spec.ROD_PIN_GAUGE_IN
-    return float(match.group(1))
+    assert dti, note
+    assert float(dti.group(1)) == spec.OUTLINE_PROFILE_ZONE / 2.0 == spec.DTI_ACCEPTANCE
+    assert float(dti.group(2)) == spec.ROD_PIN_GAUGE_IN
+    assert not re.search(r"(?i)light.gap|\bscrib|\bfil(e|ed|ing) to\b", note)
 
 
-def test_end_stations_hold_the_dti_acceptance_under_the_title_block_radii() -> None:
-    """The arcs' centre sits on the pivot centreline and each low point is
-    held by its band, so a radius error dR at the title block's band moves
-    the edge at station x by dR x^2 / (2 R^2): at the end stations that drift
-    plus the low-point band stays inside the inventory's DTI acceptance."""
-    acceptance = _dti_acceptance()
+def test_outline_profile_is_one_frame_all_around_to_a_and_c() -> None:
+    """One 0.06 surface profile all around the outline, to the pivot hole
+    (A) then the rod slot (C), on BASIC R800/R816; every outline feature
+    the rocker's inspection reads against the template carries it."""
+    assert spec.OUTLINE_PROFILE_DATUMS == ("A", "C")
+    assert drawing.OUTLINE_PROFILE_TEXT == f"{spec.OUTLINE_PROFILE_ZONE:.2f}"
+    assert drawing.DETAIL_LETTER not in spec.OUTLINE_PROFILE_DATUMS
     features = _features()
-    for feature, low_point, radius_name in (
-        ("top_edge", "height_above_pivot", "TopRadius"),
-        ("bottom_edge", "depth", "BottomRadius"),
+    for name in ("top_edge", "bottom_edge", "rod_tip_land", "tail_tip_land"):
+        fields = features[name]
+        assert "surface_profile" in fields["requirements"], name
+        assert fields["surface_profile"] == spec.OUTLINE_PROFILE_ZONE
+        assert fields["surface_profile_datums"] == list(spec.OUTLINE_PROFILE_DATUMS)
+        assert set(fields["surface_profile_governs"]) <= set(fields["requirements"])
+    assert features["pivot_hole"]["datum"] == spec.PIVOT_DATUM
+    assert features["rod_slot"]["datum"] == spec.ROD_SLOT_DATUM
+    source = inspect.getsource(drawing._add_outline_profile)
+    assert "all_around=True" in source
+    assert 'characteristic="profile_surface"' in source
+    assert "datums=OUTLINE_PROFILE_DATUMS" in source
+    assert "tolerance=OUTLINE_PROFILE_TEXT" in source
+    build = inspect.getsource(drawing.build)
+    assert "_add_datums(adapter, front, detail)" in build
+    assert "_add_outline_profile(adapter, front)" in build
+
+
+def test_each_slot_end_gets_its_own_centre_mark_in_the_detail() -> None:
+    """mr-tl13-1: the 0.750 run must read centre to centre. The slot option of
+    AutoInsertCenterMarks2 printed nothing on this stadium (tl13-gdt-r2), so
+    each end arc is picked on the slot axis and marked."""
+    assert spec.rod_slot_points()[4:] == (
+        drawing._ROD_SLOT_OUTER,
+        drawing._ROD_SLOT_INNER,
+    )
+    source = inspect.getsource(drawing._mark_rod_slot_end_centres)
+    assert "InsertCenterMark3(CENTER_MARK_SINGLE, False, False)" in source
+    # Crosses only (mr-tl13-5): extended lines lay along the run's extension
+    # lines.
+    assert "mark.ShowLines = False" in source
+    assert '("outer", _ROD_SLOT_OUTER, 0.0)' in source
+    assert '("inner", _ROD_SLOT_INNER, 180.0)' in source
+    build = inspect.getsource(drawing.build)
+    assert "slots=True" not in build
+    assert "_mark_rod_slot_end_centres(adapter, detail)" in build
+    # The run the marks explain is dimensioned between those centres (the
+    # slot axis's ends), not along one side (mr-tl13-4).
+    builder = (
+        CAD_ROOT / "scripts" / "build_ch_rocker_arm_tl_outline_template.py"
+    ).read_text(encoding="utf-8")
+    run = builder[: builder.index('"rod slot run"')]
+    assert run.rstrip().endswith(
+        'f"{axis}.start",\n        f"{axis}.end",\n        "distance",\n'
+        "        ROD_SLOT_FLAT,"
+    )
+
+
+def test_every_outline_dimension_is_basic_under_the_profile() -> None:
+    """The profile is the outline's only tolerance (machinist review
+    mr-tl13-1, rule 5): every dimension that fixes the outline is BASIC."""
+    outline = {
+        ("OutlineProfile", name) for name in spec.DRAWING_DIMENSIONS["OutlineProfile"]
+    } | {("ApexReference", name) for name in spec.DRAWING_DIMENSIONS["ApexReference"]}
+    assert outline <= set(spec.BASIC_DIMENSIONS)
+    assert not outline & set(spec.DRAWING_BANDS)
+    features = _features()
+    expected = {
+        "top_edge": {
+            "radius": spec.R_TOP,
+            "height_above_pivot": spec.TOP_ABOVE_PIVOT,
+            "station": spec.TOP_END_X,
+        },
+        "bottom_edge": {
+            "radius": spec.R_BOTTOM,
+            "depth": spec.BOTTOM_BELOW_PIVOT,
+            "station": spec.BOT_END_X,
+        },
+        "rod_tip_land": {"length": spec.TIP_FACE},
+        "tail_tip_land": {"length": spec.TIP_FACE},
+    }
+    for name, values in expected.items():
+        assert features[name]["dimension_type"] == "basic"
+        assert {key: features[name][key] for key in values} == values
+    assert features["top_edge"]["surface_profile_governs"] == {
+        "radius": "decreases",
+        "height_above_pivot": "increases",
+    }
+    assert features["bottom_edge"]["surface_profile_governs"] == {
+        "radius": "increases",
+        "depth": "increases",
+    }
+
+
+def test_the_profile_zone_has_one_literal() -> None:
+    """0.06 is written once, in the spec; the drawing and the rocker's
+    profile check derive it (the inventory note is pinned above)."""
+    scripts = CAD_ROOT / "scripts"
+    spec_source = (scripts / "ch_rocker_arm_tl_outline_template_spec.py").read_text(
+        encoding="utf-8"
+    )
+    assert len(re.findall(r"(?<![\d.])0\.06(?!\d)", spec_source)) == 1
+    assert "OUTLINE_PROFILE_ZONE = 0.06" in spec_source
+    for stem in (
+        "draw_ch_rocker_arm_tl_outline_template",
+        "ch_rocker_arm_profile_check",
     ):
-        edge = features[feature]
-        radius = edge["radius_nominal"]
-        lower, upper = printed_deviations(
-            radius, spec.DRAWING_PRECISION_BY_NAME[radius_name]
-        )
-        drift = max(-lower, upper) * edge["station_nominal"] ** 2 / (2.0 * radius**2)
-        low, high = edge[low_point]
-        assert drift + (high - low) / 2.0 <= acceptance + 1e-9, (feature, drift)
-        assert edge["radius"] == pytest.approx([radius + lower, radius + upper])
-    assert spec.DTI_ACCEPTANCE == acceptance
+        source = (scripts / f"{stem}.py").read_text(encoding="utf-8")
+        assert not re.search(r"(?<![\d.])0\.0[36](?!\d)", source), stem
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
@@ -408,7 +533,7 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
 
 
 class _SlotView:
-    """A recording IView double for detail A's place-move-crop."""
+    """A recording IView double for detail D's place-move-crop."""
 
     def __init__(
         self, *, crop_status: int = 1, crops: bool = True, moves: bool = True
@@ -455,7 +580,7 @@ class _SlotModel:
 
 
 def _crop_slot(monkeypatch, view: _SlotView) -> list[tuple]:
-    """Place, move and crop detail A on a *Front double at 5:1 whose model
+    """Place, move and crop detail D on a *Front double at 5:1 whose model
     origin sits a fixed offset from the view's position."""
     log: list[tuple] = []
     offset = (-0.650, -0.030)
@@ -565,16 +690,43 @@ def test_rod_slot_detail_circle_and_label_stay_clear_of_the_notes_and_frame() ->
     # The circle sits under the notes and right of the frame border.
     assert y + crop < drawing.NOTES_XY[1] - 0.010
     assert x - crop > 0.020 and y - crop > 0.010
-    # The width's dimension line stands outside the circle, and the label's
-    # top centre is right of it.
+    # The width's dimension line stands outside the circle; the label's top
+    # centre is left of the circle, where nothing else of the detail prints.
     width_x = drawing.DETAIL_KEEP["RodSlotWidth"][0]
     assert width_x > x + crop
-    assert drawing.DETAIL_LABEL_XY[0] - 0.010 > width_x
-    assert drawing.DETAIL_LABEL_TEXT == "DETAIL A\nSCALE 5 : 1"
-    # The run's value and flag sit right of the circle, under the label. Its
-    # widest line, "PIN REACH TO ROD-PIN", printed 51.4 mm wide and centred on
-    # the dimension (farm run 3111b8f0a's layout audit: text-on-line against
-    # the circle at +0.037), so the whole line must clear the circle's extent.
+    assert drawing.DETAIL_LABEL_XY[0] + 0.015 < x - crop
+    assert drawing.DETAIL_LABEL_XY[0] - 0.015 > 0.010
+    assert drawing.DETAIL_LABEL_TEXT == "DETAIL D\nSCALE 5 : 1"
+    # The run's value and flag sit right of and below the circle. The old
+    # flag's widest line, "PIN REACH TO ROD-PIN" (20 characters), printed
+    # 51.4 mm wide, centred on the dimension (farm run 3111b8f0a's layout
+    # audit: text-on-line against the circle at +0.037). The flag's widest line
+    # now has 21 characters, so pro rata it needs 54 mm, and the whole line
+    # must clear the circle's extent.
+    flag = max(spec.ROD_SLOT_FLAT_CALLOUT.splitlines(), key=len)
+    half = 0.0514 / 20 * len(flag) / 2.0
     flat_x, flat_y = drawing.DETAIL_KEEP["RodSlotFlat"]
-    assert flat_x - 0.0514 / 2.0 > x + crop and flat_y < y - 0.010
-    assert flat_y < drawing.DETAIL_LABEL_XY[1] - 0.015
+    assert flat_x - half > x + crop and flat_y < y - 0.010
+    # Datum C's tag hangs below the width's lower arrow (the slot's lower
+    # side, 5:1), on the dimension line's axis (SolidWorks holds it there),
+    # above the run's dimension line, its ~7 mm box left of the run's flag.
+    datum_x, datum_y = drawing.ROD_SLOT_DATUM_XY
+    lower_arrow_y = y - drawing.DETAIL_RATIO * spec.ROD_SLOT_WIDTH / 2.0 / 1000.0
+    assert flat_y < datum_y < lower_arrow_y
+    assert abs(datum_x - width_x) < 0.005
+    assert datum_x + 0.0035 < flat_x - half
+
+
+def test_datum_c_is_the_slot_width_not_one_side() -> None:
+    """mr-tl13-4: a tag on one slot edge names that surface; on the width's
+    size dimension it names the centre plane the pin gauge locates."""
+    assert drawing.ROD_SLOT_WIDTH_DIMENSION in spec.DRAWING_DIMENSIONS["RodSlotProfile"]
+    assert drawing.ROD_SLOT_WIDTH_DIMENSION in drawing.DETAIL_KEEP
+    source = inspect.getsource(drawing._rod_slot_width_datum)
+    assert "InsertDatumTag2()" in source
+    assert "SetLabel(ROD_SLOT_DATUM)" in source
+    assert "SetAttachedEntities" in source
+    assert "kinds != (14,)" in source
+    datums = inspect.getsource(drawing._add_datums)
+    assert "_rod_slot_width_datum(adapter, detail)" in datums
+    assert datums.count("add_datum_feature(") == 1

@@ -314,7 +314,9 @@ async def build(adapter) -> dict[str, str]:
     )
     # Emission order: the station (x, y), the width across the outer end's
     # tangent points (its witness lines run outboard, clear of the slot),
-    # then side a's straight run.
+    # then the run between the two end centres (the axis's ends), so its
+    # witness lines rise from the centres the detail marks (mr-tl13-4: off
+    # side a they read as lines below the slot).
     await anchor_point_to_origin(adapter, f"{ray}.start", 0.0, 0.0, "rod slot ray foot")
     await dimension_between(
         adapter,
@@ -345,8 +347,8 @@ async def build(adapter) -> dict[str, str]:
     slot.record("RodSlotWidth", '"RodSlotWidth"')
     await dimension_between(
         adapter,
-        f"{side_a}.start",
-        f"{side_a}.end",
+        f"{axis}.start",
+        f"{axis}.end",
         "distance",
         ROD_SLOT_FLAT,
         "rod slot run",

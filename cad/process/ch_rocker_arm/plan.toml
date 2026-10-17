@@ -910,26 +910,26 @@ checks = { thickness = "micrometers/0-1in" }
 op = 70
 do = "inspect"
 feature = "top_edge"
-checks = { height_above_pivot = "arm-outline-template", radius = "arm-outline-template" }
+checks = { height_above_pivot = "rocker-profile-gauge", radius = "rocker-profile-gauge" }
 
 [[setups.ops]]
 op = 80
 do = "inspect"
 feature = "profile_outer"
-checks = { bottom_radius = "arm-outline-template", mirror_symmetric = "arm-outline-template" }
+checks = { bottom_radius = "rocker-profile-gauge", mirror_symmetric = "rocker-profile-gauge" }
 
 # Each tip land's station is its own BASIC 146.25 "LAND" row from the pivot.
 [[setups.ops]]
 op = 90
 do = "inspect"
 feature = "tip_land_pos_x"
-checks = { land_angle_deg = "arm-outline-template", station = "height-gauge" }
+checks = { land_angle_deg = "rocker-profile-gauge", station = "height-gauge" }
 
 [[setups.ops]]
 op = 95
 do = "inspect"
 feature = "tip_land_neg_x"
-checks = { land_angle_deg = "arm-outline-template", station = "height-gauge" }
+checks = { land_angle_deg = "rocker-profile-gauge", station = "height-gauge" }
 
 # Both printed profile zones (top edge, and the lower outline J to K with both tip lands), read
 # with a DTI against the arm outline template. The accept/reject windows are computed in
@@ -942,7 +942,7 @@ feature = ["top_edge", "profile_outer", "tip_land_pos_x", "tip_land_neg_x"]
 checks = { surface_profile = "dti" }
 [setups.ops.inspection_methods]
 surface_profile = [
-  "Both printed profile zones, read against the arm outline template (gauges.arm-outline-template) pinned in datums A and C: the top edge (0.5, all outside the R800 BASIC arc) and the lower outline J to K (0.5, all inside the BASIC outline: the R816 arc, both tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on the granite surface plate (gauges.granite-surface-plate), off the rest plate.",
+  "Both printed profile zones, read against the arm outline template (gauges.rocker-profile-gauge) pinned in datums A and C: the top edge (0.5, all outside the R800 BASIC arc) and the lower outline J to K (0.5, all inside the BASIC outline: the R816 arc, both tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on the granite surface plate (gauges.granite-surface-plate), off the rest plate.",
   "Clean the arm, the template and both pins and leave them on the granite for 30 min to reach its temperature.",
   "Lay the template flat on the granite, the face that is laid on the arm up.",
   "Seating: lower the arm onto it with strap datum B (the +Z strap face) down, so its +Z hub face rests on the template and the rod-pin hole sits over the rod slot. Datum A: push the 0.2558 in Class X pin (gauges.vermont-class-x-2558-minus) down through the pivot bore and the template's pivot hole to the granite. Datum C: push the 0.0780 in pin (gauges.pin-gauges) down through the rod-pin hole into the slot to the granite. Press on the hub: the arm must not rock; if it does, clean and reseat.",
@@ -950,7 +950,7 @@ surface_profile = [
   "Stations (20; each at least 1 mm from a corner, placed by eye): each arc on the mirror line, halfway out and 2 mm short of each end (5 per arc); each tip land a third and two thirds along (2 per land); each tapered end 2 mm from each corner and halfway (3 per taper).",
   "At each station, zero: set the slider so the ball is 1.6 mm above the granite (the template's mid-thickness), slide the gauge base in until the dial has turned half its travel (0.015 in) and set the bezel to zero. Read: without moving the base, raise only the slider to 6.7 mm (the strap's mid-plane), letting the ball ride onto the arm's edge, and copy {o}. Lower it back to 1.6 mm: if the dial is not back at zero within one division, redo the station.",
   "Decide each station with its segment's window, o in mm: the R800 top arc (top_edge): accept -0.07 to +0.08, reject below -0.42 or above +0.43; each tip land (tip_land_pos_x, tip_land_neg_x): accept -0.17 to +0.17, reject below -0.33 or above +0.33; each tapered end (profile_outer): accept -0.10 to +0.10, reject below -0.40 or above +0.40; the R816 bottom arc (profile_outer): accept -0.09 to +0.08, reject below -0.42 or above +0.41. Between accept and reject, or off the dial either way, the station is indeterminate: re-check on a CMM. The profile is accepted only when every station accepts.",
-  "AUTHOR'S CHOICE guard (ch_rocker_arm_profile_check): each window is the zone, offset by where the template's edge sits in it, shrunk at every point by the template's clocking_error (its own 0.03 mm profile acceptance plus the pins' registration, at most 0.159 mm) and the DTI's 0.0127 mm resolution, rounded inward to 0.01 mm. The template's acceptance and the pin plays are #1413 placeholders, not a calibration; remeasure them before shop acceptance.",
+  "AUTHOR'S CHOICE guard (ch_rocker_arm_profile_check): each window is the zone, offset by where the template's edge sits in it, shrunk at every point by the template's clocking_error (half its own 0.06 mm surface profile to A|C, plus the pins' registration, at most 0.159 mm) and the DTI's 0.0127 mm resolution, rounded inward to 0.01 mm. The pin plays are #1413 placeholders, not a calibration; remeasure them before shop acceptance.",
 ]
 [[setups.ops]]
 op = 100
