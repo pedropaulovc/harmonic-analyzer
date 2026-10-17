@@ -111,4 +111,4 @@ DIMENSION_CALLOUTS: dict[str, str] = {
 # drawing-guidelines.md rule 7: the finish field's "after joining" needs the
 # joint named (r1 machinist review).
 DRAWING_NOTES = f"1. JOINED TO HUB {HUB_NUMBER} AS {ROCKER_NUMBER}."
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

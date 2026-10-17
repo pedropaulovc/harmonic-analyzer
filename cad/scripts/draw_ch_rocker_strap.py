@@ -64,15 +64,19 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # The 292.5 mm strap at full size across the sheet's upper band, its 2.5 mm
-# end view to the right; the isometric at 1:4 (captioned, it differs from the
-# sheet scale) and the note sit left of the title block below.
+# end view to the right; the isometric at 1:2 (captioned, it differs from the
+# sheet scale) and the note sit left of the title block below. At 1:4 the
+# 2.5 mm plate rendered stair-stepped (r1 and r4 machinist reviews), so the
+# view is doubled: its diagonal runs ~(0.083, 0.115) to ~(0.187, 0.049),
+# under the foot offsets' line (y 0.125) and left of the title block (x
+# 0.215), the caption in the empty corner below its upper-left end.
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
-ISO_SCALE = (1, 4)
+ISO_SCALE = (1, 2)
 FRONT_CENTER = (0.185, 0.185)
 RIGHT_CENTER = (0.385, FRONT_CENTER[1])  # projected: same row as the front
-ISO_CENTER = (0.110, 0.100)
-ISO_CAPTION_XY = (0.080, 0.078)
+ISO_CENTER = (0.135, 0.082)
+ISO_CAPTION_XY = (0.025, 0.064)
 NOTES_XY = (0.020, 0.040)
 
 

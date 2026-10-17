@@ -144,8 +144,8 @@ def test_drawing_quality_and_no_gdt() -> None:
     assert notes.DRAWING_NOTES.splitlines() == [
         "1. JOINED TO HUB MHA-CH-012 AS MHA-CH-006.",
     ]
-    assert notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
-    assert drawing.ISO_SCALE == (1, 4)
+    assert notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
+    assert drawing.ISO_SCALE == (1, 2)
 
 
 def test_registry_row() -> None:
