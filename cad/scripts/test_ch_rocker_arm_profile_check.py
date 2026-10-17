@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker arm's surface-profile check (plan S7 op 97)."""
+"""Offline contracts for the rocker arm's surface-profile check (plan F1 op 97)."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def test_plan_op_97_reads_every_profile_with_the_computed_procedure() -> None:
     (op,) = [
         op
         for setup in plan["setups"]
-        if setup["id"] == "S7"
+        if setup["id"] == "F1"
         for op in setup["ops"]
         if op["op"] == 97
     ]
