@@ -26,7 +26,7 @@ boss-hook / counter-spring / gooseneck chain.
   Motion study. The rock is the sub's single FREED operational DOF: its
   drive spec is recorded into the DOF manifest, never authored, so the
   saved model rocks on the knife edge.
-* boss-hook (keyed to the lever's anchor eye) + its MHA-VN-070 jam nut on the
+* boss-hook (keyed to the lever's anchor eye) + its MHA-VN-072 jam nut on the
   boss top face + counter-spring + gooseneck -- the counter-balance hung from
   the east column; the post is gripped by the top-frame rail hub's set screw
   (no separate clamp part).
@@ -384,7 +384,7 @@ from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
 import vn_boss_hook_jam_nut_spec as jam_nut  # noqa: E402
 
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
-# MHA-VN-070 on the anchor axis, its z = 0 face on the boss top face:
+# MHA-VN-072 on the anchor axis, its z = 0 face on the boss top face:
 # ROT_X_NEG90 turns the nut's local +Z thread axis to machine +Y.
 JAM_NUT_POS = (
     spring_mounts.COUNTER_ANCHOR_XY[0],
