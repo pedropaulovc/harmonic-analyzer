@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import ast
 import builtins
+from collections import Counter
 from dataclasses import replace
 import hashlib
 import importlib
@@ -723,6 +724,20 @@ def test_raw_step_face_sets_and_values_satisfy_installed_consumer_schema(tmp_pat
     assert manifest["cite"]["step_sha256"] == [f"harmonic-analyzer/cad/out/features/{stem}/{step.name}"]
     assert {file.name for file in path.parent.iterdir()} == {step.name, "features.toml"}
     assert step.read_bytes() == content
+
+
+def test_rocker_hub_root_carries_both_native_fillets_each_split_in_two(tmp_path: Path) -> None:
+    # One native face per strap side (P01, P02); STEP splits each periodic
+    # torus into two ADVANCED_FACEs, so the manifest lists each label twice.
+    step = _step(tmp_path, "ch_rocker_arm")
+    one = face_name("hub_root", 1)
+    rows = step.read_bytes().decode("utf-8").split("\r\n")
+    at = next(index for index, row in enumerate(rows) if f"'{one}'" in row)
+    split = [one, one, face_name("hub_root", 2), face_name("hub_root", 2)]
+    rows[at : at + 1] = [f"#{900 + index} = ADVANCED_FACE('{label}',(#1),#2,.T.);" for index, label in enumerate(split)]
+    step.write_bytes("\r\n".join(rows).encode("utf-8"))
+    faces = _load(exporter.write_manifest("ch_rocker_arm", step, revision="v40"))["features"]["hub_root"]["faces"]
+    assert Counter(face.rsplit("/", 1)[1] for face in faces) == {one: 2, face_name("hub_root", 2): 2}
 
 
 def test_raw_step_ansi_metadata_and_line_endings_are_never_rewritten(tmp_path: Path) -> None:
