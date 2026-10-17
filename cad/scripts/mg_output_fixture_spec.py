@@ -6,14 +6,15 @@ this one); this module adds what the print states about it: the marked model
 dimensions and their places, the walls at the worst case of the title block's
 rows, the walls the sheet states, and the manufacturing notes.
 
-Sheet datums: the rod bore is the datum along the hex axis.  The free end
-and the shoulder are dimensioned from the free end, the bore from the free end
-and to the spigot face (the thumb screw's reach and the tap's wall are one
-dimension each, not a stack), and the groove from the spigot face; the overall
-length is REF.  The rod bore is centred on the hex axis: the end view draws
-its axis through the tap's centre, and the stated bore-to-flat wall is the
-centring's acceptance.  The stations are dimensions on the model
-(``build_mg_output_fixture``), so the sheet only proves it imported them.
+Sheet datums: the rod bore is the datum along the hex axis.  The bore is
+dimensioned from the free end and to the spigot face (the thumb screw's
+reach and the tap's wall are one dimension each, not a stack); the lathe's
+own lengths run from the faced spigot end: the shoulder (the spigot's
+length) and the groove.  The overall length is REF.  The rod bore is centred
+on the hex axis: the end view draws its axis through the tap's centre, and
+the stated bore-to-flat wall is the centring's acceptance.  The stations
+are dimensions on the model (``build_mg_output_fixture``), so the sheet only
+proves it imported them.
 """
 
 from __future__ import annotations
@@ -37,8 +38,10 @@ from mg_output_fixture_geom import (
     OVERALL_LENGTH,
     ROD_BORE_DIA,
     ROD_STATION,
+    SHOULDER_FILLET_R,
     SPIGOT_DIA,
     SPIGOT_FACE_X,
+    SPIGOT_LENGTH,
     TAP_DRILL_DEPTH,
     TAP_DRILL_DIA,
     TAP_LENGTH,
@@ -74,7 +77,7 @@ def _wander(depth_mm: float) -> float:
 # The bar's flats: the exact 3/8 in, printed as a stock reference, (9.525).
 HEX_AF_PLACES = 3
 ROD_STATION_PLACES = 2
-HEX_LENGTH_PLACES = 2
+SPIGOT_LENGTH_PLACES = 2
 BORE_STATION_PLACES = 2
 GROOVE_STATION_PLACES = 2
 OVERALL_LENGTH_PLACES = 2
@@ -90,6 +93,10 @@ GROOVE_RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # The drilled rod bore prints at one place; its band is the title block's
 # DRILLED HOLES row (+0.10/0): running clearance on the rod, no fit.
 ROD_BORE_DIA_PLACES = 1
+# The shoulder's internal corner prints as the single limit "R0.2 MAX" (rule
+# 16: the largest tool-nose radius the shoulder takes; the model IS the limit).
+SHOULDER_RADIUS_PLACES = 1
+SHOULDER_RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # The tap's drill and thread depths (native Hole Wizard variables): one place,
 # the general .X.  The drill depth governs; the thread depth is REF -- the
 # callout prints it in parentheses, and the note's FULL THREAD TO ROD BORE
@@ -105,8 +112,10 @@ REFERENCE_DIMENSIONS = frozenset({"HexAf", "OverallLength"})
 # stock reference).  Every wall, the spigot's clean-up and the tap's reach
 # below hold at it.
 HEX_STOCK_AF_BAND = 0.13
-_ROD_STATION_LO, _ROD_STATION_HI = printed_deviations(ROD_STATION, ROD_STATION_PLACES)
-_SHOULDER_LO, _SHOULDER_HI = printed_deviations(HEX_LENGTH, HEX_LENGTH_PLACES)
+_ROD_STATION_LO, _ = printed_deviations(ROD_STATION, ROD_STATION_PLACES)
+_SPIGOT_LENGTH_LO, _SPIGOT_LENGTH_HI = printed_deviations(
+    SPIGOT_LENGTH, SPIGOT_LENGTH_PLACES
+)
 _BORE_STATION_LO, _BORE_STATION_HI = printed_deviations(
     BORE_STATION, BORE_STATION_PLACES
 )
@@ -115,6 +124,7 @@ _SPIGOT_LO, _ = printed_deviations(SPIGOT_DIA, SPIGOT_DIA_PLACES)
 _ROOT_LO, _ROOT_HI = printed_deviations(GROOVE_ROOT_DIA, GROOVE_ROOT_DIA_PLACES)
 # MAX: from sharp up to the printed (= model) radius.
 GROOVE_RADIUS_MAX = GROOVE_RADIUS
+SHOULDER_FILLET_R_MAX = SHOULDER_FILLET_R
 ROD_BORE_R_MIN = ROD_BORE_DIA / 2.0
 ROD_BORE_R_MAX = (ROD_BORE_DIA + drilled_oversize_mm()) / 2.0
 # A tap cuts up to 0.05 over the basic major: half of it on a wall.
@@ -154,17 +164,29 @@ GROOVE_DEPTH_MIN = ((SPIGOT_DIA + _SPIGOT_LO) - (GROOVE_ROOT_DIA + _ROOT_HI)) / 
 if not GROOVE_DEPTH_MIN > _geom.WIRE_DIA / 2.0:
     raise AssertionError("MHA-MG-006 groove shallower than the wire's radius")
 # The groove stays on the spigot at the worst case: its shoulder-side mouth
-# clears the shoulder (face to shoulder = the bore's two stations less the
-# hex length).
-GROOVE_SHOULDER_CLEARANCE = (
-    FACE_TO_BORE_AXIS_MIN
-    + ROD_STATION
-    + _ROD_STATION_LO
-    - (HEX_LENGTH + _SHOULDER_HI)
-    - (GROOVE_STATION + _GROOVE_HI + GROOVE_HALF_OPENING_MAX)
+# clears the shoulder (the spigot's length and the groove's station both run
+# from the spigot face: one band each), and the shoulder's corner radius.
+GROOVE_SHOULDER_CLEARANCE = (SPIGOT_LENGTH + _SPIGOT_LENGTH_LO) - (
+    GROOVE_STATION + _GROOVE_HI + GROOVE_HALF_OPENING_MAX
 )
-if not GROOVE_SHOULDER_CLEARANCE > 0.0:
-    raise AssertionError("MHA-MG-006 groove runs into the shoulder at the worst case")
+GROOVE_FILLET_CLEARANCE = GROOVE_SHOULDER_CLEARANCE - SHOULDER_FILLET_R_MAX
+if not GROOVE_FILLET_CLEARANCE > 0.0:
+    raise AssertionError(
+        "MHA-MG-006 groove runs into the shoulder's corner at the worst case"
+    )
+# The shoulder's corner radius stays on the shoulder face, inside the flats'
+# annulus round the spigot.  On the thinnest bar the largest radius may roll
+# a few microns onto a flat's edge: inside the title block's R0.25 edge break,
+# so the bar's stock assumption never rejects a part the radius passes.
+SHOULDER_ANNULUS = (HEX_AF - SPIGOT_DIA) / 2.0
+if not SHOULDER_FILLET_R_MAX < SHOULDER_ANNULUS:
+    raise AssertionError("MHA-MG-006 shoulder radius runs off the shoulder face")
+TITLE_BLOCK_EDGE_BREAK = 0.25
+SHOULDER_FILLET_FLAT_OVERRUN_MAX = SHOULDER_FILLET_R_MAX - (
+    (HEX_AF - HEX_STOCK_AF_BAND - SPIGOT_DIA) / 2.0
+)
+if not SHOULDER_FILLET_FLAT_OVERRUN_MAX < TITLE_BLOCK_EDGE_BREAK:
+    raise AssertionError("MHA-MG-006 shoulder radius breaks a flat past the edge break")
 
 # --- Walls at the printed worst case (drawing-guidelines.md rule 17 (walls and webs)) ----------------------------
 # (nominal, worst).  Drilled walls take the drill's wander over its depth;
@@ -187,10 +209,9 @@ WALLS: dict[str, tuple[float, float]] = {
         ROD_STATION + _ROD_STATION_LO - ROD_BORE_R_MAX - BORE_WANDER,
     ),
     "rod bore to the shoulder": (
-        HEX_LENGTH - ROD_STATION - ROD_BORE_DIA / 2.0,
-        HEX_LENGTH
-        + _SHOULDER_LO
-        - (ROD_STATION + _ROD_STATION_HI)
+        BORE_STATION - SPIGOT_LENGTH - ROD_BORE_DIA / 2.0,
+        FACE_TO_BORE_AXIS_MIN
+        - (SPIGOT_LENGTH + _SPIGOT_LENGTH_HI)
         - ROD_BORE_R_MAX
         - BORE_WANDER,
     ),
@@ -323,22 +344,23 @@ if not TAP_DRILL_NEAR_CLEAR > 0.0:
 if not TAP_DRILL_FAR_CLEAR > 0.0:
     raise AssertionError("MHA-MG-006 tap drill point reaches the far wall")
 
-# --- Marked model dimensions and the places the model authors on them ------------
 # The turned profile (Top plane) carries the bore's stations from the free end
-# and to the spigot face, the shoulder from the free end, the overall length
-# (driven, REF) and the spigot's Ø; the groove profile (Top plane) the
-# groove's station from the spigot face, its root Ø and its radius; the hex
-# sketch (the FreeEnd plane) the flats, a stock reference (the bore is
+# and to the spigot face, the shoulder from the spigot face (the spigot's
+# length), the overall length (driven, REF) and the spigot's Ø; the shoulder
+# fillet its corner radius (a single MAX limit); the groove profile (Top
+# plane) the groove's station from the spigot face, its root Ø and its radius;
+# the hex sketch (the FreeEnd plane) the flats, a stock reference (the bore is
 # centred: no location from a flat); the bore sketch (Top plane) its Ø.  The
 # tap is a Hole Wizard feature: its native callout prints it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "TurnedProfile": {
         "RodStation": ROD_STATION_PLACES,
-        "HexLength": HEX_LENGTH_PLACES,
+        "SpigotLength": SPIGOT_LENGTH_PLACES,
         "BoreStation": BORE_STATION_PLACES,
         "OverallLength": OVERALL_LENGTH_PLACES,
         "SpigotDia": SPIGOT_DIA_PLACES,
     },
+    "ShoulderFillet": {"ShoulderRadius": SHOULDER_RADIUS_PLACES},
     "GrooveProfile": {
         "GrooveStation": GROOVE_STATION_PLACES,
         "GrooveRootDia": GROOVE_ROOT_DIA_PLACES,
@@ -358,11 +380,16 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 # Single-limit dimensions (name -> (owning feature, swTolType)).
 SINGLE_LIMITS: dict[str, tuple[str, int]] = {
     "GrooveRadius": ("GrooveProfile", GROOVE_RADIUS_TOL_TYPE),
+    "ShoulderRadius": ("ShoulderFillet", SHOULDER_RADIUS_TOL_TYPE),
 }
 if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME) - set(SINGLE_LIMITS):
     raise AssertionError("MHA-MG-006 reference dimension is unprinted or limited")
 if abs(OVERALL_LENGTH - (ROD_STATION + BORE_STATION)) > 1e-9:
     raise AssertionError("MHA-MG-006 overall REF is not the bore's two stations")
+# The hex is extruded to the shoulder the spigot's length sets: its depth is
+# the bore's two stations less the spigot (the part's equation).
+if abs(HEX_LENGTH - (ROD_STATION + BORE_STATION - SPIGOT_LENGTH)) > 1e-9:
+    raise AssertionError("MHA-MG-006 hex length is not the stations less the spigot")
 if abs(FREE_END_X + ROD_STATION) > 1e-9:
     raise AssertionError("MHA-MG-006 rod station does not run free end to bore axis")
 
