@@ -4,7 +4,7 @@ PURE DATA, no SolidWorks/COM and no drawing imports.  A turned brass round
 nut, #6-32 tapped through, one on each MHA-VN-012 channel anchor: it runs up
 the anchor's protruding shank from below and is jammed against the MHA-SM-003
 coefficient plate's underside while the anchor's eye is held at its clocking
-(drawing-guidelines.md rule 23; coordinator ruling 2026-10-16, option A).
+(drawing-guidelines.md rule 23; owner ruling 2026-10-17, option A).
 
 Why round, not a stock hex: the 20 anchors stand in one row at the plate's
 ``CHANNEL_PITCH`` (7.0565), so neighbouring nuts are 7.06 apart centre to
@@ -14,8 +14,10 @@ cases: rule 17's 1.5 wall floor from the #6-32 major (small O.D.) and the
 0.25 modelling clearance to the neighbour (large O.D.).  The pitch leaves no
 geometry to trade, so the O.D. prints at two places with an explicit band
 inside that window (rule 4: tightened for a function, the neighbour named at
-the callout; coordinator ruling 2026-10-16).  The 2.0 wall target cannot be
-met inside the pitch; the floor is.
+the callout; owner ruling 2026-10-17).  The 2.0 wall target cannot be
+met inside the pitch; the floor is.  The 1.5 MIN wall and the 0.5D
+engagement are declared owner-ruled shortfalls (``machinist_exceptions`` in
+``ch-anchor-jam-nut.yaml``): a thin jam nut locks and carries no load.
 
 Drive: one saw cut across the lower face gives two diametrically opposite
 notches, the bore between them.  A forked driver (a screwdriver blade slotted

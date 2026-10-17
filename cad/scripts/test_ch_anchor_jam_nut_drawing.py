@@ -237,3 +237,18 @@ def test_spec_imports_no_com_or_drawing_modules() -> None:
         check=True,
     )
     assert out.stdout.strip() == ""
+
+
+def test_printed_shortfalls_are_owner_declared_minors() -> None:
+    """Machinist gate 2026-10-17: a stated shortfall with no declaration gates."""
+    from machinist_exceptions import load_exceptions
+
+    engagement, wall = load_exceptions(_config.CONFIG_DIR, "ch_anchor_jam_nut", "part")
+    assert (engagement.kind, wall.kind) == ("minor", "minor")
+    assert spec.THICKNESS_CALLOUT in engagement.where
+    assert "rule 18" in engagement.finding
+    assert drawing.DIMENSION_CALLOUTS_ABOVE["NutOd"] in wall.where
+    assert "rule 17" in wall.finding
+    for entry in (engagement, wall):
+        assert entry.reason.startswith("owner ruling 2026-10-17")
+    assert "coordinator ruling" not in Path(spec.__file__).read_text(encoding="utf-8")
