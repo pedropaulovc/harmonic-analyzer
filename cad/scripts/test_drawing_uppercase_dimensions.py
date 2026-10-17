@@ -25,7 +25,10 @@ class _Extension:
     """``IModelDocExtension`` document preferences; ``refuse`` ignores writes."""
 
     def __init__(self, *, refuse: bool = False) -> None:
-        self.toggles = {(_TOGGLE, _NO_OPTION): False}
+        self.toggles = {
+            (_TOGGLE, _NO_OPTION): False,
+            (_drawing_common._PREF_DETAILING_ALL_UPPERCASE, _NO_OPTION): False,
+        }
         self.strings = {(_EXCLUSIONS, _NO_OPTION): "m;mm;"}
         self.refuse = refuse
         self.writes: list[bool] = []
@@ -49,8 +52,8 @@ def test_uppercase_dimensions_are_switched_on_and_read_back() -> None:
 
     _drawing_common._pin_uppercase_dimensions(SimpleNamespace(Extension=ext))
 
-    assert ext.writes == [False, True]
-    assert ext.toggles[(_TOGGLE, _NO_OPTION)] is True
+    assert ext.writes == [False, True, False, True]
+    assert all(ext.toggles.values())
     assert ext.strings[(_EXCLUSIONS, _NO_OPTION)] == "m;mm;"
 
 

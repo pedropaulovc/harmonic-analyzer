@@ -433,6 +433,8 @@ def _pin_dimension_text_and_leader_style(draw: Any) -> None:
 _PREF_UPPERCASE_DIMENSIONS = 754
 _PREF_UPPERCASE_EXCLUSION_LIST = 96
 _DETAILING_NO_OPTION = 0  # swUserPreferenceOption_e.swDetailingNoOptionSpecified
+# swUserPreferenceToggle_e.swDetailingAllUpperCase (538, swconst.tlb R2026x).
+_PREF_DETAILING_ALL_UPPERCASE = 538
 
 
 def _pin_uppercase_dimensions(draw: Any) -> None:
@@ -444,18 +446,15 @@ def _pin_uppercase_dimensions(draw: Any) -> None:
     20261017T013332447Z), so the change itself has to reach them.
     """
     ext = draw.Extension
-    ext.SetUserPreferenceToggle(_PREF_UPPERCASE_DIMENSIONS, _DETAILING_NO_OPTION, False)
-    ok = ext.SetUserPreferenceToggle(
-        _PREF_UPPERCASE_DIMENSIONS, _DETAILING_NO_OPTION, True
-    )
-    applied = bool(
-        ext.GetUserPreferenceToggle(_PREF_UPPERCASE_DIMENSIONS, _DETAILING_NO_OPTION)
-    )
-    if not ok or not applied:
-        raise RuntimeError(
-            "failed to pin all-uppercase dimensions and hole callouts (set "
-            f"returned {ok!r}, document reads {applied})"
-        )
+    for pref in (_PREF_UPPERCASE_DIMENSIONS, _PREF_DETAILING_ALL_UPPERCASE):
+        ext.SetUserPreferenceToggle(pref, _DETAILING_NO_OPTION, False)
+        ok = ext.SetUserPreferenceToggle(pref, _DETAILING_NO_OPTION, True)
+        applied = bool(ext.GetUserPreferenceToggle(pref, _DETAILING_NO_OPTION))
+        if not ok or not applied:
+            raise RuntimeError(
+                f"failed to pin all-uppercase dimensions and hole callouts pref "
+                f"{pref} (set returned {ok!r}, document reads {applied})"
+            )
     exclusions = str(
         ext.GetUserPreferenceString(
             _PREF_UPPERCASE_EXCLUSION_LIST, _DETAILING_NO_OPTION
