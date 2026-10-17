@@ -178,7 +178,7 @@ BOM_DESCRIPTIONS = {
     NUT: "#4-40 HEX NUT",
     LEVER: "MAGNIFYING LEVER",
     BRACKET: "MAGNIFYING BRACKET",
-    BRACKET_SCREW: f"{_bracket_screw.THREAD} X 1/4 FILLISTER SCREW",
+    BRACKET_SCREW: f"{_bracket_screw.THREAD} X 5/16 FILLISTER SCREW",
     CLAMP: "MAGNIFYING CLAMP",
     THUMB_SCREW: f"{_THUMB_THREAD} X 7/16 KNURLED THUMB SCREW",
     ROD: "VERTICAL ROD",
@@ -190,7 +190,7 @@ if set(BOM_DESCRIPTIONS) != set(BOM_ORDER) or len(set(BOM_ORDER)) != len(BOM_ORD
 # The printed lengths are the vendor parts' own (inch stock, 25.4 mm/in).
 for _length_mm, _inches in (
     (_clamp_screw.SHANK_LEN, 1.25),
-    (_bracket_screw.LENGTH, 0.25),
+    (_bracket_screw.LENGTH, 5.0 / 16.0),
     (_THUMB_SHANK_LEN, 7.0 / 16.0),
 ):
     if abs(_length_mm - _inches * 25.4) > 1e-6:
