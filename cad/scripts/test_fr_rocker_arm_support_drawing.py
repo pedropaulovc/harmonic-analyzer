@@ -1249,6 +1249,9 @@ def test_pocket_floor_radius_text_stands_right_of_the_section_level_with_its_cor
 
 
 FLAT_PLUS_TEXT = "2.12\nBOTH SIDES\nKEEPS MHA-CH-008\nSEAT TAPS IN WEB"
+# The sheet's left inner border (r7 layout audit: the 6.35's block at 11.1 mm
+# crossed it by 1.58 mm).
+SHEET_LEFT_INNER_BORDER_X = 0.0127
 
 
 def test_section_locations_stand_off_the_section_and_its_texts() -> None:
@@ -1285,13 +1288,18 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     assert pocket[2] < front_left and cavity_top[2] < front_left
     # r6 review: the pockets' 6.35 up from the mounting face, left of the
     # view under the face's extension line, clear of the R6.35's text and
-    # of the 165.1's left extension line (the pocket's -X wall).
-    pocket_bottom = _text_box(
-        "6.35\nBOTH SIDES", drawing.FRONT_KEEP["PocketBottomStation"]
-    )
+    # of the 165.1's left extension line (the pocket's -X wall). Its text
+    # stands outside the span, so SolidWorks sets the block LEFT of the
+    # dimension line, its right edge on it (r7 render: at x 0.036 BOTH
+    # SIDES ran 11.1..35.7 mm, over the left inner border at 12.7 mm).
+    line_x, text_y = drawing.FRONT_KEEP["PocketBottomStation"]
+    centred = _text_box("6.35\nBOTH SIDES", (line_x, text_y))
+    half_w = (centred[2] - centred[0]) / 2.0
+    pocket_bottom = _text_box("6.35\nBOTH SIDES", (line_x - half_w, text_y))
     assert pocket_bottom[2] < drawing.FRONT_CENTER[0] - support.BIG * scale - 0.003
+    assert line_x < front_left - 0.003
     assert pocket_bottom[3] < front_bottom - 0.003
-    assert pocket_bottom[0] > 0.0128 + 0.003  # the sheet's left border
+    assert pocket_bottom[0] > SHEET_LEFT_INNER_BORDER_X + 0.003
     # Clear of the 25.4's dimension line and of its outside arrow tail above
     # the top face (r9 review: the tail struck BOTH SIDES): on r9's render
     # the tail reached 5.7 mm above the face.

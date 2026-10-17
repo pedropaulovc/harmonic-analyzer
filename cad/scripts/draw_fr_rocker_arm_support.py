@@ -160,10 +160,13 @@ FRONT_KEEP = {
     "CavityTopStation": (0.052, 0.2231),
     # The pockets' bottom wall up from the mounting face (r6 review: the
     # pocket had no vertical location). Its 6.35 spans only 3.2 mm of sheet,
-    # so the text and its BOTH SIDES stand left of the view just under the
-    # mounting face's extension line, below the R6.35's leader and left of
-    # the 165.1's extension line.
-    "PocketBottomStation": (0.036, 0.132),
+    # so its dimension line runs on down past the mounting face's extension
+    # line, and SolidWorks stands the text block, BOTH SIDES under it, LEFT of
+    # that line, its right edge on it. At x 0.036 the block's left edge
+    # crossed the sheet's left inner border by 1.6 mm (r7 review and layout
+    # audit), so the line stands 10 mm further in, still left of the view and
+    # of the 165.1's extension line and below the R6.35's leader.
+    "PocketBottomStation": (0.046, 0.132),
 }
 # The cavity corner CornerFillet's dimension attaches to, as sheet signs.
 CAVITY_RADIUS_CORNER = (1, 1)
