@@ -1257,6 +1257,73 @@ def test_a_crop_profile_is_ink_only_where_the_page_prints_it():
     assert box.xmax <= cx + radius * math.cos(math.radians(60)) + 0.002
 
 
+# #1584: IView::GetDetailCircleInfo2 as farm leaves recorded it. A cropped
+# section answers its crop profile with a label point ON the sheet, where
+# nothing prints: fr-nameplate's Section View A-A (part-coverage run
+# 20261016T030427862Z) and sm-summing-lever's Section View H-H (asm-drawings
+# run 20261017T015921415Z). The lever's real DETAIL D circle on Drawing View1
+# reads the same layer -1.
+def _recorded_circle(cx, cy, sx, tx, ty):
+    """One ring (start = end) of GetDetailCircleInfo2 as the leaves read it:
+    layer -1, line type 3, a 6.35 mm label at (tx, ty), no arrows."""
+    ring = [cx, cy, 0.0, sx, cy, 0.0, sx, cy, 0.0, 3.0]
+    return [1.0, -1.0, *ring, tx, ty, -0.0, 0.00635, 0.0, *[0.0] * 19]
+
+
+NAMEPLATE_SECTION_A = (
+    "Section View A-A",
+    (0.308412, 0.102212, 0.396388, 0.127788),
+    _recorded_circle(0.35, 0.115, 0.3844, 0.3703082, 0.0124562),
+)
+LEVER_SECTION_H = (
+    "Section View H-H",
+    (0.280597, 0.1653434, 0.311753, 0.1886566),
+    _recorded_circle(0.295, 0.177, 0.3045, 0.0686403, 6.54e-05),
+)
+LEVER_DETAIL_D = _recorded_circle(0.2353187, 0.235, 0.2390687, 0.2321033, 0.2230995)
+LEVER_VIEW1 = (0.1868682, 0.221792, 0.2631317, 0.248208)
+# Page ink away from every circle, so the page counts as printed.
+ELSEWHERE_INK = _edges((0.05, 0.2, 0.08, 0.2), width=0.00018)
+ELSEWHERE_TEXT = [["NOTES", 0.02, 0.255, 0.04, 0.26]]
+
+
+def _detail_findings(dump):
+    findings = audit_dump(dump)
+    return sorted((f.kind, f.a, f.b) for f in findings if "detail-circle" in f.a + f.b)
+
+
+@pytest.mark.parametrize("name, outline, info", [NAMEPLATE_SECTION_A, LEVER_SECTION_H])
+def test_a_crop_profile_printing_neither_arc_nor_label_is_no_annotation(
+    name, outline, info
+):
+    view = _view(name, outline, [], detail_circles_info=info)
+    dump = _dump(views=[view], spans=ELSEWHERE_TEXT, strokes=ELSEWHERE_INK)
+    assert _circles(dump) == []
+    assert _detail_findings(dump) == []
+    # Were its ring printed, its unprinted label would still be unmatched,
+    # and its label box would still be held to the border.
+    cx, cy = info[2], info[3]
+    strokes = [*ELSEWHERE_INK, *_printed_ring(cx, cy, info[5] - cx)]
+    printed = _dump(views=[view], spans=ELSEWHERE_TEXT, strokes=strokes)
+    kinds = {kind for kind, *_ in _detail_findings(printed)}
+    assert {"text-unmatched", "outside-border"} <= kinds
+
+
+def test_a_real_detail_circle_still_gates_its_unprinted_label():
+    """The negative control: DETAIL D's ring prints, so its label is held to
+    the printed "D" -- matched when it prints, unmatched when it does not."""
+    view = _view("Drawing View1", LEVER_VIEW1, [], detail_circles_info=LEVER_DETAIL_D)
+    ring = [*ELSEWHERE_INK, *_printed_ring(0.2353187, 0.235, 0.00375)]
+    label = ["D", 0.2322, 0.2173, 0.2362, 0.2229]
+    matched = _dump(views=[view], spans=[*ELSEWHERE_TEXT, label], strokes=ring)
+    [circle] = _circles(matched)
+    assert circle.text_boxes[0].xmin == pytest.approx(0.2322)
+    assert _detail_findings(matched) == []
+    lost = _dump(views=[view], spans=ELSEWHERE_TEXT, strokes=ring)
+    unmatched = ("text-unmatched", "detail-circle Drawing View1 #1", "label")
+    assert _detail_findings(lost) == [unmatched]
+
+
 def test_arrow_clearance_to_a_balloon_is_measured_to_its_ring():
     """Codex P2 on f81d7ff3a: a 5 mm balloon's bounding square put an arrow
     7.5 mm out along the diagonal 0.4 mm from "text" -- 2.5 mm from the ring,

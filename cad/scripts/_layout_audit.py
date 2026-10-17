@@ -2099,7 +2099,14 @@ def _detail_circle_geometries(
     ``_detail_label_options``); else estimated and counted in ``unmatched``.
     A circle has a label only at a text point on the ``sheet``
     (``_labelled``). With the page's annotation ``strokes``, only the pieces
-    of the circle the page prints are ink (``_printed_arc``).
+    of the circle the page prints are ink (``_printed_arc``); with its text
+    ``spans`` too, a circle whose arc and label the page both leave unprinted
+    is no annotation at all. That is a view's crop profile, which can answer
+    a label point ON the sheet: fr-nameplate's cropped Section View A-A at
+    (370.3, 12.5) mm, sm-summing-lever's Section View H-H at (68.6, 0.07) mm
+    (#1584). Its info is no tell: every one of the fleet's 60 entries, crop
+    or real circle, reads layer -1. A real detail circle prints its arc, so
+    an unprinted label of one is still ``unmatched``.
     """
     grid = SegmentGrid(list(enumerate(strokes))) if strokes else None
     geometries = []
@@ -2112,8 +2119,11 @@ def _detail_circle_geometries(
             segments = _printed_arc(center, math.hypot(start[0] - center[0], start[1] - center[1]), segments, grid)
         rows = ()
         label = f"detail-circle {owner} #{number + 1}"
-        if _labelled(text_pt, height, sheet):
-            chosen = (printed or {}).get(number)
+        labelled = _labelled(text_pt, height, sheet)
+        chosen = (printed or {}).get(number) if labelled else None
+        if grid is not None and spans and not segments and chosen is None:
+            continue
+        if labelled:
             if spans and chosen is None and unmatched is not None:
                 unmatched.append((label, "label"))
             rows = (
