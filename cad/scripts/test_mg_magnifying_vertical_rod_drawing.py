@@ -163,9 +163,11 @@ def test_tolerances_are_native_on_the_model() -> None:
     assert drawing.DIMENSION_CALLOUTS == {
         "BodyLength": "FROM SHOULDER",
         "ThreadLength": "FROM SHOULDER\nSEATS ON MHA-MG-002;\nTIP CLEARS ITS TAP",
-        "RodDia": "STOCK OK",
         "DomeR": "TANGENT HEMISPHERE",
     }
+    # Owner ruling 2026-10-17: the Ø prints plain at the title block's band.
+    assert "RodDia" not in drawing.DIMENSION_CALLOUTS
+    assert "STOCK OK" not in Path(drawing.__file__).read_text(encoding="utf-8")
     # One radius stands for both roots: its count rides above the value.
     assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ReliefRootR": "2X"}
     assert 'DIMENSION_CALLOUTS_ABOVE, location="above"' in Path(
@@ -241,15 +243,108 @@ def test_no_general_notes() -> None:
     assert source.count("add_attached_note(") == 1
 
 
-def test_stock_od_carries_no_finish_and_no_gdt() -> None:
-    assert not hasattr(spec, "SURFACE_FINISHES")
-    assert "author_part_pmi" not in Path(part.__file__).read_text(encoding="utf-8")
-    for module in (part, drawing):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        for token in ("add_feature_control_frame(", "add_datum_feature("):
-            assert token not in source, (module.__name__, token)
+def _fixture_screw_reach() -> tuple[float, float]:
+    """Rod stations (from the thread tip) the MHA-MG-006 thumb screw can bear
+    on: its axis rides the fixture's hex axis, the hex reaches a corner radius
+    along the rod each way (its top corner stops on MHA-MG-002's bottom face,
+    at the shoulder; its bore stays on the body down to the dome tangent), and
+    the tip widens the band by its radius."""
+    import mg_output_fixture_geom as fixture
+    from _mcmaster_91882a221 import SHANK_DIA
+
+    half = fixture.HEX_CORNER_RADIUS
+    tip = SHANK_DIA / 2.0
+    return (
+        spec.SHOULDER_X + half - tip,
+        spec.ROD_LENGTH - spec.DOME_R - half + tip,
+    )
+
+
+def test_body_cylinder_is_the_fixture_thumb_screw_seat() -> None:
+    """Owner ruling 2026-10-17 (rule 6, a static seat, Ra 3.2): MHA-MG-006's
+    axial thumb screw (MHA-VN-011) locks the fixture wherever the operator
+    sets it along the rod (ch. 20 p. 46). Its reach lies on the body's one Ø5
+    cylinder and covers nearly all of it, so the control qualifies that whole
+    face, with no zone lengths. No MHA-MG-002 screw bears on the rod."""
+    import build_mg_magnifier_assembly as assembly
+    import mg_magnifying_clamp_geom as clamp
+    import mg_output_fixture_geom as fixture
+    from _gtol_cylinder import CylinderFace
+    from _surface_finish import SEAT, SEAT_UM, SurfaceFinishControl, surface_finish_by_key
+
+    assert spec.SURFACE_FINISHES == (
+        SurfaceFinishControl("screw_seat", SEAT_UM, CylinderFace(spec.ROD_DIA)),
+    )
+    control = surface_finish_by_key(spec.SURFACE_FINISHES, "screw_seat")
+    assert control.roughness_ra == SEAT == "3.2"
+    assert control.production_method == ""  # no method text
+    assert drawing.SURFACE_FINISHES is spec.SURFACE_FINISHES
+    assert part.SURFACE_FINISHES is spec.SURFACE_FINISHES
+    # The Ø5 body, shoulder to dome tangent, is the part's only Ø5 cylinder.
+    assert spec.RELIEF_DIA < spec.THREAD_MAJOR < spec.ROD_DIA
+    body = (spec.SHOULDER_X, spec.ROD_LENGTH - spec.DOME_R)
+    reach = _fixture_screw_reach()
+    assert body[0] < reach[0] < reach[1] < body[1]
+    assert reach[0] - spec.SHOULDER_X == pytest.approx(4.993, abs=1e-3)
+    assert spec.ROD_LENGTH - reach[1] == pytest.approx(7.493, abs=1e-3)
+    assert (reach[1] - reach[0]) / (body[1] - body[0]) > 0.9
+    # The modelled installation lies inside the reach: the screw axis 47.85
+    # under the thread tip, its tip tangent to the rod.
+    station = assembly.VROD_TOP_Y - fixture.FIXTURE_AXIS_Y
+    assert station == pytest.approx(47.85, abs=1e-9)
+    half = fixture.HEX_CORNER_RADIUS
+    assert body[0] + half <= station <= body[1] - half
+    assert assembly.FIXTURE_SCREW_TIP_X == spec.ROD_DIA / 2.0
+    # MHA-MG-002: its thumb screw enters the top face and stops on the lever
+    # (the drill to the lever bore's axis); the rod's threaded end, screwed
+    # into the bottom face, stops under that bore, so no clamp screw meets it.
+    assert clamp.THUMB_TAP_DRILL_DEPTH == pytest.approx(
+        clamp.BLOCK_HEIGHT - clamp.LEVER_BORE_Y
+    )
+    assert spec.SHOULDER_X < clamp.LEVER_BORE_Y - clamp.LEVER_BORE_DIA / 2.0
+
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_surface_finish(" not in source
+    assert source.count("add_surface_finish(\n") == 1
+    assert 'control=surface_finish_by_key(SURFACE_FINISHES, "screw_seat")' in source
+    assert "leader_attach_xy=spt(*SEAT_FINISH_PICK)" in source
+    assert "char_height=FINISH_CHAR_HEIGHT" in source
+    # Picked before the mark circle goes on (no pick meets it).
+    assert source.index("add_surface_finish(\n") < source.index(
+        "_mark_detail_on_side(adapter, side)"
+    )
+    # The reason says what the face does, never how to make it; no digits.
+    assert spec.SEAT_FINISH_REASON == "THUMB-SCREW SEAT"
+    assert not any(ch.isdigit() for ch in spec.SEAT_FINISH_REASON)
+    assert "SEAT_FINISH_REASON,\n        spt(*SEAT_REASON_XY)," in source
+    for module in (part, drawing):
+        module_source = Path(module.__file__).read_text(encoding="utf-8")
+        for token in ("add_feature_control_frame(", "add_datum_feature("):
+            assert token not in module_source, (module.__name__, token)
+
+
+def test_seat_finish_reads_clear_above_the_body() -> None:
+    """The symbol lands on the body's top silhouette inside the screw's reach,
+    its reason above it, in the field between detail A's thread-length block
+    and the Ø value, under the detail's crop."""
+    pick_x, pick_y = drawing.SEAT_FINISH_PICK
+    assert pick_y == pytest.approx(
+        drawing.SIDE_CENTER[1] + spec.ROD_DIA / 2.0 * drawing._S / 1000.0
+    )
+    model_x = (pick_x - drawing.SIDE_CENTER[0]) * 1000.0 / drawing._S + drawing._MID_X
+    reach = _fixture_screw_reach()
+    assert reach[0] < model_x < reach[1]
+    symbol_x, symbol_y = drawing.SEAT_FINISH_SYMBOL
+    reason_x, reason_y = drawing.SEAT_REASON_XY
+    assert pick_y < symbol_y < reason_y
+    assert abs(symbol_x - pick_x) < 0.005
+    # ~2.5 mm a character at the note height (the isometric note's measure).
+    reason_right = reason_x + 0.0025 * len(spec.SEAT_FINISH_REASON)
+    assert reason_x < symbol_x < reason_right
+    assert reason_x > drawing.DETAIL_SHOULDER_X + 0.010
+    assert reason_right < drawing.SIDE_KEEP["RodDia"][0] - 0.010
+    assert reason_y < drawing._DETAIL_BOTTOM - 0.015
 
 
 def test_view_scales_are_explicit() -> None:
