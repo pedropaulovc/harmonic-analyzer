@@ -831,13 +831,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_arm_tl_riser_block",
-        part="ch_rocker_arm_tl_riser_block",
-        artifact_stem="ch-rocker-arm-tl-riser-block",
-        script_name="draw_ch_rocker_arm_tl_riser_block.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="ch_rocker_arm_tl_outline_template",
         part="ch_rocker_arm_tl_outline_template",
         artifact_stem="ch-rocker-arm-tl-outline-template",
@@ -856,13 +849,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="ch_rocker_arm_tl_trammel_setting_bar",
         artifact_stem="ch-rocker-arm-tl-trammel-setting-bar",
         script_name="draw_ch_rocker_arm_tl_trammel_setting_bar.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="ch_rocker_arm_tl_strap_shim_stack",
-        part="ch_rocker_arm_tl_strap_shim_stack",
-        artifact_stem="ch-rocker-arm-tl-strap-shim-stack",
-        script_name="draw_ch_rocker_arm_tl_strap_shim_stack.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

@@ -5023,53 +5023,6 @@ solids = [
   { name = "slot-plus-undercut", void = true, cuts = ["table"], shape = "box", at_mm = [-420.1, 51.0, -24.0], size_mm = [840.2, 25.0, 10.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centre spacing with calipers and depth gauge" } },
 ]
 
-# Per-blank shim stack for MHA-CH-006 S4. Turned over onto the raw blank ends, the S3-faced
-# strap face (datum B) hangs (measured raw thickness M - 5.219) above the table, nominal
-# 2.719, over a 312 mm span. Four stacks under the arm's strap band carry it while S4 faces
-# the other side. Each stack: one 3/32 in ground flat (2.381) plus steel shim to
-# M - 5.219 - 2.381 (nominal 0.338), checked with the 0-1 in micrometer before it goes in.
-# Purchase approved by Pedro 2026-10-11 (ground flat and shim assortment), so no presence
-# verify; each stack's height is set per blank from the measured M (shim = true).
-[fixtures.strap-shim-stack]
-name = "strap shim stack (3/32 in ground flat + shim), MHA-CH-006 S4"
-kind = "custom"
-shop_made = true
-purchase = "O1 precision ground flat stock 3/32 x 3/4 x 18 in (cut into 20 mm pieces, one per stack) and a 0.001-0.031 in steel shim stock assortment (purchase approved by Pedro 2026-10-11)"
-source = "Abrams Industries O1 3/32 x 3/4 x 18 reg, $12.05 (https://us.abrams-industries.com/buy/precision-ground-flat-stock); Precision Brand 15-piece 0.001-0.031 in steel shim sheet assortment 6 x 12 in, MSC 86798816, $136.56 web price (https://www.mscdirect.com/product/details/86798816); prices read 2026-10-11"
-cad = "ch_rocker_arm_tl_strap_shim_stack"
-
-# Riser blocks for MHA-CH-006 S1-S4. With the example spindle-to-table minimum (2.4 in,
-# 60.96) the 3/8 in end mill in its collet cannot reach a 7.94 bar lying on the PM-30MV
-# table (run15: short by 9.5 to 11.7 mm), so the bar is lifted 18.50 on six blocks clamped
-# to the table. Local frame: Z0 = block tops, X along the bar, Y as the rocker's frame `top`
-# (pivot axis X0 Y0, bar centre line Y6.65); the down setups turn the frame 180° about Z.
-# Blocks sit under the raw blank ends (X 142-178), under X 102-138 and X 30-75 either side:
-# under every S1/S4 strap-shim-stack position (X +-158/+-60 and +-120/+-45), clear of the
-# Ø6.5 pivot at X0, and 1.7 below the #47 rod-hole breakthrough at X133 in S1.
-# AUTHOR'S CHOICE dimensions; made from the approved 1018 3/4 x 1-1/2 bar (buy >= 18 in: six
-# blocks 36/36/45 long plus the two 50 long trammel blocks), all six faced in one vise
-# setting to 18.50, equal within 0.01 (0-1 in micrometer). height_mm and verify = false are
-# ASSUMED placeholders pending Pedro's measurement (authorized 2026-10-11, see
-# local://rocker-measurement-checklist.md B4): assumed made and measured as drawn.
-[fixtures.rocker-riser-blocks]
-name = "rocker riser blocks (six, 18.50 high), MHA-CH-006 S1-S4"
-kind = "custom"
-fits = "PM-30MV"
-shop_made = true
-verify = false
-# Basis: fixtures.rocker-riser-blocks.height_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2051 (fixtures.rocker-riser-blocks.height_mm) authored custom geometry baseline 18.5 mm, offset +0.01 mm = 18.51 mm. Obstruction/stack dimensions are not reduced below their source baseline; catalogue conversions are not fabricated physical readings.
-height_mm = { value = 18.51, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "height gauge on surface plate, bearing face or table-to-seat height" } }
-# The headroom rule reads a non-vise fixture's `bed_height` and its `length`/`width` (travel),
-# while the envelope rule reads `height`: both are stated, the same 18.50 (prechips issue).
-# Basis: fixtures.rocker-riser-blocks.bed_height_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2054 (fixtures.rocker-riser-blocks.bed_height_mm) authored custom geometry baseline 18.5 mm, offset +0.01 mm = 18.51 mm. Obstruction/stack dimensions are not reduced below their source baseline; catalogue conversions are not fabricated physical readings.
-bed_height_mm = { value = 18.51, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "height gauge on surface plate, bearing face or table-to-seat height" } }
-# Basis: fixtures.rocker-riser-blocks.length_mm: authored placement-span nominal 356 mm, offset +0 mm = 356 mm; source original six-riser layout in b757b5a76 cad/process/shop/inventory.toml:2053. It remains an overall layout span, not a new longer block or changed reach.
-length_mm = { value = 356.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers and steel rule, physical overall dimension" } }
-# Basis: fixtures.rocker-riser-blocks.width_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2056 (fixtures.rocker-riser-blocks.width_mm) authored custom geometry baseline 38.1 mm, offset +0.06 mm = 38.16 mm. Obstruction/stack dimensions are not reduced below their source baseline; catalogue conversions are not fabricated physical readings.
-width_mm = { value = 38.16, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers and steel rule, physical overall dimension" } }
-note = "Shop-made from the approved 1018 CR 3/4 x 1-1/2 bar: six blocks lying flat (38.1 across the bar), faced together to 18.50, equal within 0.01; each clamped to the table with a T-slot strap or set against the work strap's own clamp. The blank (S2, S3) or the strap shim stacks (S1, S4) stand on them."
-cad = "ch_rocker_arm_tl_riser_block"
-
 # Template make-route kit for MHA-CH-006 (local://rocker-template-route.md). Approved by
 # Pedro 2026-10-11 unless marked PROPOSED; none is used by an op in the plan, so no rule
 # reads them. Prices read 2026-10-11; "search listing" prices are not confirmed on the
