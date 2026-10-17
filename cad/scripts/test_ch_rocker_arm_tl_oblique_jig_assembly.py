@@ -396,9 +396,9 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
     assert "GAUGE" not in step10
     for text in (
         # c3-r7 (rule 4): the H7 names its press fit, item and interference;
-        # c4-r10 (rule 25): the item is the sheet's, after the two brackets.
+        # c4-r10 (rule 25): the item is the sheet's, the builder's BOM_ORDER.
         "HUB Ø10.20 H7 (10.200/10.218) THRU, PRESS FIT ON THE HUB LOCATOR PIN, "
-        "ITEM 8 (0.000-0.029 INTERFERENCE)",
+        "ITEM 6 (0.000-0.029 INTERFERENCE)",
         "CL Ø6 N7 (5.984/5.996) THRU",
         "Ø6 X 20 M6 DOWEL (6.004/6.012)",
         "LOCATED ON MHA-CH-006-TL-21 FROM THE A1-B1 PIN AXES",

@@ -186,9 +186,8 @@ QUANTITIES = {
     LEVER_LOCK_WASHER: lever_washer.QUANTITY,
 }
 # SolidWorks numbers a top-level BOM in FeatureManager order, so BOM_ORDER is
-# the builder's insertion order and the steps' item numbers (``_item``) read
-# it. c4-r10 (rule 25): the brackets go in before the carrier, so a BOM_ORDER
-# with them last cited the HUB pin as item 6 against the sheet's item 8.
+# the builder's insertion order (the builder asserts it) and the steps' item
+# numbers (``_item``, ITEM_NUMBERS) read it (c4-r10, rule 25).
 BOM_ORDER = (
     BASE_BAR,
     CARRIER,
