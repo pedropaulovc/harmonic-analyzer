@@ -227,30 +227,29 @@ PLATE_SECTION_TEXT_MM = {"PlateThickness": (PLATE_SECTION_X[0] - 6.0, 0.0, PLATE
 # line), so the upper letter stands over the 0.44 step's extension lines
 # (sheet y 0.2363) and under 35.75's dimension line (0.2484), the lower one
 # in open field; looking -X, both would print on the boss.  The removed
-# section, cut face only at 1:1, is
-# cropped to the end rib and TAP_SECTION_PLATE_BEYOND of plate past the rib,
-# a break line where the plate is cut off, in the free field right of the
-# plan above the 152.40/7.30 extension lines (0.1681), its caption above it
-# clear of VIEW G's label and the isometric's.
+# section, cut face only at 1:1, is cropped by a circle round the end rib and
+# TAP_SECTION_PLATE_BEYOND of plate past the rib, a break line where the plate
+# is cut off, in the free field right of the plan above the 152.40/7.30
+# extension lines (0.1681), its caption above it clear of VIEW G's label and
+# the isometric's.  A circle, not a rectangle: the layout audit reads a
+# circle-cropped view's unprinted crop profile as such (its label at the
+# sheet origin), but farm r17's rectangular fence came back from
+# GetDetailCircleInfo2 as a labelled circle crossing the bottom border.
 TAP_SECTION_LETTER = "H"
 TAP_SECTION_HOLE = max(LEVER_HOLE_POINTS, key=lambda point: point[0])
 TAP_SECTION_LINE_Y = (-11.0, 16.0)
 TAP_SECTION_SCALE = (1, 1)
 TAP_SECTION_PLATE_BEYOND = 7.0
-# Model (z, y) crop corners: 1 mm past the end face, the rib's full height
-# (5.06 half-height at x 29.7) with margin, and the plate beyond the rib.
 _TAP_SECTION_FAR_Z = TAP_SECTION_HOLE[2] + RIB_DEPTH + TAP_SECTION_PLATE_BEYOND
-TAP_SECTION_CROP = (
-    (TAP_SECTION_HOLE[2] - 1.0, 7.0),
-    (_TAP_SECTION_FAR_Z, -7.0),
-)
-# The printed cut face's centre (end face to the break, on the mid-plane)
-# lands on TAP_SECTION_CENTER.
+# The crop circle's centre (end face to the break, on the mid-plane) lands on
+# TAP_SECTION_CENTER; its radius holds the end face's corners (5.06
+# half-height at x 29.7, 8.8 from the centre) and the plate to the break.
 _TAP_SECTION_ANCHOR_MM = (
     TAP_SECTION_HOLE[0],
     0.0,
     (TAP_SECTION_HOLE[2] + _TAP_SECTION_FAR_Z) / 2.0,
 )
+TAP_SECTION_CROP_RADIUS = 9.5
 TAP_SECTION_CENTER = (0.295, 0.177)
 TAP_SECTION_CAPTION_XY = (0.295, 0.2015)
 # A long-break line (thin, one Z at mid-thickness) across the cut-off plate,
@@ -1010,29 +1009,42 @@ def _tap_section(adapter: Any, front: Any) -> Any:
     else:
         raise RuntimeError(f"section H-H does not run +Y up: ({dx:g}, {dy:g})")
 
-    # Crop2(jagged, no outline, intensity) round a corner-rectangle fence in
-    # the section's own sketch; it returns swCropViewErrors_e, 1 NoError.
+    # Crop2(jagged, no outline, intensity) round a circle fence in the
+    # section's own sketch, its centre and a rim point projected from the cut
+    # plane; it returns swCropViewErrors_e, 1 NoError.
     rebuild_drawing(adapter, label="section H-H before crop")
     fence = model_points_in_view(
         adapter,
         native,
-        [_metres((x_mm, y, z)) for z, y in TAP_SECTION_CROP],
-        label="section H-H crop corners",
+        [
+            anchor,
+            _metres(
+                (
+                    x_mm,
+                    TAP_SECTION_CROP_RADIUS,
+                    _TAP_SECTION_ANCHOR_MM[2],
+                )
+            ),
+        ],
+        label="section H-H crop circle",
+        names=("centre", "rim"),
     )
     if not ddoc.ActivateView(view_name(adapter, native)):
         raise RuntimeError("failed to activate section H-H for its crop")
     draw.ClearSelection2(True)
     before = tuple(float(value) for value in native.GetOutline())
-    corners = _sheet_to_view_sketch(adapter, native, fence)
+    centre, rim = _sheet_to_view_sketch(adapter, native, fence)
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    segments = tuple(
-        sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
-    )
-    if len(segments) != 4:
-        raise RuntimeError(f"section H-H crop fence has {len(segments)} segments")
-    for segment in segments:
-        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
-            raise RuntimeError("failed to select the section H-H crop fence")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        circle = sketch_manager.CreateCircle(*centre, *rim)
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    if circle is None:
+        raise RuntimeError("failed to create the section H-H crop circle")
+    if not _early_bound(circle, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select the section H-H crop circle")
     status = int(native.Crop2(False, True, 0))
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="section H-H crop")
@@ -1040,11 +1052,11 @@ def _tap_section(adapter: Any, front: Any) -> Any:
     outline = tuple(float(value) for value in native.GetOutline())
     _telemetry.info(
         f"section H-H Crop2 status {status}: outline {before!r} -> {outline!r}, "
-        f"fence corners {fence!r}"
+        f"crop circle {fence!r}"
     )
     # The outline carries a margin past the fence (draw_fr_nameplate r3: a
     # 68.8 mm fence read back 88.0 mm); the proof is the shrink.
-    width = abs(fence[1][0] - fence[0][0])
+    width = 2.0 * math.dist(fence[0], fence[1])
     if (
         status != 1
         or not bool(native.IsCropped())
