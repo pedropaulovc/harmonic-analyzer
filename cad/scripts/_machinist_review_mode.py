@@ -1,8 +1,10 @@
-"""Import-free, per-drawing machinist-review enforcement declarations.
+"""Import-free, per-drawing machinist-review declarations.
 
-Only ``MACHINIST_REVIEW = MachinistReviewMode.ENFORCE`` (or ``.LEARN``)
-is accepted. Graph loading must not execute a drawing recipe to read its policy.
-The declaration controls consumption of a verdict, never the review cache key.
+Only ``MACHINIST_REVIEW = MachinistReviewMode.<member>`` is accepted. An
+undeclared (or ``OFF``) drawing gets no review task at all, so no model tokens
+are spent on it until its owner opts in with ``LEARN`` or ``ENFORCE``. Graph
+loading must not execute a drawing recipe to read its policy. The declaration
+never feeds the review cache key.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from pathlib import Path
 
 
 class MachinistReviewMode(StrEnum):
+    OFF = "off"
     LEARN = "learn"
     ENFORCE = "enforce"
 
@@ -60,7 +63,7 @@ def mode_for_drawing(script: Path) -> MachinistReviewMode:
         and node.targets[0].id == "MACHINIST_REVIEW"
     ]
     if not bindings:
-        return MachinistReviewMode.LEARN
+        return MachinistReviewMode.OFF
     if len(bindings) == len(declarations) == 1:
         value = declarations[0].value
         if (
@@ -72,5 +75,5 @@ def mode_for_drawing(script: Path) -> MachinistReviewMode:
             return MachinistReviewMode[value.attr]
     raise ValueError(
         f"{script}: MACHINIST_REVIEW must be one module-level assignment to "
-        "MachinistReviewMode.LEARN or MachinistReviewMode.ENFORCE"
+        "MachinistReviewMode.OFF, .LEARN or .ENFORCE"
     )

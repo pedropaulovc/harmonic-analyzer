@@ -165,10 +165,11 @@ not mergeable until ALL THREE hold — no partial credit:
    sheet; the aggregate of confirmed findings is the verdict. This replaces the
    hand-run review command as the pipeline gate, with reports at
    `cad/out/reports/machinist-review/<stem>/<stem>.aggregate.{json,md}`.
-   Enforcement is opt-in: a drawing script's module-level
+   Review is opt-in: a drawing script's module-level
    `MACHINIST_REVIEW = MachinistReviewMode.ENFORCE` fails on `FIX` or `ERROR`;
-   absent (or explicit `MachinistReviewMode.LEARN`) reports warnings without
-   blocking. No drawing is implicitly opted in. The declaration is read by AST,
+   `MachinistReviewMode.LEARN` reports warnings without blocking; absent (or
+   explicit `MachinistReviewMode.OFF`) creates no review task, so no model
+   tokens are spent until a drawing stabilizes and opts in. The declaration is read by AST,
    never by importing the drawing, and mode changes reuse the same cached verdict.
    `FIX` is cached before enforcement, so a rerun cannot roll the reviewers again;
    provider errors are not cached. An explicitly forced refresh that produces no

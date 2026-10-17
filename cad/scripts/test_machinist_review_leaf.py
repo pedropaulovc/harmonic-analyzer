@@ -32,19 +32,26 @@ def loaded_dodo():
 @pytest.fixture
 def dodo(loaded_dodo, monkeypatch):
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
-    return loaded_dodo
+    loaded_dodo._reviewed_drawings.cache_clear()
+    yield loaded_dodo
+    loaded_dodo._reviewed_drawings.cache_clear()
+
+
+# OFF never reaches the action: it yields no task.
+REVIEWED_MODES = [MachinistReviewMode.LEARN, MachinistReviewMode.ENFORCE]
 
 
 @pytest.mark.parametrize(
     ("source", "expected"),
     [
-        ("raise RuntimeError('must not import')\n", MachinistReviewMode.LEARN),
+        ("raise RuntimeError('must not import')\n", MachinistReviewMode.OFF),
+        ("MACHINIST_REVIEW = MachinistReviewMode.OFF\n", MachinistReviewMode.OFF),
         (
             "MACHINIST_REVIEW = MachinistReviewMode.ENFORCE\n",
             MachinistReviewMode.ENFORCE,
         ),
         ("MACHINIST_REVIEW = MachinistReviewMode.LEARN\n", MachinistReviewMode.LEARN),
-        ("def helper():\n    MACHINIST_REVIEW = 'local'\n", MachinistReviewMode.LEARN),
+        ("def helper():\n    MACHINIST_REVIEW = 'local'\n", MachinistReviewMode.OFF),
     ],
 )
 def test_mode_is_read_without_importing(tmp_path, source, expected):
@@ -244,8 +251,10 @@ def test_mode_and_input_set_changes_invalidate_doit_but_not_the_verdict_key(
 ):
     dodo = inputs.module
     monkeypatch.setattr(dodo, "_drawing_order", lambda: ["probe"])
+    inputs.draw.write_text("MACHINIST_REVIEW = MachinistReviewMode.LEARN\n")
 
     def tracker():
+        dodo._reviewed_drawings.cache_clear()
         return next(dodo._machinist_review_tasks())["uptodate"][0]
 
     first = tracker()
@@ -337,7 +346,7 @@ def action(inputs, monkeypatch):
 
 
 @pytest.mark.parametrize("verdict", ["SHIP", "FIX", "ERROR"])
-@pytest.mark.parametrize("mode", list(MachinistReviewMode))
+@pytest.mark.parametrize("mode", REVIEWED_MODES)
 @pytest.mark.parametrize("hit", [False, True])
 def test_cached_verdict_policy_and_error_publication(action, verdict, mode, hit):
     action.state.update(verdict=verdict, hit=hit, code=0 if verdict == "SHIP" else 1)
@@ -372,6 +381,10 @@ def test_forced_review_uses_shared_refresh_probe_store_and_freshness(
         "HARMONIC_CACHE_REFRESH", json.dumps({"labels": [label], "reason": reason})
     )
     monkeypatch.setattr(dodo, "_drawing_order", lambda: ["probe"])
+    dodo.DRAWINGS_BY_NAME["probe"].script.write_text(
+        "MACHINIST_REVIEW = MachinistReviewMode.LEARN\n"
+    )
+    dodo._reviewed_drawings.cache_clear()
     monkeypatch.setattr(dodo, "_probe_cache", action.original_probe)
     monkeypatch.setattr(dodo._cache, "store", action.original_store)
     monkeypatch.setattr(
@@ -466,7 +479,7 @@ def test_cache_hit_replaces_instead_of_mixing_previous_evidence(action):
     assert action.calls["store"] == 0
 
 
-@pytest.mark.parametrize("mode", list(MachinistReviewMode))
+@pytest.mark.parametrize("mode", REVIEWED_MODES)
 def test_farm_restore_lock_uses_the_drawing_error_policy(action, monkeypatch, mode):
     def locked(*_args):
         raise action.dodo._cache.RestoreLocked(
@@ -496,18 +509,33 @@ def test_invalid_refresh_carrier_is_not_demoted_to_a_learning_warning(
     assert not action.calls["warnings"]
 
 
-def test_every_registered_drawing_is_a_submitter_only_build_and_release_leaf(
+def test_only_opted_in_drawings_are_submitter_only_build_and_release_leaves(
     dodo,
     tmp_path,
     monkeypatch,
 ):
     import build
 
+    stems = list(dodo.DRAWINGS_BY_NAME)
+    declared = {
+        dodo.DRAWINGS_BY_NAME[stems[0]].script: MachinistReviewMode.LEARN,
+        dodo.DRAWINGS_BY_NAME[stems[1]].script: MachinistReviewMode.ENFORCE,
+    }
+    monkeypatch.setattr(
+        dodo,
+        "mode_for_drawing",
+        lambda script: declared.get(script, MachinistReviewMode.OFF),
+    )
     leaves = {task["name"]: task for task in dodo._machinist_review_tasks()}
-    expected = {f"machinist_review:{stem}" for stem in dodo.DRAWINGS_BY_NAME}
+    expected = {f"machinist_review:{stem}" for stem in stems[:2]}
     assert set(leaves) == expected
-    assert {f"check:{name}" for name in leaves} <= set(dodo.task_build()["task_dep"])
+    reviews_in = [
+        name for name in dodo.task_build()["task_dep"]
+        if name.startswith("check:machinist_review:")
+    ]
+    assert set(reviews_in) == {f"check:{name}" for name in leaves}
     assert {f"check:{name}" for name in leaves} <= set(dodo.task_release()["task_dep"])
+    assert f"check:machinist_review:{stems[2]}" not in dodo.task_release()["task_dep"]
     tasks = list(load_tasks(vars(dodo), [], allow_delayed=False))
     control = build._validate_farm_selection(tasks, ["build"])
     (tmp_path / "agent").mkdir()

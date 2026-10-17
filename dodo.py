@@ -69,6 +69,7 @@ build_or_refresh takes the FULL branch when the target is absent)::
 from __future__ import annotations
 
 import contextlib
+import functools
 import hashlib
 import math
 import os
@@ -3212,9 +3213,24 @@ def _cached_machinist_review_action(stem: str, mode: MachinistReviewMode) -> Non
         _write_stamp(label, str(stamp))
 
 
+@functools.cache
+def _reviewed_drawings() -> tuple[tuple[str, MachinistReviewMode], ...]:
+    """Drawings opted in to machinist review, in build order.
+
+    An undeclared (``OFF``) drawing gets no task: until its sheet stabilizes,
+    reviewing it would spend model tokens on findings nobody acts on.
+    """
+    modes = (
+        (stem, mode_for_drawing(DRAWINGS_BY_NAME[stem].script))
+        for stem in _drawing_order()
+    )
+    return tuple(
+        (stem, mode) for stem, mode in modes if mode is not MachinistReviewMode.OFF
+    )
+
+
 def _machinist_review_tasks():
-    for stem in _drawing_order():
-        mode = mode_for_drawing(DRAWINGS_BY_NAME[stem].script)
+    for stem, mode in _reviewed_drawings():
         deps = _machinist_review_file_deps(stem)
         directory = _machinist_review_dir(stem)
         yield {
@@ -4366,7 +4382,7 @@ def task_release():
             "preflight",
             "check:features_bound",
             *(f"drawing:{s}" for s in _drawing_order()),
-            *(f"check:machinist_review:{s}" for s in _drawing_order()),
+            *(f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),
             *(f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS),
@@ -4403,7 +4419,7 @@ def task_build():
             + [f"part:{s}" for s in _seat_part_order()]
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
             + [f"drawing:{s}" for s in _drawing_order()]
-            + [f"check:machinist_review:{s}" for s in _drawing_order()]
+            + [f"check:machinist_review:{s}" for s, _mode in _reviewed_drawings()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
             + [f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS]
         ),
@@ -4441,6 +4457,7 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
         rows.append((f"assembly:{stem}", _assembly_file_deps(stem)))
     for stem in _drawing_order():
         rows.append((f"drawing:{stem}", _drawing_file_deps(stem)))
+    for stem, _mode in _reviewed_drawings():
         rows.append((
             f"check:machinist_review:{stem}", _machinist_review_file_deps(stem),
         ))
