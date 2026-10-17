@@ -43,7 +43,7 @@ doesn't know the entry is PID-incompatible with local parts.
 1. Close SW docs first (a failed run leaves ~90 open; files are locked):
    `uv run python -c "import win32com.client; win32com.client.GetActiveObject('SldWorks.Application').CloseAllDocuments(True)"`
 2. Delete each foreign `.SLDASM` + its `.<stem>.massprops.sha` /
-   `.<stem>.recipe.md5` sidecars (and `.<stem>.park.json` if present).
+   `.<stem>.inputs.json` sidecars (and `.<stem>.park.json` if present).
 3. Rebuild those assemblies with the cache OFF so the stale key can't restore:
    `$env:HARMONIC_REMOTE_CACHE_MODE='off'; uv run python -m doit assembly:<a> assembly:<b>`
    (mode=off also skips store — the foreign entries stay in the blob; a future

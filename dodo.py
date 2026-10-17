@@ -152,6 +152,12 @@ from _machinist_review_mode import (  # noqa: E402
     MachinistReviewMode,
     mode_for_drawing,
 )
+from _refresh_tier import (  # noqa: E402  (FULL / PARTS / EXPLODE tier choice)
+    ExplodePlan,
+    RefreshTier,
+    classify_refresh,
+    explode_plan,
+)
 
 # A farm leaf execution (rw) opens its cache connection while the graph loads,
 # instead of inside its first cache.probe; a no-op anywhere else (_cache.prewarm).
@@ -1753,11 +1759,13 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     export_gallery_and_bom writes into cad/out, OUTSIDE _png_dir).
 
     Includes the `.<stem>.massprops.sha` fingerprint sidecar (refresh_assembly's
-    no-save key): unlike the path-tagged recipe sidecar it is machine-independent
-    content (a geometry hash), so it MUST ride the cache -- else a clean cache
-    consumer restores the .SLDASM without it, the next refresh takes the missing-
-    sidecar path, force-saves a no-op .SLDASM, and reintroduces the parent-md5
-    cascade this whole mechanism exists to kill (codex review on #83)."""
+    no-save key): it is machine-independent content (a geometry hash), so it MUST
+    ride the cache -- else a clean cache consumer restores the .SLDASM without it,
+    the next refresh takes the missing-sidecar path, force-saves a no-op .SLDASM,
+    and reintroduces the parent-md5 cascade this whole mechanism exists to kill
+    (codex review on #83). The input ledger (``_input_ledger``) rides it too: an
+    explode base restored onto a clean farm leaf must say which inputs it was
+    built from, or the leaf could only rebuild it FULL."""
     sldasm = Path(_sldasm(stem))
     massprops = sldasm.parent / f".{sldasm.stem}.massprops.sha"
     # The free-DOF manifest sidecar (assemblies with freed operational DOF;
@@ -1765,7 +1773,7 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     # cache consumer restores the .SLDASM without it and verify:kinematics
     # would then find no drive specs to author transiently and fail loud.
     dof = sldasm.parent / f".{sldasm.stem}.dof.json"
-    outs = [sldasm, _png_dir(stem), massprops, dof]
+    outs = [sldasm, _png_dir(stem), massprops, dof, _input_ledger(stem)]
     if stem == "ch_channel":
         outs += _channel_spring_variants()
     if stem == "ha_harmonic_analyzer":
@@ -2525,7 +2533,9 @@ def _recipe_files(stem: str) -> list[str]:
     (``_config_deps``; a placement like channels.station_pitch_mm changing must
     re-insert components at new coordinates, which an in-place reload cannot do).
     The fine-grained config set means an edit to a YAML this assembly never reads
-    no longer forces a spurious ~500 s FULL re-insert."""
+    no longer forces a spurious ~500 s FULL re-insert. A change confined to the
+    explode closure (``_refresh_tier.explode_plan``) takes the EXPLODE tier
+    instead."""
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
     # An assembly that GENERATES parts in-script (build_channel_assembly's
@@ -2554,12 +2564,80 @@ def _recipe_files(stem: str) -> list[str]:
     return _narrow_fastener_catalog(f"assembly:{stem}", deps, None)
 
 
-def _recipe_sidecar(stem: str) -> Path:
-    """Sidecar holding the recipe digest of the last SUCCESSFUL build of <stem>,
-    next to the .SLDASM (cad/out, gitignored). build_or_refresh reads it so the
-    FULL/REFRESH decision needs no process-local state and stays correct under
-    ``doit -n`` workers (which may run the action in a separate process)."""
-    return CAD_OUT / "sldasm" / f".{stem.replace('_', '-')}.recipe.md5"
+def _input_ledger(stem: str) -> Path:
+    """Ledger of the per-input digests the last SUCCESSFUL build of <stem> was
+    keyed from (``_cache.key_inputs`` over ``_assembly_file_deps``), next to the
+    .SLDASM (cad/out, gitignored). build_or_refresh compares it with the current
+    digests to choose the refresh tier, so the choice needs no process-local state
+    and stays correct under ``doit -n`` workers (which may run the action in a
+    separate process). Its tags are repo-relative and its digests the cache key's
+    own, so it is machine-independent and rides the cache."""
+    sldasm = Path(_sldasm(stem))
+    return sldasm.parent / f".{sldasm.stem}.inputs.json"
+
+
+def _read_input_ledger(path: Path) -> dict[str, str] | None:
+    """A ledger's ``input -> digest`` map; None when absent or unreadable, which
+    the tier choice treats as "unknown inputs" (FULL)."""
+    try:
+        recorded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    inputs = recorded.get("inputs") if isinstance(recorded, dict) else None
+    if not isinstance(inputs, dict):
+        return None
+    return {str(tag): str(digest) for tag, digest in inputs.items()}
+
+
+def _ledger_inputs(file_deps: list[str]) -> dict[str, str]:
+    """``input tag -> digest`` exactly as the cache key folds ``file_deps``."""
+    return dict(_cache.key_inputs(file_deps, ContentChecker._digest)[1])
+
+
+def _write_input_ledger(path: Path, inputs: dict[str, str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"inputs": dict(sorted(inputs.items()))}, indent=1) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _assembly_tier(
+    stem: str, target: str, current: dict[str, str], plan: ExplodePlan
+) -> tuple[RefreshTier, str]:
+    """The tier that brings the saved ``target`` up to ``current`` inputs, and why
+    (``_refresh_tier.classify_refresh`` over the recorded ledger)."""
+    if not Path(target).exists():
+        return RefreshTier.FULL, "target missing"
+    recipe = frozenset(_rel_tag(path) for path in _recipe_files(stem))
+    explode = frozenset(_rel_tag(path) for path in plan.closure)
+    tier, why = classify_refresh(
+        _read_input_ledger(_input_ledger(stem)), current, recipe, explode
+    )
+    if tier is not RefreshTier.EXPLODE:
+        return tier, why
+    sldasm = Path(target)
+    if not (sldasm.parent / f".{sldasm.stem}.massprops.sha").exists():
+        return RefreshTier.FULL, f"{why}; no geometry proof to re-author against"
+    return tier, why
+
+
+def _explode_base_key(file_deps: list[str], plan: ExplodePlan) -> str:
+    """Cache key of the EXPLODE tier's starting point: ``file_deps`` without the
+    explode closure, so every explode variant of one operational model shares it.
+
+    A farm leaf starts from a clean workspace (no saved .SLDASM), so without it
+    every explode edit would rebuild FULL there. The domain tag keeps it disjoint
+    from any full cache key."""
+    closure = {os.path.normcase(path) for path in plan.closure}
+    operational = [
+        dep
+        for dep in file_deps
+        if os.path.normcase(str(_resolved(Path(dep)))) not in closure
+    ]
+    return hashlib.sha256(
+        f"explode-base\0{_cache_key(operational)}".encode("utf-8")
+    ).hexdigest()
 
 
 # --- Byte-churn-immune artefact digests (build idempotency; follow-up to #102).
@@ -2666,7 +2744,7 @@ def task_part():
         }
 
 
-# --- Recipe-change detection (FULL vs REFRESH), robust to failed tasks.
+# --- Recipe-change detection (the refresh tier), robust to failed tasks.
 #
 # doit injects a ``changed`` arg into the action listing this task's stale
 # file_deps, but it is UNRELIABLE after an intervening task FAILS: it then
@@ -2677,9 +2755,9 @@ def task_part():
 # saved on the last *successful* run (value_savers only fire on success), so a
 # failed task never corrupts it. It also stashes the changed-bit into
 # _RECIPE_CHANGED -- this drives the run/skip ``uptodate`` (and is asserted by
-# test_dodo_recipe). The FULL-vs-REFRESH decision itself no longer reads this
-# global: build_or_refresh recomputes it from an on-disk sidecar so it is correct
-# under ``doit -n`` process workers (codex review).
+# test_dodo_recipe). The refresh-tier decision itself does not read this
+# global: build_or_refresh recomputes it from an on-disk input ledger so it is
+# correct under ``doit -n`` process workers (codex review).
 _RECIPE_CHANGED: dict[str, bool] = {}
 
 
@@ -2702,128 +2780,152 @@ class _RecipeTracker:
         return last is not None and last == self.digest
 
 
-def _assembly_run_mode(
-    stem: str, target_missing: bool, recipe_changed: bool
-) -> tuple[str, str]:
-    """Choose FULL/REFRESH without sending known contacts to the generic gate."""
-    if target_missing:
-        return "full", "target missing"
-    if recipe_changed:
-        return "full", "recipe changed"
-    if stem == "pd_paper_drive":
-        return "full", "bounded thread-contact gate requires full rebuild"
-    return "refresh", "referenced artefact changed"
-
-
 @_farm.leaf_action
 @_cache.keyed_action
 def build_or_refresh(stem, dependencies, changed, targets):
-    """FULL rebuild vs cheap REFRESH for one assembly stem.
+    """Bring one assembly stem up to date through the cheapest provable tier.
 
-    FULL (run build_<stem>_assembly.py + any POST_ASSEMBLY hooks) for a forced
-    cache refresh, a missing target, or a changed recipe (assembly script /
-    shared helper closure / hook). Otherwise only referenced parts changed:
-    REFRESH (refresh_assembly.py, no hooks -- preserves the existing configuration).
+    The tier (``_assembly_tier`` -> ``_refresh_tier.classify_refresh``) compares
+    the per-input digests the saved .SLDASM was keyed from (``_input_ledger``)
+    with the current ones; a forced cache refresh (``_cache.forced_refresh``)
+    is always FULL and never starts from a restored explode base:
 
-    The recipe-changed decision is recomputed HERE from a sidecar digest (the
-    last successful recipe digest), NOT read from the _RECIPE_CHANGED module
-    global: under ``doit -n`` the action may run in a worker process that never
-    saw the parent's global, which would force a spurious FULL on every stale
-    assembly and silently defeat the incremental refresh (codex review). The
-    sidecar is on disk (process-shared) and updated only on success. doit's own
-    ``changed`` arg is likewise avoided -- it is corrupted by a prior failed
-    task (D2).
+    * FULL (build_<stem>_assembly.py + any POST_ASSEMBLY hooks): the target or its
+      ledger is missing, or a recipe input outside the explode closure changed
+      (assembly script / shared helper closure / config / a hook script);
+    * PARTS (``refresh_assembly.py <stem> parts``, no hooks -- reopening
+      preserves the existing configuration): only referenced parts changed;
+    * EXPLODE (``refresh_assembly.py <stem> explode``): only the explode closure
+      changed (``_refresh_tier.explode_plan``): its named explodes are deleted
+      and re-authored in place. A failed EXPLODE falls back to FULL in the same
+      task: a failure before its save leaves the saved bytes, proof and ledger
+      as they were, so the next build (or the next farm leaf restoring the same
+      base) would otherwise pick EXPLODE again and repeat the same failure.
+
+    Before a FULL build of an explode-qualified stem the explode base
+    (``_explode_base_key``) is restored when the cache has it, and the tier is
+    decided again against the base's own ledger: a clean farm leaf has no saved
+    .SLDASM, so the base is what lets it take the EXPLODE tier.
+
+    The decision is recomputed HERE from the on-disk ledger, NOT read from the
+    _RECIPE_CHANGED module global: under ``doit -n`` the action may run in a
+    worker process that never saw the parent's global, which would force a
+    spurious FULL on every stale assembly and silently defeat the incremental
+    refresh (codex review). The ledger is on disk (process-shared) and updated
+    only on success. doit's own ``changed`` arg is likewise avoided -- it is
+    corrupted by a prior failed task (D2).
     """
     label = f"assembly:{stem}"
-    # Open the task span HERE (not in _run) so the cache decision + the FULL/REFRESH
+    # Open the task span HERE (not in _run) so the cache decision + the tier's
     # build + any hooks share ONE trace rooted at this task: the cache events, the
-    # FULL-vs-REFRESH ``mode`` attribute, and every subprocess span nest under it, so
+    # tier ``mode`` attribute, and every subprocess span nest under it, so
     # a cache miss and the work it triggered are backtraceable from one trace.
-    sidecar = _recipe_sidecar(stem)
-    digest = _digest_files(_recipe_files(stem))
+    file_deps = _assembly_file_deps(stem)
+    ledger = _input_ledger(stem)
 
-    def _record_recipe_digest() -> None:
-        sidecar.parent.mkdir(parents=True, exist_ok=True)
-        sidecar.write_text(digest + "\n", encoding="utf-8")
-
-    # Remote-cache shortcut: a HIT downloads the .SLDASM (+ renders), skipping the
-    # COM build/refresh entirely. The recipe sidecar is NOT cached -- its digest
-    # tags by absolute path (machine-local) -- so recompute it here, exactly as the
-    # success tail does, to keep the next run's FULL/REFRESH decision correct.
+    # Remote-cache shortcut: a HIT downloads the .SLDASM (+ renders, + the ledger
+    # it was keyed from), skipping the COM build/refresh entirely. The ledger is
+    # rewritten from the current inputs, exactly as the success tail does. The
+    # per-input digests are taken only where a ledger is written or read.
     cache_outputs = _assembly_cache_outputs(stem)
     with _telemetry.span(
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as probe:
-        cache_key = _cache_key(_assembly_file_deps(stem), label)
+        cache_key = _cache_key(file_deps, label)
         probed = _probe_cache(cache_key, cache_outputs, label, probe)
         if probed == "hit":
             _stamp_assembly_execution(stem)
-            _record_recipe_digest()
+            _write_input_ledger(ledger, _ledger_inputs(file_deps))
             return
 
     if _farm.enabled():
         _farm_build(label, cache_key, cache_outputs)
         _stamp_assembly_execution(stem)
-        _record_recipe_digest()
+        _write_input_ledger(ledger, _ledger_inputs(file_deps))
         return
 
+    plan = explode_plan(stem)
+    base_key = _explode_base_key(file_deps, plan) if plan.closure else ""
+    base_label = f"{label} explode-base"
     with _com_seat(label) as waited:
         if _reprobe_under_seat(cache_key, cache_outputs, label, probed):
             _stamp_assembly_execution(stem)
-            _record_recipe_digest()
+            _write_input_ledger(ledger, _ledger_inputs(file_deps))
             return
 
+        current = _ledger_inputs(file_deps)
+        # A forced refresh recomputes the result: never re-author or republish a
+        # reloaded target, so it skips both the tier choice and the base restore.
+        forced = _cache.forced_refresh(label) is not None
+        if forced:
+            tier, why = RefreshTier.FULL, "forced cache refresh"
+        else:
+            tier, why = _assembly_tier(stem, targets[0], current, plan)
+        if tier is RefreshTier.FULL and base_key and not forced:
+            with _telemetry.span(
+                f"cache.explode_base {label}",
+                label=label,
+                service=_telemetry.BUILD_INFRA_SERVICE,
+            ) as base:
+                based = _probe_cache(base_key, cache_outputs, base_label, base)
+            if based == "hit":
+                tier, why = _assembly_tier(stem, targets[0], current, plan)
+                why = f"explode base restored; {why}"
+
         _sw_ensure_once()  # top-level sibling of the task span (once/worker)
-        # The FULL+hooks (or REFRESH) run HOLDING the seat, so the hooks operate on
-        # the just-built model without another COM task interleaving.
+        # The FULL+hooks (or a refresh) run HOLDING the seat, so the hooks operate
+        # on the just-built model without another COM task interleaving.
         with _telemetry.span(
             f"task {label}", label=label, service=_stage_name(label)
         ) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
             _tag_cache_key(sp, cache_key)
+            sp.set_attribute("mode", tier.value)
+            sp.set_attribute("mode_reason", why)
 
-            target_missing = not Path(targets[0]).exists()
-            try:
-                last = sidecar.read_text(encoding="utf-8").strip()
-            except OSError:
-                last = None
-            recipe_changed = last is None or last != digest  # missing sidecar = FULL
-            forced = _cache.forced_refresh(label) is not None
-
-            asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
-            hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
-            if forced or target_missing or recipe_changed:
-                why = (
-                    "forced cache refresh" if forced
-                    else "target missing" if target_missing else "recipe changed"
-                )
-                sp.set_attribute("mode", "full")
+            def full_build(reason: str) -> None:
+                asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
                 _exec_com(
                     [sys.executable, str(asm_script)],
-                    f"FULL build {stem} ({why})",
+                    f"FULL build {stem} ({reason})",
                     log_stem=f"assembly-{stem}",
                     task=label,
                 )
-                for hook in hooks:
+                for hook in (SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())):
                     _exec_com(
                         [sys.executable, str(hook)],
                         f"hook {hook.name}",
                         log_stem=f"hook-{stem}-{hook.stem}",
                         task=label,
                     )
+
+            if tier is RefreshTier.FULL:
+                full_build(why)
             else:
-                sp.set_attribute("mode", "refresh")
-                _exec_com(
-                    [sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
-                    f"REFRESH {stem}",
-                    log_stem=f"assembly-{stem}",
-                    task=label,
-                )
+                refresh = SCRIPTS_DIR / "refresh_assembly.py"
+                try:
+                    _exec_com(
+                        [sys.executable, str(refresh), stem, tier.value],
+                        f"REFRESH {tier.value} {stem} ({why})",
+                        log_stem=f"assembly-{stem}",
+                        task=label,
+                    )
+                except RuntimeError as failed:
+                    if tier is not RefreshTier.EXPLODE:
+                        raise
+                    _telemetry.warn(
+                        f"{label}: EXPLODE refresh failed ({failed}); "
+                        "falling back to a FULL build"
+                    )
+                    tier, why = RefreshTier.FULL, f"EXPLODE failed; {why}"
+                    sp.set_attribute("mode", tier.value)
+                    sp.set_attribute("mode_reason", why)
+                    full_build(why)
             # _exec raised if the build failed, so we only get here on success: record
-            # this build's recipe digest for the next run's FULL/REFRESH decision.
+            # this build's inputs for the next run's tier decision.
             _stamp_assembly_execution(stem)
-            _record_recipe_digest()
+            _write_input_ledger(ledger, current)
 
     # Publish the fresh artefacts for other machines OUTSIDE the seat (an Azure
     # upload is network, not COM). RECOMPUTE the output set here, not reuse the one
@@ -2831,13 +2933,23 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # glob-discovered and DID NOT EXIST yet on a clean builder when cache_outputs
     # was first computed, so the early list would publish an incomplete archive
     # (codex review). They exist now.
+    outputs = _assembly_cache_outputs(stem)
     with _telemetry.span(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
         _tag_cache_key(store, cache_key)
-        outcome = _cache.store(cache_key, _assembly_cache_outputs(stem), label)
+        outcome = _cache.store(cache_key, outputs, label)
         store.set_attribute("cache", outcome)
         _cache.require_refresh_store(label, outcome)
+    # The same archive is the explode base for this operational model. An
+    # EXPLODE run started from that base, which the cache already holds.
+    if not base_key or tier is RefreshTier.EXPLODE:
+        return
+    with _telemetry.span(
+        f"cache.store {base_label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as store:
+        _tag_cache_key(store, base_key)
+        store.set_attribute("cache", _cache.store(base_key, outputs, base_label))
 
 
 def _close_sw_documents() -> None:
@@ -2885,7 +2997,7 @@ def _clean_assembly(stem):
     the next build; codex review #4)."""
     _force_remove(Path(_sldasm(stem)))
     _force_remove(Path(_assembly_execution_token(stem)))
-    _force_remove(_recipe_sidecar(stem))
+    _force_remove(_input_ledger(stem))
     _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
     if stem == "ch_channel":
         for variant in _channel_spring_variants():
@@ -3296,6 +3408,9 @@ def task_check():
         SCRIPTS_DIR / "test_dodo_recipe.py",
         SCRIPTS_DIR / "test_farm_admission.py",
         SCRIPTS_DIR / "test_machinist_review_leaf.py",
+        # Which recorded-input changes may skip the insert/mate loop (the
+        # explode tier), and the in-place explode re-authoring against fakes.
+        SCRIPTS_DIR / "test_refresh_tier.py",
         # Per-assembly contracts stay per-assembly (no stem-keyed tables in
         # _assembly.py; each recipe carries its own contract only).
         SCRIPTS_DIR / "test_assembly_contract.py",
