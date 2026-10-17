@@ -117,7 +117,7 @@ HOLE_Z_OFFSET = -3.52825
 # user's ask timed out and the recommended option was auto-selected) gives
 # each tap 1.5D at the title block's .XX band
 # (``sm_summing_lever_notes`` proves it).  SPRING_SEAT_T is the tap's whole
-# length: plate top to pad underside, where each MHA-CH-012 jam nut seats.
+# length: plate top to pad underside, where each MHA-CH-014 jam nut seats.
 # The pad runs the plate's full length and in from its free +X edge past the
 # nut's O.D.
 SPRING_SEAT_T = 7.0
