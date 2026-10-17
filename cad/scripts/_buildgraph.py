@@ -856,6 +856,17 @@ def references_of(asm_stem: str) -> list[str]:
 # scope from this constant. See AGENTS.md, "Recipe-inert modules".
 RECIPE_INERT_MODULES = frozenset({"_seat_forensics.py"})
 
+# Shared import-closure exclusions for recipes and other cache-keyed leaves.
+# Keep the stricter check:inert proof scope in RECIPE_INERT_MODULES above.
+RECIPE_SKIP_MODULES = frozenset({
+    "_buildgraph.py",
+    "_extract.py",
+    "_rewrite_imports.py",
+    "_telemetry.py",
+    "_watchdog.py",
+    *RECIPE_INERT_MODULES,
+})
+
 
 @functools.lru_cache(maxsize=1)
 def _local_modules() -> dict[str, Path]:
@@ -898,20 +909,12 @@ def _local_modules() -> dict[str, Path]:
     from pinned call sites and runs no COM mutator that could land in a saved
     artefact.
     """
-    skip = {
-        "_buildgraph.py",
-        "_extract.py",
-        "_rewrite_imports.py",
-        "_telemetry.py",
-        "_watchdog.py",
-        *RECIPE_INERT_MODULES,
-    }
     out: dict[str, Path] = {}
     for path in sorted(SCRIPTS_DIR.rglob("*.py")):
         relative = path.relative_to(SCRIPTS_DIR)
         directories = relative.parts[:-1]
         if (
-            path.name in skip
+            path.name in RECIPE_SKIP_MODULES
             or path.name.startswith("test_")
             or any(part in {"tests", "__pycache__"} for part in directories)
         ):

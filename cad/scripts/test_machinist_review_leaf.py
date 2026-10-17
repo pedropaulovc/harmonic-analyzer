@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 from doit.loader import load_tasks
 
+from _buildgraph import RECIPE_SKIP_MODULES
 from _machinist_review_mode import MachinistReviewMode, mode_for_drawing
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -81,7 +82,7 @@ def _local_import_closure(entry: Path) -> set[str]:
     pending = [entry]
     while pending:
         path = pending.pop()
-        if path.name in found:
+        if path.name in found or path.name in RECIPE_SKIP_MODULES:
             continue
         found.add(path.name)
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -206,6 +207,26 @@ def test_key_changes_only_with_review_inputs(inputs):
     assert key() != initial
     inputs.spec.source_kind = "assembly"
     assert key() != initial
+
+
+def test_review_keys_exclude_the_shared_recipe_skip_set(inputs, monkeypatch):
+    dodo = inputs.module
+    for name in RECIPE_SKIP_MODULES:
+        (inputs.scripts / name).write_text("# observation-only infrastructure\n")
+    deps = dodo._machinist_review_file_deps("probe")
+    assert {Path(path).name for path in deps}.isdisjoint(RECIPE_SKIP_MODULES)
+    initial = dodo._cache_key(deps)
+    # An inert import entering the explicit manifest must still follow the
+    # recipe policy, rather than accidentally charging for another review.
+    monkeypatch.setattr(
+        dodo,
+        "_MACHINIST_REVIEW_MODULES",
+        (*dodo._MACHINIST_REVIEW_MODULES, *sorted(RECIPE_SKIP_MODULES)),
+    )
+    assert dodo._machinist_review_file_deps("probe") == deps
+    for name in RECIPE_SKIP_MODULES:
+        (inputs.scripts / name).write_text("# logging-only edit must not re-review\n")
+        assert dodo._cache_key(dodo._machinist_review_file_deps("probe")) == initial
 
 
 def test_assembly_exception_uses_bare_dashed_config_stem(inputs):

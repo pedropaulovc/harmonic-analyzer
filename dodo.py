@@ -109,6 +109,7 @@ from _buildgraph import (  # noqa: E402
     ASSEMBLY_ORDER,
     CAD_OUT,
     POST_ASSEMBLY,
+    RECIPE_SKIP_MODULES,
     SCRIPTS_DIR,
     ASSEMBLY_CONTRACTS_TOKEN,
     all_config_files,
@@ -3054,12 +3055,11 @@ def task_verify():
 # Review inputs are deliberately independent of the draw recipe and registry.
 # The CLI receives its PDF, package name and kind explicitly; only the PDF's
 # bytes, the package's exceptions and the review implementation/rubric matter.
-# Keep this explicit local-import closure pinned in test_machinist_review_leaf.
+# Keep the non-inert local-import closure pinned in test_machinist_review_leaf.
 _MACHINIST_REVIEW_MODULES = (
     "machinist_review.py",
     "machinist_review_sheets_mcp.py",
     "machinist_exceptions.py",
-    "_telemetry.py",
 )
 
 
@@ -3083,7 +3083,11 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         str(path.resolve())
         for path in (
             spec.outputs["pdf"],
-            *(SCRIPTS_DIR / name for name in _MACHINIST_REVIEW_MODULES),
+            *(
+                SCRIPTS_DIR / name
+                for name in _MACHINIST_REVIEW_MODULES
+                if name not in RECIPE_SKIP_MODULES
+            ),
             *prompts,
             SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
             *([exceptions] if exceptions.is_file() else []),
