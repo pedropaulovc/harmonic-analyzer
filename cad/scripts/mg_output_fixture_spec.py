@@ -83,13 +83,18 @@ GROOVE_STATION_PLACES = 2
 OVERALL_LENGTH_PLACES = 2
 SPIGOT_DIA_PLACES = 2
 GROOVE_ROOT_DIA_PLACES = 2
-# The groove's radius prints as the single limit "R1.2 MAX" (rule 16: the
-# largest acceptable concave radius; swTolMAX prints the model value, so the
-# model IS the limit).  Any smaller radius narrows the mouth and thickens both
-# lips; at the title block's .X (R up to 2.0) the face-side lip falls under
-# the wall target (test_mg_output_fixture_drawing proves it).
+# The groove's radius prints as the LIMIT band R1.2 over R0.5 (owner ruling
+# 2026-10-17 on review r4, rule 1: "R1.2 max." gave the shop no smallest
+# radius).  The model value is the upper limit, so every largest-radius proof
+# below still runs on GROOVE_RADIUS: any larger radius widens the mouth and
+# thins the face-side lip, and at the title block's .X (R up to 2.0) that lip
+# falls under the wall target (test_mg_output_fixture_drawing proves it).
+# The lower limit keeps the floor's radius over the Ø0.8 wire's, so the wire
+# seats on the groove's floor, not on its two walls; any smaller radius only
+# narrows the mouth and thickens both lips (the min-side proofs below).
 GROOVE_RADIUS_PLACES = 1
-GROOVE_RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX
+GROOVE_RADIUS_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+GROOVE_RADIUS_MIN = 0.5
 # The drilled rod bore prints at one place; its band is the title block's
 # DRILLED HOLES row (+0.10/0): running clearance on the rod, no fit.
 ROD_BORE_DIA_PLACES = 1
@@ -122,8 +127,11 @@ _BORE_STATION_LO, _BORE_STATION_HI = printed_deviations(
 _, _GROOVE_HI = printed_deviations(GROOVE_STATION, GROOVE_STATION_PLACES)
 _SPIGOT_LO, _ = printed_deviations(SPIGOT_DIA, SPIGOT_DIA_PLACES)
 _ROOT_LO, _ROOT_HI = printed_deviations(GROOVE_ROOT_DIA, GROOVE_ROOT_DIA_PLACES)
-# MAX: from sharp up to the printed (= model) radius.
+# MAX: from sharp up to the printed (= model) radius.  The groove's LIMIT
+# runs from GROOVE_RADIUS_MIN up to the model radius: native deviations
+# (lower, upper) off the model value, the API's order.
 GROOVE_RADIUS_MAX = GROOVE_RADIUS
+GROOVE_RADIUS_DEVIATIONS = (GROOVE_RADIUS_MIN - GROOVE_RADIUS, 0.0)
 SHOULDER_FILLET_R_MAX = SHOULDER_FILLET_R
 ROD_BORE_R_MIN = ROD_BORE_DIA / 2.0
 ROD_BORE_R_MAX = (ROD_BORE_DIA + drilled_oversize_mm()) / 2.0
@@ -159,10 +167,25 @@ if groove_half_opening(GROOVE_RADIUS, GROOVE_ROOT_DIA, SPIGOT_DIA) > (
 ):
     raise AssertionError("MHA-MG-006 groove mouth exceeds its MAX radius")
 # The wire stays in the groove: at the smallest OD over the largest root the
-# groove is still deeper than the wire's radius.
+# groove is still deeper than the wire's radius (the root sets the depth,
+# whatever the radius).
 GROOVE_DEPTH_MIN = ((SPIGOT_DIA + _SPIGOT_LO) - (GROOVE_ROOT_DIA + _ROOT_HI)) / 2.0
 if not GROOVE_DEPTH_MIN > _geom.WIRE_DIA / 2.0:
     raise AssertionError("MHA-MG-006 groove shallower than the wire's radius")
+# At the LIMIT's lower end the wire still seats on the floor: the floor's
+# radius exceeds the wire's, so the wire touches the root at one line, its
+# centre stays the root plus its radius (the hook's station, geom), and the
+# mouth stays wider than the wire.  The narrowest mouth stands over the
+# largest root under the smallest OD (the arc's centre highest); an R0.5
+# there still centres below the OD, so the groove turns to straight walls
+# 2 x R0.5 apart over the floor's arc: 1.0 wide at any printed root and OD.
+if not GROOVE_RADIUS_MIN > _geom.WIRE_DIA / 2.0:
+    raise AssertionError("MHA-MG-006 groove floor tighter than the wire: it bridges")
+GROOVE_HALF_OPENING_MIN = groove_half_opening(
+    GROOVE_RADIUS_MIN, GROOVE_ROOT_DIA + _ROOT_HI, SPIGOT_DIA + _SPIGOT_LO
+)
+if not 2.0 * GROOVE_HALF_OPENING_MIN > _geom.WIRE_DIA:
+    raise AssertionError("MHA-MG-006 groove mouth narrower than the wire at R MIN")
 # The groove stays on the spigot at the worst case: its shoulder-side mouth
 # clears the shoulder (the spigot's length and the groove's station both run
 # from the spigot face: one band each), and the shoulder's corner radius.
@@ -304,10 +327,11 @@ if not TAP_DRILL_FAR_CLEAR > 0.0:
 # and to the spigot face, the shoulder from the spigot face (the spigot's
 # length), the overall length (driven, REF) and the spigot's Ø; the shoulder
 # fillet its corner radius (a single MAX limit); the groove profile (Top
-# plane) the groove's station from the spigot face, its root Ø and its radius;
-# the hex sketch (the FreeEnd plane) the flats, a stock reference (the bore is
-# centred: no location from a flat); the bore sketch (Top plane) its Ø.  The
-# tap is a Hole Wizard feature: its native callout prints it.
+# plane) the groove's station from the spigot face, its root Ø and its radius
+# (a LIMIT band); the hex sketch (the FreeEnd plane) the flats, a stock
+# reference (the bore is centred: no location from a flat); the bore sketch
+# (Top plane) its Ø.  The tap is a Hole Wizard feature: its native callout
+# prints it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "TurnedProfile": {
         "RodStation": ROD_STATION_PLACES,
@@ -335,10 +359,16 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 # Single-limit dimensions (name -> (owning feature, swTolType)).
 SINGLE_LIMITS: dict[str, tuple[str, int]] = {
-    "GrooveRadius": ("GrooveProfile", GROOVE_RADIUS_TOL_TYPE),
     "ShoulderRadius": ("ShoulderFillet", SHOULDER_RADIUS_TOL_TYPE),
 }
-if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME) - set(SINGLE_LIMITS):
+# LIMIT bands (name -> (owning feature, native (lower, upper) deviations in
+# mm off the model value)); each prints its two limits at its places.
+LIMIT_BANDS: dict[str, tuple[str, tuple[float, float]]] = {
+    "GrooveRadius": ("GrooveProfile", GROOVE_RADIUS_DEVIATIONS),
+}
+if not REFERENCE_DIMENSIONS <= (
+    set(DRAWING_PRECISION_BY_NAME) - set(SINGLE_LIMITS) - set(LIMIT_BANDS)
+):
     raise AssertionError("MHA-MG-006 reference dimension is unprinted or limited")
 if abs(OVERALL_LENGTH - (ROD_STATION + BORE_STATION)) > 1e-9:
     raise AssertionError("MHA-MG-006 overall REF is not the bore's two stations")

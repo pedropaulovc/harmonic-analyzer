@@ -43,20 +43,23 @@ def test_sheet_prints_exactly_the_marked_dimensions() -> None:
 def test_no_printed_dimension_carries_its_own_band() -> None:
     # r1 review: every explicit ±0.05 was a band the part's function never
     # asked for.  The places carry the title block's band (rule 3); the
-    # groove's radius and the shoulder's corner are single MAX limits (rule
-    # 16); the drilled bore's band is the DRILLED HOLES row.
+    # shoulder's corner is a single MAX limit (rule 16), the groove's radius
+    # a LIMIT band (owner ruling 2026-10-17, review r4); the drilled bore's
+    # band is the DRILLED HOLES row.
     for retired in ("SYMMETRIC_BANDS", "ROD_BORE_DIA_BAND", "POSITION_TOLERANCE", "SIZE_TOLERANCE"):
         assert not hasattr(spec, retired), retired
     assert {
         name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2
     } == {"HexAf": 3, "GrooveRadius": 1, "ShoulderRadius": 1, "RodBoreDia": 1}
-    assert spec.SINGLE_LIMITS == {
-        "GrooveRadius": ("GrooveProfile", 6),
-        "ShoulderRadius": ("ShoulderFillet", 6),
+    assert spec.SINGLE_LIMITS == {"ShoulderRadius": ("ShoulderFillet", 6)}
+    assert spec.LIMIT_BANDS == {
+        "GrooveRadius": ("GrooveProfile", pytest.approx((-0.7, 0.0), abs=1e-12)),
     }
     assert part.SINGLE_LIMITS is spec.SINGLE_LIMITS
+    assert part.LIMIT_BANDS is spec.LIMIT_BANDS
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "_single_limit(adapter, feature_name, dimension_name, tol_type)" in source
+    assert "_limit_band(adapter, feature_name, dimension_name, limits)" in source
     assert "_drawing_tolerances" not in source and "_fit_deviations" not in source
     assert printed_band_mm(2) == 0.51
     assert 2.0 * spec.ROD_BORE_R_MAX == pytest.approx(5.3)
@@ -379,11 +382,19 @@ def test_the_groove_is_a_true_semicircle_centred_on_the_spigot_od() -> None:
     )
 
 
-def test_the_groove_radius_is_a_max_and_the_title_block_x_row_would_thin_the_face_lip() -> None:
-    assert spec.GROOVE_RADIUS_PLACES == 1 and spec.GROOVE_RADIUS_TOL_TYPE == 6
-    assert spec.GROOVE_RADIUS_MAX == geom.GROOVE_RADIUS
+def test_the_groove_radius_is_a_limit_band_and_the_title_block_x_row_would_thin_the_face_lip() -> None:
+    # Owner ruling 2026-10-17 (review r4, rule 1: "R1.2 max." had no
+    # minimum): a native LIMIT, the model value its upper limit, so every
+    # largest-radius proof still runs on the model.
+    assert spec.GROOVE_RADIUS_PLACES == 1 and spec.GROOVE_RADIUS_TOL_TYPE == 3
+    assert spec.GROOVE_RADIUS_MAX == geom.GROOVE_RADIUS == pytest.approx(1.2)
+    assert spec.GROOVE_RADIUS_MIN == pytest.approx(0.5)
+    lower, upper = spec.GROOVE_RADIUS_DEVIATIONS
+    assert geom.GROOVE_RADIUS + upper == pytest.approx(1.2, abs=1e-12)
+    assert geom.GROOVE_RADIUS + lower == pytest.approx(0.5, abs=1e-12)
     assert spec.GROOVE_HALF_OPENING_MAX == geom.GROOVE_RADIUS
-    assert drawing.RADIUS_GLYPHS == len("R1.2 MAX")
+    # Two rows, "R1.2" over "0.5": the R row is the wider.
+    assert drawing.RADIUS_GLYPHS == len("R1.2")
     # A bare R1.2 at the title block's .X admits R2.0: across the printed
     # root and OD the mouth opens past 1.9 and the face lip falls under the
     # target.
@@ -395,6 +406,76 @@ def test_the_groove_radius_is_a_max_and_the_title_block_x_row_would_thin_the_fac
     )
     assert (3.75 - 0.51) - half < spec.WALL_TARGET
     assert (3.75 - 0.51) - r == pytest.approx(1.24)
+
+
+_PRINTED_ROOTS = (7.70 - 0.51, 7.70 + 0.51)
+_PRINTED_ODS = (10.10 - 0.51, 10.10 + 0.51)
+
+
+def _groove_at(radius: float) -> dict[str, float]:
+    """Every groove proof that moves with the radius, at the printed worst
+    root, OD and station, for one radius."""
+    opens = [
+        spec.groove_half_opening(radius, root, od)
+        for root in _PRINTED_ROOTS
+        for od in _PRINTED_ODS
+    ]
+    far_depth = 3.75 + 0.51 + radius
+    return {
+        "narrowest mouth": 2.0 * min(opens),
+        "face lip": (3.75 - 0.51) - max(opens),
+        "root over thread": (7.70 - 0.51) / 2.0 - spec._THREAD_R_MAX - spec._wander(far_depth),
+        "shoulder clearance": (6.70 - 0.51) - (3.75 + 0.51 + max(opens)),
+    }
+
+
+def test_the_groove_holds_the_wire_and_every_wall_at_its_smallest_radius() -> None:
+    # The floor's R0.5 over the Ø0.8 wire's 0.4: the wire seats on the floor
+    # at one line, its centre the root plus its radius (the hook), and the
+    # groove's depth is the root's, whatever the radius.
+    assert spec.GROOVE_RADIUS_MIN > geom.WIRE_DIA / 2.0
+    assert geom.HOOK_RADIAL_OFFSET == pytest.approx(
+        geom.GROOVE_ROOT_DIA / 2.0 + geom.WIRE_DIA / 2.0 + geom.WIRE_CLEARANCE
+    )
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.69) and spec.GROOVE_DEPTH_MIN > 0.4
+    smallest, largest = _groove_at(0.5), _groove_at(1.2)
+    # R0.5 centres under the OD at every printed root and OD: walls 1.0 apart.
+    assert spec.GROOVE_HALF_OPENING_MIN == pytest.approx(0.5)
+    assert smallest["narrowest mouth"] == pytest.approx(1.0)
+    assert smallest["narrowest mouth"] > geom.WIRE_DIA
+    # Each wall the largest radius sets only thickens at the smallest.
+    assert largest["face lip"] == pytest.approx(spec.WALLS["groove lip to the spigot face"][1])
+    assert largest["root over thread"] == pytest.approx(
+        spec.WALLS["groove root over the thread major"][1]
+    )
+    assert largest["shoulder clearance"] == pytest.approx(spec.GROOVE_SHOULDER_CLEARANCE)
+    assert smallest["face lip"] == pytest.approx(2.74)
+    assert smallest["root over thread"] == pytest.approx(2.0226, abs=1e-4)
+    assert smallest["shoulder clearance"] == pytest.approx(1.43)
+    for name in ("face lip", "root over thread", "shoulder clearance"):
+        assert smallest[name] > largest[name], name
+    assert min(smallest["face lip"], smallest["root over thread"]) > spec.WALL_TARGET
+
+
+def test_the_overall_reference_is_an_accepted_exception_with_its_real_stack() -> None:
+    # Owner ruling 2026-10-17 (review r4): the two-station bore location and
+    # the (18.00) REF stay; a real overall would chain the free end's 5.30
+    # from two .XX bands and thin the free-end wall under the floor.
+    import machinist_exceptions
+
+    (exception,) = machinist_exceptions.load_exceptions(
+        SCRIPTS.parent / "config", "mg_output_fixture", "part"
+    )
+    assert exception.id == "RV-01" and exception.kind == "accept"
+    for text in ("5.30", "12.70", "(18.00)"):
+        assert text in exception.where, text
+    assert "rule 10" in exception.finding and "rule 11" in exception.finding
+    stacked = 5.30 - 2 * 0.51 - spec.ROD_BORE_R_MAX - spec.BORE_WANDER
+    assert stacked == pytest.approx(1.496, abs=5e-4) and stacked < 1.5
+    assert spec.WALLS["rod bore to the free end"][1] == pytest.approx(2.006, abs=5e-4)
+    for number in ("±1.02", "2.65", "0.134", "1.496", "2.006", "2026-10-17"):
+        assert number in exception.reason, number
+    assert spec.REFERENCE_DIMENSIONS >= {"OverallLength"}
 
 
 def test_the_spigot_cleans_up_inside_the_thinnest_flats() -> None:
@@ -1707,6 +1788,20 @@ def test_rotated_end_stock_af_refuses_wrong_frame_or_unwitnessed_flats(case: str
     assert drawing._end_af_ink_problem(ink, _end_flat_points()) is not None
 
 
+class _NativeTolerance:
+    """IDimensionTolerance's type and its metre-valued deviations."""
+
+    def __init__(self, tol_type: int, limits_mm: tuple[float, float]) -> None:
+        self.Type = tol_type
+        self._limits = tuple(value / 1000.0 for value in limits_mm)
+
+    def GetMinValue(self) -> float:
+        return self._limits[0]
+
+    def GetMaxValue(self) -> float:
+        return self._limits[1]
+
+
 class _NativeDisplay:
     """IDisplayDimension properties, methods and metre-valued IDimension."""
 
@@ -1714,11 +1809,12 @@ class _NativeDisplay:
         self, name: str, feature: str, value_mm: float, *, kind: int = 5,
         diametric: bool = False, arc_persists: bool = True,
         gap_results: dict[int, object] | None = None, tol_type: int = 6,
+        limits_mm: tuple[float, float] = (0.0, 0.0),
     ) -> None:
         self.dimension = SimpleNamespace(
             FullName=f"{name}@{feature}@mg-output-fixture.SLDPRT",
             SystemValue=value_mm / 1000.0,
-            Tolerance=SimpleNamespace(Type=tol_type),
+            Tolerance=_NativeTolerance(tol_type, limits_mm),
         )
         self.Type2 = kind
         self.Diametric = diametric
@@ -1754,6 +1850,12 @@ class _NativeDisplay:
 
 
 def _radial_display(**options) -> _NativeDisplay:
+    """The groove's radius as the part saves it: the LIMIT band."""
+    options = {
+        "tol_type": spec.GROOVE_RADIUS_TOL_TYPE,
+        "limits_mm": spec.GROOVE_RADIUS_DEVIATIONS,
+        **options,
+    }
     return _NativeDisplay("GrooveRadius", "GrooveProfile", geom.GROOVE_RADIUS, **options)
 
 
@@ -1839,8 +1941,9 @@ def test_station_witness_ids_follow_the_builders_reference_order() -> None:
 # 1.84 mm under to 1.72 mm over it; the full shoulder ran from 15.28 mm left
 # of and 2.78 mm under the keep to 1.50 mm past the text's right end.
 _NATIVE15_RADIUS_KEEP = (0.1724, 0.1988)
-# What the part's single limit prints (the sheet only sizes it).
-_RADIUS_TEXT = "R1.2 MAX"
+# What the part's LIMIT band prints (the sheet only sizes it): two rows, the
+# R row over the lower limit, LIMIT_ROW_PITCH apart.
+_RADIUS_ROWS = ("R1.2", "0.5")
 _NATIVE15_RADIUS_TEXT_BOX = Box(0.1604289, 0.1969558, 0.1845905, 0.2005212)
 _NATIVE15_SPIGOT_TOP_WITNESS = ((0.1614, 0.198), (0.2003, 0.198))
 _NATIVE15_GLYPH = (_NATIVE15_RADIUS_TEXT_BOX.xmax - _NATIVE15_RADIUS_TEXT_BOX.xmin) / 11
@@ -1851,15 +1954,17 @@ _SHEET_RADIUS = geom.GROOVE_RADIUS * drawing._S / 1000.0
 
 
 def _proposed_radius_text_box() -> Box:
-    """R1.2 MAX at native15's glyph pitch and height, centred on the keep."""
+    """The R1.2 / 0.5 stack at native15's glyph pitch and row height, centred
+    on the keep: the widest row wide, one row pitch taller than one row."""
     x, y = drawing.RADIUS_TEXT_XY
-    half = len(_RADIUS_TEXT) * _NATIVE15_GLYPH / 2.0
+    half = max(len(row) for row in _RADIUS_ROWS) * _NATIVE15_GLYPH / 2.0
     old = _NATIVE15_RADIUS_TEXT_BOX
+    rise = drawing.LIMIT_ROW_PITCH / 2.0
     return Box(
         x - half,
-        y + old.ymin - _NATIVE15_RADIUS_KEEP[1],
+        y + old.ymin - _NATIVE15_RADIUS_KEEP[1] - rise,
         x + half,
-        y + old.ymax - _NATIVE15_RADIUS_KEEP[1],
+        y + old.ymax - _NATIVE15_RADIUS_KEEP[1] + rise,
     )
 
 
@@ -1905,13 +2010,14 @@ def test_radius_text_reads_low_in_open_air_between_the_face_and_the_root_dia() -
     # r1 review: the shelf ran along the spigot Ø's extension at the OD.
     box = _proposed_radius_text_box()
     face_x, axis_y = _FACE_ON_AXIS
-    assert drawing.RADIUS_GLYPHS == len(_RADIUS_TEXT)
+    assert drawing.RADIUS_GLYPHS == max(len(row) for row in _RADIUS_ROWS)
     assert drawing.SIDE_KEEP["GrooveRadius"] == drawing.RADIUS_TEXT_XY
     # Right of the face, under the root Ø's upper extension, over the axis,
-    # left of the root Ø's dimension line.
+    # left of the root Ø's dimension line.  The stack's lower row stands
+    # 4.2 mm over the axis (the one-row limit's stood 5.4 mm over it).
     assert box.xmin > face_x + 0.003
     assert box.ymax < drawing.GROOVE_ROOT_SHEET_YS[1] - 0.003
-    assert box.ymin > axis_y + 0.005
+    assert box.ymin > axis_y + 0.004
     assert box.xmax < drawing.SIDE_KEEP["GrooveRootDia"][0] - 0.005
     # The estimate the layout used is the wider of the two glyph pitches.
     assert drawing.RADIUS_TEXT_HALF_WIDTH >= (box.xmax - box.xmin) / 2.0
@@ -1969,11 +2075,21 @@ def test_predicted_radius_leader_lands_on_the_face_side_material_arc() -> None:
     assert math.dist(tip, centre) == pytest.approx(_SHEET_RADIUS)
     assert centre[0] < tip[0] < centre[0] + geom.GROOVE_HALF_OPENING * drawing._S / 1000.0
     assert drawing.GROOVE_ROOT_SHEET_YS[1] < tip[1] < drawing._side_y(geom.SPIGOT_DIA / 2.0)
-    # The elbow is 2 mm right of the face, 5.5 mm over the axis; the shoulder
-    # sits between the axis and the root Ø's upper extension line.
-    assert drawing.RADIUS_ELBOW_XY == pytest.approx(
-        (_FACE_ON_AXIS[0] + 0.002, _FACE_ON_AXIS[1] + 0.0055)
-    )
+    # The text holds the one-row limit's keep (2 mm plus an eight-glyph
+    # run-in right of the face, a drop over an elbow 5.5 mm above the axis);
+    # the narrower, taller stack runs its elbow right of and below that, the
+    # shoulder still between the axis and the root Ø's upper extension line.
+    eight_glyph_run_in = 8 * drawing._GLYPH_PITCH / 2.0 + drawing.RADIUS_SHOULDER_LEAD
+    assert drawing.RADIUS_TEXT_XY == pytest.approx((
+        _FACE_ON_AXIS[0] + 0.002 + eight_glyph_run_in,
+        _FACE_ON_AXIS[1] + 0.0055 + drawing.RADIUS_SHOULDER_DROP,
+    ))
+    assert drawing.RADIUS_ELBOW_XY == pytest.approx((
+        drawing.RADIUS_TEXT_XY[0] - drawing.RADIUS_SHOULDER_RUN_IN,
+        drawing.RADIUS_TEXT_XY[1] - drawing.GROOVE_RADIUS_SHOULDER_DROP,
+    ))
+    assert drawing.RADIUS_ELBOW_XY[1] - _FACE_ON_AXIS[1] == pytest.approx(0.003255, abs=1e-6)
+    assert drawing.RADIUS_ELBOW_XY[0] - _FACE_ON_AXIS[0] == pytest.approx(0.0065846, abs=1e-6)
     assert drawing._groove_radius_ink_problem(ink, tip, station, centre, _FACE_ON_AXIS) is None
     assert drawing._radius_leader_ink_problem(ink, tip, centre, _root_line_x()) is None
     assert drawing.GROOVE_STATION_GAP == 0.003
@@ -1981,12 +2097,20 @@ def test_predicted_radius_leader_lands_on_the_face_side_material_arc() -> None:
     assert drawing.RADIUS_INK_SLOP == 0.0004
 
 
+@pytest.mark.parametrize("dy_mm", [0.0, -0.755])
 @pytest.mark.parametrize("dx_mm", [-3.0, -1.4, 0.0, 3.4, 5.0])
-def test_radius_leader_holds_wherever_solidworks_runs_the_elbow(dx_mm: float) -> None:
-    # The run-in is an estimate for R1.2 MAX: at native15's 15.28 mm the
-    # elbow lands 3.4 mm right of the prediction, and the leader still lands
-    # on the material arc, radial, short of the root Ø's line.
-    elbow = (drawing.RADIUS_ELBOW_XY[0] + dx_mm / 1000.0, drawing.RADIUS_ELBOW_XY[1])
+def test_radius_leader_holds_wherever_solidworks_runs_the_elbow(
+    dx_mm: float, dy_mm: float
+) -> None:
+    # The run-in is an estimate for the R1.2 / 0.5 stack: at native15's
+    # lead the elbow lands within a few mm of the prediction either way, and
+    # the leader still lands on the material arc, radial, short of the root
+    # Ø's line.  The drop too: a 6.0 mm row pitch (the tap callout's) instead
+    # of the crankshaft's 4.49 drops the shoulder 0.755 mm more.
+    elbow = (
+        drawing.RADIUS_ELBOW_XY[0] + dx_mm / 1000.0,
+        drawing.RADIUS_ELBOW_XY[1] + dy_mm / 1000.0,
+    )
     ink, tip = _radius_ink(elbow)
     centre = _GROOVE_CENTRE
     assert drawing._groove_radius_ink_problem(
@@ -2045,7 +2169,9 @@ def test_radius_leader_refuses_bent_detached_or_crowded_ink(case: str, message: 
     elif case == "shoulder-on-the-axis":
         ink, tip = _radius_ink((elbow[0] + 0.004, _FACE_ON_AXIS[1] + 0.001))
     else:
-        ink, tip = _radius_ink(elbow, overrun=0.008)
+        # A shoulder running on to 1 mm short of the root Ø's line.
+        box = _proposed_radius_text_box()
+        ink, tip = _radius_ink(elbow, overrun=_root_line_x() - 0.001 - box.xmax)
     problem = drawing._radius_leader_ink_problem(ink, tip, centre, _root_line_x())
     assert problem is not None and message in problem
 
@@ -2115,7 +2241,7 @@ def _native15_radius_spigot_dump(*, proposed: bool = False) -> dict:
         keep = drawing.RADIUS_TEXT_XY
         radius_ink, tip, _station, centre = _material_radius_ink()
         box = _proposed_radius_text_box()
-        radius_text, radius_glyphs = f" {_RADIUS_TEXT} ", _RADIUS_TEXT.replace(" ", "")
+        radius_text, radius_glyphs = f" {' '.join(_RADIUS_ROWS)} ", "".join(_RADIUS_ROWS)
         spigot_x = drawing.SIDE_KEEP["SpigotDia"][0]
         spigot_y = drawing.SIDE_KEEP["SpigotDia"][1]
         spigot_extensions = _proposed_extension_lines()["SpigotDia"]
@@ -2398,10 +2524,21 @@ def test_rebuilt_radius_proof_reads_native_arrow_tip_and_model_identity(
     drawing._prove_groove_radius(object(), object(), radius, station)
 
 
-def test_rebuilt_radius_proof_refuses_a_lost_max_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    ("tol_type", "limits_mm"),
+    [
+        (0, (-0.7, 0.0)),  # swTolNONE: a bare R1.2
+        (6, (-0.7, 0.0)),  # swTolMAX: r4's "R1.2 max.", no minimum
+        (3, (-0.8, 0.0)),  # a LIMIT down to R0.4: the wire's own radius
+        (3, (-0.7, 0.1)),  # a LIMIT up to R1.3: past the model
+    ],
+)
+def test_rebuilt_radius_proof_refuses_a_lost_limit_band(
+    monkeypatch: pytest.MonkeyPatch, tol_type: int, limits_mm: tuple[float, float]
+) -> None:
     radius, station = _radius_readback_fakes(monkeypatch)
-    radius.display.dimension.Tolerance.Type = 0  # swTolNONE: a bare R1.2
-    with pytest.raises(RuntimeError, match="single MAX limit"):
+    radius.display.dimension.Tolerance = _NativeTolerance(tol_type, limits_mm)
+    with pytest.raises(RuntimeError, match="lost the part's LIMIT band"):
         drawing._prove_groove_radius(object(), object(), radius, station)
 
 
