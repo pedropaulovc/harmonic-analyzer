@@ -92,6 +92,7 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
 )
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
@@ -100,6 +101,8 @@ from mg_wheel_axle_spec import TIP_Y
 from mg_wheel_bar_geom import BORE_ROW_HEIGHT
 
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 SPEC = DRAWINGS_BY_NAME["mg_magnifier_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
 SOURCE = SPEC.source
