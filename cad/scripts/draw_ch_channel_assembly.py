@@ -74,7 +74,6 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
 )
 from _drawing_view_display import set_hidden_lines_removed
-from _printed_tolerance import printed_band_mm
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
@@ -82,8 +81,9 @@ import ch_channel_assembly_spec as asm
 import ch_channel_assembly_steps as steps
 from ch_fulcrum_keeper_spec import (
     BORE_DIA as KEEPER_BORE_DIA,
-    CROWN_DIA,
-    DRAWING_PRECISION as KEEPER_PRECISION,
+    CROWN_LEAST_R,
+    CROWN_MOST_R,
+    CROWN_R,
     FULCRUM_KEEPER_CENTRE_Z,
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_PLACES,
@@ -239,9 +239,9 @@ PART_ROWS = {
     "ch-fulcrum-shaft": _config.parts("ch-fulcrum-shaft"),
     "ch-pivot-bracket": _config.parts("ch-pivot-bracket"),
     "vn-arbor-set-screw": _config.parts("vn-arbor-set-screw"),
-    "ch-rocker-thrust-washer": _config.parts("ch-rocker-thrust-washer"),
+    "vn-rocker-thrust-washer": _config.parts("vn-rocker-thrust-washer"),
     "vn-rocker-bank-spring": _config.parts("vn-rocker-bank-spring"),
-    "vn-pedestal-hold-down-screw": _config.parts("vn-pedestal-hold-down-screw"),
+    "vn-bracket-hold-down-screw": _config.parts("vn-bracket-hold-down-screw"),
     "ch-fulcrum-keeper": _config.parts("ch-fulcrum-keeper"),
     "vn-frame-side-screw": _config.parts("vn-frame-side-screw"),
     "vn-fulcrum-set-screw": _config.parts("vn-fulcrum-set-screw"),
@@ -617,19 +617,18 @@ def _fitup_notes() -> tuple[str, str]:
     # ruling): the lever-bank view's reference lug span.
     if abs(rear_face - front_face - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
         raise AssertionError("the pair-ream span is not the fit-up span")
-    # Each crown is finished at the bench to the MHA-CH-007 crown diameter
-    # (CrownDia, printed .X: "ROUND ABOUT THE REAMED BORE, PER" this step),
-    # turned or filed about a gauge pin in its own reamed bore, and only then
-    # tapped through to the bore. Concentric, the crown keeps the crown thread's
-    # 1.5D at the .X minimum (ch_fulcrum_keeper_spec.SET_SCREW_ENGAGEMENT_D;
-    # 0.064 to spare, so no eccentricity can be absorbed). The fitter gauges it
-    # as crown top over the pin's underside, the crown radius plus the pin's,
-    # with the low limit rounded up (Main's ruling, 2026-10-16).
-    crown_band = printed_band_mm(KEEPER_PRECISION["LugCrownProfile"]["CrownDia"])
+    # Each crown is finished at the bench to the MHA-CH-007 crown radius
+    # (CrownRadius, printed .X: "FULL ROUND TANGENT TO BOTH SIDES, CENTER AT
+    # BORE HEIGHT, PER" this step), turned or filed about a gauge pin in its
+    # own reamed bore, and only then tapped through to the bore ("ON BORE AXIS
+    # AFTER REAM"). The fitter gauges it as crown top over the pin's underside,
+    # the crown radius plus the pin's, across the spec's CROWN_LEAST_R ..
+    # CROWN_MOST_R band, with the low limit rounded up (Main's ruling,
+    # 2026-10-16).
     pin_r = KEEPER_BORE_DIA / 2.0
     crown_over_pin = (
-        math.ceil(((CROWN_DIA - crown_band) / 2.0 + pin_r) * 10.0 - 1e-9) / 10.0,
-        round((CROWN_DIA + crown_band) / 2.0 + pin_r, 1),
+        math.ceil((CROWN_LEAST_R + pin_r) * 10.0 - 1e-9) / 10.0,
+        round(CROWN_MOST_R + pin_r, 1),
     )
     text = {
         # The rings are captured in the closed cam slots as the cylinder stack
@@ -689,7 +688,7 @@ def _fitup_notes() -> tuple[str, str]:
             f"IN DIA REAMER, {PAIR_REAMER_OAL_IN:.0f} IN LONG. ACCEPT IF THE "
             f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED. THEN, ON "
             f"A {KEEPER_BORE_DIA:.2f} PIN IN EACH BORE, ROUND ITS CROWN TO THE "
-            f"{keeper} CROWN DIA {CROWN_DIA:.1f} ABOUT THE PIN AND TAP IT "
+            f"{keeper} CROWN R{CROWN_R:.1f} ABOUT THE PIN AND TAP IT "
             f"{KEEPER_SET_SCREW_THREAD} TO THE BORE. ACCEPT: CROWN TOP "
             f"{crown_over_pin[0]:.1f} TO {crown_over_pin[1]:.1f} OVER THE PIN'S "
             "UNDERSIDE."
