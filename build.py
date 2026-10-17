@@ -6,8 +6,9 @@ Examples:
     uv run python build.py --verbosity debug check:math
     uv run python build.py --executor farm --display-name "InchPD - Check assembly" --leaf-timeout 90 assembly:ha_harmonic_analyzer
 
-The wrapper consumes ``--verbosity``, ``--executor``, ``--display-name`` and
-``--leaf-timeout``; every other argument is passed to ``doit`` unchanged.
+The wrapper consumes ``--verbosity``, ``--executor``, ``--display-name``,
+``--leaf-timeout``, ``--force-cache-refresh`` and
+``--force-cache-refresh-reason``; every other argument goes to ``doit`` unchanged.
 A leading ``--help``/``-h`` (after
 doit's loader options, as ``DoitMain.run`` reads them) prints the wrapper's own
 options and farm defaults and then doit's command list, whose ``build.py help
@@ -68,7 +69,8 @@ _HELP = ("--help", "-h")
 
 _USAGE = (
     "build.py [--verbosity LEVEL] [--executor {local,farm}] "
-    "[--display-name LABEL] [--leaf-timeout MINUTES] [doit arguments ...]"
+    "[--display-name LABEL] [--leaf-timeout MINUTES] "
+    "[--force-cache-refresh LABELS --force-cache-refresh-reason TEXT] [doit arguments ...]"
 )
 _DESCRIPTION = """\
 Run the doit graph (dodo.py). Only the options below belong to the wrapper; every
@@ -95,6 +97,10 @@ doit's own help follows. `build.py help run` shows the run options (-n, -a,
 
 class FarmPreflightError(Exception):
     """Why a farm run must stop before task actions; printed as ``farm: <reason>``."""
+
+
+class CacheRefreshError(Exception):
+    """Why a refresh request must stop before any task or fleet side effect."""
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -140,6 +146,20 @@ def _parser() -> argparse.ArgumentParser:
         help="per-attempt budget for each farm leaf, in minutes (overrides an "
         "inherited HARMONIC_FARM_LEAF_TIMEOUT_S; the farm clamps it to 1-180)",
     )
+    parser.add_argument(
+        "--force-cache-refresh",
+        action="append",
+        default=[],
+        metavar="LABELS",
+        help="rebuild and overwrite selected remote-cache leaves (repeatable; "
+        "comma-separated exact task names; requires cache mode rw and a reason)",
+    )
+    parser.add_argument(
+        "--force-cache-refresh-reason",
+        metavar="TEXT",
+        help="required refresh audit reason: nonblank single-line text, no control "
+        "characters, at most 160 characters",
+    )
     return parser
 
 
@@ -147,6 +167,35 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     options, doit_args = parser.parse_known_args(argv)
     doit_args = list(doit_args)
+    refresh_labels = list(dict.fromkeys(
+        label.strip()
+        for option in options.force_cache_refresh
+        for label in option.split(",")
+    ))
+    refresh_request = None
+    if options.force_cache_refresh_reason is not None and not refresh_labels:
+        print(
+            "cache refresh: --force-cache-refresh-reason requires "
+            "--force-cache-refresh labels",
+            file=sys.stderr,
+        )
+        return 2
+    if refresh_labels:
+        sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
+        import _artifact_cache
+
+        try:
+            reason = _artifact_cache.validate_refresh_reason(options.force_cache_refresh_reason)
+            if not _artifact_cache.writable():
+                raise RuntimeError("forced cache refresh requires HARMONIC_REMOTE_CACHE_MODE=rw")
+            if "" in refresh_labels:
+                raise RuntimeError("--force-cache-refresh contains an empty task label")
+        except RuntimeError as problem:
+            print(f"cache refresh: {problem}", file=sys.stderr)
+            return 2
+        refresh_request = json.dumps(
+            {"labels": refresh_labels, "reason": reason}, separators=(",", ":")
+        )
     if _asks_for_help(doit_args):
         parser.print_help()
         print()
@@ -159,17 +208,36 @@ def main(argv: Sequence[str] | None = None) -> int:
     # --executor must win over an inherited HARMONIC_EXECUTOR.
     os.environ["HARMONIC_EXECUTOR"] = options.executor
 
-    doit = _FarmDoitMain() if options.executor == "farm" else DoitMain()
     if options.executor == "farm":
+        doit = _FarmDoitMain()
         doit.display_name = options.display_name
+    elif refresh_labels:
+        doit = _RefreshDoitMain()
+    else:
+        doit = DoitMain()
+    if refresh_labels:
+        doit.refresh_labels = refresh_labels
     executing = _executing_command(doit_args, doit)
+    if refresh_labels and executing is None:
+        print("cache refresh: requires a command that executes selected tasks", file=sys.stderr)
+        return 2
     refusal = _release_refusal(doit_args, executing)
     if refusal:
         print(f"release: {refusal}", file=sys.stderr)
         return 2
     if options.executor == "farm" and executing is not None:
         doit_args = _with_farm_parallelism(doit_args, *executing)
-    return doit.run(doit_args)
+    previous_refresh = os.environ.get("HARMONIC_CACHE_REFRESH")
+    if refresh_request is not None:
+        os.environ["HARMONIC_CACHE_REFRESH"] = refresh_request
+    try:
+        return doit.run(doit_args)
+    finally:
+        if refresh_request is not None:
+            if previous_refresh is None:
+                os.environ.pop("HARMONIC_CACHE_REFRESH", None)
+            else:
+                os.environ["HARMONIC_CACHE_REFRESH"] = previous_refresh
 
 
 def _release_refusal(
@@ -233,6 +301,89 @@ def _validate_farm_selection(
     )
     control.process(selection)
     return control
+
+
+def _require_cache_refresh(task_list, selected: set[str], labels: list[str]) -> None:
+    """Admit exact remote-keyed leaves that doit will actually execute."""
+    tasks = {task.name: task for task in task_list}
+    for label in labels:
+        task = tasks.get(label)
+        if task is None:
+            raise CacheRefreshError(f"unknown task {label!r}")
+        if label not in selected:
+            raise CacheRefreshError(f"task {label!r} is not in the selected task closure")
+        if not any(
+            getattr(getattr(action, "py_callable", None), "_remote_cache_action", False)
+            for action in task.actions
+        ):
+            raise CacheRefreshError(f"task {label!r} is not a remote-cache-keyed leaf")
+        # Task's normalized uptodate entries are (callable/bool, args, kwargs).
+        # Keep trackers/value savers intact while overriding even present targets.
+        task.uptodate.append((False, None, None))
+
+
+def _refresh_commands(commands, labels):
+    if not labels:
+        return commands
+    for name in commands:
+        command_class = commands.get_plugin(name)
+        if not getattr(command_class, "execute_tasks", False):
+            continue
+
+        def wrap(base):
+            class RefreshCommand(base):
+                name = base.get_name()
+
+                @functools.wraps(base._execute)
+                def _execute(self, *args, **kwargs):
+                    try:
+                        # Name unknown refresh labels before doit's selector
+                        # parser can turn the same typo into an unrelated exit 3.
+                        known = {task.name for task in self.task_list}
+                        for label in labels:
+                            if label not in known:
+                                raise CacheRefreshError(f"unknown task {label!r}")
+                        control = _validate_farm_selection(
+                            self.task_list,
+                            self.sel_tasks,
+                            auto_delayed_regex=kwargs.get("auto_delayed_regex", False),
+                        )
+                        if kwargs.get("single", False):
+                            # Run reparses single-mode selectors; mirror its
+                            # task-option consumption on the isolated graph.
+                            control.process(self.sel_tasks)
+                            selected = set(control.selected_tasks)
+                        else:
+                            selected = {
+                                task.name
+                                for task in tasks_and_deps_iter(
+                                    control.tasks, control.selected_tasks
+                                )
+                            }
+                        _require_cache_refresh(self.task_list, selected, labels)
+                    except BaseException as problem:
+                        self.dep_manager.close()
+                        if isinstance(problem, CacheRefreshError):
+                            print(f"cache refresh: {problem}", file=sys.stderr)
+                            return 2
+                        raise
+                    return base._execute(self, *args, **kwargs)
+
+            return RefreshCommand
+
+        commands[name] = wrap(command_class)
+    return commands
+
+
+class _RefreshDoitMain(DoitMain):
+    """Admit refresh requests at doit's loaded-graph execution boundary."""
+
+    refresh_labels: list[str] = []
+
+    def get_cmds(self):
+        return _refresh_commands(super().get_cmds(), self.refresh_labels)
+
+
 
 
 def _farm_command(command_class, display_name: str | None = None):
@@ -300,6 +451,7 @@ class _FarmDoitMain(DoitMain):
     """Doit with preflight wrappers around native action-executing commands."""
 
     display_name: str | None = None
+    refresh_labels: list[str] = []
 
     def get_cmds(self):
         commands = super().get_cmds()
@@ -307,7 +459,7 @@ class _FarmDoitMain(DoitMain):
             command_class = commands.get_plugin(name)
             if getattr(command_class, "execute_tasks", False):
                 commands[name] = _farm_command(command_class, self.display_name)
-        return commands
+        return _refresh_commands(commands, self.refresh_labels)
 
 
 def _git(*args: str) -> str:

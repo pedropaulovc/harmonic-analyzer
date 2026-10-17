@@ -307,6 +307,14 @@ such build:
   its lack of preflight admission; never copy a prefix list into this guard.
   Independently, the worker's exported graph is limited to the build/release
   closure. Preflight admission does not enforce that worker restriction.
+  Forced overwrites use `-ForceCacheRefresh 'part:pn_pen_rod'` together with
+  `-ForceCacheRefreshReason 'Owner - Explain why the cached result is being replaced'`
+  on the launcher (or the matching `build.py --force-cache-refresh` /
+  `--force-cache-refresh-reason` flags). Reasons follow the display-name rules;
+  a reason without refresh labels is refused.
+  Invalid reasons, labels outside the selected closure and non-cache-keyed tasks
+  exit 2 before fleet queries or actions. Farm clients and workers must both
+  advertise protocol **7**; protocol 6 is refused, with no compatibility shim.
 - The build runs from a private snapshot of the pushed HEAD under
   `-LogDirectory` (which must sit outside every Git worktree). The default root
   is `$env:HARMONIC_AGENT_SCRATCHPAD` when set; otherwise, an OMP persistent
@@ -871,6 +879,29 @@ fail a build):
   `store`; a `ro` seat) hits foreign keys as its normal path, so there the same
   event is recorded with `drift_expected: true` + a `drift_reason` and logged at
   debug — the `WARN` keeps meaning "a publishing seat drifted".
+
+**Reasoned, per-leaf refresh.** To deliberately replace an unchanged leaf's cached
+result, use `build.py --executor local --force-cache-refresh part:pn_pen_rod
+--force-cache-refresh-reason "Owner - Investigate unchanged-input result" part:pn_pen_rod`.
+The same flags work with `--executor farm` through the supervised launcher above.
+The label option is repeatable and accepts comma-separated exact task names.
+Only remote-cache-keyed leaves in the selected dependency closure qualify; ordinary
+stamped `check:*` tasks, aggregators, `prechips` and `gallery` do not. New cached
+actions declare this contract with `@_cache.keyed_action`, not a task-name prefix.
+With `-s`/`--single`, only explicitly selected leaves qualify; doit omits their
+dependencies, so a dependency-only label cannot be refreshed.
+Refresh requires `rw`, bypasses doit freshness and every pre-build restore,
+including the under-seat re-probe, and fails unless publication returns `stored`.
+Forced assembly refreshes rerun the full recipe and hooks, not a reload of the
+previous local assembly, even when its recipe sidecar is unchanged.
+The farm submitter still restores the newly published bytes after success.
+Refresh intentionally overwrites the same key (last writer wins), without changing
+workflow IDs. It is scoped to the invocation: every dispatch of a listed label
+refreshes; nothing persists in source or changes the cache salt. The submitter
+and the matching worker leaf receive `HARMONIC_CACHE_REFRESH` JSON containing
+`labels` and `reason`; never hand-edit that carrier to evade wrapper validation.
+Each skipped restore emits a `!!` warning naming label, 12-hex key and reason,
+a `cache.refresh` span event, and a `refresh` record with reason in `cache.jsonl`.
 
 ## File-granular recipe helpers
 

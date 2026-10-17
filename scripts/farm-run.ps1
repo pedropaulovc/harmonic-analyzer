@@ -70,6 +70,35 @@ param(
     })]
     [string]$DisplayName,
 
+    # Refresh only these cache labels for this invocation; build.py validates
+    # comma-separated labels against the selected task closure.
+    [Parameter(ParameterSetName = 'Launch')]
+    [string[]]$ForceCacheRefresh = @(),
+
+    [Parameter(ParameterSetName = 'Launch')]
+    [ValidateScript({
+        if ([string]::IsNullOrWhiteSpace($_) -or
+            $_ -match '[\p{Cc}\p{Zl}\p{Zp}\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]') {
+            throw 'ForceCacheRefreshReason must be nonblank, single-line, free of control characters, and at most 160 characters'
+        }
+        try {
+            [void][System.Text.UTF8Encoding]::new($false, $true).GetByteCount($_)
+        }
+        catch [System.Text.EncoderFallbackException] {
+            throw 'ForceCacheRefreshReason must contain valid Unicode'
+        }
+        # Count Unicode scalars, matching Python len(), not UTF-16 code units.
+        $scalarCount = 0
+        foreach ($rune in $_.EnumerateRunes()) {
+            $scalarCount++
+            if ($scalarCount -gt 160) {
+                throw 'ForceCacheRefreshReason must be at most 160 characters'
+            }
+        }
+        $true
+    })]
+    [string]$ForceCacheRefreshReason,
+
     # Launch: the label recorded with the run. Status/Watch/Cancel: select the
     # newest run carrying it. List: filter by it.
     [ValidatePattern('\A[A-Za-z0-9_-]+\z')]
@@ -117,6 +146,16 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($PSCmdlet.ParameterSetName -eq 'Launch') {
+    if ($ForceCacheRefresh.Count -gt 0 -and
+        -not $PSBoundParameters.ContainsKey('ForceCacheRefreshReason')) {
+        throw 'ForceCacheRefreshReason is required with ForceCacheRefresh labels'
+    }
+    if ($ForceCacheRefresh.Count -eq 0 -and
+        $PSBoundParameters.ContainsKey('ForceCacheRefreshReason')) {
+        throw 'ForceCacheRefreshReason requires ForceCacheRefresh labels'
+    }
+}
 $script:PSNativeCommandUseErrorActionPreference = $false
 # Detached Windows launches otherwise emit JSON labels in the OEM code page
 # (for example, Omega becomes byte 0xEA in CP437), not the capture's UTF-8.
@@ -985,6 +1024,8 @@ function Get-RunStatus {
         targets = @($record['targets'])
         leaf_timeout_minutes = $record['leaf_timeout_minutes']
         display_name = $record['display_name']
+        force_cache_refresh = @(if ($null -ne $record['force_cache_refresh']) { $record['force_cache_refresh'] })
+        force_cache_refresh_reason = $record['force_cache_refresh_reason']
         cache_environment = $record['cache_environment']
         started_at = $record['started_at']
         finished_at = if ($null -ne $done) { $done['finished_at'] } else { $null }
@@ -1260,6 +1301,8 @@ function Invoke-RunList {
                 run_id = $record['run_id']
                 tag = $record['tag']
                 display_name = $record['display_name']
+                force_cache_refresh = @(if ($null -ne $record['force_cache_refresh']) { $record['force_cache_refresh'] })
+                force_cache_refresh_reason = $record['force_cache_refresh_reason']
                 state = $runState
                 exit_code = if ($null -ne $done) { $done['exit_code'] } else { $null }
                 started_at = $record['started_at']
@@ -1959,7 +2002,15 @@ try {
     $buildArgs = @(
         'run', '--frozen', '--no-sync', '--active', 'python', 'build.py',
         '--executor', 'farm',
-        ('--display-name=' + $DisplayName),
+        ('--display-name=' + $DisplayName)
+    )
+    if ($ForceCacheRefresh.Count -gt 0) {
+        foreach ($label in $ForceCacheRefresh) {
+            $buildArgs += '--force-cache-refresh=' + $label
+        }
+        $buildArgs += '--force-cache-refresh-reason=' + $ForceCacheRefreshReason
+    }
+    $buildArgs += @(
         '--leaf-timeout', [string]$LeafTimeout,
         '--verbosity', 'info',
         '--continue'
@@ -2007,6 +2058,8 @@ try {
         targets = @($normalizedTargets)
         leaf_timeout_minutes = $LeafTimeout
         display_name = $DisplayName
+        force_cache_refresh = @($ForceCacheRefresh)
+        force_cache_refresh_reason = if ($ForceCacheRefresh.Count -gt 0) { $ForceCacheRefreshReason } else { $null }
         started_at = $startedAt.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
         pid = $PID
         log = [System.IO.Path]::GetFullPath($logPath)
@@ -2053,6 +2106,8 @@ try {
     [void][FarmRunJob]::Join($runRecord['job'])
     $env:SOLIDWORKS_POOL_HOME = $resolvedPoolHome
     $env:HARMONIC_REMOTE_CACHE_MODE = 'rw'
+    # Only explicit arguments may request refresh; build.py owns the carrier.
+    Remove-Item Env:HARMONIC_CACHE_REFRESH -ErrorAction SilentlyContinue
     $env:PYTHONUNBUFFERED = '1'
     # _farm._dispatch stamps this on every leaf it creates, so -Cancel can tell
     # a leaf this run created from one it attached to.

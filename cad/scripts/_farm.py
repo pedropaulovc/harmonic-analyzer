@@ -35,7 +35,7 @@ import _telemetry
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-FARM_PROTOCOL_VERSION = 6
+FARM_PROTOCOL_VERSION = 7
 
 TASK_QUEUE_CONTROL = "solidworks-control"  # coordinator and parked leaf workflows
 TASK_QUEUE_COM = "solidworks-com"  # build_leaf activity tasks
@@ -68,6 +68,7 @@ class LeafRequest:
     submitter: str  # f"{user}@{host}", UI summary only
     build_id: str
     leaf_timeout_s: int | None = None  # per-attempt budget; None takes the default
+    refresh_reason: str | None = None  # explicit overwrite for this leaf only
 
 
 @dataclass(frozen=True)
@@ -790,6 +791,9 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
             "HARMONIC_FARM_ADMITTED_LEAVES must be a JSON list of non-empty "
             "labels containing this task"
         )
+    from _artifact_cache import forced_refresh
+
+    refresh_reason = forced_refresh(task)
     with _telemetry.span(
         f"farm.run {task}", label=task, service=_telemetry.BUILD_INFRA_SERVICE
     ) as sp:
@@ -802,6 +806,7 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
             submitter=submitter(),
             build_id=_required_build_id(),
             leaf_timeout_s=leaf_timeout_s(),
+            refresh_reason=refresh_reason,
         )
         budget = clamp_leaf_timeout_s(request.leaf_timeout_s)
         wf_id = workflow_id(request.build_id, task, cache_key, request.commit, budget)
@@ -843,7 +848,7 @@ def _required_build_id() -> str:
     return build_id
 
 
-def _record_request(task: str, wf_id: str) -> None:
+def _record_request(task: str, wf_id: str, refresh_reason: str | None = None) -> None:
     """Name a reservation before acceptance, even if launcher output is lost.
 
     One atomic file per canonical workflow keeps parallel action processes
@@ -858,6 +863,7 @@ def _record_request(task: str, wf_id: str) -> None:
             "workflow_id": wf_id,
             "build_id": _required_build_id(),
             "farm_run": os.environ.get("HARMONIC_FARM_RUN"),
+            "refresh_reason": refresh_reason,
         },
     )
 
@@ -907,7 +913,7 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         "build_id": request.build_id,
     }
     _telemetry.info(f"Farm workflow requested: {wf_id}", **identity)
-    _record_request(request.task, wf_id)
+    _record_request(request.task, wf_id, request.refresh_reason)
     # Only the coordinator can reserve and start a leaf. Creator metadata stays
     # on the run it starts; attaching to a canonical ID never rewrites the memo.
     key = LeafKey(request.build_id, wf_id)

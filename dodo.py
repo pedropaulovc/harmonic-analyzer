@@ -2190,6 +2190,11 @@ def _probe_cache(
     farm executor the submitter holds no seat to release, so it fails loud.
     """
     _tag_cache_key(span, key)
+    reason = _cache.forced_refresh(label)
+    if reason is not None:
+        _cache.note_refresh(label, key, reason)
+        span.set_attribute("cache", "miss")
+        return "miss"
     try:
         outcome = hit if _cache.restore(key, outputs, label) else "miss"
     except _cache.RestoreLocked:
@@ -2259,6 +2264,7 @@ def _reprobe_under_seat(
 
 
 @_farm.leaf_action
+@_cache.keyed_action
 def _cached_com_action(
     label: str,
     cmd: list[str],
@@ -2318,10 +2324,13 @@ def _cached_com_action(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
         _tag_cache_key(store, key)
-        store.set_attribute("cache", _cache.store(key, outputs, label))
+        outcome = _cache.store(key, outputs, label)
+        store.set_attribute("cache", outcome)
+        _cache.require_refresh_store(label, outcome)
 
 
 @_farm.leaf_action
+@_cache.keyed_action
 def _cached_drawing_action(stem: str) -> None:
     """Restore a matched part+drawing pair or build and publish the drawing."""
     spec = DRAWINGS_BY_NAME[stem]
@@ -2432,6 +2441,7 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
 
 
 @_farm.leaf_action
+@_cache.keyed_action
 def _cached_part_action(stem: str, script: Path) -> None:
     """Part action with a remote-cache shortcut: on a HIT the .SLDPRT (+ renders)
     are downloaded and the SolidWorks build is skipped; otherwise build, then push.
@@ -2492,7 +2502,9 @@ def _cached_part_action(stem: str, script: Path) -> None:
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
         _tag_cache_key(store, key)
-        store.set_attribute("cache", _cache.store(key, outputs, label))
+        outcome = _cache.store(key, outputs, label)
+        store.set_attribute("cache", outcome)
+        _cache.require_refresh_store(label, outcome)
 
 
 def _recipe_files(stem: str) -> list[str]:
@@ -2633,7 +2645,10 @@ def task_part():
             "name": stem,
             "file_dep": _part_file_deps(script, stem),
             "targets": [_sldprt(stem), _part_execution_token(stem)],
-            "uptodate": [_ExecutionIdentityTracker(_part_execution_token(stem))],
+            "uptodate": [
+                _ExecutionIdentityTracker(_part_execution_token(stem)),
+                not _cache.forced_refresh(f"part:{stem}"),
+            ],
             # Remote-cache shortcut + COM seat lock wrap the build (_cached_part_action).
             "actions": [(_cached_part_action, [stem, script])],
             "clean": True,
@@ -2691,13 +2706,14 @@ def _assembly_run_mode(
 
 
 @_farm.leaf_action
+@_cache.keyed_action
 def build_or_refresh(stem, dependencies, changed, targets):
     """FULL rebuild vs cheap REFRESH for one assembly stem.
 
-    FULL (run build_<stem>_assembly.py + any POST_ASSEMBLY hooks) when the target
-    is missing OR the recipe itself changed (assembly script / shared helper
-    closure / a hook script). Otherwise only referenced parts changed: REFRESH (refresh_assembly.py,
-    no hooks -- reopening preserves the existing configuration).
+    FULL (run build_<stem>_assembly.py + any POST_ASSEMBLY hooks) for a forced
+    cache refresh, a missing target, or a changed recipe (assembly script /
+    shared helper closure / hook). Otherwise only referenced parts changed:
+    REFRESH (refresh_assembly.py, no hooks -- preserves the existing configuration).
 
     The recipe-changed decision is recomputed HERE from a sidecar digest (the
     last successful recipe digest), NOT read from the _RECIPE_CHANGED module
@@ -2763,11 +2779,15 @@ def build_or_refresh(stem, dependencies, changed, targets):
             except OSError:
                 last = None
             recipe_changed = last is None or last != digest  # missing sidecar = FULL
+            forced = _cache.forced_refresh(label) is not None
 
             asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
             hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
-            if target_missing or recipe_changed:
-                why = "target missing" if target_missing else "recipe changed"
+            if forced or target_missing or recipe_changed:
+                why = (
+                    "forced cache refresh" if forced
+                    else "target missing" if target_missing else "recipe changed"
+                )
                 sp.set_attribute("mode", "full")
                 _exec_com(
                     [sys.executable, str(asm_script)],
@@ -2805,9 +2825,9 @@ def build_or_refresh(stem, dependencies, changed, targets):
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
         _tag_cache_key(store, cache_key)
-        store.set_attribute(
-            "cache", _cache.store(cache_key, _assembly_cache_outputs(stem), label)
-        )
+        outcome = _cache.store(cache_key, _assembly_cache_outputs(stem), label)
+        store.set_attribute("cache", outcome)
+        _cache.require_refresh_store(label, outcome)
 
 
 def _close_sw_documents() -> None:
@@ -2886,6 +2906,7 @@ def task_assembly():
             "uptodate": [
                 _RecipeTracker(stem, recipe_files),
                 _ExecutionIdentityTracker(_assembly_execution_token(stem)),
+                not _cache.forced_refresh(f"assembly:{stem}"),
             ],
             # No spine: ordering (parts + sub-assemblies before this one) comes from
             # the real file_dep on their targets above; SolidWorks serialization is
@@ -2914,6 +2935,7 @@ def task_drawing():
             "name": stem,
             "file_dep": _drawing_file_deps(stem),
             "targets": [str(path) for path in _drawing_cache_outputs(stem)],
+            "uptodate": [not _cache.forced_refresh(f"drawing:{stem}")],
             "actions": [(_cached_drawing_action, [stem])],
             "clean": [(_clean_drawing, [stem])],
             "verbosity": 2,
@@ -2938,6 +2960,7 @@ def task_verify_soundness():
             "name": stem,
             "file_dep": deps,
             "targets": [stamp],
+            "uptodate": [not _cache.forced_refresh(f"verify_soundness:{stem}")],
             "actions": [
                 (
                     _cached_com_action,
@@ -2999,6 +3022,7 @@ def task_verify():
         "name": "kinematics",
         "file_dep": deps,
         "targets": [stamp],
+        "uptodate": [not _cache.forced_refresh("verify:kinematics")],
         # No spine: the file_dep on the built .SLDASM orders this after the
         # assemblies; the COM seat lock (inside _cached_com_action) serializes it.
         "actions": [

@@ -1067,5 +1067,89 @@ def test_debug_provenance_uses_key_time_salt(tmp_path, fake, monkeypatch):
     assert any("salt=captured-salt" in record for record in records)
 
 
+
+
+@pytest.mark.parametrize("raw", [
+    "", "{not json", "null", "[]", "{}",
+    '{"labels":"part:x","reason":"Audit"}',
+    '{"labels":[],"reason":"Audit"}',
+    '{"labels":["part:x",1],"reason":"Audit"}',
+    '{"labels":["part:x"," "],"reason":"Audit"}',
+    '{"labels":["part:x"]}',
+    '{"labels":["part:x"],"reason":null}',
+    '{"labels":["part:x"],"reason":" "}',
+    '{"labels":["part:x"],"reason":"line\\nbreak"}',
+])
+def test_forced_refresh_rejects_malformed_carriers_loudly(monkeypatch, raw):
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", raw)
+    with pytest.raises(RuntimeError, match="HARMONIC_CACHE_REFRESH"):
+        cache.forced_refresh("part:not-listed")
+
+
+def test_forced_refresh_reads_current_environment_without_consuming_request(monkeypatch):
+    monkeypatch.delenv("HARMONIC_CACHE_REFRESH", raising=False)
+    assert cache.forced_refresh("part:x") is None
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    for reason in ("Audit one", "  Audit Ω 👩\u200d🔧  "):
+        monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+            "labels": ["part:x"], "reason": reason,
+        }))
+        assert cache.forced_refresh("part:x") == reason
+        assert cache.forced_refresh("part:not-listed") is None
+        assert cache.forced_refresh("part:x") == reason
+
+
+@pytest.mark.parametrize("mode", ["ro", "off"])
+def test_forced_refresh_refuses_nonwritable_mode(monkeypatch, mode):
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", mode)
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", '{"labels":["part:x"],"reason":"Audit"}')
+    with pytest.raises(RuntimeError, match="requires HARMONIC_REMOTE_CACHE_MODE=rw"):
+        cache.forced_refresh("part:x")
+
+
+def test_refresh_diagnostics_carry_label_key_and_reason(
+    fake, tmp_path, monkeypatch, caplog, capsys
+):
+    key = "a" * 64
+    reason = "Owner - Re-evaluate unchanged inputs"
+    events = []
+    monkeypatch.setattr(
+        _telemetry, "event", lambda name, **attrs: events.append((name, attrs))
+    )
+    logger = _telemetry_logger(caplog, monkeypatch)
+    with caplog.at_level(logging.WARNING, logger=logger.name):
+        cache.note_refresh("part:x", key, reason)
+    warnings = _records(caplog, logger, logging.WARNING)
+    assert any("part:x" in warning and key[:12] in warning and reason in warning
+               for warning in warnings)
+    assert "!!" in capsys.readouterr().err
+    assert events == [("cache.refresh", {"label": "part:x", "key": key[:12], "reason": reason})]
+    [record] = _events(tmp_path)
+    assert (record["event"], record["label"], record["key"], record["reason"]) == (
+        "refresh", "part:x", key, reason,
+    )
+
+
+def test_refresh_overwrites_the_same_key_and_requires_publication(fake, tmp_path, monkeypatch):
+    key = "a" * 64
+    output = tmp_path / "output.bin"
+    output.write_bytes(b"replacement")
+    fake.blobs[key] = b"old cached bytes"
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", '{"labels":["part:x"],"reason":"Audit"}')
+    assert cache.store(key, [output], "part:x") == "stored"
+    assert fake.blobs[key] != b"old cached bytes"
+    assert cache.last_stored_key("part:x") == key
+
+    def fail_upload(*_args):
+        raise OSError("upload denied")
+
+    monkeypatch.setattr(fake, "put", fail_upload)
+    with pytest.raises(RuntimeError, match="forced cache refresh did not store outputs \\(error\\)"):
+        cache.store(key, [output], "part:x")
+    # Ordinary leaves retain their original fail-soft publication behavior.
+    assert cache.store(key, [output], "part:ordinary") == "error"
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

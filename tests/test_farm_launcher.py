@@ -265,6 +265,7 @@ def record(**late):
                 "environment": {
                     "SOLIDWORKS_POOL_HOME": os.environ.get("SOLIDWORKS_POOL_HOME"),
                     "HARMONIC_REMOTE_CACHE_MODE": os.environ.get("HARMONIC_REMOTE_CACHE_MODE"),
+                    "HARMONIC_CACHE_REFRESH": os.environ.get("HARMONIC_CACHE_REFRESH"),
                     "PYTHONUNBUFFERED": os.environ.get("PYTHONUNBUFFERED"),
                     "HARMONIC_FARM_DISPLAY_NAME": os.environ.get("HARMONIC_FARM_DISPLAY_NAME"),
                     "VIRTUAL_ENV": os.environ.get("VIRTUAL_ENV"),
@@ -477,8 +478,9 @@ def test_launch_preserves_boundary_display_names_and_overrides_environment(tmp_p
     assert "--display-name" not in invocation["argv"]
 
 
+@pytest.mark.parametrize("parameter", ["DisplayName", "ForceCacheRefreshReason"])
 @pytest.mark.parametrize("codepoint", [0, 0xD800, 0xDFFF])
-def test_launch_rejects_untransportable_display_name_before_creating_records(tmp_path, codepoint):
+def test_launch_rejects_untransportable_labels_before_creating_records(tmp_path, codepoint, parameter):
     fixture = _launcher_fixture(tmp_path)
     # Construct NUL and lone surrogates within PowerShell rather than relying
     # on native argv encoding to carry them to the script's validator.
@@ -487,10 +489,12 @@ def test_launch_rejects_untransportable_display_name_before_creating_records(tmp
         name.removeprefix("-") + " = '" + value.replace("'", "''") + "'"
         for name, value in zip(command[5:-2:2], command[6:-2:2])
     )
+    if parameter == "ForceCacheRefreshReason":
+        parameters += f"; DisplayName = '{DISPLAY_NAME}'; ForceCacheRefresh = @('part:pen_rod')"
     script = (
         "$ErrorActionPreference = 'Stop'; $parameters = @{ "
         + parameters
-        + f"; DisplayName = ('a' + [char]{codepoint} + 'b')"
+        + f"; {parameter} = ('a' + [char]{codepoint} + 'b')"
         + " }; try { & '"
         + str(LAUNCHER).replace("'", "''")
         + "' @parameters } catch { Write-Error $_ -ErrorAction Continue; exit 2 }"
@@ -499,10 +503,119 @@ def test_launch_rejects_untransportable_display_name_before_creating_records(tmp
         fixture, [*command[:3], "-Command", script], fixture["environment"]
     )
     assert result.returncode != 0, (result.stdout, result.stderr)
-    assert "DisplayName" in result.stdout + result.stderr
+    assert parameter in result.stdout + result.stderr
     assert not Path(fixture["invocation"]).exists()
     log_directory = Path(fixture["log_directory"])
     assert not log_directory.exists() or list(log_directory.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        None, "", " \t", "a\nb",
+        pytest.param("\u03a9" * 80 + "\U0001f680" * 81, id="mixed161"),
+    ],
+)
+def test_launch_requires_valid_cache_refresh_reason_before_actions(tmp_path, reason):
+    fixture = _launcher_fixture(tmp_path)
+    command = _command(fixture, "part:pen_rod") + ["-ForceCacheRefresh", "part:pen_rod"]
+    if reason is not None:
+        command += ["-ForceCacheRefreshReason", reason]
+    result = _run_launcher(fixture, command, fixture["environment"])
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    assert "ForceCacheRefreshReason" in result.stdout + result.stderr
+    assert not Path(fixture["invocation"]).exists()
+    assert not Path(fixture["syncs"]).exists()
+    assert not Path(fixture["farm_calls"]).exists()
+    log_directory = Path(fixture["log_directory"])
+    assert not log_directory.exists() or list(log_directory.iterdir()) == []
+
+
+def test_launch_rejects_cache_refresh_reason_without_labels_before_actions(tmp_path):
+    fixture = _launcher_fixture(tmp_path)
+    command = _command(fixture, "part:pen_rod") + [
+        "-ForceCacheRefreshReason", "Repair cached output",
+    ]
+    result = _run_launcher(fixture, command, fixture["environment"])
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    assert "ForceCacheRefreshReason requires ForceCacheRefresh labels" in result.stdout + result.stderr
+    assert not Path(fixture["invocation"]).exists()
+    assert not Path(fixture["syncs"]).exists()
+    assert not Path(fixture["farm_calls"]).exists()
+    log_directory = Path(fixture["log_directory"])
+    assert not log_directory.exists() or list(log_directory.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "  Repair cached output  ",
+        pytest.param("-👩\u200d🔧 " + "\U0001f680" * 155, id="dash-joined-unicode160"),
+    ],
+)
+def test_launch_forwards_cache_refresh_and_surfaces_run_metadata(tmp_path, reason):
+    fixture = _launcher_fixture(tmp_path)
+    labels = ["part:pen_rod,drawing:pen", "label with spaces", "--executor"]
+    command = _command(fixture, "part:pen_rod")
+    parameters = "; ".join(
+        name.removeprefix("-") + " = '" + value.replace("'", "''") + "'"
+        for name, value in zip(command[5::2], command[6::2])
+    )
+    # Use PowerShell array binding, not pwsh -File's native scalar arguments.
+    parameters += "; ForceCacheRefresh = @(" + ", ".join(
+        "'" + label.replace("'", "''") + "'" for label in labels
+    ) + "); ForceCacheRefreshReason = '" + reason.replace("'", "''") + "'"
+    script = (
+        "$parameters = @{ " + parameters + " }; & '"
+        + str(LAUNCHER).replace("'", "''") + "' @parameters"
+    )
+    environment = dict(fixture["environment"])
+    environment["HARMONIC_CACHE_REFRESH"] = '{"labels":["inherited"],"reason":"stale"}'
+    result = _run_launcher(
+        fixture, [*command[:3], "-Command", script], environment,
+        creationflags=subprocess.CREATE_NO_WINDOW if not reason.isascii() else 0,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    record = _record(_only(Path(fixture["log_directory"]), "*.run.json"))
+    finished = _record(Path(record["done"]))
+    invocation = json.loads(Path(fixture["invocation"]).read_text(encoding="utf-8"))
+    expected_refresh = [
+        *(f"--force-cache-refresh={label}" for label in labels),
+        f"--force-cache-refresh-reason={reason}",
+    ]
+    assert [
+        arg for arg in invocation["argv"] if arg.startswith("--force-cache-refresh")
+    ] == expected_refresh
+    assert record["argv"][1:] == invocation["argv"]
+    assert invocation["environment"]["HARMONIC_CACHE_REFRESH"] is None
+    assert invocation["environment"]["HARMONIC_REMOTE_CACHE_MODE"] == "rw"
+    surfaced = [record, finished]
+    for selector in ("-Status", "-List"):
+        result = _run_launcher(
+            fixture, _tracking(fixture, selector, "-Tag", "test"), environment,
+            creationflags=subprocess.CREATE_NO_WINDOW if not reason.isascii() else 0,
+        )
+        assert result.returncode == 0, (result.stdout, result.stderr)
+        surfaced.append(json.loads(result.stdout))
+    for metadata in surfaced:
+        assert metadata["force_cache_refresh"] == labels
+        assert metadata["force_cache_refresh_reason"] == reason
+
+
+def test_launch_ignores_inherited_cache_refresh_without_explicit_labels(tmp_path):
+    fixture = _launcher_fixture(tmp_path)
+    environment = dict(fixture["environment"])
+    environment["HARMONIC_CACHE_REFRESH"] = '{"labels":["inherited"],"reason":"stale"}'
+    result = _run_launcher(fixture, _command(fixture, "part:pen_rod"), environment)
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    record = _record(_only(Path(fixture["log_directory"]), "*.run.json"))
+    finished = _record(Path(record["done"]))
+    invocation = json.loads(Path(fixture["invocation"]).read_text(encoding="utf-8"))
+    assert not any(arg.startswith("--force-cache-refresh") for arg in invocation["argv"])
+    assert invocation["environment"]["HARMONIC_CACHE_REFRESH"] is None
+    for metadata in (record, finished):
+        assert metadata["force_cache_refresh"] == []
+        assert metadata["force_cache_refresh_reason"] is None
 
 
 def _only(path: Path, pattern: str) -> Path:
@@ -758,6 +871,7 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
     assert invocation["environment"] == {
         "SOLIDWORKS_POOL_HOME": str(Path(fixture["pool"]).resolve()),
         "HARMONIC_REMOTE_CACHE_MODE": "rw",
+        "HARMONIC_CACHE_REFRESH": None,
         "HARMONIC_FARM_DISPLAY_NAME": DISPLAY_NAME,
         "PYTHONUNBUFFERED": "1",
         "VIRTUAL_ENV": running["environment"],
@@ -2067,6 +2181,8 @@ def test_a_tag_and_the_list_order_runs_by_their_precise_start(tmp_path: Path) ->
 
     assert status.returncode == 0, status.stderr
     assert json.loads(status.stdout)["run_id"] == _record(newer)["run_id"]
+    assert json.loads(status.stdout)["force_cache_refresh"] == []
+    assert json.loads(status.stdout)["force_cache_refresh_reason"] is None
 
     listed = _run_launcher(
         fixture, _tracking(fixture, "-List", "-Tag", "twin"), fixture["environment"]
@@ -2077,6 +2193,10 @@ def test_a_tag_and_the_list_order_runs_by_their_precise_start(tmp_path: Path) ->
         _record(newer)["run_id"],
         _record(older)["run_id"],
     ]
+    for line in listed.stdout.splitlines():
+        metadata = json.loads(line)
+        assert metadata["force_cache_refresh"] == []
+        assert metadata["force_cache_refresh_reason"] is None
 
 
 def test_a_pid_reused_after_the_record_is_not_the_launcher(tmp_path: Path) -> None:
