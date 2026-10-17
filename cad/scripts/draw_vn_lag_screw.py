@@ -13,10 +13,15 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_lag_screw"]
+# The footer's ITEM row: the catalogue designation in plain text. The stem's
+# "lag" is historical: this is a machine screw, so the row says so outright.
+ITEM = "1/4-20 x 3/4 HEX HEAD MACHINE SCREW, FULLY THREADED (NOT A LAG)"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(adapter, SPEC)
+    return await build_purchased_fastener_drawing(
+        adapter, SPEC, item=ITEM
+    )
 
 
 def _parse_args() -> argparse.Namespace:

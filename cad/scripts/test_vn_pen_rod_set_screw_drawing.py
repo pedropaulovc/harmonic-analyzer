@@ -148,7 +148,8 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
     assert sheet.source_kind == "part"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "build_purchased_fastener_drawing" in source
-    assert "adapter, SPEC, hidden_lines_removed=True" in source
+    assert "adapter, SPEC, item=ITEM" in source
+    assert drawing.ITEM.startswith("#4-40 x 3/16 ")
 
 
 def test_no_vendor_model_is_tracked() -> None:

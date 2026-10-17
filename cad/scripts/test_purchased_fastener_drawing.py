@@ -70,6 +70,9 @@ class _View:
         x, y = self._center
         return (x - 0.001, y - 0.001, x + 0.001, y + 0.001)
 
+    def GetFirstCenterMark2(self):
+        return None
+
 
 class _Note:
     def __init__(
@@ -94,9 +97,8 @@ class _Note:
         return True
 
 
-@pytest.mark.parametrize("hidden_lines_removed", (False, True))
 def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
-    monkeypatch, tmp_path: Path, hidden_lines_removed: bool
+    monkeypatch, tmp_path: Path
 ) -> None:
     source = tmp_path / "test-fastener.SLDPRT"
     source.touch()
@@ -178,7 +180,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     )
     monkeypatch.setattr(purchased, "double_array", tuple)
 
-    cells = purchased._VIEW_CELLS
+    cells = purchased.fastener_view_cells(purchased.view_band_bottom("", label="t"))
     centers = {name: center for name, center, _cell in cells}
 
     def place_view(_adapter, path, orientation, _x, _y, *, scale):
@@ -197,10 +199,9 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
     )
     monkeypatch.setattr(
         purchased,
-        "set_hidden_lines_visible",
-        lambda _adapter, view: modes.update({view.GetOrientationName(): "HLV"}),
+        "_fit_views",
+        lambda _draw, _views, cells: {name: (1, 1) for name, _, _ in cells},
     )
-    monkeypatch.setattr(purchased, "_fit_views", lambda _draw, _views, _cells: (1, 1))
     monkeypatch.setattr(
         purchased,
         "view_name",
@@ -211,6 +212,8 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         calls.append(("assert", layout, phase, scale))
 
     monkeypatch.setattr(purchased, "assert_asme_b_sheet", assert_sheet)
+
+    monkeypatch.setattr(purchased, "apply_custom_properties", lambda *_a, **_k: None)
 
     def literal_note(_adapter, text: str, x: float, y: float):
         calls.append(("note", text, x, y))
@@ -241,19 +244,17 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     result = asyncio.run(
         purchased.build_purchased_fastener_drawing(
-            _Adapter(source), spec, hidden_lines_removed=hidden_lines_removed
+            _Adapter(source), spec, item="#4-40 x 1/4 TEST SCREW"
         )
     )
 
-    # The isometric is always hidden-lines-removed; Front/Top/Right show
-    # their hidden edges unless the sheet asks for them removed.
-    orthographic = "HLR" if hidden_lines_removed else "HLV"
-    assert modes == {
-        "*Front": orthographic,
-        "*Top": orthographic,
-        "*Right": orthographic,
-        "*Isometric": "HLR",
-    }
+    # Every view is hidden-lines-removed (rule 9: no dimension names a
+    # hidden edge on a purchased reference sheet).
+    assert modes == dict.fromkeys(("*Front", "*Top", "*Right", "*Isometric"), "HLR")
+    printed = [call[1] for call in calls if call[0] == "note"]
+    assert "#4-40 x 1/4 TEST SCREW" in printed
+    assert purchased._GENERAL_TEXT[False] in printed
+    assert not any("STOCK" in text or "INSTALL PER NOTES" in text for text in printed)
 
     assert result == {"pdf": str(outputs["pdf"])}
     assert ("new", layout) in calls
@@ -265,8 +266,6 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         "Test Fastener — Purchased Part Reference Drawing",
         (1, 1),
     ) in calls
-
-
 
 
 def test_scale_fitting_does_not_scale_fixed_native_padding(monkeypatch, tmp_path):
@@ -292,7 +291,103 @@ def test_scale_fitting_does_not_scale_fixed_native_padding(monkeypatch, tmp_path
     center = (0.111, 0.170)
     cell = (0.015, 0.155, 0.207, 0.185)
     view = PaddedView("*Front", tmp_path / "spring.SLDPRT", center)
-    assert purchased._fit_views(_Drawing(), [view], (("*Front", center, cell),)) == (
-        2,
-        1,
+    assert purchased._fit_views(_Drawing(), [view], (("*Front", center, cell),)) == {
+        "*Front": (2, 1)
+    }
+
+
+def test_isometric_scales_independently(monkeypatch, tmp_path):
+    """A tall pictorial drops its own scale, never the orthographic views'."""
+
+    class SizedView(_View):
+        def __init__(self, orientation, source, center, size):
+            super().__init__(orientation, source, center)
+            self._size = size
+
+        @property
+        def Position(self):
+            return self._center
+
+        def GetOutline(self):
+            ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
+            width = self._size[0] * ratio + 0.0112
+            height = self._size[1] * ratio + 0.0112
+            x, y = self._center
+            return (x - width / 2, y - height / 2, x + width / 2, y + height / 2)
+
+        def SetViewPosition(self, position, _update):
+            self._center = tuple(position)
+            return True
+
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    cells = purchased.fastener_view_cells(0.073)
+    sizes = {
+        "*Front": (0.010, 0.020),
+        "*Top": (0.010, 0.010),
+        "*Right": (0.010, 0.020),
+        "*Isometric": (0.020, 0.030),
+    }
+    views = [
+        SizedView(name, tmp_path / "s.SLDPRT", center, sizes[name])
+        for name, center, _ in cells
+    ]
+    scales = purchased._fit_views(_Drawing(), views, cells)
+    assert scales["*Front"] == scales["*Top"] == scales["*Right"] == (4, 1)
+    assert scales["*Isometric"] == (1, 1)
+
+
+def test_footer_notes_hold_rule_seven_budget():
+    assert purchased.note_lines("A\nB\nC", label="t") == ("A", "B", "C")
+    with pytest.raises(ValueError, match="rule 7"):
+        purchased.note_lines("A\nB\nC\nD", label="t")
+    with pytest.raises(ValueError, match="ITEM"):
+        purchased.check_item("X" * (purchased.MAX_ITEM_CHARS + 1), label="t")
+    # More note lines lift the views' bottom row, never below the title block.
+    assert purchased.view_band_bottom("", label="t") == purchased._LOWEST_CAPTION_Y
+    assert purchased.view_band_bottom("A\nB\nC", label="t") > purchased.footer_top(
+        "A\nB\nC", label="t"
     )
+
+
+def test_center_marks_lose_their_extension_lines(monkeypatch):
+    class Mark:
+        def __init__(self, following=None):
+            self.UseDocDisplaySettings = True
+            self.ShowLines = True
+            self._following = following
+
+        def GetNext(self):
+            return self._following
+
+    class MarkedView:
+        def __init__(self, first):
+            self._first = first
+
+        def GetFirstCenterMark2(self):
+            return self._first
+
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _kind: value)
+    second = Mark()
+    first = Mark(second)
+    cells = purchased.fastener_view_cells(0.073)
+    views = [MarkedView(first), MarkedView(None), MarkedView(None), MarkedView(None)]
+    assert purchased._center_marks_without_lines(views, cells) == {
+        "*Front": 2,
+        "*Top": 0,
+        "*Right": 0,
+        "*Isometric": 0,
+    }
+    assert not any(m.ShowLines or m.UseDocDisplaySettings for m in (first, second))
+
+    class StuckMark(Mark):
+        @property
+        def ShowLines(self):
+            return True
+
+        @ShowLines.setter
+        def ShowLines(self, _value):
+            pass
+
+    views[0] = MarkedView(StuckMark())
+    with pytest.raises(RuntimeError, match="extension lines"):
+        purchased._center_marks_without_lines(views, cells)

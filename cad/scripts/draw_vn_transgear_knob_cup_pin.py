@@ -17,10 +17,14 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_transgear_knob_cup_pin"]
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "Ø1/16 x 5/8 SLOTTED SPRING PIN (Ø1.59 x 15.88); SLOT NOT SHOWN"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(adapter, SPEC)
+    return await build_purchased_fastener_drawing(
+        adapter, SPEC, item=ITEM
+    )
 
 
 def _parse_args() -> argparse.Namespace:

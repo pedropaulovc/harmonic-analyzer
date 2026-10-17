@@ -17,11 +17,15 @@ from _purchased_part_drawing import build_purchased_part_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_keeper_chain"]
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "BEAD CHAIN, TRADE SIZE 3, Ø2.38 (3/32) BEADS"
 PART_STEM = SPEC.artifact_stem
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_part_drawing(adapter, SPEC)
+    return await build_purchased_part_drawing(
+        adapter, SPEC, item=ITEM, cut_to_suit=True
+    )
 
 
 def _parse_args() -> argparse.Namespace:

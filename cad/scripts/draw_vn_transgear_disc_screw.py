@@ -13,10 +13,14 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_transgear_disc_screw"]
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "#0-80 x 1/4 FILLISTER HEAD SLOTTED SCREW"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(adapter, SPEC)
+    return await build_purchased_fastener_drawing(
+        adapter, SPEC, item=ITEM, cut_to_suit=True
+    )
 
 
 def _parse_args() -> argparse.Namespace:

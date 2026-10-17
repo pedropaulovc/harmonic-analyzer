@@ -1,16 +1,14 @@
 """Four-view purchased-part reference sheets for stock that is not a catalogued fastener.
 
-The spring builder's layout is shaped for long thin coils (a 30 mm-tall Front
-cell), which shrinks a compact part to 1:4 on an empty sheet: the keeper
-chain's first sheet did exactly that. This builder reads the part's own
-Material Specification / Finish / Manufacturing Notes, as the spring builder
-does, and lays it out in the fastener cells, with the part's note printed as
-its installation line.
+This builder reads the part's own Material Specification / Finish /
+Manufacturing Notes, as the spring builder does, and lays it out in the
+fastener cells, with the part's note printed as its footer note.  The
+Isometric scales on its own, so a compact loop's tall pictorial never shrinks
+the orthographic views.
 """
 
 from __future__ import annotations
 
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -18,39 +16,17 @@ from _check import check
 from _com import _early_bound
 from _drawing_common import read_required_properties
 from _drawing_registry import DrawingSpec
-from _purchased_fastener_drawing import _PROPERTIES, _VIEW_CELLS, _build_reference_sheet
-
-# The fastener cells, with the Isometric cell run down the free right column
-# (the installation note ends at x=0.225). A compact loop's pictorial is its
-# tallest view: the keeper chain's 1:1 isometric outline, with its fixed
-# sheet-space border, overran the 60 mm fastener cell and dropped every view
-# to 1:2.
-_PART_VIEW_CELLS = (
-    *(cell for cell in _VIEW_CELLS if cell[0] != "*Isometric"),
-    ("*Isometric", (0.310, 0.2155), (0.240, 0.176, 0.380, 0.255)),
-)
-
-
-class HiddenLineDisplay(Enum):
-    """How Front/Top/Right draw the edges hidden behind the part.
-
-    The Isometric always has hidden lines removed.
-    """
-
-    # Dashed hidden edges, for a part whose bores and pins they explain.
-    VISIBLE = "visible"
-    # No hidden edges, as on a purchased fastener: on an undimensioned
-    # reference view the dashed bores and pins only clutter it.
-    REMOVED = "removed"
+from _purchased_fastener_drawing import _PROPERTIES, _build_reference_sheet
 
 
 async def build_purchased_part_drawing(
-    adapter: Any,
-    spec: DrawingSpec,
-    *,
-    hidden_lines: HiddenLineDisplay = HiddenLineDisplay.VISIBLE,
+    adapter: Any, spec: DrawingSpec, *, item: str, cut_to_suit: bool = False
 ) -> dict[str, str]:
-    """Front/Top/Right plus Isometric of a purchased part, its note as the install line."""
+    """Front/Top/Right plus Isometric of a purchased part, its note in the footer.
+
+    ``item`` is the catalogue designation on the ITEM row; ``cut_to_suit``
+    marks stock its note cuts at assembly.
+    """
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(f"source purchased part is missing: {source}")
@@ -65,8 +41,8 @@ async def build_purchased_part_drawing(
         spec,
         properties=properties,
         finish=properties["Finish"],
+        item=item,
         material_property="Material Specification",
-        installation_notes=properties["Manufacturing Notes"],
-        cells=_PART_VIEW_CELLS,
-        hidden_lines_removed=hidden_lines is HiddenLineDisplay.REMOVED,
+        notes=properties["Manufacturing Notes"],
+        cut_to_suit=cut_to_suit,
     )

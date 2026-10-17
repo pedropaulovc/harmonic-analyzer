@@ -124,6 +124,7 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
     assert sheet.source_kind == "part"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "build_purchased_fastener_drawing" in source
-    # Machinist review r8: the 8:1 thread and socket hidden edges cluttered
-    # the front and right views; every orthographic view is HLR.
-    assert "adapter, SPEC, hidden_lines_removed=True" in source
+    # The shared purchased sheet draws every view hidden-lines-removed; the
+    # ITEM row names the catalogue size.
+    assert "adapter, SPEC, item=ITEM" in source
+    assert drawing.ITEM.startswith("#1-72 x 5/32 ")

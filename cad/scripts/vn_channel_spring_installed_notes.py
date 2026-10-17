@@ -1,60 +1,37 @@
-"""Purchased reference-sheet data for the 9432K31 channel spring."""
+"""Purchased reference-sheet notes for the 9432K31 channel spring.
+
+The sheet's footer holds at most three note lines (drawing-guidelines rule 7):
+the matched-set acceptance only.  The catalogue's +/-10% rate band is too wide
+for channel consistency, so the springs are bought as one lot and the set is
+selected by measured rate (tolerance-policy.md, spring rate); the ITEM row
+identifies the spring and the Front view shows it at its installed length.
+"""
 
 from __future__ import annotations
 
 import _config
-from vn_channel_spring_installed_spec import (
-    FREE_LENGTH_MM,
-    INITIAL_TENSION_N,
-    INITIAL_TENSION_TOLERANCE_N,
-    INSTALLED_LENGTH_MM,
-    MAXIMUM_LOAD_N,
-    MAX_LENGTH_MM,
-    SPRING_RATE_N_PER_MM,
-    SPRING_RATE_TOLERANCE_FRACTION,
-)
-from spring_mount_geom import channel_force_n
 
 
 _QC_LENGTH_1_MM = 60.0
 _QC_LENGTH_2_MM = 80.0
 _QC_PIN_DIA_MM = 2.0
 _MATCHED_SET_SIZE = len(_config.channels())
-_QC_FORCE_1_N = channel_force_n(_QC_LENGTH_1_MM)
-_QC_FORCE_2_N = channel_force_n(_QC_LENGTH_2_MM)
+# Owner ruling relayed with the machinist-review fleet pass: order twice the
+# set from one lot; if the lot cannot supply a matched set, select from
+# another lot (tolerance-policy.md).
+_ORDER_QUANTITY = 2 * _MATCHED_SET_SIZE
 _MATCH_TOLERANCE_PERCENT = float(
     _config._doc("error_budget")["critical_features"]["spring_rate"]["tolerance"]
 )
 
 DRAWING_NOTES = "\n".join(
     (
-        "PURCHASED EXTENSION SPRING - REFERENCE DATA",
-        "  END TYPE .......... MACHINE-HOOK ENDS",
-        f"  FREE LENGTH ....... {FREE_LENGTH_MM:.2f} MM INSIDE HOOKS",
-        f"  CATALOG MAX ....... {MAX_LENGTH_MM:.2f} MM AT {MAXIMUM_LOAD_N:.3f} N",
-        f"  NOMINAL RATE ...... {SPRING_RATE_N_PER_MM:.4f} N/MM "
-        f"(+/-{100.0 * SPRING_RATE_TOLERANCE_FRACTION:.0f}% CATALOG)",
-        f"  INITIAL TENSION ... {INITIAL_TENSION_N:.3f} N "
-        f"(+/-{INITIAL_TENSION_TOLERANCE_N:.2f} N CATALOG)",
-        f"  ILLUSTRATED LENGTH  {INSTALLED_LENGTH_MM:.2f} MM INSIDE HOOKS",
-        "  CAD COILS: REFERENCE GEOMETRY ONLY;",
-        "  DO NOT DERIVE FORCE FROM THE COILS.",
-        f"SET QC: MATCHED SET OF {_MATCHED_SET_SIZE} SPRINGS.",
-        f"  USE Ø{_QC_PIN_DIA_MM:.2f} MM PINS; PIN C-C = "
-        f"{_QC_LENGTH_1_MM - _QC_PIN_DIA_MM:.2f}/"
-        f"{_QC_LENGTH_2_MM - _QC_PIN_DIA_MM:.2f} MM.",
-        f"  THIS REPRESENTS {_QC_LENGTH_1_MM:.2f}/{_QC_LENGTH_2_MM:.2f} MM "
-        "INSIDE-HOOK LENGTHS.",
-        f"  NOMINAL F60/F80 = {_QC_FORCE_1_N:.3f}/{_QC_FORCE_2_N:.3f} N.",
-        "  RATE = (F80-F60)/20.00 MM.",
-        "  READ EACH FORCE 30 S AFTER LOADING.",
-        f"  EACH SPRING RATE WITHIN +/-{_MATCH_TOLERANCE_PERCENT:.2f}%",
-        "  OF THE COMMON SET MEAN RATE.",
-        "  RECORD F60/F80; MATCH RATES, NOT FORCES.",
-        f"  CATALOG +/-{100.0 * SPRING_RATE_TOLERANCE_FRACTION:.0f}% "
-        "DOES NOT MEET THE SET-MATCH LIMIT.",
-        "  RECORD COMMON RATE MEAN AND EACH",
-        "  EXTRAPOLATED INITIAL TENSION FOR",
-        "  COUNTERSPRING AND MAGNIFIER CALIBRATION.",
+        f"MATCHED SET: ORDER {_ORDER_QUANTITY} FROM ONE LOT; KEEP {_MATCHED_SET_SIZE} "
+        f"WHOSE RATE (F80-F60)/{_QC_LENGTH_2_MM - _QC_LENGTH_1_MM:.0f}",
+        f"IS WITHIN \u00b1{_MATCH_TOLERANCE_PERCENT:.2f}% OF THEIR MEAN, "
+        "FOR EQUAL FORCE IN EVERY CHANNEL.",
+        f"F60/F80 = FORCE AT {_QC_LENGTH_1_MM:.0f}/{_QC_LENGTH_2_MM:.0f} INSIDE HOOKS; "
+        f"\u00d8{_QC_PIN_DIA_MM:.2f} PINS AT "
+        f"{_QC_LENGTH_1_MM - _QC_PIN_DIA_MM:.2f}/{_QC_LENGTH_2_MM - _QC_PIN_DIA_MM:.2f} C-C.",
     )
 )

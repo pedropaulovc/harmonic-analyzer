@@ -11,10 +11,14 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 SPEC = DRAWINGS_BY_NAME["vn_transgear_arm_plate_locating_pin"]
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "Ø2 x 6 DOWEL PIN, ISO 2338 m6"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(adapter, SPEC)
+    return await build_purchased_fastener_drawing(
+        adapter, SPEC, item=ITEM
+    )
 
 
 def _parse_args() -> argparse.Namespace:

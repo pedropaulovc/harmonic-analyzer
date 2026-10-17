@@ -8,8 +8,8 @@ vn-pen-adjust-nut:
   material_specification: "Brass hex nut, #0-80, 5/32 AF x 3/64; McMaster-Carr 92671A115"
   finish: plain; no coating
   installation_notes: |-
-    INSTALLATION - ON THE MHA-PN-007 PEN-ROD TOP ADJUSTER STUD.
-    SET THE STUD HEIGHT, THEN JAM THE NUT DOWN ON THE ROD TOP.
+    INSTALLATION - ON THE MHA-PN-007 PEN-ROD TOP ADJUSTER STUD,
+    JAMMED ON THE ROD TOP; IT LOCKS THE STUD AT ITS SET HEIGHT.
   quantity: 1
   tolerance_class: machined_block
   process: purchased

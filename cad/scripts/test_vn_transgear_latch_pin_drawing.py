@@ -87,7 +87,8 @@ def test_the_chamfered_end_is_the_pressed_end() -> None:
 
 def test_the_installation_note_states_the_proud_length() -> None:
     notes = _config.parts(STEM)["installation_notes"]
-    assert f"{spec.PROUD:.1f} PROUD" in notes
+    # A reference value: the hole floor sets it (machinist review).
+    assert f"({spec.PROUD:.1f}) PROUD" in notes and "REF" in notes
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

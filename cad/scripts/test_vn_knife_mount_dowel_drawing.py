@@ -79,7 +79,8 @@ def test_the_installation_note_names_both_holes_and_fits_the_sheet() -> None:
     assert all(len(line) <= 70 for line in lines), lines
     flat = " ".join(lines)
     assert "MHA-SM-002" in flat and "MHA-FR-002" in flat
-    assert "CHAMFER END FIRST" in flat
+    assert "CHAMFER END IN THE SEAT" in flat
+    assert "DIAMETRAL CLEARANCE" in flat
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

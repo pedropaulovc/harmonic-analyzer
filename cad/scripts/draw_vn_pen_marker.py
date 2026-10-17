@@ -38,7 +38,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_leader_notes import add_leader_note
-from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
@@ -48,6 +47,7 @@ from _purchased_fastener_drawing import (
     _literal_note,
     _purchased_title_block,
     _rebuild,
+    add_purchased_footer,
 )
 from _session import run_build
 from vn_pen_marker_spec import (
@@ -63,24 +63,26 @@ SPEC = DRAWINGS_BY_NAME["vn_pen_marker"]
 PART_STEM = SPEC.artifact_stem
 
 # The source part's properties this sheet prints: the title block's number,
-# title, material and finish, the footer's stock/supplier/SKU lines and the
-# grip note. finalize_drawing proves the tolerance block and revision.
+# title, material and finish, the footer's supplier/SKU lines and the grip
+# note. finalize_drawing proves the tolerance block and revision.
 SOURCE_PROPERTIES = (
     "Number",
     "Title",
     "Material Specification",
     "Finish",
-    "Stock Name",
     "Supplier",
     "Supplier SKUs",
     "Manufacturing Notes",
 )
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "SHARPIE PERMANENT MARKER, FINE POINT, ITEM 30051"
 
 # Sheet maths, ASME B landscape 431.8 x 279.4, all in sheet metres.
 #
 # Every view sits at the sheet scale, so the title block's SCALE field says
 # it and the captions carry no scale. The free field is the border (12.7 mm
-# all round) above the purchased footer (its notes reach y = 73 mm) and the
+# all round) above the purchased footer (sized when its notes reached y = 73 mm;
+# the shared footer now tops out at 54 mm) and the
 # title block (x >= 215.9 mm, y <= 65.1 mm), read from farm run e31912e0's PNG.
 # That leaves 194 mm of height. At 2:1 the FRONT outline (257 mm) alone
 # overruns it, so 1:1 is the largest project scale that keeps TOP above FRONT:
@@ -106,7 +108,7 @@ _ISO_HALF = (0.00869, 0.03417 + (OVERALL_LENGTH - 71.4) * 0.8165 / 2.0 * _MODEL_
 # View centres. GetOutline is centred on the model box, so each view's outline
 # is centred here. TOP shares FRONT's x and RIGHT shares FRONT's y.
 #   FRONT model box x 173.9..186.1, y 94.5..217.5 mm (outline 88.9..223.1;
-#   its caption's box down to 78.2, 5 mm over the footer's notes).
+#   its caption's box down to 78.2, clear of the footer's top at 54).
 #   TOP circle y 235.4..247.6 mm: 85.5 above FRONT's centre, outline gap 6.7
 #   mm; its caption's top 264.0, 2.7 mm under the border.
 #   RIGHT model box x 248.9..261.1 mm: 63 mm right of FRONT.
@@ -289,31 +291,11 @@ async def build(adapter: Any) -> dict[str, str]:
                 y + 0.001,
             )
             notes.append((note, label, label, box))
-        text = (
-            "PURCHASED PART / REFERENCE GEOMETRY\n"
-            "ORDER BY SUPPLIER SKU; INSTALL PER NOTES WHERE SHOWN.\n"
-            "GENERAL TOLERANCES AND EDGE-BREAK NOTES DO NOT APPLY."
+        notes.extend(
+            add_purchased_footer(
+                adapter, draw, properties, item=ITEM, label=PART_STEM
+            )
         )
-        note = _literal_note(adapter, text, 0.018, 0.072)
-        notes.append((note, text, text, (0.015, 0.057, 0.260, 0.073)))
-        for name, y, label in (
-            ("Stock Name", 0.050, "STOCK:"),
-            ("Supplier", 0.038, "SUPPLIER:"),
-            ("Supplier SKUs", 0.026, "SKU:"),
-        ):
-            label_note = _literal_note(adapter, label, 0.018, y)
-            notes.append(
-                (label_note, label, label, (0.015, y - 0.007, 0.050, y + 0.001))
-            )
-            note = add_property_linked_note(adapter, name, 0.052, y, char_height=0.003)
-            notes.append(
-                (
-                    _early_bound(note, "INote"),
-                    property_link(name),
-                    properties[name],
-                    (0.050, y - 0.007, 0.260, y + 0.001),
-                )
-            )
         # Rule 7: the fitting requirement is flagged on the grip it names.
         note = add_leader_note(
             adapter,
