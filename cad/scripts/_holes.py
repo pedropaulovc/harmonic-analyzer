@@ -16,8 +16,9 @@ stations:
    definition with ``AccessSelections`` / ``ModifyDefinition``; verify the
    committed thread metadata. Pre-create thread settings do not persist.
 
-Thread policy: everything is **ANSI inch (UNC/UNF)** -- see
-``memory/fastener-policy-us-customary.md``. The wizard table supplies the cut
+Thread policy: everything shop-chosen is **ANSI inch (UNC/UNF)** -- see
+``memory/fastener-policy-us-customary.md``; ``tapped_metric`` (ANSI Metric
+standard) serves only bought metric hardware. The wizard table supplies the cut
 diameters (tap drill for taps, fit diameter for clearances), so scripts get
 the ACTUAL dimensions back (:class:`WizardHoleResult`) for analytic volume
 math, and pin expectations via ``expect_dia_mm`` (a wrong size token that
@@ -39,6 +40,7 @@ from _hole_spec import (
     NUMBER_DRILL_MM as NUMBER_DRILL_MM,
     TAP_DRILL_MM as TAP_DRILL_MM,
     THREAD_MAJOR_MM as THREAD_MAJOR_MM,
+    METRIC_KINDS,
     HoleSpec,
     blind_cut_dia_mm,
 )
@@ -65,11 +67,13 @@ PlacementDimensions = tuple[PlacementDimension, PlacementDimension]
 # live rocker-arm-support feature.
 SW_FM_HOLE_WZD = 25
 _STD_ANSI_INCH = 0
+_STD_ANSI_METRIC = 1
 
 # kind -> (swWzdGeneralHoleTypes_e, swWzdHoleStandardFastenerTypes_e)
 _KINDS = {
     "tapped": (4, 27),  # straight tap, AnsiInchTappedHole
     "tapped_bottoming": (4, 26),  # AnsiInchBottomingTappedHole
+    "tapped_metric": (4, 43),  # straight tap, AnsiMetricTappedHole
     "clearance": (2, 22),  # plain hole, AnsiInchScrewClearances
     "drilled_number": (2, 24),  # AnsiInchNumberDrillSizes
     "drilled_fractional": (2, 19),  # AnsiInchFractionalDrillSizes
@@ -83,6 +87,13 @@ _KINDS = {
 }
 _ENDS = {"blind": 0, "through_all": 1, "through_next": 2}
 _FITS = {"close": 0, "normal": 1, "loose": 2}  # swWzdHoleScrewClearanceTypes_e
+
+
+def _standard(kind: str) -> int:
+    """The swWzdHoleStandards_e a ``kind`` lives in: ANSI Metric for the
+    metric taps, ANSI Inch for everything else."""
+    return _STD_ANSI_METRIC if kind in METRIC_KINDS else _STD_ANSI_INCH
+
 
 # How far an initialized wizard diameter may sit from its pinned target before
 # `wizard_holes` FORCES it -- and, by the same token, the tolerance a caller may
@@ -274,7 +285,10 @@ def _through_tap_metadata(spec: HoleSpec) -> list[tuple[str, object]]:
     alone, its native callout prints ``4-40 UNC <depth> 0.00`` (top-frame,
     016c990f8; the arbor-pedestal apex tap on the radial path, v37).
     """
-    return [("ThreadClass", spec.thread_class), ("ThreadEndCondition", _ENDS[spec.end])]
+    end = ("ThreadEndCondition", _ENDS[spec.end])
+    if spec.kind in METRIC_KINDS:
+        return [end]  # ThreadClass is an ANSI-inch-only wizard property
+    return [("ThreadClass", spec.thread_class), end]
 
 
 def _commit_definition_edits(
@@ -317,11 +331,13 @@ def _verify_tap_metadata(defn: Any, spec: HoleSpec, label: str) -> None:
     """Raise unless the COMMITTED tap definition holds the requested thread
     class and termination -- the readback, not the write, is the proof."""
     end = _ENDS[spec.end]
-    for prop, expected in (
-        ("ThreadClass", spec.thread_class),
+    checks: list[tuple[str, object]] = [
         ("ThreadEndCondition", end),
         ("EndCondition", end),
-    ):
+    ]
+    if spec.kind not in METRIC_KINDS:  # ThreadClass is ANSI-inch only
+        checks.insert(0, ("ThreadClass", spec.thread_class))
+    for prop, expected in checks:
         actual = getattr(defn, prop)
         if actual != expected:
             raise RuntimeError(
@@ -432,14 +448,14 @@ def wizard_holes(
                 -1,
                 -1,
             ]
-            tclass = spec.thread_class
+            tclass = "" if spec.kind in METRIC_KINDS else spec.thread_class
         else:
             fit = _FITS[spec.fit] if spec.kind == "clearance" else -1
             vals = [fit, ang, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
             tclass = ""
         feat = fm.HoleWizard5(
             hole_type,
-            _STD_ANSI_INCH,
+            _standard(spec.kind),
             fastener,
             spec.size,
             _ENDS["blind"],
@@ -463,7 +479,7 @@ def wizard_holes(
     else:
         data = fm.CreateDefinition(SW_FM_HOLE_WZD)
         data = _early_bound(data, "IWizardHoleFeatureData2")
-        data.InitializeHole(hole_type, _STD_ANSI_INCH, fastener, spec.size, end)
+        data.InitializeHole(hole_type, _standard(spec.kind), fastener, spec.size, end)
         feat = fm.CreateFeature(data)
         if feat is None:
             raise RuntimeError(
@@ -863,7 +879,7 @@ def wizard_hole_on_cylinder(
     data = fm.CreateDefinition(SW_FM_HOLE_WZD)
     data = _early_bound(data, "IWizardHoleFeatureData2")
     data.InitializeHole(
-        hole_type, _STD_ANSI_INCH, fastener, spec.size, _ENDS[spec.end]
+        hole_type, _standard(spec.kind), fastener, spec.size, _ENDS[spec.end]
     )
     feat = fm.CreateFeature(data)
     if feat is None:

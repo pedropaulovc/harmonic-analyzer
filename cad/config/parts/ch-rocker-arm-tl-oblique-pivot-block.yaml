@@ -7,7 +7,7 @@ ch-rocker-arm-tl-oblique-pivot-block:
   finish: as machined
   quantity: 2
   tolerance_class: machined_block
-  process: "saw and mill the block to 70 x 40 x 24; bore the 30 bearing seat 10 deep from the top, then from the bottom, leaving the 4 shoulder with R0.4 max corners; bore the 25 shoulder hole through; drill the four 4.5 holes through and counterbore 8 from the top to 15.6 above the bottom; break edges"
+  process: "saw and mill the block to 70 x 40 x 24; bore the 30 bearing seat 10 deep from the top, then from the bottom, leaving the 4 shoulder with R0.4 max corners; bore the 25 shoulder hole through; drill the four 4.5 holes through and counterbore 8 from the top to 15.6 above the bottom; drill the two 4.98 holes through along the width and counterbore 7.94 from the +Y face; break edges"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
@@ -29,3 +29,8 @@ ch-rocker-arm-tl-oblique-pivot-block:
       where: "Section B-B, the M4 x 20 carriage screws"
       finding: "engagement 3.85-4.95 in the carriage's 5.0 deep thread, under 1.5D (rule 18)"
       reason: "the bought carriage's M4 x 5 holes limit the engagement; the shortfall is stated on the sheet (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
+    - id: "RV-05"
+      kind: "accept"
+      where: "View C, the 2X Ø7.940 x 4.400 side-screw counterbores from the +Y face"
+      finding: "three-place counterbore Ø7.940 and depth 4.400, holding side counterbore walls 1.67 min to each other and 1.83 min to the carriage-screw holes, under the 2.0 target (rule 17), over the 1.5 floor"
+      reason: "MHA-CH-006-TL-29's #8 screw positions on the 24 block set the spacing; at two places the counterbore-to-counterbore wall would fall to 1.29, under the 1.5 floor, so the three-place bands hold the walls the side callout states (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
