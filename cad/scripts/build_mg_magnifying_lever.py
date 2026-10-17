@@ -40,7 +40,15 @@ bar stock (no band), printed once at mid-length, away from the press zone.
 The revolve profile cannot carry it -- its top line's height is already the
 dome radius's, so a second diameter over-defines the capsule -- hence two
 short construction lines ON the top and bottom outlines, the diameter between
-them. The front view shows both sketches.
+them.
+
+``ScrewSeat`` (blanked, on the Front plane): the OD the MHA-MG-002 clamp's
+thumb screw can bear on over the clamp's whole travel
+(mg_magnifying_lever_spec.SCREW_SEAT_X), the extent of the OD's Ra 3.2: one
+construction line ON the top outline from the seat's start to its end, its
+start dimensioned from the west tip (the origin) and its length.  The OD's
+finish is the part's model PMI (SURFACE_FINISHES); the drawing's symbol
+consumes the same control.  The front view shows all three sketches.
 
 Run (SolidWorks already open)::
 
@@ -59,6 +67,7 @@ from _com import _early_bound
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
+from _part_pmi import author_part_pmi
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -98,6 +107,9 @@ from mg_magnifying_lever_spec import (
     DRAWING_PRECISION,
     ISO_VIEW_NOTE,
     PRESS_ZONE_START_TOL_TYPE,
+    SCREW_SEAT_LENGTH,
+    SCREW_SEAT_X,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "mg-magnifying-lever"
@@ -122,13 +134,15 @@ ROD_DIA_STATION = ROD_LENGTH / 2.0
 # Everything else lies ON the silhouette -- the zone's witness on the bottom
 # outline, its tip arc on the east dome's lower outline (centre, start, end;
 # counter-clockwise from the tangent to the tip), the stock's two lines on the
-# top and bottom outlines -- so the print shows no stray line inside the rod.
+# top and bottom outlines, the screw seat's line on the top outline -- so the
+# print shows no stray line inside the rod.
 PRESS_ZONE_START_LINE = ((PRESS_ZONE_X[0], -R), (PRESS_ZONE_X[0], R))
 PRESS_ZONE_WITNESS = ((PRESS_ZONE_X[0], -R), (PRESS_ZONE_END, -R))
 PRESS_ZONE_TIP_ARC = ((PRESS_ZONE_END, 0.0), (PRESS_ZONE_END, -R), (ROD_LENGTH, 0.0))
 ROD_STOCK_LINES = tuple(
     ((ROD_DIA_STATION - R, y), (ROD_DIA_STATION + R, y)) for y in (R, -R)
 )
+SCREW_SEAT_LINE = ((SCREW_SEAT_X[0], R), (SCREW_SEAT_X[1], R))
 
 
 def silhouette_offset(x: float, y: float) -> float:
@@ -141,7 +155,7 @@ def silhouette_offset(x: float, y: float) -> float:
     return abs(math.hypot(x - centre, y) - R)
 
 
-for _start, _end in (PRESS_ZONE_WITNESS, *ROD_STOCK_LINES):
+for _start, _end in (PRESS_ZONE_WITNESS, *ROD_STOCK_LINES, SCREW_SEAT_LINE):
     # A straight entity on a flank: both ends on it, at one height.
     if not (
         R <= _start[0] < _end[0] <= ROD_LENGTH - R
@@ -468,6 +482,56 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "RodStock")
     drive_jobs += stock.apply(adapter, "RodStock")
 
+    # REFERENCE sketch (blanked before save): the clamp screw's seat -- see
+    # the module docstring and SCREW_SEAT_LINE. One construction line on the
+    # top outline over the seat. Three display dims, in creation order: the
+    # seat's start from the west tip (the origin), its length (both printed),
+    # then the line's height (unmarked).
+    seat = SketchDims()
+    check("create_sketch screw seat", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    (seat_x0, seat_y0), (seat_x1, seat_y1) = SCREW_SEAT_LINE
+    seat_line = check(
+        "screw seat line", await adapter.add_line(seat_x0, seat_y0, seat_x1, seat_y1)
+    )
+    set_sketch_direct_db(adapter, False)
+    _make_construction(adapter, seat_line)
+    check(
+        "screw seat line horizontal",
+        await adapter.add_sketch_constraint(seat_line, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{seat_line}.start",
+        "origin",
+        "horizontal_distance",
+        SCREW_SEAT_X[0],
+        "screw seat ScrewSeatStart",
+    )
+    seat.record("ScrewSeatStart")
+    await dimension_between(
+        adapter,
+        f"{seat_line}.start",
+        f"{seat_line}.end",
+        "horizontal_distance",
+        SCREW_SEAT_LENGTH,
+        "screw seat ScrewSeatLen",
+    )
+    seat.record("ScrewSeatLen")
+    await dimension_between(
+        adapter,
+        f"{seat_line}.start",
+        "origin",
+        "vertical_distance",
+        R,
+        "screw seat ScrewSeatTop",
+    )
+    seat.record("ScrewSeatTop", '"RodDia" / 2')
+    await ensure_fully_defined(adapter, "screw seat sketch")
+    check("exit_sketch screw seat", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewSeat")
+    drive_jobs += seat.apply(adapter, "ScrewSeat")
+
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
@@ -500,9 +564,10 @@ async def build(adapter) -> dict[str, str]:
     # guidelines`), places come from the spec, then mark exactly the print's
     # dimensions (the drawing recipe imports the marked set and must find
     # every one of these) and stamp the make-critical title-block properties.
-    # The rod OD carries no finish: the clamp only slides on it to be set, then
-    # pinches it (drawing-guidelines.md rule 6). The reference sketches are
-    # blanked for the assembly renders; the front view shows them per view.
+    # The OD's one finish is the clamp screw's static seat, Ra 3.2 (owner
+    # ruling; drawing-guidelines.md rule 6), authored as model PMI on the OD
+    # and bounded on the print by the ScrewSeat dims. The reference sketches
+    # are blanked for the assembly renders; the front view shows them per view.
     set_dimension_bilateral_tolerance(
         adapter, "PressZone", "PressZoneDia", *deviations(PRESS_ZONE_DIA_BAND)
     )
@@ -515,8 +580,9 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Iso View Note": ISO_VIEW_NOTE})
-    blank_reference_sketches(adapter, ("PressZone", "RodStock"))
+    blank_reference_sketches(adapter, ("PressZone", "RodStock", "ScrewSeat"))
     # Annotation changes must leave the rod intact through the final rebuild,
     # not merely at the earlier, pre-annotation equation check.
     await force_rebuild(adapter)
