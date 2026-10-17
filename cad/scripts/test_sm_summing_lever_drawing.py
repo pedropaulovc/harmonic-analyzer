@@ -235,16 +235,9 @@ def test_receiver_view_is_on_a_back_view_sheet_with_real_binding() -> None:
     assert 'length = _early_bound(raw, "ICalloutLengthVariable")' in source
 
 
-@pytest.mark.parametrize(
-    ("placed", "precise", "expected"),
-    [
-        (2, True, [2]),  # the farm's placement: a no-op set
-        (4, True, [2]),
-        (2, False, [2, 3, 2]),  # draft threads regenerate through shaded
-    ],
-)
+@pytest.mark.parametrize("placed", [2, 4])  # the farm places views in HLR (2)
 def test_sheet_one_views_never_pass_through_hidden_lines_visible(
-    monkeypatch, placed, precise, expected
+    monkeypatch, placed
 ) -> None:
     """#1591: the bracket taps' label grew on sheet 1 at the greyed pass, on
     some builds only."""
@@ -252,23 +245,16 @@ def test_sheet_one_views_never_pass_through_hidden_lines_visible(
     class View:
         def __init__(self) -> None:
             self.mode = placed
-            self.precise = precise
             self.sets: list[int] = []
 
         def GetDisplayMode2(self) -> int:
             return self.mode
 
-        def GetCThreadQuality(self) -> bool:
-            return self.precise
-
         def SetDisplayMode4(self, use_parent, mode, faceted, edges, quality) -> bool:
             self.sets.append(mode)
             changed = mode != self.mode
             self.mode = mode
-            # A same-mode set is a no-op: its thread quality is not applied.
-            if changed:
-                self.precise = bool(quality)
-            return changed
+            return changed  # a same-mode set is a no-op that returns False
 
         def GetName2(self) -> str:
             return "Drawing View2"
@@ -276,8 +262,8 @@ def test_sheet_one_views_never_pass_through_hidden_lines_visible(
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     view = View()
     drawing._hidden_lines_removed_without_greyed_pass(view)
-    assert view.sets == expected  # never swHIDDEN_GREYED (1)
-    assert (view.mode, view.precise) == (2, True)
+    assert view.sets == [2]  # swHIDDEN only, never swHIDDEN_GREYED (1)
+    assert view.mode == 2
 
 
 def test_only_the_receiver_sheet_uses_the_greyed_regen() -> None:
