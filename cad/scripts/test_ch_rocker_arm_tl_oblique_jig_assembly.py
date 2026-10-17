@@ -459,8 +459,8 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
         "CENTRE 50.000 FROM THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS);"
     ) in steps["7C"]
     assert "±" not in steps["7C"]
-    assert spec.X_SET_BAND == pytest.approx(0.13)
-    assert spec.NUT_BRACKET_END_WALL_MIN == pytest.approx(1.544, abs=0.001)
+    assert nut_bracket.X_SET_BAND == pytest.approx(0.13)
+    assert nut_bracket.END_WALL_MIN == pytest.approx(1.544, abs=0.001)
     (set_rule,) = [
         e
         for e in machinist_exceptions.load_exceptions(

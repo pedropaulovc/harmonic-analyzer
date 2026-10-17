@@ -79,8 +79,6 @@ import math
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from _printed_tolerance import printed_band_mm
-
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_bearing_spec as bearing
 import ch_rocker_arm_tl_oblique_block_washer_spec as block_washer
@@ -1254,22 +1252,11 @@ if NUT_FLANGE_SLIP_MARGIN < leadscrew.SLIP_MARGIN_MIN:
     )
 _NUT_TORQUE = f"{NUT_SCREW_TORQUE_NM:.1f} N·m"
 
-# --- Step 7C's nut bracket set: its printed band -------------------------------
-# Owner ruling 2026-10-17 (review jbf-r17, rules 4/17): TL-29 cannot grow
-# (FEED_GAP, its 3/4 stock), so 7C prints the centre at three places, the
-# title block's .XXX band, with its reason, and no explicit band. Each #8
-# tap's end wall at that band, every other band worst case, holds the 1.5
-# floor; the jig's machinist_exceptions RV-02 states the value.
-X_SET_PLACES = 3
-X_SET_BAND = printed_band_mm(X_SET_PLACES)  # 0.13
-NUT_BRACKET_END_WALL_MIN = nut_bracket.END_WALL_MIN - (
-    X_SET_BAND - nut_bracket.X_SET_BAND
-)  # 1.544
-if NUT_BRACKET_END_WALL_MIN < nut_bracket.WALL_FLOOR:
-    raise ValueError(
-        f"TL-29's #8 tap end wall falls to {NUT_BRACKET_END_WALL_MIN:.3f} at "
-        f"the .XXX band, under the {nut_bracket.WALL_FLOOR} floor"
-    )
+# Step 7C's nut bracket set (owner ruling 2026-10-17, review jbf-r17, rules
+# 4/17): TL-29 cannot grow (FEED_GAP, its 3/4 stock), so 7C prints the
+# centre at the bracket's three places, the title block's .XXX band, with its
+# reason and no explicit band; TL-29 self-checks each #8 tap's end wall at
+# that band (END_WALL_MIN 1.544), and the jig's exception RV-02 states it.
 
 # --- The feed lever screws: their tightening torque -----------------------------------
 # Rule 23 (C3 r6 TL-000 review): the 2 5/16-18 lever screws carry the
@@ -1331,11 +1318,6 @@ def _limits(nominal: float, band: tuple[float, float], places: int) -> str:
     return f"{nominal + lower:.{places}f}/{nominal + upper:.{places}f}"
 
 
-def _item(stem: str) -> int:
-    """A made part's sheet 2 item number: the BOM lists them in BOM_ORDER."""
-    return BOM_ORDER.index(stem) + 1
-
-
 # Step 10 states the two finished holes itself (TL-21 prints only their
 # centre-drill spots): the HUB hole's H7 is the HUB pin's press fit, the CL
 # hole's N7 the bought m6 dowel's. c3-r7 (rule 4): H7 alone did not read as
@@ -1344,7 +1326,7 @@ def _item(stem: str) -> int:
 _HUB_HOLE = (
     f"HUB Ø{hub_pin.FIT_DIA:.2f} H7 "
     f"({_limits(hub_pin.FIT_DIA, hub_pin.HUB_HOLE_BAND, 3)}) THRU, PRESS FIT ON "
-    f"THE HUB LOCATOR PIN, ITEM {_item(HUB_PIN)} "
+    f"THE HUB LOCATOR PIN, ITEM {ITEM_NUMBERS[HUB_PIN]} "
     f"({hub_pin.SEAT_INTERFERENCE_MIN:.3f}-{hub_pin.SEAT_INTERFERENCE_MAX:.3f} "
     "INTERFERENCE)"
 )
@@ -1400,7 +1382,8 @@ ASSEMBLY_STEPS = (
     "FROM THE BAR'S FAR END THROUGH BOTH BLOCKS AND THE NUT, "
     f"{leadscrew.NEAR_STUB:.0f} PAST THE NEAR BLOCK; IT TURNS FREELY.",
     "7C. CLAMP THE NUT BRACKET ON THE COLUMN SIDE OF RAIL 1'S PIVOT BLOCK (STILL "
-    f"ON ITS CARRIAGE), CENTRE {nut_bracket.X_SET_MID:.{X_SET_PLACES}f} FROM "
+    f"ON ITS CARRIAGE), CENTRE {nut_bracket.X_SET_MID:.{nut_bracket.X_SET_PLACES}f} "
+    "FROM "
     "THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS); SPOT THE NUT BRACKET "
     "THROUGH THE BLOCK'S 2 "
     f"Ø{pivot_block.SIDE_HOLE_DIA:.2f} SIDE HOLES ({nut_bracket.TRANSFER_PUNCH} "

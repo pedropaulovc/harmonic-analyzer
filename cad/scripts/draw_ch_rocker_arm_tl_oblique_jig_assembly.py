@@ -341,7 +341,9 @@ NOTE_LINE_M = 0.004525
 STEPS_LINE_WIDTH = 68  # characters; 197 mm, either column
 STEPS_HEADING = "ASSEMBLY SEQUENCE"
 STEPS_XY = (0.018, 0.262)
-STEPS_FLOOR = SHEET_INNER_BORDER[1] + 0.008  # the left column ends over it
+# The left column ends 4 mm over the inner border at the 4.525 mm pitch; farm
+# r17's sheet 6 printed this note at 4.34 mm a line, so the real gap is wider.
+STEPS_FLOOR = SHEET_INNER_BORDER[1] + 0.004
 STEPS_CONTINUED_XY = (0.220, 0.262)
 if STEPS_XY[0] + STEPS_LINE_WIDTH * NOTE_CHAR_M >= min(
     STEPS_CONTINUED_XY[0], TITLE_BLOCK[0]
