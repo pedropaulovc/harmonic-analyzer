@@ -140,8 +140,9 @@ _INSERTED_SOURCES = {
     "pd_transgear_thumbnut",
     "ms_measuring_stick": "ms_stick ms_stop_block ms_stop_plate vn_ms_stop_plate_screw vn_thumb_screw",
     "ch_rocker_arm_tl_oblique_jig": "ch_rocker_arm_tl_oblique_base_bar ch_rocker_arm_tl_oblique_carrier "
-    "ch_rocker_arm_tl_oblique_feed_lever ch_rocker_arm_tl_oblique_hub_pin ch_rocker_arm_tl_oblique_pivot_block "
-    "ch_rocker_arm_tl_oblique_pivot_pin ch_rocker_arm_tl_oblique_riser",
+    "ch_rocker_arm_tl_oblique_feed_lever ch_rocker_arm_tl_oblique_hub_pin "
+    "ch_rocker_arm_tl_oblique_end_bracket ch_rocker_arm_tl_oblique_nut_bracket "
+    "ch_rocker_arm_tl_oblique_pivot_block ch_rocker_arm_tl_oblique_pivot_pin ch_rocker_arm_tl_oblique_riser",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }

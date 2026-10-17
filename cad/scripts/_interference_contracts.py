@@ -898,8 +898,10 @@ _MS_MEASURING_STICK_ALLOWED_PAIRS = {
 # locator pin's Ø10.20 x 12 p6 seat fills the carrier's HUB, which the model
 # carries only as a Ø3 centre-drill spot because it is reamed in place on the
 # running jig. The pivot pins sit coincident in the carrier's Ø10 holes, the
-# riser and lever on its top: contact, not volume. Literals, like the rows
-# above; test_ch_rocker_arm_tl_oblique_jig_assembly pins them to the specs.
+# riser and lever on its top, the end brackets on bar 1's top and the
+# nut bracket on pivot block 1's face (their screws are not modelled):
+# contact, not volume. Literals, like the rows above;
+# test_ch_rocker_arm_tl_oblique_jig_assembly pins them to the specs.
 JIG_HUB_PIN_SEAT = (10.20, 12.0)  # (diameter, length)
 _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
     frozenset(

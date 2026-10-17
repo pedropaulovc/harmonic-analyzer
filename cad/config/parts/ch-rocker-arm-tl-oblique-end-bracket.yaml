@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-oblique-end-bracket:
+  title: Rocker Oblique Trammel End Bracket
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-28
+  material: 6061-T6 ALUMINUM FLAT
+  material_specification: 6061-T6 aluminum flat bar, 1/2 x 3/4 in; width and thickness as supplied
+  finish: as machined
+  quantity: 2
+  tolerance_class: machined_block
+  process: "saw and face to length; drill and tap the four #8-32 and the two M4 holes through; break edges"
