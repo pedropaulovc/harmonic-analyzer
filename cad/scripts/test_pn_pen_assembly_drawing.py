@@ -2,17 +2,78 @@
 
 from pathlib import Path
 
+import pytest
+
 import build_pn_pen_assembly as builder
 import draw_pn_pen_assembly as drawing
+import pn_pen_adjust_screw_spec as stud
 import pn_pen_assembly_notes as notes
 import pn_pen_assembly_spec as spec
 import pn_pen_carriage_geom as carriage
+import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as v_block
 import vn_pen_rod_set_screw_spec as rod_set_screw
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import THREAD_MAJOR_MM
 from _named_views import octant_axes, octant_view_name
+from _printed_tolerance import printed_band_mm
 from _simplified_names import simplified_name
+
+
+def _engagements(stud_length: float, head_height: float) -> list[float]:
+    """Thread in the rod for a stud of ``stud_length`` with its head top set
+    ``head_height`` ±STUD_TOLERANCE_MM above the rod top."""
+    band = spec.STUD_TOLERANCE_MM
+    return [stud_length - (head_height + offset) for offset in (-band, band)]
+
+
+def test_stud_set_from_its_measured_length_holds_engagement_at_both_extremes() -> None:
+    # Code review C05: the stud prints 26.0 (.X, ±0.8) and the rod tap's full
+    # thread 4.50 (.XX, ±0.51). Between 1.5 D and the shallowest accepted
+    # thread lie 1.70, and the stud band alone spans 1.6.
+    floor = 1.5 * THREAD_MAJOR_MM[stud.THREAD]
+    depth = rod.STUD_TAP_SPEC.overrides_mm["ThreadDepth"] - printed_band_mm(2)
+    assert depth == pytest.approx(spec.TAP_THREAD_DEPTH_MIN) == pytest.approx(3.99)
+    shortest, longest = spec.STUD_LENGTH_EXTREMES
+    assert (shortest, longest) == pytest.approx(
+        (stud.OVERALL_LENGTH - printed_band_mm(1), stud.OVERALL_LENGTH + printed_band_mm(1))
+    )
+    # Owner ruling: head = measured length less 3.2, ±0.4; 22.8 nominal.
+    assert rod.STUD_ENGAGEMENT == pytest.approx(3.2)
+    assert spec.STUD_HEIGHT == pytest.approx(22.8)
+    worst = [
+        engagement
+        for length in (shortest, longest)
+        for engagement in _engagements(length, spec.stud_head_setting(length))
+    ]
+    assert min(worst) == pytest.approx(2.8) and min(worst) >= floor
+    assert max(worst) == pytest.approx(3.6) and max(worst) < depth
+    # Any one fixed head height, the old 22.0 or the new nominal, fails one
+    # end of the stud band: the setting has to follow the measured length.
+    for fixed in (22.0, spec.STUD_HEIGHT):
+        reach = [e for n in (shortest, longest) for e in _engagements(n, fixed)]
+        assert min(reach) < floor or max(reach) >= depth, fixed
+    # The shortest accepted full thread still carries the deepest engagement,
+    # the jam nut and the pen-height adjustment.
+    assert stud.FULL_THREAD_LENGTH - printed_band_mm(1) >= (
+        max(worst) + stud.jam_nut.THICKNESS + stud.ADJUSTMENT_RANGE
+    )
+
+
+def test_stud_setting_prints_as_a_reference_with_the_measured_length_rule() -> None:
+    assert spec.REFERENCE_DIMENSIONS == {spec.STUD_DIMENSION}
+    assert spec.STUD_DIMENSION not in spec.DIMENSION_TOLERANCES
+    assert spec.STUD_DIMENSION not in spec.TOLERANCE_PRECISION
+    builder_source = Path(builder.__file__).read_text(encoding="utf-8")
+    assert "spec.STUD_TOLERANCE_MM" not in builder_source
+    assert notes.DIMENSION_CALLOUTS[spec.STUD_DIMENSION].endswith(
+        "STUD LENGTH\nLESS 3.2 ±0.4"
+    )
+    steps = " ".join(notes.ASSEMBLY_STEPS)
+    assert "THE STUD'S MEASURED LENGTH LESS 3.2 ±0.4 ABOVE THE ROD TOP" in steps
+    assert "22.8 FOR A 26.0 STUD" in steps
+    assert "22.0" not in steps
 
 
 def test_pen_package_keeps_registry_outputs() -> None:

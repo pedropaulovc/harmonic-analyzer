@@ -15,8 +15,10 @@ Settings (drawing-guidelines.md rule 22 (an assembly package is complete),
 setup and adjustment):
 
 * STUD HEIGHT -- the #0-80 eye stud's head top above the rod's top face,
-  ``StudHeadAboveRodTop@StudSetting`` on the Right plane. The band keeps the
-  engagement in the rod's tap at least 1.5 D and short of its thread depth.
+  ``StudHeadAboveRodTop@StudSetting`` on the Right plane, set from the
+  stud's measured length so the engagement in the rod's tap stays at least
+  1.5 D and short of its guaranteed thread depth; DETAIL A prints the
+  nominal stud's value as a reference.
 * PEN YAW -- the marker axis to the rod flats (the paper face),
   ``PenYaw@CarriageSetting`` on the Top plane.
 * NIB PRESET -- the nib tip beyond the v-block/stirrup paper-end face along
@@ -33,6 +35,7 @@ import pn_pen_carriage_geom as carriage
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as v_block
 from _hole_spec import THREAD_MAJOR_MM
+from _printed_tolerance import printed_band_mm
 
 ASM_NAME = "pn-pen"
 DRAWING_NUMBER = "MHA-PN-000"
@@ -147,12 +150,46 @@ STUD_LINE = (
     (-carriage.PEN_Z_MID, carriage.STUD_HEAD_TOP_REST_Y),
 )
 STUD_HEIGHT = carriage.STUD_HEAD_TOP_REST_Y - carriage.ROD_SQUARE_TOP_REST_Y
+# Set by the stud's measured length (owner ruling on code review C05). The
+# stud's printed length band (26.0 at one place, ±0.8) alone spans 1.6 of the
+# 1.70 the tap's guaranteed thread leaves above 1.5 D, so no fixed head
+# height holds the engagement: the fitter sets the head top the measured
+# length less rod.STUD_ENGAGEMENT, ±STUD_TOLERANCE_MM. STUD_HEIGHT is that
+# setting for a nominal stud, the value the model and DETAIL A's reference
+# dimension carry.
 STUD_TOLERANCE_MM = 0.4
 STUD_PRECISION = 1
+REFERENCE_DIMENSIONS = frozenset({STUD_DIMENSION})
 _STUD_MAJOR = THREAD_MAJOR_MM[stud.THREAD]
-_TAP_THREAD_DEPTH = rod.STUD_TAP_SPEC.overrides_mm["ThreadDepth"]
-_STUD_ENGAGEMENT_MIN = stud.OVERALL_LENGTH - STUD_HEIGHT - STUD_TOLERANCE_MM
-_STUD_ENGAGEMENT_MAX = stud.OVERALL_LENGTH - STUD_HEIGHT + STUD_TOLERANCE_MM
+STUD_LENGTH_EXTREMES = (
+    stud.OVERALL_LENGTH - printed_band_mm(1),
+    stud.OVERALL_LENGTH + printed_band_mm(1),
+)
+# The rod sheet's native tap callout prints the thread depth at two places
+# ("TAP 0-80 UNF 4.50"), so the shallowest accepted full thread is 3.99.
+TAP_THREAD_DEPTH_MIN = (
+    rod.STUD_TAP_SPEC.overrides_mm["ThreadDepth"] - printed_band_mm(2)
+)
+
+
+def stud_head_setting(stud_length: float) -> float:
+    """The head top's height above the rod top for a stud measured at
+    ``stud_length`` (mm), the centre of its ±STUD_TOLERANCE_MM band."""
+    return stud_length - rod.STUD_ENGAGEMENT
+
+
+def stud_engagement_range(stud_length: float) -> tuple[float, float]:
+    """The thread a stud of ``stud_length`` puts in the rod at the two ends of
+    its setting band (head set high, head set low)."""
+    setting = stud_head_setting(stud_length)
+    return (
+        stud_length - (setting + STUD_TOLERANCE_MM),
+        stud_length - (setting - STUD_TOLERANCE_MM),
+    )
+
+
+_STUD_ENGAGEMENT_MIN = min(stud_engagement_range(n)[0] for n in STUD_LENGTH_EXTREMES)
+_STUD_ENGAGEMENT_MAX = max(stud_engagement_range(n)[1] for n in STUD_LENGTH_EXTREMES)
 
 # PEN YAW and NIB PRESET (Top plane, sketch (u, v) = machine (X, -Z), the
 # v-block plan sketch's convention): from the marker axis at the block's
@@ -197,12 +234,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     STUD_FEATURE: {STUD_DIMENSION: STUD_PRECISION},
     CARRIAGE_FEATURE: {YAW_DIMENSION: YAW_PRECISION, NIB_DIMENSION: NIB_PRECISION},
 }
-DIMENSION_TOLERANCES = {
-    STUD_DIMENSION: STUD_TOLERANCE_MM,
-    NIB_DIMENSION: NIB_TOLERANCE_MM,
-}
+# A reference dimension carries no band: the stud's band rides on the
+# measured-length setting the callout and step 1 print.
+DIMENSION_TOLERANCES = {NIB_DIMENSION: NIB_TOLERANCE_MM}
 ANGULAR_TOLERANCES = {YAW_DIMENSION: YAW_TOLERANCE_DEG}
-TOLERANCE_PRECISION = {STUD_DIMENSION: 1, NIB_DIMENSION: 1, YAW_DIMENSION: 0}
+TOLERANCE_PRECISION = {NIB_DIMENSION: 1, YAW_DIMENSION: 0}
 DIMENSION_NOMINALS = {STUD_DIMENSION: STUD_HEIGHT, NIB_DIMENSION: NIB_PROTRUSION}
 
 # --- contract asserts ---------------------------------------------------------
@@ -212,12 +248,19 @@ assert {stem for _label, stems, _key, _d in EXPLODE_STEPS for stem in stems} == 
 ) - {HANGER}, "every family but the ground hanger moves in the explode"
 assert all(key in "xyz" and distance != 0.0 for _l, _s, key, distance in EXPLODE_STEPS)
 assert math.isclose(
-    STUD_HEIGHT, stud.OVERALL_LENGTH - rod.STUD_ENGAGEMENT, abs_tol=1e-9
+    STUD_HEIGHT, stud_head_setting(stud.OVERALL_LENGTH), abs_tol=1e-9
 )
-# Across the stud band the thread stays at least 1.5 D in the rod and short
-# of the tap's full-thread depth (drawing-guidelines.md rule 18).
+# Across the stud's printed length band and the setting band the thread stays
+# at least 1.5 D in the rod and short of the tap's guaranteed full-thread
+# depth (drawing-guidelines.md rule 18), and the shortest accepted full
+# thread still covers the deepest engagement, the jam nut and the pen-height
+# adjustment.
 assert _STUD_ENGAGEMENT_MIN >= 1.5 * _STUD_MAJOR, _STUD_ENGAGEMENT_MIN
-assert _STUD_ENGAGEMENT_MAX < _TAP_THREAD_DEPTH, _STUD_ENGAGEMENT_MAX
+assert _STUD_ENGAGEMENT_MAX < TAP_THREAD_DEPTH_MIN, _STUD_ENGAGEMENT_MAX
+assert (
+    stud.FULL_THREAD_LENGTH - printed_band_mm(1)
+    >= _STUD_ENGAGEMENT_MAX + stud.jam_nut.THICKNESS + stud.ADJUSTMENT_RANGE
+), _STUD_ENGAGEMENT_MAX
 # The nib preset band keeps the grip seated in the V both ways.
 assert carriage.MARKER_GRIP_LOCAL_X[0] + NIB_TOLERANCE_MM <= 0.0
 assert (
