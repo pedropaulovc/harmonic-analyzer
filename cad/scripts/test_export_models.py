@@ -1036,7 +1036,7 @@ def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(
         export_models.assert_gallery_inputs_current(manifest)
 
 
-@pytest.mark.parametrize("stem", ["ch_pivot_shaft", "ch_rocker_arm_tl_filing_button"])
+@pytest.mark.parametrize("stem", ["ch_pivot_shaft", "ch_rocker_arm_tl_outline_template"])
 def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
     tmp_path: Path, monkeypatch, stem: str,
 ) -> None:
@@ -1206,7 +1206,7 @@ def produced_feature_bundles(tmp_path: Path, monkeypatch):
     import export_features
     from _export_feature_faces import face_name
 
-    stems = ("ch_pivot_shaft", "ch_rocker_arm_tl_filing_button")
+    stems = ("ch_pivot_shaft", "ch_rocker_arm_tl_outline_template")
     monkeypatch.setattr(export_features, "SUPPORTED_PARTS", stems)
     colors = {}
     digests = {}
