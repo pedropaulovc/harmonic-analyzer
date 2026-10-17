@@ -190,10 +190,14 @@ SIDE_AXIS_X = 0.228
 # +5.56 mm), so the four-row block is requested one pitch under its value.
 # The arm-to-flange inside corner at the arm's west face (X -5, the flange's
 # front face Z 97.22: sheet (93, 132.93) mm) prints as an arc; its MAX
-# radius reads up-left of it, its block (two 7..8-character label rows, ~21
-# mm) centred on x 72 mm over y ~138..154 mm: right of the flange width's
-# west witness (x 55 mm), left of the arm (x 93 mm), over the flange's front
-# face (y 132.93 mm) and under the flange width's line (y ~189 mm).
+# radius reads up-left of it.  Its callout covers ALL six arm-root corners,
+# the stub's three on the mounting face too (machinist review r3: the leader
+# on one front-face corner left the stub's corners in doubt), in three label
+# rows no wider than the "R1.0 max." value (~24.8 mm): the four-row block,
+# centred on x 72 mm, its value row a pitch over the requested y, spans y
+# ~138.9..160.1 mm over x ~59.6..84.4 mm: right of the flange width's west
+# witness (x 55 mm), left of the arm (x 93 mm), over the flange's front face
+# (y 132.93 mm) and under the flange width's line (y ~189 mm).
 # The arm's length from its buried start (Z 4, inside the collar) is not
 # dimensioned: the arm's end is located from the bore axis in the side view.
 FRONT_KEEP = {
@@ -501,13 +505,14 @@ BOTTOM_WEST_AXES = {
 # title block's .XXX band, because it is the MHA-VN-050 screws' grip
 # (machinist review r2: the third place named no function); the callout,
 # derived in the spec with the stack that needs it, says so.  The
-# arm-to-flange inside corners' MAX radius names the corners it controls.
+# arm-to-flange inside corners' MAX radius names the corners it controls:
+# all six, front face and mounting face alike (rule 16).
 DIMENSION_CALLOUTS = {
     "ArmWidth": "ARM WIDTH",
     "FlangeWidth": "FLANGE WIDTH",
     "FlangeDepth": FLANGE_DEPTH_CALLOUT,
     "CollarLen": COLLAR_LENGTH_CALLOUT,
-    "ArmRootR": "ARM ROOT\nCORNERS",
+    "ArmRootR": "ALL ARM\nROOT\nCORNERS",
 }
 # The bore names its process (drawing-guidelines.md rule 7 (notes: few,
 # flagged, never a method)), the part it seats and the matched fit it needs.

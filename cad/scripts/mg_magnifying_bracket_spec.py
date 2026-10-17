@@ -22,8 +22,9 @@ which names the lever's press zone it matches; the blanked ``ArmSection``
 witness carries the arm's section and the bore axis's one datum chain (the
 mounting face and the arm's end, both from the axis) in the side view.  A
 native plain clearance-hole callout names the summing lever's tapped holes
-the banded hole pattern matches.  ``ArmRootFillet`` breaks the arm-to-flange
-inside corners at a single MAX radius (drawing-guidelines.md rule 16).
+the banded hole pattern matches.  ``ArmRootFillet`` breaks all six
+arm-to-flange inside corners, on both flange faces, at a single MAX radius
+(drawing-guidelines.md rule 16).
 """
 
 from __future__ import annotations
@@ -50,17 +51,19 @@ from mg_lever_press_fit_geom import (
     PRESS_ZONE_DIA,
     PRESS_ZONE_DIA_BAND,
     PRESS_ZONE_LENGTH,
-    PRESS_ZONE_LENGTH_BAND,
     check_press_fit_budget,
     press_fit_budget,
 )
 
-# Arm-to-flange inside corners (drawing-guidelines.md rule 16): the three
-# concave edges where the arm leaves the flange's front (-Z) face are filleted
-# AT the largest radius the print allows, a single MAX limit, so the shop may
-# leave any smaller corner a Ø2 end mill cuts.  One place: rule 3, no extra
-# places on a radius.  The build proves the fillet leaves the flange's front
-# face a flat beside the arm on both sides.
+# Arm-to-flange inside corners (drawing-guidelines.md rule 16): the arm passes
+# through the flange, so its west face and both Y faces meet the flange's
+# front (-Z) face and, at the 3.11 stub past the mounting face, the mounting
+# (+Z) face -- six concave edges, all filleted AT the largest radius the
+# print allows, a single MAX limit, so the shop may leave any smaller corner
+# a Ø2 end mill cuts.  One place: rule 3, no extra places on a radius.  The
+# build proves the fillet leaves each face a flat beside the arm on both
+# sides; the offline drawing test proves the mounting face's three stand
+# clear of the summing lever's end.
 ARM_ROOT_R_PLACES = 1
 ARM_ROOT_R_MAX = 1.0
 ARM_ROOT_R_BAND = (0.0, -ARM_ROOT_R_MAX)  # (upper, lower)
@@ -93,7 +96,7 @@ RADIUS_TOL_TYPE = 6
 # holes' row, mreview10 blocker 1), toleranced where the footprint is seen,
 # not edge-on.  The arm-to-flange inside corners' fillet radius (ArmRootFillet)
 # imports to the front view, where the corner at the arm's west face prints
-# as an arc. ---
+# as an arc; its callout says it covers ALL six. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarBore"},
     "Collar": {"CollarLen"},
@@ -172,13 +175,12 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("collar_bore", GROUND_UM, CylinderFace(COLLAR_BORE_DIA)),
 )
 # The collar's length band sets a stack: the lever's end sits flush with the
-# collar's outer face, so the collar spans exactly the lever's banded press
-# zone, and its length bounds the press contact (COLLAR_ENGAGEMENT_MAX, the
-# press force).  The callout names that zone.
-if (COLLAR_LENGTH, COLLAR_LENGTH_BAND) != (PRESS_ZONE_LENGTH, PRESS_ZONE_LENGTH_BAND):
-    raise AssertionError(
-        "the collar length must equal the lever's press zone, band and all"
-    )
+# collar's outer face, so the lever's press zone -- a single MIN limit from
+# its tip -- must cover the longest collar, and the collar's length bounds the
+# press contact (COLLAR_ENGAGEMENT_MAX, the press force).  The callout names
+# that zone.
+if not COLLAR_LENGTH + COLLAR_LENGTH_BAND[0] <= PRESS_ZONE_LENGTH:
+    raise AssertionError("the lever's MIN press zone must cover the longest collar")
 COLLAR_LENGTH_CALLOUT = "COLLAR LENGTH\nALONG BORE AXIS =\nMHA-MG-003 LEVER PRESS ZONE"
 
 # The flange's thickness is the bracket screws' (MHA-VN-050) grip: it sets how

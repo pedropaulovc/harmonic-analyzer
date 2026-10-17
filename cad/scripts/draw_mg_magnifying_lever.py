@@ -7,8 +7,8 @@ tip and the dome radius, a radial reference "(R3.0)": each end is a tangent
 full hemisphere on the selected bar) plus two blanked reference sketches the
 FRONT view shows and dimensions: ``RodStock`` (the Ø6 as plain bar stock at
 mid-length, ``STOCK OK``) and ``PressZone`` (the cylinder the bracket collar
-grips -- its banded start back from the east tip, matched to the MHA-MG-001
-collar's length, its length to the dome tangent as a reference, and its
+grips -- its start back from the east tip a single MIN limit covering the
+MHA-MG-001 collar, its length to the dome tangent as a reference, and its
 banded diameter, tied to the MHA-MG-001 bore it enters).  The zone's start is
 a solid line across the bar, so the zone reads between it and the dome's
 tangent edge; every other reference entity lies on the silhouette.  The OD
@@ -92,19 +92,26 @@ _PRESS_ZONE_MID_X = (_PRESS_ZONE_START_X + _DOME_TANGENT_X) / 2.0
 _ROD_TOP_Y = FRONT_CENTER[1] + ROD_DIA / 2.0 * SHEET_SCALE[1] / 1000.0
 
 # The two native profile dims the print keeps: the tip-to-tip length below the
-# rod, outermost (its extension lines drop from both tips), and the dome
-# radius reference right of the east tip, its three rows between the zone
-# diameter's dimension line (left) and block (above).
+# rod, outermost on a line of its own (its extension lines drop from both
+# tips), and the dome radius reference right of the east tip, its three rows
+# between the zone diameter's dimension line (left) and block (above).
+# Machinist review r2: r4 printed the 165.0 line (y 113.5 mm) level with the
+# zone start's (113.1 mm), so the two read as one chain ending at the zone
+# start; it now runs ~13 mm under the zone start's line, the title block's
+# top (y ~65 mm) far below.
 FRONT_KEEP = {
-    "OverallLength": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.034),
+    "OverallLength": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.042),
     "DomeRadius": (_ROD_TIP_X + 0.040, FRONT_CENTER[1] + 0.008),
 }
 # The reference sketches' dims.  The stock diameter above the rod at
 # mid-length, its dimension line just right of its points on the outlines.
 # The press zone's lengths hang below the rod off the witness on its bottom
 # outline and the tip (layout doc: a horizontal dim's rows centre on the
-# requested x): the cylinder's reference length innermost, its row left of
-# the 7 mm span; the start from the tip outside it, its rows right of the tip.
+# requested x and y, its line at the lowest row's baseline): the cylinder's
+# reference length innermost, its row left of the 7 mm span; the start from
+# the tip outside it, its three rows wholly right of the tip's extension line
+# (machinist review r2: r4's 52 mm block, centred 24 mm right of the tip, ran
+# that line through its 'M') and under the reference length's line.
 # The banded diameter's dimension line stands inside the zone, between the
 # zone-start line and the dome's tangent edge, and its rows hang ABOVE the
 # rod, right of that line: the line rises to the shoulder under the block,
@@ -113,7 +120,7 @@ FRONT_KEEP = {
 REFERENCE_KEEP = {
     "RodDia": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.020),
     "PressZoneLen": (_PRESS_ZONE_START_X - 0.010, FRONT_CENTER[1] - 0.012),
-    "PressZoneStart": (_ROD_TIP_X + 0.024, FRONT_CENTER[1] - 0.024),
+    "PressZoneStart": (_ROD_TIP_X + 0.030, FRONT_CENTER[1] - 0.024),
     "PressZoneDia": (_PRESS_ZONE_MID_X, FRONT_CENTER[1] + 0.030),
 }
 DIMENSION_CALLOUTS = {

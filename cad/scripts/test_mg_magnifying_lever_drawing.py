@@ -184,13 +184,14 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
     assert press.PRESS_INTERFERENCE_MAX_FN2 == pytest.approx(0.0254)
     assert budget["interference_max"] <= press.PRESS_INTERFERENCE_MAX_FN2
     assert part.PRESS_ZONE_DIA_BAND is press.PRESS_ZONE_DIA_BAND
-    # Main's batch10 ruling: the zone's start from the tip carries the
-    # drawing-free geom's axial band natively, at .XX, never a spec alias.
-    assert part.PRESS_ZONE_LENGTH_BAND is press.PRESS_ZONE_LENGTH_BAND
+    # Machinist review r2 over-specification: the zone's start from the tip is
+    # a single native MIN limit (swTolMIN), never a band, here or in the geom.
+    assert not hasattr(press, "PRESS_ZONE_LENGTH_BAND")
+    assert not hasattr(part, "PRESS_ZONE_LENGTH_BAND")
+    assert not hasattr(mg_magnifying_lever_spec, "PRESS_ZONE_LENGTH_BAND")
     assert not hasattr(mg_magnifying_lever_spec, "PRESS_ZONE_START_BAND")
-    # r1 review clarity: the spec imports the band only to prove it is the
-    # collar's own, for the start callout that names that mate.
-    assert mg_magnifying_lever_spec.PRESS_ZONE_LENGTH_BAND is press.PRESS_ZONE_LENGTH_BAND
+    assert mg_magnifying_lever_spec.PRESS_ZONE_START_TOL_TYPE == 5  # swTolMIN
+    assert part.PRESS_ZONE_START_TOL_TYPE is mg_magnifying_lever_spec.PRESS_ZONE_START_TOL_TYPE
     assert part.PRESS_ZONE_X is geom.PRESS_ZONE_X
     # Retry09 review: the zone is located from the rod TIP -- PRESS_ZONE_LENGTH
     # back to its start -- and runs to the dome tangent, so its banded
@@ -253,13 +254,21 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
     assert "PressZoneEnd" not in source
     assert 'set_global(adapter, "CollarLen", f"{PRESS_ZONE_LENGTH}mm")' in source
     assert mg_magnifying_lever_spec.DRAWING_PRECISION["PressZone"] == {
-        "PressZoneStart": 2,
+        "PressZoneStart": 1,
         "PressZoneLen": 1,
         "PressZoneDia": 3,
     }
-    assert (
-        '"PressZone", "PressZoneStart", *deviations(PRESS_ZONE_LENGTH_BAND)' in source
-    )
+    # The MIN recipe (build_vn_knife_hanger_stud's ThreadLengthMin) with the
+    # bracket's readback: the model value is the limit, no deviations.
+    assert "_press_zone_start_min_limit(adapter)" in source
+    assert '_named_dimension(adapter, "PressZone", "PressZoneStart")' in source
+    assert "math.isclose(value, PRESS_ZONE_LENGTH / 1000.0, abs_tol=1e-9)" in source
+    assert "tolerance.Type = PRESS_ZONE_START_TOL_TYPE" in source
+    assert "tolerance.SetValues(0.0, 0.0)" in source
+    assert "int(tolerance.Type) != PRESS_ZONE_START_TOL_TYPE" in source
+    assert "float(tolerance.GetMinValue()), 0.0" in source
+    assert "float(tolerance.GetMaxValue()), 0.0" in source
+    assert '"PressZone", "PressZoneStart", *deviations' not in source
     assert "PressZoneTip" not in set().union(*part.DRAWING_DIMENSIONS.values())
     # The cylinder's length (start less the dome radius) prints as a LINEAR
     # reference; the start from the tip is the toleranced value.
@@ -268,17 +277,16 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
     assert "set_reference_dimension(adapter, matches[0]" in sheet_source
     assert "set_reference_dimensions(" not in sheet_source
     assert "PressZoneLen" not in drawing.REFERENCE_CALLOUTS
-    # r1 review clarity: the start's band is the collar's length band, and
-    # the callout names that mate.
-    assert (press.PRESS_ZONE_LENGTH, press.PRESS_ZONE_LENGTH_BAND) == (
-        press.COLLAR_LENGTH,
-        press.COLLAR_LENGTH_BAND,
-    )
+    # r2 review: the MIN is the longest collar's length -- the tip is flush
+    # with the collar's outer face, so the selected land covers every collar
+    # -- and the callout names that mate, no number of its own.
+    assert press.PRESS_ZONE_LENGTH == press.COLLAR_LENGTH + press.COLLAR_LENGTH_BAND[0]
     assert (
         drawing.REFERENCE_CALLOUTS["PressZoneStart"]
         is mg_magnifying_lever_spec.PRESS_ZONE_START_CALLOUT
-        == "PRESS ZONE START\nMATCHES MHA-MG-001\nCOLLAR LENGTH"
+        == "PRESS ZONE COVERS\nMHA-MG-001 COLLAR"
     )
+    assert "MATCHES" not in mg_magnifying_lever_spec.PRESS_ZONE_START_CALLOUT
     # The sheet's stations come from the same constants as the model's.
     assert drawing._PRESS_ZONE_START_X == pytest.approx(
         drawing._ROD_TIP_X - press.PRESS_ZONE_LENGTH / 1000.0
@@ -347,6 +355,27 @@ def test_dome_radius_is_a_radial_reference_of_the_tangent_hemisphere() -> None:
     assert "<MOD-DIAM>" not in sheet_source
 
 
+# Text geometry measured on the farm r4 sheet (20261017T025452884Z): a
+# dimension's rows print centred on the requested (x, y), callout rows 5.56 mm
+# apart, 3.5 mm caps, the dimension line at the lowest row's baseline (r4's
+# five-row zone start, requested at y 126 mm, spanned 113.1..138.6 mm); a lone
+# row's baseline sits 2.78 mm under the requested y (r4's (7.0) line at 135.2
+# mm); the widest r4 row, "MATCHES MHA-MG-001", printed 52.3 mm over its 18
+# characters.
+_ROW_PITCH = 0.00556
+_TEXT_HEIGHT = 0.0035
+_LONE_ROW_DROP = 0.00278
+_CHAR_WIDTH = 0.0523 / 18
+
+
+def _block_half_extent(rows: list[str]) -> tuple[float, float]:
+    """(half width, half height) of a dimension's centred block of rows."""
+    return (
+        _CHAR_WIDTH * max(len(row) for row in rows) / 2.0,
+        (_TEXT_HEIGHT + (len(rows) - 1) * _ROW_PITCH) / 2.0,
+    )
+
+
 def test_press_zone_text_clears_its_lines_and_the_isometric() -> None:
     """Retry09 review: the zone diameter's rows sat on its own dimension
     line.  Its line now stands inside the zone and its rows hang above the
@@ -354,7 +383,13 @@ def test_press_zone_text_clears_its_lines_and_the_isometric() -> None:
     at the line), above the dome radius; the zone's lengths print below the
     rod off the bottom witness, the reference innermost and left of its span,
     the start from the tip outside it and right of the tip, the overall length
-    outermost."""
+    outermost.  Machinist review r2: r4's zone-start block (52 mm wide,
+    centred 24 mm right of the tip) ran the tip's extension line through its
+    'M', and its line was level with the 165.0's, so the overall read as
+    ending at the zone start.  The block now sits wholly right of that line,
+    under the (7.0) line, and the 165.0 runs on its own line well below."""
+    import mg_lever_press_fit_geom as press
+
     rod_bottom_y = drawing.FRONT_CENTER[1] - drawing.ROD_DIA / 2000.0
     dia_x, dia_y = drawing.REFERENCE_KEEP["PressZoneDia"]
     assert drawing._PRESS_ZONE_START_X < dia_x < drawing._DOME_TANGENT_X
@@ -367,6 +402,32 @@ def test_press_zone_text_clears_its_lines_and_the_isometric() -> None:
     assert overall_y < start_y < length_y < rod_bottom_y
     assert length_x < drawing._PRESS_ZONE_START_X
     assert start_x > drawing._ROD_TIP_X
+    # The zone start prints "10.0 MIN" over its two callout rows.
+    places = mg_magnifying_lever_spec.DRAWING_PRECISION["PressZone"]["PressZoneStart"]
+    start_rows = [
+        f"{press.PRESS_ZONE_LENGTH:.{places}f} MIN",
+        *mg_magnifying_lever_spec.PRESS_ZONE_START_CALLOUT.split("\n"),
+    ]
+    assert start_rows[0] == "10.0 MIN" and len(start_rows) == 3
+    half_width, half_height = _block_half_extent(start_rows)
+    assert half_width * 2.0 < 0.052  # narrower than r4's block
+    # Wholly right of the tip's extension line, by an arrow's air (2 mm).
+    assert start_x - half_width >= drawing._ROD_TIP_X + 0.002
+    # Under the (7.0) reference's line, which runs on past the tip.
+    assert start_y + half_height < length_y - _LONE_ROW_DROP
+    # Clear below the dome radius's three-row block and short of the
+    # isometric (its leftmost ink at x ~319 mm on r4).
+    dome_y = drawing.FRONT_KEEP["DomeRadius"][1]
+    dome_rows = ["(R3.0)", *drawing.DIMENSION_CALLOUTS["DomeRadius"].split("\n")]
+    dome_half_height = _block_half_extent(dome_rows)[1]
+    assert start_y + half_height + 0.010 < dome_y - dome_half_height
+    assert start_x + half_width < 0.300
+    # The 165.0 runs on its own line, >= 10 mm under the zone start's (the
+    # lowest row's baseline), above the title block's top (y ~65 mm).
+    start_line = start_y - half_height
+    overall_line = overall_y - _LONE_ROW_DROP
+    assert start_line - overall_line >= 0.010
+    assert overall_line > 0.070
     # Two rows, so the mate callout stays short of the isometric.
     rows = mg_magnifying_lever_spec.PRESS_ZONE_DIA_CALLOUT.split("\n")
     assert len(rows) == 2
@@ -429,6 +490,7 @@ def test_final_forced_volume_guard_follows_annotations_before_publication() -> N
     assert publish.value.value.func.id == "save_part_and_images"
     for mutation in (
         "set_dimension_bilateral_tolerance",
+        "_press_zone_start_min_limit",
         "set_dimension_prefix",
         "apply_drawing_precision",
         "clear_dimensions_for_drawing",
