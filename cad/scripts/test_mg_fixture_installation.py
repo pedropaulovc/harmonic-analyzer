@@ -269,7 +269,9 @@ def test_light_press_budget_is_the_lame_collar_inside_strength() -> None:
     assert press.COLLAR_ENGAGEMENT == 7.0
     assert press.COLLAR_LENGTH == 10.0
     assert press.COLLAR_LENGTH_BAND == (0.0, -0.05)
-    assert press.PRESS_ZONE_LENGTH_BAND == (0.0, -0.05)
+    # The lever's land start is a single MIN limit covering the longest collar.
+    assert not hasattr(press, "PRESS_ZONE_LENGTH_BAND")
+    assert press.PRESS_ZONE_LENGTH == press.COLLAR_LENGTH + press.COLLAR_LENGTH_BAND[0]
     assert press.COLLAR_ENGAGEMENT_MAX == pytest.approx(
         7.2078194326718075, rel=0.0, abs=1e-12
     )
