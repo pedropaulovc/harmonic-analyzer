@@ -7,3 +7,9 @@ mg-magnifying-lever:
   tolerance_class: machined_block
   fit_class: shaft_in_bushing   # the clamp block slides along the rod
   process: "selected cold-drawn brass rod, body Ø6.00 0/−0.03; 165.0 ±0.8 tip-to-tip with tangent hemispherical ends; select or lap the bracket-end land to Ø6.000 0/−0.006, starting at least 10.0 mm before the tip (covering the whole MHA-MG-001 collar) and ending at its dome tangent (7 mm nominal cylindrical engagement); light-press the MHA-MG-001 collar onto the rod held near its end; the press alone retains it"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "front view: the Ra 3.2 symbol on the Ø6 body, its reason MHA-MG-002 SCREW SEAT at the symbol."
+      finding: "Ra 3.2 on a set/thumb-screw clamp face: a clamp face carries no symbol (rule 6, roughness symbols only where a surface runs, slides or locates)"
+      reason: "owner ruling 2026-10-17: the Ø6 body is a functional set-screw seat for the MHA-MG-002 clamp screw, which locates the clamp anywhere along its travel from the west tip to the collar (rule 6, one static mating seat that locates the part on its neighbour)."
