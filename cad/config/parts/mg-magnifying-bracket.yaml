@@ -1,9 +1,11 @@
 mg-magnifying-bracket:
   number: MHA-MG-001
   # The light-press strength budget uses 1018 cold-drawn yield, not brittle
-  # class-30 gray iron. Keep the condition on the print, not just in code.
-  material: LOW-CARBON STEEL (1018, COLD-DRAWN)
-  material_specification: LOW-CARBON STEEL (1018, COLD-DRAWN)
+  # class-30 gray iron. Keep the condition on the print, not just in code,
+  # on one title-block line (machinist review r2: the 35-character
+  # "LOW-CARBON STEEL (1018, COLD-DRAWN)" wrapped).
+  material: AISI 1018 COLD-DRAWN STEEL
+  material_specification: AISI 1018 COLD-DRAWN STEEL
   finish: machined
   quantity: 1
   tolerance_class: machined_block

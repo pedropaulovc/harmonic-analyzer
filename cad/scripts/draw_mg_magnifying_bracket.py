@@ -98,6 +98,7 @@ from mg_magnifying_bracket_spec import (
     COLLAR_LENGTH_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_REFERENCE_PRECISION,
+    FLANGE_DEPTH_CALLOUT,
 )
 from mg_magnifying_lever_geom import COLLAR_HALF_LEN
 
@@ -157,10 +158,13 @@ SIDE_AXIS_X = 0.228
 # the lowest row's baseline 3.55 mm over the collar) over x ~98..140 mm, y
 # ~239.7..254.3 mm with the value requested at y 248 mm.  The callout now
 # names the lever's press zone the length matches on a third callout row
-# (27 characters, ~74.7 mm at retry09's 41.5 mm for 15), so the value rises
-# one row pitch: four rows over x ~81.6..156.4 mm, y ~239.7..259.9 mm, 6.8 mm
-# under the drawable top
-# (266.7 mm).
+# (27 characters, ~74.7 mm at retry09's 41.5 mm for 15), so the value rose
+# one row pitch; r3b printed the tolerance stack's "0.00" upper limit with its
+# top at ~266.4 mm, 0.3 mm under the drawable top (266.7 mm), the rows over
+# x 82.9..155.1 mm and the line at the lowest row's baseline, y 240.7 mm.
+# The block now sits 1.5 mm lower: the "0.00" top ~264.9 mm (1.8 mm under
+# the drawable top), the line at ~239.2 mm, 3.05 mm over the collar's top
+# (y 236.15 mm), its witnesses from 237.15 mm.
 # A HORIZONTAL dimension's rows requested beyond its span print centred on
 # the requested x, and its dimension line runs on under the lowest row to that
 # row's far end (retry09 native audit).  The arm width therefore reads BELOW
@@ -171,7 +175,15 @@ SIDE_AXIS_X = 0.228
 # mm) and clear of the flange depth's column at x 53 mm.  The flange's two
 # plan dimensions keep their retry09 places from the flange (the width's
 # value row ~62 mm over the mounting face, y 129.75 mm), left of the arm;
-# the flange depth's block sits a text height plus under the flange width's.
+# the flange depth's block sits a text height plus under the flange width's,
+# its rows centred on x ~36.5 mm with their near end on its column (x 53
+# mm): the value (y 178.79 mm, as r3b), then three rows
+# (FLANGE_DEPTH_CALLOUT, widest "FLANGE DEPTH", 33.1 mm over x 19.9..53 mm)
+# naming the MHA-VN-050 screws' grip the three places hold, the lowest at y
+# ~162.1 mm: left of the flange width's west witness (x 55 mm) and the arm
+# root's block (x >= 59.6 mm).  A block's value row prints (rows - 2) half
+# pitches over the requested y (r3b: 2 rows +0, 3 rows +2.78 mm, 4 rows
+# +5.56 mm), so the four-row block is requested one pitch under its value.
 # The arm-to-flange inside corner at the arm's west face (X -5, the flange's
 # front face Z 97.22: sheet (93, 132.93) mm) prints as an arc; its MAX
 # radius reads up-left of it, its block (two 7..8-character label rows, ~21
@@ -183,8 +195,8 @@ SIDE_AXIS_X = 0.228
 FRONT_KEEP = {
     "ArmWidth": (0.077, 0.11679),
     "FlangeWidth": (0.068, 0.19479),
-    "FlangeDepth": (0.053, 0.17879),
-    "CollarLen": (0.119, 0.248 + 0.00556),
+    "FlangeDepth": (0.053, 0.17879 - 0.00556),
+    "CollarLen": (0.119, 0.248 + 0.00556 - 0.0015),
     "ArmRootR": (0.072, 0.150),
 }
 # VIEW A's letter arrow on the front view: the bottom view looks up the
@@ -312,13 +324,21 @@ BOTTOM_HOLE_KEEP = {
 # over it, the elbow at (218.05, 219) mm), the bore on the right (retry09's
 # 24-character "REAM OR BORE: PRESS SEAT" printed 61.5 mm wide).  The bore
 # now reads as a REFERENCE nominal, "(Ø5.986)" with no tolerance stack,
-# over three matched-fit rows (COLLAR_BORE_CALLOUT, widest 25 characters,
-# ~64.1 mm): requested 28.5 mm over the axis (A1 frame), the value row over
-# y ~258.65..262.15 mm, the rows' baselines at y 253.05, 247.45 and 241.85
-# mm over x ~240.35..304.45 mm, the elbow at (238.75, 241.85) mm, 5.7 mm
-# over the collar's top (y 236.15 mm), right of the front view's
-# collar-length rows (x <= 156.4 mm) and clear of the sheet's right.  Each
-# leader runs
+# over three matched-fit rows (COLLAR_BORE_CALLOUT).  Measured on r3b: that
+# four-row block prints vertically CENTRED on the requested y, not hung under
+# it -- requested (272.4, 258.65) mm, the value row's top at 268.8 mm (2.1 mm
+# over the drawable top, 266.7 mm), the rows' baselines at 258.6, 253.1 and
+# 247.5 mm, each row centred on the requested x, the widest ("DIAMETRAL
+# INTERFERENCE ON", 67.0 mm) over x 238.9..305.9 mm and the elbow on the
+# lowest baseline 1.6 mm before that row's near end, at (237.3, 247.5) mm.
+# So the block's top is the requested y + 10.15 mm and its lowest baseline
+# the requested y - 11.15 mm.  The first row now says THRU (30 characters,
+# ~74.4 mm in Century Gothic, the widest), so the block is requested at
+# (270.4, 254.65) mm: top ~264.8 mm (1.9 mm under the border), lowest
+# baseline ~243.5 mm, rows over x ~233.2..307.6 mm, the elbow at ~(231.6,
+# 243.5) mm -- right of the OD's rows and elbow (x <= 218.05 mm), 7.4 mm over
+# the collar's top and 9 mm left of the isometric's outline (x 316.6 mm).
+# Each leader runs
 # steeply down from its elbow to the NEAR rim and stops there: the near-side
 # single-arrow style (set_near_side_diameter -- Diametric, one outside
 # arrow, no second arrow, a broken horizontal leader; the alignment pinion's
@@ -334,7 +354,7 @@ BOTTOM_HOLE_KEEP = {
 # ink inside the rim.
 SIDE_KEEP = {
     "CollarOd": (SIDE_AXIS_X - 0.0252, FRONT_ORIGIN_Y + 0.0185),
-    "CollarBore": (SIDE_AXIS_X + 0.0444, FRONT_ORIGIN_Y + 0.0285),
+    "CollarBore": (SIDE_AXIS_X + 0.0424, FRONT_ORIGIN_Y + 0.0245),
 }
 # The arm's section, from the part's ArmSection witness (shown in the side
 # view by curate_hidden_dimensions).  Turned into projection, the view's
@@ -403,10 +423,17 @@ SIDE_KEEP = {
 # clearances to the arm's end and to the hole callout under them.
 # Subtract 21.21 mm from the y quoted above for those two, add 24 mm for the
 # other two and for the collar's diameters.
+# r3b's native layout audit then measured the arm end reference's arrow,
+# (259.0, 126.6)->(258.6, 130.2) mm on the arm end's witness (y 126.6 mm),
+# 0.86 mm from the 3.00's value text [259.6, 122.5]..[268.4, 126.1] mm
+# (arrow-near-text needs 2.0 mm; its witness stood 0.57 mm off).  The 3.00
+# block now hangs 2.5 mm lower: its value text's top ~123.6 mm, 3.0 mm under
+# that witness and arrow; its line at ~108.0 mm stays over the hole
+# callout's block (top ~63.3 mm) and right of the overhang's column.
 SIDE_SECTION_KEEP = {
     "SeatToAxis": (SIDE_AXIS_X - 0.030, 0.2025),
     "ArmPastSeat": (SIDE_AXIS_X - 0.016, 0.09829),
-    "ArmBelowAxis": (SIDE_AXIS_X + 0.036, 0.11879),
+    "ArmBelowAxis": (SIDE_AXIS_X + 0.036, 0.11879 - 0.0025),
 }
 # The sheet-derived reference: its spec key (DRAWING_REFERENCE_PRECISION),
 # its in-span text position and its callout-below rows.
@@ -450,13 +477,15 @@ BOTTOM_WEST_AXES = {
 # each with the feature it controls.  The collar's length names its
 # direction (machinist review: 10.00 vs the Ø12 read as one feature) and the
 # stack its band sets, the lever's press zone (machinist review r1, blocker:
-# the band named no stack).  The flange's thickness, the screws' grip, takes
-# the title block's .XXX band.  The arm-to-flange inside corners' MAX radius
-# names the corners it controls.
+# the band named no stack).  The flange's thickness prints three places, the
+# title block's .XXX band, because it is the MHA-VN-050 screws' grip
+# (machinist review r2: the third place named no function); the callout,
+# derived in the spec with the stack that needs it, says so.  The
+# arm-to-flange inside corners' MAX radius names the corners it controls.
 DIMENSION_CALLOUTS = {
     "ArmWidth": "ARM WIDTH",
     "FlangeWidth": "FLANGE WIDTH",
-    "FlangeDepth": "FLANGE DEPTH",
+    "FlangeDepth": FLANGE_DEPTH_CALLOUT,
     "CollarLen": COLLAR_LENGTH_CALLOUT,
     "ArmRootR": "ARM ROOT\nCORNERS",
 }
@@ -477,14 +506,13 @@ SECTION_CALLOUTS = {
 }
 # The hole callout names the mate its banded coordinates match (machinist
 # review r1, blocker: the ±0.05 pattern named no mate): the summing lever's
-# two tapped holes the bracket screws into.  Two process rows over the
-# native thru row (compose_hole_callout_prefix: the trailing break keeps the
-# native size on its own row) -- three physical rows, one fewer than the
-# counterbore callout it replaces.  The thru row (43.8 mm) is now the
-# lowest, the leader's elbow at its near end, so the rows over it stay
-# about as narrow (18 characters, ~47 mm): a wider row there would hang
-# over a leader steep enough to pass under the offset's hung row.
-MOUNTING_HOLE_PROCESS = "MATCHES MHA-SM-003\nSUMMING LEVER TAPS\n"
+# two tapped holes the bracket screws into.  Two mate rows, then the process
+# word (machinist review r2, rule 12: say drill) joined to the native size
+# row (compose_hole_callout_prefix: no trailing break joins the two with one
+# space), "DRILL 2X Ø2.59 THRU ALL" -- three physical rows.  The size row is
+# the widest and the lowest, the leader's elbow at its near end, so neither
+# row over it reaches past that end toward the leader.
+MOUNTING_HOLE_PROCESS = "MATCHES MHA-SM-003\nSUMMING LEVER TAPS\nDRILL"
 
 # Third-angle projection of the side view: model +Z (down the front view)
 # points down the sheet, model +Y left (the viewer is at +X, the front view's
@@ -1193,25 +1221,27 @@ async def build(adapter: Any) -> dict[str, str]:
     hole_callout = add_native_hole_callout(
         adapter,
         bottom,
-        # The east hole (x 72.7 mm), nearer the block. Two process rows naming
-        # the summing lever's taps over the native thru row: three physical
-        # rows (~14.6 mm), centred 1 mm under the anchor, so the block spans
-        # y ~47.7..62.3 mm over x ~138..186 mm at its widest (the rows ~47 mm,
-        # the thru row 43.8 mm): left of the title block (x > 216 mm under y
-        # 66 mm), right of the offset's text (x <= 126.2 mm) by more than a
-        # text height, left of the iso and over the drawable border.  The
-        # counterbore callout's four rows sat at (176, 64.79) mm with its
-        # widest (lowest) row's elbow at x ~138 mm; the narrower thru row now
-        # lowest puts the elbow at x ~138.6 mm only with the block 14 mm left
-        # and ~9 mm lower, which keeps the leader (slope ~0.62) steep enough
-        # to pass left of and under the offset's hung row.
+        # The east hole (x 72.7 mm), nearer the block.  Two rows naming the
+        # summing lever's taps over the native size row, which the process
+        # word leads ("DRILL 2X Ø2.59 THRU ALL"): three physical rows
+        # (~14.6 mm), each centred on the anchor's x, the block centred 1 mm
+        # under its y.  r3b measured the block at (162, 56) mm: baselines at
+        # y 58.8, 53.25 and 47.7 mm, "MATCHES MHA-SM-003" (the widest, 51.2
+        # mm) over x 136.4..187.6 mm, the size row 45.1 mm, the elbow 1.6 mm
+        # before the widest row's near end, at (134.8, 47.6) mm.  "DRILL"
+        # widens the size row to ~56.7 mm, now the widest, so the anchor moves
+        # 6 mm right: rows over x ~139.6..196.4 mm, two text heights right of
+        # the flange height's column (x 130 mm) and right of the offset's text
+        # (x <= 126.2 mm), left of the title block (x > 216 mm under y 66 mm),
+        # left of the iso and over the drawable border; the elbow at ~(138,
+        # 47.7) mm, the leader's slope ~0.63 against r3b's 0.66.
         # The leader leaves the lowest row's near end and climbs left toward
         # the hole, clear of its own upper rows, both mounting X dimensions,
         # the offset's shoulder and the caption under the coordinate stack.
         # Those witness/caption clearances still have their native readbacks;
         # no hole variable, tolerance or shared callout helper is rewritten.
         edge=rims[1].edge,
-        callout_xy=(0.162, 0.056),
+        callout_xy=(0.168, 0.056),
         label="two bracket mounting holes",
         process=MOUNTING_HOLE_PROCESS,
     )

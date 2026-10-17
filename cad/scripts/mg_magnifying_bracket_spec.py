@@ -28,7 +28,17 @@ inside corners at a single MAX radius (drawing-guidelines.md rule 16).
 
 from __future__ import annotations
 
-from magnifying_bracket_joint_layout import POSITION_BAND
+import _config
+
+from magnifying_bracket_joint_layout import (
+    ENGAGEMENT_MIN,
+    FLANGE_THICKNESS_BAND,
+    GRIP_BAND,
+    LINEAR_BAND,
+    POSITION_BAND,
+    SCREW_MAJOR_DIA,
+    SCREW_TIP_GAP_MIN,
+)
 from mg_lever_press_fit_geom import (
     COLLAR_LENGTH,
     COLLAR_LENGTH_BAND,
@@ -126,7 +136,7 @@ DRAWING_POSITION_BAND = POSITION_BAND
 # limits, so a pair made to the stated interference is one the budget bounds:
 # at the tightest interference, on either limit of the lever's zone, the
 # matched pair's press force and collar stress stay inside the budget the
-# lever print's force limit comes from.
+# MHA-MG-000 assembly's press step is bounded by.
 for _rod in (
     PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[1],
     PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[0],
@@ -142,8 +152,10 @@ for _rod in (
             raise AssertionError(
                 f"a matched collar bore exceeds the press budget's {_key}"
             )
+# The bore runs through the collar (rule 12: the callout says what to do and
+# how far), so the process row says THRU.
 COLLAR_BORE_CALLOUT = (
-    f"REAM OR BORE: {PRESS_FIT_BUDGET['interference_min']:.3f}-"
+    f"REAM OR BORE THRU: {PRESS_FIT_BUDGET['interference_min']:.3f}-"
     f"{PRESS_FIT_BUDGET['interference_max']:.3f}\n"
     "DIAMETRAL INTERFERENCE ON\n"
     "MHA-MG-003 LEVER"
@@ -158,8 +170,27 @@ if (COLLAR_LENGTH, COLLAR_LENGTH_BAND) != (PRESS_ZONE_LENGTH, PRESS_ZONE_LENGTH_
     )
 COLLAR_LENGTH_CALLOUT = "COLLAR LENGTH\nALONG BORE AXIS =\nMHA-MG-003 LEVER PRESS ZONE"
 
+# The flange's thickness is the bracket screws' (MHA-VN-050) grip: it sets how
+# far each screw reaches into the summing lever's blind #2-56 thread.  It
+# prints three places so the title block's .XXX band (FLANGE_THICKNESS_BAND,
+# ±0.13) holds the grip: worst-case engagement ENGAGEMENT_MIN 3.305 >= 1.5D
+# 3.2766 and screw-tip gap SCREW_TIP_GAP_MIN 0.0075 > 0.  At .XX (±0.51) the
+# thick flange would leave 2.925 engagement (< 1.5D) and the thin one would
+# bottom the screws 0.3725 deep, so the third place is the function, named
+# at the dimension (machinist review r2: a .XXX size with no stated job).
+SCREW_NUMBER = _config.parts("vn-magnifying-bracket-screw")["number"]
+_XX_GRIP_LOSS = LINEAR_BAND - GRIP_BAND
+if GRIP_BAND != FLANGE_THICKNESS_BAND or not _XX_GRIP_LOSS > 0.0:
+    raise AssertionError("the flange's .XXX band must be the screws' grip band")
+if (
+    ENGAGEMENT_MIN - _XX_GRIP_LOSS >= 1.5 * SCREW_MAJOR_DIA
+    and SCREW_TIP_GAP_MIN - _XX_GRIP_LOSS > 0.0
+):
+    raise AssertionError("the flange depth no longer needs its third place")
+FLANGE_DEPTH_CALLOUT = f"FLANGE DEPTH\n{SCREW_NUMBER}\nSCREW GRIP"
+
 # No note block (drawing-guidelines.md rule 7): every requirement is a native
-# dimension or a callout at its feature.  The press, its force limit and the
-# retaining compound are assembly steps, carried by the lever print and the
-# assembly (mg_lever_press_fit_geom.PRESS_INSTALLATION_NOTES), not this part.
+# dimension or a callout at its feature.  The press and its force limit are
+# assembly steps, carried by the MHA-MG-000 assembly
+# (mg_lever_press_fit_geom.PRESS_INSTALLATION_NOTES), not this part.
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
