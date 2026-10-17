@@ -339,7 +339,7 @@ ASM_BYTES = b"SLDASM restored from the farm"
 def farm_assembly(tmp_path, monkeypatch):
     """A farm-mode ``assembly:pen`` whose probe misses.
 
-    The execution token and recipe sidecar are real files under ``tmp_path``
+    The execution token and input ledger are real files under ``tmp_path``
     and the real ``_stamp_assembly_execution`` hashes the restored .SLDASM, so
     the token's content proves the restore happened before the stamp.
     """
@@ -348,12 +348,11 @@ def farm_assembly(tmp_path, monkeypatch):
     out = tmp_path / "sldasm"
     asm = out / "pen.SLDASM"
     token = out / ".pen.execution"
-    sidecar = out / ".pen.recipe.md5"
+    ledger = out / ".pen.inputs.json"
     calls: dict[str, list] = {"restore": [], "store": []}
 
     monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: [])
-    monkeypatch.setattr(dodo, "_digest_files", lambda _files: "d" * 32)
-    monkeypatch.setattr(dodo, "_recipe_sidecar", lambda _stem: sidecar)
+    monkeypatch.setattr(dodo, "_ledger_inputs", lambda _deps: {"cad/x.py": "d" * 32})
     monkeypatch.setattr(dodo, "_assembly_cache_outputs", lambda _stem: [asm])
     monkeypatch.setattr(dodo, "_assembly_file_deps", lambda _stem: [])
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "a" * 64)
@@ -368,7 +367,7 @@ def farm_assembly(tmp_path, monkeypatch):
     def restore(outcomes):
         _restore_sequence(dodo, monkeypatch, calls, outcomes, on_hit=land_assembly)
 
-    files = {"asm": asm, "token": token, "sidecar": sidecar}
+    files = {"asm": asm, "token": token, "ledger": ledger}
     return dodo, files, calls, restore
 
 
@@ -395,7 +394,9 @@ def test_assembly_success_restores_then_stamps_token_and_recipe(
     assert files["token"].read_text(encoding="utf-8").strip() == (
         hashlib.sha256(ASM_BYTES).hexdigest()
     ), "token identifies the restored artefact, so restore ran before the stamp"
-    assert files["sidecar"].read_text(encoding="utf-8") == "d" * 32 + "\n"
+    assert json.loads(files["ledger"].read_text(encoding="utf-8")) == {
+        "inputs": {"cad/x.py": "d" * 32}
+    }
     assert calls["store"] == []
 
 
@@ -411,7 +412,7 @@ def test_assembly_failure_leaves_no_token_and_no_sidecar(farm_assembly, monkeypa
 
     assert len(calls["restore"]) == 1
     assert not files["token"].exists()
-    assert not files["sidecar"].exists()
+    assert not files["ledger"].exists()
     assert calls["store"] == []
 
 
