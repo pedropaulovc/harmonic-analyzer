@@ -26,11 +26,18 @@ _DPI = _drawing_common.PDF_SHADED_DRAFT_DPI
 
 
 class _Seat:
-    """``ISldWorks`` integer preferences; ``refuse`` values read back unchanged."""
+    """``ISldWorks`` integer preferences; ``refuse`` values read back unchanged,
+    writing a ``throw`` value raises as a disconnected seat's COM call does."""
 
-    def __init__(self, value: int, refuse: frozenset[int] = frozenset()) -> None:
+    def __init__(
+        self,
+        value: int,
+        refuse: frozenset[int] = frozenset(),
+        throw: frozenset[int] = frozenset(),
+    ) -> None:
         self.values = {_PREF: value}
         self.refuse = refuse
+        self.throw = throw
         self.writes: list[int] = []
 
     def GetUserPreferenceIntegerValue(self, pref: int) -> int:
@@ -38,6 +45,8 @@ class _Seat:
 
     def SetUserPreferenceIntegerValue(self, pref: int, value: int) -> bool:
         self.writes.append(value)
+        if value in self.throw:
+            raise ConnectionError("RPC server is unavailable")
         if value in self.refuse:
             return False
         self.values[pref] = value
@@ -103,6 +112,23 @@ def test_refused_restore_never_replaces_the_export_failure() -> None:
     with pytest.raises(OSError, match="SaveAs3 died"):
         with _drawing_common.pdf_shaded_raster_dpi(_adapter(seat), _Span()):
             raise OSError("SaveAs3 died")
+
+
+def test_throwing_restore_never_replaces_the_export_failure() -> None:
+    """Codex P2 on bdaef54: a seat that disconnected mid-export throws from
+    the restore; the export's own exception is the one that propagates."""
+    seat = _Seat(_BASELINE, throw=frozenset({_BASELINE}))
+    with pytest.raises(OSError, match="SaveAs3 died"):
+        with _drawing_common.pdf_shaded_raster_dpi(_adapter(seat), _Span()):
+            raise OSError("SaveAs3 died")
+    assert seat.writes == [_DPI, _BASELINE]
+
+
+def test_throwing_restore_raises_after_a_clean_export() -> None:
+    seat = _Seat(_BASELINE, throw=frozenset({_BASELINE}))
+    with pytest.raises(ConnectionError, match="RPC server"):
+        with _drawing_common.pdf_shaded_raster_dpi(_adapter(seat), _Span()):
+            pass
 
 
 def test_only_the_pdf_artifact_touches_the_seat(tmp_path: Path, monkeypatch) -> None:

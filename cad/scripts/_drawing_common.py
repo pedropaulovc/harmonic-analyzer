@@ -329,8 +329,9 @@ def pdf_shaded_raster_dpi(adapter: Any, span: Any) -> Iterator[None]:
     the lock holder leaves the seat as the fleet configures it. Each write is
     read back; the entry, applied and restored values land on ``span``. A
     refused write raises (a quiet refusal ships the 120 dpi raster again),
-    except a refused restore while the export is already failing, which is
-    warned so it cannot replace the export's own exception.
+    and so does a restore that throws, except while the export is already
+    failing: then a refused or throwing restore (a seat that disconnected
+    mid-export) is warned, so it cannot replace the export's own exception.
     """
     sw = _early_bound(adapter.swApp, "ISldWorks")
     pref = _PREF_PDF_SHADED_DRAFT_DPI
@@ -356,22 +357,31 @@ def pdf_shaded_raster_dpi(adapter: Any, span: Any) -> Iterator[None]:
         yield
         exporting = False
     finally:
-        sw.SetUserPreferenceIntegerValue(pref, _PDF_SHADED_DRAFT_DPI_BASELINE)
-        restored = int(sw.GetUserPreferenceIntegerValue(pref))
-        span.set_attribute("pdf.shaded_draft_dpi.restored", restored)
-        refused = (
-            f"PDF shaded/draft DPI restore refused: wanted "
-            f"{_PDF_SHADED_DRAFT_DPI_BASELINE}, seat reports {restored}"
-        )
-        if restored != _PDF_SHADED_DRAFT_DPI_BASELINE:
-            if exporting:
-                _telemetry.warn(f"[seat] {refused}", restored=restored)
-            else:
-                raise RuntimeError(refused)
-        _telemetry.info(
-            f"PDF shaded/draft DPI: seat {before}, export {PDF_SHADED_DRAFT_DPI}, "
-            f"restored {restored}"
-        )
+        try:
+            sw.SetUserPreferenceIntegerValue(pref, _PDF_SHADED_DRAFT_DPI_BASELINE)
+            restored = int(sw.GetUserPreferenceIntegerValue(pref))
+        except Exception as exc:
+            if not exporting:
+                raise
+            _telemetry.warn(
+                f"[seat] PDF shaded/draft DPI restore failed during a failed export: {exc!r}",
+                error=repr(exc),
+            )
+        else:
+            span.set_attribute("pdf.shaded_draft_dpi.restored", restored)
+            refused = (
+                f"PDF shaded/draft DPI restore refused: wanted "
+                f"{_PDF_SHADED_DRAFT_DPI_BASELINE}, seat reports {restored}"
+            )
+            if restored != _PDF_SHADED_DRAFT_DPI_BASELINE:
+                if exporting:
+                    _telemetry.warn(f"[seat] {refused}", restored=restored)
+                else:
+                    raise RuntimeError(refused)
+            _telemetry.info(
+                f"PDF shaded/draft DPI: seat {before}, export {PDF_SHADED_DRAFT_DPI}, "
+                f"restored {restored}"
+            )
 
 
 @contextlib.contextmanager
