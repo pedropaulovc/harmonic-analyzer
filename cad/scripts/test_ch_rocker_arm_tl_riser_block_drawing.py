@@ -72,7 +72,7 @@ def test_inventory_record_takes_its_solids_from_this_spec() -> None:
 
 
 def test_prechips_solids_are_the_validated_six_block_layout() -> None:
-    table, *risers = spec.PRECHIPS_SOLIDS
+    table, *risers = [solid for solid in spec.PRECHIPS_SOLIDS if not solid.get("void")]
     assert table["name"] == "table"
     assert table["at_mm"] == [-419.1, -97.975, -68.5]
     assert table["size_mm"] == [838.2, 209.55, 50.0]
@@ -90,6 +90,85 @@ def test_prechips_solids_are_the_validated_six_block_layout() -> None:
         assert solid["at_mm"][2] == table["at_mm"][2] + table["size_mm"][2]
         assert solid["at_mm"][2] + solid["size_mm"][2] == 0.0
         assert solid["measured"]["by"]
+
+
+def test_pm30mv_table_models_share_the_manual_slot_section() -> None:
+    inventory = tomllib.loads(
+        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    )
+    for solids in (
+        inventory["fixtures"]["pm30mv-table"]["solids"],
+        spec.PRECHIPS_SOLIDS,
+    ):
+        table = next(solid for solid in solids if solid["name"] == "table")
+        slots = [solid for solid in solids if solid.get("void")]
+        assert len(slots) == 6
+        table_top = table["at_mm"][2] + table["size_mm"][2]
+        centre_y = table["at_mm"][1] + table["size_mm"][1] / 2
+        sections = []
+        for slot in slots:
+            assert slot["cuts"] == ["table"]
+            assert slot["at_mm"][0] < table["at_mm"][0]
+            assert slot["at_mm"][0] + slot["size_mm"][0] > (
+                table["at_mm"][0] + table["size_mm"][0]
+            )
+            sections.append(
+                (
+                    round(slot["at_mm"][1] + slot["size_mm"][1] / 2 - centre_y, 3),
+                    slot["size_mm"][1],
+                    round(table_top - slot["at_mm"][2], 3),
+                    slot["size_mm"][2],
+                )
+            )
+        assert sorted(sections) == sorted(
+            (centre, width, depth, height)
+            for centre in (-63.5, 0.0, 63.5)
+            for width, depth, height in ((14.0, 14.0, 15.0), (25.0, 24.0, 10.0))
+        )
+
+
+def test_rocker_mill_clamp_studs_enter_the_centre_t_slot() -> None:
+    plan = tomllib.loads(plans.plan_path("ch_rocker_arm").read_text(encoding="utf-8"))
+    members = tomllib.loads(
+        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    )["fixtures"]["clamping-kit-pm-52pcck-14mm"]["members"]
+    checked = 0
+    for setup in plan["setups"]:
+        hold = setup["hold"]
+        if hold["fixture"] != "rocker-riser-blocks":
+            continue
+        hold_pose = hold["pose"]
+        table_y = (
+            hold_pose["origin_mm"][1] + hold_pose["x"][0] * spec.TABLE_SLOT_CENTRES_Y[1]
+        )
+        table_top = hold_pose["origin_mm"][2] - spec.BLOCK_HEIGHT
+        for clamp in hold["clamps"]:
+            kit, member = (
+                clamp["ref"].split("/", 1) if "/" in clamp["ref"] else ("", "")
+            )
+            if kit != "clamping-kit-pm-52pcck-14mm":
+                continue
+            assert member == (
+                "strap-pad-mill-raised" if setup["id"] == "S1" else "strap-pad-mill"
+            )
+            solids = members[member]["solids"]
+            stud = next(solid for solid in solids if solid["name"] == "stud")
+            assert stud["length_mm"] == 101.6
+            pose = clamp["pose"]
+            stud_y = pose["origin_mm"][1] + stud["at_mm"][0] * pose["x"][1]
+            assert abs(stud_y - table_y) + stud["dia_mm"] / 2 < 7.0
+            bottom = pose["origin_mm"][2] + stud["at_mm"][2]
+            assert table_top - 24.0 < bottom < table_top - 14.0
+            foot = next(solid for solid in solids if solid["name"] == "T-nut foot")
+            foot_top = pose["origin_mm"][2] + foot["at_mm"][2] + foot["size_mm"][2]
+            assert abs(foot_top - (table_top - 14.0)) < 1e-9
+            foot_width = (
+                abs(pose["x"][1]) * foot["size_mm"][0]
+                + abs(pose["x"][0]) * foot["size_mm"][1]
+            )
+            assert foot_width < 25.0
+            checked += 1
+    assert checked == 8
 
 
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:

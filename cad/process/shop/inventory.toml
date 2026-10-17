@@ -64,6 +64,11 @@ note = "Manual mill with DRO; envelope and travel below are illustrative example
 cite = ["PM-30MV manual v3 2020-10 p.5 (https://macclab.com/wp-content/uploads/2022/01/PM-30MV-v3-2020-10.pdf): 2 HP (1.5 kW) brushless DC motor, spindle 50-1500 rpm low range and 1400-3000 rpm high range, R8"]
 
 [machines.PM-30MV.envelope]
+# PM-30MV manual v3 2020-10, specifications table, read 2026-10-16:
+# https://macclab.com/wp-content/uploads/2022/01/PM-30MV-v3-2020-10.pdf
+# Spindle centreline to column: 7-1/2 in (190.5 mm) to pleated cover,
+# governing clearance; 8-5/8 in (219.075 mm) with cover absent.
+# Comment-only pending prechips throat/column-clearance schema support (#175).
 # Basis: machines.PM-30MV.envelope.spindle_to_table_max_in: catalogue-valued placeholder; source nominal 17 in, offset +0 in = 17 in. Source b757b5a76 cad/process/shop/inventory.toml:36 (machines.PM-30MV.envelope.spindle_to_table_max_in); retained item source https://www.precisionmatthews.com/products/pm-30mv. No invented catalogue deviation or actual installed-machine/gauge metrology is claimed.
 spindle_to_table_max_in = { value = 17, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "steel rule and height gauge, installed machine limit" } }
 # Basis: machines.PM-30MV.envelope.spindle_to_table_min_in: original example nominal 2.4 in, offset +0.06 in = 2.46 in; source b757b5a76 cad/process/shop/inventory.toml:37 installed minimum spindle-nose/table clearance model. A larger minimum gap is conservative; this value is not a revised maker specification.
@@ -236,6 +241,9 @@ C = [37, 39, 41, 43, 47, 49]
 [tools]
 
 [tools.endmills-lms-6784]
+# Existing set confirmed live 2026-10-16, SKU 6784: each size includes 2 and 4 flutes;
+# 3/8 in cutter has 3/8 in shank; 9/16 in cutter has 1/2 in shank.
+# https://littlemachineshop.com/products/end-mill-set-20-pieces-2-4-flute-tin-coated-hss-premium
 kind = "endmill_set"
 material = "HSS"
 coating = "TiN"
@@ -3387,25 +3395,113 @@ capacity_min_mm = { value = 6, measured = { status = "measured", by = "placehold
 # Basis: fixtures.v-blocks.capacity_max_mm: Generic practical maximum clamped round-bar support diameter estimate.
 capacity_max_mm = { value = 38, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "calipers and ground test pins, seating under clamp" } }
 
-[fixtures.clamping-kit-lms-1144]
+[fixtures.clamping-kit-pm-52pcck-14mm]
 kind = "clamping_kit"
-pieces = 58
-stud = "3/8-16"
-t_slot_in = "7/16"
+pieces = 52
+stud = "1/2-13"
+t_slot_in = "9/16"
+verify = true
+purchase = "1 x Precision Matthews 52PCCK-9/16-14mm clamping kit; $79.99 vendor listing, possession unconfirmed."
+note = "PM-30MV-compatible 14 mm T-nuts; purchase candidate, not confirmed possession."
+cite = ["Precision Matthews 52PCCK-9/16-14mm https://www.precisionmatthews.com/products/52pcck-9-16-14mm read 2026-10-16: 52 pieces, 1/2-13 studs, 14 mm / 9/16 in T-nuts, $79.99"]
 
-[fixtures.clamping-kit-lms-1144.source]
-vendor = "LittleMachineShop"
-sku = 1144
-by = "lms-package"
+[fixtures.clamping-kit-pm-52pcck-14mm.source]
+vendor = "Precision Matthews"
+sku = "52PCCK-9/16-14mm"
+by = "vendor catalogue, read 2026-10-16"
 
-# Strap frame: origin at the centre of the strap's padded underside on the work, x along it.
-[fixtures.clamping-kit-lms-1144.members.strap-pad]
+# Strap frame: origin at the centre of the padded toe underside on the work;
+# local +X runs back toward the stud and heel, local +Z is above the work.
+[fixtures.clamping-kit-pm-52pcck-14mm.members.strap-pad]
 kind = "strap_clamp"
-note = "illustrative example: short 40 mm strap with a soft pad, tightened through a 3/8-16 stud"
+note = "Full trial clamp obstruction: strap, stud and flange nut; 1 in wide body, not the old narrow toe-only surrogate. Generic unmeasured dimensions, not PM individual-component specifications. Poses and clearance findings must be reviewed for every setup."
 solids = [
-  # Basis: fixtures.clamping-kit-lms-1144.members.strap-pad.solids.strap: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1156 (fixtures.clamping-kit-lms-1144.members.strap-pad.solids.strap); retained LittleMachineShop SKU 1144 identity (not an independent dimensional citation) authored box envelope; authored physical-size model {"size_mm":[40.0,8.0,8.0]} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
-  { name = "strap", shape = "box", at_mm = [-20.0, -4.0, 0.0], size_mm = [40.0, 8.0, 8.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
+  # Basis: PM listing photograph (source above, read 2026-10-16) shows slotted strap clamps, studs and flanged nuts. Typical 1/2-13 kit short strap estimate: 3 x 1 x 1/2 in = 76.2 x 25.4 x 12.7 mm. Toe at X0, stud at X38.1; these are authored placeholder poses, not surveyed hardware.
+  { name = "strap", shape = "box", at_mm = [-12.7, -12.7, 0.0], size_mm = [76.2, 25.4, 12.7], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-16", instrument = "generic catalogue-size estimate; replace with caliper readings" } },
+  # Basis: 13.5 mm slot width clears nominal 12.7 mm stud by 0.8 mm; 30 mm slot length is a generic estimate. Overrun in Z only ensures a through void; cuts only the strap.
+  { name = "stud-slot", shape = "box", at_mm = [23.1, -6.75, -1.0], size_mm = [30.0, 13.5, 14.7], void = true, cuts = ["strap"], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-16", instrument = "generic clearance-slot estimate; replace with caliper readings" } },
+  # Basis: published 1/2-13 nominal stud diameter 12.7 mm; selected 3 in / 76.2 mm stud length is a typical kit-member estimate, not a published PM length. Stud projects 36.2 mm above work and extends 40 mm below; thread crests modeled by bounding cylinder.
+  { name = "stud", shape = "cylinder", at_mm = [38.1, 0.0, -40.0], axis = [0.0, 0.0, 1.0], dia_mm = 12.7, length_mm = 76.2, supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-16", instrument = "catalogue stud nominal and generic length estimate; replace with caliper readings" } },
+  # Basis: typical 1/2-13 flange-nut envelope estimate, rounded up: 28 mm flange OD x 13 mm height. Bounding cylinder includes hex corners; nut sits on strap top Z12.7, reaching Z25.7.
+  { name = "flange-nut", shape = "cylinder", at_mm = [38.1, 0.0, 12.7], axis = [0.0, 0.0, 1.0], dia_mm = 28.0, length_mm = 13.0, supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-16", instrument = "generic flange-nut envelope estimate; replace with caliper readings" } },
 ]
+
+# Mill selections use a 4 in stud, not the 3 in bench selection above.
+# Basis: PM listing photo shows multiple stud lengths and T-nuts; 4 in = 101.6 mm
+# is a typical 1/2-13 kit selection (Main ruling 2026-10-17), not a measured PM length.
+# Strap/slot/flange dimensions retain the Basis estimates above. T-nut estimates:
+# 24 x 24 x 8 foot and 24 x 13 x 6 neck fit the manual p6 25/14 mm slot section.
+# The two selections differ only in T-nut seating height: S1 adds 2.71875 mm shims.
+# Foot tops meet the undercut ceiling; neither is an invented table through-hole.
+[fixtures.clamping-kit-pm-52pcck-14mm.members.strap-pad-mill-raised]
+kind = "strap_clamp"
+note = "S1 selection: 4 in stud at local Z-50..51.6, T-nut seated under the slot lip with the shim-raised work. Generic component estimates; verify kit dimensions and thread engagement before use."
+solids = [
+  { name = "strap", shape = "box", at_mm = [-12.7, -12.7, 0.0], size_mm = [76.2, 25.4, 12.7], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic catalogue-size estimate; replace with caliper readings" } },
+  { name = "stud-slot", shape = "box", at_mm = [23.1, -6.75, -1.0], size_mm = [30.0, 13.5, 14.7], void = true, cuts = ["strap"], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic clearance-slot estimate; replace with caliper readings" } },
+  { name = "stud", shape = "cylinder", at_mm = [38.1, 0.0, -50.0], axis = [0.0, 0.0, 1.0], dia_mm = 12.7, length_mm = 101.6, supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "4 in stud nominal and authored extension; verify with calipers" } },
+  { name = "flange-nut", shape = "cylinder", at_mm = [38.1, 0.0, 12.7], axis = [0.0, 0.0, 1.0], dia_mm = 28.0, length_mm = 13.0, supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic flange-nut envelope estimate; replace with caliper readings" } },
+  { name = "T-nut foot", shape = "box", at_mm = [26.1, -12.0, -51.15625], size_mm = [24.0, 24.0, 8.0], supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic T-nut estimate and authored seating pose; verify undercut fit and engagement" } },
+  { name = "T-nut neck", shape = "box", at_mm = [26.1, -6.5, -43.15625], size_mm = [24.0, 13.0, 6.0], supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic T-nut estimate and authored seating pose; verify undercut fit and engagement" } },
+]
+
+[fixtures.clamping-kit-pm-52pcck-14mm.members.strap-pad-mill]
+kind = "strap_clamp"
+note = "S2-S4 selection: 4 in stud at local Z-50..51.6, T-nut seated under the slot lip with the work on the risers. Generic component estimates; verify kit dimensions and thread engagement before use."
+solids = [
+  { name = "strap", shape = "box", at_mm = [-12.7, -12.7, 0.0], size_mm = [76.2, 25.4, 12.7], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic catalogue-size estimate; replace with caliper readings" } },
+  { name = "stud-slot", shape = "box", at_mm = [23.1, -6.75, -1.0], size_mm = [30.0, 13.5, 14.7], void = true, cuts = ["strap"], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic clearance-slot estimate; replace with caliper readings" } },
+  { name = "stud", shape = "cylinder", at_mm = [38.1, 0.0, -50.0], axis = [0.0, 0.0, 1.0], dia_mm = 12.7, length_mm = 101.6, supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "4 in stud nominal and authored extension; verify with calipers" } },
+  { name = "flange-nut", shape = "cylinder", at_mm = [38.1, 0.0, 12.7], axis = [0.0, 0.0, 1.0], dia_mm = 28.0, length_mm = 13.0, supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic flange-nut envelope estimate; replace with caliper readings" } },
+  { name = "T-nut foot", shape = "box", at_mm = [26.1, -12.0, -48.4375], size_mm = [24.0, 24.0, 8.0], supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic T-nut estimate and authored seating pose; verify undercut fit and engagement" } },
+  { name = "T-nut neck", shape = "box", at_mm = [26.1, -6.5, -40.4375], size_mm = [24.0, 13.0, 6.0], supply = "bought", fastener = "1/2-13", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic T-nut estimate and authored seating pose; verify undercut fit and engagement" } },
+]
+
+# Rocker route-v3 purchased jig hardware. Candidate purchases only: no possession,
+# receipt dimensions, preload certificate or clearance acceptance is asserted.
+[fixtures.trammel-hgr15-rails]
+kind = "linear_rail"
+make = "HIWIN"
+sku = "172270559990"
+source = "https://motionconstrained.com/store/hiwin-linear-guides/hiwin-hg-series-linear-guides/hg-rails-only/hiwin-hgr15r-linear-guideway-rail/"
+present = false
+verify = true
+purchase = "Special order / vendor quote required: 2 x HGR15R rails cut to 440 mm, seven holes at 60 mm pitch, symmetric E = 40 mm at both ends. Supplier must confirm this authored order requirement before purchase or drilling the jig bars."
+note = "Read live 2026-10-16: reseller lists HGR15RXXXC, 15 mm rail, 60 mm pitch, and says Order Rails in any Length. The selector does not offer 440 mm. Main-approved 440 replaces brief 420: carriage centre reaches 412.3 plus half-length 30.7 from spindle, requiring rail to reach 443 from near end 15. Custom length and symmetric E40 end pattern are unverified purchase requirements, not a quoted or listed stock variant."
+cite = ["Motion Constrained part 172270559990, read 2026-10-16"]
+
+[fixtures.trammel-hgh15ca-carriages]
+kind = "linear_carriage"
+make = "HIWIN"
+sku = "HGH-15-CA-Z0-C"
+source = "https://www.digikey.com/en/products/detail/midwest-machine-tool-supply/HGH-15-CA-Z0-C/16622864"
+present = false
+verify = true
+purchase = "2 x HIWIN HGH-15-CA-Z0-C carriages for HGR15R, DigiKey/Midwest 4433-HGH-15-CA-Z0-C."
+note = "Read live 2026-10-16: DigiKey Marketplace lists HIWIN, HGH15CA series, 61.4 mm length, Z0 part number and 92 in stock. Rejected eBay 127866788929: photos show H15C/HG15 but not full Z0 part number. Rejected Motion Constrained HGH15CAZAC: published medium preload, not requested Z0."
+cite = ["DigiKey/Midwest 4433-HGH-15-CA-Z0-C, read 2026-10-16", "Rejected: https://www.ebay.com/itm/127866788929", "Rejected: https://motionconstrained.com/store/hiwin-linear-guides/hiwin-hg-series-linear-guides/hg-blocks-only/hiwin-hgh15cazac-square-block/"]
+
+[fixtures.trammel-6200-2rs]
+kind = "ball_bearing"
+make = "VXB"
+sku = "1111-4398"
+source = "https://vxb.com/products/6200-2rs-10x30x9-sealed-bearing-pack-of-10"
+present = false
+verify = true
+purchase = "One 10-pack 6200-2RS; four bearings required for the two pivot blocks."
+note = "Read live 2026-10-16: 10 mm bore x 30 mm OD x 9 mm wide, chrome steel, double rubber sealed. Catalogue identity, not actual race metrology."
+cite = ["VXB product 1111-4398, 6200-2RS 10-pack, $29.99, read 2026-10-16"]
+
+[fixtures.trammel-cl-dowel]
+kind = "dowel_pin"
+make = "AndyMark"
+sku = "am-1501"
+source = "https://andymark.com/products/steel-dowel-pin-6-mm-x-20-mm"
+present = false
+verify = true
+purchase = "1 x steel dowel pin 6 mm x 20 mm, CL locator in strap end waste."
+note = "Read live 2026-10-16: product title and image identity am-1501 specify 6 x 20 mm. Inch summary is rounded/inconsistent; no fit class is published. Verify diameter and usable engagement before use."
+cite = ["AndyMark am-1501, Steel Dowel Pin 6 mm x 20 mm, $0.60, read 2026-10-16"]
 
 # --- pivot-bracket additions ---
 # Illustrative angle plate. Local XY is the table plane; the front upright face
@@ -4569,6 +4665,13 @@ height_mm = { value = 0.0, measured = { status = "measured", by = "placeholder (
 solids = [
   # Basis: fixtures.pm30mv-table.solids.table: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1942 (fixtures.pm30mv-table.solids.table); retained item source https://www.precisionmatthews.com/products/pm-30mv (Table: X-axis table length 33 in, Y-axis table width 8.25 in, T-slot 9/16 in / 14 mm), read 2026-10-11 work underside; authored physical-size model {"size_mm":[838.2,209.55,50.0]} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
   { name = "table", supply = "existing", shape = "box", at_mm = [-419.1, -104.775, -50.0], size_mm = [838.2, 209.55, 50.0], locates = "work underside", note = "33 x 8.25 in from the maker's spec page (source above); 50 mm thickness is drawing depth only.", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
+  # Basis: PM-30MV manual v3 2020-10 p6, https://macclab.com/wp-content/uploads/2022/01/PM-30MV-v3-2020-10.pdf, read 2026-10-17: three 14 mm mouths on 63.5 mm centres; 14 mm neck depth plus a 25 x 10 mm undercut. Use the manual's 14 mm, not rounded 9/16 in. X and upper-Z overrun only ensure through-cut model voids.
+  { name = "slot-minus-neck", void = true, cuts = ["table"], shape = "box", at_mm = [-420.1, -70.5, -14.0], size_mm = [840.2, 14.0, 15.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centre spacing with calipers and depth gauge" } },
+  { name = "slot-minus-undercut", void = true, cuts = ["table"], shape = "box", at_mm = [-420.1, -76.0, -24.0], size_mm = [840.2, 25.0, 10.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centre spacing with calipers and depth gauge" } },
+  { name = "slot-centre-neck", void = true, cuts = ["table"], shape = "box", at_mm = [-420.1, -7.0, -14.0], size_mm = [840.2, 14.0, 15.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centre spacing with calipers and depth gauge" } },
+  { name = "slot-centre-undercut", void = true, cuts = ["table"], shape = "box", at_mm = [-420.1, -12.5, -24.0], size_mm = [840.2, 25.0, 10.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centre spacing with calipers and depth gauge" } },
+  { name = "slot-plus-neck", void = true, cuts = ["table"], shape = "box", at_mm = [-420.1, 56.5, -14.0], size_mm = [840.2, 14.0, 15.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centre spacing with calipers and depth gauge" } },
+  { name = "slot-plus-undercut", void = true, cuts = ["table"], shape = "box", at_mm = [-420.1, 51.0, -24.0], size_mm = [840.2, 25.0, 10.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centre spacing with calipers and depth gauge" } },
 ]
 
 # Per-blank shim stack for MHA-CH-006 S4. Turned over onto the raw blank ends, the S3-faced
@@ -5945,3 +6048,24 @@ section_mm = [304.8, 12.7]
 length_mm = 304.8
 on_hand = true
 cite = ["Online Metals pid 24273 https://www.onlinemetals.com/en/buy/aluminum/0-5-aluminum-plate-6061-t651-domestic/pid/24273"]
+
+# Rocker route v3 stock purchases: catalogue nominals, not receipt measurements.
+[[stock]]
+form = "flat_bar"
+material = "1018 cold-finish carbon steel"
+note = "MHA-CH-013 strap: 3 x 40 mm, 60 in +/-2 in; vendor title 1005/1018, product information alloy 1018. Require 1018 material certification on purchase. Four 350 mm blanks fit even at the 58 in low length limit; mill to drawing thickness after receipt."
+# Basis: OnlineMetals 22381 catalogue nominal [40, 3] mm and 60 x 25.4 = 1524 mm, zero offsets; not metrology.
+section_mm = [40.0, 3.0]
+length_mm = 1524.0
+on_hand = false
+cite = ["OnlineMetals part 22381 https://www.onlinemetals.com/en/buy/carbon-steel/3mm-x-40mm-carbon-steel-rectangle-bar-1005-1018-metric-60-length/pid/22381 read live 2026-10-16, $70.12"]
+
+[[stock]]
+form = "round_bar"
+material = "1018 cold-finish carbon steel"
+note = "MHA-CH-012 hub: 7/16 in (11.1125 mm) round, closest listed OnlineMetals standard diameter >=11 mm (10 mm below, 12 mm above). Order 12 in length; turn the joint land and leave finish allowance per hub drawing."
+# Basis: OnlineMetals 20743 catalogue nominal 0.4375 x 25.4 = 11.1125 mm; 12 x 25.4 = 304.8 mm, zero offsets; not metrology.
+dia_mm = 11.1125
+length_mm = 304.8
+on_hand = false
+cite = ["OnlineMetals part 20743 https://www.onlinemetals.com/en/buy/carbon-steel/0-4375-carbon-steel-round-bar-1018-cold-finish/pid/20743 read live 2026-10-16"]
