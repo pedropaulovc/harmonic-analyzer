@@ -30,8 +30,8 @@ mode changes without re-keying the review. `FIX` is stored before enforcement;
 provider/runner errors are never cached or freshness-stamped. An explicitly forced
 refresh that produces no cacheable verdict fails even in LEARN mode, without
 caching the error. Review keys hash the PDF, package exceptions, review code/import
-closure, prompts/schemas and shared drawing guidelines, not the registry or
-enforcement declaration.
+closure, prompts/schemas and shared drawing guidelines, not the registry,
+enforcement declaration, or recipe-skipped infrastructure such as telemetry.
 
 ## Process traveler prerequisites
 

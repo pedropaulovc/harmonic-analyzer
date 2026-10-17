@@ -916,9 +916,11 @@ shared judge prompts/schemas, and `cad/docs/drawing-guidelines.md`. Reviewer and
 judge defaults live in the hashed review code; there are no model/effort
 environment overrides. `_drawing_registry.py` is intentionally excluded because
 the leaf supplies PDF, name and kind explicitly; selecting a different kind
-selects a different hashed prompt. The draw script and learn/enforce declaration
-are not review inputs. The complete leaf report directory, including individual
-run JSON, source snapshots and attempt evidence, is cached without pruning.
+selects a different hashed prompt. Recipe-skipped modules, including telemetry,
+are excluded via the shared `_buildgraph.RECIPE_SKIP_MODULES` policy. The draw
+script and learn/enforce declaration are not review inputs. The complete leaf
+report directory, including individual run JSON, source snapshots and attempt
+evidence, is cached without pruning.
 
 ## File-granular recipe helpers
 
