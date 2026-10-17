@@ -49,8 +49,11 @@ STUD_TAP_SPEC = HoleSpec(
     "tapped", STUD_THREAD, end="blind", depth_mm=6.0, overrides_mm={"ThreadDepth": 4.5}
 )
 STUD_TAP_DRILL_DIA = TAP_DRILL_MM[STUD_THREAD]
-# The stud threads this far into the tap (rule 18: >= 1.5 D full thread).
-STUD_ENGAGEMENT = 4.0
+# The stud threads this far into the tap (rule 18: >= 1.5 D full thread):
+# the centre of the measured-length setting band (pn_pen_assembly_spec,
+# code review C05), which keeps 3.2 ±0.4 short of the 3.99 the tap's printed
+# depth guarantees.
+STUD_ENGAGEMENT = 3.2
 
 TOTAL_LENGTH = SQUARE_LENGTH + PIVOT_LENGTH
 
