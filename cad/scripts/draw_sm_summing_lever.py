@@ -1829,9 +1829,9 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         redundant_note_substrings=("Tapped Hole",),
         # main's 3, plus the bracket taps' per-hole cosmetic threads (2) in the
-        # receiver sheet's two views: 7 observed on the farm 2026-10-09; and
-        # the outer tap's own in section H-H, which cuts its thread.
-        expected_redundant_notes=8,
+        # receiver sheet's two views: 7 observed on the farm 2026-10-09 (and
+        # 2026-10-17 with section H-H, which adds none).
+        expected_redundant_notes=7,
     )
 
 
