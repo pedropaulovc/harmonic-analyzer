@@ -18,8 +18,11 @@ spigot face (x = SPIGOT_FACE_X), flats facing +/-Z, corners on +/-Y.
   the spigot face, revolved about local X (inside the hex it adds nothing:
   its Ø is under the flats).  It carries the rod bore's stations, from the
   free end (``RodStation``) and to the spigot face (``BoreStation``), the
-  shoulder from the free end (``HexLength``), ``SpigotDia``, and the overall
-  length as a DRIVEN dimension (``OverallLength``, REF on the sheet).
+  shoulder from the spigot face (``SpigotLength``), ``SpigotDia``, and the
+  overall length as a DRIVEN dimension (``OverallLength``, REF on the sheet).
+  The hex's depth is the equation ``RodStation + BoreStation - SpigotLength``.
+* ``ShoulderFillet``: the spigot's internal corner at the hex shoulder,
+  ``ShoulderRadius`` (a single MAX limit: the largest tool-nose radius).
 * ``GrooveProfile``: the full-radius groove, a Top-plane circle drawn as two
   semicircles meeting at the root, revolved as a cut.  Its centreline runs
   from the bore axis to the spigot face, so ``GrooveStation`` runs from the
@@ -85,6 +88,7 @@ from mg_output_fixture_geom import (
     OVERALL_LENGTH,
     ROD_BORE_DIA,
     ROD_STATION,
+    SHOULDER_FILLET_R,
     SHOULDER_X,
     SPIGOT_DIA,
     SPIGOT_FACE_X,
@@ -117,6 +121,14 @@ _SAVED_DRAWING_PROPERTIES = ("Manufacturing Notes",)
 # --- Analytic volumes (mm^3) -----------------------------------------------------
 V_HEX = math.sqrt(3.0) / 2.0 * HEX_AF**2 * HEX_LENGTH
 V_SPIGOT = math.pi * SPIGOT_R**2 * SPIGOT_LENGTH
+# Pappus: the shoulder corner's spandrel r^2 (1 - pi/4), its centroid
+# r (10 - 3 pi) / (3 (4 - pi)) out from the spigot's surface, revolved about
+# the hex axis (build_pn_pen_rod's shoulder root).
+_SPANDREL = SHOULDER_FILLET_R**2 * (1.0 - math.pi / 4.0)
+_SPANDREL_R = SPIGOT_R + SHOULDER_FILLET_R * (10.0 - 3.0 * math.pi) / (
+    3.0 * (4.0 - math.pi)
+)
+V_FILLET = 2.0 * math.pi * _SPANDREL_R * _SPANDREL
 
 
 def _groove_volume() -> float:
@@ -155,7 +167,7 @@ def _tap_volume() -> float:
 V_GROOVE = _groove_volume()
 V_BORE = _bore_volume()
 V_TAP = _tap_volume()
-V_TOTAL = V_HEX + V_SPIGOT - V_GROOVE - V_BORE - V_TAP
+V_TOTAL = V_HEX + V_SPIGOT + V_FILLET - V_GROOVE - V_BORE - V_TAP
 
 
 async def build(adapter) -> dict[str, str]:
@@ -173,12 +185,13 @@ async def build(adapter) -> dict[str, str]:
     for name, value in (
         ("HexAf", HEX_AF),
         ("RodStation", ROD_STATION),
-        ("HexLength", HEX_LENGTH),
+        ("SpigotLength", SPIGOT_LENGTH),
         ("BoreStation", BORE_STATION),
         ("SpigotDia", SPIGOT_DIA),
         ("GrooveStation", GROOVE_STATION),
         ("GrooveRadius", GROOVE_RADIUS),
         ("GrooveRootDia", GROOVE_ROOT_DIA),
+        ("ShoulderRadius", SHOULDER_FILLET_R),
         ("RodBoreDia", ROD_BORE_DIA),
     ):
         await set_global(adapter, name, f"{value}mm")
@@ -206,7 +219,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=HEX_LENGTH)),
     )
     name_last_feature(adapter, "Hex")
-    drive_jobs.append(("D1@Hex", '"HexLength"'))
+    drive_jobs.append(("D1@Hex", '"RodStation" + "BoreStation" - "SpigotLength"'))
     volume = await volume_check(adapter, "hex", V_HEX, 0.005 * V_HEX)
     await _centroid_x_check(adapter, "hex", (FREE_END_X + SHOULDER_X) / 2.0)
     await bbox_extent_check(adapter, "hex length", "x", HEX_LENGTH)
@@ -223,6 +236,26 @@ async def build(adapter) -> dict[str, str]:
         adapter, "hex and spigot", volume + V_SPIGOT, 0.005 * (volume + V_SPIGOT)
     )
     await bbox_extent_check(adapter, "overall length", "x", OVERALL_LENGTH)
+
+    # --- Shoulder corner: the tool-nose radius the print allows (R MAX) ---------
+    # Picked on the circular shoulder edge at model -Z (the side view's upper
+    # silhouette, where the sheet reads its radius): the only edge through
+    # that point.
+    check(
+        "fillet shoulder corner",
+        await adapter.add_fillet(SHOULDER_FILLET_R, [[SHOULDER_X, 0.0, -SPIGOT_R]]),
+    )
+    name_last_feature(adapter, "ShoulderFillet")
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, "ShoulderFillet", ["ShoulderRadius"])[0],
+            '"ShoulderRadius"',
+        )
+    )
+    # Half the fillet's own 0.25 mm^3: a missing or R0.1 corner still fails.
+    volume = await volume_check(
+        adapter, "shoulder corner fillet", volume + V_FILLET, 0.5 * V_FILLET
+    )
 
     # --- Full-radius wire groove -------------------------------------------------
     drive_jobs += await _groove_profile(adapter)
@@ -375,7 +408,11 @@ async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
     """The spigot's Ø from the free end to the spigot face (Top plane: sketch
     (x, y) is model (X, -Z)), split at the shoulder.  The rod bore (the sketch
     origin) is the axial datum: the free end and the spigot face each carry
-    their own station from it, and the shoulder runs from the free end.
+    their own station from it, and the shoulder runs from the spigot face's
+    corner (the spigot's length, the lathe's own length from the faced end).
+    The profile lies under the axis (model +Z, the side view's lower
+    silhouette), so the spigot's length witnesses from the lower corners and
+    reads under the view, clear of the shoulder radius over it.
 
     The centreline merges into both axis corners at creation, so the chain's
     own relations define it (build_pd_transgear_thumbnut's head profile).  The
@@ -383,9 +420,9 @@ async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
     sketch is never over-defined (build_pn_pen_v_block's flat height)."""
     points = [
         (FREE_END_X, 0.0),
-        (FREE_END_X, SPIGOT_R),
-        (SHOULDER_X, SPIGOT_R),
-        (SPIGOT_FACE_X, SPIGOT_R),
+        (FREE_END_X, -SPIGOT_R),
+        (SHOULDER_X, -SPIGOT_R),
+        (SPIGOT_FACE_X, -SPIGOT_R),
         (SPIGOT_FACE_X, 0.0),
     ]
     turned = SketchDims()
@@ -408,13 +445,18 @@ async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
     await anchor_point_to_origin(adapter, free_end, FREE_END_X, 0.0, "free end on the axis")
     turned.record("RodStation", '"RodStation"')
     await add_diametric_linear_dimension(
-        adapter, axis, lines[2], (GROOVE_X, SPIGOT_R + 4.0), "SpigotDia"
+        adapter, axis, lines[2], (GROOVE_X, -(SPIGOT_R + 4.0)), "SpigotDia"
     )
     turned.record("SpigotDia", '"SpigotDia"')
     await dimension_between(
-        adapter, free_end, f"{lines[1]}.end", "horizontal_distance", HEX_LENGTH, "shoulder"
+        adapter,
+        f"{lines[1]}.end",
+        f"{lines[2]}.end",
+        "horizontal_distance",
+        SPIGOT_LENGTH,
+        "shoulder from the spigot face",
     )
-    turned.record("HexLength", '"HexLength"')
+    turned.record("SpigotLength", '"SpigotLength"')
     overall = await dimension_between(
         adapter,
         free_end,
