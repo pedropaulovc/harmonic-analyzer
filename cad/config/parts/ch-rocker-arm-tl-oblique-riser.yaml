@@ -1,0 +1,12 @@
+ch-rocker-arm-tl-oblique-riser:
+  title: Rocker Oblique Trammel Riser
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-24
+  # Acetal machines clean and spares the cutter where the jig cuts its own
+  # band in place (SolidWorks material POM Acetal Copolymer).
+  material: ACETAL (DELRIN)
+  material_specification: Acetal (Delrin) sheet blank, 6 x 40 x 340 as supplied
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "drill #4 clearance through and countersink 82 degrees for the four screws; drill the HUB, CL and CR clearance holes through; break edges"
