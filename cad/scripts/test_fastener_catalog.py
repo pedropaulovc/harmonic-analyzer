@@ -10,6 +10,7 @@ _EXPECTED = {
     # Stable production stem: (supplier SKU(s), MHA number, fleet quantity).
     "vn-arbor-set-screw": (("91375A106",), "MHA-VN-034", 4),  # 2 arbor, 2 pivot ear
     "vn-boss-hook": (("9490T1",), "MHA-VN-001", 1),
+    "vn-bracket-hold-down-screw": (("90280A196",), "MHA-VN-071", 2),
     "vn-clamp-screw": (("90280A201",), "MHA-VN-021", 6),
     "vn-cone-lock-knob": (("93585A190",), "MHA-VN-013", 1),
     "vn-cone-pivot-screw": (("91829A560",), "MHA-VN-014", 1),
@@ -32,7 +33,7 @@ _EXPECTED = {
     "vn-magnifying-bracket-screw": (("91794A077",), "MHA-VN-050", 2),
     "vn-ms-stop-plate-screw": (("90114A124",), "MHA-VN-054", 2),
     "vn-lag-screw": (("92240A540",), "MHA-VN-009", 4),
-    "vn-pedestal-hold-down-screw": (("90280A197",), "MHA-VN-032", 6),
+    "vn-pedestal-hold-down-screw": (("90280A197",), "MHA-VN-032", 2),
     "vn-pen-set-screw": (("99607A213",), "MHA-VN-010", 1),
     "vn-pen-rod-set-screw": (("91375A105",), "MHA-VN-061", 1),
     "vn-pen-adjust-nut": (("92671A115",), "MHA-VN-062", 1),

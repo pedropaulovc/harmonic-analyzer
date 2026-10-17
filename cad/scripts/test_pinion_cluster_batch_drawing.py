@@ -756,15 +756,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 1.778,
                 5.2207,
             ),
-            # #743 PR2: MHA-VN-032 #8-32 x 3/4 through the 6.0 rocker-bracket
+            # Owner Q13c: MHA-VN-071 #8-32 x 5/8 through the 6.0 rocker-bracket
             # foot, one per bracket since the 2026-10-09 flip.
             **_expected_numbered_pairs(
-                "ch-channel-1/vn-pedestal-hold-down-screw",
+                "ch-channel-1/vn-bracket-hold-down-screw",
                 range(1, 3),
                 "fr-frame-1/fr-rocker-arm-support",
                 4.1656,
                 3.454,
-                13.05,
+                9.875,
             ),
         },
     }
@@ -830,8 +830,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # MHA-CH-010: the same pin pressed into its rod's Ø1.968 fork ream through
     # both tines (6.075 fork less the 2.675 slot); channel j's pin with
     # channel j's bar or rod only. MHA-VN-034: each #4-40 apex set screw's
-    # thread in its MHA-CH-008 ear's tap, over the R8 arch less the Ø6.5
-    # bore's height at the Ø2.845 envelope's edge; screw n in bracket n.
+    # thread in its MHA-CH-008 ear's tap, over the 9.80 apex (R8 arch lifted
+    # 1.80, #1371) less the Ø6.5 bore's height at the Ø2.845 envelope's edge;
+    # screw n in bracket n.
     # MHA-VN-055: each #1-72 x 5/32 keeper set screw in its own keeper's
     # crown tap (#53 drill).
     channel_allowed = _interference_contracts.allowed_interference_pairs("ch-channel")
@@ -853,7 +854,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 frozenset(
                     (f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")
                 ): _annulus_limit(
-                    2.845, 2.261, 8.0 - math.sqrt(3.25**2 - (2.845 / 2.0) ** 2)
+                    2.845, 2.261, 9.8 - math.sqrt(3.25**2 - (2.845 / 2.0) ** 2)
                 )
                 for n in (1, 2)
             },

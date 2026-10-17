@@ -27,6 +27,7 @@ recipes:
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | — (diagnostic recipe; a former `vn-frame-side-screw`) | Steel Narrow Fillister Head Slotted Screw |
+| 90280A196 | `vn-bracket-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | — (diagnostic recipe; a former `vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `vn-clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -376,6 +377,15 @@ Catalog specifications checked on September 10, 2026:
   maximum. The tap station prints at .XXX.
   94355A212 (#2-56 x 1/4 inch, also verified) loses because the shorter
   screw buries its drive at the collar's worst-case radial flat.
+- [90280A196](https://www.mcmaster.com/90280A196/) was read live on
+  October 16, 2026: #8-32 UNC class 2A, 5/8 in (15.875 mm) long under the
+  head, fully threaded zinc-plated steel, flat tip, ASME B18.6.3; head
+  diameter 0.27 in and height 0.156 in. Owner Q13c selects it for
+  MHA-VN-071, the two rocker-bracket hold-downs (one per MHA-CH-008 foot
+  into MHA-FR-005's top-face seat), so that seat stays 11.5 thread / 14.7
+  drill; 90280A197 stays on the arbor pedestals. Its head and thread match
+  90280A197, so the shared fillister family recipe builds it from the
+  length alone. No vendor SLDPRT has been harvested for this length yet.
 - [90280A197](https://www.mcmaster.com/90280A197/) was read live on
   September 23, 2026: #8-32 UNC class 2A, 3/4 in (19.05 mm) long under the
   head, fully threaded zinc-plated steel, flat tip, ASME B18.6.3; head

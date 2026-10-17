@@ -53,16 +53,19 @@ if not 0.0 < CORNER_R_MAX <= HEAD_TO_EAR_FACE_MIN:
 
 # Hidden reference sketches (drawing-simplicity-policy.md `How the repository
 # implements the guidelines`): the bore's and the hold-down hole's lateral
-# locations off the west side face, and the apex tap's station off the ear's
-# inboard face, are manufacturing dimensions no feature dimension measures
-# (the profiles are X-centred and the wizard tap is placed from the origin).
-# Each gets a one-line construction sketch on the part outline whose single
-# driving dimension IS the value; the part saves them blanked and the drawing
-# shows each in the one view that dimensions it.
+# locations off the west side face, the apex tap's station off the ear's
+# inboard face, and the overall height off the seat (rule 10: every height
+# from the seat, #1371) are manufacturing dimensions no feature dimension
+# measures (the profiles are X-centred, the wizard tap is placed from the
+# origin, and the arch's centre sits off the bore). Each gets a one-line
+# construction sketch whose single driving dimension IS the value; the part
+# saves them blanked and the drawing shows each in the one view that
+# dimensions it.
 REFERENCE_SKETCHES = (
     "BoreLateralReference",
     "HoleLateralReference",
     "SetScrewReference",
+    "HeightReference",
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -76,6 +79,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreLateralReference": {"BoreLateral"},
     "HoleLateralReference": {"HoleLateral"},
     "SetScrewReference": {"SetScrewLocation"},
+    "HeightReference": {"OverallHeight"},
     # The foot-to-ear inside corner's single-limit radius (CORNER_R_MAX).
     "CornerFillet": {"CornerRadius"},
 }
@@ -85,13 +89,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # reads it back. Every length is .XX; the corner radius is .X:
 # - the foot's sides and the hole's centring ride the .XX band the ligament
 #   check spends (ch_pivot_bracket_spec EDGE_BAND, HOLE_X_BAND), and the arch
-#   radius the band the set screw's full thread is counted at (ARCH_R_BAND);
-# - the foot length rides the title block's .XX, its foot-end wall sized for
-#   it (ch_pivot_bracket_sides); the ear thickness, hole station and tap
-#   station carry their own +/-0.10 at two places;
+#   radius, the overall height and the bore height the bands the set screw's
+#   full thread is counted at (ARCH_R_BAND, HEIGHT_BAND);
+# - the foot length and the hold-down station ride the title block's .XX, the
+#   support (and so the foot) sized for them (ch_pivot_bracket_sides); the ear
+#   thickness and tap station carry their own +/-0.10 at two places;
 # - the foot height sits at .XX in the support's seat-screw reach
 #   (rocker_bracket_seat_layout.FOOT_H_RANGE);
-# - the bore height and bore lateral are routine locations of a fitted bore,
+# - the bore lateral is a routine location of a fitted bore,
 #   and the drilled holes print their drill size to two places;
 # - the corner radius is a single limit at CORNER_R_PLACES (rule 3: no extra
 #   places on radii).
@@ -105,13 +110,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BoreLateralReference": {"BoreLateral": 2},
     "HoleLateralReference": {"HoleLateral": 2},
     "SetScrewReference": {"SetScrewLocation": 2},
+    "HeightReference": {"OverallHeight": 2},
     "CornerFillet": {"CornerRadius": CORNER_R_PLACES},
 }
-
-# Places for the one dimension the SHEET derives, keyed by the recipe's own
-# label: the parenthesised overall height, a band-free restatement of the
-# bore height plus the arch radius. Two places, like the two it sums.
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall height": 2}
 
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names

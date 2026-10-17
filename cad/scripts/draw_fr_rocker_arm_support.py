@@ -6,7 +6,7 @@ sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
 The support is a painted gray-iron frame with a trapezoidal wall, two opposed
-pockets leaving a 9.525 central web, a through cavity, a chamfered window rim,
+pockets leaving a 12.70 central web, a through cavity, a chamfered window rim,
 four 5/16 clearance holes through its mounting foot, and the rocker brackets'
 two #8-32 seats in its top face, transferred from the set brackets at
 assembly. The sheet runs 1:2, with each view's scale pinned explicitly.
@@ -29,6 +29,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    remove_notes_matching,
     view_name,
     visible_component_entities,
 )
@@ -122,12 +123,15 @@ ISO_CENTER = (0.350, 0.201)
 # overall size above, nested pocket sizes below, radii beside their corners.
 FRONT_KEEP = {
     "Depth": (0.105, 0.258),
-    "PocketRadius": (0.035, 0.150),
+    # Its leader's shelf stands 7 mm above the pocket's bottom wall, whose
+    # PocketBottomStation extension line runs out left under it (r6 render:
+    # at 0.150 the shelf sat 0.8 mm above that line).
+    "PocketRadius": (0.035, 0.157),
     # CornerFillet's dimension belongs to the cavity's top-right corner (the
     # fix3 render), so the text sits up-right of that corner, on the arc's
     # own bisector. From the left column its leader crossed the whole cavity
     # and landed on the far side of the fillet's circle, off the arc.
-    "CavityRadius": (0.160, 0.240),
+    "CavityRadius": (0.161, 0.240),
     # Each stacked width prints its text just above its own dimension line,
     # so the lower one needs a full band: at 0.118 the 127.0 line ran
     # through "165.1" (fix3 render).
@@ -144,16 +148,25 @@ FRONT_KEEP = {
     ),
     # The cavity's and the pockets' locations (CavityLocationReference, blanked
     # in the part) stand above the view's left end, clear of the R6.35 low
-    # left: from the -X end face, the pocket wall's 6.85 on the inner band
+    # left: from the -X end face, the pocket wall's 7.70 on the inner band
     # (its text outside left, its pocket-wall extension line stopping below
-    # the outer band) and the cavity wall's 25.9 on the outer one, under the
-    # 178.8; from the top face, the cavity's top wall left of the view. The
-    # 6.85's BOTH SIDES stands left of the 25.4's dimension line and its line
+    # the outer band) and the cavity wall's 26.7 on the outer one, under the
+    # 180.5; from the top face, the cavity's top wall left of the view. The
+    # 7.70's BOTH SIDES stands left of the 25.4's dimension line and its line
     # above the 25.4's outside arrow tail (r9 review: the tail struck the
-    # callout's E and crossed the 6.85's line).
+    # callout's E and crossed the pocket station's line).
     "PocketEndStation": (0.0365, 0.244),
     "CavityEndStation": (0.0668, 0.249),
     "CavityTopStation": (0.052, 0.2231),
+    # The pockets' bottom wall up from the mounting face (r6 review: the
+    # pocket had no vertical location). Its 6.35 spans only 3.2 mm of sheet,
+    # so its dimension line runs on down past the mounting face's extension
+    # line, and SolidWorks stands the text block, BOTH SIDES under it, LEFT of
+    # that line, its right edge on it. At x 0.036 the block's left edge
+    # crossed the sheet's left inner border by 1.6 mm (r7 review and layout
+    # audit), so the line stands 10 mm further in, still left of the view and
+    # of the 165.1's extension line and below the R6.35's leader.
+    "PocketBottomStation": (0.046, 0.132),
 }
 # The cavity corner CornerFillet's dimension attaches to, as sheet signs.
 CAVITY_RADIUS_CORNER = (1, 1)
@@ -176,6 +189,15 @@ DIMENSION_CALLOUTS = {
     "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
     # One location covers both opposed pockets, as the SQ size does.
     "PocketEndStation": "BOTH SIDES",
+    "PocketBottomStation": "BOTH SIDES",
+    # One flat edge prints for both (the section is symmetric about the web);
+    # off its nearer web face it keeps the transferred seats clear of the
+    # web's faces (owner Q13d, rocker_bracket_seat_layout's stack). r6 review:
+    # "CENTERS" read as the mating part being centred, not what the 2.12 is.
+    "TopFlatPlusZStation": (
+        "BOTH SIDES\n"
+        f"KEEPS {_config.parts('ch-pivot-bracket')['number']}\nSEAT TAPS IN WEB"
+    ),
 }
 # The sheet's own places. RimChamferSize's, PocketFloorRadius's, the seat REF
 # stations' and the locations' are the PART's
@@ -189,8 +211,7 @@ DIMENSION_PRECISION = {
     "CavityRadius": 1,
     "WallHeight": 1,
     "FootSpan": 1,
-    "TopSpan": 1,
-    # A held thickness, 9.525 at the routine ±0.51: the seats' thread-wall
+    # A held thickness, 12.70 at the routine ±0.51: the seats' thread-wall
     # stack reads the same places (rocker_bracket_seat_layout).
     "WebThickness": WEB_PLACES,
     "FootThickness": 2,
@@ -300,20 +321,21 @@ FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
 # top-rail floor corner (build_fr_rocker_arm_support.POCKET_FLOOR_FILLET_EDGES),
 # which the section shows in profile at its upper right. The text stands
 # level with it right of the section, between the slanted wall and the
-# 177.8, which moves out to clear it: the left lane carries the base edge's
-# extension line up to TaperRun. The 16.9 prints right of its span, off the
-# top-face edge's extension line TaperRun runs on up past it; the 63.5
-# prints right of the web face's extension line WebFaceStation runs down to
-# just above it, its row no lower than r8's (r10 review: 1 mm lower, its
-# left extension line's overshoot struck the SECTION A-A label's E).
-# TaperRun (the base edge to the top face's) and WebFaceStation (to the
-# web's face, WebLocationReference, blanked in the part) both measure from
-# the base's -Z edge, the section's left.
+# 177.8, which moves out to clear it. One top-flat edge prints off its
+# nearer web face (WebLocationReference, blanked in the part; owner Q13d),
+# its BOTH SIDES covering the other (r6 review), on the row above the
+# section: the span is only about 1 mm of sheet, so its text stands outboard
+# of the +Z edge, its reason rows hanging below the value, above the R0.8
+# MAX's block. The 63.5 prints
+# right of the web face's extension line WebFaceStation runs down to just
+# above it, its row no lower than r8's (r10 review: 1 mm lower, its left
+# extension line's overshoot struck the SECTION A-A label's E).
+# WebFaceStation (to the web's face) measures from the base's -Z edge, the
+# section's left.
 RIGHT_KEEP = {
     "WallHeight": (0.256, 0.185),
     "FootSpan": (0.2125, 0.133),
-    "TopSpan": (0.2155, 0.238),
-    "TaperRun": (0.195, 0.2475),
+    "TopFlatPlusZStation": (0.2385, 0.2475),
     "WebFaceStation": (0.1958, 0.1375),
     "PocketFloorRadius": (0.2335, 0.2195),
 }
@@ -333,10 +355,10 @@ HOLE_TABLE_DATUM_XZ_MM = (-BOSS_DEPTH / 2.0, -WIDE)
 RIGHT_END_HOLE_TAGS = ("A3", "A4")
 HOLE_TAG_MIRROR_SHIFT = -0.0150
 EXPECTED_HOLE_TABLE_LOCATIONS_MM = (
-    (149.72, 49.21),
-    (29.08, 49.21),
-    (149.72, 14.29),
-    (29.08, 14.29),
+    (150.57, 49.21),
+    (29.93, 49.21),
+    (150.57, 14.29),
+    (29.93, 14.29),
 )
 
 
@@ -872,6 +894,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # The mounting face is the trapezoid's visible bottom edge in section A-A.
     # Keep the symbol near the foot while clearing the 63.5 width dimension.
+    # The leader lands 8 mm of sheet in from the foot's sharp: at 2 mm it hit
+    # the corner where the rim chamfer meets the face (r5 review, minor).
     seat_y = RIGHT_CENTER[1] - HALF_Y * VIEW_SCALE / 1000.0
     seat_half_w = WIDE * VIEW_SCALE / 1000.0
     add_surface_finish(
@@ -882,7 +906,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "mounting_face"),
         label="mounting face finish",
         char_height=0.0025,
-        leader_attach_xy=(RIGHT_CENTER[0] + seat_half_w - 0.002, seat_y),
+        leader_attach_xy=(RIGHT_CENTER[0] + seat_half_w - 0.008, seat_y),
     )
 
     datum_axes = _bottom_datum_axes(adapter, bottom)
@@ -952,14 +976,21 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Materialize the iso's cosmetic threads before the strict final note
-    # cleanup, so BracketSeats' descriptive label exists when it is counted
+    # cleanup, so any descriptive BracketSeats label exists when it is counted
     # rather than first appearing during the native drawing save.
     # VIEW B shows the same seats face-on, so its cosmetic threads are
     # imported too (the thread circles print; nothing is left for the save to
-    # add). r743-p1s-B showed the import brings NO label in that top view:
-    # finalize removed exactly the iso's one.
+    # add). r743-p1s-B showed the import brings NO label in that top view.
     import_cosmetic_threads(adapter, iso)
     import_cosmetic_threads(adapter, view_b)
+    # Whether the iso draws BracketSeats' "#8-32 Tapped Hole" label is
+    # SolidWorks' choice: on part key 40ff46054ba2 the q12q13-r3 render counted
+    # none and the stack-top build one, past the right border. The tap is
+    # stated once, on its hole callout, so any such label goes and the count
+    # is logged, not gated (draw_sm_knife_mount); finalize_drawing then proves
+    # none is left.
+    removed_tap_labels = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(f"removed {removed_tap_labels} automatic tapped-hole label(s)")
 
     return await finalize_drawing(
         adapter,
@@ -967,12 +998,10 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker-Arm Support Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # BracketSeats' descriptive label on the isometric ran past the
-        # right border (fix3 render); the seat note already states it. One
-        # label per tapped Hole Wizard feature, and only the iso draws one
-        # (r743-p1s-B: VIEW B's import brought none).
+        # The sweep stays, so a label that appears after the removal above
+        # fails the count instead of printing.
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=1,
+        expected_redundant_notes=0,
     )
 
 

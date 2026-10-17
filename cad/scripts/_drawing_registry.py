@@ -1034,6 +1034,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_bracket_hold_down_screw",
+        part="vn_bracket_hold_down_screw",
+        artifact_stem="vn-bracket-hold-down-screw",
+        script_name="draw_vn_bracket_hold_down_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_pedestal_hold_down_screw",
         part="vn_pedestal_hold_down_screw",
         artifact_stem="vn-pedestal-hold-down-screw",
