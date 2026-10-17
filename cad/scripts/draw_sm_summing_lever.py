@@ -1180,8 +1180,9 @@ def _hidden_lines_removed_without_greyed_pass(view: Any) -> None:
     (ba33167e's stage log), on section C-C (493638fa), on neither in
     2fa756e1 and 802e4117 -- the one note the sweep's count varied by.  Each
     caller sets the view straight after creating it, before anything is
-    attached, so the regen is not needed.  Farm seats place these views in
-    HLR already (802e4117), where the set is a no-op; that build's PDF is
+    attached, so the regen is not needed.  Farm seats place all six sheet-1
+    views in HLR already (5a58480d), where the set is a no-op; that build,
+    on the seat behind both 9-label builds, swept 8 and its PDF is
     pixel-identical to r18b's, which still had the pass.
     """
     bound = _early_bound(view, "IView")
