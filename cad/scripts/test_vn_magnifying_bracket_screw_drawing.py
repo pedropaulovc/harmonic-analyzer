@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+from fractions import Fraction
+import re
 
 import pytest
 
@@ -87,3 +89,14 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert sheet.source_kind == "part"
     assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
     assert sheet.layout in DRAWING_TEMPLATES
+
+
+def test_sheet_item_names_the_sku_thread_and_catalogue_length() -> None:
+    """91794A078 replaced the 1/4 in 91794A077, but the ITEM row kept 1/4."""
+    import draw_vn_magnifying_bracket_screw as drawing
+
+    assert drawing.ITEM == "#2-56 x 5/16 FILLISTER HEAD SLOTTED SCREW"
+    match = re.fullmatch(r"(#\d+-\d+) x (\d+/\d+) FILLISTER HEAD SLOTTED SCREW", drawing.ITEM)
+    assert match, drawing.ITEM
+    assert match[1] == spec.THREAD
+    assert float(Fraction(match[2])) * 25.4 == pytest.approx(FILLISTER_SIZE[1])
