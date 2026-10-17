@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the counter-anchor jam nut (MHA-VN-070, McMaster 90760A140)."""
+"""Create the purchased reference drawing for the counter-anchor jam nut (MHA-VN-072, McMaster 90760A140)."""
 
 from __future__ import annotations
 

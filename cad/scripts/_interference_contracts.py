@@ -860,7 +860,7 @@ _CHANNEL_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(*FULCRUM_SET_SCREW_THREAD),
         second_number=None,
     ),
-    # Each MHA-VN-012 anchor's #6-32 major envelope in its MHA-CH-012 round
+    # Each MHA-VN-012 anchor's #6-32 major envelope in its MHA-CH-014 round
     # jam nut's #36 tap drill over the nut's 3.60 thickness; anchor and nut
     # are placed in the same channel loop, so their suffixes match.  Literals,
     # like the rows above; test_vn_spring_hook_drawing pins them to the specs.

@@ -5,7 +5,7 @@ import vn_boss_hook_jam_nut_spec as jam_nut
 from stock_anchor_geom import ANCHOR_9490T1, trim
 from sm_summing_lever_spec import ANCHOR_H
 
-# The MHA-VN-070 jam nut locks the anchor on the boss top face (#1189), so
+# The MHA-VN-072 jam nut locks the anchor on the boss top face (#1189), so
 # the shank is trimmed longer than the boss by the nut's height plus one
 # pitch: the nut runs on full thread a pitch clear of the thread's start at
 # the eye neck, and the cut end still finishes flush with the boss underside
