@@ -49,10 +49,13 @@ _DATA_EXTENSIONS = (".dxf", ".dwg")
 _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECASE)
 
 # Sub-assemblies in build order; the top-level harmonic-analyzer references the
-# eight subs, so it is last. doit derives ordering from file_dep, but this tuple
-# still enumerates the assembly tasks. The former monolithic ``output`` is split
-# by function into summing -> magnifier -> pen (the value chain) + paper-drive;
-# the measuring stick + its clamped stop form their own sub (MS, 2026-10-09).
+# eight machine subs, so it is last. doit derives ordering from file_dep, but
+# this tuple still enumerates the assembly tasks. The former monolithic
+# ``output`` is split by function into summing -> magnifier -> pen (the value
+# chain) + paper-drive; the measuring stick + its clamped stop form their own
+# sub (MS, 2026-10-09). Shop-fixture assemblies (``is_shop_fixture``: the
+# rocker's oblique-trammel jig, TL-000) build here too but never enter the
+# machine tree: ``MACHINE_ASSEMBLIES`` excludes them.
 ASSEMBLY_ORDER = (
     "fr_frame",
     "dt_drive_train",
@@ -62,8 +65,22 @@ ASSEMBLY_ORDER = (
     "pn_pen",
     "pd_paper_drive",
     "ms_measuring_stick",
+    "ch_rocker_arm_tl_oblique_jig",
     "ha_harmonic_analyzer",
 )
+
+
+def is_shop_fixture(stem: str) -> bool:
+    """True for a shop-fixture stem (``_tl_``: cad/docs/subsystem-identities.md).
+
+    A fixture part may appear only in a shop-fixture assembly; a fixture
+    assembly never enters a machine assembly or a machine BOM
+    (test_part_coverage.py, #1239)."""
+    return "_tl_" in stem
+
+
+# The machine's own assemblies: the harmonic-analyzer and the subs it places.
+MACHINE_ASSEMBLIES = tuple(a for a in ASSEMBLY_ORDER if not is_shop_fixture(a))
 
 # Scripts that match build_*.py but produce no .SLDPRT part in the SolidWorks
 # queue -- excluded from the part list: motion/diagnostic deliverables that
@@ -2387,6 +2404,10 @@ def dependents_of(stem: str) -> list[str]:
     .SLDASM`` -- so ``references_of`` is the DIRECT inverse only.
     """
     deps = [asm for asm in ASSEMBLY_ORDER if asm != stem and stem in references_of(asm)]
-    if deps and "ha_harmonic_analyzer" not in deps:
+    # Only a machine sub flows up to the top; a shop-fixture jig never does.
+    if (
+        any(not is_shop_fixture(asm) for asm in deps)
+        and "ha_harmonic_analyzer" not in deps
+    ):
         deps.append("ha_harmonic_analyzer")
     return deps

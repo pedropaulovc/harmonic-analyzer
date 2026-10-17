@@ -42,15 +42,23 @@ def test_components_name_a_built_part_whose_notes_permit_the_construction():
 
 
 def test_part_and_assembly_coverage():
-    """Every built item belongs to the machine or shop, and has its own sheet."""
+    """Every built item belongs to the machine or shop, and has its own sheet.
+
+    Shop fixtures (``bg.is_shop_fixture``) may be placed only by a shop-fixture
+    assembly, and a shop-fixture assembly never enters the machine tree."""
     parts = set(bg.part_stems())
     assemblies = set(bg.ASSEMBLY_ORDER)
     assert parts, "part_stems() returned no parts"
     assert assemblies, "ASSEMBLY_ORDER contains no assemblies"
     assert registry.DRAWINGS_BY_NAME, "DRAWINGS_BY_NAME contains no drawings"
+    assert bg.ASSEMBLY_ORDER[-1] == "ha_harmonic_analyzer", bg.ASSEMBLY_ORDER
 
-    fixtures = {stem for stem in parts if "_tl_" in stem}
+    fixtures = {stem for stem in parts if bg.is_shop_fixture(stem)}
+    fixture_assemblies = {stem for stem in assemblies if bg.is_shop_fixture(stem)}
     references = {stem: set(bg.references_of(stem)) for stem in bg.ASSEMBLY_ORDER}
+    machine_references = set().union(
+        *(refs for stem, refs in references.items() if stem not in fixture_assemblies)
+    )
     reachable = set()
     pending = [bg.ASSEMBLY_ORDER[-1]]
     while pending:
@@ -72,12 +80,13 @@ def test_part_and_assembly_coverage():
         if row.source_kind == "assembly"
     }
     exemptions = set(PART_DRAWING_EXEMPTIONS)
-    referenced_fixtures = fixtures & set().union(*references.values())
+    referenced_fixtures = fixtures & machine_references
     components = _components()
     reachable |= {stem for stem, parent in components.items() if parent in reachable}
     violations = {
         "orphans": parts - fixtures - reachable,
-        "shop fixtures referenced by assemblies (#1239)": referenced_fixtures,
+        "shop fixtures referenced by machine assemblies (#1239)": referenced_fixtures,
+        "shop-fixture assemblies in the machine tree": fixture_assemblies & reachable,
         "undrawn": parts - part_drawings - exemptions,
         "exemptions with drawings": exemptions & (part_drawings | assembly_drawings),
         "exemptions naming nonexistent parts": exemptions - parts,

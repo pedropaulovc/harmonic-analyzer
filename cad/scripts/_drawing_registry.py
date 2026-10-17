@@ -894,6 +894,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_feed_lever",
+        part="ch_rocker_arm_tl_oblique_feed_lever",
+        artifact_stem="ch-rocker-arm-tl-oblique-feed-lever",
+        script_name="draw_ch_rocker_arm_tl_oblique_feed_lever.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_rocker_arm_tl_outline_template",
         part="ch_rocker_arm_tl_outline_template",
         artifact_stem="ch-rocker-arm-tl-outline-template",
@@ -1500,6 +1507,14 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="ms_measuring_stick",
         artifact_stem="ms-measuring-stick-assembly",
         script_name="draw_ms_measuring_stick_assembly.py",
+        source_kind="assembly",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_jig_assembly",
+        part="ch_rocker_arm_tl_oblique_jig",
+        artifact_stem="ch-rocker-arm-tl-oblique-jig-assembly",
+        script_name="draw_ch_rocker_arm_tl_oblique_jig_assembly.py",
         source_kind="assembly",
         layout=DrawingLayout.LANDSCAPE,
     ),

@@ -7,8 +7,9 @@ assembly step. A plain seated thread, shoulder, shim or threadlocker alone is
 not one, and a cap that retains a cluster axially does not lock a different
 interface.
 
-``JOINTS`` holds one row per threaded joint of every assembly in
-``_buildgraph.ASSEMBLY_ORDER`` (identical pattern instances share a row and
+``JOINTS`` holds one row per threaded joint of every machine assembly
+(``_buildgraph.MACHINE_ASSEMBLIES``: shop-fixture jigs are not operating
+machinery; identical pattern instances share a row and
 carry their ``quantity``). Each part an assembly references is classified as
 threaded or not (``THREADED_PARTS`` / ``UNTHREADED_PARTS``), so the joint list
 is checked against the build's own component enumeration
@@ -450,12 +451,13 @@ def audit(
 
 @functools.lru_cache(maxsize=1)
 def build_inventory() -> Inventory:
-    """The build's own enumeration: each assembly script's referenced parts
-    and sub-assemblies (``_buildgraph.references_of``) and its keyed steps."""
+    """The build's own enumeration: each machine assembly script's referenced
+    parts and sub-assemblies (``_buildgraph.references_of``) and its keyed
+    steps."""
     assemblies = frozenset(_buildgraph.ASSEMBLY_ORDER)
     parts: dict[str, frozenset[str]] = {}
     subassemblies: dict[str, frozenset[str]] = {}
-    for assembly in _buildgraph.ASSEMBLY_ORDER:
+    for assembly in _buildgraph.MACHINE_ASSEMBLIES:
         references = _buildgraph.references_of(assembly)
         subassemblies[assembly] = frozenset(r for r in references if r in assemblies)
         parts[assembly] = frozenset(r for r in references if r not in assemblies)
@@ -496,7 +498,7 @@ def _part_number(stem: str) -> str:
 def report(findings: list[Finding]) -> dict[str, object]:
     """The JSON report: per-assembly counts, the findings and every row."""
     per_assembly: dict[str, dict[str, int]] = {}
-    for assembly in _buildgraph.ASSEMBLY_ORDER:
+    for assembly in _buildgraph.MACHINE_ASSEMBLIES:
         rows = [j for j in JOINTS if j.assembly == assembly]
         per_assembly[assembly] = {
             "rows": len(rows),
