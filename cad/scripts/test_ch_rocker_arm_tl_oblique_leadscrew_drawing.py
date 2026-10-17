@@ -478,24 +478,22 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         assert draw._inside_sheet(box), box
     assert main[2] < iso[0]
     assert not draw._inside_sheet(draw.TITLE_BLOCK)
-    # The cut length stands over the screw, inside its span; the clock-0
-    # flats' controls under it and off its far end, short of the isometric.
-    assert set(draw.MAIN_KEEP) == (
+    # The cut length stands over the screw, inside its span; the far two
+    # flats' stations under it, each in its own row. The near station, the
+    # flats' length and across-flat are the details'.
+    details = [set(detail.keep) for detail in draw.END_DETAILS]
+    assert set(draw.MAIN_KEEP).union(*details) == (
         spec.DRAWING_DIMENSIONS["ScrewProfile"] | spec.DRAWING_DIMENSIONS["FlatProfile"]
+    )
+    assert sum(map(len, details)) + len(draw.MAIN_KEEP) == len(
+        set(draw.MAIN_KEEP).union(*details)
     )
     text_x, text_y = draw.MAIN_KEEP["CutLength"]
     assert main[0] < text_x < main[2] and text_y > main[3]
-    rows = [draw.MAIN_KEEP[f"{name}FlatStation"][1] for name in spec.FLAT_STATIONS]
-    assert len(set(rows)) == 3 and max(rows) < main[1] - 0.015
-    for name in ("FlatLength", "FlatAF"):
-        x, _y = draw.MAIN_KEEP[name]
-        assert main[2] < x - 0.01 and x + 0.01 < iso[0]
-    # The across-flat's text is offset right of its dimension line, its left
-    # edge past the extension lines' 1 mm overrun, short of the isometric.
-    af_x, af_y = draw.FLAT_AF_TEXT_XY
-    assert af_x - draw._AF_TEXT_HALF_WIDTH >= draw.MAIN_KEEP["FlatAF"][0] + 0.004
-    assert af_x + draw._AF_TEXT_HALF_WIDTH + 0.01 < iso[0]
-    assert main[1] <= af_y <= main[3]
+    rows = [
+        draw.MAIN_KEEP[f"{name}FlatStation"][1] for name in ("FarKP08", "Handwheel")
+    ]
+    assert len(set(rows)) == 2 and max(rows) < main[1] - 0.015
     assert draw.sheet_x(spec.FLAT_STATIONS["Handwheel"]) == pytest.approx(0.29175)
     # The cut length's dimension line (its text about 2.7 mm over it) stands
     # over the sections' letters, 1.7 .. 7.9 mm past the cutting lines' reach.
@@ -527,9 +525,22 @@ def test_one_axis_horizontal_view_at_the_largest_fitting_scale() -> None:
         station = spec.FLAT_STATIONS[section.flat]
         assert 2.5 < abs(section.cut_mm - station) < spec.FLAT_LENGTH / 2.0
     assert [s.flat for s in draw.CLOCK_SECTIONS] == list(spec.CLOCKED_FLATS)
-    # The note block stays bottom-left, under the main view.
-    assert draw.NOTES_XY[0] > draw.BORDER[0] and draw.NOTES_XY[0] < draw.TITLE_BLOCK[0]
-    assert draw.NOTES_XY[1] < main[1]
+    # The note block (about 70 x 13 mm, top-left anchored) stands under the
+    # main view's lowest text, right of the details and over the title block,
+    # left of the isometric.
+    notes = (
+        draw.NOTES_XY[0],
+        draw.NOTES_XY[1] - 0.013,
+        draw.NOTES_XY[0] + 0.070,
+        draw.NOTES_XY[1],
+    )
+    assert draw._inside_sheet(notes)
+    assert notes[3] < min(rows) - draw.TEXT_HALF_HEIGHT - 0.005
+    assert notes[2] < iso[0]
+    detail_right = max(
+        x for detail in draw.END_DETAILS for x, _y in detail.keep.values()
+    )
+    assert notes[0] > detail_right + 0.015
 
 
 def test_notes_name_the_item_not_its_length_or_material() -> None:
@@ -563,10 +574,132 @@ def test_sections_print_hidden_lines_removed_and_text_off_their_lines() -> None:
     assert "_offset_angle_text(adapter, view_annotations, angle, arc, angle_text)" in (
         sections
     )
+    details = source[source.index("def _add_end_details") :]
+    assert "set_hidden_lines_removed(adapter, view)" in details
     build = source[source.index("async def build") :]
-    assert build.index('{"FlatAF": FLAT_AF_TEXT_XY}') < build.index(
-        "set_dimension_callouts("
+    assert "FLAT_AF_TEXT_XY" not in source
+    assert build.index("_add_end_details(adapter, main)") < build.index(
+        "verify_machining_controls("
     )
+
+
+def _fence_box(detail) -> tuple[float, float, float, float]:
+    half = detail.radius_mm * draw._DETAIL_PER_MODEL_MM
+    x, y = detail.centre
+    return (x - half, y - half, x + half, y + half)
+
+
+def test_details_show_every_flat_at_the_sections_scale() -> None:
+    """The 1:2 view draws a flat 0.36 mm deep: each station's flats, and the
+    screw's ends, stand whole in one 3:1 detail fence (review r9, rule 15)."""
+    assert draw.DETAIL_SCALE == draw.SECTION_SCALE == (3, 1)
+    labels = [detail.label for detail in draw.END_DETAILS]
+    assert labels == ["C", "D", "E"]
+    assert not set(labels) & {section.label for section in draw.CLOCK_SECTIONS}
+    radius = spec.MAJOR_DIA / 2.0
+
+    def fences(station: float, offset: float) -> list[str]:
+        return [
+            detail.label
+            for detail in draw.END_DETAILS
+            if math.hypot(station - detail.centre_mm, offset) < detail.radius_mm
+        ]
+
+    for name, station in spec.FLAT_STATIONS.items():
+        corners = [
+            fences(station + along * spec.FLAT_LENGTH / 2.0, across * radius)
+            for along in (-1.0, 1.0)
+            for across in (-1.0, 1.0)
+        ]
+        assert all(found == corners[0] and len(found) == 1 for found in corners), name
+    for end in (0.0, spec.LENGTH):
+        assert all(len(fences(end, across * radius)) == 1 for across in (-1.0, 1.0))
+    assert [fences(station, 0.0)[0] for station in spec.FLAT_STATIONS.values()] == [
+        "C",
+        "D",
+        "E",
+    ]
+    # The fences stand apart on the main view, and so do the details, in a
+    # row under its lowest text, left of the title block and in the border.
+    spans = sorted(
+        (detail.centre_mm - detail.radius_mm, detail.centre_mm + detail.radius_mm)
+        for detail in draw.END_DETAILS
+    )
+    assert all(left[1] < right[0] for left, right in zip(spans, spans[1:]))
+    boxes = [_fence_box(detail) for detail in draw.END_DETAILS]
+    lowest_main_text = min(y for _x, y in draw.MAIN_KEEP.values())
+    for box in boxes:
+        assert draw._inside_sheet(box), box
+        assert box[3] < lowest_main_text - draw.TEXT_HALF_HEIGHT - 0.010
+    assert all(left[2] + 0.004 < right[0] for left, right in zip(boxes, boxes[1:]))
+
+
+def test_details_carry_the_near_station_and_the_printed_flat() -> None:
+    """C prints the near station from the near end's centre; E the printed
+    flat's length and across-flat, the 5X and 3X callouts; every text off its
+    fence and over the captions' row."""
+    by_label = {detail.label: detail for detail in draw.END_DETAILS}
+    assert set(by_label["C"].keep) == {"NearKP08FlatStation"}
+    assert set(by_label["D"].keep) == set()
+    assert set(by_label["E"].keep) == {"FlatLength", "FlatAF"}
+    assert spec.PRINTED_FLAT == "Handwheel"
+    assert draw.FLAT_CALLOUTS == {"FlatLength": "5X", "FlatAF": "3X"}
+    for detail in draw.END_DETAILS:
+        fence = detail.radius_mm * draw._DETAIL_PER_MODEL_MM
+        for name, (x, y) in detail.keep.items():
+            assert math.dist((x, y), detail.centre) > fence + 0.004, name
+            assert y - draw.TEXT_HALF_HEIGHT - 0.006 > draw.DETAIL_CAPTION_TOP
+            assert draw.BORDER[0] < x < draw.TITLE_BLOCK[0]
+    # The flat's length and the near station hang under their spans.
+    near, wheel = by_label["C"], by_label["E"]
+    x, _y = near.keep["NearKP08FlatStation"]
+    assert draw.detail_xy(near.centre_mm, near.centre, 0.0)[0] < x
+    assert (
+        x
+        < draw.detail_xy(near.centre_mm, near.centre, spec.FLAT_STATIONS["NearKP08"])[0]
+    )
+    assert wheel.keep["FlatLength"][0] == pytest.approx(
+        draw.detail_xy(wheel.centre_mm, wheel.centre, spec.FLAT_STATIONS["Handwheel"])[
+            0
+        ]
+    )
+    # The across-flat's dimension line stands right of the far end, its text
+    # between the far crest and the flat.
+    af_x, af_y = wheel.keep["FlatAF"]
+    assert af_x > draw.detail_xy(wheel.centre_mm, wheel.centre, spec.LENGTH)[0]
+    radius = spec.MAJOR_DIA / 2.0
+    crest = draw.detail_xy(wheel.centre_mm, wheel.centre, 0.0, -radius)[1]
+    flat = draw.detail_xy(wheel.centre_mm, wheel.centre, 0.0, spec.FLAT_AF - radius)[1]
+    assert flat < af_y < crest
+
+
+def test_details_letters_stand_off_the_screw() -> None:
+    letters = [detail.letter for detail in draw.END_DETAILS]
+    for x, y in letters:
+        assert abs(y - draw.MAIN_CENTER[1]) > draw.SCREW_SHEET_DIA / 2.0 or (
+            x > draw.sheet_x(spec.LENGTH) + 0.004 or x < draw.NEAR_END_X - 0.004
+        )
+    assert all(math.dist(a, b) > 0.010 for a in letters for b in letters if a != b)
+
+
+def test_thread_is_called_out_on_the_main_view() -> None:
+    """The bought thread is named by a leadered callout touching the screw,
+    a designation and its extent, no size or method (rule 7)."""
+    assert draw.THREAD_CALLOUT.splitlines()[0] == "TR8X2 THREAD FULL LENGTH"
+    assert re.findall(r"\d", draw.THREAD_CALLOUT.replace("TR8X2", "")) == []
+    tip_x, tip_y = draw.THREAD_LEADER_TIP
+    assert draw.NEAR_END_X < tip_x < draw.sheet_x(spec.LENGTH)
+    assert tip_y == pytest.approx(draw.MAIN_CENTER[1] + draw.SCREW_SHEET_DIA / 2.0)
+    text_x, text_top = draw.THREAD_CALLOUT_XY
+    # Under the cut length's dimension line, over the screw, clear of the
+    # sections' letters 4.8 .. 6.3 mm in from the cutting lines' ends.
+    assert text_top < draw.MAIN_KEEP["CutLength"][1] - 0.006
+    assert text_top - 0.009 > tip_y + 0.005
+    cuts = [draw.sheet_x(section.cut_mm) for section in draw.CLOCK_SECTIONS]
+    assert min(cuts) + 0.025 < text_x and text_x + 0.060 < max(cuts) - 0.015
+    source = Path(draw.__file__).read_text(encoding="utf-8")
+    build = source[source.index("async def build") :]
+    assert "add_leader_note(" in build and "view=main," in build
 
 
 @pytest.mark.parametrize("target", sorted(spec.DIMENSION_CONTROLS))
