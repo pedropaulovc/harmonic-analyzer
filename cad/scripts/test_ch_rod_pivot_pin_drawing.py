@@ -2,11 +2,12 @@
 
 The installed pressed pin under ``cad/docs/drawing-guidelines.md``
 (user ruling 2026-10-09, PR #1292 review F1): three native model dimensions
-whose places and bands the PART owns -- the diameter with its grind band, the
-installed length as REFERENCE, and the blank's cut length from a blanked
-reference sketch with its band (drawing-simplicity-policy.md `How the repository implements the guidelines`; PR #1292 review N1: never note
-text) -- no GD&T, no roughness symbol, and at most four note lines: cut the
-blank, the press, the flush ends, the running fit.
+whose places and limits the PART owns -- the diameter with its grind band and
+its two fits flagged at the callout, the installed length as REFERENCE, and
+the blank's cut length from a blanked reference sketch as a single MIN limit
+(drawing-simplicity-policy.md `How the repository implements the guidelines`;
+PR #1292 review N1: never note text; machinist review #1522) -- no GD&T, no
+roughness symbol, and one note line: installed state, flush ends, removable.
 """
 
 from __future__ import annotations
@@ -78,8 +79,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 def test_precision_and_band_are_authored_on_the_part() -> None:
     # The installed length is the fork's 3-place thickness, so it prints at
-    # three places; the blank's band is written at two.
-    assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 3, "BlankLen": 2}
+    # three places; the blank's MIN limit at one.
+    assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 3, "BlankLen": 1}
     assert "draw_ch_rod_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
@@ -93,29 +94,36 @@ def test_precision_and_band_are_authored_on_the_part() -> None:
     assert "require_saved_drawing_properties(" in _build_source()
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "PinDia"): "PIN_DIA_TOLERANCE",
-        ("BlankReference", "BlankLen"): "blank_upper",
     }
 
 
-def test_blank_length_is_a_model_dimension_with_its_band() -> None:
-    """PR #1292 review N1: the 6.40 +/-0.13 cut length prints from a blanked
-    reference sketch on the pin axis with its native band at its native two
-    places, never from note text (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method))."""
-    assert spec.PIN_BLANK_LENGTH == 6.40
-    assert spec.PIN_BLANK_LENGTH_BAND == (0.13, -0.13)
+def test_blank_length_is_a_model_dimension_with_its_min_limit() -> None:
+    """PR #1292 review N1 and machinist review #1522 (rule 4 (tighten only
+    for function)): the cut length prints from a blanked reference sketch on
+    the pin axis as a single MIN limit at one place, never from note text and
+    never as a symmetric band -- its only job is to leave dressing stock."""
+    assert spec.PIN_BLANK_LENGTH == 6.4
+    assert spec.PIN_BLANK_LENGTH_TOL_TYPE == 5  # swTolType_e.swTolMIN
+    assert not hasattr(spec, "PIN_BLANK_LENGTH_BAND")
     assert notes.DRAWING_DIMENSIONS["BlankReference"] == {"BlankLen"}
-    assert notes.DRAWING_PRECISION["BlankReference"] == {"BlankLen": 2}
+    assert notes.DRAWING_PRECISION["BlankReference"] == {"BlankLen": 1}
     build = "".join(_build_source().split())
     assert 'set_global(adapter,"BlankLen",f"{PIN_BLANK_LENGTH}mm")' in build
     assert 'blank.record("BlankLen",\'"BlankLen"\')' in build
     assert 'name_last_feature(adapter,"BlankReference")' in build
     assert '"origin",blank_line,"midpoint"' in build
-    assert "blank_lower,blank_upper=deviations(PIN_BLANK_LENGTH_BAND)" in build
+    assert "tolerance.Type=PIN_BLANK_LENGTH_TOL_TYPE" in build
+    assert "tolerance.SetValues(0.0,0.0)" in build
     assert 'blank_reference_sketches(adapter,("BlankReference",))' in build
+    # The limit is set (the call, after its def) before the drawing marks are
+    # cleared and re-applied.
+    assert build.rindex("_blank_min_limit(adapter)") < build.index(
+        "clear_dimensions_for_drawing(adapter)"
+    )
     source = _source()
-    assert '{"BlankLen": "BLANK"}' in source
-    # The blank is longer than the installed pin by the two ends' dressing.
-    assert spec.PIN_BLANK_LENGTH > spec.PIN_INSTALLED_LENGTH
+    assert '"BlankLen": "BLANK"' in source
+    # The shortest blank still leaves dressing stock over the thickest fork.
+    assert spec.BUDGET["blank_excess_min"] > 0.0
 
 
 def test_print_carries_no_gdt_roughness_or_callouts() -> None:
@@ -129,9 +137,12 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
         "add_native_hole_callout(",
     ):
         assert helper not in source, helper
-    # The one dimension callout is the blank's descriptive word beneath its
-    # native value and band.
+    # The dimension callouts are descriptive words below native values: the
+    # journal's stock and fits, the installed reference's and the blank's
+    # words. Nothing rides ABOVE: a line break there is stored but never
+    # printed (ch_rod_pivot_pin r1 render).
     assert source.count("set_dimension_callouts(") == 1
+    assert 'location="above"' not in source
     assert "author_part_pmi" not in _build_source()
     assert (
         "for view in (front, right, iso):\n        set_hidden_lines_removed" in source
@@ -139,33 +150,45 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
     assert "add_view_centerline(" in source
 
 
-def test_notes_state_blank_press_flush_ends_and_running_fit() -> None:
+def test_journal_callout_names_both_mates_and_stock() -> None:
+    """Machinist review #1522 (rules 4 and 7): the Ø band's two mates and fits
+    are flagged at the callout, and the drill rod as supplied meets it."""
+    assert notes.PIN_DIA_CALLOUT.splitlines() == [
+        "STOCK OK",
+        "PRESS FIT IN MHA-CH-003 FORK HOLE",
+        "RUNNING FIT IN MHA-CH-006 #47 HOLE",
+    ]
+    # The press and the running fit hold at the drill rod's own grind band.
+    assert spec.BUDGET["interference_min"] > 0.0
+    assert spec.BUDGET["running_clearance_min"] > 0.0
+    assert (
+        '{"PinDia": PIN_DIA_CALLOUT, "PinLen": "INSTALLED", "BlankLen": "BLANK"}'
+        in _source()
+    )
+
+
+def test_note_states_installed_state_and_flush_ends() -> None:
     lines = notes.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4  # drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
     assert lines == [
-        "1. CUT BLANK TO THE BLANK LENGTH SHOWN; INSTALLED STATE SHOWN.",
-        "2. PRESS IN; REMOVABLE WITH PUNCH.",
-        "3. PRESSED IN THE MHA-CH-003 REAMED FORK PIN HOLE;"
-        " DRESS BOTH ENDS FLUSH, NEVER PROUD.",
-        "4. RUNS FREE IN THE MHA-CH-006 #47 ROD HOLE.",
+        "1. INSTALLED STATE SHOWN: BOTH ENDS DRESSED FLUSH WITH THE MHA-CH-003"
+        " FORK FACES AT ASSEMBLY, NEVER PROUD.",
     ]
     text = notes.DRAWING_NOTES
-    # drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (PR #1292 review N1): the blank's size and band are the
+    # drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (PR #1292 review N1): the blank's size and limit are the
     # BlankLen model dimension's, so no limit may ride the note text.
-    for limit in (
-        f"{spec.PIN_BLANK_LENGTH:.2f}",
-        f"{spec.PIN_BLANK_LENGTH_BAND[0]:.2f}",
-        "\u00b1",
-        "+/-",
-    ):
+    for limit in (f"{spec.PIN_BLANK_LENGTH:g}", "MIN", "\u00b1", "+/-"):
         assert limit not in text, limit
+    # The fits ride the Ø callout (#1522), so the note restates neither.
+    for fit in ("PRESS IN", "PRESSED", "RUNS", "#47", "BLANK"):
+        assert fit not in text, fit
     assert "PEEN" not in text and "#746" not in text
     assert "DRILL ROD" not in text  # the title-block MATERIAL owns the stock
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 
 
-def test_mating_part_numbers_in_the_notes_are_live() -> None:
+def test_mating_part_numbers_on_the_sheet_are_live() -> None:
     assert _config.parts("ch-connecting-rod")["number"] == "MHA-CH-003"
     assert _config.parts("ch-rocker-arm")["number"] == "MHA-CH-006"
     import ch_rocker_arm_spec as arm

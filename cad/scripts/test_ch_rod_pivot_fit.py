@@ -106,9 +106,10 @@ def test_worst_case_joint_budget() -> None:
     assert b["crotch_clearance_min"] >= pin.CROTCH_CLEARANCE_MIN
     assert b["bridge_min"] == pytest.approx(2.234, abs=1e-6)
     assert b["bridge_min"] >= pin.BRIDGE_TARGET
-    # Dressing stock: the shortest blank still covers the thickest fork.
-    assert b["blank_excess_min"] == pytest.approx(0.045, abs=1e-6)
-    assert b["blank_excess_max"] == pytest.approx(0.605, abs=1e-6)
+    # Dressing stock: the shortest blank the 6.4 MIN limit allows still covers
+    # the thickest fork (6.225); a longer blank only dresses back further.
+    assert b["blank_excess_min"] == pytest.approx(0.175, abs=1e-6)
+    assert "blank_excess_max" not in b
     assert not any(key.startswith(("upset", "retention")) for key in b)
 
 
