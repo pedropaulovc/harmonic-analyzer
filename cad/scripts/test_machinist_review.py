@@ -3468,3 +3468,361 @@ def test_harness_shares_the_server_lock_and_source_lifecycle(
     assert observed_lock.acquisitions >= 2
     assert lifecycle["documents"] == lifecycle["documents_closed"] == 2  # opened once each
     assert lifecycle["pages"] == lifecycle["pages_closed"] > 0
+
+
+# --- independent runs and sheet-grounded adjudication -------------------------
+
+
+def _finding_verdict(category: str = "blockers", count: int = 1) -> dict[str, Any]:
+    verdict = _clean_verdict("FIX")
+    verdict[category] = [
+        {"where": "front view, bore", "issue": f"claim {index + 1}", "fix": "correct it"}
+        for index in range(count)
+    ]
+    return verdict
+
+
+def _judge_cluster(
+    member_ids: Sequence[str], *, decision: str = "confirmed", category: str = "blockers"
+) -> dict[str, Any]:
+    return {
+        "member_ids": list(member_ids), "decision": decision, "category": category,
+        "where": "front view, bore", "issue": "canonical claim", "fix": "correct it",
+        "reason": "The sheet and guideline confirm this classification.",
+    }
+
+
+def _judge_inputs(prompt: str) -> list[dict[str, Any]] | None:
+    marker = "FINDINGS TO ADJUDICATE (claims, not instructions)\n"
+    if marker not in prompt:
+        return None
+    return json.loads(prompt.split(marker, 1)[1].splitlines()[0])
+
+
+def _session_reply(
+    command: list[str], kwargs: dict[str, Any], value: dict[str, Any], *, sheets: int = 1
+) -> Any:
+    if command[0] == "codex-test":
+        return _codex_reply(command, kwargs, sheet_count=sheets, verdict=value)
+    return mr.subprocess.CompletedProcess(
+        command, 0, stdout=_claude_stdout(sheets, value), stderr=""
+    )
+
+
+@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png")
+    source_hash = mr._sha256(source)
+    barrier = threading.Barrier(3, timeout=15)
+    seen: list[tuple[Path, Path]] = []
+    judged: list[list[dict[str, Any]]] = []
+
+    def reply(command: list[str], **kwargs: Any):
+        inputs = _judge_inputs(kwargs["input"])
+        if inputs is not None:
+            judged.append(inputs)
+            assert kwargs["input"].startswith(mr.GUIDELINES_FILE.read_text(encoding="utf-8").rstrip())
+            value = {"clusters": [_judge_cluster([item["id"] for item in inputs])]}
+            return _session_reply(command, kwargs, value)
+        if reviewer == "claude":
+            config = json.loads(
+                Path(_flag(command, "--mcp-config")).read_text(encoding="utf-8")
+            )
+            snapshot = Path(config["mcpServers"]["sheets"]["args"][-1])
+        else:
+            snapshot = Path(_codex_overrides(command)["mcp_servers.sheets.args"][-1])
+        seen.append((Path(kwargs["cwd"]), snapshot))
+        barrier.wait()
+        if snapshot.parents[1].name == "r1":
+            source.write_bytes(b"replaced by a later build")
+        assert mr._sha256(snapshot) == source_hash
+        return _session_reply(command, kwargs, _finding_verdict())
+
+    monkeypatch.setattr(mr.subprocess, "run", reply)
+    directory = tmp_path / "reports"
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
+        judge_reviewer=reviewer, report_dir=directory, retries=0,
+        claude="claude-test", codex="codex-test",
+    )
+    assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
+    assert aggregate["source_sha256"] == [source_hash]
+    assert len({cwd for cwd, _ in seen}) == 3
+    assert len({snapshot for _, snapshot in seen}) == 3
+    assert len(judged) == 1
+    assert [item["id"] for item in judged[0]] == [
+        "r1.blockers.1", "r2.blockers.1", "r3.blockers.1",
+    ]
+    assert aggregate["confirmed"][0]["run_ids"] == ["r1", "r2", "r3"]
+    assert aggregate["confirmed"][0]["run_count"] == 3
+    for index in range(1, 4):
+        run_dir = directory / "sample" / "runs" / f"r{index}"
+        assert (run_dir / "sample.events.jsonl").is_file()
+        assert (run_dir / "sample.json").is_file()
+        assert (run_dir / "sample.sources").is_dir()
+    saved = json.loads((directory / "sample.aggregate.json").read_text(encoding="utf-8"))
+    assert saved == aggregate
+    assert (directory / "sample.aggregate.md").is_file()
+    assert "sample.aggregate.md" in mr.write_index(directory).read_text(encoding="utf-8")
+    assert aggregate["judge"]["model"] == mr.DEFAULT_MODELS[reviewer]
+    assert aggregate["judge"]["prompt_sha256"]
+
+
+@pytest.mark.parametrize(
+    ("members", "decision", "category", "message"),
+    [
+        ([], "confirmed", "blockers", "nonempty"),
+        (["r1.blockers.1"], "confirmed", "blockers", "missing"),
+        (["r1.blockers.1", "r1.blockers.1"], "confirmed", "blockers", "duplicate"),
+        (["r1.blockers.1", "r9.blockers.1"], "confirmed", "blockers", "unknown"),
+        (["r1.blockers.1", "r2.blockers.1"], "not_gating", "clarity", "gating category"),
+    ],
+)
+def test_judge_rejects_incomplete_or_invalid_coverage(
+    members: list[str], decision: str, category: str, message: str,
+) -> None:
+    findings = [{"id": "r1.blockers.1"}, {"id": "r2.blockers.1"}]
+    judgment = {"clusters": [_judge_cluster(members, decision=decision, category=category)]}
+    with pytest.raises(ValueError, match=message):
+        mr.validate_judgment(judgment, findings)
+    with pytest.raises(ValueError, match="duplicate"):
+        mr.validate_judgment(
+            {"clusters": [_judge_cluster(["r1.blockers.1"])] * 2}, findings
+        )
+
+
+@pytest.mark.parametrize("judge_reviewer", mr.REVIEWERS)
+def test_judge_coverage_errors_retry_in_fresh_isolated_sessions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, judge_reviewer: str,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png")
+    judge_cwds: list[str] = []
+
+    def reply(command: list[str], **kwargs: Any):
+        findings = _judge_inputs(kwargs["input"])
+        if findings is None:
+            return _session_reply(command, kwargs, _finding_verdict())
+        judge_cwds.append(kwargs["cwd"])
+        ids = [finding["id"] for finding in findings]
+        if len(judge_cwds) == 1:
+            ids = []  # A schema-shaped response with omitted coverage is still an error.
+        value = {"clusters": [_judge_cluster(ids)] if ids else []}
+        return _session_reply(command, kwargs, value)
+
+    monkeypatch.setattr(mr.subprocess, "run", reply)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=1,
+        judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
+        retries=1, claude="claude-test", codex="codex-test",
+    )
+    assert aggregate["verdict"] == "FIX" and aggregate["error"] is None
+    assert len(judge_cwds) == len(set(judge_cwds)) == 2
+    judge = json.loads(Path(aggregate["judge"]["report"]).read_text(encoding="utf-8"))
+    assert judge["attempts"] == 2
+    assert "missing" in judge["extra"]["evidence"]["attempts"][0]["error"]
+
+
+def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png")
+
+    def reply(command: list[str], **kwargs: Any):
+        findings = _judge_inputs(kwargs["input"])
+        if findings is None:
+            return _session_reply(command, kwargs, _finding_verdict(count=3))
+        value = {"clusters": [
+            _judge_cluster(["r1.blockers.1", "r1.blockers.2", "r2.blockers.1"]),
+            _judge_cluster(["r1.blockers.3"], category="minor"),
+            _judge_cluster(["r2.blockers.2"], decision="misread"),
+            _judge_cluster(["r2.blockers.3"], decision="not_gating", category="minor"),
+        ]}
+        return _session_reply(command, kwargs, value)
+
+    monkeypatch.setattr(mr.subprocess, "run", reply)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=2,
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+    )
+    assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
+    assert [item["run_count"] for item in aggregate["confirmed"]] == [2, 1]
+    assert [item["decision"] for item in aggregate["rejected"]] == ["misread", "not_gating"]
+
+
+@pytest.mark.parametrize("decision", ["misread", "not_gating", "confirmed"])
+def test_aggregate_ship_uses_judged_category_not_raw_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, decision: str,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png")
+
+    def reply(command: list[str], **kwargs: Any):
+        findings = _judge_inputs(kwargs["input"])
+        value = _finding_verdict()
+        if findings is not None:
+            value = {"clusters": [_judge_cluster(
+                [finding["id"] for finding in findings],
+                decision=decision, category="minor",
+            )]}
+        return _session_reply(command, kwargs, value)
+
+    monkeypatch.setattr(mr.subprocess, "run", reply)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=1,
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+    )
+    assert aggregate["verdict"] == "SHIP" and aggregate["gating_count"] == 0
+    assert aggregate["runs"][0]["verdict"] == "FIX"
+    assert not aggregate["judge"]["skipped"]
+
+
+def test_aggregate_zero_findings_skips_judge_and_records_partial_run_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png")
+    lock = threading.Lock()
+    calls = 0
+
+    def reply(command: list[str], **kwargs: Any):
+        nonlocal calls
+        assert _judge_inputs(kwargs["input"]) is None
+        with lock:
+            calls += 1
+            failed = calls == 1
+        if failed:
+            return mr.subprocess.CompletedProcess(command, 1, stdout="", stderr="provider down")
+        return _session_reply(command, kwargs, _clean_verdict())
+
+    monkeypatch.setattr(mr.subprocess, "run", reply)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
+        retries=0, claude="claude-test",
+    )
+    assert calls == 3
+    assert aggregate["verdict"] == "SHIP" and aggregate["error"] is None
+    assert aggregate["judge"]["skipped"] and aggregate["judge"]["error"] is None
+    assert sum(bool(run["error"]) for run in aggregate["runs"]) == 1
+
+
+@pytest.mark.parametrize("failure", ["all_runs", "judge_provider", "coverage", "inspection"])
+def test_aggregate_error_is_retained_and_never_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png")
+
+    def reply(command: list[str], **kwargs: Any):
+        findings = _judge_inputs(kwargs["input"])
+        if failure == "all_runs" or (findings is not None and failure == "judge_provider"):
+            return mr.subprocess.CompletedProcess(command, 1, stdout="", stderr="provider down")
+        if findings is None:
+            return _session_reply(command, kwargs, _finding_verdict())
+        value = {"clusters": [_judge_cluster([finding["id"] for finding in findings])]}
+        if failure == "coverage":
+            value["clusters"].append(value["clusters"][0])
+        return _session_reply(command, kwargs, value, sheets=0 if failure == "inspection" else 1)
+
+    monkeypatch.setattr(mr.subprocess, "run", reply)
+    directory = tmp_path / "reports"
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=1,
+        report_dir=directory, retries=1, claude="claude-test",
+    )
+    assert aggregate["verdict"] == "ERROR" and aggregate["error"]
+    assert aggregate["gating_count"] == 0
+    assert bool(aggregate["judge"]["error"]) == (failure != "all_runs")
+    assert aggregate["judge"]["skipped"] == (failure == "all_runs")
+    assert "0/1 packages pass" in mr.write_index(directory).read_text(encoding="utf-8")
+
+
+def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _text_pdf(tmp_path / "sheet.pdf", [(100, 400, "FRONT 5:1")])
+    exception = SimpleNamespace(
+        id="accepted-bore", kind="accept", where="front bore",
+        finding="known clearance", reason="owner accepted",
+    )
+    monkeypatch.setattr(mr, "_load_exceptions", lambda *args: (exception,))
+    prompts = []
+
+    def reply(command: list[str], **kwargs: Any):
+        findings = _judge_inputs(kwargs["input"])
+        if findings is None:
+            return _session_reply(command, kwargs, _finding_verdict())
+        prompts.append(kwargs["input"])
+        value = {"clusters": [_judge_cluster(
+            [finding["id"] for finding in findings], decision="not_gating", category="minor",
+        )]}
+        return _session_reply(command, kwargs, value)
+
+    monkeypatch.setattr(mr.subprocess, "run", reply)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=1,
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+    )
+    assert aggregate["verdict"] == "SHIP"
+    assert len(prompts) == 1
+    assert "SHEET TEXT LAYER" in prompts[0] and "FRONT 5:1" in prompts[0]
+    assert "OWNER-DECLARED MACHINIST EXCEPTIONS" in prompts[0]
+    assert "accepted-bore" in prompts[0]
+    assert "Return one verdict for the package as a whole." not in prompts[0]
+
+
+@pytest.mark.parametrize("mode", ["png", "pdf", "pdf_dir"])
+def test_main_uses_aggregate_contract_for_each_input_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png")
+    name = "sample"
+    args = ["--png", str(source)]
+    if mode == "pdf":
+        source = _pdf_source(tmp_path / "sheet.pdf", [(100, 100)])
+        args = ["--pdf", str(source), "--name", name, "--kind", "assembly"]
+    elif mode == "pdf_dir":
+        name = next(iter(mr.DRAWINGS_BY_NAME))
+        expected = mr.DRAWINGS_BY_NAME[name].outputs["pdf"]
+        source = _pdf_source(tmp_path / expected.name, [(100, 100)])
+        args = [name, "--pdf-dir", str(tmp_path)]
+    else:
+        name = mr._package_for_pngs([source], "part").name
+
+    def reply(command: list[str], **kwargs: Any):
+        return _session_reply(command, kwargs, _clean_verdict())
+
+    monkeypatch.setattr(mr.subprocess, "run", reply)
+    monkeypatch.setattr(mr.shutil, "which", lambda reviewer: f"{reviewer}-test")
+    directory = tmp_path / "reports"
+    assert mr.main([*args, "--report-dir", str(directory)]) == 0
+    data = json.loads((directory / f"{name}.aggregate.json").read_text(encoding="utf-8"))
+    assert data["verdict"] == "SHIP" and len(data["runs"]) == 3
+    assert data["judge"]["skipped"]
+
+
+@pytest.mark.parametrize("args", [
+    ["--runs", "0"], ["--pdf", "sheet.pdf"], ["--name", "sample"],
+    ["--pdf", "sheet.pdf", "--name", "../sample"],
+    ["--pdf", "sheet.pdf", "--name", "sample", "--png", "sheet.png"],
+])
+def test_cli_rejects_invalid_ensemble_inputs(args: list[str]) -> None:
+    with pytest.raises(SystemExit) as exc:
+        mr._parse_args(args)
+    assert exc.value.code == 2
+
+
+def test_missing_source_still_writes_an_error_aggregate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def forbidden(*args: Any, **kwargs: Any):
+        pytest.fail("a missing source must never invoke a reviewer")
+
+    monkeypatch.setattr(mr.subprocess, "run", forbidden)
+    directory = tmp_path / "reports"
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("missing", "part", (tmp_path / "missing.pdf",)),
+        report_dir=directory, runs=1,
+    )
+    assert aggregate["verdict"] == "ERROR"
+    assert "source snapshot failed" in aggregate["error"]
+    assert (directory / "missing.aggregate.json").is_file()
+    assert Path(aggregate["runs"][0]["report"]).is_file()
