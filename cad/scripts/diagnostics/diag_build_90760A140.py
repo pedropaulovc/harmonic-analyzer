@@ -1,6 +1,6 @@
 r"""McMaster 90760A140 -- zinc-plated steel narrow-profile hex nut, #10-24.
 
-Used as vn-boss-hook-jam-nut (MHA-VN-070), the thin nut jammed against the
+Used as vn-boss-hook-jam-nut (MHA-VN-072), the thin nut jammed against the
 MHA-SM-003 boss top face on the MHA-VN-001 counter anchor.  The catalogue facts are
 ``_mcmaster_90760a140``'s.  The model is the 92671A115 recipe at this size:
 one Top-plane profile -- the hexagon (flats normal to the sketch X) with the

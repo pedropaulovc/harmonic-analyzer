@@ -1,4 +1,4 @@
-"""Offline contracts for the channel anchor jam nut (MHA-CH-012) drawing."""
+"""Offline contracts for the channel anchor jam nut (MHA-CH-014) drawing."""
 
 from __future__ import annotations
 
@@ -172,7 +172,7 @@ def test_callouts_and_no_notes() -> None:
 
 def test_registry_row() -> None:
     row = _config.parts("ch-anchor-jam-nut")
-    assert row["number"] == "MHA-CH-012"
+    assert row["number"] == "MHA-CH-014"
     assert row["title"] == "Channel Anchor Jam Nut"
     assert int(row["quantity"]) == 20
     assert "C36000" in str(row["material_specification"])

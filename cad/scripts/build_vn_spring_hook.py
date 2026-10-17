@@ -4,7 +4,7 @@ Twenty of these routing eyebolts replace the old formed-wire J-hook. Each one
 threads DOWN through a #6-32 tap in the summing lever's coefficient plate
 (``sm_summing_lever_spec.HOLE_SPEC``, sourced from this same anchor record) and
 the channel spring's lower eye links onto its eye. The SUPPLIED HEX NUT IS
-OMITTED: the anchor is locked by the separate MHA-CH-012 round jam nut
+OMITTED: the anchor is locked by the separate MHA-CH-014 round jam nut
 (``ch_anchor_jam_nut_spec``) on the plate underside, so the production
 part is the bolt body alone.
 
@@ -68,7 +68,7 @@ MATERIAL = SPEC.material
 ANCHOR = ANCHOR_9489T111
 
 # The vendor ships 9489T111 with a captive hex nut; it is discarded (the
-# MHA-CH-012 jam nut is its own part), so no nut geometry belongs in the
+# MHA-CH-014 jam nut is its own part), so no nut geometry belongs in the
 # SLDPRT -- and the trim below would cut through its seat.
 NUT = "omitted"
 

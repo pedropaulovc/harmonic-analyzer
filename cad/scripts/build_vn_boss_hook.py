@@ -3,7 +3,7 @@
 The single open routing eyebolt that hangs the master (counter) spring from the
 summing lever's summation-anchor boss. It threads DIRECTLY into the #10-24 tap
 through that boss (``sm_summing_lever_spec.COUNTER_HOLE_SPEC``, sourced from this
-same anchor record) and is locked by the MHA-VN-070 jam nut on the boss top face
+same anchor record) and is locked by the MHA-VN-072 jam nut on the boss top face
 -- no separate link ring.
 
 The one supplier option this production part takes is LENGTH: the vendor's

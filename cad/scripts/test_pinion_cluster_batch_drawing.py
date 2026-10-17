@@ -841,7 +841,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # screw n in bracket n.
     # MHA-VN-055: each #1-72 x 5/32 keeper set screw in its own keeper's
     # crown tap (#53 drill). MHA-VN-012: each #6-32 anchor's thread in its
-    # MHA-CH-012 jam nut's #36 tap drill over the nut's thickness.
+    # MHA-CH-014 jam nut's #36 tap drill over the nut's thickness.
     channel_allowed = _interference_contracts.allowed_interference_pairs("ch-channel")
     assert channel_allowed == pytest.approx(
         {

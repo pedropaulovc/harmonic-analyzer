@@ -1,4 +1,4 @@
-"""Offline contracts for the MHA-VN-070 counter-anchor jam nut (McMaster 90760A140)."""
+"""Offline contracts for the MHA-VN-072 counter-anchor jam nut (McMaster 90760A140)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from diagnostics import diag_build_90760A140 as recipe
 
 STEM = "vn-boss-hook-jam-nut"
 SHEET = "vn_boss_hook_jam_nut"
-NUMBER = "MHA-VN-070"
+NUMBER = "MHA-VN-072"
 STOCK_NAME = "#10-24 Zinc-Plated Steel Narrow-Profile Hex Nut"
 BUILD = "build_90760A140"
 IN = 25.4
