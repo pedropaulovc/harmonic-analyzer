@@ -199,14 +199,18 @@ DETAIL_A = CroppedView(
     # circle, and a centred label stood in its path (r1, 64ebba372).
     label_dx=0.016,
 )
+# DETAIL B and its right side frame the top end down to the 14.0 notch roof
+# (#1038 option 2 deepened it from 12.7); the bar's top edge stays where it
+# printed on the sheet before, and the label stays clear of DETAIL A's
+# four-line depth stack.
 DETAIL_B = CroppedView(
     "B",
     "DETAIL B",
     "*Front",
     (4, 1),
-    (BAR_WIDTH / 2.0, BAR_LENGTH - 6.0, 0.0),
-    8.0,
-    (0.150, 0.200),
+    (BAR_WIDTH / 2.0, BAR_LENGTH - 7.0, 0.0),
+    8.5,
+    (0.150, 0.196),
     letter="B",
 )
 # DETAIL B's right side, projected on its row (third angle): the reamed pin
@@ -217,8 +221,8 @@ TOP_SIDE = CroppedView(
     "RIGHT SIDE OF DETAIL B",
     "*Right",
     (4, 1),
-    (BAR_WIDTH, BAR_LENGTH - 6.0, BAR_DEPTH / 2.0),
-    8.0,
+    (BAR_WIDTH, BAR_LENGTH - 7.0, BAR_DEPTH / 2.0),
+    8.5,
     (0.255, DETAIL_B.centre[1]),
 )
 # The pictorials: each end at 3:1 (machinist round 1, #1293: the full bar at
@@ -243,9 +247,8 @@ FOOT_ISO = CroppedView(
 )
 CROPPED_VIEWS = (DETAIL_A, DETAIL_B, TOP_SIDE, TOP_ISO, FOOT_ISO)
 
-# A callout's text stands this far outside the bar's edge, or outside
-# DETAIL A's fence; a ledge row this far outside the bar's end.
-DETAIL_TEXT_GAP = 0.010
+# A callout's text stands this far outside DETAIL A's fence; a ledge row this
+# far outside the bar's end.
 DETAIL_A_FENCE_TEXT_GAP = 0.020
 DETAIL_ROW_GAP = 0.012
 # DETAIL A's width row hangs under its ledge row and the ledge's one-line
@@ -275,7 +278,7 @@ _DETAIL_A_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_ROW_GAP
 _DETAIL_A_WIDTH_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_A_WIDTH_ROW_GAP
 DETAIL_A_KEEP = {
     # Left of the fence, over the notch floor: the depth and its band, the
-    # ROOTS callout above it, hanging west of the dimension line.
+    # mate callout above it, hanging west of the dimension line.
     "BottomNotchHeight": (
         _DETAIL_A_FENCE_X - DETAIL_A_DEPTH_LINE_GAP,
         DETAIL_A.sheet_xy(0.0, BOTTOM_NOTCH_HEIGHT)[1] + DETAIL_A_DEPTH_TEXT_RISE,
@@ -290,7 +293,14 @@ DETAIL_A_KEEP = {
         _DETAIL_A_WIDTH_ROW_Y,
     ),
 }
-_DETAIL_B_TEXT_X = DETAIL_B.sheet_xy(BAR_WIDTH, 0.0)[0] + DETAIL_TEXT_GAP
+# The ledge's text and its callout stand wholly east of the bar's right-face
+# witness (r6, c8fafeb80: centred 10 mm out, that witness struck the leading
+# '1' of 1.60): the callout's half-width plus a 2 mm gap.
+_DETAIL_B_TEXT_X = (
+    DETAIL_B.sheet_xy(BAR_WIDTH, 0.0)[0]
+    + len(DIMENSION_CALLOUTS["TopRightLedge"]) * 0.0026 / 2.0
+    + 0.002
+)
 _DETAIL_B_ROW_Y = DETAIL_B.sheet_xy(0.0, BAR_LENGTH)[1] + DETAIL_ROW_GAP
 DETAIL_B_KEEP = {
     "TopNotchHeight": (

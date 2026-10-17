@@ -67,10 +67,12 @@ from ch_amplitude_bar_spec import (
     BOTTOM_NOTCH_DEPTH_BAND,
     BOTTOM_NOTCH_OFFSET,
     BOTTOM_NOTCH_WIDTH,
+    BOTTOM_NOTCH_WIDTH_BAND,
     NOTCH_OFFSET_TOLERANCE_MM,
-    NOTCH_WIDTH_BAND,
+    TOP_NOTCH_HEIGHT,
     TOP_NOTCH_OFFSET,
     TOP_NOTCH_WIDTH,
+    TOP_NOTCH_WIDTH_BAND,
     TOP_PIN_HOLE_BAND,
     TOP_PIN_HOLE_DIA,
 )
@@ -88,7 +90,8 @@ BAR_DEPTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: legacy, square section (med)
 # Notch widths: ch_amplitude_bar_spec derives each from the plate it straddles
 # (was the legacy 1/8" = 3.175; user ruling 2026-09-27, #1038).
 BOTTOM_NOTCH_HEIGHT = 0.09375 * IN  # 2.381  DIMENSIONS.md ch15: legacy 3/32" (med)
-TOP_NOTCH_HEIGHT = 0.5 * IN  # 12.7   DIMENSIONS.md ch15: legacy (med)
+# TOP_NOTCH_HEIGHT (14.0, was the legacy 1/2") is the spec's: it clears the
+# lever's lower edge (ch_amplitude_bar_spec).
 # top pin hole: was Ø2.0 drill, then #47 (Ø1.994) Hole Wizard; now the
 # Ø1.968 +0.010/0 reamed press hole for the MHA-CH-011 pin (a sketch cut: the
 # Hole Wizard has no reamed-size table)
@@ -379,7 +382,7 @@ async def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: the foot notch may only come out shallow
     # (ch_amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND), natively on its depth;
     # each notch may only come out wider than the plate it straddles
-    # (NOTCH_WIDTH_BAND, #1038) and is centred by the band on the ledge its
+    # (BOTTOM_/TOP_NOTCH_WIDTH_BAND, #1038) and is centred by the band on the ledge its
     # detail prints; author every printed dimension's places, mark exactly
     # the print's dimensions and stamp the make-critical title-block properties.
     set_dimension_bilateral_tolerance(
@@ -389,10 +392,10 @@ async def build(adapter) -> dict[str, str]:
         *deviations(BOTTOM_NOTCH_DEPTH_BAND),
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BarProfile", "BottomNotchWidth", *deviations(NOTCH_WIDTH_BAND)
+        adapter, "BarProfile", "BottomNotchWidth", *deviations(BOTTOM_NOTCH_WIDTH_BAND)
     )
     set_dimension_bilateral_tolerance(
-        adapter, "BarProfile", "TopNotchWidth", *deviations(NOTCH_WIDTH_BAND)
+        adapter, "BarProfile", "TopNotchWidth", *deviations(TOP_NOTCH_WIDTH_BAND)
     )
     set_dimension_symmetric_tolerance(
         adapter, "BarProfile", "BottomLeftLedge", NOTCH_OFFSET_TOLERANCE_MM

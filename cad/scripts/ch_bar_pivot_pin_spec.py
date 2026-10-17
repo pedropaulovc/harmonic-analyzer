@@ -13,7 +13,7 @@ cheeks and the lever's #47 bar-pin hole. The pin RUNS in the lever (the one
 moving member) and is PRESSED into holes reamed through both cheeks, its ends
 dressed flush with the bar's faces: the bar-to-bar side gap leaves no room
 for anything proud (issue #1038). Press-fit retention is the user's choice
-(2026-10): the bar's 1.575 cheeks leave no bearing land under a countersink,
+(2026-10): the bar's 1.60 cheeks leave no bearing land under a countersink,
 and a pressed pin drives out with a punch. The MHA-CH-010 rod-fork pin
 (``ch_rod_pivot_pin_spec``) follows it (user ruling 2026-10-09, PR #1292
 review F1).
@@ -46,14 +46,16 @@ PIN_DIA_TOLERANCE = 0.005  # +/-, drill-rod grind
 PIN_INSTALLED_LENGTH = _bar.BAR_WIDTH  # dressed flush with both bar faces
 # Cut length of the blank: the bar plus dressing stock at each end. Its one
 # function is to stand proud of both faces before dressing, so it prints at
-# two places under the title block's .XX band (test_ch_bar_pivot_fit pins the
+# one place under the title block's .X band (test_ch_bar_pivot_fit pins the
 # restatement to title_block.yaml); machinist round 1 (#1305) found the former
-# 6.60 +/-0.13 tighter than a dress-flush blank needs.
-PIN_BLANK_LENGTH = 7.00
-PIN_BLANK_LENGTH_PLACES = 2
-PIN_BLANK_LENGTH_BAND = (0.51, -0.51)  # (upper, lower) deviations: .XX
+# 6.60 +/-0.13, and ch-channel-lever r5 the 7.00 at .XX, tighter than a
+# dress-flush blank needs. 7.5 keeps the shortest blank proud of the widest bar.
+PIN_BLANK_LENGTH = 7.5
+PIN_BLANK_LENGTH_PLACES = 1
+PIN_BLANK_LENGTH_BAND = (0.8, -0.8)  # (upper, lower) deviations: .X
 # Dressed ends stand nothing proud of the bar faces: the top-notch stack
-# below leaves 0.1065 against the 0.10 running floor (#1038).
+# below leaves 0.1065 against the 0.10 running floor (#1038, owner ruling
+# 2026-10-15 option 2).
 PIN_END_PROUD_MAX = 0.0
 
 # --- The bar's reamed press hole (the bar spec owns it; restated here so the
@@ -79,6 +81,16 @@ PRESS_INTERFERENCE_MAX = 0.00085 * MM_PER_IN  # 0.0216
 RULE12_WALL_TARGET = 2.0  # drawing-guidelines.md rule 17 (walls and webs)
 RULE12_WALL_FLOOR = 1.5
 RUNNING_FLOOR = _bar.STRADDLE_RUNNING_FLOOR  # 0.10, oiled steel faces
+# Title-block linear bands, restated (test_ch_bar_pivot_fit pins them to
+# title_block.yaml): the lever's height prints at one place, the bar's notch
+# depth and pin drop at two.
+LINEAR_1PL = 0.8
+LINEAR_2PL = 0.51
+# The lever turns on the pin relative to the bar: |lever tilt - bar tilt| over
+# a cam turn at every bar station up to the square preset's 80 mm (channels.yaml
+# a_1), taking the rocker's solved swing in either sense; the loop solves
+# 10.28 deg, restated rounded outward (test_ch_bar_pivot_fit re-solves it).
+LEVER_BAR_SWING_DEG = 10.3
 
 
 def _band(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
@@ -90,29 +102,56 @@ def joint_budget() -> dict[str, float]:
 
     Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)): the
     drill rod +/-0.005, the reamed cheek hole +0.010/0, the lever's #47 hole
-    +0.10/0, the lever 3.00 +/-0.10, the top notch 3.20 +0.30/0, its ledge
-    1.575 +/-0.05, the bar stock +0/-0.051, the hole's offset from the back
-    face +/-0.13, the hubs that set the pitch never shorter than nominal.
+    +0.10/0, the lever 3.00 +/-0.05, its plate offset 2.03 +/-0.05 from one hub
+    face, the top notch 3.15 +0.20/0, its ledge 1.60 +/-0.05, the bar stock
+    +0/-0.051, the hole's offset from the back face +/-0.13, the hubs that set
+    the pitch never shorter than nominal, the lever's height (.X), the notch's
+    depth and the pin's drop (.XX).
     """
     pin_min, pin_max = PIN_DIA - PIN_DIA_TOLERANCE, PIN_DIA + PIN_DIA_TOLERANCE
     hole_min, hole_max = _band(BAR_HOLE_DIA, BAR_HOLE_BAND)
     lever_hole_min = NUMBER_DRILL_MM[_lever.BAR_PIN_HOLE_SPEC.size]
     lever_hole_max = lever_hole_min + DRILLED_PLUS
-    lever_min = _lever.LEVER_THICKNESS - _bar.LEVER_THICKNESS_TOLERANCE
-    notch_min, notch_max = _band(_bar.TOP_NOTCH_WIDTH, _bar.NOTCH_WIDTH_BAND)
+    lever_min = _lever.LEVER_THICKNESS - _lever.LEVER_THICKNESS_TOLERANCE
+    notch_min, notch_max = _band(_bar.TOP_NOTCH_WIDTH, _bar.TOP_NOTCH_WIDTH_BAND)
     w_min, w_max = _bar.BAR_WIDTH - BAR_STOCK_UNDERSIZE, _bar.BAR_WIDTH
     blank_min, blank_max = _band(PIN_BLANK_LENGTH, PIN_BLANK_LENGTH_BAND)
     pitch_min = _lever.HUB_LENGTH  # levers stack hub on hub at the pitch
     # Each bar floats on its lever by the notch's side clearance; bar j
     # leans north and bar j+1 south, each face carrying its dressed pin end.
+    # Each notch sits on its ledge (printed from one bar face) and each plate
+    # on its offset (printed from one hub face): one bar's ledge and plate at
+    # one end of their bands, its neighbour's at the other, close the gap by
+    # both bands twice.
     float_max = notch_max - lever_min
-    neighbour = pitch_min - w_max - float_max - 2.0 * PIN_END_PROUD_MAX
+    neighbour = (
+        pitch_min
+        - w_max
+        - float_max
+        - 2.0 * _bar.NOTCH_OFFSET_TOLERANCE_MM
+        - 2.0 * _lever.PLATE_OFFSET_TOLERANCE
+        - 2.0 * PIN_END_PROUD_MAX
+    )
+    # The notch roof below the lever's lower edge: the roof's least depth
+    # under the pin's lowest hole, against the tallest lever turned the full
+    # relative swing (its corner at the bar's depth face) and dropped by the
+    # pin's running clearance.
+    swing = math.radians(LEVER_BAR_SWING_DEG)
+    roof_below_pin_min = (_bar.TOP_NOTCH_HEIGHT - LINEAR_2PL) - (
+        _bar.TOP_PIN_DROP + LINEAR_2PL
+    )
+    lever_reach_max = (
+        (_lever.BAR_TALL + LINEAR_1PL) / 2.0 * math.cos(swing)
+        + _bar.BAR_DEPTH / 2.0 * math.sin(swing)
+        + (lever_hole_max - pin_min) / 2.0
+    )
     return {
         "interference_min": pin_min - hole_max,
         "interference_max": pin_max - hole_min,
         "running_clearance_min": lever_hole_min - pin_max,
         "running_clearance_max": lever_hole_max - pin_min,
         "neighbour_clearance_min": neighbour,
+        "notch_roof_clearance_min": roof_below_pin_min - lever_reach_max,
         # The reamed hole's wall to the bar's front/back faces: its offset
         # from the back face at either end of its band, on the narrowest
         # stock (the far face is the nearer one when the offset runs long).
@@ -124,8 +163,8 @@ def joint_budget() -> dict[str, float]:
         ),
         # The cheek the pin presses into. The printed ledge is the near-side
         # cheek; the far cheek is what the widest notch leaves of the
-        # narrowest stock beside the thinnest ledge -- a pre-existing #1038
-        # shortfall the pin does not change (it fills the hole it presses).
+        # narrowest stock beside the widest ledge -- the owner-approved #1038
+        # exception (1.17 MIN or better) the pin does not change.
         "tine_min_printed": _bar.TOP_NOTCH_OFFSET - _bar.NOTCH_OFFSET_TOLERANCE_MM,
         "tine_min_derived": w_min
         - (_bar.TOP_NOTCH_OFFSET + _bar.NOTCH_OFFSET_TOLERANCE_MM)
@@ -144,6 +183,8 @@ if BUDGET["running_clearance_min"] <= 0.0:
     raise AssertionError("pin can seize in the lever's bar-pin hole")
 if BUDGET["neighbour_clearance_min"] < RUNNING_FLOOR - 1e-9:
     raise AssertionError("a pin end can close the bar-to-bar running gap")
+if BUDGET["notch_roof_clearance_min"] < RUNNING_FLOOR - 1e-9:
+    raise AssertionError("the lever's lower edge can reach the top notch's roof")
 if BUDGET["hole_face_wall_min"] < RULE12_WALL_TARGET - 1e-9:
     raise AssertionError("reamed hole to bar face under the drawing-guidelines.md rule 17 (walls and webs) target")
 if BUDGET["blank_excess_min"] <= 0.0:

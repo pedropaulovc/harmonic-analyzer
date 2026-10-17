@@ -161,9 +161,10 @@ def test_callouts_name_each_mate_at_its_dimension() -> None:
     assert callouts["BottomNotchWidth"].startswith("RIDES MHA-CH-006\n")
     assert callouts["TopRightLedge"] == "CENTRES ON LEVER"
     assert callouts["BottomLeftLedge"] == "CENTRES ON ROCKER"
-    assert callouts["TopNotchHeight"] == callouts["BottomNotchHeight"] == (
-        "ROOTS R0.40 MAX"
-    )
+    assert callouts["TopNotchHeight"] == "ROOTS R0.40 MAX"
+    # Machinist r5: the foot depth's shallow-only band names its mate.
+    assert callouts["BottomNotchHeight"] == "SITS ON MHA-CH-006"
+    assert callouts["BottomNotchWidth"].endswith("\nROOTS R0.40 MAX")
     assert drawing.CALLOUTS_ABOVE <= set(callouts)
     for text in callouts.values():
         assert all(len(line) <= 20 for line in text.splitlines()), text
@@ -182,11 +183,17 @@ def test_cheek_walls_state_their_worst_case_at_each_width() -> None:
     spec = ch_amplitude_bar_spec
     notes = ch_amplitude_bar_notes
     assert spec.BAR_STOCK_UNDERSIZE == pytest.approx(0.0508)
-    upper, _lower = spec.NOTCH_WIDTH_BAND
-    for width, ledge, printed, name in (
-        (spec.TOP_NOTCH_WIDTH, spec.TOP_NOTCH_OFFSET, notes.TOP_CHEEK_WALL_MIN, "TopNotchWidth"),
+    for width, (upper, _lower), ledge, printed, name in (
+        (
+            spec.TOP_NOTCH_WIDTH,
+            spec.TOP_NOTCH_WIDTH_BAND,
+            spec.TOP_NOTCH_OFFSET,
+            notes.TOP_CHEEK_WALL_MIN,
+            "TopNotchWidth",
+        ),
         (
             spec.BOTTOM_NOTCH_WIDTH,
+            spec.BOTTOM_NOTCH_WIDTH_BAND,
             spec.BOTTOM_NOTCH_OFFSET,
             notes.BOTTOM_CHEEK_WALL_MIN,
             "BottomNotchWidth",
@@ -200,8 +207,10 @@ def test_cheek_walls_state_their_worst_case_at_each_width() -> None:
         )
         assert printed <= wall < printed + 0.01
         assert printed < 2.0
-        assert notes.DIMENSION_CALLOUTS[name].endswith(f"CHEEK WALL {printed:.2f} MIN")
-    assert (notes.TOP_CHEEK_WALL_MIN, notes.BOTTOM_CHEEK_WALL_MIN) == (1.17, 1.21)
+        assert f"CHEEK WALL {printed:.2f} MIN" in notes.DIMENSION_CALLOUTS[name].splitlines()
+    assert (notes.TOP_CHEEK_WALL_MIN, notes.BOTTOM_CHEEK_WALL_MIN) == (1.29, 1.21)
+    # Owner ruling 2026-10-15: approved exceptions at 1.17 (top), 1.21 (foot).
+    assert notes.CHEEK_WALL_APPROVED_MIN == {"top": 1.17, "bottom": 1.21}
 
 
 def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:
@@ -283,7 +292,7 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
     # on that witness with the text inside it.
     floor_y = a.sheet_xy(0.0, spec.BOTTOM_NOTCH_HEIGHT)[1]
     assert depth_y - 1.5 * _LINE > floor_y
-    # Its stack (band, value, ROOTS line) stays under DETAIL B's label.
+    # Its stack (band, value, mate line) stays under DETAIL B's label.
     assert depth_y + 3.0 * _LINE < b.label_xy[1] - 2 * _LINE - 0.004
     # r743-6b (64fedd3cc): a width with its +0.3/0.0 stack prints ~20 mm
     # wide; centred on the ~12.4 mm mouth it straddled both extension lines.
@@ -325,8 +334,11 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
     assert row_y > b.sheet_xy(0.0, spec.BAR_LENGTH)[1]
     half = max(map(len, callouts["TopNotchWidth"].splitlines())) * _CHAR / 2
     assert drawing.DETAIL_B_KEEP["TopNotchWidth"][0] + half + 0.002 < b.sheet_xy(0.0, 0.0)[0]
+    # r6: the ledge's value and callout clear the bar's right-face witness.
+    ledge_half = len(callouts["TopRightLedge"]) * _CHAR / 2
     assert (
-        drawing.DETAIL_B_KEEP["TopRightLedge"][0] > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
+        drawing.DETAIL_B_KEEP["TopRightLedge"][0] - ledge_half
+        > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0] + 0.0015
     )
     # The side view: +Z runs left, so the back face (z = 0) is its right edge.
     back_x = side.sheet_xy(0.0, 0.0, 0.0)[0]
@@ -568,10 +580,7 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     spec = ch_amplitude_bar_spec
     # The restated plate constants are their sources'.
     assert spec.LEVER_THICKNESS == lever.LEVER_THICKNESS
-    lever_print = (
-        f"{lever.LEVER_THICKNESS:.2f} +/-{spec.LEVER_THICKNESS_TOLERANCE:.2f} OVERALL"
-    )
-    assert lever_print in lever.DRAWING_NOTES
+    assert spec.LEVER_THICKNESS_TOLERANCE == lever.LEVER_THICKNESS_TOLERANCE
     assert spec.STRAP_THICKNESS == rocker.ARM_THICKNESS
     # The rocker strap now prints 2.500 +/-0.025 natively (Main ruling
     # 2026-10, option b); the bar keeps the former .XX band, which covers it,
@@ -580,47 +589,75 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     assert spec.STRAP_THICKNESS_TOLERANCE >= max(map(abs, rocker.ARM_THICKNESS_BAND))
     assert spec.STRADDLE_RUNNING_FLOOR == bank.RUNNING_FLOOR
 
-    upper, lower = spec.NOTCH_WIDTH_BAND
-    assert (upper, lower) == (0.30, 0.0)
-    for width, plate, tolerance in (
-        (spec.TOP_NOTCH_WIDTH, spec.LEVER_THICKNESS, spec.LEVER_THICKNESS_TOLERANCE),
-        (spec.BOTTOM_NOTCH_WIDTH, spec.STRAP_THICKNESS, spec.STRAP_THICKNESS_TOLERANCE),
+    # #1038 option 2 (owner ruling 2026-10-15): the top notch +0.20/0; the
+    # foot keeps the interim +0.30/0.
+    assert spec.TOP_NOTCH_WIDTH_BAND == (0.20, 0.0)
+    assert spec.BOTTOM_NOTCH_WIDTH_BAND == (0.30, 0.0)
+    for width, (_upper, lower), plate, tolerance in (
+        (
+            spec.TOP_NOTCH_WIDTH,
+            spec.TOP_NOTCH_WIDTH_BAND,
+            spec.LEVER_THICKNESS,
+            spec.LEVER_THICKNESS_TOLERANCE,
+        ),
+        (
+            spec.BOTTOM_NOTCH_WIDTH,
+            spec.BOTTOM_NOTCH_WIDTH_BAND,
+            spec.STRAP_THICKNESS,
+            spec.STRAP_THICKNESS_TOLERANCE,
+        ),
     ):
         least = width + lower
         assert least >= plate + tolerance + bank.RUNNING_FLOOR - 1e-9
         assert least - (plate + tolerance + bank.RUNNING_FLOOR) < 0.01  # the minimum
-    assert spec.TOP_NOTCH_WIDTH == 3.20
+    assert spec.TOP_NOTCH_WIDTH == 3.15
     assert spec.BOTTOM_NOTCH_WIDTH == 3.11
     assert bar.TOP_NOTCH_WIDTH is spec.TOP_NOTCH_WIDTH
     assert bar.BOTTOM_NOTCH_WIDTH is spec.BOTTOM_NOTCH_WIDTH
 
     bands = model_toleranced_dimensions(bar)
-    for name in ("BottomNotchWidth", "TopNotchWidth"):
-        assert bands[("BarProfile", name)] == "*deviations(NOTCH_WIDTH_BAND)"
+    for name, band in (
+        ("BottomNotchWidth", "BOTTOM_NOTCH_WIDTH_BAND"),
+        ("TopNotchWidth", "TOP_NOTCH_WIDTH_BAND"),
+    ):
+        assert bands[("BarProfile", name)] == f"*deviations({band})"
         assert ch_amplitude_bar_notes.DRAWING_PRECISION["BarProfile"][name] == 2
+
+
+def test_top_notch_keeps_the_running_gap_at_the_printed_worst_case() -> None:
+    """#1038 option 2 (owner ruling 2026-10-15): the top notch's float on the
+    3.00 +/-0.05 plate leaves the 0.7065 side gap its running floor; the full
+    stack, with both ledges and plate offsets, is
+    ch_bar_pivot_pin_spec.joint_budget's neighbour_clearance_min."""
+    import ch_bar_pivot_pin_spec as pin
+    import rocker_bank_layout as bank
+
+    spec = ch_amplitude_bar_spec
+    float_max = (spec.TOP_NOTCH_WIDTH + spec.TOP_NOTCH_WIDTH_BAND[0]) - (
+        spec.LEVER_THICKNESS - spec.LEVER_THICKNESS_TOLERANCE
+    )
+    assert bank.PITCH - spec.BAR_WIDTH - float_max >= bank.RUNNING_FLOOR
+    assert pin.BUDGET["neighbour_clearance_min"] >= bank.RUNNING_FLOOR
 
 
 @pytest.mark.xfail(
     strict=True,
-    reason="#1038: at the printed bands a bar's notch float can close the "
-    "0.7065 side gap to its neighbour (user ruling 2026-09-27: ship as a "
+    reason="#1038: at the printed bands a bar's foot-notch float can close "
+    "the 0.7065 side gap to its neighbour (user ruling 2026-09-27: ship as a "
     "known issue with interim bands)",
 )
-def test_neighbouring_bars_keep_a_running_gap_at_the_printed_worst_case() -> None:
+def test_neighbouring_bars_keep_a_running_gap_at_the_foot() -> None:
     """Bars 6.35 wide sit at the 7.0565 station pitch. Each floats on its
-    straddled plate by (notch max - plate min); two neighbours floating toward
-    each other close the side gap by that much, at the top and at the foot."""
+    straddled strap by (notch max - strap min); two neighbours floating toward
+    each other close the side gap by that much."""
     import rocker_bank_layout as bank
 
     spec = ch_amplitude_bar_spec
     gap = bank.PITCH - spec.BAR_WIDTH
-    upper, _lower = spec.NOTCH_WIDTH_BAND
-    for width, plate, tolerance in (
-        (spec.TOP_NOTCH_WIDTH, spec.LEVER_THICKNESS, spec.LEVER_THICKNESS_TOLERANCE),
-        (spec.BOTTOM_NOTCH_WIDTH, spec.STRAP_THICKNESS, spec.STRAP_THICKNESS_TOLERANCE),
-    ):
-        float_max = (width + upper) - (plate - tolerance)
-        assert gap - float_max >= bank.RUNNING_FLOOR
+    float_max = (spec.BOTTOM_NOTCH_WIDTH + spec.BOTTOM_NOTCH_WIDTH_BAND[0]) - (
+        spec.STRAP_THICKNESS - spec.STRAP_THICKNESS_TOLERANCE
+    )
+    assert gap - float_max >= bank.RUNNING_FLOOR
 
 
 def test_cropped_views_are_model_views_dimensioned_before_the_crop() -> None:

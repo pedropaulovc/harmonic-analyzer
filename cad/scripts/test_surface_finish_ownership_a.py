@@ -12,6 +12,7 @@ import build_dt_cone_gear
 import build_dt_cone_gear_shaft
 import build_dt_cone_swing_platform
 import build_ch_connecting_rod
+import build_ch_channel_lever
 import build_dt_crank_drive_gear
 import build_dt_crank_pinion
 import build_dt_crankshaft
@@ -20,6 +21,7 @@ import dt_cone_gear_shaft_spec
 import dt_cone_gear_spec
 import dt_cone_swing_platform_spec
 import ch_connecting_rod_spec
+import ch_channel_lever_spec
 import dt_crank_drive_gear_spec
 import dt_crank_pinion_spec
 import dt_crankshaft_spec
@@ -30,6 +32,7 @@ import draw_dt_cone_gear
 import draw_dt_cone_gear_shaft
 import draw_dt_cone_swing_platform
 import draw_ch_connecting_rod
+import draw_ch_channel_lever
 import draw_dt_crank_drive_gear
 import draw_dt_crank_pinion
 import draw_dt_crankshaft
@@ -122,6 +125,18 @@ CASES = (
                 "strap_bore",
                 MACHINED_UM,
                 CylinderFace(ch_connecting_rod_spec.RING_BORE_DIA),
+            ),
+        ),
+    ),
+    (
+        ch_channel_lever_spec,
+        build_ch_channel_lever,
+        draw_ch_channel_lever,
+        (
+            SurfaceFinishControl(
+                "fulcrum_bore",
+                MACHINED_UM,
+                CylinderFace(ch_channel_lever_spec.PIVOT_HOLE_DIA),
             ),
         ),
     ),

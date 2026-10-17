@@ -771,12 +771,12 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
 
 # The MHA-CH-011 bar pivot pins (ch_bar_pivot_pin_spec), Ø1.984375 drill rod
 # pressed into each MHA-CH-001 bar's Ø1.968 top-pin ream through both
-# top-notch cheeks: 6.35 bar less the 3.20 notch. Channel j's pin and bar are
+# top-notch cheeks: 6.35 bar less the 3.15 notch. Channel j's pin and bar are
 # both its (j + 1)th instance (build_ch_channel_assembly inserts one pin per
 # channel in channel order; _copied_chain_instances pins the bar's number).
 # Literals, like the rows above, so every assembly does not re-key on the pin
 # spec; test_ch_bar_pivot_fit pins them to it.
-BAR_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.35 - 3.20)
+BAR_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.35 - 3.15)
 # The MHA-CH-010 rod pivot pins (ch_rod_pivot_pin_spec), the same drill rod
 # pressed into each MHA-CH-003 rod's Ø1.968 fork ream through both tines:
 # 6.075 fork less the 2.675 slot (user ruling 2026-10-09, PR #1292 review F1;

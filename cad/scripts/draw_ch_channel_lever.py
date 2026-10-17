@@ -1,13 +1,16 @@
 r"""Create the curated machinist drawing for the channel (top) lever.
 
-The SLDPRT remains authoritative.  This recipe supplies only the channel-lever
-views, dimension layout, hole callouts, and manufacturing notes;
-sheet/template and export behavior lives in ``_drawing_common``.
-Dimension import and curation live in ``_drawing_dimension_import``.
+The SLDPRT remains authoritative.  Every size, location and band prints from
+its native model dimension (``ch_channel_lever_notes.DRAWING_DIMENSIONS``, at
+the places the part authors); this recipe supplies only the views, the
+placement of those dimensions, the function each tight band serves, the hole
+callouts, the bore's roughness and one reference overall length.
+Sheet/template and export behaviour lives in ``_drawing_common``.
 
-The lever is a long thin third-class lever (~188 mm nose-to-tip, 9.5 mm tall,
-3.0 mm thick).  The sheet runs at 1:1 with a small 1:4 isometric; the 3.0 x 9.5
-section is dimensioned on a right end view.
+The lever is a long thin third-class lever (186.6 mm over the hub, 11.0 mm
+tall, 3.0 mm thick).  The sheet runs at 1:1: the front view carries the
+profile, bore, hub, both arms from the fulcrum bore and the overall length;
+the top view the plate thickness and the hub length; a 1:2 isometric.
 
 Run with SolidWorks open::
 
@@ -21,45 +24,56 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
-    view_name,
 )
 
+import _config
 from _check import check
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_basic_dimension
-from _drawing_edge_dimensions import add_edge_dimension
-from _drawing_gdt import add_datum_feature, add_feature_control_frame
+# The plate offset is owned by a reference sketch the part saves hidden.
+from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_arc_endpoints_to_max,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
-from _hole_spec import blind_cut_dia_mm
+from _drawing_view_display import set_hidden_lines_removed
+from _hole_spec import blind_cut_dia_mm, drill_process
 from _paths import CAD_ROOT
 from _session import run_build
+from _surface_finish import surface_finish_by_key
 import _telemetry
+from ch_channel_lever_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION, ROOT_CALLOUT
 from ch_channel_lever_spec import (
     BAR_PIN_HOLE_SPEC,
     BAR_PIN_X,
-    BAR_TALL,
-    GEOMETRIC_TOLERANCES_MM,
+    HUB_DIA,
     LEVER_SPRING_X,
-    LEVER_THICKNESS,
+    PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
     SPRING_EYE_HOLE_SPEC,
+    SURFACE_FINISHES,
     TIP_END_X,
 )
+from ch_fulcrum_shaft_spec import SHAFT_DIA, SHAFT_DIA_BAND
 
 
 SPEC = DRAWINGS_BY_NAME["ch_channel_lever"]
@@ -75,85 +89,102 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)  # 1:1
+ISO_SCALE = (1, 2)
 
-_NOSE_R = BAR_TALL / 2.0  # 4.75
-_BBOX_CX = (-_NOSE_R + TIP_END_X) / 2.0  # front-view X centre
+_HUB_R = HUB_DIA / 2.0
+_BBOX_CX = (-_HUB_R + TIP_END_X) / 2.0  # both 1:1 views centre on the hub..tip span
 _SPRING_HOLE_DIA = blind_cut_dia_mm(SPRING_EYE_HOLE_SPEC)
 _BAR_PIN_DIA = blind_cut_dia_mm(BAR_PIN_HOLE_SPEC)
 
 FRONT_CENTER = (0.150, 0.155)
-RIGHT_CENTER = (0.295, 0.155)
-TOP_CENTER = (0.150, 0.205)  # above the profile: plate thickness + datum A live here
-ISO_CENTER = (0.360, 0.210)
+TOP_CENTER = (0.150, 0.220)  # above the profile: plate thickness, hub length
+ISO_CENTER = (0.345, 0.215)
+ISO_NOTE_XY = (0.315, 0.185)  # left end: centres the label under the iso
 
 
-def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model point in the bbox-centred front view (1:1)."""
-    return (
-        FRONT_CENTER[0] + (mx - _BBOX_CX) / 1000.0,
-        FRONT_CENTER[1] + my / 1000.0,
-    )
+def _name_hole_mate(display: Any, *, label: str) -> None:
+    """Add the hole's mate under its native callout.
+
+    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
+    swDimensionTextCalloutBelow (4); the prefix, size and depth definitions
+    stay untouched, so the Hole Wizard variables stay associative
+    (draw_ch_rocker_arm_tl_profile_fixture._locate_pivot_tap_depths)."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    below = definitions[8].rstrip()
+    mate = HOLE_MATES[label]
+    updated = f"{below}\n{mate}" if below else mate
+    display.SetText(4, updated)
+    if str(display.GetText(8) or "").replace("\r", "") != updated or any(
+        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+    ):
+        raise RuntimeError(
+            f"{label}: hole callout mate or native definitions did not persist: "
+            f"{[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+        )
 
 
-def _top_xy(mx: float, mz: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (x, z) point in the top view (1:1, x aligned
-    with the front view, centred on the plate's mid-thickness)."""
-    return (
-        TOP_CENTER[0] + (mx - _BBOX_CX) / 1000.0,
-        TOP_CENTER[1] + mz / 1000.0,
-    )
+def _sheet_x(mx: float) -> float:
+    """Sheet x of a model x in either 1:1 view (both are bbox-centred)."""
+    return FRONT_CENTER[0] + (mx - _BBOX_CX) / 1000.0
 
 
-def _force_dimension_black(dimension: Any, *, label: str) -> None:
-    """Make an added basic dimension print at full black instead of driven gray."""
-    display = _sw_type_info.early_bound_or_flag(
-        dimension, "IDisplayDimension", "GetAnnotation"
-    )
-    annotation = display.GetAnnotation()
-    if annotation is None:
-        raise RuntimeError(f"{label} has no annotation")
-    annotation = _sw_type_info.early_bound_or_flag(
-        annotation, "IAnnotation", "Color", "LayerOverride"
-    )
-    annotation.Color = 0  # COLORREF black; overrides the drawing layer color.
-    if int(annotation.Color) != 0:
-        raise RuntimeError(f"{label} did not retain black annotation color")
-    if not int(annotation.LayerOverride) & 0x1:
-        raise RuntimeError(f"{label} did not retain its color override")
+# --- Mates and functions named on the bands' own callouts (rules 4 and 7). ---
+SHAFT_NUMBER = _config.parts("ch-fulcrum-shaft")["number"]
+BAR_NUMBER = _config.parts("ch-amplitude-bar")["number"]
+PIN_NUMBER = _config.parts("ch-bar-pivot-pin")["number"]
+SPRING_NUMBER = _config.parts("vn-channel-spring-installed")["number"]
+STATIONS = _config.machine("channels", "count")
+_CLEARANCE_LEAST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]) - (SHAFT_DIA + SHAFT_DIA_BAND[0])
+_CLEARANCE_MOST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) - (SHAFT_DIA + SHAFT_DIA_BAND[1])
 
-
-def _add_tip_arc_center_mark(adapter: Any, view: Any) -> None:
-    """Center-mark the outer R3 arc so its boxed centre coordinate is explicit."""
-    draw = adapter.currentModel
-    drawing_doc = _sw_type_info.early_bound_or_flag(
-        draw, "IDrawingDoc", "ActivateView", "InsertCenterMark3"
-    )
-    if not drawing_doc.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate channel-lever front view")
-    draw.ClearSelection2(True)
-    tip_edge = _sheet_xy(TIP_END_X, 0.0)
-    selected = draw.Extension.SelectByID2(
-        "", "EDGE", tip_edge[0], tip_edge[1], 0.0, False, 0, null_callout(), 0
-    )
-    if not selected:
-        raise RuntimeError("failed to select channel-lever tip R3 arc")
-    center_mark = drawing_doc.InsertCenterMark3(2, False, False)
-    draw.ClearSelection2(True)
-    if center_mark is None:
-        raise RuntimeError("failed to add channel-lever tip R3 center mark")
-
+FRONT_CALLOUTS = {
+    "HubDia": ROOT_CALLOUT,
+    "FulcrumDia": (
+        f"REAM; RUNS ON SHAFT\n{SHAFT_NUMBER},"
+        f" {_CLEARANCE_LEAST:.2f}-{_CLEARANCE_MOST:.2f}\nDIAMETRAL CLEARANCE"
+    ),
+    "BarHeight": "FULL R AT TIP",
+    "BarPinCx": "SETS LEVER RATIO",
+    "SpringCx": "SETS LEVER RATIO",
+}
+# What engages each drilled hole rides its own hole callout (machinist r5:
+# on the arm's location it did not say the hole is a running bore).
+HOLE_MATES = {
+    "bar-pin hole": f"RUNS ON PIN\n{PIN_NUMBER}",
+    "spring-eye hole": f"HOOKS SPRING\n{SPRING_NUMBER}",
+}
+TOP_CALLOUTS = {
+    "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
+    "PlateOffset": f"LOCATES {BAR_NUMBER} NOTCH;\nSETS GAP TO NEXT BAR",
+    "HubLength": f"{STATIONS} HUBS STACK;\nSETS STATION PITCH",
+}
 
 FRONT_KEEP = {
-    "BarLength": (FRONT_CENTER[0] - 0.010, 0.138),
-    "TipCentreX": (FRONT_CENTER[0] + 0.070, 0.125),
-    "NoseRadius": (0.070, 0.172),
-    # Below-right of the tip (was 0.240, 0.172 above it): the spring-eye position
-    # frame's leader now drops to the 3-o'clock rim through the space it freed.
-    "TipRadius": (0.262, 0.141),
-    "FulcrumDia": (0.075, 0.180),
+    # Left of the hub, just above its axis: the near-side leader stops on the
+    # left rim, clear of the overall length's extension line below the hub
+    # and of the REAM leader, which lands from the upper right.
+    "HubDia": (0.033, 0.165),
+    "FulcrumDia": (0.050, 0.190),
+    # Above the bar, so neither dimension line runs into the text.
+    "BarHeight": (0.262, 0.171),
+    "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.126),
+    "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.104),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+TOP_KEEP = {
+    # Above the plate: its arrows come in from outside the 3.00 span.
+    "LeverThick": (0.264, TOP_CENTER[1] + 0.032),
+    # Both above the hub, their lines just right of it (left of the hub there
+    # is no room inside the border).  Each text runs right from its own line
+    # (r2 render), so the outer (right) line carries the lower text and
+    # neither line runs through the other's text.
+    "HubLength": (0.075, TOP_CENTER[1] + 0.032),
+    "PlateOffset": (0.095, TOP_CENTER[1] + 0.014),
+}
+OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.082)
+BAR_PIN_CALLOUT_XY = (0.170, 0.188)
+SPRING_CALLOUT_XY = (0.240, 0.188)
+BORE_FINISH_SYMBOL = (0.080, 0.140)
+FINISH_CHAR_HEIGHT = 0.0025
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -170,7 +201,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -178,7 +208,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -198,226 +227,147 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
-    # Top view (2026-09-02): the integral O12 x 7.06 fulcrum hub hides the whole
-    # 3 x 9.5 plate section in the end view, so the plate thickness and the
-    # broad-face datum are read here, along the length clear of the hub.
+    # The integral Ø12 x 7.06 fulcrum hub hides the whole 3 x 11 plate section
+    # in an end view, so the plate thickness and the hub length read here.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    for view in (right, top, iso):
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, front)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    profile_dimensions = {"BarLength", "TipCentreX", "NoseRadius", "TipRadius"}
-    for annotation in front_annotations:
-        name = dimension_name(adapter, annotation)
-        if name not in profile_dimensions:
-            continue
-        display = annotation.GetSpecificAnnotation()
-        if display is None:
-            raise RuntimeError(f"profile dimension {name!r} has no display annotation")
-        set_basic_dimension(adapter, display, label=f"profile {name}")
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
-
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to front view")
-    _add_tip_arc_center_mark(adapter, front)
-
-    # Fulcrum -> bar-pin (127) and fulcrum -> spring-eye (175.05) centre distances
-    # (bore edge to bore edge; SolidWorks dimensions circle edges centre-to-centre).
-    fulcrum_rim = _sheet_xy(-PIVOT_HOLE_DIA / 2.0, 0.0)
-    bar_pin_rim = _sheet_xy(BAR_PIN_X - _BAR_PIN_DIA / 2.0, 0.0)
-    spring_rim = _sheet_xy(LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0, 0.0)
-    bar_pin_c2c = add_edge_dimension(
         adapter,
         front,
-        p0=fulcrum_rim,
-        p1=bar_pin_rim,
-        text_xy=(FRONT_CENTER[0] - 0.020, 0.128),
-        label="fulcrum-to-bar-pin c2c",
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    set_basic_dimension(adapter, bar_pin_c2c, label="fulcrum-to-bar-pin c2c")
-    _force_dimension_black(bar_pin_c2c, label="fulcrum-to-bar-pin c2c")
-    spring_c2c = add_edge_dimension(
-        adapter,
-        front,
-        p0=fulcrum_rim,
-        p1=spring_rim,
-        text_xy=(FRONT_CENTER[0], 0.118),
-        label="fulcrum-to-spring c2c",
-    )
-    set_basic_dimension(adapter, spring_c2c, label="fulcrum-to-spring c2c")
-    _force_dimension_black(spring_c2c, label="fulcrum-to-spring c2c")
-
-    # Section thickness (3.0) in the top view at mid-length (clear of the hub);
-    # bar height (9.5) on the front profile at the same station.
-    _mid_x = (
-        BAR_PIN_X + LEVER_SPRING_X
-    ) / 2.0 - 60.0  # ~91: between the hub and the tab
-    add_edge_dimension(
+    top_annotations = curate_view_dimensions(
         adapter,
         top,
-        p0=_top_xy(_mid_x, -LEVER_THICKNESS / 2.0),
-        p1=_top_xy(_mid_x, LEVER_THICKNESS / 2.0),
-        text_xy=(_top_xy(_mid_x, 0.0)[0], TOP_CENTER[1] + 0.020),
-        label="lever thickness",
-        orientation="vertical",
+        keep=TOP_KEEP,
+        view_label="top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    bar_height = add_edge_dimension(
+    # The bands import with their named model dimensions, at the part's
+    # places; the drawing owns only the callout text beneath them.
+    assert_imported_precision(
+        adapter,
+        front_annotations,
+        {
+            **DRAWING_PRECISION["LeverOutline"],
+            **DRAWING_PRECISION["HubProfile"],
+            **DRAWING_PRECISION["FulcrumProfile"],
+            **DRAWING_PRECISION["BarPinHole"],
+            **DRAWING_PRECISION["SpringHole"],
+        },
+    )
+    assert_imported_precision(
+        adapter,
+        top_annotations,
+        {
+            **DRAWING_PRECISION["LeverBody"],
+            **DRAWING_PRECISION["Hub"],
+            **DRAWING_PRECISION["PlateOffsetReference"],
+        },
+    )
+    # Native, the Ø12.0 line runs rim to rim through the hub centre and
+    # crosses the REAM leader there (review r3): one arrow on the near rim.
+    hub_dia = [a for a in front_annotations if dimension_name(adapter, a) == "HubDia"]
+    if len(hub_dia) != 1:
+        raise RuntimeError(f"expected one HubDia dimension, found {len(hub_dia)}")
+    set_near_side_diameter(hub_dia[0], "hub diameter")
+    rebuild_drawing(adapter, label="hub diameter near-side leader")
+    set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
+    set_dimension_callouts(adapter, top_annotations, TOP_CALLOUTS)
+
+    # Overall length over the hub and the full-round tip, for the stock cut:
+    # a reference (the hub, the spring-hole location and the bar's full round
+    # set it).  Both ends are arcs in the front view, each picked on its
+    # extreme and re-anchored to it (a horizontal arc pick resolves to the
+    # centre by default and would read the 175.05 spring arm).
+    hub_end, tip_end = (
+        model_point_in_view(adapter, front, (x / 1000.0, 0.0, 0.0), label=label)
+        for x, label in ((-_HUB_R, "hub extreme"), (TIP_END_X, "tip extreme"))
+    )
+    overall = add_edge_dimension(
         adapter,
         front,
-        p0=_sheet_xy(_mid_x, -BAR_TALL / 2.0),
-        p1=_sheet_xy(_mid_x, BAR_TALL / 2.0),
-        text_xy=(_sheet_xy(_mid_x, 0.0)[0] + 0.022, FRONT_CENTER[1]),
-        label="bar height",
-        orientation="vertical",
+        p0=hub_end,
+        p1=tip_end,
+        text_xy=OVERALL_TEXT_XY,
+        label="overall length",
+        orientation="horizontal",
     )
-    set_basic_dimension(adapter, bar_height, label="bar height from datum C")
+    set_arc_endpoints_to_max(adapter, overall, label="overall length")
+    # Value-only: both picks are arcs the recipe locates by coordinate, and
+    # the far-extreme sum is the one value either centre-anchored mistake
+    # (175.05, 181.05, 180.55) cannot produce.
+    assert_dimension_measures(
+        adapter, overall, expected_mm=_HUB_R + TIP_END_X, label="overall length"
+    )
+    overall = _sw_type_info.early_bound_or_flag(
+        overall, "IDisplayDimension", "GetAnnotation"
+    )
+    set_reference_dimension(adapter, overall.GetAnnotation(), label="overall length")
 
-    # Hole callouts (bar-pin #47, spring-eye #21).  Pick a point ON each hole's
-    # rim, not its centre: SolidWorks edge selection only catches the circular
-    # edge within tolerance of the rim.  The bar-pin sits in the tall 9.5 mm bar,
-    # so its 12-o'clock rim is clear.  The spring eye rides a narrow 6.0 mm tab
-    # (rim ~1 mm from the tab's top edge), so a 12-o'clock pick grabs the tab
-    # edge and AddHoleCallout2 fails -- pick it at 9 o'clock (toward the lever
-    # body, on the Y=0 centreline), ~3 mm from the tab edges and clear of the tip.
-    bar_pin_edge = _sheet_xy(BAR_PIN_X, _BAR_PIN_DIA / 2.0)
-    spring_edge = _sheet_xy(LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0, 0.0)
-    spring_fcf_edge = _sheet_xy(LEVER_SPRING_X + _SPRING_HOLE_DIA / 2.0, 0.0)
-    add_native_hole_callout(
+    # Hole callouts (bar-pin #47, spring-eye #21) say DRILL ahead of the native
+    # size.  Pick a point ON each hole's rim, not its centre: edge selection
+    # only catches the circular edge within tolerance of the rim.  The spring
+    # eye is picked at 9 o'clock, clear of the concentric full-round tip.
+    bar_pin_edge = model_point_in_view(
+        adapter, front, (BAR_PIN_X / 1000.0, _BAR_PIN_DIA / 2000.0, 0.0),
+        label="bar-pin hole rim",
+    )
+    spring_edge = model_point_in_view(
+        adapter,
+        front,
+        ((LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0) / 1000.0, 0.0, 0.0),
+        label="spring-eye hole rim",
+    )
+    bar_pin_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=bar_pin_edge,
-        callout_xy=(bar_pin_edge[0] - 0.010, 0.185),
+        callout_xy=BAR_PIN_CALLOUT_XY,
         label="bar-pin hole",
+        process=drill_process(BAR_PIN_HOLE_SPEC) + "\n",
     )
-    add_native_hole_callout(
+    _name_hole_mate(bar_pin_callout, label="bar-pin hole")
+    spring_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=spring_edge,
-        callout_xy=(spring_edge[0] + 0.005, 0.185),
+        callout_xy=SPRING_CALLOUT_XY,
         label="spring-eye hole",
+        process=drill_process(SPRING_EYE_HOLE_SPEC) + "\n",
+    )
+    _name_hole_mate(spring_callout, label="spring-eye hole")
+    rebuild_drawing(adapter, label="hole callout mates")
+
+    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to front view")
+
+    # The reamed fulcrum bore is the one running surface (rule 6): Ra on its
+    # rim at 300 degrees, the symbol below-right of the hub: between the REAM
+    # leader (about 240 degrees through the bore) and the hub's (about 345),
+    # right of the arms' extension line.
+    bore_rim = model_point_in_view(
+        adapter,
+        front,
+        (PIVOT_HOLE_DIA / 2000.0 * 0.5, -PIVOT_HOLE_DIA / 2000.0 * 0.8660, 0.0),
+        label="fulcrum bore rim",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=bore_rim,
+        symbol_xy=BORE_FINISH_SYMBOL,
+        control=surface_finish_by_key(SURFACE_FINISHES, "fulcrum_bore"),
+        label="fulcrum bore finish",
+        char_height=FINISH_CHAR_HEIGHT,
     )
 
-    # Complete datum reference frame: A is a broad machined face (primary), B
-    # is the functional fulcrum-bore axis (secondary), and C is the top narrow
-    # face (tertiary clocking).  The two BASIC hole locations reference A|B|C.
-    broad_face = _top_xy(
-        _mid_x - 25.0, LEVER_THICKNESS / 2.0
-    )  # the broad face's edge line, top view
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=broad_face,
-        symbol_xy=(broad_face[0] - 0.018, broad_face[1] + 0.016),
-        datum="A",
-        label="broad machined face",
-    )
-    fulcrum_left = _sheet_xy(-PIVOT_HOLE_DIA / 2.0, 0.0)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=fulcrum_left,
-        symbol_xy=(fulcrum_left[0] - 0.018, fulcrum_left[1]),
-        datum="B",
-        label="fulcrum bore axis",
-        # The tag stands only 18 mm off the bore edge, so a snap-back onto the
-        # attachment would pass the default bound; the live readback is
-        # 0.0020 mm from the request.
-        position_tolerance_m=0.010,
-    )
-    top_face = (
-        RIGHT_CENTER[0],
-        RIGHT_CENTER[1] + BAR_TALL / 2000.0,
-    )
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=top_face,
-        symbol_xy=(top_face[0] + 0.018, top_face[1] + 0.010),
-        datum="C",
-        label="top clocking face",
-    )
-    outer_profile = _sheet_xy(80.0, BAR_TALL / 2.0)
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=outer_profile,
-        # Between the front and top views, left of the bar-pin frame (was
-        # 0.105, 0.210 on the top view: its leader crossed that view and the
-        # bar-pin frame, and datum A's leader ran through its text).
-        frame_xy=(0.092, 0.189),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["outer perimeter profile"],
-        datums=("A", "B", "C"),
-        all_around=True,
-        label="outer perimeter profile",
-    )
-    fulcrum_bottom = _sheet_xy(0.0, -PIVOT_HOLE_DIA / 2.0)
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=fulcrum_bottom,
-        frame_xy=(0.065, 0.200),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["fulcrum bore perpendicularity"],
-        datums=("A",),
-        diameter=True,
-        label="fulcrum bore perpendicularity",
-    )
-    opposite_broad_face = (
-        RIGHT_CENTER[0] + LEVER_THICKNESS / 2000.0,
-        RIGHT_CENTER[1],
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=opposite_broad_face,
-        # Right of its own end view, level with the attachment (was 0.225,
-        # 0.205 on the top view: its leader crossed the spring-eye frame).
-        frame_xy=(0.308, 0.159),
-        characteristic="parallelism",
-        tolerance=GEOMETRIC_TOLERANCES_MM["opposite broad face parallelism"],
-        datums=("A",),
-        label="opposite broad face parallelism",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=bar_pin_edge,
-        # Keep this frame below the hole-callout elbow (y ~= 0.182) and in a
-        # separate horizontal lane from the spring-eye frame.  Routing it from
-        # the old above-left position crossed the bar-pin callout leader.
-        frame_xy=(bar_pin_edge[0] - 0.045, 0.174),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["bar-pin hole position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        label="bar-pin hole position",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        # The hole callout owns the 9-o'clock rim and routes up-left.  Attach
-        # the position frame at 3 o'clock and keep its whole leader to the
-        # right of the callout path: the frame sits under the callout text,
-        # left of the end view and datum C (was +0.020, 0.174, where its leader
-        # crossed the R3.00 leader and datum C's leader ran through its text).
-        edge_xy=spring_fcf_edge,
-        frame_xy=(spring_fcf_edge[0] + 0.006, 0.180),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["spring-eye hole position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        label="spring-eye hole position",
-    )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

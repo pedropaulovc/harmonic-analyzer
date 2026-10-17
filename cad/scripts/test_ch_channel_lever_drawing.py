@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import ch_channel_lever_spec
-import draw_ch_channel_lever as drawing
+import pytest
+
+import build_ch_channel_assembly as assembly
 import build_ch_channel_lever as lever
+import ch_amplitude_bar_spec
+import ch_channel_lever_notes as notes
+import ch_channel_lever_spec as spec
+import draw_ch_channel_lever as drawing
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 
@@ -18,78 +24,127 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["ch_channel_lever"].script == Path(drawing.__file__).resolve()
 
 
-def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    assert lever.DRAWING_DIMENSIONS is ch_channel_lever_spec.DRAWING_DIMENSIONS
-    marked = set().union(*ch_channel_lever_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
+def test_kept_dimensions_are_exactly_the_marked_set() -> None:
+    assert lever.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
+    assert drawing.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
+    marked = set().union(*notes.DRAWING_DIMENSIONS.values())
+    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
-    assert "TipCentreX" in marked
+    assert set(drawing.FRONT_KEEP).isdisjoint(drawing.TOP_KEEP)
+
+
+def test_every_marked_dimension_states_its_places() -> None:
+    assert lever.DRAWING_PRECISION is notes.DRAWING_PRECISION
+    assert set(notes.DRAWING_PRECISION) == set(notes.DRAWING_DIMENSIONS)
+    for feature, names in notes.DRAWING_DIMENSIONS.items():
+        assert set(notes.DRAWING_PRECISION[feature]) == names
+
+
+def test_drawing_is_precision_migrated() -> None:
+    assert "draw_ch_channel_lever.py" in PRECISION_MIGRATED_DRAWINGS
+
+
+def test_bands_are_native_on_the_model_from_named_constants() -> None:
+    assert model_toleranced_dimensions(lever) == {
+        ("FulcrumProfile", "FulcrumDia"): "*deviations(PIVOT_HOLE_BAND)",
+        ("Hub", "HubLength"): "*deviations(HUB_LENGTH_BAND)",
+        ("LeverBody", "LeverThick"): "LEVER_THICKNESS_TOLERANCE",
+        ("PlateOffsetReference", "PlateOffset"): "PLATE_OFFSET_TOLERANCE",
+        ("BarPinHole", "BarPinCx"): "BAR_PIN_X_TOLERANCE",
+        ("SpringHole", "SpringCx"): "LEVER_SPRING_X_TOLERANCE",
+    }
+
+
+def test_every_tight_band_names_its_mate_or_function() -> None:
+    callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
+    for name in (
+        "FulcrumDia",
+        "LeverThick",
+        "PlateOffset",
+        "HubLength",
+        "BarPinCx",
+        "SpringCx",
+    ):
+        assert callouts[name]
+    assert drawing.SHAFT_NUMBER in callouts["FulcrumDia"]
+    assert "REAM" in callouts["FulcrumDia"]
+    assert drawing.BAR_NUMBER in callouts["LeverThick"]
+    assert drawing.BAR_NUMBER in callouts["PlateOffset"]
+    # Machinist r5: each hole's mate rides its own hole callout.
+    assert callouts["BarPinCx"] == callouts["SpringCx"] == "SETS LEVER RATIO"
+    assert drawing.HOLE_MATES == {
+        "bar-pin hole": f"RUNS ON PIN\n{drawing.PIN_NUMBER}",
+        "spring-eye hole": f"HOOKS SPRING\n{drawing.SPRING_NUMBER}",
+    }
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for label in drawing.HOLE_MATES:
+        assert f'_callout, label="{label}")' in source
+    assert drawing._CLEARANCE_LEAST == pytest.approx(0.15)
+    assert drawing._CLEARANCE_MOST == pytest.approx(0.20)
+
+
+def test_walls_clear_the_floor_at_worst_case() -> None:
+    assert spec.TIP_ARC_CX == spec.LEVER_SPRING_X
+    assert spec.TIP_RADIUS == spec.BAR_TALL / 2.0
+    for wall, value in spec.WALL_MIN.items():
+        assert value >= spec.WALL_FLOOR, wall
+    # The concentric full round leaves the same nominal wall to the tip.
+    nominal = spec.TIP_RADIUS - blind_cut_dia_mm(spec.SPRING_EYE_HOLE_SPEC) / 2.0
+    assert nominal == pytest.approx(3.48, abs=0.01)
+
+
+def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
+    stations = drawing.STATIONS
+    printed_max = round(spec.HUB_LENGTH, 2) + spec.HUB_LENGTH_BAND[0]
+    growth = stations * (printed_max - spec.HUB_LENGTH)
+    assert spec.HUB_LENGTH_BAND[1] == 0.0  # ch_bar_pivot_pin_spec's pitch minimum
+    assert growth < sum(assembly.KEEPER_HUB_FLOAT)
+
+
+def test_plate_band_is_the_notch_allowance() -> None:
+    assert ch_amplitude_bar_spec.LEVER_THICKNESS_TOLERANCE == spec.LEVER_THICKNESS_TOLERANCE
+
+
+def test_plate_is_located_from_one_hub_face() -> None:
+    assert spec.PLATE_OFFSET == pytest.approx((spec.HUB_LENGTH - spec.LEVER_THICKNESS) / 2.0)
+    assert notes.DRAWING_PRECISION["PlateOffsetReference"] == {"PlateOffset": 2}
+    assert lever.PLATE_OFFSET_SKETCH == "PlateOffsetReference"
+    # The line runs from the hub face to the plate face on the hub silhouette.
+    start, end = lever._PLATE_OFFSET_START, lever._PLATE_OFFSET_END
+    assert start[0] == end[0] == spec.HUB_DIA / 2.0
+    assert start[1] - end[1] == pytest.approx(spec.PLATE_OFFSET)
 
 
 def test_draw_view_math_matches_the_spec() -> None:
-    assert (drawing.LEVER_SPRING_X, drawing.BAR_PIN_X) == (
-        ch_channel_lever_spec.LEVER_SPRING_X,
-        ch_channel_lever_spec.BAR_PIN_X,
-    )
-    assert lever.BAR_PIN_HOLE_SPEC is ch_channel_lever_spec.BAR_PIN_HOLE_SPEC
-    assert lever.SPRING_EYE_HOLE_SPEC is ch_channel_lever_spec.SPRING_EYE_HOLE_SPEC
-    assert drawing._BAR_PIN_DIA == blind_cut_dia_mm(
-        ch_channel_lever_spec.BAR_PIN_HOLE_SPEC
-    )
-    assert drawing._SPRING_HOLE_DIA == blind_cut_dia_mm(
-        ch_channel_lever_spec.SPRING_EYE_HOLE_SPEC
-    )
+    assert drawing._BAR_PIN_DIA == blind_cut_dia_mm(spec.BAR_PIN_HOLE_SPEC)
+    assert drawing._SPRING_HOLE_DIA == blind_cut_dia_mm(spec.SPRING_EYE_HOLE_SPEC)
+    assert spec.TIP_END_X == pytest.approx(180.55)
 
 
-def test_sheet_runs_at_1_to_1_with_1_to_4_isometric() -> None:
+def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
+    assert drawing.ISO_SCALE == (1, 2)
+    assert notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 4)" in source  # the isometric override
-    assert ch_channel_lever_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    assert "Manufacturing Notes" not in source
 
 
-def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
-    notes = ch_channel_lever_spec.DRAWING_NOTES
-    assert "6.50 +0.03/0" in notes
-    assert "DATUM C IS THE LONG TOP FACE" in notes
-    assert "BASIC 4.75 BELOW C" in notes
-    assert "BASIC FROM B: BAR-PIN" in notes
-    assert "NOT CONCENTRIC" in notes
-    assert "#47 DRILL" not in notes
-    assert "#21 DRILL" not in notes
-    assert "LINEAR +/-" not in notes
-    assert "GRAY-IRON" not in notes
-    assert "GREEN ENAMEL" not in notes
+def test_sheet_carries_no_gdt_and_drill_callouts() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-
-
-def test_native_gdt_and_finish_present() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'bar_height = add_edge_dimension(' in source
-    assert 'set_basic_dimension(adapter, bar_height, label="bar height from datum C")' in source
-    assert source.count("add_datum_feature(") == 3
-    assert 'label="fulcrum bore axis",' in source
-    assert source.count("_force_dimension_black(") == 3
-    assert source.count("annotation.Color = 0") == 1
-    assert "annotation.LayerOverride" in source
-    assert "InsertCenterMark3(2, False, False)" in source
-    assert "tip_edge = _sheet_xy(TIP_END_X, 0.0)" in source
-    assert source.count("add_feature_control_frame(") == 5
-    assert source.count('characteristic="position"') == 2
-    assert source.count('datums=("A", "B", "C")') == 3
-    assert 'characteristic="profile_surface"' in source
-    assert 'characteristic="perpendicularity"' in source
-    assert 'characteristic="parallelism"' in source
-    assert source.count('datums=("A",)') == 2
-    assert "all_around=True" in source
-    assert 'edge_xy=bar_pin_edge' in source
-    assert 'label="bar-pin hole position"' in source
-    assert 'edge_xy=spring_fcf_edge' in source
-    assert 'label="spring-eye hole position"' in source
-    assert "add_surface_finish(" not in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_datum_feature(" not in source
+    assert "set_basic_dimension(" not in source
     assert source.count("add_native_hole_callout(") == 2
+    assert source.count("process=drill_process(") == 2
+
+
+def test_hub_diameter_lands_on_its_near_rim() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'set_near_side_diameter(hub_dia[0], "hub diameter")' in source
+    assert source.index("set_near_side_diameter(") < source.index(
+        "set_dimension_callouts(adapter, front_annotations"
+    )
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
@@ -98,10 +153,14 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert "clear_dimensions_for_drawing" in source
     import _config
 
-    spec = _config.parts("ch-channel-lever")
-    assert spec["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
-    assert spec["material"] == "LOW-CARBON STEEL OR GRAY IRON"
-    assert spec["finish"] == (
-        "RAL 6005 alkyd enamel, SSPC-SP3, 40-60 um DFT; mask all bores"
-    )
-    assert int(spec["quantity"]) == 20
+    part = _config.parts("ch-channel-lever")
+    # Owner ruling 2026-10-15: gray cast iron is the material, and its
+    # build-up-free conversion coat is the cast-iron class of black oxide.
+    assert part["material_specification"] == "GRAY CAST IRON, ASTM A48 CLASS 30"
+    assert part["material"] == "GRAY CAST IRON"
+    assert "material_family" not in part
+    assert lever.MATERIAL == "Gray Cast Iron"
+    # A conversion coat, not paint: the hub faces, plate faces and bores
+    # keep their bands with nothing masked (as the rocker arms, MHA-CH-006).
+    assert part["finish"] == "matte black oxide per MIL-DTL-13924 Class 1, oil sealed"
+    assert int(part["quantity"]) == 20

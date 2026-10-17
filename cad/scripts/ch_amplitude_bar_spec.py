@@ -20,7 +20,7 @@ MM_PER_IN = 25.4
 # rocker-bank closures import this module, so it reads no other part's spec;
 # test_ch_amplitude_bar_drawing pins each to its source). ---
 LEVER_THICKNESS = 3.0  # ch_channel_lever_spec.LEVER_THICKNESS (the top notch's)
-LEVER_THICKNESS_TOLERANCE = 0.10  # channel-lever note 2: "3.00 +/-0.10 OVERALL"
+LEVER_THICKNESS_TOLERANCE = 0.05  # ch_channel_lever_spec.LEVER_THICKNESS_TOLERANCE
 STRAP_THICKNESS = 2.5  # ch_rocker_arm_spec.ARM_THICKNESS (the foot notch's)
 STRAP_THICKNESS_TOLERANCE = 0.508  # ch_rocker_arm_spec.LINEAR_2PL: "STRAP 2.50" at .XX
 STRADDLE_RUNNING_FLOOR = 0.10  # rocker_bank_layout.RUNNING_FLOOR, oiled steel faces
@@ -46,22 +46,31 @@ BAR_DEPTH = 0.25 * MM_PER_IN  # 6.35
 # The section is the stock (printed as reference), so the stock band, not the
 # title block's .XX, bounds the bar's width and depth.
 BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
-# Notch widths: interim one-sided bands (user ruling 2026-09-27, #1038). The
-# legacy 1/8" (3.175) width left the top notch under the lever's 3.10 max
-# material. Each width's modelled nominal is now its minimum -- the straddled
-# plate at max material plus the running floor -- and the band sits all on the
-# plus side, so a notch is never narrower than its plate. The 0.25 novice spare
-# (rocker_bank_layout.MARGIN_SPARE) is deliberately left out: with it, and with
-# the band's upper side, the bar-to-bar side gap (pitch 7.0565 - bar 6.35 =
-# 0.7065) does not close. That stack, and the geometry change that fixes it,
-# is #1038.
+# Notch widths: one-sided bands (user ruling 2026-09-27, #1038). The legacy
+# 1/8" (3.175) width left the top notch under the lever's max material. Each
+# width's modelled nominal is its minimum -- the straddled plate at max
+# material plus the running floor -- and the band sits all on the plus side,
+# so a notch is never narrower than its plate. The 0.25 novice spare
+# (rocker_bank_layout.MARGIN_SPARE) is deliberately left out.
+# The top notch (owner ruling 2026-10-15, #1038 option 2): the lever plate
+# prints 3.00 +/-0.05, so the notch is 3.15 +0.20/0, and the bar-to-bar side
+# gap (pitch 7.0565 - bar 6.35 = 0.7065) holds the running floor with this
+# float, both ledges' and both plate offsets' bands in it
+# (ch_bar_pivot_pin_spec.joint_budget). The foot notch keeps the interim
+# +0.30/0; its stack is still #1038.
 BOTTOM_NOTCH_WIDTH = _straddle_minimum(
     STRAP_THICKNESS, STRAP_THICKNESS_TOLERANCE
 )  # 3.11
 BOTTOM_NOTCH_HEIGHT = 0.09375 * MM_PER_IN  # 2.381
-TOP_NOTCH_WIDTH = _straddle_minimum(LEVER_THICKNESS, LEVER_THICKNESS_TOLERANCE)  # 3.20
-NOTCH_WIDTH_BAND = (0.30, 0.0)  # (upper, lower) deviations, native on both widths
-TOP_NOTCH_HEIGHT = 0.5 * MM_PER_IN  # 12.7
+BOTTOM_NOTCH_WIDTH_BAND = (0.30, 0.0)  # (upper, lower) deviations, native
+TOP_NOTCH_WIDTH = _straddle_minimum(LEVER_THICKNESS, LEVER_THICKNESS_TOLERANCE)  # 3.15
+TOP_NOTCH_WIDTH_BAND = (0.20, 0.0)  # (upper, lower) deviations, native
+# The top notch's depth only clears the lever: its roof must stay below the
+# lever's lower edge with the lever turned on the pin relative to the bar
+# (ch_bar_pivot_pin_spec.joint_budget notch_roof_clearance_min). The legacy
+# 1/2" (12.7) does not hold that at the printed bands (owner ruling
+# 2026-10-15 deepened the lever to 11.0), so the notch is cut 14.0 deep.
+TOP_NOTCH_HEIGHT = 14.0
 TOP_PIN_DROP = 0.25 * MM_PER_IN  # 6.35 hole centre below the bar top
 # The MHA-CH-011 bar pivot pin presses into this hole through both top-notch
 # cheeks and runs in the lever's #47 hole (user ruling 2026-10, press fit;
@@ -74,7 +83,7 @@ TOP_PIN_HOLE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed; native
 TOP_PIN_Y = BAR_LENGTH - TOP_PIN_DROP  # 801.95
 # Each notch is centred on the width, so each end has its own ledge.
 BOTTOM_NOTCH_OFFSET = (BAR_WIDTH - BOTTOM_NOTCH_WIDTH) / 2.0  # 1.62
-TOP_NOTCH_OFFSET = (BAR_WIDTH - TOP_NOTCH_WIDTH) / 2.0  # 1.575
+TOP_NOTCH_OFFSET = (BAR_WIDTH - TOP_NOTCH_WIDTH) / 2.0  # 1.60
 
 
 # The foot notch's roof rides the rocker's top edge, and at d = 0 the cheeks

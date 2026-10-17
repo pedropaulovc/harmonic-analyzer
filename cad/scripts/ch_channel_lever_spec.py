@@ -3,12 +3,16 @@ the part build (``build_ch_channel_lever.py``) and its manufacturing drawing
 (``draw_ch_channel_lever.py``).
 
 PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the pattern).
-The nominal geometry MUST match the constants in build_ch_channel_lever.py (the
-test cross-checks the load-bearing ones).
+The drawing-only prose and the marked-dimension contract live in
+``ch_channel_lever_notes`` so the assemblies that import this spec never
+re-key on a drawing edit.
 """
 
 from __future__ import annotations
-from _hole_spec import HoleSpec
+
+from _gtol_cylinder import CylinderFace
+from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 17"). ---
@@ -22,64 +26,85 @@ from _hole_spec import HoleSpec
 # below the +/-0.10 hook-arm allocation (error_budget.yaml), hence the flat
 # nominal.  Was 177.8 (7"), which left the spring leaning 2.75 mm off plumb.
 LEVER_SPRING_X = 175.05  # fulcrum -> spring-hole c2c, plumb over the anchor
-BAR_TALL = 9.5  # bar height
+# Bar height, full length; the end carries the spring hole. The lever is
+# gray cast iron (owner ruling 2026-10-15: "device levers are clearly cast
+# iron"), so the arm is deepened in its own plane from 9.5 for strength while
+# staying under the O12.0 hub. Its lower edge clears the bar's top-notch roof
+# (ch_bar_pivot_pin_spec notch_roof_clearance_min) and the spring's coil
+# under the full-round tip (build_ch_channel_assembly._assert_spring_mount).
+BAR_TALL = 11.0
 LEVER_THICKNESS = 3.0
 PIVOT_HOLE_DIA = 6.5  # fulcrum bore riding the 6.35 fulcrum shaft
 BAR_PIN_X = 127.0  # fulcrum -> bar-pin c2c, 5"
 BAR_PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 SPRING_EYE_HOLE_SPEC = HoleSpec("drilled_number", "#21")
-TAB_START_X = 169.0  # bar steps down to the end tab; photo-read, so it stays
-# put while the reach shortens: 14.05 of 6.0-tall tab, 4.0 of it between the
-# step and the #21 hole edge
-TAB_HALF = 3.0  # tab 6.0 tall
-TIP_RADIUS = 3.0  # rounded tab tip
-TIP_ARC_CX = LEVER_SPRING_X + 5.0  # 180.05: 8.0 tip overhang past the hole
+
+# The end is the full-height bar with a full-round tip about the spring hole
+# (ch17 p.39 close-up, page001_img01: the bar runs full height to a rounded
+# end with the hook hole in it).  The former 6.0-tall stepped tab left
+# (6.0 - 4.04) / 2 = 0.98 of wall beside the #21 hole (baseline machinist
+# review, drawing-guidelines.md rule 17); concentric with the full round the
+# wall is BAR_TALL / 2 - r all the way round.
+TIP_ARC_CX = LEVER_SPRING_X
+TIP_RADIUS = BAR_TALL / 2.0  # 5.50: full round, tangent to both bar edges
 
 # --- Derived spans. ---
-NOSE_RADIUS = BAR_TALL / 2.0  # 4.75 fulcrum nose
-TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 183.05 overall length
-
-
-# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  build_ch_channel_lever marks exactly these. ---
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "LeverOutline": {"BarLength", "TipCentreX", "NoseRadius", "TipRadius"},
-    "FulcrumProfile": {"FulcrumDia"},
-}
+NOSE_RADIUS = BAR_TALL / 2.0  # 5.50 fulcrum nose (inside the hub)
+TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 180.55 tip from the fulcrum axis
 
 # Integral fulcrum hub (2026-09-02 photo re-derive, ch17 p.40 page002_img03):
 # the levers stack hub-to-hub on the fulcrum shaft at the station pitch; the
 # 19 `lever-bushing` spacers are retired. OD = the old bushing's O12.
 HUB_DIA = 12.0
 HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the build)
+if not BAR_TALL < HUB_DIA:
+    raise AssertionError("the arm must stay under the hub")
 
-DRAWING_NOTES = "\n".join(
-    (
-        "1. MACHINE FROM CONTINUOUS-CAST FLAT STOCK.",
-        "2. INDICATED BROAD FACE ESTABLISHES DATUM A;",
-        "   MACHINE OPPOSITE FACE TO 3.00 +/-0.10 OVERALL.",
-        "3. DATUM B IS THE DERIVED AXIS OF THE FULCRUM BORE:",
-        "   REAM DIA 6.50 +0.03/0 THRU, Ra 1.6.",
-        "4. DATUM C IS THE LONG TOP FACE; ALL HOLE AXES AND TIP R3 CENTRE",
-        "   ARE BASIC 4.75 BELOW C.",
-        f"5. BASIC FROM B: BAR-PIN {BAR_PIN_X:.2f}; SHOULDER {TAB_START_X:.2f};",
-        f"   SPRING-HOLE {LEVER_SPRING_X:.2f}; TIP R3 CENTRE {TIP_ARC_CX:.2f}.",
-        "6. SPRING-HOLE AND TIP R3 CENTRES ARE NOT CONCENTRIC.",
-        "7. PROFILE FCF APPLIES ALL AROUND OUTER PERIMETER",
-        "   EXCEPT DATUM C; STRAIGHTS TANGENT TO RADII.",
-        f"8. INTEGRAL HUB DIA {HUB_DIA:.2f} X {HUB_LENGTH:.2f} LONG ON THE",
-        "   FULCRUM BORE, PROUD 2.03 EACH FACE; HUB FACES",
-        "   SET THE STATION PITCH (NO SPACERS).",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+# --- Bands (upper, lower), native on the model dimensions. ---
+# The fulcrum bore is reamed: it runs on the h-band 6.35 fulcrum shaft
+# (MHA-CH-004), the same O6.5 +0.03/0 pivot the rocker arm runs on its shaft.
+PIVOT_HOLE_BAND = (0.03, 0.0)
+# The plate is straddled by the amplitude bar's top notch, whose 3.15 minimum
+# is this band's maximum plus the running floor (ch_amplitude_bar_spec). The
+# band is +/-0.05 so the bar's float, with both ledges and both plate offsets,
+# leaves the bar-to-bar running gap (owner ruling 2026-10-15, #1038 option 2).
+LEVER_THICKNESS_TOLERANCE = 0.05
+# Both transfer arms carry the error budget's +/-0.10 gain allocation
+# (error_budget.yaml lever_bar_pin_arm / lever_spring_hook_arm), measured from
+# the fulcrum bore that the lever turns about.
+BAR_PIN_X_TOLERANCE = 0.10
+LEVER_SPRING_X_TOLERANCE = 0.10
+# The 20 hubs stack face to face between the fulcrum keepers.  A hub may only
+# come out long (ch_bar_pivot_pin_spec's bar-to-bar clearance takes the pitch
+# at its nominal minimum), and twenty of them at the band's top must still
+# leave float at the keeper lugs (test_ch_channel_lever_drawing pins it).
+HUB_LENGTH_BAND = (0.03, 0.0)
+# The plate sits central on the hub, located from ONE hub face: each bar rides
+# its lever's plate, so the plate's offset in the hub shifts the bar toward its
+# neighbour's (ch_bar_pivot_pin_spec's bar-to-bar gap; the stack is #1038).
+PLATE_OFFSET = (HUB_LENGTH - LEVER_THICKNESS) / 2.0  # 2.028 hub face -> plate face
+PLATE_OFFSET_TOLERANCE = 0.05
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "outer perimeter profile": "0.50",
-    "fulcrum bore perpendicularity": "0.05",
-    "opposite broad face parallelism": "0.05",
-    "bar-pin hole position": "0.20",
-    "spring-eye hole position": "0.20",
+# drawing-guidelines.md rule 17 (walls and webs): every wall the holes leave,
+# at the worst case of the printed bands (the bar height and the hub both
+# print at one place, title-block +/-0.8; drilled holes +0.10/0; the reamed
+# bore at its top).
+WALL_FLOOR = 2.0
+_LINEAR_1PL = 0.8
+_DRILL_PLUS = 0.10
+_SPRING_HOLE_R_MAX = (blind_cut_dia_mm(SPRING_EYE_HOLE_SPEC) + _DRILL_PLUS) / 2.0
+_BAR_PIN_HOLE_R_MAX = (blind_cut_dia_mm(BAR_PIN_HOLE_SPEC) + _DRILL_PLUS) / 2.0
+WALL_MIN = {
+    "spring hole to tip and edges": (BAR_TALL - _LINEAR_1PL) / 2.0 - _SPRING_HOLE_R_MAX,
+    "bar-pin hole to edges": (BAR_TALL - _LINEAR_1PL) / 2.0 - _BAR_PIN_HOLE_R_MAX,
+    "fulcrum bore to hub": (HUB_DIA - _LINEAR_1PL) / 2.0
+    - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) / 2.0,
 }
+for _wall, _value in WALL_MIN.items():
+    if _value < WALL_FLOOR:
+        raise AssertionError(f"{_wall} wall {_value:.2f} < {WALL_FLOOR} floor")
+
+# drawing-guidelines.md rule 6: the fulcrum bore is the one running surface.
+SURFACE_FINISHES = (
+    SurfaceFinishControl("fulcrum_bore", MACHINED_UM, CylinderFace(PIVOT_HOLE_DIA)),
+)

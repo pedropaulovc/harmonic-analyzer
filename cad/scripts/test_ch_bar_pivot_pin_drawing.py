@@ -81,7 +81,8 @@ def test_blank_length_is_a_model_dimension_on_a_hidden_sketch() -> None:
     """Machinist round 1 (#1305): the blank length sat in a note. It prints
     from the part's blanked BlankReference sketch (the rod-pin pattern).
     Round 2: its only job is to stand proud of both faces before dressing,
-    so it takes the title block's .XX band, not a tighter one of its own."""
+    so it takes the title block's band, not a tighter one of its own; the
+    ch-channel-lever r5 review moved it to one place (7.5 under .X)."""
     from _printed_tolerance import printed_band_mm
 
     build = _build_source()
@@ -91,7 +92,7 @@ def test_blank_length_is_a_model_dimension_on_a_hidden_sketch() -> None:
     assert 'blank_reference_sketches(adapter, ("BlankReference",))' in build
     assert "hidden_sketches.curate_view_dimensions(" in _source()
     places = notes.DRAWING_PRECISION["BlankReference"]["BlankLen"]
-    assert places == spec.PIN_BLANK_LENGTH_PLACES == 2
+    assert places == spec.PIN_BLANK_LENGTH_PLACES == 1
     band = printed_band_mm(places)
     assert spec.PIN_BLANK_LENGTH_BAND == (band, -band)
     assert spec.BUDGET["blank_excess_min"] > 0.0
@@ -99,7 +100,7 @@ def test_blank_length_is_a_model_dimension_on_a_hidden_sketch() -> None:
 
 
 def test_precision_and_band_are_authored_on_the_part() -> None:
-    assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 2, "BlankLen": 2}
+    assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 2, "BlankLen": 1}
     assert "draw_ch_bar_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
