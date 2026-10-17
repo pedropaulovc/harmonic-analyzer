@@ -423,7 +423,10 @@ KEEPER_TRANSFER_PLAN_SHIFT = (
     )
     + KEEPER_TRANSFER_EXTRA_WIDTH
 )
-DETAIL_TOP_CENTER = (0.215 - KEEPER_TRANSFER_PLAN_SHIFT, 0.160)
+# Centred 160.5 mm up: owner ruling Q11-B' moved the rear keeper tap 0.75
+# toward the rear boss, which drops RD4 and the facing note under it 0.375 mm
+# on the sheet; at 160.0 the note stood 1.77 mm off the title block.
+DETAIL_TOP_CENTER = (0.215 - KEEPER_TRANSFER_PLAN_SHIFT, 0.1605)
 # HOLES-SOCKETS' left lanes, outside in: 202.1 REAR HANGER Z at x 27 mm, the
 # 224.00 socket pitch at x 40.5, 28.0 FRONT HANGER Z at x 62.  28.0's text
 # (42.9..81.3 mm on the 40d9d030e render) leaves the pitch line 2.4 mm of
@@ -796,7 +799,7 @@ POCKET_LENGTH_OFFSET_XY = (0.0320, 0.2555)
 
 # Sheet 1, Section E-E: the side rails and the crossbar T, cut inside the
 # crossbar pockets (|z| <= 69, where the crossbar is a T) and clear of every hole
-# station (keeper taps at z -82.8 / 81.7, hangers at -84.0 / 90.1, corner
+# station (keeper taps at z -83.5 / 82.5, hangers at -84.0 / 90.1, corner
 # bosses at z +/-112), so the section carries rail and T stock only.
 SIDE_SECTION_Z = -56.0
 # Removed sections are centred on the cut span, so each centre puts the

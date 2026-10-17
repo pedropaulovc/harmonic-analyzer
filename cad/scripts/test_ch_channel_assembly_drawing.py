@@ -244,7 +244,7 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert f"CLAMP BOTH {number}, FEET OUTBOARD ON ONE FLAT" in reamed
     assert f"INNER LUG FACES {rear - front:.{places}f} APART" in reamed
     assert "BORE AXIS PARALLEL TO THE FLAT" in reamed
-    assert "DRILL AND REAM BOTH IN ONE PASS, 12 IN 0.2514 REAMER" in reamed
+    assert "DRILL AND REAM BOTH IN ONE PASS, 12 IN 0.2515 REAMER" in reamed
     assert keeper.PAIR_REAMER_REACH_MARGIN_MM > 0.0
     assert "ROUND EACH CROWN ON ITS BORE" in reamed
     assert (
@@ -269,11 +269,11 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert keeper_drawing.DIMENSION_CALLOUTS["BoreDia"].endswith(
         f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
     )
-    assert keeper_drawing.DIMENSION_CALLOUTS["CrownDia"].endswith(
+    assert keeper_drawing.DIMENSION_CALLOUTS["CrownRadius"].endswith(
         f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
     )
     staking = steps.step_ref(steps.SET_SCREWS_STAKED_KEY)
-    assert staking in keeper_drawing.SET_SCREW_PROCESS
+    assert staking in keeper_drawing.SET_SCREW_QUALIFIER
 
 
 def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:

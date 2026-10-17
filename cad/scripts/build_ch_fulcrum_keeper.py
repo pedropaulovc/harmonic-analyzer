@@ -8,13 +8,14 @@ bore, the shaft's domed end proud of its outer face; a #1-72 cup-point set
 screw (MHA-VN-055) in the crown tap bears on the shaft's flat and fixes it.
 The short straight foot points OUTBOARD and is screwed down into the
 top-frame rail top face by one slotted #2-56 fillister frame-side
-screw (MHA-VN-022) seated flush in a counterbore.
+screw (MHA-VN-022) seated flush in a counterbore; the foot-to-lug inside
+corner is filleted at its MAX radius (``CornerFillet``).
 
 Layout (part frame): +X along the shaft, OUTBOARD (away from the lever
 bank; the lug mid-plane / set-screw axis is x = 0); +Y up from the seat
 (y = 0 lands on the rail top face, machine 1036.2); +Z across the 14 width.
-The lug spans x -3..+3 from the seat up; the foot runs outboard from the
-lug's outer face to x = +13.5, and the whole underside x -3..+13.5 is the
+The lug spans x -4..+4 from the seat up; the foot runs outboard from the
+lug's outer face to x = +12.5, and the whole underside x -4..+12.5 is the
 flat seat.
 
 One part serves both ends: the assembly places the +Z (rear) end keeper
@@ -51,7 +52,7 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -68,9 +69,13 @@ from vn_frame_side_screw_spec import THREAD as FRAME_SIDE_THREAD
 from ch_fulcrum_keeper_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
+    BORE_FROM_SIDE,
     CBORE_DEPTH_MM,
     CBORE_DIA_MM,
-    CROWN_DIA,
+    CORNER_R_BAND,
+    CORNER_R_MAX,
+    CORNER_R_TOL_TYPE,
+    CROWN_R,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -83,21 +88,24 @@ from ch_fulcrum_keeper_spec import (
     ISOMETRIC_VIEW_NOTE,
     KEEPER_WIDTH,
     LUG_HALF_T,
+    OVERALL_LENGTH,
     REFERENCE_SKETCHES,
-    SCREW_FROM_LUG_FACE,
     SCREW_FROM_SIDE,
+    SCREW_FROM_TIP,
     SCREW_X,
     SCREW_HOLE_SPEC,
     SET_SCREW_HOLE_SPEC,
     SHAFT_AXIS_H,
+    SUPPLY_HEIGHT_MIN,
+    SUPPLY_HEIGHT_TOL_TYPE,
 )
 
 PART_NAME = "ch-fulcrum-keeper"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
-LUG_T = 2.0 * LUG_HALF_T  # 6.0 lug thickness along X
+LUG_T = 2.0 * LUG_HALF_T  # 8.0 lug thickness along X
 # Mid-plane through-cut total (both_directions splits the depth half per side
-# of the sketch plane): past the lug's +-3 X extent, clear of the foot below.
+# of the sketch plane): past the lug's +-4 X extent, clear of the foot below.
 BORE_CUT_DEPTH = 2.0 * LUG_T
 
 # The keeper's foot screw is the part-owned #2 close-clearance counterbore;
@@ -116,50 +124,109 @@ if CBORE_DEPTH_MM >= FOOT_H:
 # volume below (a full crown cylinder across the drill) does not hold.
 if blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) >= LUG_T:
     raise AssertionError("crown tap drill breaks out of the lug faces")
+# The foot-to-lug inside corner's fillet adds its spandrel, (1 - pi/4) R^2,
+# along the keeper's width.
+V_CORNER = (1.0 - math.pi / 4.0) * CORNER_R_MAX**2 * KEEPER_WIDTH
 
 # The drawing-reference lines (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES):
 # (sketch, plane, dimension, start, end, orientation, value, drives), the
 # dt_arbor_pedestal pattern. Each line starts on the feature it is measured
-# from (drawing-guidelines.md rule 10 (dimension from a real feature)): the set-screw tap's runs along the crown-top outline
-# from the outer lug face to the tap axis; the foot screw's run on the seat
-# (Top plane: sketch u = model X, v = -model Z) from the outer lug face to the
-# screw axis and from the screw axis to the -Z side face. ``drives`` binds
-# the value dimension, then the start point's origin anchors, to the part's
-# globals.
+# from (drawing-guidelines.md rule 10 (dimension from a real feature)): the
+# set-screw tap's runs on the seat (Top plane: sketch u = model X, v = -model
+# Z) along the lug mid-width from the inner lug face -- the face the fit-up
+# sets -- to the tap axis, so the plan dimensions it from the inner face's
+# edge; the foot screw's two run on the seat from the foot-tip/-Z
+# side corner along the side face to the screw station and down the tip
+# face to the screw axis, so their extension lines leave the plan's outline
+# without crossing; the bore's runs on the Right plane
+# (the end view's frame) from a side face to the bore axis; the finished and
+# supplied heights' run up the lug's inner face from the seat to the crown
+# top and to the blank's least top; the overall length's along the seat
+# from the inner lug face to the foot tip. ``drives`` binds the value
+# dimension, then the start point's
+# origin anchors, to the part's globals.
 REFERENCE_LINES = (
     (
         "SetScrewReference",
-        "Front",
+        "Top",
         "SetScrewLocation",
-        (LUG_HALF_T, CROWN_TOP_Y),
-        (0.0, CROWN_TOP_Y),
+        (-LUG_HALF_T, 0.0),
+        (0.0, 0.0),
         "horizontal",
         LUG_HALF_T,
-        ('"LugT" / 2', '"LugT" / 2', '"ShaftAxisH" + "CrownDia" / 2'),
+        ('"LugT" / 2', '"LugT" / 2'),
     ),
     (
         "FootScrewReference",
         "Top",
-        "ScrewFromLug",
-        (LUG_HALF_T, 0.0),
-        (SCREW_X, 0.0),
+        "ScrewFromTip",
+        (FOOT_TIP_X, SCREW_FROM_SIDE),
+        (SCREW_X, SCREW_FROM_SIDE),
         "horizontal",
-        SCREW_FROM_LUG_FACE,
-        ('"FootL" / 2', '"LugT" / 2'),
+        SCREW_FROM_TIP,
+        ('"FootScrewFromTip"', '"LugT" / 2 + "FootL"', '"KeeperWidth" / 2'),
     ),
     (
         "FootScrewSideReference",
         "Top",
         "ScrewFromSide",
-        (SCREW_X, 0.0),
-        (SCREW_X, SCREW_FROM_SIDE),
+        (FOOT_TIP_X, SCREW_FROM_SIDE),
+        (FOOT_TIP_X, 0.0),
         "vertical",
         SCREW_FROM_SIDE,
-        ('"KeeperWidth" / 2', '"LugT" / 2 + "FootL" / 2'),
+        ('"KeeperWidth" / 2', '"LugT" / 2 + "FootL"', '"KeeperWidth" / 2'),
+    ),
+    (
+        "BoreSideReference",
+        "Right",
+        "BoreFromSide",
+        (BORE_FROM_SIDE, SHAFT_AXIS_H),
+        (0.0, SHAFT_AXIS_H),
+        "horizontal",
+        BORE_FROM_SIDE,
+        ('"KeeperWidth" / 2', '"KeeperWidth" / 2', '"ShaftAxisH"'),
+    ),
+    (
+        "OverallHeightReference",
+        "Front",
+        "OverallHeight",
+        (-LUG_HALF_T, 0.0),
+        (-LUG_HALF_T, CROWN_TOP_Y),
+        "vertical",
+        CROWN_TOP_Y,
+        ('"ShaftAxisH" + "CrownR"', '"LugT" / 2'),
+    ),
+    (
+        "SupplyHeightReference",
+        "Front",
+        "SupplyHeight",
+        (-LUG_HALF_T, 0.0),
+        (-LUG_HALF_T, SUPPLY_HEIGHT_MIN),
+        "vertical",
+        SUPPLY_HEIGHT_MIN,
+        ('"SupplyH"', '"LugT" / 2'),
+    ),
+    (
+        "OverallLengthReference",
+        "Front",
+        "OverallLength",
+        (-LUG_HALF_T, 0.0),
+        (FOOT_TIP_X, 0.0),
+        "horizontal",
+        OVERALL_LENGTH,
+        ('"LugT" + "FootL"', '"LugT" / 2'),
     ),
 )
 if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
     raise AssertionError("REFERENCE_LINES and REFERENCE_SKETCHES disagree")
+# The supplied blank's square top (MR-fleet r8, 7b21790: the supply height's
+# extension line ended in air above the crown): a second construction line in
+# the supply height's sketch, across the lug thickness from the height line's
+# top, so the dimension lands on drawn geometry, the blank's phantom outline.
+SUPPLY_TOP_SKETCH = "SupplyHeightReference"
+SUPPLY_TOP_DIMENSION = "SupplyTopWidth"
+if SUPPLY_TOP_SKETCH not in REFERENCE_SKETCHES:
+    raise AssertionError("the supply top's sketch is not a reference sketch")
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -169,6 +236,31 @@ def _as_construction(adapter, entity_id: str) -> None:
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _supply_square_top(adapter, sketch: str, height_line: str, corner) -> None:
+    """The blank's square top: a horizontal construction line LUG_T long from
+    the supply height line's top corner, sized by its own dimension."""
+    set_sketch_direct_db(adapter, True)
+    top = check(
+        f"{sketch} square top",
+        await adapter.add_line(*corner, corner[0] + LUG_T, corner[1]),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, top)
+    check(
+        f"{sketch} square top horizontal",
+        await adapter.add_sketch_constraint(top, None, "horizontal"),
+    )
+    check(
+        f"{sketch} square top starts on the height line",
+        await adapter.add_sketch_constraint(
+            f"{height_line}.end", f"{top}.start", "coincident"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{top}.start", f"{top}.end", "horizontal_distance", LUG_T, sketch
+    )
 
 
 async def _reference_line(
@@ -196,10 +288,14 @@ async def _reference_line(
         sketch,
     )
     await anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
+    names = [dimension, *(f"{dimension}Anchor{i}" for i in range(1, len(drives)))]
+    if sketch == SUPPLY_TOP_SKETCH:
+        await _supply_square_top(adapter, sketch, line, end)
+        names.append(SUPPLY_TOP_DIMENSION)
+        drives = (*drives, '"LugT"')
     await ensure_fully_defined(adapter, f"{sketch} sketch")
     check(f"exit_sketch {sketch}", await adapter.exit_sketch())
     name_last_feature(adapter, sketch)
-    names = [dimension, *(f"{dimension}Anchor{i}" for i in range(1, len(drives)))]
     full = name_dimensions(adapter, sketch, names)
     measured = (
         float(
@@ -230,6 +326,43 @@ def _hide_reference_sketches(adapter) -> None:
         raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
 
 
+def _single_limit(
+    adapter,
+    feature: str,
+    name: str,
+    limit: float,
+    tol_type: int,
+    lower: float,
+    upper: float,
+) -> None:
+    """``name@feature`` as a single limit: its nominal IS the printed limit
+    (swTolMAX / swTolMIN print the nominal plus MAX / MIN), carrying the
+    deviations ``lower`` / ``upper`` mm (build_ch_pivot_bracket.
+    _corner_radius_max_limit's recipe)."""
+    _, dimension = _named_dimension(adapter, feature, name)
+    label = f"{name}@{feature}"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, limit / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the limit {limit}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = tol_type
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != tol_type
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: single-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {limit:g} (type {tol_type})")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -242,8 +375,11 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "KeeperWidth", f"{KEEPER_WIDTH}mm")
     await set_global(adapter, "LugT", f"{LUG_T}mm")
     await set_global(adapter, "ShaftAxisH", f"{SHAFT_AXIS_H}mm")
-    await set_global(adapter, "CrownDia", f"{CROWN_DIA}mm")
+    await set_global(adapter, "CrownR", f"{CROWN_R}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    await set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
+    await set_global(adapter, "SupplyH", f"{SUPPLY_HEIGHT_MIN}mm")
+    await set_global(adapter, "FootScrewFromTip", f"{SCREW_FROM_TIP}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -285,7 +421,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "lug", v_lug, 0.005 * v_lug)
 
     # --- Foot: side-profile rectangle on Front (XY), extruded +-Z ---------
-    # Outboard of the lug's outer face, x +3..+13.5, y 0..8; its underside
+    # Outboard of the lug's outer face, x +4..+12.5, y 0..8; its underside
     # is coplanar with the lug's, so the two make one flat seat.
     foot = SketchDims()
     check("create_sketch foot", await adapter.create_sketch("Front"))
@@ -321,6 +457,23 @@ async def build(adapter) -> dict[str, str]:
     v_foot = FOOT_L * FOOT_H * KEEPER_WIDTH
     volume = await volume_check(adapter, "foot", volume + v_foot, 0.005 * v_foot)
 
+    # Foot-to-lug inside corner (drawing-guidelines.md rule 16): the edge where
+    # the foot top meets the lug's outer face, filleted AT the largest radius
+    # whose tangent line stays off the counterbore (CORNER_R_MAX), the radius
+    # the print gives as a single MAX limit.
+    check(
+        "fillet foot-to-lug corner",
+        await adapter.add_fillet(
+            CORNER_R_MAX, [[LUG_HALF_T, FOOT_H, 0.0]], propagate=False
+        ),
+    )
+    name_last_feature(adapter, "CornerFillet")
+    corner_dim = name_dimensions(adapter, "CornerFillet", ["CornerRadius"])
+    drive_jobs.append((corner_dim[0], '"CornerR"'))
+    volume = await volume_check(
+        adapter, "foot-to-lug corner fillet", volume + V_CORNER, 0.1 * V_CORNER
+    )
+
     # --- Crown: full-round lug top, concentric with the shaft axis --------
     crown = SketchDims()
     check("create_sketch crown", await adapter.create_sketch("Right"))
@@ -328,11 +481,12 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         0.0,
         SHAFT_AXIS_H,
-        CROWN_DIA / 2.0,
+        CROWN_R,
         "lug crown",
         dims=crown,
-        names=("CrownCz", "ShaftAxisH", "CrownDia"),
-        drives=(None, '"ShaftAxisH"', '"CrownDia"'),
+        names=("CrownCz", "ShaftAxisH", "CrownRadius"),
+        drives=(None, '"ShaftAxisH"', '"CrownR"'),
+        size_dimension="radius",
     )
     await ensure_fully_defined(adapter, "lug crown sketch")
     check("exit_sketch crown", await adapter.exit_sketch())
@@ -347,7 +501,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "LugCrown")
     crown_depth = name_dimensions(adapter, "LugCrown", ["Depth"])
     drive_jobs += [(crown_depth[0], '"LugT"')]
-    r_c = CROWN_DIA / 2.0
+    r_c = CROWN_R
     # The crown circle's lower half merges into the lug rectangle (its centre
     # sits ON the lug top edge and its bottom, y 18.2, is inside the lug), so
     # only the upper half adds metal.
@@ -378,12 +532,12 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ShaftBore")
-    # Coaxial cylinder through the 6.0 lug only: the bore (y 22.0..28.4)
+    # Coaxial cylinder through the 8.0 lug only: the bore (y 22.0..28.4)
     # lies wholly inside the lug + crown and well above the foot (y <= 8).
     v_bore = math.pi * (BORE_DIA / 2.0) ** 2 * LUG_T
     volume = await volume_check(adapter, "shaft bore", volume - v_bore, 0.01 * v_bore)
 
-    # --- Foot screw hole: fillister counterbore in the foot centre --------
+    # --- Foot screw hole: fillister counterbore SCREW_FROM_TIP off the tip --
     screw_hole = wizard_holes(
         adapter,
         SCREW_HOLE_SPEC,
@@ -419,11 +573,11 @@ async def build(adapter) -> dict[str, str]:
     )
     # The tap drill removes the crown wall between the crown and the bore:
     # half of each perpendicular cross-hole volume, crown minus bore (the
-    # drill's +-0.76 footprint along X stays inside the 6.0 lug, so the crown
+    # drill's +-0.76 footprint along X stays inside the 8.0 lug, so the crown
     # is a full cylinder across it).
     tap_dia = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC)
     v_tap = (
-        cross_hole_volume_mm3(tap_dia, CROWN_DIA)
+        cross_hole_volume_mm3(tap_dia, 2.0 * CROWN_R)
         - cross_hole_volume_mm3(tap_dia, BORE_DIA)
     ) / 2.0
     volume = await volume_check(
@@ -447,6 +601,26 @@ async def build(adapter) -> dict[str, str]:
     # Decimal places are the tolerance statement, so the PART carries them;
     # the reamed bore's running band (BORE_DIA_BAND) is a native model tolerance.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _single_limit(
+        adapter,
+        "CornerFillet",
+        "CornerRadius",
+        CORNER_R_MAX,
+        CORNER_R_TOL_TYPE,
+        *deviations(CORNER_R_BAND),
+    )
+    # Any taller blank rounds down to the crown: no deviation either way.
+    _single_limit(
+        adapter,
+        "SupplyHeightReference",
+        "SupplyHeight",
+        SUPPLY_HEIGHT_MIN,
+        SUPPLY_HEIGHT_TOL_TYPE,
+        0.0,
+        0.0,
+    )
+    # The crown is a full round tangent to both sides: no band of its own
+    # (the width's governs it); the sheet prints it as a radial reference.
     set_dimension_bilateral_tolerance(
         adapter, "ShaftBoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )

@@ -438,8 +438,8 @@ if CAP_RECESS_FLOOR_Y - SIDE_TAP_DRILL_DIA / 2.0 <= 0.0:
 # #2-56 with 7.6 full thread and 11.5 drill retains a five-pitch plug
 # lead at the sheet's general .X depth band. No assembly recipe dependency.
 KEEPER_TAP_X = COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM  # nominal fulcrum line
-KEEPER_TAP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_SCREW_Z_OFF  # -82.754
-KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +81.746
+KEEPER_TAP_Z_FRONT = FULCRUM_KEEPER_CENTRE_Z - KEEPER_SCREW_Z_OFF  # -83.504
+KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +82.496
 
 # --- Webbing ----------------------------------------------------------------
 # T-rail section (user-corrected vs ch19 img04): an 8-tall full-thickness top
@@ -1385,7 +1385,7 @@ KEEPER_CROSS_TAP_WALL = (
     - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
     - _CROSS_TAP_WANDER_MM
     - KEEPER_TAP_AXIS_WANDER_MM
-)  # 1.73: under the 2.0 target, over the 1.5 floor
+)  # 1.74: under the 2.0 target, over the 1.5 floor
 if KEEPER_CROSS_TAP_WALL < 1.5:
     raise AssertionError("top cross-tap thread leaves under 1.5 mm to a keeper drill")
 

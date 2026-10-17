@@ -69,7 +69,7 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
     keeper_lo = channel.FULCRUM_SHAFT_Z - channel.KEEPER_Z_OFF
     keeper_hi = channel.FULCRUM_SHAFT_Z + channel.KEEPER_Z_OFF
     assert fulcrum_min < keeper_lo < row_min < row_max < keeper_hi < fulcrum_max
-    assert channel.KEEPER_SCREW_Z_OFF - channel.KEEPER_Z_OFF == 8.25
+    assert channel.KEEPER_SCREW_Z_OFF - channel.KEEPER_Z_OFF == 8.0
     assert channel.FULCRUM_SHAFT_Z == pytest.approx(rocker_bank_layout.STACK_MID_Z)
     assert channel.KEEPER_HUB_FLOAT == pytest.approx((0.4346, 0.4346), abs=1e-3)
 

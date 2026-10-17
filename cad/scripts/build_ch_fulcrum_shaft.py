@@ -5,7 +5,7 @@ Plain Ø6.35 (1/4") steel shaft: the top levers' common fulcrum at machine
 keeper axis rise 25.2). One diameter full length -- no journals, shoulders or
 steps -- through the reamed bores of the two end keepers (MHA-CH-007). Each
 end stands 1.025 past its keeper lug's outer face and finishes in a full
-hemisphere (the bright dome of the ch. 17 p. 40 closeup): 162.4 tip to tip.
+hemisphere (the bright dome of the ch. 17 p. 40 closeup): 166.4 tip to tip.
 One set-screw flat per end, both on +Y, sits under the keeper's crown tap;
 the two #1-72 cup-point set screws (MHA-VN-055) bearing on them are the
 shaft's only axial and rotational location.
@@ -13,7 +13,7 @@ shaft's only axial and rotational location.
 Dimensions: ``ch_fulcrum_shaft_spec`` (derived from ``ch_fulcrum_keeper_spec``);
 cad/DIMENSIONS.md "Channel & top-frame layout".
 
-Layout: shaft axis along Z, centred (tips at z +-81.2); flats face +Y. The
+Layout: shaft axis along Z, centred (tips at z +-83.2); flats face +Y. The
 body is ONE Right-plane half-profile (two quarter-arc domes on a straight
 O.D.) revolved about its on-axis close line (the mg_magnifying_lever capsule
 idiom), so the diameter and tip-to-tip length import into the side view; the
@@ -83,7 +83,7 @@ from ch_fulcrum_shaft_spec import (
 PART_NAME = "ch-fulcrum-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
-TIP = SHAFT_LENGTH / 2.0  # 81.2: dome apex off the centre
+TIP = SHAFT_LENGTH / 2.0  # 83.2: dome apex off the centre
 # Capsule: the straight O.D. between the dome centres plus one full sphere.
 V_BODY = (
     math.pi * SHAFT_R**2 * (SHAFT_LENGTH - SHAFT_DIA) + 4.0 / 3.0 * math.pi * SHAFT_R**3
@@ -404,7 +404,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
-    # document units (an unsuffixed 162.4 = 162.4 in).
+    # document units (an unsuffixed 166.4 = 166.4 in).
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
     await set_global(adapter, "FlatLength", f"{FLAT_LENGTH}mm")
