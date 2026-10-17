@@ -113,7 +113,10 @@ FRONT_KEEP = {
     "BottomRodX": (FRONT_CENTER[0] + BOT_END_X / 2000.0, FOOT_LINE_Y),
     "TopRadius": (FRONT_CENTER[0] - 0.095, 0.166),
     "BottomBelowPivot": (_HOLE[0] - 0.012, 0.160),
-    "HoleDia": (_HOLE[0] + 0.060, 0.160),
+    # The callout's rows stack UP from the requested y: with its sharp-edge
+    # row at 0.160 (strap-sharp-r1) the +0.018 limit sat on the strap's bottom
+    # edge, so the block drops one row; its last row clears the foot line.
+    "HoleDia": (_HOLE[0] + 0.060, 0.153),
     "TopAbovePivot": (_HOLE[0] - 0.035, 0.207),
     # The land's two extension lines run ~5.6 mm apart, rising ~10 deg to the
     # right (perpendicular to the radial land); the upper one passes y ~0.206
