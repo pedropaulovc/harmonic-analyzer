@@ -14,6 +14,7 @@ import _config
 import build_ch_anchor_jam_nut as part
 import ch_anchor_jam_nut_spec as spec
 import draw_ch_anchor_jam_nut as drawing
+import sm_summing_lever_spec as lever
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
@@ -108,6 +109,40 @@ def test_only_the_od_carries_an_explicit_band() -> None:
         spec.OD - printed_band_mm(spec.OD_PLACES)
         < 2 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]
     )
+
+
+def test_neighbour_gap_charges_both_taps_position_zones() -> None:
+    # Code review C06: two adjacent anchors, each tap at the far edge of the
+    # lever's RFS spring-hole zone toward the other, and both nuts at the top
+    # of their O.D. band; the thinnest nut at the bottom of it.
+    zone = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"])
+    assert zone == pytest.approx(0.15)  # owner ruling: Ø0.30 -> Ø0.15
+    # Each centre sits within a zone radius of true position; worst, each
+    # moves that radius toward the other.
+    left_tap = 0.0 + zone / 2.0
+    right_tap = lever.CHANNEL_PITCH - zone / 2.0
+    spacing = right_tap - left_tap
+    assert spacing == pytest.approx(lever.CHANNEL_PITCH - zone)
+    assert spec.CENTRE_SPACING_WORST == pytest.approx(spacing)
+    od_max, od_min = spec.OD + spec.OD_BAND, spec.OD - spec.OD_BAND
+    gap = spacing - od_max  # two radii of od_max between the centres
+    assert spec.NEIGHBOUR_GAP_WORST == pytest.approx(gap) == pytest.approx(0.2565)
+    assert gap >= spec.NEIGHBOUR_CLEARANCE
+    wall = (od_min - THREAD_MAJOR_MM["#6-32"]) / 2.0
+    assert spec.WALL_WORST == pytest.approx(wall) == pytest.approx(1.5025)
+    assert wall >= spec.MIN_WALL
+    # The old Ø0.30 zone with the old 6.66 ±0.14 nut overlapped its neighbour,
+    # and at Ø0.30 the O.D. window between the wall floor (6.505) and the gap
+    # (6.5065) is 0.0015 wide: no turnable band fits in it.
+    assert lever.CHANNEL_PITCH - 0.30 - (6.66 + 0.14) < 0.0
+    window = (lever.CHANNEL_PITCH - 0.30 - spec.NEIGHBOUR_CLEARANCE) - (
+        2.0 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]
+    )
+    assert window == pytest.approx(0.0015)
+    # Ø0.15 opens it to 0.1515, which holds the ±0.07 band.
+    assert spec.CENTRE_SPACING_WORST - spec.NEIGHBOUR_CLEARANCE - (
+        2.0 * spec.MIN_WALL + THREAD_MAJOR_MM["#6-32"]
+    ) >= 2.0 * spec.OD_BAND
 
 
 def test_spec_margins() -> None:

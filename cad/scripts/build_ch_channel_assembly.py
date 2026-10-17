@@ -948,9 +948,14 @@ def _assert_spring_mount(
             f"nut at the worst case, under the {floor:.4f} mm floor"
         )
     # Neighbouring round nuts on the one-row tap pattern, both at their
-    # largest printed O.D.
+    # largest printed O.D., their taps displaced toward each other across the
+    # lever's spring-hole position zone (a zone radius each; code review C06).
     nut_gap = (
-        sm_summing_lever_spec.CHANNEL_PITCH - ch_anchor_jam_nut_spec.OD_MAX
+        sm_summing_lever_spec.CHANNEL_PITCH
+        - float(
+            sm_summing_lever_spec.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]
+        )
+        - ch_anchor_jam_nut_spec.OD_MAX
     )
     if nut_gap < spring_mounts.MIN_CLEARANCE_MM:
         raise RuntimeError(
