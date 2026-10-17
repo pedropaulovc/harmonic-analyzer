@@ -2989,8 +2989,7 @@ def test_shoulder_radius_on_the_lower_arc_crosses_only_the_face_witnesses() -> N
     ("side", "case", "message"),
     [
         ("upper", "corner", "not on the shoulder corner's arc"),
-        ("upper", "far-quarter", "not on the shoulder corner's arc"),
-        ("lower", "far-quarter", "not on the shoulder corner's arc"),
+        ("upper", "off-circle", "not on the shoulder corner's arc"),
         ("upper", "detached", "no attached leader ink"),
         ("upper", "across-station", "crosses GrooveStation's ink"),
         ("lower", "across-spigot-length", "crosses SpigotLength's ink"),
@@ -3003,8 +3002,11 @@ def test_shoulder_radius_ink_refuses_off_arc_detached_or_crossing_leaders(
     centre = drawing.SHOULDER_ARC_CENTRES[side]
     if case == "corner":
         tip = drawing.SHOULDER_CORNERS[side]
-    elif case == "far-quarter":
-        tip = (2.0 * centre[0] - tip[0], 2.0 * centre[1] - tip[1])
+    elif case == "off-circle":
+        tip = (
+            centre[0] + 0.5 * (tip[0] - centre[0]),
+            centre[1] + 0.5 * (tip[1] - centre[1]),
+        )
     elif case == "detached":
         ink = [((a[0] + 0.002, a[1]), (b[0] + 0.002, b[1])) for a, b in ink]
     elif case == "across-station":
@@ -3015,6 +3017,25 @@ def test_shoulder_radius_ink_refuses_off_arc_detached_or_crossing_leaders(
         ink, tip, side, centre, _shoulder_neighbour_ink(side)
     )
     assert problem is not None and message in problem
+
+
+@pytest.mark.parametrize("side", ["upper", "lower"])
+def test_shoulder_radius_arrow_on_the_arcs_extension_is_accepted(side: str) -> None:
+    # Farm r4 (0676a2115): text outside the arc's quarter ends the leader on
+    # the fillet circle's text side, the arc's extension.
+    ink, tip = _shoulder_radius_ink(side)
+    centre = drawing.SHOULDER_ARC_CENTRES[side]
+    near = (2.0 * centre[0] - tip[0], 2.0 * centre[1] - tip[1])
+    (_tip, elbow), shoulder = ink
+    ink = [(near, elbow), shoulder]
+    assert math.dist(near, elbow) < math.dist(tip, elbow)
+    assert drawing._shoulder_radius_side(near) == side
+    assert (
+        drawing._shoulder_radius_ink_problem(
+            ink, near, side, centre, _shoulder_neighbour_ink(side)
+        )
+        is None
+    )
 
 
 class _ShoulderRadiusAnnotation(_RadialAnnotation):
