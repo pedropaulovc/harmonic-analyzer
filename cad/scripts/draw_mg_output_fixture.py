@@ -14,7 +14,8 @@ spigot's length from the faced end, then the bore's stations from the free
 end and to the spigot face, and the overall length REF; over it the groove
 from the spigot face and the bore's Ø.  The groove's root Ø nests inside
 the spigot's, right of the face, each a dimension line standing across its
-diameter, and the groove's R LIMIT reads low between them and the face.  The
+diameter, and the groove's R LIMIT, FULL R on its own row under it, reads
+between them and the face, over the root Ø's text.  The
 shoulder's corner R MAX reads over the groove's station, its leader rising
 to the corner's arc.  The end view looks at the spigot face: its ``*Right``
 orientation is turned by the measured projected axes until -Z points up,
@@ -102,6 +103,7 @@ from mg_output_fixture_geom import (
 from mg_output_fixture_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    GROOVE_RADIUS_CALLOUT,
     GROOVE_RADIUS_MIN,
     GROOVE_RADIUS_TOL_TYPE,
     GROOVE_STATION,
@@ -202,56 +204,61 @@ BORE_CALLOUT_HALF_HEIGHT = 0.0073
 # the Ø read as an axial length (machinist review09).
 _FACE_SHEET_X = _side_x(SPIGOT_FACE_X)
 _HEX_MID_X = _side_x((FREE_END_X + SHOULDER_X) / 2.0)
-# The groove's radius reads in the open air right of the spigot face, low,
-# between the axis and the root Ø's upper extension line, inside the root
-# Ø's dimension line.  Its radial leader climbs from the elbow to the
+# The groove's radius reads in the open air right of the spigot face, over
+# the root Ø's text and under its upper extension line, inside the root Ø's
+# dimension line.  Its radial leader climbs from the elbow to the
 # face-side material arc (r1 review: the shelf at the OD ran along the
 # spigot Ø's extension and the arrow sat at the mouth).  The leader crosses
 # the face outline and the root Ø's extension line, never a dimension line
 # (drawing-guidelines.md rule 14).  Native15 measured the full shoulder
 # starting 15.2764 mm left of and 2.7781 mm below the keep for its eleven
 # radius glyphs: the run-in is the text's half width plus a lead, so the
-# LIMIT's is estimated from the glyph pitch.  The proofs below need only the
+# stack's is estimated from the glyph pitch.  The proofs below need only the
 # arrow on the material arc, the leader radial and the ink clear of the
 # dimension lines, whatever run-in SolidWorks draws.
 RADIUS_INK_SLOP = 0.0004
 RADIUS_STATION_CLEARANCE = 0.002
 # The part's LIMIT band (owner ruling 2026-10-17, review r4) prints two rows,
 # R and the upper limit over the lower limit, at its places (the part owns
-# the text; this only sizes it): the wider row is the R row.
+# the text; this only sizes it).  Under them the dimension's own callout row
+# reads FULL R (owner ruling, review r5): the widest of the three rows.
 RADIUS_GLYPHS = 1 + max(
     len(f"{value:.{DRAWING_PRECISION_BY_NAME['GrooveRadius']}f}")
     for value in (GROOVE_RADIUS, GROOVE_RADIUS_MIN)
 )
-RADIUS_TEXT_HALF_WIDTH = RADIUS_GLYPHS * _GLYPH_PITCH / 2.0
+RADIUS_CALLOUT_GLYPHS = len(GROOVE_RADIUS_CALLOUT)
+RADIUS_TEXT_HALF_WIDTH = max(RADIUS_GLYPHS, RADIUS_CALLOUT_GLYPHS) * _GLYPH_PITCH / 2.0
 _NATIVE15_RADIUS_GLYPHS = 11
 RADIUS_SHOULDER_LEAD = 0.0152764 - _NATIVE15_RADIUS_GLYPHS * _GLYPH_PITCH / 2.0
 RADIUS_SHOULDER_RUN_IN = RADIUS_TEXT_HALF_WIDTH + RADIUS_SHOULDER_LEAD
 RADIUS_SHOULDER_DROP = 0.0027781
-# The shoulder underlines the stack's bottom row (the r4 sheet's one-row
-# "R1.2 max." sat on its shoulder; the 2026-10-15 dt-cone-gear sheets' LIMIT
-# stacks hang their shelf under the last row), so the stack's second row
-# drops it half a row pitch further below the keep.  The pitch is the
-# 2026-10-16 dt-crankshaft sheet's (same template): its stacked deviations
-# printed 4.49 mm apart (20261016T024637705Z, 300 dpi).
-LIMIT_ROW_PITCH = 0.00449
-GROOVE_RADIUS_SHOULDER_DROP = RADIUS_SHOULDER_DROP + LIMIT_ROW_PITCH / 2.0
+_CALLOUT_BELOW = 4  # swDimensionTextParts_e.swDimensionTextCalloutBelow
+# Row pitches from the layout audits' display data (same template): r12's
+# GrooveRadius (20261017T053834039Z) printed its upper limit on the keep and
+# the lower 4.5257 mm under it, the shoulder under the lower row; a callout
+# row prints 5.5563 mm under the last value row (pd-latch-hook's RoundR,
+# "FULL ROUND", 20261015T223846658Z), and SolidWorks re-centres the stack
+# on the keep, so a callout row under a LIMIT lifts the limits half a
+# callout pitch and drops the shoulder, under the callout, as far:
+# dt-cone-gear's FloorDia, a LIMIT over "ROOT ENVELOPE", hangs its shoulder
+# 7.3038 mm under its keep (20261015T201555493Z).
+LIMIT_ROW_PITCH = 0.0045257
+CALLOUT_ROW_PITCH = 0.0055563
+GROOVE_RADIUS_SHOULDER_DROP = LIMIT_ROW_PITCH + CALLOUT_ROW_PITCH / 2.0
 _GROOVE_CENTRE_XY = (_side_x(GROOVE_X), _side_y(GROOVE_CENTRE_R))
-# The text holds the keep r1-r4's one-row limit used (eight glyphs, centred
-# 2 mm plus that text's run-in right of the face and its drop over an elbow
-# 5.5 mm above the axis), so the two turned Ø's dimension lines beside it
-# (_GROOVE_ROOT_DIA_X) stay where those reviews tuned them.  The stack is
-# narrower and one row taller, so SolidWorks runs the elbow right of and
-# below the old one: 3.25 mm over the axis, still 1.25 mm above the proof's
-# floor (_radius_leader_ink_problem); a 6 mm row pitch would still leave
-# 0.5 mm.
-_SINGLE_ROW_RADIUS_GLYPHS = 8
+# The three rows stand 14.5 mm from the shoulder to the upper limit's ink
+# (r12 printed ink from 0.99 mm over a row's position to 4.42 mm over it),
+# and the air over the root Ø's text (its ink tops out 2.03 mm under the
+# axis, r12) up to the root Ø's upper extension line (15.4 mm over the axis)
+# is 17.4 mm.  The shoulder 1 mm under the axis stands the callout row's
+# ink 2.0 mm over the root Ø's text, so the two never read as one row, and
+# the upper limit's 1.9 mm under the extension line.  On r12's keep the
+# callout row would have pushed the upper limit onto that line.  The text
+# runs 2 mm plus its run-in right of the face, as r1-r4's did; the run-in
+# is the callout row's, the widest.
 RADIUS_TEXT_XY = (
-    _FACE_SHEET_X
-    + 0.002
-    + _SINGLE_ROW_RADIUS_GLYPHS * _GLYPH_PITCH / 2.0
-    + RADIUS_SHOULDER_LEAD,
-    SIDE_CENTER[1] + 0.0055 + RADIUS_SHOULDER_DROP,
+    _FACE_SHEET_X + 0.002 + RADIUS_SHOULDER_RUN_IN,
+    SIDE_CENTER[1] - 0.001 + GROOVE_RADIUS_SHOULDER_DROP,
 )
 RADIUS_ELBOW_XY = (
     RADIUS_TEXT_XY[0] - RADIUS_SHOULDER_RUN_IN,
@@ -263,13 +270,21 @@ RADIUS_PREDICTED_TIP_XY = tuple(
     centre + (elbow - centre) * GROOVE_RADIUS * _S / 1000.0 / _ELBOW_RUN
     for elbow, centre in zip(RADIUS_ELBOW_XY, _GROOVE_CENTRE_XY)
 )
-# The root Ø's dimension line stands where r1-r4 tuned it, 6 mm right of the
-# one-row limit's text (the stack is narrower: about 10.6 mm right of it).
+# The root Ø's dimension line stands where r1-r4 tuned it, 6 mm right of
+# their one-row limit's eight glyphs, centred 2 mm plus that text's run-in
+# right of the face.
+_SINGLE_ROW_RADIUS_GLYPHS = 8
+_R4_RADIUS_TEXT_X = (
+    _FACE_SHEET_X
+    + 0.002
+    + _SINGLE_ROW_RADIUS_GLYPHS * _GLYPH_PITCH / 2.0
+    + RADIUS_SHOULDER_LEAD
+)
 _STACKED_DIA_PITCH = 0.020
 # Each Ø text's offset from the axis: the two texts' centres 10 mm apart.
 _STACKED_DIA_STAGGER = 0.005
 _GROOVE_ROOT_DIA_X = (
-    RADIUS_TEXT_XY[0] + _SINGLE_ROW_RADIUS_GLYPHS * _GLYPH_PITCH / 2.0 + 0.006
+    _R4_RADIUS_TEXT_X + _SINGLE_ROW_RADIUS_GLYPHS * _GLYPH_PITCH / 2.0 + 0.006
 )
 # Rows under the view, 12 mm apart: the spigot's length nearest, then the
 # bore's stations, then the overall REF.
@@ -622,8 +637,8 @@ def _radius_leader_ink_problem(
     root_dia_line_x: float,
 ) -> str | None:
     """The radius draws a radial leader through its material tip and one
-    horizontal shoulder from the leader's outer end, low in the air between
-    the axis and the root Ø's extension line, short of the root Ø's
+    horizontal shoulder from the leader's outer end, in the air over the
+    root Ø's text and under its upper extension line, short of the root Ø's
     dimension line (rule 14: a leader never crosses a dimension line)."""
     slop = RADIUS_INK_SLOP
     radius = GROOVE_RADIUS * _S / 1000.0
@@ -659,12 +674,15 @@ def _radius_leader_ink_problem(
         return "radius shoulder does not run right from the leader's outer end"
     axis_y = centre[1] - GROOVE_CENTRE_R * _S / 1000.0
     root_y = centre[1] - radius
+    # The floor is the root Ø's text, whose ink tops out 2 mm under the axis
+    # (r12: 177.97 mm); the shoulder stands 1 mm under the axis so the three
+    # rows over it clear the extension line (RADIUS_TEXT_XY).
     if not (
-        axis_y + RADIUS_STATION_CLEARANCE
+        axis_y - RADIUS_STATION_CLEARANCE
         <= start[1]
         <= root_y - RADIUS_STATION_CLEARANCE
     ):
-        return "radius shoulder is not between the axis and the root Ø's extension"
+        return "radius shoulder is not between the root Ø's text and its extension"
     if max(point[0] for stroke in ink for point in stroke) > (
         root_dia_line_x - RADIUS_STATION_CLEARANCE
     ):
@@ -719,6 +737,13 @@ def _prove_groove_radius(adapter: Any, view: Any, radius: Any, station: Any) -> 
         )
     ):
         raise RuntimeError("GrooveRadius lost the part's LIMIT band")
+    # The dimension's own callout row, read back: FULL R defines the groove's
+    # width (2R) and walls across the whole band (owner ruling, review r5).
+    callout = str(display.GetText(_CALLOUT_BELOW) or "")
+    if callout != GROOVE_RADIUS_CALLOUT:
+        raise RuntimeError(
+            f"GrooveRadius lost its {GROOVE_RADIUS_CALLOUT} callout row: read {callout!r}"
+        )
     tip = _single_arrow_tip(display, "GrooveRadius")
     centre = model_point_in_view(
         adapter, view, (GROOVE_X / 1000.0, 0.0, -GROOVE_CENTRE_R / 1000.0),
@@ -739,8 +764,9 @@ def _prove_groove_radius(adapter: Any, view: Any, radius: Any, station: Any) -> 
     if problem is not None:
         raise RuntimeError(f"GrooveRadius leader does not read in open air: {problem}")
     _telemetry.success(
-        f"genuine GrooveRadius LIMIT, material-arc tip {tip}, radial leader to a low "
-        f"shoulder inside the root Ø's dimension line; station witness gaps "
+        f"genuine GrooveRadius LIMIT over {GROOVE_RADIUS_CALLOUT}, material-arc tip {tip}, "
+        f"radial leader to a shoulder over the root Ø's text, inside its dimension line; "
+        f"station witness gaps "
         f"{GROOVE_STATION_GAP * 1000:g} mm (centre) and "
         f"{GROOVE_STATION_FACE_GAP * 1000:g} mm (face), leader clearance >= "
         f"{RADIUS_STATION_CLEARANCE * 1000:g} mm from both"
@@ -1480,7 +1506,13 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(
         adapter, [*side_annotations, *end_annotations], DRAWING_PRECISION_BY_NAME
     )
-    set_dimension_callouts(adapter, side_annotations, {"RodBoreDia": ROD_BORE_CALLOUT})
+    # Each below its value: the bore's process, and the groove radius's
+    # profile under its LIMIT (read back in _prove_groove_radius).
+    set_dimension_callouts(
+        adapter,
+        side_annotations,
+        {"RodBoreDia": ROD_BORE_CALLOUT, "GrooveRadius": GROOVE_RADIUS_CALLOUT},
+    )
     # The flats are the bar's as supplied: a stock reference, not a size the
     # shop holds to three places.  The overall length is the part's driven
     # sum of the bore's two stations: a reference, never a third control.

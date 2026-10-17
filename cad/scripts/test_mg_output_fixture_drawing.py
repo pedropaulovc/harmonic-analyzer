@@ -443,6 +443,18 @@ def test_the_groove_holds_the_wire_and_every_wall_at_its_smallest_radius() -> No
     assert spec.GROOVE_HALF_OPENING_MIN == pytest.approx(0.5)
     assert smallest["narrowest mouth"] == pytest.approx(1.0)
     assert smallest["narrowest mouth"] > geom.WIRE_DIA
+    # Owner ruling on review r5: the radius's own row reads FULL R, the arc
+    # tangent to both walls (2R wide), the depth the root Ø's.  An R0.5 arc
+    # cannot reach the Ø7.70 root from the Ø10.10 OD (1.20 deep), so its
+    # walls run straight: 0.19 long at the shallowest printed groove, 0.70
+    # at nominal, 1.21 at the deepest.  At R1.2 the shallowest groove (0.69)
+    # is under R: the arc meets the OD first, a 2.172 mouth, not 2R.
+    assert spec.GROOVE_RADIUS_CALLOUT == "FULL R"
+    assert spec.GROOVE_WALL_AT_RADIUS_MIN == pytest.approx(0.19)
+    assert (10.10 - 7.70) / 2.0 - 0.5 == pytest.approx(0.70)
+    assert (10.10 + 0.51 - (7.70 - 0.51)) / 2.0 - 0.5 == pytest.approx(1.21)
+    assert largest["narrowest mouth"] == pytest.approx(2.0 * math.sqrt(1.2**2 - 0.51**2))
+    assert largest["narrowest mouth"] == pytest.approx(2.172, abs=5e-4)
     # Each wall the largest radius sets only thickens at the smallest.
     assert largest["face lip"] == pytest.approx(spec.WALLS["groove lip to the spigot face"][1])
     assert largest["root over thread"] == pytest.approx(
@@ -1057,11 +1069,11 @@ def test_turned_diameters_stack_right_of_the_face_smaller_inside() -> None:
     assert spigot_box[1] - root_box[3] >= _TEXT_HEIGHT
     # The spigot's text clears the rotated end view's left-standing AF line.
     assert spigot_box[2] < drawing.END_KEEP["HexAf"][0] - 0.005
-    # Overall length stays under the view.  The radius text reads low, right
-    # of the face, its shoulder under the spigot mouth.
+    # Overall length stays under the view.  The radius text reads right of
+    # the face, its shoulder under the spigot mouth.
     assert drawing.SIDE_KEEP["OverallLength"][1] < drawing._SIDE_BOTTOM
     assert drawing.SIDE_KEEP["GrooveRadius"] == drawing.RADIUS_TEXT_XY
-    assert drawing.RADIUS_TEXT_XY[1] - drawing.RADIUS_SHOULDER_DROP < od_high
+    assert drawing.RADIUS_TEXT_XY[1] - drawing.GROOVE_RADIUS_SHOULDER_DROP < od_high
 
 
 def _function(tree: ast.Module, name: str) -> ast.AST:
@@ -1809,7 +1821,7 @@ class _NativeDisplay:
         self, name: str, feature: str, value_mm: float, *, kind: int = 5,
         diametric: bool = False, arc_persists: bool = True,
         gap_results: dict[int, object] | None = None, tol_type: int = 6,
-        limits_mm: tuple[float, float] = (0.0, 0.0),
+        limits_mm: tuple[float, float] = (0.0, 0.0), callout_below: str = "",
     ) -> None:
         self.dimension = SimpleNamespace(
             FullName=f"{name}@{feature}@mg-output-fixture.SLDPRT",
@@ -1823,6 +1835,7 @@ class _NativeDisplay:
         self.gap_results = {0: True, 1: True, **(gap_results or {})}
         self.gaps: list[tuple[int, bool, float]] = []
         self.data: object | None = None
+        self.callout_below = callout_below
 
     @property
     def ArcExtensionLineOrOppositeSide(self) -> bool:
@@ -1848,12 +1861,18 @@ class _NativeDisplay:
     def GetDisplayData(self) -> object | None:
         return self.data
 
+    def GetText(self, part: int) -> str:
+        assert part == 4  # swDimensionTextCalloutBelow
+        return self.callout_below
+
 
 def _radial_display(**options) -> _NativeDisplay:
-    """The groove's radius as the part saves it: the LIMIT band."""
+    """The groove's radius as the part saves it, the LIMIT band, with the
+    sheet's FULL R under it."""
     options = {
         "tol_type": spec.GROOVE_RADIUS_TOL_TYPE,
         "limits_mm": spec.GROOVE_RADIUS_DEVIATIONS,
+        "callout_below": spec.GROOVE_RADIUS_CALLOUT,
         **options,
     }
     return _NativeDisplay("GrooveRadius", "GrooveProfile", geom.GROOVE_RADIUS, **options)
@@ -1941,9 +1960,28 @@ def test_station_witness_ids_follow_the_builders_reference_order() -> None:
 # 1.84 mm under to 1.72 mm over it; the full shoulder ran from 15.28 mm left
 # of and 2.78 mm under the keep to 1.50 mm past the text's right end.
 _NATIVE15_RADIUS_KEEP = (0.1724, 0.1988)
-# What the part's LIMIT band prints (the sheet only sizes it): two rows, the
-# R row over the lower limit, LIMIT_ROW_PITCH apart.
-_RADIUS_ROWS = ("R1.2", "0.5")
+# What the radius prints: the part's LIMIT band, the R row over the lower
+# limit, and under them the sheet's callout row (owner ruling, review r5).
+_RADIUS_ROWS = ("R1.2", "0.5", "FULL R")
+# r12's GrooveRadius (20261017T053834039Z: audit display data, 300 dpi PNG):
+# keep (164.8379, 188.2781) mm; " R", "1.2" over "0.5" and a closing space
+# from x 158.8952 to 170.7806 mm, centred on the keep; the upper row on the
+# keep, the lower LIMIT_ROW_PITCH under it, the shoulder under the lower
+# row; the ink from 0.99 mm over a row's position (the lower row's foot at
+# 184.74 mm) to 4.42 mm over it (the upper row's top at 192.70 mm).
+_R12_RADIUS_KEEP = (0.1648379, 0.1882781)
+_R12_RADIUS_STACK_X = (0.1588952, 0.1707806)
+_R12_RADIUS_ROWS = (0.1882781, 0.1837524)
+_ROW_INK = (0.00099, 0.00442)
+# The two same-template callout rows: pd-latch-hook's RoundR "R5.75" over
+# "FULL ROUND" (keep y 87.8837 mm, rows at 87.8837 and 82.3274 mm, 27.7861
+# mm for the ten capitals; 20261015T223846658Z), and dt-cone-gear's FloorDia
+# LIMIT over "ROOT ENVELOPE" (keep y 169.338 mm, limits at 172.1161 and
+# 167.5904 mm, callout row and shoulder at 162.0342 mm; 20261015T201555493Z).
+_LATCH_ROUND_ROWS = (0.0878837, 0.0823274)
+_CAPITAL_PITCH = 0.0277861 / 10
+_CONE_FLOOR_KEEP_Y = 0.169338
+_CONE_FLOOR_ROWS = (0.1721161, 0.1675904, 0.1620342)
 _NATIVE15_RADIUS_TEXT_BOX = Box(0.1604289, 0.1969558, 0.1845905, 0.2005212)
 _NATIVE15_SPIGOT_TOP_WITNESS = ((0.1614, 0.198), (0.2003, 0.198))
 _NATIVE15_GLYPH = (_NATIVE15_RADIUS_TEXT_BOX.xmax - _NATIVE15_RADIUS_TEXT_BOX.xmin) / 11
@@ -1953,19 +1991,65 @@ _FACE_ON_AXIS = (drawing._side_x(geom.SPIGOT_FACE_X), drawing.SIDE_CENTER[1])
 _SHEET_RADIUS = geom.GROOVE_RADIUS * drawing._S / 1000.0
 
 
-def _proposed_radius_text_box() -> Box:
-    """The R1.2 / 0.5 stack at native15's glyph pitch and row height, centred
-    on the keep: the widest row wide, one row pitch taller than one row."""
+def _proposed_radius_rows() -> tuple[Box, Box]:
+    """The LIMIT stack and the FULL R row under it, printed ink, on the keep:
+    r12's stack lifted half a callout pitch, the callout row a callout pitch
+    under the lower limit at the capitals' pitch (wider than FULL R's real
+    13.76 mm), both centred on the keep."""
     x, y = drawing.RADIUS_TEXT_XY
-    half = max(len(row) for row in _RADIUS_ROWS) * _NATIVE15_GLYPH / 2.0
-    old = _NATIVE15_RADIUS_TEXT_BOX
-    rise = drawing.LIMIT_ROW_PITCH / 2.0
-    return Box(
-        x - half,
-        y + old.ymin - _NATIVE15_RADIUS_KEEP[1] - rise,
-        x + half,
-        y + old.ymax - _NATIVE15_RADIUS_KEEP[1] + rise,
+    upper = y + drawing.CALLOUT_ROW_PITCH / 2.0
+    lower = upper - drawing.LIMIT_ROW_PITCH
+    callout = lower - drawing.CALLOUT_ROW_PITCH
+    stack_half = (_R12_RADIUS_STACK_X[1] - _R12_RADIUS_STACK_X[0]) / 2.0
+    callout_half = len(_RADIUS_ROWS[-1]) * _CAPITAL_PITCH / 2.0
+    return (
+        Box(x - stack_half, lower + _ROW_INK[0], x + stack_half, upper + _ROW_INK[1]),
+        Box(x - callout_half, callout + _ROW_INK[0], x + callout_half, callout + _ROW_INK[1]),
     )
+
+
+def _proposed_radius_text_box() -> Box:
+    """Everything the radius prints: the stack over the callout row."""
+    stack, callout = _proposed_radius_rows()
+    return Box(
+        min(stack.xmin, callout.xmin),
+        callout.ymin,
+        max(stack.xmax, callout.xmax),
+        stack.ymax,
+    )
+
+
+def test_radius_rows_replay_the_r12_latch_and_cone_gear_audits() -> None:
+    # r12, two LIMIT rows: the upper on the keep, the shoulder under the
+    # lower, the stack centred on the keep.
+    assert _R12_RADIUS_ROWS[0] == _R12_RADIUS_KEEP[1]
+    assert _R12_RADIUS_ROWS[0] - _R12_RADIUS_ROWS[1] == pytest.approx(
+        drawing.LIMIT_ROW_PITCH, abs=1e-7
+    )
+    assert sum(_R12_RADIUS_STACK_X) / 2.0 == pytest.approx(_R12_RADIUS_KEEP[0], abs=1e-7)
+    # A callout row one callout pitch under the last value row.
+    assert _LATCH_ROUND_ROWS[0] - _LATCH_ROUND_ROWS[1] == pytest.approx(
+        drawing.CALLOUT_ROW_PITCH, abs=1e-7
+    )
+    upper, lower, callout = _CONE_FLOOR_ROWS
+    assert upper - lower == pytest.approx(drawing.LIMIT_ROW_PITCH, abs=1e-7)
+    assert lower - callout == pytest.approx(drawing.CALLOUT_ROW_PITCH, abs=1e-7)
+    # Under a LIMIT it lifts the limits half a callout pitch off the keep
+    # and hangs the shoulder GROOVE_RADIUS_SHOULDER_DROP under it.
+    assert upper - _CONE_FLOOR_KEEP_Y == pytest.approx(drawing.CALLOUT_ROW_PITCH / 2.0, abs=1e-6)
+    assert _CONE_FLOOR_KEEP_Y - callout == pytest.approx(
+        drawing.GROOVE_RADIUS_SHOULDER_DROP, abs=1e-6
+    )
+    assert drawing.GROOVE_RADIUS_SHOULDER_DROP == pytest.approx(0.0073039, abs=1e-7)
+    # The callout row is the widest; the layout's run-in sizes it at the
+    # glyph pitch, as wide as FULL R's 13.76 mm advance in the template's
+    # 3.5 mm Century Gothic (the font's widths scale to every audit string
+    # above at one factor: 27.7861 mm for FULL ROUND).
+    assert _RADIUS_ROWS[-1] == spec.GROOVE_RADIUS_CALLOUT
+    assert drawing.RADIUS_CALLOUT_GLYPHS == len(spec.GROOVE_RADIUS_CALLOUT) == 6
+    assert drawing.RADIUS_TEXT_HALF_WIDTH == pytest.approx(0.01376 / 2.0, abs=1e-5)
+    stack, row = _proposed_radius_rows()
+    assert row.xmax - row.xmin > stack.xmax - stack.xmin
 
 
 def _audit_line(stroke: tuple) -> AuditSegment:
@@ -2006,28 +2090,48 @@ def _proposed_extension_lines() -> dict[str, list]:
     }
 
 
-def test_radius_text_reads_low_in_open_air_between_the_face_and_the_root_dia() -> None:
+# r12's printed Ø7.70 (300 dpi PNG): its ink, the Ø's stroke included.
+_R12_ROOT_DIA_INK = Box(0.17391, 0.17010, 0.18694, 0.17797)
+
+
+def test_radius_text_reads_in_open_air_over_the_root_dia_text() -> None:
     # r1 review: the shelf ran along the spigot Ø's extension at the OD.
+    # r5 ruling: FULL R prints on its own row under the LIMIT.
+    stack, callout = _proposed_radius_rows()
     box = _proposed_radius_text_box()
-    face_x, axis_y = _FACE_ON_AXIS
-    assert drawing.RADIUS_GLYPHS == max(len(row) for row in _RADIUS_ROWS)
+    face_x = _FACE_ON_AXIS[0]
+    assert drawing.RADIUS_GLYPHS == len(_RADIUS_ROWS[0])
     assert drawing.SIDE_KEEP["GrooveRadius"] == drawing.RADIUS_TEXT_XY
-    # Right of the face, under the root Ø's upper extension, over the axis,
-    # left of the root Ø's dimension line.  The stack's lower row stands
-    # 4.2 mm over the axis (the one-row limit's stood 5.4 mm over it).
+    # Right of the face, under the root Ø's upper extension, left of its
+    # dimension line: the upper limit's ink 1.9 mm under the extension.
     assert box.xmin > face_x + 0.003
-    assert box.ymax < drawing.GROOVE_ROOT_SHEET_YS[1] - 0.003
-    assert box.ymin > axis_y + 0.004
-    assert box.xmax < drawing.SIDE_KEEP["GrooveRootDia"][0] - 0.005
-    # The estimate the layout used is the wider of the two glyph pitches.
-    assert drawing.RADIUS_TEXT_HALF_WIDTH >= (box.xmax - box.xmin) / 2.0
+    assert drawing.GROOVE_ROOT_SHEET_YS[1] - box.ymax == pytest.approx(0.0019, abs=5e-5)
+    assert box.xmax < drawing.SIDE_KEEP["GrooveRootDia"][0] - 0.009
+    # The callout row stands over the root Ø's text, never level with it:
+    # 2.0 mm over r12's printed ink, 2.2 mm over the layout's text box.
+    root_text = _dia_text_box("GrooveRootDia")
+    assert callout.ymin - _R12_ROOT_DIA_INK.ymax == pytest.approx(0.0020, abs=5e-5)
+    assert callout.ymin > root_text[3] + 0.002
+    assert stack.ymin > callout.ymax
     extensions = _proposed_extension_lines()
     distances = {
         name: min(segment_box_distance(_audit_line(stroke), box) for stroke in strokes)
         for name, strokes in extensions.items()
     }
-    assert min(distances.values()) >= 0.003
+    assert min(distances.values()) >= 0.0018
     assert min(distances, key=distances.get) == "GrooveRootDia"
+    # The shoulder passes over the root Ø's text.  Here it runs past the
+    # capitals'-pitch row by native15's overrun, to 172.4 mm: 1.8 mm off
+    # r12's Ø7.70 ink.  r12, the latch and the cone gear all ended theirs
+    # at the widest row's right edge, which for FULL R's 13.76 mm is
+    # 169.4 mm: 4.5 mm left of it.
+    ink, _tip, _station, _centre = _material_radius_ink()
+    shoulder = _audit_line(ink[-1])
+    assert shoulder.y0 - _R12_ROOT_DIA_INK.ymax > 0.001
+    assert segment_box_distance(shoulder, Box(*root_text)) > 0.001
+    assert segment_box_distance(shoulder, _R12_ROOT_DIA_INK) > 0.0018
+    real_end = drawing.RADIUS_TEXT_XY[0] + 0.01376 / 2.0
+    assert _R12_ROOT_DIA_INK.xmin - real_end == pytest.approx(0.0045, abs=1e-4)
 
 
 def _radius_ink(
@@ -2075,21 +2179,24 @@ def test_predicted_radius_leader_lands_on_the_face_side_material_arc() -> None:
     assert math.dist(tip, centre) == pytest.approx(_SHEET_RADIUS)
     assert centre[0] < tip[0] < centre[0] + geom.GROOVE_HALF_OPENING * drawing._S / 1000.0
     assert drawing.GROOVE_ROOT_SHEET_YS[1] < tip[1] < drawing._side_y(geom.SPIGOT_DIA / 2.0)
-    # The text holds the one-row limit's keep (2 mm plus an eight-glyph
-    # run-in right of the face, a drop over an elbow 5.5 mm above the axis);
-    # the narrower, taller stack runs its elbow right of and below that, the
-    # shoulder still between the axis and the root Ø's upper extension line.
-    eight_glyph_run_in = 8 * drawing._GLYPH_PITCH / 2.0 + drawing.RADIUS_SHOULDER_LEAD
+    # The text runs 2 mm plus the widest row's run-in right of the face, its
+    # shoulder 1 mm under the axis: the elbow 2 mm right of the face.  The
+    # root Ø's line holds r1-r4's place, off their eight-glyph keep.
     assert drawing.RADIUS_TEXT_XY == pytest.approx((
-        _FACE_ON_AXIS[0] + 0.002 + eight_glyph_run_in,
-        _FACE_ON_AXIS[1] + 0.0055 + drawing.RADIUS_SHOULDER_DROP,
+        _FACE_ON_AXIS[0] + 0.002 + drawing.RADIUS_SHOULDER_RUN_IN,
+        _FACE_ON_AXIS[1] - 0.001 + drawing.GROOVE_RADIUS_SHOULDER_DROP,
     ))
     assert drawing.RADIUS_ELBOW_XY == pytest.approx((
         drawing.RADIUS_TEXT_XY[0] - drawing.RADIUS_SHOULDER_RUN_IN,
         drawing.RADIUS_TEXT_XY[1] - drawing.GROOVE_RADIUS_SHOULDER_DROP,
     ))
-    assert drawing.RADIUS_ELBOW_XY[1] - _FACE_ON_AXIS[1] == pytest.approx(0.003255, abs=1e-6)
-    assert drawing.RADIUS_ELBOW_XY[0] - _FACE_ON_AXIS[0] == pytest.approx(0.0065846, abs=1e-6)
+    assert drawing.RADIUS_ELBOW_XY[0] - _FACE_ON_AXIS[0] == pytest.approx(0.002, abs=1e-9)
+    assert drawing.RADIUS_ELBOW_XY[1] - _FACE_ON_AXIS[1] == pytest.approx(-0.001, abs=1e-9)
+    eight_glyph_run_in = 8 * drawing._GLYPH_PITCH / 2.0 + drawing.RADIUS_SHOULDER_LEAD
+    assert _root_line_x() == pytest.approx(
+        _FACE_ON_AXIS[0] + 0.002 + eight_glyph_run_in + 8 * drawing._GLYPH_PITCH / 2.0 + 0.006
+    )
+    assert _root_line_x() == pytest.approx(0.1800072, abs=1e-7)  # r12's audit
     assert drawing._groove_radius_ink_problem(ink, tip, station, centre, _FACE_ON_AXIS) is None
     assert drawing._radius_leader_ink_problem(ink, tip, centre, _root_line_x()) is None
     assert drawing.GROOVE_STATION_GAP == 0.003
@@ -2097,16 +2204,17 @@ def test_predicted_radius_leader_lands_on_the_face_side_material_arc() -> None:
     assert drawing.RADIUS_INK_SLOP == 0.0004
 
 
-@pytest.mark.parametrize("dy_mm", [0.0, -0.755])
-@pytest.mark.parametrize("dx_mm", [-3.0, -1.4, 0.0, 3.4, 5.0])
+@pytest.mark.parametrize("dy_mm", [-0.51, 0.0, 0.51])
+@pytest.mark.parametrize("dx_mm", [-3.0, -1.4, 0.0, 1.08, 3.4, 5.0])
 def test_radius_leader_holds_wherever_solidworks_runs_the_elbow(
     dx_mm: float, dy_mm: float
 ) -> None:
-    # The run-in is an estimate for the R1.2 / 0.5 stack: at native15's
-    # lead the elbow lands within a few mm of the prediction either way, and
-    # the leader still lands on the material arc, radial, short of the root
-    # Ø's line.  The drop too: a 6.0 mm row pitch (the tap callout's) instead
-    # of the crankshaft's 4.49 drops the shoulder 0.755 mm more.
+    # The run-in is an estimate for the three rows: at native15's lead the
+    # elbow lands within a few mm of the prediction either way (r12's ran
+    # 1.59 mm short of its text, 1.08 mm right of this estimate), and the
+    # leader still lands on the material arc, radial, short of the root Ø's
+    # line.  The drop too: half a millimetre either way (latch's unbanded
+    # stack centres 0.51 mm lower on its keep than a LIMIT's).
     elbow = (
         drawing.RADIUS_ELBOW_XY[0] + dx_mm / 1000.0,
         drawing.RADIUS_ELBOW_XY[1] + dy_mm / 1000.0,
@@ -2143,7 +2251,9 @@ def test_radius_leader_accepts_a_leader_drawn_from_the_elbow_alone() -> None:
         # centre now sits on the OD, so that shelf is the radial line itself
         # and leaves the leader no shoulder.
         ("shelf-at-the-od", "no unique horizontal shoulder"),
-        ("shoulder-on-the-axis", "not between the axis and the root"),
+        # A shoulder level with the root Ø's text (its ink tops out 2.03 mm
+        # under the axis on r12).
+        ("shoulder-by-the-root-dia-text", "not between the root Ø's text and its extension"),
         ("into-the-root-dia-line", "reaches the root Ø's dimension line"),
     ],
 )
@@ -2166,8 +2276,8 @@ def test_radius_leader_refuses_bent_detached_or_crowded_ink(case: str, message: 
         ink[2] = (elbow, (elbow[0] - 0.02, elbow[1]))
     elif case == "shelf-at-the-od":
         ink, tip = _radius_ink((elbow[0], drawing._side_y(geom.SPIGOT_DIA / 2.0)))
-    elif case == "shoulder-on-the-axis":
-        ink, tip = _radius_ink((elbow[0] + 0.004, _FACE_ON_AXIS[1] + 0.001))
+    elif case == "shoulder-by-the-root-dia-text":
+        ink, tip = _radius_ink((elbow[0], _FACE_ON_AXIS[1] - 0.0025))
     else:
         # A shoulder running on to 1 mm short of the root Ø's line.
         box = _proposed_radius_text_box()
@@ -2539,6 +2649,18 @@ def test_rebuilt_radius_proof_refuses_a_lost_limit_band(
     radius, station = _radius_readback_fakes(monkeypatch)
     radius.display.dimension.Tolerance = _NativeTolerance(tol_type, limits_mm)
     with pytest.raises(RuntimeError, match="lost the part's LIMIT band"):
+        drawing._prove_groove_radius(object(), object(), radius, station)
+
+
+@pytest.mark.parametrize("callout", ["", "FULL R.", "FULL RADIUS", "R0.5-R1.2 FULL R"])
+def test_rebuilt_radius_proof_refuses_a_lost_or_rewritten_full_r_row(
+    monkeypatch: pytest.MonkeyPatch, callout: str
+) -> None:
+    # Owner ruling on review r5: FULL R is the dimension's own row under the
+    # LIMIT, exactly; the values stay the part's.
+    radius, station = _radius_readback_fakes(monkeypatch)
+    radius.display.callout_below = callout
+    with pytest.raises(RuntimeError, match="lost its FULL R callout row"):
         drawing._prove_groove_radius(object(), object(), radius, station)
 
 
