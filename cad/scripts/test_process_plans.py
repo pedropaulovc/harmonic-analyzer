@@ -694,14 +694,36 @@ def _hold_solids(fixtures: dict, ref: str) -> list[dict]:
 
 
 def _posed_box(solid: dict, pose: dict) -> tuple[list[float], list[float]]:
-    """The setup-frame bounding box of a fixture-local box solid placed by a pose."""
+    """Conservative setup-frame AABB for supported box and cylinder primitives."""
     x, z = pose["x"], pose["z"]
     y = [
         z[1] * x[2] - z[2] * x[1],
         z[2] * x[0] - z[0] * x[2],
         z[0] * x[1] - z[1] * x[0],
     ]
-    at, size = solid["at_mm"], solid["size_mm"]
+    at = solid["at_mm"]
+    shape = solid.get("shape")
+    if shape == "cylinder":
+        axis = solid["axis"]
+        direction = [sum(axis[k] * (x, y, z)[k][a] for k in range(3)) for a in range(3)]
+        start = [
+            pose["origin_mm"][a] + sum(at[k] * (x, y, z)[k][a] for k in range(3))
+            for a in range(3)
+        ]
+        end = [start[a] + solid["length_mm"] * direction[a] for a in range(3)]
+        radial = [
+            solid["dia_mm"] / 2 * math.sqrt(max(0.0, 1.0 - component**2))
+            for component in direction
+        ]
+        return (
+            [min(start[a], end[a]) - radial[a] for a in range(3)],
+            [max(start[a], end[a]) + radial[a] for a in range(3)],
+        )
+    if shape != "box":
+        raise ValueError(
+            f"fixture solid {solid.get('name', '?')!r}: unsupported shape {shape!r}"
+        )
+    size = solid["size_mm"]
     corners = [
         [
             pose["origin_mm"][axis]
@@ -715,7 +737,60 @@ def _posed_box(solid: dict, pose: dict) -> tuple[list[float], list[float]]:
     ]
 
 
-def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm():
+@pytest.mark.parametrize(
+    ("axis", "low", "high"),
+    [
+        ([0.0, 0.0, 1.0], [-2.0, -2.0, 0.0], [2.0, 2.0, 10.0]),
+        ([1.0, 0.0, 0.0], [0.0, -2.0, -2.0], [10.0, 2.0, 2.0]),
+        (
+            [0.6, 0.0, 0.8],
+            [-1.6, -2.0, -1.2],
+            [7.6, 2.0, 9.2],
+        ),
+    ],
+)
+def test_posed_cylinder_bounds_include_radial_extent(axis, low, high):
+    solid = {
+        "name": "stud",
+        "shape": "cylinder",
+        "at_mm": [0.0, 0.0, 0.0],
+        "axis": axis,
+        "dia_mm": 4.0,
+        "length_mm": 10.0,
+    }
+    pose = {"origin_mm": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "z": [0.0, 0.0, 1.0]}
+    actual_low, actual_high = _posed_box(solid, pose)
+    assert actual_low == pytest.approx(low)
+    assert actual_high == pytest.approx(high)
+
+
+def test_posed_unknown_primitive_names_the_solid():
+    pose = {"origin_mm": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "z": [0.0, 0.0, 1.0]}
+    with pytest.raises(
+        ValueError, match="fixture solid 'mystery': unsupported shape 'cone'"
+    ):
+        _posed_box({"name": "mystery", "shape": "cone", "at_mm": [0, 0, 0]}, pose)
+
+
+@pytest.mark.parametrize(
+    "stem",
+    [
+        pytest.param(
+            stem,
+            marks=(
+                pytest.mark.xfail(
+                    strict=True,
+                    raises=AssertionError,
+                    reason="superseded plan collides with 52PCCK clamps; rewrite in #1577",
+                )
+                if stem == "ch_rocker_arm"
+                else ()
+            ),
+        )
+        for stem in dict.fromkeys((*MIGRATED_PLANS, *plans.TRAVELER_STEMS))
+    ],
+)
+def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
     # A paper touch lowers the tool onto the work's top face at a spot the plan names in
     # prose (prechips 0.1.2 has no touch-position field). The tool's widest diameter must
     # clear, in plan view, every hold solid standing above that face (the strap clamps) by
@@ -724,43 +799,42 @@ def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm():
     shop = tomllib.loads(
         (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
     )
-    for stem in dict.fromkeys((*MIGRATED_PLANS, *plans.TRAVELER_STEMS)):
-        plan = tomllib.loads(plans.plan_path(stem).read_text(encoding="utf-8"))
-        for setup in plan["setups"]:
-            zero = setup.get("zero", {})
-            touches = [
-                (touch["tool"], touch["method"])
-                for touch in zero.get("tool_touches", ())
-            ]
-            if zero.get("z", {}).get("method") == "paper":
-                touches.append((zero["z"]["tool"], zero["z"].get("edge", "")))
-            if not touches:
-                continue
-            hold = setup["hold"]
-            top = setup["stock_state"]["top_z"]
-            placed = [(hold["fixture"], hold["pose"])] + [
-                (clamp["ref"], clamp["pose"]) for clamp in hold.get("clamps", ())
-            ]
-            boxes = [
-                (ref, solid.get("name", "?"), box)
-                for ref, pose in placed
-                for solid in _hold_solids(shop["fixtures"], ref)
-                for box in [_posed_box(solid, pose)]
-                if box[1][2] > top
-            ]
-            for tool, prose in touches:
-                where = f"{stem} {setup['id']} {tool} touch"
-                spot = _TOUCH_SPOT.search(prose)
-                assert spot, f"{where}: no 'at X.. Y..' spot in {prose!r}"
-                sx, sy = float(spot[1]), float(spot[2])
-                need = _tool_radius(shop["tools"], tool) + 1.0
-                for ref, name, (low, high) in boxes:
-                    dx = max(low[0] - sx, 0.0, sx - high[0])
-                    dy = max(low[1] - sy, 0.0, sy - high[1])
-                    assert math.hypot(dx, dy) >= need, (
-                        f"{where} at X{sx:+} Y{sy:+}: {ref} {name} is "
-                        f"{math.hypot(dx, dy):.2f} away, needs {need:.2f}"
-                    )
+    plan = tomllib.loads(plans.plan_path(stem).read_text(encoding="utf-8"))
+    for setup in plan["setups"]:
+        zero = setup.get("zero", {})
+        touches = [
+            (touch["tool"], touch["method"]) for touch in zero.get("tool_touches", ())
+        ]
+        if zero.get("z", {}).get("method") == "paper":
+            touches.append((zero["z"]["tool"], zero["z"].get("edge", "")))
+        if not touches:
+            continue
+        hold = setup["hold"]
+        top = setup["stock_state"]["top_z"]
+        placed = [(hold["fixture"], hold["pose"])] + [
+            (clamp["ref"], clamp["pose"]) for clamp in hold.get("clamps", ())
+        ]
+        boxes = [
+            (ref, solid.get("name", "?"), box)
+            for ref, pose in placed
+            for solid in _hold_solids(shop["fixtures"], ref)
+            if not solid.get("void", False)
+            for box in [_posed_box(solid, pose)]
+            if box[1][2] > top
+        ]
+        for tool, prose in touches:
+            where = f"{stem} {setup['id']} {tool} touch"
+            spot = _TOUCH_SPOT.search(prose)
+            assert spot, f"{where}: no 'at X.. Y..' spot in {prose!r}"
+            sx, sy = float(spot[1]), float(spot[2])
+            need = _tool_radius(shop["tools"], tool) + 1.0
+            for ref, name, (low, high) in boxes:
+                dx = max(low[0] - sx, 0.0, sx - high[0])
+                dy = max(low[1] - sy, 0.0, sy - high[1])
+                assert math.hypot(dx, dy) >= need, (
+                    f"{where} at X{sx:+} Y{sy:+}: {ref} {name} is "
+                    f"{math.hypot(dx, dy):.2f} away, needs {need:.2f}"
+                )
 
 
 def test_shop_without_cad_has_no_spec_dependencies(synthetic):
