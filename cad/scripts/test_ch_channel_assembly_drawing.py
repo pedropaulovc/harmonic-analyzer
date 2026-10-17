@@ -391,6 +391,39 @@ def test_the_bom_covers_every_family_once_with_its_sku() -> None:
     ) in body
 
 
+def test_a_preset_with_several_spring_lengths_is_refused_at_drawing_time(
+    monkeypatch,
+) -> None:
+    """Code review C07: the square preset builds 11 spring variants (one per
+    distinct amplitude), each its own SLDPRT under MHA-VN-004, so its BOM
+    would print 11 rows of one part number. The drawing refuses that preset
+    when it runs, not at import, so collection and the neutral contract hold."""
+    import asyncio
+
+    square = _config.machine("springs", "presets", "square", "amplitudes_mm")
+    stems = drawing.spring_stems(square, drawing.CHANNELS)
+    assert len(square) == drawing.CHANNELS == 20
+    assert len(stems) == len(set(square)) == 11
+    neutral = drawing.spring_stems([0.0] * drawing.CHANNELS, drawing.CHANNELS)
+    assert neutral == ("vn-channel-spring-installed-stretch00",)
+    drawing.require_single_spring_variant(neutral, "neutral")
+
+    real_machine = _config.machine
+    monkeypatch.setattr(
+        _config,
+        "machine",
+        lambda *keys: "square" if keys == ("amplitude", "preset") else real_machine(*keys),
+    )
+    monkeypatch.setattr(drawing, "SPRING_STEMS", stems)
+    with pytest.raises(RuntimeError) as refused:
+        asyncio.run(drawing.build(object()))
+    message = str(refused.value)
+    assert "'square' amplitude preset builds 11 spring variants" in message
+    assert "MHA-VN-004" in message
+    assert drawing.SPRING_VARIANT_ISSUE in message
+    assert drawing.SPRING_VARIANT_ISSUE.endswith("/issues/1610")
+
+
 def test_the_sheet_text_stays_out_of_the_assembly_recipe() -> None:
     """Code review C03: the BOM descriptions and dimension callouts are read
     by the drawing alone. The builder's recipe closure (file-granular, every

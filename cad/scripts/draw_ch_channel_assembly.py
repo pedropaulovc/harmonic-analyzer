@@ -197,20 +197,37 @@ EXPLODED_CAPTION = "\n".join(
 CHANNELS = _config.active_count()
 if CHANNELS != COUNT:
     raise AssertionError("the channel package is drawn for the full bank")
-_AMPLITUDES = _config.amplitudes()
-_VARIANTS = {
-    amplitude: index for index, amplitude in enumerate(dict.fromkeys(_AMPLITUDES))
-}
-SPRING_STEMS = tuple(
-    dict.fromkeys(
-        f"vn-channel-spring-installed-stretch{_VARIANTS[amplitude]:02d}"
-        for amplitude in _AMPLITUDES[:CHANNELS]
+SPRING_VARIANT_ISSUE = "https://github.com/pedropaulovc/harmonic-analyzer/issues/1610"
+
+
+def spring_stems(amplitudes: list[float], channels: int) -> tuple[str, ...]:
+    """Installed-spring file stems the channel builder makes for these amplitudes."""
+    variants = {
+        amplitude: index for index, amplitude in enumerate(dict.fromkeys(amplitudes))
+    }
+    return tuple(
+        dict.fromkeys(
+            f"vn-channel-spring-installed-stretch{variants[amplitude]:02d}"
+            for amplitude in amplitudes[:channels]
+        )
     )
-)
-if len(SPRING_STEMS) != 1:
-    raise AssertionError(
-        "one BOM row per part number: several spring variants share MHA-VN-004"
-    )
+
+
+def require_single_spring_variant(stems: tuple[str, ...], preset: str) -> None:
+    """Refuse a BOM the drawing cannot print: one MHA-VN-004 row of qty 20.
+
+    Each spring variant is its own SLDPRT, so a preset with several installed
+    lengths would print several rows under one part number.
+    """
+    if len(stems) != 1:
+        raise RuntimeError(
+            f"MHA-CH-000 is drawn for one installed-spring length, but the "
+            f"{preset!r} amplitude preset builds {len(stems)} spring variants "
+            f"that share MHA-VN-004; see {SPRING_VARIANT_ISSUE}"
+        )
+
+
+SPRING_STEMS = spring_stems(_config.amplitudes(), CHANNELS)
 SPRING_STEM = SPRING_STEMS[0]
 
 BOM_QUANTITIES = {
@@ -1408,6 +1425,9 @@ def _create_sheets(adapter: Any) -> None:
 
 @_telemetry.traced("drawing.channel_assembly")
 async def build(adapter: Any) -> dict[str, str]:
+    require_single_spring_variant(
+        SPRING_STEMS, str(_config.machine("amplitude", "preset"))
+    )
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 
