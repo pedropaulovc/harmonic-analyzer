@@ -458,12 +458,13 @@ BOM_ITEM_NUMBERS = dict(spec.ITEM_NUMBERS)
 # share one ring (_ring_balloons).
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
 # The base bar's walk landed on rail 2's carriage end seal (review r5): its
-# balloon lands on the bar's long edge on the operator's side (part +Y,
-# ``HIGH_SIDE_Y``, z 0: the top of the turned-over bar 2, the bottom of bar 1),
-# 300 from the spindle end, clear of either carriage and of the far flange nut
-# on the sheet.
+# balloon lands on bar 1's long top edge on the operator's side (part +Y,
+# ``HIGH_SIDE_Y``, z ``BAR_THICK``), the edge nearest the viewer, 200 from the
+# spindle end: what stands on the bar sits behind and above it on the sheet,
+# what hangs under it below. The bottom edge 300 out (bought-r15) selected no
+# edge on the sheet once C4 widened the bar to 1/2 x 6 (bought-r16).
 BALLOON_ANCHORS[spec.BASE_BAR] = BalloonAnchor(
-    point_mm=(300.0, base_bar.HIGH_SIDE_Y, 0.0)
+    point_mm=(200.0, base_bar.HIGH_SIDE_Y, base_bar.BAR_THICK)
 )
 
 EXPLODED_VIEW_NAMES = {
