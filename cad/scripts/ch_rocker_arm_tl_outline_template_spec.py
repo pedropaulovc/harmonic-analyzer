@@ -13,7 +13,7 @@ never from a render. The one deliberate offset: every edge aims at the middle
 of the rocker's 0.5 surface-profile zone (``ch_rocker_arm_spec.TOP_EDGE_BAND``,
 outside on the top arc, inside on the lower outline), leaving the zone's whole
 width to the filing that follows. The arc system sits 0.25 higher, on the
-trammel's own radii; the tip lands and tapered ends are offset 0.25 along
+rocker's own radii; the tip lands and tapered ends are offset 0.25 along
 their own normals, since a +Y shift would carry the near-vertical lands out
 of the lower zone.
 
@@ -96,7 +96,7 @@ for _low, _high, _nominal in (
 # put each tip land 0.0453 OUTSIDE that zone (#1544). So the straight edges are
 # offset along their own normals instead, through the three printed stations:
 # the top-arc end, the tip-land length and the bottom-arc end. The arcs stay
-# on the trammel's R800/R816 about CENTER_Y (MHA-CH-006-TL-14..19 scribe them).
+# on the rocker's R800/R816 about CENTER_Y.
 _MID_ZONE = _ROCKER_ZONE / 2.0  # 0.25 into the material on the lower outline
 END_PLACES = 3
 _ROCKER_CENTRE = (0.0, rocker.CENTER_Y - rocker.PIVOT_MID_Y)
