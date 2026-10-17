@@ -80,6 +80,20 @@ KNIFE_FLANK_HALF_MAX_DEG = 180.0 - (
 KNIFE_SHOULDER_DROP_MIN = KNIFE_SHOULDER_X_MAX / math.tan(
     math.radians(KNIFE_FLANK_HALF_MAX_DEG)
 )
+# Between the stubs: both are one prism through the body
+# (``build_sm_summing_lever._hex_knife``, read back by
+# ``_assert_knife_sides_coplanar``), so each side face of one stub lies in the
+# same plane as the other's, and the print says so ("SIDES IN ONE PLANE").
+# Each ridge then stands RIDGE_FROM_SIDE +/-RIDGE_FROM_SIDE_TOL from the SAME
+# side plane, which puts the two ridges within KNIFE_STUB_RIDGE_OFFSET_MAX of
+# each other.  This bound rests on the shared planes: with each stub's sides
+# free, the symmetry would tie each ridge only to its own stub, and nothing
+# would tie the -Z ridge to datum A.  The two ridges rest on the knife mounts
+# at the stubs' mid-lengths, KNIFE_RIDGE_CONTACT_SPAN apart, so that offset
+# skews the knife axis and spreads the 20 spring holes' hook arms by up to
+# KNIFE_HOOK_ARM_SPREAD_MAX over the column.
+KNIFE_STUB_RIDGE_OFFSET_MAX = 2.0 * RIDGE_FROM_SIDE_TOL  # 0.10
+KNIFE_RIDGE_CONTACT_SPAN = PLATE_L + HEX_DEPTH  # 174.117 stub mid to stub mid
 
 # Outward normal and plane offset of the upper-right sloping face of the
 # vertex-up hexagon. Its upper endpoint is the +Y knife-edge ridge.
@@ -146,6 +160,12 @@ HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # from the -Z end
 HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # from the +Z end
 HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
 HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
+# The between-stub ridge offset's hook-arm spread over the hole column (0.077).
+KNIFE_HOOK_ARM_SPREAD_MAX = (
+    KNIFE_STUB_RIDGE_OFFSET_MAX
+    * (HOLE_Z_LAST - HOLE_Z_FIRST)
+    / KNIFE_RIDGE_CONTACT_SPAN
+)
 
 # Drawing prose + marked-dimension contract (DRAWING_DIMENSIONS /
 # ISOMETRIC_VIEW_NOTE) live in ``sm_summing_lever_notes`` --
