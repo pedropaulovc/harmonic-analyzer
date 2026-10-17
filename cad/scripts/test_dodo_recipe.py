@@ -816,6 +816,7 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
                 "pn_pen",
                 "sm_summing",
                 "ha_harmonic_analyzer",
+                "ch_rocker_arm_tl_oblique_jig",
             },
         ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
