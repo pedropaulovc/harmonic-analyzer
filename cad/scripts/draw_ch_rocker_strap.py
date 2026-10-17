@@ -7,10 +7,11 @@ of its one profile sketch, located from the Ø10.200 H7 hub hole's centre
 mate, the R800 top edge (its centre, ~808 mm off the sheet, stated on it as
 above the hole), the bottom edge's depth under the hole, both tip corners'
 and both taper feet's offsets, and the 2X radial tip land. The hole's H7 band
-names the MHA-CH-012 hub and the fit (rule 4); the 2.500 thickness, on the end
-view, names the rod fork it runs in. One property-linked note names the joint
-the finish field's "after joining" refers to. No datums, no frames, no
-roughness symbol (rule 6: a pressed bore carries none). The decimal places
+names the MHA-CH-012 hub and the fit (rule 4) and keeps both its edges sharp
+(the title block's break would groove the pressed root); the 2.500 thickness,
+on the end view, names the rod fork it runs in. One property-linked note names
+the joint the finish field's "after joining" refers to. No datums, no frames,
+no roughness symbol (rule 6: a pressed bore carries none). The decimal places
 and bands are the PART's (``ch_rocker_strap_notes.DRAWING_PRECISION``); this
 script only reads them back off the sheet.
 
@@ -112,7 +113,11 @@ FRONT_KEEP = {
     "BottomRodX": (FRONT_CENTER[0] + BOT_END_X / 2000.0, FOOT_LINE_Y),
     "TopRadius": (FRONT_CENTER[0] - 0.095, 0.166),
     "BottomBelowPivot": (_HOLE[0] - 0.012, 0.160),
-    "HoleDia": (_HOLE[0] + 0.060, 0.160),
+    # The callout's rows stack UP from the requested y: with its sharp-edge
+    # row at 0.160 (strap-sharp-r1) the +0.018 limit sat on the strap's bottom
+    # edge. Dropped one row for that row (0.153, r2: clear), then 4 mm more
+    # for its reason row (r3), whose last row still clears the foot line.
+    "HoleDia": (_HOLE[0] + 0.060, 0.149),
     "TopAbovePivot": (_HOLE[0] - 0.035, 0.207),
     # The land's two extension lines run ~5.6 mm apart, rising ~10 deg to the
     # right (perpendicular to the radial land); the upper one passes y ~0.206
