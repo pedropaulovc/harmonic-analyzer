@@ -472,13 +472,13 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91251A540",
         material="Alloy Steel",
     ),
-    # MHA-CH-006-TL-49: the oblique trammel jig's 5/16-18 X 7/8 SHCS (the
+    # MHA-CH-006-TL-49: the oblique trammel jig's 5/16-18 X 1 SHCS (the
     # fastener table's LEVER_TO_CARRIER row); shop fixture hardware, modelled
     # so the jig assembly can mate it and run native interference.
     "ch-rocker-arm-tl-oblique-lever-screw": _stock(
         "ch-rocker-arm-tl-oblique-lever-screw",
         "Black-Oxide Alloy Steel Socket Head Screw",
-        "91251A582",
+        "91251A583",
         material="Alloy Steel",
     ),
     # MHA-CH-006-TL-50: the oblique trammel jig's #8 wedge-lock washer pairs
@@ -489,6 +489,16 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "ch-rocker-arm-tl-oblique-block-washer",
         "Extreme-Vibration-Resistant Wedge Lock Washer",
         "91812A215",
+        material="AISI 304",  # native library stand-in; purchased grade is 316
+    ),
+    # MHA-CH-006-TL-51: the oblique trammel jig's 5/16 wedge-lock washer pairs
+    # under the TL-49 feed lever screws' heads (the fastener table's
+    # LEVER_LOCK_WASHER row); shop fixture hardware, modelled so the jig
+    # assembly can mate it and run native interference.
+    "ch-rocker-arm-tl-oblique-lever-washer": _stock(
+        "ch-rocker-arm-tl-oblique-lever-washer",
+        "Extreme-Vibration-Resistant Wedge Lock Washer",
+        "91812A230",
         material="AISI 304",  # native library stand-in; purchased grade is 316
     ),
 }

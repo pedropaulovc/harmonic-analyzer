@@ -163,6 +163,7 @@ CLUSTERS = (
             spec.RISER_SCREW,
             spec.CLAMP_SCREW,
             spec.LEVER_SCREW,
+            spec.LEVER_LOCK_WASHER,
         ),
         (1.0, 5.0),
     ),
@@ -437,6 +438,9 @@ PART_ROWS = {
     ),
     "ch-rocker-arm-tl-oblique-block-washer": _config.parts(
         "ch-rocker-arm-tl-oblique-block-washer"
+    ),
+    "ch-rocker-arm-tl-oblique-lever-washer": _config.parts(
+        "ch-rocker-arm-tl-oblique-lever-washer"
     ),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):

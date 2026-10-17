@@ -176,7 +176,7 @@ def test_fitted_cluster_scales_reach_finalize_in_sheet_order() -> None:
 def test_clusters_partition_the_bom() -> None:
     clustered = [stem for cluster in drawing.CLUSTERS for stem in cluster.stems]
     assert sorted(clustered) == sorted(spec.BOM_ORDER)
-    assert len(clustered) == len(set(clustered)) == 30
+    assert len(clustered) == len(set(clustered)) == 31
     for cluster in drawing.CLUSTERS:
         # Each sheet balloons in item order.
         assert list(cluster.stems) == [s for s in spec.BOM_ORDER if s in cluster.stems]
@@ -617,7 +617,7 @@ def test_bom_identity_is_the_registry() -> None:
     for stem in spec.BOM_ORDER:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
     assert sorted(drawing.BOM_PART_NUMBERS.values()) == sorted(
-        f"MHA-CH-006-TL-{n}" for n in (*range(20, 27), *range(28, 51))
+        f"MHA-CH-006-TL-{n}" for n in (*range(20, 27), *range(28, 52))
     )
     assert drawing.BOM_ITEM_NUMBERS == {
         stem: str(item) for item, stem in enumerate(spec.BOM_ORDER, 1)

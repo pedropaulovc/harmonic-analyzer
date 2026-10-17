@@ -9,12 +9,12 @@ read from the calculator ``ch_rocker_arm_tl_oblique_trammel_spec`` (imported as
 ``trammel``), never retyped.
 
 Material: see the component drawings (TL-20 to TL-26, TL-28, TL-29) and the
-bought items' (TL-30 to TL-50). Overall envelope at the modelled pose,
+bought items' (TL-30 to TL-51). Overall envelope at the modelled pose,
 machine frame: X -507.3 (the handwheel's rim) to +463.0 (the base bars' far
 column-side corners), Y -347.5 (the feed lever's grip end) to +85.8 (the
 bars' near column-side corners since the 2026-10-17 1/2 x 6 widening; the
 TL-28 brackets end flush with bar 1's column-side edge), Z -22.0 (the
-T-nuts' feet in the table slots) to 100.3 (the feed lever screws' heads); see
+T-nuts' feet in the table slots) to 102.6 (the feed lever screws' heads); see
 ``MODEL_EXTENT``.
 
 Frame: the MACHINE frame. Origin on the spindle axis at the table top; +X along
@@ -38,11 +38,11 @@ underside carry the KP08 blocks; the TL-29 nut bracket bolts to pivot block
 with the nut bracket's block screws out; the handwheel feeds the finish pass.
 
 Every bought item is modelled and inserted, each family its own TL part
-(TL-30 to TL-50, ``BOM_ORDER``): the two HGR15R rails and HGH15CA carriages,
+(TL-30 to TL-51, ``BOM_ORDER``): the two HGR15R rails and HGH15CA carriages,
 the four 6200-2RS bearings, the CL dowel, the leadscrew, its flanged nut, the
 two KP08 blocks and the handwheel, the four hold-down studs with their
 T-nuts and flange nuts, every screw, and the wedge-lock washer pair under
-each block screw's head. Each instance's pose is
+each block screw's and each feed lever screw's head. Each instance's pose is
 ``PLACEMENTS`` (from the part frames each part spec documents), and the BOM
 rows, item numbers and descriptions are ``QUANTITIES``, ``ITEM_NUMBERS`` and
 ``BOM_DESCRIPTIONS``. No skid (user ruling).
@@ -100,6 +100,7 @@ import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_nut_bracket_spec as nut_bracket
 import ch_rocker_arm_tl_oblique_leadscrew_stock_spec as leadscrew_stock
 import ch_rocker_arm_tl_oblique_lever_screw_spec as lever_screw
+import ch_rocker_arm_tl_oblique_lever_washer_spec as lever_washer
 import ch_rocker_arm_tl_oblique_nut_screw_spec as nut_screw
 import ch_rocker_arm_tl_oblique_kp08_screw_spec as kp08_screw
 import ch_rocker_arm_tl_oblique_pillow_block_spec as pillow_block
@@ -146,10 +147,11 @@ RISER_SCREW = "ch-rocker-arm-tl-oblique-riser-screw"
 CLAMP_SCREW = "ch-rocker-arm-tl-oblique-clamp-screw"
 LEVER_SCREW = "ch-rocker-arm-tl-oblique-lever-screw"
 BLOCK_LOCK_WASHER = "ch-rocker-arm-tl-oblique-block-washer"
+LEVER_LOCK_WASHER = "ch-rocker-arm-tl-oblique-lever-washer"
 
 # Every component family and its count: the builder places, the explode moves
 # and the drawing's BOM proves exactly this inventory, in registry order
-# TL-20..50. The bought counts are the part specs' own.
+# TL-20..51. The bought counts are the part specs' own.
 QUANTITIES = {
     BASE_BAR: base_bar.QUANTITY,
     CARRIER: 1,
@@ -181,6 +183,7 @@ QUANTITIES = {
     CLAMP_SCREW: clamp_screw.QUANTITY,
     LEVER_SCREW: lever_screw.QUANTITY,
     BLOCK_LOCK_WASHER: block_washer.QUANTITY,
+    LEVER_LOCK_WASHER: lever_washer.QUANTITY,
 }
 # SolidWorks numbers a top-level BOM in FeatureManager order, so BOM_ORDER is
 # the builder's insertion order and the steps' item numbers (``_item``) read
@@ -217,6 +220,7 @@ BOM_ORDER = (
     CLAMP_SCREW,
     LEVER_SCREW,
     BLOCK_LOCK_WASHER,
+    LEVER_LOCK_WASHER,
 )
 
 Rows = tuple[tuple[float, float, float], ...]
@@ -615,14 +619,19 @@ CARRIAGE_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     for point in pivot_block.BOLT_POINTS
 )
 # On the carrier: the riser's flat heads flush with its top, the CR clamp
-# screw's head on the strap, the lever screws' heads on the feed lever.
+# screw's head on the strap, each lever screw's wedge-lock pair (TL-51) on the
+# feed lever and the screw's head on the pair.
 RISER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     _carried(point, trammel.CARRIER_TOP_Z + trammel.RISER_THICK)
     for point in trammel.RISER_SCREWS
 )
 CLAMP_SCREW_PLACEMENTS = (_carried(trammel.CR, PART_TOP_Z),)
-LEVER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
+LEVER_LOCK_WASHER_PLACEMENTS: tuple[Placement, ...] = tuple(
     _carried(point, trammel.CARRIER_TOP_Z + feed_lever.LEVER_THICK)
+    for point in carrier.LEVER_HOLES
+)
+LEVER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
+    _carried(point, trammel.CARRIER_TOP_Z + feed_lever.LEVER_THICK + lever_washer.TOP_Y)
     for point in carrier.LEVER_HOLES
 )
 
@@ -659,6 +668,7 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
     CLAMP_SCREW: CLAMP_SCREW_PLACEMENTS,
     LEVER_SCREW: LEVER_SCREW_PLACEMENTS,
     BLOCK_LOCK_WASHER: BLOCK_LOCK_WASHER_PLACEMENTS,
+    LEVER_LOCK_WASHER: LEVER_LOCK_WASHER_PLACEMENTS,
 }
 
 
@@ -695,6 +705,7 @@ LOCKED_TO: dict[str, tuple[str, int]] = {
     CL_DOWEL: (CARRIER, 1),
     CLAMP_SCREW: (CARRIER, 1),
     BLOCK_LOCK_WASHER: (PIVOT_BLOCK, len(pivot_block.SIDE_SCREW_X)),
+    LEVER_LOCK_WASHER: (CARRIER, len(carrier.LEVER_HOLES)),
 }
 # Every family that rides the sweep, in BOM order: the contract's allowed and
 # required free stems.
@@ -780,6 +791,7 @@ BOM_DESCRIPTIONS = {
     CLAMP_SCREW: clamp_screw.CALLOUT,
     LEVER_SCREW: lever_screw.CALLOUT,
     BLOCK_LOCK_WASHER: f"{block_washer.SCREW_SIZE} WEDGE-LOCK WASHER PAIR",
+    LEVER_LOCK_WASHER: f"{lever_washer.SCREW_SIZE} WEDGE-LOCK WASHER PAIR",
 }
 BOM_DESCRIPTION_CHARS = 41  # the drawing's description cell prints one line
 # BOM item n is BOM_ORDER position n: the builder inserts each family's first
@@ -801,7 +813,8 @@ ITEM_NUMBERS = {stem: str(index) for index, stem in enumerate(BOM_ORDER, 1)}
 # driven on, each block screw's wedge-lock pair halfway out to its head;
 # then the carrier, its HUB pin dropped out beneath it and its CL
 # dowel lifted out, and the riser and the feed lever over it with their screws
-# above them. Each step's families move by a signed distance along a machine
+# above them, each lever screw's wedge-lock pair halfway out to its head.
+# Each step's families move by a signed distance along a machine
 # axis; a family's displacement along an axis is the sum of the steps naming
 # it (``explode_shift``; ``explode_lift`` along Z). The rail 1 axis runs
 # along -X within 9 degrees, so the nut screws back out along +X and the
@@ -809,7 +822,14 @@ ITEM_NUMBERS = {stem: str(index) for index, stem in enumerate(BOM_ORDER, 1)}
 # (label, families, axis, signed distance mm).
 EXPLODED_VIEW_NAME = "JIG_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
-_CARRIER_RIDERS = (RISER, RISER_SCREW, CLAMP_SCREW, FEED_LEVER, LEVER_SCREW)
+_CARRIER_RIDERS = (
+    RISER,
+    RISER_SCREW,
+    CLAMP_SCREW,
+    FEED_LEVER,
+    LEVER_SCREW,
+    LEVER_LOCK_WASHER,
+)
 _BLOCK_RIDERS = (
     PIVOT_PIN,
     BEARING,
@@ -822,7 +842,13 @@ _BLOCK_RIDERS = (
 )
 EXPLODE_STEPS = (
     ("lever screws lift out", (LEVER_SCREW,), "z", 40.0),
-    ("feed lever lifts off", (FEED_LEVER, LEVER_SCREW), "z", 60.0),
+    ("lever wedge-lock pairs lift out", (LEVER_LOCK_WASHER,), "z", 20.0),
+    (
+        "feed lever lifts off",
+        (FEED_LEVER, LEVER_SCREW, LEVER_LOCK_WASHER),
+        "z",
+        60.0,
+    ),
     ("clamp screw lifts out", (CLAMP_SCREW,), "z", 40.0),
     ("riser screws lift out", (RISER_SCREW,), "z", 30.0),
     ("riser lifts off", (RISER, RISER_SCREW, CLAMP_SCREW), "z", 60.0),
@@ -1155,6 +1181,53 @@ if not BLOCK_JOINT_SLIP_N >= 1.25 * FEED_THRUST_N:
         f"block screws at {BLOCK_SCREW_TORQUE_NM} N·m hold {BLOCK_JOINT_SLIP_N:.0f} N "
         f"by friction, under 1.25 x the {FEED_THRUST_N:.0f} N feed thrust"
     )
+
+# --- The feed lever screws: their tightening torque -----------------------------------
+# Rule 23 (C3 r6 TL-000 review): the 2 5/16-18 lever screws carry the
+# operator's push and pull on the TL-26 lever, reversing through every pass.
+# Wedge-lock pairs (TL-51) under the heads keep them from backing off. The
+# torque takes the block screws' basis: the TL-21 6061-T6 tap's strip load
+# at the worst-case engagement (lever_washer.ENGAGEMENT_MIN 9.14: the
+# shortest screw through the thickest lever and pair, inside the 12 plate's
+# RV-01 1.20D full thread), a third of it as preload, T = K F d.
+_LEVER_THREAD_STRIP_N = (
+    0.75
+    * math.pi
+    * fasteners.LEVER_TO_CARRIER.major_mm
+    * lever_washer.ENGAGEMENT_MIN
+    * _AL_SHEAR_ULTIMATE_MPA
+)
+LEVER_SCREW_TORQUE_NM = (
+    math.floor(
+        10.0
+        * _NUT_FACTOR
+        * (_LEVER_THREAD_STRIP_N / _STRIP_SAFETY)
+        * fasteners.LEVER_TO_CARRIER.major_mm
+        / 1000.0
+    )
+    / 10.0
+)  # rounded down to 0.1 N·m
+LEVER_SCREW_PRELOAD_N = LEVER_SCREW_TORQUE_NM / (
+    _NUT_FACTOR * fasteners.LEVER_TO_CARRIER.major_mm / 1000.0
+)
+# The pair bears on the 6061-T6 lever over the ring outside the drilled hole,
+# less its worst-case overhang past the lever's inner end
+# (lever_washer.BEARING_AREA_MIN): under the 6061-T6 yield, 276 MPa (SOURCED:
+# ASM / MatWeb 6061-T6), taken as the compressive yield.
+_AL_YIELD_MPA = 276.0
+LEVER_PAIR_BEARING_MPA = LEVER_SCREW_PRELOAD_N / lever_washer.BEARING_AREA_MIN
+if not LEVER_PAIR_BEARING_MPA < _AL_YIELD_MPA:
+    raise ValueError(
+        f"lever screws at {LEVER_SCREW_TORQUE_NM} N·m press the pair on the "
+        f"lever at {LEVER_PAIR_BEARING_MPA:.0f} MPa, over 6061-T6's yield"
+    )
+# The screw: the preload's stress on the 5/16-18 tensile stress area
+# (0.0524 in², ASME B1.1) stays under half the A574 screw's 170,000 psi.
+_LEVER_STRESS_AREA_MM2 = 0.0524 * trammel.INCH**2
+_A574_TENSILE_MPA = 170_000.0 * 0.006894757
+if not LEVER_SCREW_PRELOAD_N / _LEVER_STRESS_AREA_MM2 < 0.5 * _A574_TENSILE_MPA:
+    raise ValueError(f"lever screw preload {LEVER_SCREW_PRELOAD_N:.0f} N overloads it")
+_LEVER_TORQUE = f"{LEVER_SCREW_TORQUE_NM:.1f} N·m"
 _BLOCK_TORQUE = f"{BLOCK_SCREW_TORQUE_NM:.1f} N·m"
 
 
@@ -1273,7 +1346,8 @@ ASSEMBLY_STEPS = (
     f"HUB PIN'S TOP {hub_pin.LOCATOR_SET_MIN:.2f}-{hub_pin.LOCATOR_SET_MAX:.2f} "
     f"ABOVE THE RISER AND RECHAMFER IT {hub_pin.LEAD_CHAMFER:.1f} X 45° MAX.",
     f"12. BOLT THE FEED LEVER ON THE CARRIER WITH 2 {_LEVER_SCREW} "
-    f"{_item(LEVER_SCREW)}, GRIP END TOWARD THE OPERATOR. IN USE THE "
+    f"{_item(LEVER_SCREW)} ON WEDGE-LOCK PAIRS {_item(LEVER_LOCK_WASHER)}, "
+    f"TIGHTENED TO {_LEVER_TORQUE}, GRIP END TOWARD THE OPERATOR. IN USE THE "
     f"{_CLAMP_SCREW} {_item(CLAMP_SCREW)} GOES DOWN THROUGH THE WORKPIECE, "
     f"THE {carrier.STRAP_NUMBER} STRAP BLANK (NOT SUPPLIED), AND THE RISER "
     "INTO THE CARRIER'S CR TAP.",
