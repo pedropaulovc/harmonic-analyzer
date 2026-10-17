@@ -690,7 +690,8 @@ def _hold_solids(fixtures: dict, ref: str) -> list[dict]:
     record = fixtures[kit]["members"][member] if member else fixtures[kit]
     if "cad" in record:
         return importlib.import_module(f"{record['cad']}_spec").PRECHIPS_SOLIDS
-    return record["solids"]
+    # An undrawn fixture (the vise: prechips judges its jaws itself) places nothing.
+    return record.get("solids", [])
 
 
 def _posed_box(solid: dict, pose: dict) -> tuple[list[float], list[float]]:
@@ -786,22 +787,7 @@ def test_posed_unknown_primitive_names_the_solid():
 
 
 @pytest.mark.parametrize(
-    "stem",
-    [
-        pytest.param(
-            stem,
-            marks=(
-                pytest.mark.xfail(
-                    strict=True,
-                    raises=AssertionError,
-                    reason="superseded plan collides with 52PCCK clamps; rewrite in #1577",
-                )
-                if stem == "ch_rocker_arm"
-                else ()
-            ),
-        )
-        for stem in dict.fromkeys((*MIGRATED_PLANS, *plans.TRAVELER_STEMS))
-    ],
+    "stem", list(dict.fromkeys((*MIGRATED_PLANS, *plans.TRAVELER_STEMS)))
 )
 def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
     # A paper touch lowers the tool onto the work's top face at a spot the plan names in
@@ -824,8 +810,13 @@ def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
             continue
         hold = setup["hold"]
         top = setup["stock_state"]["top_z"]
-        placed = [(hold["fixture"], hold["pose"])] + [
-            (clamp["ref"], clamp["pose"]) for clamp in hold.get("clamps", ())
+        drawn = [(hold["fixture"], hold)] + [
+            (clamp["ref"], clamp) for clamp in hold.get("clamps", ())
+        ]
+        placed = [
+            (ref, item["pose"])
+            for ref, item in drawn
+            if _hold_solids(shop["fixtures"], ref)
         ]
         boxes = [
             (ref, solid.get("name", "?"), box)

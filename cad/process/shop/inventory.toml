@@ -2213,12 +2213,13 @@ oal_mm = { value = 152.4, measured = { status = "measured", by = "placeholder (r
 lms-3066 = "over_under_14pc"
 lms-3067 = "64ths_29pc"
 
-# Example purchase: one DIN 212 H7 chucking reamer for the 6.5 H7 pivot bores.
+# Example purchase: DIN 212 H7 chucking reamers for the 6.5 H7 pivot bores and the
+# rocker strap's Ø10.20 H7 hub hole (MHA-CH-013, ch_rocker_hub_fit).
 [tools.reamers-metric]
 kind = "reamers"
 material = "HSS"
-sizes_mm = [6.5]
-note = "illustrative example item: 6.5 mm H7 HSS machine (chucking) reamer, DIN 212 proportions"
+sizes_mm = [6.5, 10.2]
+note = "illustrative example item: 6.5 mm and 10.2 mm H7 HSS machine (chucking) reamers, DIN 212 proportions"
 
 [tools.reamers-metric.members."6.5mm"]
 # Basis: tools.reamers-metric.members."6.5mm".dia_mm: nominal named 6.5 mm, offset +0.006 mm = 6.506 mm; slight chucking-reamer oversize under the authorized cutting-diameter manufacturing-tolerance exception. Source b757b5a76 cad/process/shop/inventory.toml:616 (tools.reamers-metric.members."6.5mm".dia_mm); not a bore-fit or clearance pass claim.
@@ -2237,6 +2238,25 @@ oal_mm = { value = 92.85, measured = { status = "measured", by = "placeholder (r
 [tools.reamers-metric.members."6.5mm".projection_mm]
 # Basis: tools.reamers-metric.members."6.5mm".projection_mm."drill-chuck-r8": no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:625 (tools.reamers-metric.members."6.5mm".projection_mm."drill-chuck-r8") authored reamers geometry baseline 72 mm, offset +0 mm = 72 mm. No extra reachable/cutting length is credited over the source setup.
 "drill-chuck-r8" = { value = 72.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers or steel rule, installed holder exit face to cutting tip" } }
+
+# Rocker route v3 (harmonic-analyzer #1577): the strap's Ø10.20 H7 hub hole, piloted by the
+# 9.5 mm drill (0.7 on diameter).
+[tools.reamers-metric.members."10.2mm"]
+# Basis: tools.reamers-metric.members."10.2mm".dia_mm: nominal named 10.2 mm, offset +0.009 mm = 10.209 mm; H7 chucking-reamer cutting diameter in the middle of the 10.200-10.218 hole band, under the authorized cutting-diameter manufacturing-tolerance exception; not a bore-fit pass claim.
+dia_mm = { value = 10.209, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
+# Basis: tools.reamers-metric.members."10.2mm".shank_mm: DIN 212 straight shank under the cutting diameter, 10.0 mm nominal, offset -0.02 mm = 9.98 mm; h8-style shank estimate, not a maker tolerance assertion.
+shank_mm = { value = 9.98, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "micrometer on shank" } }
+flutes = 6
+# Basis: tools.reamers-metric.members."10.2mm".lead_mm: same 1 mm bevel lead as the 6.5 mm member; estimate, no shop metrology asserted.
+lead_mm = { value = 1, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "optical comparator, axial bevel length" } }
+# Basis: tools.reamers-metric.members."10.2mm".flute_len_mm: DIN 212 proportions near 10 mm, 38 mm; estimate, not a supplier citation.
+flute_len_mm = { value = 38.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "digital calipers, cutting length from point to flute or countersink boundary" } }
+# Basis: tools.reamers-metric.members."10.2mm".oal_mm: DIN 212 proportions near 10 mm, 133 mm; estimate, not a supplier citation.
+oal_mm = { value = 133.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "calipers" } }
+
+[tools.reamers-metric.members."10.2mm".projection_mm]
+# Basis: tools.reamers-metric.members."10.2mm".projection_mm."drill-chuck-r8": 133 OAL less about 35 of shank in the chuck = 98 mm; estimate, no extra reach credited.
+"drill-chuck-r8" = { value = 98.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "digital calipers or steel rule, installed holder exit face to cutting tip" } }
 
 # --- cone-pivot-post additions ---
 # Example purchase: decimal-size HSS chucking reamers for the cone post's running bores
