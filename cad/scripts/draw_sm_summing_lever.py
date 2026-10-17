@@ -89,6 +89,7 @@ from sm_summing_lever_notes import (
     DIMENSION_CALLOUTS_ABOVE,
     DIMENSION_CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
+    FRONT_VIEW_LETTER,
     SPRING_TAP_CALLOUT_PROCESS,
 )
 from sm_summing_lever_spec import (
@@ -481,32 +482,54 @@ def _apply_callouts(adapter: Any, annotations: list[Any], *, label: str) -> None
     _telemetry.info(f"{label}: callouts on {sorted(present)}")
 
 
-def _add_view_f_arrow(adapter: Any, top: Any) -> None:
-    """The letter arrow on the plan that names sheet 2's VIEW F."""
-    text_xy, tip_xy = VIEW_F_ARROW
+def _add_view_arrow(
+    adapter: Any,
+    top: Any,
+    letter: str,
+    arrow: tuple[tuple[float, float], tuple[float, float]],
+) -> None:
+    """A letter arrow on the plan that names a removed view: square onto the
+    end face it looks at."""
+    text_xy, tip_xy = arrow
+    label = f"view {letter} viewing arrow"
     note = add_leader_note(
         adapter,
-        BACK_VIEW_LETTER,
+        letter,
         text_xy=text_xy,
         attach_xy=tip_xy,
         view=top,
-        label="view F viewing arrow",
+        label=label,
     )
     # add_note leaves text at the document height; size the letter here and
     # prove the leader tip did not move with it.
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     text_format = annotation.GetTextFormat(0)
     if text_format is None:
-        raise RuntimeError("view F arrow note has no text format")
+        raise RuntimeError(f"{label} note has no text format")
     text_format.CharHeight = VIEW_LETTER_HEIGHT
     if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError("failed to size the view F arrow letter")
-    rebuild_drawing(adapter, label="view F arrow letter")
+        raise RuntimeError(f"failed to size the {label} letter")
+    rebuild_drawing(adapter, label=f"{label} letter")
     points = list(annotation.GetLeaderPointsAtIndex(0) or ())
     if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
-        raise RuntimeError("view F arrow tip moved when its letter was sized")
+        raise RuntimeError(f"{label} tip moved when its letter was sized")
+    # The leader leaves the letter's nearer side, whose x is the glyph's
+    # width: slide the letter by any miss so the arrow stands square.
+    miss = tip_xy[0] - points[0]
+    if abs(miss) > VIEW_ARROW_SQUARE_TOL:
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(x + miss, y, z):
+            raise RuntimeError(f"failed to square the {label}")
+        rebuild_drawing(adapter, label=f"square {label}")
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+        if (
+            len(points) < 6
+            or math.dist((points[-3], points[-2]), tip_xy) > 0.001
+            or abs(tip_xy[0] - points[0]) > VIEW_ARROW_SQUARE_TOL
+        ):
+            raise RuntimeError(f"{label} did not square: leader {points}")
     _telemetry.info(
-        f"view F arrow: leader {points[0]:.5f},{points[1]:.5f} -> "
+        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
         f"{points[-3]:.5f},{points[-2]:.5f} (square when the x agree)"
     )
 
@@ -1004,6 +1027,22 @@ VIEW_F_ARROW = (
     (_VIEW_F_TIP[0] - VIEW_F_LEADER_DX, _VIEW_F_TIP[1] + 0.013),
     _VIEW_F_TIP,
 )
+# Sheet 1's end profile is VIEW G, so the plan carries its arrow too: up onto
+# the +Z end (datum B) at model x 7.8 (sheet x 0.2392), 1.9 mm right of the
+# hex stub, with datum B's tag moved right to leave the letter room.  The
+# letter hangs below the edge and the leader leaves its left side, so the
+# note stands at the tip (the left margin is squared on readback); its foot
+# stays 3 mm over the 76.20/39.85 dimension line (y 0.0784).
+VIEW_ARROW_SQUARE_TOL = 0.0003
+_VIEW_G_TIP = _top_xy(7.8, -PLATE_L / 2.0)
+VIEW_G_ARROW = (
+    (_VIEW_G_TIP[0] - 0.0004, _VIEW_G_TIP[1] - 0.005),
+    _VIEW_G_TIP,
+)
+# VIEW G's label, under the end profile, right of Detail D's letter and
+# leader (x 0.2452), 1 cm over the 20X frame's leader.  The point is its top
+# left.
+FRONT_VIEW_NOTE_XY = (0.258, 0.2120)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -1023,6 +1062,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Isometric View Note",
             "Back View Note",
+            "Front View Note",
         ),
         required=(
             "Number",
@@ -1031,6 +1071,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Isometric View Note",
             "Back View Note",
+            "Front View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -1242,7 +1283,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Hang B's tag straight down right of the +Z trunnion stub, between it and
     # the 39.85 extension line: left of the stub it sat in the finish leader's
     # only path (layout audit); the 20X callout now hangs on the middle hole,
-    # well away from this tag.
+    # well away from this tag.  It stands 9 mm right of the pick, clear of
+    # VIEW G's letter beside the stub.
     # Every datum and dimension here names its entities: a coordinate
     # hit-test on the plate corner resolved to the rib flange 5.08 mm inboard
     # (datum B on the flange, start Z reading 3.35 for 8.43 -- #1105), and a
@@ -1256,7 +1298,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_entity=end_edge.edge,
-        symbol_xy=(plate_end_edge[0] + 0.0062, plate_end_edge[1] - 0.0035),
+        symbol_xy=(plate_end_edge[0] + 0.0090, plate_end_edge[1] - 0.0035),
         datum="B",
         label="plate +Z end face",
     )
@@ -1445,7 +1487,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole pattern position",
     )
     _plate_section(adapter, top)
-    _add_view_f_arrow(adapter, top)
+    _add_view_arrow(adapter, top, BACK_VIEW_LETTER, VIEW_F_ARROW)
+    _add_view_arrow(adapter, top, FRONT_VIEW_LETTER, VIEW_G_ARROW)
+    add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
 
     # The isometric's view label, under the iso.
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
