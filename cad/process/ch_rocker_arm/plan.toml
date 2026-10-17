@@ -908,8 +908,7 @@ do = "inspect"
 feature = "profile_outer"
 checks = { bottom_radius = "arm-outline-template", mirror_symmetric = "arm-outline-template" }
 
-# The +X tip land's station is the BASIC 146.25 "LAND" row from the pivot; the manifest
-# carries no station requirement on the -X land (mirror_symmetric covers it).
+# Each tip land's station is its own BASIC 146.25 "LAND" row from the pivot.
 [[setups.ops]]
 op = 90
 do = "inspect"
@@ -920,7 +919,7 @@ checks = { land_angle_deg = "arm-outline-template", station = "height-gauge" }
 op = 95
 do = "inspect"
 feature = "tip_land_neg_x"
-checks = { land_angle_deg = "arm-outline-template" }
+checks = { land_angle_deg = "arm-outline-template", station = "height-gauge" }
 
 # Both printed profile zones (top edge, and the lower outline J to K with both tip lands), read
 # with a DTI against the arm outline template. The accept/reject windows are computed in
