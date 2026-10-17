@@ -687,7 +687,7 @@ the magnifying lever's capsule OD on retry10 (source `644308e47`, launcher
 but its attached silhouette's face failed `IsSame` against the picked one.
 Keep that refusal. Resolve the part-owned finish-control face on the view's
 `ReferencedDocument` and attach as a FACE with the pre-insertion selection
-point (`draw_dt_pinion_arbor`, `draw_mg_magnifying_lever`): `IsSame` proves
+point (`draw_dt_pinion_arbor`): `IsSame` proves
 the actual cylinder and the 1 mm landing readback still pins its flank.
 
 **j. A fresh detail view whose readbacks lag its ink.**
