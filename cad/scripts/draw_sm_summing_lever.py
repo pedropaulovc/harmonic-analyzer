@@ -15,7 +15,7 @@ shows a 1:2 front profile (the boss, web and the rib outline every rib
 shares), a 4:1 detail of the trunnion envelope and its knife-edge round, a
 1:2 top plan (plate, ribs, cylinder, summation web, trunnion length, the
 anchor taps and their pattern control, and the VIEW F arrow onto the -Z
-end), a 1:1 partial section C-C of the plate's thickness, a 1:1 section H-H
+end), a 1:1 partial section C-C of the plate's thickness, a 4:1 section H-H
 cut in the front profile along the outer receiver tap through the -Z end
 rib, and a 1:4 isometric; sheet 2 shows VIEW F at 1:1, the -Z end with the
 two bracket receiver taps and the spring-anchor pad under the plate they sit
@@ -50,7 +50,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import set_basic_dimension, set_dimension_callouts
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
@@ -227,31 +227,30 @@ PLATE_SECTION_TEXT_MM = {"PlateThickness": (PLATE_SECTION_X[0] - 6.0, 0.0, PLATE
 # line), so the upper letter stands over the 0.44 step's extension lines
 # (sheet y 0.2363) and under 35.75's dimension line (0.2484), the lower one
 # in open field; looking -X, both would print on the boss.  The removed
-# section, cut face only at 1:1, is cropped by a circle round the end rib and
-# TAP_SECTION_PLATE_BEYOND of plate past the rib, a break line where the plate
-# is cut off, in the free field right of the plan above the 152.40/7.30
-# extension lines (0.1681), its caption above it clear of VIEW G's label and
-# the isometric's.  A circle, not a rectangle: the layout audit reads a
-# circle-cropped view's unprinted crop profile as such (its label at the
-# sheet origin), but farm r17's rectangular fence came back from
-# GetDetailCircleInfo2 as a labelled circle crossing the bottom border.
+# section, cut face only at 4:1 (machinist review r17: at 1:1 the blind
+# drill barely read), is cropped by a circle round the end rib and
+# TAP_SECTION_PLATE_BEYOND of plate past the rib, a break line where the
+# plate is cut off, in the free field under the plan's boss-axis 76.20
+# (0.092) between Detail E (x 0.086) and that dimension's extension line
+# (x 0.197), its caption below it over the bottom border (0.012).  Its
+# content spans about x 0.121..0.169 and y 0.044..0.084.  GetDetailCircleInfo2
+# answers the crop's unprinted profile with a label point on the sheet
+# (farm r17b/r17c, as draw_fr_nameplate's section A-A), which the layout
+# audit reports as an outside-border, unmatched detail circle.
 TAP_SECTION_LETTER = "H"
 TAP_SECTION_HOLE = max(LEVER_HOLE_POINTS, key=lambda point: point[0])
 TAP_SECTION_LINE_Y = (-11.0, 16.0)
-TAP_SECTION_SCALE = (1, 1)
-TAP_SECTION_PLATE_BEYOND = 7.0
+TAP_SECTION_SCALE = (4, 1)
+TAP_SECTION_PLATE_BEYOND = 4.0
 _TAP_SECTION_FAR_Z = TAP_SECTION_HOLE[2] + RIB_DEPTH + TAP_SECTION_PLATE_BEYOND
-# The crop circle's centre (end face to the break, on the mid-plane) lands on
-# TAP_SECTION_CENTER; its radius holds the end face's corners (5.06
-# half-height at x 29.7, 8.8 from the centre) and the plate to the break.
-_TAP_SECTION_ANCHOR_MM = (
-    TAP_SECTION_HOLE[0],
-    0.0,
-    (TAP_SECTION_HOLE[2] + _TAP_SECTION_FAR_Z) / 2.0,
-)
-TAP_SECTION_CROP_RADIUS = 9.5
-TAP_SECTION_CENTER = (0.295, 0.177)
-TAP_SECTION_CAPTION_XY = (0.295, 0.2015)
+# The crop circle's centre, on the mid-plane 4.75 in from the end face, lands
+# on TAP_SECTION_CENTER; its radius holds the end face's corners (5.06
+# half-height at x 29.7, 6.94 from the centre) and leaves the plate's faces
+# 0.19 past the break, so the plate ends at the break line.
+_TAP_SECTION_ANCHOR_MM = (TAP_SECTION_HOLE[0], 0.0, TAP_SECTION_HOLE[2] + 4.75)
+TAP_SECTION_CROP_RADIUS = 7.2
+TAP_SECTION_CENTER = (0.140, 0.064)
+TAP_SECTION_CAPTION_XY = (0.145, 0.037)
 # A long-break line (thin, one Z at mid-thickness) across the cut-off plate,
 # overrunning both faces (model z, y), draw_fr_nameplate's SECTION_BREAK.
 _TAP_BREAK_OVERRUN = 0.8
@@ -263,6 +262,11 @@ TAP_SECTION_BREAK = (
     (_TAP_SECTION_FAR_Z, -0.8),
     (_TAP_SECTION_FAR_Z, -PLATE_T / 2.0 - _TAP_BREAK_OVERRUN),
 )
+# SolidWorks prints a section's cosmetic thread dashed, as a hidden thread
+# (machinist review r17, rule 9); draw_pn_pen_v_block's precedent imports
+# H-H's thread and moves it onto a visible thin continuous layer of its own.
+TAP_THREAD_LAYER = "TAP-THREAD-SECTION"
+_COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
 
 # The -Z end rib's banded depth is named by
 # build_sm_summing_lever._receiver_model_bands, and the receiver stations by
@@ -936,12 +940,58 @@ def _sheet_to_view_sketch(
     return points
 
 
+def _section_thread_on_visible_layer(adapter: Any, section: Any) -> None:
+    """Import section H-H's cosmetic thread and print it thin and solid.
+
+    draw_pn_pen_v_block's ``_section_thread_on_visible_layer``: the layer is
+    created thin continuous (``ILayerMgr::AddLayer``), its state and every
+    thread annotation's layer read back.
+    """
+    threads = import_cosmetic_threads(adapter, section)
+    if threads[1] < 1:
+        raise RuntimeError("section H-H has no native cosmetic-thread instance")
+    draw = adapter.currentModel
+    manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(TAP_THREAD_LAYER)
+    if layer is None:
+        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
+        if (
+            int(manager.AddLayer(TAP_THREAD_LAYER, "section H-H tap thread", 0, 0, 0))
+            != 1
+        ):
+            raise RuntimeError(f"failed to add layer {TAP_THREAD_LAYER}")
+        layer = manager.GetLayer(TAP_THREAD_LAYER)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = True
+    if not bool(layer.Visible) or int(layer.Style) != 0 or int(layer.Width) != 0:
+        raise RuntimeError(
+            f"layer {TAP_THREAD_LAYER} reads visible={layer.Visible!r}, style "
+            f"{layer.Style!r}, width {layer.Width!r}; wanted visible thin continuous"
+        )
+    moved = 0
+    for raw_annotation in _early_bound(section, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
+            continue
+        annotation.Layer = TAP_THREAD_LAYER
+        if str(annotation.Layer or "") != TAP_THREAD_LAYER:
+            raise RuntimeError(f"a cosmetic thread refused layer {TAP_THREAD_LAYER}")
+        moved += 1
+    if moved < 1:
+        raise RuntimeError("section H-H lists no cosmetic-thread annotation to layer")
+    rebuild_drawing(adapter, label=f"cosmetic threads to {TAP_THREAD_LAYER}")
+    _telemetry.info(
+        f"section H-H cosmetic threads: seeds/instances={threads!r}, {moved} on "
+        f"{TAP_THREAD_LAYER}"
+    )
+
+
 def _tap_section(adapter: Any, front: Any) -> Any:
     """Section H-H along the outer receiver tap (TAP_SECTION_* above), cut in
     VIEW G: cut face only, looking +X, turned +Y up, cropped to the end rib
     and the plate beyond (draw_fr_nameplate's ``_crop_section``), its centre
-    landed on TAP_SECTION_CENTER, and a break line where the plate is cut
-    off."""
+    landed on TAP_SECTION_CENTER, a break line where the plate is cut off,
+    and its cosmetic thread on a thin continuous layer."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     x_mm, _, end_z = TAP_SECTION_HOLE
@@ -1110,6 +1160,7 @@ def _tap_section(adapter: Any, front: Any) -> Any:
         sketch_manager.AddToDB = previous_add_to_db
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="section H-H break line")
+    _section_thread_on_visible_layer(adapter, native)
     position_section_caption(
         adapter, native, TAP_SECTION_CAPTION_XY, label="receiver tap section H-H"
     )
@@ -1186,7 +1237,11 @@ TOP_KEEP = {
     # Right of the -Z rib's three lines (they end at x 0.4007; at 0.395 its
     # line crossed "DRILL", farm r7).
     "PlateLength": (0.405, TOP_CENTER[1]),
-    "RibDepth": (0.325, 0.160),  # -Z receiver rib: Top prints model +Z down
+    # -Z receiver rib (Top prints model +Z down): beside it, its witness lines
+    # 17 mm from the free edge (x 0.2542; at 0.325 they ran 70 mm across the
+    # field, machinist review r17), the line 5 mm right of section C-C's
+    # outboard letter (x 0.259..0.265, top 0.161) and its text above the span.
+    "RibDepth": (0.270, 0.1745),
     # The boss's diameter names the web arcs' ends under its value; its
     # four lines stand left of its leader, above the anchor tap's callout.
     "AnchorOuterDia": (0.145, 0.168),
