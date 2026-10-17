@@ -235,24 +235,40 @@ def test_receiver_view_is_on_a_back_view_sheet_with_real_binding() -> None:
     assert 'length = _early_bound(raw, "ICalloutLengthVariable")' in source
 
 
-def test_sheet_one_views_never_pass_through_hidden_lines_visible(monkeypatch) -> None:
-    """#1591: the greyed pass reveals the bracket taps' hidden threads on
-    sheet 1, whose label then grows there on some builds only."""
-    import ast
-    from pathlib import Path
+@pytest.mark.parametrize(
+    ("placed", "precise", "expected"),
+    [
+        (2, True, [2]),  # the farm's placement: a no-op set
+        (4, True, [2]),
+        (2, False, [2, 3, 2]),  # draft threads regenerate through shaded
+    ],
+)
+def test_sheet_one_views_never_pass_through_hidden_lines_visible(
+    monkeypatch, placed, precise, expected
+) -> None:
+    """#1591: the bracket taps' label grew on sheet 1 at the greyed pass, on
+    some builds only."""
 
     class View:
         def __init__(self) -> None:
-            self.mode = 4
+            self.mode = placed
+            self.precise = precise
             self.sets: list[int] = []
 
         def GetDisplayMode2(self) -> int:
             return self.mode
 
-        def SetDisplayMode4(self, use_parent, mode, faceted, edges, update) -> bool:
+        def GetCThreadQuality(self) -> bool:
+            return self.precise
+
+        def SetDisplayMode4(self, use_parent, mode, faceted, edges, quality) -> bool:
             self.sets.append(mode)
+            changed = mode != self.mode
             self.mode = mode
-            return True
+            # A same-mode set is a no-op: its thread quality is not applied.
+            if changed:
+                self.precise = bool(quality)
+            return changed
 
         def GetName2(self) -> str:
             return "Drawing View2"
@@ -260,20 +276,43 @@ def test_sheet_one_views_never_pass_through_hidden_lines_visible(monkeypatch) ->
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     view = View()
     drawing._hidden_lines_removed_without_greyed_pass(view)
-    assert view.sets == [2]  # swHIDDEN only, never swHIDDEN_GREYED (1)
+    assert view.sets == expected  # never swHIDDEN_GREYED (1)
+    assert (view.mode, view.precise) == (2, True)
+
+
+def test_only_the_receiver_sheet_uses_the_greyed_regen() -> None:
+    import ast
+    from pathlib import Path
 
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(
+    greyed = [
         node
         for node in ast.walk(tree)
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
-    )
-    loops = {
-        tuple(element.id for element in node.iter.elts): ast.unparse(node.body[0])
-        for node in ast.walk(build)
-        if isinstance(node, ast.For) and isinstance(node.iter, ast.Tuple)
-    }
-    assert loops[("top", "iso")] == "_hidden_lines_removed_without_greyed_pass(view)"
+        if isinstance(node, ast.For)
+        and any(
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Name)
+            and call.func.id == "set_hidden_lines_removed"
+            for call in ast.walk(node)
+        )
+    ]
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "set_hidden_lines_removed"
+    ]
+    assert len(calls) == 1 and len(greyed) == 1
+    assert ast.unparse(greyed[0].iter) == "(back, receiver_iso)"
+    direct = [
+        ast.unparse(node.args[0])
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_hidden_lines_removed_without_greyed_pass"
+    ]
+    assert sorted(direct) == ["detail", "native", "native", "ridge_detail", "view"]
 
 
 def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
