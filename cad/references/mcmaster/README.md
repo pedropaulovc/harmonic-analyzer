@@ -17,8 +17,6 @@ recipes:
 |---|---|---|
 | 3088A429 | `vn-rocker-thrust-washer` (MHA-VN-070; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 1/4" ID x 3/8" OD, 0.031" Thick |
 | 3606T118 | `vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
-| 5972K41 | rocker trammel jig, `fixtures.trammel-6200-2rs` (catalogue-only; no vendor model downloaded) | Steel sealed 6200-2RS bearing, 10 × 30 × 9 mm; live verified 2026-10-16 |
-| 91595A452 | rocker trammel jig, `fixtures.trammel-cl-dowel` (catalogue-only; no vendor model downloaded) | 52100 alloy-steel dowel, Ø6 × 20 mm, DIN 6325-m6 / ISO 8734; live verified 2026-10-16 |
 | 3606T811 | `vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 6261K108 | `vn-chain-connecting-link` (the loop's one connecting link; catalogue-only, vendor model not downloaded) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
 | 6261K171 | `vn-chain-inner-link`, `vn-chain-outer-link` (cut to length; catalogue-only, vendor model not downloaded) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
@@ -93,6 +91,20 @@ recipes:
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_vn_cone_lock_knob.py`
 and `cad/scripts/build_vn_swing_stop_screw.py`.
+
+Shop tooling catalogue verification on October 16, 2026 (not production
+fastener identities; no vendor models downloaded):
+
+- [5972K41](https://www.mcmaster.com/5972K41/) supplies
+  `fixtures.trammel-6200-2rs`: four steel sealed 6200-2RS bearings,
+  10 × 30 × 9 mm, Buna-N seals, ABEC 1, C3 radial clearance 0.008–0.023 mm.
+  Live Firecrawl spec table read October 16, 2026. The inventory records
+  the accepted play and rejected C0 upgrade; receipt verification is required.
+- [91595A452](https://www.mcmaster.com/91595A452/) supplies
+  `fixtures.trammel-cl-dowel`: 52100 alloy-steel Ø6 × 20 mm dowel,
+  DIN 6325-m6 / ISO 8734, diameter 6.004–6.012 mm, minimum HRC 52.
+  Live Firecrawl spec table read October 16, 2026; length tolerance unstated.
+  Both purchases remain unconfirmed in `cad/process/shop/inventory.toml`.
 
 Live catalogue verification on October 12, 2026:
 
