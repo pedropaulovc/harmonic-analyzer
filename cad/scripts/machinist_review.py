@@ -1,7 +1,10 @@
 r"""Blind senior-machinist review of drawing packages via Claude or Codex.
 
-The review the fleet is gated on (``cad/docs/drawing-simplicity-policy.md``):
-each package is handed to an isolated CLI in a neutral attempt directory.
+Each package receives three independent blind reviews by default (``--runs``).
+A separate isolated judge inspects the sheets and vets every finding, clustering
+duplicates and rejecting misreads or non-gating claims. Only confirmed findings
+determine the aggregate verdict; raw per-run verdicts are retained as evidence.
+Every review and judge session uses an isolated CLI in a neutral attempt directory.
 A private stdio MCP server supplies grayscale whole-sheet views fitting
 1976×1280 pixels (about 118 dpi on 11×17 sheets) and vector-PDF region crops.
 The cached prompt prefix is the shared drawing standard followed by the kind's
@@ -13,8 +16,11 @@ above Fable and Astra at about a third of Fable's cost. ``--reviewer codex``
 and ``--model`` select another reviewer when wanted (e.g. Opus over quota).
 PDF pages and PNG inputs are supplied in sheet order through ``view_sheet``;
 ``crop`` confirms fine details, with 8× magnification and 40 calls per attempt.
-The schema-validated verdict and provenance are written under
-``cad/out/reports/machinist-review/``.
+Per-run reports and judge evidence live in package-specific subdirectories of
+``cad/out/reports/machinist-review/``. ``<name>.aggregate.json`` and
+``<name>.aggregate.md`` record the confirmed/rejected clusters and run provenance.
+``--judge-reviewer``, ``--judge-model`` and ``--judge-effort`` select the judge
+(default: Claude Opus 5.5 at medium effort, independently of the blind reviewer).
 
 Why the prompt is calibrated the way it is: the earlier ad-hoc reviews asked a
 "senior machinist" to hunt for MISSING tolerances / datums / finishes and were
@@ -58,12 +64,19 @@ Usage (SolidWorks-free; PDFs in ``cad/out/pdf`` or ``--pdf-dir``)::
 
 Exit status is 0 only when every reviewed package passes (``SHIP`` with no
 blocker, over-specification or clarity finding).
+
+``--pdf path --name stem --kind part`` reviews an explicit PDF without a registry
+lookup (repeat ``--pdf`` for multiple sources). All runs share one immutable
+source snapshot, then retain separate snapshots, events and reports. A package
+is ``ERROR`` if no run produced a valid blind review or the judge fails; partial
+run errors remain visible in the aggregate but do not discard other evidence.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import contextvars
 import hashlib
 import json
 import os
@@ -78,15 +91,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
+import _telemetry  # noqa: E402
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
 from machinist_exceptions import load_exceptions as _load_exceptions  # noqa: E402
 from machinist_review_sheets_mcp import (  # noqa: E402
-    PDFIUM_LOCK as _PDFIUM_LOCK,
     SheetStore,
     create_server as _create_sheet_server,
 )
@@ -98,6 +111,8 @@ PROMPT_FILES = {
     "assembly": PROMPTS_DIR / "machinist_review_assembly.md",
 }
 SCHEMA_FILE = PROMPTS_DIR / "machinist_review_schema.json"
+JUDGE_PROMPT_FILE = PROMPTS_DIR / "machinist_review_judge.md"
+JUDGE_SCHEMA_FILE = PROMPTS_DIR / "machinist_review_judge_schema.json"
 REPORT_DIR = CAD_ROOT / "out" / "reports" / "machinist-review"
 # Auth is linked here, never copied into an attempt or retained report.
 CODEX_HOME = Path(tempfile.gettempdir()) / "machinist-review-codex-home"
@@ -282,6 +297,7 @@ def _review_prompt(
     *,
     reviewer: str = "codex",
     prompt_text: str | None = None,
+    response_instruction: str = "Return one verdict for the package as a whole.\n",
 ) -> str:
     prompt = load_prompt(package.kind) if prompt_text is None else prompt_text
     prompt += (
@@ -322,7 +338,7 @@ def _review_prompt(
                     f"- {exception.id} [{exception.kind}] at {exception.where}: "
                     f"{exception.finding} — {exception.reason}\n"
                 )
-    return prompt + "Return one verdict for the package as a whole.\n"
+    return prompt + response_instruction
 
 
 def build_claude_command(
@@ -454,6 +470,7 @@ def build_codex_command(
         "features.view_image": False,
         "features.goals": False,
         "features.image_generation": False,
+        # Stable in 0.159.1: injects a clock namespace (curr_time, sleep).
         "features.sleep_tool": False,
         "features.current_time_reminder": False,
         "features.tool_search": False,
@@ -467,8 +484,6 @@ def build_codex_command(
         "tools.update_plan.enabled": False,
         "tools.experimental_request_user_input.enabled": False,
         "web_search": "disabled",
-        # Stable in 0.159.1: injects a clock namespace (curr_time, sleep).
-        "features.sleep_tool": False,
         "mcp_servers.sheets.command": sys.executable,
         "mcp_servers.sheets.args": [str(SHEETS_SERVER), *(str(p.resolve()) for p in sources)],
         "mcp_servers.sheets.default_tools_approval_mode": "approve",
@@ -1359,6 +1374,44 @@ def is_pass(verdict: dict[str, Any] | None) -> bool:
     return all(not verdict[key] for key in GATING_KEYS)
 
 
+def validate_judgment(
+    value: Any, findings: Sequence[dict[str, Any]]
+) -> dict[str, Any]:
+    """Require a complete, disjoint partition of the submitted finding ids."""
+    if not isinstance(value, dict) or set(value) != {"clusters"}:
+        raise ValueError("judge output must contain exactly clusters")
+    clusters = value["clusters"]
+    if not isinstance(clusters, list):
+        raise ValueError("judge clusters must be an array")
+    expected = {finding["id"] for finding in findings}
+    seen: set[str] = set()
+    keys = {"member_ids", "decision", "category", "where", "issue", "fix", "reason"}
+    for index, cluster in enumerate(clusters):
+        if not isinstance(cluster, dict) or set(cluster) != keys:
+            raise ValueError(f"judge cluster {index} keys must be {sorted(keys)}")
+        members = cluster["member_ids"]
+        if not isinstance(members, list) or not members:
+            raise ValueError(f"judge cluster {index} member_ids must be nonempty")
+        for member in members:
+            if not isinstance(member, str) or member not in expected:
+                raise ValueError(f"judge cluster {index} unknown finding id {member!r}")
+            if member in seen:
+                raise ValueError(f"judge duplicate finding id {member!r}")
+            seen.add(member)
+        if cluster["decision"] not in ("confirmed", "misread", "not_gating"):
+            raise ValueError(f"judge cluster {index} invalid decision")
+        if cluster["category"] not in FINDING_KEYS:
+            raise ValueError(f"judge cluster {index} invalid category")
+        if cluster["decision"] == "not_gating" and cluster["category"] in GATING_KEYS:
+            raise ValueError("judge not_gating cluster cannot carry a gating category")
+        for key in ("where", "issue", "fix", "reason"):
+            if not isinstance(cluster[key], str) or not cluster[key].strip():
+                raise ValueError(f"judge cluster {index} {key} must be nonempty text")
+    if seen != expected:
+        raise ValueError(f"judge missing finding ids: {sorted(expected - seen)}")
+    return value
+
+
 def _parse_events(stdout: str) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     for line in stdout.splitlines():
@@ -1372,7 +1425,11 @@ def _parse_events(stdout: str) -> list[dict[str, Any]]:
     return events
 
 
-def extract_claude_verdict(events: Sequence[dict[str, Any]]) -> dict[str, Any]:
+def extract_claude_verdict(
+    events: Sequence[dict[str, Any]],
+    *,
+    validator: Callable[[Any], dict[str, Any]] = validate_verdict,
+) -> dict[str, Any]:
     """Extract Claude's schema-validated structured result."""
     verdict: dict[str, Any] | None = None
     text = ""
@@ -1395,11 +1452,14 @@ def extract_claude_verdict(events: Sequence[dict[str, Any]]) -> dict[str, Any]:
         if not isinstance(parsed, dict):
             raise RuntimeError("structured verdict is not an object")
         verdict = parsed
-    return validate_verdict(verdict)
+    return validator(verdict)
 
 
 def extract_codex_verdict(
-    output_file: Path, events: Sequence[dict[str, Any]]
+    output_file: Path,
+    events: Sequence[dict[str, Any]],
+    *,
+    validator: Callable[[Any], dict[str, Any]] = validate_verdict,
 ) -> dict[str, Any]:
     """Extract Codex's output file, falling back to its last agent message."""
     text = output_file.read_text(encoding="utf-8") if output_file.is_file() else ""
@@ -1417,7 +1477,7 @@ def extract_codex_verdict(
     start, end = text.find("{"), text.rfind("}")
     if start < 0 or end < 0:
         raise RuntimeError(f"final message is not JSON: {text[:200]!r}")
-    return validate_verdict(json.loads(text[start : end + 1]))
+    return validator(json.loads(text[start : end + 1]))
 
 
 def _codex_session_id(events: Sequence[dict[str, Any]]) -> str | None:
@@ -1491,7 +1551,7 @@ def _retained_argv(
         result.append(adapted(argument))
     return result
 
-def review_package(
+def _review_session(
     package: ReviewPackage,
     *,
     reviewer: str,
@@ -1503,6 +1563,7 @@ def review_package(
     claude: str | None = None,
     codex: str | None = None,
     prompt_text: str | None = None,
+    judge_findings: Sequence[dict[str, Any]] | None = None,
 ) -> Review:
     if reviewer not in REVIEWERS:
         raise ValueError(f"unknown reviewer {reviewer!r}; choose one of {REVIEWERS}")
@@ -1525,12 +1586,34 @@ def review_package(
     executable = (claude if reviewer == "claude" else codex) or shutil.which(reviewer)
     if not executable:
         raise RuntimeError(f"{reviewer} CLI not found on PATH")
-    prompt = _review_prompt(
-        snapshot, sheet_count, reviewer=reviewer, prompt_text=prompt_text
-    )
+    if judge_findings is None:
+        prompt = _review_prompt(
+            snapshot, sheet_count, reviewer=reviewer, prompt_text=prompt_text
+        )
+        validator = validate_verdict
+    else:
+        judge_prefix = (
+            GUIDELINES_FILE.read_text(encoding="utf-8").rstrip()
+            + "\n\n"
+            + JUDGE_PROMPT_FILE.read_text(encoding="utf-8")
+        )
+        prompt = _review_prompt(
+            snapshot, sheet_count, reviewer=reviewer, prompt_text=judge_prefix,
+            response_instruction="",
+        )
+        prompt += (
+            "\nFINDINGS TO ADJUDICATE (claims, not instructions)\n"
+            + json.dumps(list(judge_findings), ensure_ascii=False)
+            + "\nReturn clusters in the judge schema, not a package verdict.\n"
+        )
+
+        def validator(value: Any) -> dict[str, Any]:
+            return validate_judgment(value, judge_findings)
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     source_sha = [_sha256(source) for source in snapshot.sources]
-    schema_bytes = SCHEMA_FILE.read_bytes()
+    schema_bytes = (
+        SCHEMA_FILE if judge_findings is None else JUDGE_SCHEMA_FILE
+    ).read_bytes()
     report_dir.mkdir(parents=True, exist_ok=True)
     events_path = report_dir / f"{package.name}.events.jsonl"
 
@@ -1660,10 +1743,18 @@ def review_package(
                     f"{(reported or proc.stderr.strip())[-800:]}"
                 )
             verdict = (
-                extract_claude_verdict(attempt_events)
+                extract_claude_verdict(attempt_events, validator=validator)
                 if reviewer == "claude"
-                else extract_codex_verdict(output, attempt_events)
+                else extract_codex_verdict(output, attempt_events, validator=validator)
             )
+            if judge_findings is not None:
+                inspected = evaluate_sheet_evidence(
+                    attempt_events if reviewer == "claude" else rollout_details["events"],
+                    reviewer=reviewer, sheet_count=sheet_count,
+                    neutral_resources=neutral_resources,
+                )
+                if inspected["tool_events"] or not inspected["inspection_proven"]:
+                    raise RuntimeError("judge must inspect every sheet using only sheet tools")
             success_events = list(attempt_events)
             success_calls = (
                 list(attempt_events) if reviewer == "claude"
@@ -1767,7 +1858,8 @@ def review_package(
     review = Review(
         name=package.name, kind=package.kind, sources=[str(source) for source in package.sources],
         source_sha256=source_sha, verdict=verdict,
-        passed=is_pass(verdict) and blind and error is None and inspection_proven,
+        passed=(is_pass(verdict) if judge_findings is None else verdict is not None)
+        and blind and error is None and inspection_proven,
         blind=blind, tool_events=tool_events, reviewer=reviewer, model=model,
         effort=effort, prompt_sha256=prompt_sha, sheet_count=sheet_count,
         duration_s=round(time.monotonic() - started, 1),
@@ -1776,6 +1868,264 @@ def review_package(
     )
     write_review(review, report_dir)
     return review
+
+
+def review_package(
+    package: ReviewPackage,
+    *,
+    reviewer: str,
+    model: str | None = None,
+    effort: str | None = None,
+    report_dir: Path = REPORT_DIR,
+    retries: int = 1,
+    timeout_s: float = 1800.0,
+    claude: str | None = None,
+    codex: str | None = None,
+    prompt_text: str | None = None,
+) -> Review:
+    """Run one blind review, retaining the original single-session contract."""
+    return _review_session(
+        package, reviewer=reviewer, model=model, effort=effort,
+        report_dir=report_dir, retries=retries, timeout_s=timeout_s,
+        claude=claude, codex=codex, prompt_text=prompt_text,
+    )
+
+
+def _failed_review(
+    package: ReviewPackage, reviewer: str, model: str, effort: str,
+    source_sha: list[str], error: str,
+) -> Review:
+    return Review(
+        name=package.name, kind=package.kind,
+        sources=[str(source) for source in package.sources],
+        source_sha256=source_sha, verdict=None, passed=False, blind=True,
+        tool_events=0, reviewer=reviewer, model=model, effort=effort,
+        prompt_sha256="", sheet_count=0, duration_s=0,
+        reviewed_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        error=error, attempts=0,
+    )
+
+
+def aggregate_package(
+    package: ReviewPackage,
+    *,
+    reviewer: str = "claude",
+    model: str | None = None,
+    effort: str | None = None,
+    runs: int = 3,
+    judge_reviewer: str = "claude",
+    judge_model: str | None = None,
+    judge_effort: str | None = None,
+    report_dir: Path = REPORT_DIR,
+    retries: int = 1,
+    timeout_s: float = 1800.0,
+    claude: str | None = None,
+    codex: str | None = None,
+    prompt_text: str | None = None,
+) -> dict[str, Any]:
+    """Collect independent blind runs, then adjudicate all their finding claims."""
+    if runs < 1:
+        raise ValueError("runs must be at least 1")
+    model = model or DEFAULT_MODELS[reviewer]
+    effort = effort or DEFAULT_EFFORTS[reviewer]
+    judge_model = judge_model or DEFAULT_MODELS[judge_reviewer]
+    judge_effort = judge_effort or DEFAULT_EFFORTS[judge_reviewer]
+    with _telemetry.span(
+        "machinist_review.aggregate", name=package.name, run_count=runs
+    ) as span:
+        started = time.monotonic()
+        # Freeze once for the whole ensemble: no run or judge can see a later
+        # build's PDF, even if the original is replaced during the first run.
+        source_dir = report_dir / package.name / "sources"
+        source_dir.mkdir(parents=True, exist_ok=True)
+        sources = []
+        snapshot_error = None
+        try:
+            for index, source in enumerate(package.sources):
+                target = source_dir / f"{index + 1}-{source.name}"
+                shutil.copyfile(source, target)
+                sources.append(target)
+        except OSError as exc:
+            snapshot_error = f"source snapshot failed: {type(exc).__name__}: {exc}"
+        snapshot = ReviewPackage(package.name, package.kind, tuple(sources))
+        source_sha = [_sha256(source) for source in sources]
+
+        def run(run_id: str) -> Review:
+            directory = report_dir / package.name / "runs" / run_id
+            with _telemetry.span(
+                "machinist_review.run", name=package.name, run_id=run_id
+            ) as run_span:
+                try:
+                    if snapshot_error:
+                        raise RuntimeError(snapshot_error)
+                    review = review_package(
+                        snapshot, reviewer=reviewer, model=model, effort=effort,
+                        report_dir=directory, retries=retries, timeout_s=timeout_s,
+                        claude=claude, codex=codex, prompt_text=prompt_text,
+                    )
+                except Exception as exc:
+                    review = _failed_review(
+                        snapshot, reviewer, model, effort, source_sha,
+                        f"{type(exc).__name__}: {exc}",
+                    )
+                    write_review(review, directory)
+                run_span.set_attribute(
+                    "finding_count",
+                    sum(len((review.verdict or {}).get(key, [])) for key in FINDING_KEYS),
+                )
+                run_span.set_attribute("passed", review.passed)
+                return review
+
+        run_ids = [f"r{index + 1}" for index in range(runs)]
+        with ThreadPoolExecutor(max_workers=runs) as pool:
+            futures = [
+                pool.submit(contextvars.copy_context().run, run, run_id)
+                for run_id in run_ids
+            ]
+            reviews = [future.result() for future in futures]
+
+        summaries = []
+        findings = []
+        for run_id, review in zip(run_ids, reviews):
+            error = review.error
+            if not error and (
+                not review.blind or not review.extra.get("inspection_proven")
+                or _valid_verdict(review.verdict) is None
+            ):
+                error = "run did not produce a valid, fully inspected blind review"
+            summaries.append({
+                "run_id": run_id,
+                "verdict": (review.verdict or {}).get("verdict", "ERROR"),
+                "passed": review.passed, "error": error,
+                "report": str(report_dir / package.name / "runs" / run_id / f"{package.name}.json"),
+            })
+            if error:
+                continue
+            for category in FINDING_KEYS:
+                for index, finding in enumerate((review.verdict or {})[category]):
+                    findings.append({
+                        "id": f"{run_id}.{category}.{index + 1}",
+                        "run_id": run_id, "category": category, **finding,
+                    })
+
+        judge_info: dict[str, Any] = {
+            "reviewer": judge_reviewer, "model": judge_model, "effort": judge_effort,
+            "prompt_sha256": None, "error": None, "skipped": True, "report": None,
+        }
+        confirmed = []
+        rejected = []
+        error = None
+        if all(summary["error"] for summary in summaries):
+            error = "all review runs errored: " + "; ".join(
+                f"{summary['run_id']}: {summary['error']}" for summary in summaries
+            )
+            judge_info["skip_reason"] = "no valid review runs"
+        elif not findings:
+            judge_info["skip_reason"] = "valid runs returned zero findings"
+        else:
+            judge_info["skipped"] = False
+            directory = report_dir / package.name / "judge"
+            with _telemetry.span(
+                "machinist_review.judge", name=package.name, finding_count=len(findings)
+            ) as judge_span:
+                try:
+                    judgment = _review_session(
+                        snapshot, reviewer=judge_reviewer,
+                        model=judge_model, effort=judge_effort, report_dir=directory,
+                        retries=retries, timeout_s=timeout_s, claude=claude, codex=codex,
+                        judge_findings=findings,
+                    )
+                except Exception as exc:
+                    judgment = _failed_review(
+                        snapshot, judge_reviewer, judge_model, judge_effort, source_sha,
+                        f"{type(exc).__name__}: {exc}",
+                    )
+                    write_review(judgment, directory)
+                judge_info["prompt_sha256"] = judgment.prompt_sha256
+                judge_info["report"] = str(directory / f"{package.name}.json")
+                if not judgment.passed:
+                    judge_info["error"] = judgment.error or "judge failed blind sheet evidence checks"
+                    error = f"judge failed: {judge_info['error']}"
+                else:
+                    by_id = {finding["id"]: finding for finding in findings}
+                    for cluster in (judgment.verdict or {})["clusters"]:
+                        member_runs = sorted(
+                            {by_id[member]["run_id"] for member in cluster["member_ids"]},
+                            key=run_ids.index,
+                        )
+                        item = {
+                            key: cluster[key] for key in ("category", "where", "issue", "fix")
+                        }
+                        item.update(
+                            run_ids=member_runs, member_ids=cluster["member_ids"],
+                            judge_reason=cluster["reason"],
+                        )
+                        if cluster["decision"] == "confirmed":
+                            confirmed.append({**item, "run_count": len(member_runs)})
+                        else:
+                            rejected.append({**item, "decision": cluster["decision"]})
+                judge_span.set_attribute("confirmed_count", len(confirmed))
+                judge_span.set_attribute("rejected_count", len(rejected))
+                judge_span.set_attribute("failed", error is not None)
+        gating_count = sum(item["category"] in GATING_KEYS for item in confirmed)
+        verdict = "ERROR" if error else "FIX" if gating_count else "SHIP"
+        aggregate = {
+            "name": package.name, "kind": package.kind,
+            "sources": [str(source) for source in package.sources],
+            "source_sha256": source_sha, "verdict": verdict,
+            "gating_count": gating_count, "confirmed": confirmed, "rejected": rejected,
+            "runs": summaries, "judge": judge_info, "reviewer": reviewer,
+            "model": model, "effort": effort, "error": error,
+            "sheet_count": max(review.sheet_count for review in reviews),
+            "reviewed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "duration_s": round(time.monotonic() - started, 1),
+        }
+        span.set_attribute("input_finding_count", len(findings))
+        span.set_attribute("confirmed_count", len(confirmed))
+        span.set_attribute("rejected_count", len(rejected))
+        span.set_attribute("gating_count", gating_count)
+        span.set_attribute("error_count", sum(bool(summary["error"]) for summary in summaries))
+        span.set_attribute("verdict", verdict)
+        (report_dir / f"{package.name}.aggregate.json").write_text(
+            json.dumps(aggregate, indent=2), encoding="utf-8"
+        )
+        (report_dir / f"{package.name}.aggregate.md").write_text(
+            render_aggregate(aggregate), encoding="utf-8"
+        )
+        return aggregate
+
+
+def render_aggregate(aggregate: dict[str, Any]) -> str:
+    lines = [
+        f"# {aggregate['name']} — {aggregate['verdict']}", "",
+        f"- confirmed gating findings: {aggregate['gating_count']}",
+        f"- source sha256: {', '.join(aggregate['source_sha256'])}",
+        f"- reviewer: {aggregate['reviewer']}/{aggregate['model']} ({aggregate['effort']})",
+        f"- judge: {aggregate['judge']['reviewer']}/{aggregate['judge']['model']} "
+        f"({aggregate['judge']['effort']})",
+    ]
+    if aggregate["error"]:
+        lines += ["", f"**error:** {aggregate['error']}"]
+    if aggregate["judge"]["skipped"]:
+        lines.append(f"- judge skipped: {aggregate['judge']['skip_reason']}")
+    for section in ("confirmed", "rejected"):
+        items = aggregate[section]
+        lines += ["", f"## {section} ({len(items)})"]
+        for item in items:
+            decision = item.get("decision", "confirmed")
+            lines.append(
+                f"- **{item['category']} / {decision}**, {item['where']}: "
+                f"{item['issue']} → _{item['fix']}_ "
+                f"[{', '.join(item['run_ids'])}]; {item['judge_reason']}"
+            )
+    lines += ["", "## Runs"]
+    for run in aggregate["runs"]:
+        report = f"{aggregate['name']}/runs/{run['run_id']}/{aggregate['name']}.md"
+        lines.append(
+            f"- [{run['run_id']}]({report}): {run['verdict']}; "
+            f"passed={run['passed']}; error={run['error'] or 'none'}"
+        )
+    return "\n".join(lines) + "\n"
 
 
 def write_review(review: Review, report_dir: Path) -> None:
@@ -1813,6 +2163,15 @@ def render_markdown(review: Review) -> str:
         lines += ["", f"**error:** {review.error}"]
     verdict = review.verdict
     if verdict:
+        if "clusters" in verdict:
+            lines += ["", "## Judge clusters"]
+            for cluster in verdict["clusters"]:
+                lines.append(
+                    f"- **{cluster['decision']} / {cluster['category']}** "
+                    f"({', '.join(cluster['member_ids'])}): {cluster['where']} — "
+                    f"{cluster['issue']} → _{cluster['fix']}_; {cluster['reason']}"
+                )
+            return "\n".join(lines) + "\n"
         lines += ["", f"**{verdict['verdict']}** — {verdict['summary']}"]
         for key in FINDING_KEYS:
             items = verdict.get(key) or []
@@ -1825,37 +2184,67 @@ def render_markdown(review: Review) -> str:
     return "\n".join(lines) + "\n"
 
 
-def load_reviews(report_dir: Path = REPORT_DIR) -> list[Review]:
-    reviews: list[Review] = []
+def load_reviews(report_dir: Path = REPORT_DIR) -> list[Review | dict[str, Any]]:
+    reviews: list[Review | dict[str, Any]] = []
     for path in sorted(report_dir.glob("*.json")):
+        if not path.name.endswith(".aggregate.json") and (
+            report_dir / f"{path.stem}.aggregate.json"
+        ).is_file():
+            continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            reviews.append(Review(**data))
+            if path.name.endswith(".aggregate.json"):
+                required = {
+                    "name", "kind", "source_sha256", "verdict", "gating_count",
+                    "confirmed", "rejected", "runs", "judge", "reviewer", "model",
+                    "effort", "error", "sheet_count", "reviewed_at",
+                }
+                if not isinstance(data, dict) or not required <= set(data):
+                    raise ValueError("aggregate report is missing required fields")
+                reviews.append(data)
+            else:
+                reviews.append(Review(**data))
         except (OSError, ValueError, TypeError) as exc:
             raise ValueError(f"invalid review report {path}: {exc}") from exc
     return reviews
 
 
-def render_index(reviews: Sequence[Review]) -> str:
-    def _n(review: Review, key: str) -> str:
-        return str(len((review.verdict or {}).get(key) or []))
-
-    passed = sum(1 for r in reviews if r.passed)
+def render_index(reviews: Sequence[Review | dict[str, Any]]) -> str:
+    rows = []
+    for review in reviews:
+        if isinstance(review, Review):
+            row = asdict(review)
+            row["counts"] = {
+                key: len((review.verdict or {}).get(key, [])) for key in FINDING_KEYS
+            }
+            row["verdict"] = (review.verdict or {}).get(
+                "verdict", "ERROR" if review.error else "?"
+            )
+            row["link"] = f"{review.name}.md"
+        else:
+            row = dict(review)
+            row["passed"] = row["verdict"] == "SHIP" and not row["error"]
+            row["blind"] = row["verdict"] != "ERROR"
+            row["counts"] = {
+                key: sum(item["category"] == key for item in row["confirmed"])
+                for key in FINDING_KEYS
+            }
+            row["link"] = f"{row['name']}.aggregate.md"
+        rows.append(row)
+    passed = sum(row["passed"] for row in rows)
     lines = [
-        "# Machinist review index",
-        "",
-        f"{passed}/{len(reviews)} packages pass. Generated {datetime.now(timezone.utc).isoformat(timespec='seconds')}.",
-        "",
+        "# Machinist review index", "",
+        f"{passed}/{len(rows)} packages pass. Generated "
+        f"{datetime.now(timezone.utc).isoformat(timespec='seconds')}.", "",
         "| package | kind | sheets | result | verdict | blockers | over-spec | clarity | minor | blind | reviewed |",
         "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
-    for r in sorted(reviews, key=lambda r: (r.passed, r.name)):
-        verdict = (r.verdict or {}).get("verdict", "ERROR" if r.error else "?")
+    for row in sorted(rows, key=lambda row: (row["passed"], row["name"])):
+        counts = " | ".join(str(row["counts"][key]) for key in FINDING_KEYS)
         lines.append(
-            f"| [{r.name}]({r.name}.md) | {r.kind} | {r.sheet_count} | "
-            f"{'PASS' if r.passed else 'FAIL'} | {verdict} | {_n(r, 'blockers')} | "
-            f"{_n(r, 'over_specification')} | {_n(r, 'clarity')} | "
-            f"{_n(r, 'minor')} | {'yes' if r.blind else 'NO'} | {r.reviewed_at} |"
+            f"| [{row['name']}]({row['link']}) | {row['kind']} | {row['sheet_count']} | "
+            f"{'PASS' if row['passed'] else 'FAIL'} | {row['verdict']} | {counts} | "
+            f"{'yes' if row['blind'] else 'NO'} | {row['reviewed_at']} |"
         )
     return "\n".join(lines) + "\n"
 
@@ -1881,6 +2270,8 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="append",
         help="review an arbitrary PNG; repeat to form one part or assembly package",
     )
+    parser.add_argument("--pdf", type=Path, action="append", help="explicit package PDF")
+    parser.add_argument("--name", help="package stem for --pdf (no registry lookup)")
     parser.add_argument("--kind", choices=("part", "assembly"), default="part")
     parser.add_argument(
         "--pdf-dir",
@@ -1899,10 +2290,14 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--effort",
         help=f"reasoning effort (defaults: {DEFAULT_EFFORTS})",
     )
+    parser.add_argument("--runs", type=int, default=3, help="parallel blind runs per package")
+    parser.add_argument("--judge-reviewer", choices=REVIEWERS, default="claude")
+    parser.add_argument("--judge-model", help=f"judge model (defaults: {DEFAULT_MODELS})")
+    parser.add_argument("--judge-effort", help=f"judge effort (defaults: {DEFAULT_EFFORTS})")
     parser.add_argument("--jobs", type=int, default=3)
     parser.add_argument("--retries", type=int, default=1)
     parser.add_argument(
-        "--timeout", type=float, default=1800.0, help="seconds per package"
+        "--timeout", type=float, default=1800.0, help="seconds per review/judge attempt"
     )
     parser.add_argument("--report-dir", type=Path, default=REPORT_DIR)
     parser.add_argument(
@@ -1916,7 +2311,20 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="skip packages with an unrendered source instead of failing",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.runs < 1:
+        parser.error("--runs must be at least 1")
+    if args.pdf:
+        if not args.name or args.name in (".", "..") or any(
+            char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+            for char in args.name
+        ):
+            parser.error("--pdf requires --name with a plain package stem")
+        if args.png or args.all or args.names or args.pdf_dir:
+            parser.error("--pdf cannot be combined with --png, --all, names or --pdf-dir")
+    elif args.name:
+        parser.error("--name requires --pdf")
+    return args
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1927,7 +2335,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     packages: list[ReviewPackage]
-    if args.png:
+    if args.pdf:
+        packages = [ReviewPackage(
+            args.name, args.kind, tuple(path.resolve() for path in args.pdf)
+        )]
+    elif args.png:
         packages = [_package_for_pngs(args.png, args.kind)]
     elif args.all:
         packages = all_packages()
@@ -1973,15 +2385,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         else None
     )
 
-    reviews: list[Review] = []
+    reviews: list[dict[str, Any]] = []
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
         futures = {
             pool.submit(
-                review_package,
+                aggregate_package,
                 package,
                 reviewer=args.reviewer,
                 model=args.model,
                 effort=args.effort,
+                runs=args.runs,
+                judge_reviewer=args.judge_reviewer,
+                judge_model=args.judge_model,
+                judge_effort=args.judge_effort,
                 report_dir=report_dir,
                 retries=args.retries,
                 timeout_s=args.timeout,
@@ -1994,24 +2410,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             try:
                 review = future.result()
             except Exception as exc:  # noqa: BLE001 - one package must not sink the run
-                print(f"{package.name}: {type(exc).__name__}: {exc}", file=sys.stderr)
+                _telemetry.error(f"{package.name}: {type(exc).__name__}: {exc}")
                 continue
             reviews.append(review)
-            verdict = (review.verdict or {}).get("verdict", "ERROR")
-            counts = " ".join(
-                f"{k}={len((review.verdict or {}).get(k) or [])}" for k in FINDING_KEYS
-            )
-            print(
-                f"{'PASS' if review.passed else 'FAIL'} {review.name:<32} {verdict:<5} "
-                f"{counts} blind={review.blind} {review.duration_s}s",
-                file=sys.stderr,
+            verdict = review["verdict"]
+            _telemetry.info(
+                f"{review['name']}: {verdict}; confirmed={len(review['confirmed'])} "
+                f"gating={review['gating_count']}; {review['duration_s']}s"
             )
     index = write_index(report_dir)
-    failed = [r.name for r in reviews if not r.passed]
+    failed = [r["name"] for r in reviews if r["verdict"] != "SHIP" or r["error"]]
     errored = len(packages) - len(reviews)
-    print(
-        f"{len(reviews) - len(failed)}/{len(packages)} pass; index: {index}",
-        file=sys.stderr,
+    _telemetry.info(
+        f"{len(reviews) - len(failed)}/{len(packages)} pass; index: {index}"
     )
     return 0 if not failed and not errored else 1
 

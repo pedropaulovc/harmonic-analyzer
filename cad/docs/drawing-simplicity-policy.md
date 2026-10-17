@@ -120,11 +120,15 @@ approved declaration carries a comment naming it.
 
 ## The gate
 
-`uv run cad/scripts/machinist_review.py <name>...` (or `--all`) renders each
-package's verdict from a blind senior machinist. The prompt is
-`drawing-guidelines.md` followed by the reviewer instructions for the package
-kind (`cad/scripts/prompts/machinist_review_part.md` or
-`machinist_review_assembly.md`).
+`uv run cad/scripts/machinist_review.py <name>...` (or `--all`) runs three
+independent blind senior-machinist reviews per package (`--runs N` changes the
+count). Each run receives `drawing-guidelines.md` followed by the reviewer
+instructions for the package kind (`cad/scripts/prompts/machinist_review_part.md`
+or `machinist_review_assembly.md`). A separate isolated judge inspects the sheets,
+vets every finding against the same guidelines, text layer and owner exceptions,
+and clusters duplicate claims. It confirms real findings, rejects misreads, and
+demotes advisory or accepted-exception claims to non-gating `minor`. Repetition is
+not a vote: a confirmed finding from only one run still counts.
 
 The gate covers every sheet whose rendered output a PR changes, including a
 sheet that changes only because CAD geometry, config or a helper it reads
@@ -141,14 +145,19 @@ both verdicts and the finding diff.
   `--model claude-fable-5-1`) is allowed, for example when Opus is over
   quota; record the reviewer and model in the PR. An 80-case benchmark ranks
   Opus highest on expectations met at about a third of Fable's cost.
-- Every native PDF page is rendered at 300 dpi and all sheets go to one
-  review. A downscaled contact sheet is not a substitute.
-- A package passes on `SHIP` with no blocker, over-specification or clarity
-  finding; minor findings are recorded, not gating. The runner passes `SHIP`
-  only. A `FIX` whose only gating findings match a named exception still
-  exits nonzero; accept it by hand, citing the declaration in the PR, and
-  state the shortfall on the sheet so the reviewer files it under minor next
-  time.
+- Every review and judge must view every sheet through the private sheet server;
+  full-resolution crops resolve fine detail. A contact sheet alone is not proof.
+  The judge defaults independently to Claude Opus 5.5 at medium effort
+  (`--judge-reviewer`, `--judge-model`, `--judge-effort` select alternatives).
+- The authoritative result is `<name>.aggregate.json` and its companion
+  `<name>.aggregate.md`, not an individual run's verdict. `FIX` means at least one
+  **confirmed** blocker, over-specification or clarity finding. Confirmed minor
+  findings and rejected clusters remain in the report but do not gate. `SHIP`
+  means no confirmed gating findings and no aggregate error. If valid runs return
+  zero findings, the judge is skipped. If all runs fail, or the judge fails after
+  retries (including incomplete/duplicate finding coverage), the result is
+  `ERROR` and exits nonzero. Partial run failures remain visible alongside valid
+  evidence; run reports and isolated judge transcripts are retained separately.
 - A review counts as a merge gate's visual check only on the exact drawing
   version being merged.
 
