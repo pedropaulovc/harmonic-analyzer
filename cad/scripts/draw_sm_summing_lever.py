@@ -102,7 +102,6 @@ from sm_summing_lever_spec import (
     GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
     HEX_H,
-    HEX_W,
     HOLE_COUNT,
     HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
@@ -172,24 +171,20 @@ DETAIL_LABEL_XY = (0.075, 0.176)
 # between the rib-arc and cylinder leaders.
 DETAIL_LETTER_OFFSET = (0.0, -0.016)
 KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
-# Detail E: the knife-edge vertex at 10:1, cut from Detail D, carrying only
-# the ridge's included angle (machinist reviews r7/r8: in D the angle's text
-# stood inside the hexagon on its centreline, and the wedge over the vertex,
-# outside the part, is D's R0.1 MAX leader's).  The fence, 1.5 model mm
-# round the theoretical sharp (6 mm in D), holds the round and both flanks;
-# at 10:1 it prints 15 mm round RIDGE_DETAIL_CENTER in the free field under
-# section C-C, the label below it (see KNIFE_ANGLE_TEXT_DROP for the angle).
+# Detail E: the knife-edge vertex at 10:1, cut from Detail D, carrying datum
+# A and the ridge round's R0.1 MAX (code review C09: D's top now holds the
+# ridge-to-side dimensions, which a leader from the round would cross).  The
+# fence, 1.5 model mm round the theoretical sharp (6 mm in D), holds the
+# round and both flanks; at 10:1 it prints 15 mm round RIDGE_DETAIL_CENTER in
+# the free field under section C-C, the label below it.
 RIDGE_DETAIL_LETTER = "E"
 RIDGE_DETAIL_CENTER = (0.070, 0.075)
 RIDGE_DETAIL_SCALE = (10.0, 1.0)
 RIDGE_DETAIL_RADIUS_MM = 1.5
 RIDGE_DETAIL_LABEL_XY = (0.070, 0.052)
-# E's letter up-left of the vertex in D, outside D's fence and clear of the
-# R0.1 MAX callout up-right, its leader running to E's fence.
-RIDGE_DETAIL_LETTER_OFFSET = (-0.017, 0.0095)
-# Flank picks this far down each flank from the sharp: past the round's
-# tangent (0.063) and inside E's fence.
-RIDGE_FLANK_PICK_MM = 0.9
+# E's letter up-left of the vertex in D, outside E's fence, between the -X
+# ridge-to-side dimension's extension lines and under its dimension line.
+RIDGE_DETAIL_LETTER_OFFSET = (-0.009, 0.0045)
 
 # Section C-C: the plate's own thickness.  Every end view shows the end ribs
 # over the plate and the spring-anchor pad below its free edge, so no view
@@ -590,7 +585,7 @@ def _add_view_arrow(
 
 
 def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Prove Detail D's KnifeRidgeRadius prints the part's R MAX: radial,
+    """Prove Detail E's KnifeRidgeRadius prints the part's R MAX: radial,
     measuring KNIFE_RIDGE_R, the native swTolMAX the part set
     (draw_ch_pivot_bracket._dress_corner_radius's readback)."""
     found = [
@@ -600,7 +595,7 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
     ]
     if len(found) != 1:
         raise RuntimeError(
-            f"expected one KnifeRidgeRadius in the knife detail, found {len(found)}"
+            f"expected one KnifeRidgeRadius in the ridge detail, found {len(found)}"
         )
     annotation = _early_bound(found[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
@@ -619,90 +614,9 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
 
 
-# Detail E's included-angle text: inside the ridge's own wedge, 9 sheet mm
-# under the vertex at 10:1, where the wedge is 28 mm wide and E holds nothing
-# else.  Over the vertex, in the flanks' opposite wedge, SolidWorks measures
-# the reflex 244.86 (farm r11 2026-10-16).
-KNIFE_ANGLE_TEXT_DROP = 0.009
-
-
-def _knife_ridge_angle(adapter: Any, ridge_detail: Any) -> Any:
-    """Detail E's knife-edge included angle (machinist reviews r4 B2, r7 B1,
-    r8): a driven angular dimension between the +Z stub's two upper flats,
-    printed plain so the title block's angular band governs it.  HexWidth
-    and HexHeight leave the flanks, so the shoulders' height, free; this
-    angle fixes them (``sm_summing_lever_spec.KNIFE_SHOULDER_RISE`` charges
-    its band to the free-rock worst case).  The picks name the outboard end
-    face's two upper slant edges RIDGE_FLANK_PICK_MM down from the sharp,
-    and the value must read RIDGE_ANGLE_DEG: the supplement means the text
-    landed in a side wedge."""
-    z_mm = PLATE_L / 2.0 + HEX_DEPTH
-    flank = math.hypot(HEX_W / 2.0, HEX_H / 4.0)
-    step = (
-        RIDGE_FLANK_PICK_MM * HEX_W / 2.0 / flank,
-        RIDGE_FLANK_PICK_MM * HEX_H / 4.0 / flank,
-    )
-    slant_points = [
-        (side * step[0], HEX_H / 2.0 - step[1], z_mm) for side in (-1.0, 1.0)
-    ]
-    edges = scan_view_edges(ridge_detail, label="ridge detail")
-    flats = [
-        edges.exact_line_through(point, label=f"knife ridge {name} flat").edge
-        for point, name in zip(slant_points, ("left", "right"))
-    ]
-    picks = model_points_in_view(
-        adapter,
-        ridge_detail,
-        [_metres(point) for point in slant_points],
-        label="knife ridge flat",
-        names=("left", "right"),
-    )
-    vertex = model_point_in_view(
-        adapter,
-        ridge_detail,
-        _metres((0.0, HEX_H / 2.0, z_mm)),
-        label="knife ridge vertex",
-    )
-    angle = add_edge_dimension(
-        adapter,
-        ridge_detail,
-        p0=picks[0],
-        p1=picks[1],
-        text_xy=(vertex[0], vertex[1] - KNIFE_ANGLE_TEXT_DROP),
-        label="knife-edge included angle",
-        orientation="angular",
-        entities=(flats[0], flats[1]),
-    )
-    display = _early_bound(angle, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    measured = math.degrees(abs(float(dimension.SystemValue)))
-    if abs(measured - RIDGE_ANGLE_DEG) > 1e-3:
-        raise RuntimeError(
-            f"knife-edge included angle reads {measured:.4f} deg, "
-            f"not {RIDGE_ANGLE_DEG:.4f}"
-        )
-    # Plain: no prefix/suffix parentheses and no ShowParenthesis brackets, so
-    # the angle reads as a toleranced size, not a reference.
-    display.SetText(1, "")
-    display.SetText(2, "")
-    display.ShowParenthesis = False
-    if (
-        str(display.GetText(1) or ""),
-        str(display.GetText(2) or ""),
-        bool(display.ShowParenthesis),
-    ) != ("", "", False):
-        raise RuntimeError(
-            "knife-edge included angle still prints as a reference: "
-            f"{display.GetText(1)!r} {display.GetText(2)!r} "
-            f"{display.ShowParenthesis!r}"
-        )
-    _telemetry.info(f"knife-edge included angle: {measured:.3f} deg, toleranced")
-    return angle
-
-
-# Datum A's box over the vertex in Detail E, clear of the angle's arc stubs
-# (9 mm out along the flanks) and inside E's 15 mm fence: the request is the
-# box's foot, the box 7 mm tall (at 0.008 its top sat on the fence, r14).
+# Datum A's box over the vertex in Detail E, inside E's 15 mm fence: the
+# request is the box's foot, the box 7 mm tall (at 0.008 its top sat on the
+# fence, r14).
 RIDGE_DATUM_RISE = 0.006
 
 
@@ -1276,18 +1190,29 @@ FRONT_KEEP = {
     "EdgeRibFrontEndStep": (0.284, 0.253),
 }
 # Detail D at 4:1: the hexagon's centre prints at DETAIL_CENTER, its flats at
-# x 0.0588/0.0912, its vertices at y 0.2015/0.2425, the fence 0.030 round it.
-# The width's three lines stand right of its span (32.4 mm: the callout's
-# 37 mm would run its extension lines through the text), above the boss
-# diameter's four lines (top 0.1784) and the label, its line ~0.181; the
-# vertex height stands right of the fence, its text level with the centre
-# and its three callout lines below the value; the vertex's R MAX leads off
-# up-right from over the fence, inside the round's span (the flats' normals,
-# 57.6..122.4 deg).  The included angle is Detail E's.
+# x 0.0588/0.0912, its vertices at y 0.2015/0.2425, its upper shoulders at y
+# 0.2323, the fence 0.030 round it.  The reference width stands right of its
+# span, above the boss diameter's four lines (top 0.1784) and the label, its
+# line ~0.181; the vertex height stands right of the fence, its text level
+# with the centre and its three callout lines below the value.  Code review
+# C09 (owner ruling T1): the ridge-to-side pair shares one dimension line
+# over the vertex, each text outside its own span, the -X one's symmetry
+# callout under it, left of its extension lines; the flank-to-side angle
+# stands up-right of the +X shoulder, in the wedge opposite the solid's
+# corner (inside the hexagon, machinist reviews r7/r8 read its text as a
+# feature), its arc right of the side face's extension.
 DETAIL_KEEP = {
     "HexWidth": (0.121, 0.1895),
     "HexHeight": (0.130, DETAIL_CENTER[1]),
-    "KnifeRidgeRadius": (0.093, 0.259),
+    "RidgeFromLeft": (0.030, 0.258),
+    "RidgeFromRight": (0.120, 0.258),
+    "FlankToSide": (0.124, 0.240),
+}
+# Detail E: the round's R MAX up-right of the vertex, its text right of E's
+# fence and of datum A's box (RIDGE_DATUM_RISE), its leader ~30 deg up the
+# +X flank's side, ~8 mm right of the box's foot.
+RIDGE_DETAIL_KEEP = {
+    "KnifeRidgeRadius": (0.098, 0.091),
 }
 TOP_KEEP = {
     # Below the plate end, its witness lines 14 mm long: at 0.160 they ran
@@ -1520,13 +1445,19 @@ async def build(adapter: Any) -> dict[str, str]:
         if dimension_name(adapter, annotation) == "AnchorOuterDia"
     ]
     set_near_side_diameter(boss_dia, "boss diameter")
-    _attach_radial_leaders(
-        adapter, detail_annotations, ("KnifeRidgeRadius",), label="knife detail"
-    )
-    _assert_knife_ridge_radius(adapter, detail_annotations)
     ridge_detail = _ridge_detail(adapter, detail)
     _hidden_lines_removed_without_greyed_pass(ridge_detail)
-    _knife_ridge_angle(adapter, ridge_detail)
+    ridge_annotations = curate_hidden_dimensions(
+        adapter,
+        ridge_detail,
+        keep=RIDGE_DETAIL_KEEP,
+        view_label="ridge detail",
+        dimensions_by_feature=DIMENSIONS_BY_FEATURE,
+    )
+    _attach_radial_leaders(
+        adapter, ridge_annotations, ("KnifeRidgeRadius",), label="ridge detail"
+    )
+    _assert_knife_ridge_radius(adapter, ridge_annotations)
     _ridge_datum(adapter, ridge_detail)
     _apply_callouts(
         adapter,

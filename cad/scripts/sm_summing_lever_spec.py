@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import math
 from _hole_spec import HoleSpec
-from _printed_tolerance import angular_band_deg
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 
@@ -37,12 +36,12 @@ ANCHOR_H = 0.75 * MM_PER_IN  # 19.05 summation-anchor boss height (Y)
 # hex knife-edge trunnion (vertex-up).  HEX_W was 8.653 (118.6 deg ridge);
 # narrowed to 8.080 (115.1 deg ridge) so the trunnion still rocks >= 5.0 deg
 # inside the sm-knife-mount Ø12 close bore at the worst case of BOTH parts'
-# bands (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``).  Both section
-# sizes print .XXX, so the title block holds them to HEX_BAND; the ridge angle
-# prints toleranced at the title block's angular band (below).
+# bands (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``).  The print
+# holds the ridge to each side face and each upper flank to its side face
+# (below); the width prints as a reference, the vertex height .XXX at HEX_BAND.
 HEX_W = 8.080
 HEX_H = 10.268
-HEX_BAND = 0.13  # title-block .XXX band on HEX_W and HEX_H
+HEX_BAND = 0.13  # title-block .XXX band on HEX_H
 HEX_DEPTH = 21.717
 # Included angle of the knife-edge ridge (the top vertex of the hexagon).
 RIDGE_ANGLE_DEG = 2.0 * math.degrees(math.atan2(HEX_W / 2.0, HEX_H / 4.0))
@@ -61,17 +60,26 @@ KNIFE_RIDGE_TANGENT_XY = (
     _RIDGE_SETBACK * math.sin(_RIDGE_HALF),
     HEX_H / 2.0 - _RIDGE_SETBACK * math.cos(_RIDGE_HALF),
 )
-# Detail E tolerances the ridge angle at the title block's angular band
-# (machinist review r7: HEX_W and HEX_H alone leave the flanks, so the
-# shoulders' height, free).  Nothing holds the two flanks symmetric, so one
-# flank may take the whole band: at the widest .XXX section its shoulder then
-# rises KNIFE_SHOULDER_RISE (0.0994) over the nominal angle's, and the
-# free-rock worst case folds that rise in with the section and bore bands.
-RIDGE_ANGLE_TOL_DEG = angular_band_deg()
-_HEX_HALF_W_MAX = (HEX_W + HEX_BAND) / 2.0
-KNIFE_SHOULDER_RISE = _HEX_HALF_W_MAX / math.tan(
-    _RIDGE_HALF
-) - _HEX_HALF_W_MAX / math.tan(_RIDGE_HALF + math.radians(RIDGE_ANGLE_TOL_DEG))
+# Code review C09 (owner ruling T1, 2026-10-17): the included angle with
+# HexWidth and HexHeight left the ridge's position between the sides and each
+# flank's own angle free; one flank could take the whole angle band.  Detail D
+# instead holds, on both stubs, the ridge sharp RIDGE_FROM_SIDE from EACH side
+# face and each upper flank KNIFE_FLANK_TO_SIDE_DEG to its side face, both
+# toleranced explicitly; HexWidth becomes a reference.  The worst shoulder is
+# the farthest from the ridge with the flattest flank: KNIFE_SHOULDER_X_MAX
+# out and KNIFE_SHOULDER_DROP_MIN down, on a flank KNIFE_FLANK_HALF_MAX_DEG
+# off the vertical.  The edge's hardness is still unspecified (#1611).
+KNIFE_FLANK_TO_SIDE_DEG = round(180.0 - RIDGE_ANGLE_DEG / 2.0, 1)  # 122.4 printed
+KNIFE_FLANK_TO_SIDE_TOL_DEG = 0.5
+RIDGE_FROM_SIDE = HEX_W / 2.0  # 4.040 from each side face
+RIDGE_FROM_SIDE_TOL = 0.05
+KNIFE_SHOULDER_X_MAX = RIDGE_FROM_SIDE + RIDGE_FROM_SIDE_TOL
+KNIFE_FLANK_HALF_MAX_DEG = 180.0 - (
+    KNIFE_FLANK_TO_SIDE_DEG - KNIFE_FLANK_TO_SIDE_TOL_DEG
+)
+KNIFE_SHOULDER_DROP_MIN = KNIFE_SHOULDER_X_MAX / math.tan(
+    math.radians(KNIFE_FLANK_HALF_MAX_DEG)
+)
 
 # Outward normal and plane offset of the upper-right sloping face of the
 # vertex-up hexagon. Its upper endpoint is the +Y knife-edge ridge.
