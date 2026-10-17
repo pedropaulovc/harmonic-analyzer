@@ -90,8 +90,14 @@ FRONT_KEEP = {
     "SupplyBore": (FRONT_CENTER[0] + 0.040, FRONT_CENTER[1] + HALF_DIA + 0.022),
     "LandDia": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] - HALF_DIA - 0.020),
 }
+# "SUPPLY 8.2 min." (~45 mm) outruns the 33 mm hub: centred (r1) it sat on
+# both extension lines, so it stands right of the right one, the dimension
+# line carried out to it, below the land's lower extension line.
 RIGHT_KEEP = {
-    "SupplyLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
+    "SupplyLength": (
+        RIGHT_CENTER[0] + HALF_LEN + 0.028,
+        RIGHT_CENTER[1] - HALF_DIA - 0.016,
+    ),
 }
 LAND_ON_SIDE = (RIGHT_CENTER[0] + HALF_LEN + 0.060, RIGHT_CENTER[1])
 DIMENSION_CALLOUTS = {

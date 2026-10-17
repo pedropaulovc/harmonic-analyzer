@@ -102,9 +102,14 @@ FRONT_KEEP = {
     "BottomRadius": (FRONT_CENTER[0] - 0.045, 0.158),
     "HoleDia": (_HOLE[0] + 0.060, 0.160),
     "TopAbovePivot": (_HOLE[0] - 0.035, 0.207),
-    "RodTipLen": (_front(ROD_TIP_X, 0.0)[0] + 0.020, 0.203),
+    # Right of the land's own dimension line, between its extension lines:
+    # at +0.020 (r1) the text sat on the upper extension line.
+    "RodTipLen": (_front(ROD_TIP_X, 0.0)[0] + 0.034, 0.200),
 }
-RIGHT_KEEP = {"StrapThickness": (RIGHT_CENTER[0], 0.228)}
+# The 2.5 mm end view is narrower than its four-row callout: centred over it
+# (r1) both extension lines ran through the text, so the text stands below
+# the view, left of its left extension line, the dimension line carried out.
+RIGHT_KEEP = {"StrapThickness": (RIGHT_CENTER[0] - 0.027, 0.150)}
 ARC_RADIUS_NAMES = ("TopRadius", "BottomRadius")
 
 
