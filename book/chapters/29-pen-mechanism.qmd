@@ -27,7 +27,7 @@ The one sub-assembly with no original to copy.
 | `vn-pen-adjust-nut` | 1 | brass | #0-80 hex nut (McMaster 92671A115) |
 | `vn-pen-hanger-nut` | 1 | steel, zinc plated | #8-32 hex nut (McMaster 90480A009) |
 | `vn-pen-hanger-jam-nut` | 1 | steel, zinc plated | #8-32 thin hex jam nut (McMaster 90760A009) |
-| `mg-output-fixture` | 1 | C36000 brass | 9.525 mm (3/8 in) hex bar (`mg_output_fixture_geom.HEX_AF`); TODO(cut it first) |
+| `mg-output-fixture` | 1 | C36000 brass | 11.1125 mm (7/16 in) hex bar (`mg_output_fixture_geom.HEX_AF`); TODO(cut it first) |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

@@ -19,7 +19,7 @@ shoulder's corner R MAX reads over the groove's station, its leader rising
 to the corner's arc.  The end view looks at the spigot face: its ``*Right``
 orientation is turned by the measured projected axes until -Z points up,
 matching the side view, and -Y points right.  Its origin is pinned to the
-side view's origin height.  The flats' stock reference, (9.525), stands
+side view's origin height.  The flats' stock reference, (11.113), stands
 vertically, and the #4-40 native callout states the controlling drill depth
 and reference thread depth, (10.1), INTO BORE.  One native centreline
 identifies the rod bore's Y axis through the corners, independently of the
@@ -126,7 +126,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A 17.7 x 11 part: 4:1 leaves room for the side view's nine dimensions.
+# An 18.0 x 12.8 part: 4:1 leaves room for the side view's nine dimensions.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 ISO_SCALE = (3, 1)
@@ -163,8 +163,12 @@ _SIDE_BOTTOM = _side_y(-_HALF_AF)
 # used to hold each text clear of the lines beside it; the layout audit's
 # text-on-line gate (_enforce_fixture_text_on_line) is the proof.
 _GLYPH_PITCH = 0.0298 / 13
-# A turned Ø now prints seven glyphs: a space, Ø, the .XX value, a space.
-TURNED_DIA_TEXT_HALF_WIDTH = 7 * _GLYPH_PITCH / 2.0
+# A turned Ø prints a space, Ø, the .XX value and a space; the spigot's
+# (Ø10.10) is the wider of the two.
+TURNED_DIA_GLYPHS = 3 + len(
+    f"{max(SPIGOT_DIA, GROOVE_ROOT_DIA):.{DRAWING_PRECISION_BY_NAME['SpigotDia']}f}"
+)
+TURNED_DIA_TEXT_HALF_WIDTH = TURNED_DIA_GLYPHS * _GLYPH_PITCH / 2.0
 # Upper bounds from the larger banded, reamed callout (27.5 x 14.6 mm) this
 # bore printed before; the drilled Ø over its one process row is smaller.
 BORE_CALLOUT_HALF_WIDTH = 0.0138
@@ -1323,7 +1327,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Output Fixture Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "output fixture; 3/8 hex brass; drilled rod bore; wire groove; #4-40 tap",
+            3: "output fixture; 7/16 hex brass; drilled rod bore; wire groove; #4-40 tap",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

@@ -9,7 +9,7 @@ Layout (part frame, ``mg_output_fixture_geom``): the origin is the rod-bore
 centre, the hex axis local +X from the free end (x = FREE_END_X) to the
 spigot face (x = SPIGOT_FACE_X), flats facing +/-Z, corners on +/-Y.
 
-* ``HexProfile``: the 3/8 hex on the ``FreeEnd`` plane, extruded to the
+* ``HexProfile``: the 7/16 hex on the ``FreeEnd`` plane, extruded to the
   shoulder.  It carries the flats (``HexAf``); its corners sit on the
   vertical through the sketch origin (the bore axis) and its two flats are
   equal, so the rod bore is centred between the flats with no dimension to
@@ -344,7 +344,7 @@ async def build(adapter) -> dict[str, str]:
 
 
 async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
-    """The 3/8 hex on ``FreeEnd``, corners on the sketch's vertical axis.
+    """The 7/16 hex on ``FreeEnd``, corners on the sketch's vertical axis.
 
     On the negative-offset Right plane sketch x is model -Z (build_fr_top_frame
     module docstring).  Both corners sit on the vertical through the origin

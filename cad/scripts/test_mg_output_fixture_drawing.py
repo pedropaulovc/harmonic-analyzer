@@ -64,11 +64,11 @@ def test_no_printed_dimension_carries_its_own_band() -> None:
 
 
 def test_flats_and_overall_length_print_as_unbanded_references() -> None:
-    # Machinist review: 9.525 at .XXX asked for a size the bar is bought at.
+    # Machinist review: the flats at .XXX asked for a size the bar is bought at.
     # r1: the overall length closed a loop with the bore's two stations.
     assert spec.REFERENCE_DIMENSIONS == {"HexAf", "OverallLength"}
     assert spec.DRAWING_DIMENSIONS["HexProfile"] == {"HexAf"}
-    assert spec.DRAWING_PRECISION_BY_NAME["HexAf"] == 3  # the exact 3/8 in
+    assert spec.DRAWING_PRECISION_BY_NAME["HexAf"] == 3  # the exact 7/16 in
     assert geom.OVERALL_LENGTH == pytest.approx(geom.ROD_STATION + spec.BORE_STATION)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "for name in sorted(REFERENCE_DIMENSIONS):" in source
@@ -77,9 +77,9 @@ def test_flats_and_overall_length_print_as_unbanded_references() -> None:
     turned = ast.unparse(
         _function(ast.parse(Path(part.__file__).read_text(encoding="utf-8")), "_turned_profile")
     )
-    # Driven in the part, so the sheet's (17.70) is the model's own sum.
+    # Driven in the part, so the sheet's (18.00) is the model's own sum.
     assert "_make_driven(adapter, overall, 'overall length')" in turned
-    assert spec.STOCK_NOTE == "3/8 HEX BAR, FLATS AS SUPPLIED."
+    assert spec.STOCK_NOTE == "7/16 HEX BAR, FLATS AS SUPPLIED."
 
 
 def _local_imports(module: Path) -> set[str]:
@@ -156,71 +156,69 @@ def test_groove_runs_on_the_spigot_with_both_lips() -> None:
     assert geom.GROOVE_ROOT_DIA < geom.SPIGOT_DIA < geom.HEX_AF
 
 
-def test_every_wall_holds_the_floor_and_each_under_the_target_is_stated() -> None:
-    assert (spec.WALL_TARGET, spec.WALL_FLOOR) == (2.0, 1.5)
+def test_every_wall_holds_the_target_and_the_sheet_states_none() -> None:
+    assert spec.WALL_TARGET == 2.0
     for name, (nominal, worst) in spec.WALLS.items():
         assert worst <= nominal, name
-        assert worst >= spec.WALL_FLOOR - 1e-9, (name, worst)
-        if worst < spec.WALL_TARGET - 1e-9:
-            stated = spec.STATED_WALL_MINS[name]
-            assert spec.WALL_FLOOR <= stated <= spec.floor_2(worst), name
-    assert {name: worst for name, (_n, worst) in spec.WALLS.items()} == pytest.approx({
-        "rod bore to a flat": 2.0475,
-        "rod bore to the free end": 1.7112,
-        "rod bore to the shoulder": 2.2012,
-        "groove lip to the spigot face": 1.64,
-        "groove root over the thread major": 1.6710,
-    }, abs=1e-4)
-    assert spec.STATED_WALL_MINS == {
-        "rod bore to a flat": 1.97,
-        "rod bore to the free end": 1.71,
-        "groove lip to the spigot face": 1.64,
-        "groove root over the thread major": 1.67,
-    }
-
-
-def test_floor_2_never_rounds_a_min_up() -> None:
-    assert spec.floor_2(2.0824999999999996) == 2.08
-    assert spec.floor_2(2.0899999) == 2.08
-    # The epsilon keeps a float a hair under an exact hundredth on it.
-    assert spec.floor_2(1.97 - 1e-12) == 1.97
-    assert spec.floor_2(1.9699) == 1.96
-
-
-def test_bore_is_centred_and_the_stated_wall_is_the_named_shortfall() -> None:
-    # Independent of the spec's arithmetic: the bore centred on the thinnest
-    # stock (3/8 in less the 0.13 stock assumption) at its largest drilled Ø
-    # (the title block's DRILLED HOLES +0.10/0).
-    assert spec.HEX_STOCK_AF_BAND == 0.13
-    smallest_af = 0.375 * 25.4 - 0.13
-    largest_bore_r = (5.2 + 0.10) / 2.0
-    worst = smallest_af / 2.0 - largest_bore_r
-    assert worst == pytest.approx(2.0475, abs=1e-9)
-    assert spec.WALLS[spec.BORE_WALL_NAME] == pytest.approx((2.1625, worst), abs=1e-9)
-    # The 1.97 pending #1433 stays: under the target, over the floor, under
-    # the centred worst wall by the centring it accepts.
-    assert spec.BORE_WALL_STATED_MIN == 1.97
-    assert spec.WALL_FLOOR <= spec.BORE_WALL_STATED_MIN < spec.WALL_TARGET
-    assert spec.BORE_CENTRING_ACCEPTED == pytest.approx(worst - 1.97, abs=1e-9)
-    # What it accepts off centre: the widest stock, the smallest bore.
-    assert spec.BORE_OFFSET_MAX == pytest.approx(
-        (0.375 * 25.4 + 0.13) / 2.0 - 2.6 - 1.97, abs=1e-9
+        assert worst >= spec.WALL_TARGET, (name, worst)
+    assert {name: worst for name, (_n, worst) in spec.WALLS.items()} == pytest.approx(
+        {
+            "rod bore to a flat": 2.7077,
+            "rod bore to the free end": 2.0064,
+            "rod bore to the shoulder": 2.1964,
+            "groove lip to the spigot face": 2.04,
+            "groove root over the thread major": 2.0189,
+        },
+        abs=1e-4,
     )
-    assert spec.BORE_OFFSET_MAX == pytest.approx(0.2575, abs=1e-9)
-    # The drill's run-off at the exit corner (0.10 start, 0.3 deg over the
-    # corner radius) exceeds that centring: the MIN rejects such a part, for
-    # the owner's ruling (#1433).
+    # Rule 20: only a wall under the target prints as a MIN; none is.
+    for retired in (
+        "STATED_WALL_MINS",
+        "BORE_WALL_STATED_MIN",
+        "BORE_CENTRING_ACCEPTED",
+        "BORE_WALL_NOTE",
+        "GROOVE_WALL_NOTE",
+        "WALL_FLOOR",
+        "floor_2",
+    ):
+        assert not hasattr(spec, retired), retired
+    assert "MIN" not in spec.DRAWING_NOTES
+
+
+def test_the_owner_ruling_numbers_hold() -> None:
+    # #1559, 2026-10-16: Ø10.1 spigot, R1.2 semicircular groove at 3.75 from
+    # the face on 7/16 hex; the hook stays in the plumb plane.
+    lip = spec.WALLS["groove lip to the spigot face"][1]
+    root = spec.WALLS["groove root over the thread major"][1]
+    assert lip == pytest.approx(2.04, abs=0.005)
+    assert root == pytest.approx(2.02, abs=0.005)
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx(0.69, abs=0.005)
+    assert spec.SHOULDER_ANNULUS == pytest.approx(0.51, abs=0.005)
+    assert geom.FIXTURE_YAW_DEG == pytest.approx(26.69, abs=0.005)
+
+
+def test_bore_is_centred_and_its_walls_take_the_drill_run_off() -> None:
+    # Independent of the spec's arithmetic: the bore on the thinnest stock
+    # (7/16 in less the 0.13 stock assumption) at its largest drilled Ø (the
+    # title block's DRILLED HOLES +0.10/0), off the hex axis by the drill's
+    # run-off at the exit corner (0.10 start, 0.3 deg over the corner radius):
+    # nothing locates it from a flat, so the run-off is its only offset.
+    assert spec.HEX_STOCK_AF_BAND == 0.13
+    assert geom.HEX_AF == pytest.approx(11.1125, abs=1e-12)
+    smallest_af = 7.0 / 16.0 * 25.4 - 0.13
+    largest_bore_r = (5.2 + 0.10) / 2.0
     wander = 0.10 + geom.HEX_CORNER_RADIUS * math.tan(math.radians(0.3))
     assert spec.BORE_WANDER == pytest.approx(wander, abs=1e-12)
-    assert spec.BORE_WANDER > spec.BORE_CENTRING_ACCEPTED
+    assert spec.BORE_OFFSET_MAX == spec.BORE_WANDER
+    worst = smallest_af / 2.0 - largest_bore_r - wander
+    assert worst == pytest.approx(2.7077, abs=1e-4)
+    assert spec.WALLS["rod bore to a flat"] == pytest.approx((2.95625, worst), abs=1e-9)
     # The free-end wall: one .XX station, the drilled Ø, the run-off.
     assert spec.WALLS["rod bore to the free end"][1] == pytest.approx(
-        5.00 - 0.51 - largest_bore_r - wander, abs=1e-9
+        5.30 - 0.51 - largest_bore_r - wander, abs=1e-9
     )
     assert spec.DRAWING_NOTES.splitlines() == [
-        "3/8 HEX BAR, FLATS AS SUPPLIED.",
-        "BORE TO FLAT WALL 1.97 MIN; BORE TO FREE END WALL 1.71 MIN.",
-        "GROOVE TO FACE WALL 1.64 MIN; GROOVE ROOT TO THREAD WALL 1.67 MIN.",
+        "7/16 HEX BAR, FLATS AS SUPPLIED.",
         "FULL THREAD TO ROD BORE.",
     ]
     # Nothing locates the bore from a flat any longer: the hex sketch centres
@@ -272,22 +270,22 @@ def test_a_bottoming_tap_reaches_full_thread_through_the_wall_and_stops_short() 
         (face_to_axis_max, face_to_axis_min), abs=1e-9
     )
     # The thread's widest reach off the bore axis: the library's metric basic
-    # major Ø2.845, tap oversize and all the off-centre the stated wall accepts.
+    # major Ø2.845, tap oversize and the bore's run-off off the hex axis.
     assert spec.THREAD_MAJOR == 2.845
-    reach_off_axis = 2.845 / 2.0 + 0.025 + 0.2575
+    reach_off_axis = 2.845 / 2.0 + 0.025 + spec.BORE_WANDER
     half_chord = math.sqrt(2.6**2 - reach_off_axis**2)
     deepest_wall = face_to_axis_max - half_chord
     assert spec.TAP_WALL_DEEPEST == pytest.approx(deepest_wall, abs=1e-9)
-    assert spec.TAP_WALL_DEEPEST == pytest.approx(11.2471, abs=5e-4)
+    assert spec.TAP_WALL_DEEPEST == pytest.approx(11.1460, abs=5e-4)
     assert spec.TAP_REACH_NEEDED == pytest.approx(deepest_wall + 2.0 * pitch, abs=1e-9)
-    assert reach - spec.TAP_REACH_NEEDED == pytest.approx(1.7704, abs=5e-4)
+    assert reach - spec.TAP_REACH_NEEDED == pytest.approx(1.8715, abs=5e-4)
     # On one part both walls move together: the tap stops anywhere in the
     # bore's chord less its lead.
     assert spec.FAR_WALL_NEAREST == pytest.approx(face_to_axis_min + half_chord, abs=1e-9)
     assert spec.TAP_STOP_WINDOW == pytest.approx(2.0 * half_chord - 2.0 * pitch, abs=1e-9)
     assert spec.TAP_STOP_WINDOW > 0.0
     # The plug tap the sheet asked for before (3-5 thread chamfer) cannot
-    # reach full thread at the worst case: 11.247 + 3.175 = 14.42 > 14.29.
+    # reach full thread at the worst case: 11.146 + 3.175 = 14.32 > 14.29.
     assert deepest_wall + 5.0 * pitch > reach
     assert spec.TAP_EXTENT_NOTE in spec.DRAWING_NOTES.splitlines()
     for retired in ("PLUG_TAP_USABLE_LENGTH", "PLUG_TAP_LEAD", "TAP_TOOL_NOTE"):
@@ -312,14 +310,14 @@ def test_the_bore_datum_holds_the_screw_reach_and_the_rejected_datums_fail() -> 
     assert spec.SCREW_REACH_MARGIN > 0.0
     # r1's datums: the overall length from the free end less the rod station,
     # two .XX bands to the bore: the screw bottoms before it clamps the rod.
-    stacked = (17.70 + 0.51) - (5.00 - 0.51) + bore_r_max - rod_min
+    stacked = (18.00 + 0.51) - (5.30 - 0.51) + bore_r_max - rod_min
     assert stacked == pytest.approx(11.42, abs=5e-3)
     assert stacked > SHANK_LEN
     # The bore from the face with the overall from the free end (the rod
-    # station a reference) leaves the free-end wall under the floor.
-    free_end_wall = (17.70 - 0.51) - (12.70 + 0.51) - bore_r_max
-    assert free_end_wall == pytest.approx(1.33, abs=1e-9)
-    assert free_end_wall < spec.WALL_FLOOR
+    # station a reference) leaves the free-end wall under the target.
+    free_end_wall = (18.00 - 0.51) - (12.70 + 0.51) - bore_r_max
+    assert free_end_wall == pytest.approx(1.63, abs=1e-9)
+    assert free_end_wall < spec.WALL_TARGET
     # Engagement at the shallowest bore: at least 1.5 D.
     engagement = (12.70 - 0.51) - bore_r_max - PITCH
     assert spec.ENGAGEMENT_WORST == pytest.approx(engagement, abs=1e-9)
@@ -328,28 +326,53 @@ def test_the_bore_datum_holds_the_screw_reach_and_the_rejected_datums_fail() -> 
 
 def test_the_groove_station_from_the_face_holds_the_face_lip() -> None:
     # One .XX band from the face to the groove centre, and the MAX radius.
-    face_lip = (3.35 - 0.51) - 1.2
-    assert spec.GROOVE_STATION == pytest.approx(3.35)
+    face_lip = (3.75 - 0.51) - 1.2
+    assert spec.GROOVE_STATION == geom.GROOVE_STATION == pytest.approx(3.75)
+    assert geom.GROOVE_X == pytest.approx(geom.SPIGOT_FACE_X - 3.75)
     assert spec.WALLS["groove lip to the spigot face"][1] == pytest.approx(face_lip, abs=1e-9)
-    assert face_lip >= spec.WALL_FLOOR
-    # From the free end instead (r1's 14.35) with the overall a reference:
-    # three .XX bands to the face put the lip far under the floor.
-    via_free_end = (12.70 - 0.51) + (5.00 - 0.51) - (14.35 + 0.51) - 1.2
-    assert via_free_end < spec.WALL_FLOOR
+    assert face_lip >= spec.WALL_TARGET
+    # From the free end instead (r1's route, now 14.25) with the overall a
+    # reference: three .XX bands to the face put the lip under the target.
+    via_free_end = (12.70 - 0.51) + (5.30 - 0.51) - (14.25 + 0.51) - 1.2
+    assert via_free_end < spec.WALL_TARGET
     # The groove stays on the spigot: its shoulder-side mouth clears the hex
     # shoulder at the worst case (a step up to the hex, not a wall), and the
     # shoulder's R MAX corner too.  r2 review: the spigot's own length from
     # the face, one .XX band, not the hex from the free end (three bands).
-    clearance = (6.70 - 0.51) - (3.35 + 0.51 + 1.2)
+    clearance = (6.70 - 0.51) - (3.75 + 0.51 + 1.2)
     assert spec.GROOVE_SHOULDER_CLEARANCE == pytest.approx(clearance, abs=1e-9)
-    assert clearance == pytest.approx(1.13)
+    assert clearance == pytest.approx(0.73)
     assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(clearance - 0.2, abs=1e-9)
-    assert spec.GROOVE_FILLET_CLEARANCE > 0.0
-    via_free_end = (12.70 - 0.51) + (5.00 - 0.51) - (11.00 + 0.51) - (3.35 + 0.51 + 1.2)
-    assert via_free_end == pytest.approx(0.11)
+    assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(0.53)
+    via_free_end = (12.70 - 0.51) + (5.30 - 0.51) - (11.30 + 0.51) - (3.75 + 0.51 + 1.2)
+    assert via_free_end == pytest.approx(-0.29)
     # The wire stays in it at the smallest OD over the largest root.
-    assert spec.GROOVE_DEPTH_MIN == pytest.approx(((9.00 - 0.51) - (7.00 + 0.51)) / 2.0)
+    assert spec.GROOVE_DEPTH_MIN == pytest.approx(
+        ((10.10 - 0.51) - (7.70 + 0.51)) / 2.0
+    )
     assert spec.GROOVE_DEPTH_MIN > geom.WIRE_DIA / 2.0
+
+
+def test_the_groove_is_a_true_semicircle_centred_on_the_spigot_od() -> None:
+    # Ø10.1 = root Ø7.7 + 2 x R1.2: the arc's centre on the OD, so the
+    # groove is as deep as its radius and opens its full Ø at the mouth.  The
+    # owner's Ø10.5 would bury the centre 0.2 under the OD: 1.4 deep under an
+    # R1.2 arc, a re-entrant groove.
+    assert geom.SPIGOT_DIA == pytest.approx(
+        geom.GROOVE_ROOT_DIA + 2.0 * geom.GROOVE_RADIUS
+    )
+    assert geom.GROOVE_CENTRE_R == pytest.approx(geom.SPIGOT_DIA / 2.0, abs=1e-12)
+    assert geom.GROOVE_HALF_OPENING == pytest.approx(geom.GROOVE_RADIUS, abs=1e-12)
+    assert (10.5 - geom.GROOVE_ROOT_DIA) / 2.0 > geom.GROOVE_RADIUS
+    assert part.V_GROOVE == pytest.approx(
+        2.0
+        * math.pi
+        * (geom.GROOVE_CENTRE_R - 4.0 * geom.GROOVE_RADIUS / (3.0 * math.pi))
+        * math.pi
+        * geom.GROOVE_RADIUS**2
+        / 2.0,
+        rel=1e-9,
+    )
 
 
 def test_the_groove_radius_is_a_max_and_the_title_block_x_row_would_thin_the_face_lip() -> None:
@@ -359,32 +382,35 @@ def test_the_groove_radius_is_a_max_and_the_title_block_x_row_would_thin_the_fac
     assert drawing.RADIUS_GLYPHS == len("R1.2 MAX")
     # A bare R1.2 at the title block's .X admits R2.0: across the printed
     # root and OD the mouth opens past 1.9 and the face lip falls under the
-    # floor.
+    # target.
     r = 1.2 + printed_band_mm(1)
     half = max(
         spec.groove_half_opening(r, root, od)
-        for root in (7.00 - 0.51, 7.00 + 0.51)
-        for od in (9.00 - 0.51, 9.00 + 0.51)
+        for root in (7.70 - 0.51, 7.70 + 0.51)
+        for od in (10.10 - 0.51, 10.10 + 0.51)
     )
-    assert (3.35 - 0.51) - half < spec.WALL_FLOOR
-    assert (3.35 - 0.51) - r == pytest.approx(0.84)
+    assert (3.75 - 0.51) - half < spec.WALL_TARGET
+    assert (3.75 - 0.51) - r == pytest.approx(1.24)
 
 
 def test_the_spigot_cleans_up_inside_the_thinnest_flats() -> None:
-    # A route check, not a band: the shop turns Ø9.00 inside 9.395 flats.
+    # A route check, not a band: the shop turns Ø10.10 inside 10.9825 flats.
     assert geom.SPIGOT_DIA < geom.HEX_AF - spec.HEX_STOCK_AF_BAND
-    assert geom.HEX_AF - spec.HEX_STOCK_AF_BAND - geom.SPIGOT_DIA == pytest.approx(0.395)
+    assert geom.HEX_AF - spec.HEX_STOCK_AF_BAND - geom.SPIGOT_DIA == pytest.approx(
+        0.8825
+    )
 
 
 def test_the_spigot_prints_its_own_length_and_the_hex_is_the_stations_less_it() -> None:
-    # r2 review: the hex from the free end (11.00) left the turner to find
+    # r2 review: the hex from the free end (11.30) left the turner to find
     # the shoulder through the stations; the lathe faces the spigot and
     # measures back to its shoulder.  The hex stays modelled, unprinted.
     assert "HexLength" not in spec.DRAWING_PRECISION_BY_NAME
     assert spec.DRAWING_PRECISION_BY_NAME["SpigotLength"] == spec.SPIGOT_LENGTH_PLACES == 2
     assert spec.DRAWING_DIMENSIONS["TurnedProfile"] >= {"SpigotLength", "RodStation", "BoreStation"}
     assert geom.SPIGOT_LENGTH == pytest.approx(6.70)
-    assert geom.HEX_LENGTH == pytest.approx(5.00 + 12.70 - 6.70)
+    assert geom.HEX_LENGTH == pytest.approx(5.30 + 12.70 - 6.70)
+    assert geom.OVERALL_LENGTH == pytest.approx(18.00)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"D1@Hex", \'"RodStation" + "BoreStation" - "SpigotLength"\'' in source
     turned = ast.unparse(_function(ast.parse(source), "_turned_profile"))
@@ -401,23 +427,20 @@ def test_the_shoulder_corner_is_a_max_radius_inside_the_flats_clear_of_the_groov
     assert spec.SHOULDER_RADIUS_PLACES == 1 and spec.SHOULDER_RADIUS_TOL_TYPE == 6
     assert spec.SHOULDER_FILLET_R_MAX == geom.SHOULDER_FILLET_R == pytest.approx(0.2)
     assert spec.DRAWING_DIMENSIONS["ShoulderFillet"] == {"ShoulderRadius"}
-    # Inside the shoulder's annulus on 3/8 flats...
+    # Inside the shoulder's annulus on 7/16 flats, even on the thinnest bar.
     annulus = (geom.HEX_AF - geom.SPIGOT_DIA) / 2.0
-    assert annulus == pytest.approx(0.2625)
+    assert annulus == pytest.approx(0.50625)
     assert spec.SHOULDER_ANNULUS == pytest.approx(annulus)
-    assert geom.SHOULDER_FILLET_R < annulus
-    # ...and on the thinnest stock it may run 0.0025 onto a flat, inside the
-    # title block's R0.25 edge break.
-    overrun = geom.SHOULDER_FILLET_R - (
-        geom.HEX_AF - spec.HEX_STOCK_AF_BAND - geom.SPIGOT_DIA
-    ) / 2.0
-    assert spec.SHOULDER_FILLET_FLAT_OVERRUN_MAX == pytest.approx(overrun)
-    assert overrun == pytest.approx(0.0025)
-    assert overrun < spec.TITLE_BLOCK_EDGE_BREAK == 0.25
+    thinnest = (geom.HEX_AF - spec.HEX_STOCK_AF_BAND - geom.SPIGOT_DIA) / 2.0
+    assert spec.SHOULDER_ANNULUS_MIN == pytest.approx(thinnest)
+    assert thinnest == pytest.approx(0.44125)
+    assert geom.SHOULDER_FILLET_R < thinnest
+    for retired in ("TITLE_BLOCK_EDGE_BREAK", "SHOULDER_FILLET_FLAT_OVERRUN_MAX"):
+        assert not hasattr(spec, retired), retired
     # Clear of the groove's shoulder-side mouth, nominal and worst case.
     nominal = geom.GROOVE_MOUTHS[0] - (geom.SHOULDER_X + geom.SHOULDER_FILLET_R)
-    assert nominal == pytest.approx(1.9668, abs=1e-4)
-    assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(0.93)
+    assert nominal == pytest.approx(1.55, abs=1e-4)
+    assert spec.GROOVE_FILLET_CLEARANCE == pytest.approx(0.53)
 
 
 def test_the_builder_fillets_the_shoulder_and_its_volume_is_the_swept_spandrel() -> None:
@@ -432,7 +455,7 @@ def test_the_builder_fillets_the_shoulder_and_its_volume_is_the_swept_spandrel()
         for index in range(steps)
     )
     assert part.V_FILLET == pytest.approx(swept, rel=1e-4)
-    assert part.V_FILLET == pytest.approx(0.245, abs=1e-3)
+    assert part.V_FILLET == pytest.approx(0.275, abs=1e-3)
     assert part.V_TOTAL == pytest.approx(
         part.V_HEX + part.V_SPIGOT + part.V_FILLET - part.V_GROOVE - part.V_BORE - part.V_TAP
     )
@@ -1384,7 +1407,7 @@ def test_tap_centre_mark_unmeasured_fails(
 
 def test_notes_are_short() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
-    assert len(lines) == 4
+    assert len(lines) == 2
     assert max(map(len, lines)) <= 68
     assert spec.TAP_EXTENT_NOTE in lines
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -1405,16 +1428,14 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_wall_notes_are_model_owned_and_state_each_min_as_a_fact() -> None:
+def test_notes_are_model_owned_and_state_no_wall() -> None:
     assert part.DRAWING_NOTES is spec.DRAWING_NOTES
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '{"Manufacturing Notes": DRAWING_NOTES}' in source
-    assert spec.BORE_WALL_NOTE == (
-        "BORE TO FLAT WALL 1.97 MIN; BORE TO FREE END WALL 1.71 MIN."
-    )
-    assert spec.GROOVE_WALL_NOTE == (
-        "GROOVE TO FACE WALL 1.64 MIN; GROOVE ROOT TO THREAD WALL 1.67 MIN."
-    )
+    # Every wall holds the target (rule 20): no wall note survives.
+    assert spec.DRAWING_NOTES == "\n".join((spec.STOCK_NOTE, spec.TAP_EXTENT_NOTE))
+    for word in ("WALL", "MIN"):
+        assert word not in spec.DRAWING_NOTES, word
     # r1: the corner-to-corner bore is drawn (the end view's centreline
     # through the corners), never noted; no note names a method.
     for word in ("CENTRED", "CORNER", "REAM", "DRILL", "HOLD ON", "PLUG"):
@@ -1879,8 +1900,10 @@ def test_radius_leader_accepts_a_leader_drawn_from_the_elbow_alone() -> None:
         ("jogged-leader", "not on the radial line"),
         ("detached-shoulder", "does not run right"),
         ("shoulder-runs-left", "does not run right"),
-        # r1's shelf: along the spigot Ø's extension at the OD.
-        ("shelf-at-the-od", "not between the axis and the root"),
+        # r1's shelf: along the spigot Ø's extension at the OD.  The groove's
+        # centre now sits on the OD, so that shelf is the radial line itself
+        # and leaves the leader no shoulder.
+        ("shelf-at-the-od", "no unique horizontal shoulder"),
         ("shoulder-on-the-axis", "not between the axis and the root"),
         ("into-the-root-dia-line", "reaches the root Ø's dimension line"),
     ],
@@ -1981,7 +2004,7 @@ def _native15_radius_spigot_dump(*, proposed: bool = False) -> dict:
         spigot_x = drawing.SIDE_KEEP["SpigotDia"][0]
         spigot_y = drawing.SIDE_KEEP["SpigotDia"][1]
         spigot_extensions = _proposed_extension_lines()["SpigotDia"]
-        spigot_value = " 9.00 "
+        spigot_value = f" {geom.SPIGOT_DIA:.2f} "
     else:
         keep = _NATIVE15_RADIUS_KEEP
         centre = (0.147, 0.1988)
@@ -2032,8 +2055,15 @@ def _native15_radius_spigot_dump(*, proposed: bool = False) -> dict:
         },
         "dim": {"hole_callout": False},
     }
+    spigot_half = 0.0045 * len(spigot_value.strip()) / 4.0
     spigot_glyphs = (
-        ["9.00", spigot_x - 0.0045, spigot_y - 0.0018175, spigot_x + 0.0045, spigot_y + 0.0017479]
+        [
+            spigot_value.strip(),
+            spigot_x - spigot_half,
+            spigot_y - 0.0018175,
+            spigot_x + spigot_half,
+            spigot_y + 0.0017479,
+        ]
         if proposed
         else ["9.00±0.05", 0.1911891, 0.1831825, 0.2127127, 0.1867479]
     )
@@ -2262,13 +2292,17 @@ def test_rebuilt_radius_proof_refuses_a_lost_max_limit(monkeypatch: pytest.Monke
 
 def test_rebuilt_radius_proof_refuses_r1s_shelf_at_the_od(monkeypatch: pytest.MonkeyPatch) -> None:
     # r1: the shoulder ran level at the OD and the arrow sat at the mouth.
-    # Its arrow is already off the material arc; its leader, put back on it,
-    # still shelves at the OD.
+    # With the groove's centre on the OD the mouth is the material arc's end,
+    # so the level shelf is the radial line itself, run along the OD under
+    # the spigot face's witness: it crowds that witness.  Put back low, it
+    # still fails to read in open air.
     radius, station = _radius_readback_fakes(monkeypatch)
     elbow = (drawing.RADIUS_ELBOW_XY[0], drawing._side_y(geom.SPIGOT_DIA / 2.0))
     radius.ink, tip = _radius_ink(elbow)
     radius.display.data = _ArrowData(tip)
-    with pytest.raises(RuntimeError, match="not on the face-side material arc"):
+    with pytest.raises(
+        RuntimeError, match="not clear of the station's spigot face witness"
+    ):
         drawing._prove_groove_radius(object(), object(), radius, station)
     radius.ink, _tip = _radius_ink((_FACE_ON_AXIS[0] + 0.004, drawing.GROOVE_ROOT_SHEET_YS[1] - 0.001))
     radius.display.data = _ArrowData(_tip)
