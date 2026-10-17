@@ -7,11 +7,12 @@ lifecycle rather than adding modules with no useful cache isolation.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 import math
 from pathlib import Path
 import time
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Iterator, Literal, Mapping, Sequence
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
@@ -295,6 +296,107 @@ def _pin_annotation_ink(adapter: Any) -> None:
         if int(sw.GetUserPreferenceIntegerValue(pref)) != _COLORREF_BLACK:
             raise RuntimeError(f"annotation colour pref {pref} did not persist")
         _telemetry.debug(f"annotation colour pref {pref} pinned to black")
+
+
+# System Options > Export > PDF > "Shaded/Draft geometry DPI"
+# (swUserPreferenceIntegerValue_e.swPDFExportShadedDraftDPI = 534, read off
+# swconst.tlb R2026x; docs/swconst/FileSaveAsPDFOptions.md). SolidWorks prints
+# a shaded or draft-quality view into the PDF as ONE raster at this resolution
+# and draws the edges over it as vectors. Every farm seat carries the factory
+# 96 (registry ``Export Settings\PDF Dots Per Inch`` on all five workers,
+# 2026-10-16), which embeds the shaded isos at 120.5 dpi: the 0.21 mm pixel
+# staircase shows as white specks between the vector silhouette and the fill
+# (machinist review MHA-MG-001 r2: "draft quality, speckled broken edges").
+_PREF_PDF_SHADED_DRAFT_DPI = 534
+
+
+PDF_SHADED_DRAFT_DPI = 300
+
+
+# The DECLARED seat value restored after every export, never the value read on
+# entry: a leaf that dies inside the export (watchdog ``os._exit`` skips
+# ``finally``) would otherwise teach the next leaf that 300 is "the original"
+# (see ``_preferences``). A seat found elsewhere is reported, then healed.
+_PDF_SHADED_DRAFT_DPI_BASELINE = 96
+
+
+@contextlib.contextmanager
+def pdf_shaded_raster_dpi(adapter: Any, span: Any) -> Iterator[None]:
+    """Export the PDF with shaded views rastered at ``PDF_SHADED_DRAFT_DPI``.
+
+    A seat-global system preference, so it is raised for the one ``SaveAs3``
+    that prints the PDF and put back to the declared baseline in a ``finally``:
+    the lock holder leaves the seat as the fleet configures it. Each write is
+    read back; the entry, applied and restored values land on ``span``. A
+    refused write raises (a quiet refusal ships the 120 dpi raster again),
+    and so does a restore that throws, except while the export is already
+    failing: then a refused or throwing restore (a seat that disconnected
+    mid-export) is warned, so it cannot replace the export's own exception.
+    """
+    sw = _early_bound(adapter.swApp, "ISldWorks")
+    pref = _PREF_PDF_SHADED_DRAFT_DPI
+    before = int(sw.GetUserPreferenceIntegerValue(pref))
+    span.set_attribute("pdf.shaded_draft_dpi.before", before)
+    span.set_attribute("pdf.shaded_draft_dpi.baseline", _PDF_SHADED_DRAFT_DPI_BASELINE)
+    if before != _PDF_SHADED_DRAFT_DPI_BASELINE:
+        _telemetry.warn(
+            f"[seat] PDF shaded/draft DPI was {before}, declared baseline "
+            f"{_PDF_SHADED_DRAFT_DPI_BASELINE}: a seat left mutated, restored after export",
+            before=before,
+        )
+    exporting = True
+    try:
+        sw.SetUserPreferenceIntegerValue(pref, PDF_SHADED_DRAFT_DPI)
+        applied = int(sw.GetUserPreferenceIntegerValue(pref))
+        span.set_attribute("pdf.shaded_draft_dpi.applied", applied)
+        if applied != PDF_SHADED_DRAFT_DPI:
+            raise RuntimeError(
+                f"PDF shaded/draft DPI did not persist: wanted "
+                f"{PDF_SHADED_DRAFT_DPI}, seat reports {applied}"
+            )
+        yield
+        exporting = False
+    finally:
+        try:
+            sw.SetUserPreferenceIntegerValue(pref, _PDF_SHADED_DRAFT_DPI_BASELINE)
+            restored = int(sw.GetUserPreferenceIntegerValue(pref))
+        except Exception as exc:
+            if not exporting:
+                raise
+            _telemetry.warn(
+                f"[seat] PDF shaded/draft DPI restore failed during a failed export: {exc!r}",
+                error=repr(exc),
+            )
+        else:
+            span.set_attribute("pdf.shaded_draft_dpi.restored", restored)
+            refused = (
+                f"PDF shaded/draft DPI restore refused: wanted "
+                f"{_PDF_SHADED_DRAFT_DPI_BASELINE}, seat reports {restored}"
+            )
+            if restored != _PDF_SHADED_DRAFT_DPI_BASELINE:
+                if exporting:
+                    _telemetry.warn(f"[seat] {refused}", restored=restored)
+                else:
+                    raise RuntimeError(refused)
+            _telemetry.info(
+                f"PDF shaded/draft DPI: seat {before}, export {PDF_SHADED_DRAFT_DPI}, "
+                f"restored {restored}"
+            )
+
+
+@contextlib.contextmanager
+def _drawing_artifact_save(
+    adapter: Any, kind: Literal["drawing", "pdf", "png"], path: str
+) -> Iterator[None]:
+    """One span per ``save_drawing`` artefact; the PDF also raises its raster DPI."""
+    with _telemetry.span(f"drawing.save_{kind}") as span:
+        with (
+            pdf_shaded_raster_dpi(adapter, span)
+            if kind == "pdf"
+            else contextlib.nullcontext()
+        ):
+            yield
+        span.set_attribute("artifact.bytes", Path(path).stat().st_size)
 
 
 def _pin_dimension_text_and_leader_style(draw: Any) -> None:
@@ -950,13 +1052,16 @@ async def finalize_drawing(
     # path; the template and precomputed recipe placements own the layout.
     # One child span per SaveAs3: an assembly drawing's save_and_export_pdf
     # runs 42-180 s (harmonic_analyzer_assembly p50 177 s) and nothing said
-    # whether the SLDDRW save or the PDF export spends it.
+    # whether the SLDDRW save or the PDF export spends it. The PDF's span also
+    # carries the shaded-raster DPI it was printed at (pdf_shaded_raster_dpi).
     with _telemetry.span("drawing.save_and_export_pdf"):
         artifacts = save_drawing(
             adapter,
             str(outputs.slddrw),
             pdf_path=str(outputs.pdf),
-            artifact_context=lambda kind, _path: _telemetry.span(f"drawing.save_{kind}"),
+            artifact_context=lambda kind, path: _drawing_artifact_save(
+                adapter, kind, path
+            ),
         )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
