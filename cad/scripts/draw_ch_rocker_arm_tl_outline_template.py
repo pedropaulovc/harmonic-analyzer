@@ -17,7 +17,7 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -34,6 +34,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 
@@ -109,11 +110,12 @@ DETAIL_CROP_RADIUS = DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0
 DETAIL_LETTER = "D"
 # A model view has no native label the API can show, so the label is a note
 # the view owns, in the native detail label's words, anchored at its top
-# centre: right of the width's dimension line, under its callout.
+# centre: left of the circle, where nothing else of the detail prints, so
+# datum C's tag can stand right of the width's dimension line.
 DETAIL_LABEL_TEXT = (
     f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
 )
-DETAIL_LABEL_XY = (0.116, 0.050)
+DETAIL_LABEL_XY = (0.038, 0.050)
 # The face view's letter goes west of the slot's mark, level with its centre:
 # the plate between the pivot and the slot carries nothing else there.
 PARENT_LETTER_OFFSET = (
@@ -153,7 +155,7 @@ FRONT_KEEP = {
 # The width's dimension line stands outboard of the crop circle, right of the
 # slot's round end, with its value and fit callout above the circle. The
 # run's value and its two-line function flag sit right of and below the
-# circle, under the detail label: left of the circle the flag would cross it.
+# circle: left of the circle the flag would cross it.
 # The flag's widest line prints 51.4 mm wide (farm run 3111b8f0a), so its
 # centre stands far enough right that the whole line clears the circle.
 DETAIL_KEEP = {
@@ -208,11 +210,13 @@ PROFILE_FRAME_XY = (0.080, 0.192)
 PIVOT_DATUM_PICK_DEG = 135.0
 PIVOT_DATUM_OFFSET = (-0.012, 0.022)
 # Datum C: on the 5:1 detail, where the slot is drawn large (at 1:1 its tag
-# would sit inside the detail's mark circle, farm run tl13-gdt-r1): on the
-# inboard round end's lower-left rim, its tag down and left, clear of the
-# run's extension lines (below the slot) and the width's callout (above).
-ROD_SLOT_DATUM_PICK_DEG = 225.0
-ROD_SLOT_DATUM_OFFSET = (-0.020, -0.014)
+# would sit inside the detail's mark circle, farm run tl13-gdt-r1), attached
+# to the width's size dimension so it names the slot's centre plane
+# (mr-tl13-4). Its tag is asked for right of the width's dimension line,
+# between the width's callout (above) and the run's (below); SolidWorks may
+# not honour the request for a dimension-attached tag, so the render says.
+ROD_SLOT_WIDTH_DIMENSION = "RodSlotWidth"
+ROD_SLOT_DATUM_XY = (DETAIL_CENTER[0] + 0.032, DETAIL_CENTER[1] + 0.004)
 
 _Z = [0.0, 0.0, 1.0]
 _PRECISION = DRAWING_PRECISION_BY_NAME
@@ -913,9 +917,9 @@ def _mark_rod_slot_end_centres(adapter: Any, detail: Any) -> None:
 
 
 def _add_datums(adapter: Any, front: Any, detail: Any) -> None:
-    """Datum A on the pivot hole (face view) and datum C on the rod slot (its
-    5:1 detail), each picked on its own rim by sheet point (an edge-object
-    tag ignores SetPosition2)."""
+    """Datum A on the pivot hole (face view), picked on its rim by sheet point
+    (an edge-object tag ignores SetPosition2), and datum C on the rod slot's
+    width in its 5:1 detail."""
     pivot = model_point_in_view(adapter, front, (0.0, 0.0, 0.0), label="datum A centre")
     pick = model_point_in_view(
         adapter,
@@ -934,32 +938,96 @@ def _add_datums(adapter: Any, front: Any, detail: Any) -> None:
         label="pivot hole datum feature",
         shoulder=True,
     )
-    slot = model_point_in_view(
-        adapter, detail, _ROD_SLOT_CENTRE_M, label="datum C centre"
+    _rod_slot_width_datum(adapter, detail)
+
+
+def _rod_slot_width_datum(adapter: Any, detail: Any) -> Any:
+    """Datum C on the slot's width size dimension, so it names the slot's
+    centre plane the pin gauge locates, not one side (mr-tl13-4).
+
+    InsertDatumTag2 on a selected dimension attaches to nothing, so the tag
+    is offered the display dimension, then its annotation, through
+    IAnnotation::SetAttachedEntities (draw_fr_top_frame's crossbar datum D);
+    after the rebuild it must hold exactly that one swSelDIMENSIONS entity."""
+    label = "rod slot datum C"
+    model = adapter.currentModel
+    _activate_view(adapter, detail, label="rod slot detail")
+    matches = [
+        display
+        for display in (
+            _early_bound(raw, "IDisplayDimension")
+            for raw in _early_bound(detail, "IView").GetDisplayDimensions() or ()
+        )
+        if dimension_name(adapter, _early_bound(display.GetAnnotation(), "IAnnotation"))
+        == ROD_SLOT_WIDTH_DIMENSION
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: expected one {ROD_SLOT_WIDTH_DIMENSION} in the detail, "
+            f"found {len(matches)}"
+        )
+    display = matches[0]
+    width_annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    name = display.GetNameForSelection()
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    if (
+        extension.SelectByID2(
+            name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+        )
+        is not True
+    ):
+        raise RuntimeError(f"{label}: failed to select {name!r}")
+    selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+    count = int(selection.GetSelectedObjectCount2(-1))
+    kind = int(selection.GetSelectedObjectType3(count, -1)) if count else 0
+    if count != 1 or kind != 14:  # swSelDIMENSIONS
+        model.ClearSelection2(True)
+        raise RuntimeError(
+            f"{label}: selecting {name!r} gave {count} object(s) of type {kind}"
+        )
+    raw_tag = model.InsertDatumTag2()
+    if raw_tag is None:
+        raise RuntimeError(f"{label}: InsertDatumTag2 returned nothing")
+    tag = _early_bound(raw_tag, "IDatumTag")
+    if not tag.SetLabel(ROD_SLOT_DATUM):
+        raise RuntimeError(f"{label}: SetLabel failed")
+    annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    attempts: list[str] = []
+    if int(annotation.GetAttachedEntityCount3()) == 0:
+        for target_kind, target in (
+            ("display_dimension", display),
+            ("annotation", width_annotation),
+        ):
+            accepted = bool(annotation.SetAttachedEntities(dispatch_array([target])))
+            attached_count = int(annotation.GetAttachedEntityCount3())
+            attempts.append(f"{target_kind}:{accepted}:{attached_count}")
+            if accepted and attached_count:
+                break
+    if not annotation.SetPosition2(*ROD_SLOT_DATUM_XY, 0.0):
+        raise RuntimeError(f"{label}: SetPosition2 failed")
+    model.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+    kinds = tuple(int(value) for value in annotation.GetAttachedEntityTypes() or ())
+    entities = tuple(annotation.GetAttachedEntities3() or ())
+    position = tuple(float(value) for value in annotation.GetPosition())
+    _telemetry.info(
+        f"{label}: attach attempts={attempts}, types={kinds}, position "
+        f"{tuple(round(value * 1000, 1) for value in position[:2])} mm"
     )
-    pick = model_point_in_view(
-        adapter,
-        detail,
-        _rim_point(
-            _ROD_SLOT_INNER,
-            part_spec.ROD_SLOT_AXIS,
-            part_spec.ROD_SLOT_WIDTH / 2.0,
-            ROD_SLOT_DATUM_PICK_DEG,
-        ),
-        label="datum C rim",
-    )
-    add_datum_feature(
-        adapter,
-        detail,
-        edge_xy=pick,
-        symbol_xy=(
-            slot[0] + ROD_SLOT_DATUM_OFFSET[0],
-            slot[1] + ROD_SLOT_DATUM_OFFSET[1],
-        ),
-        datum=ROD_SLOT_DATUM,
-        label="rod slot datum feature",
-        shoulder=True,
-    )
+    if (
+        kinds != (14,)
+        or len(entities) != 1
+        or entities[0] is None
+        or annotation.IsDangling()
+    ):
+        raise RuntimeError(f"{label}: not attached to the slot width: types={kinds}")
+    attached = _early_bound(entities[0], "IDisplayDimension")
+    if (
+        str(tag.GetLabel()) != ROD_SLOT_DATUM
+        or int(adapter.swApp.IsSame(attached, display)) != 1
+    ):
+        raise RuntimeError(f"{label}: lost the slot width attachment")
+    return tag
 
 
 def _add_outline_profile(adapter: Any, front: Any) -> Any:
