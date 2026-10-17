@@ -28,8 +28,10 @@ class _Extension:
         self.toggles = {(_TOGGLE, _NO_OPTION): False}
         self.strings = {(_EXCLUSIONS, _NO_OPTION): "m;mm;"}
         self.refuse = refuse
+        self.writes: list[bool] = []
 
     def SetUserPreferenceToggle(self, pref: int, option: int, value: bool) -> bool:
+        self.writes.append(value)
         if self.refuse:
             return False
         self.toggles[(pref, option)] = value
@@ -47,6 +49,7 @@ def test_uppercase_dimensions_are_switched_on_and_read_back() -> None:
 
     _drawing_common._pin_uppercase_dimensions(SimpleNamespace(Extension=ext))
 
+    assert ext.writes == [False, True]
     assert ext.toggles[(_TOGGLE, _NO_OPTION)] is True
     assert ext.strings[(_EXCLUSIONS, _NO_OPTION)] == "m;mm;"
 

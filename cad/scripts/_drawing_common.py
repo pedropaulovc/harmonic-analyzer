@@ -436,8 +436,15 @@ _DETAILING_NO_OPTION = 0  # swUserPreferenceOption_e.swDetailingNoOptionSpecifie
 
 
 def _pin_uppercase_dimensions(draw: Any) -> None:
-    """Print dimension and hole-callout text on ``draw`` in uppercase."""
+    """Print dimension and hole-callout text on ``draw`` in uppercase.
+
+    Called once every dimension exists, and written off then on: a drawing
+    whose toggle was set while it held no dimensions still printed the
+    imported swTolMAX / swTolMIN words as 'max.' / 'min.' (farm run
+    20261017T013332447Z), so the change itself has to reach them.
+    """
     ext = draw.Extension
+    ext.SetUserPreferenceToggle(_PREF_UPPERCASE_DIMENSIONS, _DETAILING_NO_OPTION, False)
     ok = ext.SetUserPreferenceToggle(
         _PREF_UPPERCASE_DIMENSIONS, _DETAILING_NO_OPTION, True
     )
@@ -504,7 +511,6 @@ def new_project_drawing(
     # display (an exact inch conversion like 9.525) can pass decimals=3.
     set_units_mm(adapter, decimals=decimals)
     _pin_dimension_text_and_leader_style(draw)
-    _pin_uppercase_dimensions(draw)
     _pin_annotation_ink(adapter)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(
@@ -1064,6 +1070,7 @@ async def finalize_drawing(
     # per-callout helpers no longer rebuild (their readbacks never needed it),
     # so every text extent and view outline is brought current here, before
     # the SLDDRW/PDF that the blind review and the layout audit read.
+    _pin_uppercase_dimensions(drawing_model)
     rebuild_drawing(adapter, label="finalize_drawing")
     if settled_checks:
         for settled in settled_checks:
