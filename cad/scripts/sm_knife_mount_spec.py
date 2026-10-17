@@ -145,11 +145,11 @@ def free_rock_deg(
 # Why Ø0.05 (2026-10-09 ruling): a yawed bore steals rock.  Free rock of the
 # nominal 8.080 x 10.268 trunnion in the nominal Ø12 against the far-end
 # offset t across the 14 deep bore: t 0 -> 8.92 deg, 0.05 -> 8.44, 0.10 ->
-# 7.96, 0.18 -> 7.17.  The drawing-guidelines.md rule 17 (walls and webs) budget -- the trunnion's .XXX section and
-# the bore's .XX size at their band limits, t the ⊥Ø0.05 zone plus the dowel
+# 7.96, 0.18 -> 7.17.  The drawing-guidelines.md rule 17 (walls and webs) budget -- the trunnion's ridge-to-side and flank-to-side limits and
+# the bore's .XX size at its band limit, t the ⊥Ø0.05 zone plus the dowel
 # yaw across the deepest .X block -- is
-# ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 5.64 in
-# the reamed bore with the ridge angle at its band), which owns the
+# ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 6.64 in
+# the reamed bore), which owns the
 # crossbar's slip terms.  The top seat clamps to the frame's faced Ra 3.2
 # underside plane (MHA-FR-002, user ruling 2026-10-12), so no bedding term
 # enters: seat form tilts the block, it cannot yaw the bore off the dowel

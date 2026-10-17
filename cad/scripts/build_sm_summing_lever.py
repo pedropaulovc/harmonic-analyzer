@@ -67,7 +67,7 @@ import _telemetry
 from _appearance import CASTING_GREEN, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
@@ -104,7 +104,11 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _drawing_dimension_insert import add_angular_reference_dimension
+from _drawing_tolerances import (
+    set_dimension_symmetric_angular_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _drawing_precision import _named_dimension, set_dimension_display_precision
 from _fit_deviations import deviations
 from _drawing_prefix import set_dimension_prefix
@@ -127,10 +131,12 @@ from sm_summing_lever_spec import (
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_OFFSET,
+    KNIFE_FLANK_TO_SIDE_TOL_DEG,
     KNIFE_RIDGE_R,
     KNIFE_RIDGE_R_BAND,
     KNIFE_RIDGE_R_TOL_TYPE,
     RIDGE_ANGLE_DEG,
+    RIDGE_FROM_SIDE_TOL,
     SPRING_PAD_W,
     SPRING_SEAT_T,
     SURFACE_FINISHES,
@@ -1119,51 +1125,128 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
+def _driven_hex_width(adapter, width: str) -> None:
+    """HexWidth as a driven reference across the shoulder line (code review
+    C09): the ridge-to-side dimensions own the width, so this one only reads
+    it back and prints in parentheses (``_hex_width_reference``)."""
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [width], 0)
+    extension = _sw_type_info.early_bound_or_flag(
+        model.Extension, "IModelDocExtension", "AddSpecificDimension"
+    )
+    display, status = extension.AddSpecificDimension(
+        0.0,
+        (-HEX_H / 2.0 - 1.5) / 1000.0,
+        0.0,
+        11,  # swDimensionType_e.swHorLinearDimension
+        0,
+    )
+    model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(
+            f"knife-envelope width: AddSpecificDimension failed ({status})"
+        )
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
+    if int(_read_member(dimension, "DrivenState")) != 1:
+        raise RuntimeError("knife-envelope width did not become driven")
+    measured = float(_read_member(dimension, "SystemValue")) * 1000.0
+    if abs(measured - HEX_W) > 1e-6:
+        raise RuntimeError(f"knife-envelope width reads {measured:.6f}, not {HEX_W}")
+
+
 async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
-    """Hidden Front-plane reference: the trunnion's width and vertex height.
+    """Hidden Front-plane reference: the trunnion's knife-edge controls.
 
     The hexagon sketch is driven by halves and quarters of HexW/HexH, so no
-    single dimension of the solid IS the across-flats width or the vertex
-    height the knife-edge seat needs.  Two construction lines across the
-    envelope carry them as driving dimensions off the same globals; the part
-    saves the sketch hidden and the drawing shows it only in Detail A."""
+    single dimension of the solid IS the ridge's distance from a side face,
+    a flank's angle to its side face, or the vertex height the knife-edge
+    seat needs.  Construction lines carry them off the same globals: the
+    vertex line (HexHeight), the shoulder line between the upper shoulders
+    (the ridge sharp from each end, RidgeFromLeft/Right; HexWidth a driven
+    reference), and the +X upper flank and side face (FlankToSide, driven).
+    The part saves the sketch hidden and the drawing shows it only in
+    Detail D (code review C09, owner ruling T1)."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     knife = SketchDims()
     check("create knife-envelope reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     width = check(
-        "knife-envelope width reference",
-        await adapter.add_line(-HEX_W / 2.0, 0.0, HEX_W / 2.0, 0.0),
+        "knife-envelope shoulder line",
+        await adapter.add_line(-HEX_W / 2.0, HEX_H / 4.0, HEX_W / 2.0, HEX_H / 4.0),
     )
     height = check(
         "knife-envelope height reference",
         await adapter.add_line(0.0, -HEX_H / 2.0, 0.0, HEX_H / 2.0),
     )
-    set_sketch_direct_db(adapter, False)
-    for entity in (width, height):
-        _as_construction(adapter, entity)
-    check(
-        "knife-envelope width horizontal",
-        await adapter.add_sketch_constraint(width, None, "horizontal"),
+    flank = check(
+        "knife-envelope +X upper flank",
+        await adapter.add_line(0.0, HEX_H / 2.0, HEX_W / 2.0, HEX_H / 4.0),
     )
+    side = check(
+        "knife-envelope +X side face",
+        await adapter.add_line(HEX_W / 2.0, HEX_H / 4.0, HEX_W / 2.0, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for entity in (width, height, flank, side):
+        _as_construction(adapter, entity)
+    for entity, relation in (
+        (width, "horizontal"),
+        (height, "vertical"),
+        (side, "vertical"),
+    ):
+        check(
+            f"knife-envelope {entity} {relation}",
+            await adapter.add_sketch_constraint(entity, None, relation),
+        )
+    for first, second in (
+        (f"{flank}.start", f"{height}.end"),
+        (f"{flank}.end", f"{width}.end"),
+        (f"{side}.start", f"{width}.end"),
+    ):
+        check(
+            f"knife-envelope {first} on {second}",
+            await adapter.add_sketch_constraint(first, second, "coincident"),
+        )
     check(
-        "knife-envelope height vertical",
-        await adapter.add_sketch_constraint(height, None, "vertical"),
+        "knife-envelope side foot level with the origin",
+        await adapter.add_sketch_constraint(
+            f"{side}.end", "origin", "horizontal_points"
+        ),
     )
     await dimension_between(
         adapter,
+        f"{height}.end",
         f"{width}.start",
+        "horizontal_distance",
+        HEX_W / 2.0,
+        "knife ridge from the -X side",
+    )
+    knife.record("RidgeFromLeft", '"HexW" / 2')
+    await dimension_between(
+        adapter,
+        f"{height}.end",
         f"{width}.end",
         "horizontal_distance",
-        HEX_W,
-        "knife-envelope width",
+        HEX_W / 2.0,
+        "knife ridge from the +X side",
     )
-    knife.record("HexWidth", '"HexW"')
-    await anchor_point_to_origin(
-        adapter, f"{width}.start", -HEX_W / 2.0, 0.0, "knife-envelope width start"
+    knife.record("RidgeFromRight", '"HexW" / 2')
+    await dimension_between(
+        adapter,
+        f"{width}.start",
+        f"{height}.end",
+        "vertical_distance",
+        HEX_H / 4.0,
+        "knife shoulder below the ridge",
     )
-    knife.record("HexWidthHalf", '"HexW" / 2')
+    knife.record("ShoulderDrop", '"HexH" / 4')
     await dimension_between(
         adapter,
         f"{height}.start",
@@ -1177,6 +1260,19 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
         adapter, f"{height}.start", 0.0, -HEX_H / 2.0, "knife-envelope height start"
     )
     knife.record("HexHeightHalf", '"HexH" / 2')
+    _driven_hex_width(adapter, width)
+    knife.record("HexWidth")
+    # Text up-right of the +X shoulder, in the wedge opposite the solid's
+    # corner: the drawing keeps it there (DETAIL_KEEP), outside the hexagon.
+    await add_angular_reference_dimension(
+        adapter,
+        flank,
+        side,
+        (HEX_W / 2.0 + 2.0, HEX_H / 4.0 + 0.6),
+        "knife flank to side face",
+        expected_degrees=180.0 - RIDGE_ANGLE_DEG / 2.0,
+    )
+    knife.record("FlankToSide")
     await ensure_fully_defined(adapter, "knife-envelope reference sketch")
     check("exit knife-envelope reference", await adapter.exit_sketch())
     name_last_feature(adapter, "KnifeEnvelopeReference")
@@ -1236,12 +1332,40 @@ async def _cylinder_reference(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     blank_reference_sketches(adapter, ("CylinderReference",))
 
 
+def _hex_width_reference(adapter) -> None:
+    """HexWidth prints as a reference, "2X (8.080)": untoleranced, the
+    parentheses its native prefix (DIMENSION_PREFIXES) and suffix."""
+    display, dimension = _named_dimension(adapter, "KnifeEnvelopeReference", "HexWidth")
+    label = "HexWidth@KnifeEnvelopeReference"
+    if int(dimension.DrivenState) != 1:
+        raise RuntimeError(f"{label}: a reference dimension must be driven")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 0  # swTolType_e.swTolNONE
+    display.SetText(2, ")")  # swDimensionTextParts_e.swDimensionTextSuffix
+    if int(tolerance.Type) != 0 or str(display.GetText(2) or "") != ")":
+        raise RuntimeError(f"{label}: reference display did not persist")
+
+
 def _drawing_dimension_contract(adapter) -> None:
     """Size and mark every dimension the print imports (DRAWING_DIMENSIONS)."""
-    # The trunnion envelope is the knife-edge size: three places carry the
-    # title block's .XXX band (spec HEX_BAND) the free-rock check assumes.
-    for name in ("HexWidth", "HexHeight"):
+    # The knife-edge controls the free-rock check assumes (code review C09):
+    # the ridge from each side face and the flank-to-side angle carry their
+    # own tolerances; the vertex height three places, the title block's .XXX.
+    for name in ("HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight"):
         set_dimension_display_precision(adapter, "KnifeEnvelopeReference", name, 3)
+    set_dimension_display_precision(adapter, "KnifeEnvelopeReference", "FlankToSide", 1)
+    for name in ("RidgeFromLeft", "RidgeFromRight"):
+        set_dimension_symmetric_tolerance(
+            adapter, "KnifeEnvelopeReference", name, RIDGE_FROM_SIDE_TOL
+        )
+    set_dimension_symmetric_angular_tolerance(
+        adapter,
+        "KnifeEnvelopeReference",
+        "FlankToSide",
+        KNIFE_FLANK_TO_SIDE_TOL_DEG,
+        require_driven=True,
+    )
+    _hex_width_reference(adapter)
     for (feature_name, name), prefix in DIMENSION_PREFIXES.items():
         set_dimension_prefix(adapter, feature_name, name, prefix)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
