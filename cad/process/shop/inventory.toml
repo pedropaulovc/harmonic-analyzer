@@ -3553,11 +3553,11 @@ sku = "LS-TR8-2-2P-CTS"
 source = "https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/"
 present = false
 verify = true
-purchase = "1 x Ooznest LS-TR8-2-2P-CTS cut to 500 mm, Tr8x2 single-start screw; UK-based vendor shipping to the US, shipping cost and delivery time require checkout confirmation."
-note = "Read live 2026-10-16: A2 stainless steel, nominal diameter 8 mm, pitch 2 mm, lead 2 mm/revolution, one start; cut-to-size range 100-2000 mm, length tolerance +/-0.5 mm, ends manually deburred with a small chamfer. Fully threaded ends, not supplied with smooth or turned 8 mm journals. Thread hand is not explicitly stated; use the matching Ooznest nut, do not infer a hand specification. Owner sourcing brief 2026-10-16 selects 500 mm total length as a purchase candidate, not a released CAD dimension; confirm the final jig spec's block positions, wheel engagement and usable travel before ordering a non-returnable cut length."
-cite = ["Ooznest LS-TR8-2-2P-CTS https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/ read live 2026-10-16: 8 mm, single start, pitch/lead 2 mm, cut 500 +/-0.5 mm", "Ooznest screw drawing https://ooznest.co.uk/wp-content/uploads/2026/09/TR8x2-2P-Lead-Screw-8mm-Dia-2mm-Lead-2mm-Pitch-Cut-To-Size_drawing.png"]
+purchase = "1 x Ooznest LS-TR8-2-2P-CTS cut to 410 mm +/-0.5 mm for the final C4 trammel layout, Tr8x2 single-start screw; UK-based vendor shipping to the US, shipping cost and delivery time require checkout confirmation."
+note = "Read live 2026-10-16: A2 stainless steel, nominal diameter 8 mm, pitch 2 mm, lead 2 mm/revolution, one start; cut-to-size range 100-2000 mm, length tolerance +/-0.5 mm, ends manually deburred with a small chamfer. Fully threaded ends, not supplied with smooth or turned 8 mm journals. Thread hand is not explicitly stated; use the matching Ooznest nut, do not infer a hand specification. Owner's final C4 layout ruling selects 410 mm total length, replacing the provisional 500 mm shortlist, to fit the blind 18 mm wheel bore and spindle-side clearance. This is a custom cut request within the published length range, not a separate stocked length SKU; physical engagement, block fit and usable travel remain to verify against the jig layout."
+cite = ["Ooznest LS-TR8-2-2P-CTS https://ooznest.co.uk/product/tr8x2-2p-lead-screw-cut-to-size/ read live 2026-10-16: 8 mm, single start, pitch/lead 2 mm, cut-to-size 100-2000 mm +/-0.5 mm; owner C4 order request 410 mm", "Ooznest screw drawing https://ooznest.co.uk/wp-content/uploads/2026/09/TR8x2-2P-Lead-Screw-8mm-Dia-2mm-Lead-2mm-Pitch-Cut-To-Size_drawing.png"]
 # McMaster alternatives considered, not chosen: M8 pitch 2 / lead 4 screws
-# 97783A170/97783A180 are only 200/300 mm; too short for the ~500 mm layout.
+# 97783A170/97783A180 are only 200/300 mm; too short for the final 410 mm order.
 # McMaster 2391N25 is 500 mm but pitch 2.5 / lead 10, unnecessarily coarse
 # compared with the available no-journal-machining Ooznest lead-2 matched pair.
 # https://www.mcmaster.com/97783A170/ https://www.mcmaster.com/97783A180/
