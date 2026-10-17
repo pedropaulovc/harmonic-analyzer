@@ -421,7 +421,10 @@ def test_controls_print_at_the_title_block_rows() -> None:
             assert spec.control_si(name)[1] == band / 1000.0
     # Every flat is one size; the printed one says how many.
     assert (spec.FLAT_LENGTH_CALLOUT, spec.FLAT_AF_CALLOUT) == ("5X", "3X")
-    assert draw.FLAT_CALLOUTS == {"FlatLength": "5X", "FlatAF": "3X"}
+    assert draw.FLAT_CALLOUTS == {
+        "FlatLength": "5X, ALL FLATS",
+        "FlatAF": "3X\nC, D, E",
+    }
     # The feed absorbs the band at either limit.
     short_margin = (feed.NEAR_STUB - feed.NEAR_STUB_MIN) + (
         feed.HANDWHEEL_ENGAGEMENT - feed.HANDWHEEL_ENGAGEMENT_MIN
@@ -653,7 +656,10 @@ def test_details_carry_the_near_station_and_the_printed_flat() -> None:
     assert set(by_label["D"].keep) == set()
     assert set(by_label["E"].keep) == {"FlatLength", "FlatAF"}
     assert spec.PRINTED_FLAT == "Handwheel"
-    assert draw.FLAT_CALLOUTS == {"FlatLength": "5X", "FlatAF": "3X"}
+    assert draw.FLAT_CALLOUTS == {
+        "FlatLength": "5X, ALL FLATS",
+        "FlatAF": "3X\nC, D, E",
+    }
     for detail in draw.END_DETAILS:
         fence = detail.radius_mm * draw._DETAIL_PER_MODEL_MM
         for name, (x, y) in detail.keep.items():
@@ -675,13 +681,13 @@ def test_details_carry_the_near_station_and_the_printed_flat() -> None:
     )
     # The across-flat's dimension line stands left of E's fence, short of the
     # flat's start (so its extension line leaves the fence over the flat, not
-    # along the thread to the far end), its text (about 10 mm wide) clear of
-    # D's fence and between the far crest and the flat.
+    # along the thread to the far end), its text (widest row "C, D, E", about
+    # 15 mm) clear of both fences and between the far crest and the flat.
     af_x, af_y = wheel.keep["FlatAF"]
     flat_start = spec.FLAT_STATIONS["Handwheel"] - spec.FLAT_LENGTH / 2.0
     assert wheel.centre_mm - wheel.radius_mm < flat_start
-    assert af_x + 0.005 < _fence_box(wheel)[0]
-    assert af_x - 0.005 > _fence_box(by_label["D"])[2] + 0.004
+    assert af_x + 0.0075 < _fence_box(wheel)[0]
+    assert af_x - 0.0075 > _fence_box(by_label["D"])[2] + 0.004
     radius = spec.MAJOR_DIA / 2.0
     crest = draw.detail_xy(wheel.centre_mm, wheel.centre, 0.0, -radius)[1]
     flat = draw.detail_xy(wheel.centre_mm, wheel.centre, 0.0, spec.FLAT_AF - radius)[1]

@@ -134,8 +134,6 @@ MAIN_KEEP = {
         MAIN_CENTER[1] - 0.032,
     ),
 }
-# Every flat is one size: the printed one says how many (pivot-shaft style).
-FLAT_CALLOUTS = {"FlatLength": FLAT_LENGTH_CALLOUT, "FlatAF": FLAT_AF_CALLOUT}
 # The thread is the stock's: a leadered callout over the screw names it, its
 # leader's tip on the upper silhouette, the text (top-left anchored, two rows
 # about 9 mm tall and 56 mm wide) between the sections' A letters (x <= 0.121)
@@ -271,8 +269,8 @@ _FAR_XY = (0.091, DETAIL_ROW_Y)
 # its extension line off the flat runs back along the flat and out of the
 # fence over 0.6 mm of thread (right of it, it would run 7.5 mm along the
 # unflatted thread to the far end, reading as the flat running out there).
-# The across-flat's text (about 10 mm wide, centred on its dimension line)
-# stands between D's fence and E's.
+# The across-flat's text (its widest row, "C, D, E", about 15 mm wide, centred
+# on its dimension line) stands between D's fence and E's.
 _WHEEL_CENTRE_MM = (FLAT_STATIONS["Handwheel"] - FLAT_LENGTH / 2.0 + LENGTH) / 2.0
 _WHEEL_RADIUS_MM = 9.0
 _WHEEL_XY = (0.1615, DETAIL_ROW_Y)
@@ -329,6 +327,18 @@ END_DETAILS = (
         },
     ),
 )
+# Every flat is one size: the printed one says how many (pivot-shaft style)
+# and which (review bought-r16, rule 1: "3X" and "5X" on detail E's one flat
+# left the reader to work out which flats they cover). The length is every
+# flat's; the across-flat is each clock-0 flat's, one in each detail (the
+# clock flats print their own in sections A-A and B-B). The across-flat's
+# rows stay narrower than the 25 mm between fences D and E.
+FLAT_CALLOUTS = {
+    "FlatLength": f"{FLAT_LENGTH_CALLOUT}, ALL FLATS",
+    "FlatAF": "\n".join(
+        (FLAT_AF_CALLOUT, ", ".join(detail.label for detail in END_DETAILS))
+    ),
+}
 # The cylinder face on the axis, 50 mm right of centre: 2 mm from either
 # silhouette and clear of the dimension above.
 CENTERLINE_PICK = (MAIN_CENTER[0] + 0.050, MAIN_CENTER[1])
