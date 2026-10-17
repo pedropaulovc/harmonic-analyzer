@@ -67,7 +67,7 @@ _EXPECTED = {
     "ch-rocker-arm-tl-oblique-bearing": (("5972K41",), "MHA-CH-006-TL-32", 4),
     "ch-rocker-arm-tl-oblique-cl-dowel": (("91595A452",), "MHA-CH-006-TL-33", 1),
     "ch-rocker-arm-tl-oblique-rail-screw": (("91251A197",), "MHA-CH-006-TL-41", 14),
-    "ch-rocker-arm-tl-oblique-bracket-screw": (("91251A196",), "MHA-CH-006-TL-42", 4),
+    "ch-rocker-arm-tl-oblique-bracket-screw": (("91251A196",), "MHA-CH-006-TL-42", 8),
     "ch-rocker-arm-tl-oblique-block-screw": (("91251A188",), "MHA-CH-006-TL-43", 2),
     "ch-rocker-arm-tl-oblique-carriage-screw": (("91290A168",), "MHA-CH-006-TL-44", 8),
     "ch-rocker-arm-tl-oblique-kp08-screw": (

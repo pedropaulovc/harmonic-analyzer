@@ -208,9 +208,11 @@ def test_sheet_text_is_the_spec_text_wrapped() -> None:
 
     assert words(drawing.ASSEMBLED_CAPTION) == words(spec.ASSEMBLED_CAPTION)
     assert words(drawing.ALIGNMENT_NOTE) == words(" ".join(spec.ALIGNMENT_NOTE_LINES))
-    # Both columns read as the spec's steps, in order, split between steps.
+    # Both columns read as the spec's steps, in order, split between steps
+    # (or sub-steps).
     if drawing.ASSEMBLY_STEPS_CONTINUED:
-        assert drawing.ASSEMBLY_STEPS_CONTINUED.split(".", 1)[0].isdigit()
+        label = drawing.ASSEMBLY_STEPS_CONTINUED.split(". ", 1)[0]
+        assert drawing._STEP_LABEL.fullmatch(label)
     assert words(drawing.ASSEMBLY_STEPS + " " + drawing.ASSEMBLY_STEPS_CONTINUED) == (
         words("ASSEMBLY SEQUENCE " + " ".join(spec.ASSEMBLY_STEPS))
     )
@@ -571,7 +573,7 @@ def test_every_bom_row_carries_one_balloon() -> None:
     # frame, mid-span between the spindle end and the far hold-down slot.
     bar = drawing.BALLOON_ANCHORS[spec.BASE_BAR]
     assert bar.instance is None
-    assert bar.point_mm == (300.0, base_bar.HALF_WIDTH, 0.0)
+    assert bar.point_mm == (300.0, base_bar.HIGH_SIDE_Y, 0.0)
     assert base_bar.NEAR_SLOT_X < bar.point_mm[0] < base_bar.FAR_SLOT_X
     assert 0.0 < bar.point_mm[0] < base_bar.BAR_LENGTH
     assert drawing.BALLOON_RING_REACH == (

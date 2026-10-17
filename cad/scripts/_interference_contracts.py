@@ -919,13 +919,13 @@ _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
     ),
     **_numbered_pairs(
         f"{_JIG}-bracket-screw",
-        range(1, 3),
+        range(1, 5),
         f"{_JIG}-end-bracket",
         _smooth_annulus_limit_mm3(*JIG_BRACKET_SCREW_THREAD),
     ),
     **_numbered_pairs(
         f"{_JIG}-bracket-screw",
-        range(3, 5),
+        range(5, 9),
         f"{_JIG}-end-bracket",
         _smooth_annulus_limit_mm3(*JIG_BRACKET_SCREW_THREAD),
         second_number=2,
