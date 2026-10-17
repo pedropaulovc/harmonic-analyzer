@@ -6,8 +6,9 @@ ch-rocker-hub:
   component_of: ch-rocker-arm
   material: Plain Carbon Steel
   material_specification: AISI 1018 cold-finish round
-  # Black oxide once, on the joined MHA-CH-006, after its bore and length are finished.
-  finish: black oxide on joined MHA-CH-006
+  # Black oxide once, on the joined MHA-CH-006, after its bore and length are
+  # finished; note 1 names the joint.
+  finish: black oxide after joining
   quantity: 20
   tolerance_class: machined_block
   process: "turned from 1018 round: land turned to the p6 press band, bore drilled and length parted off long; pressed into MHA-CH-013, then bore and length finished on MHA-CH-006"

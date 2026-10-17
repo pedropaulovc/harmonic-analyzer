@@ -11,15 +11,14 @@ offline test. The mates' wording is the finished part's
 from __future__ import annotations
 
 from ch_rocker_arm_notes import (
-    BOTTOM_RADIUS_CALLOUT,
     STRAP_FIT_CALLOUT,
     TOP_EDGE_MATE_CALLOUT,
 )
 from ch_rocker_hub_fit import INTERFERENCE_TEXT
-from ch_rocker_strap_spec import HUB_NUMBER
+from ch_rocker_strap_spec import HUB_NUMBER, R_TOP, ROCKER_NUMBER
 
 __all__ = [
-    "BOTTOM_RADIUS_CALLOUT",
+    "BOTTOM_EDGE_CALLOUT",
     "DIMENSION_CALLOUTS",
     "DRAWING_DIMENSIONS",
     "DRAWING_NOTES",
@@ -36,15 +35,17 @@ __all__ = [
 # implements the guidelines`: the PART owns places and bands). One sketch,
 # ``StrapProfile``, carries the outline and the hub hole, and every printed
 # location runs from the hub hole's centre (rule 10: from a real feature):
-# the top edge's height over it (+0.50/0, the finished part's band), both tip
-# lands' and both taper feet's offsets, the two radii and the tip land. The
-# thickness is the ``Strap`` extrude's depth, on the end view.
+# the top edge's height over it (+0.50/0) and the bottom edge's depth under
+# it (0/-0.50) -- the finished part's bands -- both tip lands' and both taper
+# feet's offsets, the R800 and the tip land. The concentric R816 follows from
+# those (never a second, stacking size). The thickness is the ``Strap``
+# extrude's depth, on the end view.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {
         "HoleDia",
         "TopAbovePivot",
+        "BottomBelowPivot",
         "TopRadius",
-        "BottomRadius",
         "TailTipX",
         "RodTipX",
         "BottomTailX",
@@ -54,15 +55,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Strap": {"StrapThickness"},
 }
 # The hole at three places with its H7 band; the thickness at three with its
-# ±0.025; the top edge at two with +0.50/0; the radii at one (noncritical
-# sizes: a 0.8 radius error moves the 146 mm half-chord's sagitta 0.01); the
-# offsets and the land at two (the title block's ±0.51).
+# ±0.025; both edges at two with their one-sided 0.50; the radius at one (a
+# noncritical size: a 0.8 radius error moves the 146 mm half-chord's sagitta
+# 0.01); the offsets and the land at two (the title block's ±0.51).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
         "HoleDia": 3,
         "TopAbovePivot": 2,
+        "BottomBelowPivot": 2,
         "TopRadius": 1,
-        "BottomRadius": 1,
         "TailTipX": 2,
         "RodTipX": 2,
         "BottomTailX": 2,
@@ -87,15 +88,23 @@ TIP_LAND_PREFIX = "2X "
 # drawing-guidelines.md rule 4: the H7 band names its mate and the fit. Below
 # rows (an ABOVE-compartment line break never prints).
 HOLE_CALLOUT = f"REAM THRU\nPRESS FIT ON {HUB_NUMBER} HUB\n{INTERFERENCE_TEXT}"
+# The bottom edge's one-sided band is the joined part's lower profile (rule 4:
+# the need it serves), and that edge is the R800's concentric arc. Two short
+# rows: the text sits between the R800's leader and the hole's extension line.
+BOTTOM_EDGE_CALLOUT = f"{ROCKER_NUMBER} PROFILE\nCONCENTRIC WITH R{R_TOP:.0f}"
 DIMENSION_CALLOUTS: dict[str, str] = {
     "HoleDia": HOLE_CALLOUT,
     "TopAbovePivot": TOP_EDGE_MATE_CALLOUT,
-    "BottomRadius": BOTTOM_RADIUS_CALLOUT,
+    "BottomBelowPivot": BOTTOM_EDGE_CALLOUT,
     "StrapThickness": STRAP_FIT_CALLOUT,
 }
 
-# drawing-guidelines.md rule 7: one line a machinist cannot read off the
-# views. The lands' angle is the arc half-angle, radial to a centre ~808 mm
-# off the sheet.
-DRAWING_NOTES = "1. ARC CENTRE DIRECTLY ABOVE THE HUB HOLE; TIP LANDS RADIAL TO IT."
+# drawing-guidelines.md rule 7: what a machinist cannot read off the views.
+# The lands' angle is the arc half-angle, radial to a centre ~808 mm off the
+# sheet; the finish field's "after joining" needs the joint named (r1
+# machinist review).
+DRAWING_NOTES = (
+    "1. ARC CENTRE DIRECTLY ABOVE THE HUB HOLE; TIP LANDS RADIAL TO IT.\n"
+    f"2. JOINED TO HUB {HUB_NUMBER} AS {ROCKER_NUMBER}."
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

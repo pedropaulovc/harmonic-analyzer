@@ -12,9 +12,10 @@ Layout: the MHA-CH-006 frame (origin on the bottom arc's midpoint, +X the rod
 side, the hub hole PIVOT_MID_Y up), extruded mid-plane in Z. ONE sketch,
 ``StrapProfile``, holds the outline and the hole, so every printed location
 runs from the hole's centre: a construction line on the mirror axis, from the
-hole's centre to the top edge, carries the top edge's height and puts the arcs'
-centre on that axis; the tip lands' outer corners and the taper feet are
-dimensioned across from the hole's centre.
+bottom edge through the hole's centre to the top edge, carries both edges'
+heights from the hole and puts the arcs' centre on that axis (the R816 is
+then derived, never printed); the tip lands' outer corners and the taper feet
+are dimensioned across from the hole's centre.
 
 Run (SolidWorks already open)::
 
@@ -69,11 +70,12 @@ from ch_rocker_strap_spec import (
     ARM_THICKNESS_BAND,
     BOT_END_X,
     BOT_END_Y,
+    BOTTOM_EDGE_BAND,
+    BOTTOM_EDGE_BELOW_PIVOT,
     CENTER_Y,
     CURVE_RADIUS,
     HOLE_DIA,
     PIVOT_MID_Y,
-    R_BOTTOM,
     R_TOP,
     ROD_TIP_X,
     ROD_TIP_Y,
@@ -114,10 +116,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "TipFaceLen", f"{TIP_FACE}mm")
     await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
     await set_global(adapter, "TopAbovePivot", f"{TOP_EDGE_ABOVE_PIVOT}mm")
+    await set_global(adapter, "BottomBelowPivot", f"{BOTTOM_EDGE_BELOW_PIVOT}mm")
     await set_global(adapter, "TipX", f"{ROD_TIP_X}mm")
     await set_global(adapter, "BottomEndX", f"{BOT_END_X}mm")
     await set_global(adapter, "RTop", '"CurveRadius"')
-    await set_global(adapter, "RBottom", '"CurveRadius" + "ArmDepth"')
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -146,12 +148,12 @@ async def build(adapter) -> dict[str, str]:
         check("strap rod end", await adapter.add_line(*rod_tip, *rod_b)),
         check("strap tail tip", await adapter.add_line(*tail_t, *tail_tip)),
         check("strap tail end", await adapter.add_line(*tail_tip, *tail_b)),
-        # The mirror axis from the hole's centre up to the top edge: its
-        # length is the top edge's printed height over the hole.
+        # The mirror axis from the bottom edge, through the hole's centre, to
+        # the top edge: its two parts are the edges' printed heights.
         check(
-            "top edge reference centerline",
+            "edge reference centerline",
             await adapter.add_centerline(
-                0.0, PIVOT_MID_Y, 0.0, PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT
+                0.0, 0.0, 0.0, PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT
             ),
         ),
     ]
@@ -161,8 +163,9 @@ async def build(adapter) -> dict[str, str]:
     )
     # Dimension EMISSION ORDER (SketchDims renames by it): the hole's centre
     # height (on-axis: one dim) and Ø, the top edge's height over the hole,
-    # the two radii, the taper feet's and the tip corners' offsets from the
-    # hole's centre, then the two land lengths. Every other tie is a relation.
+    # the bottom edge's depth under it, the top radius, the taper feet's and
+    # the tip corners' offsets from the hole's centre, then the two land
+    # lengths. Every other tie is a relation.
     hole = await define_circle(
         adapter,
         0.0,
@@ -179,8 +182,12 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_constraint(axis, None, "vertical"),
     )
     check(
-        "mirror axis foot on the hole centre",
-        await adapter.add_sketch_constraint(f"{axis}.start", hole_centre, "coincident"),
+        "hole centre on the mirror axis",
+        await adapter.add_sketch_constraint(hole_centre, axis, "coincident"),
+    )
+    check(
+        "mirror axis foot on the bottom edge",
+        await adapter.add_sketch_constraint(f"{axis}.start", bottom_arc, "coincident"),
     )
     check(
         "mirror axis head on the top edge",
@@ -198,18 +205,22 @@ async def build(adapter) -> dict[str, str]:
     )
     await dimension_between(
         adapter,
-        f"{axis}.start",
+        hole_centre,
         f"{axis}.end",
         "vertical_distance",
         TOP_EDGE_ABOVE_PIVOT,
         "top edge above the hole",
     )
     strap.record("TopAbovePivot", '"TopAbovePivot"')
-    check(
-        "bottom radius",
-        await adapter.add_sketch_dimension(bottom_arc, None, "radial", R_BOTTOM),
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        hole_centre,
+        "vertical_distance",
+        BOTTOM_EDGE_BELOW_PIVOT,
+        "bottom edge below the hole",
     )
-    strap.record("BottomRadius", '"RBottom"')
+    strap.record("BottomBelowPivot", '"BottomBelowPivot"')
     check(
         "top radius",
         await adapter.add_sketch_dimension(top_arc, None, "radial", R_TOP),
@@ -275,7 +286,8 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
 
     # Native bands: the thickness ±0.025 (the finished part's, the faces are
-    # not cut again), the hub hole H7, the top edge +0.50/0 over the hole.
+    # not cut again), the hub hole H7, the top edge +0.50/0 over the hole and
+    # the bottom edge 0/-0.50 under it.
     strap_lower, strap_upper = deviations(ARM_THICKNESS_BAND)
     if strap_lower != -strap_upper:
         raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS_BAND must be symmetric")
@@ -285,6 +297,9 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "StrapProfile", "TopAbovePivot", *deviations(TOP_EDGE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "StrapProfile", "BottomBelowPivot", *deviations(BOTTOM_EDGE_BAND)
     )
     set_dimension_prefix(adapter, "StrapProfile", "RodTipLen", TIP_LAND_PREFIX)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

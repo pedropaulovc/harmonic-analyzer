@@ -87,9 +87,11 @@ def _front(x_mm: float, y_mm: float) -> tuple[float, float]:
 _HOLE = _front(0.0, PIVOT_MID_Y)
 # The tip corners' offsets on one dimension line above the strap, the taper
 # feet's on one below it, each pair meeting on the hole centre's extension
-# line. Between the strap and the lower line: both radii's texts (left, below
-# both arcs, so each leader stays outside its circle -- draw_ch_rocker_arm
-# _dress_arc_radii) and the hole's callout (right, its leader short). The top
+# line. Between the strap and the lower line: the R800's text (left, below
+# both arcs, so its leader stays outside its circle -- draw_ch_rocker_arm
+# _dress_arc_radii), the bottom edge's depth under the hole (~56 mm wide,
+# between the R800's leader shelf ending x ~0.110 and the hole's extension
+# line at x 0.185) and the hole's callout (right, its leader short). The top
 # edge's height reads left of the hole, under the upper line.
 TIP_LINE_Y = 0.232
 FOOT_LINE_Y = 0.125
@@ -99,23 +101,26 @@ FRONT_KEEP = {
     "BottomTailX": (FRONT_CENTER[0] - BOT_END_X / 2000.0, FOOT_LINE_Y),
     "BottomRodX": (FRONT_CENTER[0] + BOT_END_X / 2000.0, FOOT_LINE_Y),
     "TopRadius": (FRONT_CENTER[0] - 0.085, 0.158),
-    "BottomRadius": (FRONT_CENTER[0] - 0.045, 0.158),
+    # Mirrors the top edge's height on the same vertical, below the strap.
+    "BottomBelowPivot": (_HOLE[0] - 0.038, 0.160),
     "HoleDia": (_HOLE[0] + 0.060, 0.160),
     "TopAbovePivot": (_HOLE[0] - 0.035, 0.207),
-    # Right of the land's own dimension line, between its extension lines:
-    # at +0.020 (r1) the text sat on the upper extension line.
-    "RodTipLen": (_front(ROD_TIP_X, 0.0)[0] + 0.034, 0.200),
+    # The land's two extension lines run ~5.6 mm apart, rising ~10 deg to the
+    # right (perpendicular to the radial land); the upper one passes y ~0.206
+    # at x 0.365. Between them (r1, r2) a line struck the text, so it stands
+    # above both, the dimension line carried up to it.
+    "RodTipLen": (_front(ROD_TIP_X, 0.0)[0] + 0.031, 0.215),
 }
 # The 2.5 mm end view is narrower than its four-row callout: centred over it
 # (r1) both extension lines ran through the text, so the text stands below
 # the view, left of its left extension line, the dimension line carried out.
 RIGHT_KEEP = {"StrapThickness": (RIGHT_CENTER[0] - 0.027, 0.150)}
-ARC_RADIUS_NAMES = ("TopRadius", "BottomRadius")
+ARC_RADIUS_NAMES = ("TopRadius",)
 
 
 def _exterior_radius_leaders(adapter: Any, annotations: list[Any]) -> None:
-    """Exterior leaders on both radii (draw_ch_rocker_arm._dress_arc_radii):
-    the ~808 mm centres are off the sheet, so no centre-directed leader."""
+    """Exterior leader on the R800 (draw_ch_rocker_arm._dress_arc_radii): the
+    ~808 mm centre is off the sheet, so no centre-directed leader."""
     remaining = set(ARC_RADIUS_NAMES)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import math
 
-from _config import title_block
+import _config
 from ch_rocker_arm_spec import (
     HUB_DIA,
     HUB_LENGTH,
@@ -40,7 +40,7 @@ LAND_DIA = HUB_DIA
 # half of, so the ream always cleans up.
 REAM_STOCK_DIA = 0.20
 SUPPLY_BORE_DIA = round(PIVOT_HOLE_DIA - REAM_STOCK_DIA, 2)  # 6.30
-DRILLED_PLUS = float(title_block("drilled_hole")["plus_mm"])
+DRILLED_PLUS = float(_config.title_block("drilled_hole")["plus_mm"])
 if not SUPPLY_BORE_DIA + DRILLED_PLUS < PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]:
     raise AssertionError("the largest supply bore leaves no stock for the Ø6.50 ream")
 

@@ -42,6 +42,8 @@ __all__ = [
     "ARM_DEPTH",
     "ARM_THICKNESS",
     "ARM_THICKNESS_BAND",
+    "BOTTOM_EDGE_BAND",
+    "BOTTOM_EDGE_BELOW_PIVOT",
     "BOT_END_X",
     "BOT_END_Y",
     "CENTER_Y",
@@ -69,6 +71,15 @@ ROCKER_NUMBER = "MHA-CH-006"
 
 # The hub hole: the finished hub O.D.'s nominal, H7 (ch_rocker_hub_fit).
 HOLE_DIA = HUB_DIA
+
+# The bottom edge's depth under the hole, on the mirror axis -- the
+# finished part's lower profile (draw_ch_rocker_arm: zone TOP_EDGE_BAND[0],
+# wholly in material, U0) said as a +/- from the hole the hub fills. It may
+# only come out shallow, the top edge only high: the arcs' radial width is
+# held from the hole, not stacked from two radii (r1 machinist review: two
+# one-place radii left a 0.79 worst-case wall under the hole).
+BOTTOM_EDGE_BELOW_PIVOT = PIVOT_MID_Y
+BOTTOM_EDGE_BAND = (TOP_EDGE_BAND[1], -TOP_EDGE_BAND[0])  # (upper, lower)
 
 # The two vertices the spec does not export, from the same construction as
 # build_ch_rocker_arm: each arc's end on its circle, and the tip land's outer

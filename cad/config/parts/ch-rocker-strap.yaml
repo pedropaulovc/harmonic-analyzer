@@ -6,8 +6,10 @@ ch-rocker-strap:
   component_of: ch-rocker-arm
   material: Plain Carbon Steel
   material_specification: AISI 1018 flat, 3 x 40 mm
-  # Black oxide once, on the joined MHA-CH-006, after its bore and length are finished.
-  finish: black oxide on joined MHA-CH-006
+  # Black oxide once, on the joined MHA-CH-006, after its bore and length are
+  # finished; note 2 names the joint ("on joined MHA-CH-006" read as an
+  # unexplained second joint to the r1 machinist review).
+  finish: black oxide after joining
   quantity: 20
   tolerance_class: machined_block
   process: "1018 flat 3 x 40 mm (OnlineMetals 22381) milled to the 2.5 thickness; hub hole reamed H7; outline milled; MHA-CH-012 pressed in, then finished on MHA-CH-006"
