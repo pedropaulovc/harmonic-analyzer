@@ -64,9 +64,12 @@ def test_arm_deflection_old_and_new():
 
 def test_arm_adds_under_one_percent_to_the_spring_compliance():
     spring = _spring_compliance_along_wire()
-    assert spring == pytest.approx(3.19, abs=0.02)
+    # 3.13 since the counter boss hook rides its jam-nut thread higher
+    # (spring_mount_geom.COUNTER_ANCHOR_XY), which moves the counter spring's
+    # installed geometry and stiffens the summing springs slightly.
+    assert spring == pytest.approx(3.13, abs=0.02)
     share = arm.ARM_COMPLIANCE_MM_PER_N / spring
-    assert share == pytest.approx(0.0071, abs=2e-4)
+    assert share == pytest.approx(0.0073, abs=2e-4)
     assert share <= arm.ARM_SHARE_OF_SPRING_COMPLIANCE_MAX
 
 
