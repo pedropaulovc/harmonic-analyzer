@@ -1,50 +1,144 @@
-r"""Amplitude-bar drawing prose -- the manufacturing notes the part build stamps
-into the SLDPRT and the view labels.
+r"""Amplitude bar (MHA-CH-001) drawing-only data: the marked-dimension and
+precision contract and the dimension callouts.
 
-Split OUT of ``amplitude_bar_spec`` (the ``rocker_arm_notes`` treatment, codex
-#354): the channel kinematics, the rocker-bank layout and the spring specs
-import the bar's geometry, so drawing prose in that import closure re-keyed
-the channel, magnifier and summing assemblies on every notes edit.  Imported
-ONLY by ``build_amplitude_bar`` and the offline tests.
+Split OUT of ``ch_amplitude_bar_spec`` (the ``ch_rocker_arm_notes`` treatment,
+codex #354): the channel kinematics, the rocker-bank layout, the rocker arm
+and both pivot pins import the bar's geometry, so drawing data in that import
+closure re-keyed them on every sheet edit. Imported ONLY by
+``build_ch_amplitude_bar``, ``draw_ch_amplitude_bar`` and the offline tests.
 """
 
 from __future__ import annotations
 
-from ch_amplitude_bar_spec import TOP_PIN_HOLE_BAND, TOP_PIN_HOLE_DIA
+import math
 
-# The pin pressed into the top pin hole (test_ch_amplitude_bar_drawing pins it
-# to the part registry). The hole is dimensioned in the notes, so its reamed
-# band (the model's, native on TopPinDia) is stated with it.
-TOP_PIN_NUMBER = "MHA-CH-011"
-_HOLE_UPPER, _HOLE_LOWER = TOP_PIN_HOLE_BAND
-if _HOLE_LOWER != 0.0:
-    raise AssertionError("note 3 prints the reamed band as +upper/0")
+import ch_amplitude_bar_spec as bar
+from _printed_tolerance import printed_band_mm
 
-# The title-block QTY cell owns the 20-off count; notch orientation and
-# coplanarity are stated because no view resolves them at 1:4 (machinist
-# round 1): both notches live in ONE profile sketch cut thru the full depth,
-# so open-to-opposite-ends / common-plane IS the model truth, and the pin
-# hole runs thru the top-notch cheeks at mid-depth. Each notch's centring
-# ledge, width and depth -- the bottom depth with its one-sided band
-# (amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND), each ledge with
-# NOTCH_OFFSET_TOLERANCE_MM -- print as model dimensions in its end's detail,
-# and the floor's Ra is a native symbol there (amplitude_bar_drawing_spec),
-# never here (drawing-simplicity-policy.md `How the repository implements the guidelines`, Codex #936 PRRT_kwDOPHDy386mWF0L).
-# "ROOTS R0.40 MAX." is a Main-ruled exception (2026-09-27): it limits the
-# cutter's corner at an unmodelled root, so nothing in the model can carry it.
-DRAWING_NOTES = "\n".join(
-    (
-        "1. BAR SECTION 6.35 SQUARE.",
-        "2. END NOTCHES (DETAILS A, B):",
-        "   BOTH THRU THE FULL DEPTH, OPEN TO",
-        "   OPPOSITE ENDS, IN ONE COMMON PLANE;",
-        "   ROOTS R0.40 MAX.",
-        f"3. TOP PIN HOLE \u00d8{TOP_PIN_HOLE_DIA:.3f} +{_HOLE_UPPER:.3f}/0 REAM",
-        "   THRU BOTH TOP-NOTCH CHEEKS AT",
-        "   MID-DEPTH, 6.35 BELOW THE BAR TOP;",
-        f"   PRESS FIT PIN {TOP_PIN_NUMBER}.",
-        "4. DIMS APPLY AFTER PLATING.",
+# Mating parts the callouts name (test_ch_amplitude_bar_drawing pins each to
+# the part registry).
+TOP_PIN_NUMBER = "MHA-CH-011"  # pressed into the top pin hole
+LEVER_NUMBER = "MHA-CH-002"  # the channel lever the top notch straddles
+ROCKER_ARM_NUMBER = "MHA-CH-006"  # the rocker arm whose strap the foot notch rides
+
+# --- Drawing contract (drawing-simplicity-policy.md `How the repository
+# implements the guidelines`: the PART owns places and bands). ---
+# BarProfile (the Front-plane outline): the overall length prints on the 1:4
+# front view; each notch's centring ledge, width and depth in the 4:1 detail
+# of its end. TopPinProfile (the Right-plane cut sketch): the pin hole, located
+# from the bar's top edge, and that edge's length -- the 1/4 in square stock --
+# print in the 4:1 right side view of the top end.
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "BarProfile": {
+        "BarLength",
+        "BottomLeftLedge",
+        "BottomNotchHeight",
+        "BottomNotchWidth",
+        "TopNotchHeight",
+        "TopNotchWidth",
+        "TopRightLedge",
+    },
+    "TopPinProfile": {"BarSection", "TopPinX", "TopPinDrop", "TopPinDia"},
+}
+# Places the part authors on each printed dimension. The hole's offset from the
+# back face prints at three places: the .XXX band (+/-0.13) holds the reamed
+# hole's walls to both faces at the 2.0 target on the narrowest stock
+# (ch_bar_pivot_pin_spec.joint_budget hole_face_wall_min); at .XX it would not.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "BarProfile": {
+        "BarLength": 1,
+        "BottomLeftLedge": 2,
+        "BottomNotchHeight": 2,
+        "BottomNotchWidth": 2,
+        "TopNotchHeight": 2,
+        "TopNotchWidth": 2,
+        "TopRightLedge": 2,
+    },
+    "TopPinProfile": {
+        "BarSection": 2,
+        "TopPinX": 3,
+        "TopPinDrop": 2,
+        "TopPinDia": 3,
+    },
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: digits
+    for names in DRAWING_PRECISION.values()
+    for name, digits in names.items()
+}
+# The section is the stock: printed in parentheses, its band the mill's.
+REFERENCE_DIMENSIONS = frozenset({"BarSection"})
+if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
+    DRAWING_PRECISION_BY_NAME
+):
+    raise AssertionError("every marked bar dimension needs authored places")
+
+
+def _far_cheek_min(notch_width: float, ledge: float) -> float:
+    """The cheek opposite a notch's printed ledge at the worst case: the
+    narrowest stock less the widest notch beside the widest ledge, floored to
+    the two places it prints at."""
+    upper, _lower = bar.NOTCH_WIDTH_BAND
+    wall = (
+        (bar.BAR_WIDTH - bar.BAR_STOCK_UNDERSIZE)
+        - (ledge + bar.NOTCH_OFFSET_TOLERANCE_MM)
+        - (notch_width + upper)
     )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:8"
-END_VIEW_NOTE = "END VIEW SCALE 4:1"
+    return math.floor(round(wall * 100.0, 9)) / 100.0
+
+
+# drawing-guidelines.md rule 20: the notch cheeks fall short of the 2.0 wall
+# target and the 1.5 floor (#1038; the book's 6.35 bar straddling its 2.5
+# rocker arm leaves cheeks under 1.93 nominal). The shortfall is stated at
+# each notch's width.
+# Pending exception ruling: MHA-CH-001 cheek wall 1.17 MIN (#1293/#1038).
+TOP_CHEEK_WALL_MIN = _far_cheek_min(bar.TOP_NOTCH_WIDTH, bar.TOP_NOTCH_OFFSET)
+BOTTOM_CHEEK_WALL_MIN = _far_cheek_min(bar.BOTTOM_NOTCH_WIDTH, bar.BOTTOM_NOTCH_OFFSET)
+
+
+def _pin_hole_wall_min() -> float:
+    """The reamed pin hole's wall to the nearer depth face at the worst case:
+    its offset at either end of the band its TopPinX places print, the hole
+    at its largest, on the narrowest stock; floored to one place. The tight
+    location exists for this wall (machinist round 1, #1293: the 3.175 read
+    as a three-place size with no function)."""
+    location = printed_band_mm(DRAWING_PRECISION["TopPinProfile"]["TopPinX"])
+    hole_max = bar.TOP_PIN_HOLE_DIA + bar.TOP_PIN_HOLE_BAND[0]
+    near = bar.BAR_DEPTH / 2.0 - location
+    far = (bar.BAR_DEPTH - bar.BAR_STOCK_UNDERSIZE) - (bar.BAR_DEPTH / 2.0 + location)
+    wall = min(near, far) - hole_max / 2.0
+    return math.floor(round(wall * 10.0, 9)) / 10.0
+
+
+# drawing-guidelines.md rule 17: the hole's wall holds the 2.0 target.
+PIN_HOLE_WALL_MIN = _pin_hole_wall_min()
+if PIN_HOLE_WALL_MIN < 2.0:
+    raise AssertionError("the top pin hole's face wall fell under 2.0")
+
+# "ROOTS R0.40 MAX" is a Main-ruled exception (2026-09-27): it limits the
+# cutter's corner at an unmodelled root, so it rides each notch's depth.
+ROOT_CALLOUT = "ROOTS R0.40 MAX"
+# Each line stays within ~20 characters (~48 mm at the sheet's dimension
+# font): the callouts sit between a notch's crop circle and its neighbours.
+DIMENSION_CALLOUTS: dict[str, str] = {
+    "TopNotchWidth": (
+        f"STRADDLES {LEVER_NUMBER}\nCHEEK WALL {TOP_CHEEK_WALL_MIN:.2f} MIN"
+    ),
+    "BottomNotchWidth": (
+        f"RIDES {ROCKER_ARM_NUMBER}\nCHEEK WALL {BOTTOM_CHEEK_WALL_MIN:.2f} MIN"
+    ),
+    "TopRightLedge": "CENTRES ON LEVER",
+    "BottomLeftLedge": "CENTRES ON ROCKER",
+    "TopNotchHeight": ROOT_CALLOUT,
+    "BottomNotchHeight": ROOT_CALLOUT,
+    "TopPinDia": f"THRU, REAM\nPRESS FIT {TOP_PIN_NUMBER}",
+    "TopPinX": f"HOLE WALL {PIN_HOLE_WALL_MIN:.1f} MIN",
+    "BarSection": "1/4 SQ STOCK",
+}
+if not set(DIMENSION_CALLOUTS) <= set(DRAWING_PRECISION_BY_NAME):
+    raise AssertionError("a callout names a dimension the sheet does not print")
+
+# No general note: the title-block QTY owns the count, the FINISH field the
+# plating, and the views both notches' depth and common plane (machinist
+# round 2, #1293: "BOTH END NOTCHES THRU THE FULL DEPTH, IN ONE COMMON PLANE"
+# repeated what the front view and the isometrics show).

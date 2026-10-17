@@ -22,7 +22,7 @@ Frame (part): pin axis = part X (Top ∩ Front, named Axis1), axial mid-plane =
 Right Plane (x = 0), as build_ch_bar_pivot_pin revolves it; the
 model is the INSTALLED pin -- a Ø PIN_DIA cylinder BAR_WIDTH long, flush with
 both bar faces. The shop cuts the blank PIN_BLANK_LENGTH long; the drawing
-states that.
+prints that from the part's blanked BlankReference sketch.
 """
 
 from __future__ import annotations
@@ -44,10 +44,14 @@ DRILLED_PLUS = 0.10
 PIN_DIA = 5.0 / 64.0 * MM_PER_IN  # 1.984
 PIN_DIA_TOLERANCE = 0.005  # +/-, drill-rod grind
 PIN_INSTALLED_LENGTH = _bar.BAR_WIDTH  # dressed flush with both bar faces
-# Cut length of the blank: the bar plus dressing stock at each end. 2-place,
-# printed on the pin sheet with its band.
-PIN_BLANK_LENGTH = 6.60
-PIN_BLANK_LENGTH_BAND = (0.13, -0.13)  # (upper, lower) deviations
+# Cut length of the blank: the bar plus dressing stock at each end. Its one
+# function is to stand proud of both faces before dressing, so it prints at
+# two places under the title block's .XX band (test_ch_bar_pivot_fit pins the
+# restatement to title_block.yaml); machinist round 1 (#1305) found the former
+# 6.60 +/-0.13 tighter than a dress-flush blank needs.
+PIN_BLANK_LENGTH = 7.00
+PIN_BLANK_LENGTH_PLACES = 2
+PIN_BLANK_LENGTH_BAND = (0.51, -0.51)  # (upper, lower) deviations: .XX
 # Dressed ends stand nothing proud of the bar faces: the top-notch stack
 # below leaves 0.1065 against the 0.10 running floor (#1038).
 PIN_END_PROUD_MAX = 0.0
@@ -56,10 +60,14 @@ PIN_END_PROUD_MAX = 0.0
 # budget reads one place). ---
 BAR_HOLE_DIA = _bar.TOP_PIN_HOLE_DIA
 BAR_HOLE_BAND = _bar.TOP_PIN_HOLE_BAND
-# 1/4 in cold-finished square bar: ASTM A108/A29 size tolerance +0/-0.002 in.
-# The bar's width is never printed (it is the stock), so the stock band, not
-# the title block's .XX, bounds it.
-BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
+# 1/4 in cold-finished square bar (the bar spec owns the stock band). The
+# bar's section prints only as the stock's reference size, so the stock band,
+# not the title block's .XX, bounds it.
+BAR_STOCK_UNDERSIZE = _bar.BAR_STOCK_UNDERSIZE  # 0.051
+# The hole's offset from the bar's back face prints at three places on the
+# bar sheet (ch_amplitude_bar_notes.DRAWING_PRECISION TopPinX): the title
+# block's .XXX band (test_ch_bar_pivot_fit pins it to title_block.yaml).
+HOLE_LOCATION_TOLERANCE = 0.13
 
 # --- The joint's limits (the budget test_ch_bar_pivot_fit holds). ---
 # The tightest press the cheeks take: ANSI B4.1-1967 (R1987) FN2 "medium
@@ -83,8 +91,8 @@ def joint_budget() -> dict[str, float]:
     Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)): the
     drill rod +/-0.005, the reamed cheek hole +0.010/0, the lever's #47 hole
     +0.10/0, the lever 3.00 +/-0.10, the top notch 3.20 +0.30/0, its ledge
-    1.575 +/-0.05, the bar stock +0/-0.051, the hubs that set the pitch never
-    shorter than nominal.
+    1.575 +/-0.05, the bar stock +0/-0.051, the hole's offset from the back
+    face +/-0.13, the hubs that set the pitch never shorter than nominal.
     """
     pin_min, pin_max = PIN_DIA - PIN_DIA_TOLERANCE, PIN_DIA + PIN_DIA_TOLERANCE
     hole_min, hole_max = _band(BAR_HOLE_DIA, BAR_HOLE_BAND)
@@ -105,9 +113,15 @@ def joint_budget() -> dict[str, float]:
         "running_clearance_min": lever_hole_min - pin_max,
         "running_clearance_max": lever_hole_max - pin_min,
         "neighbour_clearance_min": neighbour,
-        # Hole at mid-depth: the reamed hole's wall to the bar's front/back
-        # faces on the narrowest stock.
-        "hole_face_wall_min": (w_min - hole_max) / 2.0,
+        # The reamed hole's wall to the bar's front/back faces: its offset
+        # from the back face at either end of its band, on the narrowest
+        # stock (the far face is the nearer one when the offset runs long).
+        "hole_face_wall_min": min(
+            _bar.BAR_DEPTH / 2.0 - HOLE_LOCATION_TOLERANCE - hole_max / 2.0,
+            w_min
+            - (_bar.BAR_DEPTH / 2.0 + HOLE_LOCATION_TOLERANCE)
+            - hole_max / 2.0,
+        ),
         # The cheek the pin presses into. The printed ledge is the near-side
         # cheek; the far cheek is what the widest notch leaves of the
         # narrowest stock beside the thinnest ledge -- a pre-existing #1038
@@ -140,26 +154,3 @@ if _bar.LEVER_THICKNESS != _lever.LEVER_THICKNESS:
     raise AssertionError("the bar's restated lever thickness drifted")
 if not math.isclose(_lever.HUB_LENGTH, 7.0565):
     raise AssertionError("the station pitch moved; re-run the #1038 gap budget")
-
-# --- Drawing contract (drawing-simplicity-policy.md `How the repository implements the guidelines`: the PART owns places and bands). ---
-# Both marked dimensions live on the revolve's half-profile (``PinProfile``),
-# so both import into the side view beside each other (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned part).
-# The diameter carries the drill rod's own grind band natively at three
-# places; the installed length is the bar's width, printed as REFERENCE (the
-# bar's stock owns it). The blank cut length is a shop instruction in the notes.
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PinProfile": {"PinDia", "PinLen"},
-}
-DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PinProfile": {"PinDia": 3, "PinLen": 2},
-}
-DRAWING_PRECISION_BY_NAME: dict[str, int] = {
-    name: decimals
-    for dimensions in DRAWING_PRECISION.values()
-    for name, decimals in dimensions.items()
-}
-REFERENCE_DIMENSIONS = frozenset({"PinLen"})
-if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
-    DRAWING_PRECISION_BY_NAME
-):
-    raise AssertionError("every marked pin dimension needs authored places")

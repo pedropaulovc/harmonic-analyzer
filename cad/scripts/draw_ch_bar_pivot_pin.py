@@ -2,15 +2,17 @@ r"""Create the curated manufacturing drawing for the bar pivot pin (MHA-CH-011).
 
 Under ``cad/docs/drawing-guidelines.md``: the INSTALLED pin -- a 5/64
 drill-rod cylinder pressed into the amplitude bar's reamed top pin hole and
-dressed flush with the bar's faces -- on two native model dimensions, both on
-the side view where a turned part's diameter sits beside its length (drawing-guidelines.md rule 11 (turned parts read like the lathe)):
-the Ø with the drill rod's own grind band, and the installed length as
-REFERENCE (the bar's width; the MHA-CH-001 stock owns it). An axis
-centerline, a bare end view with its center mark, the isometric, and the
-property-linked notes (the blank's cut length, the press, the flush ends, the
-running fit). No datums, no frames, no roughness symbol.
+dressed flush with the bar's faces -- on three native model dimensions, all
+on the side view where a turned part's diameter sits beside its length
+(drawing-guidelines.md rule 11 (turned parts read like the lathe)): the Ø
+with the drill rod's own grind band, its callout naming the stock and both
+mates; the installed length as REFERENCE (the bar's width; the MHA-CH-001
+stock owns it); and the blank's cut length with its band from the part's
+blanked ``BlankReference`` sketch. An axis centerline, a bare end view with
+its center mark, the isometric, and the one property-linked note. No datums,
+no frames, no roughness symbol.
 The decimal places and the band are the PART's
-(``ch_bar_pivot_pin_spec.DRAWING_PRECISION``, applied natively by
+(``ch_bar_pivot_pin_notes.DRAWING_PRECISION``, applied natively by
 ``build_ch_bar_pivot_pin``); this script only reads them back off the sheet.
 
 Drawn 10:1 -- a Ø1.98 x 6.35 pin is a speck on a B sheet at anything less.
@@ -33,6 +35,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -41,21 +44,25 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_reference_dimension
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+import _drawing_hidden_sketches as hidden_sketches
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from ch_bar_pivot_pin_spec import (
+from ch_bar_pivot_pin_notes import (
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    PIN_DIA,
-    PIN_INSTALLED_LENGTH,
     REFERENCE_DIMENSIONS,
 )
+from ch_bar_pivot_pin_spec import PIN_DIA, PIN_INSTALLED_LENGTH
 
 
 SPEC = DRAWINGS_BY_NAME["ch_bar_pivot_pin"]
@@ -84,12 +91,38 @@ HALF_DIA = PIN_DIA * VIEW_SCALE[0] / 2000.0  # 0.0099
 HALF_LEN = PIN_INSTALLED_LENGTH * VIEW_SCALE[0] / 2000.0  # 0.0318
 
 # Side view: the diameter above the view, its text left of centre so the
-# axis-centerline pick at the view's middle lands on bare face; the installed
-# length below.
+# axis-centerline pick at the view's middle lands on bare face, high enough
+# that its three-line callout hangs clear of the pin; the installed length
+# below with its one-line callout, and the blank's cut length below that.
 FRONT_KEEP = {
-    "PinDia": (FRONT_CENTER[0] - 0.020, FRONT_CENTER[1] + HALF_DIA + 0.016),
+    "PinDia": (FRONT_CENTER[0] - 0.020, FRONT_CENTER[1] + HALF_DIA + 0.032),
     "PinLen": (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_DIA - 0.016),
+    "BlankLen": (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_DIA - 0.036),
 }
+# The installed length's arrows stand inside its span (swDimensionArrowsSide_e
+# swDimArrowsInside, read back as draw_mg_magnifying_wheel does): left to the
+# document's smart arrows, r2 drew them outside, across the blank's extension
+# lines 3.25 mm beyond each pin end.
+ARROWS_INSIDE = ("PinLen",)
+_DIM_ARROWS_INSIDE = 0
+
+
+def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
+    remaining = set(ARROWS_INSIDE)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        remaining.discard(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = _DIM_ARROWS_INSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError(f"pin {name} did not keep its arrows inside")
+    if remaining:
+        raise RuntimeError(
+            f"no pin dimension to set arrows inside: {sorted(remaining)}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -138,9 +171,12 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # Both dimensions live on the revolve's half-profile and import into the
-    # side view only; the end view is a bare circle with its center mark.
-    front_annotations = curate_view_dimensions(
+    # The diameter and installed length live on the revolve's half-profile and
+    # the blank length on a reference sketch the part saves hidden, all on the
+    # Front plane: the side view curates through _drawing_hidden_sketches,
+    # which shows that sketch in this view only. The end view is a bare
+    # circle with its center mark.
+    front_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         front,
         keep=FRONT_KEEP,
@@ -148,6 +184,8 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
+    # Descriptive text only; every value and band is the model's.
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     # The installed length is the bar's width: a LINEAR reference. The plural
     # set_reference_dimensions forces a diameter glyph, printing "(Ø6.35)".
     for name in sorted(REFERENCE_DIMENSIONS):
@@ -155,6 +193,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one pin {name} reference dimension")
         set_reference_dimension(adapter, matches[0], label=f"pin {name}")
+    _set_arrows_inside(adapter, front_annotations)
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin end view")
     add_view_centerline(

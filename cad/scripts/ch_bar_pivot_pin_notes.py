@@ -1,35 +1,79 @@
-r"""Bar pivot pin (MHA-CH-011) drawing prose: the manufacturing notes the part
-build stamps into the SLDPRT.
+r"""Bar pivot pin (MHA-CH-011) drawing-only data: the marked-dimension and
+precision contract, the dimension callouts and the manufacturing note the
+part build stamps into the SLDPRT.
 
 Kept out of ``ch_bar_pivot_pin_spec`` (the ``ch_rocker_arm_notes`` split): the
-channel assembly and ``test_ch_bar_pivot_fit`` import the spec, so prose there
-would re-key them on every wording edit. Imported ONLY by
-``build_ch_bar_pivot_pin`` and the offline tests.
+channel assembly and ``test_ch_bar_pivot_fit`` import the spec, so drawing
+data there would re-key them on every sheet edit. Imported ONLY by
+``build_ch_bar_pivot_pin``, ``draw_ch_bar_pivot_pin`` and the offline tests.
 
-drawing-guidelines.md rule 7 (notes: few, flagged, never a method): four lines a machinist cannot read off the views. The model is
-the INSTALLED pin, so the blank's cut length is the one size the views cannot
-show; the press and its removal are the retention requirement (user ruling
-2026-10); the flush dressing is the bar-to-bar gap's requirement (#1038); the
-running fit names its mating part. The title block owns the drill rod
-(MATERIAL) and its finish.
+drawing-guidelines.md rule 7 (notes: few, flagged, never a method). The model
+is the INSTALLED pin, so the blank's cut length prints from a blanked
+reference sketch (drawing-simplicity-policy.md `How the repository implements
+the guidelines`: its band rides that model dimension, never note text) and the
+one note says the views show the installed state. Machinist round 1 (#1305):
+the mates and the drill-rod stock moved from the notes to the diameter they
+govern, the flush ends to the installed length; the press/punch line was a
+method and left. The title block owns the drill rod (MATERIAL) and its finish.
 """
 
 from __future__ import annotations
 
 import ch_bar_pivot_pin_spec as pin
 
-if pin.PIN_BLANK_LENGTH_BAND[0] != -pin.PIN_BLANK_LENGTH_BAND[1]:
-    raise AssertionError("the blank note prints a symmetric band")
 if pin.PIN_END_PROUD_MAX != 0.0:
-    raise AssertionError("note 3 states flush ends")
+    raise AssertionError("the installed-length callout states flush ends")
 
-DRAWING_NOTES = "\n".join(
-    (
-        f"1. CUT BLANK {pin.PIN_BLANK_LENGTH:.2f} "
-        f"\u00b1{pin.PIN_BLANK_LENGTH_BAND[0]:.2f} LONG; INSTALLED STATE SHOWN.",
-        "2. PRESS IN; REMOVABLE WITH PUNCH.",
-        "3. PRESSED IN THE MHA-CH-001 REAMED TOP PIN HOLE;"
-        " DRESS BOTH ENDS FLUSH, NEVER PROUD.",
-        "4. RUNS FREE IN THE MHA-CH-002 #47 BAR-PIN HOLE.",
-    )
+# Mating parts the callouts name (test_ch_bar_pivot_pin_drawing pins each to
+# the part registry).
+BAR_NUMBER = "MHA-CH-001"  # pressed into its reamed top pin hole
+LEVER_NUMBER = "MHA-CH-002"  # runs in its #47 bar-pin hole
+
+# --- Drawing contract (drawing-simplicity-policy.md `How the repository
+# implements the guidelines`: the PART owns places and bands). ---
+# The diameter and the installed length live on the revolve's half-profile
+# (``PinProfile``), so both import into the side view beside each other
+# (drawing-guidelines.md rule 11 (turned parts read like the lathe)). The
+# diameter carries the drill rod's own grind band natively at three places;
+# the installed length is the bar's width, printed as REFERENCE (the bar's
+# stock owns it). The blank's cut length lives on the blanked
+# ``BlankReference`` sketch on the same plane and prints at the spec's places
+# under the title block's band (the dressing stock in
+# ch_bar_pivot_pin_spec.joint_budget is judged at it).
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "PinProfile": {"PinDia", "PinLen"},
+    "BlankReference": {"BlankLen"},
+}
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PinProfile": {"PinDia": 3, "PinLen": 2},
+    "BlankReference": {"BlankLen": pin.PIN_BLANK_LENGTH_PLACES},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: decimals
+    for dimensions in DRAWING_PRECISION.values()
+    for name, decimals in dimensions.items()
+}
+REFERENCE_DIMENSIONS = frozenset({"PinLen"})
+if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
+    DRAWING_PRECISION_BY_NAME
+):
+    raise AssertionError("every marked pin dimension needs authored places")
+
+# Descriptive text only; every value and band is the model's. The diameter
+# names the stock that holds its band and both mates (rule 4). Every callout
+# hangs under its value: SOLIDWORKS drops a multi-line callout stacked above a
+# value from the print (r1: the diameter's never reached the PDF). The
+# installed length's stays narrower than the 63.5 mm pin at 10:1, clear of
+# both length rows' witnesses; note 1 says the views are the installed pin.
+DIAMETER_CALLOUT = (
+    "5/64 DRILL ROD, AS SUPPLIED\n"
+    f"PRESS FIT IN {BAR_NUMBER}\n"
+    f"RUNS IN {LEVER_NUMBER} #47 HOLE"
 )
+DIMENSION_CALLOUTS: dict[str, str] = {
+    "PinDia": DIAMETER_CALLOUT,
+    "PinLen": f"FLUSH WITH {BAR_NUMBER}",
+    "BlankLen": "BLANK",
+}
+
+DRAWING_NOTES = "1. VIEWS SHOW THE INSTALLED PIN; CUT THE BLANK SHOWN."

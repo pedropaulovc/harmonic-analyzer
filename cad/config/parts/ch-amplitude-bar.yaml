@@ -1,8 +1,8 @@
 ch-amplitude-bar:
   number: MHA-CH-001
-  material: Plain Carbon Steel
+  material: "AISI 1018 cold-finished, 1/4 in sq"
   material_specification: AISI 1018 cold-rolled steel, 6.35 sq
-  finish: bright chrome plated
+  finish: "bright chrome, dims plated; pin hole bare, oiled"
   quantity: 20
   tolerance_class: machined_block
   fit_class: sliding_amplitude_bar_on_rocker
@@ -13,3 +13,18 @@ ch-amplitude-bar:
       where: "the one position control carried on this sheet"
       finding: "position frame over-specified on a channel part (rule 5)"
       reason: "a coordinate plus/minus would let the 20 channels scatter; at most one control per channel part (owner-accepted channel-consistency class)"
+    - id: "RV-02"
+      kind: "accept"
+      where: "the two notch-centring ledge bands (+/-0.05, CENTRES ON LEVER and CENTRES ON ROCKER) in DETAIL A and DETAIL B"
+      finding: "tight ledge bands over-specified on centred notches (rules 4, 5)"
+      reason: "each ledge band is what holds the far cheek wall the notch-width callout states; at the title-block band the cheeks thin further under the 1.5 floor (owner-accepted: keep the bands)"
+    - id: "RV-03"
+      kind: "accept"
+      where: "the three-place TopPinX location 3.175 under HOLE WALL 2.0 MIN"
+      finding: "three-place pin-hole location over-specified (rule 4)"
+      reason: "the tight location holds the reamed press-fit pin hole's wall to the nearer depth face at the 2.0 target on the narrowest stock; a looser band lets the wall fall under it (owner-accepted: keep the band)"
+    - id: "RV-04"
+      kind: "minor"
+      where: "the CHEEK WALL n MIN line under each notch-width callout (STRADDLES the lever, RIDES the rocker)"
+      finding: "notch cheek walls below the 2.0 mm target and the 1.5 floor (rules 17, 20)"
+      reason: "the book's 1/4 square bar straddles the lever and rides the 2.5 rocker arm, so its cheeks cannot reach 2.0; approved floors 1.17 MIN at the top notch and 1.21 MIN at the foot, stated as plain facts at each width (owner-ruled shortfall)"
