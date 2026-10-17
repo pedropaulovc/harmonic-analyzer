@@ -423,46 +423,6 @@ def _pin_dimension_text_and_leader_style(draw: Any) -> None:
     )
 
 
-# Document Properties > Drafting Standard > Uppercase > "All uppercase for
-# dimensions and hole callouts" (swUserPreferenceToggle_e = 754) and its
-# "Exclusion list" (swUserPreferenceStringValue_e = 96), read off swconst.tlb
-# R2026x; docs/swconst/DP_DraftingStandard.md. SolidWorks spells the
-# swTolMAX / swTolMIN suffix 'max.' / 'min.'; ASME Y14.5 drawings and every
-# hand-written note on these sheets say MAX / MIN. The exclusion list keeps
-# case-meaningful tokens (units) lowercase; it is recorded, not replaced.
-_PREF_UPPERCASE_DIMENSIONS = 754
-_PREF_UPPERCASE_EXCLUSION_LIST = 96
-_DETAILING_NO_OPTION = 0  # swUserPreferenceOption_e.swDetailingNoOptionSpecified
-# swUserPreferenceToggle_e.swDetailingAllUpperCase (538, swconst.tlb R2026x).
-_PREF_DETAILING_ALL_UPPERCASE = 538
-
-
-def _pin_uppercase_dimensions(draw: Any) -> None:
-    """Print dimension and hole-callout text on ``draw`` in uppercase.
-
-    Called once every dimension exists, and written off then on: a drawing
-    whose toggle was set while it held no dimensions still printed the
-    imported swTolMAX / swTolMIN words as 'max.' / 'min.' (farm run
-    20261017T013332447Z), so the change itself has to reach them.
-    """
-    ext = draw.Extension
-    for pref in (_PREF_UPPERCASE_DIMENSIONS, _PREF_DETAILING_ALL_UPPERCASE):
-        ext.SetUserPreferenceToggle(pref, _DETAILING_NO_OPTION, False)
-        ok = ext.SetUserPreferenceToggle(pref, _DETAILING_NO_OPTION, True)
-        applied = bool(ext.GetUserPreferenceToggle(pref, _DETAILING_NO_OPTION))
-        if not ok or not applied:
-            raise RuntimeError(
-                f"failed to pin all-uppercase dimensions and hole callouts pref "
-                f"{pref} (set returned {ok!r}, document reads {applied})"
-            )
-    exclusions = str(
-        ext.GetUserPreferenceString(
-            _PREF_UPPERCASE_EXCLUSION_LIST, _DETAILING_NO_OPTION
-        )
-    )
-    _telemetry.info(f"uppercase dimensions on; exclusion list {exclusions!r}")
-
-
 @_telemetry.traced("drawing.new_from_template")
 def new_project_drawing(
     adapter: Any,
@@ -1069,7 +1029,6 @@ async def finalize_drawing(
     # per-callout helpers no longer rebuild (their readbacks never needed it),
     # so every text extent and view outline is brought current here, before
     # the SLDDRW/PDF that the blind review and the layout audit read.
-    _pin_uppercase_dimensions(drawing_model)
     rebuild_drawing(adapter, label="finalize_drawing")
     if settled_checks:
         for settled in settled_checks:
