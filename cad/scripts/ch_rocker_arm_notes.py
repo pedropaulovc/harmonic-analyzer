@@ -50,8 +50,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # The strap thickness, +/-0.025 natively at three places (Main ruling
     # 2026-10, option b; ch_rocker_arm_spec.ARM_THICKNESS_BAND): the Strap
     # extrude's depth, printed in the end view where the section reads. Its
-    # mid-plane is located by a position frame to datum G, the hub width
-    # (#948 ruling R; Main's 2026-10-15 option B over the old 2X StrapOffset).
+    # mid-plane is located by a position frame to datum G, the hub's -Z end
+    # face, at a BASIC to that plane (#948 ruling R; #1579 option 1).
     "Strap": {"StrapThickness"},
     # The hub-to-strap root fillets' single limit (HUB_ROOT_RADIUS_MAX).
     "HubRoot": {"HubRootRadius"},
@@ -124,7 +124,7 @@ DRAWING_NOTES = "\n".join(
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
 # The end view prints at 3:1, not the sheet's 1:2, off the front's projection
 # line: a removed view named by its viewing arrow (Opus #1020 r1), enlarged
-# so the hub width, its datum and the strap's position read apart (r2).
+# so the hub width, datum G and the strap's position read apart (r2).
 VIEW_ARROW_LETTER = "F"
 RIGHT_VIEW_SCALE = 3
 RIGHT_VIEW_NOTE = f"VIEW {VIEW_ARROW_LETTER} SCALE {RIGHT_VIEW_SCALE}:1"

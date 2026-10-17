@@ -270,10 +270,10 @@ def test_native_gdt_and_finish_present() -> None:
         ("_drawing_hole_callout", "add_native_hole_callout"),
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # A = pivot bore axis, B = broad face (right end view): edge tags. C is
-    # the rod-pin hole, tagged on its own position frame (option 4), which
-    # references only A|B.
-    assert source.count("add_datum_feature(") == 2
+    # A = pivot bore axis, B = broad face (right end view), G = the hub's -Z
+    # end face: edge tags. C is the rod-pin hole, tagged on its own position
+    # frame (option 4), which references only A|B.
+    assert source.count("add_datum_feature(") == 3
     assert source.count("add_frame_datum_feature(\n            adapter, end, rod_position_gtol,") == 1
     assert drawing.ROD_HOLE.fields["datum"][0] == "C"
     # Datum A's leader runs oblique, 45 deg off both centre-mark axes.
@@ -1643,7 +1643,7 @@ def _callout_block(xy: tuple[float, float], callout: str) -> Box:
 
 def test_view_f_size_blocks_stand_left_of_the_view_on_the_strap_and_under_it() -> None:
     """Opus #1020 r2 C3: the 2.500 line crosses the strap alone, not the hub;
-    the hub width's line runs under the view where datum G stands on it."""
+    the hub width's line runs under the view."""
     assert drawing.RIGHT_KEEP == {
         "HubLength": drawing.HUB_LENGTH_TEXT_XY,
         "StrapThickness": drawing.STRAP_THICKNESS_TEXT_XY,
@@ -1683,7 +1683,7 @@ def test_view_f_size_blocks_stand_left_of_the_view_on_the_strap_and_under_it() -
     assert hub_top < root.ymin
 
 
-def test_right_view_caption_sits_under_view_f_clear_of_the_hub_width_and_datum_g() -> None:
+def test_right_view_caption_sits_under_view_f_clear_of_the_hub_width() -> None:
     caption = ch_rocker_arm_notes.RIGHT_VIEW_NOTE
     left, top = drawing.RIGHT_CAPTION_XY
     right = left + len(caption) * CAPTION_CHAR_WIDTH
@@ -1693,17 +1693,39 @@ def test_right_view_caption_sits_under_view_f_clear_of_the_hub_width_and_datum_g
     hub = _callout_block(drawing.HUB_LENGTH_TEXT_XY, drawing.HUB_LENGTH_TEXT)
     # The caption reads well under the hub width's line.
     assert hub.ymin - top >= 0.020
-    # G stands in line with that line just outboard of its -Z arrow end: a
-    # dimension-attached tag stays on its line and leads from that end, so
-    # inboard its leader would lie along the line (r3b run's audit). Its box
-    # (~7 mm) clears the arrow and stops short of the front view's 132.8 left
-    # witness.
-    d_x, _ = drawing.HUB_WIDTH_DATUM_XY
-    hub_right_x, _ = _view_f_xy(-ch_rocker_arm_spec.HUB_LENGTH / 2.0, 0.0)
-    assert d_x - 0.0035 - hub_right_x >= 0.003
-    assert d_x + 0.0035 < 0.105
     # Inside the bottom border.
     assert top - 0.0035 > BORDER_BOTTOM
+
+
+def test_datum_g_and_its_basic_stand_right_of_the_hub_minus_z_face() -> None:
+    """#1579 option 1: G's box out right of the -Z face's lower half, the
+    BASIC's boxed text out right above the hub, both short of the front
+    view's 132.8 left witness and clear of each other."""
+    spec = ch_rocker_arm_spec
+    face_x, landing_y = _view_f_xy(
+        -spec.HUB_LENGTH / 2.0, drawing.HUB_FACE_DATUM_LANDING_Y_MM
+    )
+    _, hub_bottom = _view_f_xy(0.0, spec.PIVOT_MID_Y - spec.HUB_DIA / 2.0)
+    _, pivot = _view_f_xy(0.0, spec.PIVOT_MID_Y)
+    _, hub_top = _view_f_xy(0.0, spec.PIVOT_MID_Y + spec.HUB_DIA / 2.0)
+    assert hub_bottom < landing_y < pivot
+    witness = drawing.FRONT_LEFT_WITNESS_X - drawing.ARROW_TEXT_CLEARANCE_M
+    # The tag's box (~7 mm) leads straight out right from its landing.
+    g_left = face_x + drawing.HUB_FACE_DATUM_STANDOFF_M
+    g = Box(g_left, landing_y - 0.0035, g_left + 0.007, landing_y + 0.0035)
+    assert g.xmin - face_x >= 0.005
+    assert g.xmax <= witness
+    # The BASIC's text, centred on its request, clears the face's extension
+    # line, the witness, the hub top and G.
+    places = drawing.HUB_FACES.precision["length"]
+    text = f"{drawing.HUB_FACE_BASIC_MM:.{places}f}"
+    text_x, text_y = drawing.HUB_FACE_BASIC_TEXT_XY
+    half_w = len(text) * CAPTION_CHAR_WIDTH / 2.0
+    basic = Box(text_x - half_w, text_y - 0.00175, text_x + half_w, text_y + 0.00175)
+    assert basic.xmin - face_x >= drawing.ARROW_TEXT_CLEARANCE_M
+    assert basic.xmax <= witness
+    assert basic.ymin - hub_top >= 0.005
+    assert basic.ymin - g.ymax >= 0.020
 
 
 def test_top_edge_model_band_is_unchanged_by_the_basic_drawing_override() -> None:
@@ -3141,7 +3163,7 @@ def test_hub_root_refuses_a_lost_limit_or_leader(native_hub_root, defect: str) -
 @pytest.fixture
 def view_f_dimension(monkeypatch: pytest.MonkeyPatch):
     """View F's imported hub width / strap width, re-resolved and selected
-    natively, with a datum tag or frame annotation to attach to it."""
+    natively, with a frame annotation to attach to it."""
     calls: list = []
     state: dict = {}
 
@@ -3166,10 +3188,6 @@ def view_f_dimension(monkeypatch: pytest.MonkeyPatch):
             return True
         return False
 
-    def set_position(x: float, y: float, z: float) -> bool:
-        calls.append(("SetPosition2", (x, y, z)))
-        return state["position_ok"]
-
     attached = _native(
         "IAnnotation",
         GetAttachedEntityCount3=lambda: state["attached_count"],
@@ -3177,11 +3195,6 @@ def view_f_dimension(monkeypatch: pytest.MonkeyPatch):
         GetAttachedEntityTypes=lambda: state["types"],
         GetAttachedEntities3=lambda: (state["attached"],),
         IsDangling=lambda: state["dangling"],
-        SetPosition2=set_position,
-    )
-    tag = _native(
-        "IDatumTag", SetLabel=lambda text: state["label_ok"] and state.update(label=text) is None,
-        GetLabel=lambda: state["label"], GetAnnotation=lambda: attached,
     )
 
     def set_xml(xml: str) -> bool:
@@ -3210,7 +3223,7 @@ def view_f_dimension(monkeypatch: pytest.MonkeyPatch):
         "IModelDoc2", "IDrawingDoc",
         ActivateView=lambda name: name == "Drawing View2",
         ClearSelection2=lambda _all: calls.append("ClearSelection2"),
-        InsertDatumTag2=insert("InsertDatumTag2"), InsertGtol=insert("InsertGtol"),
+        InsertGtol=insert("InsertGtol"),
         Extension=_native("IModelDocExtension", SelectByID2=select),
         SelectionManager=_native(
             "ISelectionMgr",
@@ -3228,199 +3241,40 @@ def view_f_dimension(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         drawing, "rebuild_drawing", lambda _adapter, *, label: calls.append(("rebuild", label)),
     )
-    monkeypatch.setattr(
-        drawing, "_clear_hub_width_datum",
-        lambda _adapter, annotation, dimension, *, label: calls.append(("clear", label)),
-    )
 
     def reset(**changes) -> None:
         state.update(
-            displays=(other, fresh), annotation_type=4, selected=True, count=1, kind=14,
-            picked=fresh, types=(14,), attached=fresh, attached_count=1, accepts=(),
-            dangling=False, label_ok=True, label="", InsertDatumTag2=tag, InsertGtol=gtol,
-            xml_ok=True, xml="", format=2, position_ok=True,
+            displays=(other, fresh),
+            annotation_type=4,
+            selected=True,
+            count=1,
+            kind=14,
+            picked=fresh,
+            types=(14,),
+            attached=fresh,
+            attached_count=1,
+            accepts=(),
+            dangling=False,
+            InsertGtol=gtol,
+            xml_ok=True,
+            xml="",
+            format=2,
         )
         state.update(changes)
         calls.clear()
 
     reset()
     return SimpleNamespace(
-        adapter=adapter, view=view, imported=imported, fresh=fresh, other=other,
-        tag=tag, gtol=gtol, calls=calls, state=state, reset=reset,
+        adapter=adapter,
+        view=view,
+        imported=imported,
+        fresh=fresh,
+        other=other,
+        gtol=gtol,
+        calls=calls,
+        state=state,
+        reset=reset,
     )
-
-
-def test_hub_width_datum_attaches_to_the_reselected_native_hub_width(view_f_dimension) -> None:
-    """Main's option B: G is the hub width's centre plane, on its own size."""
-    env = view_f_dimension
-    assert drawing._hub_width_datum(env.adapter, env.view, env.imported) is env.tag
-    assert env.state["label"] == drawing.HUB_FACES.fields["datum"][0] == "G"
-    assert env.calls == [
-        "ClearSelection2", ("SelectByID2", ("RD3@Drawing View2", "DIMENSION")),
-        "InsertDatumTag2", ("SetPosition2", (*drawing.HUB_WIDTH_DATUM_XY, 0.0)),
-        "ClearSelection2", ("rebuild", "hub width datum G"), ("clear", "hub width datum G"),
-    ]
-    # An unattached tag is offered the display dimension, then its annotation.
-    env.reset(attached_count=0, accepts=(env.fresh.GetAnnotation(),))
-    drawing._hub_width_datum(env.adapter, env.view, env.imported)
-    assert [call[1] for call in env.calls if call[0] == "SetAttachedEntities"] == [
-        env.fresh, env.fresh.GetAnnotation(),
-    ]
-
-
-@pytest.mark.parametrize("defect,message", [
-    ({"displays": ()}, "found 0"),
-    ({"displays": "two"}, "found 2"),
-    ({"annotation_type": 1}, "re-resolved to another dimension"),
-    ({"selected": False}, "failed to select"),
-    ({"count": 2}, "gave 2 object"),
-    ({"kind": 1}, "of type 1"),
-    ({"InsertDatumTag2": None}, "InsertDatumTag2 returned nothing"),
-    ({"label_ok": False}, "failed to label it G"),
-    ({"position_ok": False}, "failed to position it"),
-    ({"types": (1,)}, "not attached to its dimension"),
-    ({"dangling": True}, "not attached to its dimension"),
-    ({"attached": "other"}, "attached to another dimension"),
-    ({"attached_count": 0}, "not attached to its dimension"),
-])
-def test_hub_width_datum_refuses_an_unproven_dimension_attachment(
-    view_f_dimension, defect: dict, message: str,
-) -> None:
-    env = view_f_dimension
-    changes = {
-        key: (env.fresh, env.fresh) if value == "two" else env.other if value == "other" else value
-        for key, value in defect.items()
-    }
-    if changes.get("attached_count") == 0:
-        changes["types"] = ()
-    env.reset(**changes)
-    with pytest.raises(RuntimeError, match=message):
-        drawing._hub_width_datum(env.adapter, env.view, env.imported)
-
-
-# Run 20261017T024838726Z's audit: the HubLength -Z arrow (85.6,142.2)->(82.0,
-# 141.8) mm stood 1.89 mm from G's letter [87.5,140.3]..[91.1,143.9] mm.
-_HUB_WIDTH_ARROW = Segment(0.0856, 0.1422, 0.0820, 0.1418, "arrow")
-_COLLAPSED_G = Box(0.0875, 0.1403, 0.0911, 0.1439)
-
-
-def _shifted(box: Box, dx: float) -> Box:
-    return Box(box.xmin + dx, box.ymin, box.xmax + dx, box.ymax)
-
-
-def test_hub_width_datum_air_measures_the_audit_arrow_gap(monkeypatch: pytest.MonkeyPatch) -> None:
-    datum = AnnotationGeometry("datum G", "datum", "right", text_boxes=(_COLLAPSED_G,))
-    width = AnnotationGeometry(
-        "dim HubLength", "dim", "right",
-        text_boxes=(Box(0.030, 0.150, 0.050, 0.160),),
-        segments=(_HUB_WIDTH_ARROW, Segment(0.0644, 0.1422, 0.0856, 0.1422, "dim-line")),
-    )
-    records = {"tag": {"name": "G"}, "dim": {"name": "HubLength"}}
-    geometry = {"G": datum, "HubLength": width}
-    monkeypatch.setattr(drawing, "_Reader", lambda _adapter: SimpleNamespace(take_errors=dict))
-    monkeypatch.setattr(drawing, "_dump_annotation", lambda _reader, raw: records[raw])
-    monkeypatch.setattr(drawing, "calibrate_sheet_advance", lambda _records: 0.6)
-    monkeypatch.setattr(
-        drawing, "annotation_geometry", lambda record, *, owner, advance: geometry[record["name"]],
-    )
-    gap, text_air, arrow_right, letter = drawing._hub_width_datum_air(
-        None, "tag", "dim", label="hub width datum G",
-    )
-    assert gap == pytest.approx(0.00189, abs=1e-5)
-    assert gap < drawing.ARROW_TEXT_CLEARANCE_M
-    assert arrow_right == pytest.approx(0.0856)
-    assert letter == _COLLAPSED_G
-    assert text_air == pytest.approx(math.hypot(0.0875 - 0.050, 0.150 - 0.1439))
-    geometry["G"] = AnnotationGeometry("datum G", "datum", "right")
-    with pytest.raises(RuntimeError, match="no printed letter"):
-        drawing._hub_width_datum_air(None, "tag", "dim", label="hub width datum G")
-
-
-@pytest.fixture
-def g_readback(monkeypatch: pytest.MonkeyPatch):
-    """G's tag whose printed letter follows each SetPosition2 x after a rebuild."""
-    state = {"position": (0.0893, 0.142, 0.0), "letter": _COLLAPSED_G, "moves": [],
-             "follows": True, "dangling": False}
-    calls: list = []
-
-    def set_position(x: float, y: float, z: float) -> bool:
-        state["moves"].append((x, y, z))
-        if state["follows"]:
-            state["letter"] = _shifted(state["letter"], x - state["position"][0])
-            state["position"] = (x, y, z)
-        return True
-
-    annotation = SimpleNamespace(
-        GetPosition=lambda: state["position"], SetPosition2=set_position,
-        IsDangling=lambda: state["dangling"],
-    )
-
-    def air(_adapter, _annotation, _dimension, *, label):
-        letter = state["letter"]
-        gap = segment_box_distance(_HUB_WIDTH_ARROW, letter)
-        return gap, state.get("text_air", 0.0375), 0.0856, letter
-
-    monkeypatch.setattr(drawing, "_hub_width_datum_air", air)
-    monkeypatch.setattr(
-        drawing, "rebuild_drawing", lambda _adapter, *, label: calls.append(("rebuild", label)),
-    )
-    return SimpleNamespace(annotation=annotation, state=state, calls=calls)
-
-
-def _clear_g(env) -> None:
-    drawing._clear_hub_width_datum(None, env.annotation, None, label="hub width datum G")
-
-
-def test_hub_width_datum_left_clear_is_not_moved(g_readback) -> None:
-    env = g_readback
-    env.state.update(position=(*drawing.HUB_WIDTH_DATUM_XY, 0.0), letter=_shifted(_COLLAPSED_G, 0.0043))
-    _clear_g(env)
-    assert env.state["moves"] == [] and env.calls == []
-
-
-def test_hub_width_datum_collapsed_onto_the_arrow_returns_to_its_requested_x(g_readback) -> None:
-    env = g_readback
-    _clear_g(env)
-    ((x, y, z),) = env.state["moves"]
-    assert (x, y, z) == pytest.approx((drawing.HUB_WIDTH_DATUM_XY[0], 0.142, 0.0))
-    assert env.calls == [("rebuild", "hub width datum G correction 1")]
-    gap = segment_box_distance(_HUB_WIDTH_ARROW, env.state["letter"])
-    assert gap >= drawing.ARROW_TEXT_CLEARANCE_M
-    assert env.state["letter"].xmax <= drawing.HUB_WIDTH_DATUM_XMAX
-
-
-def test_hub_width_datum_honoured_but_near_moves_on_by_the_shortfall(g_readback) -> None:
-    """At its requested x but printed near: on by the shortfall plus the settle."""
-    env = g_readback
-    env.state["position"] = (*drawing.HUB_WIDTH_DATUM_XY, 0.0)
-    _clear_g(env)
-    ((x, _y, _z),) = env.state["moves"]
-    assert x - drawing.HUB_WIDTH_DATUM_XY[0] == pytest.approx(
-        0.0856 + drawing.ARROW_TEXT_CLEARANCE_M + drawing.PLACE_SETTLE_M - _COLLAPSED_G.xmin,
-    )
-
-
-@pytest.mark.parametrize("change,message", [
-    ({"follows": False}, "still near the hub width after 3 correction"),
-    ({"letter": _shifted(_COLLAPSED_G, 0.0125)}, "left witness"),
-    ({"text_air": 0.0}, "no clear x short of"),
-])
-def test_hub_width_datum_that_cannot_clear_fails_the_leaf(g_readback, change: dict, message: str) -> None:
-    env = g_readback
-    env.state.update(change)
-    if "text_air" in change:
-        env.state["letter"] = _shifted(_COLLAPSED_G, 0.0093)  # clear of the arrow, xmax 0.1004
-    with pytest.raises(RuntimeError, match=message):
-        _clear_g(env)
-    if change == {"follows": False}:
-        assert len(env.state["moves"]) == drawing.HUB_WIDTH_DATUM_CORRECTIONS
-
-
-def test_hub_width_datum_dangling_after_placement_fails(g_readback) -> None:
-    env = g_readback
-    env.state["dangling"] = True
-    with pytest.raises(RuntimeError, match="dangling"):
-        _clear_g(env)
 
 
 def test_strap_position_frame_locates_the_strap_width_to_g_on_its_size(view_f_dimension) -> None:
@@ -3455,6 +3309,20 @@ def test_strap_position_frame_refuses_an_unproven_frame(
     env.reset(**{key: env.other if value == "other" else value for key, value in defect.items()})
     with pytest.raises(RuntimeError, match=message):
         drawing._strap_position_frame(env.adapter, env.view, env.imported)
+
+
+def test_dimension_frame_left_unattached_is_offered_the_display_then_its_annotation(
+    view_f_dimension,
+) -> None:
+    """A frame inserted on a selected dimension can attach to nothing; it is
+    offered the display dimension, then that dimension's annotation."""
+    env = view_f_dimension
+    env.reset(attached_count=0, accepts=(env.fresh.GetAnnotation(),))
+    drawing._strap_position_frame(env.adapter, env.view, env.imported)
+    assert [call[1] for call in env.calls if call[0] == "SetAttachedEntities"] == [
+        env.fresh,
+        env.fresh.GetAnnotation(),
+    ]
 
 
 class _CentrePlaneLine:
@@ -3526,9 +3394,9 @@ def _centre_plane_env(monkeypatch, defect=None):
     )
 
 
-def test_view_f_draws_the_hub_and_strap_centre_plane_g_frames_to(monkeypatch) -> None:
-    """The strap frame's implied zero basic to G (#1579 r6-fit reviews):
-    one black centreline on model Z = 0 over the whole view F silhouette."""
+def test_view_f_draws_the_strap_centre_plane_the_g_basic_runs_to(monkeypatch) -> None:
+    """The strap frame's located plane, which G's BASIC is dimensioned to
+    (#1579): one black centreline on model Z = 0 over the whole view F."""
     env = _centre_plane_env(monkeypatch)
     line = drawing._strap_centre_plane(env.adapter, env.view)
     ((xyz, created),) = env.created
@@ -3564,6 +3432,374 @@ def test_view_f_centre_plane_refuses_an_unproven_line(
     with pytest.raises(RuntimeError, match=message):
         drawing._strap_centre_plane(env.adapter, env.view)
     assert env.rebuilds == []
+
+
+def test_datum_g_basic_is_the_half_hub_length_off_the_face_requirements() -> None:
+    """#1579 option 1: G is the hub's -Z end face, and the strap frame's
+    BASIC runs from it to the strap's centre plane, derived, never typed."""
+    assert drawing.HUB_FACE_BASIC_MM == pytest.approx(
+        ch_rocker_arm_spec.HUB_LENGTH / 2.0
+    )
+    places = drawing.HUB_FACES.precision["length"]
+    assert f"{drawing.HUB_FACE_BASIC_MM:.{places}f}" == "3.528"
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    assert not [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, float)
+        and abs(node.value - drawing.HUB_FACE_BASIC_MM) < 0.001
+    ]
+    assert drawing.HUB_FACES.fields["datum"] == (
+        "G",
+        (("draw_ch_rocker_arm", "_hub_face_datum"),),
+    )
+    (g,) = [
+        meta.datums["G"] for meta in drawing._FEATURE_METADATA if "G" in meta.datums
+    ]
+    assert g[0] == {
+        "feature": "hub_faces",
+        "surface": "-Z hub end face (20X stack registration)",
+    }
+    assert g[1] == (("draw_ch_rocker_arm", "_hub_face_datum"),)
+    assert drawing.STRAP_FACES.fields["position_datums"][0] == ["G"]
+
+
+def test_datum_g_lands_on_the_minus_z_face_then_basics_and_reads_back(
+    monkeypatch,
+) -> None:
+    view, plane, hub_length, tag, face = (
+        object(),
+        object(),
+        object(),
+        object(),
+        object(),
+    )
+    basic_annotation = object()
+    basic = SimpleNamespace(GetAnnotation=lambda: basic_annotation)
+    calls = []
+
+    def circle_at(center, radius, *, axis, label):
+        calls.append(("circle", center, radius, axis))
+        return SimpleNamespace(edge=face)
+
+    monkeypatch.setattr(
+        drawing,
+        "scan_view_edges",
+        lambda native, *, label: (
+            SimpleNamespace(circle_at=circle_at) if native is view else None
+        ),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "_project",
+        lambda _adapter, native, points, *, label: [
+            _view_f_xy(z * 1000.0, y * 1000.0) for _x, y, z in points
+        ],
+    )
+    monkeypatch.setattr(
+        drawing,
+        "_hub_face_datum",
+        lambda _adapter, native, edge, landing: (
+            calls.append(("datum", edge, landing)) or tag
+        ),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "_hub_face_basic",
+        lambda _adapter, native, centre, edge, *, picks: (
+            calls.append(("basic", centre, edge, picks)) or basic
+        ),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "_assert_hub_face_datum_clear",
+        lambda _adapter, native_tag, neighbours, *, face_x, label: calls.append(
+            ("clear", native_tag, neighbours, face_x)
+        ),
+    )
+    assert drawing._hub_face_datum_g(None, view, plane, hub_length) == (tag, basic)
+    face_z = -ch_rocker_arm_spec.HUB_LENGTH / 2.0
+    landing = _view_f_xy(face_z, drawing.HUB_FACE_DATUM_LANDING_Y_MM)
+    plane_point = _view_f_xy(0.0, drawing.HUB_FACE_DATUM_LANDING_Y_MM)
+    assert calls == [
+        (
+            "circle",
+            (0.0, ch_rocker_arm_spec.PIVOT_MID_Y, face_z),
+            ch_rocker_arm_spec.HUB_DIA / 2.0,
+            (0.0, 0.0, 1.0),
+        ),
+        ("datum", face, landing),
+        ("basic", plane, face, (plane_point, landing)),
+        (
+            "clear",
+            tag,
+            {"G BASIC": basic_annotation, "hub width": hub_length},
+            landing[0],
+        ),
+    ]
+
+
+def test_datum_g_tag_stands_on_its_face_rim_out_right_of_the_landing(
+    monkeypatch,
+) -> None:
+    calls = []
+    monkeypatch.setattr(
+        drawing,
+        "add_datum_feature",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or "tag",
+    )
+    face, landing = object(), (0.0856, 0.1674)
+    assert drawing._hub_face_datum("adapter", "view", face, landing) == "tag"
+    assert calls == [
+        (
+            ("adapter", "view"),
+            {
+                "edge_entity": face,
+                "leader_attach_xy": landing,
+                "symbol_xy": (
+                    landing[0] + drawing.HUB_FACE_DATUM_STANDOFF_M,
+                    landing[1],
+                ),
+                "datum": "G",
+                "label": "hub -Z end face datum G",
+            },
+        )
+    ]
+
+
+class _GBasicDisplay:
+    _native_interfaces = ("IDisplayDimension",)
+
+    def __init__(self, annotation, *, takes_precision=True):
+        self.annotation = annotation
+        self.takes_precision = takes_precision
+        self.precision = 2
+        self.requested = []
+
+    def GetAnnotation(self):
+        return self.annotation
+
+    def SetPrecision3(self, *values):
+        self.requested.append(values)
+        if self.takes_precision:
+            self.precision = values[0]
+
+    def GetPrimaryPrecision2(self):
+        return self.precision
+
+
+def _g_basic_env(
+    monkeypatch, *, entities=None, types=(10, 1), dangling=False, takes_precision=True
+):
+    plane, face = object(), object()
+    annotation = _native(
+        "IAnnotation",
+        GetAttachedEntities3=lambda: (
+            (plane, face) if entities is None else entities(plane, face)
+        ),
+        GetAttachedEntityTypes=lambda: types,
+        IsDangling=lambda: dangling,
+    )
+    display = _GBasicDisplay(annotation, takes_precision=takes_precision)
+    calls = []
+    monkeypatch.setattr(drawing, "_early_bound", _bind_owner)
+    monkeypatch.setattr(
+        drawing,
+        "add_edge_dimension",
+        lambda _adapter, view, **kwargs: (
+            calls.append(("dimension", view, kwargs)) or display
+        ),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "assert_dimension_measures",
+        lambda _adapter, dimension, **kwargs: calls.append(
+            ("measures", dimension, kwargs)
+        ),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "set_basic_dimension",
+        lambda _adapter, dimension, *, label: calls.append(("basic", dimension, label)),
+    )
+    adapter = SimpleNamespace(swApp=_APP)
+    return SimpleNamespace(
+        adapter=adapter, plane=plane, face=face, display=display, calls=calls
+    )
+
+
+def test_datum_g_basic_spans_the_centreline_and_the_minus_z_rim(monkeypatch) -> None:
+    env = _g_basic_env(monkeypatch)
+    picks = ((0.075, 0.1674), (0.0856, 0.1674))
+    result = drawing._hub_face_basic(
+        env.adapter, "view", env.plane, env.face, picks=picks
+    )
+    assert result is env.display
+    label = "datum G to strap centre plane BASIC"
+    places = drawing.HUB_FACES.precision["length"]
+    assert env.calls == [
+        (
+            "dimension",
+            "view",
+            {
+                "p0": picks[0],
+                "p1": picks[1],
+                "text_xy": drawing.HUB_FACE_BASIC_TEXT_XY,
+                "label": label,
+                "orientation": "horizontal",
+                "entity_types": ("SKETCHSEGMENT", "EDGE"),
+                "entities": (env.plane, env.face),
+            },
+        ),
+        (
+            "measures",
+            env.display,
+            {"expected_mm": drawing.HUB_FACE_BASIC_MM, "label": label},
+        ),
+        ("basic", env.display, label),
+    ]
+    assert env.display.requested == [(places, -1, -1, -1)]
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    [
+        (
+            {"entities": lambda plane, _face: (plane, object())},
+            "not the dimension from the centreline",
+        ),
+        (
+            {
+                "entities": lambda plane, face: (plane, face, object()),
+                "types": (10, 1, 1),
+            },
+            "not the dimension",
+        ),
+        ({"types": (10, 10)}, "not the dimension"),
+        ({"dangling": True}, "dangling=True"),
+        ({"takes_precision": False}, "did not take 3 places"),
+    ],
+)
+def test_datum_g_basic_refuses_an_unproven_span(
+    monkeypatch, defect: dict, message: str
+) -> None:
+    env = _g_basic_env(monkeypatch, **defect)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._hub_face_basic(
+            env.adapter, "view", env.plane, env.face, picks=((0, 0), (0, 0))
+        )
+    assert not [call for call in env.calls if call[0] == "basic"]
+
+
+# View F's -Z face prints at x 0.0856; G's letter and triangle out right of
+# it, the BASIC's arrows and text above the hub, the hub width's -Z arrow
+# under the view (run 20261017T024838726Z's audit numbers).
+_G_FACE_X = 0.085585
+_G_LETTER = Box(0.0951, 0.1656, 0.0981, 0.1692)
+_G_TRIANGLE = Segment(0.0856, 0.1674, 0.0876, 0.1674, "arrow")
+_G_BASIC_TEXT = Box(0.0890, 0.1975, 0.1000, 0.2010)
+_G_BASIC_ARROW = Segment(0.0856, 0.1965, 0.0826, 0.1965, "arrow")
+_HUB_WIDTH_ARROW = Segment(0.0856, 0.1422, 0.0820, 0.1418, "arrow")
+
+
+def _g_clear_env(
+    monkeypatch,
+    *,
+    letter=_G_LETTER,
+    basic_text=_G_BASIC_TEXT,
+    dangling=False,
+    errors=None,
+):
+    datum = AnnotationGeometry(
+        "datum G",
+        "datum",
+        "right",
+        text_boxes=(letter,) if letter is not None else (),
+        segments=(_G_TRIANGLE,),
+    )
+    basic = AnnotationGeometry(
+        "dim RD9",
+        "dim",
+        "right",
+        text_boxes=(basic_text,),
+        segments=(_G_BASIC_ARROW, Segment(0.075, 0.1965, 0.0856, 0.1965, "dim-line")),
+    )
+    width = AnnotationGeometry(
+        "dim HubLength",
+        "dim",
+        "right",
+        text_boxes=(Box(0.030, 0.150, 0.050, 0.160),),
+        segments=(_HUB_WIDTH_ARROW,),
+    )
+    geometry = {"G": datum, "RD9": basic, "HubLength": width}
+    records = {
+        "tag": {"name": "G"},
+        "basic": {"name": "RD9"},
+        "width": {"name": "HubLength"},
+    }
+    tag_annotation = _native("IAnnotation", IsDangling=lambda: dangling)
+    tag = _native("IDatumTag", GetAnnotation=lambda: tag_annotation)
+    monkeypatch.setattr(drawing, "_early_bound", _bind_owner)
+    monkeypatch.setattr(
+        drawing,
+        "_Reader",
+        lambda _adapter: SimpleNamespace(take_errors=lambda: errors or {}),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "_dump_annotation",
+        lambda _reader, raw: records["tag"] if raw is tag_annotation else records[raw],
+    )
+    monkeypatch.setattr(drawing, "calibrate_sheet_advance", lambda _records: 0.6)
+    monkeypatch.setattr(
+        drawing,
+        "annotation_geometry",
+        lambda record, *, owner, advance: geometry[record["name"]],
+    )
+    return tag
+
+
+def _clear_g(tag):
+    return drawing._assert_hub_face_datum_clear(
+        None,
+        tag,
+        {"G BASIC": "basic", "hub width": "width"},
+        face_x=_G_FACE_X,
+        label="hub -Z end face datum G",
+    )
+
+
+def test_datum_g_read_back_clear_of_its_neighbours_passes(monkeypatch) -> None:
+    assert _clear_g(_g_clear_env(monkeypatch)) == _G_LETTER
+
+
+def _moved(box: Box, dx: float = 0.0, dy: float = 0.0) -> Box:
+    return Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy)
+
+
+@pytest.mark.parametrize(
+    "change,message",
+    [
+        # Collapsed onto the BASIC's arrow, as the hub-width tag once was.
+        ({"letter": Box(0.0870, 0.1950, 0.0900, 0.1986)}, "crowds the G BASIC"),
+        (
+            {"letter": _moved(_G_LETTER, dx=-0.0140)},
+            "letter not out right of the -Z face",
+        ),
+        ({"letter": _moved(_G_LETTER, dx=0.0062)}, "front view's left witness"),
+        ({"basic_text": Box(0.0700, 0.1690, 0.0850, 0.1720)}, "crowds the G BASIC"),
+        ({"basic_text": _moved(_G_BASIC_TEXT, dx=0.0040)}, "G BASIC text runs onto"),
+        ({"letter": None}, "no printed letter"),
+        ({"errors": {"tag": "unreadable"}}, "cannot measure its ink"),
+        ({"dangling": True}, "dangling after its placement"),
+    ],
+)
+def test_datum_g_that_does_not_read_back_clear_fails_the_leaf(
+    monkeypatch, change: dict, message: str
+) -> None:
+    with pytest.raises(RuntimeError, match=message):
+        _clear_g(_g_clear_env(monkeypatch, **change))
 
 
 def test_hub_position_frame_locates_the_hub_od_to_a_on_its_own_diameter(view_f_dimension) -> None:
@@ -5064,8 +5300,8 @@ def test_hub_length_stack_callout_is_below_and_preserves_native_size(
             for target in node.targets
         )
     )
-    # View F's dressing (hub root, datum G, strap frame, their shared centre
-    # plane) is one guarded block.
+    # View F's dressing (hub root, strap frame, the strap's centre plane, and
+    # datum G with its BASIC to that plane) is one guarded block.
     stop = next(
         index for index, node in enumerate(build.body)
         if isinstance(node, ast.Try)
@@ -5085,7 +5321,7 @@ def test_hub_length_stack_callout_is_below_and_preserves_native_size(
         and node.value.args[1].id == "right_annotations"
     )
     assert start < label_start < stop
-    right, placed, captured = object(), [], []
+    right, plane, placed, captured = object(), object(), [], []
     namespace = dict(
         adapter=adapter, right=right, RIGHT_KEEP=drawing.RIGHT_KEEP,
         DRAWING_DIMENSIONS=drawing.DRAWING_DIMENSIONS,
@@ -5094,9 +5330,15 @@ def test_hub_length_stack_callout_is_below_and_preserves_native_size(
         dimension_name=drawing.dimension_name, _early_bound=drawing._early_bound,
         rocker_notes=ch_rocker_arm_notes, HUB_LENGTH_TEXT=drawing.HUB_LENGTH_TEXT,
         _dress_hub_root=drawing._dress_hub_root,
-        _hub_width_datum=lambda _adapter, view, ann: placed.append(("D", view, ann)),
-        _strap_position_frame=lambda _adapter, view, ann: placed.append(("frame", view, ann)),
-        _strap_centre_plane=lambda _adapter, view: placed.append(("centre plane", view)),
+        _strap_position_frame=lambda _adapter, view, ann: placed.append(
+            ("frame", view, ann)
+        ),
+        _strap_centre_plane=lambda _adapter, view: (
+            placed.append(("centre plane", view)) or plane
+        ),
+        _hub_face_datum_g=lambda _adapter, view, centre, ann: placed.append(
+            ("G", view, centre, ann)
+        ),
         _capture_layout_failure=lambda _adapter, phase, _exc: captured.append(phase),
     )
     # This label test owns the right import, its callout/readback and view F's
@@ -5113,12 +5355,13 @@ def test_hub_length_stack_callout_is_below_and_preserves_native_size(
         assert "MHA-CH-005" in drawing.HUB_LENGTH_TEXT
         assert strap.writes == [(4, ch_rocker_arm_notes.STRAP_FIT_CALLOUT)]
         assert "MHA-CH-003" in ch_rocker_arm_notes.STRAP_FIT_CALLOUT
-        # D hangs on the hub width, the position frame on the strap width,
-        # then the centre plane both share (G's implied zero basic).
+        # The position frame hangs on the strap width, then the centre plane
+        # it locates, then G on the -Z face with its BASIC to that plane, read
+        # back against the hub width.
         assert placed == [
-            ("D", right, hub.annotation),
             ("frame", right, strap.annotation),
             ("centre plane", right),
+            ("G", right, plane, hub.annotation),
         ]
         assert root.ArcExtensionLineOrOppositeSide is False
         assert captured == []
