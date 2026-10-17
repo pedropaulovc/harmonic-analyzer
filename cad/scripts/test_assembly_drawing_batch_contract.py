@@ -106,6 +106,7 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
         elif drawing is draw_ch_channel_assembly:
             scripts_dir = Path(draw_ch_channel_assembly.__file__).resolve().parent
             assert {
+                str(scripts_dir / "ch_channel_assembly_notes.py"),
                 str(scripts_dir / "ch_channel_assembly_steps.py"),
                 str(scripts_dir / "rocker_bank_layout.py"),
             } <= set(deps)

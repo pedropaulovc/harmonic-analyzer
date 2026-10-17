@@ -1,8 +1,10 @@
-"""MHA-CH-000 fitter-package data: settings chain, explode plan, BOM text.
+"""MHA-CH-000 fitter-package data: settings chain and explode plan.
 
 Pure data, no SolidWorks: build_ch_channel_assembly authors the settings
 reference sketch and the named explode from it, and draw_ch_channel_assembly
-reads the same names back.
+reads the same names back. The sheet text (BOM descriptions, dimension
+callouts) lives in ``ch_channel_assembly_notes``, which only the drawing
+reads, so a wording edit does not rebuild the assembly.
 
 Settings: two construction sketches on the Right plane (sketch x is machine
 -z, sketch y machine y), one per bank view, so each 1:1 view shows only the
@@ -97,14 +99,6 @@ DIMENSION_TOLERANCES = {
     STACK_LENGTH_DIMENSION: (-STACK_L20_ACCEPT_BAND[1], STACK_L20_ACCEPT_BAND[0]),
 }
 REFERENCE_DIMENSIONS = frozenset({LUG_SPAN_DIMENSION})
-DIMENSION_CALLOUTS = {
-    SPRING_SET_DIMENSION: "SPRING-SET BLADE",
-    # The accepted stack caps the hubs' summed excess, so each strap stays on
-    # its rod's cam plane and under its bar's foot notch (test_channel_axial_
-    # budget); r10 machinist review: name what the tight band sets (rule 4).
-    STACK_LENGTH_DIMENSION: "STACK, CLOSED UP: STRAP PITCH TO RODS AND BARS",
-    LUG_SPAN_DIMENSION: "LUG SPAN",
-}
 if set(DIMENSION_TOLERANCES) | REFERENCE_DIMENSIONS != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension is toleranced or reference")
 
@@ -293,29 +287,3 @@ def plan_explode(
             )
         plan.append((step, tuple(sorted(names))))
     return plan
-
-
-# --- BOM ---------------------------------------------------------------------
-# Hand-written (components carry no Description property), keyed by stem; the
-# spring row is keyed by its built variant stem in the drawing.
-BOM_DESCRIPTIONS = {
-    "ch-pivot-shaft": "ROCKER PIVOT SHAFT",
-    "ch-fulcrum-shaft": "LEVER FULCRUM SHAFT",
-    BRACKET: "ROCKER PIVOT BRACKET",
-    BRACKET_SET_SCREW: "#4-40 X 1/4 CUP-POINT SET SCREW",
-    WASHER: "ROCKER BANK THRUST WASHER",
-    BANK_SPRING: "WAVE DISC SPRING",
-    BRACKET_HOLD_DOWN: "#8-32 X 5/8 FILLISTER HEAD SCREW",
-    KEEPER: "FULCRUM SHAFT KEEPER",
-    KEEPER_FOOT_SCREW: "#2-56 X 7/16 FILLISTER HEAD SCREW",
-    KEEPER_SET_SCREW: "#1-72 X 5/32 CUP-POINT SET SCREW",
-    "ch-rocker-arm": "ROCKER ARM",
-    ROD: "CONNECTING ROD",
-    BAR: "AMPLITUDE BAR",
-    "ch-channel-lever": "CHANNEL LEVER",
-    "ch-rod-pivot-pin": "ROD PIVOT PIN",
-    BAR_PIN: "BAR PIVOT PIN",
-    "vn-channel-spring-installed": "EXTENSION SPRING",
-    HOOK: "#6-32 EYEBOLT SPRING ANCHOR",
-    ANCHOR_NUT: "#6-32 ROUND ANCHOR JAM NUT",
-}
