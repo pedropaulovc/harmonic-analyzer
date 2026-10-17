@@ -840,7 +840,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # 1.80, #1371) less the Ø6.5 bore's height at the Ø2.845 envelope's edge;
     # screw n in bracket n.
     # MHA-VN-055: each #1-72 x 5/32 keeper set screw in its own keeper's
-    # crown tap (#53 drill).
+    # crown tap (#53 drill). MHA-VN-012: each #6-32 anchor's thread in its
+    # MHA-CH-014 jam nut's #36 tap drill over the nut's thickness.
     channel_allowed = _interference_contracts.allowed_interference_pairs("ch-channel")
     assert channel_allowed == pytest.approx(
         {
@@ -869,6 +870,12 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                     (f"vn-fulcrum-set-screw-{n}", f"ch-fulcrum-keeper-{n}")
                 ): _annulus_limit(1.854, 1.511, 3.96875)
                 for n in range(1, 3)
+            },
+            **{
+                frozenset(
+                    (f"vn-spring-hook-{n}", f"ch-anchor-jam-nut-{n}")
+                ): _annulus_limit(3.505, 2.705, 3.60)
+                for n in range(1, 21)
             },
         }
     )

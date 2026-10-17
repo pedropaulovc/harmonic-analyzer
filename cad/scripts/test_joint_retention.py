@@ -269,18 +269,16 @@ def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> N
     assert f"\u00b1{rock:.1f}\u00b0 per reversal" in jr.RULINGS[row.exception].granted
 
 
-def test_the_knife_hanger_is_a_threadlocked_clamp_keyed_by_its_two_dowels() -> None:
+def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
     """The cut #10-24 hex bolt clamps through a new SAE washer; the two
-    pressed dowels react torque, so the removable threadlocker-only policy
-    remains unchanged. The plain washer is not a mechanical thread lock."""
+    pressed dowels react torque, so the static clamp takes no lock and no
+    threadlocker (period hardware). The plain washer is not a thread lock."""
     (row,) = [j for j in jr.JOINTS if j.id == "sm-summing/knife-hanger-in-mount"]
     assert row.thread == "#10-24 UNC"
     assert row.exposure is Exposure.STATIC_CLAMP
-    assert row.lock is Lock.THREADLOCKER_ONLY
-    sentence = "USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER."
-    assert sentence in row.evidence
+    assert row.lock is Lock.NONE
     notes = jr._config.parts("vn-knife-hanger-stud")["installation_notes"]
-    assert sentence in " ".join(notes.split())
+    assert "THREADLOCK" not in notes.upper()
     assert "vn_knife_mount_dowel" in jr.UNTHREADED_PARTS
     assert jr.UNTHREADED_STOCK["vn_knife_mount_dowel"] == (
         "dowel pin pressed into a reamed hole"
@@ -603,14 +601,39 @@ def test_per_channel_joints_follow_the_built_channel_count(monkeypatch) -> None:
     # channel anchors; the report must count what the build places.
     built = jr._config.active_count()
     before = jr.report([])["per_assembly"]["ha_harmonic_analyzer"]["instances"]
+    per_channel = sum(
+        j.quantity
+        for j in jr.JOINTS
+        if j.assembly == "ha_harmonic_analyzer" and j.per_channel
+    )
+    # Each channel anchor and its jam nut.
+    assert per_channel == 2
     monkeypatch.setattr(jr._config, "active_count", lambda: 5)
     data = jr.report([])
     assert data["per_assembly"]["ha_harmonic_analyzer"]["instances"] == before - (
-        built - 5
+        per_channel * (built - 5)
     )
-    anchors = next(
-        j
-        for j in data["joints"]
-        if j["id"] == "ha-harmonic-analyzer/channel-anchor-in-summing-plate"
-    )
-    assert anchors["instances"] == 5
+    for joint_id in (
+        "ha-harmonic-analyzer/channel-anchor-in-summing-plate",
+        "ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor",
+    ):
+        row = next(j for j in data["joints"] if j["id"] == joint_id)
+        assert row["instances"] == 5
+
+
+def test_channel_anchors_are_locked_by_their_jam_nuts() -> None:
+    rows = {j.id: j for j in jr.JOINTS}
+    anchor = rows["ha-harmonic-analyzer/channel-anchor-in-summing-plate"]
+    assert anchor.exposure is Exposure.ADJUSTER
+    assert anchor.lock is Lock.JAM_NUT
+    assert anchor.lock_part == "ch_anchor_jam_nut"
+    assert set(anchor.lock_binds) == {"vn_spring_hook", "sm_summing_lever"}
+    assert anchor.exception == ""
+    nut = rows["ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor"]
+    assert nut.member == "ch_anchor_jam_nut"
+    assert nut.receiver == "vn_spring_hook"
+    assert nut.exposure is Exposure.STATIC_CLAMP
+    for row in (anchor, nut):
+        text = " ".join((row.axial_capture, row.evidence, row.exposure_reason))
+        for banned in ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC"):
+            assert banned not in text.upper()

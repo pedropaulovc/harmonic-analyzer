@@ -1,10 +1,17 @@
 """Manufacturing controls for the modified McMaster 9490T1 anchor."""
 
 import _config
+import vn_boss_hook_jam_nut_spec as jam_nut
 from stock_anchor_geom import ANCHOR_9490T1, trim
 from sm_summing_lever_spec import ANCHOR_H
 
-SHANK_LENGTH_MM = round(ANCHOR_H, 3)
+# The MHA-VN-072 jam nut locks the anchor on the boss top face (#1189), so
+# the shank is trimmed longer than the boss by the nut's height plus one
+# pitch: the nut runs on full thread a pitch clear of the thread's start at
+# the eye neck, and the cut end still finishes flush with the boss underside
+# (full ANCHOR_H engagement in the lever's through tap).
+JAM_NUT_THREAD_MM = jam_nut.THICKNESS + ANCHOR_9490T1.thread_pitch_mm
+SHANK_LENGTH_MM = round(ANCHOR_H + JAM_NUT_THREAD_MM, 3)
 TRIM = trim(ANCHOR_9490T1, SHANK_LENGTH_MM)
 FINISHED_OVERALL_MM = ANCHOR_9490T1.eye_od_mm / 2 - TRIM.shank_end_y_mm
 FINISHED_OVERALL_TOLERANCE_MM = _config.title_block("linear_1pl")["value_in"] * 25.4

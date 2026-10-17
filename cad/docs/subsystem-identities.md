@@ -15,7 +15,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 | Prefix | Category | Parts |
 |---|---|---:|
 | `ha` / `HA` | Harmonic analyzer | 0 |
-| `ch` / `CH` | Channel | 12 |
+| `ch` / `CH` | Channel | 13 |
 | `dt` / `DT` | Drive train | 35 |
 | `fr` / `FR` | Frame | 5 |
 | `mg` / `MG` | Magnifier | 10 |
@@ -23,7 +23,7 @@ Components of a built-up part are the detail parts a finished part may be made f
 | `pn` / `PN` | Pen | 5 |
 | `ms` / `MS` | Measuring stick | 3 |
 | `sm` / `SM` | Summing | 4 |
-| `vn` / `VN` | Vendor parts | 67 |
+| `vn` / `VN` | Vendor parts | 68 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
 Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. Wheel axle nut is VN by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
@@ -123,6 +123,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired part | `rocker-thrust-washer` | `ch-rocker-thrust-washer` | MHA-148 | MHA-CH-009 (retired; never reissued) |
 | part | — | `ch-rod-pivot-pin` | — | MHA-CH-010 |
 | part | — | `ch-bar-pivot-pin` | — | MHA-CH-011 |
+| part | — | `ch-anchor-jam-nut` | — | MHA-CH-014 |
 | part | `alignment-pinion` | `dt-alignment-pinion` | MHA-002 | MHA-DT-001 |
 | part | `arbor-pedestal` | `dt-arbor-pedestal` | MHA-004 | MHA-DT-002 |
 | part | `cone-gear` | `dt-cone-gear` | MHA-013 | MHA-DT-003 |
@@ -280,6 +281,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | `vn-transgear-pivot-shim` | — | MHA-VN-069 |
 | part | — | `vn-rocker-thrust-washer` | — | MHA-VN-070 |
 | part | — | `vn-bracket-hold-down-screw` | — | MHA-VN-071 |
+| part | — | `vn-boss-hook-jam-nut` | — | MHA-VN-072 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
@@ -340,3 +342,5 @@ next free Number in its category and has no old stem or old Number.
 | added | `vn-bracket-hold-down-screw` | MHA-VN-071 | McMaster 90280A196 #8-32 x 5/8 slotted narrow fillister, zinc-plated steel; one per MHA-CH-008 foot into MHA-FR-005's top-face seat (owner Q13c), so the transferred seat stays 11.5 thread / 14.7 drill; MHA-VN-032 keeps the arbor pedestals |
 | added | `ch-rocker-hub` | MHA-CH-012 | turned 1018 hub of the built-up MHA-CH-006 rocker arm (`component_of: ch-rocker-arm`); its Ø10.20 r6 land is pressed into the MHA-CH-013 strap's H7 hole, then the bore and length are finished on MHA-CH-006 |
 | added | `ch-rocker-strap` | MHA-CH-013 | 1018 flat strap of the built-up MHA-CH-006 rocker arm (`component_of: ch-rocker-arm`); finished outline and 2.5 thickness with the Ø10.20 H7 hole for the MHA-CH-012 hub |
+| added | `vn-boss-hook-jam-nut` | MHA-VN-072 | thin zinc-plated steel #10-24 narrow-profile hex nut jammed against the MHA-SM-003 boss top face, locking the MHA-VN-001 counter anchor |
+| added | `ch-anchor-jam-nut` | MHA-CH-014 | turned brass round #6-32 jam nut, notched across its driven face for a forked driver, jammed against the MHA-SM-003 plate underside on each MHA-VN-012 channel anchor; round because a hex overruns the 7.06 anchor pitch |

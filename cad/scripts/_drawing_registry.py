@@ -362,6 +362,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_anchor_jam_nut",
+        part="ch_anchor_jam_nut",
+        artifact_stem="ch-anchor-jam-nut",
+        script_name="draw_ch_anchor_jam_nut.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="mg_wheel_axle_spacer",
         part="mg_wheel_axle_spacer",
         artifact_stem="mg-wheel-axle-spacer",
@@ -1367,6 +1374,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="vn_pen_hanger_jam_nut",
         artifact_stem="vn-pen-hanger-jam-nut",
         script_name="draw_vn_pen_hanger_jam_nut.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_boss_hook_jam_nut",
+        part="vn_boss_hook_jam_nut",
+        artifact_stem="vn-boss-hook-jam-nut",
+        script_name="draw_vn_boss_hook_jam_nut.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
