@@ -2,7 +2,7 @@ r"""Reproduction script: rocker hub (MHA-CH-012; 20 used, one per rocker arm).
 
 The turned 1018 hub of the built-up rocker arm MHA-CH-006
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``), as SUPPLIED to the joint
-(``ch_rocker_hub_spec``): the Ø10.20 land at its finished size with the p6
+(``ch_rocker_hub_spec``): the Ø10.20 land at its finished size with the r6
 press band on the MHA-CH-013 strap's H7 hole (``ch_rocker_hub_fit``), the bore
 drilled under the finished ream and the length left long, both finished on the
 joined part to the MHA-CH-006 print.
@@ -159,7 +159,7 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # The land carries its p6 press band natively; the supply bore takes the
+    # The land carries its r6 press band natively; the supply bore takes the
     # title block's DRILLED HOLES row; the supply length is a single MIN limit
     # (it only has to leave facing stock, ch_rocker_hub_spec.FACE_STOCK).
     set_dimension_bilateral_tolerance(

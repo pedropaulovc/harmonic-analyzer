@@ -7,9 +7,11 @@ builds and their drawing tests import this one module, so the hole's band, the
 land's band and the interference they make are stated once.
 
 User ruling (route v3, 2026-10-16): a press fit, the strap hole H7 and the hub
-land p6. ISO 286-2, nominal sizes over 10 up to 18 mm: H7 is 0/+0.018 and p6
-is +0.018/+0.029, so the diametral interference runs 0.000-0.029. The size
-range is the 10.20 nominal's (``ch_rocker_arm_spec.HUB_DIA``).
+land r6. ISO 286-2, nominal sizes over 10 up to 18 mm: H7 is 0/+0.018 and r6
+is +0.023/+0.034, so the diametral interference runs 0.005-0.034. H7/p6 was
+refused: p6's +0.018 floor meets H7's +0.018 ceiling, so its least
+interference is 0.000 and a worst-case pair goes together line-to-line. The
+size range is the 10.20 nominal's (``ch_rocker_arm_spec.HUB_DIA``).
 """
 
 from __future__ import annotations
@@ -23,18 +25,29 @@ if not ISO_RANGE_MM[0] < HUB_DIA <= ISO_RANGE_MM[1]:
         f"Ø{HUB_DIA} left the ISO 286 10-18 mm range the bands are read from"
     )
 STRAP_HOLE_BAND = (0.018, 0.0)  # H7
-HUB_LAND_BAND = (0.029, 0.018)  # p6
+HUB_LAND_BAND = (0.034, 0.023)  # r6
 
-# Diametral interference (least, greatest): the smallest land in the largest
-# hole, then the largest land in the smallest hole.
-PRESS_INTERFERENCE = (
-    round(HUB_LAND_BAND[1] - STRAP_HOLE_BAND[0], 6),
-    round(HUB_LAND_BAND[0] - STRAP_HOLE_BAND[1], 6),
-)
-if PRESS_INTERFERENCE[0] < 0.0:
-    raise AssertionError(
-        f"the hub land can slip in the strap hole: {PRESS_INTERFERENCE}"
-    )
+
+def press_interference(
+    land_band: tuple[float, float], hole_band: tuple[float, float]
+) -> tuple[float, float]:
+    """Diametral interference (least, greatest) of a land band in a hole band.
+
+    The least is the smallest land in the largest hole, the greatest the
+    largest land in the smallest hole. A press fit must interfere at both
+    ends: a least of 0.000 is a line-to-line pair that need not hold.
+    """
+    least = round(land_band[1] - hole_band[0], 6)
+    greatest = round(land_band[0] - hole_band[1], 6)
+    if not least > 0.0:
+        raise AssertionError(
+            f"the hub land can go in the strap hole line-to-line or loose: "
+            f"{(least, greatest)}"
+        )
+    return least, greatest
+
+
+PRESS_INTERFERENCE = press_interference(HUB_LAND_BAND, STRAP_HOLE_BAND)
 
 # The callout row both prints carry under their Ø (drawing-guidelines.md rule 4:
 # a tight band names its mate and why).

@@ -2,7 +2,7 @@ r"""Create the manufacturing drawing for the rocker hub (MHA-CH-012).
 
 Under ``cad/docs/drawing-guidelines.md``: the turned hub of the built-up rocker
 arm MHA-CH-006 as SUPPLIED to the joint (``ch_rocker_hub_spec``), on three
-native model dimensions: the Ø10.200 land with its p6 band and the press fit
+native model dimensions: the Ø10.200 land with its r6 band and the press fit
 it makes in the MHA-CH-013 strap hole below it (rule 4), the supply bore with
 the title block's DRILLED HOLES row, and the supply length as a single MIN
 limit (rule 19). The face view carries the bore; the side view, where a

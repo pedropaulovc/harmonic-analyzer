@@ -36,12 +36,23 @@ def test_required_drawing_paths() -> None:
 
 
 def test_press_fit_bands_are_iso_286_10_to_18() -> None:
-    # ISO 286-2, over 10 up to 18 mm: H7 0/+18 um, p6 +18/+29 um.
+    # ISO 286-2, over 10 up to 18 mm: H7 0/+18 um, r6 +23/+34 um.
     assert fit.ISO_RANGE_MM[0] < rocker.HUB_DIA <= fit.ISO_RANGE_MM[1]
     assert fit.STRAP_HOLE_BAND == (0.018, 0.0)
-    assert fit.HUB_LAND_BAND == (0.029, 0.018)
-    assert fit.PRESS_INTERFERENCE == pytest.approx((0.000, 0.029))
-    assert fit.INTERFERENCE_TEXT == "0.000-0.029 DIAMETRAL INTERFERENCE"
+    assert fit.HUB_LAND_BAND == (0.034, 0.023)
+    assert fit.PRESS_INTERFERENCE == pytest.approx((0.005, 0.034))
+    assert fit.INTERFERENCE_TEXT == "0.005-0.034 DIAMETRAL INTERFERENCE"
+
+
+@pytest.mark.parametrize(
+    "land_band",
+    [(0.029, 0.018), (0.020, 0.010)],
+    ids=["p6-line-to-line", "loose"],
+)
+def test_a_press_that_can_go_line_to_line_is_refused(land_band) -> None:
+    # H7/p6 at 10-18 mm: the smallest land meets the largest hole at 0.000.
+    with pytest.raises(AssertionError, match="line-to-line or loose"):
+        fit.press_interference(land_band, fit.STRAP_HOLE_BAND)
 
 
 def test_supply_sizes_derive_from_the_finished_rocker() -> None:
@@ -103,7 +114,7 @@ def test_every_band_is_native_and_named() -> None:
     assert "tolerance.SetValues(0.0, 0.0)" in build
     assert notes.LAND_CALLOUT.splitlines() == [
         "PRESS FIT IN MHA-CH-013 STRAP HOLE",
-        "0.000-0.029 DIAMETRAL INTERFERENCE",
+        "0.005-0.034 DIAMETRAL INTERFERENCE",
     ]
     assert notes.SUPPLY_BORE_CALLOUT.splitlines() == ["DRILL THRU", "SUPPLY SIZE"]
 

@@ -105,7 +105,7 @@ def test_every_band_is_native_and_names_its_mate() -> None:
     assert notes.HOLE_CALLOUT.splitlines() == [
         "REAM THRU",
         "PRESS FIT ON MHA-CH-012 HUB",
-        "0.000-0.029 DIAMETRAL INTERFERENCE",
+        "0.005-0.034 DIAMETRAL INTERFERENCE",
     ]
     # The finished part's mates, worded as on its own print.
     assert (

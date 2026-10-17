@@ -4,7 +4,7 @@ PURE DATA, no SolidWorks/COM imports. MHA-CH-006 may be built up
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): this hub is pressed into
 the strap MHA-CH-013 (``ch_rocker_hub_fit``), then the joined part's bore is
 reamed and its hub length faced to the MHA-CH-006 print. So this detail is
-the hub as SUPPLIED to the joint: the land at its finished Ø with the p6
+the hub as SUPPLIED to the joint: the land at its finished Ø with the r6
 press band, the bore and the length left with stock (drawing-guidelines.md
 rule 19: a supply size, finished later). The finished bore and length print on
 MHA-CH-006 only; this sheet never repeats them.
