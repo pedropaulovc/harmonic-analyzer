@@ -289,23 +289,34 @@ def _project_end_view(
     _telemetry.success(f"clamp {label} view in projection: origin {at}")
 
 
+def _face_hatches(section: Any) -> list[Any]:
+    """The section's IFaceHatch objects.  The returned array can carry null
+    slots (the API's own VBA example reads from index 1), so drop them."""
+    view = _early_bound(section, "IView")
+    return [
+        _early_bound(raw, "IFaceHatch")
+        for raw in (view.GetFaceHatches() or ())
+        if raw is not None
+    ]
+
+
 def _solid_line_hatch(adapter: Any, section: Any) -> None:
     """Swap the brass material hatch (dashed ANSI33) for continuous lines."""
-    hatches = tuple(_early_bound(section, "IView").GetFaceHatches() or ())
+    hatches = _face_hatches(section)
     if not hatches:
-        raise RuntimeError("section A-A has no face hatch")
-    for raw in hatches:
-        hatch = _early_bound(raw, "IFaceHatch")
+        view = _early_bound(section, "IView")
+        raise RuntimeError(
+            "section A-A has no face hatch: GetFaceHatchCount "
+            f"{view.GetFaceHatchCount()}, slots {len(view.GetFaceHatches() or ())}"
+        )
+    for hatch in hatches:
         hatch.UseMaterialHatch = False
         if str(hatch.Pattern) != SECTION_HATCH_PATTERN:
             hatch.Pattern = SECTION_HATCH_PATTERN
     rebuild_drawing(adapter, label="section A-A solid-line hatch")
     read = [
-        (
-            bool(_early_bound(raw, "IFaceHatch").UseMaterialHatch),
-            str(_early_bound(raw, "IFaceHatch").Pattern),
-        )
-        for raw in _early_bound(section, "IView").GetFaceHatches() or ()
+        (bool(hatch.UseMaterialHatch), str(hatch.Pattern))
+        for hatch in _face_hatches(section)
     ]
     if len(read) != len(hatches) or any(
         material or pattern != SECTION_HATCH_PATTERN for material, pattern in read

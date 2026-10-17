@@ -87,7 +87,7 @@ from magnifying_bracket_joint_layout import (
     SIDE_PLATE_Z as FLANGE_Z,
     SIDE_PLATE_THICKNESS,
 )
-from _holes import wizard_holes
+from _holes import DIAMETER_TOLERANCE_MM, wizard_holes
 
 PART_NAME = "mg-magnifying-bracket"
 MATERIAL = "Plain Carbon Steel"  # black hardware
@@ -146,23 +146,31 @@ def _resolve_native_mounting_dimensions(adapter) -> dict[str, str]:
         raise RuntimeError("Flange: native extrusion height differs from contract")
     height.Name = "FlangeHeight"
     feature = _early_bound(model.FeatureByName("MountingHoles"), "IFeature")
+    # A plain #2 normal hole cuts the Wizard's own 0.102 in (2.5908); the
+    # pinned table reads 2.591, inside the Wizard's no-override tolerance.
     required = {
         "HoleDiameter": ("dia", CLEARANCE_DIA),
     }
     matches = {name: [] for name in required}
+    seen = []
     display = feature.GetFirstDisplayDimension()
     while display is not None:
         display = _early_bound(display, "IDisplayDimension")
         dimension = _early_bound(display.GetDimension(), "IDimension")
         native_name = str(dimension.FullName).split("@")[0].lower()
+        value_mm = float(dimension.SystemValue) * 1000.0
+        seen.append(f"{dimension.FullName}={value_mm:.4f}")
         for name, (kind, nominal) in required.items():
-            if kind in native_name and abs(float(dimension.SystemValue) * 1000.0 - nominal) < 1e-5:
+            if kind in native_name and abs(value_mm - nominal) <= DIAMETER_TOLERANCE_MM:
                 matches[name].append(dimension)
         display = feature.GetNextDisplayDimension(display)
     resolved = {}
     for name, dimensions in matches.items():
         if len(dimensions) != 1:
-            raise RuntimeError(f"MountingHoles: expected one native {name}, found {len(dimensions)}")
+            raise RuntimeError(
+                f"MountingHoles: expected one native {name}, found {len(dimensions)}"
+                f" among {seen}"
+            )
         resolved[name] = str(dimensions[0].Name)
     return resolved
 
