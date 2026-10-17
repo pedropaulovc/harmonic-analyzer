@@ -588,8 +588,10 @@ SHARP_EDGE_CALLOUT = "SHARP EDGE"
 PROFILE_CALLOUT = "ROCKER PROFILE"
 ROCKER_NUMBER = "MHA-CH-006"
 STATION_CALLOUT = f"{PROFILE_CALLOUT}, {ROCKER_NUMBER}"
-# The run's function (its three-place minimum is what must reach), no method.
-ROD_SLOT_FLAT_CALLOUT = f"PIN REACH TO ROD-PIN\nHOLE, {ROCKER_NUMBER}"
+# The run's feature (the slot's end centres, mr-tl13-5 could not tell what it
+# landed on) and its function (its three-place minimum is what must reach),
+# no method.
+ROD_SLOT_FLAT_CALLOUT = f"SLOT END CENTRES;\nPIN REACH, {ROCKER_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:4"
 
 # The #1413 placeholder provenance every solid carries: ``by`` is
