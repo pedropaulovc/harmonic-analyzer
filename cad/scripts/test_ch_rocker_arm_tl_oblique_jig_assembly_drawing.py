@@ -460,6 +460,18 @@ def test_ring_right_slack_follows_the_low_balloons() -> None:
     )
 
 
+def test_keep_out_overshoot_measures_the_low_balloons() -> None:
+    keep_out = (0.200, 0.0, 0.400, 0.070)
+    outline = (0.050, 0.100, 0.150, 0.200)
+    high = [(0.300, 0.100, 0.005)]
+    assert drawing.keep_out_overshoot(high, outline, keep_out=keep_out) == -math.inf
+    # Farm r9: a T-nut balloon carried 0.3 past the keep-out's left edge.
+    low = [*high, (0.1983, 0.060, 0.005)]
+    assert drawing.keep_out_overshoot(low, outline, keep_out=keep_out) == pytest.approx(
+        0.0033
+    )
+
+
 def test_clusters_relax_their_slide_after_ringing() -> None:
     body = inspect.getsource(drawing._balloon_cluster)
     assert body.index("_relax_cluster_slide(") > body.index("_ring_balloons(")

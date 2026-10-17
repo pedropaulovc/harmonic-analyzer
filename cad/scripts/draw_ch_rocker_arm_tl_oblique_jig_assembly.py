@@ -1458,6 +1458,31 @@ def _fit_cluster_view(
     return scale
 
 
+# The relax leaves this much room to the keep-out for the balloons' lag
+# behind their view, and corrects at most this many times.
+_RELAX_MARGIN = 0.001
+_RELAX_PASSES = 3
+
+
+def keep_out_overshoot(
+    circles: Sequence[tuple[float, float, float]],
+    outline: tuple[float, float, float, float],
+    *,
+    keep_out: tuple[float, float, float, float],
+) -> float:
+    """How far right of ``keep_out``'s left edge the rightmost balloon circle
+    (centre x, y, radius) or outline whose bottom is below the keep-out's top
+    reaches; negative when they stay clear, ``-inf`` when none is that low."""
+    left, _bottom, _right, top = keep_out
+    reach = -math.inf
+    for x, y, radius in circles:
+        if y - radius < top:
+            reach = max(reach, x + radius - left)
+    if outline[1] < top:
+        reach = max(reach, outline[2] - left)
+    return reach
+
+
 def ring_right_slack(
     circles: Sequence[tuple[float, float, float]],
     outline: tuple[float, float, float, float],
@@ -1469,44 +1494,44 @@ def ring_right_slack(
 
     ``cluster_ring_fit`` slides a view left until the whole ellipse its
     balloons can land on clears ``keep_out``; the balloons land only at their
-    attachments' angles, so the ones actually placed usually need less.
-    Every balloon circle (centre x, y, radius) whose bottom is below the
-    keep-out's top, and the outline if it is, stays left of the keep-out's
-    left edge. Review bought-r6: the full-ellipse slide left the sheets'
-    right halves empty.
+    attachments' angles, so the ones actually placed usually need less:
+    every balloon and the outline below the keep-out's top stay left of it
+    (:func:`keep_out_overshoot`). Review bought-r6: the full-ellipse slide
+    left the sheets' right halves empty.
     """
-    left, _bottom, _right, top = keep_out
-    slack = cap
-    for x, y, radius in circles:
-        if y - radius < top:
-            slack = min(slack, left - (x + radius))
-    if outline[1] < top:
-        slack = min(slack, left - outline[2])
-    return max(0.0, slack)
+    return max(0.0, min(cap, -keep_out_overshoot(circles, outline, keep_out=keep_out)))
 
 
 def _relax_cluster_slide(
     adapter: Any, view: Any, landings: Sequence[BalloonLanding], *, label: str
 ) -> None:
     """Move a ringed cluster view, its balloons with it, back right by its
-    placed balloons' slack (:func:`ring_right_slack`), never past the ring's
-    centred position; then every balloon must clear the title block and sit
-    inside the border."""
+    placed balloons' slack (:func:`ring_right_slack`) less ``_RELAX_MARGIN``,
+    never past the ring's centred position; then every balloon must clear the
+    title block and sit inside the border.
+
+    The balloons do not ride with the view exactly (farm r9: 9.54 to 10.02 for
+    a 9.70 move), so a balloon the move still left in the keep-out sends the
+    view back left by its overshoot, at most ``_RELAX_PASSES`` times."""
     outline = _view_outline(view, label=label)
     circles = [rendered_balloon_circle(item.note, label=label) for item in landings]
     centre = _region_center(outline)
-    move = ring_right_slack(
-        circles,
-        outline,
-        keep_out=TITLE_BLOCK_KEEP_OUT,
-        cap=CLUSTER_CENTER[0] - centre[0],
+    move = max(
+        0.0,
+        ring_right_slack(
+            circles,
+            outline,
+            keep_out=TITLE_BLOCK_KEEP_OUT,
+            cap=CLUSTER_CENTER[0] - centre[0],
+        )
+        - _RELAX_MARGIN,
     )
-    if move > 1e-4:
+    for _pass in range(_RELAX_PASSES):
+        if abs(move) <= 1e-4:
+            break
         _center_view_outline(adapter, view, (centre[0] + move, centre[1]), label=label)
         moved = [rendered_balloon_circle(item.note, label=label) for item in landings]
-        # The balloons ride with the view to within a fraction of a millimetre
-        # (farm r8: 9.54 for a 9.68 move); a balloon left behind is a failure.
-        follow = max(5e-4, 0.05 * move)
+        follow = max(5e-4, 0.05 * abs(move))
         for item, before, after in zip(landings, circles, moved, strict=True):
             if (
                 abs(after[0] - before[0] - move) > follow
@@ -1517,13 +1542,17 @@ def _relax_cluster_slide(
                     f"({before[:2]!r} -> {after[:2]!r}, view moved {move:.6f})"
                 )
         _telemetry.info(
-            f"{label}: ring moved back {move * 1000.0:.1f} mm right, balloons "
+            f"{label}: ring moved {move * 1000.0:.1f} mm right, balloons "
             + ", ".join(
                 f"{(after[0] - before[0]) * 1000.0:.2f}"
                 for before, after in zip(circles, moved, strict=True)
             )
         )
         circles = moved
+        outline = _view_outline(view, label=label)
+        centre = _region_center(outline)
+        overshoot = keep_out_overshoot(circles, outline, keep_out=TITLE_BLOCK_KEEP_OUT)
+        move = -(overshoot + _RELAX_MARGIN) if overshoot > 0.0 else 0.0
     left, bottom, right, top = SHEET_INNER_BORDER
     k0, k1, k2, k3 = TITLE_BLOCK_KEEP_OUT
     for item, (x, y, radius) in zip(landings, circles, strict=True):
