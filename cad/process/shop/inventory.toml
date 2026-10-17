@@ -3553,9 +3553,9 @@ sku = "HW-SC-T8x2-600"
 source = "https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/"
 present = false
 verify = true
-purchase = "1 x ZYLtech HW-SC-T8x2-600, select 600 mm pre-cut length; USD 14.95 and in stock in the live variant response 2026-10-16. Includes one regular brass flange nut recorded at fixtures.trammel-tr8-flange-nut; do not buy a second nut. Houston, Texas vendor with domestic shipping and will-call pickup."
-note = "Read live 2026-10-16: nominal diameter 8 mm, T8x2 single-start right-hand trapezoidal thread, pitch 2 mm and lead 2 mm/revolution, 304 stainless steel. Ordered stock length is 600 mm, not the installed length; vendor length tolerance and straightness are unpublished. Owner's C4 layout retains 410 mm +/-0.5 mm installed total length. Shop step: confirm the matching C4 support positions and wheel engagement, cut the stock screw to 410 mm +/-0.5 mm, deburr and lightly chamfer the cut end, and check that the brass nut runs freely over it before assembly. Do not turn end journals; the KP08 and wheel set screws grip the threaded ends. Receipt checks of crest fit, runout, installed travel and bidirectional axial retention remain required."
-cite = ["ZYLtech pre-cut screw/regular nut kit https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/ read live 2026-10-16: T8x2 single start, pitch/lead 2 mm, right hand, 304 stainless; product 197 length variant HW-SC-T8x2-600 USD 14.95 in stock", "Owner/C4 layout decision 2026-10-16 (not vendor tolerance): cut to 410 mm +/-0.5 mm; SCREW_LENGTH = 410.0 in cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py, rocker/trammel-jig-4 branch stacked on PR #1583"]
+purchase = "1 x ZYLtech HW-SC-T8x2-600, select 600 mm pre-cut length; USD 14.95 and in stock in the live variant response 2026-10-17 UTC. Includes one regular brass flange nut recorded at fixtures.trammel-tr8-flange-nut; do not buy a second nut. Houston, Texas vendor with domestic shipping and will-call pickup."
+note = "Read live 2026-10-17 UTC: nominal diameter 8 mm, T8x2 single-start right-hand trapezoidal thread, pitch 2 mm and lead 2 mm/revolution, 304 stainless steel. Ordered stock length is 600 mm, not the installed length; vendor length tolerance and straightness are unpublished. Owner's C4 layout retains 410 mm +/-0.5 mm installed total length. Shop step: confirm the matching C4 support positions and wheel engagement, cut the stock screw to 410 mm +/-0.5 mm, deburr and lightly chamfer the cut end, and check that the brass nut runs freely over it before assembly. Do not turn end journals; the KP08 and wheel set screws grip the threaded ends. Keep nut travel off set-screw-marked end threads; inspect for raised crest damage before passing the nut over a previously clamped end. Receipt checks of crest fit, runout, installed travel and bidirectional axial retention remain required."
+cite = ["ZYLtech pre-cut screw/regular nut kit https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/ read live 2026-10-17 UTC: T8x2 single start, pitch/lead 2 mm, right hand, 304 stainless; product 197 length variant HW-SC-T8x2-600 USD 14.95 in stock", "Owner/C4 layout decision 2026-10-16 (not vendor tolerance): cut to 410 mm +/-0.5 mm; SCREW_LENGTH = 410.0 in cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py, rocker/trammel-jig-4 branch stacked on PR #1583"]
 # McMaster alternatives considered, not chosen: M8 pitch 2 / lead 4 screws
 # 97783A170/97783A180 are only 200/300 mm; too short for the final 410 mm order.
 # McMaster 2391N25 is 500 mm but pitch 2.5 / lead 10, unnecessarily coarse
@@ -3587,8 +3587,8 @@ sku = "HW-SC-T8x2-NUT"
 source = "https://www.zyltech.com/zyltech-brass-nut-only-various-diameters-and-pitches-available/"
 present = false
 verify = true
-purchase = "One regular brass T8x2 flange nut is included with the HW-SC-T8x2-600 screw purchase; do not order separately. HW-SC-T8x2-NUT is the vendor's standalone replacement SKU (USD 2.95 in stock live 2026-10-16), not a second required purchase."
-note = "Read live page/drawings 2026-10-16: brass regular nut matching the ZYLtech T8x2 single-start right-hand screw, pitch/lead 2 mm. Flange OD 22 mm, thickness 3.5 mm; body OD 10.2 mm; four non-threaded 3.5 mm through holes on 16 mm bolt circle. Body projects 10 mm on the long side and 1.5 mm past the flange outer face as a short spigot, giving total axial length 15 mm. No angular datum is specified on the round flange. Compared with the superseded Ooznest nut, only the stated body OD (10 to 10.2 mm) and PCD (16.1 to 16 mm) change; the 1.5 + 3.5 + 10 axial split is unchanged. Backlash, dimensional tolerances and received fit remain unverified."
+purchase = "One regular brass T8x2 flange nut is included with the HW-SC-T8x2-600 screw purchase; do not order separately. HW-SC-T8x2-NUT is the vendor's standalone replacement SKU (USD 2.95 in stock live 2026-10-17 UTC), not a second required purchase."
+note = "Read live page/drawings 2026-10-17 UTC: brass regular nut matching the ZYLtech T8x2 single-start right-hand screw, pitch/lead 2 mm. Flange OD 22 mm, thickness 3.5 mm; body OD 10.2 mm; four non-threaded 3.5 mm through holes on 16 mm bolt circle. Body projects 10 mm on the long side and 1.5 mm past the flange outer face as a short spigot, giving total axial length 15 mm. No angular datum is specified on the round flange. Backlash, dimensional tolerances and received fit remain unverified."
 # Lubrication and backlash acceptance remain shop checks, not catalogue proof.
 # Four plain 3.5 mm holes suit M3 clearance mounting; a shop-made nut bracket
 # is a separate jig part, not a claim of direct mounting to M4 carriage threads.
@@ -3597,13 +3597,15 @@ note = "Read live page/drawings 2026-10-16: brass regular nut matching the ZYLte
 # Interface authority: NUT_ID and NUT_* in
 # cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py, in-flight
 # rocker/trammel-jig-4 branch; this sourcing branch adds no CAD geometry.
-cite = ["ZYLtech nut-only https://www.zyltech.com/zyltech-brass-nut-only-various-diameters-and-pitches-available/ read live 2026-10-16: T8x2 single-start option resolves to HW-SC-T8x2-NUT; included regular nut geometry is published with screw kit product 197", "ZYLtech front drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16129/s136714152818872222_p75_i6_w500__21913__97391.1698349316.jpg?c=2 : flange 22, body 10.2, PCD 16, four 3.5 holes", "ZYLtech side drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16130/s136714152818872222_p75_i5_w1005__99935__02876.1698349316.jpg?c=2 : short spigot 1.5, flange 3.5, long projection 10"]
+cite = ["ZYLtech kit regular-nut geometry https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/ read live 2026-10-17 UTC; nut-only https://www.zyltech.com/zyltech-brass-nut-only-various-diameters-and-pitches-available/ T8x2 single-start option resolves to HW-SC-T8x2-NUT", "ZYLtech front drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16129/s136714152818872222_p75_i6_w500__21913__97391.1698349316.jpg?c=2 : flange 22, body 10.2, PCD 16, four 3.5 holes", "ZYLtech side drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16130/s136714152818872222_p75_i5_w1005__99935__02876.1698349316.jpg?c=2 : short spigot 1.5, flange 3.5, long projection 10"]
 # McMaster matching M8 lead-4 flanged nut 97783A270 is acetal (acceptable),
 # but its matching stocked screws are too short; material is not a rejection.
 # https://www.mcmaster.com/97783A270/
 # Ooznest LSRFN-TR8-2-2P-B was a matched dimensional candidate, not a
 # material failure; superseded with its screw to avoid UK-only DHL logistics.
 # https://ooznest.co.uk/product/tr8x2-2p-lead-screw-round-flanged-nut-brass/
+# Interface delta from Ooznest: body OD 10 -> 10.2, PCD 16.1 -> 16;
+# axial split 1.5 + 3.5 + 10 = 15 is unchanged. Relayed to C4 owner.
 
 [fixtures.trammel-kp08-blocks]
 kind = "pillow_block_bearing"
@@ -3634,7 +3636,7 @@ source = "https://us.misumi-ec.com/vona2/detail/110300515660/?HissuCode=HOK40-HC
 present = false
 verify = true
 purchase = "1 x MISUMI HOK40-HC8 with factory HC8 alteration, USD 47.92 and estimated ship date 2026-10-26 on the live configured page; includes one M5 set screw, not two. MISUMI USA's shipping FAQ specifies domestic warehouses and default UPS Ground; confirm price and delivery at checkout."
-note = "Read live 2026-10-16 (2026-10-17 UTC): black-anodised 5056 aluminium knurled wheel OD 40 mm x 12 mm rim thickness; hub OD 22 mm projects 13 mm, body axial length 25 mm. Factory HC8 alteration specifies an 8 mm H8 through bore across the body, plus two radial M5 tapped set-screw holes 90 degrees apart, centres 6.5 mm from the hub end. One set screw is included; its length and retention torque are not stated. Revolving black Nylon 6 grip has diameter 13 mm, axis offset 14.5 mm and forward projection 18.8 mm, giving calculated total axial envelope 43.8 mm (25+18.8) and grip swept radius 21 mm (14.5+13/2); add hand clearance. No shop boring, tapping or turned screw journals are required. Compared with Ooznest HW-8, hub OD changes 25 to 22 mm, blind 8 x 18 bore becomes 8 H8 through x 25, M4 holes become M5 with only one supplied screw, and axial envelope changes 44 to 43.8 mm. Receipt fit, screw engagement and installed retention remain to verify against C4; factory machining is included in the ordered SKU."
+note = "Read live 2026-10-17 UTC: black-anodised 5056 aluminium knurled wheel OD 40 mm x 12 mm rim thickness; hub OD 22 mm projects 13 mm, body axial length 25 mm. Factory HC8 alteration specifies an 8 mm H8 through bore across the body, plus two radial M5 tapped set-screw holes 90 degrees apart, centres 6.5 mm from the hub end. One set screw is included; its length and retention torque are not stated. Revolving black Nylon 6 grip has diameter 13 mm, axis offset 14.5 mm and forward projection 18.8 mm, giving calculated total axial envelope 43.8 mm (25+18.8) and grip swept radius 21 mm (14.5+13/2); add hand clearance. No shop boring, tapping or turned screw journals are required. Receipt fit, screw engagement and installed retention remain to verify against C4; factory machining is included in the ordered SKU."
 # Layout condition: wheel radius 20 mm and grip swept radius 21 mm versus
 # KP08 axis height 15 mm require base-edge overhang or at least 6 mm lift
 # plus running/hand clearance. This purchase record proves no installed layout.
@@ -3652,6 +3654,9 @@ cite = ["MISUMI HOK40-HC8 https://us.misumi-ec.com/vona2/detail/110300515660/?Hi
 # explicitly supplies the through bore and tapped holes at the factory.
 # StepperOnline HWA40-D8 offered China/Germany dispatch, no documented
 # retaining screw. ZYLtech's identified NEMA 17 wheel has a 5 mm bore.
+# Interface delta from HW-8: hub OD 25 -> 22; blind 8 x 18 bore ->
+# 8 H8 through x 25; M4 holes -> M5, only one screw supplied instead of two;
+# grip OD 9.6 -> 13, projection 19 -> 18.8, axial envelope 44 -> 43.8.
 
 # --- pivot-bracket additions ---
 # Illustrative angle plate. Local XY is the table plane; the front upright face

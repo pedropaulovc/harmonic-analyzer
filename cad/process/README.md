@@ -82,7 +82,6 @@ Record unpublished fields and rejected substitutes beside the affected item,
 rather than duplicating their changing verification status here. CAD remains
 the authority for installed geometry and any shop-made adapter.
 
-
 ## Add or migrate a part
 
 1. Ensure the part is supported by `export_features.SUPPORTED_PARTS` and obtain
