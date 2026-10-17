@@ -25,11 +25,8 @@ MODELS = {
 SHOP_MADE_IDS = frozenset(
     {
         "fixtures.angle-plate",
-        "fixtures.trammel-pivot-plate",
         "gauges.arm-outline-template",
-        "gauges.rocker-trammel-setting-bar",
         "tools.ring-laps",
-        "tools.rocker-trammel",
     }
 )
 

@@ -1,7 +1,7 @@
 # Identity/ownership extension (#1413, 2026-10-13): Pedro explicitly permits realistic
-# hypothetical possession and named identities for the 18 legacy unresolved roots plus
-# the two shop-made trammel records. present=true / verify=false below qualify this
-# trial input, NOT actual ownership, completed fabrication, purchase or metrology.
+# hypothetical possession and named identities for the 18 legacy unresolved roots.
+# present=true / verify=false below qualify this trial input, NOT actual ownership,
+# completed fabrication, purchase or metrology.
 # Identity provenance is comment-only (item-root measured is forbidden); every newly
 # assigned operative physical fact has its own explicit Measurement or a schema-safe
 # scalar/text/vector provenance comment. Catalogue capacities stay within publications;
@@ -4973,91 +4973,6 @@ solids = [
 # vendor page. The owned flat bench (about 1.0 x 0.65 m, Pedro 2026-10-11) carries the
 # MDF scribing board.
 
-# Dedicated trammel (Pedro 2026-10-11: not the amplitude bar). Bar used uncut and undrilled;
-# clamp-on pivot block (point 25 from the bar end) and scriber block (scribers at 825 and
-# 841, 16.000 +/-0.025 apart), both from the approved 1018 3/4 x 1-1/2 bar, slot 6.45
-# +0.05/0, 10-24 set screws and a 10-24 SHCS split clamp; points from the 1/4 in O1 rod,
-# hardened (tools.map-torch-kit, consumables.quench-oil-canola). Set on the setting bar.
-[tools.rocker-trammel]
-name = "Trial shop-made rocker template trammel, 1018 quarter-inch square bar"
-# Source access: All Metals 3/4 x 1-1/2 1018 page read 2026-10-12 confirms section; Abrams product URL returned unrelated GTC PDF, so no O1 product dimensions were freshly verified.
-kind = "trammel"
-shop_made = true
-cad = "ch_rocker_arm_tl_trammel"
-# Historical note (retained, superseded by the trial identity below): "Shop-made, not yet made (verify = true). Pivot pin 25 from the pivot-end face; R800 scriber at 825, R816 scriber at 841. Proven on the setting bar (H0/H800/H816) before and after scribing."
-# Identity/ownership: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "hypothetical visual identity, package-label and shop-shelf inspection".
-# Basis: Pedro-authorized trial ownership/identity assumption (#1413); not a real receipt, owned-tool sighting or shop measurement.
-present = true
-verify = false
-note = "Trial assumed made and present: pivot pin 25 mm from pivot-end face; scribers 825 and 841 mm from that face give 800 and 816 mm pivot radii. Those positions remain authored targets, not surveyed measurements. Proven-on-setting-bar statement is hypothetical; PR1c decision 3 will revisit ch_rocker_arm_tl_* fixture geometry. Hypothetical identity and ownership only; remeasure and establish actual ownership before shop use."
-source = "bar: Online Metals 1018 CF 1/4 sq x 36 in, part 7088, $4.60 (https://www.onlinemetals.com/en/buy/carbon-steel/0-25-carbon-steel-square-bar-1018-cold-finish/pid/7088); blocks: All Metals 1018 CR 3/4 x 1-1/2, $10.20 sale, cut length not shown (https://allmetalsinc.com/products/steel-cold-rolled-flat-bar-3-4-x-1-1-2-grade-1018); points: Abrams O1 drill rod 1/4 x 36, $11.12 search listing (https://us.abrams-industries.com/steel/tool-steel/o1/dr-36); all purchases approved by Pedro 2026-10-11"
-# Basis: tools.rocker-trammel.material: Retained authored 1018 material selection. Online Metals source URLs currently return 403; original source attribution is preserved, not claimed freshly verified.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "package-label and material-marking inspection"; scalar/vector/text-only schema.
-material = "1018 cold-finished steel"
-# Basis: tools.rocker-trammel.length_mm: Retained authored 36-inch supply length x 25.4 = 914.4 mm; finished full-length trial estimate, not made-item metrology.
-length_mm = { value = 914.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: tools.rocker-trammel.width_mm: Retained authored quarter-inch square width = 6.35 mm or one-inch rectangular width = 25.4 mm, respectively; exact nominal conversion, finished-width trial estimate.
-width_mm = { value = 6.35, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, bar across broad faces" } }
-# Basis: tools.rocker-trammel.thickness_mm: Retained authored quarter-inch bar thickness x 25.4 = 6.35 mm; finished-thickness trial estimate.
-thickness_mm = { value = 6.35, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, bar across thin faces" } }
-
-[tools.rocker-trammel.members."R800"]
-# Basis: tools.rocker-trammel.members."R800".length_mm: Exact authored nominal centre-to-scriber radius or centre-to-centre setting span, offset zero; authorized finished-tool trial estimate, not surveyed shop geometry.
-length_mm = { value = 800, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital position readout and fitted setting pins, successive transfers along bar" } }
-
-[tools.rocker-trammel.members."R816"]
-# Basis: tools.rocker-trammel.members."R816".length_mm: Exact authored nominal centre-to-scriber radius or centre-to-centre setting span, offset zero; authorized finished-tool trial estimate, not surveyed shop geometry.
-length_mm = { value = 816, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital position readout and fitted setting pins, successive transfers along bar" } }
-
-[gauges.rocker-trammel-setting-bar]
-name = "Trial shop-made 1018 trammel setting bar, quarter-inch by one-inch"
-# Source access: original Online Metals product URL returned HTTP 403 on 2026-10-12; original citation remains historical, not falsely claimed live verification.
-kind = "setting_bar"
-cad = "ch_rocker_arm_tl_trammel_setting_bar"
-shop_made = true
-# Historical note (retained, superseded by the trial identity below): "Holes at 0, 800.00 and 816.00 set by the X DRO in three shifts of the bar; good to about +/-0.05 only if the DRO scale is right (checklist A4). Not yet made (verify = true)."
-# Identity/ownership: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "hypothetical visual identity, package-label and shop-shelf inspection".
-# Basis: Pedro-authorized trial ownership/identity assumption (#1413); not a real receipt, owned-tool sighting or shop measurement.
-present = true
-verify = false
-note = "Trial assumed made and present: holes H0/H800/H816 at authored 0, 800 and 816 mm. Finished hole positions and DRO scale accuracy are not certified; PR1c decision 3 will revisit ch_rocker_arm_tl_* fixture geometry. Hypothetical identity and ownership only; remeasure and establish actual ownership before shop use."
-source = "Online Metals 1018 CF 1/4 x 1 x 36 in, part 7465, $12.83 (https://www.onlinemetals.com/en/buy/carbon-steel/0-25-x-1-carbon-steel-rectangle-bar-1018-cold-finish/pid/7465); purchase approved by Pedro 2026-10-11"
-# Basis: gauges.rocker-trammel-setting-bar.material: Retained authored 1018 material selection. Online Metals source URLs currently return 403; original source attribution is preserved, not claimed freshly verified.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "package-label and material-marking inspection"; scalar/vector/text-only schema.
-material = "1018 cold-finished steel"
-# Basis: gauges.rocker-trammel-setting-bar.length_mm: Retained authored 36-inch supply length x 25.4 = 914.4 mm; finished full-length trial estimate, not made-item metrology.
-length_mm = { value = 914.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital calipers, overall length between end faces" } }
-# Basis: gauges.rocker-trammel-setting-bar.width_mm: Retained authored quarter-inch square width = 6.35 mm or one-inch rectangular width = 25.4 mm, respectively; exact nominal conversion, finished-width trial estimate.
-width_mm = { value = 25.4, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, bar across broad faces" } }
-# Basis: gauges.rocker-trammel-setting-bar.thickness_mm: Retained authored quarter-inch bar thickness x 25.4 = 6.35 mm; finished-thickness trial estimate.
-thickness_mm = { value = 6.35, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "outside micrometer, bar across thin faces" } }
-# Basis: gauges.rocker-trammel-setting-bar.resolution_mm: Retained authored approximate +/-0.05 mm setting capability; 0.05 mm is a trial gauge readout/setting increment, not DRO calibration or positional acceptance.
-resolution_mm = { value = 0.05, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "DRO cross-check and fitted setting-pin comparison" } }
-# Basis: gauges.rocker-trammel-setting-bar.range_mm: Authored nominal setting distances H0-H800/H816 only; not surveyed hole centre distances.
-# Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "DRO and gauge pins, setting-hole centre separation"; scalar/vector/text-only schema.
-range_mm = [800, 816]
-
-[gauges.rocker-trammel-setting-bar.members."H0-H800"]
-# Basis: gauges.rocker-trammel-setting-bar.members."H0-H800".length_mm: Exact authored nominal centre-to-scriber radius or centre-to-centre setting span, offset zero; authorized finished-tool trial estimate, not surveyed shop geometry.
-length_mm = { value = 800, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital position readout and fitted setting pins, successive transfers along bar" } }
-
-[gauges.rocker-trammel-setting-bar.members."H0-H816"]
-# Basis: gauges.rocker-trammel-setting-bar.members."H0-H816".length_mm: Exact authored nominal centre-to-scriber radius or centre-to-centre setting span, offset zero; authorized finished-tool trial estimate, not surveyed shop geometry.
-length_mm = { value = 816, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital position readout and fitted setting pins, successive transfers along bar" } }
-
-# Template-making extra (route 2.1 "Pivot plate"; Pedro 2026-10-14: every shop-made item the
-# route uses gets CAD). An offcut of the approved 1018 3/4 x 1-1/2 bar, screwed to the MDF
-# scribing board; the trammel's 60 degree pivot point runs in its centre-drilled 60 degree cone.
-# Geometry comes from the CAD spec; not yet made, so verify = true.
-[fixtures.trammel-pivot-plate]
-name = "Trial shop-made rocker trammel pivot plate, 1018 offcut with a No. 2 centre-drilled cone"
-kind = "custom"
-shop_made = true
-cad = "ch_rocker_arm_tl_trammel_pivot_plate"
-verify = true
-material = "1018 cold-rolled steel"
-note = "Template-making extra (CAD part ch_rocker_arm_tl_trammel_pivot_plate, MHA-CH-006-TL-19): screwed to the MDF scribing board; the trammel pivot point (MHA-CH-006-TL-18) runs in its 60 degree centre-drilled cone while R800/R816 are scribed. Not yet made."
-
 [fixtures.trammel-board-mdf]
 name = "MDF scribing board 3/4 in, 2 x 4 ft, cut to 1000 x 610 on the owned bench"
 kind = "custom"
@@ -5083,7 +4998,7 @@ name = "Bernzomatic Max Heat torch kit with MAP-Pro cylinder"
 kind = "torch"
 purchase = "Bernzomatic Max Heat torch kit with MAP-Pro cylinder (purchase approved by Pedro 2026-10-11)"
 source = "L&M Supply, $64.99 (https://www.landmsupply.com/bernzomatic-max-heat-torch-kit-w-map-pro-cylinder), read 2026-10-11"
-note = "Hardens the O1 trammel points and template; temper in the kitchen oven."
+note = "Hardens the O1 template; temper in the kitchen oven."
 
 [consumables.quench-oil-canola]
 name = "canola oil (O1 quench), about 1 qt in a steel can with a lid"
@@ -5290,16 +5205,6 @@ products = ["Zig-Zag 1-1/4 rolling papers, any shop (https://zigzag.com/blogs/le
 name = "Norton Metalite K225 aluminium-oxide cloth roll, 1 in x 50 yd, P180 and P320"
 # Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "steel rule, roll width"; the consumable schema holds no numbers.
 products = ["Norton K225 Metalite cloth roll 1 in x 50 yd (https://www.amazon.com/Norton-Metalite-Abrasive-Backing-Aluminum/dp/B0002FSRM6)"]
-
-# PROPOSED, not approved (Pedro 2026-10-11: not owned). Feeler gauges are dropped: the
-# template is accepted by DTI null and the light-gap check needs none.
-[tools.tap-10-24-spiral-point]
-name = "10-24 HSS spiral-point tap (PROPOSED purchase) with 10-24 screws"
-kind = "tap"
-present = false
-purchase = "PROPOSED, awaiting Pedro: Tap America T/A57097 10-24 HSS 2-flute spiral-point tap; Bolt Depot 8474 10-24 x 3/8 cup-point set screws (6); Bolt Depot 5008 10-24 x 3/4 SHCS (100)"
-source = "DrillsandCutters.com $6.24 (https://drillsandcutters.com/10-24-hss-2-flute-spiral-point-tap-tap-america/); Bolt Depot 8474 $0.10 each search listing (https://boltdepot.com/Product-Details?product=8474); Bolt Depot 5008 $7.89/100 search listing (https://boltdepot.com/Product-Details?product=5008)"
-note = "Taps the trammel block set-screw and clamp holes (#25 tap drill)."
 
 # --- pivot-bracket additions ---
 

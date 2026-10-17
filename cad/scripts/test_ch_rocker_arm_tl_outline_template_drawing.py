@@ -12,7 +12,6 @@ import pytest
 import _config
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_outline_template_spec as spec
-import ch_rocker_arm_tl_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_outline_template as drawing
 import export_features
 from _paths import CAD_ROOT
@@ -128,11 +127,12 @@ def test_straight_edges_sit_mid_zone_along_their_own_normals(
         )
 
 
-def test_arcs_stay_on_the_trammel_and_their_mid_zone_residual_is_bounded() -> None:
-    """Both arcs keep the trammel's radii about a centre raised by half the
+def test_arcs_keep_the_rocker_radii_and_their_mid_zone_residual_is_bounded() -> None:
+    """Both arcs keep the rocker's R800/R816 about a centre raised by half the
     zone: mid-zone on the mirror line, short of it by half the zone times
     (1 - cos phi) off it, within the printed radius's budgeted end drift."""
-    assert (spec.R_TOP, spec.R_BOTTOM) == trammel.TEMPLATE_RADII
+    assert (spec.R_TOP, spec.R_BOTTOM) == (rocker.R_TOP, rocker.R_BOTTOM)
+    assert (spec.R_TOP, spec.R_BOTTOM) == (800.0, 816.0)
     assert math.isclose(spec.CENTER_Y - _ROCKER_CENTRE_Y, _MID_ZONE, abs_tol=1e-9)
     for name, radius, end_x in (
         ("top", spec.R_TOP, spec.TOP_END_X),

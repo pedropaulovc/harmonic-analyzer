@@ -64,7 +64,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ),
     # Fixture builders apply the same bands their specs publish on the sheet.
     ("build_ch_rocker_arm_tl_outline_template", "band"): ("DRAWING_BANDS", "values"),
-    ("build_ch_rocker_arm_tl_trammel_setting_bar", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_v_block", "band"): ("DRAWING_BANDS", "values"),
