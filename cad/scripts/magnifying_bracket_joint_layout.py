@@ -45,7 +45,8 @@ LEVER_HOLE_POINTS = tuple(
     (x - LEVER_ORIGIN_X, 0.0, LEVER_FRONT_LOCAL_Z) for x in SCREW_MACHINE_X
 )
 # A flush head would put this screw's full thread beyond the 5.08 front rib.
-# The shallow counterbore instead leaves a bearing floor and a visible head.
+# The heads instead bear on the flange's front face, no counterbore, inside a
+# head-clearance circle (still named COUNTERBORE_DIA) that keeps their float.
 COUNTERBORE_DIA = 3.8  # no counterbore: the head-clearance circle of the wall asserts
 COUNTERBORE_DEPTH = 0.0  # no counterbore
 CLEARANCE_SPEC = HoleSpec("clearance", "#2", fit="normal")
