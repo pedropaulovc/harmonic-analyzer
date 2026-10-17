@@ -2340,6 +2340,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "ch_rocker_arm_tl_outline_template_spec",
         # Drilled-hole row bounds the hub's supply bore under the Ø6.50 ream.
         "ch_rocker_hub_spec",
+        # Edge-break row takes the tap mouths off the carrier taps' engagement.
+        "ch_rocker_arm_tl_oblique_carrier_spec",
         "dt_crankshaft_spec",
         "error_budget",
         "export_features",

@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-oblique-hub-pin:
+  title: Rocker Oblique Trammel HUB Locator Pin
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-25
+  material: 1144 stress-proof steel
+  material_specification: 1144 stress-proof cold-drawn round, 3/4 in
+  finish: as turned
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turn the head, the press seat and the strap locator in one chucking, the locator left long to the supply length; part off and face the head; lead chamfer the top; the top is faced to fit and chamfered again at assembly"

@@ -1,0 +1,18 @@
+ch-rocker-arm-tl-oblique-carrier:
+  title: Rocker Oblique Trammel Carrier Plate
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-21
+  # The pin holes are reamed and the plate must stay flat on two pins:
+  # a stable, free-machining plate grade.
+  material: 6061-T6 aluminium
+  material_specification: 6061-T6 aluminium plate, 12 thick, ASTM B209
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "saw and mill plate to 520 x 130; drill and ream the four pivot-pin holes; chamfer each pin hole's underside edge 0.3 min x 45 deg; centre-drill the HUB and CL spots; drill and tap the CR, riser and feed-lever holes; break edges"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "the 2X 5/16-18 UNC feed-lever taps"
+      finding: "engagement 9.53 min (1.20D) in the 12 plate, under 1.5D (rule 18)"
+      reason: "12 plate cannot hold 1.5D of 5/16-18 and the feed lever only takes hand load; the shortfall is stated in the tap callout (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
