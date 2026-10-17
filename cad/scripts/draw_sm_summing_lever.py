@@ -848,7 +848,7 @@ def _plate_section(adapter: Any, top: Any) -> list[Any]:
     rebuild_drawing(adapter, label="section C-C cut face only")
     if not cut.GetDisplayOnlySurfaceCut():
         raise RuntimeError("section C-C retained geometry beyond the cutting plane")
-    set_hidden_lines_removed(adapter, native)
+    _hidden_lines_removed_without_greyed_pass(native)
     anchor = _metres(_PLATE_SECTION_ANCHOR_MM)
     above = _metres(
         (_PLATE_SECTION_ANCHOR_MM[0], 1.0, _PLATE_SECTION_ANCHOR_MM[2])
@@ -1045,7 +1045,7 @@ def _tap_section(adapter: Any, front: Any) -> Any:
         f"section H-H arrows {tuple(cut.GetArrowInfo() or ())!r}, "
         f"letters {tuple(cut.GetTextInfo() or ())!r}"
     )
-    set_hidden_lines_removed(adapter, native)
+    _hidden_lines_removed_without_greyed_pass(native)
     anchor = _metres(_TAP_SECTION_ANCHOR_MM)
     above = _metres((_TAP_SECTION_ANCHOR_MM[0], 1.0, _TAP_SECTION_ANCHOR_MM[2]))
     for attempt in range(3):
@@ -1168,28 +1168,39 @@ def _tap_section(adapter: Any, front: Any) -> Any:
 
 
 _SW_HIDDEN = 2  # swDisplayMode_e.swHIDDEN: hidden lines removed
+_SW_SHADED = 3  # swDisplayMode_e.swSHADED: shows no hidden edge either
 
 
 def _hidden_lines_removed_without_greyed_pass(view: Any) -> None:
-    """Set ``view`` hidden-lines-removed straight from its placed mode.
+    """Set a sheet-1 ``view`` hidden-lines-removed, never showing hidden lines.
 
     set_hidden_lines_removed passes through hidden-lines-visible to force a
-    regen, and that pass is where the bracket taps' "#2-56 Tapped Hole" label,
-    their threads hidden behind the plate, sometimes grew on the plan and
-    sometimes not: farm 2026-10-17, ba33167e logged it first right after the
-    pass, 2fa756e1 never had it (#1591).  Straight after placement nothing is
-    attached yet, so the regen is not needed; farm seats place these views in
-    HLR already (802e4117), where the set is a no-op that reads back HLR.
+    regen.  That pass is where the bracket taps' "#2-56 Tapped Hole" label,
+    their threads hidden behind the plate in every sheet-1 view, grew on some
+    builds only (#1591, farm 2026-10-17): on the plan right after its pass
+    (ba33167e's stage log), on section C-C (493638fa), on neither in
+    2fa756e1 and 802e4117 -- the one note the sweep's count varied by.  Each
+    caller sets the view straight after creating it, before anything is
+    attached, so the regen is not needed.  Farm seats place these views in
+    HLR already (802e4117), where the set is a no-op; a view placed with draft
+    cosmetic threads is regenerated through shaded instead, which shows no
+    hidden edge, so the precision threads the greyed pass gave still hold.
     """
     bound = _early_bound(view, "IView")
-    placed = int(bound.GetDisplayMode2())
+    placed = (int(bound.GetDisplayMode2()), bool(bound.GetCThreadQuality()))
     bound.SetDisplayMode4(False, _SW_HIDDEN, False, False, True)
-    mode = int(bound.GetDisplayMode2())
-    if mode != _SW_HIDDEN:
+    if not bool(bound.GetCThreadQuality()):
+        bound.SetDisplayMode4(False, _SW_SHADED, False, False, True)
+        bound.SetDisplayMode4(False, _SW_HIDDEN, False, False, True)
+    settled = (int(bound.GetDisplayMode2()), bool(bound.GetCThreadQuality()))
+    if settled != (_SW_HIDDEN, True):
         raise RuntimeError(
-            f"failed to set hidden-lines-removed drawing view (mode reads {mode})"
+            f"failed to set precise hidden-lines-removed drawing view "
+            f"(mode, precise threads) read {settled}"
         )
-    _telemetry.info(f"{bound.GetName2()} placed in display mode {placed}, now HLR")
+    _telemetry.info(
+        f"{bound.GetName2()} placed as (mode, precise threads) {placed}, now HLR"
+    )
 
 
 def _log_thread_labels(adapter: Any) -> None:
@@ -1492,7 +1503,7 @@ async def build(adapter: Any) -> dict[str, str]:
         base_view=front,
     ):
         detail = _knife_detail(adapter, front)
-        set_hidden_lines_removed(adapter, detail)
+        _hidden_lines_removed_without_greyed_pass(detail)
         detail_annotations = curate_hidden_dimensions(
             adapter,
             detail,
@@ -1521,7 +1532,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _assert_knife_ridge_radius(adapter, detail_annotations)
     ridge_detail = _ridge_detail(adapter, detail)
-    set_hidden_lines_removed(adapter, ridge_detail)
+    _hidden_lines_removed_without_greyed_pass(ridge_detail)
     _knife_ridge_angle(adapter, ridge_detail)
     _ridge_datum(adapter, ridge_detail)
     _apply_callouts(
@@ -1958,7 +1969,8 @@ async def build(adapter: Any) -> dict[str, str]:
         # main's 3 on the plan's lever taps, the bracket taps' one on the back
         # view and the receiver iso's 3 (7, farm 2026-10-09), plus section
         # H-H's cosmetic-thread import (farm r18 2026-10-17).  No sheet-1 view
-        # shows the bracket taps' threads, so none can grow their label (#1591).
+        # passes through hidden-lines-visible, where the bracket taps' label
+        # grew on some builds only (#1591).
         expected_redundant_notes=8,
     )
 
