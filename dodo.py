@@ -3765,6 +3765,19 @@ def task_check():
         # cannot see: runtime-read data, scanned sources, dodo.py, and the tooling
         # modules module_deps_of excludes. test_dodo_recipe pins the invariant.
         executed = _executed_closure(spec["cmd"])
+        cmd = spec["cmd"]
+        if cmd[: len(pytest_cmd)] == pytest_cmd:
+            # _run_subprocess always uses REPO_ROOT as cwd. Keep the same explicit
+            # test selection/rootdir/conftest discovery without repeating a long
+            # farm snapshot root hundreds of times (Windows CreateProcess: 32767
+            # characters). Derive dependencies above from the original paths.
+            cmd = [
+                *pytest_cmd,
+                *(
+                    str(Path(arg).relative_to(REPO_ROOT))
+                    for arg in cmd[len(pytest_cmd) :]
+                ),
+            ]
         yield {
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),
@@ -3773,7 +3786,7 @@ def task_check():
             "targets": [stamp, *spec.get("targets", [])],
             "actions": [
                 (_run_stamped, [
-                    spec["cmd"], spec.get("label", f"check {name}"),
+                    cmd, spec.get("label", f"check {name}"),
                     stamp, f"check:{name}",
                 ])
             ],
