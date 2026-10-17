@@ -3228,6 +3228,10 @@ def view_f_dimension(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         drawing, "rebuild_drawing", lambda _adapter, *, label: calls.append(("rebuild", label)),
     )
+    monkeypatch.setattr(
+        drawing, "_clear_hub_width_datum",
+        lambda _adapter, annotation, dimension, *, label: calls.append(("clear", label)),
+    )
 
     def reset(**changes) -> None:
         state.update(
@@ -3254,7 +3258,7 @@ def test_hub_width_datum_attaches_to_the_reselected_native_hub_width(view_f_dime
     assert env.calls == [
         "ClearSelection2", ("SelectByID2", ("RD3@Drawing View2", "DIMENSION")),
         "InsertDatumTag2", ("SetPosition2", (*drawing.HUB_WIDTH_DATUM_XY, 0.0)),
-        "ClearSelection2", ("rebuild", "hub width datum G"),
+        "ClearSelection2", ("rebuild", "hub width datum G"), ("clear", "hub width datum G"),
     ]
     # An unattached tag is offered the display dimension, then its annotation.
     env.reset(attached_count=0, accepts=(env.fresh.GetAnnotation(),))
@@ -3292,6 +3296,131 @@ def test_hub_width_datum_refuses_an_unproven_dimension_attachment(
     env.reset(**changes)
     with pytest.raises(RuntimeError, match=message):
         drawing._hub_width_datum(env.adapter, env.view, env.imported)
+
+
+# Run 20261017T024838726Z's audit: the HubLength -Z arrow (85.6,142.2)->(82.0,
+# 141.8) mm stood 1.89 mm from G's letter [87.5,140.3]..[91.1,143.9] mm.
+_HUB_WIDTH_ARROW = Segment(0.0856, 0.1422, 0.0820, 0.1418, "arrow")
+_COLLAPSED_G = Box(0.0875, 0.1403, 0.0911, 0.1439)
+
+
+def _shifted(box: Box, dx: float) -> Box:
+    return Box(box.xmin + dx, box.ymin, box.xmax + dx, box.ymax)
+
+
+def test_hub_width_datum_air_measures_the_audit_arrow_gap(monkeypatch: pytest.MonkeyPatch) -> None:
+    datum = AnnotationGeometry("datum G", "datum", "right", text_boxes=(_COLLAPSED_G,))
+    width = AnnotationGeometry(
+        "dim HubLength", "dim", "right",
+        text_boxes=(Box(0.030, 0.150, 0.050, 0.160),),
+        segments=(_HUB_WIDTH_ARROW, Segment(0.0644, 0.1422, 0.0856, 0.1422, "dim-line")),
+    )
+    records = {"tag": {"name": "G"}, "dim": {"name": "HubLength"}}
+    geometry = {"G": datum, "HubLength": width}
+    monkeypatch.setattr(drawing, "_Reader", lambda _adapter: SimpleNamespace(take_errors=dict))
+    monkeypatch.setattr(drawing, "_dump_annotation", lambda _reader, raw: records[raw])
+    monkeypatch.setattr(drawing, "calibrate_sheet_advance", lambda _records: 0.6)
+    monkeypatch.setattr(
+        drawing, "annotation_geometry", lambda record, *, owner, advance: geometry[record["name"]],
+    )
+    gap, text_air, arrow_right, letter = drawing._hub_width_datum_air(
+        None, "tag", "dim", label="hub width datum G",
+    )
+    assert gap == pytest.approx(0.00189, abs=1e-5)
+    assert gap < drawing.ARROW_TEXT_CLEARANCE_M
+    assert arrow_right == pytest.approx(0.0856)
+    assert letter == _COLLAPSED_G
+    assert text_air == pytest.approx(math.hypot(0.0875 - 0.050, 0.150 - 0.1439))
+    geometry["G"] = AnnotationGeometry("datum G", "datum", "right")
+    with pytest.raises(RuntimeError, match="no printed letter"):
+        drawing._hub_width_datum_air(None, "tag", "dim", label="hub width datum G")
+
+
+@pytest.fixture
+def g_readback(monkeypatch: pytest.MonkeyPatch):
+    """G's tag whose printed letter follows each SetPosition2 x after a rebuild."""
+    state = {"position": (0.0893, 0.142, 0.0), "letter": _COLLAPSED_G, "moves": [],
+             "follows": True, "dangling": False}
+    calls: list = []
+
+    def set_position(x: float, y: float, z: float) -> bool:
+        state["moves"].append((x, y, z))
+        if state["follows"]:
+            state["letter"] = _shifted(state["letter"], x - state["position"][0])
+            state["position"] = (x, y, z)
+        return True
+
+    annotation = SimpleNamespace(
+        GetPosition=lambda: state["position"], SetPosition2=set_position,
+        IsDangling=lambda: state["dangling"],
+    )
+
+    def air(_adapter, _annotation, _dimension, *, label):
+        letter = state["letter"]
+        gap = segment_box_distance(_HUB_WIDTH_ARROW, letter)
+        return gap, state.get("text_air", 0.0375), 0.0856, letter
+
+    monkeypatch.setattr(drawing, "_hub_width_datum_air", air)
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing", lambda _adapter, *, label: calls.append(("rebuild", label)),
+    )
+    return SimpleNamespace(annotation=annotation, state=state, calls=calls)
+
+
+def _clear_g(env) -> None:
+    drawing._clear_hub_width_datum(None, env.annotation, None, label="hub width datum G")
+
+
+def test_hub_width_datum_left_clear_is_not_moved(g_readback) -> None:
+    env = g_readback
+    env.state.update(position=(*drawing.HUB_WIDTH_DATUM_XY, 0.0), letter=_shifted(_COLLAPSED_G, 0.0043))
+    _clear_g(env)
+    assert env.state["moves"] == [] and env.calls == []
+
+
+def test_hub_width_datum_collapsed_onto_the_arrow_returns_to_its_requested_x(g_readback) -> None:
+    env = g_readback
+    _clear_g(env)
+    ((x, y, z),) = env.state["moves"]
+    assert (x, y, z) == pytest.approx((drawing.HUB_WIDTH_DATUM_XY[0], 0.142, 0.0))
+    assert env.calls == [("rebuild", "hub width datum G correction 1")]
+    gap = segment_box_distance(_HUB_WIDTH_ARROW, env.state["letter"])
+    assert gap >= drawing.ARROW_TEXT_CLEARANCE_M
+    assert env.state["letter"].xmax <= drawing.HUB_WIDTH_DATUM_XMAX
+
+
+def test_hub_width_datum_honoured_but_near_moves_on_by_the_shortfall(g_readback) -> None:
+    """At its requested x but printed near: on by the shortfall plus the settle."""
+    env = g_readback
+    env.state["position"] = (*drawing.HUB_WIDTH_DATUM_XY, 0.0)
+    _clear_g(env)
+    ((x, _y, _z),) = env.state["moves"]
+    assert x - drawing.HUB_WIDTH_DATUM_XY[0] == pytest.approx(
+        0.0856 + drawing.ARROW_TEXT_CLEARANCE_M + drawing.PLACE_SETTLE_M - _COLLAPSED_G.xmin,
+    )
+
+
+@pytest.mark.parametrize("change,message", [
+    ({"follows": False}, "still near the hub width after 3 correction"),
+    ({"letter": _shifted(_COLLAPSED_G, 0.0125)}, "left witness"),
+    ({"text_air": 0.0}, "no clear x short of"),
+])
+def test_hub_width_datum_that_cannot_clear_fails_the_leaf(g_readback, change: dict, message: str) -> None:
+    env = g_readback
+    env.state.update(change)
+    if "text_air" in change:
+        env.state["letter"] = _shifted(_COLLAPSED_G, 0.0093)  # clear of the arrow, xmax 0.1004
+    with pytest.raises(RuntimeError, match=message):
+        _clear_g(env)
+    if change == {"follows": False}:
+        assert len(env.state["moves"]) == drawing.HUB_WIDTH_DATUM_CORRECTIONS
+
+
+def test_hub_width_datum_dangling_after_placement_fails(g_readback) -> None:
+    env = g_readback
+    env.state["dangling"] = True
+    with pytest.raises(RuntimeError, match="dangling"):
+        _clear_g(env)
 
 
 def test_strap_position_frame_locates_the_strap_width_to_g_on_its_size(view_f_dimension) -> None:

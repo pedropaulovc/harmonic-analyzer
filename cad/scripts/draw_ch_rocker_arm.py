@@ -47,6 +47,7 @@ from _gtol_planar import PlanarFace
 from _check import check
 from _com import _early_bound
 from _drawing_attachment import _assert_attached_to, _assert_leader_lands
+from _drawing_annotation_extent import PLACE_SETTLE_M
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -97,7 +98,7 @@ from _layout_audit import (
     calibrate_sheet_advance,
 )
 from _layout_geometry import (
-    Box, Segment, clip_segment_to_circle, point_segment_distance,
+    ARROW_TEXT_CLEARANCE_M, Box, Segment, clip_segment_to_circle, point_segment_distance,
     segment_box_distance, segment_circle_distance, text_overlap, union_boxes,
 )
 from _gtol_frame import gtol_frame_signature, gtol_frame_xml
@@ -1964,6 +1965,16 @@ HUB_WIDTH_DATUM_XY = (
     RIGHT_CENTER[0] + rocker.HUB_LENGTH / 2.0 * RIGHT_SCALE[0] / RIGHT_SCALE[1] / 1000.0 + 0.008,
     0.142,
 )
+# The requested x is not always honoured. Run 20261017T024838726Z rebuilt G's
+# letter at 87.5..91.1 mm, 1.89 mm off the -Z arrow (arrow-near-text), from
+# the same SetPosition2 and attach path that run 20261017T011527861Z and main
+# printed clear. So G is read back from its ink after the attaching rebuild:
+# if its letter stands nearer than the audit's ARROW_TEXT_CLEARANCE_M to a
+# hub-width arrow or to the hub width's text, it goes back to its requested
+# x (or on by the shortfall) and is read again. Still near after
+# HUB_WIDTH_DATUM_CORRECTIONS, or pushed onto that witness, fails the leaf.
+HUB_WIDTH_DATUM_CORRECTIONS = 3
+HUB_WIDTH_DATUM_XMAX = 0.105 - ARROW_TEXT_CLEARANCE_M
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
     "HubLength": HUB_LENGTH_TEXT_XY,
     "StrapThickness": STRAP_THICKNESS_TEXT_XY,
@@ -2579,13 +2590,81 @@ def _hub_width_datum(adapter: Any, view: Any, hub_length: Any) -> Any:
     letter = HUB_FACES.fields["datum"][0]
     if not tag.SetLabel(letter):
         raise RuntimeError(f"{label}: failed to label it {letter}")
+    tag_annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
     _attach_to_dimension(
-        adapter, _early_bound(tag.GetAnnotation(), "IAnnotation"), display,
+        adapter, tag_annotation, display,
         dimension_annotation, label=label, position=HUB_WIDTH_DATUM_XY,
     )
+    _clear_hub_width_datum(adapter, tag_annotation, dimension_annotation, label=label)
     if str(tag.GetLabel()) != letter:
         raise RuntimeError(f"{label}: label did not persist")
     return tag
+
+
+def _hub_width_datum_air(
+    adapter: Any, tag_annotation: Any, dimension_annotation: Any, *, label: str,
+) -> tuple[float, float, float, Box]:
+    """G's printed letter against the hub width, as the layout audit measures
+    them (``find_arrows_near_text``'s arrow and outside-arrow tail segments):
+    (arrow gap, text air, the arrows' right-most ink x, G's letter box)."""
+    reader = _Reader(adapter)
+    records = [_dump_annotation(reader, tag_annotation), _dump_annotation(reader, dimension_annotation)]
+    errors = reader.take_errors()
+    if any(record is None for record in records) or errors:
+        raise RuntimeError(f"{label}: cannot measure its ink: {errors!r}")
+    advance = calibrate_sheet_advance(records)
+    datum, width = (annotation_geometry(record, owner="right", advance=advance) for record in records)
+    letter = union_boxes(list(datum.text_boxes)) if datum is not None else None
+    if letter is None or width is None:
+        raise RuntimeError(f"{label}: no printed letter or hub width to measure")
+    arrows = [
+        *(segment for segment in width.segments if segment.role == "arrow"),
+        *getattr(width, "arrow_tails", ()),
+    ]
+    if not arrows:
+        raise RuntimeError(f"{label}: the hub width prints no arrows to measure against")
+    gap = min(segment_box_distance(segment, letter) for segment in arrows)
+    text_air = min((_box_air(letter, box) for box in width.text_boxes), default=math.inf)
+    return gap, text_air, max(max(segment.x0, segment.x1) for segment in arrows), letter
+
+
+def _clear_hub_width_datum(
+    adapter: Any, tag_annotation: Any, dimension_annotation: Any, *, label: str,
+) -> None:
+    """Read G back and move it outboard until its letter clears the hub
+    width's arrows and text by ARROW_TEXT_CLEARANCE_M (HUB_WIDTH_DATUM_CORRECTIONS)."""
+    for step in range(HUB_WIDTH_DATUM_CORRECTIONS + 1):
+        gap, text_air, arrow_right, letter = _hub_width_datum_air(
+            adapter, tag_annotation, dimension_annotation, label=label,
+        )
+        position = tuple(float(value) for value in (tag_annotation.GetPosition() or ()))
+        detail = (
+            f"{label}: step={step}, GetPosition={position}, letter_mm={letter.format_mm()}, "
+            f"arrow_gap_mm={gap * 1000.0:.3f}, text_air_mm={text_air * 1000.0:.3f}, "
+            f"required_mm={ARROW_TEXT_CLEARANCE_M * 1000.0:.3f}, xmax_limit={HUB_WIDTH_DATUM_XMAX}"
+        )
+        _telemetry.info(detail)
+        if letter.xmax > HUB_WIDTH_DATUM_XMAX:
+            raise RuntimeError(f"{label}: letter runs onto the front view's left witness: {detail}")
+        if gap >= ARROW_TEXT_CLEARANCE_M and text_air >= ARROW_TEXT_CLEARANCE_M:
+            if tag_annotation.IsDangling():
+                raise RuntimeError(f"{label}: dangling after its placement: {detail}")
+            return
+        if step == HUB_WIDTH_DATUM_CORRECTIONS or len(position) != 3:
+            break
+        # Back to the requested x when it reports inboard of it, else on by
+        # the shortfall (plus the settle margin the next read-back needs).
+        shift = max(
+            arrow_right + ARROW_TEXT_CLEARANCE_M - letter.xmin + PLACE_SETTLE_M,
+            ARROW_TEXT_CLEARANCE_M - text_air + PLACE_SETTLE_M,
+            HUB_WIDTH_DATUM_XY[0] - position[0],
+        )
+        if letter.xmax + shift > HUB_WIDTH_DATUM_XMAX:
+            raise RuntimeError(f"{label}: no clear x short of the front view's left witness: {detail}")
+        if not tag_annotation.SetPosition2(position[0] + shift, position[1], position[2]):
+            raise RuntimeError(f"{label}: failed to move it {shift * 1000.0:.3f} mm outboard: {detail}")
+        rebuild_drawing(adapter, label=f"{label} correction {step + 1}")
+    raise RuntimeError(f"{label}: still near the hub width after {step} correction(s): {detail}")
 
 
 def _dimension_position_frame(
