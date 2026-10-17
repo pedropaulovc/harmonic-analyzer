@@ -4028,3 +4028,111 @@ def test_prechips_empty_enrollment_has_no_tasks(monkeypatch, synthetic_prechips_
     assert list(dodo.task_prechips()) == []
     assert synthetic_prechips_kernel["discoveries"] == 0
     assert synthetic_prechips_kernel["queries"] == []
+
+
+@pytest.mark.parametrize("kind", ["part", "assembly", "gate"])
+@pytest.mark.parametrize("outcome", ["stored", "skip", "empty", "error", "off"])
+def test_forced_refresh_never_restores_and_requires_a_stored_result(
+    monkeypatch, tmp_path, kind, outcome
+):
+    import json
+    import _artifact_cache
+
+    monkeypatch.setattr(_artifact_cache, "prewarm", lambda: None)
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    dodo = _load_dodo()
+    labels = {"part": "part:pn_pen_rod", "assembly": "assembly:pn_pen", "gate": "verify:kinematics"}
+    label = labels[kind]
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+        "labels": [label], "reason": "Owner - Re-evaluate unchanged inputs",
+    }))
+    output = tmp_path / "result"
+    sidecar = tmp_path / "recipe"
+    builds = []
+    stores = []
+    refreshes = []
+    commands = []
+
+    def execute(cmd, *_args, **_kwargs):
+        builds.append(label)
+        commands.append(cmd)
+
+    monkeypatch.setattr(dodo, "_cache_key", lambda *_a: "a" * 64)
+    monkeypatch.setattr(
+        dodo._cache, "restore", lambda *_a: pytest.fail("refreshed leaf restored")
+    )
+    monkeypatch.setattr(dodo._cache, "note_refresh", lambda *args: refreshes.append(args))
+    monkeypatch.setattr(
+        dodo._cache, "store", lambda *args: stores.append(args) or outcome
+    )
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(0.0))
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(dodo, "_exec_com", execute)
+    monkeypatch.setattr(dodo, "_part_file_deps", lambda *_a: [])
+    monkeypatch.setattr(dodo, "_part_cache_outputs", lambda *_a: [output])
+    monkeypatch.setattr(dodo, "_stamp_part_execution", lambda *_a: None)
+    monkeypatch.setattr(dodo, "_assembly_file_deps", lambda *_a: [])
+    monkeypatch.setattr(dodo, "_assembly_cache_outputs", lambda *_a: [output])
+    monkeypatch.setattr(dodo, "_stamp_assembly_execution", lambda *_a: None)
+    monkeypatch.setattr(dodo, "_recipe_sidecar", lambda *_a: sidecar)
+    monkeypatch.setattr(dodo, "_recipe_files", lambda *_a: [])
+    if kind == "assembly":
+        # A matching local target must not launder the old cached assembly by
+        # taking the cheap reload path instead of rerunning its recipe.
+        output.write_bytes(b"old cached assembly")
+        sidecar.write_text(dodo._digest_files([]), encoding="utf-8")
+
+    def run():
+        if kind == "part":
+            dodo._cached_part_action("pn_pen_rod", tmp_path / "build.py")
+        elif kind == "assembly":
+            dodo.build_or_refresh("pn_pen", [], [], [str(output)])
+        else:
+            dodo._cached_com_action(label, ["gate"], [], [output], "gate")
+
+    if outcome == "stored":
+        run()
+    else:
+        with pytest.raises(RuntimeError, match="forced cache refresh did not store outputs"):
+            run()
+    assert builds == [label]
+    if kind == "assembly":
+        assert Path(commands[0][1]).name == "build_pn_pen_assembly.py"
+    assert stores == [("a" * 64, [output], label)]
+    # Both the first probe and under-seat re-probe bypassed restore.
+    assert refreshes == [(label, "a" * 64, "Owner - Re-evaluate unchanged inputs")] * 2
+
+
+def test_refresh_bypasses_each_cached_task_family_freshness(monkeypatch):
+    import json
+    import _artifact_cache
+
+    monkeypatch.setattr(_artifact_cache, "prewarm", lambda: None)
+    dodo = _load_dodo()
+    labels = [
+        "part:pn_pen_rod", "assembly:pn_pen", "drawing:pn_pen_rod",
+        "verify_soundness:pn_pen", "verify:kinematics",
+    ]
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+        "labels": labels, "reason": "Re-evaluate",
+    }))
+    monkeypatch.setattr(dodo, "_seat_part_order", lambda: ["pn_pen_rod"])
+    monkeypatch.setattr(dodo, "_drawing_order", lambda: ["pn_pen_rod"])
+    monkeypatch.setattr(dodo, "ASSEMBLY_ORDER", ["pn_pen"])
+    monkeypatch.setattr(dodo, "_part_file_deps", lambda *_a: [])
+    monkeypatch.setattr(dodo, "_assembly_file_deps", lambda *_a: [])
+    monkeypatch.setattr(dodo, "_drawing_file_deps", lambda *_a: [])
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda *_a: [])
+    monkeypatch.setattr(dodo, "_recipe_files", lambda *_a: [])
+    monkeypatch.setattr(dodo, "_soundness_file_deps", lambda *_a: [])
+    monkeypatch.setattr(dodo, "_kinematics_file_deps", lambda: [])
+    tasks = [
+        *dodo.task_part(), *dodo.task_assembly(), *dodo.task_drawing(),
+        *dodo.task_verify_soundness(),
+        *(task for task in dodo.task_verify() if task["name"] == "kinematics"),
+    ]
+    assert len(tasks) == len(labels)
+    for task in tasks:
+        assert False in task["uptodate"]
+        assert all(getattr(action[0], "_remote_cache_action", False) for action in task["actions"])

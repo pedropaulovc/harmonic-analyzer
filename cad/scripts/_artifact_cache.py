@@ -1,4 +1,4 @@
-r"""Remote build-artefact cache for the COM (SolidWorks) tasks.
+r"""Remote build-artefact cache for cache-keyed doit leaves.
 
 The expensive tasks in this pipeline -- ``part:<stem>`` / ``assembly:<stem>`` /
 ``drawing:<stem>`` -- drive a live SolidWorks seat. Their
@@ -46,13 +46,13 @@ Design notes / invariants:
   root, or finally
   ``_DEFAULT_MODE`` = ``rw``: both dev seats publish what they build by default,
   so neither rebuilds an artefact the other already produced. Drop a seat to
-  ``ro``/``off`` via the file or env. A miss -- or an unauthorised push (RBAC
-  denies a machine without the data-plane role) -- is never fatal: it falls
-  through to the real build.
+  ``ro``/``off`` via the file or env. A miss -- or an unauthorised ordinary push
+  (RBAC denies a machine without the data-plane role) -- falls through to the
+  real build. Explicit forced refreshes instead require successful publication.
 
-* **Fail-soft.** Any backend error (network, creds, corrupt archive) logs a
-  warning and is treated as a miss / no-op push. The cache can only make a build
-  FASTER, never make a correct build FAIL.
+* **Fail-soft unless explicitly refreshing.** Backend errors normally warn and
+  become misses/no-op pushes. A reasoned forced refresh deliberately replaces an
+  existing result and MUST publish successfully; a failed upload fails that task.
 
 * **Observable.** A cache miss must be explainable WITHOUT scrollback archaeology
   (issue #73). Three knobs, all best-effort and never able to fail a build:
@@ -108,6 +108,7 @@ import sys
 import tarfile
 import threading
 import time
+import unicodedata
 from pathlib import Path
 
 # Bump to invalidate EVERY cached entry pipeline-wide (e.g. after a change to the
@@ -493,6 +494,73 @@ class _BlobBackend:
 # --------------------------------------------------------------------------- #
 # Public surface
 # --------------------------------------------------------------------------- #
+def keyed_action(action):
+    """Mark a doit action that uses the shared remote-cache key/probe/store path."""
+    action._remote_cache_action = True
+    return action
+
+
+def validate_refresh_reason(reason: str | None) -> str:
+    """Validate human refresh metadata before any cache or farm side effect."""
+    if (
+        not isinstance(reason, str)
+        or not reason.strip()
+        or len(reason) > 160
+        or any(
+            unicodedata.category(char) in {"Cc", "Zl", "Zp"}
+            or char in "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+            for char in reason
+        )
+    ):
+        raise RuntimeError(
+            "--force-cache-refresh-reason / HARMONIC_CACHE_REFRESH reason must "
+            "be nonblank, single-line, free of control characters, and at most "
+            "160 characters"
+        )
+    try:
+        reason.encode("utf-8")
+    except UnicodeEncodeError:
+        raise RuntimeError(
+            "--force-cache-refresh-reason / HARMONIC_CACHE_REFRESH reason must "
+            "contain valid Unicode"
+        ) from None
+    return reason
+
+
+def forced_refresh(label: str) -> str | None:
+    """Read this invocation's explicit refresh set lazily, refusing bad carriers."""
+    raw = os.environ.get("HARMONIC_CACHE_REFRESH")
+    if raw is None:
+        return None
+    try:
+        request = json.loads(raw)
+    except (ValueError, RecursionError) as exc:
+        raise RuntimeError(f"HARMONIC_CACHE_REFRESH is not valid JSON: {exc}") from None
+    if not isinstance(request, dict) or not isinstance(request.get("labels"), list):
+        raise RuntimeError("HARMONIC_CACHE_REFRESH must contain a labels list and reason")
+    labels = request["labels"]
+    if not labels or any(not isinstance(item, str) or not item.strip() for item in labels):
+        raise RuntimeError("HARMONIC_CACHE_REFRESH labels must be non-empty task names")
+    reason = validate_refresh_reason(request.get("reason"))
+    if not writable():
+        raise RuntimeError("forced cache refresh requires HARMONIC_REMOTE_CACHE_MODE=rw")
+    return reason if label in labels else None
+
+
+def note_refresh(label: str, key: str, reason: str) -> None:
+    """Expose an intentionally skipped restore through every cache diagnostic."""
+    _warn(f"refresh {label} ({key[:12]}): {reason}")
+    _event("cache.refresh", label, key, reason=reason)
+    _record("refresh", label, key, reason=reason)
+
+
+def require_refresh_store(label: str, outcome: str) -> str:
+    """A requested refresh is successful only after the replacement is published."""
+    if forced_refresh(label) is not None and outcome != "stored":
+        raise RuntimeError(f"{label}: forced cache refresh did not store outputs ({outcome})")
+    return outcome
+
+
 def _mode() -> str:
     env = os.environ.get("HARMONIC_REMOTE_CACHE_MODE")
     if env:
@@ -977,6 +1045,12 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
 
 
 def store(key: str, outputs: list[Path], label: str) -> str:
+    """Publish outputs; an explicit refresh must never swallow a failed upload."""
+    forced_refresh(label)  # Validate the carrier/mode before touching the backend.
+    return require_refresh_store(label, _store(key, outputs, label))
+
+
+def _store(key: str, outputs: list[Path], label: str) -> str:
     """Pack+upload the just-built outputs under ``key``. No-op unless mode=rw.
     Swallows every error -- a failed push must not fail the build. Records the event
     in cache.jsonl and stamps the per-label "last published key" sidecar so a later
@@ -1012,7 +1086,7 @@ def store(key: str, outputs: list[Path], label: str) -> str:
         _record("store", label, key)
         return "stored"
     except Exception as exc:  # noqa: BLE001
-        _warn(f"store error for {label}: {exc!r} -- continuing")
+        _warn(f"store error for {label}: {exc!r}")
         _event("cache.store_error", label, key)
         _record("store_error", label, key)
         return "error"

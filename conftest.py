@@ -297,6 +297,16 @@ def _solidworks_autostart_off(monkeypatch):
     monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
 
 
+@pytest.fixture(autouse=True)
+def _cache_refresh_isolated(monkeypatch):
+    """Build refreshes must not change the synthetic graphs exercised by checks.
+
+    check:* subprocesses inherit their build's carrier, but a test's fake tasks
+    and cache modes are independent invocations. Tests of refresh set it explicitly.
+    """
+    monkeypatch.delenv("HARMONIC_CACHE_REFRESH", raising=False)
+
+
 @pytest.fixture
 def saved_native_bytes():
     """Build the observed native DisplayLists envelope for parser-backed tests."""

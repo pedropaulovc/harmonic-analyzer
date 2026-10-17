@@ -1167,7 +1167,7 @@ class _LeafControl:
     def __init__(self, requests):
         self.requests = requests
         self.request = _farm.LeafRequest(
-            farm_protocol_version=6,
+            farm_protocol_version=7,
             commit="c" * 40,
             task="part:pen_rod",
             cache_key="k" * 64,
@@ -1220,6 +1220,7 @@ class _LeafControl:
         assert records == [{
             "task": self.request.task, "workflow_id": self.workflow_id,
             "build_id": self.request.build_id, "farm_run": FARM_RUN,
+            "refresh_reason": None,
         }]
         return self.reserved
 

@@ -29,6 +29,7 @@ import _farm  # noqa: E402
 import build  # noqa: E402
 
 _RealFarmDoitMain = build._FarmDoitMain
+_RealRefreshDoitMain = build._RefreshDoitMain
 
 SHA = "c" * 40
 DISPLAY_NAME = "Test farm build"
@@ -614,7 +615,7 @@ def _install_real_doit(monkeypatch, namespace=None):
                     break
             return super().run(serial)
 
-    class FixtureLocalDoit(_RealDoitMain):
+    class FixtureLocalDoit(_RealRefreshDoitMain):
         def __init__(self):
             super().__init__(
                 task_loader=ModuleTaskLoader(task_namespace), extra_config=config
@@ -626,6 +627,7 @@ def _install_real_doit(monkeypatch, namespace=None):
 
     monkeypatch.setattr(build, "_FarmDoitMain", FixtureFarmDoit)
     monkeypatch.setattr(build, "DoitMain", FixtureLocalDoit)
+    monkeypatch.setattr(build, "_RefreshDoitMain", FixtureLocalDoit)
     return seen, executed
 
 
@@ -729,7 +731,7 @@ def test_farm_build_refuses_a_dirty_tree_before_contacting_the_fleet(
     assert executed == []
 
 
-PROTOCOL = 6
+PROTOCOL = 7
 AGENT_TAG = "7" * 16
 
 
@@ -746,7 +748,7 @@ def _worker(*, protocol=PROTOCOL, fresh=True, age_s=30, worker_id="swmaker000004
 
 
 def _agents_summary(**overrides):
-    """``farm.py agents --json``: one worker freshly reporting protocol 6."""
+    """``farm.py agents --json``: one worker freshly reporting protocol 7."""
     summary = {
         "farm_protocol_version": PROTOCOL,
         "verdict": "matched",
@@ -833,7 +835,7 @@ def test_successful_preflight_stamps_only_committed_head_without_mutating_refs(
         ["agents", "--json"]
     ]
     assert capsys.readouterr().out.splitlines()[:2] == [
-        "farm: protocol 6 on 1 worker(s)",
+        "farm: protocol 7 on 1 worker(s)",
         "farm: every SolidWorks task runs on the farm (parts, assemblies, "
         "drawings, verify:*, preflight, export, package:release)",
     ]
@@ -1010,7 +1012,7 @@ def test_default_build_target_carries_the_verify_gates_under_every_executor(
         ),
         (
             _agents_summary(farm_protocol_version=3),
-            "farm: pool CLI supports farm protocol 3, but this client requires 6",
+            "farm: pool CLI supports farm protocol 3, but this client requires 7",
         ),
         (
             _agents_summary(workers={"swmaker000004@4": "ready"}),
@@ -1070,7 +1072,7 @@ def test_an_unknown_fleet_verdict_blocks_with_the_invalid_token(
 
 def test_an_incompatible_fleet_stops_before_actions(monkeypatch, capsys):
     report = (
-        "farm protocol 6 is required, but the fleet reports:\n"
+        "farm protocol 7 is required, but the fleet reports:\n"
         "  protocol 3: swmaker000004@4 (3h 0m ago)\n"
         "Deploy a protocol-compatible agent."
     )
@@ -1150,7 +1152,7 @@ def test_current_compatible_worker_allows_an_aged_retired_unreadable_report(
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
     assert executed
-    assert "protocol 6" in capsys.readouterr().out.splitlines()[0]
+    assert "protocol 7" in capsys.readouterr().out.splitlines()[0]
 
 
 def test_a_sleeping_compatible_fleet_says_so(monkeypatch, capsys):
@@ -1164,7 +1166,7 @@ def test_a_sleeping_compatible_fleet_says_so(monkeypatch, capsys):
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
     status = capsys.readouterr().out.splitlines()[0]
-    assert "protocol 6" in status
+    assert "protocol 7" in status
     assert "no worker has reported within 120s" in status
     assert "last report of 1 worker(s)" in status
     assert "supports it" in status
@@ -1180,7 +1182,7 @@ def test_a_fleet_that_never_reported_says_compatibility_is_unconfirmed(
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
     status = capsys.readouterr().out.splitlines()[0]
-    assert "protocol 6" in status
+    assert "protocol 7" in status
     assert "no worker has ever reported" in status
     assert "unconfirmed" in status
 
@@ -1206,7 +1208,7 @@ def test_aged_out_compatible_reports_are_not_called_silence(monkeypatch, capsys)
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
     status = capsys.readouterr().out.splitlines()[0]
-    assert "protocol 6" in status
+    assert "protocol 7" in status
     assert "2 worker(s)" in status
     assert "more than 14d ago" in status
     assert "too old to prove the fleet is up" in status
@@ -1783,7 +1785,7 @@ def test_run_leaf_rejects_wrong_type_before_submission_or_request_record(
     temporal_boundary, tmp_path, monkeypatch
 ):
     calls, resolve = temporal_boundary
-    # A usable protocol-6 result cannot make an old coordinator type safe.
+    # A usable protocol-7 result cannot make an old coordinator type safe.
     resolve(_leaf_result())
     calls["workflow_type"] = "BuildFifo"
     requests = tmp_path / "run.requests"
@@ -2190,6 +2192,7 @@ def test_a_launcher_run_names_each_workflow_before_creating_it(
     assert named_at_start == [{
         "task": "part:pen_rod", "workflow_id": wf_id,
         "build_id": BUILD_ID, "farm_run": None,
+        "refresh_reason": None,
     }]
     assert len(calls["submit"]) == 1
 
@@ -2257,6 +2260,7 @@ def test_uncertain_submission_preserves_request_for_reconciliation(
         "workflow_id": f"leaf:{BUILD_ID}:part:pen_rod:" + "k" * 64 + ":900s",
         "build_id": BUILD_ID,
         "farm_run": None,
+        "refresh_reason": None,
     }]
     assert calls["handles"][-1] == ("solidworks-build-fifo-6", {})
 
@@ -2392,3 +2396,187 @@ def test_settled_unbound_reply_cannot_be_used_as_a_leaf_result(
         _farm.run_leaf("part:pen_rod", "k" * 64)
 
     assert calls["handles"] == [("solidworks-build-fifo-6", {})]
+
+
+@pytest.mark.parametrize("executor", ["local", "farm"])
+@pytest.mark.parametrize("reason", [
+    None, "", " \t", "x" * 161, "a\nb", "a\tb", "a\0b", "a\u0085b",
+    "a\u2028b", "a\u2029b", "a\u061cb", "a\u200eb", "a\u202eb", "a\u2066b",
+    "a\ud800b",
+])
+def test_refresh_reason_is_required_before_any_graph_or_fleet_work(
+    monkeypatch, capsys, executor, reason
+):
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setattr(
+        build, "_executing_command", lambda *_a: pytest.fail("parsed command before reason")
+    )
+    args = ["--executor", executor, "--force-cache-refresh", "part:x", "part:x"]
+    if reason is not None:
+        args.append(f"--force-cache-refresh-reason={reason}")
+    assert build.main(args) == 2
+    assert "--force-cache-refresh-reason" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("mode", ["ro", "off"])
+def test_refresh_refuses_nonwritable_cache_before_fleet_work(monkeypatch, capsys, mode):
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", mode)
+    monkeypatch.setattr(
+        build, "_executing_command", lambda *_a: pytest.fail("parsed command before mode")
+    )
+    assert build.main([
+        "--executor", "farm", "--force-cache-refresh", "part:x",
+        "--force-cache-refresh-reason", "Re-evaluate", "part:x",
+    ]) == 2
+    assert "requires HARMONIC_REMOTE_CACHE_MODE=rw" in capsys.readouterr().err
+
+
+def _refresh_namespace(monkeypatch, observed, target=None):
+    import _artifact_cache
+
+    @_artifact_cache.keyed_action
+    def record():
+        observed.append(json.loads(os.environ["HARMONIC_CACHE_REFRESH"]))
+
+    def task_leaf():
+        for stem in ("x", "other"):
+            yield {
+                "name": stem, "actions": [record],
+                "targets": [str(target)] if target is not None and stem == "x" else [],
+                "uptodate": [True],
+            }
+
+    return {
+        "task_leaf": task_leaf,
+        "task_check": lambda: {"actions": [lambda: pytest.fail("ran uncached task")]},
+        "task_group": lambda: {"actions": None, "task_dep": ["leaf:x"]},
+    }
+
+
+@pytest.mark.parametrize("executor", ["local", "farm"])
+@pytest.mark.parametrize(("label", "selector", "diagnostic"), [
+    ("missing", "missing", "unknown task 'missing'"),
+    ("check", "check", "not a remote-cache-keyed leaf"),
+    ("group", "group", "not a remote-cache-keyed leaf"),
+    ("leaf:other", "leaf:x", "not in the selected task closure"),
+])
+def test_refresh_refuses_unknown_uncached_and_unselected_labels(
+    monkeypatch, capsys, executor, label, selector, diagnostic
+):
+    observed = []
+    namespace = _refresh_namespace(monkeypatch, observed)
+    _install_real_doit(monkeypatch, namespace)
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setattr(build, "_farm_preflight", lambda: pytest.fail("fleet before selection"))
+    monkeypatch.setattr(build, "_require_leaf_admission", lambda *_a: pytest.fail("pool before selection"))
+    assert build.main([
+        "--executor", executor, "--force-cache-refresh", label,
+        "--force-cache-refresh-reason", "Re-evaluate unchanged inputs", selector,
+    ]) == 2
+    assert diagnostic in capsys.readouterr().err
+    assert observed == []
+    assert "HARMONIC_CACHE_REFRESH" not in os.environ
+
+
+@pytest.mark.parametrize("executor", ["local", "farm"])
+@pytest.mark.parametrize("inherited", [None, "previous carrier"])
+def test_refresh_runs_fresh_targets_with_scoped_deduplicated_carrier(
+    monkeypatch, tmp_path, executor, inherited
+):
+    observed = []
+    target = tmp_path / "fresh.out"
+    target.write_text("already built", encoding="utf-8")
+    namespace = _refresh_namespace(monkeypatch, observed, target)
+    _install_real_doit(monkeypatch, namespace)
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    if inherited is not None:
+        monkeypatch.setenv("HARMONIC_CACHE_REFRESH", inherited)
+    monkeypatch.setattr(build, "_farm_preflight", lambda: None)
+    reason = "  Owner - Re-evaluate Ω 👩\u200d🔧  "
+    args = [
+        "--executor", executor, "--force-cache-refresh", "leaf:x,leaf:other",
+        "--force-cache-refresh", "leaf:x", f"--force-cache-refresh-reason={reason}",
+        "group", "leaf:other",
+    ]
+    # Repeat the same invocation: a successful prior refresh must not consume it.
+    assert build.main(args) == 0
+    assert build.main(args) == 0
+    assert observed == [{"labels": ["leaf:x", "leaf:other"], "reason": reason}] * 4
+    assert os.environ.get("HARMONIC_CACHE_REFRESH") == inherited
+
+
+def test_refresh_farm_submitter_only_restores_after_the_worker_publishes(
+    farm_part, monkeypatch
+):
+    dodo, script, calls, restore = farm_part
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+        "labels": ["part:pen_rod"], "reason": "Re-evaluate",
+    }))
+    restore((True,))
+    dispatched = []
+    monkeypatch.setattr(
+        dodo._farm, "run_leaf",
+        lambda label, key: dispatched.append((label, key)) or _leaf_result(),
+    )
+    dodo._cached_part_action("pen_rod", script)
+    assert dispatched == [("part:pen_rod", "k" * 64)]
+    assert len(calls["restore"]) == 1
+    assert calls["store"] == []
+    assert calls["stamp"] == ["pen_rod"]
+
+
+def test_leaf_refresh_wire_and_durable_record_are_scoped_to_the_listed_task(
+    temporal_boundary, tmp_path, monkeypatch
+):
+    from dataclasses import asdict
+
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    requests = tmp_path / "requests"
+    requests.mkdir()
+    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(requests))
+    monkeypatch.setenv("HARMONIC_FARM_LEAF_TIMEOUT_S", "900")
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+        "labels": ["part:pen_rod"], "reason": "Re-evaluate unchanged inputs",
+    }))
+    assert _farm.FARM_PROTOCOL_VERSION == 7
+    _farm.run_leaf("part:pen_rod", "k" * 64)
+    _farm.run_leaf("check:math", None)
+    wire = [asdict(submission.request) for submission, _ in calls["submit"]]
+    assert [request["refresh_reason"] for request in wire] == [
+        "Re-evaluate unchanged inputs", None,
+    ]
+    records = {
+        record["task"]: record
+        for path in requests.iterdir()
+        for record in [json.loads(path.read_text(encoding="utf-8"))]
+    }
+    assert records["part:pen_rod"]["refresh_reason"] == wire[0]["refresh_reason"]
+    assert records["check:math"]["refresh_reason"] is None
+    assert records["part:pen_rod"]["workflow_id"] == (
+        f"leaf:{BUILD_ID}:part:pen_rod:{'k' * 64}:900s"
+    )
+
+
+def test_check_pytest_process_does_not_apply_its_builds_refresh_carrier():
+    environment = dict(os.environ)
+    environment["HARMONIC_REMOTE_CACHE_MODE"] = "rw"
+    environment["HARMONIC_CACHE_REFRESH"] = json.dumps({
+        "labels": ["part:x"], "reason": "Refresh an actual build, not test fixtures",
+    })
+    # This normal cache test expects an empty publication to remain fail-soft.
+    # Without suite isolation, the inherited request makes it raise instead.
+    result = subprocess.run(
+        [
+            sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+            "cad/scripts/test_artifact_cache.py::test_store_nothing_on_disk_logs_empty",
+        ],
+        cwd=REPO_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

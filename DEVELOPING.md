@@ -282,6 +282,8 @@ explicit way to stop a run, `-Cancel` (see
 | `-Targets` | yes | doit task names as ONE comma-separated string (`part:pn_pen_rod,part:dt_cone_gear`) |
 | `-LeafTimeout` | yes | per-attempt remote leaf budget in minutes, 1–180 |
 | `-DisplayName` | yes, Launch only | short owner/session plus reason; nonblank, single-line, no control characters, at most 160 characters; tracking commands such as `-Watch` do not require it |
+| `-ForceCacheRefresh` | no, Launch only | string array of exact remote-cache leaf task names; each string may also be comma-separated |
+| `-ForceCacheRefreshReason` | with refresh labels | why these cached outputs must be overwritten; same text/Unicode rules as `-DisplayName` |
 | `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
 
 An explicit `HARMONIC_AGENT_SCRATCHPAD` always wins. Otherwise, an OMP
@@ -315,13 +317,13 @@ Launcher stdout JSON and its logs use UTF-8, including detached Windows launches
 
 Every new leaf execution has coordinator-authored Temporal memo `display_name`,
 separate from optional launcher metadata `farm_run`. Neither label enters the
-workflow ID or cache key. Protocol 6 gives each build its own workflow ID,
+workflow ID or cache key. Protocol 7 retains the build-scoped workflow ID,
 `leaf:<build_id>:<task>:<cache key or commit[:16]>:<timeout_s>s`, and binds each
 accepted reservation to an exact workflow run. Builds can reuse cache artifacts,
 but never attach to another build's execution. The display label identifies
 the build that owns the execution.
 
-Old-protocol native logs are unsupported by the protocol-6 launcher, including
+Old native workflow-ID formats are unsupported by the launcher, including
 status inspection and remote cancellation. Finish or cancel those runs with
 their matched old tools **before** the coordinated cutover to an idle,
 physically drained fleet; there is no runtime legacy fallback. Cancellation
@@ -364,7 +366,7 @@ task still leaves the run nonzero.
 
 After successful preflight, the parent build creates a fresh timestamp-and-GUID
 `build_id` (`YYYYMMDDTHHMMSS.ffffffZ-32hex`), ignoring any inherited
-`HARMONIC_FARM_BUILD_ID`, and registers with the protocol-6 singleton
+`HARMONIC_FARM_BUILD_ID`, and registers with the protocol-7 fleet's singleton
 `solidworks-build-fifo-6` coordinator. After registration
 is acknowledged with an open, valid producer lease, its doit scheduler starts
 immediately, even with zero reserved capacity or ownership reported as waiting.
@@ -468,17 +470,16 @@ recreated as an empty singleton: that would forget accepted work and drain
 obligations. Recovery requires physical-drain evidence and a reviewed,
 snapshot-aware recovery or history reset, not another producer launch.
 
-Protocol 6 is a clean cutover, not a rolling upgrade over protocol 5 histories.
-The protocol-5 coordinator state is not replayed as protocol 6. The singleton
-`solidworks-build-fifo-6` uses workflow type `BuildFifo6`, and native leaf workflows
-use `BuildLeaf6`; neither old type is registered as an alias. A fresh protocol-6
-history requests the new type, so an old controller cannot execute its logic,
-even on the shared `solidworks-control` queue. Before registering a build or
-submitting/observing a leaf, the producer describes the current coordinator
-under the bounded RPC deadline and requires exactly `BuildFifo6`. A reused ID
-with any other workflow type is refused without updates, termination or replay;
-do not invoke it with new tools. The handle remains unpinned across
-continue-as-new. This identity check does not replace normal CLI protocol
+Protocol **7** is a hard wire cutover from protocol 6: both repositories advertise
+7 and exact-equality admission refuses older clients or workers. `LeafRequest`
+adds optional `refresh_reason`, validated before any work; only that leaf's child
+process receives the refresh carrier. No protocol-6 compatibility shim is provided.
+The existing coordinator/workflow identities are unchanged:
+`solidworks-build-fifo-6`, workflow type `BuildFifo6`, and native type `BuildLeaf6`.
+The producer still describes the coordinator under the bounded RPC deadline and
+requires exactly `BuildFifo6`; a reused ID with any other workflow type is refused
+without updates, termination or replay. The handle remains unpinned across
+continue-as-new. This type identity check does not replace wire-protocol
 preflight or the required coordinated cutover.
 Paired producer, pool coordinator and worker deployment
 requires an idle fleet with all old physical work drained, no outstanding
@@ -672,11 +673,11 @@ from stale identity data. Corrupt or conflicting metadata may still make
   Leaves come from the log plus `<run-id>.requests\`: the launcher sets
   `HARMONIC_FARM_REQUESTS` to that directory. The parent writes `build.json`
   with `{build_id, farm_run}`; `_farm._dispatch` atomically writes one
-  `{task, workflow_id, build_id, farm_run}` file before submitting a reservation
+  `{task, workflow_id, build_id, farm_run, refresh_reason}` file before submitting a reservation
   (a failed write fails the leaf before submission). Status also reports
   `build_id`, recovered from durable registration metadata or the registration
-  log and persisted in the run record. Native IDs encode their exact protocol-6
-  build scope and task directly; task parsing never needs registration metadata.
+  log and persisted in the run record. Native IDs encode their exact build
+  scope and task directly; task parsing never needs registration metadata.
   Before registration, a run has no `build_id` or native leaves and remains
   inspectable. Stopping the launcher can drop a logged request line but cannot
   erase the durable request.
@@ -851,7 +852,7 @@ cache-miss followed by a restored artifact, and the artifact plus its
 ### Recovering a run across a handoff
 
 Use `-Status -RunId <run-id>` or `-Watch -RunId <run-id>` on the recorded
-protocol-6 run:
+protocol-7 run:
 
 1. **`running`.** Keep watching. Do not start another submitter for this work.
 2. **`succeeded`, `failed` or `cancelled`.** This is the local launcher's
@@ -925,9 +926,10 @@ git worktree remove --force <snapshot>
 git worktree prune
 ```
 
-Old-protocol native logs are unsupported by this launcher: finish or cancel
-those runs with matching old tools **before** the coordinated, idle and
-physically drained protocol-6 cutover.
+Old native workflow-ID formats are unsupported by this launcher: finish or cancel
+those runs with matching old tools before changing tools. Protocol 6 to 7 keeps
+the ID format, but deployment still requires the coordinated, idle, physically
+drained wire-protocol cutover described above.
 
 ### Finite form-cut gear profiles
 
@@ -1395,6 +1397,50 @@ hit. Mix-ins guard this:
   code. All seats must agree on the salt or they never share hits.
 - **`_CACHE_EPOCH`** — bump to invalidate *every* entry pipeline-wide (e.g. a
   pack-format change).
+
+### Refreshing one unchanged leaf
+
+Use a forced refresh when the input key must stay unchanged but its cached result
+must be deliberately replaced. It works under either executor:
+
+```powershell
+uv run --frozen python build.py --executor local `
+  --force-cache-refresh part:pn_pen_rod `
+  --force-cache-refresh-reason 'Owner - Re-evaluate unchanged-input result' `
+  part:pn_pen_rod
+```
+
+For agent farm launches, pass `-ForceCacheRefresh @('part:pn_pen_rod')` and
+`-ForceCacheRefreshReason 'Owner - Re-evaluate unchanged-input result'` to the
+supervised launcher with the normal worktree, targets, display name and budget.
+The launcher records `force_cache_refresh` and `force_cache_refresh_reason`.
+Direct attended `build.py --executor farm` uses the same wrapper flags.
+`--force-cache-refresh` is repeatable and accepts comma-separated labels; each
+must be an exact remote-cache-keyed leaf in the selected task closure. A plain
+stamped check, aggregator, traveler or gallery task is refused. The declaration
+is the action's `@_cache.keyed_action` marker, so cache-keyed non-COM leaves
+qualify without a prefix allowlist.
+
+A reason is mandatory: nonblank single-line text, no controls or bidi-control
+characters, valid Unicode, at most 160 code points (the display-name rules).
+Invalid reasons, unknown/non-cached/out-of-closure labels and cache mode other
+than `rw` exit 2 before any fleet query or action. The request is scoped to this
+invocation, overriding doit freshness as well as both cache probes; every
+dispatch of a listed label refreshes again. A successful execution must publish
+(`store` returns `stored`), otherwise the task fails rather than swallowing an
+upload failure. Publication deliberately overwrites the existing key (last writer
+wins); it is not a salt change or a persistent invalidation.
+For an assembly, refresh reruns the full recipe and its hooks rather than reloading
+the previous local target; an unchanged sidecar must not republish suspect bytes.
+
+`HARMONIC_CACHE_REFRESH` carries compact JSON `{"labels":["part:pn_pen_rod"],
+"reason":"Owner - Re-evaluate unchanged-input result"}` during the submitter run.
+The protocol-7 `LeafRequest.refresh_reason` carries only the matching task's
+reason; its worker injects a one-label carrier only into that leaf process.
+Workflow IDs are unchanged. The submitter's post-success download still restores
+the just-published bytes. Each bypassed probe emits a `!!` warning with label,
+12-hex key and reason, a `cache.refresh` span event with `label`, `key`, `reason`,
+and a `refresh` record in `cad/out/reports/cache.jsonl` carrying the same reason.
 
 ### Retention — server-side, no job
 
