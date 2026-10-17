@@ -1467,7 +1467,7 @@ JOINTS: tuple[Joint, ...] = (
             "vn_knife_hanger_washer_spec.py; vn_knife_hanger_stud_spec.py THREAD_LENGTH_MIN/"
             "INCOMPLETE_TIP_LEN_MAX; cad/config/parts/vn-knife-hanger-stud.yaml "
             "(92314A253) installation_notes; "
-            "sm_summing_assembly_spec.ASSEMBLY_STEPS 4-5, ASSEMBLY_CHECKS 1"
+            "sm_summing_assembly_notes.ASSEMBLY_STEPS 4-5, ASSEMBLY_CHECKS 1"
         ),
     ),
     Joint(
@@ -1502,7 +1502,7 @@ JOINTS: tuple[Joint, ...] = (
             "vn_boss_hook_spec.py JAM_NUT_THREAD_MM/SHANK_LENGTH_MM; vn_boss_hook_jam_nut_spec.py; "
             "cad/config/parts/vn-boss-hook.yaml and vn-boss-hook-jam-nut.yaml (90760A140, McMaster 10-24 "
             "narrow-profile listing read live 2026-10-16: zinc-plated steel, 5/16 wide, 7/64 high) "
-            "installation_notes; sm_summing_assembly_spec.ASSEMBLY_STEPS 2, ASSEMBLY_CHECKS 5"
+            "installation_notes; sm_summing_assembly_notes.ASSEMBLY_STEPS 2, ASSEMBLY_CHECKS 5"
         ),
     ),
     Joint(
@@ -1562,7 +1562,7 @@ JOINTS: tuple[Joint, ...] = (
             "screw's Manufacturing Notes and property-linked by "
             "draw_sm_gooseneck_spring_screw), repeated in the summing "
             "assembly's Manufacturing Notes property (UPPER_EYE_CLAMP_NOTES) and "
-            "printed as MHA-SM-000 step 7 (sm_summing_assembly_spec.ASSEMBLY_STEPS 7, "
+            "printed as MHA-SM-000 step 7 (sm_summing_assembly_notes.ASSEMBLY_STEPS 7, "
             "ASSEMBLY_CHECKS 3); _assert_counter_spring_top_hang"
         ),
     ),
