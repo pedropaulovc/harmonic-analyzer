@@ -3326,20 +3326,22 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
 PD_EXPLODE_SPEC = "cad/scripts/pd_paper_drive_explode_spec.py"
 
 
-def _pd_clean_leaf(dodo, monkeypatch, tmp_path, *, base_inputs):
+def _pd_clean_leaf(dodo, monkeypatch, tmp_path, *, base_inputs, refresh_rc=0):
     """Run ``build_or_refresh("pd_paper_drive")`` on a clean workspace whose full
     cache key misses. ``base_inputs`` is the ledger of the cached explode base,
-    or None when the cache holds no base. Returns ``(commands, restores, stores)``
-    as ``(script, args)`` and ``(key, label)`` rows."""
+    or None when the cache holds no base; ``refresh_rc`` is the exit code of
+    ``refresh_assembly.py``. Returns ``(commands, restores, stores)`` as
+    ``(script, args)`` and ``(key, label)`` rows."""
     launched, restores, stores = [], [], []
 
     class FakePopen:
         def __init__(self, cmd, cwd, env, **_kw):
-            launched.append((Path(cmd[1]).name, list(cmd[2:])))
+            self.script = Path(cmd[1]).name
+            launched.append((self.script, list(cmd[2:])))
             self.stdout = iter(())
 
         def wait(self):
-            return 0
+            return refresh_rc if self.script == "refresh_assembly.py" else 0
 
     @contextlib.contextmanager
     def free_seat(label):
@@ -3399,6 +3401,26 @@ def test_clean_leaf_with_an_explode_base_takes_the_explode_tier(monkeypatch, tmp
     ]
     # The base it started from is already cached; only the full key is new.
     assert stores == [restores[0]]
+
+
+def test_failed_explode_tier_falls_back_to_full_in_the_same_task(monkeypatch, tmp_path):
+    """A pre-save EXPLODE failure leaves the base's bytes, proof and ledger as
+    they were, so the next leaf restoring that base would pick EXPLODE and fail
+    the same way again (coderabbit on #1575). The task builds FULL instead."""
+    dodo = _load_dodo()
+    current = dodo._ledger_inputs(dodo._recipe_files("pd_paper_drive"))
+    base = {**current, PD_EXPLODE_SPEC: "0" * 32}
+
+    launched, restores, stores = _pd_clean_leaf(
+        dodo, monkeypatch, tmp_path, base_inputs=base, refresh_rc=1
+    )
+
+    assert launched == [
+        ("refresh_assembly.py", ["pd_paper_drive", "explode"]),
+        ("build_pd_paper_drive_assembly.py", []),
+    ]
+    # The FULL result is a fresh base for this operational model: publish both.
+    assert stores == restores
 
 
 def test_clean_leaf_without_a_base_builds_full_and_publishes_the_base(
