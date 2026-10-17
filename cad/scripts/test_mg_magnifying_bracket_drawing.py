@@ -1461,7 +1461,8 @@ def test_native_hole_dimensions_keep_names_and_route_annotations(monkeypatch) ->
 
     height = SimpleNamespace(Name="D1", SystemValue=12.7 / 1000.0)
     native = [
-        WizardDimension("Thru Hole Dia.@MountingHoles", 2.591),
+        # The Wizard cuts its own 0.102 in, not the pinned 2.591.
+        WizardDimension("Thru Hole Dia.@MountingHoles", 0.102 * 25.4),
     ]
     original_names = [dim.Name for dim in native]
     displays = [SimpleNamespace(GetDimension=lambda dim=dim: dim) for dim in native]
@@ -1505,7 +1506,7 @@ def test_native_hole_dimensions_keep_names_and_route_annotations(monkeypatch) ->
         part._resolve_native_mounting_dimensions(adapter)
     displays.pop()
     native[0].SystemValue = 2.7 / 1000.0
-    with pytest.raises(RuntimeError, match="expected one native HoleDiameter, found 0"):
+    with pytest.raises(RuntimeError, match="expected one native HoleDiameter, found 0 among"):
         part._resolve_native_mounting_dimensions(adapter)
     native[0].SystemValue = 2.591 / 1000.0
     native[0].FullName = "Hole Depth@MountingHoles"
