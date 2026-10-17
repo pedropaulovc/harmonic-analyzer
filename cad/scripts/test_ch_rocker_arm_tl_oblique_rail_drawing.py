@@ -323,6 +323,8 @@ def test_receipt_dimensions_are_the_marked_model_dimensions() -> None:
     assert set(draw.FRONT_DIMENSION_PRECISION) == marked
     assert set(draw.FRONT_DIMENSION_PRECISION.values()) == {0}
     assert draw.DIMENSION_PREFIXES == {"HolePitch": spec.HOLE_PITCH_CALLOUT}
+    # The short hole-row spans keep their arrows off each other.
+    assert draw.ARROWS_INSIDE == ("HoleEnd", "HolePitch")
     # Each spans its own stations from the -X end face (rule 10).
     assert draw.RECEIPT_DIMENSIONS["Length"][:2] == (0.0, spec.LENGTH)
     assert draw.RECEIPT_DIMENSIONS["HoleEnd"][:2] == (0.0, spec.HOLE_END)
