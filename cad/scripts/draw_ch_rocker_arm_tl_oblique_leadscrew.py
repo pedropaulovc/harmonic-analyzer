@@ -67,6 +67,7 @@ from ch_rocker_arm_tl_oblique_leadscrew_stock_spec import (
     FLAT_AF_CALLOUT,
     FLAT_LENGTH,
     FLAT_LENGTH_CALLOUT,
+    FLAT_STARTS,
     FLAT_STATIONS,
     KP08_SET_SCREW_SPACING_DEG,
     LENGTH,
@@ -120,15 +121,16 @@ def sheet_x(station_mm: float) -> float:
 # dimension line clear over the sections' letters (12 mm cutting-line reach,
 # letters to 20 mm over the axis); its extension lines rise from the end
 # faces' centres. Under the screw, the far two flats' stations run from the
-# near end's centre, each in its own row; the near one's is detail C's.
+# near end's centre to each flat's near edge, each in its own row; the near
+# one's is detail C's.
 MAIN_KEEP = {
     "CutLength": (MAIN_CENTER[0], MAIN_CENTER[1] + 0.030),
     "FarKP08FlatStation": (
-        (NEAR_END_X + sheet_x(FLAT_STATIONS["FarKP08"])) / 2.0,
+        (NEAR_END_X + sheet_x(FLAT_STARTS["FarKP08"])) / 2.0,
         MAIN_CENTER[1] - 0.024,
     ),
     "HandwheelFlatStation": (
-        (NEAR_END_X + sheet_x(FLAT_STATIONS["Handwheel"])) / 2.0,
+        (NEAR_END_X + sheet_x(FLAT_STARTS["Handwheel"])) / 2.0,
         MAIN_CENTER[1] - 0.032,
     ),
 }
@@ -289,7 +291,7 @@ END_DETAILS = (
             "NearKP08FlatStation": detail_xy(
                 _NEAR_CENTRE_MM,
                 _NEAR_XY,
-                FLAT_STATIONS["NearKP08"] / 2.0,
+                FLAT_STARTS["NearKP08"] / 2.0,
                 _text_row_radius_mm(),
             ),
         },

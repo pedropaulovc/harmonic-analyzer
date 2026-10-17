@@ -123,10 +123,15 @@ def test_flat_stations_are_c4s_set_screw_positions() -> None:
     assert spec.KP08_SET_SCREW_SPACING_DEG == 120.0
     assert spec.FLAT_COUNT == 5
     assert spec.HANDWHEEL_SET_SCREW_MAJOR == 5.0
-    for name, station in spec.FLAT_STATIONS.items():
+    # Review bought-r15 (rule 10): the print stations each flat's near edge.
+    assert spec.FLAT_STARTS == pytest.approx(
+        {"NearKP08": 4.5, "FarKP08": 375.5, "Handwheel": 394.5}
+    )
+    for name, start in spec.FLAT_STARTS.items():
         lo, hi = (s - near for s in spec.FLAT_HOUSINGS[name])
-        assert lo <= station - spec.FLAT_LENGTH / 2.0 - spec.FLAT_TOLERANCE
-        assert station + spec.FLAT_LENGTH / 2.0 + spec.FLAT_TOLERANCE <= hi
+        assert lo <= start - spec.FLAT_TOLERANCE
+        end_max = start + spec.FLAT_LENGTH + spec.FLAT_TOLERANCE
+        assert end_max + spec.FLAT_LENGTH_TOLERANCE <= hi
 
 
 def test_flats_hold_the_set_screws_at_the_band_limits() -> None:
@@ -135,6 +140,7 @@ def test_flats_hold_the_set_screws_at_the_band_limits() -> None:
     assert spec.FLAT_AF == pytest.approx(7.28)
     assert spec.FLAT_AF_TOLERANCE == printed_band_mm(2) == pytest.approx(0.51)
     assert spec.FLAT_TOLERANCE == printed_band_mm(1) == pytest.approx(0.8)
+    assert spec.FLAT_LENGTH_TOLERANCE == printed_band_mm(2) == pytest.approx(0.51)
     assert spec.CLOCK_TOLERANCE_DEG == 1.0
     # ISO 2904: the Tr8x2 external root d3 = d - 2 (P/2 + ac), ac = 0.25.
     assert spec.SCREW_ROOT_DIA == spec.MAJOR_DIA - 2.0 * (spec.PITCH / 2.0 + 0.25)
@@ -158,7 +164,12 @@ def test_flats_hold_the_set_screws_at_the_band_limits() -> None:
     assert r - deepest == pytest.approx(2.77)
     # Wider than an M5 cup point, and past the screw both sides off station.
     assert spec.flat_chord(shallowest) == pytest.approx(2.558, abs=1e-3)
-    assert spec.FLAT_LENGTH / 2.0 - spec.FLAT_TOLERANCE >= 2.5
+    # The far side takes the near edge's band and the length's.
+    far_side = spec.FLAT_LENGTH / 2.0 - spec.FLAT_TOLERANCE - spec.FLAT_LENGTH_TOLERANCE
+    assert far_side >= 2.5
+    # At one place the length's band would leave the screw's far side on the
+    # thread.
+    assert spec.FLAT_LENGTH / 2.0 - 2.0 * spec.FLAT_TOLERANCE < 2.5
     # A KP08's two flats never meet.
     assert 2.0 * spec.flat_half_angle_deg(deepest) < 120.0 - 1.0
 
@@ -212,12 +223,11 @@ def test_flats_sketch_records_every_dimension_it_emits(monkeypatch) -> None:
     assert spec.DRAWING_DIMENSIONS["FlatProfile"] <= set(names)
     assert by_name["FlatLength"][2:] == ("vertical_distance", 8.0)
     assert by_name["FlatAF"][2:] == ("horizontal_distance", pytest.approx(7.28))
-    for name, station in spec.FLAT_STATIONS.items():
-        assert by_name[f"{name}FlatStation"][1:] == (
-            "origin",
-            "vertical_distance",
-            station,
-        )
+    for name, start in spec.FLAT_STARTS.items():
+        station = by_name[f"{name}FlatStation"]
+        assert station[1:] == ("origin", "vertical_distance", start)
+        # From the flat's near end: the rectangle's first vertex.
+        assert station[0].endswith("_0.start")
     # The printed pair is on the handwheel's rectangle: its station's chains.
     handwheel = [points for points in chains if points[0][1] == 398.5 - 4.0]
     assert handwheel and by_name["FlatLength"][0].startswith(
@@ -388,7 +398,7 @@ def test_controls_print_at_the_title_block_rows() -> None:
     }
     places = {
         "CutLength": 1,
-        "FlatLength": 1,
+        "FlatLength": 2,
         "FlatAF": 2,
         **dict.fromkeys(stations, 1),
         "NearKP08ClockAF": 2,

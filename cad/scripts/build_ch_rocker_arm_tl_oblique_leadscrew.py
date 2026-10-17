@@ -68,6 +68,7 @@ from ch_rocker_arm_tl_oblique_leadscrew_stock_spec import (
     FLAT_CHORD,
     FLAT_DEPTH,
     FLAT_LENGTH,
+    FLAT_STARTS,
     FLAT_STATIONS,
     FLAT_VOLUME_MM3,
     KP08_SET_SCREW_SPACING_DEG,
@@ -165,8 +166,9 @@ async def _flats(adapter) -> None:
     rectangle's inner edge is its flat, at x = R - FLAT_DEPTH (the flat faces
     model +X), its other three edges 1 mm clear of the screw; a construction
     line from the screw's far side (x = -R) square to the flat's midpoint has
-    the across-flat as its length, and its end's height over the origin is
-    the flat's station from the near end. ``PRINTED_FLAT``'s rectangle carries
+    the across-flat as its length, and the flat's near end's height over the
+    origin is its station: the review's rule 10 dimensions the flat's edge,
+    not its unmarked middle. ``PRINTED_FLAT``'s rectangle carries
     the printed ``FlatLength`` and ``FlatAF``; every station's ``FlatStation``
     prints. A mid-plane cut 1 mm past the screw each side of Front takes the
     whole segment."""
@@ -246,10 +248,10 @@ async def _flats(adapter) -> None:
         dims.record("FlatAF" if printed else f"{name}FlatAF")
         await dimension_between(
             adapter,
-            f"{across}.end",
+            f"{flat}.start",
             "origin",
             "vertical_distance",
-            FLAT_STATIONS[name],
+            FLAT_STARTS[name],
             f"{name} flat station",
         )
         dims.record(f"{name}FlatStation")
