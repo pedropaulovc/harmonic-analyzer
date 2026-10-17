@@ -781,7 +781,7 @@ async def build(adapter) -> dict[str, str]:
         label="mag-bracket locked to lever",
     )
     # Stock shank is -Y: Rx(-90) points it +Z into the lever's front taps.
-    # Heads seat on the counterbore floors; both ride the knife-edge rock.
+    # Heads bear on the flange's front face; both ride the knife-edge rock.
     for index, position in enumerate(BRACKET_SCREW_POSITIONS, start=1):
         screw = await place_component(
             adapter,
