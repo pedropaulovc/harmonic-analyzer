@@ -4,10 +4,12 @@ from pathlib import Path
 
 import build_pn_pen_assembly as builder
 import draw_pn_pen_assembly as drawing
+import pn_pen_assembly_notes as notes
 import pn_pen_assembly_spec as spec
 import pn_pen_carriage_geom as carriage
 import pn_pen_v_block_spec as v_block
 import vn_pen_rod_set_screw_spec as rod_set_screw
+from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _named_views import octant_axes, octant_view_name
 from _simplified_names import simplified_name
@@ -25,6 +27,26 @@ def test_pen_package_keeps_registry_outputs() -> None:
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "build_simple_three_view_drawing" not in source
+
+
+def test_sheet_text_stays_out_of_the_assembly_recipe() -> None:
+    # Recipe closures are file-granular: a wording edit in the notes must
+    # re-key only the drawing, never the native pen assembly (code review C03).
+    def closure(module: object) -> set[str]:
+        return {Path(path).name for path in module_deps_of(Path(module.__file__))}
+
+    assembly = closure(builder)
+    assert "pn_pen_assembly_spec.py" in assembly
+    assert "pn_pen_assembly_notes.py" not in assembly
+    assert "pn_pen_assembly_notes.py" in closure(drawing)
+    for name in (
+        "BOM_DESCRIPTIONS",
+        "DIMENSION_CALLOUTS",
+        "SETTINGS_NOTE",
+        "ASSEMBLY_STEPS",
+        "ASSEMBLY_CHECKS",
+    ):
+        assert not hasattr(spec, name), name
 
 
 def test_pen_package_is_three_landscape_sheets_at_half_scale() -> None:
@@ -88,7 +110,7 @@ def test_rod_set_screw_trail_runs_up_the_tap_axis_to_its_mouth() -> None:
     for _label, stems, key, distance in spec.EXPLODE_STEPS:
         if stems == (spec.ROD_SET_SCREW,):
             moves["xyz".index(key)] += distance
-    cup, mouth = spec.ROD_SET_SCREW_TRAIL
+    cup, mouth = notes.ROD_SET_SCREW_TRAIL
     trail = [b - a for a, b in zip(cup, mouth)]
     out = sum(value * value for value in moves) ** 0.5
     length = sum(value * value for value in trail) ** 0.5
@@ -138,7 +160,7 @@ def test_every_setting_is_printed_with_a_callout_beside_its_detail() -> None:
         name for points in drawing.DIMENSION_TEXT_POINTS.values() for name in points
     }
     marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
-    assert printed == marked == set(spec.DIMENSION_CALLOUTS)
+    assert printed == marked == set(notes.DIMENSION_CALLOUTS)
     details = {detail.key: detail for detail in drawing.DETAILS}
     for key, points in drawing.DIMENSION_TEXT_POINTS.items():
         detail = details[key]
@@ -157,7 +179,7 @@ def test_each_detail_title_carries_its_letter_and_any_other_direction() -> None:
     assert drawing.BOUNDED_ON_RIGHT <= keys
     for detail in drawing.DETAILS:
         first = detail.title.splitlines()[0]
-        assert first.startswith(f"DETAIL {spec.DETAIL_LETTERS[detail.key]}")
+        assert first.startswith(f"DETAIL {notes.DETAIL_LETTERS[detail.key]}")
         # A detail circled on RIGHT enlarges what the circle holds: drawn from
         # the right, unturned, its title naming no other direction.
         if detail.key in drawing.BOUNDED_ON_RIGHT:
@@ -165,7 +187,7 @@ def test_each_detail_title_carries_its_letter_and_any_other_direction() -> None:
             assert " - FROM " not in first
         else:
             assert " - FROM " in first
-    assert len(set(spec.DETAIL_LETTERS.values())) == len(drawing.DETAILS)
+    assert len(set(notes.DETAIL_LETTERS.values())) == len(drawing.DETAILS)
 
 
 def test_text_blocks_respect_the_measured_note_width() -> None:

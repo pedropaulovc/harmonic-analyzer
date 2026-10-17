@@ -7,9 +7,10 @@ hanger screw's nut and jam nut, DETAIL C the pen yaw and nib preset
 (``CarriageSetting``), with the as-shipped note; sheet 2 the builder-owned
 ``PN_EXPLODED`` presentation with the BOM (numbers, descriptions, vendor SKU,
 quantity) and a balloon on every row; sheet 3 the finished isometric beside
-the numbered assembly sequence and checks. Every text, setting and pose comes
-from ``pn_pen_assembly_spec`` or the part registry; this recipe only lays the
-sheets out. It never edits the source assembly or its explodes.
+the numbered assembly sequence and checks. Every setting and pose comes from
+``pn_pen_assembly_spec``, every printed text and detail region from
+``pn_pen_assembly_notes``, the rest from the part registry; this recipe only
+lays the sheets out. It never edits the source assembly or its explodes.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from typing import Any, Callable
 import _config
 import _telemetry
 import pn_pen_adjust_screw_spec as stud
+import pn_pen_assembly_notes as notes
 import pn_pen_assembly_spec as spec
 import pn_pen_hanger_spec as hanger
 import pn_pen_rod_spec as rod
@@ -172,7 +174,7 @@ class Detail:
 
     @property
     def title(self) -> str:
-        return spec.SHEET_TITLES[self.key]
+        return notes.SHEET_TITLES[self.key]
 
     @property
     def label(self) -> str:
@@ -196,8 +198,8 @@ STUD_DETAIL = Detail(
     key="stud",
     orientation="*Right",
     scale=(2, 1),
-    model_centre=spec.STUD_DETAIL_CENTRE,
-    radius_mm=spec.STUD_DETAIL_RADIUS,
+    model_centre=notes.STUD_DETAIL_CENTRE,
+    radius_mm=notes.STUD_DETAIL_RADIUS,
     centre=(0.262, 0.214),
     stems=frozenset((spec.ROD, spec.STUD, spec.STUD_NUT, spec.WIRE)),
     feature=spec.STUD_FEATURE,
@@ -207,8 +209,8 @@ HANGER_DETAIL = Detail(
     key="hanger",
     orientation="*Right",
     scale=(2, 1),
-    model_centre=spec.HANGER_DETAIL_CENTRE,
-    radius_mm=spec.HANGER_DETAIL_RADIUS,
+    model_centre=notes.HANGER_DETAIL_CENTRE,
+    radius_mm=notes.HANGER_DETAIL_RADIUS,
     centre=(0.362, 0.214),
     stems=frozenset(
         (spec.HANGER, spec.HANGER_SCREW, spec.HANGER_NUT, spec.HANGER_JAM_NUT)
@@ -220,13 +222,13 @@ CARRIAGE_DETAIL = Detail(
     key="carriage",
     orientation="*Top",
     scale=(2, 1),
-    model_centre=spec.CARRIAGE_DETAIL_CENTRE,
-    radius_mm=spec.CARRIAGE_DETAIL_RADIUS,
+    model_centre=notes.CARRIAGE_DETAIL_CENTRE,
+    radius_mm=notes.CARRIAGE_DETAIL_RADIUS,
     centre=(0.110, 0.058),
     stems=_CARRIAGE_STEMS,
     feature=spec.CARRIAGE_FEATURE,
     label_xy=(0.156, 0.090),
-    axis_points=spec.CARRIAGE_AXIS_POINTS,
+    axis_points=notes.CARRIAGE_AXIS_POINTS,
 )
 DETAILS = (STUD_DETAIL, HANGER_DETAIL, CARRIAGE_DETAIL)
 
@@ -234,23 +236,23 @@ DETAILS = (STUD_DETAIL, HANGER_DETAIL, CARRIAGE_DETAIL)
 def _top_plan_point(uv: tuple[float, float]) -> tuple[float, float, float]:
     """A Top-plane sketch point (u, v) = machine (X, -Z) as machine mm; the
     plan view projects Y away."""
-    return (uv[0], spec.CARRIAGE_DETAIL_CENTRE[1], -uv[1])
+    return (uv[0], notes.CARRIAGE_DETAIL_CENTRE[1], -uv[1])
 
 
 # Each kept dimension's text point, machine mm, projected into its detail.
 DIMENSION_TEXT_POINTS = {
     STUD_DETAIL.key: {
-        spec.STUD_DIMENSION: spec.STUD_TEXT_POINT,
+        spec.STUD_DIMENSION: notes.STUD_TEXT_POINT,
     },
     CARRIAGE_DETAIL.key: {
         spec.YAW_DIMENSION: _top_plan_point(spec.YAW_TEXT_UV),
-        spec.NIB_DIMENSION: _top_plan_point(spec.NIB_TEXT_UV),
+        spec.NIB_DIMENSION: _top_plan_point(notes.NIB_TEXT_UV),
     },
 }
 # Every callout is two lines, which only the below compartment prints.
 CALLOUT_LOCATION = "below"
 CALLOUT_TEXT_PART = 4  # swDimensionTextParts_e: swDimensionTextCalloutBelow
-if set(spec.DIMENSION_CALLOUTS) != {
+if set(notes.DIMENSION_CALLOUTS) != {
     name for names in spec.DRAWING_DIMENSIONS.values() for name in names
 }:
     raise AssertionError("every pen setting carries its callout")
@@ -316,7 +318,7 @@ BOM_SKUS = {
     or MADE_PART_SKU
     for stem, row in PART_ROWS.items()
 }
-BOM_DESCRIPTIONS = dict(spec.BOM_DESCRIPTIONS)
+BOM_DESCRIPTIONS = dict(notes.BOM_DESCRIPTIONS)
 BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
@@ -407,11 +409,11 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
     return "\n".join(out)
 
 
-SETTINGS_NOTE = _wrapped((spec.SETTINGS_NOTE,), width=SETTINGS_NOTE_WIDTH)
+SETTINGS_NOTE = _wrapped((notes.SETTINGS_NOTE,), width=SETTINGS_NOTE_WIDTH)
 ASSEMBLY_STEPS = _wrapped(
-    spec.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
+    notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
-ASSEMBLY_CHECKS = _wrapped(spec.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
+ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
 
 Box = tuple[float, float, float, float]
 
@@ -769,7 +771,7 @@ def _mark_detail_boundary(adapter: Any, parent: Any, detail: Detail) -> None:
     _label_view(
         adapter,
         parent,
-        spec.DETAIL_LETTERS[detail.key],
+        notes.DETAIL_LETTERS[detail.key],
         (centre[0] + reach, centre[1] + reach),
         label=label,
     )
@@ -888,7 +890,7 @@ def _assert_settings(displays: list[tuple[str, Any]], *, when: str) -> None:
             or abs(float(tolerance.GetMaxValue()) - band) > 1e-9
             or abs(float(tolerance.GetMinValue()) + band) > 1e-9
             or int(display.GetPrimaryTolPrecision2()) != spec.TOLERANCE_PRECISION[name]
-            or callout != spec.DIMENSION_CALLOUTS[name]
+            or callout != notes.DIMENSION_CALLOUTS[name]
         ):
             raise RuntimeError(
                 f"{when} {name}: value {value!r} (nominal {nominal!r}), tolerance "
@@ -903,16 +905,16 @@ def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
     the check that re-reads every setting once the drawing has settled."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     _placed_base_view(
-        adapter, "*Front", FRONT_CENTER, spec.VIEW_TITLES["front"], label="pen front"
+        adapter, "*Front", FRONT_CENTER, notes.VIEW_TITLES["front"], label="pen front"
     )
     right = _placed_base_view(
-        adapter, "*Right", RIGHT_CENTER, spec.VIEW_TITLES["right"], label="pen right"
+        adapter, "*Right", RIGHT_CENTER, notes.VIEW_TITLES["right"], label="pen right"
     )
     annotations = [
         annotation for detail in DETAILS for annotation in _detail(adapter, detail)
     ]
     set_dimension_callouts(
-        adapter, annotations, dict(spec.DIMENSION_CALLOUTS), location=CALLOUT_LOCATION
+        adapter, annotations, dict(notes.DIMENSION_CALLOUTS), location=CALLOUT_LOCATION
     )
     assert_imported_precision(
         adapter,
@@ -933,7 +935,7 @@ def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
         )
         for annotation in annotations
     ]
-    if sorted(name for name, _ in displays) != sorted(spec.DIMENSION_CALLOUTS):
+    if sorted(name for name, _ in displays) != sorted(notes.DIMENSION_CALLOUTS):
         raise RuntimeError(f"pen details imported {sorted(n for n, _ in displays)}")
     for name, display in displays:
         _assert_dimension_ink_on_sheet(display, label=f"pen {name}")
@@ -1223,13 +1225,13 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     _add_explode_trail(
         adapter,
         exploded,
-        spec.ROD_SET_SCREW_TRAIL,
+        notes.ROD_SET_SCREW_TRAIL,
         label="pen rod set screw explode trail",
     )
     _add_note_block(
         adapter,
         SHEET_NAMES[1],
-        f"{spec.EXPLODED_CAPTION}\nSCALE {_scale_text(scale)}",
+        f"{notes.EXPLODED_CAPTION}\nSCALE {_scale_text(scale)}",
         EXPLODED_CAPTION_XY,
         label="exploded-view caption",
     )
@@ -1260,7 +1262,7 @@ def _place_steps_sheet(adapter: Any) -> None:
     _label_view(
         adapter,
         finished,
-        spec.VIEW_TITLES["finished"],
+        notes.VIEW_TITLES["finished"],
         (x0, y0 - VIEW_LABEL_GAP),
         label=label,
     )
