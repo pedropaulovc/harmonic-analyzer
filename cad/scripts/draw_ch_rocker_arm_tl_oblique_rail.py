@@ -170,6 +170,11 @@ RECEIPT_DIMENSIONS = {
     "Length": (0.0, LENGTH, LENGTH_ROW_DROP),
 }
 DIMENSION_PREFIXES = {"HolePitch": HOLE_PITCH_CALLOUT}
+# Smart arrows put the 20 mm and 30 mm spans' arrows outside, where the end
+# distance's and the pitch's met at the first hole (r1); both spans hold their
+# value and arrows inside.
+ARROWS_INSIDE = ("HoleEnd", "HolePitch")
+_DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 FRONT_DIMENSION_PRECISION = {
     name: places
     for places_by_name in DRAWING_PRECISION.values()
@@ -264,6 +269,10 @@ def _receipt_dimensions(adapter: Any, front: Any) -> list[Any]:
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
         display = set_reference_dimension(adapter, annotation, label=name)
+        if name in ARROWS_INSIDE:
+            display.ArrowSide = _DIM_ARROWS_INSIDE
+            if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+                raise RuntimeError(f"{name} did not keep its arrows inside")
         prefix = DIMENSION_PREFIXES.get(name)
         if prefix is None:
             continue
