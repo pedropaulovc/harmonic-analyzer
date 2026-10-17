@@ -492,7 +492,7 @@ check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
-edge = "datum B beside the hole, at X+20"
+edge = "datum B beside the hole, at X+20 Y+0"
 edge_mm = 2.5
 method = "paper"
 tool = "center-drills-lms-4859/2"
@@ -642,7 +642,7 @@ check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
-edge = "datum B at X+20"
+edge = "datum B, at X+20 Y+0"
 edge_mm = 2.5
 method = "paper"
 tool = "endmills-lms-6784/3-8in-4fl"
@@ -746,7 +746,7 @@ check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
-edge = "strap face at X+20"
+edge = "strap face, at X+20 Y+0"
 edge_mm = 2.5
 method = "paper"
 tool = "endmills-lms-6784/3-8in-4fl"
@@ -807,6 +807,77 @@ feature = "pivot_bore"
 checks = { dia = "pin-gauges", thru = "pin-gauges", finish_ra = "roughness-comparator", process = "pin-gauges" }
 
 [[setups.ops]]
+op = 30
+do = "inspect"
+feature = "rod_hole"
+checks = { dia = "pin-gauges", thru = "pin-gauges", at = "height-gauge", position_dia = "height-gauge" }
+note = "Off the rest plate: the A|B position check is done on the angle-plate fixture below (one clamping held through both views), then the part goes back to the rest plate."
+# Option 4: the rod-pin hole IS datum C, so its own Ø0.20 position refers only to A|B.
+# Rotation about A is free, so the zone is an annulus about A: only the A-to-C centre
+# distance is toleranced. Its nominal is the drawing's BASIC 133.07 / 8.46 PIN AXIS pair
+# from A combined: features.toml rod_hole.at - pivot_bore.at = (133.0674, 8.4561), D =
+# hypot = 133.336. The two views read X and Y in any clocking; D does not depend on it.
+# F1 gauge-resolution source: gauges.height-gauge.resolution_in = 0.001 in x 25.4 = 0.0254 mm; never substitute the former uncited 0.018 mm.
+# Schema-limited placeholder (realistic, remeasure: #1413): status="measured", date="2026-10-13", instrument="certified gauge blocks and height gauge"; scale-error estimate 0.0254 mm over the 133.336 mm lever, one displayed count (no calibration nominal; conservative rounding up from the former 0.025 mm estimate).
+# Schema-limited placeholder (realistic, remeasure: #1413): status="measured", date="2026-10-13", instrument="0.001 mm DTI, gauge pins loaded up/down in both bores"; combined pin-clearance sag estimate 0.013 mm, unchanged from the authored inspection method (no certified nominal; compare the two pin-centre readings).
+# Derived guardband: 2*sqrt(2*0.0254^2 + 0.0254^2 + 2*0.013^2 + (0.0254*133.336/100)^2) = 0.116968... mm; round UP to 0.12 mm, so 0.20 - 0.12 = 0.08 mm acceptance. This trial estimate is not calibrated inspection uncertainty.
+[setups.ops.inspection_methods]
+position_dia = [
+  "Inspection fixture: the 4 x 5 x 3-1/2 in angle plate (fixtures.angle-plate) with its bolted foot-end ledge taken off (two #10-24 SHCS), and the pivot bracket's shop-made two-stud bridge clamp (not yet in the shop inventory; it returns with the bracket's migration) on its 3/8-16 studs through the upright's two letter-X stud holes. Datum C is the rod-pin hole itself, so the check reads its centre distance from A; the +X tip land rests on the granite only to steady the arm and is not a datum.",
+  "Clean the part, the plate, the bridge and the pin gauges and leave them on the granite surface plate (gauges.granite-surface-plate) for 30 min to reach the plate's temperature.",
+  "Push the largest freely passing pin gauge (gauges.pin-gauges) through bore A (datum A), and the largest freely passing one into the rod hole (datum C) from the side away from datum B; copy the sizes marked on the pins: {pin A Ø} {rod pin Ø}.",
+  "Seating, view 1: the angle plate stands on its base on the granite. Hold strap datum B (the +Z strap face, the hub's raised side) flat on the upright's outer face, rod end down, the +X tip land resting on the granite in front of the upright, the arm centred between the two studs. Lay the bridge beam across the strap's other face and run both nuts down finger-tight, a little at a time each. Keep this clamping unchanged through step 11.",
+  "Reading a pin: the DTI (gauges.dti) on the height gauge's scriber; sweep it across the pin crown within 2 mm of the bore face, raise or lower the slider until the sweep's peak reads zero, and copy the height-gauge reading; a higher contact reads higher. Pin-centre height = reading - pin Ø / 2.",
+  "View 1: read hub pin {H1} and rod pin {R1} (hub pin about 132.4 above the rod pin).",
+  "Lean check, view 1: read the hub pin crown at its mouth {mouth 1} and 10 mm farther out {out 1}. If they differ by more than 0.025, or B will not lie flat without leaning the pin, the readings are not valid: reseat from step 4; if it persists, stop and report.",
+  "View 2: without touching the clamp, tip the whole plate a quarter turn clockwise as you face the part, onto the plate's end (the arm now points right, the rod pin about 15.8 below the hub pin). Read hub pin {H2} and rod pin {R2}.",
+  "Plate lean, view 2: the plate's base bottom is now the upright face toward the gauge, on the left. With the DTI on the height gauge against it, read it at 10 mm {base 10} and at 110 mm {base 110} above the granite, moving only the slider; a face standing farther out toward the gauge reads higher. s = base 110 - base 10 = {s} (per 100 mm).",
+  "Lean check, view 2, as in step 7: {mouth 2} {out 2}.",
+  "Hold check: tip the plate back onto its base (view 1) without touching the clamp and read again: {H1c} {R1c}. If H1c - R1c differs from H1 - R1 by more than 0.013, the part moved in the clamp: restart at step 4.",
+  "Calculate: X = (H1 - pin A Ø / 2) - (R1 - rod pin Ø / 2) = {X}; Y = (H2 - pin A Ø / 2) - (R2 - rod pin Ø / 2) = {Y}.",
+  "Calculate: Y corrected = Y - s x X / 100 = {Y corrected}. View 1 reads X square to the plate's base; in view 2 the base leans s per 100 from vertical, which adds s x X / 100 to Y over the X lever, so the plate's end needs to be stable but not square.",
+  "Calculate: D = √(X² + Y corrected²) = {D}; position Ø = 2 x |D - 133.336| = {position Ø}. 133.336 is the drawing's BASIC 133.07 and 8.46 from A combined: datum C clocks the arm, so only the hole's distance from A is held, whatever the arm's angle on the plate.",
+  "Decide: accept if position Ø is no more than 0.08; reject if it is over 0.20; between 0.08 and 0.20 the reading is indeterminate with this height gauge, so re-check it with gauge blocks or on a CMM. AUTHOR'S CHOICE conservative guardband 0.12 mm, rounded up from 2 x sqrt(2 x 0.0254^2 + 0.0254^2 + 2 x 0.013^2 + (0.0254 x 133.336 / 100)^2) mm. The selected gauges.height-gauge resolution is 0.001 in = 0.0254 mm, used on each coordinate difference and on the base-lean difference over 100 mm; the scale-error estimate is 0.0254 mm over the 133.336 mm lever; combined pin-clearance sag is 0.013 mm per coordinate. Scale error and sag are #1413 test-only measured placeholders, not a calibration certificate; remeasure them before shop acceptance.",
+]
+[[setups.ops.inspection_views.position_dia]]
+title = "VIEW 1 (STEPS 4-7, 11): PLATE ON ITS BASE, THE +X TIP LAND RESTING ON THE GRANITE"
+up = [-0.9833816999, -0.1815500823, 0.0]
+toward = [0.0, 0.0, -1.0]
+aids = [
+  { name = "ANGLE PLATE BASE", shape = "box", at_mm = [134.518, 87.374, 102.85], size_mm = [127.0, 12.7, 101.6], axes = [[0.1815500823, -0.9833816999, 0.0], [-0.9833816999, -0.1815500823, 0.0]] },
+  { name = "ANGLE PLATE UPRIGHT (LEDGE OFF)", shape = "box", at_mm = [122.029, 85.068, 13.95], size_mm = [127.0, 76.2, 12.7], axes = [[0.1815500823, -0.9833816999, 0.0], [-0.9833816999, -0.1815500823, 0.0]] },
+  { name = "BRIDGE BEAM", shape = "box", at_mm = [72.379, 43.615, -1.25], size_mm = [63.5, 12.7, 9.525], axes = [[0.1815500823, -0.9833816999, 0.0], [-0.9833816999, -0.1815500823, 0.0]] },
+  { name = "3/8-16 STUD 1", shape = "cylinder", at_mm = [68.268, 30.908, 20.0], axis = [0.0, 0.0, -1.0], dia_mm = 9.525, length_mm = 54.0 },
+  { name = "3/8-16 STUD 2", shape = "cylinder", at_mm = [75.53, -8.428, 20.0], axis = [0.0, 0.0, -1.0], dia_mm = 9.525, length_mm = 54.0 },
+  { name = "A: GAUGE PIN IN BORE A", shape = "cylinder", at_mm = [0.0, 8.0, -30.0], axis = [0.0, 0.0, 1.0], dia_mm = 6.5, length_mm = 50.0 },
+  { name = "C: GAUGE PIN IN THE ROD HOLE", shape = "cylinder", at_mm = [133.067, 16.456, -25.0], axis = [0.0, 0.0, 1.0], dia_mm = 1.994, length_mm = 26.25 },
+]
+marks = [
+  { label = "H1: HUB PIN TOP", at_mm = [-3.196, 7.41, -5.0], reads = true },
+  { label = "R1: ROD PIN TOP", at_mm = [132.087, 16.275, -5.0], reads = true },
+  { label = "REST: +X TIP LAND ON THE GRANITE", at_mm = [145.747, 26.547, 0.0] },
+  { label = "B: STRAP FACE ON THE UPRIGHT", at_mm = [96.877, 15.851, 1.25] },
+]
+[[setups.ops.inspection_views.position_dia]]
+title = "VIEW 2 (STEPS 8-10): PLATE TIPPED A QUARTER TURN CLOCKWISE ONTO ITS END"
+up = [-0.1815500823, 0.9833816999, 0.0]
+toward = [0.0, 0.0, -1.0]
+aids = [
+  { name = "ANGLE PLATE BASE", shape = "box", at_mm = [134.518, 87.374, 102.85], size_mm = [127.0, 12.7, 101.6], axes = [[0.1815500823, -0.9833816999, 0.0], [-0.9833816999, -0.1815500823, 0.0]] },
+  { name = "ANGLE PLATE UPRIGHT (LEDGE OFF)", shape = "box", at_mm = [122.029, 85.068, 13.95], size_mm = [127.0, 76.2, 12.7], axes = [[0.1815500823, -0.9833816999, 0.0], [-0.9833816999, -0.1815500823, 0.0]] },
+  { name = "BRIDGE BEAM", shape = "box", at_mm = [72.379, 43.615, -1.25], size_mm = [63.5, 12.7, 9.525], axes = [[0.1815500823, -0.9833816999, 0.0], [-0.9833816999, -0.1815500823, 0.0]] },
+  { name = "3/8-16 STUD 1", shape = "cylinder", at_mm = [68.268, 30.908, 20.0], axis = [0.0, 0.0, -1.0], dia_mm = 9.525, length_mm = 54.0 },
+  { name = "3/8-16 STUD 2", shape = "cylinder", at_mm = [75.53, -8.428, 20.0], axis = [0.0, 0.0, -1.0], dia_mm = 9.525, length_mm = 54.0 },
+  { name = "A: GAUGE PIN IN BORE A", shape = "cylinder", at_mm = [0.0, 8.0, -30.0], axis = [0.0, 0.0, 1.0], dia_mm = 6.5, length_mm = 50.0 },
+  { name = "C: GAUGE PIN IN THE ROD HOLE", shape = "cylinder", at_mm = [133.067, 16.456, -25.0], axis = [0.0, 0.0, 1.0], dia_mm = 1.994, length_mm = 26.25 },
+]
+marks = [
+  { label = "H2: HUB PIN TOP", at_mm = [-0.59, 11.196, -5.0], reads = true },
+  { label = "R2: ROD PIN TOP", at_mm = [132.886, 17.436, -5.0], reads = true },
+  { label = "BASE 10: BASE BOTTOM AT 10", at_mm = [155.759, -27.682, 52.0] },
+  { label = "BASE 110: BASE BOTTOM AT 110", at_mm = [137.604, 70.656, 52.0] },
+]
+[[setups.ops]]
 op = 40
 do = "inspect"
 feature = "hub_od"
@@ -825,6 +896,53 @@ do = "inspect"
 feature = ["strap_faces", "strap_datum_b"]
 checks = { thickness = "micrometers/0-1in" }
 
+[[setups.ops]]
+op = 70
+do = "inspect"
+feature = "top_edge"
+checks = { height_above_pivot = "arm-outline-template", radius = "arm-outline-template" }
+
+[[setups.ops]]
+op = 80
+do = "inspect"
+feature = "profile_outer"
+checks = { bottom_radius = "arm-outline-template", mirror_symmetric = "arm-outline-template" }
+
+# The +X tip land's station is the BASIC 146.25 "LAND" row from the pivot; the manifest
+# carries no station requirement on the -X land (mirror_symmetric covers it).
+[[setups.ops]]
+op = 90
+do = "inspect"
+feature = "tip_land_pos_x"
+checks = { land_angle_deg = "arm-outline-template", station = "height-gauge" }
+
+[[setups.ops]]
+op = 95
+do = "inspect"
+feature = "tip_land_neg_x"
+checks = { land_angle_deg = "arm-outline-template" }
+
+# Both printed profile zones (top edge, and the lower outline J to K with both tip lands), read
+# with a DTI against the arm outline template. The accept/reject windows are computed in
+# ch_rocker_arm_profile_check from the printed zones, where the template's edge sits in them,
+# its clocking_error and the DTI resolution; test_process_plans pins this text to that module.
+[[setups.ops]]
+op = 97
+do = "inspect"
+feature = ["top_edge", "profile_outer", "tip_land_pos_x", "tip_land_neg_x"]
+checks = { surface_profile = "dti" }
+[setups.ops.inspection_methods]
+surface_profile = [
+  "Both printed profile zones, read against the arm outline template (gauges.arm-outline-template) pinned in datums A and C: the top edge (0.5, all outside the R800 BASIC arc) and the lower outline J to K (0.5, all inside the BASIC outline: the R816 arc, both tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on the granite surface plate (gauges.granite-surface-plate), off the rest plate.",
+  "Clean the arm, the template and both pins and leave them on the granite for 30 min to reach its temperature.",
+  "Lay the template flat on the granite, the face that is laid on the arm up.",
+  "Seating: lower the arm onto it with strap datum B (the +Z strap face) down, so its +Z hub face rests on the template and the rod-pin hole sits over the rod slot. Datum A: push the 0.2558 in Class X pin (gauges.vermont-class-x-2558-minus) down through the pivot bore and the template's pivot hole to the granite. Datum C: push the 0.0780 in pin (gauges.pin-gauges) down through the rod-pin hole into the slot to the granite. Press on the hub: the arm must not rock; if it does, clean and reseat.",
+  "Gauge: the DTI (gauges.dti) on the height gauge's scriber (gauges.height-gauge), stylus horizontal, its ball approaching each edge square to it from outside the part. A higher reading is an edge standing farther out. The DTI reads inches: o (mm) = reading x 25.4.",
+  "Stations (20; each at least 1 mm from a corner, placed by eye): each arc on the mirror line, halfway out and 2 mm short of each end (5 per arc); each tip land a third and two thirds along (2 per land); each tapered end 2 mm from each corner and halfway (3 per taper).",
+  "At each station, zero: set the slider so the ball is 1.6 mm above the granite (the template's mid-thickness), slide the gauge base in until the dial has turned half its travel (0.015 in) and set the bezel to zero. Read: without moving the base, raise only the slider to 6.7 mm (the strap's mid-plane), letting the ball ride onto the arm's edge, and copy {o}. Lower it back to 1.6 mm: if the dial is not back at zero within one division, redo the station.",
+  "Decide each station with its segment's window, o in mm: the R800 top arc (top_edge): accept -0.07 to +0.08, reject below -0.42 or above +0.43; each tip land (tip_land_pos_x, tip_land_neg_x): accept -0.17 to +0.17, reject below -0.33 or above +0.33; each tapered end (profile_outer): accept -0.10 to +0.10, reject below -0.40 or above +0.40; the R816 bottom arc (profile_outer): accept -0.09 to +0.08, reject below -0.42 or above +0.41. Between accept and reject, or off the dial either way, the station is indeterminate: re-check on a CMM. The profile is accepted only when every station accepts.",
+  "AUTHOR'S CHOICE guard (ch_rocker_arm_profile_check): each window is the zone, offset by where the template's edge sits in it, shrunk at every point by the template's clocking_error (its own 0.03 mm profile acceptance plus the pins' registration, at most 0.159 mm) and the DTI's 0.0127 mm resolution, rounded inward to 0.01 mm. The template's acceptance and the pin plays are #1413 placeholders, not a calibration; remeasure them before shop acceptance.",
+]
 [[setups.ops]]
 op = 100
 do = "coating"
