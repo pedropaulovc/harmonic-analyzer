@@ -18,6 +18,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -541,9 +542,13 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add the center mark to the template pivot hole")
-    # One mark on each of the slot's round ends.
-    if not auto_center_marks(adapter, detail, holes=False, slots=True, size=0.0025):
-        raise RuntimeError("failed to add the center marks to the template rod slot")
+    # One mark on each of the slot's round ends, so the 0.750 run reads
+    # centre to centre (mr-tl13-1). AutoInsertCenterMarks2's slot option only
+    # finds sketch-slot features and printed none on this stadium (tl13-gdt-r2).
+    _mark_rod_slot_end_centres(adapter, detail)
+    # Precision HLR again once cropped and marked: the 5:1 ends printed as
+    # facets (mr-tl13-1 "draft quality").
+    set_hidden_lines_removed(adapter, detail)
     # The mark and the labels go on once every import is done, so nothing of
     # the face view's own sketch is near its import.
     mark = _mark_rod_slot_on_front(adapter, front)
@@ -875,6 +880,39 @@ def _rim_point(
         / 1000.0,
         0.0,
     )
+
+
+CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
+
+
+def _mark_rod_slot_end_centres(adapter: Any, detail: Any) -> None:
+    """Centre-mark each round end of the rod slot in its 5:1 detail, each
+    arc picked at its far point along the slot axis (the draw_dt_cone_gear
+    D-bore recipe)."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    extension = _early_bound(draw.Extension, "IModelDocExtension")
+    for label, centre, deg in (
+        ("outer", _ROD_SLOT_OUTER, 0.0),
+        ("inner", _ROD_SLOT_INNER, 180.0),
+    ):
+        _activate_view(adapter, detail, label="rod slot detail")
+        pick = model_point_in_view(
+            adapter,
+            detail,
+            _rim_point(
+                centre, part_spec.ROD_SLOT_AXIS, part_spec.ROD_SLOT_WIDTH / 2.0, deg
+            ),
+            label=f"rod slot {label} end arc",
+        )
+        if not extension.SelectByID2(
+            "", "EDGE", pick[0], pick[1], 0.0, False, 0, null_callout(), 0
+        ):
+            raise RuntimeError(f"failed to select the rod slot {label} end arc")
+        mark = ddoc.InsertCenterMark3(CENTER_MARK_SINGLE, False, False)
+        draw.ClearSelection2(True)
+        if mark is None:
+            raise RuntimeError(f"failed to centre-mark the rod slot {label} end")
 
 
 def _add_datums(adapter: Any, front: Any, detail: Any) -> None:
