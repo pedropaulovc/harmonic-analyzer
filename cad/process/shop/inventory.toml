@@ -3467,13 +3467,14 @@ sku = "172270559990"
 source = "https://motionconstrained.com/store/hiwin-linear-guides/hiwin-hg-series-linear-guides/hg-rails-only/hiwin-hgr15r-linear-guideway-rail/"
 present = false
 verify = true
-purchase = "Special order / vendor quote required: 2 x HGR15R rails cut to 440 mm, seven holes at 60 mm pitch, symmetric E = 40 mm at both ends. Supplier must confirm this authored order requirement before purchase or drilling the jig bars."
-note = "Read live 2026-10-16: reseller lists HGR15RXXXC, 15 mm rail, 60 mm pitch, and says Order Rails in any Length. The selector does not offer 440 mm. Main-approved 440 replaces brief 420: carriage centre reaches 412.3 plus half-length 30.7 from spindle, requiring rail to reach 443 from near end 15. Custom length and symmetric E40 end pattern are unverified purchase requirements, not a quoted or listed stock variant."
+purchase = "Special order / vendor quote required: 2 x HGR15R rails cut to 440 mm. Current authored request is seven holes at 60 mm pitch, symmetric E = 40 mm; confirm the supplied pattern before drilling the shop-made base. E40 / seven holes is not a sourcing invariant."
+note = "Read live 2026-10-16: reseller lists HGR15RXXXC, 15 mm rail, 60 mm pitch, and says Order Rails in any Length. The selector does not offer 440 mm. Main-approved 440 replaces brief 420: carriage centre reaches 412.3 plus half-length 30.7 from spindle, requiring rail to reach 443 from near end 15. Custom length and supplied hole pattern require a vendor quote; the shop-made base can be tapped to match the rail. Keep this rail with its HIWIN carriage only because the matched McMaster pair's preload is unstated, not because of the hole pattern."
 cite = ["Motion Constrained part 172270559990, read 2026-10-16", "Rejected live 2026-10-16: https://www.mcmaster.com/6709K26/", "Rejected live 2026-10-16: https://www.mcmaster.com/6709K33/"]
-# McMaster comparison, live 2026-10-16: 6709K26 permits 440 mm custom length,
-# 15 x 15 mm section and 60 mm pitch, but "centered" holes do not specify
-# seven holes / E40. Stock 6709K33 has E20 and no 440 mm option. Keep HIWIN:
-# require the supplier's explicit 440/E40 quote, not an assumed custom pattern.
+# McMaster matched pair, live 2026-10-16: 6709K26 permits custom 440 mm,
+# 15 x 15 mm section / 60 mm pitch, paired with 6709K12 carriage.
+# The base is shop-made and can be tapped to its pattern; E40/seven holes
+# is not required for equivalence. The sole reason to keep the HIWIN pair
+# is unstated preload/clearance for the McMaster carriage.
 # Sources: https://www.mcmaster.com/6709K26/ and https://www.mcmaster.com/6709K33/
 
 [fixtures.trammel-hgh15ca-carriages]
@@ -3486,12 +3487,15 @@ verify = true
 purchase = "2 x HIWIN HGH-15-CA-Z0-C carriages for HGR15R, DigiKey/Midwest 4433-HGH-15-CA-Z0-C."
 note = "Read live 2026-10-16: DigiKey Marketplace lists HIWIN, HGH15CA series, 61.4 mm length, Z0 part number and 92 in stock. Rejected eBay 127866788929: photos show H15C/HG15 but not full Z0 part number. Rejected Motion Constrained HGH15CAZAC: published medium preload, not requested Z0."
 cite = ["DigiKey/Midwest 4433-HGH-15-CA-Z0-C, read 2026-10-16", "Rejected: https://www.ebay.com/itm/127866788929", "Rejected: https://motionconstrained.com/store/hiwin-linear-guides/hiwin-hg-series-linear-guides/hg-blocks-only/hiwin-hgh15cazac-square-block/", "Rejected live 2026-10-16: https://www.mcmaster.com/6709K12/", "Rejected live 2026-10-16: https://www.mcmaster.com/6709K11/", "Rejected live 2026-10-16: https://www.mcmaster.com/6688K18/"]
-# Rejected McMaster pair, live 2026-10-16: 6709K12 standard carriage with
-# corresponding 6709K26 rail. Drawing matches 26 x 26 M4 x 5 mm mounting,
-# 34 mm width and 28 mm assembled height, but length is 56.6 mm (table: 57),
-# versus HIWIN 61.4 mm; preload/accuracy are unstated, so Z0 is not established.
-# Do not mix McMaster carriages with HIWIN rails. 6709K11 flanged alternative
-# changes width to 47, assembled height to 24 and top threads to M5.
+# McMaster matched pair, live 2026-10-16: 6709K12 with corresponding 6709K26.
+# Drawing matches 26 x 26 M4 x 5 mm mounting, 34 mm width, 28 mm assembled height.
+# Length 56.6 mm (table: 57) versus HIWIN 61.4 is acceptable: on a 440 rail,
+# half-length 28.3 gives centre travel 28.3..411.7 mm, span 383.4 mm,
+# 4.8 mm more than HIWIN, before end-stop allowances. Shorter is not a blocker.
+# The sole blocker is no stated preload/clearance/no-play guarantee; perpendicular
+# play can move the jig pin and change the generated radius.
+# This is a matched McMaster pair comparison, not a proposal to mix brands.
+# 6709K11 flanged alternative changes width to 47, height to 24, top threads to M5.
 # Sources: https://www.mcmaster.com/6709K12/ and https://www.mcmaster.com/6709K11/
 # HIWIN manufacturer Z0/interface reference (not a substitute order code):
 # https://www.hiwin.de/en/Products/Linear-guideways/Blocks/Ball-guides/Series-HG-QH/HGH-QHH/HGH15CAZ0H/p/5-001622
