@@ -179,11 +179,14 @@ STEPS_SHEET_NUMBER = SHEET_NAMES.index(STEPS_SHEET) + 1
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the jig's primary sheet must remain landscape")
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
-# The jig is about 965 x 425 in plan: 1:4 for the arrangement, 1:8 for the
-# finished isometric and 1:10 for the BOM's collapsed reference.
+# The jig is about 965 x 425 in plan: 1:4 for the arrangement, 1:15 for the
+# finished isometric and 1:10 for the BOM's collapsed reference. The finished
+# view sits under the continued steps and the checks; review bought-r15's
+# step 4, 6 and 7 rewrites send step 11 to the right column, which leaves its
+# room about 63 tall, short of the 93 the view needs at 1:8.
 ASSEMBLED_SCALE = (1.0, 4.0)
 REFERENCE_SCALE = (1.0, 10.0)
-ISOMETRIC_SCALE = (1.0, 8.0)
+ISOMETRIC_SCALE = (1.0, 15.0)
 # The exploded clusters' scales, largest first. Every one is at most 1:2, so
 # every rung references the simplified configuration (the view policy) and
 # re-scaling a cluster never switches its configuration or its explode.

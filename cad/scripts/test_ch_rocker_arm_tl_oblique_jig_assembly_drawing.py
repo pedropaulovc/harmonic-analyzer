@@ -156,7 +156,7 @@ def test_sheets_are_landscape_with_their_scales() -> None:
         "RAIL BARS EXPLODED": (1.0, 5.0),
         "LEADSCREW FEED EXPLODED": (1.0, 3.0),
         "CARRIER EXPLODED": (1.0, 5.0),
-        "ASSEMBLY STEPS": (1.0, 8.0),
+        "ASSEMBLY STEPS": (1.0, 15.0),
     }
     assert drawing.SHEET_SCALE == (1.0, 4.0)
     assert drawing.SPEC.source_kind == "assembly"
