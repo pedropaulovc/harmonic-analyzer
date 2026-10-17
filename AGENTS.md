@@ -780,10 +780,11 @@ the rest of the builder reaches — reopens the model, deletes its named explode
 re-authors them with the builder's own function (`refresh_assembly.py <stem>
 explode`), with no insert/mate loop. The reopened model must reproduce its saved
 geometry proof, stay collapsed, and keep every top-level component pose
-numerically unchanged after re-authoring and in the re-saved model (else the proof
-stays retired and the next build is FULL); the proof is republished from the
-re-saved model, and the saved renders and `.dof.json` are kept. Only a
-builder whose sole use of that module is
+numerically unchanged after re-authoring and in the re-saved model; a failed
+EXPLODE falls back to a FULL build in the same task, since a failure before the
+save leaves the proof and ledger that chose EXPLODE in place. The proof is
+republished from the re-saved model, and the saved renders and `.dof.json` are
+kept. Only a builder whose sole use of that module is
 `author_in_drawing_configurations(adapter, ASM_NAME, lambda configuration:
 <fn>(adapter, configuration))` qualifies (on main: `pd_paper_drive`); an explode
 that takes other build state (`dt_drive_train`'s collar-pin roles) or lives inline

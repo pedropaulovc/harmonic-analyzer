@@ -21,9 +21,12 @@ exactly where a FULL build takes it. That fingerprint hashes the ``repr`` of
 rounded values, so a solver-noise sign flip of a zero rotation entry
 (``-0.0`` -> ``0.0``, observed on the paper drive's knob drive pins) changes
 it with nothing moved; the pose comparison is numeric and does not. If a
-check fails the tier raises with no proof on disk: the task fails, nothing is
-stamped or published, and the next build takes the FULL tier, which replaces
-the bytes. PNG renders, the free-DOF manifest and every other sidecar describe
+check fails the tier raises: the subprocess exits non-zero, a failure after
+the proof is retired leaves no proof on disk, and ``dodo.build_or_refresh``
+falls back to a FULL build in the same task, which replaces the bytes. A
+failure before the save leaves the bytes, proof and input ledger as they
+were, so without that fallback the next build would pick EXPLODE again and
+repeat it. PNG renders, the free-DOF manifest and every other sidecar describe
 the collapsed operational model, which is unchanged, so they are kept as saved.
 
 Kept outside every builder's import closure (refresh_assembly.py is its only

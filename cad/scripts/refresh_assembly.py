@@ -14,8 +14,10 @@ from the recorded per-input digests:
   (:func:`_explode_refresh.refresh_explode`).
 
 Fail loud: any dangling mate, free DOF, interference or geometry drift halts the
-refresh with a non-zero exit and leaves the ``.SLDASM`` unsaved -- recover with
-the full escape (delete the target + ``doit assembly:<stem>``).
+refresh with a non-zero exit and leaves the ``.SLDASM`` unsaved. A failed
+``parts`` refresh needs the full escape (delete the target + ``doit
+assembly:<stem>``); ``dodo.build_or_refresh`` follows a failed ``explode``
+refresh with a FULL build in the same task.
 
 Run (SolidWorks already open)::
 
