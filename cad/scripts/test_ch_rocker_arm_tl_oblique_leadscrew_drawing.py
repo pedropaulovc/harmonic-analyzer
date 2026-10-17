@@ -674,10 +674,19 @@ def test_details_carry_the_near_station_and_the_printed_flat() -> None:
         x
         < draw.detail_xy(near.centre_mm, near.centre, spec.FLAT_STATIONS["NearKP08"])[0]
     )
-    assert wheel.keep["FlatLength"][0] == pytest.approx(
-        draw.detail_xy(wheel.centre_mm, wheel.centre, spec.FLAT_STATIONS["Handwheel"])[
-            0
-        ]
+    # The flat length's text stands right of the flat's far-end extension line
+    # (review jbf-r17, rule 14), its widest row clear of the line and of the
+    # title block.
+    flat_end = draw.detail_xy(
+        wheel.centre_mm,
+        wheel.centre,
+        spec.FLAT_STATIONS["Handwheel"] + spec.FLAT_LENGTH / 2.0,
+    )[0]
+    text_x = wheel.keep["FlatLength"][0]
+    assert text_x - draw.FLAT_LENGTH_TEXT_HALF_WIDTH > flat_end
+    assert text_x + draw.FLAT_LENGTH_TEXT_HALF_WIDTH < draw.TITLE_BLOCK[0]
+    assert draw.FLAT_LENGTH_TEXT_HALF_WIDTH * 2 > 0.0022 * len(
+        draw.FLAT_CALLOUTS["FlatLength"]
     )
     # The across-flat's dimension line stands left of E's fence, short of the
     # flat's start (so its extension line leaves the fence over the flat, not

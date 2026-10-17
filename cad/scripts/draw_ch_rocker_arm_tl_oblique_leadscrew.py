@@ -265,7 +265,8 @@ _NEAR_XY = (0.043, DETAIL_ROW_Y)
 _FAR_CENTRE_MM = FLAT_STATIONS["FarKP08"]
 _FAR_XY = (0.091, DETAIL_ROW_Y)
 # E: the handwheel's flat and the far end (394.5 .. 410), the printed flat's
-# length under the fence and its across-flat left of it, square to the axis:
+# length under the fence, right of the flat, and its across-flat left of it,
+# square to the axis:
 # its extension line off the flat runs back along the flat and out of the
 # fence over 0.6 mm of thread (right of it, it would run 7.5 mm along the
 # unflatted thread to the far end, reading as the flat running out there).
@@ -277,6 +278,12 @@ _WHEEL_XY = (0.1615, DETAIL_ROW_Y)
 # The across-flat runs from the far crest (clock 180, radius -4) to the flat
 # (FLAT_AF - 4 toward clock 0): its middle stands at half their sum.
 _AF_MID_RADIUS_MM = (FLAT_AF - MAJOR_DIA) / 2.0
+# The flat length's text (widest row "5X, ALL FLATS", about 29 mm) is wider
+# than the flat's 24 mm at 3:1, so it stands right of the flat's far-end
+# extension line, its dimension line run out to it (review jbf-r17, rule 14:
+# both extension lines crossed the text).
+FLAT_LENGTH_TEXT_HALF_WIDTH = 0.0155
+FLAT_LENGTH_TEXT_GAP = 0.003
 END_DETAILS = (
     EndDetail(
         "C",
@@ -312,11 +319,15 @@ END_DETAILS = (
         # Right of the far end, level with the axis.
         (sheet_x(LENGTH) + 0.008, MAIN_CENTER[1]),
         {
-            "FlatLength": detail_xy(
-                _WHEEL_CENTRE_MM,
-                _WHEEL_XY,
-                FLAT_STATIONS["Handwheel"],
-                _text_row_radius_mm(),
+            "FlatLength": (
+                detail_xy(
+                    _WHEEL_CENTRE_MM,
+                    _WHEEL_XY,
+                    FLAT_STATIONS["Handwheel"] + FLAT_LENGTH / 2.0,
+                )[0]
+                + FLAT_LENGTH_TEXT_GAP
+                + FLAT_LENGTH_TEXT_HALF_WIDTH,
+                detail_xy(_WHEEL_CENTRE_MM, _WHEEL_XY, 0.0, _text_row_radius_mm())[1],
             ),
             "FlatAF": detail_xy(
                 _WHEEL_CENTRE_MM,
