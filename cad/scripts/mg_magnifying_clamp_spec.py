@@ -189,10 +189,10 @@ if not ROD_TAP_DRILL_DEPTH_MAX < LEVER_BORE_Y - _HEIGHT_BAND - _LEVER_BORE_R_MAX
 # --- Squareness ----------------------------------------------------------------
 # The MHA-MG-004 rod seats on the bottom face, so it hangs at the lever bore's
 # angle to that seat: the title block's +/-1 deg on the drawn 90 deg.  1 deg
-# along the lever swings the wire hook (60.00 under the bore axis, 10.23 toward
+# along the lever swings the wire hook (60.00 under the bore axis, 10.02 toward
 # the knife) 1.05 along the lever and 0.17 vertically, moving the wire moment
-# arm (error_budget.wire_moment_arm) 1.25 of 55.86 at the collar pose (2.2 %),
-# 1.07 of 166.65 at the 165 station (0.6 %) and 0.93 of 208.23 at the rod tip
+# arm (error_budget.wire_moment_arm) 1.25 of 56.11 at the collar pose (2.2 %),
+# 1.07 of 166.87 at the 165 station (0.6 %) and 0.93 of 208.42 at the rod tip
 # (0.4 %).  The ratio is common-mode (tolerance-policy.md: the calibration run
 # removes it; error_budget.yaml carries no clamp row) and the operator sets the
 # station by the k=0 normalisation, so fit-up absorbs it (rule 19).  Rotation

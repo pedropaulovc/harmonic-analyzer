@@ -4,7 +4,8 @@ PURE DATA, no SolidWorks/COM imports.  The shape is
 ``mg_output_fixture_geom``'s (the assembly and the wire read that module, not
 this one); this module adds what the print states about it: the marked model
 dimensions and their places, the walls at the worst case of the title block's
-rows, the walls the sheet states, and the manufacturing notes.
+rows (each holds the 2.0 target, so the sheet states none), and the
+manufacturing notes.
 
 Sheet datums: the rod bore is the datum along the hex axis.  The bore is
 dimensioned from the free end and to the spigot face (the thumb screw's
@@ -12,9 +13,9 @@ reach and the tap's wall are one dimension each, not a stack); the lathe's
 own lengths run from the faced spigot end: the shoulder (the spigot's
 length) and the groove.  The overall length is REF.  The rod bore is centred
 on the hex axis: the end view draws its axis through the tap's centre, and
-the stated bore-to-flat wall is the centring's acceptance.  The stations
-are dimensions on the model (``build_mg_output_fixture``), so the sheet only
-proves it imported them.
+the walls take the drill's run-off as its only offset from that axis.  The
+stations are dimensions on the model (``build_mg_output_fixture``), so the
+sheet only proves it imported them.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ from mg_output_fixture_geom import (
     FREE_END_X,
     GROOVE_RADIUS,
     GROOVE_ROOT_DIA,
-    GROOVE_X,
+    GROOVE_STATION,
     HEX_AF,
     HEX_CORNER_RADIUS,
     HEX_LENGTH,
@@ -54,9 +55,8 @@ from mg_output_fixture_geom import (
 TAP_SPEC = _geom.TAP_SPEC
 
 # The bore's station back from the spigot face (the bore axis is the part
-# origin), and the groove's from the same face.
+# origin); the groove's runs from the same face (mg_output_fixture_geom).
 BORE_STATION = SPIGOT_FACE_X
-GROOVE_STATION = SPIGOT_FACE_X - GROOVE_X
 
 # Drill wander, restated (mg_magnifying_clamp_spec's precedent) so this recipe
 # does not import other parts' closures: linear start wander and angular
@@ -74,7 +74,7 @@ def _wander(depth_mm: float) -> float:
 # --- Places each printed dimension carries ---------------------------------------
 # Every length and turned Ø prints at the title block's .XX; none carries its
 # own band (drawing-guidelines.md rule 3: the places carry the tolerance).
-# The bar's flats: the exact 3/8 in, printed as a stock reference, (9.525).
+# The bar's flats: the exact 7/16 in, printed as a stock reference (11.113).
 HEX_AF_PLACES = 3
 ROD_STATION_PLACES = 2
 SPIGOT_LENGTH_PLACES = 2
@@ -87,7 +87,7 @@ GROOVE_ROOT_DIA_PLACES = 2
 # largest acceptable concave radius; swTolMAX prints the model value, so the
 # model IS the limit).  Any smaller radius narrows the mouth and thickens both
 # lips; at the title block's .X (R up to 2.0) the face-side lip falls under
-# the floor (test_mg_output_fixture_drawing proves it).
+# the wall target (test_mg_output_fixture_drawing proves it).
 GROOVE_RADIUS_PLACES = 1
 GROOVE_RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # The drilled rod bore prints at one place; its band is the title block's
@@ -108,9 +108,9 @@ REFERENCE_DIMENSIONS = frozenset({"HexAf", "OverallLength"})
 
 # --- Printed limits ----------------------------------------------------------------
 # An assumption, not a printed band: the flats as supplied stay within
-# +/-0.13 of 3/8 in (the .XXX row this size printed under before it became a
-# stock reference).  Every wall, the spigot's clean-up and the tap's reach
-# below hold at it.
+# +/-0.13 of 7/16 in (the band MG-002's same bar assumes,
+# mg_magnifying_clamp_geom.HEX_AF_BAND).  Every wall, the spigot's clean-up
+# and the tap's reach below hold at it.
 HEX_STOCK_AF_BAND = 0.13
 _ROD_STATION_LO, _ = printed_deviations(ROD_STATION, ROD_STATION_PLACES)
 _SPIGOT_LENGTH_LO, _SPIGOT_LENGTH_HI = printed_deviations(
@@ -175,34 +175,26 @@ if not GROOVE_FILLET_CLEARANCE > 0.0:
         "MHA-MG-006 groove runs into the shoulder's corner at the worst case"
     )
 # The shoulder's corner radius stays on the shoulder face, inside the flats'
-# annulus round the spigot.  On the thinnest bar the largest radius may roll
-# a few microns onto a flat's edge: inside the title block's R0.25 edge break,
-# so the bar's stock assumption never rejects a part the radius passes.
+# annulus round the spigot, even on the thinnest bar.
 SHOULDER_ANNULUS = (HEX_AF - SPIGOT_DIA) / 2.0
-if not SHOULDER_FILLET_R_MAX < SHOULDER_ANNULUS:
+SHOULDER_ANNULUS_MIN = (HEX_AF - HEX_STOCK_AF_BAND - SPIGOT_DIA) / 2.0
+if not SHOULDER_FILLET_R_MAX < SHOULDER_ANNULUS_MIN:
     raise AssertionError("MHA-MG-006 shoulder radius runs off the shoulder face")
-TITLE_BLOCK_EDGE_BREAK = 0.25
-SHOULDER_FILLET_FLAT_OVERRUN_MAX = SHOULDER_FILLET_R_MAX - (
-    (HEX_AF - HEX_STOCK_AF_BAND - SPIGOT_DIA) / 2.0
-)
-if not SHOULDER_FILLET_FLAT_OVERRUN_MAX < TITLE_BLOCK_EDGE_BREAK:
-    raise AssertionError("MHA-MG-006 shoulder radius breaks a flat past the edge break")
 
 # --- Walls at the printed worst case (drawing-guidelines.md rule 17 (walls and webs)) ----------------------------
 # (nominal, worst).  Drilled walls take the drill's wander over its depth;
-# turned walls do not.  The bore-to-flat wall is the bore centred on the
-# thinnest stock at its largest drilled Ø; how far off centre the bore may
-# stand is what the sheet's stated MIN accepts (below), not a printed band.
+# turned walls do not.  The bore is centred by the hex sketch's symmetry, with
+# no printed location: its worst offset from the hex axis is the drill's
+# corner-to-corner run-off.
 WALL_TARGET = 2.0
-WALL_FLOOR = 1.5
-BORE_WALL_NAME = "rod bore to a flat"
+BORE_OFFSET_MAX = BORE_WANDER
 # The far side of the groove from the spigot face: where the tap's run-off
 # under the groove's root is largest.
 _GROOVE_FAR_DEPTH = GROOVE_STATION + _GROOVE_HI + GROOVE_RADIUS_MAX
 WALLS: dict[str, tuple[float, float]] = {
-    BORE_WALL_NAME: (
+    "rod bore to a flat": (
         (HEX_AF - ROD_BORE_DIA) / 2.0,
-        (HEX_AF - HEX_STOCK_AF_BAND) / 2.0 - ROD_BORE_R_MAX,
+        (HEX_AF - HEX_STOCK_AF_BAND) / 2.0 - ROD_BORE_R_MAX - BORE_OFFSET_MAX,
     ),
     "rod bore to the free end": (
         ROD_STATION - ROD_BORE_DIA / 2.0,
@@ -224,51 +216,15 @@ WALLS: dict[str, tuple[float, float]] = {
         (GROOVE_ROOT_DIA + _ROOT_LO) / 2.0 - _THREAD_R_MAX - _wander(_GROOVE_FAR_DEPTH),
     ),
 }
+# Every wall holds the target at the worst case (the owner's 2026-10-16
+# ruling, #1559), so the sheet states none (drawing-guidelines.md rule 20).
 for _name, (_nominal, _worst) in WALLS.items():
-    if _worst < WALL_FLOOR - 1e-9:
+    if _worst < WALL_TARGET - 1e-9:
         raise AssertionError(
-            f"MHA-MG-006 {_name} wall {_worst:.3f} under the {WALL_FLOOR} floor "
+            f"MHA-MG-006 {_name} wall {_worst:.3f} under the {WALL_TARGET} target "
             "at the printed worst case"
         )
 
-
-def floor_2(value: float) -> float:
-    """A MIN on the sheet never rounds up past the arithmetic."""
-    return math.floor(value * 100.0 + 1e-9) / 100.0
-
-
-# --- Stated walls (drawing-guidelines.md rule 20) ----------------------------------
-# Every wall under the 2.0 target at the printed worst case is stated on the
-# sheet as a plain MIN, never above that worst case nor under the floor.  The
-# bore-to-flat MIN is the 1.97 pending its exception ruling (#1433); it sits
-# below the centred worst wall (the difference is the centring it accepts).
-STATED_WALL_MINS: dict[str, float] = {
-    BORE_WALL_NAME: 1.97,
-    "rod bore to the free end": floor_2(WALLS["rod bore to the free end"][1]),
-    "groove lip to the spigot face": floor_2(WALLS["groove lip to the spigot face"][1]),
-    "groove root over the thread major": floor_2(
-        WALLS["groove root over the thread major"][1]
-    ),
-}
-for _name, (_nominal, _worst) in WALLS.items():
-    _stated = STATED_WALL_MINS.get(_name)
-    if _worst < WALL_TARGET - 1e-9 and _stated is None:
-        raise AssertionError(f"MHA-MG-006 {_name} wall under the target is unstated")
-    if _stated is not None and not WALL_FLOOR <= _stated <= floor_2(_worst):
-        raise AssertionError(
-            f"MHA-MG-006 stated {_name} MIN {_stated:.2f} outside "
-            f"[{WALL_FLOOR}, {floor_2(_worst):.2f}]"
-        )
-BORE_WALL_STATED_MIN = STATED_WALL_MINS[BORE_WALL_NAME]
-# The centring the stated MIN accepts on the thinnest stock at the largest
-# drilled Ø (the drill's corner-to-corner run-off, BORE_WANDER, is larger:
-# such a part is rejected by the MIN, not passed by a band).
-BORE_CENTRING_ACCEPTED = WALLS[BORE_WALL_NAME][1] - BORE_WALL_STATED_MIN
-# The farthest the bore axis may stand off the hex axis on a part the stated
-# MIN accepts: the widest stock, the smallest bore.
-BORE_OFFSET_MAX = (
-    (HEX_AF + HEX_STOCK_AF_BAND) / 2.0 - ROD_BORE_R_MIN - BORE_WALL_STATED_MIN
-)
 
 # --- The thumb screw (McMaster 91882A221) ------------------------------------------
 # Its tip pushes the rod against the bore's far wall: the reach it needs runs
@@ -303,7 +259,7 @@ BOTTOMING_TAP_LEAD = BOTTOMING_TAP_CHAMFER_THREADS[1] * THREAD_PITCH
 if not TAP_SHANK_DIA > THREAD_MAJOR:
     raise AssertionError("MHA-MG-006 tap shank enters its own thread")
 # The bore's half-chord at the thread's widest reach off the bore axis: the
-# major envelope, with the bore off centre by all the stated MIN accepts.
+# major envelope, with the bore off centre by the drill's run-off.
 THREAD_HALF_CHORD = math.sqrt(
     ROD_BORE_R_MIN**2 - (_THREAD_R_MAX + BORE_OFFSET_MAX) ** 2
 )
@@ -409,22 +365,9 @@ TAP_CALLOUT_PRECISION = {
     TAP_DRILL_DEPTH_VARIABLE: TAP_DEPTH_PLACES,
     TAP_THREAD_DEPTH_VARIABLE: TAP_DEPTH_PLACES,
 }
-STOCK_NOTE = "3/8 HEX BAR, FLATS AS SUPPLIED."
-_MIN = STATED_WALL_MINS
-# Pending exception ruling: MHA-MG-006 bore-to-flat wall (#1433).  The bore's
-# walls, then the groove's (rule 20: stated as plain facts).
-BORE_WALL_NOTE = (
-    f"BORE TO FLAT WALL {_MIN[BORE_WALL_NAME]:.2f} MIN; "
-    f"BORE TO FREE END WALL {_MIN['rod bore to the free end']:.2f} MIN."
-)
-GROOVE_WALL_NOTE = (
-    f"GROOVE TO FACE WALL {_MIN['groove lip to the spigot face']:.2f} MIN; "
-    f"GROOVE ROOT TO THREAD WALL {_MIN['groove root over the thread major']:.2f} MIN."
-)
+STOCK_NOTE = "7/16 HEX BAR, FLATS AS SUPPLIED."
 # The thread's extent: the rod bore ends it; the callout prints the native
 # thread depth, its nominal, as (REF).
 TAP_EXTENT_NOTE = "FULL THREAD TO ROD BORE."
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): four rows.
-DRAWING_NOTES = "\n".join(
-    (STOCK_NOTE, BORE_WALL_NOTE, GROOVE_WALL_NOTE, TAP_EXTENT_NOTE)
-)
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): two rows.
+DRAWING_NOTES = "\n".join((STOCK_NOTE, TAP_EXTENT_NOTE))
