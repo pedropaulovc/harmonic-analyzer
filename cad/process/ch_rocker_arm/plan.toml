@@ -22,7 +22,7 @@
 #   J1  bench vise: press the hub in
 #   P1  mill: indicate the hub OD, ream Ø6.5, face hub side A, spot and drill the #47
 #   P2  mill: flip, face hub side B to length
-#   V1/V2 mill vise swivelled 43.77 deg on pins in A/C: side-mill each taper   BLOCKED: prechips #300
+#   V1/V2 mill vise swivelled 40.89 deg, set on pins in A/C: side-mill each taper   BLOCKED: prechips #300
 #   F1  bench: deburr, inspect, black oxide
 # Each BLOCKED setup is left out until the prechips release that expresses it is pinned; the
 # plan does not work around a missing prechips feature.
