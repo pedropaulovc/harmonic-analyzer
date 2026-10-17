@@ -104,3 +104,15 @@ def test_the_template_edge_is_mid_zone_on_every_segment() -> None:
             low, high = check.zone_readings(name, point)
             assert low == pytest.approx(-half, abs=0.005)
             assert high == pytest.approx(half, abs=0.005)
+
+
+def test_the_guard_spends_half_the_templates_printed_profile(monkeypatch) -> None:
+    """The template's share of each guard is half its printed surface
+    profile (the TL-13 sheet's one zone), and the procedure cites that zone."""
+    assert template.DTI_ACCEPTANCE == template.OUTLINE_PROFILE_ZONE / 2.0
+    monkeypatch.setattr(template, "LOCATOR_REGISTRATION_MAX", 0.0)
+    assert template.clocking_error((0.0, 8.0), (0.0, 1.0), play=0.0) == pytest.approx(
+        template.OUTLINE_PROFILE_ZONE / 2.0
+    )
+    zone = f"{template.OUTLINE_PROFILE_ZONE:g} mm surface profile to A|C"
+    assert zone in check.method_steps()[-1]
