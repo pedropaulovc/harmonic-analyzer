@@ -92,6 +92,7 @@ from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 import pd_latch_hook_geometry as hook_geometry
+import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_explode_spec as explode
 import pd_platen_guide_spec as platen_guide
@@ -1375,7 +1376,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         # The hook's Ø3.3 pin hole is match-drilled from the pin at that mesh,
         # then the hook is hardened and refitted with the hole's lower edge on
         # the pin before its screws are tightened, so the unclamped arm has no
-        # room to fall and open the mesh (steps.LATCH_SLACK_ALONG; Codex P1 on
+        # room to fall and open the mesh (rack_setup.LATCH_SLACK_ALONG; Codex P1 on
         # b2eb9a0e1).
         "hook-pin-hole-match-drilled": (
             f"HOLDING THAT MESH, MARK THE {_N['vn-transgear-latch-pin']} PIN'S "
@@ -1578,7 +1579,7 @@ def format_step_notes(*, operating_domain: RackOperatingDomain) -> StepNotes:
 
 def require_step_notes() -> StepNotes:
     """Guard the full paper sweep on the finite rack before printing."""
-    return format_step_notes(operating_domain=steps.feed_rack_operating_domain())
+    return format_step_notes(operating_domain=rack_setup.feed_rack_operating_domain())
 
 
 # The exploded view's caption at each scale it may take.

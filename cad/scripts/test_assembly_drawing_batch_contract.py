@@ -150,12 +150,15 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_ms_measuring_stick_assembly:
             scripts_dir = Path(draw_ms_measuring_stick_assembly.__file__).resolve().parent
-            # The spec module (poses, explode plan, steps text) and the pure
-            # part/vendor specs whose constants the sheets print.
+            # The builder spec (poses), the explode spec, the sheet module
+            # (BOM and steps text) and the pure part/vendor specs whose
+            # constants the sheets print.
             assert {
                 str(scripts_dir / name)
                 for name in (
                     "ms_measuring_stick_assembly_spec.py",
+                    "ms_measuring_stick_explode_spec.py",
+                    "ms_measuring_stick_assembly_sheet.py",
                     "ms_stop_spec.py",
                     "ms_stick_spec.py",
                     "_mcmaster_91882a221.py",

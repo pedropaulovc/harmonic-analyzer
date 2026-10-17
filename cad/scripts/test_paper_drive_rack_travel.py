@@ -9,14 +9,14 @@ import pytest
 from _printed_tolerance import printed_deviations
 import paper_drive_geom as geometry
 import paper_drive_mesh_check as mesh
+import paper_drive_rack_setup as rack_setup
 import paper_drive_rack_travel as travel
-import pd_paper_drive_assembly_steps as steps
 import pd_platen_rack_spec as rack
 
 
 @pytest.fixture(scope="module")
 def domain():
-    return steps.feed_rack_operating_domain()
+    return rack_setup.feed_rack_operating_domain()
 
 
 def test_window_clips_the_contact_path_and_one_pitch_inside_the_shortest_cut(domain):

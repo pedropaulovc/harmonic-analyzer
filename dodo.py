@@ -3683,12 +3683,25 @@ def task_check():
                 str((SCRIPTS_DIR / "test_part_coverage.py").resolve()),
                 *part_script_deps,
                 *(str(script_for(stem).resolve()) for stem in ASSEMBLY_ORDER),
+                # test_assembly_sheet_isolation walks every builder's import
+                # closure and scans the sheet/steps sources; it imports none.
+                *(
+                    dep
+                    for stem in ASSEMBLY_ORDER
+                    for dep in module_deps_of(script_for(stem))
+                ),
+                *(
+                    str(path.resolve())
+                    for pattern in ("*_assembly_sheet.py", "*_steps.py")
+                    for path in sorted(SCRIPTS_DIR.glob(pattern))
+                ),
                 config_py,
             ],
             "cmd": [
                 *pytest_cmd,
                 str(SCRIPTS_DIR / "test_buildgraph.py"),
                 str(SCRIPTS_DIR / "test_part_coverage.py"),
+                str(SCRIPTS_DIR / "test_assembly_sheet_isolation.py"),
             ],
         },
         "nameplate": {
