@@ -23,14 +23,17 @@ DFM rule"):
   the face, never the rod tip on incomplete thread);
 * the plug tap's five-pitch lead fits between the deepest printed thread and
   the shallowest printed drill depth;
-* the die run-out ends in the relief and the relief stays under the 2A root.
+* the die run-out ends in the relief and the relief stays under the 2A root;
+* the relief's two root fillets (r2 machinist review, rules 11 and 16) fit
+  the narrowest relief and stand inside the tap's minor (so under the thread
+  step too), so the shoulder's seat annulus on the clamp face stays flat.
 """
 
 from __future__ import annotations
 
 import math
 
-from _hole_spec import THREAD_MAJOR_MM, HoleSpec
+from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 
 MM_PER_IN = 25.4
 
@@ -76,6 +79,16 @@ RELIEF_DIA_MAX = RELIEF_DIA
 RELIEF_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX
 RELIEF_WIDTH = 1.50
 RELIEF_WIDTH_PLACES = 2
+# Both internal corners of the relief (thread end to floor, floor to
+# shoulder) carry the grooving tool's nose as the single limit "R0.2 MAX"
+# (swTolMAX: the model sits at the printed maximum, any smaller nose down to
+# sharp is accepted). The shoulder-side root's outer edge, at the largest
+# relief Ø and the largest radius, is RELIEF_ROOT_OUTER_DIA, checked below to
+# stand inside the tap's mouth: the clamp face never meets the fillet.
+RELIEF_ROOT_R = 0.2
+RELIEF_ROOT_R_PLACES = 1
+RELIEF_ROOT_R_TOL_TYPE = 6  # swTolType_e.swTolMAX
+RELIEF_ROOT_OUTER_DIA = RELIEF_DIA_MAX + 2.0 * RELIEF_ROOT_R  # 2.25
 
 ROD_THREAD_LEN_MIN = ROD_THREAD_LEN + ROD_THREAD_LEN_BAND[1]
 ROD_THREAD_LEN_MAX = ROD_THREAD_LEN + ROD_THREAD_LEN_BAND[0]
@@ -122,6 +135,9 @@ ROD_TAP_THREAD_DEPTH_MIN = ROD_TAP_THREAD_DEPTH - HOLE_DEPTH_BAND
 ROD_TAP_THREAD_DEPTH_MAX = ROD_TAP_THREAD_DEPTH + HOLE_DEPTH_BAND
 ROD_TAP_DRILL_DEPTH_MIN = ROD_TAP_DRILL_DEPTH - HOLE_DEPTH_BAND
 ROD_TAP_DRILL_DEPTH_MAX = ROD_TAP_DRILL_DEPTH + HOLE_DEPTH_BAND
+# The tapped hole's minor Ø is its tap drill's (the tap never cuts the
+# minor), and drilled holes print +0.10/0, so the mouth is never smaller.
+ROD_TAP_MINOR_DIA = blind_cut_dia_mm(ROD_TAP_SPEC)  # 2.261, #43
 
 # --- import-time worst-case guards -------------------------------------------
 if ENGAGEMENT_WORST < ENGAGEMENT_MIN - 1e-9:
@@ -145,3 +161,12 @@ if RELIEF_DIA_MAX > THREAD_ROOT_2A_MIN + 1e-9:
     )
 if not THREAD_BASIC_MINOR > RELIEF_DIA_MAX:
     raise AssertionError("MHA-MG-004 tip chamfer runs below the relief")
+if round(RELIEF_ROOT_R, RELIEF_ROOT_R_PLACES) != RELIEF_ROOT_R:
+    raise AssertionError("MHA-MG-004 relief root MAX does not print as its model")
+if 2.0 * RELIEF_ROOT_R > RELIEF_WIDTH_MIN + 1e-9:
+    raise AssertionError("MHA-MG-004 relief roots meet at the narrowest relief")
+if not RELIEF_ROOT_OUTER_DIA < ROD_TAP_MINOR_DIA:
+    raise AssertionError(
+        f"MHA-MG-004 shoulder-side relief root Ø{RELIEF_ROOT_OUTER_DIA:.3f} reaches "
+        f"the seat annulus outside the MHA-MG-002 tap mouth Ø{ROD_TAP_MINOR_DIA:.3f}"
+    )
