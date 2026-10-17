@@ -16,6 +16,10 @@ through an object store. A machine WITHOUT a SolidWorks seat can then download a
 prebuilt ``.SLDPRT``/``.SLDASM`` for an unchanged input set instead of failing on
 COM; a CI builder with a seat populates the cache for everyone else.
 
+The submitter-only ``check:machinist_review:<stem>`` leaves use the same cache
+to freeze their aggregate verdict and retained evidence for unchanged review
+inputs. They neither need a COM seat nor dispatch to the farm.
+
 Design notes / invariants:
 
 * **Content-addressed, input-keyed.** We key by INPUTS, never by the task's own
@@ -559,7 +563,6 @@ def require_refresh_store(label: str, outcome: str) -> str:
     if forced_refresh(label) is not None and outcome != "stored":
         raise RuntimeError(f"{label}: forced cache refresh did not store outputs ({outcome})")
     return outcome
-
 
 def _mode() -> str:
     env = os.environ.get("HARMONIC_REMOTE_CACHE_MODE")

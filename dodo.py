@@ -21,6 +21,7 @@ Task groups (the prefix says whether SolidWorks is required):
   package:features   aggregate every feature bundle (NO SolidWorks)
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
+  check:machinist_review:<stem> cached blind reviews + judge (NO SolidWorks)
   prechips:<stem>    strict manufacturing traveler (NO SolidWorks; FreeCAD)
   export             neutral STEP/STL/glTF/scene export (COM)
   release            cut a tagged GitHub release (COM + gh; opt-in)
@@ -72,6 +73,7 @@ import hashlib
 import math
 import os
 import re
+import json
 import shutil
 import socket
 import subprocess
@@ -107,6 +109,7 @@ from _buildgraph import (  # noqa: E402
     ASSEMBLY_ORDER,
     CAD_OUT,
     POST_ASSEMBLY,
+    RECIPE_SKIP_MODULES,
     SCRIPTS_DIR,
     ASSEMBLY_CONTRACTS_TOKEN,
     all_config_files,
@@ -143,6 +146,10 @@ import _telemetry  # noqa: E402  (observability spine: console logging + tracing
 from _drawing_registry import (  # noqa: E402
     DRAWING_TEMPLATES,
     DRAWINGS_BY_NAME,
+)
+from _machinist_review_mode import (  # noqa: E402
+    MachinistReviewMode,
+    mode_for_drawing,
 )
 
 # A farm leaf execution (rw) opens its cache connection while the graph loads,
@@ -626,6 +633,8 @@ def _stage_name(label: str) -> str:
         return "verify-" + label.split(None, 2)[1]
     if label.startswith("prechips:"):
         return "prechips-traveler"
+    if label.startswith("check:machinist_review:"):
+        return "check-machinist-review"
     if label.startswith("check "):
         return "check-" + label.split(None, 2)[1]
     if label.startswith("cut release") or label in ("release", "package:release"):
@@ -3043,6 +3052,198 @@ def task_verify():
     }
 
 
+# Review inputs are deliberately independent of the draw recipe and registry.
+# The CLI receives its PDF, package name and kind explicitly; only the PDF's
+# bytes, the package's exceptions and the review implementation/rubric matter.
+# Keep the non-inert local-import closure pinned in test_machinist_review_leaf.
+_MACHINIST_REVIEW_MODULES = (
+    "machinist_review.py",
+    "machinist_review_sheets_mcp.py",
+    "machinist_exceptions.py",
+)
+
+
+def _machinist_review_file_deps(stem: str) -> list[str]:
+    spec = DRAWINGS_BY_NAME[stem]
+    dashed = stem.replace("_", "-")
+    if spec.source_kind == "part":
+        exceptions = CONFIG_DIR / "parts" / f"{dashed}.yaml"
+    else:
+        exceptions = (
+            CONFIG_DIR / "assemblies" / f"{dashed.removesuffix('-assembly')}.yaml"
+        )
+    # Selecting only this kind's prompt also keys --kind without hashing the
+    # registry. All shared reviewer/judge prompts and schemas are included.
+    other_kind = "assembly" if spec.source_kind == "part" else "part"
+    prompts = [
+        path for path in (SCRIPTS_DIR / "prompts").iterdir()
+        if path.is_file() and path.name != f"machinist_review_{other_kind}.md"
+    ]
+    return sorted({
+        str(path.resolve())
+        for path in (
+            spec.outputs["pdf"],
+            *(
+                SCRIPTS_DIR / name
+                for name in _MACHINIST_REVIEW_MODULES
+                if name not in RECIPE_SKIP_MODULES
+            ),
+            *prompts,
+            SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
+            *([exceptions] if exceptions.is_file() else []),
+        )
+    })
+
+
+def _machinist_review_dir(stem: str) -> Path:
+    return (REPORTS / "machinist-review" / stem).resolve()
+
+
+def _machinist_review_stamp(stem: str) -> Path:
+    return REPORTS / f"check-machinist-review-{stem}.ok"
+
+
+def _machinist_review_command(stem: str) -> list[str]:
+    spec = DRAWINGS_BY_NAME[stem]
+    return [
+        sys.executable, str(SCRIPTS_DIR / "machinist_review.py"),
+        "--pdf", str(spec.outputs["pdf"]), "--name", stem,
+        "--kind", spec.source_kind, "--runs", "3",
+        "--report-dir", str(_machinist_review_dir(stem)),
+    ]
+
+
+def _read_machinist_aggregate(stem: str) -> dict[str, Any]:
+    path = _machinist_review_dir(stem) / f"{stem}.aggregate.json"
+    aggregate = json.loads(path.read_text(encoding="utf-8"))
+    if (
+        not isinstance(aggregate, dict)
+        or aggregate.get("name") != stem
+        or aggregate.get("kind") != DRAWINGS_BY_NAME[stem].source_kind
+        or aggregate.get("verdict") not in ("SHIP", "FIX", "ERROR")
+        or type(aggregate.get("gating_count")) is not int
+        or aggregate["gating_count"] < 0
+        or (aggregate.get("error") is not None
+            and not isinstance(aggregate["error"], str))
+    ):
+        raise ValueError(f"{path}: invalid machinist aggregate")
+    return aggregate
+
+
+def _evaluate_machinist_review(
+    stem: str, mode: MachinistReviewMode, aggregate: dict[str, Any]
+) -> None:
+    verdict = aggregate["verdict"]
+    error = aggregate.get("error")
+    if verdict == "SHIP" and error is None:
+        return
+    path = _machinist_review_dir(stem) / f"{stem}.aggregate.json"
+    message = (
+        f"check:machinist_review:{stem}: {verdict}, "
+        f"gating_count={aggregate['gating_count']}; {path}"
+    )
+    if error:
+        message += f"; {error}"
+    no_verdict = verdict == "ERROR" or error is not None
+    if mode is MachinistReviewMode.ENFORCE or (
+        no_verdict and _cache.forced_refresh(f"check:machinist_review:{stem}") is not None
+    ):
+        raise RuntimeError(message)
+    _telemetry.warn(message)
+
+
+@_cache.keyed_action
+def _cached_machinist_review_action(stem: str, mode: MachinistReviewMode) -> None:
+    """Review on the submitter, caching verdicts BEFORE enforcing their policy.
+
+    Cache the complete leaf directory, including attempt evidence and per-run
+    reports: no transcripts or source snapshots are pruned from the payload.
+    Provider/runner errors never publish and never leave a freshness stamp.
+    """
+    label = f"check:machinist_review:{stem}"
+    directory = _machinist_review_dir(stem)
+    stamp = _machinist_review_stamp(stem)
+    stamp.unlink(missing_ok=True)
+    with _telemetry.span(
+        f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as probe:
+        key = _cache_key(_machinist_review_file_deps(stem), label)
+        try:
+            # Restore into a clean evidence directory: an archive must not be
+            # mixed with attempts retained under a previous input key.
+            if directory.exists():
+                shutil.rmtree(directory)
+            probed = _probe_cache(key, [directory], label, probe)
+        except (OSError, _cache.RestoreLocked) as error:
+            _evaluate_machinist_review(
+                stem, mode,
+                {"verdict": "ERROR", "gating_count": 0, "error": str(error)},
+            )
+            return
+    try:
+        if probed != "hit":
+            if probed == "locked":
+                raise OSError(f"{label}: report outputs are locked")
+            with _telemetry.span(
+                f"task {label}", label=label, service=_stage_name(label)
+            ) as work:
+                _tag_cache_key(work, key)
+                work.set_attribute("cache", "miss")
+                code = _run_subprocess(
+                    _machinist_review_command(stem), label,
+                    log_stem=f"machinist-review-{stem}", task=label,
+                )
+            aggregate = _read_machinist_aggregate(stem)
+            if code not in (0, 1) or (code and aggregate["verdict"] == "SHIP"):
+                raise ValueError(f"review command exited {code}")
+            if aggregate["verdict"] != "ERROR" and aggregate.get("error") is None:
+                with _telemetry.span(
+                    f"cache.store {label}", label=label,
+                    service=_telemetry.BUILD_INFRA_SERVICE,
+                ) as store:
+                    _tag_cache_key(store, key)
+                    store.set_attribute("cache", _cache.store(key, [directory], label))
+        else:
+            aggregate = _read_machinist_aggregate(stem)
+    except (OSError, ValueError) as error:
+        aggregate = {"verdict": "ERROR", "gating_count": 0, "error": str(error)}
+    _evaluate_machinist_review(stem, mode, aggregate)
+    if aggregate["verdict"] != "ERROR" and aggregate.get("error") is None:
+        _write_stamp(label, str(stamp))
+
+
+def _machinist_review_tasks():
+    for stem in _drawing_order():
+        mode = mode_for_drawing(DRAWINGS_BY_NAME[stem].script)
+        deps = _machinist_review_file_deps(stem)
+        directory = _machinist_review_dir(stem)
+        yield {
+            "name": f"machinist_review:{stem}",
+            "file_dep": deps,
+            # The real producer edge is the PDF file_dep. Repeating it in the
+            # packaged task closure keeps a selected review's drawing admitted.
+            "task_dep": [f"drawing:{stem}"],
+            "uptodate": [
+                config_changed({
+                    "mode": mode.value, "inputs": [_rel_tag(dep) for dep in deps],
+                }),
+                not _cache.forced_refresh(f"check:machinist_review:{stem}"),
+            ],
+            "targets": [
+                str(_machinist_review_stamp(stem)),
+                str(directory / f"{stem}.aggregate.json"),
+                str(directory / f"{stem}.aggregate.md"),
+                *(
+                    str(directory / stem / "runs" / f"r{run}" / f"{stem}.json")
+                    for run in range(1, 4)
+                ),
+            ],
+            "actions": [(_cached_machinist_review_action, [stem, mode])],
+            "clean": True,
+            "verbosity": 2,
+        }
+
+
 def _executed_closure(cmd: list[str]) -> set[str]:
     """Source and config inputs of every Python entry point a command executes."""
     return {
@@ -3078,6 +3279,7 @@ def task_check():
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
         SCRIPTS_DIR / "test_farm_admission.py",
+        SCRIPTS_DIR / "test_machinist_review_leaf.py",
         # Per-assembly contracts stay per-assembly (no stem-keyed tables in
         # _assembly.py; each recipe carries its own contract only).
         SCRIPTS_DIR / "test_assembly_contract.py",
@@ -3344,12 +3546,9 @@ def task_check():
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
     # the offline machinist-review contract.
     machinist_review_contract_deps = [
-        # The reviewer prompt is the shared guideline plus the kind's
-        # reviewer instructions (machinist_review.load_prompt).
+        # Reviewer and judge prompts/schemas are read at runtime.
         SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
-        SCRIPTS_DIR / "prompts" / "machinist_review_part.md",
-        SCRIPTS_DIR / "prompts" / "machinist_review_assembly.md",
-        SCRIPTS_DIR / "prompts" / "machinist_review_schema.json",
+        *(path for path in (SCRIPTS_DIR / "prompts").iterdir() if path.is_file()),
         # test_dt_cone_pivot_post_drawing reads the policy's GD&T allowlist;
         # allowlist edits must rerun its frame-ownership contract.
         SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
@@ -3804,6 +4003,7 @@ def task_check():
             "clean": True,
             "verbosity": 2,
         }
+    yield from _machinist_review_tasks()
 
 
 class _PrechipsKernelTracker:
@@ -4157,6 +4357,7 @@ def task_release():
             "preflight",
             "check:features_bound",
             *(f"drawing:{s}" for s in _drawing_order()),
+            *(f"check:machinist_review:{s}" for s in _drawing_order()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),
             *(f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS),
@@ -4193,6 +4394,7 @@ def task_build():
             + [f"part:{s}" for s in _seat_part_order()]
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
             + [f"drawing:{s}" for s in _drawing_order()]
+            + [f"check:machinist_review:{s}" for s in _drawing_order()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
             + [f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS]
         ),
@@ -4221,7 +4423,7 @@ def task_build_bare():
 # this seat's last-published key differs from the current one. That is the ad-hoc
 # script we hand-wrote cutting v0.9.0, kept.
 def _cache_rows() -> list[tuple[str, list[str]]]:
-    """(label, file_deps) for every cacheable COM task, in build order."""
+    """(label, file_deps) for every cacheable leaf, in build order."""
     rows: list[tuple[str, list[str]]] = []
     for script in part_scripts():
         stem = script.stem.removeprefix("build_")
@@ -4230,6 +4432,9 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
         rows.append((f"assembly:{stem}", _assembly_file_deps(stem)))
     for stem in _drawing_order():
         rows.append((f"drawing:{stem}", _drawing_file_deps(stem)))
+        rows.append((
+            f"check:machinist_review:{stem}", _machinist_review_file_deps(stem),
+        ))
     for stem in ASSEMBLY_ORDER:
         rows.append((f"verify_soundness:{stem}", _soundness_file_deps(stem)))
     rows.append(("verify:kinematics", _kinematics_file_deps()))

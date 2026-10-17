@@ -3030,6 +3030,8 @@ def test_check_pytest_commands_disable_the_shared_cache():
     dodo = _load_dodo()
     pytest_gates = {}
     for task in dodo.task_check():
+        if task["actions"][0][0] is not dodo._run_stamped:
+            continue
         command = task["actions"][0][1][0]
         if command[1:3] == ["-m", "pytest"]:
             pytest_gates[task["name"]] = command
@@ -3062,6 +3064,14 @@ def test_check_gates_depend_on_everything_they_execute():
     dodo = _load_dodo()
     gaps: dict[str, list[str]] = {}
     for task in dodo.task_check():
+        if task["actions"][0][0] is dodo._cached_machinist_review_action:
+            # This leaf's explicit PDF/name/kind path excludes registry lookup;
+            # test_machinist_review_leaf pins its complete local-import closure
+            # and runtime-read rubric/exception inputs separately.
+            assert set(dodo._machinist_review_file_deps(
+                task["name"].split(":", 1)[1]
+            )) <= set(task["file_dep"])
+            continue
         declared = {str(Path(dep).resolve()) for dep in task["file_dep"]}
         command = task["actions"][0][1][0]
         entries = [Path(arg) for arg in command if str(arg).endswith(".py")]

@@ -655,20 +655,19 @@ def test_deterministic_grade_and_exact_benchmark_order(
 def test_review_main_uses_registry_pdf_basename(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from types import SimpleNamespace
-
     mr = evaluation.mr
     _, cases = evaluation.load_evals(selectors=("1",))
     case = cases[0]
     calls = []
 
-    def review(package, **kwargs):
+    def aggregate(package, **kwargs):
         calls.append((package, kwargs))
-        return SimpleNamespace(
-            name=package.name, verdict=_verdict(), passed=True, blind=True, duration_s=0
-        )
+        return {
+            "name": package.name, "verdict": "SHIP", "confirmed": [],
+            "gating_count": 0, "duration_s": 0, "error": None,
+        }
 
-    monkeypatch.setattr(mr, "review_package", review)
+    monkeypatch.setattr(mr, "aggregate_package", aggregate)
     monkeypatch.setattr(mr, "write_index", lambda directory: directory / "index.html")
     pdf_dir = tmp_path / "frozen-release" / "pdf"
     report_dir = tmp_path / "reports"
@@ -697,6 +696,10 @@ def test_review_main_uses_registry_pdf_basename(
     )
     assert controls["report_dir"] == report_dir
     assert controls["reviewer"] == "claude"
+    assert controls["runs"] == 3
+    assert controls["judge_reviewer"] == "claude"
+    assert controls["judge_model"] is None
+    assert controls["judge_effort"] is None
 
 
 @pytest.mark.parametrize("uses_tool", [False, True])
