@@ -160,21 +160,26 @@ BACK_CENTER = (0.225, 0.150)
 SHEET_NAMES = ("Lever Geometry", "Bracket Receiver")
 
 # Detail D: the trunnion envelope at 4:1, in the open field left of the front
-# profile.  The fence (7.5 model mm) holds the hexagon (5.13 half-height) and
-# none of the rib or web outline (the R15.24 rib arc, 7.6 sheet mm out).
-# Centred on the axis, the hexagon prints at DETAIL_CENTER, its fence 30 mm
-# round it; the label hangs below the width's dimension line, clear of
-# section C-C's caption.  D, not A: A is the datum letter (machinist review
-# r5: one letter named both).
+# profile.  The fence (6 model mm) holds the hexagon (5.13 half-height, 3.5
+# sheet mm to spare) and none of the rib or web outline (the R15.24 rib arc,
+# 7.6 sheet mm out).  Centred on the axis, the hexagon prints at
+# DETAIL_CENTER, its fence 24 mm round it: at 7.5 model mm (30 sheet mm) the
+# flank angle's text, which must stand outside the fence, pushed its arc up
+# into the ridge pair's line (stack r4 render).  The centre stands low enough
+# that the ridge pair's line clears that arc and the callout over it stays
+# under the border, and far enough right that the vertex height's four lines
+# fit between the border and the fence.  The label hangs below the width's
+# dimension line, clear of section C-C's caption.  D, not A: A is the datum
+# letter (machinist review r5: one letter named both).
 DETAIL_LETTER = "D"
-DETAIL_CENTER = (0.075, 0.222)
+DETAIL_CENTER = (0.079, 0.208)
 DETAIL_SCALE = (4.0, 1.0)
-DETAIL_RADIUS_MM = 7.5
-DETAIL_LABEL_XY = (0.075, 0.176)
-# The parent circle's letter, below the rib arc, tied to the 7.5 mm fence by
+DETAIL_RADIUS_MM = 6.0
+DETAIL_LABEL_XY = (0.079, 0.176)
+# The parent circle's letter, below the rib arc, tied to the 6 mm fence by
 # the leader style's leader: machinist review r6 read the bare fence, the
-# letter outside the rib arc, as an unsized Ø15 feature.  The letter's top
-# prints ~0.2235, its leader dropping 8 mm from the fence across the arc,
+# letter outside the rib arc, as an unsized feature.  The letter's top
+# prints ~0.2235, its leader dropping ~9 mm from the fence across the arc,
 # between the rib-arc and cylinder leaders.
 DETAIL_LETTER_OFFSET = (0.0, -0.016)
 KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
@@ -189,9 +194,10 @@ RIDGE_DETAIL_CENTER = (0.070, 0.075)
 RIDGE_DETAIL_SCALE = (10.0, 1.0)
 RIDGE_DETAIL_RADIUS_MM = 1.5
 RIDGE_DETAIL_LABEL_XY = (0.070, 0.052)
-# E's letter up-left of the vertex in D, outside E's fence, between the -X
-# ridge-to-side dimension's extension lines and under its dimension line.
-RIDGE_DETAIL_LETTER_OFFSET = (-0.009, 0.0045)
+# E's letter up-right of the vertex in D, outside E's fence, between the +X
+# ridge-to-side dimension's extension lines and under its dimension line
+# (the vertex height's upper extension line runs left from the vertex).
+RIDGE_DETAIL_LETTER_OFFSET = (0.009, 0.0045)
 
 # Section C-C: the plate's own thickness.  Every end view shows the end ribs
 # over the plate and the spring-anchor pad below its free edge, so no view
@@ -1311,23 +1317,33 @@ FRONT_KEEP = {
     "EdgeRibFrontEndStep": (0.284, 0.253),
 }
 # Detail D at 4:1: the hexagon's centre prints at DETAIL_CENTER, its flats at
-# x 0.0588/0.0912, its vertices at y 0.2015/0.2425, its upper shoulders at y
-# 0.2323, the fence 0.030 round it.  The reference width stands right of its
-# span, above the boss diameter's four lines (top 0.1784) and the label, its
-# line ~0.181; the vertex height stands right of the fence, its text level
-# with the centre and its three callout lines below the value.  Code review
-# C09 (owner ruling T1): the ridge-to-side pair shares one dimension line
-# over the vertex, each text outside its own span, the -X one's symmetry
-# callout under it, left of its extension lines; the flank-to-side angle
-# stands up-right of the +X shoulder, in the wedge opposite the solid's
-# corner (inside the hexagon, machinist reviews r7/r8 read its text as a
-# feature), its arc right of the side face's extension.
+# x 0.0628/0.0952, its vertices at y 0.1875/0.2285, its upper shoulders at y
+# 0.2183, the fence 0.024 round it.  SolidWorks centres a dimension's whole
+# text block (value and callout lines, 5.5 mm a line) on its keep, and a
+# linear dimension's line underlines the block's bottom line, 2.8 mm under
+# the keep for one line (stack r4: a seven-line block keyed at 0.258 rose
+# 9.7 mm over the border and dropped its line onto E's fence).
+# The reference width stands right of its span, under the fence and above
+# the boss diameter's four lines (top 0.1784), its line ~0.1817.  The vertex
+# height stands left of the fence, its block level with the centre between
+# the border and the fence, its three callout lines below the value; its
+# extension lines cross only the side faces' extensions.  Code review C09
+# (owner ruling T1): the ridge-to-side pair shares one dimension line at
+# 0.245 over the vertex, each text outside its own span; the +X one carries
+# the two-line symmetry callout under its value (keep 5.5 mm higher for the
+# same line), right of its extension lines and left of view G, its top line
+# under the border.  The flank-to-side angle stands up-right of the +X
+# shoulder, in the wedge opposite the solid's corner (inside the hexagon,
+# machinist reviews r7/r8 read its text as a feature), its text outside the
+# fence and its arc (~23.5 mm round the shoulder) topping out under the ridge
+# pair's line; nothing else stands in that wedge (stack r4: the vertex
+# height's line and text crossed the angle's text and extension).
 DETAIL_KEEP = {
-    "HexWidth": (0.121, 0.1895),
-    "HexHeight": (0.130, DETAIL_CENTER[1]),
-    "RidgeFromLeft": (0.030, 0.258),
-    "RidgeFromRight": (0.120, 0.258),
-    "FlankToSide": (0.124, 0.240),
+    "HexWidth": (0.125, 0.1845),
+    "HexHeight": (0.0342, DETAIL_CENTER[1]),
+    "RidgeFromLeft": (0.043, 0.2478),
+    "RidgeFromRight": (0.1355, 0.2533),
+    "FlankToSide": (0.1165, 0.2280),
 }
 # Detail E: the round's R MAX up-right of the vertex, its text right of E's
 # fence and of datum A's box (RIDGE_DATUM_RISE), its leader ~30 deg up the
