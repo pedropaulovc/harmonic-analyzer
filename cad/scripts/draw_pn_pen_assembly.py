@@ -48,7 +48,11 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
@@ -875,10 +879,34 @@ def _band(name: str) -> tuple[float, float]:
     ] / 1000.0
 
 
+def _assert_reference(name: str, display: Any, *, when: str) -> None:
+    """A reference setting (the stud height, set from the stud's measured
+    length) reads its nominal in parentheses, no band, and its callout."""
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    value = abs(float(dimension.SystemValue))
+    brackets = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+    callout = str(display.GetText(CALLOUT_TEXT_PART) or "").replace("\r\n", "\n")
+    if (
+        abs(value - spec.DIMENSION_NOMINALS[name] / 1000.0) > 1e-8
+        or brackets != ("(", ")")
+        or int(tolerance.Type) != 0  # swTolNONE
+        or callout != notes.DIMENSION_CALLOUTS[name]
+    ):
+        raise RuntimeError(
+            f"{when} {name}: value {value!r}, brackets {brackets!r}, tolerance "
+            f"type {int(tolerance.Type)}, callout {callout!r}"
+        )
+
+
 def _assert_settings(displays: list[tuple[str, Any]], *, when: str) -> None:
     """Each setting reads its nominal (the angle 45, not its supplement), its
-    symmetric band and places, and its callout."""
+    symmetric band and places, and its callout; a reference setting its
+    parenthesised nominal."""
     for name, display in displays:
+        if name in spec.REFERENCE_DIMENSIONS:
+            _assert_reference(name, display, when=when)
+            continue
         nominal, band = _band(name)
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
@@ -935,6 +963,9 @@ def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
         )
         for annotation in annotations
     ]
+    for annotation, (name, _display) in zip(annotations, displays):
+        if name in spec.REFERENCE_DIMENSIONS:
+            set_reference_dimension(adapter, annotation, label=f"pen {name}")
     if sorted(name for name, _ in displays) != sorted(notes.DIMENSION_CALLOUTS):
         raise RuntimeError(f"pen details imported {sorted(n for n, _ in displays)}")
     for name, display in displays:
