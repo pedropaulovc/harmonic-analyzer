@@ -158,21 +158,25 @@ not mergeable until ALL THREE hold — no partial credit:
    read; move the camera off the standard axes when needed). The CAD gates
    prove volumes and mates, not that the geometry LOOKS like the machine —
    a shape can pass every check and still be visibly wrong.
-   **Drawing sheets need a machinist review; an eye pass does not count.**
-   Every drawing sheet whose rendered output the PR changes — because the PR
-   edits its drawing script or spec, or because it changes CAD geometry,
-   config or a helper the sheet depends on — needs a
-   `cad/scripts/machinist_review.py` verdict on the exact version being
-   merged. The reviewer defaults to Claude Opus 5.5 whichever model authored
-   the change; another reviewer family is allowed. The machinist review is
-   exempt from the cross-family rule for code review
-   (`cad/docs/drawing-simplicity-policy.md`, "The gate"). A sheet whose
-   drawing script or spec the PR edits must reach
-   `SHIP` (or `FIX` whose only gating findings are blockers matching a named
-   exception, cited in the PR). A sheet changed only indirectly passes when
-   its review adds no gating finding beyond a baseline review of `main`'s
-   version of that sheet run with the same reviewer, model, effort and prompt;
-   post both verdicts and the finding diff on the PR.
+   **Drawing sheets have a cached machinist-review leaf; an eye pass does not
+   replace it.** `check:machinist_review:<stem>` runs in both `build` and `release`
+   for every drawing that opts in, on the submitter without a COM seat. It runs
+   three parallel blind reviews, then a judge vets every finding against the
+   sheet; the aggregate of confirmed findings is the verdict. This replaces the
+   hand-run review command as the pipeline gate, with reports at
+   `cad/out/reports/machinist-review/<stem>/<stem>.aggregate.{json,md}`.
+   Review is opt-in: a drawing script's module-level
+   `MACHINIST_REVIEW = MachinistReviewMode.ENFORCE` fails on `FIX` or `ERROR`;
+   `MachinistReviewMode.LEARN` reports warnings without blocking; absent (or
+   explicit `MachinistReviewMode.OFF`) creates no review task, so no model
+   tokens are spent until a drawing stabilizes and opts in. The declaration is read by AST,
+   never by importing the drawing, and mode changes reuse the same cached verdict.
+   `FIX` is cached before enforcement, so a rerun cannot roll the reviewers again;
+   provider errors are not cached. An explicitly forced refresh that produces no
+   cacheable verdict fails even in LEARN mode: it could not publish the requested
+   replacement. Reviewer/judge defaults and their prompts are hashed review inputs.
+   The review remains exempt from code review's cross-family rule
+   (`cad/docs/drawing-simplicity-policy.md`, "The gate").
 
 **Stacked PRs share gates 1 and 3.** A successful build at the TOP of a stack
 covers every PR in that stack, and so does the visual inspection of the renders
@@ -363,6 +367,7 @@ such build:
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
+| `check:machinist_review:<stem>` (one cached aggregate per drawing; opt-in enforcement) | **no** | no (parallel) | no (submitter-only) |
 | `prechips:<stem>` (enrolled process travelers) | **no** (FreeCAD 1.1) | no (parallel; needs scoped manifest + STEP) | no (submitter-only) |
 | `check:features_bound` | **no** | no (release only; validates scoped face refs and identical full STEP copy) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
@@ -902,6 +907,21 @@ and the matching worker leaf receive `HARMONIC_CACHE_REFRESH` JSON containing
 `labels` and `reason`; never hand-edit that carrier to evade wrapper validation.
 Each skipped restore emits a `!!` warning naming label, 12-hex key and reason,
 a `cache.refresh` span event, and a `refresh` record with reason in `cache.jsonl`.
+
+`check:machinist_review:<stem>` also uses the shared cache probe/store path, but
+executes entirely on the submitter under either executor. Its key includes the
+drawing PDF, the package's existing `cad/config/parts/<dashed>.yaml` (or assembly
+contract with the `-assembly` suffix removed), the review/exception/sheet-server
+code and its pinned local-import closure, the selected kind's reviewer prompt,
+shared judge prompts/schemas, and `cad/docs/drawing-guidelines.md`. Reviewer and
+judge defaults live in the hashed review code; there are no model/effort
+environment overrides. `_drawing_registry.py` is intentionally excluded because
+the leaf supplies PDF, name and kind explicitly; selecting a different kind
+selects a different hashed prompt. Recipe-skipped modules, including telemetry,
+are excluded via the shared `_buildgraph.RECIPE_SKIP_MODULES` policy. The draw
+script and learn/enforce declaration are not review inputs. The complete leaf
+report directory, including individual run JSON, source snapshots and attempt
+evidence, is cached without pruning.
 
 ## File-granular recipe helpers
 

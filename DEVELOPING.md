@@ -10,6 +10,30 @@ goes to the farm)? Read
 — it is the decision tree, the seat/cache invariants and the evidence trail for
 an ad-hoc COM operation, and it links back here for cache detail.
 
+## Cached machinist-review leaves
+
+`check:machinist_review:<stem>` is a SolidWorks-free, submitter-only task for
+every drawing that opts in, included in `build` and `release` under both executors.
+It waits for the drawing PDF, runs three parallel blind reviews and a
+sheet-grounded judge on a cache miss, then caches the complete per-drawing report
+directory at `cad/out/reports/machinist-review/<stem>/`. The aggregate JSON and
+Markdown are named `<stem>.aggregate.{json,md}`; per-run JSON and retained attempt
+evidence remain alongside them. A cache hit evaluates the same verdict without
+calling a model.
+
+Draw scripts default to `MachinistReviewMode.OFF`: no review task exists, so
+`build` and `release` spend no model tokens on the sheet. To opt in, import
+`MachinistReviewMode` from `_machinist_review_mode` and declare
+`MACHINIST_REVIEW = MachinistReviewMode.LEARN` (`FIX`/`ERROR` warn) or
+`MachinistReviewMode.ENFORCE` (they fail the build) at module level. The graph reads
+only the AST, rejects other value forms, and reruns verdict consumption when the
+mode changes without re-keying the review. `FIX` is stored before enforcement;
+provider/runner errors are never cached or freshness-stamped. An explicitly forced
+refresh that produces no cacheable verdict fails even in LEARN mode, without
+caching the error. Review keys hash the PDF, package exceptions, review code/import
+closure, prompts/schemas and shared drawing guidelines, not the registry,
+enforcement declaration, or recipe-skipped infrastructure such as telemetry.
+
 ## Process traveler prerequisites
 
 `prechips:<stem>` tasks run on the submitter, including when SolidWorks leaves
