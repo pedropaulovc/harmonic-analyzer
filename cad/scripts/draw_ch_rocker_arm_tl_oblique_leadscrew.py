@@ -3,13 +3,16 @@
 The shop cuts the bought 600 mm screw to length and mills a set-screw flat
 under each set screw that locks it, so the sheet is a modified-stock
 drawing: one view of the screw lying axis-horizontal, as it sits in the saw
-and the mill, carrying the native ``CutLength``, the clock-0 flats' length,
-across-flat and three stations (the title block's band for each one's places
-governs it, the across-flat's text offset beside its dimension line); sections
-A-A and B-B through the two KP08 stations, each carrying its 120° flat's
-across-flat and angle from clock 0, the angle's text offset outboard of its
-arc; the isometric; and a note block naming the item, its supplier and SKU.
-The thread is bought, not cut: it is not modelled.
+and the mill, carrying the native ``CutLength`` and the far two flats'
+stations (the title block's band for each one's places governs it); details
+C, D and E at 3:1 of the near end's station, the far KP08's and the
+handwheel's, the 1:2 view drawing a flat 0.36 mm deep: C carries the near
+station, E the printed flat's length and across-flat; sections A-A and B-B
+through the two KP08 stations, each carrying its 120° flat's across-flat and
+angle from clock 0, the angle's text offset outboard of its arc; the
+isometric; and a note block naming the item, its supplier and SKU.
+The thread is bought, not cut: it is not modelled, and a leadered callout on
+the main view names it over the full length.
 
 Run with SolidWorks open::
 
@@ -23,11 +26,13 @@ import math
 import sys
 from typing import Any, NamedTuple
 
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
@@ -41,8 +46,10 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import property_link
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -56,6 +63,7 @@ from ch_rocker_arm_tl_oblique_leadscrew_stock_spec import (
     DIMENSION_PRECISION,
     DIMENSION_TOLERANCE_TYPES,
     DRAWING_DIMENSIONS,
+    FLAT_AF,
     FLAT_AF_CALLOUT,
     FLAT_LENGTH,
     FLAT_LENGTH_CALLOUT,
@@ -107,39 +115,32 @@ def sheet_x(station_mm: float) -> float:
 
 # The clock-0 flats face model +X, which the turned view lays toward the
 # sheet's bottom: each flat stands edge-on 0.72 mm (0.36 on the sheet) into
-# the lower silhouette. CutLength's text stands 30 mm over the axis, centred
-# on the span, its dimension line clear over the sections' letters (12 mm
-# cutting-line reach, letters to 20 mm over the axis); its
-# extension lines rise from the end faces' centres. Under the screw, each
-# flat's station runs from the near end's centre in its own row, the near
-# one's text outboard of its short span; the printed flat's length and
-# across-flat (at the far end, the handwheel's) stand right of the far end,
-# their dimension lines run out to them.
+# the lower silhouette, too shallow to read, so details C, D and E carry the
+# flats. CutLength's text stands 30 mm over the axis, centred on the span, its
+# dimension line clear over the sections' letters (12 mm cutting-line reach,
+# letters to 20 mm over the axis); its extension lines rise from the end
+# faces' centres. Under the screw, the far two flats' stations run from the
+# near end's centre, each in its own row; the near one's is detail C's.
 MAIN_KEEP = {
     "CutLength": (MAIN_CENTER[0], MAIN_CENTER[1] + 0.030),
-    "NearKP08FlatStation": (NEAR_END_X - 0.010, MAIN_CENTER[1] - 0.024),
     "FarKP08FlatStation": (
         (NEAR_END_X + sheet_x(FLAT_STATIONS["FarKP08"])) / 2.0,
-        MAIN_CENTER[1] - 0.032,
+        MAIN_CENTER[1] - 0.024,
     ),
     "HandwheelFlatStation": (
         (NEAR_END_X + sheet_x(FLAT_STATIONS["Handwheel"])) / 2.0,
-        MAIN_CENTER[1] - 0.040,
+        MAIN_CENTER[1] - 0.032,
     ),
-    "FlatLength": (sheet_x(LENGTH) + 0.016, MAIN_CENTER[1] - 0.016),
-    "FlatAF": (sheet_x(LENGTH) + 0.016, MAIN_CENTER[1]),
 }
 # Every flat is one size: the printed one says how many (pivot-shaft style).
 FLAT_CALLOUTS = {"FlatLength": FLAT_LENGTH_CALLOUT, "FlatAF": FLAT_AF_CALLOUT}
-# The across-flat's 3.6 mm span holds no text: its value and callout (about
-# 9 x 7 mm, positioned by its centre) are offset onto a leader right of its
-# dimension line, past the extension lines' ends (1 mm beyond the line), the
-# leader level with the screw's axis (the pen hanger's SLOT_WIDTH_TEXT_XY).
-_AF_TEXT_HALF_WIDTH = 0.0055
-FLAT_AF_TEXT_XY = (
-    MAIN_KEEP["FlatAF"][0] + 0.001 + 0.004 + _AF_TEXT_HALF_WIDTH,
-    MAIN_CENTER[1],
-)
+# The thread is the stock's: a leadered callout over the screw names it, its
+# leader's tip on the upper silhouette, the text (top-left anchored, two rows
+# about 9 mm tall and 56 mm wide) between the sections' A letters (x <= 0.121)
+# and B letters (x >= 0.263), under the cut length's dimension line (0.187).
+THREAD_CALLOUT = "TR8X2 THREAD FULL LENGTH\nAS SUPPLIED"
+THREAD_CALLOUT_XY = (0.140, 0.181)
+THREAD_LEADER_TIP = (sheet_x(80.0), MAIN_CENTER[1] + SCREW_SHEET_DIA / 2.0)
 
 
 class ClockSection(NamedTuple):
@@ -202,12 +203,132 @@ CAPTION_SETTLE_M = 0.0006
 # (draw_dt_cone_gear_shaft).
 CENTRE_MARK_ARM = 0.003
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+
+
+class EndDetail(NamedTuple):
+    """One 3:1 detail of the main view: its letter, its fence (a circle on the
+    axis ``centre_mm`` from the near end, ``radius_mm`` across, model mm),
+    where the fence's centre stands on the sheet, where its letter stands on
+    the main view, and the dimensions it carries, each by its text's sheet
+    point."""
+
+    label: str
+    centre_mm: float
+    radius_mm: float
+    centre: tuple[float, float]
+    letter: tuple[float, float]
+    keep: dict[str, tuple[float, float]]
+
+
+DETAIL_SCALE = SECTION_SCALE
+_DETAIL_PER_MODEL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+# The details stand in a row under the main view (its lowest text, the
+# handwheel station's, 32 mm under the axis) and left of the title block,
+# each fence's centre on DETAIL_ROW_Y. Their dimension texts stand in one row
+# under the fences and their captions in one row under that.
+DETAIL_ROW_Y = 0.082
+DETAIL_TEXT_ROW_Y = 0.050
+DETAIL_CAPTION_TOP = 0.036
+# A detail's axis runs as the main view's: model +Y to sheet right, model +X
+# (clock 0, where every station's printed flat faces) to sheet down.
+DETAIL_ORIENTATION_TOL = 1e-6
+# A detail's fence centre lands within this of its layout point.
+DETAIL_SETTLE_M = 0.0002
+
+
+def detail_xy(
+    centre_mm: float,
+    centre: tuple[float, float],
+    station_mm: float,
+    radius_mm: float = 0.0,
+) -> tuple[float, float]:
+    """Sheet point of station ``station_mm``, ``radius_mm`` toward clock 0, in
+    a detail whose fence centre (``centre_mm`` on the axis) stands at
+    ``centre``."""
+    return (
+        centre[0] + (station_mm - centre_mm) * _DETAIL_PER_MODEL_MM,
+        centre[1] - radius_mm * _DETAIL_PER_MODEL_MM,
+    )
+
+
+def _text_row_radius_mm() -> float:
+    """The model radius (toward clock 0) of the details' text row."""
+    return (DETAIL_ROW_Y - DETAIL_TEXT_ROW_Y) / _DETAIL_PER_MODEL_MM
+
+
+# C: the near end and the near KP08's two flats (0 .. 12.5), its station
+# from the near end's centre under the fence.
+_NEAR_CENTRE_MM = (FLAT_STATIONS["NearKP08"] + FLAT_LENGTH / 2.0) / 2.0
+_NEAR_XY = (0.045, DETAIL_ROW_Y)
+# D: the far KP08's two flats (375.5 .. 383.5); its station is the main
+# view's.
+_FAR_CENTRE_MM = FLAT_STATIONS["FarKP08"]
+_FAR_XY = (0.100, DETAIL_ROW_Y)
+# E: the handwheel's flat and the far end (394.5 .. 410), the printed flat's
+# length under the fence and its across-flat right of it, square to the axis.
+_WHEEL_CENTRE_MM = (FLAT_STATIONS["Handwheel"] - FLAT_LENGTH / 2.0 + LENGTH) / 2.0
+_WHEEL_RADIUS_MM = 9.0
+_WHEEL_XY = (0.153, DETAIL_ROW_Y)
+# The across-flat runs from the far crest (clock 180, radius -4) to the flat
+# (FLAT_AF - 4 toward clock 0): its middle stands at half their sum.
+_AF_MID_RADIUS_MM = (FLAT_AF - MAJOR_DIA) / 2.0
+END_DETAILS = (
+    EndDetail(
+        "C",
+        _NEAR_CENTRE_MM,
+        8.0,
+        _NEAR_XY,
+        # Left of the near end, under the cut length's extension line.
+        (NEAR_END_X - 0.012, MAIN_CENTER[1] - 0.010),
+        {
+            "NearKP08FlatStation": detail_xy(
+                _NEAR_CENTRE_MM,
+                _NEAR_XY,
+                FLAT_STATIONS["NearKP08"] / 2.0,
+                _text_row_radius_mm(),
+            ),
+        },
+    ),
+    EndDetail(
+        "D",
+        _FAR_CENTRE_MM,
+        6.0,
+        _FAR_XY,
+        # Over its fence, between section B-B's cutting line and the cut
+        # length's far extension line.
+        (sheet_x(FLAT_STATIONS["FarKP08"]) + 0.005, MAIN_CENTER[1] + 0.012),
+        {},
+    ),
+    EndDetail(
+        "E",
+        _WHEEL_CENTRE_MM,
+        _WHEEL_RADIUS_MM,
+        _WHEEL_XY,
+        # Right of the far end, level with the axis.
+        (sheet_x(LENGTH) + 0.008, MAIN_CENTER[1]),
+        {
+            "FlatLength": detail_xy(
+                _WHEEL_CENTRE_MM,
+                _WHEEL_XY,
+                FLAT_STATIONS["Handwheel"],
+                _text_row_radius_mm(),
+            ),
+            "FlatAF": detail_xy(
+                _WHEEL_CENTRE_MM,
+                _WHEEL_XY,
+                _WHEEL_CENTRE_MM + _WHEEL_RADIUS_MM + 3.5,
+                _AF_MID_RADIUS_MM,
+            ),
+        },
+    ),
+)
 # The cylinder face on the axis, 50 mm right of centre: 2 mm from either
 # silhouette and clear of the dimension above.
 CENTERLINE_PICK = (MAIN_CENTER[0] + 0.050, MAIN_CENTER[1])
-# Bottom-left: in from the left border and left of the title block, under
-# the main view (its lower silhouette at y 0.158).
-NOTES_XY = (0.018, 0.060)
+# Right of the details and over the title block (top-left anchored, three
+# rows about 13 mm tall and 70 mm wide): under the handwheel station's text
+# (0.128) and left of the isometric.
+NOTES_XY = (0.230, 0.105)
 # The catalogue designation in plain text: the material is the title block's
 # and the cut length is the dimension's.
 ITEM = "TR8X2 LEAD SCREW"
@@ -559,6 +680,192 @@ def _add_clock_sections(adapter: Any, main: Any) -> list[Any]:
     return annotations
 
 
+def _sketch_fence(adapter: Any, main: Any, detail: EndDetail) -> Any:
+    """Sketch the detail's fence in the main view's own sketch space: the
+    model points go to the sheet, then through the sketch transform
+    (draw_dt_cone_swing_platform's ``_create_detail_view``, the path
+    ``create_section_view`` takes for the cutting lines). Returns the circle."""
+    draw = adapter.currentModel
+    centre, rim = model_points_in_view(
+        adapter,
+        main,
+        (
+            _axis_point(detail.centre_mm),
+            _axis_point(detail.centre_mm + detail.radius_mm),
+        ),
+        label=f"detail {detail.label} fence",
+        names=("centre", "rim"),
+    )
+    sketch = _early_bound(_early_bound(main, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (centre, rim):
+        point = _early_bound(
+            utility.CreatePoint(double_array([float(x), float(y), 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if circle is None:
+        raise RuntimeError(f"failed to sketch detail {detail.label}'s fence")
+    return circle
+
+
+def _require_detail_orientation(adapter: Any, view: Any, detail: EndDetail) -> None:
+    """The detail's texts are laid out for the main view's turn: model +Y to
+    sheet right and +X (clock 0) to sheet down, at the detail's scale."""
+    origin, along_y, along_x = model_points_in_view(
+        adapter,
+        view,
+        (
+            _axis_point(detail.centre_mm),
+            _axis_point(detail.centre_mm + 1.0),
+            _axis_point(detail.centre_mm, 1.0, 0.0),
+        ),
+        label=f"detail {detail.label} frame",
+        names=("centre", "+Y", "+X"),
+    )
+    step = _DETAIL_PER_MODEL_MM
+    turned = (
+        along_y[0] - origin[0] - step,
+        along_y[1] - origin[1],
+        along_x[0] - origin[0],
+        along_x[1] - origin[1] + step,
+    )
+    if max(map(abs, turned)) > DETAIL_ORIENTATION_TOL:
+        raise RuntimeError(
+            f"detail {detail.label} does not run as the main view: +Y at "
+            f"{along_y}, +X at {along_x}, centre {origin}"
+        )
+
+
+def _place_detail_letter(adapter: Any, main: Any, detail: EndDetail) -> None:
+    """Stand the fence's letter on the main view at ``detail.letter``, off the
+    screw and the other annotations (draw_ch_pivot_shaft's letter)."""
+    circles = [
+        _early_bound(circle, "IDetailCircle")
+        for circle in (
+            _read_member(_early_bound(main, "IView"), "GetDetailCircles") or ()
+        )
+    ]
+    matches = [circle for circle in circles if str(circle.GetLabel()) == detail.label]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"expected one detail circle {detail.label} on the main view, "
+            f"found {len(matches)} of {len(circles)}"
+        )
+    matches[0].SetLabelPosition(*detail.letter)
+    rebuild_drawing(adapter, label=f"detail {detail.label} letter")
+    letter = tuple(float(value) for value in matches[0].GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, detail.letter) > 1e-6:
+        raise RuntimeError(f"detail {detail.label}'s letter did not persist: {letter}")
+
+
+def _create_end_detail(adapter: Any, main: Any, detail: EndDetail) -> Any:
+    """A native 3:1 detail of the main view round ``detail``'s fence, its
+    fence centre on ``detail.centre``. A fresh detail's transform lags its
+    ink (``_drawing_detail_projection``), so it is placed by its outline (the
+    fence's square) and its projection settled before anything reads it."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, main)):
+        raise RuntimeError(f"failed to activate detail {detail.label}'s parent")
+    draw.ClearSelection2(True)
+    circle = _sketch_fence(adapter, main, detail)
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr").CreateSelectData()
+    selection.View = main
+    segment = _sw_type_info.early_bound_or_flag(circle, "ISketchSegment", "Select4")
+    if not segment.Select4(False, selection):
+        raise RuntimeError(f"failed to select detail {detail.label}'s fence")
+    view = ddoc.CreateDetailViewAt4(
+        *detail.centre,
+        0.0,
+        0,  # swDetViewSTANDARD
+        float(DETAIL_SCALE[0]),
+        float(DETAIL_SCALE[1]),
+        detail.label,
+        1,  # swDetCircleCIRCLE
+        True,  # FullOutline
+        False,  # JaggedOutline
+        False,  # NoOutline
+        5,
+    )
+    draw.ClearSelection2(True)
+    if view is None:
+        raise RuntimeError(f"CreateDetailViewAt4 returned no detail {detail.label}")
+    view = _sw_type_info.early_bound_or_flag(
+        view, "IView", "SetViewPosition", "Position"
+    )
+    rebuild_drawing(adapter, label=f"create detail {detail.label}")
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if not math.isclose(ratio[0] / ratio[1], DETAIL_SCALE[0] / DETAIL_SCALE[1]):
+        raise RuntimeError(f"detail {detail.label} scale {ratio}, not {DETAIL_SCALE}")
+    for _attempt in range(4):
+        box = _outline(view, f"detail {detail.label}")
+        landed = ((box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0)
+        error = (detail.centre[0] - landed[0], detail.centre[1] - landed[1])
+        if max(abs(error[0]), abs(error[1])) < DETAIL_SETTLE_M:
+            break
+        position = tuple(float(value) for value in view.Position)
+        target = [position[0] + error[0], position[1] + error[1]]
+        if not view.SetViewPosition(double_array(target), False):
+            raise RuntimeError(f"failed to position detail {detail.label}")
+        rebuild_drawing(adapter, label=f"place detail {detail.label}")
+    else:
+        raise RuntimeError(
+            f"detail {detail.label}'s outline centre stayed at {landed}, "
+            f"not {detail.centre}"
+        )
+    if not _inside_sheet(box):
+        raise RuntimeError(f"detail {detail.label} leaves the drawable sheet: {box!r}")
+    settle_detail_projection(
+        adapter,
+        view,
+        _axis_point(detail.centre_mm),
+        ink_xy=landed,
+        tolerance_xy=(DETAIL_SETTLE_M * 2.5, DETAIL_SETTLE_M * 2.5),
+        label=f"detail {detail.label}",
+    )
+    _require_detail_orientation(adapter, view, detail)
+    return view
+
+
+@_telemetry.traced("drawing.end_details")
+def _add_end_details(adapter: Any, main: Any) -> list[Any]:
+    """Detail each flat station at 3:1, where the main view's 0.36 mm flats
+    read: each detail's dimensions, its letter on the main view and its
+    caption under the row of texts. Returns the details' dimension
+    annotations; ``curate_view_dimensions`` fails the build if one does not
+    arrive."""
+    annotations: list[Any] = []
+    for detail in END_DETAILS:
+        view = _create_end_detail(adapter, main, detail)
+        set_hidden_lines_removed(adapter, view)
+        if detail.keep:
+            annotations += curate_view_dimensions(
+                adapter,
+                view,
+                keep=detail.keep,
+                view_label=f"detail {detail.label}",
+                dimensions_by_feature=DRAWING_DIMENSIONS,
+            )
+        _place_detail_letter(adapter, main, detail)
+        _place_view_caption(
+            adapter,
+            view,
+            (detail.centre[0], DETAIL_CAPTION_TOP),
+            label=f"detail {detail.label} caption",
+        )
+    return annotations
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -607,6 +914,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations += _add_clock_sections(adapter, main)
+    annotations += _add_end_details(adapter, main)
     verify_machining_controls(
         adapter,
         annotations,
@@ -614,9 +922,6 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance_types=DIMENSION_TOLERANCE_TYPES,
         precision=DIMENSION_PRECISION,
     )
-    # The across-flat's text beside its dimension line, before its callout
-    # stacks under it (draw_pn_pen_hanger's order).
-    offset_dimension_text(adapter, annotations, {"FlatAF": FLAT_AF_TEXT_XY})
     set_dimension_callouts(adapter, annotations, FLAT_CALLOUTS)
     add_view_centerline(adapter, main, face_xy=CENTERLINE_PICK, label="leadscrew axis")
     note = add_note(adapter, NOTES, *NOTES_XY)
@@ -632,6 +937,17 @@ async def build(adapter: Any) -> dict[str, str]:
     printed = str(_early_bound(note, "INote").GetText() or "")
     if printed.replace("\r\n", "\n").replace("\r", "\n") != resolved:
         raise RuntimeError(f"leadscrew note block did not resolve: {printed!r}")
+    thread = add_leader_note(
+        adapter,
+        THREAD_CALLOUT,
+        text_xy=THREAD_CALLOUT_XY,
+        attach_xy=THREAD_LEADER_TIP,
+        label="leadscrew thread callout",
+        view=main,
+    )
+    callout = str(_early_bound(thread, "INote").GetText() or "")
+    if callout.replace("\r\n", "\n").replace("\r", "\n") != THREAD_CALLOUT:
+        raise RuntimeError(f"leadscrew thread callout did not print: {callout!r}")
     return await finalize_drawing(
         adapter,
         OUTPUTS,
