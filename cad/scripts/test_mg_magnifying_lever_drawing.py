@@ -11,6 +11,7 @@ import build_mg_magnifying_lever as part
 import draw_mg_magnifying_lever as drawing
 import mg_magnifying_lever_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 
 
 def test_required_drawing_paths() -> None:
@@ -588,7 +589,8 @@ def test_rod_od_carries_one_clamp_screw_seat_finish() -> None:
     ).read_text(encoding="utf-8")
     assert part.R <= reach[0] < reach[1] <= part.ROD_LENGTH - part.R
     assert geom.PRESS_ZONE_X[0] < part.ROD_LENGTH - part.R
-    (control,) = spec.SURFACE_FINISHES
+    assert [row.key for row in spec.SURFACE_FINISHES] == ["clamp_screw_seat", "press_land"]
+    control = surface_finish_by_key(spec.SURFACE_FINISHES, "clamp_screw_seat")
     assert control.key == "clamp_screw_seat"
     assert control.roughness_um == SEAT_UM == 3.2
     assert control.production_method == ""
@@ -613,7 +615,7 @@ def test_rod_od_carries_one_clamp_screw_seat_finish() -> None:
     for source in (build_source, sheet_source):
         assert "ScrewSeat" not in source and "SCREW_SEAT_X" not in source
     assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in build_source
-    assert sheet_source.count("add_surface_finish(\n") == 1
+    assert sheet_source.count("add_surface_finish(\n") == 2
     assert 'surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat")' in sheet_source
     # Attached to the OD's face, not its top silhouette: the front view lies
     # in the revolve's profile plane, so that outline is the cylinder's seam
@@ -645,9 +647,12 @@ def test_screw_seat_reason_stands_at_its_symbol() -> None:
     assert "\n" not in text
     assert not set("()±/").intersection(text) and "MIN" not in text
     sheet_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_note(adapter, SCREW_SEAT_CALLOUT, *SEAT_REASON_XY)" in sheet_source
-    # Placed after the symbol, in the front view.
-    assert sheet_source.index("_add_seat_reason(adapter, front)") > sheet_source.index(
+    assert (
+        "_add_finish_reason(\n        adapter, front, SCREW_SEAT_CALLOUT, SEAT_REASON_XY,"
+        in sheet_source
+    )
+    # Placed after its symbol, in the front view.
+    assert sheet_source.index("SCREW_SEAT_CALLOUT, SEAT_REASON_XY") > sheet_source.index(
         "add_surface_finish(\n"
     )
     assert "ActivateView(name)" in sheet_source
@@ -732,16 +737,137 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "MHA-MG-001" in config["process"]
 
 
-def test_machinist_exception_accepts_the_owner_ruled_seat_finish() -> None:
+def test_machinist_exceptions_accept_the_owner_ruled_finishes() -> None:
     """Owner ruling 2026-10-17: the Ra 3.2 on the Ø6 body is the MHA-MG-002
     clamp screw's functional seat (rule 6), declared so the reviewer does not
-    re-file it as a symbol on a clamp face."""
+    re-file it as a symbol on a clamp face.  #1570 (press only): the press
+    land's Ra 0.8 is the retention proof's smoothing input, declared as the
+    MHA-MG-001 bore's is, with the proof's own numbers."""
+    import mg_lever_press_fit_geom as press
     from machinist_exceptions import load_exceptions
+    from _surface_finish import SEAT_UM
 
     config_root = Path(part.__file__).resolve().parents[1] / "config"
-    (entry,) = load_exceptions(config_root, "mg_magnifying_lever", "part")
+    entry, land = load_exceptions(config_root, "mg_magnifying_lever", "part")
     assert (entry.id, entry.kind) == ("RV-01", "accept")
     assert "Ra 3.2" in entry.where and "Ø6 body" in entry.where
     assert "rule 6" in entry.finding and "rule 6" in entry.reason
     assert "owner ruling 2026-10-17" in entry.reason
     assert "MHA-MG-002" in entry.reason
+    assert (land.id, land.kind) == ("RV-02", "accept")
+    assert "Ra 0.8" in land.where and "press land" in land.where
+    assert " ".join(mg_magnifying_lever_spec.PRESS_LAND_CALLOUT.split()) in land.where
+    assert "rule 6" in land.finding
+    assert land.reason.startswith("owner ruling #1570")
+    assert land.reason.endswith("(owner-accepted)")
+    floor = press.PRESS_INTERFERENCE_LIMITS[0]
+    for land_ra in (press.ROD_LAND_RA_UM, SEAT_UM):
+        smoothing = (
+            press.SMOOTHING_FACTOR * press.RZ_PER_RA
+            * (press.COLLAR_BORE_RA_UM + land_ra) / 1000.0
+        )
+        # The land's term first (both 0.8 for the printed grade).
+        assert (
+            f"{press.SMOOTHING_FACTOR:g} x {press.RZ_PER_RA:g} x "
+            f"({land_ra:g} + {press.COLLAR_BORE_RA_UM:g}) um = {smoothing:.5f}"
+        ) in land.reason
+        assert f"effective minimum {floor - smoothing:.5f}" in land.reason
+    assert f"{floor:g} minimum" in land.reason
+
+
+def test_press_land_prints_the_roughness_the_retention_proof_takes() -> None:
+    """C01 (#1570 press only): the retention proof's DIN 7190 smoothing takes
+    the land at ROD_LAND_RA_UM, so the land prints that grade -- its own
+    symbol on the Ø6 face, overriding the body's general Ra 3.2 -- and the
+    bore prints COLLAR_BORE_RA_UM.  Smoothing recomputed from the two PRINTED
+    symbols is the proof's, and at the loosest band corner (0.007) it still
+    leaves interference that grips (press_holding); with the land left at the
+    face's Ra 3.2 the same corner smooths to -0.0058 and the proof refuses."""
+    import mg_lever_press_fit_geom as press
+    import mg_magnifying_bracket_spec as bracket_spec
+    from _surface_finish import GROUND_UM, SEAT_UM
+
+    spec = mg_magnifying_lever_spec
+    land = surface_finish_by_key(spec.SURFACE_FINISHES, "press_land")
+    seat = surface_finish_by_key(spec.SURFACE_FINISHES, "clamp_screw_seat")
+    bore = surface_finish_by_key(bracket_spec.SURFACE_FINISHES, "collar_bore")
+    assert land.roughness_um == press.ROD_LAND_RA_UM == GROUND_UM
+    assert bore.roughness_um == press.COLLAR_BORE_RA_UM
+    assert land.production_method == ""
+    # The land is the zone's Ø6 face; the stricter grade governs it.
+    assert land.face == seat.face and land.face.diameter_mm == press.PRESS_ZONE_DIA
+    assert land.roughness_um < seat.roughness_um == SEAT_UM
+
+    def smoothing(bore_ra: float, land_ra: float) -> float:
+        return press.SMOOTHING_FACTOR * press.RZ_PER_RA * (bore_ra + land_ra) / 1000.0
+
+    loosest = press.PRESS_INTERFERENCE_LIMITS[0]
+    printed = smoothing(bore.roughness_um, land.roughness_um)
+    assert printed == pytest.approx(press.SMOOTHING, abs=1e-15)
+    budget = press.PRESS_FIT_BUDGET
+    assert budget["interference_effective_min"] == pytest.approx(loosest - printed)
+    assert loosest - printed == pytest.approx(0.00188, abs=1e-12)
+    press.check_press_fit_budget(budget)
+    holding = press.press_holding(1.0, 1.0)
+    assert holding["contact_pressure_min_mpa"] > 0.0 and holding["axial_hold_n"] > 0.0
+    # The counterexample the finding names: the land at the body's Ra 3.2.
+    rough = smoothing(bore.roughness_um, seat.roughness_um)
+    assert rough == pytest.approx(0.0128, abs=1e-12)
+    assert loosest - rough == pytest.approx(-0.0058, abs=1e-12)
+    with pytest.raises(AssertionError, match="loosest band corner after smoothing"):
+        press.check_press_fit_budget(
+            {**budget, "interference_effective_min": loosest - rough}
+        )
+
+
+def test_press_land_symbol_lands_inside_the_land_with_its_reason() -> None:
+    """The land's Ra 0.8 is attached to the Ø6 face inside the land, between
+    the zone-start line and the zone diameter's dimension line; the symbol
+    and its two-row reason stand above-left, clear of that line, the zone
+    diameter's block and the stock diameter, and the leader's run (from the
+    r15 seat's 6.4 mm shoulder) crosses the top outline east of the
+    zone-start line, never across it."""
+    sheet_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "press_land")' in sheet_source
+    assert "edge_xy=PRESS_LAND_FINISH_PICK" in sheet_source
+    assert "leader_attach_xy=PRESS_LAND_FINISH_PICK" in sheet_source
+    assert (
+        "_add_finish_reason(\n        adapter, front, PRESS_LAND_CALLOUT, "
+        "PRESS_LAND_REASON_XY," in sheet_source
+    )
+    assert sheet_source.index("PRESS_LAND_CALLOUT, PRESS_LAND_REASON_XY") > (
+        sheet_source.index("edge_xy=PRESS_LAND_FINISH_PICK")
+    )
+    assert mg_magnifying_lever_spec.PRESS_LAND_CALLOUT == "MHA-MG-001\nPRESS LAND"
+
+    start_x = drawing._PRESS_ZONE_START_X
+    dim_line_x = drawing.REFERENCE_KEEP["PressZoneDia"][0]
+    pick_x, pick_y = drawing.PRESS_LAND_FINISH_PICK
+    # On the face (midway in the OD, as the seat's pick) inside the land,
+    # >= 1 mm from the solid zone-start line and the diameter's line.
+    assert pick_y == pytest.approx((drawing.FRONT_CENTER[1] + drawing._ROD_TOP_Y) / 2)
+    assert start_x + 0.001 <= pick_x <= dim_line_x - 0.001
+    assert pick_x < drawing._DOME_TANGENT_X
+    # The symbol (root = its V's tip; r15 seat: shoulder 6.4 mm right, bar
+    # 1.5 mm left, "Ra" text +5.1..+14.8 mm right and up to 7.1 mm high).
+    sym_x, sym_y = drawing.PRESS_LAND_FINISH_SYMBOL
+    shoulder_x = sym_x + 0.0064
+    assert shoulder_x < pick_x and sym_y > drawing._ROD_TOP_Y
+    crossing_x = pick_x - (pick_x - shoulder_x) * (drawing._ROD_TOP_Y - pick_y) / (
+        sym_y - pick_y
+    )
+    assert crossing_x >= start_x + 0.0005
+    # Its "Ra 0.8" ends >= 3 mm west of the diameter's line, whose shoulder
+    # (y ~169.9 mm on r15) and block run east from it.
+    assert sym_x + 0.0148 + 0.003 <= dim_line_x
+    # The reason: a note's position is its top-left; its two rows straddle
+    # the symbol's ink, ending >= 2 mm short of its bar.
+    left, top = drawing.PRESS_LAND_REASON_XY
+    rows = mg_magnifying_lever_spec.PRESS_LAND_CALLOUT.split("\n")
+    right = left + 0.0301 / 10 * max(len(row) for row in rows)  # r15 "MHA-MG-002"
+    bottom = top - (_TEXT_HEIGHT + (len(rows) - 1) * _ROW_PITCH)
+    assert right + 0.002 <= sym_x - 0.0015
+    assert bottom <= sym_y + 0.0071 / 2 <= top
+    assert bottom > drawing._ROD_TOP_Y + 0.008
+    # East of the stock diameter's "Ø6.0" row (it ends ~128 mm on r15).
+    assert left > drawing.REFERENCE_KEEP["RodDia"][0] + 0.020

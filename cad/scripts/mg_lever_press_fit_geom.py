@@ -77,9 +77,10 @@ if abs(COLLAR_BORE_DIA - (PRESS_ZONE_DIA - PRESS_INTERFERENCE_LIMITS[1])) > 1e-1
 # DIN 7190 smoothing: pressing flattens each surface's peaks, so the effective
 # interference is the measured one less SMOOTHING_FACTOR * (Rz bore + Rz rod).
 # 0.8 is DIN 7190:1988's factor, twice DIN 7190-1:2017's 0.4. Rz is taken as
-# RZ_PER_RA x Ra. The bore prints Ra 0.8 (reamed or honed; _surface_finish
-# GROUND). The rod's selected or lapped drawn-brass land is not printed and is
-# taken at the same Ra 0.8 (drawn bright stock is that or finer).
+# RZ_PER_RA x Ra. Both surfaces print Ra 0.8 (_surface_finish GROUND): the
+# MHA-MG-001 bore (reamed or honed) and the MHA-MG-003 press land, whose own
+# symbol overrides the lever body's general Ra 3.2 (its screw seat); at Ra 3.2
+# the loosest press would smooth away. Each spec asserts its symbol is this.
 COLLAR_BORE_RA_UM = 0.8
 ROD_LAND_RA_UM = 0.8
 RZ_PER_RA = 4.0

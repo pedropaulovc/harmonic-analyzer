@@ -12,8 +12,9 @@ covering the MHA-MG-001 collar, its length to the dome tangent as a
 reference, and its banded diameter, tied to the MHA-MG-001 bore it enters).
 The zone's start is a solid line across the bar, so the zone reads between it
 and the dome's tangent edge; every other reference entity lies on the
-silhouette.  The Ø6 body's one finish, the part-owned Ra 3.2 seat of the
-MHA-MG-002 clamp's screw, is a native symbol with its reason standing at it.
+silhouette.  The Ø6 body's general finish, the part-owned Ra 3.2 seat of the
+MHA-MG-002 clamp's screw, and the press land's stricter Ra 0.8 are native
+symbols, each with its reason standing at it.
 The sheet carries no note block: pressing the collar on is the MHA-MG-000
 assembly's step.  The rod axis is local +X, so the FRONT view is the long
 side elevation; an end view of a plain round would show nothing the Ø does
@@ -60,6 +61,7 @@ from _surface_finish import surface_finish_by_key
 from mg_lever_press_fit_geom import ROD_DIA
 from mg_magnifying_lever_spec import (
     DRAWING_DIMENSIONS,
+    PRESS_LAND_CALLOUT,
     PRESS_ZONE_DIA_CALLOUT,
     PRESS_ZONE_LENGTH,
     PRESS_ZONE_START_CALLOUT,
@@ -165,24 +167,43 @@ SEAT_FINISH_SYMBOL = (_ROD_WEST_TIP_X + 0.030, _ROD_TOP_Y + 0.014)
 # and ~4 mm over the stock diameter's row (its top ~172 mm), well west of the
 # zone diameter's block (x >= ~191 mm).
 SEAT_REASON_XY = (SEAT_FINISH_SYMBOL[0] - 0.0025, SEAT_FINISH_SYMBOL[1] + 0.013)
+# The press land's Ra 0.8 (SURFACE_FINISHES "press_land", #1570): the same Ø6
+# face, picked inside the 7 mm land between the zone-start line and the zone
+# diameter's dimension line (x ~190.8 mm on r15), midway between the axis and
+# the top outline as the seat's pick.  The symbol stands above-left, its
+# "Ra 0.8" ending ~3 mm short of that dimension line and under the zone
+# diameter's block, high enough that the leader crosses the top outline east
+# of the zone-start line.  Its two-row reason stands left of the symbol, the
+# rows straddling the symbol's ink, well east of the stock diameter's row.
+PRESS_LAND_FINISH_PICK = (
+    _PRESS_ZONE_START_X + 0.002,
+    (FRONT_CENTER[1] + _ROD_TOP_Y) / 2.0,
+)
+PRESS_LAND_FINISH_SYMBOL = (_PRESS_ZONE_START_X - 0.015, _ROD_TOP_Y + 0.012)
+PRESS_LAND_REASON_XY = (
+    PRESS_LAND_FINISH_SYMBOL[0] - 0.035,
+    PRESS_LAND_FINISH_SYMBOL[1] + 0.008,
+)
 
 
-def _add_seat_reason(adapter: Any, view: Any) -> None:
-    """The seat's reason as a free note owned by ``view`` at SEAT_REASON_XY;
-    a note that did not land in that view raises (the reason-note recipe of
+def _add_finish_reason(
+    adapter: Any, view: Any, text: str, xy: tuple[float, float], *, what: str
+) -> None:
+    """A finish's reason as a free note owned by ``view`` at ``xy``; a note
+    that did not land in that view raises (the reason-note recipe of
     draw_mg_magnifying_vertical_rod)."""
     name = view_name(adapter, view)
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
         raise RuntimeError(f"failed to activate the lever front view {name!r}")
     adapter.currentModel.ClearSelection2(True)
-    if add_note(adapter, SCREW_SEAT_CALLOUT, *SEAT_REASON_XY) is None:
-        raise RuntimeError("failed to add the lever screw-seat reason note")
+    if add_note(adapter, text, *xy) is None:
+        raise RuntimeError(f"failed to add the lever {what} reason note")
     texts = [
         " ".join(str(_early_bound(found, "INote").GetText() or "").split())
         for found in (_early_bound(view, "IView").GetNotes() or ())
     ]
-    if texts.count(SCREW_SEAT_CALLOUT) != 1:
-        raise RuntimeError(f"lever screw-seat reason missed its view: {texts!r}")
+    if texts.count(" ".join(text.split())) != 1:
+        raise RuntimeError(f"lever {what} reason missed its view: {texts!r}")
 
 
 def _set_radial_reference(adapter: Any, annotation: Any, *, label: str) -> None:
@@ -293,7 +314,23 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lever clamp screw seat finish",
         char_height=0.0025,
     )
-    _add_seat_reason(adapter, front)
+    _add_finish_reason(
+        adapter, front, SCREW_SEAT_CALLOUT, SEAT_REASON_XY, what="screw-seat"
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=PRESS_LAND_FINISH_PICK,
+        entity_type="FACE",
+        symbol_xy=PRESS_LAND_FINISH_SYMBOL,
+        leader_attach_xy=PRESS_LAND_FINISH_PICK,
+        control=surface_finish_by_key(SURFACE_FINISHES, "press_land"),
+        label="lever press land finish",
+        char_height=0.0025,
+    )
+    _add_finish_reason(
+        adapter, front, PRESS_LAND_CALLOUT, PRESS_LAND_REASON_XY, what="press-land"
+    )
     add_property_linked_note(adapter, "Iso View Note", 0.320, 0.140)
 
     return await finalize_drawing(
