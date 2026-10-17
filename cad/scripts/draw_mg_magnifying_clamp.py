@@ -301,7 +301,11 @@ def _face_hatches(section: Any) -> list[Any]:
 
 
 def _solid_line_hatch(adapter: Any, section: Any) -> None:
-    """Swap the brass material hatch (dashed ANSI33) for continuous lines."""
+    """Swap the brass material hatch (dashed ANSI33) for continuous lines.
+
+    IFaceHatch.Pattern is get-only (setting it raises "Unable to write
+    read-only property"); clearing UseMaterialHatch falls back to the
+    document's area hatch, which must read back as ANSI31."""
     hatches = _face_hatches(section)
     if not hatches:
         view = _early_bound(section, "IView")
@@ -311,15 +315,14 @@ def _solid_line_hatch(adapter: Any, section: Any) -> None:
         )
     for hatch in hatches:
         hatch.UseMaterialHatch = False
-        if str(hatch.Pattern) != SECTION_HATCH_PATTERN:
-            hatch.Pattern = SECTION_HATCH_PATTERN
     rebuild_drawing(adapter, label="section A-A solid-line hatch")
     read = [
         (bool(hatch.UseMaterialHatch), str(hatch.Pattern))
         for hatch in _face_hatches(section)
     ]
     if len(read) != len(hatches) or any(
-        material or pattern != SECTION_HATCH_PATTERN for material, pattern in read
+        material or not pattern.upper().startswith(SECTION_HATCH_PATTERN)
+        for material, pattern in read
     ):
         raise RuntimeError(
             f"section A-A hatch is not {SECTION_HATCH_PATTERN}: {read!r}"
