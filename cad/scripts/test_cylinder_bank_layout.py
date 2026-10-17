@@ -124,11 +124,11 @@ def test_the_datum_chain_is_mic_compensated() -> None:
 
 
 def test_a_closed_slot_always_holds_the_whole_ring() -> None:
-    # #948 ruling R: ring and shank 2.200 at three places, the title block's
-    # 3-place class.
-    three_place = _config.title_block("linear_3pl")["value_in"] * MM_PER_IN
-    assert rod.RING_THICKNESS_BAND == pytest.approx((three_place, -three_place))
-    ring_max = rod.RING_THICKNESS + three_place
+    # #982: ring and shank one 2.175 plate, its thickness printed +/-0.05 at
+    # the ring (review r1).
+    upper, _lower = rod.RING_THICKNESS_BAND
+    ring_max = rod.RING_THICKNESS + upper
+    assert ring_max == pytest.approx(2.225)
     assert bank.RING_MAX == pytest.approx(ring_max)
     assert bank.SHANK_MAX == pytest.approx(ring_max)
     # d': the thinnest in-band gear, 7.0565 - 0.025, less FW + 0.05.

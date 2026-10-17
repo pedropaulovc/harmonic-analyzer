@@ -779,10 +779,11 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
 BAR_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.35 - 3.20)
 # The MHA-CH-010 rod pivot pins (ch_rod_pivot_pin_spec), the same drill rod
 # pressed into each MHA-CH-003 rod's Ø1.968 fork ream through both tines:
-# 6.075 fork less the 2.625 slot (user ruling 2026-10-09, PR #1292 review F1).
+# 6.075 fork less the 2.675 slot (user ruling 2026-10-09, PR #1292 review F1;
+# slot widened from 2.625, #982).
 # Channel j's pin and rod are both its (j + 1)th instance, as the bar pin's
 # are; test_ch_rod_pivot_fit pins the literals to the pin spec.
-ROD_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.075 - 2.625)
+ROD_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.075 - 2.675)
 # The MHA-VN-034 #4-40 apex set screws (user, 2026-10-10), one down through
 # each MHA-CH-008 ear's R8 arch into its Ø6.5 bore, the tap cut at its drill.
 # The thread's major envelope crosses no longer a metal column than the arch

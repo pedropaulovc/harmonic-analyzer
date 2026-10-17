@@ -114,38 +114,37 @@ def joint_budget() -> dict[str, float]:
     Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)):
     the drill rod +/-0.005, the reamed tine hole +0.010/0, the arm's #47 hole
     +0.10/0, the arm strap 2.500 +/-0.025 and symmetric to its hub within
-    STRAP_HUB_SYMMETRY, the fork 6.075 +/-0.05, the slot 2.625 +0.127/0, the
-    tines equal within FORK_TINE_MATCH, the hubs that set the pitch never
-    shorter than nominal; the fork outline, slot depth and arm radii at the
-    title block's .XX class, the arm's top edge 8.0 +0.5/0 over its pivot.
+    STRAP_HUB_SYMMETRY, each tine 1.700 +/-0.05, the slot 2.675 +/-0.05 (so
+    the fork over the tines, their reference sum, spans FORK_THICKNESS_BAND),
+    the hubs that set the pitch never shorter than nominal; the fork outline,
+    slot depth and arm radii at the title block's .XX class, the arm's top
+    edge 8.0 +0.5/0 over its pivot.
     """
     t_min, t_max = _band(_arm.ARM_THICKNESS, _arm.ARM_THICKNESS_BAND)
     w_min, w_max = _band(_rod.FORK_THICKNESS, _rod.FORK_THICKNESS_BAND)
     s_min, s_max = _band(_rod.FORK_SLOT_WIDTH, _rod.FORK_SLOT_BAND)
+    tine_min, tine_max = _band(_rod.TINE_THICKNESS, _rod.TINE_BAND)
     blank_min, blank_max = _band(PIN_BLANK_LENGTH, PIN_BLANK_LENGTH_BAND)
     hole_min, hole_max = _band(ROD_HOLE_DIA, ROD_HOLE_BAND)
     arm_hole_min = NUMBER_DRILL_MM[_arm.ROD_HOLE_SPEC.size]
     arm_hole_max = arm_hole_min + DRILLED_PLUS
     pin_min, pin_max = PIN_DIA - PIN_DIA_TOLERANCE, PIN_DIA + PIN_DIA_TOLERANCE
-    off_centre = _rod.FORK_TINE_MATCH / 2.0
     pitch_min = _arm.HUB_LENGTH  # hubs bear face on face; +0.05/0 band
     # Each rod floats on its own arm's strap by the slot's side clearance, and
     # each strap stands off its hub's mid-plane by up to half its symmetry
     # zone: rod j's fork leans north on a strap set north, rod j+1's south on
-    # a strap set south, each face at half the fork plus its float and the
-    # slot's off-centre, each dressed pin end flush. The ring's symmetry to
-    # the slot does not enter: the fork's reach from its strap is bounded by
-    # the slot float alone, wherever the ring rides in its cam slot.
+    # a strap set south. With its slot's trailing wall on the strap, a fork's
+    # leading face stands the slot plus a tine, less half the strap, past the
+    # strap's mid-plane, each dressed pin end flush. The ring's place on the
+    # plate does not enter: the fork's reach from its strap is bounded by the
+    # slot and tine alone, wherever the ring rides in its cam slot.
     side_clearance_max = s_max - t_min
     neighbour = (
         pitch_min
-        - w_max
-        - side_clearance_max
-        - 2.0 * off_centre
+        - 2.0 * (s_max + tine_max - t_min / 2.0)
         - _arm.STRAP_HUB_SYMMETRY
         - 2.0 * PIN_END_PROUD_MAX
     )
-    tine_min = (w_min - s_max) / 2.0 - off_centre
     # Arm material inside the slot: the arm's bottom-edge arc, lowest at the
     # print-worst corner (top radius short, bottom radius long, top edge at
     # its MIN height over the pivot), swept through the relative swing across
@@ -218,6 +217,10 @@ if BUDGET["tine_bearing_land_min"] < RULE12_WALL_FLOOR - 1e-9:
     raise AssertionError("the pin's land in a tine is under the drawing-guidelines.md rule 17 (walls and webs) floor")
 if BUDGET["crotch_clearance_min"] < CROTCH_CLEARANCE_MIN - 1e-9:
     raise AssertionError("fork crotch can strike the arm's bottom edge")
+# The slot floor's corner radii stand no higher than the arm's least
+# clearance over the floor, so the arm never meets them.
+if _rod.INSIDE_CORNER_R >= BUDGET["crotch_clearance_min"]:
+    raise AssertionError("the slot floor's corner radii reach the arm's bottom edge")
 if BUDGET["bridge_min"] < BRIDGE_TARGET - 1e-9:
     raise AssertionError("fork bridge below the slot under the 2.0 target")
 if BUDGET["crown_wall_min"] < RULE12_WALL_TARGET - 1e-9:

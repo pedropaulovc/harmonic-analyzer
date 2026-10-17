@@ -11,63 +11,48 @@ part + drawing and leaves the assembly to its cheap token refresh.
 
 from __future__ import annotations
 
-from ch_connecting_rod_spec import (
-    FORK_TINE_MATCH,
-    RING_SLOT_SYMMETRY,
-    RING_THICKNESS,
-    SHANK_THICKNESS,
-)
+from ch_connecting_rod_spec import TINE_MIN
 
-# The strap-bore fit rides the Ø30.80 dimension callout (+0.10/0); the ring
-# centre-to-pin distance is a BASIC sheet dimension; the fork thickness and
-# slot carry their 3-place model bands; the reamed pin hole prints its size
-# and band from the PinHoleDia model dimension at three places (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
-# , PR #1292 review N1), so note 5 names only the press and its pin.
-# Notes carry only what the sheet does not dimension natively, so no number
-# appears in both places.  The
-# material (1018 plate) and the black finish are title-block rows, never
-# restated here (drawing-guidelines.md rule 2 (the title block is the general specification)).  Lines stay within 40 characters:
-# the block sits in the column between the front view's pin annotations and
-# the isometric view.
+# Every size, location and band prints from its native model dimension, and
+# each tight band names its mate on its own callout (drawing-guidelines.md
+# rules 4 and 7), so the one note states the tines' known shortfall against
+# the 2.0 wall target as a plain fact (rule 20).  The material (1018 plate)
+# and the black finish are title-block rows, never restated here (rule 2).
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_ch_connecting_rod marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "RingDiscProfile": {"RingOuterDia"},
+    "PlateProfile": {"RingOuterDia", "ShankWidthDim"},
+    "Plate": {"RingThick"},
     "StrapBoreProfile": {"StrapBoreDia"},
-    "ShankProfile": {"ShankWidthDim"},
     "ForkProfile": {"ForkWidthDim"},
     "ForkBoss": {"ForkThick"},
-    "ForkSlotProfile": {"SlotWidth", "SlotDepth", "ForkBossLength"},
+    "ForkSlotProfile": {
+        "TineNear",
+        "SlotWidth",
+        "RingFaceNear",
+        "SlotDepth",
+        "ForkBossLength",
+    },
+    "InsideCorners": {"InsideCornerR"},
     "PinHoleProfile": {"PinHoleDia"},
 }
 
-# The fork's outer thickness and slot hold the inter-arm gap (each gap holds
-# one tine of each neighbouring rod): three places, as their bands are written.
-# The reamed press hole's band is written at three places too.
+# The tines, slot, the plate's near face and its thickness hold the inter-arm
+# gap and the ring's float in its cam slot: three places, as their model
+# bands are written. The fork over the tines is their reference sum, at the
+# same places. The reamed press hole's band is written at three places too;
+# the inside corners' single-limit radius at one.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "Plate": {"RingThick": 3},
     "ForkBoss": {"ForkThick": 3},
-    "ForkSlotProfile": {"SlotWidth": 3},
+    "ForkSlotProfile": {
+        "TineNear": 3,
+        "SlotWidth": 3,
+        "RingFaceNear": 3,
+    },
+    "InsideCorners": {"InsideCornerR": 1},
     "PinHoleProfile": {"PinHoleDia": 3},
 }
 
-# The pin pressed into the reamed fork pin hole (test_ch_connecting_rod_drawing
-# pins it to the part registry).
-PIN_NUMBER = "MHA-CH-010"
-# Note 2 prints the one plate thickness ring to shank, at the title block's
-# three places (#948 ruling R, PR #1292).
-if SHANK_THICKNESS != RING_THICKNESS:
-    raise AssertionError("note 2 states one thickness for the ring and the shank")
-
-DRAWING_NOTES = "\n".join(
-    (
-        "1. STRAP BORE MACHINED; RUNS THE 30.60",
-        "   CAM, 0.10 MIN CLR/SIDE.",
-        f"2. RING AND SHANK {RING_THICKNESS:.3f} THICK;",
-        f"   SYMMETRIC TO SLOT WITHIN {RING_SLOT_SYMMETRY:.2f}.",
-        "3. RING WALL 4.50 MIN AFTER BORING.",
-        f"4. SLOT CENTRED; TINES EQUAL WITHIN {FORK_TINE_MATCH:.2f}",
-        f"5. PRESS FIT PIN {PIN_NUMBER} INTO THE",
-        "   REAMED PIN HOLE, BOTH TINES.",
-    )
-)
+DRAWING_NOTES = f"1. TINE WALL {TINE_MIN:.2f} MIN."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

@@ -238,8 +238,14 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "air and the chain envelope's reach"
     ),
     ("ch_connecting_rod_spec", "RING_THICKNESS_BAND"): (
-        "2.200 plate at three places stated in note 2 (title-block linear_3pl), "
-        "indexed by cylinder_bank_layout for the thickest ring its cam slot holds"
+        "the 2.175 plate's thickness, printed at the ring (#982 review r1), "
+        "indexed by cylinder_bank_layout for the thickest ring its cam slot "
+        "holds"
+    ),
+    ("ch_connecting_rod_spec", "FORK_THICKNESS_BAND"): (
+        "the fork over the tines, a reference: two TINE_BANDs and the "
+        "FORK_SLOT_BAND, indexed by ch_rod_pivot_pin_spec for the blank's "
+        "dressing stock"
     ),
     ("ch_bar_pivot_pin_spec", "PIN_BLANK_LENGTH_BAND"): (
         "the drill-rod blank's cut-length deviations: indexed into the blank "
@@ -249,7 +255,7 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "indexed into the cylinder gear-data whole-depth limits"
     ),
     ("ch_connecting_rod_spec", "SHANK_THICKNESS_BAND"): (
-        "same 2.200 plate as the ring (note 2), indexed by cylinder_bank_layout "
+        "same 2.175 plate as the ring (#982), indexed by cylinder_bank_layout "
         "for the thickest shank its cam slot holds"
     ),
     ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"): (

@@ -2,7 +2,7 @@ ch-connecting-rod:
   number: MHA-CH-003
   material: Plain Carbon Steel
   material_specification: AISI 1018 low-carbon steel plate
-  finish: BLACK ENAMEL; MASK STRAP BORE, PIN HOLE AND FORK SLOT; OIL BARE MACHINED SURFACES
+  finish: BLACK ENAMEL; MASK STRAP BORE, RING FACES, PIN HOLE AND FORK SLOT; OIL BARE MACHINED SURFACES
   quantity: 20
   tolerance_class: machined_block
   fit_class: cam_follower_contact
@@ -13,3 +13,8 @@ ch-connecting-rod:
       where: "the one position control carried on this sheet"
       finding: "position frame over-specified on a channel part (rule 5)"
       reason: "a coordinate plus/minus would let the 20 channels scatter; at most one control per channel part (owner-accepted channel-consistency class)"
+    - id: "RV-02"
+      kind: "minor"
+      where: "sheet note 1, TINE WALL 1.65 MIN"
+      finding: "fork tine wall below the 2.0 mm target (rules 17, 20)"
+      reason: "each gap between neighbouring 2.5 rocker arms at the 7.0565 channel pitch holds one tine of each adjacent rod, so the tine is pitch-bound; 1.65 MIN at the worst printed limits stays above the 1.5 floor (owner-ruled shortfall)"
