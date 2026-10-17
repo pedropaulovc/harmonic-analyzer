@@ -160,7 +160,7 @@ not mergeable until ALL THREE hold — no partial credit:
    a shape can pass every check and still be visibly wrong.
    **Drawing sheets have a cached machinist-review leaf; an eye pass does not
    replace it.** `check:machinist_review:<stem>` runs in both `build` and `release`
-   for every registered drawing, on the submitter without a COM seat. It runs
+   for every drawing that opts in, on the submitter without a COM seat. It runs
    three parallel blind reviews, then a judge vets every finding against the
    sheet; the aggregate of confirmed findings is the verdict. This replaces the
    hand-run review command as the pipeline gate, with reports at

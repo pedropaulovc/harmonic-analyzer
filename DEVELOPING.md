@@ -13,7 +13,7 @@ an ad-hoc COM operation, and it links back here for cache detail.
 ## Cached machinist-review leaves
 
 `check:machinist_review:<stem>` is a SolidWorks-free, submitter-only task for
-every registered drawing, included in `build` and `release` under both executors.
+every drawing that opts in, included in `build` and `release` under both executors.
 It waits for the drawing PDF, runs three parallel blind reviews and a
 sheet-grounded judge on a cache miss, then caches the complete per-drawing report
 directory at `cad/out/reports/machinist-review/<stem>/`. The aggregate JSON and
