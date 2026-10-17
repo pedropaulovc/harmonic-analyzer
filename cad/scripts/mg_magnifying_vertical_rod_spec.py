@@ -14,6 +14,8 @@ shoulder at SHOULDER_X, the bottom dome's tip at ROD_LENGTH.
 
 from __future__ import annotations
 
+from _gtol_cylinder import CylinderFace
+from _surface_finish import SEAT_UM, SurfaceFinishControl
 from mg_magnifying_vertical_rod_geom import (
     BODY_LENGTH,
     DOME_R,
@@ -63,8 +65,10 @@ __all__ = [
     "ROD_LENGTH",
     "ROD_THREAD_LEN",
     "ROD_THREAD_LEN_BAND",
+    "SEAT_FINISH_REASON",
     "SHOULDER_X",
     "SINGLE_LIMITS",
+    "SURFACE_FINISHES",
     "THREAD",
     "THREAD_BASIC_MINOR",
     "THREAD_CALLOUT",
@@ -125,8 +129,25 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # above the value.
 RELIEF_ROOTS_CALLOUT = "2X"
 
-# No general notes (drawing-guidelines.md rule 7): the stock, the overall, the
-# seat on MHA-MG-002 and the hemisphere each ride their own callout.
+# The fixture's thumb-screw seat (owner ruling 2026-10-17; drawing-guidelines.md
+# rule 6, a static seat that locates, Ra 3.2). MHA-MG-006's axial #4-40 knurled
+# thumb screw (MHA-VN-011) locks the fixture to the rod, and the operator sets
+# the fixture anywhere along the body (ch. 20 p. 46: "sliding a fixture up and
+# down on the vertical rod"). Its tip reaches from where the fixture's top hex
+# corner meets MHA-MG-002's bottom face down to where its bore reaches the
+# dome tangent: at the nominal model 5.0 under the shoulder to 7.5 over the
+# dome tip, 92% of the body's one Ø5 cylinder (the drawing test derives the
+# reach from the fixture and screw geometry). The symbol qualifies that whole
+# face: a zone stopping only where the fixture runs out of rod would add two
+# lengths and nothing the shop could act on. No clamp screw bears on the rod:
+# MHA-MG-002's thumb screw enters its top face and pinches the lever; the rod
+# is threaded into its bottom face (mg_rod_clamp_joint).
+SURFACE_FINISHES = (SurfaceFinishControl("screw_seat", SEAT_UM, CylinderFace(ROD_DIA)),)
+# The seat's reason stands beside its symbol (rule 7: say why, where it applies).
+SEAT_FINISH_REASON = "THUMB-SCREW SEAT"
+
+# No general notes (drawing-guidelines.md rule 7): the overall, the seat on
+# MHA-MG-002, the hemisphere and the screw seat each ride their own callout.
 ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
 if (
