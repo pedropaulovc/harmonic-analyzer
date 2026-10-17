@@ -33,6 +33,7 @@ from typing import Any
 
 import _telemetry
 import ms_measuring_stick_assembly_spec as spec
+import ms_measuring_stick_explode_spec as explode
 from _assembly import (
     activate_assembly_contract,
     assembly_title_properties,
@@ -84,12 +85,12 @@ async def _place_fixed(
 def ms_exploded_view_name(configuration: str) -> str:
     """The named explode ``configuration`` owns: exploded-view names are unique
     per document, so ``Default Simplified``'s copy carries the suffix too."""
-    if configuration == spec.SOURCE_CONFIGURATION:
-        return spec.EXPLODED_VIEW_NAME
-    if configuration == simplified_name(spec.SOURCE_CONFIGURATION):
-        return simplified_name(spec.EXPLODED_VIEW_NAME)
+    if configuration == explode.SOURCE_CONFIGURATION:
+        return explode.EXPLODED_VIEW_NAME
+    if configuration == simplified_name(explode.SOURCE_CONFIGURATION):
+        return simplified_name(explode.EXPLODED_VIEW_NAME)
     raise ValueError(
-        f"{spec.EXPLODED_VIEW_NAME}: no explode is authored in {configuration!r}"
+        f"{explode.EXPLODED_VIEW_NAME}: no explode is authored in {configuration!r}"
     )
 
 
@@ -159,7 +160,7 @@ def _create_named_view(
 
 @_telemetry.traced("assembly.ms_explode")
 def _create_ms_explode(adapter: Any, configuration_name: str) -> None:
-    """Author ``spec.EXPLODE_STEPS`` in the active ``configuration_name`` and
+    """Author ``explode.EXPLODE_STEPS`` in the active ``configuration_name`` and
     leave the operational model collapsed.
 
     Run in Default and in Default Simplified
@@ -209,7 +210,7 @@ def _create_ms_explode(adapter: Any, configuration_name: str) -> None:
                 raise RuntimeError(f"{view_name}: cannot remove auto step {index}")
         if int(configuration.GetNumberOfExplodeSteps()) != 0:
             raise RuntimeError(f"{view_name}: auto steps remain")
-        for step_index, (label, stems, key, distance_mm) in enumerate(spec.EXPLODE_STEPS, 1):
+        for step_index, (label, stems, key, distance_mm) in enumerate(explode.EXPLODE_STEPS, 1):
             moved = [component for stem in stems for component in groups[stem]]
             distance = distance_mm / 1000.0
             with _telemetry.span("assembly.ms_explode.step", label=label, moved=len(moved)):
@@ -242,7 +243,7 @@ def _create_ms_explode(adapter: Any, configuration_name: str) -> None:
                 step = _early_bound(raw_step, "IExplodeStep")
                 # Distinct per explode: Default Simplified's copy carries the suffix.
                 step_name = f"MS {label.upper()}"
-                if configuration_name != spec.SOURCE_CONFIGURATION:
+                if configuration_name != explode.SOURCE_CONFIGURATION:
                     step_name = simplified_name(step_name)
                 step.Name = step_name
                 if str(step.Name) != step_name or not model.EditRebuild3():
@@ -292,14 +293,14 @@ def _create_ms_explode(adapter: Any, configuration_name: str) -> None:
             if primary_error is None:
                 raise
             _telemetry.warn(f"{view_name}: cleanup after authoring failure: {cleanup_error}")
-    if int(configuration.GetNumberOfExplodeSteps()) != len(spec.EXPLODE_STEPS):
+    if int(configuration.GetNumberOfExplodeSteps()) != len(explode.EXPLODE_STEPS):
         raise RuntimeError(f"{view_name}: collapsed presentation lost authored steps")
     if tuple(assembly.GetExplodedViewNames2(configuration_name) or ()) != (view_name,):
         raise RuntimeError(f"{view_name}: collapsed presentation lost named view")
     if str(assembly.GetExplodedViewConfigurationName(view_name)) != configuration_name:
         raise RuntimeError(f"{view_name}: named presentation is not owned by {configuration_name}")
     _telemetry.success(
-        f"{view_name}: {len(spec.EXPLODE_STEPS)} native steps verified in world space; "
+        f"{view_name}: {len(explode.EXPLODE_STEPS)} native steps verified in world space; "
         f"all {len(components)} instances restored"
     )
 

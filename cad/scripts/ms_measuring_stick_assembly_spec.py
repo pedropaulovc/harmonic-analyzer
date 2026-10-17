@@ -9,6 +9,11 @@ block and plate sit at the identity and every other pose below is derived
 from the part contracts -- the builder, the top-level park pose and the
 fitter drawing all read these values; none of them restates a dimension.
 
+Builder data only: everything here reaches the saved .SLDASM (poses, the
+clamped-setting sketch and its tolerance/precision, the top-level park
+envelope). The explode lives in ``ms_measuring_stick_explode_spec``; the
+fitter drawing's BOM, captions and text in ``ms_measuring_stick_assembly_sheet``.
+
 Clamped state: the stick rides the window against the roof, graduations up,
 with the thumbscrew's tip on its underside and the block centred on the
 STOP_MARK division. Rotation rows follow ``_transforms``: ``rows[i]`` is the
@@ -17,15 +22,12 @@ assembly-frame image of the part's local axis ``i``. No SolidWorks imports.
 
 from __future__ import annotations
 
-import textwrap
-
 import ms_stick_spec as stick
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import _mcmaster_91882a221 as thumb
 
 ASM_NAME = "ms-measuring-stick"
-DRAWING_NUMBER = "MHA-MS-000"
 
 STICK = "ms-stick"
 BLOCK = "ms-stop-block"
@@ -36,7 +38,6 @@ THUMB_SCREW = "vn-thumb-screw"
 # Every component family and its count: the builder places, the explode moves
 # and the drawing's BOM proves exactly this inventory.
 QUANTITIES = {STICK: 1, BLOCK: 1, PLATE: 1, PLATE_SCREW: 2, THUMB_SCREW: 1}
-BOM_ORDER = (STICK, BLOCK, PLATE, PLATE_SCREW, THUMB_SCREW)
 
 Rows = tuple[tuple[float, float, float], ...]
 IDENTITY_ROWS: Rows = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
@@ -100,99 +101,20 @@ EXTENT_MAX = (
     max(stop.BLOCK_DEPTH, stop.THUMB_AXIS_Z + thumb.HEAD_DIA / 2.0),
 )
 
-# BOM DESCRIPTION cells (the parts carry no Description property); the steps
-# below name the parts the same way.
-BOM_DESCRIPTIONS = {
-    STICK: "GRADUATED STICK",
-    BLOCK: "STOP BLOCK",
-    PLATE: "STOP COVER PLATE",
-    PLATE_SCREW: f"{plate_screw.THREAD} X 1/4 BRASS FILLISTER SCREW",
-    THUMB_SCREW: f"{thumb.THREAD} X 7/16 KNURLED THUMBSCREW",
-}
-
-# --- Native explode (MS_EXPLODED) --------------------------------------------
-# The disassembly order, ASSEMBLY_STEPS read back to front: the cover and its
-# screws off the open side, the screws clear of the cover, the bar out of the
-# opened window, then the thumbscrew down its axis. (label, families, axis,
-# signed distance mm), all along the assembly's global axes. The distances are
-# sized for the drawing's *Isometric (it looks from +X+Y+Z, the closed side):
-# each further -Z step slides a part up and right on the sheet, so the screws
-# withdraw far enough to clear the cover's outline instead of hiding behind
-# it, and the thumbscrew drops clear of the block.
-EXPLODED_VIEW_NAME = "MS_EXPLODED"
-SOURCE_CONFIGURATION = "Default"
-EXPLODE_STEPS = (
-    ("cover comes off", (PLATE, PLATE_SCREW), "z", -24.0),
-    ("plate screws withdraw", (PLATE_SCREW,), "z", -26.0),
-    ("stick leaves window", (STICK,), "z", -12.0),
-    ("thumbscrew backs out", (THUMB_SCREW,), "y", -22.0),
-)
-
-# --- Fitter package text ------------------------------------------------------
-EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
+# --- Clamped setting (a construction sketch in the .SLDASM) ------------------
 # Assembly acceptance measured between real faces; no component size is changed.
+# The builder applies its tolerance and both precisions to the model dimension.
 SETTING_TOLERANCE_MM = 0.10
 SETTING_NEAR_FACE_MM = BLOCK_ORIGIN[0] - STICK_X_MIN
 SETTING_PRECISION = 1
 SETTING_TOLERANCE_PRECISION = 2
 SETTING_FEATURE = "ClampedSetting"
 SETTING_DIMENSION = "NearFaceFromStickEnd"
-DRAWING_DIMENSIONS = {SETTING_FEATURE: {SETTING_DIMENSION}}
 DRAWING_PRECISION = {SETTING_FEATURE: {SETTING_DIMENSION: SETTING_PRECISION}}
 SETTING_CHORD = (
     (STICK_X_MIN, STICK_TOP_Y),
     (BLOCK_ORIGIN[0], STICK_TOP_Y),
 )
-SETTING_CRITERION = (
-    f"NEAR BLOCK FACE {SETTING_NEAR_FACE_MM:.1f} ±{SETTING_TOLERANCE_MM:.2f} mm "
-    "FROM LEFT STICK END"
-)
-SETTING_REFERENCE_DESCRIPTION = (
-    f"{stop.STOP_MARK:.1f} GRADUATION ON THUMBSCREW AXIS (REF)"
-)
-# Components own material and finish; no assembly coating operation is required.
-# The fitter's order; the explode above runs steps 2-5 backwards. Each line
-# names the parts as the BOM's DESCRIPTION column does. The block and its
-# cover are a match-drilled pair (step 1): neither is interchangeable.
-ASSEMBLY_STEPS = (
-    "1. PLATE IS MASTER: LAYOUT BOTH HOLES ON THE STOP COVER PLATE AT ITS OWN "
-    f"±{stop.PLATE_HOLE_POSITION_TOLERANCE_MM:.2f} mm LOCATIONS. CLAMP PLATE "
-    f"AND BLOCK WITH {stop.MATCH_DRILL_DATUM_ALIGNMENT}; PILOT FROM PLATE "
-    f"DIA {stop.PLATE_TAP_DRILL_DIA:.2f} THROUGH INTO BLOCK TO "
-    f"{stop.PLATE_TAP_DRILL_DEPTH:.1f} mm CYLINDRICAL DEPTH INTO BLOCK "
-    "(DEPTH EXCLUDES PLATE). REMOVE PLATE; OPEN ITS HOLES TO "
-    f"DIA {stop.PLATE_CLEARANCE_DIA:.1f}; BOTTOMING-TAP BLOCK "
-    f"{plate_screw.THREAD} TO {stop.PLATE_TAP_THREAD_DEPTH:.1f} mm FULL THREAD "
-    "DEPTH INTO BLOCK. MARK BLOCK AND PLATE AS A PAIR.",
-    f"2. START THE {thumb.THREAD} KNURLED THUMBSCREW UP INTO THE STOP BLOCK FROM "
-    "ITS UNDERSIDE; KEEP THE TIP BELOW THE WINDOW FLOOR.",
-    "3. LAY THE GRADUATED STICK, GRADUATED FACE UP, INTO THE BLOCK WINDOW FROM "
-    "ITS OPEN SIDE.",
-    "4. FIT ITS OWN STOP COVER PLATE OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE "
-    f"BOTH {plate_screw.THREAD} BRASS FILLISTER SCREWS UNTIL THE HEADS SEAT.",
-    f"5. SET {SETTING_CRITERION}; THEN TURN THE THUMBSCREW IN BY HAND UNTIL "
-    "ITS TIP CLAMPS THE STICK AGAINST THE ROOF.",
-)
-ASSEMBLY_CHECKS = (
-    "CHECK: WITH THE THUMBSCREW BACKED OFF THE STICK SLIDES FREELY IN THE WINDOW.",
-    "CHECK: CLAMPED, THE STOP DOES NOT MOVE ALONG THE STICK.",
-    "CHECK: BOTH SCREW HEADS SEAT ON THE COVER AND THE COVER LIES FLAT ON THE BLOCK.",
-)
-CLAMPED_SETUP_NOTE = (
-    f"CLAMPED SETUP: SET {SETTING_CRITERION}; THEN CLAMP. "
-    "GRADUATED FACE AGAINST THE ROOF; THUMBSCREW TIP ON THE STICK UNDERSIDE."
-)
-
-# Overall is pure reference; the near-face value is assembly acceptance only.
-REFERENCE_OVERALL_LENGTH = STICK_X_MAX - STICK_X_MIN
-# The dimension itself states the near-face criterion and the setup note
-# repeats it in words; the callout carries only the graduation reference,
-# wrapped narrow enough to sit between the dimension's extension lines.
-STOP_POSITION_CALLOUT_WIDTH = 21  # characters
-STOP_POSITION_CALLOUT = "\n".join(
-    textwrap.wrap(SETTING_REFERENCE_DESCRIPTION, width=STOP_POSITION_CALLOUT_WIDTH)
-)
-DRAWING_REFERENCE_PRECISION = 1
 
 assert STICK_SIDE_CLEARANCE > 0.0, STICK_SIDE_CLEARANCE
 assert STICK_FLOOR_GAP > 0.0, STICK_FLOOR_GAP
@@ -203,4 +125,3 @@ assert abs(
     THUMB_EXPOSED_THREAD + THUMB_ENGAGED_THREAD + STICK_FLOOR_GAP - thumb.SHANK_LEN
 ) < 1e-9
 assert 0.0 < PLATE_SCREW_ENGAGED < stop.PLATE_TAP_THREAD_DEPTH, PLATE_SCREW_ENGAGED
-assert sorted(QUANTITIES) == sorted(BOM_ORDER)

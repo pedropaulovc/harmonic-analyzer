@@ -21,6 +21,7 @@ import dt_drive_train_steps
 import fr_harmonic_base_spec as base
 import fr_nameplate_spec as nameplate
 import paper_drive_geom as paper_geometry
+import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_explode_spec as explode
 import pd_rack_pinion_spec as disc
@@ -111,7 +112,7 @@ RETIRED_FAMILIES = {
 
 def _unit_operating_domain() -> drawing.RackOperatingDomain:
     """The real engaged-feed window: closed-form, cheap and source-derived."""
-    return steps.feed_rack_operating_domain()
+    return rack_setup.feed_rack_operating_domain()
 
 
 def _unit_step_notes() -> drawing.StepNotes:
@@ -1778,10 +1779,10 @@ def test_the_reducer_is_clocked_once_with_an_ordinary_limit() -> None:
 
 def test_the_feed_mesh_stays_on_the_hook_run_and_passes_its_closed_form_gates() -> None:
     assert assembly.RACK_MESH_EXT == pytest.approx(feed_pinion.RACK_MESH_EXTENSION)
-    assert steps.RACK_DATUM_BACKLASH_RANGE == feed_pinion.RACK_BACKLASH_RANGE
+    assert rack_setup.RACK_DATUM_BACKLASH_RANGE == feed_pinion.RACK_BACKLASH_RANGE
     height = assembly.RACK_PITCH_Y - assembly.STUD_XY[1]
     assert height == pytest.approx(feed_pinion.RACK_AXIS_DISTANCE)
-    low, high = steps.RACK_DATUM_MODEL_AXIS_DISTANCE_RANGE
+    low, high = rack_setup.RACK_DATUM_MODEL_AXIS_DISTANCE_RANGE
     assert low < height < high
     # A mesh change at the stud turns the hanger about P: the pin crosses the
     # hook's straight run by the change over the stud's lever, and the
@@ -1795,11 +1796,11 @@ def test_the_feed_mesh_stays_on_the_hook_run_and_passes_its_closed_form_gates() 
         shift = abs(end - height) * lever
         assert shift + room < hook_geometry.RUN_ABOVE_HOLE
         assert shift + room < hook_geometry.RUN_BELOW_HOLE
-    assert assembly._assert_rack_mesh() == steps.feed_rack_operating_domain()
+    assert assembly._assert_rack_mesh() == rack_setup.feed_rack_operating_domain()
 
 
 def test_the_native_feed_mesh_rejects_a_height_outside_its_actual_datum(monkeypatch) -> None:
-    height = steps.RACK_DATUM_MODEL_AXIS_DISTANCE_RANGE[1] + feed_pinion.MODULE_MM
+    height = rack_setup.RACK_DATUM_MODEL_AXIS_DISTANCE_RANGE[1] + feed_pinion.MODULE_MM
     monkeypatch.setattr(assembly, "RACK_MESH_EXT", height - feed_pinion.PITCH_DIA / 2.0)
     monkeypatch.setattr(assembly, "RACK_PITCH_Y", assembly.STUD_XY[1] + height)
     with pytest.raises(ValueError):
@@ -1888,7 +1889,7 @@ def test_the_native_default_pose_and_whole_loaded_axis_family_fit_the_end_window
 
 def test_native_rack_height_is_observed_not_assumed_from_the_recipe(monkeypatch) -> None:
     observed = []
-    bad_height = steps.RACK_DATUM_MODEL_AXIS_DISTANCE_RANGE[1] + feed_pinion.MODULE_MM
+    bad_height = rack_setup.RACK_DATUM_MODEL_AXIS_DISTANCE_RANGE[1] + feed_pinion.MODULE_MM
 
     def native_point(adapter, name, local):
         if name == "actual-stud":
@@ -1909,10 +1910,10 @@ def test_native_rack_height_is_observed_not_assumed_from_the_recipe(monkeypatch)
 
 
 def test_a_direct_datum_reader_cannot_widen_the_printed_setup_band() -> None:
-    low, high = steps.RACK_DATUM_BACKLASH_RANGE
+    low, high = rack_setup.RACK_DATUM_BACKLASH_RANGE
     span = high - low
     with pytest.raises(ValueError, match="datum setup band leaves"):
-        steps.require_feed_rack_datum_axis_distance(
+        rack_setup.require_feed_rack_datum_axis_distance(
             feed_pinion.RACK_AXIS_DISTANCE, (low - span, high + span)
         )
 
@@ -1931,7 +1932,7 @@ def test_note_formatting_is_explicit_about_its_supplied_window() -> None:
 
 def test_drawing_notes_print_the_window_checked_against_the_paper_sweep() -> None:
     notes = drawing.require_step_notes()
-    assert notes == drawing.format_step_notes(operating_domain=steps.feed_rack_operating_domain())
+    assert notes == drawing.format_step_notes(operating_domain=rack_setup.feed_rack_operating_domain())
 
 
 @pytest.mark.parametrize(

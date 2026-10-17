@@ -649,7 +649,7 @@ def test_explode_families_are_either_moved_or_stationary_never_both() -> None:
 
 def test_clusters_partition_every_instance_once() -> None:
     census = _instances()
-    members = spec.cluster_members(census)
+    members = drawing.cluster_members(census)
     flat = [name for names in members.values() for name in names]
     assert sorted(flat) == sorted(i.name for i in census)
     assert "vn-foot-screw-1" in members["pinion-rig"]
@@ -1196,13 +1196,13 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     washer = f"{bank.WASHER_THICK:.3f}"
     bank_x = cone_line.X_DRUM + base.BOTTOM_LENGTH / 2.0
     assert (
-        f"TO X {limits(bank_x - band, bank_x + band, spec.FIT_LIMIT_PLACES)}" in steps
+        f"TO X {limits(bank_x - band, bank_x + band, drawing.FIT_LIMIT_PLACES)}" in steps
     )
     assert (
-        f"X {limits(bank_x - band, bank_x + band, spec.FIT_LIMIT_PLACES)} AND SPOT" in steps
+        f"X {limits(bank_x - band, bank_x + band, drawing.FIT_LIMIT_PLACES)} AND SPOT" in steps
     )
     assert (
-        f"Y {limits(back_y - band, back_y + band, spec.FIT_LIMIT_PLACES)} "
+        f"Y {limits(back_y - band, back_y + band, drawing.FIT_LIMIT_PLACES)} "
         f"LESS (W - {washer})" in steps
     )
     assert steps.index("MIC ONE MHA-DT-026, W") < steps.index("FACE TO Y")

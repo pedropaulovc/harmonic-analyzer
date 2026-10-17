@@ -2,13 +2,16 @@
 
 The clamped pose, the park pose under the top assembly, the thread
 allowances and the fitter package all derive from
-``ms_measuring_stick_assembly_spec``; these tests pin the derivations to the
-part and vendor specs so none of them can drift on its own.
+``ms_measuring_stick_assembly_spec`` (builder data),
+``ms_measuring_stick_explode_spec`` and ``ms_measuring_stick_assembly_sheet``
+(drawing-only); these tests pin the derivations to the part and vendor specs
+so none of them can drift on its own.
 """
 
 from __future__ import annotations
 
 import ast
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -24,7 +27,9 @@ import _interference_contracts as contracts
 import build_ha_harmonic_analyzer_assembly as top
 import draw_ms_measuring_stick_assembly as drawing
 import joint_retention
+import ms_measuring_stick_assembly_sheet as sheet
 import ms_measuring_stick_assembly_spec as spec
+import ms_measuring_stick_explode_spec as explode
 import ms_stick_spec as stick
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
@@ -246,7 +251,7 @@ def test_thread_allowances_are_the_spec_values() -> None:
 def test_assembly_contract_is_fully_fixed() -> None:
     path = _config.CONFIG_DIR / "assemblies" / f"{spec.ASM_NAME}.yaml"
     contract = yaml.safe_load(path.read_text(encoding="utf-8"))
-    assert contract["number"] == spec.DRAWING_NUMBER
+    assert contract["number"] == sheet.DRAWING_NUMBER
     assert contract["free_dof"] == 0
     assert contract["allowed_free_stems"] == []
     assert contract["required_free_stems"] == []
@@ -269,11 +274,11 @@ def _placed_stems() -> list[str]:
 
 def test_builder_places_exactly_the_inventory() -> None:
     assert sorted(set(_placed_stems())) == sorted(spec.QUANTITIES)
-    assert sorted(spec.BOM_ORDER) == sorted(spec.QUANTITIES)
-    for _label, families, axis, distance in spec.EXPLODE_STEPS:
+    assert sorted(sheet.BOM_ORDER) == sorted(spec.QUANTITIES)
+    for _label, families, axis, distance in explode.EXPLODE_STEPS:
         assert set(families) <= set(spec.QUANTITIES)
         assert axis in {"x", "y", "z"} and distance != 0.0
-    moved = {family for _label, families, _axis, _distance in spec.EXPLODE_STEPS for family in families}
+    moved = {family for _label, families, _axis, _distance in explode.EXPLODE_STEPS for family in families}
     assert moved == set(spec.QUANTITIES) - {spec.BLOCK}
 
 
@@ -309,12 +314,12 @@ def test_joint_rows_name_printed_steps() -> None:
         "ms-measuring-stick/stop-thumbscrew",
         "ms-measuring-stick/plate-screws",
     }
-    printed = {line.split(". ", 1)[0]: line for line in spec.ASSEMBLY_STEPS}
+    printed = {line.split(". ", 1)[0]: line for line in sheet.ASSEMBLY_STEPS}
     for joint, word in (
         (joints["ms-measuring-stick/stop-thumbscrew"], "THUMBSCREW"),
         (joints["ms-measuring-stick/plate-screws"], "FILLISTER SCREWS"),
     ):
-        prefix = f"{spec.DRAWING_NUMBER} STEP "
+        prefix = f"{sheet.DRAWING_NUMBER} STEP "
         assert joint.installed_at.startswith(prefix)
         assert word in printed[joint.installed_at.removeprefix(prefix)]
     assert joints["ms-measuring-stick/plate-screws"].quantity == spec.QUANTITIES[spec.PLATE_SCREW]
@@ -333,7 +338,7 @@ def test_fitter_package_covers_rule_9() -> None:
         drawing.DrawingLayout.LANDSCAPE,
     )
     assert all(scale == (1.0, 1.0) for scale in drawing.SHEET_SCALES.values())
-    assert drawing.BOM_COMPONENTS == spec.BOM_ORDER
+    assert drawing.BOM_COMPONENTS == sheet.BOM_ORDER
     assert set(drawing.BOM_DESCRIPTIONS) == set(spec.QUANTITIES)
     assert set(drawing.BALLOON_ANCHORS) == set(spec.QUANTITIES)
     assert drawing.BOM_PART_NUMBERS[spec.PLATE_SCREW] == "MHA-VN-054"
@@ -341,16 +346,16 @@ def test_fitter_package_covers_rule_9() -> None:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
     for text in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS, drawing.SETUP_NOTE):
         assert all(len(line) <= drawing.STEPS_LINE_WIDTH for line in text.splitlines())
-    assert drawing.ASSEMBLY_STEPS.count("\n") >= len(spec.ASSEMBLY_STEPS)
-    for instruction in (spec.ASSEMBLY_STEPS[-1], spec.CLAMPED_SETUP_NOTE):
-        assert spec.SETTING_CRITERION in instruction
+    assert drawing.ASSEMBLY_STEPS.count("\n") >= len(sheet.ASSEMBLY_STEPS)
+    for instruction in (sheet.ASSEMBLY_STEPS[-1], sheet.CLAMPED_SETUP_NOTE):
+        assert sheet.SETTING_CRITERION in instruction
         assert "NEAR BLOCK FACE" in instruction
         assert "FROM LEFT STICK END" in instruction
-    assert drawing.EXPLODED_CAPTION == spec.EXPLODED_CAPTION == (
+    assert drawing.EXPLODED_CAPTION == sheet.EXPLODED_CAPTION == (
         "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
     )
     # drawing-guidelines.md rule 2 (the title block is the general specification) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the component Finish fields, not fitter notes or steps, own finish.
-    assert not any("BLACKEN" in step or "FINISH" in step for step in spec.ASSEMBLY_STEPS)
+    assert not any("BLACKEN" in step or "FINISH" in step for step in sheet.ASSEMBLY_STEPS)
     for obsolete in ("FINISH_NOTE", "FINISH_NOTE_TEXT", "FINISH_NOTE_XY", "_BLOCK_FINISH"):
         assert not hasattr(drawing, obsolete)
 
@@ -651,7 +656,7 @@ def test_mixed_sheets_copy_real_templates_and_close_donors(monkeypatch, defect) 
 
 
 def test_reference_dimensions_follow_the_spec() -> None:
-    assert spec.REFERENCE_OVERALL_LENGTH == pytest.approx(stick.BODY_LENGTH)
+    assert sheet.REFERENCE_OVERALL_LENGTH == pytest.approx(stick.BODY_LENGTH)
     # The stop's near face sits half a block short of the STOP_MARK division.
     assert spec.SETTING_NEAR_FACE_MM == pytest.approx(
         stick.SCALE_START_X
@@ -664,11 +669,11 @@ def test_reference_dimensions_follow_the_spec() -> None:
         "stop position",
     }
     values = {label: value for label, value, _callout in drawing.ASSEMBLY_DIMENSIONS}
-    assert values["overall length"] == spec.REFERENCE_OVERALL_LENGTH
+    assert values["overall length"] == sheet.REFERENCE_OVERALL_LENGTH
     assert values["stop position"] == spec.SETTING_NEAR_FACE_MM
-    assert f"{stop.STOP_MARK:.1f}" in spec.STOP_POSITION_CALLOUT
-    assert isinstance(spec.DRAWING_REFERENCE_PRECISION, int)
-    assert spec.DRAWING_REFERENCE_PRECISION >= 1
+    assert f"{stop.STOP_MARK:.1f}" in sheet.STOP_POSITION_CALLOUT
+    assert isinstance(sheet.DRAWING_REFERENCE_PRECISION, int)
+    assert sheet.DRAWING_REFERENCE_PRECISION >= 1
     # Both texts sit between the front view and the top view above it.
     assert (
         drawing.FRONT_CENTER[1]
@@ -685,7 +690,8 @@ def test_reference_dimensions_follow_the_spec() -> None:
 def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     monkeypatch, mark, tolerance, drill_depth, thread_depth, zero
 ) -> None:
-    """Evaluate real spec expressions with changed shop values, not COM mocks."""
+    """Evaluate real spec and sheet expressions with changed shop values, not
+    COM mocks: the mutated spec is the one the sheet module imports."""
     monkeypatch.setattr(stop, "STOP_MARK", mark)
     monkeypatch.setattr(stick, "SCALE_START_X", zero)
     monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DEPTH", drill_depth)
@@ -708,7 +714,15 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     )
     namespace = {"__name__": "mutated_ms_assembly_spec"}
     exec(compile(ast.fix_missing_locations(tree), spec.__file__, "exec"), namespace)
-    changed = SimpleNamespace(**namespace)
+    mutated_spec = SimpleNamespace(**namespace)
+    monkeypatch.setitem(sys.modules, spec.__name__, mutated_spec)
+    sheet_namespace = {"__name__": "mutated_ms_assembly_sheet"}
+    exec(
+        compile(Path(sheet.__file__).read_text(encoding="utf-8"), sheet.__file__, "exec"),
+        sheet_namespace,
+    )
+    assert sheet_namespace["spec"] is mutated_spec
+    changed = SimpleNamespace(**{**namespace, **sheet_namespace})
     assert changed.STICK_MARK_X == pytest.approx(
         stick.SCALE_START_X + mark * stick.DIVISION_SPACING
     )
@@ -788,8 +802,8 @@ def _assert_fitter_text_spacing(fitter) -> None:
 
 def test_fitter_text_has_room_for_setting_and_pilot_depths() -> None:
     assert spec.SETTING_TOLERANCE_MM == pytest.approx(0.10)
-    assert f"±{spec.SETTING_TOLERANCE_MM:.2f} mm" in spec.SETTING_CRITERION
-    _assert_fitter_text_spacing(spec)
+    assert f"±{spec.SETTING_TOLERANCE_MM:.2f} mm" in sheet.SETTING_CRITERION
+    _assert_fitter_text_spacing(SimpleNamespace(**{**vars(spec), **vars(sheet)}))
 
 
 @pytest.mark.parametrize(
@@ -992,7 +1006,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(
     )
 
     def import_setting(*args, **kwargs):
-        assert kwargs["dimensions_by_feature"] == spec.DRAWING_DIMENSIONS
+        assert kwargs["dimensions_by_feature"] == sheet.DRAWING_DIMENSIONS
         assert set(kwargs["keep"]) == {spec.SETTING_DIMENSION}
         display = Display(spec.SETTING_NEAR_FACE_MM / 1000.0)
         displays.append(display)
@@ -1068,7 +1082,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         assert display.text[2] == (")" if index == 0 else "")
         if index == 0:
             assert {1, 2} <= set(display.readbacks)
-        assert display.precision == (spec.DRAWING_REFERENCE_PRECISION if index == 0 else spec.SETTING_PRECISION)
+        assert display.precision == (sheet.DRAWING_REFERENCE_PRECISION if index == 0 else spec.SETTING_PRECISION)
         if index == 1:
             assert display.Tolerance.Type == 4
             assert display.minimum == pytest.approx(-spec.SETTING_TOLERANCE_MM / 1000)
@@ -1163,7 +1177,7 @@ def test_exploded_isometric_shows_every_component() -> None:
     hulls = {}
     for name, box in boxes.items():
         shift = [0.0, 0.0, 0.0]
-        for _label, moved, axis, distance in spec.EXPLODE_STEPS:
+        for _label, moved, axis, distance in explode.EXPLODE_STEPS:
             if families[name] in moved:
                 shift["xyz".index(axis)] += distance
         hulls[name] = _iso_hull(
