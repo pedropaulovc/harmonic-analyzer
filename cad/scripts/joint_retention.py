@@ -39,6 +39,7 @@ import _buildgraph
 import _config
 import ch_channel_assembly_steps
 import dt_drive_train_steps
+import mg_magnifier_assembly_steps
 import pd_paper_drive_assembly_steps
 import sm_gooseneck_spring_screw_geom as gooseneck_screw
 
@@ -268,6 +269,7 @@ STEP_LISTS: dict[str, tuple[str, ...]] = {
     "dt_drive_train": dt_drive_train_steps.SEQUENCE,
     "ch_channel": ch_channel_assembly_steps.SEQUENCE,
     "pd_paper_drive": pd_paper_drive_assembly_steps.SEQUENCE,
+    "mg_magnifier": mg_magnifier_assembly_steps.SEQUENCE,
 }
 
 
@@ -1836,7 +1838,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="mg_wheel_axle",
         thread="#4-40 UNC",
         quantity=2,
-        installed_at="",
+        installed_at=mg_magnifier_assembly_steps.ENDSHAKE_SET_KEY,
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "the nut retains the magnifying wheel, which the lever-wire (WIRE 1) turns back and forth every "
@@ -1852,7 +1854,7 @@ JOINTS: tuple[Joint, ...] = (
         lock=Lock.JAM_NUT,
         lock_part="vn_wheel_axle_nut:locknut",
         lock_binds=("vn_wheel_axle_nut", "mg_wheel_axle"),
-        lock_step="second nut jammed against the first (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads))",
+        lock_step=mg_magnifier_assembly_steps.LOCKNUT_JAMMED_KEY,
         evidence=(
             "build_mg_magnifier_assembly.py:build (lock_mates 'wheel-axle nut locked to the axle' / 'wheel-axle locknut locked to the axle' at NUT_D / LOCKNUT_D); "
             "build_vn_wheel_axle_nut.py + diagnostics/diag_build_92671A005.py; "
@@ -1867,7 +1869,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="mg_magnifying_clamp",
         thread="#4-40 UNC",
         quantity=1,
-        installed_at="",
+        installed_at=mg_magnifier_assembly_steps.CLAMP_SET_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "hand-set operator clamp: pinches the hex clamp onto the Ø6 lever rod at the chosen "
@@ -1923,7 +1925,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="mg_output_fixture",
         thread="#4-40 UNC",
         quantity=1,
-        installed_at="",
+        installed_at=mg_magnifier_assembly_steps.FIXTURE_SET_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "hand-set operator clamp: locks the output fixture's hex body at its set height on the vertical rod "
@@ -1952,7 +1954,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="sh_column_clamp_back",
         thread="#8-32 UNC",
         quantity=2,
-        installed_at="",
+        installed_at=mg_magnifier_assembly_steps.COLUMN_CLAMP_STARTED_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "close the stack wheel-bar -> front arc -> back arc around the fixed front column; bar, arcs and "

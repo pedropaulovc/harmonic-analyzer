@@ -1,4 +1,4 @@
-"""Assembly-level settings of the mg-magnifier wheel stack, as model dimensions.
+"""The MHA-MG-000 magnifier assembly settings: the builder's and the sheet's.
 
 Two settings belong to no single part: the press gauge the wheel axle is pressed
 to in the bar, and the endshake the first nut sets. Each one is printed as a
@@ -7,10 +7,23 @@ assembly carries both (the ms-measuring-stick ClampedSetting pattern). It runs
 along the axle centreline on the Right plane, through four stations: the bar
 front face, the shank step, the wheel's spigot face and the front washer. The
 chain is blanked, so it prints only in the drawing view that dimensions it.
+
+Two more are the lever group's operator settings: the clamp station on the
+lever and the output fixture's drop below the lever axis. A second blanked
+chain on the Front plane carries them (LEVER_FEATURE), from the lever rod's
+west tip along its axis to the clamp centre, then down the vertical-rod line
+to the fixture axis. They print at the title block's general tolerance.
+
+The sheet's text (BOM rows, setting callouts, steps and checks) lives in
+mg_magnifier_assembly_notes, which only the drawing imports, so a wording
+edit there does not rebuild the assembly.
 """
 
 from __future__ import annotations
 
+import magnifying_bracket_joint_layout as _bracket
+import mg_magnifying_lever_geom as _lever
+import mg_output_fixture_geom as _fixture
 import mg_wheel_axle_spec as _pin
 import mg_wheel_bar_geom as _bar
 import mg_wheel_group as _group
@@ -50,17 +63,25 @@ DIMENSION_TOLERANCES = {
     PRESS_GAUGE_DIMENSION: PRESS_GAUGE_TOL,
     ENDSHAKE_DIMENSION: ENDSHAKE_TOL,
 }
-# Each callout states what its band protects. The gauge's prints above its
-# value, on one line: SolidWorks keeps a line break in that compartment but
-# prints none of the callout (run 20261012T185729782Z). The endshake's
-# prints below, where line breaks print.
-DIMENSION_CALLOUTS = {
-    PRESS_GAUGE_DIMENSION: "PRESS GAUGE: KEEPS WHEEL LOCKNUT ON FULL THREAD",
-    ENDSHAKE_DIMENSION: "\n".join(
-        (
-            "WHEEL FREE, NO RATTLE;",
-            "SET BY THE FIRST NUT,",
-            "LOCKED BY THE SECOND",
-        )
-    ),
+
+# --- The lever group's settings (LEVER_FEATURE, Front plane: sketch x is
+# machine x, sketch y machine y) ---------------------------------------------
+# The lever rod lies along machine x at the bracket's height; its west dome
+# tip is the collar station east of the bracket (Ry(180) placement).
+LEVER_AXIS_Y = _bracket.BRACKET_ORIGIN[1]
+LEVER_TIP_X = _bracket.BRACKET_ORIGIN[0] + _lever.COLLAR_LOCAL_X
+CLAMP_STATION = _lever.CLAMP_LOCAL_X
+CLAMP_CENTRE_X = LEVER_TIP_X - CLAMP_STATION
+FIXTURE_AXIS_Y = _fixture.FIXTURE_AXIS_Y
+FIXTURE_DROP = LEVER_AXIS_Y - FIXTURE_AXIS_Y
+if not 0.0 < FIXTURE_DROP:
+    raise AssertionError("the output fixture must hang below the lever axis")
+LEVER_FEATURE = "LeverSettingReference"
+CLAMP_STATION_DIMENSION = "ClampStation"
+FIXTURE_DROP_DIMENSION = "FixtureDrop"
+LEVER_DRAWING_DIMENSIONS = {
+    LEVER_FEATURE: {CLAMP_STATION_DIMENSION, FIXTURE_DROP_DIMENSION}
+}
+LEVER_DRAWING_PRECISION = {
+    LEVER_FEATURE: {CLAMP_STATION_DIMENSION: 1, FIXTURE_DROP_DIMENSION: 1}
 }
