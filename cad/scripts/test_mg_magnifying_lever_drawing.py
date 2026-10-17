@@ -615,15 +615,16 @@ def test_rod_od_carries_one_clamp_screw_seat_finish() -> None:
     # Attached to the OD's face, not its top silhouette: the front view lies
     # in the revolve's profile plane, so that outline is the cylinder's seam
     # and a silhouette re-solved onto the other half-face (r12). A coordinate
-    # face pick keeps the leader at the pick (r13), so pick == landing.
+    # face pick keeps the leader at the pick (r13) and one 0.4 mm inside the
+    # outline selected nothing (r14), so pick == landing, midway in the OD.
     assert 'entity_type="FACE"' in sheet_source
     assert 'entity_type="SILHOUETTE"' not in sheet_source
     assert "edge_xy=SEAT_FINISH_PICK" in sheet_source
     assert "leader_attach_xy=SEAT_FINISH_PICK" in sheet_source
-    # The leader lands just inside the OD's top outline, inside the seat.
+    # The leader lands on the OD's face, inside the seat.
     pick_x, pick_y = drawing.SEAT_FINISH_PICK
     assert drawing.FRONT_CENTER[1] < pick_y < drawing._ROD_TOP_Y
-    assert drawing._ROD_TOP_Y - pick_y <= 0.0005
+    assert pick_y == pytest.approx((drawing.FRONT_CENTER[1] + drawing._ROD_TOP_Y) / 2)
     station = (pick_x - drawing._ROD_WEST_TIP_X) * 1000.0
     assert low < station < high
     # Clear of the stock diameter's points (mid-length +/- R).
