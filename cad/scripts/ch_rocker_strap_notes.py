@@ -27,8 +27,10 @@ __all__ = [
     "HOLE_CALLOUT",
     "ISOMETRIC_VIEW_NOTE",
     "STRAP_FIT_CALLOUT",
+    "TIP_LAND_CALLOUT",
     "TIP_LAND_PREFIX",
     "TOP_EDGE_MATE_CALLOUT",
+    "TOP_RADIUS_CALLOUT",
 ]
 
 # --- Drawing contract (drawing-simplicity-policy.md `How the repository
@@ -92,19 +94,21 @@ HOLE_CALLOUT = f"REAM THRU\nPRESS FIT ON {HUB_NUMBER} HUB\n{INTERFERENCE_TEXT}"
 # the need it serves), and that edge is the R800's concentric arc. Two short
 # rows: the text sits between the R800's leader and the hole's extension line.
 BOTTOM_EDGE_CALLOUT = f"{ROCKER_NUMBER} PROFILE\nCONCENTRIC WITH R{R_TOP:.0f}"
+# The arcs' centre (~808 mm off the sheet) and the lands' radial direction
+# are geometry, so they ride on the dimensions they qualify rather than in a
+# general note (r1 and r3 machinist reviews, rule 7).
+TOP_RADIUS_CALLOUT = "CENTRE ABOVE HOLE"
+TIP_LAND_CALLOUT = "RADIAL"
 DIMENSION_CALLOUTS: dict[str, str] = {
     "HoleDia": HOLE_CALLOUT,
     "TopAbovePivot": TOP_EDGE_MATE_CALLOUT,
     "BottomBelowPivot": BOTTOM_EDGE_CALLOUT,
+    "TopRadius": TOP_RADIUS_CALLOUT,
+    "RodTipLen": TIP_LAND_CALLOUT,
     "StrapThickness": STRAP_FIT_CALLOUT,
 }
 
-# drawing-guidelines.md rule 7: what a machinist cannot read off the views.
-# The lands' angle is the arc half-angle, radial to a centre ~808 mm off the
-# sheet; the finish field's "after joining" needs the joint named (r1
-# machinist review).
-DRAWING_NOTES = (
-    "1. ARC CENTRE DIRECTLY ABOVE THE HUB HOLE; TIP LANDS RADIAL TO IT.\n"
-    f"2. JOINED TO HUB {HUB_NUMBER} AS {ROCKER_NUMBER}."
-)
+# drawing-guidelines.md rule 7: the finish field's "after joining" needs the
+# joint named (r1 machinist review).
+DRAWING_NOTES = f"1. JOINED TO HUB {HUB_NUMBER} AS {ROCKER_NUMBER}."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

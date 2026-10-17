@@ -218,10 +218,11 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "NORMAL TO LENGTH" not in notes and "NOMINAL MIRROR PLANE" not in notes
     # Named-exception wall and the mate that caps the OD.
     assert f"2. {ch_rocker_arm_notes.HUB_WALL_NOTE}; OD CLEARS MHA-CH-001 FOOT CHEEKS." in notes
-    # Route v3: permission for the hub + strap construction, and nothing more
-    # (the joint is on MHA-CH-012/-013, never a method here).
+    # Route v3: permission for the hub + strap construction, with the joint
+    # referred to MHA-CH-012/-013's own drawings, never a method here.
     assert (
-        "3. MAY BE BUILT UP FROM HUB MHA-CH-012 AND STRAP MHA-CH-013." in notes.splitlines()
+        "3. MAY BE HUB MHA-CH-012 JOINED TO STRAP MHA-CH-013 PER THEIR DWGS."
+        in notes.splitlines()
     )
     assert ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE == notes.splitlines()[2]
     for method in ("PRESS", "LOCTITE", "ADHESIVE", "BRAZE", "SOLDER", "WELD"):

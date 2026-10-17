@@ -4,11 +4,12 @@ Under ``cad/docs/drawing-guidelines.md``: the flat strap of the built-up rocker
 arm MHA-CH-006 (``ch_rocker_strap_spec``), every size a native model dimension
 of its one profile sketch, located from the Ø10.200 H7 hub hole's centre
 (rule 10): the top edge's height over the hole with the MHA-CH-006 band and
-mate, the R800 top edge and the concentric R816 bottom edge, both tip corners'
-and both taper feet's offsets, and the 2X tip land. The hole's H7 band names
-the MHA-CH-012 hub and the fit (rule 4); the 2.500 thickness, on the end view,
-names the rod fork it runs in. One property-linked note says what the views
-cannot (the arcs' centre is ~808 mm off the sheet). No datums, no frames, no
+mate, the R800 top edge (its centre, ~808 mm off the sheet, stated on it as
+above the hole), the bottom edge's depth under the hole, both tip corners'
+and both taper feet's offsets, and the 2X radial tip land. The hole's H7 band
+names the MHA-CH-012 hub and the fit (rule 4); the 2.500 thickness, on the end
+view, names the rod fork it runs in. One property-linked note names the joint
+the finish field's "after joining" refers to. No datums, no frames, no
 roughness symbol (rule 6: a pressed bore carries none). The decimal places
 and bands are the PART's (``ch_rocker_strap_notes.DRAWING_PRECISION``); this
 script only reads them back off the sheet.
@@ -87,12 +88,17 @@ def _front(x_mm: float, y_mm: float) -> tuple[float, float]:
 _HOLE = _front(0.0, PIVOT_MID_Y)
 # The tip corners' offsets on one dimension line above the strap, the taper
 # feet's on one below it, each pair meeting on the hole centre's extension
-# line. Between the strap and the lower line: the R800's text (left, below
-# both arcs, so its leader stays outside its circle -- draw_ch_rocker_arm
-# _dress_arc_radii), the bottom edge's depth under the hole (~56 mm wide,
-# between the R800's leader shelf ending x ~0.110 and the hole's extension
-# line at x 0.185) and the hole's callout (right, its leader short). The top
-# edge's height reads left of the hole, under the upper line.
+# line. Between the strap and the lower line: the R800's text (far left,
+# below both arcs, so its leader stays outside its circle --
+# draw_ch_rocker_arm _dress_arc_radii), the bottom edge's depth under the
+# hole and the hole's callout (right, its leader short). The top edge's
+# height reads left of the hole, under the upper line. A vertical dimension's
+# text stands LEFT of its dimension line, ending at the requested x (r3: the
+# depth's ~55 mm rows ran x 0.093..0.147 over the R800 at x 0.100), so the
+# depth's line sits 12 mm left of the hole (rows ~0.118..0.173) and the R800
+# block (centred on its x, ~47 mm wide with its CENTRE ABOVE HOLE row) moves
+# to x 0.090, right of the left foot's extension line at x 0.052, raised so
+# its leader up to the top arc clears those rows (top ~0.171).
 TIP_LINE_Y = 0.232
 FOOT_LINE_Y = 0.125
 FRONT_KEEP = {
@@ -100,16 +106,16 @@ FRONT_KEEP = {
     "RodTipX": (FRONT_CENTER[0] + ROD_TIP_X / 2000.0, TIP_LINE_Y),
     "BottomTailX": (FRONT_CENTER[0] - BOT_END_X / 2000.0, FOOT_LINE_Y),
     "BottomRodX": (FRONT_CENTER[0] + BOT_END_X / 2000.0, FOOT_LINE_Y),
-    "TopRadius": (FRONT_CENTER[0] - 0.085, 0.158),
-    # Mirrors the top edge's height on the same vertical, below the strap.
-    "BottomBelowPivot": (_HOLE[0] - 0.038, 0.160),
+    "TopRadius": (FRONT_CENTER[0] - 0.095, 0.166),
+    "BottomBelowPivot": (_HOLE[0] - 0.012, 0.160),
     "HoleDia": (_HOLE[0] + 0.060, 0.160),
     "TopAbovePivot": (_HOLE[0] - 0.035, 0.207),
     # The land's two extension lines run ~5.6 mm apart, rising ~10 deg to the
     # right (perpendicular to the radial land); the upper one passes y ~0.206
     # at x 0.365. Between them (r1, r2) a line struck the text, so it stands
-    # above both, the dimension line carried up to it.
-    "RodTipLen": (_front(ROD_TIP_X, 0.0)[0] + 0.031, 0.215),
+    # above both, the dimension line carried up to it, high enough (r3 -> r4)
+    # that its RADIAL row below the value clears that line too.
+    "RodTipLen": (_front(ROD_TIP_X, 0.0)[0] + 0.031, 0.226),
 }
 # The 2.5 mm end view is narrower than its four-row callout: centred over it
 # (r1) both extension lines ran through the text, so the text stands below

@@ -97,9 +97,11 @@ HUB_WALL_NOTE = f"HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f} MIN"
 # text in DRAWING_NOTES. None/absence means one_piece, never inferred permission.
 # Route v3 (user ruling, 2026-10-16): the part may be the turned hub
 # MHA-CH-012 joined to the flat strap MHA-CH-013. Permission only; the joint
-# is on those two details (ch_rocker_hub_fit), never a method here.
+# (its fit) is on those two details (ch_rocker_hub_fit), never a method here
+# -- the note points at them so the joint is defined, not left open (r1
+# machinist review of "MAY BE BUILT UP FROM ...").
 BUILT_UP_PERMISSION_NOTE = (
-    "3. MAY BE BUILT UP FROM HUB MHA-CH-012 AND STRAP MHA-CH-013."
+    "3. MAY BE HUB MHA-CH-012 JOINED TO STRAP MHA-CH-013 PER THEIR DWGS."
 )
 
 # Three lines (drawing-guidelines rule 7; Opus #1020 r3 C3).

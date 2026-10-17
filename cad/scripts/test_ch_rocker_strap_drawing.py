@@ -116,6 +116,10 @@ def test_every_band_is_native_and_names_its_mate() -> None:
         "MHA-CH-006 PROFILE",
         "CONCENTRIC WITH R800",
     ]
+    # The arc centre and the lands' direction ride on their own dimensions,
+    # not in a general note.
+    assert notes.DIMENSION_CALLOUTS["TopRadius"] == "CENTRE ABOVE HOLE"
+    assert notes.DIMENSION_CALLOUTS["RodTipLen"] == "RADIAL"
 
 
 def test_no_rod_pin_hole_and_no_finished_bore_on_the_strap() -> None:
@@ -138,8 +142,7 @@ def test_drawing_quality_and_no_gdt() -> None:
         "add_surface_finish",
     }
     assert notes.DRAWING_NOTES.splitlines() == [
-        "1. ARC CENTRE DIRECTLY ABOVE THE HUB HOLE; TIP LANDS RADIAL TO IT.",
-        "2. JOINED TO HUB MHA-CH-012 AS MHA-CH-006.",
+        "1. JOINED TO HUB MHA-CH-012 AS MHA-CH-006.",
     ]
     assert notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
     assert drawing.ISO_SCALE == (1, 4)
