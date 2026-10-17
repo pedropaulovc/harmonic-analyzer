@@ -95,6 +95,15 @@ GROOVE_ROOT_DIA_PLACES = 2
 GROOVE_RADIUS_PLACES = 1
 GROOVE_RADIUS_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 GROOVE_RADIUS_MIN = 0.5
+# The radius's own callout row (owner ruling on review r5, rule 1: under R1.2
+# the band left the groove's width and walls undefined).  FULL R is the
+# profile: the arc tangent to both walls, so the groove is 2R wide, and its
+# depth is the root Ø's.  Wherever the root and OD put the floor deeper than
+# R (always at R0.5: the printed depth runs 0.69-1.71), the groove runs
+# straight parallel walls 2R apart from the arc up to the OD; where the depth
+# is under R (R1.2 over the largest root under the smallest OD) the arc meets
+# the OD first and the mouth is that chord (groove_half_opening).
+GROOVE_RADIUS_CALLOUT = "FULL R"
 # The drilled rod bore prints at one place; its band is the title block's
 # DRILLED HOLES row (+0.10/0): running clearance on the rod, no fit.
 ROD_BORE_DIA_PLACES = 1
@@ -175,12 +184,17 @@ if not GROOVE_DEPTH_MIN > _geom.WIRE_DIA / 2.0:
 # At the LIMIT's lower end the wire still seats on the floor: the floor's
 # radius exceeds the wire's, so the wire touches the root at one line, its
 # centre stays the root plus its radius (the hook's station, geom), and the
-# mouth stays wider than the wire.  The narrowest mouth stands over the
-# largest root under the smallest OD (the arc's centre highest); an R0.5
-# there still centres below the OD, so the groove turns to straight walls
-# 2 x R0.5 apart over the floor's arc: 1.0 wide at any printed root and OD.
+# mouth stays wider than the wire.  FULL R (GROOVE_RADIUS_CALLOUT) holds the
+# width at 2R: an R0.5 arc cannot reach the root from the OD (even the
+# shallowest printed groove is deeper than R0.5), so its two walls run
+# straight and parallel from the arc's tangent points up to the OD, 0.19
+# long at the shallowest groove (0.7 at nominal, 1.21 at the deepest), and
+# the mouth is 2 x R0.5 = 1.0 at any printed root and OD.
 if not GROOVE_RADIUS_MIN > _geom.WIRE_DIA / 2.0:
     raise AssertionError("MHA-MG-006 groove floor tighter than the wire: it bridges")
+GROOVE_WALL_AT_RADIUS_MIN = GROOVE_DEPTH_MIN - GROOVE_RADIUS_MIN
+if not GROOVE_WALL_AT_RADIUS_MIN > 0.0:
+    raise AssertionError("MHA-MG-006 R MIN groove has no straight walls under FULL R")
 GROOVE_HALF_OPENING_MIN = groove_half_opening(
     GROOVE_RADIUS_MIN, GROOVE_ROOT_DIA + _ROOT_HI, SPIGOT_DIA + _SPIGOT_LO
 )
