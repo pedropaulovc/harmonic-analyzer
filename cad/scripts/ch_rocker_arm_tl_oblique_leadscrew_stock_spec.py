@@ -132,9 +132,14 @@ FLAT_LENGTH = feed.SCREW_FLAT_LENGTH  # 8, along the axis, centred on the set sc
 FLAT_AF = MAJOR_DIA - FLAT_DEPTH  # 7.28, across the flat to the far crest
 FLAT_AF_PLACES = 2
 FLAT_AF_TOLERANCE = printed_band_mm(FLAT_AF_PLACES)  # ±0.51, the title block's .XX
-# The flats' length and stations print at one place, the cut length's row.
+# The flats' stations print at one place, the cut length's row. Their length
+# prints at two: each station locates its flat's near edge (rule 10: to a
+# feature's edge, not its unmarked middle), so the length's band stacks onto
+# the far edge's, and the far side of the set screw needs the tighter one.
 FLAT_PLACES = LENGTH_PLACES
 FLAT_TOLERANCE = printed_band_mm(FLAT_PLACES)  # ±0.8
+FLAT_LENGTH_PLACES = 2
+FLAT_LENGTH_TOLERANCE = printed_band_mm(FLAT_LENGTH_PLACES)  # ±0.51
 KP08_SET_SCREW_SPACING_DEG = 120.0  # SOURCED: the KP08 listing (pillow-block spec)
 CLOCK_PLACES = 0
 CLOCK_TOLERANCE_DEG = angular_band_deg()  # ±1, the title block's angular row
@@ -153,6 +158,10 @@ FLAT_STATIONS = {
         feed.HUB_END_S + feed.HANDWHEEL_GRUB_FROM_HUB - feed.SCREW_NEAR_END_S
     ),  # 398.5
 }
+# Each flat's near edge, from the near end: what the print dimensions.
+FLAT_STARTS = {
+    name: station - FLAT_LENGTH / 2.0 for name, station in FLAT_STATIONS.items()
+}  # 4.5, 375.5, 394.5
 # What each flat sits under, as station spans on the rail (C4's s): the KP08
 # blocks' widths, and the screw's length inside the handwheel's hub.
 FLAT_HOUSINGS = {
@@ -204,11 +213,11 @@ VOLUME_MM3 = BLANK_VOLUME_MM3 - FLAT_COUNT * FLAT_VOLUME_MM3
 # and angle from clock 0 are its station sketch's (they print on its section).
 DIMENSION_CONTROLS = {
     "CutLength": (LENGTH, LENGTH_TOLERANCE, LENGTH_PLACES),
-    "FlatLength": (FLAT_LENGTH, FLAT_TOLERANCE, FLAT_PLACES),
+    "FlatLength": (FLAT_LENGTH, FLAT_LENGTH_TOLERANCE, FLAT_LENGTH_PLACES),
     "FlatAF": (FLAT_AF, FLAT_AF_TOLERANCE, FLAT_AF_PLACES),
     **{
-        f"{name}FlatStation": (station, FLAT_TOLERANCE, FLAT_PLACES)
-        for name, station in FLAT_STATIONS.items()
+        f"{name}FlatStation": (start, FLAT_TOLERANCE, FLAT_PLACES)
+        for name, start in FLAT_STARTS.items()
     },
     **{
         f"{name}ClockAF": (FLAT_AF, FLAT_AF_TOLERANCE, FLAT_AF_PLACES)
@@ -277,8 +286,12 @@ if not flat_offset(FLAT_DEPTH + FLAT_AF_TOLERANCE) > SCREW_ROOT_DIA / 2.0:
 # The shallowest still seats the set screw's cup point across the flat.
 if not flat_chord(FLAT_DEPTH - FLAT_AF_TOLERANCE) >= SET_SCREW_POINT_DIA:
     raise AssertionError("a shallow set-screw flat is narrower than the cup point")
-# A flat off station by its band still runs past the set screw both sides.
-if not FLAT_LENGTH / 2.0 - FLAT_TOLERANCE >= HANDWHEEL_SET_SCREW_MAJOR / 2.0:
+# A flat off station by its band, and short by its length's band, still runs
+# past the set screw both sides: the far side takes both bands.
+if not (
+    FLAT_LENGTH / 2.0 - FLAT_TOLERANCE - FLAT_LENGTH_TOLERANCE
+    >= HANDWHEEL_SET_SCREW_MAJOR / 2.0
+):
     raise AssertionError("a flat off station leaves the set screw on the thread")
 # A KP08's two flats, both at their deepest and the angle at its band, keep a
 # full round between them.
@@ -292,14 +305,15 @@ if set(FLAT_HOUSINGS) != set(FLAT_STATIONS) or not set(CLOCKED_FLATS) < set(
     raise AssertionError(
         "every flat station needs its housing; the clock flats a station"
     )
-for _name, _station in FLAT_STATIONS.items():
-    _start, _end = _station - FLAT_LENGTH / 2.0, _station + FLAT_LENGTH / 2.0
+for _name, _start in FLAT_STARTS.items():
+    _end = _start + FLAT_LENGTH
     # Clear of the end breaks, inside the screw.
     if not (END_CHAMFER < _start and _end < LENGTH - END_CHAMFER):
         raise AssertionError(f"the {_name} flat runs onto an end of the screw")
-    # Under its KP08 block, or inside the handwheel's hub, at its band.
+    # Under its KP08 block, or inside the handwheel's hub, at its bands.
     _housing = tuple(s - feed.SCREW_NEAR_END_S for s in FLAT_HOUSINGS[_name])
     if not (
-        _housing[0] <= _start - FLAT_TOLERANCE and _end + FLAT_TOLERANCE <= _housing[1]
+        _housing[0] <= _start - FLAT_TOLERANCE
+        and _end + FLAT_TOLERANCE + FLAT_LENGTH_TOLERANCE <= _housing[1]
     ):
         raise AssertionError(f"the {_name} flat leaves its housing")
