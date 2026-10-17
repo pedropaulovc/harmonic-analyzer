@@ -1,0 +1,15 @@
+ch-rocker-arm-tl-oblique-lever-screw:
+  title: Rocker Oblique Trammel Feed Lever Screw
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-49
+  stock_name: Black-Oxide Alloy Steel Socket Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: ["91251A582"]
+  material: Alloy Steel
+  material_specification: "Alloy steel, black oxide, ASTM A574, Rockwell C37; McMaster-Carr 91251A582"
+  finish: black oxide
+  # The fastener table's LEVER_TO_CARRIER count (5/16-18 X 7/8 SHCS).
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

@@ -22,14 +22,16 @@ the row:
   nothing below the carrier. A 1 in screw would stand 0.7 out of the
   underside.
 
-Washers: none. Every head seats in a counterbore or countersink, or on a
-flat face. Hold-down studs: 1/2-13 x 3 in only, from the clamping kit. A
-longer stud reaches the swinging carrier (``clearance_report``'s
-``stud_length_max``).
+Washers: one, the wedge-lock pair under each of the two TL-29 block screws'
+heads (``WASHERS``, TL-50): those screws carry the leadscrew's reversing
+thrust, so rule 23 wants a mechanical lock, and the pair's stack adds to
+the row's grip. Every other head seats in a counterbore or countersink, or
+on a flat face. Hold-down studs: 1/2-13 x 3 in only, from the clamping kit. A
+longer stud reaches the swinging carrier (the jig spec's ``STUD_LENGTH_MAX``).
 
-These screws are not BOM rows. The fitter BOM lists bought items by
-shop-inventory id, and the inventory carries no screw stock, so the assembly
-steps name each screw by its callout (``callout``) instead.
+Each joint's screw is its own bought part and BOM row (TL-41 to TL-49, the
+wedge-lock pairs TL-50); the assembly steps name each by its callout
+(``callout``) and its item number.
 """
 
 from __future__ import annotations
@@ -98,6 +100,17 @@ class Fastener:
         return self.engagement_mm - self.thread_depth_mm
 
 
+@dataclass(frozen=True)
+class Washer:
+    """A washer under a row's heads: its stack adds to that row's grip."""
+
+    joint: str  # the Fastener row's joint it sits in
+    size: str  # the screw size it fits: "#8"
+    kind: str  # as the fitter names it
+    count: int  # one per screw of its row
+    thickness_mm: float  # the installed stack under one head
+
+
 _METRIC_PITCH = {"M3": "0.5", "M4": "0.7"}
 
 
@@ -131,7 +144,8 @@ NUT_BRACKET_TO_BLOCK = Fastener(
     SHCS,
     leadscrew.BLOCK_SCREW_LENGTH,
     len(leadscrew.PIVOT_BLOCK_HOLES),
-    leadscrew.BLOCK_SCREW_GRIP,  # head recessed in TL-22's 4.40 counterbore
+    # head on the TL-50 pair, on TL-22's 4.40 counterbore floor
+    leadscrew.BLOCK_SCREW_GRIP + leadscrew.BLOCK_SCREW_LOCK_STACK,
     leadscrew.NUT_BRACKET_TAP_DEPTH,  # blind
 )
 BLOCK_TO_CARRIAGE = Fastener(
@@ -204,7 +218,14 @@ FASTENERS: tuple[Fastener, ...] = (
     CR_CLAMP,
     LEVER_TO_CARRIER,
 )
-WASHERS: tuple[Fastener, ...] = ()  # none: every head seats on its own part
+BLOCK_LOCK_WASHER = Washer(
+    NUT_BRACKET_TO_BLOCK.joint,
+    "#8",
+    "WEDGE-LOCK WASHER PAIR",
+    NUT_BRACKET_TO_BLOCK.count,
+    leadscrew.BLOCK_SCREW_LOCK_STACK,
+)
+WASHERS: tuple[Washer, ...] = (BLOCK_LOCK_WASHER,)
 
 # Hold-down studs, from the clamping kit (fixtures.clamping-kit-pm-52pcck-14mm).
 HOLD_DOWN_STUD_THREAD = "1/2-13"

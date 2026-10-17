@@ -1,0 +1,649 @@
+"""Create the cut-to-length drawing for ZYLtech HW-SC-T8x2-600, the TL-34 Tr8x2 lead screw.
+
+The shop cuts the bought 600 mm screw to length and mills a set-screw flat
+under each set screw that locks it, so the sheet is a modified-stock
+drawing: one view of the screw lying axis-horizontal, as it sits in the saw
+and the mill, carrying the native ``CutLength``, the clock-0 flats' length,
+across-flat and three stations (the title block's band for each one's places
+governs it, the across-flat's text offset beside its dimension line); sections
+A-A and B-B through the two KP08 stations, each carrying its 120° flat's
+across-flat and angle from clock 0, the angle's text offset outboard of its
+arc; the isometric; and a note block naming the item, its supplier and SKU.
+The thread is bought, not cut: it is not modelled.
+
+Run with SolidWorks open::
+
+    uv run python cad\\scripts\\draw_ch_rocker_arm_tl_oblique_leadscrew.py ch-rocker-arm-tl-oblique-leadscrew
+"""
+
+from __future__ import annotations
+
+import argparse
+import math
+import sys
+from typing import Any, NamedTuple
+
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    dimension_name,
+    place_view,
+)
+
+from _check import check
+from _com import _early_bound, _read_member
+from _drawing_centerline import add_view_centerline
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    rebuild_drawing,
+    stamp_drawing_summary,
+)
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
+from _drawing_notes import property_link
+from _drawing_projection import model_points_in_view
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
+from _session import run_build
+from _stock_trim_drawing import verify_machining_controls
+import _telemetry
+from ch_rocker_arm_tl_oblique_leadscrew_stock_spec import (
+    DIMENSION_CONTROLS,
+    DIMENSION_PRECISION,
+    DIMENSION_TOLERANCE_TYPES,
+    DRAWING_DIMENSIONS,
+    FLAT_AF_CALLOUT,
+    FLAT_LENGTH,
+    FLAT_LENGTH_CALLOUT,
+    FLAT_STATIONS,
+    KP08_SET_SCREW_SPACING_DEG,
+    LENGTH,
+    MAJOR_DIA,
+    control_si,
+)
+
+SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_leadscrew"]
+PART_STEM = SPEC.artifact_stem
+SOURCE = SPEC.source
+OUTPUTS = DrawingOutputs(**SPEC.outputs)
+
+# ASME B landscape, sheet metres: 431.8 x 279.4 with the inner border 12.7 in
+# from each edge, so 406.4 mm of drawable width. The title block spans
+# x >= 0.2159 below y = 0.0651.
+BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
+TITLE_BLOCK = (0.2159, 0.0127, 0.4191, 0.0651)
+# The 410 screw overruns the 406.4 mm border at 1:1; 1:2, the next project
+# scale down, lays it 205 mm long and Ø8 4 mm across.
+SHEET_SCALE = (1.0, 2.0)
+ISO_SCALE = SHEET_SCALE  # One-scale sheet: no per-view scale label.
+_SHEET_PER_MODEL_MM = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000
+SCREW_SHEET_LENGTH = LENGTH * _SHEET_PER_MODEL_MM
+SCREW_SHEET_DIA = MAJOR_DIA * _SHEET_PER_MODEL_MM
+
+# *Front looks square at the Front-plane profile sketch, so CutLength imports
+# into it; turned -90 deg, model +Y (near end y = 0 to the far end) runs to
+# sheet right and the axis lies horizontal.
+MAIN_VIEW_ANGLE = -math.pi / 2.0
+# The main view centred left of the isometric's column: x 0.195 spans the
+# screw over 0.0925 .. 0.2975, 80 mm in from the left border; y 0.160 sits
+# mid-height, 95 mm above the title block's top.
+MAIN_CENTER = (0.195, 0.160)
+# The isometric stands the axis up: 410 cos 35.26 deg plus the Ø8 end
+# ellipses is about 340 mm, 170 at 1:2, and about 5 wide. Centred 29 mm in
+# from the right border, its outline spans y 0.081 .. 0.251, between the
+# title block's top (0.0651) and the top border (0.2667).
+ISO_CENTER = (0.390, 0.166)
+# Model station s (mm from the near end) on the main view's sheet x.
+NEAR_END_X = MAIN_CENTER[0] - SCREW_SHEET_LENGTH / 2.0
+
+
+def sheet_x(station_mm: float) -> float:
+    return NEAR_END_X + station_mm * _SHEET_PER_MODEL_MM
+
+
+# The clock-0 flats face model +X, which the turned view lays toward the
+# sheet's bottom: each flat stands edge-on 0.72 mm (0.36 on the sheet) into
+# the lower silhouette. CutLength's text stands 30 mm over the axis, centred
+# on the span, its dimension line clear over the sections' letters (12 mm
+# cutting-line reach, letters to 20 mm over the axis); its
+# extension lines rise from the end faces' centres. Under the screw, each
+# flat's station runs from the near end's centre in its own row, the near
+# one's text outboard of its short span; the printed flat's length and
+# across-flat (at the far end, the handwheel's) stand right of the far end,
+# their dimension lines run out to them.
+MAIN_KEEP = {
+    "CutLength": (MAIN_CENTER[0], MAIN_CENTER[1] + 0.030),
+    "NearKP08FlatStation": (NEAR_END_X - 0.010, MAIN_CENTER[1] - 0.024),
+    "FarKP08FlatStation": (
+        (NEAR_END_X + sheet_x(FLAT_STATIONS["FarKP08"])) / 2.0,
+        MAIN_CENTER[1] - 0.032,
+    ),
+    "HandwheelFlatStation": (
+        (NEAR_END_X + sheet_x(FLAT_STATIONS["Handwheel"])) / 2.0,
+        MAIN_CENTER[1] - 0.040,
+    ),
+    "FlatLength": (sheet_x(LENGTH) + 0.016, MAIN_CENTER[1] - 0.016),
+    "FlatAF": (sheet_x(LENGTH) + 0.016, MAIN_CENTER[1]),
+}
+# Every flat is one size: the printed one says how many (pivot-shaft style).
+FLAT_CALLOUTS = {"FlatLength": FLAT_LENGTH_CALLOUT, "FlatAF": FLAT_AF_CALLOUT}
+# The across-flat's 3.6 mm span holds no text: its value and callout (about
+# 9 x 7 mm, positioned by its centre) are offset onto a leader right of its
+# dimension line, past the extension lines' ends (1 mm beyond the line), the
+# leader level with the screw's axis (the pen hanger's SLOT_WIDTH_TEXT_XY).
+_AF_TEXT_HALF_WIDTH = 0.0055
+FLAT_AF_TEXT_XY = (
+    MAIN_KEEP["FlatAF"][0] + 0.001 + 0.004 + _AF_TEXT_HALF_WIDTH,
+    MAIN_CENTER[1],
+)
+
+
+class ClockSection(NamedTuple):
+    """One KP08 station's section: the clock flat it shows, its letter, where
+    its cutting line crosses the axis (model mm from the near end: inside the
+    flat, 3.5 off its station toward the screw's middle, so the line stands
+    clear of the station's extension line), whether it looks toward the far
+    end (model +Y, sheet right; its arrows then point right, away from the
+    screw's nearer end and the cut length's extension line), and where the
+    section's axis stands on the sheet."""
+
+    flat: str
+    label: str
+    cut_mm: float
+    looks_far: bool
+    centre: tuple[float, float]
+
+
+SECTION_SCALE = (3, 1)
+_SECTION_CUT_OFF_STATION_MM = FLAT_LENGTH / 2.0 - 0.5
+# Above the main view, under the top border: each face 12 mm in radius at
+# 3:1, its texts within 24 mm of its axis, its caption under its lowest ink.
+CLOCK_SECTIONS = (
+    ClockSection(
+        "NearKP08",
+        "A",
+        FLAT_STATIONS["NearKP08"] + _SECTION_CUT_OFF_STATION_MM,
+        True,
+        (0.090, 0.235),
+    ),
+    ClockSection(
+        "FarKP08",
+        "B",
+        FLAT_STATIONS["FarKP08"] - _SECTION_CUT_OFF_STATION_MM,
+        False,
+        (0.280, 0.235),
+    ),
+)
+# The cutting line's reach either side of the axis on the main view's sheet:
+# its letters (4.8 .. 6.3 mm in from the line's ends, draw_dt_cone_gear_shaft)
+# stand 3.7 mm off the screw's silhouettes.
+SECTION_REACH = 0.012
+# A section's axis lands within this of its layout point.
+SECTION_SETTLE_M = 0.0005
+# Each section's across-flat text stands this far (model mm) from the axis,
+# square to its flat's radial on the side away from the angle. The angle's
+# arc stands on its bisector just outside the face, and its text is offset
+# outboard along the bisector onto a leader (the trammel pivot point's tip
+# angle), so the arc never runs through its own text.
+CLOCK_AF_TEXT_RADIUS_MM = MAJOR_DIA / 2.0 + 3.5
+CLOCK_ANGLE_ARC_RADIUS_MM = MAJOR_DIA / 2.0 + 1.5
+CLOCK_ANGLE_TEXT_RADIUS_MM = MAJOR_DIA / 2.0 + 5.5
+# A dimension's text stands this far either side of its position point.
+TEXT_HALF_HEIGHT = 0.003
+# The angle's extension line along clock 0 runs this far past its arc.
+EXTENSION_OVERSHOOT = 0.0015
+SECTION_CAPTION_GAP = 0.003
+CAPTION_SETTLE_M = 0.0006
+# The section's centre mark keeps only its cross, arms this long on the sheet
+# (draw_dt_cone_gear_shaft).
+CENTRE_MARK_ARM = 0.003
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+# The cylinder face on the axis, 50 mm right of centre: 2 mm from either
+# silhouette and clear of the dimension above.
+CENTERLINE_PICK = (MAIN_CENTER[0] + 0.050, MAIN_CENTER[1])
+# Bottom-left: in from the left border and left of the title block, under
+# the main view (its lower silhouette at y 0.158).
+NOTES_XY = (0.018, 0.060)
+# The catalogue designation in plain text: the material is the title block's
+# and the cut length is the dimension's.
+ITEM = "TR8X2 LEAD SCREW"
+NOTES = "\n".join(
+    (
+        f"ITEM: {ITEM}",
+        f"SUPPLIER: {property_link('Supplier')}",
+        f"SKU: {property_link('Supplier SKUs')}",
+    )
+)
+EXPECTED_CONTROLS = {
+    name: (nominal, -band, band)
+    for name, (nominal, band) in (
+        (name, control_si(name)) for name in DIMENSION_CONTROLS
+    )
+}
+PDF_TITLE = "Rocker Oblique Trammel Leadscrew — Modified Stock Drawing"
+
+
+def _overlaps(box: tuple[float, ...], other: tuple[float, ...]) -> bool:
+    return (
+        box[0] < other[2]
+        and other[0] < box[2]
+        and box[1] < other[3]
+        and other[1] < box[3]
+    )
+
+
+def _inside_sheet(box: tuple[float, ...]) -> bool:
+    """Inside the border and clear of the title block."""
+    return (
+        box[0] >= BORDER[0]
+        and box[1] >= BORDER[1]
+        and box[2] <= BORDER[2]
+        and box[3] <= BORDER[3]
+        and not _overlaps(box, TITLE_BLOCK)
+    )
+
+
+def _outline(view: Any, label: str) -> tuple[float, float, float, float]:
+    box = tuple(float(value) for value in (view.GetOutline() or ()))
+    if len(box) != 4 or not all(map(math.isfinite, box)):
+        raise RuntimeError(f"{label}: invalid view outline {box!r}")
+    return box
+
+
+def _center_view(draw: Any, view: Any, center: tuple[float, float], label: str) -> None:
+    """Centre the view's actual outline on ``center`` and keep it on the sheet.
+
+    ``place_view`` does not centre the geometry box (the screw's origin is at
+    its near end), and the rotation turns the outline about the view's own
+    position, so both views are moved by their measured outline.
+    """
+    view = _early_bound(view, "IView")
+    box = _outline(view, label)
+    position = tuple(float(value) for value in view.Position)
+    if len(position) != 2 or not all(map(math.isfinite, position)):
+        raise RuntimeError(f"{label}: invalid view position {position!r}")
+    target = [
+        position[0] + center[0] - (box[0] + box[2]) / 2,
+        position[1] + center[1] - (box[1] + box[3]) / 2,
+    ]
+    if not view.SetViewPosition(double_array(target), False):
+        raise RuntimeError(f"{label}: failed to position the view")
+    draw.EditRebuild3()
+    box = _outline(view, label)
+    if (
+        abs((box[0] + box[2]) / 2 - center[0]) > 1e-6
+        or abs((box[1] + box[3]) / 2 - center[1]) > 1e-6
+    ):
+        raise RuntimeError(f"{label}: view failed to centre: {box!r}")
+    if not _inside_sheet(box):
+        raise RuntimeError(f"{label}: view leaves the drawable sheet: {box!r}")
+
+
+def _axis_point(
+    station_mm: float, radius_mm: float = 0.0, clock_deg: float = 0.0
+) -> tuple[float, float, float]:
+    """Model metres: ``radius_mm`` out from the axis at ``station_mm``, at
+    ``clock_deg`` from +X toward +Z (the part's clock, as the builder's)."""
+    clock = math.radians(clock_deg)
+    return (
+        radius_mm * math.cos(clock) / 1000.0,
+        station_mm / 1000.0,
+        radius_mm * math.sin(clock) / 1000.0,
+    )
+
+
+def _cut_endpoints(
+    adapter: Any, main: Any, section: ClockSection
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """The cutting line's sheet endpoints across the screw, bottom first."""
+    reach_mm = SECTION_REACH * 1000.0 * SHEET_SCALE[1] / SHEET_SCALE[0]
+    first, second = model_points_in_view(
+        adapter,
+        main,
+        (_axis_point(section.cut_mm, -reach_mm), _axis_point(section.cut_mm, reach_mm)),
+        label=f"section {section.label} cutting line",
+        names=("one end", "other end"),
+    )
+    return (first, second) if first[1] < second[1] else (second, first)
+
+
+def _looks_far(adapter: Any, view: Any, section: ClockSection) -> bool:
+    """Whether the section looks along model +Y. Model +X and +Z land on the
+    sheet as ``x`` and ``z``; X x Z is -Y, so a counter-clockwise turn from
+    ``x`` to ``z`` puts -Y toward the reader: the view looks along +Y."""
+    origin, along_x, along_z = model_points_in_view(
+        adapter,
+        view,
+        (
+            _axis_point(section.cut_mm),
+            _axis_point(section.cut_mm, 1.0, 0.0),
+            _axis_point(section.cut_mm, 1.0, 90.0),
+        ),
+        label=f"section {section.label} frame",
+        names=("axis", "+X", "+Z"),
+    )
+    x = (along_x[0] - origin[0], along_x[1] - origin[1])
+    z = (along_z[0] - origin[0], along_z[1] - origin[1])
+    turn = x[0] * z[1] - x[1] * z[0]
+    if abs(turn) < 1e-9:
+        raise RuntimeError(f"section {section.label} does not look along the axis")
+    return turn > 0.0
+
+
+def _prepare_section(adapter: Any, view: Any, section: ClockSection) -> None:
+    """Keep only the cut face, at the section's own scale
+    (draw_dt_cone_gear_shaft._prepare_d_section), looking the way the layout
+    wants (the reversed-cut readback of draw_fr_nameplate)."""
+    bound = _early_bound(view, "IView")
+    bound.UseParentScale = False
+    bound.UseSheetScale = 0
+    bound.ScaleRatio = double_array([float(SECTION_SCALE[0]), float(SECTION_SCALE[1])])
+    cut = _early_bound(bound.GetSection(), "IDrSection")
+    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
+    # dedicated bool getter may be truth-tested.
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label=f"section {section.label} cut face and scale")
+    ratio = tuple(float(value) for value in bound.ScaleRatio)
+    if (
+        bool(bound.UseParentScale)
+        or int(bound.UseSheetScale) != 0
+        or not math.isclose(ratio[0] / ratio[1], SECTION_SCALE[0] / SECTION_SCALE[1])
+    ):
+        raise RuntimeError(f"section {section.label} scale did not persist: {ratio}")
+    if not bool(cut.GetDisplayOnlySurfaceCut()):
+        raise RuntimeError(f"section {section.label} kept geometry beyond the cut")
+    if _looks_far(adapter, view, section) != section.looks_far:
+        reversed_cut = not bool(cut.GetReversedCutDirection())
+        cut.SetReversedCutDirection(reversed_cut)
+        rebuild_drawing(adapter, label=f"section {section.label} cut direction")
+        if bool(cut.GetReversedCutDirection()) != reversed_cut:
+            raise RuntimeError(f"section {section.label} cut direction did not persist")
+        if _looks_far(adapter, view, section) != section.looks_far:
+            raise RuntimeError(f"section {section.label} would not turn to the layout")
+
+
+def _centre_section(adapter: Any, view: Any, section: ClockSection) -> None:
+    """Stand the section's axis on its layout point: a section's outline is no
+    measure of its ink (draw_dt_cone_gear_shaft._section_face), so the axis
+    is projected and the view moved by the error."""
+    bound = _early_bound(view, "IView")
+    for _attempt in range(3):
+        (axis,) = model_points_in_view(
+            adapter,
+            view,
+            (_axis_point(section.cut_mm),),
+            label=f"section {section.label} axis",
+        )
+        error = (section.centre[0] - axis[0], section.centre[1] - axis[1])
+        if max(abs(error[0]), abs(error[1])) < SECTION_SETTLE_M:
+            return
+        position = tuple(float(value) for value in bound.Position)
+        target = [position[0] + error[0], position[1] + error[1]]
+        if not bound.SetViewPosition(double_array(target), False):
+            raise RuntimeError(f"section {section.label}: failed to position the view")
+        rebuild_drawing(adapter, label=f"centre section {section.label}")
+    raise RuntimeError(
+        f"section {section.label} axis stayed at {axis}, not {section.centre}"
+    )
+
+
+def _trim_centre_mark(adapter: Any, view: Any, section: ClockSection) -> None:
+    """Keep the section's centre mark, if SolidWorks gave it one, as a small
+    cross (draw_dt_cone_gear_shaft._trim_centre_mark): its size is model
+    length, so the arm is divided by the section's scale."""
+    label = f"section {section.label} centre mark"
+    marks = tuple(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+    if not marks:
+        _telemetry.info(f"{label}: none drawn")
+        return
+    if len(marks) != 1:
+        raise RuntimeError(f"expected at most one {label}, found {len(marks)}")
+    annotation = _early_bound(marks[0], "IAnnotation")
+    mark = _early_bound(annotation.GetSpecificAnnotation(), "ICenterMark")
+    mark.UseDocDisplaySettings = False
+    mark.ShowLines = False
+    mark.Size = CENTRE_MARK_ARM * SECTION_SCALE[1] / SECTION_SCALE[0]
+    rebuild_drawing(adapter, label=f"trim {label}")
+    if bool(mark.UseDocDisplaySettings) or bool(mark.ShowLines):
+        raise RuntimeError(f"{label} kept its document display or its extended lines")
+
+
+def _place_view_caption(
+    adapter: Any, view: Any, target: tuple[float, float], *, label: str
+) -> None:
+    """Move a view's native caption so its box's top centre lands on
+    ``target``, its linked fields intact (draw_dt_cone_gear_shaft's
+    ``_place_view_caption``: the move is measured by ``INote.GetExtent``, the
+    sheet scale pinned first so finalization cannot move it after)."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+    if not sheet.SetScale(*SHEET_SCALE, False, False):
+        raise RuntimeError(f"cannot pin sheet scale before {label} placement")
+    notes = tuple(_read_member(_early_bound(view, "IView"), "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native {label}, found {len(notes)} notes")
+    note = _early_bound(notes[0], "INote")
+    linked = str(note.PropertyLinkedText or "")
+    if not linked:
+        raise RuntimeError(f"{label} carries no linked view fields")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    for _attempt in range(4):
+        extent = tuple(float(value) for value in note.GetExtent())
+        box = (extent[0], extent[1], extent[3], extent[4])
+        error = (target[0] - (box[0] + box[2]) / 2.0, target[1] - box[3])
+        if max(abs(error[0]), abs(error[1])) < CAPTION_SETTLE_M:
+            break
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(x + error[0], y + error[1], z):
+            raise RuntimeError(f"failed to move the {label}")
+        rebuild_drawing(adapter, label=f"place {label}")
+    else:
+        raise RuntimeError(
+            f"{label} stayed at {box}, its top centre requested at {target}"
+        )
+    if str(note.PropertyLinkedText or "") != linked:
+        raise RuntimeError(f"{label} lost its linked view fields")
+
+
+def _offset_angle_text(
+    adapter: Any,
+    annotations: list[Any],
+    name: str,
+    arc_xy: tuple[float, float],
+    text_xy: tuple[float, float],
+) -> None:
+    """Keep the angle's arc at ``arc_xy`` and move only its text to
+    ``text_xy`` on a leader (draw_ch_rocker_arm_tl_trammel_pivot_point's
+    ``_place_tip_angle``), each position read back."""
+    matches = [item for item in annotations if dimension_name(adapter, item) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"section needs one native {name}, got {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    # An inherited offset would move only the text, leaving the arc behind.
+    display.OffsetText = False
+    if bool(display.OffsetText):
+        raise RuntimeError(f"{name} text offset could not be reset")
+    if not annotation.SetPosition2(*arc_xy, 0.0):
+        raise RuntimeError(f"failed to position the {name} arc")
+    _require_position(annotation, arc_xy, f"{name} arc")
+    offset_dimension_text(adapter, [annotation], {name: text_xy})
+    if not bool(display.OffsetText):
+        raise RuntimeError(f"{name} text did not stay offset")
+    _require_position(annotation, text_xy, f"{name} text")
+
+
+def _require_position(annotation: Any, target: tuple[float, float], label: str) -> None:
+    position = annotation.GetPosition()
+    if (
+        not position
+        or math.dist((float(position[0]), float(position[1])), target) > 1e-5
+    ):
+        raise RuntimeError(f"{label} did not persist: {position!r}")
+
+
+@_telemetry.traced("drawing.clock_sections")
+def _add_clock_sections(adapter: Any, main: Any) -> list[Any]:
+    """Cut each KP08 station across its two flats and print its clock flat's
+    across-flat and angle from clock 0 in the section, its centre mark a
+    cross and its caption hung under its lowest ink. Returns the sections'
+    dimension annotations; ``curate_view_dimensions`` fails the build if one
+    does not arrive."""
+    annotations: list[Any] = []
+    clock = KP08_SET_SCREW_SPACING_DEG
+    for section in CLOCK_SECTIONS:
+        start, end = _cut_endpoints(adapter, main, section)
+        if not section.looks_far:
+            start, end = end, start
+        view = create_section_view(
+            adapter,
+            main,
+            line_start=start,
+            line_end=end,
+            view_xy=section.centre,
+            section_label=section.label,
+            scale=SECTION_SCALE,
+            partial=False,
+            label=f"{section.flat} clock flat section",
+        )
+        _prepare_section(adapter, view, section)
+        # Precision display, not draft: the hidden-lines-removed transition is
+        # a real mode change (draw_fr_nameplate's section A-A).
+        set_hidden_lines_removed(adapter, view)
+        _centre_section(adapter, view, section)
+        angle = f"{section.flat}ClockAngle"
+        af_text, arc, angle_text, *extension_ends = model_points_in_view(
+            adapter,
+            view,
+            (
+                _axis_point(section.cut_mm, CLOCK_AF_TEXT_RADIUS_MM, clock + 90.0),
+                _axis_point(section.cut_mm, CLOCK_ANGLE_ARC_RADIUS_MM, clock / 2.0),
+                _axis_point(section.cut_mm, CLOCK_ANGLE_TEXT_RADIUS_MM, clock / 2.0),
+                _axis_point(section.cut_mm, CLOCK_ANGLE_ARC_RADIUS_MM, 0.0),
+                _axis_point(section.cut_mm, CLOCK_ANGLE_ARC_RADIUS_MM, clock),
+            ),
+            label=f"section {section.label} texts",
+            names=("across-flat", "angle arc", "angle text", "clock 0", "clock"),
+        )
+        keep = {f"{section.flat}ClockAF": af_text, angle: arc}
+        view_annotations = curate_view_dimensions(
+            adapter,
+            view,
+            keep=keep,
+            view_label=f"section {section.label}",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
+        _offset_angle_text(adapter, view_annotations, angle, arc, angle_text)
+        annotations += view_annotations
+        _trim_centre_mark(adapter, view, section)
+        face_half = MAJOR_DIA / 2000.0 * SECTION_SCALE[0] / SECTION_SCALE[1]
+        # Under the face, both texts and the angle's extension lines.
+        lowest = min(
+            section.centre[1] - face_half,
+            af_text[1] - TEXT_HALF_HEIGHT,
+            angle_text[1] - TEXT_HALF_HEIGHT,
+            *(end[1] - EXTENSION_OVERSHOOT for end in extension_ends),
+        )
+        _place_view_caption(
+            adapter,
+            view,
+            (section.centre[0], lowest - SECTION_CAPTION_GAP),
+            label=f"section {section.label} caption",
+        )
+    return annotations
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    if not SOURCE.is_file():
+        raise FileNotFoundError(f"source part is missing: {SOURCE}")
+    check("open cut leadscrew", await adapter.open_model(str(SOURCE)))
+    required = (
+        "Number",
+        "Material Specification",
+        "Finish",
+        "Quantity",
+        "Supplier",
+        "Supplier SKUs",
+    )
+    properties = read_required_properties(
+        adapter.currentModel, required, required=required
+    )
+    draw, _sheet = new_project_drawing(
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+    )
+    stamp_drawing_summary(
+        adapter,
+        draw,
+        {
+            0: PDF_TITLE,
+            1: "Manufacturing controls for modified purchased stock",
+            2: "Harmonic Analyzer Project",
+            3: "MHA-CH-006-TL-34; ZYLtech HW-SC-T8x2-600",
+            4: "Native dimension-driven cut length and set-screw flats",
+        },
+    )
+    main = place_view(adapter, str(SOURCE), "*Front", *MAIN_CENTER, scale=SHEET_SCALE)
+    native = _early_bound(main, "IView")
+    native.Angle = MAIN_VIEW_ANGLE
+    if abs(math.remainder(float(native.Angle) - MAIN_VIEW_ANGLE, 2.0 * math.pi)) > 1e-9:
+        raise RuntimeError("failed to turn the leadscrew view axis-horizontal")
+    draw.EditRebuild3()
+    _center_view(draw, main, MAIN_CENTER, "leadscrew view")
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    _center_view(draw, iso, ISO_CENTER, "leadscrew isometric")
+    for view in (main, iso):
+        set_hidden_lines_removed(adapter, view)
+    annotations = curate_view_dimensions(
+        adapter,
+        main,
+        keep=MAIN_KEEP,
+        view_label="cut length and flats",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations += _add_clock_sections(adapter, main)
+    verify_machining_controls(
+        adapter,
+        annotations,
+        expected=EXPECTED_CONTROLS,
+        tolerance_types=DIMENSION_TOLERANCE_TYPES,
+        precision=DIMENSION_PRECISION,
+    )
+    # The across-flat's text beside its dimension line, before its callout
+    # stacks under it (draw_pn_pen_hanger's order).
+    offset_dimension_text(adapter, annotations, {"FlatAF": FLAT_AF_TEXT_XY})
+    set_dimension_callouts(adapter, annotations, FLAT_CALLOUTS)
+    add_view_centerline(adapter, main, face_xy=CENTERLINE_PICK, label="leadscrew axis")
+    note = add_note(adapter, NOTES, *NOTES_XY)
+    if note is None:
+        raise RuntimeError("failed to add the leadscrew note block")
+    resolved = "\n".join(
+        (
+            f"ITEM: {ITEM}",
+            f"SUPPLIER: {properties['Supplier']}",
+            f"SKU: {properties['Supplier SKUs']}",
+        )
+    )
+    printed = str(_early_bound(note, "INote").GetText() or "")
+    if printed.replace("\r\n", "\n").replace("\r", "\n") != resolved:
+        raise RuntimeError(f"leadscrew note block did not resolve: {printed!r}")
+    return await finalize_drawing(
+        adapter,
+        OUTPUTS,
+        pdf_title=PDF_TITLE,
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+    )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[PART_STEM])
+    parser.parse_args()
+    _telemetry.set_service("drawing-export")
+    sys.exit(run_build(build))

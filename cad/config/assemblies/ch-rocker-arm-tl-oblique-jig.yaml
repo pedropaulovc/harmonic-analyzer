@@ -5,12 +5,65 @@ number: MHA-CH-006-TL-000
 # closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
 # its saved .SLDASM), never a sibling assembly.
 #
-# flip_invert: _assembly._flip_sig signatures this build queries that seat
-#   OPPOSITE the plain sign rule. The build adds no mates: none.
-# allowed_free_stems / required_free_stems: none; every component is fixed.
-# free_dof: the jig is modelled at one position of its sweep (the symmetric
-#   inner pass), so its carrier, blocks and pins are fixed too: 0.
+# flip_invert: _assembly._flip_sig signatures (+ " @<diag>" orientation suffix
+#   for a rotation/mirror twin) whose distance driver seats OPPOSITE the plain
+#   sign rule. The one distance driver is carriage 1's slide ("carriage 1 slide
+#   on rail 1"), recorded in the DOF manifest and authored only by verify's
+#   transient replays; a wrong side fails there with "flip-seed MISS ... toggle
+#   sig", naming this file. None inverted until a replay says otherwise.
+# allowed_free_stems: the exact component families allowed to read
+#   under-constrained (freed operational DOF + everything coupled to them).
+#   Shared by the incremental refresh and verify:soundness.
+# required_free_stems: one family per freed DOF that must itself read
+#   under-constrained (verify:soundness necessity).
+# free_dof (+ free_dof_per_active_channel x active channels): the operational
+#   DOF the saved model ships free (verify:soundness).
 flip_invert: []
-allowed_free_stems: []
-required_free_stems: []
-free_dof: 0
+# The sweep: the carriages slide on their rails, the carrier rides the two
+# pivot pins, and every part on a carriage, pivot block, nut bracket or the
+# carrier is lock-mated to it and moves with it (the jig spec's MOVING, BOM
+# order). The rails, bars, leadscrew feed and hold-downs are fixed.
+allowed_free_stems:
+  - ch-rocker-arm-tl-oblique-carrier
+  - ch-rocker-arm-tl-oblique-pivot-block
+  - ch-rocker-arm-tl-oblique-pivot-pin
+  - ch-rocker-arm-tl-oblique-riser
+  - ch-rocker-arm-tl-oblique-hub-pin
+  - ch-rocker-arm-tl-oblique-feed-lever
+  - ch-rocker-arm-tl-oblique-nut-bracket
+  - ch-rocker-arm-tl-oblique-carriage
+  - ch-rocker-arm-tl-oblique-bearing
+  - ch-rocker-arm-tl-oblique-cl-dowel
+  - ch-rocker-arm-tl-oblique-leadscrew-nut
+  - ch-rocker-arm-tl-oblique-block-screw
+  - ch-rocker-arm-tl-oblique-carriage-screw
+  - ch-rocker-arm-tl-oblique-nut-screw
+  - ch-rocker-arm-tl-oblique-riser-screw
+  - ch-rocker-arm-tl-oblique-clamp-screw
+  - ch-rocker-arm-tl-oblique-lever-screw
+  - ch-rocker-arm-tl-oblique-block-washer
+# One freed DOF (carriage 1's slide, DOF manifest key carriage_slide); every
+# moving family rides it, so each must read under-constrained: a rider whose
+# lock mate silently fixed it to the ground would otherwise pass.
+required_free_stems:
+  - ch-rocker-arm-tl-oblique-carrier
+  - ch-rocker-arm-tl-oblique-pivot-block
+  - ch-rocker-arm-tl-oblique-pivot-pin
+  - ch-rocker-arm-tl-oblique-riser
+  - ch-rocker-arm-tl-oblique-hub-pin
+  - ch-rocker-arm-tl-oblique-feed-lever
+  - ch-rocker-arm-tl-oblique-nut-bracket
+  - ch-rocker-arm-tl-oblique-carriage
+  - ch-rocker-arm-tl-oblique-bearing
+  - ch-rocker-arm-tl-oblique-cl-dowel
+  - ch-rocker-arm-tl-oblique-leadscrew-nut
+  - ch-rocker-arm-tl-oblique-block-screw
+  - ch-rocker-arm-tl-oblique-carriage-screw
+  - ch-rocker-arm-tl-oblique-nut-screw
+  - ch-rocker-arm-tl-oblique-riser-screw
+  - ch-rocker-arm-tl-oblique-clamp-screw
+  - ch-rocker-arm-tl-oblique-lever-screw
+  - ch-rocker-arm-tl-oblique-block-washer
+# The sweep; verify's pass-sweep-interference-free gate replays the recorded
+# slide drive through both passes (the .<asm>.sweep.json sidecar).
+free_dof: 1
