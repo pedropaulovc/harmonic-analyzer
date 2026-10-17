@@ -1,0 +1,16 @@
+number: MHA-CH-006-TL-000
+# ch-rocker-arm-tl-oblique-jig assembly contract (shop fixture; never in the
+# machine tree) -- per-assembly build data read through
+# cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the jig's
+# closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
+# its saved .SLDASM), never a sibling assembly.
+#
+# flip_invert: _assembly._flip_sig signatures this build queries that seat
+#   OPPOSITE the plain sign rule. The build adds no mates: none.
+# allowed_free_stems / required_free_stems: none; every component is fixed.
+# free_dof: the jig is modelled at one position of its sweep (the symmetric
+#   inner pass), so its carrier, blocks and pins are fixed too: 0.
+flip_invert: []
+allowed_free_stems: []
+required_free_stems: []
+free_dof: 0
