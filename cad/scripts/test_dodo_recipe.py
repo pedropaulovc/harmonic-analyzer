@@ -815,6 +815,7 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
                 "ms_measuring_stick",
                 "pn_pen",
                 "sm_summing",
+                "ha_harmonic_analyzer",
             },
         ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
