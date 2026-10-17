@@ -1433,10 +1433,14 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate lever geometry sheet")
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
+    _log_thread_labels(adapter, stage="front placed")
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
+    _log_thread_labels(adapter, stage="top placed")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
+    _log_thread_labels(adapter, stage="iso placed")
     for view in (top, iso):
         set_hidden_lines_removed(adapter, view)
+    _log_thread_labels(adapter, stage="HLR")
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -1445,6 +1449,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
+    _log_thread_labels(adapter, stage="front curated")
     # The cylinder's diameter lives in a reference sketch the part saves
     # hidden (its band shows no silhouette to dimension): the hidden-owner
     # curate shows it in the plan, the one view that dimensions it.
@@ -1455,6 +1460,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="top",
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
+    _log_thread_labels(adapter, stage="top curated")
     # The trunnion width and vertex height live in a reference sketch the
     # part saves hidden (no single hexagon dimension is either).  The detail
     # is cut and dimensioned while the part shows it; the front view shows it
@@ -1836,14 +1842,19 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
 
     _log_thread_labels(adapter, stage="after sheet 1")
+    import_cosmetic_threads(adapter, iso)
+    _log_thread_labels(adapter, stage="iso threads imported")
     if not drawing.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate bracket receiver sheet")
     back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=(1, 1))
+    _log_thread_labels(adapter, stage="back placed")
     receiver_iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4),
     )
+    _log_thread_labels(adapter, stage="receiver iso placed")
     for view in (back, receiver_iso):
         set_hidden_lines_removed(adapter, view)
+    _log_thread_labels(adapter, stage="sheet 2 HLR")
     mounting_rims = _mounting_rims(back)
     # Right of the view, where the 2026-10-09 render seated it.
     mounting_callout = add_native_hole_callout(
@@ -1922,6 +1933,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # The repeated isometric's label, where sheet 1 puts its own (machinist
     # review r12: unlabelled on this sheet).
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
+    _log_thread_labels(adapter, stage="sheet 2 done")
+    import_cosmetic_threads(adapter, receiver_iso)
     _log_thread_labels(adapter, stage="before the sweep")
     return await finalize_drawing(
         adapter,
