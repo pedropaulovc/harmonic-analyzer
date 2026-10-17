@@ -727,23 +727,25 @@ def _shoulder_radius_ink_problem(
     centre: tuple[float, float],
     others: dict[str, list[Segment]],
 ) -> str | None:
-    """The arrow on the corner's arc about ``centre``, leader ink at it, and
+    """The arrow on the corner's fillet circle about ``centre``, leader ink at it, and
     no other dimension's ink crossed (rule 14).  On the lower arc the leader
     may cross the face's witnesses, the extension lines at the spigot face."""
     slop = RADIUS_INK_SLOP
     cx, cy = centre
-    # The arc lies on the corner's side of its centre: left of it, and under
-    # it at the upper corner, over it at the lower.  The 0.8 mm arc needs a
-    # tighter radius check than the ink's slop: the sharp corner itself
-    # stands only 0.33 mm off it.
-    corner_side = -1.0 if side == "upper" else 1.0
-    if (
-        not all(math.isfinite(v) for v in tip)
-        or abs(math.dist(tip, (cx, cy)) - SHOULDER_SHEET_RADIUS) > SHOULDER_ARC_SLOP
-        or tip[0] > cx + SHOULDER_ARC_SLOP
-        or (tip[1] - cy) * corner_side < -SHOULDER_ARC_SLOP
+    # The arrow on the fillet's circle, R round its centre.  The 0.8 mm arc
+    # needs a tighter radius check than the ink's slop: the sharp corner
+    # itself stands only 0.33 mm off it.  Either side of the centre: with
+    # its text outside the arc's quarter SolidWorks ends the leader on the
+    # circle point facing the text, the arc's extension (the vertical rod's
+    # relief root, farm r4, 0676a2115), and _shoulder_radius_side has
+    # already held the arrow to this corner.
+    if not all(math.isfinite(v) for v in tip) or (
+        abs(math.dist(tip, (cx, cy)) - SHOULDER_SHEET_RADIUS) > SHOULDER_ARC_SLOP
     ):
-        return "radius arrow is not on the shoulder corner's arc"
+        return (
+            f"radius arrow is not on the shoulder corner's arc: tip {tip}, "
+            f"centre {centre}, R {SHOULDER_SHEET_RADIUS}"
+        )
     ink = [stroke for stroke in segments if math.dist(*stroke) > slop]
     if not ink or min(distance_to_point(stroke, tip) for stroke in ink) > slop:
         return "radius arrow has no attached leader ink"
