@@ -36,7 +36,9 @@ def _spring_compliance_along_wire() -> float:
 def test_a1_pose_and_arm_length():
     assert joint.BRACKET_ORIGIN[2] == vn_lever_wire_geom.DRUM_END_Z == -173.51
     assert arm.COLLAR == joint.BRACKET_ORIGIN
-    assert ARM_Z == (4.0, 103.51)
+    # The arm starts buried in the collar's wall (r4: at Z 4.0 its +Y corner
+    # stepped the collar root); only its end, 103.51 from the axis, prints.
+    assert ARM_Z == (3.5, 103.51)
     assert arm.ARM_SPAN == pytest.approx(91.2226, abs=1e-3)
     assert arm.OLD_ARM_SPAN == pytest.approx(46.01)
 
