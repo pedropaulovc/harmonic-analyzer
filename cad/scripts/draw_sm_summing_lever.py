@@ -1028,13 +1028,13 @@ VIEW_F_ARROW = (
     _VIEW_F_TIP,
 )
 # Sheet 1's end profile is VIEW G, so the plan carries its arrow too: up onto
-# the +Z end (datum B) at model x 7.8 (sheet x 0.2392), 1.9 mm right of the
+# the +Z end (datum B) at model x 7.2 (sheet x 0.2389), 1.4 mm right of the
 # hex stub, with datum B's tag moved right to leave the letter room.  The
 # letter hangs below the edge and the leader leaves its left side, so the
 # note stands at the tip (the left margin is squared on readback); its foot
 # stays 3 mm over the 76.20/39.85 dimension line (y 0.0784).
 VIEW_ARROW_SQUARE_TOL = 0.0003
-_VIEW_G_TIP = _top_xy(7.8, -PLATE_L / 2.0)
+_VIEW_G_TIP = _top_xy(7.2, -PLATE_L / 2.0)
 VIEW_G_ARROW = (
     (_VIEW_G_TIP[0] - 0.0004, _VIEW_G_TIP[1] - 0.005),
     _VIEW_G_TIP,
@@ -1283,8 +1283,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # Hang B's tag straight down right of the +Z trunnion stub, between it and
     # the 39.85 extension line: left of the stub it sat in the finish leader's
     # only path (layout audit); the 20X callout now hangs on the middle hole,
-    # well away from this tag.  It stands 9 mm right of the pick, clear of
-    # VIEW G's letter beside the stub.
+    # well away from this tag.  It stands 10.2 mm right of the pick, clear of
+    # VIEW G's letter beside the stub (at 9.0 its frame touched the letter,
+    # farm r16).
     # Every datum and dimension here names its entities: a coordinate
     # hit-test on the plate corner resolved to the rib flange 5.08 mm inboard
     # (datum B on the flange, start Z reading 3.35 for 8.43 -- #1105), and a
@@ -1298,7 +1299,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_entity=end_edge.edge,
-        symbol_xy=(plate_end_edge[0] + 0.0090, plate_end_edge[1] - 0.0035),
+        symbol_xy=(plate_end_edge[0] + 0.0102, plate_end_edge[1] - 0.0035),
         datum="B",
         label="plate +Z end face",
     )
