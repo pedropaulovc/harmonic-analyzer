@@ -1371,7 +1371,7 @@ sections:
         - stock + photo topology
         - high (stock); med (two clamp functions); low (photo-scaled original size)
       - - Output fixture
-        - 'C36000 3/8 in hex brass (AF9.525) × 11.0, horizontal axis; vertical Ø5.20 +0.03/0 sliding bore through corners, station 5.00 ±0.05 from free end; turned Ø9.0 × 6.7 spigot; R1.2 circumferential wire groove, root Ø7.00 ±0.05, centred on spigot so both axial lips remain ≥2.0 at print-worst; axial #4-40 UNC-2B tap from spigot face into rod bore'
+        - 'C36000 7/16 in hex brass (AF11.1125) × 11.3, horizontal axis; vertical Ø5.2 drilled bore through corners, centred between the flats, station 5.30 from free end; turned Ø10.1 × 6.7 spigot; R1.2 MAX circumferential wire groove centred on the spigot OD, root Ø7.70, station 3.75 from the spigot face; every wall ≥2.0 at print-worst including drill wander (owner ruling 2026-10-16); axial #4-40 UNC-2B tap from spigot face into rod bore'
         - —
         - '20_Magnifying_Lever.pdf p.46 text; ch20_images/page001_img01.jpeg, page002_img04.jpeg and page002_img07.jpeg: hex body cross-bored on vertical rod, grooved round spigot, axial knurled screw and front-hanging wire'
         - photo topology + engineered walls
@@ -1432,16 +1432,16 @@ sections:
       clears the front column face (z −124.7) by about 45.8. The vertical rod
       screws into the clamp and seats on its shoulder at y 960.05 (thread tip
       y 967.55, bottom dome y 835.05); the fixture screw axis is y 919.7, with
-      the hex body spanning approximately 914.2..925.2. Both thumb screws are
+      the hex body spanning approximately 913.3..926.1. Both thumb screws are
       installed backed out to tip/rod tangency so nominal CAD solids do not
       overlap.
 
       The fixture screw points toward the bracket, and the wire winds in
       the spigot groove then leaves its front tangent at screw-axis height.
-      Its yaw about the vertical rod (+23.93°) is solved from the groove
+      Its yaw about the vertical rod (+26.69°) is solved from the groove
       station and groove-root radius plus wire radius and 0.25 stand-off, so
-      the hook lands at (139.77, 919.7, −173.51) in the rod plane. Hook X,
-      yaw, wire length (354.631), drum tangent (clock 15.79°) and the yoke
+      the hook lands at (139.98, 919.7, −173.51) in the rod plane. Hook X,
+      yaw, wire length (354.683), drum tangent (clock 15.82°) and the yoke
       point are derived in cad/scripts/mg_output_fixture_geom.py and
       vn_lever_wire_geom.py. The drawing-free route checks clearance behind
       the rim (6.61), spokes (8.61) and boss (4.10). The straight rest wire

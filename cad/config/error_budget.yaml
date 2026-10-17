@@ -80,11 +80,11 @@ reserved:
     # The clamp stations are where the BLOCK sits (reach and setup); what the
     # pen sees is the WIRE MOMENT ARM -- the knife axis's perpendicular
     # distance to wire 1's rest run (error_budget.wire_moment_arm): the output
-    # fixture's groove hook sits its signed HOOK_OFFSET_X (~10.2 mm toward the
+    # fixture's groove hook sits its signed HOOK_OFFSET_X (~10.0 mm toward the
     # knife) from the clamp station and below the knife, and the wire leans
-    # toward the wheel, so the arm is ~55.86 mm with the clamp against the
-    # collar (66.4 mm from the knife) and ~166.65 mm at the as-built 165 mm
-    # station (~208.23 at the 208.6 mm rod tip) -- not proportional to the
+    # toward the wheel, so the arm is ~56.11 mm with the clamp against the
+    # collar (66.4 mm from the knife) and ~166.87 mm at the as-built 165 mm
+    # station (~208.42 at the 208.6 mm rod tip) -- not proportional to the
     # station. The k=0 (greatest) term is made to span the stroke,
     # Michelson's normalisation, book p. 99: where the arm that does it is
     # below the collar station's the operator scales the ordinates down

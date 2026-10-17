@@ -45,7 +45,7 @@ def test_loads_from_their_sources():
     assert arm.PEN_SIDE_G == pytest.approx(145.25, abs=0.05)
     assert arm.WIRE1_TENSION_MAX_N == pytest.approx(WIRE_RATIO * arm.PEN_LOAD_MAX_N)
     assert arm.WIRE1_TENSION_MAX_N == pytest.approx(10.68, abs=0.01)
-    assert arm.LEVER_GROUP_G == pytest.approx(105.6, abs=0.1)
+    assert arm.LEVER_GROUP_G == pytest.approx(110.2, abs=0.1)
     assert arm.HOOK == (
         vn_lever_wire_geom.HOOK_X,
         vn_lever_wire_geom.HOOK_Y,
@@ -55,8 +55,8 @@ def test_loads_from_their_sources():
 
 def test_arm_deflection_old_and_new():
     assert arm.HOOK_OFFSET_OLD == pytest.approx(0.123, abs=0.001)
-    assert arm.HOOK_OFFSET_NEW == pytest.approx(0.274, abs=0.001)
-    assert arm.PEN_OFFSET_NEW == pytest.approx(1.37, abs=0.01)
+    assert arm.HOOK_OFFSET_NEW == pytest.approx(0.276, abs=0.001)
+    assert arm.PEN_OFFSET_NEW == pytest.approx(1.38, abs=0.01)
     assert arm.ARM_COMPLIANCE_MM_PER_N == pytest.approx(0.0227, abs=1e-4)
 
 
@@ -71,7 +71,7 @@ def test_arm_adds_under_one_percent_to_the_spring_compliance():
 def test_flange_joint_margins():
     assert arm.JOINT_PRELOAD_MARGIN == pytest.approx(1.65, abs=0.01)
     assert arm.JOINT_PRELOAD_MARGIN > 1.0
-    assert arm.SCREW_SHEAR_STRESS == pytest.approx(66.1, abs=0.2)
+    assert arm.SCREW_SHEAR_STRESS == pytest.approx(66.5, abs=0.2)
     assert arm.SCREW_SHEAR_STRESS < arm.SCREW_SHEAR_ALLOWABLE
     assert arm.BENDING_STRESS == pytest.approx(13.1, abs=0.1)
     assert arm.TORSION_STRESS == pytest.approx(10.6, abs=0.1)

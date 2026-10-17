@@ -10,7 +10,7 @@ Bands, places, worst-case walls and sheet text live in
 ``mg_output_fixture_spec``.
 
 The fixture (book ch. 20 p. 48, the photographed small hex block on the
-vertical rod) is a 3/8 brass hex bar: the Ø5 vertical rod slides through a
+vertical rod) is a 7/16 brass hex bar: the Ø5 vertical rod slides through a
 cross bore across the hex corners, a turned spigot on one end carries the
 full-radius groove the lever wire hooks into, and an axial #4-40 tap from
 the spigot face down to the rod bore takes the thumb screw that locks the
@@ -39,40 +39,44 @@ import math
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 
-# --- Stock: 3/8 hex brass bar --------------------------------------------------
-HEX_AF = 0.375 * 25.4  # 9.525 across the flats
+# --- Stock: 7/16 hex brass bar (MG-002's stock) -----------------------------------
+HEX_AF = 7.0 / 16.0 * 25.4  # 11.1125 across the flats
 # Centre to a corner: the hex's half-extent along local Y.
 HEX_CORNER_RADIUS = HEX_AF / math.sqrt(3.0)
 
 # --- Stations along the hex axis (local x; origin on the rod-bore axis) ----------
-ROD_STATION = 5.0  # free end to the rod-bore axis
+ROD_STATION = 5.30  # free end to the rod-bore axis
 FREE_END_X = -ROD_STATION
-HEX_LENGTH = 11.0  # free end to the shoulder (modelled; printed via the spigot)
+HEX_LENGTH = 11.3  # free end to the shoulder (modelled; printed via the spigot)
 SHOULDER_X = FREE_END_X + HEX_LENGTH
-# Spigot face back to the shoulder: the lathe's own length from the faced
-# end.  Long enough that the groove's face-side lip and its root over the
-# tap hold the floor at the worst case of the printed bands
-# (mg_output_fixture_spec.WALLS states each one the target cannot reach).
+# Spigot face back to the shoulder: the lathe's own length from the faced end.
 SPIGOT_LENGTH = 6.7
 SPIGOT_FACE_X = SHOULDER_X + SPIGOT_LENGTH
 OVERALL_LENGTH = HEX_LENGTH + SPIGOT_LENGTH
 
 # --- Rod bore: across the corners, along local Y, through the hex axis --------
-# Centred between the flats: the sheet states the wall it must leave
-# (mg_output_fixture_spec), not a location from one flat.
+# Centred between the flats by the hex sketch's symmetry: no location from a
+# flat (mg_output_fixture_spec takes the drill's run-off as its offset).
 ROD_BORE_DIA = 5.2  # drilled: running clearance on the Ø5 vertical rod
 
 # --- Spigot and its full-radius wire groove ------------------------------------
-SPIGOT_DIA = 9.0
+# The groove arc's centre sits exactly on the spigot OD (Ø10.1 = root Ø7.7 +
+# 2 x R1.2), so the groove is a true semicircle, as deep as its radius.  The
+# owner's suggested Ø10.5 would stand the centre inside the OD: a groove
+# 1.4 deep under an R1.2 arc, re-entrant (undercut), not turnable.
+SPIGOT_DIA = 10.1
 GROOVE_RADIUS = 1.2
-GROOVE_ROOT_DIA = 7.0
+GROOVE_ROOT_DIA = 7.7
 # The internal corner where the spigot turns up to the hex shoulder: the
 # tool-nose radius, modelled at the largest the print allows (R MAX).  It
 # stays on the shoulder face inside the flats and short of the groove.
 SHOULDER_FILLET_R = 0.2
-GROOVE_X = SHOULDER_X + SPIGOT_LENGTH / 2.0  # centred on the spigot
-# The groove arc's centre stands outside the spigot OD, so the arc meets the
-# OD at a definite mouth on each side, GROOVE_HALF_OPENING from GROOVE_X.
+# The groove's station from the spigot face: its face-side lip holds the wall
+# target at the worst case; the shoulder side takes the rest of the spigot.
+GROOVE_STATION = 3.75
+GROOVE_X = SPIGOT_FACE_X - GROOVE_STATION
+# The groove arc meets the OD at a mouth on each side, GROOVE_HALF_OPENING
+# from GROOVE_X (the full radius: the centre is on the OD).
 GROOVE_CENTRE_R = GROOVE_ROOT_DIA / 2.0 + GROOVE_RADIUS
 GROOVE_HALF_OPENING = math.sqrt(
     GROOVE_RADIUS**2 - (GROOVE_CENTRE_R - SPIGOT_DIA / 2.0) ** 2
@@ -145,8 +149,10 @@ if abs(HOOK_OFFSET_Z - (HOOK_TARGET_Z - VROD_Z)) > 1e-9:
     raise AssertionError("MHA-MG-006 yaw does not put the hook in the rod's plane")
 if HOOK_OFFSET_X >= 0.0:
     raise AssertionError("MHA-MG-006 hook must sit on the bracket side of the rod")
-if not GROOVE_CENTRE_R - SPIGOT_DIA / 2.0 < GROOVE_RADIUS:
-    raise AssertionError("MHA-MG-006 groove arc does not reach the spigot OD")
+if abs(GROOVE_CENTRE_R - SPIGOT_DIA / 2.0) > 1e-9:
+    raise AssertionError(
+        "MHA-MG-006 groove centre is not on the spigot OD (semicircle)"
+    )
 if not SHOULDER_X < GROOVE_MOUTHS[0] < GROOVE_MOUTHS[1] < SPIGOT_FACE_X:
     raise AssertionError("MHA-MG-006 groove runs off the spigot")
 if not SPIGOT_DIA < HEX_AF:
