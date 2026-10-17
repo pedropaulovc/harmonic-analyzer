@@ -56,8 +56,11 @@ def _load_dodo():
 def _collected_by_check_gates() -> dict[str, list[str]]:
     """Test file name -> the check:* tasks whose pytest command collects it."""
     collected: dict[str, list[str]] = {}
-    for task in _load_dodo().task_check():
+    dodo = _load_dodo()
+    for task in dodo.task_check():
         _run, (cmd, *_rest) = task["actions"][0]
+        if _run is not dodo._run_stamped:
+            continue
         for arg in cmd:
             path = Path(str(arg))
             if path.suffix != ".py" or not path.name.startswith("test_"):
