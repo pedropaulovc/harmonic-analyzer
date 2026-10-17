@@ -546,9 +546,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # centre to centre (mr-tl13-1). AutoInsertCenterMarks2's slot option only
     # finds sketch-slot features and printed none on this stadium (tl13-gdt-r2).
     _mark_rod_slot_end_centres(adapter, detail)
-    # Precision HLR again once cropped and marked: the 5:1 ends printed as
-    # facets (mr-tl13-1 "draft quality").
-    set_hidden_lines_removed(adapter, detail)
     # The mark and the labels go on once every import is done, so nothing of
     # the face view's own sketch is near its import.
     mark = _mark_rod_slot_on_front(adapter, front)
