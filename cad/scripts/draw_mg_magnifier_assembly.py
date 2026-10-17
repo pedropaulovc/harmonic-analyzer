@@ -48,6 +48,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 import _config
 import _telemetry
+import mg_magnifier_assembly_notes as notes
 import mg_magnifier_assembly_spec as stack
 import mg_magnifier_explode_spec as explode
 import vn_lever_wire_geom
@@ -233,7 +234,7 @@ WHEEL_LABEL = "wheel group exploded"
 # tall (r4's read-back: 128.3 mm for 19 rows of 6.0), so the plan books three
 # rows; the reference view still fits its field at 1:16 (44.3 mm tall on r3).
 BOM_HEADING_ROWS = 3
-BOM_BOTTOM = BOM_ANCHOR[1] - (len(stack.BOM_ORDER) + BOM_HEADING_ROWS) * BOM_ROW_HEIGHT
+BOM_BOTTOM = BOM_ANCHOR[1] - (len(notes.BOM_ORDER) + BOM_HEADING_ROWS) * BOM_ROW_HEIGHT
 BOM_REFERENCE_FIELD = (
     BOM_ANCHOR[0],
     TITLE_BLOCK[3] + _PAD,
@@ -343,7 +344,7 @@ WIRE_BALLOON_POINT_MM = wire_facing_point(
     station=vn_lever_wire_spec.BALLOON_RING_FRACTION * vn_lever_wire_geom.WIRE_LEN,
 )
 
-BOM_QUANTITIES = {stem: stack.QUANTITIES[stem] for stem in stack.BOM_ORDER}
+BOM_QUANTITIES = {stem: notes.QUANTITIES[stem] for stem in notes.BOM_ORDER}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 # Literal stems, so the config-dependency analysis reads exactly these rows.
 PART_ROWS = {
@@ -377,7 +378,7 @@ BOM_SKUS = {
     stem: " / ".join(str(sku) for sku in row.get("supplier_skus") or ()) or MADE_PART_SKU
     for stem, row in PART_ROWS.items()
 }
-BOM_DESCRIPTIONS = dict(stack.BOM_DESCRIPTIONS)
+BOM_DESCRIPTIONS = dict(notes.BOM_DESCRIPTIONS)
 BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
@@ -483,9 +484,9 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
 
 
 ASSEMBLY_STEPS = _wrapped(
-    stack.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
+    notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
-ASSEMBLY_CHECKS = _wrapped(stack.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
+ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
 CHECKS_XY = (
     STEPS_XY[0],
     STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 1) * NOTE_LINE_PITCH - 2 * _PAD,
@@ -637,11 +638,11 @@ def _printable_callouts() -> dict[str, str]:
     broken = sorted(
         name
         for name, location in CALLOUT_LOCATION.items()
-        if location == "above" and "\n" in stack.DIMENSION_CALLOUTS[name]
+        if location == "above" and "\n" in notes.DIMENSION_CALLOUTS[name]
     )
     if broken:
         raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
-    return {name: stack.DIMENSION_CALLOUTS[name] for name in CALLOUT_LOCATION}
+    return {name: notes.DIMENSION_CALLOUTS[name] for name in CALLOUT_LOCATION}
 
 
 def _assert_callouts(displays: list[tuple[str, Any]], callouts: dict[str, str]) -> None:
@@ -820,11 +821,11 @@ def _printable_lever_callouts() -> dict[str, str]:
     broken = sorted(
         name
         for name, location in LEVER_CALLOUT_LOCATION.items()
-        if location == "above" and "\n" in stack.LEVER_CALLOUTS[name]
+        if location == "above" and "\n" in notes.LEVER_CALLOUTS[name]
     )
     if broken:
         raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
-    return {name: stack.LEVER_CALLOUTS[name] for name in LEVER_CALLOUT_LOCATION}
+    return {name: notes.LEVER_CALLOUTS[name] for name in LEVER_CALLOUT_LOCATION}
 
 
 def _assert_lever_callouts(
@@ -1102,7 +1103,7 @@ def _fit_ring(
 
 
 def exploded_caption(group: str, scale: tuple[float, float]) -> str:
-    return f"{group} {stack.EXPLODED_CAPTION} (SCALE {scale_text(scale)})"
+    return f"{group} {notes.EXPLODED_CAPTION} (SCALE {scale_text(scale)})"
 
 
 def _component_stem(component: Any) -> str:
@@ -1579,10 +1580,10 @@ async def build(adapter: Any) -> dict[str, str]:
         ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
         required=("Number", "Revision", "Material Specification", "Finish", "Quantity"),
     )
-    if properties["Number"] != stack.DRAWING_NUMBER:
+    if properties["Number"] != notes.DRAWING_NUMBER:
         raise RuntimeError(
             f"magnifier source Number {properties['Number']!r} != "
-            f"{stack.DRAWING_NUMBER!r}"
+            f"{notes.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
     _create_sheets(adapter)
