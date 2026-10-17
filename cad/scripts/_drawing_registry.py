@@ -866,6 +866,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_carrier",
+        part="ch_rocker_arm_tl_oblique_carrier",
+        artifact_stem="ch-rocker-arm-tl-oblique-carrier",
+        script_name="draw_ch_rocker_arm_tl_oblique_carrier.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_rocker_arm_tl_oblique_pivot_block",
         part="ch_rocker_arm_tl_oblique_pivot_block",
         artifact_stem="ch-rocker-arm-tl-oblique-pivot-block",
@@ -877,6 +884,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="ch_rocker_arm_tl_oblique_pivot_pin",
         artifact_stem="ch-rocker-arm-tl-oblique-pivot-pin",
         script_name="draw_ch_rocker_arm_tl_oblique_pivot_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_riser",
+        part="ch_rocker_arm_tl_oblique_riser",
+        artifact_stem="ch-rocker-arm-tl-oblique-riser",
+        script_name="draw_ch_rocker_arm_tl_oblique_riser.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_hub_pin",
+        part="ch_rocker_arm_tl_oblique_hub_pin",
+        artifact_stem="ch-rocker-arm-tl-oblique-hub-pin",
+        script_name="draw_ch_rocker_arm_tl_oblique_hub_pin.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
