@@ -71,6 +71,17 @@ and the shared placeholder spelling (spec solids included), enumerates every
 `shop_made` record, and rejects any other inventory table whose id or name names
 a registered part (stem or drawing number from `cad/config/parts`).
 
+Catalogue sourcing belongs in `shop/inventory.toml`: keep the dated vendor
+specification separate from any owner-selected cut length or jig-layout
+decision. Distinguish purchased stock length from the installed length: record
+cutting and deburring as shop steps, not as a vendor-guaranteed tolerance.
+An included kit member must not trigger a duplicate purchase. Keep unpurchased
+hardware at `verify = true`; catalogue dimensions do not establish possession,
+receipt metrology or assembled mechanical fit.
+Record unpublished fields and rejected substitutes beside the affected item,
+rather than duplicating their changing verification status here. CAD remains
+the authority for installed geometry and any shop-made adapter.
+
 ## Add or migrate a part
 
 1. Ensure the part is supported by `export_features.SUPPORTED_PARTS` and obtain
