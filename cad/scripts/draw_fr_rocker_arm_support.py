@@ -880,6 +880,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # The mounting face is the trapezoid's visible bottom edge in section A-A.
     # Keep the symbol near the foot while clearing the 63.5 width dimension.
+    # The leader lands 8 mm of sheet in from the foot's sharp: at 2 mm it hit
+    # the corner where the rim chamfer meets the face (r5 review, minor).
     seat_y = RIGHT_CENTER[1] - HALF_Y * VIEW_SCALE / 1000.0
     seat_half_w = WIDE * VIEW_SCALE / 1000.0
     add_surface_finish(
@@ -890,7 +892,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "mounting_face"),
         label="mounting face finish",
         char_height=0.0025,
-        leader_attach_xy=(RIGHT_CENTER[0] + seat_half_w - 0.002, seat_y),
+        leader_attach_xy=(RIGHT_CENTER[0] + seat_half_w - 0.008, seat_y),
     )
 
     datum_axes = _bottom_datum_axes(adapter, bottom)

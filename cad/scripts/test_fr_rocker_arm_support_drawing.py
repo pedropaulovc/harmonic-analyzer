@@ -758,7 +758,7 @@ def test_part_owned_places_are_the_parts_and_the_sheet_reads_them_back(
         support.POCKET_END_PLACES,
         support.SECTION_LOCATION_PLACES,
         seats.TOP_FLAT_PLACES,
-    ) == (1, 1, 2, 1, 2, 2, 3)
+    ) == (1, 1, 2, 1, 2, 2, 2)
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in inspect.getsource(
         support.build
     )
@@ -1099,6 +1099,9 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
     # 180.5 casting's cavity wall stands 26.75 off the end face, a .X tie
     # whose metre value lies just under it, so the sheet prints 26.7 (r1 of
     # the main stack's render; mm-side half-even rounding would say 26.8).
+    # The top flat's 2.1165 is no tie at .XX: the r5 render's solved sketch
+    # printed 2.116 at .XXX, its metre value just under the tie, while this
+    # replay's lies just over it; both print 2.12.
     printed = {
         name: str(
             (Decimal(dims[name][3] / 1000.0) * 1000).quantize(
@@ -1112,8 +1115,8 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         "PocketEndStation": "7.70",
         "CavityTopStation": "25.4",
         "WebFaceStation": "25.40",
-        "TopFlatMinusZStation": "2.117",
-        "TopFlatPlusZStation": "2.117",
+        "TopFlatMinusZStation": "2.12",
+        "TopFlatPlusZStation": "2.12",
     }
 
     nominal = {
@@ -1235,7 +1238,7 @@ def test_pocket_floor_radius_text_stands_right_of_the_section_level_with_its_cor
     assert radius[1] < corner_y < radius[3] + 0.003
 
 
-FLAT_PLUS_TEXT = "2.117\nCENTERS MHA-CH-008\nSEAT TAPS IN WEB"
+FLAT_PLUS_TEXT = "2.12\nCENTERS MHA-CH-008\nSEAT TAPS IN WEB"
 
 
 def test_section_locations_stand_off_the_section_and_its_texts() -> None:
@@ -1250,7 +1253,7 @@ def test_section_locations_stand_off_the_section_and_its_texts() -> None:
     base_left = centre_x - support.WIDE * scale
     web_left = centre_x - support.WEB * scale
     section_top = centre_y + support.HALF_Y * scale
-    taper = _text_box("2.117", drawing.RIGHT_KEEP["TopFlatMinusZStation"])
+    taper = _text_box("2.12", drawing.RIGHT_KEEP["TopFlatMinusZStation"])
     top_span = _text_box(FLAT_PLUS_TEXT, drawing.RIGHT_KEEP["TopFlatPlusZStation"])
     assert taper[2] < top_left - 0.002
     assert top_span[0] > top_right + 0.002
@@ -1492,7 +1495,7 @@ def test_cavity_radius_callout_sits_on_its_corner_bisector_outside_the_view() ->
     front_right = drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2 * scale
     assert label[0] > front_right + 0.003
     for other in (
-        _text_box("2.117", drawing.RIGHT_KEEP["TopFlatMinusZStation"]),
+        _text_box("2.12", drawing.RIGHT_KEEP["TopFlatMinusZStation"]),
         _rim_chamfer_box(),
         _text_box("177.8", drawing.FRONT_KEEP["Depth"]),
     ):

@@ -25,15 +25,16 @@ the support's length and symmetric about its centre plane (owner Q13c,
 2026-10-16; the source cast 6.35).
 
 Across the web the seat lands where the bracket's foot puts its hole: each
-edge of the top flat prints off its nearer web face, a cast surface, at .XXX
+edge of the top flat prints off its nearer web face, a cast surface, at .XX
 (owner Q13d, 2026-10-16; Q13-B had them off the web's centre plane, which
-carries no feature until the seats are transferred). The foot may stand
-anywhere on the flat up to flush with either edge, the hole sits off the
-foot's far side at its own .XX centring band, and the transfer punch (11/64,
+carries no feature until the seats are transferred; the r5 review read .XXX
+as over-specified, and .XX keeps the wall). The foot may stand anywhere on
+the flat up to flush with either edge, the hole sits off the foot's far side
+at its own .XX centring band, and the transfer punch (11/64,
 dt_arbor_pedestal_spec's) floats in the close hole at its drilled maximum.
-The thread keeps the 2.0 wall to both web faces at that worst lateral offset;
-the web's .XX thickness band is out of that chain, as each edge moves with
-the face it is measured from.
+The thread keeps the 2.0 wall to both web faces at that worst lateral offset:
+to the face the flush edge is measured from, the web's .XX thickness band is
+out of the chain; to the far face it enters.
 
 Each seat is transferred from its bracket's hole, so it lands wherever the
 bracket's own bands put that hole: the support's end face and the bracket's
@@ -104,7 +105,7 @@ WEB = 6.35  # 12.70 (1/2 in) web (owner Q13c)
 WEB_PLACES = 2
 # Each top-flat edge off its nearer web face (owner Q13d), 2.1165.
 TOP_FLAT_EDGE_FROM_WEB = NARROW - WEB
-TOP_FLAT_PLACES = 3
+TOP_FLAT_PLACES = 2
 
 # Machine (x, z) of the two seats, south bracket first: each under its
 # bracket's one hold-down hole, on the support's centreline (the brackets sit
@@ -120,21 +121,35 @@ FOOT_H_RANGE = (_bracket.FOOT_H - LINEAR_2PL, _bracket.FOOT_H + LINEAR_2PL)
 SCREW_REACH_MAX = SCREW_LENGTH + SCREW_LENGTH_BAND[0] - FOOT_H_RANGE[0]
 SCREW_REACH_MIN = SCREW_LENGTH - SCREW_LENGTH_BAND[1] - FOOT_H_RANGE[1]
 ENGAGEMENT_MIN = SCREW_REACH_MIN - SCREW_TIP_CHAMFER - EDGE_BREAK
-# The seat's nearest approach to a web face: the foot flush with the flat's
-# edge at its .XXX outermost off that face, the hole at its nearest to that
-# side (the foot's narrowest, the hole's centring band toward the far side),
-# and the transfer punch's float in the hole at its drilled maximum toward
-# the face.
+# The foot flush with one flat edge, that edge at either end of its .XX band
+# off its web face (the near face), the transfer punch's float in the hole
+# at its drilled maximum. Toward the near face: the edge at its outermost,
+# the hole at its nearest to the flush side (the foot's narrowest, the hole's
+# centring band toward the far side). Toward the far face: the edge at its
+# innermost, the hole at its farthest, the web at its thinnest.
 TRANSFER_PUNCH_DIA = 11.0 / 64.0 * 25.4
+TOP_FLAT_EDGE_BAND = {1: LINEAR_1PL, 2: LINEAR_2PL, 3: LINEAR_3PL}[TOP_FLAT_PLACES]
 HOLE_FROM_FOOT_SIDE_MIN = (_bracket.FOOT_W - _bracket.EDGE_BAND) - (
     _bracket.FOOT_W / 2.0 + _bracket.HOLE_X_BAND
 )  # 6.98
+HOLE_FROM_FOOT_SIDE_MAX = (_bracket.FOOT_W + _bracket.EDGE_BAND) - (
+    _bracket.FOOT_W / 2.0 - _bracket.HOLE_X_BAND
+)  # 9.02
 PUNCH_FLOAT = (_bracket.HOLE_DIA + _bracket.DRILL_GROWTH - TRANSFER_PUNCH_DIA) / 2.0
-SEAT_FROM_WEB_FACE_MIN = (
-    HOLE_FROM_FOOT_SIDE_MIN - (TOP_FLAT_EDGE_FROM_WEB + LINEAR_3PL) - PUNCH_FLOAT
-)  # 4.59
-# Beside the thread, to the nearer web face, at the seat's worst offset.
-WEB_WALL_MIN = SEAT_FROM_WEB_FACE_MIN - SCREW_MAJOR_DIA / 2.0  # 2.50
+SEAT_FROM_NEAR_FACE_MIN = (
+    HOLE_FROM_FOOT_SIDE_MIN
+    - (TOP_FLAT_EDGE_FROM_WEB + TOP_FLAT_EDGE_BAND)
+    - PUNCH_FLOAT
+)  # 4.21
+SEAT_FROM_FAR_FACE_MIN = (2.0 * WEB - LINEAR_2PL) - (
+    HOLE_FROM_FOOT_SIDE_MAX
+    + PUNCH_FLOAT
+    - (TOP_FLAT_EDGE_FROM_WEB - TOP_FLAT_EDGE_BAND)
+)  # 4.63
+# Beside the thread, to either web face, at the seat's worst offset.
+WEB_WALL_MIN = (
+    min(SEAT_FROM_NEAR_FACE_MIN, SEAT_FROM_FAR_FACE_MIN) - SCREW_MAJOR_DIA / 2.0
+)  # 2.12
 # From the thread to the support's end face on its side, at the worst
 # transferred position: the end face moves by half the support length's .X
 # band, the hole by the bracket's station band from the fit-up-set ear face.
@@ -179,6 +194,7 @@ __all__ = [
     "EDGE_BREAK",
     "END_WALL_MIN",
     "ENGAGEMENT_MIN",
+    "HOLE_FROM_FOOT_SIDE_MAX",
     "HOLE_FROM_FOOT_SIDE_MIN",
     "LINEAR_1PL",
     "LINEAR_2PL",
@@ -191,11 +207,13 @@ __all__ = [
     "SEAT_DRILL_BOTTOM_MAX",
     "SEAT_DRILL_DEPTH",
     "SEAT_DRILL_NAME",
-    "SEAT_FROM_WEB_FACE_MIN",
+    "SEAT_FROM_FAR_FACE_MIN",
+    "SEAT_FROM_NEAR_FACE_MIN",
     "SEAT_LOCAL_X",
     "SEAT_MACHINE_XZ",
     "SEAT_SPEC",
     "SEAT_THREAD_DEPTH",
+    "TOP_FLAT_EDGE_BAND",
     "TOP_FLAT_EDGE_FROM_WEB",
     "TOP_FLAT_PLACES",
     "TRANSFER_PUNCH_DIA",

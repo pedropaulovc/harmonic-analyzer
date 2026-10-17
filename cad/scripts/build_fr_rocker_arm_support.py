@@ -310,7 +310,7 @@ SEAT_STATION_PLACES = 2
 # pocket's 7.70 at two places, its value; the web's location across the base
 # at the web thickness's own places (PR #1469 r4 machinist review; Main's
 # ruling: routine .XX bands). Each top-flat edge prints off its nearer web
-# face at .XXX: the bracket feet stand on the flat and the transferred seats
+# face at .XX: the bracket feet stand on the flat and the transferred seats
 # follow them, so the flat holds the seats' threads clear of the web's faces
 # (owner Q13d, rocker_bracket_seat_layout's web-wall stack).
 CAVITY_LOCATION_PLACES = 1

@@ -81,26 +81,33 @@ def test_seat_stack_margins() -> None:
 def test_seat_thread_keeps_the_web_wall_at_the_printed_worst_case() -> None:
     """Each seat runs down the 12.70 web column (owner Q13c: thickened
     uniformly, symmetric about its centre plane): the thread's major diameter
-    to the nearer web face, the seat at its worst offset toward it (owner
-    Q13d: each flat edge at .XXX off its nearer web face, so the web's .XX
-    thickness band is out of the chain)."""
+    to either web face, the seat at its worst offset toward it (owner Q13d:
+    each flat edge at .XX off its nearer web face; the web's .XX thickness
+    band enters only toward the far face)."""
     assert support.WEB is seats.WEB
     assert 2.0 * seats.WEB == pytest.approx(12.70)  # 1/2 in
-    assert (seats.WEB_PLACES, seats.TOP_FLAT_PLACES) == (2, 3)
+    assert (seats.WEB_PLACES, seats.TOP_FLAT_PLACES) == (2, 2)
     assert seats.TOP_FLAT_EDGE_FROM_WEB == pytest.approx(8.4665 - 6.35)
-    # The hole at its nearest to the foot's flush side (16.00 - 0.51 wide,
-    # 8.00 + 0.51 off the far side).
-    hole = (16.0 - 0.508) - (8.0 + 0.508)
-    assert seats.HOLE_FROM_FOOT_SIDE_MIN == pytest.approx(hole) == pytest.approx(6.984)
+    assert seats.TOP_FLAT_EDGE_BAND == seats.LINEAR_2PL == 0.508
+    # The hole off the foot's flush side: nearest at 16.00 - 0.51 wide and
+    # 8.00 + 0.51 off the far side, farthest the other way round.
+    near_hole = (16.0 - 0.508) - (8.0 + 0.508)
+    far_hole = (16.0 + 0.508) - (8.0 - 0.508)
+    assert seats.HOLE_FROM_FOOT_SIDE_MIN == pytest.approx(near_hole) == pytest.approx(6.984)
+    assert seats.HOLE_FROM_FOOT_SIDE_MAX == pytest.approx(far_hole) == pytest.approx(9.016)
     # An 11/64 transfer punch in the #8 close hole at its +0.10 drilled max.
     punch = (4.572 + 0.10 - 11.0 / 64.0 * 25.4) / 2.0
     assert seats.PUNCH_FLOAT == pytest.approx(punch, abs=1e-3)
-    # The foot flush with the flat's edge at 2.117 + 0.13 off the face.
-    seat = hole - (2.1165 + 0.127) - punch
-    assert seats.SEAT_FROM_WEB_FACE_MIN == pytest.approx(seat, abs=1e-3)
-    wall = seat - seats.SCREW_MAJOR_DIA / 2.0
+    # Toward the near face: the flush edge at 2.12 + 0.51 off it.
+    near = near_hole - (2.1165 + 0.508) - punch
+    # Toward the far face: the edge at 2.12 - 0.51, the web 12.70 - 0.51.
+    far = (12.70 - 0.508) - (far_hole + punch - (2.1165 - 0.508))
+    assert seats.SEAT_FROM_NEAR_FACE_MIN == pytest.approx(near, abs=1e-3)
+    assert seats.SEAT_FROM_FAR_FACE_MIN == pytest.approx(far, abs=1e-3)
+    wall = min(near, far) - seats.SCREW_MAJOR_DIA / 2.0
     assert wall == pytest.approx(seats.WEB_WALL_MIN, abs=1e-3)
-    assert wall == pytest.approx(2.50, abs=0.01)
+    assert wall == pytest.approx(2.12, abs=0.01)
+    assert far - seats.SCREW_MAJOR_DIA / 2.0 == pytest.approx(2.55, abs=0.01)
     assert wall >= seats.RULE12_WEB_TARGET
 
 
