@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import re
 
+import _buildgraph
 from _assembly_contract import assembly_contract
 import _config
 import ch_channel_assembly_steps as steps
@@ -261,7 +263,7 @@ def test_the_package_sheets_and_settings_contract() -> None:
     assert {
         asm.DIMENSION_FEATURE[name] for name in (*drawing.STACK_KEEP, *drawing.SPRING_KEEP)
     } == {asm.PIVOT_FEATURE}
-    assert set(asm.DIMENSION_CALLOUTS) == set(kept)
+    assert set(drawing.notes.DIMENSION_CALLOUTS) == set(kept)
     assert asm.REFERENCE_DIMENSIONS == {asm.LUG_SPAN_DIMENSION}
     assert set(asm.DIMENSION_TOLERANCES) == set(kept) - asm.REFERENCE_DIMENSIONS
     lower, upper = asm.DIMENSION_TOLERANCES[asm.SPRING_SET_DIMENSION]
@@ -387,6 +389,20 @@ def test_the_bom_covers_every_family_once_with_its_sku() -> None:
         f"THREADED AND JAMMED BY ITS {drawing.BOM_PART_NUMBERS[nut]} PER "
         f"{steps.HA_ANCHORS_SET_REF}."
     ) in body
+
+
+def test_the_sheet_text_stays_out_of_the_assembly_recipe() -> None:
+    """Code review C03: the BOM descriptions and dimension callouts are read
+    by the drawing alone. The builder's recipe closure (file-granular, every
+    local import followed) must not reach them, or a wording edit would force
+    a full native rebuild of the channel assembly."""
+    scripts = Path(drawing.__file__).resolve().parent
+    notes = str(scripts / "ch_channel_assembly_notes.py")
+    for builder in ("build_ch_channel_assembly.py", "_ch_channel_explode.py"):
+        assert notes not in _buildgraph.module_deps_of(scripts / builder)
+    assert notes in _buildgraph.module_deps_of(scripts / "draw_ch_channel_assembly.py")
+    for text in ("BOM_DESCRIPTIONS", "DIMENSION_CALLOUTS"):
+        assert not hasattr(drawing.asm, text)
 
 
 def test_the_explode_plan_moves_every_family_and_only_them() -> None:
