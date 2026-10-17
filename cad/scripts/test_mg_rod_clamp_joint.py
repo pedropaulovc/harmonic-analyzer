@@ -95,15 +95,13 @@ def test_thumb_screw_thread_is_one_and_a_half_diameters_at_worst() -> None:
 def test_hex_stock_and_extent_along_the_lever() -> None:
     assert clamp.HEX_AF == pytest.approx(7.0 / 16.0 * _IN)
     assert clamp.BLOCK_DEPTH == pytest.approx(clamp.HEX_AF * 2.0 / math.sqrt(3.0))
-    # The bore located 5.56 (.XX) from one flat: its far wall on the thinnest
-    # stock, the location at its limit and the drill's wander to mid-block,
-    # is stated at the bore under the 2.0 target and over the 1.5 floor.
-    from_flat_max = round(clamp.HEX_AF / 2.0, 2) + 0.51
+    # The bore centred between the flats by symmetry: its far wall on the
+    # thinnest stock at the largest drilled Ø, off centre by the drill's
+    # wander to mid-block, holds the 2.0 target.
     wander = 0.10 + clamp.HEX_AC / 2.0 * math.tan(math.radians(0.3))
-    far_wall = (clamp.HEX_AF - clamp.HEX_AF_BAND) - from_flat_max - (6.2 + 0.10) / 2.0
-    far_wall -= wander
-    assert far_wall == pytest.approx(1.6289, abs=1e-4)
-    assert 1.5 <= far_wall < 2.0
+    far_wall = (clamp.HEX_AF - clamp.HEX_AF_BAND) / 2.0 - (6.2 + 0.10) / 2.0 - wander
+    assert far_wall == pytest.approx(2.2077, abs=1e-4)
+    assert far_wall >= 2.0
 
 
 def test_shoulder_land_seats_flat_all_round() -> None:

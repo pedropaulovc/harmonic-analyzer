@@ -12,11 +12,9 @@ centre, hex axis +Y, corners on +/-X, flats square to +/-Z.
 * ``HexProfile``: the 7/16 hex on the Top plane (sketch (x, y) -> model
   (X, -Z)), corners on the sketch's horizontal axis, extruded +Y as ``Block``
   (``Height``).  Equal flats either side of the origin centre the hex axis,
-  so the taps need no location from a flat.
+  so neither the bore nor the taps need a location from a flat.
 * ``LeverBoreProfile``: the Ø6.2 drilled lever bore, a Right-plane circle on
-  the hex axis at ``LeverBoreYDim``, cut mid-plane through both corners.  A
-  construction witness on one flat's line, up to the bore's height, prints
-  the bore's distance from that flat (``LeverBoreFromFlat``).
+  the hex axis at ``LeverBoreYDim``, cut mid-plane through both corners.
 * ``ThumbTap``: blind Hole Wizard #4-40 from the top face on the hex axis,
   thread ending at the bore, drill to the bore axis.
 * ``RodTap``: blind Hole Wizard #4-40 from the bottom face on the hex axis
@@ -58,6 +56,7 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
+from _sketch_circle import define_circle
 from mg_magnifying_clamp_geom import (
     BLOCK_HEIGHT,
     HEX_AC,
@@ -74,7 +73,6 @@ from mg_magnifying_clamp_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
-    LEVER_BORE_FROM_FLAT,
     PREF_MATERIAL_HATCH_PATTERN,
     PREF_MATERIAL_HATCH_STYLE,
     PREF_NO_OPTION,
@@ -145,55 +143,20 @@ async def build(adapter) -> dict[str, str]:
     await bbox_extent_check(adapter, "hex across the corners", "x", HEX_AC)
 
     # --- Lever bore along X through both corners ---------------------------------
-    # Its height from the bottom seat and its Ø; a vertical construction
-    # witness on the line of the flat at sketch +x (model -Z), from the seat up
-    # to the bore's height and located from the origin by half the flats
-    # (unmarked), carries the bore centre's printed distance from that flat:
-    # the drawing runs it along the bore's horizontal centreline, clear of
-    # the vertical A-A cutting line on the hex axis.
+    # On the hex axis (sketch x = 0 is model Z = 0), so define_circle emits the
+    # height then the diameter -- the x slot is ignored.
     lever = SketchDims()
     check("create_sketch lever bore", await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)
-    circle = check(
-        "lever bore circle", await adapter.add_circle(0.0, LEVER_BORE_Y, BORE_R)
+    await define_circle(
+        adapter,
+        0.0,
+        LEVER_BORE_Y,
+        BORE_R,
+        "lever bore",
+        dims=lever,
+        names=("LeverCz", "LeverBoreYDim", "LeverBoreDiaDim"),
+        drives=(None, '"LeverBoreY"', '"LeverBoreDia"'),
     )
-    witness = check(
-        "lever bore flat witness",
-        await adapter.add_line(HEX_AF / 2.0, 0.0, HEX_AF / 2.0, LEVER_BORE_Y),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, witness)
-    for label, first, second, relation in (
-        ("vertical flat witness", witness, None, "vertical"),
-        ("witness foot on the seat", f"{witness}.start", "origin", "horizontal_points"),
-        (
-            "witness top at the bore height",
-            f"{witness}.end",
-            f"{circle}.center",
-            "horizontal_points",
-        ),
-    ):
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
-    await dimension_between(
-        adapter, f"{circle}.center", "origin", "vertical_distance", LEVER_BORE_Y,
-        "lever bore height",
-    )
-    lever.record("LeverBoreYDim", '"LeverBoreY"')
-    check(
-        "dimension lever bore diameter",
-        await adapter.add_sketch_dimension(circle, None, "diameter", LEVER_BORE_DIA),
-    )
-    lever.record("LeverBoreDiaDim", '"LeverBoreDia"')
-    await dimension_between(
-        adapter, f"{witness}.start", "origin", "horizontal_distance", HEX_AF / 2.0,
-        "flat witness from the hex axis",
-    )
-    lever.record("FlatWitnessX", '"HexAf" / 2')
-    await dimension_between(
-        adapter, f"{witness}.end", f"{circle}.center", "horizontal_distance",
-        LEVER_BORE_FROM_FLAT, "lever bore from the flat",
-    )
-    lever.record("LeverBoreFromFlat", '"HexAf" / 2')
     await ensure_fully_defined(adapter, "lever bore sketch")
     check("exit_sketch lever bore", await adapter.exit_sketch())
     name_last_feature(adapter, "LeverBoreProfile")
@@ -302,15 +265,6 @@ def _set_section_hatch(adapter: Any) -> None:
             f"clamp material crosshatch read back style {style}, pattern "
             f"{pattern!r}; wanted {AREA_HATCH_STYLE_PATTERN}, {SECTION_HATCH_PATTERN!r}"
         )
-
-
-def _as_construction(adapter: Any, entity_id: str) -> None:
-    """Make a registered sketch segment construction-only and prove the flag
-    (the ``build_pd_transgear_disc_hub`` witness)."""
-    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
 async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
