@@ -152,13 +152,22 @@ REFERENCE_CALLOUTS = {
     "ScrewSeatLen": SCREW_SEAT_CALLOUT,
 }
 # The seat's Ra 3.2 (SURFACE_FINISHES "clamp_screw_seat"): a native symbol
-# whose leader lands on the OD's top silhouette 40 mm in from the west tip,
+# whose leader lands on the OD's top outline 40 mm in from the west tip,
 # inside the seat and clear of the stock diameter's station (82.5 mm); the
 # symbol stands above-left of the landing, under the seat's dimension line,
 # between its west extension lines and the stock diameter's row.
-# add_surface_finish proves the symbol attached to that silhouette's face
-# (the part's control) and the leader landed where requested.
-SEAT_FINISH_PICK = (_ROD_WEST_TIP_X + 0.040, _ROD_TOP_Y)
+# The symbol is attached to the OD's FACE, picked midway between the axis and
+# the top outline at the same station: the front view lies in the revolve's
+# profile plane, so its top outline is the cylinder's seam, and a silhouette
+# pick there re-solved onto the other half-face on rebuild (r12 leaf
+# 20261017T061433Z-1-6db3cfe0: types=(46,), same_entity=False).
+# add_surface_finish proves the symbol attached to that face (the part's
+# control) and the leader landed where requested.
+SEAT_FINISH_LANDING = (_ROD_WEST_TIP_X + 0.040, _ROD_TOP_Y)
+SEAT_FINISH_FACE_PICK = (
+    SEAT_FINISH_LANDING[0],
+    (FRONT_CENTER[1] + _ROD_TOP_Y) / 2.0,
+)
 SEAT_FINISH_SYMBOL = (_ROD_WEST_TIP_X + 0.030, _ROD_TOP_Y + 0.014)
 
 
@@ -263,10 +272,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=SEAT_FINISH_PICK,
-        entity_type="SILHOUETTE",
+        edge_xy=SEAT_FINISH_FACE_PICK,
+        entity_type="FACE",
         symbol_xy=SEAT_FINISH_SYMBOL,
-        leader_attach_xy=SEAT_FINISH_PICK,
+        leader_attach_xy=SEAT_FINISH_LANDING,
         control=surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat"),
         label="lever clamp screw seat finish",
         char_height=0.0025,

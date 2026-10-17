@@ -612,14 +612,24 @@ def test_rod_od_carries_one_clamp_screw_seat_finish() -> None:
     sheet_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert sheet_source.count("add_surface_finish(\n") == 1
     assert 'surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat")' in sheet_source
-    assert 'entity_type="SILHOUETTE"' in sheet_source
-    # The leader lands on the OD's top silhouette inside the seat.
-    pick_x, pick_y = drawing.SEAT_FINISH_PICK
+    # Attached to the OD's face, not its top silhouette: the front view lies
+    # in the revolve's profile plane, so that outline is the cylinder's seam
+    # and a silhouette re-solved onto the other half-face (r12).
+    assert 'entity_type="FACE"' in sheet_source
+    assert 'entity_type="SILHOUETTE"' not in sheet_source
+    assert "edge_xy=SEAT_FINISH_FACE_PICK" in sheet_source
+    assert "leader_attach_xy=SEAT_FINISH_LANDING" in sheet_source
+    # The leader lands on the OD's top outline inside the seat.
+    pick_x, pick_y = drawing.SEAT_FINISH_LANDING
     assert pick_y == pytest.approx(drawing._ROD_TOP_Y)
     station = (pick_x - drawing._ROD_WEST_TIP_X) * 1000.0
     assert low < station < high
     # Clear of the stock diameter's points (mid-length +/- R).
     assert abs(station - part.ROD_DIA_STATION) > part.R + 5.0
+    # The face pick: same station, strictly inside the projected OD.
+    face_x, face_y = drawing.SEAT_FINISH_FACE_PICK
+    assert face_x == pick_x
+    assert drawing.FRONT_CENTER[1] < face_y < drawing._ROD_TOP_Y
 
 
 def test_screw_seat_text_clears_the_other_blocks() -> None:
