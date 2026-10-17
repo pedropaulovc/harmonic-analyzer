@@ -1168,7 +1168,6 @@ def _tap_section(adapter: Any, front: Any) -> Any:
 
 
 _SW_HIDDEN = 2  # swDisplayMode_e.swHIDDEN: hidden lines removed
-_SW_SHADED = 3  # swDisplayMode_e.swSHADED: shows no hidden edge either
 
 
 def _hidden_lines_removed_without_greyed_pass(view: Any) -> None:
@@ -1182,25 +1181,18 @@ def _hidden_lines_removed_without_greyed_pass(view: Any) -> None:
     2fa756e1 and 802e4117 -- the one note the sweep's count varied by.  Each
     caller sets the view straight after creating it, before anything is
     attached, so the regen is not needed.  Farm seats place these views in
-    HLR already (802e4117), where the set is a no-op; a view placed with draft
-    cosmetic threads is regenerated through shaded instead, which shows no
-    hidden edge, so the precision threads the greyed pass gave still hold.
+    HLR already (802e4117), where the set is a no-op; that build's PDF is
+    pixel-identical to r18b's, which still had the pass.
     """
     bound = _early_bound(view, "IView")
-    placed = (int(bound.GetDisplayMode2()), bool(bound.GetCThreadQuality()))
+    placed = int(bound.GetDisplayMode2())
     bound.SetDisplayMode4(False, _SW_HIDDEN, False, False, True)
-    if not bool(bound.GetCThreadQuality()):
-        bound.SetDisplayMode4(False, _SW_SHADED, False, False, True)
-        bound.SetDisplayMode4(False, _SW_HIDDEN, False, False, True)
-    settled = (int(bound.GetDisplayMode2()), bool(bound.GetCThreadQuality()))
-    if settled != (_SW_HIDDEN, True):
+    mode = int(bound.GetDisplayMode2())
+    if mode != _SW_HIDDEN:
         raise RuntimeError(
-            f"failed to set precise hidden-lines-removed drawing view "
-            f"(mode, precise threads) read {settled}"
+            f"failed to set hidden-lines-removed drawing view (mode reads {mode})"
         )
-    _telemetry.info(
-        f"{bound.GetName2()} placed as (mode, precise threads) {placed}, now HLR"
-    )
+    _telemetry.info(f"{bound.GetName2()} placed in display mode {placed}, now HLR")
 
 
 def _log_thread_labels(adapter: Any) -> None:
