@@ -211,6 +211,7 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
 ASSEMBLED_NOTE = _wrapped(
     (
         notes.ORIENTATION_NOTE,
+        notes.NIB_PARKED_NOTE,
         f"INTEGRATION STEPS ON SHEET {SHEET_NAMES.index('INTEGRATION STEPS') + 1}.",
     ),
     width=ASSEMBLED_NOTE_WIDTH,
