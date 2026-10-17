@@ -1062,6 +1062,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_oblique_lever_washer",
+        part="ch_rocker_arm_tl_oblique_lever_washer",
+        artifact_stem="ch-rocker-arm-tl-oblique-lever-washer",
+        script_name="draw_ch_rocker_arm_tl_oblique_lever_washer.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_rocker_arm_tl_outline_template",
         part="ch_rocker_arm_tl_outline_template",
         artifact_stem="ch-rocker-arm-tl-outline-template",

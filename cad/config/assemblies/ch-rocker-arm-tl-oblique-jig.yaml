@@ -42,6 +42,7 @@ allowed_free_stems:
   - ch-rocker-arm-tl-oblique-clamp-screw
   - ch-rocker-arm-tl-oblique-lever-screw
   - ch-rocker-arm-tl-oblique-block-washer
+  - ch-rocker-arm-tl-oblique-lever-washer
 # One freed DOF (carriage 1's slide, DOF manifest key carriage_slide); every
 # moving family rides it, so each must read under-constrained: a rider whose
 # lock mate silently fixed it to the ground would otherwise pass.
@@ -64,6 +65,7 @@ required_free_stems:
   - ch-rocker-arm-tl-oblique-clamp-screw
   - ch-rocker-arm-tl-oblique-lever-screw
   - ch-rocker-arm-tl-oblique-block-washer
+  - ch-rocker-arm-tl-oblique-lever-washer
 # The sweep; verify's pass-sweep-interference-free gate replays the recorded
 # slide drive through both passes (the .<asm>.sweep.json sidecar).
 free_dof: 1

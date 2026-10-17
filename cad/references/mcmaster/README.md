@@ -44,8 +44,9 @@ recipes:
 | 91251A196 | `ch-rocker-arm-tl-oblique-bracket-screw` (MHA-CH-006-TL-42; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91251A197 | `ch-rocker-arm-tl-oblique-rail-screw` (MHA-CH-006-TL-41; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91251A540 | `ch-rocker-arm-tl-oblique-clamp-screw` (MHA-CH-006-TL-48; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
-| 91251A582 | `ch-rocker-arm-tl-oblique-lever-screw` (MHA-CH-006-TL-49; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
+| 91251A583 | `ch-rocker-arm-tl-oblique-lever-screw` (MHA-CH-006-TL-49; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91812A215 | `ch-rocker-arm-tl-oblique-block-washer` (MHA-CH-006-TL-50; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
+| 91812A230 | `ch-rocker-arm-tl-oblique-lever-washer` (MHA-CH-006-TL-51; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 91255A106 | — (diagnostic recipe; a former `vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91290A115 | `ch-rocker-arm-tl-oblique-nut-screw` (MHA-CH-006-TL-46; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
@@ -341,22 +342,25 @@ replica-gated and no copy is kept here:
   does not draw. It is NOT replica-gated (user ruling, October 17, 2026): the
   standalone run is catalogue-only (it builds the recipe, checks the solid and
   saves it under `cad/out/reference`).
-- [91251A582](https://www.mcmaster.com/91251A582/)
+- [91251A583](https://www.mcmaster.com/91251A583/)
   (`ch-rocker-arm-tl-oblique-lever-screw`, MHA-CH-006-TL-49, 2 in the oblique
   trammel jig: the fastener table's `LEVER_TO_CARRIER` row) was read live on
-  October 17, 2026: 5/16-18 UNC class 3A, 7/8 in under the head, fully threaded,
-  head Ø15/32 x 5/16 in, 1/4 in hex, Rockwell C37, ASTM A574, $14.48 per pack of
-  50.
-  The page gives no socket depth, so the model takes ASME B18.3's minimum key
+  October 17, 2026 from the 5/16-18 x 1 in socket head screw listing (the
+  product page is login-walled): 5/16-18 UNC, 1 in under the head, fully
+  threaded, head Ø15/32 x 5/16 in, 170,000 psi, $15.30 per pack of 50; the
+  family's 1/4 in hex, class 3A, Rockwell C37 and ASTM A574 are the 7/8 in
+  sibling 91251A582's page, read live the same day. It replaced 91251A582
+  when the TL-51 wedge-lock pair entered the grip.
+  The listing gives no socket depth, so the model takes ASME B18.3's minimum key
   engagement for 5/16, 0.151 in (the 91251A108 convention).
-  `diag_build_91251A582.py` builds it from those catalogue values on the 91251A
+  `diag_build_91251A583.py` builds it from those catalogue values on the 91251A
   family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
   cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
-  0, tip at y = -length). The vendor model was downloaded from the product page
-  on October 17, 2026 (the SLDPRT, SHA-256
+  0, tip at y = -length). No vendor model was downloaded for this length; the
+  7/8 in sibling's (SLDPRT SHA-256
   `9feed1cd8f28f698a03478549d6f0a70b5bc99916c1e8199b3d9857b4c99b5c7`; its STEP,
   SHA-256 `1e7b1c0ae31b76b34ea88254712024f5851b9fd953af801f633caf292272d940`)
-  and read for dimensions only; no copy is kept here. It shows a hex socket
+  was read for dimensions only; no copy is kept here. It shows a hex socket
   0.15625 in deep and a 50-groove knurled head, a 60 deg socket entry
   countersink, a 20 deg thread runout cone and a 0.6P tip chamfer, which the
   family recipe does not draw. It is NOT replica-gated (user ruling, October 17,
@@ -374,6 +378,22 @@ replica-gated and no copy is kept here:
   thickness is the pair's stack or one washer's, nor whether a package is 5
   pairs; the model takes the band as the pair's stack at its 0.100 in
   maximum. `diag_build_91812A215.py` builds the pair's envelope, one plain
+  annulus from y = 0 along +Y (no cam faces, serrations or split). No vendor
+  model was downloaded, so it is not replica-gated: the standalone run is
+  catalogue-only (it builds the recipe, checks the solid and saves it under
+  `cad/out/reference`).
+- [91812A230](https://www.mcmaster.com/91812A230/)
+  (`ch-rocker-arm-tl-oblique-lever-washer`, MHA-CH-006-TL-51, 2 pairs in
+  the oblique trammel jig: the fastener table's `LEVER_LOCK_WASHER` row, one
+  pair under each TL-49 feed lever screw head) was read live on October 17,
+  2026 from the wedge-lock listing; the product page and its 2-D PDF are
+  login-walled. Two-piece wedge-lock washer, reusable up to 15 times,
+  comparable to NORD-LOCK; 316 stainless steel, Rockwell C51, case hardened;
+  for 5/16" / M8; ID 0.340 in, OD 0.530 in, thickness 0.070 to 0.090 in;
+  5 per package, $12.40. UNVERIFIED: the listing does not say whether the
+  thickness is the pair's stack or one washer's, nor whether a package is 5
+  pairs; the model takes the band as the pair's stack at its 0.090 in
+  maximum. `diag_build_91812A230.py` builds the pair's envelope, one plain
   annulus from y = 0 along +Y (no cam faces, serrations or split). No vendor
   model was downloaded, so it is not replica-gated: the standalone run is
   catalogue-only (it builds the recipe, checks the solid and saves it under

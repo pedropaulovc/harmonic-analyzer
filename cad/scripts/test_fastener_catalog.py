@@ -78,10 +78,15 @@ _EXPECTED = {
     "ch-rocker-arm-tl-oblique-nut-screw": (("91290A115",), "MHA-CH-006-TL-46", 4),
     "ch-rocker-arm-tl-oblique-riser-screw": (("91771A110",), "MHA-CH-006-TL-47", 4),
     "ch-rocker-arm-tl-oblique-clamp-screw": (("91251A540",), "MHA-CH-006-TL-48", 1),
-    "ch-rocker-arm-tl-oblique-lever-screw": (("91251A582",), "MHA-CH-006-TL-49", 2),
+    "ch-rocker-arm-tl-oblique-lever-screw": (("91251A583",), "MHA-CH-006-TL-49", 2),
     "ch-rocker-arm-tl-oblique-block-washer": (
         ("91812A215",),
         "MHA-CH-006-TL-50",
+        2,
+    ),
+    "ch-rocker-arm-tl-oblique-lever-washer": (
+        ("91812A230",),
+        "MHA-CH-006-TL-51",
         2,
     ),
 }

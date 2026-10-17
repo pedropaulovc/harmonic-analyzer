@@ -4,11 +4,11 @@ ch-rocker-arm-tl-oblique-lever-screw:
   number: MHA-CH-006-TL-49
   stock_name: Black-Oxide Alloy Steel Socket Head Screw
   supplier: McMaster-Carr
-  supplier_skus: ["91251A582"]
+  supplier_skus: ["91251A583"]
   material: Alloy Steel
-  material_specification: "Alloy steel, black oxide, ASTM A574, Rockwell C37; McMaster-Carr 91251A582"
+  material_specification: "Alloy steel, black oxide, ASTM A574, Rockwell C37; McMaster-Carr 91251A583"
   finish: black oxide
-  # The fastener table's LEVER_TO_CARRIER count (5/16-18 X 7/8 SHCS).
+  # The fastener table's LEVER_TO_CARRIER count (5/16-18 X 1 SHCS).
   quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance

@@ -1,7 +1,7 @@
 """Offline contract for the oblique-trammel jig assembly (MHA-CH-006-TL-000).
 
 The poses close on the calculator's rail and carrier geometry and the leadscrew
-feed's layout, the builder places all twenty-nine made and bought families,
+feed's layout, the builder places all thirty-one made and bought families,
 one free DOF slides the carriages and what rides them, the interference
 contracts are the specs' press fits and threads, the jig stays a shop fixture
 outside the machine tree, and the sweep of both passes clears the table and
@@ -39,6 +39,7 @@ import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import ch_rocker_arm_tl_oblique_leadscrew_nut_spec as leadscrew_nut
 import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_leadscrew_stock_spec as leadscrew_stock
+import ch_rocker_arm_tl_oblique_lever_washer_spec as lever_washer
 import ch_rocker_arm_tl_oblique_nut_bracket_spec as nut_bracket
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
@@ -311,6 +312,7 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
         spec.CL_DOWEL: 260.0,
         spec.RISER: 290.0,
         spec.FEED_LEVER: 290.0,
+        spec.LEVER_LOCK_WASHER: 310.0,
         spec.RISER_SCREW: 320.0,
         spec.CLAMP_SCREW: 330.0,
         spec.LEVER_SCREW: 330.0,
@@ -425,6 +427,14 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
         f"(ITEM {spec.ITEM_NUMBERS[spec.BLOCK_SCREW]}) ON WEDGE-LOCK PAIRS "
         f"(ITEM {spec.ITEM_NUMBERS[spec.BLOCK_LOCK_WASHER]}), SNUG."
     ) in steps["7E"]
+    # C3 r6 TL-000 review (rule 23): the lever screws seat on wedge-lock pairs
+    # and go to their derived torque.
+    assert (
+        "BOLT THE FEED LEVER ON THE CARRIER WITH 2 5/16-18 X 1 SHCS "
+        f"(ITEM {spec.ITEM_NUMBERS[spec.LEVER_SCREW]}) ON WEDGE-LOCK PAIRS "
+        f"(ITEM {spec.ITEM_NUMBERS[spec.LEVER_LOCK_WASHER]}), TIGHTENED TO "
+        "18.7 N·m, GRIP END TOWARD THE OPERATOR."
+    ) in steps["12"]
     # Review bought-r15: step 7 is one operation a line; the taps go in the
     # nut bracket's spots, the pivot block stays on its carriage, its side
     # holes plain.
@@ -537,8 +547,9 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.CLAMP_SCREW: 1,
         spec.LEVER_SCREW: 2,
         spec.BLOCK_LOCK_WASHER: 2,
+        spec.LEVER_LOCK_WASHER: 2,
     }
-    assert sum(spec.QUANTITIES.values()) == 88
+    assert sum(spec.QUANTITIES.values()) == 90
     assert spec.QUANTITIES[spec.END_BRACKET] == (leadscrew.END_BRACKET_QUANTITY)
     assert spec.QUANTITIES[spec.NUT_BRACKET] == leadscrew.NUT_BRACKET_QUANTITY
     assert spec.QUANTITIES[spec.BASE_BAR] == base_bar.QUANTITY
@@ -564,7 +575,7 @@ def test_builder_places_exactly_the_inventory() -> None:
         )
     ]
     assert set(bg.references_of(JIG)) == PART_STEMS
-    assert len(PART_STEMS) == 30
+    assert len(PART_STEMS) == 31
 
 
 def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
@@ -596,6 +607,7 @@ def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
         spec.CLAMP_SCREW,
         spec.LEVER_SCREW,
         spec.BLOCK_LOCK_WASHER,
+        spec.LEVER_LOCK_WASHER,
     }
     # Nothing that moves stays put in the explode, and nothing fixed rides.
     assert not set(spec.MOVING) & set(spec.EXPLODE_STATIC)
@@ -616,6 +628,7 @@ def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
         spec.RISER_SCREW,
         spec.CLAMP_SCREW,
         spec.LEVER_SCREW,
+        spec.LEVER_LOCK_WASHER,
     }
     for stem, (parent, _per) in spec.LOCKED_TO.items():
         assert parent in {spec.CARRIAGE, spec.CARRIER} or (
@@ -790,8 +803,8 @@ def test_bom_follows_the_part_registry() -> None:
     numbers = [
         int(rows[stem]["number"].removeprefix(prefix)) for stem in spec.BOM_ORDER
     ]
-    # Registry order TL-20..50 (TL-27 is not a jig component).
-    assert numbers == [20, 21, 22, 23, 24, 25, 26, 28, 29, *range(30, 51)]
+    # Registry order TL-20..51 (TL-27 is not a jig component).
+    assert numbers == [20, 21, 22, 23, 24, 25, 26, 28, 29, *range(30, 52)]
     for stem, number in zip(spec.BOM_ORDER, numbers, strict=True):
         row = rows[stem]
         assert row["quantity"] == spec.QUANTITIES[stem], stem
@@ -1084,7 +1097,7 @@ FASTENER_TABLE = {
     "NUT_TO_NUT_BRACKET": ("M3 X 10 SHCS", 4, 6.5, -0.8),
     "RISER_TO_CARRIER": ("#4-40 X 1/2 B18.6.3 FLAT HEAD", 4, 6.7, -5.3),
     "CR_CLAMP": ("1/4-20 X 3/4 SHCS", 1, 10.55, -1.45),
-    "LEVER_TO_CARRIER": ("5/16-18 X 7/8 SHCS", 2, 9.525, -2.475),
+    "LEVER_TO_CARRIER": ("5/16-18 X 1 SHCS", 2, 10.414, -1.586),
 }
 
 
@@ -1118,19 +1131,29 @@ def test_fastener_table_engagement_and_protrusion() -> None:
     assert fasteners.BLOCK_TO_CARRIAGE.engagement_mm == pytest.approx(
         pivot_block.CARRIAGE_THREAD_DEPTH - 0.6
     )
-    # A 1 in lever screw would stand out of the carrier's underside.
-    assert fasteners.inch_mm("1") - feed_lever.LEVER_THICK > carrier.THICKNESS
+    # A 1-1/8 in lever screw would stand out of the carrier's underside.
+    assert (
+        fasteners.inch_mm("1-1/8") - fasteners.LEVER_TO_CARRIER.grip_mm
+        > carrier.THICKNESS
+    )
     # The bar screws' worst case at TL-20's bands stays inside 1.5 D .. TL-28.
     low, high = leadscrew.BAR_SCREW_ENGAGEMENT_RANGE
     assert (low, high) == pytest.approx((6.955, 8.995), abs=1e-3)
     assert 1.5 * leadscrew.SHCS_8_MAJOR < low and high < leadscrew.BRACKET_THICK
     assert leadscrew.KP08_FOOT_THICK == 5.0  # UNVERIFIED: verify on receipt
-    # One wedge-lock pair under each block screw head (rule 23: those screws
-    # carry the leadscrew's reversing thrust), in the row's grip.
-    assert fasteners.WASHERS == (fasteners.BLOCK_LOCK_WASHER,)
+    # One wedge-lock pair under each block screw head and each lever screw
+    # head (rule 23: those screws carry a reversing load), in the row's grip.
+    assert fasteners.WASHERS == (
+        fasteners.BLOCK_LOCK_WASHER,
+        fasteners.LEVER_LOCK_WASHER,
+    )
     assert fasteners.BLOCK_LOCK_WASHER.count == fasteners.NUT_BRACKET_TO_BLOCK.count
     assert fasteners.NUT_BRACKET_TO_BLOCK.grip_mm == pytest.approx(
         leadscrew.BLOCK_SCREW_GRIP + fasteners.BLOCK_LOCK_WASHER.thickness_mm
+    )
+    assert fasteners.LEVER_LOCK_WASHER.count == fasteners.LEVER_TO_CARRIER.count
+    assert fasteners.LEVER_TO_CARRIER.grip_mm == pytest.approx(
+        feed_lever.LEVER_THICK + fasteners.LEVER_LOCK_WASHER.thickness_mm
     )
     assert fasteners.HOLD_DOWN_STUD_THREAD == "1/2-13"
     assert fasteners.HOLD_DOWN_STUD_COUNT == 4
@@ -1319,6 +1342,26 @@ def test_block_screw_torque_is_capped_by_the_bracket_thread() -> None:
     assert spec.BLOCK_SCREW_TORQUE_NM == 4.4
     assert spec.BLOCK_SCREW_PRELOAD_N <= spec._BLOCK_THREAD_STRIP_N / 3.0
     assert spec.BLOCK_JOINT_SLIP_N >= 1.25 * spec.FEED_THRUST_N
+
+
+def test_lever_screw_torque_is_capped_by_the_carrier_thread() -> None:
+    # C3 r6 TL-000 review (rule 23): the wedge-lock pairs keep the lever
+    # screws from backing off under the operator's reversing push and pull.
+    # Their preload is a third of the TL-21 6061 tap's strip load over the
+    # shortest engagement (the shortest 1 in screw through the thickest lever
+    # and pair, inside the 12 plate's RV-01 full thread), T = 0.20 F d.
+    engagement = lever_washer.ENGAGEMENT_MIN
+    assert engagement == pytest.approx(9.14, abs=0.01)
+    assert engagement <= carrier.ENGAGEMENT_MM[carrier.LEVER_THREAD]
+    major = fasteners.LEVER_TO_CARRIER.major_mm
+    assert major == pytest.approx(7.9375, abs=1e-3)
+    assert spec._LEVER_THREAD_STRIP_N == pytest.approx(
+        0.75 * math.pi * major * engagement * spec._AL_SHEAR_ULTIMATE_MPA
+    )
+    assert spec.LEVER_SCREW_TORQUE_NM == 18.7
+    assert spec.LEVER_SCREW_PRELOAD_N <= spec._LEVER_THREAD_STRIP_N / 3.0
+    assert spec.LEVER_PAIR_BEARING_MPA < 276.0
+    assert spec.LEVER_SCREW_PRELOAD_N / (0.0524 * 25.4**2) < 0.5 * 1172.1
 
 
 def test_handwheel_set_screw_meets_the_leadscrew_flat() -> None:

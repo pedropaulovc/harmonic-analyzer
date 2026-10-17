@@ -1,15 +1,15 @@
-r"""McMaster 91251A582 -- black-oxide alloy steel socket head screw, 5/16"-18 x 7/8".
+r"""McMaster 91251A583 -- black-oxide alloy steel socket head screw, 5/16"-18 x 1".
 
-Catalogue: ``_mcmaster_91251a582`` (its docstring carries the live catalogue reading of
+Catalogue: ``_mcmaster_91251a583`` (its docstring carries the live catalogue reading of
 2026-10-17 and the socket depth's source); every dimension is the catalogue's,
 the socket depth the standard's minimum key engagement.
 
 Geometry: the shared fully threaded socket-head recipe in
 ``diag_mcmaster_socket_head.py`` (see its docstring).
 
-The product page's vendor model (SLDPRT SHA-256
-``9feed1cd8f28f698a03478549d6f0a70b5bc99916c1e8199b3d9857b4c99b5c7``, and its STEP) was
-downloaded on 2026-10-17 and read for dimensions only: it is NOT
+No vendor model was downloaded for this length (the product page is
+login-walled); the 7/8 in sibling's (91251A582) was read for dimensions
+only.  The recipe is NOT
 replica-gated (user ruling 2026-10-17) and no copy is kept in the repo.  The
 standalone run is catalog-only: it builds the recipe, checks the solid is
 sane and saves it under cad/out/reference for inspection.
@@ -19,7 +19,7 @@ y = -length.
 
 Run standalone (SolidWorks open)::
 
-    uv run python cad\scripts\diagnostics\diag_build_91251A582.py
+    uv run python cad\scripts\diagnostics\diag_build_91251A583.py
 """
 
 from __future__ import annotations
@@ -30,15 +30,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _stock_recipe import stock_recipe  # noqa: E402
-from _mcmaster_91251a582 import DIMS  # noqa: E402
+from _mcmaster_91251a583 import DIMS  # noqa: E402
 from diagnostics.diag_mcmaster_socket_head import (  # noqa: E402
     build_socket_head,
     build_socket_head_catalog,
 )
 
 
-@stock_recipe("91251A582", threaded=True)
-async def build_91251A582(adapter, truth=None):
+@stock_recipe("91251A583", threaded=True)
+async def build_91251A583(adapter, truth=None):
     await build_socket_head(adapter, DIMS)
 
 
