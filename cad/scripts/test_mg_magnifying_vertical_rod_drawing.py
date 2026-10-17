@@ -324,10 +324,12 @@ def test_body_cylinder_is_the_fixture_thumb_screw_seat() -> None:
             assert token not in module_source, (module.__name__, token)
 
 
-def test_seat_finish_reads_clear_above_the_body() -> None:
-    """The symbol lands on the body's top silhouette inside the screw's reach,
-    its reason above it, in the field between detail A's thread-length block
-    and the Ø value, under the detail's crop."""
+def test_seat_finish_reason_reads_at_its_symbol() -> None:
+    """The symbol lands on the body's top silhouette inside the screw's reach;
+    its reason reads on the symbol's own row, just right of its "Ra 3.2" (r4
+    review: a label floating near detail A did not read as the symbol's),
+    clear of detail A's stack and of the Ø value. Ink sizes are the r5 farm
+    render's (20261017T070700133Z) measures against each anchor."""
     pick_x, pick_y = drawing.SEAT_FINISH_PICK
     assert pick_y == pytest.approx(
         drawing.SIDE_CENTER[1] + spec.ROD_DIA / 2.0 * drawing._S / 1000.0
@@ -337,14 +339,25 @@ def test_seat_finish_reads_clear_above_the_body() -> None:
     assert reach[0] < model_x < reach[1]
     symbol_x, symbol_y = drawing.SEAT_FINISH_SYMBOL
     reason_x, reason_y = drawing.SEAT_REASON_XY
-    assert pick_y < symbol_y < reason_y
-    assert abs(symbol_x - pick_x) < 0.005
-    # ~2.5 mm a character at the note height (the isometric note's measure).
-    reason_right = reason_x + 0.0025 * len(spec.SEAT_FINISH_REASON)
-    assert reason_x < symbol_x < reason_right
-    assert reason_x > drawing.DETAIL_SHOULDER_X + 0.010
-    assert reason_right < drawing.SIDE_KEEP["RodDia"][0] - 0.010
-    assert reason_y < drawing._DETAIL_BOTTOM - 0.015
+    assert pick_y < symbol_y and abs(symbol_x - pick_x) < 0.005
+    # The symbol's "Ra 3.2" ends 14.9 mm right of its anchor and spans 3.7..
+    # 7.0 mm over it; the reason (a note: position = top-left) prints 3.9 mm
+    # tall and 2.8 mm a character.
+    ra_right = symbol_x + 0.0149
+    ra_mid_y = symbol_y + (0.0037 + 0.0070) / 2.0
+    reason_right = reason_x + 0.0028 * len(spec.SEAT_FINISH_REASON)
+    reason_mid_y = reason_y - 0.0039 / 2.0
+    assert 0.001 < reason_x - ra_right < 0.005  # beside it, not touching
+    assert abs(reason_mid_y - ra_mid_y) < 0.001  # on its row
+    # Clear of the Ø value's text (~12.5 mm left of its dimension line).
+    assert reason_right < drawing.SIDE_KEEP["RodDia"][0] - 0.0125 - 0.010
+    # The symbol's leader shoulder (~5 mm left of its anchor) stands right of
+    # detail A's shoulder extension line, and its top (8 mm over the anchor)
+    # under the detail's thread-length row (dimension line ~33 mm under the
+    # crop's bottom).
+    assert symbol_x - 0.005 > drawing.DETAIL_SHOULDER_X + 0.008
+    assert symbol_y + 0.008 < drawing._DETAIL_BOTTOM - 0.030
+    assert reason_y < drawing._DETAIL_BOTTOM - 0.030
 
 
 def test_view_scales_are_explicit() -> None:

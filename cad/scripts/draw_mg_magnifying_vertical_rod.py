@@ -229,16 +229,21 @@ _CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
 # A point on the body face, clear of the Ø dimension line.
 CENTERLINE_PICK = (_sheet_x(0.2 * ROD_LENGTH), SIDE_CENTER[1] + 0.002)
 # The thumb-screw seat's Ra 3.2 (SURFACE_FINISHES "screw_seat") lands on the
-# body's top silhouette 0.45 along, inside the fixture screw's reach; the
-# symbol stands just over it and its reason above that (pd_support_bar's
-# stack), both in the clear field right of detail A's thread-length block
-# (right edge ~0.147, its shoulder extension line at 0.150) and left of the
-# Ø value (~0.251).
+# body's top silhouette 0.40 along, inside the fixture screw's reach; the
+# symbol stands just over it, its bent leader's shoulder left of the V, and
+# its reason reads on the symbol's own row, just right of its "Ra 3.2" (r4
+# review: a label floating near detail A did not read as the symbol's). r5
+# farm render (20261017T070700133Z) measured the symbol's ink against its
+# anchor: the "Ra 3.2" text ends 14.9 mm right of it and spans 3.7..7.0 mm
+# over it; a note's position is its top-left corner and the 16-character
+# reason prints 44.6 x 3.9 mm. So the reason starts 3 mm past the "Ra 3.2",
+# centred on its row, and ends ~228 mm, 15 mm short of the Ø value's text
+# (~244 mm); the symbol's shoulder (~161 mm) stays right of detail A's
+# shoulder extension line (150 mm) and under its thread-length row (132 mm).
 _ROD_TOP_Y = SIDE_CENTER[1] + ROD_DIA / 2.0 * _S / 1000.0
-SEAT_FINISH_PICK = (_sheet_x(0.45 * ROD_LENGTH), _ROD_TOP_Y)
+SEAT_FINISH_PICK = (_sheet_x(0.40 * ROD_LENGTH), _ROD_TOP_Y)
 SEAT_FINISH_SYMBOL = (SEAT_FINISH_PICK[0] + 0.002, _ROD_TOP_Y + 0.014)
-# The reason note's top-left corner (a note's position).
-SEAT_REASON_XY = (SEAT_FINISH_PICK[0] - 0.012, _ROD_TOP_Y + 0.032)
+SEAT_REASON_XY = (SEAT_FINISH_SYMBOL[0] + 0.018, SEAT_FINISH_SYMBOL[1] + 0.0075)
 FINISH_CHAR_HEIGHT = 0.0025
 ISO_NOTE_XY = (0.290, 0.160)
 
