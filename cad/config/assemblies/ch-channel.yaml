@@ -86,3 +86,13 @@ required_free_stems:
 free_dof: 0
 free_dof_per_active_channel: 3
 
+# machinist_exceptions: the assembly drawing's owner-declared machinist-review
+#   exceptions (drawing-simplicity-policy.md "Named exceptions"); read by
+#   machinist_exceptions.load_exceptions for ch_channel_assembly, ignored by
+#   the build.
+machinist_exceptions:
+  - id: "RV-01"
+    kind: "accept"
+    where: "sheet 4 KEEPER PLAN VIEW, the lug inner faces 40.50 ±0.02 and 182.50 ±0.02 off the MHA-FR-002 line of the upper socket centres (KeeperFrontFaceZ, KeeperRearFaceZ), and step 10's statement of what those bands hold"
+    finding: "lug inner faces DRO-set to ±0.02 where a fit-up of the keepers to the MHA-CH-004 flats could absorb the stack (rules 4, 19)"
+    reason: "owner ruling X-A (50072e913, 2026-10-18): it loosened the lug centre's lateral band to ±0.10 because no mate needs it held, and left the inner faces at KEEPER_FITUP_LOCATION_BAND_MM ±0.02 because the shaft flats need them. Both bands are named on the sheet with their mates. The south band also holds the south foot 0.06 clear of the MHA-FR-002 front socket boss (build_fr_top_frame KEEPER_FOOT_PRINTED_BOSS_MARGINS): any band past ±0.08 lets the foot meet the boss, so the boss alone needs a sub-title-block band. The ±0.02 pair is what ch_fulcrum_shaft_spec's 0.057 flat-station window and the frame's foot-to-boss stack are computed against. Replacing them with a fit-up to the flats changes those shared stacks (MHA-CH-004, MHA-FR-002), and that is left to the owner (PR #1665, decisions) (owner-accepted)"
