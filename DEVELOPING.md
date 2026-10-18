@@ -714,9 +714,28 @@ release before tagging. A genuine historical bundle without PDFs is an empty
 drawing baseline; on the first release every current drawing is added.
 
 All PDF drawings and pages participate, including added and removed drawings or
-pages. Narrow BUILD/REV provenance-stamp changes and antialiasing noise are
-excluded, so a revision bump alone does not generate a drawing-change PNG.
-Other title-block changes remain part of the comparison. The drawing ZIP is
+pages. Only geometrically identified BUILD/REV value glyphs are masked, not the
+whole title block. At 144 dpi, ink is matched in both directions against the
+darkest pixel within one pixel along each axis (Chebyshev distance), allowing
+68 grayscale levels on the 0–255 scale. This bounded tolerance omits thin
+red/blue edge differences without a changed-area or page-percentage cutoff:
+even a single isolated pixel above that contrast bound remains a change if
+there is no matching nearby ink. Added/removed pages and page-size changes are
+always included, even when blank. The exact rule and parameters are recorded
+in `summary.json` and explained in the HTML index.
+
+The one-pixel bound is 0.176 mm per axis on the printed page. Ink movement or
+thickness changes within that bound and contrast changes of at most 68 levels
+can be missed, including embedded-image shading and regenerated break lines.
+Gaps or bridges up to two pixels (0.35 mm) and pattern changes inside dense ink
+can also be missed when every changed pixel is near existing ink.
+Printed-character inventory changes disable both tolerances; the inventory is
+a visible-character multiset, not a semantic check of text order or placement.
+This is a visual triage aid, not proof of manufacturing/CAD equivalence. The
+v42/v43 knob-cup page 1 and cone-gear page 18 calibration required at most 68
+and 51 unmatched grayscale levels with a one-pixel neighborhood; increasing
+the radius to two pixels still required 52 and 51 levels. The smaller spatial
+bound avoids doubling the displacement blind spot. The drawing ZIP is
 staged beside `cad/out/release/harmonic-analyzer-vNN.zip`, not inside it, leaving
 the main bundle's provenance/integrity contract unchanged. `--no-publish`
 prepares the same drawing ZIP and reports its path and notes without uploading

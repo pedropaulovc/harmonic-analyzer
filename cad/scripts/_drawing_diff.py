@@ -2,12 +2,12 @@
 
 Only geometrically identified BUILD/REV *values* in the template's lower-right
 216 x 66 mm title block are normalized. No title-block rectangle is erased.
-The 144 dpi comparison tolerates eight grayscale levels, not missing pixels:
-there is no spatial dilation, minimum changed area, or component filtering.
-Consequently even small dimension/geometry edits survive; regenerated jagged
-SolidWorks break lines can also appear as changes. Embedded image placement,
-resolution, and shading changes are compared without extra smoothing. This is
-intentionally a visual comparison, not a semantic CAD equivalence test.
+The 144 dpi comparison matches ink in both directions within one pixel along
+each axis and 68 grayscale levels. There is no minimum changed area: isolated
+high-contrast additions/removals survive. Printed-character inventory changes
+disable both tolerances. Low-contrast edits, one-pixel edge movements/thickness
+changes, gaps/bridges up to two pixels and dense-ink pattern changes can be
+omitted. This is a bounded visual comparison, not semantic CAD equivalence.
 
 Run from the repository root, without SolidWorks::
 
@@ -38,11 +38,14 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 import numpy as np
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_raw
-from PIL import Image
+from PIL import Image, ImageFilter
 
 DPI = 144
 SCALE = DPI / 72.0
-ANTIALIAS_TOLERANCE = 8
+# Calibrated against v42/v43 knob-cup p1 and cone-gear p18. A one-pixel
+# neighborhood needs 68 levels; two pixels still need 52 and hide more geometry.
+ANTIALIAS_TOLERANCE = 68
+SPATIAL_TOLERANCE_PIXELS = 1
 # Both project templates have the same block width and height; portrait moves
 # its left edge. See cad/templates/README.md and _drawing_registry.py.
 TITLE_BLOCK_WIDTH_PT = 216.0 / 25.4 * 72.0
@@ -186,8 +189,8 @@ def _stamp_text(
                 boxes.append((left - 1, top - 1, right + 1, bottom + 1))
 
     # A visible-character multiset is invariant to text-object splitting and
-    # paint order. Its only purpose is protecting tiny textual edits from the
-    # intensity tolerance; placement and ordering changes remain raster-detected.
+    # paint order. Its only purpose is protecting textual edits from the visual
+    # tolerances; it is not a semantic comparison of text order or placement.
     # Version-looking text elsewhere is not normalized.
     text = tuple(
         sorted(
@@ -236,6 +239,13 @@ def _raster(document: pdfium.PdfDocument, index: int, path: Path) -> _Raster:
         page.close()
 
 
+def _nearby_darkest(gray: np.ndarray) -> np.ndarray:
+    """Bounded Chebyshev ink matching, without wrapping at page boundaries."""
+    with Image.fromarray(gray) as image:
+        with image.filter(ImageFilter.MinFilter(2 * SPATIAL_TOLERANCE_PIXELS + 1)) as nearby:
+            return np.array(nearby, dtype=np.int16)
+
+
 def _overlay(
     old: _Raster | None, new: _Raster | None
 ) -> tuple[bytes | None, bool]:
@@ -261,16 +271,24 @@ def _overlay(
             before[top:bottom, left:right] = 255
             after[top:bottom, left:right] = 255
 
-    # There is deliberately no changed-pixel count cutoff. Text content changes
-    # disable the intensity tolerance for this page rather than hiding tiny ink.
-    tolerance = 0 if text_changed else ANTIALIAS_TOLERANCE
-    delta = after.astype(np.int16) - before
-    removed = delta > tolerance
-    added = delta < -tolerance
+    if old is not None and new is not None and not text_changed:
+        # Each source pixel must find equal/darker ink (within the intensity
+        # tolerance) in the other page's bounded neighborhood. Check BOTH
+        # directions: dilation of only one side could hide a new isolated mark.
+        # No pixel-count/page-percentage cutoff discards unmatched features.
+        removed = _nearby_darkest(after) - before > ANTIALIAS_TOLERANCE
+        added = _nearby_darkest(before) - after > ANTIALIAS_TOLERANCE
+    else:
+        # Character edits bypass both tolerances. Missing pages also retain
+        # every ink level rather than matching against an absent counterpart.
+        delta = after.astype(np.int16) - before
+        removed = delta > 0
+        added = delta < 0
     changed = (
         old is None
         or new is None
         or old.size_points != new.size_points
+        or text_changed
         or bool(np.any(removed | added))
     )
     if not changed:
@@ -345,11 +363,19 @@ def _index(summary: dict[str, Any]) -> bytes:
         '<span class="shared">Light gray: shared ink</span></p>'
         f"<p>Pages: {counts['changed']} changed, {counts['added']} added, "
         f"{counts['removed']} removed, {counts['unchanged']} unchanged (omitted).</p>"
-        "<p>Only title-block BUILD/REV values and minor intensity antialiasing "
-        "are ignored. Small geometric/text edits are retained. Regenerated jagged "
-        "break lines may appear as changes. Embedded image placement, resolution, "
-        "and shading changes are retained without extra smoothing. Pages align at "
-        "their top-left, without rescaling. Added/removed blank pages still have an image.</p>"
+        "<p>Only geometrically identified title-block BUILD/REV values are masked. "
+        f"At {summary['dpi']} dpi, ink is matched in both directions within "
+        f"{summary['spatial_tolerance_pixels']} pixel along each axis "
+        f"(Chebyshev distance) and {summary['antialias_intensity_tolerance']} "
+        "grayscale levels (0–255). There is no changed-area cutoff. "
+        "Printed-character inventory changes disable both tolerances; text order "
+        "and placement are not compared semantically. Low-contrast edits and "
+        "edge movements/thickness changes within these bounds can be omitted, "
+        "as can gaps/bridges up to two pixels and changes inside dense ink. "
+        "Embedded-image shading and regenerated break lines can be omitted. "
+        "This is not proof of CAD equivalence. Pages align at their top-left "
+        "without rescaling. Added/removed pages and page-size changes are always "
+        "included, even when blank.</p>"
         '<p><a href="summary.json">Machine-readable summary</a></p>'
         f"{content}</html>"
     ).encode("utf-8")
@@ -380,6 +406,20 @@ def create_drawing_diff(
         "new_label": new_label,
         "dpi": DPI,
         "antialias_intensity_tolerance": ANTIALIAS_TOLERANCE,
+        "spatial_tolerance_pixels": SPATIAL_TOLERANCE_PIXELS,
+        "spatial_distance_metric": "chebyshev",
+        "comparison_rule": "symmetric-darker-ink-neighborhood-v1",
+        "tolerances_disabled_for_text_changes": True,
+        "text_comparison": "visible-character-multiset",
+        "tolerance_limitations": [
+            f"Ink contrast changes of at most {ANTIALIAS_TOLERANCE} grayscale levels "
+            "can be omitted.",
+            f"Ink movements/thickness changes within {SPATIAL_TOLERANCE_PIXELS} pixel "
+            "along each axis can be omitted.",
+            "Gaps/bridges up to two pixels (0.35 mm) and dense-ink pattern changes "
+            "can be omitted.",
+            "Text order and placement are not compared semantically.",
+        ],
         "images": [],
         "changed_drawings": [],
         "added_drawings": sorted(new_files.keys() - old_files.keys()),

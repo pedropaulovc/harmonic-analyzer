@@ -1250,8 +1250,9 @@ def _drawing_diff_section(version: str, diff: dict[str, Any] | None) -> str:
         "Red = old-only / removed ink; blue = new-only / added ink; "
         "light gray = common ink. All drawing PDFs and all their pages are "
         "compared, including added and removed drawings/pages. BUILD and REV "
-        "provenance-only changes and antialiasing noise are skipped, not "
-        "reported as drawing changes. With no drawing changes the ZIP still "
+        "provenance-only changes and bounded raster differences are skipped: "
+        "the index and summary document the pixel/intensity tolerances and their "
+        "small-edge/low-contrast blind spots. With no drawing changes the ZIP still "
         "contains the index and summary; on a first release all drawings are added. "
         "This is separate from the existing 3D changed-parts gallery.\n"
     )
