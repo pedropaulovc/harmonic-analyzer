@@ -136,8 +136,10 @@ JOURNAL_CENTER = (0.235, 0.160)
 ISO_CENTER = (0.360, 0.150)
 SECTION_CENTER = (0.295, 0.230)
 # Top-centre of the native caption: it stands under View B's letter arrow,
-# which runs south off the section's lower boss end (#848).
-SECTION_CAPTION = (0.295, 0.191)
+# which runs south off the section's lower boss end (#848), and a caption
+# height clear of View B's Ø17.2 callout (at 0.191 they were 7.54 mm apart,
+# r3 view-crowding).
+SECTION_CAPTION = (0.295, 0.1925)
 SECTION_LABEL_SCALE_TEXT = "SCALE"
 SECTION_SCALE = (1, 1)
 
@@ -270,9 +272,11 @@ FRONT_KEEP = {
     # A REFERENCE since U31: the crank bore is located from the cone bore
     # (View B), so its height above the foot only follows that chain.
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
-    # Out past the angularity frame, text above it: at x=0.150 its extension
-    # lines fenced the frame off the crank bore (leader-crosses-line, af13).
-    "HeadHt": (0.164, 0.1475),
+    # Out past the angularity frame, text level with its top: at x=0.150 its
+    # extension lines fenced the frame off the crank bore (leader-crosses-line,
+    # af13), and at y=0.1475 its text sat 0.44 mm under View B's labelled
+    # 38.10 (r3 view-crowding).
+    "HeadHt": (0.166, 0.1440),
     "CrankBossDia": (0.132, 0.120),
     # Held 10 mm clear of View B's toleranced crank-above-cone text: at
     # x=0.155 the two sat 4.15 mm apart, under one text height (r7 audit).
@@ -373,10 +377,12 @@ for _side, _x, _dim in (("west", -cone.ATTACHMENT_X, "MountWestX"), ("east", con
     )
 # The collar thrust face's station stands left of the section, mirroring the
 # face-to-face on the right: its text needs the clear band between the plan's
-# callouts and the section, above View B.
+# callouts and the section, above View B.  It sits high on its dimension
+# line: centred at y=0.230 the post-axis extension line ran through its
+# last label line (r3 sheet).
 SECTION_KEEP = {
     "ConeBossLen": (0.355, 0.235),
-    "ConeBossNorthZ": (0.250, 0.230),
+    "ConeBossNorthZ": (0.249, 0.234),
 }
 # The crank bore is located from the cone bore (U31), so its spacing chains
 # off the cone-axis height on the same dimension line, in the one view that
