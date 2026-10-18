@@ -156,6 +156,12 @@ FRONT_KEEP = {
 RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], FRONT_TOP_Y + 0.00925)}
 TOP_KEEP = {}
 DIMENSION_CALLOUTS = dict(BORE_CALLOUTS)
+# One line ABOVE the lift-bore spacing (a multi-line above-callout does not
+# print): machinist review r2 (#1014) asked the sheet to say why the
+# bore-to-bore spacing is held from the pivot bore instead of the edges -- the
+# lift rod's eccentric cam must clear the strap's pivot end cap (X) and hover
+# over the follower stud at park (Y) (dt_pinion_pivot_block_geometry).
+ABOVE_CALLOUTS = {"LiftBoreX": "SETS LIFT CAM CLEARANCE AND PARK GAP"}
 # Front-view locations that start at the pivot bore: name -> the sheet axis
 # each measures along (0 = x, 1 = y).
 PIVOT_ORIGIN_DIMENSIONS = {"AnchorX": 0, "LiftBoreX": 0, "AnchorZ": 1, "LiftBoreCz": 1}
@@ -279,6 +285,7 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *top_annotations, *right_annotations],
         DIMENSION_CALLOUTS,
     )
+    set_dimension_callouts(adapter, front_annotations, ABOVE_CALLOUTS, location="above")
     for name, axis in PIVOT_ORIGIN_DIMENSIONS.items():
         _set_dimension_origin(
             adapter,

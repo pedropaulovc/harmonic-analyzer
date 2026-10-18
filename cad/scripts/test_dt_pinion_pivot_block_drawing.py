@@ -176,6 +176,10 @@ def test_front_view_locations_start_at_the_pivot_bore() -> None:
     # The lift-bore rise stands outside the block's west end (rule 14).
     rise_x, _ = drawing.FRONT_KEEP["LiftBoreCz"]
     assert rise_x < drawing._front_x(-dt_pinion_pivot_block_spec.BLOCK_WEST)
+    # Review r2: the sheet says why the spacing is held from the pivot bore,
+    # on one line (a multi-line above-callout does not print).
+    assert set(drawing.ABOVE_CALLOUTS) == {"LiftBoreX"}
+    assert all("\n" not in text for text in drawing.ABOVE_CALLOUTS.values())
 
 
 def test_hole_states_are_annotated() -> None:
