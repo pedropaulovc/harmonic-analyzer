@@ -37,6 +37,7 @@ from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
@@ -229,6 +230,9 @@ SET_SCREW_CALLOUT_XY = (TOP_CENTER[0] - 0.055, _CROWN_APEX_Y + 0.0114)
 _HOLD_DOWN_RIM = SCREW_HOLE_DIA / 2.0 * _S * sqrt(0.5)
 HOLD_DOWN_EDGE_XY = (TOP_CENTER[0] - _HOLD_DOWN_RIM, _top_y(SCREW_Z) + _HOLD_DOWN_RIM)
 HOLD_DOWN_CALLOUT_XY = (TOP_CENTER[0] - 0.055, _top_y(FOOT_NEAR_Z) - 0.004)
+# The note hangs from its top-left anchor in the empty lower-left corner,
+# clear below the bore lateral lane and left of the title block.
+NOTES_ANCHOR = (0.016, 0.034)
 # Half the ink of a drawn line: the 0.25 mm line weight.
 _LINE_HALF_M = 0.000125
 
@@ -553,6 +557,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
         required=(
             "Number",
@@ -560,6 +565,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -692,6 +698,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_tap_callout_text(tap_callout)
     _prove_set_screw_callout_clear(adapter, tap_callout)
+    # The one note (DRAWING_NOTES), lower left under the elevation's lanes.
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.

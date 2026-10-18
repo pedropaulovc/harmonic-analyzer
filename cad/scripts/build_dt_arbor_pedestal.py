@@ -66,6 +66,7 @@ from dt_arbor_pedestal_spec import (
     BORE_DIA_BAND,
     BORE_HEIGHT,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION,
     FOOT_DEPTH,
     FOOT_HEIGHT,
@@ -536,7 +537,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
 
 
