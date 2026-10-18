@@ -398,7 +398,21 @@ def test_collar_diameter_stands_on_the_collar() -> None:
 # the pivot-journal Ra 1.6 box, and the Ø9.525 text on land 1.  final877 had
 # the same block (0.2094, 0.1683, 0.2565, 0.1834): the Ra sat on "15.88)" and
 # its leader crossed the block.
-_COLLAR_TEXT = (0.2088, 0.1676, 0.2565, 0.1844)
+_MHA014_COLLAR_TEXT = (0.2088, 0.1676, 0.2565, 0.1844)
+
+
+def _scaled_collar_text() -> tuple[float, float, float, float]:
+    """The mha014-1 block grown to today's callout: its per-character width
+    (widest line "5/8 BAR AS SUPPLIED") times today's widest line, and its
+    per-line height times today's line count, from the same corner."""
+    x0, y0, x1, y1 = _MHA014_COLLAR_TEXT
+    lines = drawing.COLLAR_CALLOUT_LINES
+    per_char = (x1 - x0) / len("5/8 BAR AS SUPPLIED")
+    per_line = (y1 - y0) / 3
+    return (x0, y0, x0 + per_char * max(map(len, lines)), y0 + per_line * len(lines))
+
+
+_COLLAR_TEXT = _scaled_collar_text()
 _PIVOT_FINISH_BOX = (0.2320, 0.1800, 0.2790, 0.1980)
 _SEC1_TEXT = (0.1400, 0.1685, 0.1723, 0.1765)
 _SEC1_LINES = [((0.1400, 0.1452), (0.1400, 0.1548))]
@@ -454,7 +468,8 @@ def test_the_collar_callout_read_guard_takes_the_whole_block() -> None:
         "(Ø15.88)",
         *dt_cone_gear_shaft_spec.COLLAR_STOCK_CALLOUT.split("\n"),
     )
-    per_char = (_COLLAR_TEXT[2] - _COLLAR_TEXT[0]) / len("5/8 BAR AS SUPPLIED")
+    x0, _y0, x1, _y1 = _MHA014_COLLAR_TEXT
+    per_char = (x1 - x0) / len("5/8 BAR AS SUPPLIED")
     widest = max(len(line) for line in drawing.COLLAR_CALLOUT_LINES)
     assert per_char * widest >= drawing.COLLAR_CALLOUT_MIN_READ
     value_line_only = len("(Ø15.88)") * drawing.LENGTH_CHAR_WIDTH
