@@ -241,7 +241,12 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
     import _config
 
     assert round(dt_arbor_pedestal_spec.BORE_DIA, 2) == 9.55
-    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU"}
+    # Rule 4: the REAM bore's callout names its mate and the fit it needs.
+    arbor = str(_config.parts("dt-cylinder-gear-shaft")["number"])
+    bore_callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert bore_callout.startswith("REAM THRU\n")
+    assert "FIT ON" in bore_callout
+    assert bore_callout.endswith(arbor)
     shaft_limits = (9.505, 9.525)
     bore_limits = (9.550, 9.580)
     clearances = (
@@ -422,6 +427,7 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         "bore lateral lane": drawing.BORE_LATERAL_XY,
         "hole lateral lane": drawing.HOLE_LATERAL_XY,
         "set-screw callout": drawing.SET_SCREW_CALLOUT_XY,
+        "hold-down callout": drawing.HOLD_DOWN_CALLOUT_XY,
     }
     for label, (x, y) in anchors.items():
         assert margin < x < template.width_m - margin, label
@@ -442,8 +448,11 @@ _CALLOUT_LINE_SPACING = 16.8 * 25.4 / 72.0 / 3.5
 def _estimated_set_screw_callout():
     from _layout_geometry import estimate_text_box
 
-    drill = f"Ø{blind_cut_dia_mm(dt_arbor_pedestal_spec.SET_SCREW_HOLE_SPEC):.2f} THRU"
-    thread = f"{drawing.SET_SCREW_PROCESS} 4-40 UNC-2B THRU"
+    drill = (
+        f"Ø{blind_cut_dia_mm(dt_arbor_pedestal_spec.SET_SCREW_HOLE_SPEC):.2f}"
+        f" {drawing.SET_SCREW_EXTENT}"
+    )
+    thread = f"{drawing.SET_SCREW_PROCESS} 4-40 UNC {drawing.SET_SCREW_EXTENT}"
     return estimate_text_box(
         f"{drill}\n{thread}",
         anchor=drawing.SET_SCREW_CALLOUT_XY,
@@ -504,6 +513,42 @@ def test_the_tap_note_solidworks_adds_is_removed() -> None:
     assert "expected_redundant_notes=1" in source
 
 
+# The native definitions of a through-next 4-40 Hole Wizard tap, as the
+# fleet's TAP-prefixed callouts carry them (part 5 the thread, part 7 the
+# tap drill).
+_NATIVE_TAP = {
+    5: "TAP <hw-threaddesc> - <hw-threadclass> <hw-thru>",
+    6: "",
+    7: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>",
+    8: "",
+}
+
+
+def test_tap_callout_gives_one_extent_to_the_bore() -> None:
+    """ENFORCE r1: "Ø2.26 THRU / TAP TO BORE ... THRU" read as two extents."""
+    updated = drawing.set_screw_callout_definitions(dict(_NATIVE_TAP))
+    assert updated[7] == "<MOD-DIAM><hw-thrutapdrldia> TO BORE"
+    assert updated[5] == "TAP <hw-threaddesc> TO BORE"
+    joined = "\n".join(updated.values())
+    assert "<hw-threaddesc>" in joined and "<hw-thrutapdrldia>" in joined
+    assert "<hw-threadclass>" not in joined and "<hw-thru>" not in joined
+    source = _drawing_source()
+    assert source.index("_set_tap_callout_text(tap_callout)") < source.index(
+        "_prove_set_screw_callout_clear(adapter, tap_callout)"
+    )
+
+
+def test_tap_callout_rewrite_refuses_an_unexpected_native_format() -> None:
+    import pytest
+
+    blind = {**_NATIVE_TAP, 5: "TAP <hw-threaddesc> <hw-threadclass> <hw-depth>"}
+    with pytest.raises(RuntimeError, match="two native extents"):
+        drawing.set_screw_callout_definitions(blind)
+    no_class = {**_NATIVE_TAP, 5: "TAP <hw-threaddesc> <hw-thru>"}
+    with pytest.raises(RuntimeError, match="not in one callout part"):
+        drawing.set_screw_callout_definitions(no_class)
+
+
 def test_part_stamps_make_flexible_material_and_protective_finish() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
@@ -531,15 +576,18 @@ def test_lateral_locations_start_on_a_feature_not_the_symmetry_axis() -> None:
     starts = {row[2]: row[3] for row in part.REFERENCE_LINES}
     assert starts["BoreLateral"][0] == -dt_arbor_pedestal_spec.FOOT_WIDTH / 2.0
     assert starts["HoleLateral"][0] == -dt_arbor_pedestal_spec.FOOT_WIDTH / 2.0
-    # The hole lane sits above the plan's near edge; the foot-width lane sits
-    # below the far face, over the tap callout's shoulder.
+    # Both plan lanes sit above its near edge, the hole lateral inside the
+    # foot width, so the apex tap callout's leader leaves the plan downward
+    # across no dimension line; the hold-down callout sits left of the plan,
+    # clear of the 19.0 lane, so its leader crosses neither.
     plan_top = drawing._top_y(dt_arbor_pedestal_spec.FOOT_NEAR_Z)
-    assert plan_top < drawing.HOLE_LATERAL_XY[1]
-    assert (
-        drawing.SET_SCREW_CALLOUT_XY[1]
-        < drawing.TOP_KEEP["Width"][1]
-        < drawing._top_y(dt_arbor_pedestal_spec.STRAP_INNER_Z)
+    assert plan_top < drawing.HOLE_LATERAL_XY[1] < drawing.TOP_KEEP["Width"][1]
+    plan_west = (
+        drawing.TOP_CENTER[0] - dt_arbor_pedestal_spec.FOOT_WIDTH * drawing._S / 2
     )
+    assert drawing.HOLD_DOWN_CALLOUT_XY[0] + 0.025 < plan_west
+    assert drawing.HOLD_DOWN_EDGE_XY[1] > drawing._top_y(dt_arbor_pedestal_spec.SCREW_Z)
+    assert drawing.HOLD_DOWN_CALLOUT_XY[1] > drawing.HOLD_DOWN_EDGE_XY[1]
     # The bore lane sits below the seat.
     assert drawing.BORE_LATERAL_XY[1] < drawing._front_y(0.0)
 
