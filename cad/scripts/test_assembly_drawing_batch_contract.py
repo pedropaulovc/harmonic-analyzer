@@ -224,10 +224,14 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_sm_summing_assembly:
             scripts_dir = Path(draw_sm_summing_assembly.__file__).resolve().parent
-            # The spec module (settings, explode plan) and the sheet text.
+            # The spec module (settings), the explode spec and the sheet module.
             assert {
                 str(scripts_dir / name)
-                for name in ("sm_summing_assembly_spec.py", "sm_summing_assembly_notes.py")
+                for name in (
+                    "sm_summing_assembly_spec.py",
+                    "sm_summing_explode_spec.py",
+                    "sm_summing_assembly_sheet.py",
+                )
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_ha_harmonic_analyzer_assembly:

@@ -1,13 +1,16 @@
-"""Pure fitting contract for sm-summing.SLDASM (MHA-SM-000): inventory, the
-native explode and the two assembly settings.
+"""Pure fitting contract for sm-summing.SLDASM (MHA-SM-000): inventory and
+the two assembly settings.
 
-The builder (``build_sm_summing_assembly``) authors the explode and the two
-setting sketches from these values; the package drawing
-(``draw_sm_summing_assembly``) proves the BOM against ``QUANTITIES`` and
-prints the settings as those sketches' own model dimensions. The BOM
-descriptions, callouts, notes, steps and checks the sheets print live in
-``sm_summing_assembly_notes``, which only the drawing reads, so a wording
-edit does not rebuild the assembly. No SolidWorks imports.
+Builder data only: the builder (``build_sm_summing_assembly``) places
+``QUANTITIES`` and authors the two setting sketches from these values; the
+package drawing (``draw_sm_summing_assembly``) proves the BOM against
+``QUANTITIES`` and prints the settings as those sketches' own model
+dimensions. The ``SM_EXPLODED`` presentation lives in
+``sm_summing_explode_spec``. The drawing number, BOM order, the dimensions
+the drawing imports, the level tolerance, the BOM descriptions, callouts,
+notes, steps and checks the sheets print live in ``sm_summing_assembly_sheet``,
+which only the drawing reads, so a wording edit does not rebuild the
+assembly. No SolidWorks imports.
 
 Assembly frame: machine coordinates (Y up, output side -Z). The lever rocks
 on the hex trunnions' top ridge (the knife edge) at ``KNIFE_POINT``; the two
@@ -18,14 +21,12 @@ from __future__ import annotations
 
 import math
 
-import _config
 import settled_spring_seats
 import sm_gooseneck_geom
 import sm_summing_lever_spec as lever
 from spring_mount_geom import COUNTER_ANCHOR_XY, KNIFE, KNIFE_CONTACT_Y
 
 ASM_NAME = "sm-summing"
-DRAWING_NUMBER = "MHA-SM-000"
 
 KNIFE_MOUNT = "sm-knife-mount"
 HANGER_WASHER = "vn-knife-hanger-washer"
@@ -52,7 +53,6 @@ QUANTITIES = {
     GOOSENECK: 1,
     SPRING_SCREW: 1,
 }
-BOM_ORDER = tuple(QUANTITIES)
 
 # --- Knife-hanger bolt fit-up ---------------------------------------------------
 # Each MHA-VN-024 is cut at this assembly to the stack measured at its own
@@ -60,42 +60,10 @@ BOM_ORDER = tuple(QUANTITIES)
 # seated on the faced top -- plus this reach into its knife mount's tap. The
 # frame's printed grip band and the washer's catalogue thickness spread are
 # measured out of the reach; only this cut band reaches the tap. Two places,
-# so the notes print it as "8.92 ±0.15".
+# so the sheet prints it as "8.92 ±0.15".
 HANGER_FIT_REACH = 8.92
 HANGER_FIT_REACH_TOL = 0.15
 HANGER_FIT_REACH_PLACES = 2
-
-# --- Native explode (SM_EXPLODED) ---------------------------------------------
-# The notes' ASSEMBLY_STEPS read back to front: the gooseneck and its screw
-# lift off the spring, the screw backs out of the plug, the spring lifts off
-# the boss hook
-# and the hook unscrews from the lever boss, its jam nut left standing between
-# the cut end and the boss (the nut goes on from the cut end before the hook
-# enters the boss); then each knife-mount station (mount, its two dowels, its
-# washer and bolt) slides off its hex trunnion along Z, the bolts and washers
-# lift, the bolts clear their washers and the dowels leave their mounts.
-# (label, families, station, axis, signed mm):
-# ``station`` "front"/"back" moves only the instances at +Z/-Z of the lever
-# centre plane, None every instance; all along the assembly's global axes.
-# Sized for the drawing's *Isometric (it looks from +X+Y+Z): each mount clears
-# its trunnion end (17.9 of slide) with room for the dowels to stand between
-# mount and washer.
-EXPLODED_VIEW_NAME = "SM_EXPLODED"
-SOURCE_CONFIGURATION = "Default"
-STATIONS = ("front", "back")
-_STATION_FAMILIES = (KNIFE_MOUNT, DOWEL, HANGER_WASHER, HANGER_BOLT)
-EXPLODE_STEPS: tuple[tuple[str, tuple[str, ...], str | None, str, float], ...] = (
-    ("gooseneck lifts", (GOOSENECK, SPRING_SCREW), None, "y", 80.0),
-    ("spring screw backs out", (SPRING_SCREW,), None, "x", 35.0),
-    ("counter spring lifts off hook", (COUNTER_SPRING,), None, "y", 55.0),
-    ("boss hook unscrews", (BOSS_HOOK,), None, "y", 35.0),
-    ("jam nut lifts off boss", (BOSS_JAM_NUT,), None, "y", 6.0),
-    ("front station slides off", _STATION_FAMILIES, "front", "z", 45.0),
-    ("back station slides off", _STATION_FAMILIES, "back", "z", -45.0),
-    ("hanger bolts and washers lift", (HANGER_WASHER, HANGER_BOLT), None, "y", 40.0),
-    ("hanger bolts clear washers", (HANGER_BOLT,), None, "y", 55.0),
-    ("dowels leave mounts", (DOWEL,), None, "y", 20.0),
-)
 
 # --- Assembly settings, as model dimensions -------------------------------------
 # Two blanked Front-plane construction sketches in the assembly (sketch x =
@@ -152,19 +120,10 @@ BOSS_ROCK_TRAVEL = (
     / 10**ROCK_PRECISION
 )
 COUNTER_PRECISION = 1
-DRAWING_DIMENSIONS = {
-    COUNTER_FEATURE: {COUNTER_DIMENSION},
-    ROCK_FEATURE: {ROCK_DIMENSION},
-}
 DRAWING_PRECISION = {
     COUNTER_FEATURE: {COUNTER_DIMENSION: COUNTER_PRECISION},
     ROCK_FEATURE: {ROCK_DIMENSION: ROCK_PRECISION},
 }
-# The lever is set level to the title block's general angular tolerance: the
-# operating rock (about 1 deg) then stays well inside the free-rock floor.
-LEVEL_TOLERANCE_DEG = float(_config.title_block("angular")["value_deg"])
-if LEVEL_TOLERANCE_DEG + 1.0 >= KNIFE_FREE_ROCK_FLOOR_DEG:
-    raise AssertionError("the level tolerance eats the knife edge's free rock")
 
 assert 0.0 < COUNTER_SCREW_RISE, COUNTER_SCREW_RISE
 assert 0.0 < COUNTER_SCREW_OFFSET_X, COUNTER_SCREW_OFFSET_X

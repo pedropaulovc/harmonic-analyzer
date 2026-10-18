@@ -1,6 +1,6 @@
 """The summing assembly's builder-owned named explode (SM_EXPLODED).
 
-``create_summing_explode`` authors ``sm_summing_assembly_spec.EXPLODE_STEPS``
+``create_summing_explode`` authors ``sm_summing_explode_spec.EXPLODE_STEPS``
 in the active configuration along the assembly's native world axes, proves
 every instance's world translation after each step and leaves the
 operational model collapsed (the ms-measuring-stick pattern). A step that
@@ -17,6 +17,7 @@ from typing import Any
 
 import _telemetry
 import sm_summing_assembly_spec as spec
+import sm_summing_explode_spec as explode
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
 from _simplified_names import simplified_name
@@ -28,12 +29,12 @@ _SW_SEL_EXPLVIEWS = 43
 def summing_exploded_view_name(configuration: str) -> str:
     """The named explode ``configuration`` owns: exploded-view names are unique
     per document, so ``Default Simplified``'s copy carries the suffix too."""
-    if configuration == spec.SOURCE_CONFIGURATION:
-        return spec.EXPLODED_VIEW_NAME
-    if configuration == simplified_name(spec.SOURCE_CONFIGURATION):
-        return simplified_name(spec.EXPLODED_VIEW_NAME)
+    if configuration == explode.SOURCE_CONFIGURATION:
+        return explode.EXPLODED_VIEW_NAME
+    if configuration == simplified_name(explode.SOURCE_CONFIGURATION):
+        return simplified_name(explode.EXPLODED_VIEW_NAME)
     raise ValueError(
-        f"{spec.EXPLODED_VIEW_NAME}: no explode is authored in {configuration!r}"
+        f"{explode.EXPLODED_VIEW_NAME}: no explode is authored in {configuration!r}"
     )
 
 
@@ -113,12 +114,12 @@ def station_of(z_mm: float) -> str:
     """The knife-mount station an instance at world ``z_mm`` belongs to."""
     if abs(z_mm - SUMMING_Z) < 1.0:
         raise ValueError(f"z {z_mm:.3f} sits on the lever centre plane, not a station")
-    return spec.STATIONS[0] if z_mm > SUMMING_Z else spec.STATIONS[1]
+    return explode.STATIONS[0] if z_mm > SUMMING_Z else explode.STATIONS[1]
 
 
 @_telemetry.traced("assembly.sm_explode")
 def create_summing_explode(adapter: Any, configuration_name: str) -> None:
-    """Author ``spec.EXPLODE_STEPS`` in the active ``configuration_name`` and
+    """Author ``explode.EXPLODE_STEPS`` in the active ``configuration_name`` and
     leave the operational model collapsed.
 
     Run in Default and in Default Simplified
@@ -166,7 +167,7 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
         raise RuntimeError(f"{view_name}: duplicate component identities")
     station_stems = {
         stem
-        for _, stems, station, _, _ in spec.EXPLODE_STEPS
+        for _, stems, station, _, _ in explode.EXPLODE_STEPS
         if station
         for stem in stems
     }
@@ -189,7 +190,7 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
         if int(configuration.GetNumberOfExplodeSteps()) != 0:
             raise RuntimeError(f"{view_name}: auto steps remain")
         for step_index, (label, stems, station, key, distance_mm) in enumerate(
-            spec.EXPLODE_STEPS, 1
+            explode.EXPLODE_STEPS, 1
         ):
             moved = [
                 component
@@ -198,7 +199,7 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
                 if station is None or stations[str(component.Name2)] == station
             ]
             if station is not None and len(moved) != sum(
-                spec.QUANTITIES[stem] // len(spec.STATIONS) for stem in stems
+                spec.QUANTITIES[stem] // len(explode.STATIONS) for stem in stems
             ):
                 raise RuntimeError(
                     f"{label}: {station} station holds {len(moved)} instances"
@@ -248,7 +249,7 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
                 step = _early_bound(raw_step, "IExplodeStep")
                 # Distinct per explode: Default Simplified's copy carries the suffix.
                 step_name = f"SM {label.upper()}"
-                if configuration_name != spec.SOURCE_CONFIGURATION:
+                if configuration_name != explode.SOURCE_CONFIGURATION:
                     step_name = simplified_name(step_name)
                 step.Name = step_name
                 if str(step.Name) != step_name or not model.EditRebuild3():
@@ -319,7 +320,7 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
             _telemetry.warn(
                 f"{view_name}: cleanup after authoring failure: {cleanup_error}"
             )
-    if int(configuration.GetNumberOfExplodeSteps()) != len(spec.EXPLODE_STEPS):
+    if int(configuration.GetNumberOfExplodeSteps()) != len(explode.EXPLODE_STEPS):
         raise RuntimeError(f"{view_name}: collapsed presentation lost authored steps")
     if tuple(assembly.GetExplodedViewNames2(configuration_name) or ()) != (view_name,):
         raise RuntimeError(f"{view_name}: collapsed presentation lost named view")
@@ -328,6 +329,6 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
             f"{view_name}: named presentation is not owned by {configuration_name}"
         )
     _telemetry.success(
-        f"{view_name}: {len(spec.EXPLODE_STEPS)} native steps verified in world space; "
+        f"{view_name}: {len(explode.EXPLODE_STEPS)} native steps verified in world space; "
         f"all {len(components)} instances restored"
     )
