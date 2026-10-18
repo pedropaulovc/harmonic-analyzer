@@ -351,7 +351,10 @@ DETAIL_LABEL_LOWER_LEFT = (0.016, 0.0145)
 # 30-character rows measured 84 mm wide (2.8 mm a character): their leader
 # left from x 0.3839 and crossed the Ra 1.6 leader (y 0.135, x >= 0.3738);
 # 23 characters end ~0.364, so the leader crosses y 0.135 near x 0.373.
-RELIEF_NOTE_XY = (0.300, 0.172)
+# r3 put the top row on the 213.56 text (bottom ~0.169, right end ~0.3025):
+# the note's top stands under it, its bottom row (~0.141) over the PlateThk
+# text and A-A's UNDERSIDE label.
+RELIEF_NOTE_XY = (0.300, 0.1665)
 # The leader's tip, this far (model mm) into the relief floor from the bore
 # wall: the leader runs down the bore's gap and must not cross the hatch.
 RELIEF_TIP_INSET_MM = 0.05
@@ -379,27 +382,65 @@ ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
 # Each end clears its edge at the letter's far station by the letter's half
 # width (5.5 model mm at 1:2) plus 1.5.
 HOLDDOWN_SECTION_LINE_X_MM = (-26.0, 24.0)
-# 1:1, full width: the strip is the plate edge-on, 27.06 x 6.35 (sheet
-# x 0.1465..0.1735, y 0.0393..0.0457; ~4 mm outline padding), in the free
-# band's right half, its native label centred under it.  It stands 17 mm
-# right of where it began (0.143) so HoldDownX's text can hang outside
-# detail B: the audit boxed this view 26 mm left of its centre (run
-# 20260930T041147948Z), now x 0.134, 4 mm past that text's end.  10 mm
-# lower than r1 (0.0525): its callout above grew two rows under the
-# counterbore row.
-HOLDDOWN_SECTION_CENTER = (0.160, 0.0425)
-# The native label box measured 46.5 x 16.2 mm; centred under the strip,
-# its top (0.0352) under the strip's padded outline (0.0353).
-HOLDDOWN_SECTION_LABEL_LOWER_LEFT = (HOLDDOWN_SECTION_CENTER[0] - 0.02325, 0.019)
+# 1:1, full width: the strip is the plate edge-on, 27.06 x 6.35 (r3 sheet
+# x 0.1465..0.1736, y 0.0455..0.0519 for a centre at y 0.0425; the audit's
+# view box pads it ~5.5 mm), in the free band's right half, its native
+# label centred under it.  It stands 17 mm right of where it began (0.143)
+# so HoldDownX's text can hang outside detail B: the audit boxed this view
+# 26 mm left of its centre (run 20260930T041147948Z), now x 0.134, 4 mm
+# past that text's end.  4 mm lower than r3: its four-row callout above
+# needs ~24 mm between the strip and the plan captions (0.0805).
+HOLDDOWN_SECTION_CENTER = (0.160, 0.0385)
+# The native label box measured 46.5 x 16.4 mm (r3); centred under the
+# strip, its top (~0.032) under the C-C UNDERSIDE label, its foot 2.8 mm
+# over the border zone (0.0127).
+HOLDDOWN_SECTION_LABEL_LOWER_LEFT = (HOLDDOWN_SECTION_CENTER[0] - 0.02325, 0.0155)
 # The hold-down callout, above and right of the strip: DRILL Ø3.05 THRU
 # ALL, the Ø5.56 counterbore row and its 3.50 depth, then FROM UNDERSIDE
-# and the mate (HOLDDOWN_CALLOUT_BELOW).  RD1's render put the text's
-# centre on the requested x and its baseline 2.7 mm under the requested y,
-# so r1's two rows sat in ~x 0.150..0.200, y 0.062..0.076; the two rows
-# below end ~0.052, over the strip's padded outline (0.0497), under the plan
-# captions (0.0805), left of the title block (0.216).  Its leader drops to
-# the counterbore's sheet-right wall (x ~0.165).
-HOLDDOWN_CALLOUT_XY = (HOLDDOWN_SECTION_CENTER[0] + 0.015, 0.072)
+# and the mate (HOLDDOWN_CALLOUT_BELOW).  SolidWorks centres the block on
+# the requested point: r3's four rows sat at x 0.139..0.211, y 0.0608..
+# 0.0849 for a requested y 0.072, the top row on the plan caption.  Here
+# they stand ~0.051..0.075: 3 mm over the strip (top ~0.0479), 5 mm under
+# the captions, left of the title block (0.216).  Its leader drops to the
+# counterbore's sheet-right wall.
+HOLDDOWN_CALLOUT_XY = (HOLDDOWN_SECTION_CENTER[0] + 0.015, 0.0625)
+# Face labels on both sections (machinist review r3 blocker): A-A, looking
+# down the sheet, draws the top face at its foot; C-C, looking up it, at its
+# head.  Both are true projections, but with no face named a reader cannot
+# tell the relief (top) from the counterbore (underside).  Each label is a
+# pointer note on its face: (view key, text, model x candidates in mm, model
+# y in mm, which candidate -- the one furthest "max" right or "min" left on
+# the sheet -- and the note's upper-left corner relative to the tip).  At
+# r2's 2.8 mm a character a label is 22..25 mm long; each tip sits near one
+# end of its label, so the smart-side leader leaves from that end.
+# Positions are measured on r3's render; the tip is projected on the seat.
+FACE_LABELS = (
+    # Under A-A's right-hand piece, right of the relief, over the A-A label
+    # (top ~0.0995) and left of the (0.25) dimension line (x 0.3955).
+    ("A-A", "TOP FACE", (-6.8, 6.8), PLATE_THICKNESS, "max", (-0.0196, -0.00515)),
+    # Over A-A's left-hand piece (tip ~0.348), right of the PlateThk text
+    # (x <= 0.330), under the relief note (~0.141) and left of its leader
+    # (x ~0.372 at this height).
+    ("A-A", "UNDERSIDE", (-12.0, 12.0), 0.0, "min", (-0.016, 0.00715)),
+    # Right of C-C's strip, under the hold-down callout (~0.051).
+    (
+        "C-C",
+        "TOP FACE",
+        (HOLDDOWN_LOCAL_X - 6.0, HOLDDOWN_LOCAL_X + 6.0),
+        PLATE_THICKNESS,
+        "max",
+        (0.008, -0.002),
+    ),
+    # Under C-C's left-hand piece, over the C-C label.
+    (
+        "C-C",
+        "UNDERSIDE",
+        (HOLDDOWN_LOCAL_X - 9.0, HOLDDOWN_LOCAL_X + 9.0),
+        0.0,
+        "min",
+        (-0.004, -0.0035),
+    ),
+)
 # Rows printed under native hole callouts (swDimensionTextCalloutBelow).
 # Each tight band names its mate at its own callout (rule 4; machinist
 # review r1 blocker: the +-0.1 stations named none), and a local override
@@ -415,10 +456,11 @@ HOLDDOWN_CALLOUT_BELOW = ("FROM UNDERSIDE", "LOCATES MHA-DT-021 TIP BLOCK")
 # Prefix process read "DRILL ⌴ Ø5.56" at r1, so the word goes into the THRU
 # row instead (draw_ch_rocker_arm_tl_oblique_pivot_block's precedent).
 HOLDDOWN_PROCESS = "DRILL"
-# The post-mount taps' callout over the hole-location plan: r1's two rows
-# sat at y 0.2528..0.2631 for a requested 0.258; the two rows under the
-# thread end ~0.2413, 2.3 mm over the dropped plate's top edge (~0.239).
-POST_MOUNT_CALLOUT_XY = (0.200, 0.2565)
+# The post-mount taps' callout over the hole-location plan.  The block is
+# centred on the requested point: r3's four rows ran from the inner border
+# (top 0.2665, ~0.3 mm air) to their underline at 0.2453, 6.6 mm over the
+# plate's top edge (0.2387).  3 mm lower leaves both ~3 mm.
+POST_MOUNT_CALLOUT_XY = (0.200, 0.2535)
 # The reamed pivot bore's callout, below the A-A cutting line between its
 # arrows: right of the plate the 189.26 dimension line crosses any callout
 # wider than ~40 mm.  Its fit row hangs under it, over the plan caption row
@@ -868,25 +910,81 @@ def _add_holddown_callout(adapter: Any, section: Any) -> Any:
     return display
 
 
+def section_point_xy(
+    adapter: Any,
+    section: Any,
+    model_xs_mm: tuple[float, ...],
+    model_y_mm: float,
+    model_z_mm: float,
+    *,
+    pick: str,
+    label: str,
+) -> tuple[float, float]:
+    """Sheet point of the candidate model point furthest right ("max") or
+    left ("min") on the sheet.
+
+    A section's sheet x runs along model x one way or the other with its
+    viewing direction, so a point on a named piece (the right-hand piece of
+    A-A, say) is chosen by where it projects, not by its model sign.
+    """
+    candidates = [
+        model_point_in_view(
+            adapter,
+            section,
+            (x / 1000.0, model_y_mm / 1000.0, model_z_mm / 1000.0),
+            label=f"{label} x={x:+.2f}",
+        )
+        for x in model_xs_mm
+    ]
+    chooser = {"max": max, "min": min}[pick]
+    tip = chooser(candidates, key=lambda point: point[0])
+    print(f"{label}: candidates={candidates} tip={tip[:2]}")
+    return (float(tip[0]), float(tip[1]))
+
+
 def relief_floor_tip_xy(adapter: Any, section: Any) -> tuple[float, float]:
     """Sheet point where the top relief's floor meets the pivot bore, on A-A's
     right-hand piece (RELIEF_TIP_INSET_MM into the floor).
 
     The section is cut on the pivot's axis (model z = 0), so the floor stands
     PIVOT_BEARING_RELIEF_DEPTH under the plate's top face either side of the
-    bore; the right-hand piece is whichever side projects further right.
+    bore.
     """
-    floor_y = (PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH) / 1000.0
-    x = (PIVOT_HOLE_DIA / 2.0 + RELIEF_TIP_INSET_MM) / 1000.0
-    candidates = [
-        model_point_in_view(
-            adapter, section, (side * x, floor_y, 0.0), label=f"relief floor {side:+d}"
+    x = PIVOT_HOLE_DIA / 2.0 + RELIEF_TIP_INSET_MM
+    return section_point_xy(
+        adapter,
+        section,
+        (-x, x),
+        PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH,
+        0.0,
+        pick="max",
+        label="relief floor tip",
+    )
+
+
+def _add_face_labels(adapter: Any, sections: dict[str, Any]) -> None:
+    """TOP FACE and UNDERSIDE pointer notes on sections A-A and C-C."""
+    model_z_mm = {"A-A": 0.0, "C-C": HOLDDOWN_LOCAL_Z}
+    for key, text, xs, model_y, pick, offset in FACE_LABELS:
+        label = f"{key} {text.lower()} label"
+        tip = section_point_xy(
+            adapter,
+            sections[key],
+            xs,
+            model_y,
+            model_z_mm[key],
+            pick=pick,
+            label=label,
         )
-        for side in (-1, 1)
-    ]
-    tip = max(candidates, key=lambda point: point[0])
-    print(f"relief floor tip: candidates={candidates} tip={tip[:2]}")
-    return (float(tip[0]), float(tip[1]))
+        add_leader_note(
+            adapter,
+            text,
+            text_xy=(tip[0] + offset[0], tip[1] + offset[1]),
+            attach_xy=tip,
+            label=label,
+            view=sections[key],
+            height=0.0025,
+        )
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -1466,6 +1564,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The hold-down's size, from the underside, where section C-C shows its
     # counterbore in solid lines (user ruling 2026-09-29).
     _add_holddown_callout(adapter, holddown_section)
+    _add_face_labels(adapter, {"A-A": section, "C-C": holddown_section})
 
     # Annotation insertion can invalidate the exported display geometry.
     for view in (profile, feature, notch, section, detail, holddown_section, iso):
