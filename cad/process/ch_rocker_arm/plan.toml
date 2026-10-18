@@ -12,7 +12,7 @@ quantity_cite = "AUTHOR'S CHOICE: one arm per traveler run"
 
 [drawing]
 number = "MHA-CH-006"
-revision = "v43"
+revision = "v44"
 cite = ["harmonic-analyzer/cad/config/parts/ch-rocker-arm.yaml:ch-rocker-arm.number", "harmonic-analyzer/cad/config/release.yaml:next_revision"]
 
 [dro]
