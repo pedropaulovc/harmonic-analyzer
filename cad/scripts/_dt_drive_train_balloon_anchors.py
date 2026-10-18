@@ -28,6 +28,13 @@ The thrust washer is pinned to the north one, cylinder-end-disc-2 (placed
 after the south): it stands alone at the sheet's west end, while the south
 one sits among the front strap, MHA-VN-052 and the apex set screw (#1051;
 the machinist review of 9ebf51696 found the visible washer unballooned).
+
+The MHA-VN-019 block screw is pinned to the front (south) block's west
+screw, slotted-screw-3 (x -4.65, z -85.59 in the assembly), which stands
+clear above that block: none of the 24 points tried on the first,
+slotted-screw-1, found its own ink, and the listed-edge leader SolidWorks
+placed ended on the front MHA-DT-014 strap (machinist review of 53a7c4266,
+balloon 31, two runs).
 """
 
 from __future__ import annotations
@@ -94,7 +101,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "dt-pinion-handle": BalloonAnchor(),
         "dt-pinion-arbor": BalloonAnchor(),
         "dt-pinion-arbor-collar": BalloonAnchor(),
-        "vn-slotted-screw": BalloonAnchor(),
+        "vn-slotted-screw": BalloonAnchor(instance="vn-slotted-screw-3"),
         "vn-foot-screw": BalloonAnchor(),
     },
 }

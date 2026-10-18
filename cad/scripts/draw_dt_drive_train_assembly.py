@@ -852,7 +852,7 @@ BANK_STEPS = _note_text(
         "   CAM; RE-FACE ITS CAM FACE, RESTACK, REMEASURE.",
         f"   SHORT OF {bank.STACK_L20_ACCEPT[0]:.2f}: REMAKE THE THINNEST GEAR,"
         " REMEASURE.",
-        "   SLIDE THE STACK OFF IN ORDER, EACH GEAR WITH ITS PAIR.",
+        "   SLIDE THE STACK OFF, GEAR 0 FIRST, EACH GEAR WITH ITS PAIR.",
         "9. BASE MHA-FR-001 OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
         "   OVERHANG SUPPORTED; CONE SET (MHA-DT-020) NOT FITTED.",
         "9A. BACK MHA-DT-002 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND BOTH",
@@ -868,10 +868,13 @@ BANK_STEPS = _note_text(
         # strap alone until the front one goes on (F2), and its front end sits
         # over the front foot hole, where no chuck or tap wrench reaches (F1).
         # So the loaded mandrel leaves the base for the drill and tap.
-        "9B. FROM THE FRONT, LOAD THE MICED MHA-DT-026, THE STACK IN ORDER, ITS",
-        "   PAIRS HANGING FREE, THEN THE OTHER MHA-DT-026, THEN MHA-VN-052; IT",
-        "   SLIDES FREE ON THE MHA-DT-013 BAR (ELSE STONE THE BURR OFF ITS",
-        "   BORE). PUSH THE BANK BACK, CLOSED UP ON THE BACK MHA-DT-026.",
+        # The machinist review of 53a7c4266 read "THE STACK IN ORDER" either way
+        # round: loaded from the front, the first gear on goes to the back.
+        "9B. FROM THE FRONT, LOAD THE MICED MHA-DT-026, THE STACK FROM GEAR 19",
+        "   TO GEAR 0, CAM SIDE FRONT, ITS PAIRS HANGING FREE, THEN THE OTHER",
+        "   MHA-DT-026, THEN MHA-VN-052; IT SLIDES FREE ON THE MHA-DT-013 BAR",
+        "   (ELSE STONE THE BURR OFF ITS BORE). PUSH THE BANK BACK, CLOSED UP ON",
+        "   THE BACK MHA-DT-026.",
         "   PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON PARALLELS);",
         "   TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT MHA-DT-002 ON.",
         "9C. SLIDE THE FRONT MHA-DT-002 ON UNTIL A "
@@ -1132,6 +1135,19 @@ CONSUMABLES_NOTES = _note_text(
         "OIL THE MHA-DT-012/MHA-DT-013 JOURNALS AND ALL PIVOTS WITH ISO VG 32",
         "MACHINE OIL. NO THREADLOCKER ON ANY THREAD. RUN EVERY SCREW IN SNUG",
         "UNLESS ITS STEP GIVES ANOTHER SETTING.",
+    )
+)
+
+# The steps' compass and FRONT/BACK words, keyed once over step 1 (machinist
+# review of 53a7c4266: EAST in the rig steps could not be worked out). Model
+# -Z is south, the machine front; -X is east (the builder's block screws, "east
+# screw first (-x)"). Sheet 1's general notes field has no line to spare.
+DIRECTION_NOTES = _note_text(
+    (
+        "DIRECTIONS: FRONT IS SOUTH (THE CRANK END), BACK IS NORTH (THE CONE TIP",
+        "END). SHEET 1: THE TOP VIEW HAS SOUTH UP AND EAST LEFT; THE FRONT VIEW",
+        "LOOKS SOUTH, EAST AT ITS LEFT; THE RIGHT VIEW LOOKS EAST, SOUTH AT ITS",
+        "RIGHT.",
     )
 )
 
@@ -1596,6 +1612,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             f"sheet {SEQUENCE_SHEET} left note field",
             NOTE_FIELD_LEFT,
             (
+                ("direction key", DIRECTION_NOTES),
                 (
                     "cone and crank sequence",
                     CONE_CRANK_PRIMARY.format(cone_gears=cone_gears)

@@ -619,6 +619,9 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     assert bank_anchors["dt-cylinder-end-disc"].instance == "dt-cylinder-end-disc-2"
     assert moved["spring foot screw lifts"] == ("vn-foot-screw-1",)
     assert moved["block screws lift"] == tuple(f"vn-slotted-screw-{i}" for i in range(1, 5))
+    # The rig sheet's MHA-VN-019 balloon is pinned to the front block's west screw.
+    rig_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["pinion-rig"]
+    assert rig_anchors["vn-slotted-screw"].instance == "vn-slotted-screw-3"
 
 
 def test_explode_plan_refuses_unknown_retired_and_missing_families() -> None:
