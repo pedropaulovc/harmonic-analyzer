@@ -38,7 +38,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -98,10 +102,11 @@ ROD_FLANK_Y = RIGHT_CENTER[1] + ROD_DIA * SHEET_SCALE[0] / 2000.0
 
 # In the *Right view the part's +Z (crowned back end) points screen-left, so
 # the flat front end (z 0) is the RIGHT silhouette edge.  The diameter and its
-# mate stack above the rod, right of the finish symbol; the body length and
-# the (overall) stack below it, the overall outermost (rule 10).
+# mate hang above the rod, right of the finish symbol and left of Detail A's
+# circle, high enough that the callout lines clear the rod; the body length
+# and the (overall) stack below it, the overall outermost (rule 10).
 RIGHT_KEEP = {
-    "RodDia": (RIGHT_CENTER[0] + 0.035, ROD_FLANK_Y + 0.012),
+    "RodDia": (RIGHT_CENTER[0] - 0.005, ROD_FLANK_Y + 0.026),
     "RodBody": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.020),
     "RodOverall": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.032),
     "CapR": (RIGHT_CENTER[0] - HALF_SPAN - 0.012, RIGHT_CENTER[1] + 0.024),
@@ -116,12 +121,15 @@ DETAIL_KEEP = {
 }
 LEVER_PIN_SET_STEP_KEY = "lever-pin-set"
 DIMENSION_CALLOUTS = {
+    # Below the value: SolidWorks stores a multi-line ABOVE callout but prints
+    # none of it (r2 layout audit text-unmatched; draw_dt_cone_gear_shaft).
+    "RodDia": ROD_DIA_CALLOUT,
     # Drilled at MHA-DT-000's LEVER PIN SET; the pointer comes from the registry.
     "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(LEVER_PIN_SET_STEP_KEY)}",
-    "PinHoleZ": "FROM FRONT END",
+    # The rod has one flat end and one crowned end; "front" named nothing on
+    # the sheet (machinist review r2).
+    "PinHoleZ": "FROM FLAT END",
 }
-# The diameter's mate and stock stack ABOVE its value, away from the rod.
-ABOVE_CALLOUTS = {"RodDia": ROD_DIA_CALLOUT}
 
 
 def _front_end_detail(adapter: Any, side: Any) -> Any:
@@ -201,8 +209,8 @@ def _show_as_reference(
 ) -> None:
     """Parenthesize each named linear dimension: (199.5), a reference.
 
-    A linear dimension takes ``ShowParenthesis`` (draw_dt_cylinder_gear's cam
-    thickness); each named one must be present exactly once on its view.
+    Through the prefix/suffix channel: ShowParenthesis read back True on the
+    r2 sheet yet printed a bare 199.5.  Each name must be on the view once.
     """
     for name in sorted(names):
         found = [a for a in annotations if dimension_name(adapter, a) == name]
@@ -210,13 +218,7 @@ def _show_as_reference(
             raise RuntimeError(
                 f"expected one {name} on the side view, found {len(found)}"
             )
-        display = _early_bound(
-            _early_bound(found[0], "IAnnotation").GetSpecificAnnotation(),
-            "IDisplayDimension",
-        )
-        display.ShowParenthesis = True
-        if not bool(display.ShowParenthesis):
-            raise RuntimeError(f"{name} was not shown as a reference")
+        set_reference_dimension(adapter, found[0], label=f"MHA-DT-017 {name}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -281,7 +283,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*right_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, annotations, ABOVE_CALLOUTS, location="above")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _show_as_reference(adapter, right_annotations, DRAWING_REFERENCE_DIMENSIONS)
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):

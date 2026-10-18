@@ -97,7 +97,8 @@ def test_the_bearing_band_names_its_mate() -> None:
     callout = dt_pinion_lift_rod_spec.ROD_DIA_CALLOUT
     assert f"RUNNING FIT IN {block['number']} LIFT BORES" in callout
     assert "GROUND STOCK OK" in callout
-    assert drawing.ABOVE_CALLOUTS == {"RodDia": callout}
+    assert drawing.DIMENSION_CALLOUTS["RodDia"] == callout
+    assert "\n" in callout  # multi-line: below the value, where it prints
 
 
 def test_the_sheet_has_no_general_notes() -> None:
