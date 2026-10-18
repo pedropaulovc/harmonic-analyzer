@@ -436,12 +436,18 @@ SURFACE_FINISHES = (
 # (exception RV-02 in cad/config/parts/dt-cone-gear-shaft.yaml).  The flats'
 # shared clock is FLATS_IN_LINE_CALLOUT on section A-A; its tolerance is the
 # title block's angle, which error_budget.yaml books per land as
-# cone_land_clock.
+# cone_land_clock.  The across-flats name their gears in suffixes and have no
+# room left for a fit word (B-B's line would overrun the border, A-A's crowd
+# B-B, and an above-callout cannot break a line), so FLAT_FIT_NOTE states the
+# fit those names need once, under the gear key (drawing-guidelines.md rule
+# 4; machinist review r4b, 20261018T072511131Z).
+FLAT_FIT_NOTE = "FLATS: SLIDING FIT IN THE NAMED GEARS' D-BORES."
 DRAWING_NOTES = "\n".join(
     (
         f"{_gear(min(min(g) for g in SECTION_CONE_GEAR_TEETH if g))}"
         f"-{_gear(max(max(g) for g in SECTION_CONE_GEAR_TEETH if g))}"
         ": MHA-DT-003 CONE GEARS. 64T: MHA-DT-007.",
+        FLAT_FIT_NOTE,
         "TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
     )
 )

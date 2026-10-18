@@ -1271,6 +1271,14 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # U40: "TURN" appears only in the ruled tailstock line.
     assert "TURN" not in notes.upper().replace(tailstock[0].upper(), "")
     assert notes.splitlines()[0] == f"T006-T120: {cone} CONE GEARS. 64T: {crank}."
+    # rule 4: the across-flats' tight bands name their gears at the callout;
+    # the fit those names need is stated once, under the gear key (r4b).
+    assert notes.splitlines()[1] == dt_cone_gear_shaft_spec.FLAT_FIT_NOTE
+    assert "SLIDING FIT" in dt_cone_gear_shaft_spec.FLAT_FIT_NOTE
+    # The extension lines stop short of every across-flat's text foot.
+    assert 0.0 < drawing.WITNESS_LINE_EXTENSION <= 0.0005
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_pin_witness_line_extension(drawing_model)" in drawing_source
     assert "THREE-PLACE" not in notes
     assert (
         'apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})'

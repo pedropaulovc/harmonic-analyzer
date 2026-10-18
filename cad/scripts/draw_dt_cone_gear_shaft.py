@@ -193,21 +193,26 @@ STATION_TEXT_CLEARANCE = 0.002
 # from each small end.  Ø12.231 stands just off the faced end, its text and
 # two mate lines above the journal's extension lines, 4 mm nearer the end
 # than r2's so its widest mate line ends clear of section A-A's across-flat.
-# A tip-end text spans
+# Its text's lower-left corner is where the dimension line turns, so the
+# block stands 3.5 mm higher than r4b's: there the shelf sat on the
+# extension line and the 3 mm arrow rose into "MHA-DT-005" (machinist
+# review r4b, 20261018T072511131Z).  A tip-end text spans
 # its right-hand neighbours' lines: the tip's text sits highest and each
 # neighbour to the right steps down, so no line rises through a text (codex,
 # 18395f30).  Lands 2 and 3 carry their lines mid-land; the tip's line stays
-# 1.7 mm in from the tip face, right of the tip finish glyph, and follows the
+# 3.0 mm in from the tip face, right of the tip finish leader's landing 0.8
+# mm in (at 1.7 mm and 2.0 mm the leader ended on the line's arrowhead, r4b),
+# and follows the
 # tip face when its station moves.  With its suffix the Ø6.350 text runs over
 # A-A's upper letter, so the three tip-end texts stand 2.5 mm higher than
 # r1's (the tip detail with them); Ø9.525 stands right of all three suffixes,
 # its two mate lines centred on it clear above A-A's letter.
 SIDE_DIAMETERS = {
-    "Sec0Dia": (0.2660, 0.1680),
+    "Sec0Dia": (0.2660, 0.1715),
     "Sec1Dia": (0.1600, 0.1800),
     "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1785),
     "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1905),
-    "Sec4Dia": (TIP_END_X + 0.0017, 0.2025),
+    "Sec4Dia": (TIP_END_X + 0.0030, 0.2025),
     # #914: the collar ring is 3.181 wide, too narrow for a dimension line
     # and two arrows inside it, so the collar alone takes the near-side
     # diametric style: one arrow on the top rim from outside, leader up to
@@ -1396,6 +1401,34 @@ def _prove_section_layout(
     )
 
 
+# swUserPreferenceDoubleValue_e.swDetailingWitnessLineExtension, the extension
+# lines' run past the dimension line (read from swconst.tlb), document scope
+# (swDetailingNoOptionSpecified).  The project standard runs them 0.9 mm past
+# (r4b, 20261018T072511131Z: A-A's dimension line at y 174.7 mm, its
+# extension lines to 175.6, the text's foot at 175.7), and every across-flat's
+# text is wider than its flat, so the lines' ends struck the band and the gear
+# names in all four sections (machinist review r2 and r4b).  0.4 mm past keeps
+# a visible overrun and leaves the text's foot 0.6 mm clear.
+_PREF_WITNESS_LINE_EXTENSION = 14
+_PREF_OPTION_NONE = 0
+WITNESS_LINE_EXTENSION = 0.0004
+
+
+def _pin_witness_line_extension(drawing_model: Any) -> None:
+    """Set this sheet's extension-line overrun, read back, raise on mismatch."""
+    extension = drawing_model.Extension
+    key, scope = _PREF_WITNESS_LINE_EXTENSION, _PREF_OPTION_NONE
+    before = float(extension.GetUserPreferenceDouble(key, scope))
+    ok = extension.SetUserPreferenceDouble(key, scope, WITNESS_LINE_EXTENSION)
+    applied = float(extension.GetUserPreferenceDouble(key, scope))
+    if not ok or abs(applied - WITNESS_LINE_EXTENSION) > 1e-7:
+        raise RuntimeError(
+            f"failed to set the extension-line overrun to {WITNESS_LINE_EXTENSION} m "
+            f"(set returned {ok!r}, document reads {applied}, was {before})"
+        )
+    _telemetry.info(f"extension-line overrun {before * 1000:.2f} -> {applied * 1000:.2f} mm")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1423,6 +1456,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _pin_witness_line_extension(drawing_model)
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -1493,6 +1527,12 @@ async def build(adapter: Any) -> dict[str, str]:
     sections = _add_d_sections(
         adapter, {CutParent.SIDE: side, CutParent.TIP_DETAIL: detail}, sign
     )
+    # Precision hidden-lines-removed on every section, after its across-flat
+    # is attached: left on their parents' display, C-C (5:1) and D-D (20:1)
+    # printed their round as visible straight segments (machinist review r1,
+    # r2, r4b).
+    for placed in sections:
+        set_hidden_lines_removed(adapter, placed.view)
     # The caption stands right of the detail's ink: B's letters and the
     # detail's own outline, whichever reaches further.
     detail_ink_right = max(
@@ -1529,13 +1569,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # symbol stands above the tip with its glyph LEFT of the terminal diameter
     # line and its text ABOVE that native diameter text, inside the left border
     # (x 0.012; a glyph at 0.016 poked through it, codex c4720c62); the
-    # leader drops onto the tip's top flank inside the first 2 mm of the land.
+    # leader drops onto the tip's top flank 0.8 mm into the land, left of the
+    # terminal diameter's line and arrowhead (SIDE_DIAMETERS["Sec4Dia"]).
     # No length extension line runs up there (they all hang from the bottom
     # flank) and no diameter line stands left of the terminal diameter's.
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
     tip_top = (
-        big_end_x - SHAFT_LENGTH / 1000.0 + 0.002,
+        big_end_x - SHAFT_LENGTH / 1000.0 + 0.0008,
         SIDE_CENTER[1] + SECTION_DIAS[-1] / 2000.0,
     )
     pivot_finish = add_surface_finish(
