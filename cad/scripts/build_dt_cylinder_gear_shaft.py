@@ -124,7 +124,9 @@ def _dome_end(adapter, y_mm: float, name: str) -> None:
 async def _dome_reference(adapter) -> list[tuple[str, str]]:
     """The hidden DomeReference sketch (dt_cylinder_gear_shaft_spec): one
     construction line along the axis over the north dome whose driving
-    dimension IS the dome height, equation-bound to its global."""
+    dimension IS the dome height, and one construction arc over that dome's
+    silhouette whose radial dimension IS its sphere radius, both
+    equation-bound to the globals the domes are built from."""
     sketch = "DomeReference"
     check(f"create_sketch {sketch}", await adapter.create_sketch("Front"))
     # Direct-to-DB: the line runs along the sketch's own axis, so creation
@@ -134,15 +136,45 @@ async def _dome_reference(adapter) -> list[tuple[str, str]]:
         f"{sketch} line",
         await adapter.add_line(0.0, SHAFT_LENGTH, 0.0, SHAFT_LENGTH + DOME_HEIGHT),
     )
+    # Counter-clockwise from the dome's rim on the +X flank (the side the
+    # rotated profile prints DOWN) to its apex on the axis, centred on the axis
+    # as build_dt_crankshaft's StationReference dome arc.
+    arc = check(
+        f"{sketch} arc",
+        await adapter.add_arc(
+            0.0,
+            SHAFT_LENGTH + DOME_HEIGHT - DOME_SPHERE_RADIUS,
+            SHAFT_RADIUS,
+            SHAFT_LENGTH,
+            0.0,
+            SHAFT_LENGTH + DOME_HEIGHT,
+        ),
+    )
     set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{sketch} line did not take the construction flag")
+    for entity in (line, arc):
+        segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{sketch} {entity} did not take the construction flag")
     check(
         f"{sketch} vertical",
         await adapter.add_sketch_constraint(line, None, "vertical"),
     )
+    for label, first, second, relation in (
+        ("arc ends at the apex", f"{arc}.end", f"{line}.end", "coincident"),
+        ("arc centre on the axis", f"{arc}.center", "origin", "vertical_points"),
+        (
+            "arc starts at the dome root",
+            f"{arc}.start",
+            f"{line}.start",
+            "horizontal_points",
+        ),
+    ):
+        check(
+            f"{sketch} {label}",
+            await adapter.add_sketch_constraint(first, second, relation),
+        )
+    # Dimensions in creation order; name_dimensions renames them by that order.
     await dimension_between(
         adapter,
         f"{line}.start",
@@ -152,11 +184,28 @@ async def _dome_reference(adapter) -> list[tuple[str, str]]:
         sketch,
     )
     await anchor_point_to_origin(adapter, f"{line}.start", 0.0, SHAFT_LENGTH, sketch)
+    check(
+        f"{sketch} radius",
+        await adapter.add_sketch_dimension(arc, None, "radial", DOME_SPHERE_RADIUS),
+    )
     await ensure_fully_defined(adapter, f"{sketch} sketch")
     check(f"exit_sketch {sketch}", await adapter.exit_sketch())
     name_last_feature(adapter, sketch)
-    full = name_dimensions(adapter, sketch, ["DomeHeight", "DomeHeightAnchor1"])
-    return list(zip(full, ('"DomeHeight"', '"ShaftLength"'), strict=True))
+    full = name_dimensions(
+        adapter, sketch, ["DomeHeight", "DomeHeightAnchor1", "DomeRadius"]
+    )
+    return list(
+        zip(
+            full,
+            (
+                '"DomeHeight"',
+                '"ShaftLength"',
+                '("ShaftDia" / 2 * "ShaftDia" / 2 + "DomeHeight" * "DomeHeight")'
+                ' / (2 * "DomeHeight")',
+            ),
+            strict=True,
+        )
+    )
 
 
 def _hide_reference_sketches(adapter) -> None:

@@ -24,8 +24,10 @@ SHAFT_RADIUS = SHAFT_DIA / 2.0
 SHAFT_DIA_BAND = SHAFT_H
 # The print's one statement of how the length is set: the fitter measures the
 # span over both installed MHA-DT-002 straps (drive-train assembly steps 8-9 carry
-# the same measurement) and that span is the cylinder.
-LENGTH_CALLOUT = "CUT TO FIT: SPAN OVER BOTH MHA-DT-002"
+# the same measurement) and that span is the cylinder, so its acceptance is
+# that both ends finish flush with the straps' outer faces (r1 machinist
+# review: "span over" alone left the end condition open).
+LENGTH_CALLOUT = "CUT TO FIT: ENDS FLUSH WITH MHA-DT-002 OUTER FACES"
 DOME_CALLOUT = "BOTH ENDS"
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
 # the O.D. band exists for the 20 MHA-DT-012 gears that run on it (their
@@ -55,13 +57,17 @@ SURFACE_FINISHES = (
 # The dome height is a manufacturing dimension no feature dimension states,
 # so -- like the pedestal's locations (dt_arbor_pedestal_spec.REFERENCE_SKETCHES)
 # -- a hidden construction line along the axis over the north dome owns it,
-# equation-bound to the same global the domes are built from.
+# equation-bound to the same global the domes are built from. A construction
+# arc over the same dome's silhouette carries its spherical radius, which the
+# sheet prints as a reference: the height on the toleranced diameter already
+# fixes it, but a bare height did not say the end is a spherical cap (r1
+# machinist review; the MHA-CH-005 and MHA-DT-001 domes print the same way).
 REFERENCE_SKETCHES = ("DomeReference",)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDia"},
     "Shaft": {"Depth"},
-    "DomeReference": {"DomeHeight"},
+    "DomeReference": {"DomeHeight", "DomeRadius"},
 }
 
 # Decimal places are the tolerance (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL owns them and
@@ -76,7 +82,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Shaft": {"Depth": 1},
     # One place: a filed or form-turned dome only has to read as the dome
     # and clears nothing (it stands proud of the strap in free air).
-    "DomeReference": {"DomeHeight": 1},
+    "DomeReference": {"DomeHeight": 1, "DomeRadius": 1},
 }
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
@@ -98,14 +104,15 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # turned between centres -- saying the centre holes may stay saves a phone
 # call (each dome is turned on its centre, which may stay).
 # The length is cut at assembly, so the shop supplies the bar long (190 covers
-# the nominal span plus both domes and facing stock). The set screws' cup
-# points bear in spots drilled through the pedestal taps at assembly (#743),
-# so the bar itself is never flatted.
+# the nominal span plus both domes and facing stock) and the domes are turned
+# on the cut ends (r1 machinist review: nothing tied the end form to the
+# cut-to-fit). The set screws' cup points bear in spots drilled through the
+# pedestal taps at assembly (#743), so the bar itself is never flatted.
 DRAWING_NOTES = "\n".join(
     (
         "3/8 IN GROUND STOCK OK.",
         "CENTRES OK.",
-        "SUPPLY 190 LONG, UNCUT.",
+        "SUPPLY 190 LONG, UNCUT; CUT AND DOME BOTH ENDS AT ASSEMBLY.",
         "NO FLATS; SET-SCREW SPOTS ARE DRILLED AT ASSEMBLY.",
     )
 )
