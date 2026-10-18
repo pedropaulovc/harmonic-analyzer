@@ -3145,8 +3145,13 @@ class _AnchorSheet:
     had not drawn the zoom, #1667)."""
 
     def __init__(
-        self, edges_at, attach=lambda edge: ((edge,), (1,)), near=None, window_px=640,
-        honours_point=True, ink_after_redraw=None,
+        self,
+        edges_at,
+        attach=lambda edge: ((edge,), (1,)),
+        near=None,
+        window_px=640,
+        honours_point=True,
+        ink_after_redraw=None,
     ):
         self.edges_at = edges_at
         self.attach = attach
@@ -3439,7 +3444,8 @@ def test_frozen_anchor_that_hits_nothing_fails_after_redrawn_picks(monkeypatch):
     assert sheet.hits == [(0.001, 0.002)] * 3 and sheet.redraws == 2
     zoom = 2 * _drawing_scan._HIT_ZOOM_HALF
     assert sheet.screens == [
-        (f"dt-cone-gear-frozen-anchor-pick{pick}", pytest.approx(zoom)) for pick in (1, 2, 3)
+        (f"dt-cone-gear-frozen-anchor-pick{pick}", pytest.approx(zoom))
+        for pick in (1, 2, 3)
     ]
     assert [sheet.span_attrs[f"pick{pick}"] for pick in (1, 2, 3)] == ["miss"] * 3
     assert sheet.span_attrs["pick3_desktop_png"] == (
@@ -3451,10 +3457,16 @@ def test_frozen_anchor_miss_healed_by_a_redraw_balloons_its_own_ink(monkeypatch)
     """A miss the redrawn pick heals is still screenshotted, and the span and
     event say which pick hit (#1667)."""
     view = _exploded_view(_instances("dt-cone-gear-1"), [])
-    sheet = _AnchorSheet({}, ink_after_redraw={(0.001, 0.002): _AnchorEdge("dt-cone-gear-1")})
-    balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
+    sheet = _AnchorSheet(
+        {}, ink_after_redraw={(0.001, 0.002): _AnchorEdge("dt-cone-gear-1")}
+    )
+    balloons, _projected, anchors = _balloon(
+        monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR}
+    )
     assert len(balloons) == 1 and sheet.redraws == 1
-    assert [label for label, _span in sheet.screens] == ["dt-cone-gear-frozen-anchor-pick1"]
+    assert [label for label, _span in sheet.screens] == [
+        "dt-cone-gear-frozen-anchor-pick1"
+    ]
     assert anchors[0]["method"] == "frozen" and anchors[0]["picks"] == "miss,hit"
     assert (sheet.span_attrs["pick1"], sheet.span_attrs["pick2"]) == ("miss", "hit")
     assert sheet.span_attrs["pick1_desktop_png"] == (

@@ -1263,10 +1263,14 @@ def _select_balloon_anchor(
             picks.append(outcome)
             pick_attrs[f"pick{attempt}"] = outcome
             # The pick's own time, without the screenshots taken at its miss.
-            pick_attrs[f"pick{attempt}_ms"] = elapsed_ms - int(captured.get("capture_ms", 0))
+            pick_attrs[f"pick{attempt}_ms"] = elapsed_ms - int(
+                captured.get("capture_ms", 0)
+            )
             if observed["zoom_scale2"] is not None:
                 pick_attrs[f"pick{attempt}_scale2"] = observed["zoom_scale2"]
-            pick_attrs.update({f"pick{attempt}_{kind}": value for kind, value in captured.items()})
+            pick_attrs.update(
+                {f"pick{attempt}_{kind}": value for kind, value in captured.items()}
+            )
             if edge is not None:
                 break
         tried.append(sheet_xy)

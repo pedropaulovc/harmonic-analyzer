@@ -358,7 +358,9 @@ def _or_of_constants(node: ast.AST, constants: dict[str, ast.AST]) -> int:
     if isinstance(node, ast.Constant) and isinstance(node.value, int):
         return node.value
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        return _or_of_constants(node.left, constants) | _or_of_constants(node.right, constants)
+        return _or_of_constants(node.left, constants) | _or_of_constants(
+            node.right, constants
+        )
     if isinstance(node, ast.Name) and node.id in constants:
         return _or_of_constants(constants[node.id], constants)
     raise ValueError(f"not a constant bit set: {ast.unparse(node)}")
@@ -381,7 +383,9 @@ def _export_violations(tree: ast.Module) -> list[str]:
             continue
         reached = _reachable(tree, {root}) & set(MUTATOR_ROOTS)
         if reached - writers:
-            violations.append(f"pre-save export {root}() reaches {sorted(reached - writers)}")
+            violations.append(
+                f"pre-save export {root}() reaches {sorted(reached - writers)}"
+            )
         for writer in sorted(reached & writers):
             for node in ast.walk(functions[writer]):
                 if not (
@@ -394,7 +398,9 @@ def _export_violations(tree: ast.Module) -> list[str]:
                 if verb == "SaveBMP":
                     continue
                 if verb != "SaveAs3" or len(node.args) < 3:
-                    violations.append(f"{writer}() calls {verb} with no proven Copy option")
+                    violations.append(
+                        f"{writer}() calls {verb} with no proven Copy option"
+                    )
                     continue
                 try:
                     options = _or_of_constants(node.args[2], constants)
@@ -413,7 +419,9 @@ def test_pre_save_exports_write_nothing_into_the_model():
     assert set(PRE_SAVE_EXPORTS) <= defined, sorted(set(PRE_SAVE_EXPORTS) - defined)
     assert not set(PRE_SAVE_EXPORTS) & (PRE_SAVE | TERMINAL | PINNED_TERMINALS)
     violations = [
-        violation for path in INERT.values() for violation in _export_violations(_tree(path))
+        violation
+        for path in INERT.values()
+        for violation in _export_violations(_tree(path))
     ]
     assert not violations, "\n".join(violations)
 
@@ -435,7 +443,6 @@ def test_pre_save_export_rule_rejects_a_writing_save():
         "pre-save export capture_pick_screens() reaches ['release_seat_working_directory']",
         "_save_failure_document() SaveAs3 options 1 lack swSaveAsOptions_Copy",
     ]
-
 
 
 @pytest.mark.parametrize("name", sorted(INERT))

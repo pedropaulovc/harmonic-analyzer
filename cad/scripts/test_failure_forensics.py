@@ -1540,10 +1540,15 @@ def test_the_frame_records_which_window_holds_the_foreground(tmp_path, monkeypat
             }
             return calls.get(name, lambda *args: 0)
 
-    with mock.patch.object(_seat_forensics.ctypes, "windll", mock.Mock(user32=_User32())):
+    with mock.patch.object(
+        _seat_forensics.ctypes, "windll", mock.Mock(user32=_User32())
+    ):
         geometry = _seat_forensics._frame_geometry(_unmerged_profile(tmp_path))
     assert geometry["frame_foreground"] is False
-    assert (geometry["foreground_window"], geometry["foreground_pid"]) == ("#32770", 1234)
+    assert (geometry["foreground_window"], geometry["foreground_pid"]) == (
+        "#32770",
+        1234,
+    )
 
 
 def test_display_geometry_flags_a_session_without_a_display(tmp_path, monkeypatch):
@@ -2802,32 +2807,55 @@ def test_a_missed_coordinate_pick_names_its_window_and_keeps_its_message(
     window the hit test ran in."""
     spans, logs = capture_telemetry
     monkeypatch.setattr(
-        _seat_forensics, "_frame_geometry", lambda adapter: {"frame_width_px": 1536, "frame_height_px": 864}
+        _seat_forensics,
+        "_frame_geometry",
+        lambda adapter: {"frame_width_px": 1536, "frame_height_px": 864},
     )
     message = "failed to select arbor front_journal finish silhouette at sheet (0.25355, 0.166)"
     adapter = _Adapter(sw=_Seat(), model=_PickDrawing())
-    with _telemetry.span("drawing.surface_finish"), pytest.raises(RuntimeError) as raised:
+    with (
+        _telemetry.span("drawing.surface_finish"),
+        pytest.raises(RuntimeError) as raised,
+    ):
         _seat_forensics.capture_pick_miss(
-            adapter, message, view="Drawing View2", entity_type="SILHOUETTE", sheet_xy=(0.25355, 0.166)
+            adapter,
+            message,
+            view="Drawing View2",
+            entity_type="SILHOUETTE",
+            sheet_xy=(0.25355, 0.166),
         )
     assert str(raised.value) == message and type(raised.value) is RuntimeError
     (event,) = [
-        e for s in spans.get_finished_spans() for e in s.events if e.name == "drawing.pick_miss"
+        e
+        for s in spans.get_finished_spans()
+        for e in s.events
+        if e.name == "drawing.pick_miss"
     ]
     assert event.attributes["view_visible_width_px"] == 1700
-    assert (event.attributes["sheet_x"], event.attributes["sheet_y"]) == (0.25355, 0.166)
+    assert (event.attributes["sheet_x"], event.attributes["sheet_y"]) == (
+        0.25355,
+        0.166,
+    )
     (record,) = [
-        r.log_record for r in logs.get_finished_logs() if r.log_record.severity_text == "WARN"
+        r.log_record
+        for r in logs.get_finished_logs()
+        if r.log_record.severity_text == "WARN"
     ]
-    assert str(record.body).startswith(f"[forensics] {message}: view='Drawing View2' session=active")
+    assert str(record.body).startswith(
+        f"[forensics] {message}: view='Drawing View2' session=active"
+    )
     assert "frame=1536x864" in str(record.body)
     assert "view_window=1700x1160" in str(record.body)
     capture = json.loads(record.attributes["capture"])
     assert capture["seat"]["seat_pid"] == 4242
-    assert not [r for r in logs.get_finished_logs() if r.log_record.severity_text == "ERROR"]
+    assert not [
+        r for r in logs.get_finished_logs() if r.log_record.severity_text == "ERROR"
+    ]
 
 
-def test_a_pick_miss_writes_its_capture_under_failures(tmp_path, capture_telemetry, monkeypatch):
+def test_a_pick_miss_writes_its_capture_under_failures(
+    tmp_path, capture_telemetry, monkeypatch
+):
     """Every pick miss's leaf log used to say "no forensic artefacts captured":
     capture_pick_miss wrote no file, so nothing reached the farm's 'failures/'
     upload (#1667). It now writes capture.json and a desktop grab, and names
@@ -2835,7 +2863,10 @@ def test_a_pick_miss_writes_its_capture_under_failures(tmp_path, capture_telemet
     spans, _logs = capture_telemetry
     monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
     message = "fr-harmonic-base frozen balloon anchor selects no edge in 3 picks"
-    with _telemetry.span("drawing.pick_balloon_anchor"), pytest.raises(RuntimeError) as raised:
+    with (
+        _telemetry.span("drawing.pick_balloon_anchor"),
+        pytest.raises(RuntimeError) as raised,
+    ):
         _seat_forensics.capture_pick_miss(
             _Adapter(sw=_Seat(), model=_PickDrawing()),
             message,
@@ -2848,16 +2879,25 @@ def test_a_pick_miss_writes_its_capture_under_failures(tmp_path, capture_telemet
     out = _failure_dir(tmp_path, "pick-miss-drawing-view9")
     relative = f"failures/pick-miss-drawing-view9/{out.name}"
     assert sorted(path.name for path in out.iterdir()) == [
-        "capture.json", "pick-miss-drawing-view9-desktop.png",
+        "capture.json",
+        "pick-miss-drawing-view9-desktop.png",
     ]
     report = json.loads((out / "capture.json").read_text())
     assert report["message"] == message and report["state"]["pick1"] == "miss"
-    assert report["artefacts"] == {"desktop_png": f"{relative}/pick-miss-drawing-view9-desktop.png"}
+    assert report["artefacts"] == {
+        "desktop_png": f"{relative}/pick-miss-drawing-view9-desktop.png"
+    }
     (event,) = [
-        e for s in spans.get_finished_spans() for e in s.events if e.name == "drawing.pick_miss"
+        e
+        for s in spans.get_finished_spans()
+        for e in s.events
+        if e.name == "drawing.pick_miss"
     ]
     assert event.attributes["report"] == f"{relative}/capture.json"
-    assert event.attributes["desktop_png"] == f"{relative}/pick-miss-drawing-view9-desktop.png"
+    assert (
+        event.attributes["desktop_png"]
+        == f"{relative}/pick-miss-drawing-view9-desktop.png"
+    )
     assert event.attributes["pick1_desktop_png"] == "failures/x/desktop.png"
 
 
@@ -2873,7 +2913,9 @@ def test_pick_screens_save_desktop_window_region_and_sheet_as_copies(
     model = _FailureDrawing(tmp_path, unsaved=True)
     label = "fr-harmonic-base-frozen-anchor-pick1"
     with _telemetry.span("drawing.pick_balloon_anchor"):
-        captured = _seat_forensics.capture_pick_screens(_Adapter(sw=_Seat(), model=model), label)
+        captured = _seat_forensics.capture_pick_screens(
+            _Adapter(sw=_Seat(), model=model), label
+        )
     out = _failure_dir(tmp_path, label)
     relative = f"failures/{label}/{out.name}"
     assert {key: value for key, value in captured.items() if key != "capture_ms"} == {
@@ -2887,7 +2929,11 @@ def test_pick_screens_save_desktop_window_region_and_sheet_as_copies(
     assert model.saved == [
         (str(out / f"{label}-sheet.pdf"), 0, _seat_forensics._SAVE_AS_SILENT_COPY)
     ]
-    assert all((out / Path(path).name).is_file() for key, path in captured.items() if key != "capture_ms")
+    assert all(
+        (out / Path(path).name).is_file()
+        for key, path in captured.items()
+        if key != "capture_ms"
+    )
     (event,) = [
         e
         for s in spans.get_finished_spans()

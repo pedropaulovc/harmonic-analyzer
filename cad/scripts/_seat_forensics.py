@@ -1012,7 +1012,11 @@ _USER32_PROTOTYPES: tuple[tuple[str, tuple[Any, ...], Any], ...] = (
     ("IsZoomed", (wintypes.HWND,), wintypes.BOOL),
     ("GetSystemMetrics", (ctypes.c_int,), ctypes.c_int),
     ("GetForegroundWindow", (), wintypes.HWND),
-    ("GetWindowThreadProcessId", (wintypes.HWND, ctypes.POINTER(wintypes.DWORD)), wintypes.DWORD),
+    (
+        "GetWindowThreadProcessId",
+        (wintypes.HWND, ctypes.POINTER(wintypes.DWORD)),
+        wintypes.DWORD,
+    ),
     ("GetClassNameW", (wintypes.HWND, wintypes.LPWSTR, ctypes.c_int), ctypes.c_int),
 )
 
@@ -1095,7 +1099,9 @@ def _frame_hwnd(adapter: Any) -> int | None:
     # (dispid 11, VT_I4) is the 32-bit form and truncates on win64.
     if frame is None:
         return None
-    return adapter._attempt(lambda: int(_com._early_bound(frame, "IFrame").GetHWndx64()), default=None)
+    return adapter._attempt(
+        lambda: int(_com._early_bound(frame, "IFrame").GetHWndx64()), default=None
+    )
 
 
 def _foreground_window(user32: Any, frame_hwnd: int) -> dict[str, Any]:
@@ -1421,17 +1427,24 @@ def drawing_pick_state(adapter: Any, view: Any) -> dict[str, Any]:
     draw = adapter.currentModel
     reads: dict[str, Callable[[], Any]] = {
         "active_doc_is_drawing": lambda: (
-            str(adapter.swApp.ActiveDoc.GetTitle()) == str(draw.GetTitle())
+            str(_com._read_member(adapter.swApp.ActiveDoc, "GetTitle"))
+            == str(_com._read_member(draw, "GetTitle"))
         ),
         "graphics_update": lambda: bool(draw.ActiveView.EnableGraphicsUpdate),
         "fit_scale2": lambda: float(draw.ActiveView.Scale2),
         "needs_rebuild": lambda: int(draw.Extension.NeedsRebuild2),
-        "view_out_of_date": lambda: bool(_com._early_bound(view, "IView").IsModelOutOfDate()),
-        "view_lightweight": lambda: bool(_com._early_bound(view, "IView").IsLightweight()),
+        "view_out_of_date": lambda: bool(
+            _com._early_bound(view, "IView").IsModelOutOfDate()
+        ),
+        "view_lightweight": lambda: bool(
+            _com._early_bound(view, "IView").IsLightweight()
+        ),
         "view_facetted_hlr": lambda: bool(
             _com._early_bound(view, "IView").GetFacettedHlrDisplay()
         ),
-        "view_display_mode": lambda: int(_com._early_bound(view, "IView").GetDisplayMode2()),
+        "view_display_mode": lambda: int(
+            _com._early_bound(view, "IView").GetDisplayMode2()
+        ),
     }
     state: dict[str, Any] = {}
     for key, read in reads.items():
@@ -1577,9 +1590,9 @@ def capture_pick_screens(adapter: Any, label: str) -> dict[str, Any]:
             ),
             (
                 "region_bmp",
-                lambda: _save_seat_image(adapter, out_dir, f"{slug}-region", size=(0, 0))[
-                    "seat_image"
-                ],
+                lambda: _save_seat_image(
+                    adapter, out_dir, f"{slug}-region", size=(0, 0)
+                )["seat_image"],
             ),
             (
                 "sheet_pdf",
@@ -1592,7 +1605,9 @@ def capture_pick_screens(adapter: Any, label: str) -> dict[str, Any]:
     captured["capture_ms"] = round((time.perf_counter() - started) * 1000.0)
     with contextlib.suppress(Exception):
         _telemetry.event(
-            "drawing.pick_miss_capture", label=label, **_session._attributes_of(captured)
+            "drawing.pick_miss_capture",
+            label=label,
+            **_session._attributes_of(captured),
         )
     return captured
 
@@ -1601,10 +1616,14 @@ def _capture_dir(slug: str) -> Path:
     """``failures/<slug>/<UTC timestamp to the millisecond>/``: a new directory
     per capture, so a retry's capture never overwrites the miss before it."""
     stamp = datetime.now(UTC)
-    return OUT_FAILURES / slug / f"{stamp:%Y%m%dT%H%M%S}{stamp.microsecond // 1000:03d}Z"
+    return (
+        OUT_FAILURES / slug / f"{stamp:%Y%m%dT%H%M%S}{stamp.microsecond // 1000:03d}Z"
+    )
 
 
-def _write_artefacts(steps: Sequence[tuple[str, Callable[[], str | None]]]) -> dict[str, Any]:
+def _write_artefacts(
+    steps: Sequence[tuple[str, Callable[[], str | None]]],
+) -> dict[str, Any]:
     """Run each artefact writer, guarded on its own; map its kind to the file's
     path under ``failures/`` (the farm's upload prefix), or ``<kind>_error`` to
     why there is none."""
@@ -1631,7 +1650,9 @@ def _grab_screen(target: Path, *, window: int | None = None) -> str:
     if window == 0:
         raise RuntimeError("no SolidWorks main window handle")
     image = (
-        ImageGrab.grab(all_screens=True) if window is None else ImageGrab.grab(window=window)
+        ImageGrab.grab(all_screens=True)
+        if window is None
+        else ImageGrab.grab(window=window)
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     image.save(target)
@@ -1788,7 +1809,9 @@ def _save_failure_document(
         return {key: None}
     if sheet:
         if _com._read_member(model, "GetType") != 3:
-            raise RuntimeError(f"failure sheet {sheet[1:].upper()} requires an active drawing")
+            raise RuntimeError(
+                f"failure sheet {sheet[1:].upper()} requires an active drawing"
+            )
         suffix = sheet
     else:
         suffix = Path(str(_com._read_member(model, "GetPathName") or "")).suffix
