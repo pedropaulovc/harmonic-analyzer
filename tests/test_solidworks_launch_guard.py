@@ -486,6 +486,75 @@ def test_worker_logs_isolate_siblings_but_keep_nested_child_refusals(
         assert Path(sibling).read_text(encoding="utf-8") == ""
 
 
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "test",
+        "collection",
+        "xdist",
+        "xdist-maxfail",
+        "xdist-crash",
+        "consumed",
+        "xdist-consumed",
+    ],
+)
+def test_nested_pytest_forwards_only_unconsumed_refusals(
+    tmp_path, solidworks_child_refusals, mode
+):
+    # A private pytest project uses the real hooks without collecting this suite.
+    shutil.copy2(REPO_ROOT / "conftest.py", tmp_path / "conftest.py")
+    guard_dir = tmp_path / "tests" / "_child_guard"
+    guard_dir.mkdir(parents=True)
+    for name in ("sitecustomize.py", "harmonic_solidworks_guard.py"):
+        shutil.copy2(REPO_ROOT / "tests" / "_child_guard" / name, guard_dir / name)
+    probe = (
+        "try:\n"
+        f"    os.startfile({MISSING_SHORTCUT!r}, 'tripwire-no-such-verb')\n"
+        "except RuntimeError:\n"
+        "    pass\n"
+    )
+    if mode == "collection":
+        source = "import os\n" + probe
+    elif mode == "xdist-crash":
+        # Kill only this private Python worker, not any host process.
+        source = "import os\n\ndef test_crash():\n    os._exit(3)\n"
+    else:
+        source = "import os\n\ndef test_probe(solidworks_launch_refusals):\n"
+        source += "".join("    " + line + "\n" for line in probe.splitlines())
+        if mode in {"consumed", "xdist-consumed"}:
+            source += "    solidworks_launch_refusals.clear()\n"
+    (tmp_path / "test_probe.py").write_text(source, encoding="utf-8")
+    command = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+    ]
+    if mode in {"xdist", "xdist-maxfail", "xdist-crash", "xdist-consumed"}:
+        command.extend(["-n", "2", "--dist", "loadfile"])
+        if mode == "xdist-maxfail":
+            command.append("--maxfail=1")
+    else:
+        # The optional xdist hook must also work without the xdist plugin.
+        command.extend(["-p", "no:xdist"])
+    result = _run_child(command, cwd=tmp_path)
+    assert "INTERNALERROR" not in result.stdout + result.stderr
+    # Ignoring the nested status must not hide a launch attempt from the caller.
+    recorded = "".join(solidworks_child_refusals())
+    if mode == "xdist-crash":
+        assert result.returncode != 0
+        assert recorded == ""
+    elif mode in {"consumed", "xdist-consumed"}:
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert recorded == ""
+    else:
+        assert "via os.startfile" in recorded, result.stdout + result.stderr
+        assert "test_probe.py" in recorded
+        assert result.returncode != 0
+
+
 @pytest.mark.skipif(shutil.which("git") is None, reason="git is not on PATH")
 def test_git_external_diff_binding_solidworks_is_refused(
     solidworks_child_refusals, tmp_path

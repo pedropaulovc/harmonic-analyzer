@@ -46,6 +46,7 @@ _refused: list[str] = []
 # much of it has been reported.
 _child_log: str | None = None
 _child_log_read = 0
+_parent_child_log: str | None = None
 
 
 class SolidWorksLaunchBlocked(RuntimeError):
@@ -205,6 +206,10 @@ def pytest_configure(config):
         )
     # SolidWorks runs only on Windows; elsewhere there is nothing to start.
     if sys.platform == "win32" and not _guard_disabled():
+        global _parent_child_log
+        _parent_child_log = (
+            None if hasattr(config, "workerinput") else os.environ.get(_guard.MARKER)
+        )
         # Inherited hooks must raise/record in this pytest host, not terminate
         # the worker. Fresh Python descendants still use the hard-exit handler.
         _guard._pytest_refuse = _refuse
@@ -236,8 +241,37 @@ def _take_refusals():
     return taken
 
 
+def _publish_nested_refusals(refusals, config):
+    """Keep unconsumed refusals visible to the pytest session that launched us."""
+    global _child_log_read
+    if not refusals:
+        return
+    if hasattr(config, "workerinput"):
+        # Return evidence through xdist, never through a sibling/controller log.
+        config.workeroutput.setdefault("solidworks_refusals", []).extend(refusals)
+    elif _parent_child_log is not None:
+        with open(_parent_child_log, "a", encoding="utf-8") as log:
+            log.write("\n".join(refusals) + "\n")
+            if _parent_child_log == _child_log:
+                _child_log_read = log.tell()
+
+
+@pytest.hookimpl(optionalhook=True)
+def pytest_testnodedown(node, error):
+    # A crashed worker has no workeroutput. Publish completed workers' evidence
+    # immediately: maxfail can finish the session before the final node exits.
+    _publish_nested_refusals(
+        getattr(node, "workeroutput", {}).get("solidworks_refusals", []), node.config
+    )
+
+
+def pytest_sessionfinish(session, exitstatus):
+    # Collection can abort before any autouse fixture gets to enforce the guard.
+    _publish_nested_refusals(_take_refusals(), session.config)
+
+
 @pytest.fixture(autouse=True)
-def _no_swallowed_solidworks_launch():
+def _no_swallowed_solidworks_launch(request):
     """Fail a test whose code caught a refused launch instead of surfacing it.
 
     A child's refusal counts too, whatever its exit code did to the test. A
@@ -246,6 +280,7 @@ def _no_swallowed_solidworks_launch():
     """
     earlier = _take_refusals()
     if earlier:
+        _publish_nested_refusals(earlier, request.config)
         attempts = "\n".join(earlier)
         pytest.fail(
             f"SolidWorks launch attempt(s) refused before this test:\n{attempts}",
@@ -254,6 +289,7 @@ def _no_swallowed_solidworks_launch():
     yield
     refused = _take_refusals()
     if refused:
+        _publish_nested_refusals(refused, request.config)
         attempts = "\n".join(refused)
         pytest.fail(f"SolidWorks launch attempt(s) refused:\n{attempts}", pytrace=False)
 

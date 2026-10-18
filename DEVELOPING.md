@@ -145,6 +145,11 @@ When pytest configures an inherited worker, existing guard hooks hand refusals t
 pytest's raising/recording handler instead of terminating the worker. This
 process-local handoff is not inherited by fresh Python children: they still log
 and exit 97 on a refusal.
+Nested pytest sessions forward unconsumed refusals when enforcing a test failure
+or finishing collection, even if their caller ignores the failed subprocess.
+Expected refusals consumed by guard self-tests are not forwarded. Nested xdist
+workers return refusal evidence to their controller through worker results,
+never by writing into a sibling's refusal log.
 
 ## Persisted assembly display data
 
