@@ -178,8 +178,8 @@ BORE_VIEW_CROP_MARGIN = 0.0015
 BORE_VIEW_AF_DROP = 0.0025
 BORE_VIEW_LABEL_DROP = 0.016
 # The diameter's text stands this far above the crop circle (6 mm with the
-# value alone): the block is centred there, and the mate's two lines over the
-# value would lower the leader shoulder under it ~5.3 mm, onto the bore.
+# value alone): the block is centred there, and the mate's two lines under
+# THRU would lower the leader shoulder under it ~5.3 mm, onto the bore.
 BORE_VIEW_DIA_LIFT = 0.0115
 # The across-flat text stands OUTSIDE its witnesses, right of the flat's, as
 # MHA-DT-007's does. Centred between them, its lines (~2.65 mm a character in
@@ -329,8 +329,10 @@ CYLINDER_MATE = "MHA-DT-012"
 DIMENSION_CALLOUTS = {
     # No process word: a reamer would cut away the flat, and the dimensions
     # define the D-profile (user ruling 2026-09-29, machinist review of the
-    # #1128 full build).
-    "BoreCutDia": "THRU",
+    # #1128 full build). The mate hangs under the value in rows as narrow as
+    # the value: on T006/T012 the flat's witness for the clock rises ~3 mm
+    # right of it, and a wider block's shoulder crosses that witness.
+    "BoreCutDia": f"THRU\nSLIDES ON\n{SHAFT_MATE}",
     # The value is the gear bore's own; naming the bore, not the shaft it
     # slides on, keeps it from reading as MHA-DT-004's across-flat.
     "BoreAF": f"BORE ACROSS FLAT\nSLIDES ON {SHAFT_MATE}",
@@ -338,37 +340,45 @@ DIMENSION_CALLOUTS = {
     # the bore view crops the teeth off, so the callout names the reference
     # its centre-mark line stands for.
     "BoreFlatClock": "TO TOOTH CENTERLINE",
-    # The pitch circle and the mesh it sets go over the value
-    # (callouts_above).
+    # The circle the arc is measured on; the mesh it sets goes over the value
+    # (CALLOUTS_ABOVE). Per-sheet: see callouts_below.
     "ToothThickness": "CIRCULAR TOOTH THICKNESS",
     # The origin circle is an inspection witness, not the off-centre root arc.
-    "FloorDia": "ROOT ENVELOPE",
+    "FloorDia": f"ROOT ENVELOPE\nCLEARS {CYLINDER_MATE}",
     # The cone set is a solid stack on the shaft; each gear's width sets the
     # stations (user ruling 2026-09-28, spec FACE_WIDTH).
     "FaceWidth": f"20-GEAR STACK\nON {SHAFT_MATE}",
 }
 
 
-def callouts_above(teeth: int) -> dict[str, str]:
-    """Text over the value: the mates, and the circle the tooth thickness is
-    measured on.
+def callouts_below(teeth: int) -> dict[str, str]:
+    """Text under the value, with the circle the tooth thickness is measured
+    on.
 
     The thickness is the arc on the pitch circle, but its witnesses are
     straight lines, so without the circle it read as unmeasurable (machinist
-    review of the round-2 build). Below the shelf there is no room on the
-    large-gear sheets: there the callout's end already stands over the title
-    block, ~5 mm above it. The bore diameter's text must stay narrow: on
-    T006/T012 the flat's witness for the clock rises ~3 mm right of it. The
-    root envelope's lines stay as narrow as its label, clear of the teeth.
+    review of the round-2 build).
     """
     pitch_dia = 2.0 * stock_form_profile(teeth).pitch_radius_mm
     return {
-        "ToothThickness": f"BACKLASH WITH {CYLINDER_MATE}\nON PITCH CIRCLE \u00d8{pitch_dia:.3f}",
-        "BlankDia": f"MESHES WITH {CYLINDER_MATE}",
-        "FloorDia": f"CLEARS TIPS OF\n{CYLINDER_MATE}",
-        "BoreCutDia": f"SLIDES ON\n{SHAFT_MATE}",
-        "BoreFlatClock": f"PHASED TO {SHAFT_MATE}",
+        **DIMENSION_CALLOUTS,
+        "ToothThickness": (
+            f"{DIMENSION_CALLOUTS['ToothThickness']}\n"
+            f"ON PITCH CIRCLE \u00d8{pitch_dia:.3f}"
+        ),
     }
+
+
+# Text over the value: the mates. One line each: SOLIDWORKS drops a
+# multi-line callout above a value from the print (ENFORCE round 2 of #971:
+# every two-line one went unmatched in the PDF; draw_ch_amplitude_bar r1).
+CALLOUTS_ABOVE = {
+    "ToothThickness": f"BACKLASH WITH {CYLINDER_MATE}",
+    "BlankDia": f"MESHES WITH {CYLINDER_MATE}",
+    "BoreFlatClock": f"PHASED TO {SHAFT_MATE}",
+}
+if any("\n" in text for text in CALLOUTS_ABOVE.values()):
+    raise AssertionError("an above-callout with a line break does not print")
 
 
 def rendered_half_od(teeth: int) -> float:
@@ -390,11 +400,13 @@ BLANK_DIA_LIFT = 0.0175
 # The functional root-envelope stack stands right of the tip circle,
 # above the thickness witness: in the same lane as the thickness
 # dimension line, which runs DOWN from the +X tooth, and clear of the side
-# view (left edge >= 0.219 on every sheet).
-FLOOR_DIA_GAP_X = 0.016
+# view (left edge >= 0.219 on every sheet). The mate's row is ~4 chars wider
+# than the label (centred block), so the gap grows ~5.5 mm over the label-only
+# 0.016 to hold the block's left edge where it cleared the teeth.
+FLOOR_DIA_GAP_X = 0.0215
 # The shelf's rise above 0.6 of the tip radius: 6 mm with the three-row stack;
-# the mate's two rows over it (centred block) would lower the shelf ~5.3 mm.
-FLOOR_DIA_RISE = 0.0115
+# the mate's row under the label (centred block) would lower it ~2.8 mm.
+FLOOR_DIA_RISE = 0.009
 # The thickness dimension's arrows stand outside its witnesses, so the upper
 # arrow's tail runs UP the stack's lane: on the 834-fix-6927 T006 sheet (8:1)
 # it crossed the shelf under "GAP FLOOR" by ~1 mm.  The shelf therefore rises
@@ -409,11 +421,11 @@ _PREF_OPT_NONE = 0
 # the thickness arrow 6.35 mm from tip to tail end; build() reads the live
 # preference and refuses a template that differs.
 DIMENSION_ARROW_LENGTH = 0.00635
-# The limit stack hangs ~12.5 mm from its anchor down to the shelf line (five
-# rows, the mate's two over the limits, at a ~4.9-5.3 mm pitch, 834-fix-6927
-# T006 sheet and the ENFORCE round-1 T084 render), rounded outward; it is
+# The limit stack hangs ~11 mm from its anchor down to the shelf line (four
+# rows, the label and the mate under the limits, at the ~5.7 mm pitch of the
+# ENFORCE round-1 T084 render's three-row block), rounded outward; it is
 # centred on the anchor, so the same half-height bounds its top.
-FLOOR_STACK_HALF_HEIGHT = 0.013
+FLOOR_STACK_HALF_HEIGHT = 0.0115
 
 
 def thickness_arrow_reach_y(teeth: int) -> float:
@@ -460,8 +472,9 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
         # just right of the tip circle, and runs down to the text below the
         # gear's lowest point (the ~65 mm callout stays left of the side view).
         # The block is centred on its point: 22.5 mm under the tip circle
-        # with the mate's row over it keeps its bottom where the three-row
-        # block's stood at 25 mm, ~5 mm above the title block.
+        # with one row more than the three-row block (the mate over the
+        # value, the pitch circle under the label) keeps its bottom where
+        # that block's stood at 25 mm, ~5 mm above the title block.
         "ToothThickness": (
             FRONT_CENTER[0] + half_od + 0.014,
             FRONT_CENTER[1] - half_od - 0.0225,
@@ -1209,8 +1222,8 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} right",
         )
         annotations = [*bore_annotations, *front_annotations, *right_annotations]
-        set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-        set_dimension_callouts(adapter, annotations, callouts_above(teeth), location="above")
+        set_dimension_callouts(adapter, annotations, callouts_below(teeth))
+        set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
         assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
         _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
         _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")

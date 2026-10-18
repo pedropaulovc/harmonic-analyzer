@@ -247,33 +247,38 @@ def test_root_envelope_is_the_actual_translated_arc_not_a_bisector_circle() -> N
         assert minimum == pytest.approx(round(minimum, 3), abs=1e-12)
         if abs(profile.radial_translation_mm) > 1e-9:
             assert profile.root_radius_min_mm < profile.root_radius_max_mm
-    assert drawing.DIMENSION_CALLOUTS["FloorDia"] == "ROOT ENVELOPE"
+    assert drawing.DIMENSION_CALLOUTS["FloorDia"].splitlines()[0] == "ROOT ENVELOPE"
 
 
 def test_tight_bands_name_their_mates_at_the_callout() -> None:
     """Machinist review of the round-2 build: straight witnesses with no
-    circle left the circular thickness unmeasurable, so over the value the
+    circle left the circular thickness unmeasurable, so under the value the
     callout names the pitch circle (N / 48 in). ENFORCE round 1 of #971:
-    each tight band names its mate and fit at the callout (rule 4)."""
-    assert drawing.DIMENSION_CALLOUTS["ToothThickness"] == "CIRCULAR TOOTH THICKNESS"
+    each tight band names its mate and fit at the callout (rule 4). ENFORCE
+    round 2: a multi-line callout above a value never prints, so every
+    above-callout is one line."""
     assert "MHA-DT-004" in drawing.DIMENSION_CALLOUTS["BoreAF"]
+    assert "MHA-DT-004" in drawing.DIMENSION_CALLOUTS["BoreCutDia"]
     assert "MHA-DT-004" in drawing.DIMENSION_CALLOUTS["FaceWidth"]
+    assert notes.CYLINDER_MATE_NUMBER in drawing.DIMENSION_CALLOUTS["FloorDia"]
+    above = drawing.CALLOUTS_ABOVE
+    assert set(above) == {"ToothThickness", "BlankDia", "BoreFlatClock"}
+    assert all("\n" not in text for text in above.values())
+    for key in ("ToothThickness", "BlankDia"):
+        assert notes.CYLINDER_MATE_NUMBER in above[key], key
+    assert "MHA-DT-004" in above["BoreFlatClock"]
+    label = "CIRCULAR TOOTH THICKNESS"
+    assert drawing.DIMENSION_CALLOUTS["ToothThickness"] == label
+    # The bore diameter's rows stay as narrow as its value, clear of the
+    # flat's witness on T006/T012 (r2: a 20-character row crossed it).
+    assert max(map(len, drawing.DIMENSION_CALLOUTS["BoreCutDia"].splitlines())) <= 10
+    assert len(above["ToothThickness"]) <= len(label)
     for teeth in spec.CONFIGURATION_TEETH:
-        above = drawing.callouts_above(teeth)
-        assert set(above) == {
-            "ToothThickness", "BlankDia", "FloorDia", "BoreCutDia", "BoreFlatClock"
-        }
+        below = drawing.callouts_below(teeth)
+        assert set(below) == set(drawing.DIMENSION_CALLOUTS)
         pitch_dia = teeth / spec.DIAMETRAL_PITCH * 25.4
-        assert above["ToothThickness"].endswith(f"\nON PITCH CIRCLE \u00d8{pitch_dia:.3f}")
-        for key in ("ToothThickness", "BlankDia", "FloorDia"):
-            assert notes.CYLINDER_MATE_NUMBER in above[key], key
-        for key in ("BoreCutDia", "BoreFlatClock"):
-            assert "MHA-DT-004" in above[key], key
-        # Every line stays no wider than the label under the thickness, and
-        # the bore diameter's lines clear the flat's witness (14 characters).
-        width = len(drawing.DIMENSION_CALLOUTS["ToothThickness"])
-        assert max(map(len, above["ToothThickness"].splitlines())) <= width
-        assert max(map(len, above["BoreCutDia"].splitlines())) <= 14
+        assert below["ToothThickness"] == f"{label}\nON PITCH CIRCLE \u00d8{pitch_dia:.3f}"
+        assert max(map(len, below["ToothThickness"].splitlines())) <= len(label)
         assert pitch_dia / 2.0 == pytest.approx(spec.stock_form_profile(teeth).pitch_radius_mm)
 
 
@@ -922,8 +927,11 @@ def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
         drawing._assert_dimension_arrow_length(_Drawing(0.003175))
 
 
-# The functional root callout is thirteen characters, wider than either value.
-_FLOOR_TEXT_HALF_WIDTH = len(drawing.DIMENSION_CALLOUTS["FloorDia"]) * 0.00185 / 2.0
+# The functional root callout's widest row (the mate's, seventeen characters)
+# is wider than either value.
+_FLOOR_TEXT_HALF_WIDTH = (
+    max(map(len, drawing.DIMENSION_CALLOUTS["FloorDia"].splitlines())) * 0.00185 / 2.0
+)
 
 
 class _FakeFeature:
