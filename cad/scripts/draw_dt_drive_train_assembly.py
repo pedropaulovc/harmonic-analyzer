@@ -2986,6 +2986,19 @@ def _note_handle_stake(adapter: Any, view: Any, *, label: str) -> None:
         "INote",
     )
     extent = _note_extent(adapter, note, label=label)
+    # HANDLE_STAKE_NOTE_WIDTH_MAX only seeds the placement: the rendered text
+    # ran wider (farm run 20261018T064504517Z: right end 0.2 mm short of the
+    # tip), so the measured box is steered to stand the gap short of the tip.
+    extent = _anchor_note(
+        adapter,
+        note,
+        (
+            tip[0] - HANDLE_STAKE_NOTE_GAP - (extent[2] - extent[0]),
+            tip[1] - HANDLE_STAKE_NOTE_DROP,
+        ),
+        label=label,
+    )
+    rebuild_drawing(adapter, label=f"{label} anchored")
     points = list(
         _early_bound(note.GetAnnotation(), "IAnnotation").GetLeaderPointsAtIndex(0)
         or ()
