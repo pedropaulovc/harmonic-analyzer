@@ -176,8 +176,9 @@ _NORTH_END_GROUP = (*_BRACKET_GROUP, WASHER)
 # the 20 channels print as one dark mass at 1:7 and the balloons pinned on
 # the north-most instances landed inside it (r11 machinist review). At 300
 # its footprint stands 26 px (5.5 mm) clear of the bank's on an r11 sheet
-# replay; its two pins then come 25 further out of their bores, along their
-# axes. It spends 156 of the box's 286 (its pins' north ends ~400 north).
+# replay; its two pins then come 25 out of their bores, along their axes (the
+# rod pin north, the bar pin south). It
+# spends 156 of the box's 286 (its rod pin's north end ~400 north).
 _CHANNEL_GROUP = (
     ARM,
     ROD,
@@ -233,7 +234,15 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # the right, which a replay of the r6 ring places clear of every leader.
     ExplodeStep("fulcrum shaft out south", (FULCRUM_SHAFT,), "z", -120.0),
     ExplodeStep("north-most channel out", _CHANNEL_GROUP, "z", 300.0, "north-most"),
-    ExplodeStep("its pins out", (ROD_PIN, BAR_PIN), "z", 25.0, "north-most"),
+    ExplodeStep("its rod pin out", (ROD_PIN,), "z", 25.0, "north-most"),
+    # South, not north: 25 north put the bar pin on the lever's lower edge
+    # beside the spring's hook end, and balloon 16's arrowhead, reaching it
+    # from the upper left, lay along the dark lever, so its leader read as
+    # ending at the lever end with 17's (machinist review, PR #1605). 25 south
+    # stands it in the open, up and right of the bar's top end. A replay of
+    # the last ring (its 19 logged attachments, 16's moved 50 south) keeps
+    # the ring order and crosses no pair.
+    ExplodeStep("its bar pin out", (BAR_PIN,), "z", -25.0, "north-most"),
     # Its bar and bar pin, coaxial still, 30 back down the 50 every bar went
     # up: at 50 the bar's balloon took the ring slot past its rod's and
     # leaders 12/13 crossed (r14 layout audit); the r14 ring replay clears

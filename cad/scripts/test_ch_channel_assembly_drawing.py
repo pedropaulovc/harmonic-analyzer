@@ -11,6 +11,7 @@ import _config
 import ch_channel_assembly_steps as steps
 import draw_ch_channel_assembly as drawing
 import dt_drive_train_steps
+from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
 import pytest
 import rocker_bank_layout as bank
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -26,12 +27,16 @@ NOTE_LINE_PITCH = 0.0045
 
 
 def _step_body(key: str) -> str:
-    """The printed text of one step, from its head to the next head."""
-    text = drawing.FITUP_STEPS
-    heads = list(STEP_HEAD.finditer(text))
-    index = steps.step_number(key) - 1
-    end = heads[index + 1].start() if index + 1 < len(heads) else len(text)
-    return " ".join(text[heads[index].end() : end].split())
+    """The printed text of one step, from its head to the next head or the
+    end of its sheet's block (never into the next sheet's heading)."""
+    number = steps.step_number(key)
+    for block in drawing.FITUP_NOTES:
+        heads = list(STEP_HEAD.finditer(block))
+        for index, head in enumerate(heads):
+            if int(head.group(1)) == number:
+                end = heads[index + 1].start() if index + 1 < len(heads) else len(block)
+                return " ".join(block[head.end() : end].split())
+    raise KeyError(key)
 
 
 def _sequence_steps(text: str) -> dict[str, str]:
@@ -135,14 +140,17 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     north = sheets[fitup_number][north_label]
     assert "EAR INNER FACE TO Y" in north and "DRO STILL ZEROED AS 9A" in north
     # The plain shaft threads through the set ear: the bracket stays down,
-    # and the channel sheet threads the shaft and the miced washer from the
-    # north.
+    # and the channel sheet threads the shaft and the washer measured there
+    # from the north.
     assert "LIFT IT OFF" not in north
     assert "MIC ONE MHA-VN-070, W" in north
     north_ear = _step_body("north-ear-datum")
     washer = _config.parts("vn-rocker-thrust-washer")["number"]
     assert "FLATS UP" in north_ear and "SOUTH THROUGH THE EAR" in north_ear
-    assert f"THE {washer} MICED AND KEPT AT THAT STEP" in north_ear
+    # Machinist review (PR #1605): "MICED AND KEPT" read as a second, unstated
+    # measurement; the washer is the one measured at the drive-train step.
+    assert f"THE {washer} WASHER MEASURED AT THAT STEP, THEN HUBS" in north_ear
+    assert "MICED" not in north_ear
     # Positive control: the step before it is the bank's end play, not the ear.
     assert f"NORTH {bracket}" not in sheets[fitup_number]["9F"]
     # It follows 9F, the bank's last sub-step, on the bank sheet: the rig's
@@ -165,9 +173,11 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     printed = [int(n) for n in STEP_HEAD.findall(drawing.FITUP_STEPS)]
     assert printed == list(range(1, len(steps.SEQUENCE) + 1))
     assert len(steps.SEQUENCE) == 14
-    assert steps.SEQUENCE[6:] == (
+    assert steps.SEQUENCE[4:] == (
+        "south-bracket-spring-set",
+        "south-bracket-screwed",
+        "shaft-set",
         "set-screws-driven",
-        "preload-accepted",
         steps.KEEPERS_PAIR_REAMED_KEY,
         steps.KEEPERS_SET_KEY,
         steps.BARS_PINNED_KEY,
@@ -187,18 +197,29 @@ def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> N
     setting = _step_body("south-bracket-spring-set")
     assert f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS." in setting
     assert "SPRING-SET BLADE (DETAIL A) BESIDE THE SPRING" in setting
-    assert "PULL THE BLADE" in setting
-    # r10 machinist review: worded as step 10's keeper transfer.
+    # Machinist review (PR #1605): the spring-back check is run while the
+    # bracket is only clamped, so "repeat" re-sets a bracket that can still
+    # move; it used to follow the drilled, tapped, screwed and staked step.
+    assert "CLAMP AND PULL THE BLADE. ACCEPT: PUSHED SOUTH," in setting
+    assert "THE BANK SPRINGS BACK ONTO THE NORTH WASHER" in setting
+    assert "ELSE UNCLAMP AND REPEAT THIS STEP." in setting
     support = _config.parts("fr-rocker-arm-support")["number"]
     hold_down = _config.parts("vn-bracket-hold-down-screw")["number"]
+    bracket = _config.parts("ch-pivot-bracket")["number"]
+    assert support not in setting and hold_down not in setting
+    # r10 machinist review: worded as step 10's keeper transfer.
+    screwed = _step_body("south-bracket-screwed")
+    assert screwed.startswith("STILL CLAMPED AS ACCEPTED, ")
     assert (
-        f"TRANSFER ITS FOOT HOLE INTO THE {support} RAIL, TAP AS {support}, "
-        f"SCREW DOWN ONE {hold_down}, PULL THE BLADE."
-    ) in setting
-    accept = _step_body("preload-accepted")
-    assert "PUSHED SOUTH," in accept
-    assert "THE BANK SPRINGS BACK ONTO THE NORTH WASHER" in accept
-    assert f"STEP {steps.step_number('south-bracket-spring-set')}" in accept
+        f"TRANSFER THE SOUTH {bracket} FOOT HOLE INTO THE {support} RAIL, TAP AS "
+        f"{support}, SCREW DOWN ONE {hold_down}."
+    ) in screwed
+    # Screwed down only after the check passes, and before anything staked.
+    assert (
+        steps.step_number("south-bracket-spring-set") + 1
+        == steps.step_number("south-bracket-screwed")
+        < steps.step_number("set-screws-driven")
+    )
     stack = _step_body("rocker-stack-accepted")
     assert "TO THE ROCKER BANK VIEW'S STACK DIMENSION" in stack
     # The numbers live in the model dimensions, never in the step text.
@@ -210,6 +231,23 @@ def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> N
     assert "END PLAY" not in drawing.FITUP_STEPS
     # Positive control: the spring is not what step 4 fits.
     assert spring not in _step_body("south-washer-fitted")
+
+
+def test_the_stack_step_says_which_way_and_where_to_re_face() -> None:
+    """Machinist review (PR #1605): "RE-FACE A LONG STACK" left a short stack
+    and the face to cut open. The hub band is upper-only, so the shortest
+    stack meets the acceptance's low limit, and the re-face is on the south
+    faces, never the datum face the strap is dimensioned from."""
+    arm = _config.parts("ch-rocker-arm")["number"]
+    assert HUB_LENGTH_BAND[1] == 0.0
+    assert bank.COUNT * (HUB_LENGTH + HUB_LENGTH_BAND[1]) >= bank.STACK_L20_ACCEPT[0] - 1e-9
+    stack = _step_body("rocker-stack-accepted")
+    assert (
+        f"EVERY {arm} HUB COMES AT OR OVER PRINT LENGTH, SO THE STACK IS NEVER "
+        "SHORT. RE-FACE A LONG STACK ON THE SOUTH FACES OF THE LONGEST HUBS AS "
+        "STACKED, NEVER THE DATUM FACE, NO HUB UNDER PRINT LENGTH."
+    ) in stack
+    assert f"{HUB_LENGTH:.2f}" not in stack
 
 
 
@@ -315,6 +353,9 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     assert drawing.exploded_offset(asm.BRACKET, "south") == (0.0, 0.0, -60.0)
     bracket, keeper = drawing.NORTH_BRACKET_DETAIL, drawing.NORTH_KEEPER_DETAIL
     assert drawing.EXPLODED_DETAILS == (bracket, keeper)
+    # Machinist review (PR #1605): at the upper right the letter B sat over
+    # the rocker bank's stack beside the circle; the lower left is open.
+    assert bracket.letter_corner == (-1, -1)
     # Each cluster member's exploded reference point projects inside its
     # circle with room for the part round it: the washer (Ø10.2), the set
     # screw above the ear apex, the hold-down over its foot hole.
@@ -569,7 +610,14 @@ def test_the_explode_plan_moves_every_family_and_only_them() -> None:
     assert drawing.exploded_offset(asm.ARM, "north-most") == (0.0, 0.0, 300.0)
     assert drawing.exploded_offset(asm.ROD, "north-most") == (0.0, -50.0, 300.0)
     assert drawing.exploded_offset(asm.ROD_PIN, "north-most") == (0.0, 0.0, 325.0)
-    assert drawing.exploded_offset(asm.BAR_PIN, "north-most") == (0.0, 20.0, 325.0)
+    # Machinist review (PR #1605): withdrawn north the bar pin sat on the
+    # lever's lower edge and balloon 16's arrowhead lay along the lever, so it
+    # read as landing on the lever end with 17. South, along its own axis
+    # (still coaxial with its bar), it stands in the open past the bar's top.
+    assert drawing.exploded_offset(asm.BAR_PIN, "north-most") == (0.0, 20.0, 275.0)
+    bar_offset = drawing.exploded_offset(asm.BAR, "north-most")
+    pin_offset = drawing.exploded_offset(asm.BAR_PIN, "north-most")
+    assert pin_offset[:2] == bar_offset[:2] and pin_offset[2] < bar_offset[2]
     assert drawing.exploded_offset(asm.BAR, "north-most") == (0.0, 20.0, 300.0)
     assert drawing.exploded_offset(asm.BAR, "north") == (0.0, 50.0, 0.0)
     spring = drawing.exploded_offset(drawing.SPRING_STEM, "north-most")
@@ -729,7 +777,7 @@ def test_the_finished_shaft_is_set_by_its_north_tip_before_the_screws() -> None:
         assert "CUT THE" not in body and "SCRIBE" not in body and "UNCUT" not in body
     key = "shaft-set"
     number = steps.step_number(key)
-    assert steps.step_number("south-bracket-spring-set") < number
+    assert steps.step_number("south-bracket-screwed") < number
     assert number < steps.step_number("set-screws-driven")
     low = shaft.DOME_HEIGHT - bank.SHAFT_TIP_SET_BAND
     high = shaft.DOME_HEIGHT + bank.SHAFT_TIP_SET_BAND
@@ -745,8 +793,9 @@ def test_the_finished_shaft_is_set_by_its_north_tip_before_the_screws() -> None:
 
 def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fact() -> None:
     """User, 2026-10-10: one MHA-VN-034 down each ear's apex tap onto the
-    plain shaft's flat, once the shaft is set, before the preload is
-    accepted. The step prints the bracket spec's engagement fact from the
+    plain shaft's flat, once the shaft is set. The preload is accepted before
+    (machinist review, PR #1605: a failed check after staking could not be
+    re-set). The step prints the bracket spec's engagement fact from the
     spec, never typed."""
     import ch_pivot_bracket_spec as bracket_spec
 
@@ -754,7 +803,8 @@ def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fa
     key = "set-screws-driven"
     number = steps.step_number(key)
     assert steps.step_number("shaft-set") < number
-    assert number < steps.step_number("preload-accepted")
+    assert steps.step_number("south-bracket-spring-set") < number
+    assert number < steps.step_number(steps.KEEPERS_PAIR_REAMED_KEY)
     body = _step_body(key)
     assert f"RUN ONE {set_screw} DOWN EACH APEX TAP ONTO ITS FLAT" in body
     assert "FLATS UP" in body and "NORTH FIRST" in body

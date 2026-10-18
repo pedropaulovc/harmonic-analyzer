@@ -104,12 +104,14 @@ from ch_pivot_bracket_spec import (
     SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT,
 )
 from ch_pivot_shaft_spec import DOME_HEIGHT
+from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
     COUNT,
     PIVOT_BRACKET_Z,
     SHAFT_TIP_SET_BAND,
+    STACK_L20_ACCEPT,
     STACK_MID_Z,
 )
 
@@ -515,6 +517,10 @@ NORTH_BRACKET_DETAIL = BankView(
     orientation="*Isometric",
     exploded=True,
     letter="B",
+    # Lower left: at the upper right the letter sat over the rocker bank's
+    # stack beside the circle, where the machinist review (PR #1605) could not
+    # tell which boundary it named; the lower left of the circle is clear.
+    letter_corner=(-1, -1),
 )
 NORTH_KEEPER_DETAIL = BankView(
     "DETAIL C",
@@ -639,7 +645,17 @@ def _fitup_notes() -> tuple[str, str]:
     anchor = _config.parts("vn-spring-hook")["number"]
     anchor_nut = _config.parts("ch-anchor-jam-nut")["number"]
     last = COUNT - 1
-    set_step = steps.step_number("south-bracket-spring-set")
+    # Step 1 prints that the stack is never short (machinist review, PR
+    # #1605): every hub comes at or over its print length, so the shortest
+    # stack the part band allows must still meet the acceptance's low limit.
+    # A long stack is then re-faced on the longest hubs' south faces, each
+    # kept at or over its print, and never on the datum face the strap is
+    # dimensioned from.
+    if COUNT * (HUB_LENGTH + HUB_LENGTH_BAND[1]) < STACK_L20_ACCEPT[0] - 1e-9:
+        raise AssertionError(
+            "step 1 says the stack is never short, but the hub band allows "
+            "a stack under the acceptance's low limit"
+        )
     # The pivot shaft comes finished, domed both ends to its overall length
     # (ch_pivot_shaft_spec): its north tip set DOME_HEIGHT proud of the north
     # ear, within SHAFT_TIP_SET_BAND, puts both flats under their screws
@@ -679,8 +695,11 @@ def _fitup_notes() -> tuple[str, str]:
         "rocker-stack-accepted": (
             f"STACK THE {COUNT} {arm} ROCKERS ON THE {shaft} SHAFT, CLOSED UP. "
             f"HUB 0 SOUTH FACE TO HUB {last} NORTH FACE TO THE ROCKER BANK "
-            "VIEW'S STACK DIMENSION; RE-FACE A LONG STACK. SLIDE THE ROCKERS "
-            "OFF IN ORDER AND KEEP THAT ORDER."
+            f"VIEW'S STACK DIMENSION. EVERY {arm} HUB COMES AT OR OVER PRINT "
+            "LENGTH, SO THE STACK IS NEVER SHORT. RE-FACE A LONG STACK ON THE "
+            "SOUTH FACES OF THE LONGEST HUBS AS STACKED, NEVER THE DATUM FACE, "
+            "NO HUB UNDER PRINT LENGTH. SLIDE THE ROCKERS OFF IN ORDER AND KEEP "
+            "THAT ORDER."
         ),
         "rod-forks-pinned": (
             f"BEFORE {steps.CYLINDER_STACK_REF}, AT THE BENCH: PIN EACH {rod} "
@@ -692,16 +711,24 @@ def _fitup_notes() -> tuple[str, str]:
             f"NORTH {bracket} SET AT {steps.NORTH_BRACKET_SET_REF}: SWING "
             f"EACH ARM UP ON ITS ROD; PUSH THE {shaft} SHAFT, FLATS UP, "
             "SOUTH THROUGH THE EAR, THE "
-            f"{washer} MICED AND KEPT AT THAT STEP, AND HUBS {last} TO 0."
+            f"{washer} WASHER MEASURED AT THAT STEP, THEN HUBS {last} TO 0."
         ),
         "south-washer-fitted": f"SLIP THE OTHER {washer} ON AGAINST HUB 0.",
+        # The spring-back check runs while the bracket is only clamped, so a
+        # failed check is re-set before anything is drilled, tapped or staked
+        # (machinist review, PR #1605).
         "south-bracket-spring-set": (
             f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS. "
             f"FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
             f"SPRING-SET BLADE (DETAIL {DETAIL_LETTER}) BESIDE THE SPRING, "
-            "BANK PUSHED NORTH. "
-            f"CLAMP, TRANSFER ITS FOOT HOLE INTO THE {support} RAIL, TAP AS "
-            f"{support}, SCREW DOWN ONE {hold_down}, PULL THE BLADE."
+            "BANK PUSHED NORTH. CLAMP AND PULL THE BLADE. ACCEPT: PUSHED "
+            "SOUTH, THE BANK SPRINGS BACK ONTO THE NORTH WASHER; ELSE UNCLAMP "
+            "AND REPEAT THIS STEP."
+        ),
+        "south-bracket-screwed": (
+            f"STILL CLAMPED AS ACCEPTED, TRANSFER THE SOUTH {bracket} FOOT HOLE "
+            f"INTO THE {support} RAIL, TAP AS {support}, SCREW DOWN ONE "
+            f"{hold_down}."
         ),
         "shaft-set": (
             f"SLIDE THE {shaft} SHAFT UNTIL ITS NORTH TIP STANDS "
@@ -717,10 +744,6 @@ def _fitup_notes() -> tuple[str, str]:
             # The bracket's engagement fact; the lifted arch meets rule 18
             # (ch_pivot_bracket_spec), so no exception is declared for it.
             f"{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
-        ),
-        "preload-accepted": (
-            "ACCEPT: PUSHED SOUTH, THE BANK SPRINGS BACK ONTO THE NORTH "
-            f"WASHER. ELSE REPEAT STEP {set_step}."
         ),
         steps.KEEPERS_PAIR_REAMED_KEY: (
             f"CLAMP BOTH {keeper}, FEET OUTBOARD ON ONE FLAT, INNER LUG FACES "

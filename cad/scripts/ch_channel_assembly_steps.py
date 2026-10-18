@@ -49,15 +49,22 @@ SPRINGS_HOOKED_KEY = "springs-hooked"
 # ha_harmonic_analyzer_assembly_steps.step_ref("channel-anchors-set").
 HA_ANCHORS_SET_REF = "MHA-HA-000 STEP 5"
 
+# The spring-back acceptance belongs to the spring-set step, run while the
+# south bracket is still only clamped: it used to be a separate step after the
+# foot hole was transferred and tapped, the bracket screwed down and the shaft
+# set screws staked, so "else repeat" re-set a bracket that could no longer
+# move (machinist review, PR #1605). The bracket is screwed down only once
+# that check has passed. The step count is unchanged, so every key from
+# KEEPERS_PAIR_REAMED_KEY on keeps the number other sheets print.
 SEQUENCE: tuple[str, ...] = (
     "rocker-stack-accepted",
     RODS_PINNED_KEY,
     "north-ear-datum",
     "south-washer-fitted",
     "south-bracket-spring-set",
+    "south-bracket-screwed",
     "shaft-set",
     "set-screws-driven",
-    "preload-accepted",
     KEEPERS_PAIR_REAMED_KEY,
     KEEPERS_SET_KEY,
     BARS_PINNED_KEY,

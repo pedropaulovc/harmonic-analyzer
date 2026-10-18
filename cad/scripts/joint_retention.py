@@ -1340,7 +1340,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_rocker_arm_support",
         thread="#8-32",
         quantity=1,
-        installed_at=ch_channel_assembly_steps.step_ref("south-bracket-spring-set"),
+        installed_at=ch_channel_assembly_steps.step_ref("south-bracket-screwed"),
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the south pivot_bracket foot to the stationary rocker_arm_support "
@@ -1358,8 +1358,8 @@ JOINTS: tuple[Joint, ...] = (
         lock_step="",
         evidence=(
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header; rocker_bracket_seat_layout.SEAT_SPEC; "
-            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-spring-set' (MHA-CH-000 STEP 5: 'TRANSFER ITS FOOT HOLE ... "
-            "TAP AS MHA-FR-005, SCREW DOWN ONE MHA-VN-071, PULL THE BLADE')"
+            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-screwed' (MHA-CH-000 STEP 6: 'TRANSFER THE SOUTH "
+            "MHA-CH-008 FOOT HOLE INTO THE MHA-FR-005 RAIL, TAP AS MHA-FR-005, SCREW DOWN ONE MHA-VN-071')"
         ),
     ),
     Joint(
@@ -2358,7 +2358,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "north-ear-datum"
     ),
     "ha-harmonic-analyzer/south-pivot-bracket-hold-down": Occurrence(
-        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "south-bracket-spring-set"
+        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "south-bracket-screwed"
     ),
     "ha-harmonic-analyzer/fulcrum-keeper-screw-in-top-frame": Occurrence(
         "ha_harmonic_analyzer", "build_ch_channel_assembly.py", '"vn-frame-side-screw"'
