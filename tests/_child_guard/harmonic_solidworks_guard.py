@@ -34,8 +34,10 @@ parent's command-line check still sees its command line), and what a
 ``.ps1``/``.cmd``/``.vbs`` file does past its command line.
 """
 
+import functools
 import ntpath
 import os
+import subprocess
 import sys
 from importlib.machinery import ExtensionFileLoader, SourceFileLoader
 
@@ -43,6 +45,11 @@ from importlib.machinery import ExtensionFileLoader, SourceFileLoader
 MARKER = "HARMONIC_TEST_FORBID_SOLIDWORKS"
 # Outside dodo's SolidWorks crash/timeout/modal/seat codes (86-89).
 REFUSED_EXIT = 97
+
+_REAL_POPEN = subprocess.Popen
+_REAL_RUN = subprocess.run
+# Set only in a pytest host, never propagated through the child environment.
+_pytest_refuse = None
 
 # A command line naming one of these starts SolidWorks, whatever runs it.
 LAUNCH_MARKERS = (
@@ -482,6 +489,8 @@ def after_module_load(callback):
 
 
 def _child_refuse(route, detail):
+    if _pytest_refuse is not None:
+        return _pytest_refuse(route, detail)
     test = os.environ.get("PYTEST_CURRENT_TEST", "<no test>")
     message = (
         f"SolidWorks launch blocked in a child process of {test} via {route}: "
@@ -502,12 +511,30 @@ def _child_refuse(route, detail):
         os._exit(REFUSED_EXIT)
 
 
+def _guard_dodo(module, refuse):
+    """Allow fake COM runners, but refuse a real subprocess in every Python host."""
+    run_subprocess = getattr(module, "_run_subprocess", None)
+    exec_com = getattr(module, "_exec_com", None)
+    if exec_com is None:
+        return
+
+    @functools.wraps(exec_com)
+    def guarded_exec_com(cmd, label, log_stem=None, *, task=None):
+        runner = getattr(module, "subprocess", None)
+        real_runner = runner is None or (
+            getattr(runner, "Popen", None) is _REAL_POPEN
+            and (log_stem is not None or getattr(runner, "run", None) is _REAL_RUN)
+        )
+        if getattr(module, "_run_subprocess", None) is run_subprocess and real_runner:
+            refuse("dodo._exec_com", f"{label}: {cmd}")
+        return exec_com(cmd, label, log_stem, task=task)
+
+    module._exec_com = guarded_exec_com
+
+
 def install_child_guard():
     """Refuse SolidWorks in this process; any refusal ends it."""
     class_ids = launcher_class_ids()
-
-    def refuse_com_task(cmd, label, *_args, **_kwargs):
-        _child_refuse("dodo._exec_com", f"{label}: {cmd}")
 
     def guard_loaded(loader, module):
         name = module.__name__
@@ -517,7 +544,7 @@ def install_child_guard():
             guard_module(name, sys.modules[name], _child_refuse, class_ids)
         path = getattr(loader, "path", "")
         if os.path.basename(path).lower() == "dodo.py" and hasattr(module, "_exec_com"):
-            module._exec_com = refuse_com_task
+            _guard_dodo(module, _child_refuse)
 
     after_module_load(guard_loaded)
     # A builtin module loads past the loader hook.

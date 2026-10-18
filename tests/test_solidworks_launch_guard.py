@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from harmonic_solidworks_guard import (
@@ -439,6 +440,52 @@ def test_doit_child_running_a_com_task_is_refused(solidworks_child_refusals, tmp
     assert result.returncode == REFUSED_EXIT
 
 
+def test_child_dodo_with_a_fake_runner_keeps_exercising_exec_com(tmp_path):
+    """A guarded xdist worker must not exit when its test injects a fake runner."""
+    dodo = tmp_path / "dodo.py"
+    dodo.write_text(
+        "import subprocess\n"
+        "def _run_subprocess(*args, **kwargs):\n"
+        "    raise AssertionError('real runner reached')\n"
+        "def _exec_com(cmd, label, log_stem=None, *, task=None):\n"
+        "    return _run_subprocess(cmd, label, log_stem, task=task)\n",
+        encoding="utf-8",
+    )
+    script = (
+        "import dodo; "
+        "dodo._run_subprocess = lambda *args, **kwargs: 89; "
+        "assert dodo._exec_com(['probe'], 'part:probe') == 89; "
+        "print('fake runner exercised')"
+    )
+    result = _run_child([sys.executable, "-c", script], cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "fake runner exercised" in result.stdout
+
+
+def test_worker_logs_isolate_siblings_but_keep_nested_child_refusals(
+    request, monkeypatch
+):
+    root = _root_conftest(request)
+    with monkeypatch.context() as patch:
+        # Restore the live session's log and cursor before autouse enforcement.
+        patch.setattr(root, "_child_log", root._child_log)
+        patch.setattr(root, "_child_log_read", root._child_log_read)
+        patch.setenv(MARKER, os.environ[MARKER])
+        root._guard_child_processes(SimpleNamespace(workerinput={}))
+        first = os.environ[MARKER]
+        root._guard_child_processes(SimpleNamespace(workerinput={}))
+        sibling = os.environ[MARKER]
+        assert first != sibling
+        # A nested session in the first worker reuses that worker's log.
+        os.environ[MARKER] = first
+        root._guard_child_processes(SimpleNamespace())
+        assert os.environ[MARKER] == first
+        result = _run_child([sys.executable, "-c", _CHILD_LAUNCHES_SOLIDWORKS])
+        _expect_child_refused(root._child_refusals, result, "subprocess.Popen")
+        assert result.returncode == REFUSED_EXIT
+        assert Path(sibling).read_text(encoding="utf-8") == ""
+
+
 @pytest.mark.skipif(shutil.which("git") is None, reason="git is not on PATH")
 def test_git_external_diff_binding_solidworks_is_refused(
     solidworks_child_refusals, tmp_path
@@ -750,7 +797,6 @@ def test_dodo_part_build_with_a_real_runner_is_refused(
 ):
     """dodo's part path: a cache miss with no farm reaches ``_exec_com``."""
     with _fresh_dodo() as dodo:
-        assert dodo._exec_com.__code__.co_name == "refuse_com_task"
         monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
         monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [])
         monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [])

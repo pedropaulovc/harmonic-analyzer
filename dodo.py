@@ -3438,6 +3438,8 @@ def task_check():
         # Persisted display data must fail closed before assembly publication.
         SCRIPTS_DIR / "test_assembly_save.py",
         REPO_ROOT / "tests" / "test_saved_display_data.py",
+        # Worker/child guard isolation and fake-runner safety under xdist.
+        REPO_ROOT / "tests" / "test_solidworks_launch_guard.py",
         # The copied-mate safeguard must keep failing CLOSED: an unreadable
         # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
         # read as "this copy is clean".
@@ -3879,6 +3881,14 @@ def task_check():
             "file_dep": [
                 str((REPO_ROOT / "dodo.py").resolve()),
                 str((REPO_ROOT / "build.py").resolve()),
+                # Pytest hooks/child startup sit outside the cad/scripts import
+                # map, so the executed closure cannot discover these inputs.
+                str((REPO_ROOT / "conftest.py").resolve()),
+                str((REPO_ROOT / "tests" / "_child_guard" / "sitecustomize.py").resolve()),
+                str(
+                    (REPO_ROOT / "tests" / "_child_guard" / "harmonic_solidworks_guard.py")
+                    .resolve()
+                ),
                 *recipe_test_deps,
                 *_CONFIG_YAMLS,
                 *sorted(
