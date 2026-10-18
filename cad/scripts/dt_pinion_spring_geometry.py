@@ -194,18 +194,26 @@ FREE_KINK_START = _free(KINK_START)
 FREE_KINK_C = _free(KINK_C)
 FREE_KINK_EXIT = _free(KINK_EXIT)
 FREE_FLAT_TIP = _free(FLAT_TIP)
-# The kink prints as its angle, blade to flat (machinist review, PR #1675):
-# the two lines cross outside the crest, on its convex side, R_KINK /
-# cos(KINK_DEG / 2) out along the crest's mid-normal, and the acute wedge
-# below that crossing -- the blade running down, the flat's line carried down
-# past the crest -- holds the arc.  Shape-invariant, so the free form's is the
-# installed one turned PRESET_DEG about the bend centre.
+# The kink prints as its included angle, blade to flat (machinist review, PR
+# #1675): 180 - KINK_DEG, the angle SOLIDWORKS measures between the two
+# segments (spring r3/r7/r8 leaves read 155 deg, and SupplementaryAngle left
+# that reading).  The two lines cross outside the crest, on its convex side,
+# R_KINK / cos(KINK_DEG / 2) out along the crest's mid-normal.  The sketch
+# places the dimension's text down the bisector of the acute wedge below
+# that crossing (KINK_ANGLE_BISECTOR, where those leaves read 155); the
+# print shows the arc in the included wedge on the convex side, west of the
+# crest -- the blade's line carried up, the flat's carried down -- about
+# KINK_INCLUDED_BISECTOR, the crest's mid-normal.  Shape-invariant, so the
+# free form's is the installed one turned PRESET_DEG about the bend centre.
+KINK_INCLUDED_DEG = 180.0 - KINK_DEG
 KINK_VERTEX = _add(
     KINK_C, _cw(_W, KINK_DEG / 2.0), R_KINK / math.cos(math.radians(KINK_DEG / 2.0))
 )
 KINK_ANGLE_BISECTOR = _cw((-_B[0], -_B[1]), KINK_DEG / 2.0)
+KINK_INCLUDED_BISECTOR = _cw(_W, KINK_DEG / 2.0)
 FREE_KINK_VERTEX = _free(KINK_VERTEX)
 FREE_KINK_ANGLE_BISECTOR = _cw(KINK_ANGLE_BISECTOR, -PRESET_DEG)
+FREE_KINK_INCLUDED_BISECTOR = _cw(KINK_INCLUDED_BISECTOR, -PRESET_DEG)
 KINK_ANGLE_PLACES = 0
 # How far the free crest's outer face stands into the parked flank, along the
 # flank normal: the free crest circle's centre shift less the parked air. The

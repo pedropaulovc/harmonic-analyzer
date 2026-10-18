@@ -208,16 +208,23 @@ def _unit(v: tuple[float, float]) -> tuple[float, float]:
     return (v[0] / length, v[1] / length)
 
 
-def test_kink_angle_drives_the_flick_in_the_acute_wedge() -> None:
+def test_kink_angle_drives_the_flick_as_its_included_angle() -> None:
     # PR #1675 review r2: the tip's location from the free end less the kink
     # start's (two .X dimensions) let the flick read flat, reversed or sharply
-    # kinked.  The kink's angle, blade to flat, now drives both profiles and
-    # prints on the free one, in the acute wedge below the lines' crossing.
+    # kinked.  The kink's included angle, blade to flat, now drives both
+    # profiles and prints on the free one, on the crest's convex side.
     build_source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "TipH" not in build_source
-    assert build_source.count('dims.record(f"{prefix}KinkAngle", \'"KinkAngle"\')') == 1
-    assert 'set_global(adapter, "KinkAngle", f"{KINK_DEG}deg")' in build_source
-    for start, bend_exit, kink_exit, tip, vertex, bisector in (
+    assert (
+        build_source.count('dims.record(f"{prefix}KinkAngle", \'"KinkIncludedAngle"\')')
+        == 1
+    )
+    assert (
+        'set_global(adapter, "KinkIncludedAngle", f"{KINK_INCLUDED_DEG}deg")'
+        in build_source
+    )
+    assert geometry.KINK_INCLUDED_DEG == pytest.approx(180.0 - geometry.KINK_DEG)
+    for start, bend_exit, kink_exit, tip, vertex, bisector, included in (
         (
             geometry.KINK_START,
             geometry.BEND_EXIT,
@@ -225,6 +232,7 @@ def test_kink_angle_drives_the_flick_in_the_acute_wedge() -> None:
             geometry.FLAT_TIP,
             geometry.KINK_VERTEX,
             geometry.KINK_ANGLE_BISECTOR,
+            geometry.KINK_INCLUDED_BISECTOR,
         ),
         (
             geometry.FREE_KINK_START,
@@ -233,6 +241,7 @@ def test_kink_angle_drives_the_flick_in_the_acute_wedge() -> None:
             geometry.FREE_FLAT_TIP,
             geometry.FREE_KINK_VERTEX,
             geometry.FREE_KINK_ANGLE_BISECTOR,
+            geometry.FREE_KINK_INCLUDED_BISECTOR,
         ),
     ):
         blade_down = _unit((bend_exit[0] - start[0], bend_exit[1] - start[1]))
@@ -244,25 +253,30 @@ def test_kink_angle_drives_the_flick_in_the_acute_wedge() -> None:
             )
         dot = blade_down[0] * flat_down[0] + blade_down[1] * flat_down[1]
         assert math.degrees(math.acos(dot)) == pytest.approx(geometry.KINK_DEG)
+        # The sketch's text point (where SOLIDWORKS read the included angle).
         assert bisector == pytest.approx(
             _unit((blade_down[0] + flat_down[0], blade_down[1] + flat_down[1]))
         )
-    # The keep sits on the free wedge's bisector, the wedge wide enough there
-    # for the text.
+        # The printed wedge: between the blade's line carried up and the
+        # flat's carried down, away from the crest.
+        assert included == pytest.approx(
+            _unit((flat_down[0] - blade_down[0], flat_down[1] - blade_down[1]))
+        )
+        towards_crest = (start[0] - vertex[0], start[1] - vertex[1])
+        assert included[0] * towards_crest[0] + included[1] * towards_crest[1] < 0.0
+    # The keep sits on the free included wedge's bisector, west of the crest.
     vertex = (
         drawing._front_x(geometry.FREE_KINK_VERTEX[0]),
         drawing._front_y(geometry.FREE_KINK_VERTEX[1]),
     )
     keep = drawing.FRONT_KEEP[dt_pinion_spring_spec.FREE_KINK_ANGLE]
     assert math.dist(keep, vertex) == pytest.approx(drawing.KINK_ANGLE_TEXT_RADIUS)
-    half = math.radians(geometry.KINK_DEG / 2)
-    chord = 2.0 * drawing.KINK_ANGLE_TEXT_RADIUS * math.sin(half)
-    assert chord > 0.010
+    assert keep[0] < vertex[0] - 0.010
     assert dt_pinion_spring_spec.FREE_KINK_ANGLE not in drawing.DIMENSION_CALLOUTS
 
 
-def _arc(vertex, about_deg: float, half_deg: float, radius: float = 0.024):
-    bisector_x, bisector_y = geometry.FREE_KINK_ANGLE_BISECTOR
+def _arc(vertex, about_deg: float, half_deg: float, radius: float = 0.012):
+    bisector_x, bisector_y = geometry.FREE_KINK_INCLUDED_BISECTOR
     bisector = math.degrees(math.atan2(bisector_y, bisector_x))
     points = []
     for step in range(11):
@@ -274,24 +288,25 @@ def _arc(vertex, about_deg: float, half_deg: float, radius: float = 0.024):
 
 def test_kink_arc_faults_reads_the_wedge_the_arc_sweeps() -> None:
     vertex = (0.087, 0.152)
+    half = geometry.KINK_INCLUDED_DEG / 2
     acute = geometry.KINK_DEG / 2
-    assert drawing.kink_arc_faults(_arc(vertex, 0.0, acute), vertex) == []
-    # Positive controls: the obtuse neighbour, the upper acute wedge, an arc
-    # about another centre, and no arc.
-    obtuse_half = 90.0 - geometry.KINK_DEG / 2
-    assert drawing.kink_arc_faults(_arc(vertex, 90.0, obtuse_half), vertex)
-    assert drawing.kink_arc_faults(_arc(vertex, 180.0, geometry.KINK_DEG / 2), vertex)
+    assert drawing.kink_arc_faults(_arc(vertex, 0.0, half), vertex) == []
+    # Positive controls: either acute wedge, the opposite included wedge, an
+    # arc about another centre, and no arc.
+    assert drawing.kink_arc_faults(_arc(vertex, 90.0, acute), vertex)
+    assert drawing.kink_arc_faults(_arc(vertex, -90.0, acute), vertex)
+    assert drawing.kink_arc_faults(_arc(vertex, 180.0, half), vertex)
     shifted = (vertex[0] + 0.002, vertex[1])
-    assert drawing.kink_arc_faults(_arc(shifted, 0.0, geometry.KINK_DEG / 2), vertex)
+    assert drawing.kink_arc_faults(_arc(shifted, 0.0, half), vertex)
     assert drawing.kink_arc_faults([], vertex) == ["no arc"]
-    # Only the upper acute wedge (the same 25 deg) reads as one to turn
-    # vertically opposite; the lower one and the obtuse neighbour do not.
-    lower = drawing.kink_arc_mean_offset_deg(_arc(vertex, 0.0, acute), vertex)
-    upper = drawing.kink_arc_mean_offset_deg(_arc(vertex, 180.0, acute), vertex)
-    assert lower == pytest.approx(0.0, abs=1e-6)
-    assert upper == pytest.approx(180.0, abs=1e-4)
-    obtuse = drawing.kink_arc_mean_offset_deg(_arc(vertex, 90.0, obtuse_half), vertex)
-    assert obtuse == pytest.approx(90.0, abs=1e-4)
+    # Only the opposite included wedge (the same 155 deg) reads as one to
+    # turn vertically opposite; the convex one and the acute ones do not.
+    convex = drawing.kink_arc_mean_offset_deg(_arc(vertex, 0.0, half), vertex)
+    opposite = drawing.kink_arc_mean_offset_deg(_arc(vertex, 180.0, half), vertex)
+    assert convex == pytest.approx(0.0, abs=1e-6)
+    assert opposite == pytest.approx(180.0, abs=1e-4)
+    side = drawing.kink_arc_mean_offset_deg(_arc(vertex, 90.0, acute), vertex)
+    assert side == pytest.approx(90.0, abs=1e-4)
 
 
 class _KinkView:

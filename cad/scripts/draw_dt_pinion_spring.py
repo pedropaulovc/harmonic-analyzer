@@ -61,14 +61,14 @@ from dt_pinion_spring_geometry import (
     FOOT_END,
     FOOT_TAN,
     FREE_FLAT_TIP,
-    FREE_KINK_ANGLE_BISECTOR,
+    FREE_KINK_INCLUDED_BISECTOR,
     FREE_KINK_START,
     FREE_KINK_VERTEX,
     HOLE_DIA,
     HOLE_FROM_END,
     KINK_C,
-    KINK_DEG,
     KINK_EXIT,
+    KINK_INCLUDED_DEG,
     PAD_WIDTH,
     PAD_WING_LEN,
     PAD_Z,
@@ -200,15 +200,17 @@ def callout_half_width(name: str) -> float:
 
 TEXT_TO_EXTENSION_GAP = 0.003
 _KINK_TEXT_X = _PAD_EAST + TEXT_TO_EXTENSION_GAP + callout_half_width("FreeKinkH")
-# The kink angle's text (and so its arc) this far from the vertex down the
-# wedge's bisector (sheet metres): there the 25 deg wedge is 10.4 mm wide,
-# room for "25°" with 2 mm to the blade and to the flat's extension line.
-KINK_ANGLE_TEXT_RADIUS = 0.024
+# The kink angle's text (and so its arc) this far from the vertex along the
+# included wedge's bisector, the crest's convex mid-normal (sheet metres):
+# "155°" stands west of the phantom crest, and the arc's ends on the blade's
+# line carried up and the flat's carried down stay under FreeKinkH's
+# dimension line and 2 mm west of its extension line from the kink start.
+KINK_ANGLE_TEXT_RADIUS = 0.012
 # The arc must centre on the vertex and every drawn point lie within this of
 # the wedge's bisector (half the wedge plus room for outside arrows); the
-# neighbouring wedges' arcs reach 77.5 deg and more off it.
+# acute wedges' arcs reach 102.5 deg off it, the opposite included one's more.
 KINK_ARC_CENTRE_TOL = 0.0005
-KINK_ARC_HALF_SPREAD_DEG = KINK_DEG / 2.0 + 15.0
+KINK_ARC_HALF_SPREAD_DEG = KINK_INCLUDED_DEG / 2.0 + 15.0
 FRONT_KEEP = {
     "FootLen": (
         _PAD_EAST + TEXT_TO_EXTENSION_GAP + callout_half_width("FootLen"),
@@ -224,15 +226,16 @@ FRONT_KEEP = {
     # between its extension lines.  The top view stands clear above it
     # (spring r1: the row's text met the pad's edge).
     "FreeKinkH": (_KINK_TEXT_X, _PROFILE_TOP + 0.032),
-    # The kink angle, blade to flat, on the phantom: in the acute wedge below
-    # the two lines' crossing, west of the blade, where no other extension
-    # line runs (above it, FreeKinkH's rises from the kink start; east of the
-    # crest, FreeKinkV's runs to its dimension line).
+    # The kink's included angle, blade to flat, on the phantom: in the wedge
+    # on the crest's convex side, west of it, where no other extension line
+    # runs (FreeKinkH's rises from the kink start east of the blade's line
+    # carried up; FreeKinkV's runs east from the kink start to its dimension
+    # line, through the opposite included wedge).
     FREE_KINK_ANGLE: (
         _front_x(FREE_KINK_VERTEX[0])
-        + KINK_ANGLE_TEXT_RADIUS * FREE_KINK_ANGLE_BISECTOR[0],
+        + KINK_ANGLE_TEXT_RADIUS * FREE_KINK_INCLUDED_BISECTOR[0],
         _front_y(FREE_KINK_VERTEX[1])
-        + KINK_ANGLE_TEXT_RADIUS * FREE_KINK_ANGLE_BISECTOR[1],
+        + KINK_ANGLE_TEXT_RADIUS * FREE_KINK_INCLUDED_BISECTOR[1],
     ),
 }
 # The vertical extension lines each qualified row's text sits among: its own
@@ -634,13 +637,16 @@ def kink_arc_faults(
     arcs: list[tuple[tuple[float, float], list[tuple[float, float]]]],
     vertex: tuple[float, float],
 ) -> list[str]:
-    """Why the kink angle's drawn arcs do not read as the acute wedge below
-    the blade/flat crossing (draw_dt_cone_gear.clock_arc_faults' reading):
-    centred on the crossing, every point within KINK_ARC_HALF_SPREAD_DEG of
-    the wedge's bisector and spanning it.  Empty when they do."""
+    """Why the kink angle's drawn arcs do not read as the included wedge on
+    the crest's convex side of the blade/flat crossing
+    (draw_dt_cone_gear.clock_arc_faults' reading): centred on the crossing,
+    every point within KINK_ARC_HALF_SPREAD_DEG of the wedge's bisector and
+    spanning it.  Empty when they do."""
     if not arcs:
         return ["no arc"]
-    bisector = math.atan2(FREE_KINK_ANGLE_BISECTOR[1], FREE_KINK_ANGLE_BISECTOR[0])
+    bisector = math.atan2(
+        FREE_KINK_INCLUDED_BISECTOR[1], FREE_KINK_INCLUDED_BISECTOR[0]
+    )
     faults = []
     offsets = []
     for centre, points in arcs:
@@ -666,10 +672,11 @@ def kink_arc_mean_offset_deg(
     vertex: tuple[float, float],
 ) -> float:
     """How far (deg, 0-180) the arcs' mean direction from the vertex stands
-    off the lower wedge's bisector: near 180 when they took the upper one."""
+    off the convex included wedge's bisector: near 180 when they took the
+    opposite included wedge, across the crest."""
     sx = sum(x - vertex[0] for _, points in arcs for x, _ in points)
     sy = sum(y - vertex[1] for _, points in arcs for _, y in points)
-    bx, by = FREE_KINK_ANGLE_BISECTOR
+    bx, by = FREE_KINK_INCLUDED_BISECTOR
     cos = (sx * bx + sy * by) / (math.hypot(sx, sy) or 1.0)
     return math.degrees(math.acos(max(-1.0, min(1.0, cos))))
 
@@ -690,12 +697,12 @@ def _kink_arcs(
 
 
 def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -> None:
-    """Fail unless the printed kink angle draws its arc in the acute wedge
-    below the free form's blade/flat crossing.  The angle drives the free
-    form, so the only turn allowed is to the vertically opposite wedge, the
-    same 25 deg (a supplement would refold the flat; the value is read back
-    after the turn): the sketch's 155-to-25 supplement may leave the arc in
-    the upper acute wedge (build_dt_pinion_spring._driving_kink_angle)."""
+    """Fail unless the printed kink angle draws its arc in the included wedge
+    on the crest's convex side of the free form's blade/flat crossing.  The
+    angle drives the free form, so the only turn allowed is to the
+    vertically opposite wedge, the same 155 deg (the value is read back
+    after the turn): the sketch's dimension may bring its arc in the wedge
+    across the crest (build_dt_pinion_spring._driving_kink_angle)."""
     matches = [
         item for item in annotations if dimension_name(adapter, item) == FREE_KINK_ANGLE
     ]
@@ -722,8 +729,8 @@ def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -
         arcs = _kink_arcs(display)
         faults = kink_arc_faults(arcs, vertex)
     value = abs(float(_read_member(dimension, "SystemValue")))
-    if abs(value - math.radians(KINK_DEG)) > 1e-8:
-        faults.append(f"value {math.degrees(value):.6f} deg, not {KINK_DEG:g}")
+    if abs(value - math.radians(KINK_INCLUDED_DEG)) > 1e-8:
+        faults.append(f"value {math.degrees(value):.6f} deg, not {KINK_INCLUDED_DEG:g}")
     _telemetry.info(
         f"kink angle: {len(arcs)} arc(s) about the free kink vertex "
         f"{tuple(round(v * 1000, 2) for v in vertex)} mm; "
