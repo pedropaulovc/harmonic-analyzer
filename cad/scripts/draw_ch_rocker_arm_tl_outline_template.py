@@ -1,11 +1,13 @@
 r"""Create the drawing for the rocker arm's outline template (MHA-CH-006-TL-13).
 
 The face view (``*Front``, 1:1) carries the whole outline from the pivot
-hole: both apex heights on the mirror line, both radii, the arc-end stations
-and the tip lands, plus the rod slot's BASIC station; a cropped 5:1 *Front
-detail carries the rod slot's width (a matched fit on its pin gauge) and run;
-the right-side edge view carries the plate thickness; a shaded isometric at
-1:4 sits above.
+hole, every outline dimension BASIC: both apex heights on the mirror line,
+both radii, the arc-end stations and the tip lands, plus the rod slot's
+station; datum A on the pivot hole and one surface profile all around the
+outline to A|C (``OUTLINE_PROFILE_ZONE``); a cropped 5:1 *Front detail
+carries datum C on the rod slot, its width (a matched fit on its pin gauge)
+and its run; the right-side edge view carries the plate thickness; a shaded
+isometric at 1:4 sits above.
 """
 
 from __future__ import annotations
@@ -15,7 +17,8 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -31,6 +34,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 
@@ -42,10 +46,12 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
+from _gear_drawing_entities import visible_circle_edge
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -59,10 +65,14 @@ from ch_rocker_arm_tl_outline_template_spec import (
     DETAIL_SCALE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    OUTLINE_PROFILE_DATUMS,
+    OUTLINE_PROFILE_ZONE,
     PIVOT_CALLOUT,
+    PIVOT_DATUM,
     PROFILE_CALLOUT,
     REFERENCE_DIMENSIONS,
     ROD_SLOT_CALLOUT,
+    ROD_SLOT_DATUM,
     ROD_SLOT_FLAT_CALLOUT,
     ROD_SLOT_STATION_CALLOUT,
     SHARP_EDGE_CALLOUT,
@@ -96,14 +106,16 @@ DETAIL_CENTER = (0.075, 0.040)
 DETAIL_RADIUS_MM = 3.0
 DETAIL_RATIO = DETAIL_SCALE[0] / DETAIL_SCALE[1]
 DETAIL_CROP_RADIUS = DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0
-DETAIL_LETTER = "A"
+# Not A or C: those letters are the sheet's datums.
+DETAIL_LETTER = "D"
 # A model view has no native label the API can show, so the label is a note
 # the view owns, in the native detail label's words, anchored at its top
-# centre: right of the width's dimension line, under its callout.
+# centre: left of the circle, where nothing else of the detail prints, so
+# datum C's tag can stand right of the width's dimension line.
 DETAIL_LABEL_TEXT = (
     f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
 )
-DETAIL_LABEL_XY = (0.116, 0.050)
+DETAIL_LABEL_XY = (0.038, 0.050)
 # The face view's letter goes west of the slot's mark, level with its centre:
 # the plate between the pivot and the slot carries nothing else there.
 PARENT_LETTER_OFFSET = (
@@ -143,12 +155,13 @@ FRONT_KEEP = {
 # The width's dimension line stands outboard of the crop circle, right of the
 # slot's round end, with its value and fit callout above the circle. The
 # run's value and its two-line function flag sit right of and below the
-# circle, under the detail label: left of the circle the flag would cross it.
+# circle: left of the circle the flag would cross it.
 # The flag's widest line prints 51.4 mm wide (farm run 3111b8f0a), so its
-# centre stands far enough right that the whole line clears the circle.
+# centre stands far enough right that the whole line clears the circle and
+# datum C's tag, which hangs below the width's dimension line.
 DETAIL_KEEP = {
     "RodSlotWidth": (DETAIL_CENTER[0] + 0.020, DETAIL_CENTER[1] + 0.028),
-    "RodSlotFlat": (DETAIL_CENTER[0] + 0.042, DETAIL_CENTER[1] - 0.012),
+    "RodSlotFlat": (DETAIL_CENTER[0] + 0.058, DETAIL_CENTER[1] - 0.0155),
 }
 # Below the edge view and left of its extension lines (the text is far wider
 # than the 3.175 span), clear of the front view's rod tip and the isometric.
@@ -156,10 +169,7 @@ RIGHT_KEEP = {"Thick": (0.370, 0.140)}
 # Both arc centres lie on the bore's vertical centreline, off the sheet
 # above; the apex heights land on each arc's low point there, and the tip
 # lands run radially from those centres.  Each scribing edge carries its
-# SHARP requirement and each apex height the rocker edge it sets.  SOLIDWORKS
-# centres each apex block on its position, so the extra line grows it upward:
-# the positions sit low enough that each +0.03 keeps its single-line height,
-# clear of the bottom arc and the 144.951 line.
+# SHARP requirement and each apex height the rocker edge it sets.
 CALLOUTS_BELOW = {
     "TopRadius": f"{ARC_CENTER_CALLOUT}\n{SHARP_EDGE_CALLOUT}",
     "BottomRadius": f"{ARC_CENTER_CALLOUT}\n{SHARP_EDGE_CALLOUT}",
@@ -179,7 +189,7 @@ CALLOUTS_BELOW = {
     # print gives its reference nominal and the clearance on the named pin.
     "RodSlotWidth": ROD_SLOT_CALLOUT,
     # The run prints at three places for its minimum's reach: the flag
-    # names that function and the hole it reaches (rule 3).
+    # names the feature it spans and that function (rules 3 and 12).
     "RodSlotFlat": ROD_SLOT_FLAT_CALLOUT,
 }
 # The top stations take their profile flag above the value: below, it would
@@ -190,27 +200,80 @@ CALLOUTS_ABOVE = {
     "TailTipLen": "RADIAL, SHARP",
     "RodTipLen": "RADIAL, SHARP",
 }
+# The outline's surface profile, all around, to A|C. Its leader lands on the
+# top arc's tail half (PROFILE_LANDING_X_MM off the mirror line) and the
+# frame stands above the arc, right of the tail tip's block and under the
+# 144.951 station line.
+PROFILE_LANDING_X_MM = -70.0
+PROFILE_FRAME_XY = (0.080, 0.192)
+# Datum A: on the pivot hole's upper-left rim, its tag up and left over the
+# plate, clear of the apex heights' witness lines (right) and the R800 block.
+PIVOT_DATUM_PICK_DEG = 135.0
+PIVOT_DATUM_OFFSET = (-0.012, 0.022)
+# Datum C: on the 5:1 detail, where the slot is drawn large (at 1:1 its tag
+# would sit inside the detail's mark circle, farm run tl13-gdt-r1), attached
+# to the width's size dimension so it names the slot's centre plane
+# (mr-tl13-4). SolidWorks keeps a dimension-attached tag on the dimension
+# line's axis (tl13-gdt-r6 asked for x 107 and got 96.6, on the line), and
+# above the lower arrow its leader ran along that line (layout audit
+# line-on-dimension-line). So it hangs below the lower arrow, extending the
+# line: between it and the run's dimension line, left of the run's flag.
+ROD_SLOT_WIDTH_DIMENSION = "RodSlotWidth"
+ROD_SLOT_DATUM_XY = (DETAIL_CENTER[0] + 0.022, DETAIL_CENTER[1] - 0.007)
 
 _Z = [0.0, 0.0, 1.0]
 _PRECISION = DRAWING_PRECISION_BY_NAME
 
-part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
+part_metadata(
+    precision_sources=("DRAWING_PRECISION_BY_NAME",),
+    datums={
+        PIVOT_DATUM: (
+            {"feature": "pivot_hole", "surface": "pivot hole"},
+            ("PIVOT_DATUM", ("draw_ch_rocker_arm_tl_outline_template", "_add_datums")),
+        ),
+        ROD_SLOT_DATUM: (
+            {"feature": "rod_slot", "surface": "rod slot"},
+            (
+                "ROD_SLOT_DATUM",
+                ("draw_ch_rocker_arm_tl_outline_template", "_add_datums"),
+            ),
+        ),
+    },
+)
+
+# The outline's one profile frame, all around, as its own printed strings.
+OUTLINE_PROFILE_TEXT = f"{OUTLINE_PROFILE_ZONE:.2f}"
+_PROFILE_SOURCES = (
+    "OUTLINE_PROFILE_ZONE",
+    ("draw_ch_rocker_arm_tl_outline_template", "_add_outline_profile"),
+)
+
+
+def _profile_zone(governs: dict[str, str]) -> dict[str, tuple[Any, tuple[Any, ...]]]:
+    """The all-around frame's zone and datums; ``governs`` names this
+    feature's own BASICs and the way added material moves each."""
+    return {
+        "surface_profile": (OUTLINE_PROFILE_ZONE, _PROFILE_SOURCES),
+        "surface_profile_datums": (
+            list(OUTLINE_PROFILE_DATUMS),
+            ("OUTLINE_PROFILE_DATUMS", _PROFILE_SOURCES[1]),
+        ),
+        "surface_profile_governs": (governs, ("BASIC_DIMENSIONS",)),
+    }
+
 
 requirement(
     "top_edge",
     kind="profile",
     faces=(CylinderFace(2.0 * part_spec.R_TOP),),
-    requirements=("height_above_pivot", "radius", "station"),
+    requirements=("height_above_pivot", "radius", "station", "surface_profile"),
     fields={
+        # Every outline dimension is BASIC: the profile is their tolerance.
         "height_above_pivot": (
-            limits(
-                part_spec.TOP_ABOVE_PIVOT,
-                _PRECISION["TopAbovePivot"],
-                part_spec.LOW_POINT_BAND,
-            ),
+            part_spec.TOP_ABOVE_PIVOT,
             (
                 "TOP_ABOVE_PIVOT",
-                "LOW_POINT_BAND",
+                "BASIC_DIMENSIONS",
                 ("ch_rocker_arm_spec", "TOP_EDGE_BAND"),
             ),
         ),
@@ -219,13 +282,14 @@ requirement(
             "pivot_hole",
             (("draw_ch_rocker_arm_tl_outline_template", "build"),),
         ),
-        "radius": (limits(part_spec.R_TOP, _PRECISION["TopRadius"]), ("R_TOP",)),
+        "radius": (part_spec.R_TOP, ("R_TOP", "BASIC_DIMENSIONS")),
+        "dimension_type": ("basic", ("BASIC_DIMENSIONS",)),
+        # Material added on the top edge moves it toward the arcs' centre:
+        # up, away from the pivot.
+        **_profile_zone({"radius": "decreases", "height_above_pivot": "increases"}),
         "radius_nominal": (part_spec.R_TOP, ("R_TOP",)),
         "arc_centre": ([0.0, part_spec.CENTER_Y, 0.0], ("CENTER_Y",)),
-        "station": (
-            limits(part_spec.TOP_END_X, _PRECISION["TopRodX"]),
-            ("TOP_END_X", "END_PLACES"),
-        ),
+        "station": (part_spec.TOP_END_X, ("TOP_END_X", "BASIC_DIMENSIONS")),
         "station_nominal": (part_spec.TOP_END_X, ("TOP_END_X",)),
         "end": (
             [part_spec.TOP_END_X, part_spec.TOP_END_Y, 0.0],
@@ -247,18 +311,14 @@ requirement(
     "bottom_edge",
     kind="profile",
     faces=(CylinderFace(2.0 * part_spec.R_BOTTOM),),
-    requirements=("depth", "radius", "station"),
+    requirements=("depth", "radius", "station", "surface_profile"),
     fields={
         # The bottom apex's depth below the pivot, on the mirror line.
         "depth": (
-            limits(
-                part_spec.BOTTOM_BELOW_PIVOT,
-                _PRECISION["BottomBelowPivot"],
-                part_spec.LOW_POINT_BAND,
-            ),
+            part_spec.BOTTOM_BELOW_PIVOT,
             (
                 "BOTTOM_BELOW_PIVOT",
-                "LOW_POINT_BAND",
+                "BASIC_DIMENSIONS",
                 ("ch_rocker_arm_spec", "TOP_EDGE_BAND"),
             ),
         ),
@@ -266,16 +326,14 @@ requirement(
             "pivot_hole",
             (("draw_ch_rocker_arm_tl_outline_template", "build"),),
         ),
-        "radius": (
-            limits(part_spec.R_BOTTOM, _PRECISION["BottomRadius"]),
-            ("R_BOTTOM",),
-        ),
+        "radius": (part_spec.R_BOTTOM, ("R_BOTTOM", "BASIC_DIMENSIONS")),
+        "dimension_type": ("basic", ("BASIC_DIMENSIONS",)),
+        # Material added on the bottom edge moves it away from the centre:
+        # down, away from the pivot.
+        **_profile_zone({"radius": "increases", "depth": "increases"}),
         "radius_nominal": (part_spec.R_BOTTOM, ("R_BOTTOM",)),
         "arc_centre": ([0.0, part_spec.CENTER_Y, 0.0], ("CENTER_Y",)),
-        "station": (
-            limits(part_spec.BOT_END_X, _PRECISION["BottomRodX"]),
-            ("BOT_END_X", "END_PLACES"),
-        ),
+        "station": (part_spec.BOT_END_X, ("BOT_END_X", "BASIC_DIMENSIONS")),
         "station_nominal": (part_spec.BOT_END_X, ("BOT_END_X",)),
         "bottom_end": (
             [part_spec.BOT_END_X, part_spec.BOT_END_Y, 0.0],
@@ -300,6 +358,7 @@ requirement(
     requirements=("dia", "thru"),
     fields={
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "datum": (PIVOT_DATUM, ("PIVOT_DATUM",)),
         "axis": (_Z, ("__frame__",)),
         "dia": (
             limits(
@@ -323,6 +382,7 @@ requirement(
 # on the radial from the pivot; its width is a matched fit on the pin, its
 # length the end-centre run.
 _ROD_SLOT_OUTER = part_spec.rod_slot_points()[4]
+_ROD_SLOT_INNER = part_spec.rod_slot_points()[5]
 requirement(
     "rod_slot",
     kind="slot",
@@ -339,6 +399,7 @@ requirement(
             ("ROD_SLOT_X", "ROD_SLOT_Y"),
         ),
         "axis": (_Z, ("__frame__",)),
+        "datum": (ROD_SLOT_DATUM, ("ROD_SLOT_DATUM",)),
         "end": (
             [_ROD_SLOT_OUTER[0], _ROD_SLOT_OUTER[1], 0.0],
             ("ROD_SLOT_AXIS", "ROD_SLOT_FLAT"),
@@ -375,18 +436,19 @@ for _side, _sign in (("rod", 1.0), ("tail", -1.0)):
                 part_spec.CENTER_Y * math.sin(part_spec.ALPHA_TOP),
             ),
         ),
-        requirements=("length",),
+        requirements=("length", "surface_profile"),
         fields={
-            "length": (
-                limits(part_spec.TIP_FACE, _PRECISION["RodTipLen"]),
-                ("TIP_FACE", "END_PLACES"),
-            ),
+            "length": (part_spec.TIP_FACE, ("TIP_FACE", "BASIC_DIMENSIONS")),
+            "dimension_type": ("basic", ("BASIC_DIMENSIONS",)),
             "length_nominal": (part_spec.TIP_FACE, ("TIP_FACE",)),
             "top_edge_feature": ("top_edge", ("ALPHA_TOP", "CENTER_Y")),
             "end": (
                 [_sign * part_spec.TIP_X, part_spec.TIP_Y, 0.0],
                 ("TIP_X", "TIP_Y"),
             ),
+            # The length ends where the land meets the arc and the taper, so
+            # its sense under an offset face is theirs: no BASIC of its own.
+            **_profile_zone({}),
         },
         precision={"length": _PRECISION["RodTipLen"]},
     )
@@ -487,13 +549,16 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add the center mark to the template pivot hole")
-    # One mark on each of the slot's round ends.
-    if not auto_center_marks(adapter, detail, holes=False, slots=True, size=0.0025):
-        raise RuntimeError("failed to add the center marks to the template rod slot")
+    # One mark on each of the slot's round ends, so the 0.750 run reads
+    # centre to centre (mr-tl13-1). AutoInsertCenterMarks2's slot option only
+    # finds sketch-slot features and printed none on this stadium (tl13-gdt-r2).
+    _mark_rod_slot_end_centres(adapter, detail)
     # The mark and the labels go on once every import is done, so nothing of
     # the face view's own sketch is near its import.
     mark = _mark_rod_slot_on_front(adapter, front)
     _label_rod_slot_detail(adapter, detail, front, mark)
+    _add_datums(adapter, front, detail)
+    _add_outline_profile(adapter, front)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
@@ -584,7 +649,7 @@ def _placed_rod_slot_view(adapter: Any) -> Any:
 
 
 def _crop_rod_slot_view(adapter: Any, view: Any) -> None:
-    """Crop detail A to its 5:1 circle round DETAIL_CENTER: the circle is
+    """Crop detail D to its 5:1 circle round DETAIL_CENTER: the circle is
     sketched in the view's own sketch and Crop2 consumes it while selected.
     Crop status, IsCropped, the outline and its style are read back."""
     draw = adapter.currentModel
@@ -642,7 +707,7 @@ def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
 
 
 def _dimension_then_crop_rod_slot_view(adapter: Any, detail: Any) -> list[Any]:
-    """Import and curate detail A's pair while it is uncropped, then crop it;
+    """Import and curate detail D's pair while it is uncropped, then crop it;
     either of the pair missing after the crop raises."""
     annotations = curate_view_dimensions(
         adapter,
@@ -669,7 +734,7 @@ def _dimension_then_crop_rod_slot_view(adapter: Any, detail: Any) -> list[Any]:
 
 
 def _mark_rod_slot_on_front(adapter: Any, front: Any) -> tuple[float, float]:
-    """Circle detail A's region on the face view in the outline's black;
+    """Circle detail D's region on the face view in the outline's black;
     returns its sheet centre."""
     _activate_view(adapter, front, label="face view")
     center = model_point_in_view(
@@ -779,7 +844,7 @@ def _centred_view_note(
 def _label_rod_slot_detail(
     adapter: Any, detail: Any, front: Any, mark: tuple[float, float]
 ) -> None:
-    """Label detail A beside its crop circle and letter its mark on the face
+    """Label detail D beside its crop circle and letter its mark on the face
     view, with the sheet scale pinned first (a 5:1 view must not rescale it)."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
@@ -802,6 +867,205 @@ def _label_rod_slot_detail(
         center_x=mark[0] + PARENT_LETTER_OFFSET[0],
         center_y=mark[1] + PARENT_LETTER_OFFSET[1],
         label="rod-slot-detail letter",
+    )
+
+
+def _rim_point(
+    centre: tuple[float, float], axis: tuple[float, float], radius: float, deg: float
+) -> tuple[float, float, float]:
+    """Model point (m) on a round rim of ``radius`` (mm) about ``centre`` (mm),
+    ``deg`` from ``axis`` toward its left-hand normal, on the face laid on the arm."""
+    a = math.radians(deg)
+    normal = (-axis[1], axis[0])
+    return (
+        (centre[0] + radius * (math.cos(a) * axis[0] + math.sin(a) * normal[0]))
+        / 1000.0,
+        (centre[1] + radius * (math.cos(a) * axis[1] + math.sin(a) * normal[1]))
+        / 1000.0,
+        0.0,
+    )
+
+
+CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
+
+
+def _mark_rod_slot_end_centres(adapter: Any, detail: Any) -> None:
+    """Centre-mark each round end of the rod slot in its 5:1 detail, each
+    arc picked at its far point along the slot axis (the draw_dt_cone_gear
+    D-bore recipe). Each mark is the cross alone: its extended lines lay
+    along the run's extension lines, so the run read as one from a
+    centreline and a converging line (mr-tl13-5)."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    extension = _early_bound(draw.Extension, "IModelDocExtension")
+    for label, centre, deg in (
+        ("outer", _ROD_SLOT_OUTER, 0.0),
+        ("inner", _ROD_SLOT_INNER, 180.0),
+    ):
+        _activate_view(adapter, detail, label="rod slot detail")
+        pick = model_point_in_view(
+            adapter,
+            detail,
+            _rim_point(
+                centre, part_spec.ROD_SLOT_AXIS, part_spec.ROD_SLOT_WIDTH / 2.0, deg
+            ),
+            label=f"rod slot {label} end arc",
+        )
+        if not extension.SelectByID2(
+            "", "EDGE", pick[0], pick[1], 0.0, False, 0, null_callout(), 0
+        ):
+            raise RuntimeError(f"failed to select the rod slot {label} end arc")
+        mark = ddoc.InsertCenterMark3(CENTER_MARK_SINGLE, False, False)
+        draw.ClearSelection2(True)
+        if mark is None:
+            raise RuntimeError(f"failed to centre-mark the rod slot {label} end")
+        mark = _early_bound(mark, "ICenterMark")
+        mark.UseDocDisplaySettings = False
+        mark.ShowLines = False
+        if mark.UseDocDisplaySettings or mark.ShowLines:
+            raise RuntimeError(
+                f"rod slot {label} end's centre mark still shows its extended lines"
+            )
+
+
+def _add_datums(adapter: Any, front: Any, detail: Any) -> None:
+    """Datum A on the pivot hole (face view), picked on its rim by sheet point
+    (an edge-object tag ignores SetPosition2), and datum C on the rod slot's
+    width in its 5:1 detail."""
+    pivot = model_point_in_view(adapter, front, (0.0, 0.0, 0.0), label="datum A centre")
+    pick = model_point_in_view(
+        adapter,
+        front,
+        _rim_point(
+            (0.0, 0.0), (1.0, 0.0), part_spec.PIVOT_HOLE_DIA / 2.0, PIVOT_DATUM_PICK_DEG
+        ),
+        label="datum A rim",
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=pick,
+        symbol_xy=(pivot[0] + PIVOT_DATUM_OFFSET[0], pivot[1] + PIVOT_DATUM_OFFSET[1]),
+        datum=PIVOT_DATUM,
+        label="pivot hole datum feature",
+        shoulder=True,
+    )
+    _rod_slot_width_datum(adapter, detail)
+
+
+def _rod_slot_width_datum(adapter: Any, detail: Any) -> Any:
+    """Datum C on the slot's width size dimension, so it names the slot's
+    centre plane the pin gauge locates, not one side (mr-tl13-4).
+
+    InsertDatumTag2 on a selected dimension attaches to nothing, so the tag
+    is offered the display dimension, then its annotation, through
+    IAnnotation::SetAttachedEntities (draw_fr_top_frame's crossbar datum D);
+    after the rebuild it must hold exactly that one swSelDIMENSIONS entity."""
+    label = "rod slot datum C"
+    model = adapter.currentModel
+    _activate_view(adapter, detail, label="rod slot detail")
+    matches = [
+        display
+        for display in (
+            _early_bound(raw, "IDisplayDimension")
+            for raw in _early_bound(detail, "IView").GetDisplayDimensions() or ()
+        )
+        if dimension_name(adapter, _early_bound(display.GetAnnotation(), "IAnnotation"))
+        == ROD_SLOT_WIDTH_DIMENSION
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: expected one {ROD_SLOT_WIDTH_DIMENSION} in the detail, "
+            f"found {len(matches)}"
+        )
+    display = matches[0]
+    width_annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    name = display.GetNameForSelection()
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    if (
+        extension.SelectByID2(
+            name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+        )
+        is not True
+    ):
+        raise RuntimeError(f"{label}: failed to select {name!r}")
+    selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+    count = int(selection.GetSelectedObjectCount2(-1))
+    kind = int(selection.GetSelectedObjectType3(count, -1)) if count else 0
+    if count != 1 or kind != 14:  # swSelDIMENSIONS
+        model.ClearSelection2(True)
+        raise RuntimeError(
+            f"{label}: selecting {name!r} gave {count} object(s) of type {kind}"
+        )
+    raw_tag = model.InsertDatumTag2()
+    if raw_tag is None:
+        raise RuntimeError(f"{label}: InsertDatumTag2 returned nothing")
+    tag = _early_bound(raw_tag, "IDatumTag")
+    if not tag.SetLabel(ROD_SLOT_DATUM):
+        raise RuntimeError(f"{label}: SetLabel failed")
+    annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    attempts: list[str] = []
+    if int(annotation.GetAttachedEntityCount3()) == 0:
+        for target_kind, target in (
+            ("display_dimension", display),
+            ("annotation", width_annotation),
+        ):
+            accepted = bool(annotation.SetAttachedEntities(dispatch_array([target])))
+            attached_count = int(annotation.GetAttachedEntityCount3())
+            attempts.append(f"{target_kind}:{accepted}:{attached_count}")
+            if accepted and attached_count:
+                break
+    if not annotation.SetPosition2(*ROD_SLOT_DATUM_XY, 0.0):
+        raise RuntimeError(f"{label}: SetPosition2 failed")
+    model.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+    kinds = tuple(int(value) for value in annotation.GetAttachedEntityTypes() or ())
+    entities = tuple(annotation.GetAttachedEntities3() or ())
+    position = tuple(float(value) for value in annotation.GetPosition())
+    _telemetry.info(
+        f"{label}: attach attempts={attempts}, types={kinds}, position "
+        f"{tuple(round(value * 1000, 1) for value in position[:2])} mm"
+    )
+    if (
+        kinds != (14,)
+        or len(entities) != 1
+        or entities[0] is None
+        or annotation.IsDangling()
+    ):
+        raise RuntimeError(f"{label}: not attached to the slot width: types={kinds}")
+    attached = _early_bound(entities[0], "IDisplayDimension")
+    if (
+        str(tag.GetLabel()) != ROD_SLOT_DATUM
+        or int(adapter.swApp.IsSame(attached, display)) != 1
+    ):
+        raise RuntimeError(f"{label}: lost the slot width attachment")
+    return tag
+
+
+def _add_outline_profile(adapter: Any, front: Any) -> Any:
+    """One native surface-profile frame, all around the outline, to A|C."""
+    x = PROFILE_LANDING_X_MM
+    landing = model_point_in_view(
+        adapter,
+        front,
+        (
+            x / 1000.0,
+            (part_spec.CENTER_Y - math.sqrt(part_spec.R_TOP**2 - x**2)) / 1000.0,
+            0.0,
+        ),
+        label="outline profile landing",
+    )
+    return add_feature_control_frame(
+        adapter,
+        front,
+        edge_entity=visible_circle_edge(adapter, front, 2.0 * part_spec.R_TOP),
+        leader_attach_xy=landing,
+        frame_xy=PROFILE_FRAME_XY,
+        characteristic="profile_surface",
+        tolerance=OUTLINE_PROFILE_TEXT,
+        datums=OUTLINE_PROFILE_DATUMS,
+        all_around=True,
+        label="outline surface profile",
     )
 
 

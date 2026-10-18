@@ -793,7 +793,7 @@ def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
     # A paper touch lowers the tool onto the work's top face at a spot the plan names in
     # prose (prechips 0.1.2 has no touch-position field). The tool's widest diameter must
     # clear, in plan view, every hold solid standing above that face (the strap clamps) by
-    # 1 mm; solids wholly under it (table, riser blocks, shim stacks) cannot meet a tool
+    # 1 mm; solids wholly under it (table, sub-plates) cannot meet a tool
     # that stops on it, and a touch over a support is the stiffest spot.
     shop = tomllib.loads(
         (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")

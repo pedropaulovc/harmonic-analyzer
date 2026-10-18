@@ -90,7 +90,21 @@ def _tree(root: Path) -> dict[str, bytes]:
     }
 
 
+# No tracked spec declares FEATURE_STEP_CONFIGURATIONS; one part declares two here.
+_CONFIGURED = "ch_pivot_shaft"
+
+
+def _declare_configurations(monkeypatch) -> None:
+    monkeypatch.setattr(
+        export_features,
+        "step_configurations",
+        lambda stem: ("L036", "L045") if stem.replace("-", "_") == _CONFIGURED else (),
+    )
+
+
+
 def test_copied_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path, monkeypatch) -> None:
+    _declare_configurations(monkeypatch)
     out = bound_output(tmp_path)
 
     def refuse_declarations(*_args):
@@ -115,7 +129,7 @@ def test_copied_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path, monkey
         stem: export_features.configuration_step_paths(stem, out)
         for stem in export_features.SUPPORTED_PARTS
     }
-    assert configured["ch_rocker_arm_tl_riser_block"]
+    assert configured[_CONFIGURED]
     files = 2 * len(export_features.SUPPORTED_PARTS) + sum(map(len, configured.values()))
     assert len(checked) == len(staged) == len(expected) == files
     assert _tree(stage) == expected
@@ -126,9 +140,10 @@ def test_copied_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path, monkey
         }
 
 
-def test_missing_configuration_step_never_stages(tmp_path: Path) -> None:
+def test_missing_configuration_step_never_stages(tmp_path: Path, monkeypatch) -> None:
+    _declare_configurations(monkeypatch)
     out = bound_output(tmp_path)
-    missing = export_features.configuration_step_paths("ch_rocker_arm_tl_riser_block", out)["L045"]
+    missing = export_features.configuration_step_paths(_CONFIGURED, out)["L045"]
     missing.unlink()
     with pytest.raises(features_bound.FeaturesBoundError, match="cannot read required file"):
         features_bound.stage_bound_features(out, tmp_path / "stage")
