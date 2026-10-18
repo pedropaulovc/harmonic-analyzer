@@ -200,7 +200,7 @@ if not DATUM_B_TAG_XY[1] < _front_y(0.0):
 #   prints right of the junction, past a 6.4 mm shoulder (r16 sheet).
 DATUM_A_TAG_XY = (0.266, 0.098)
 DATUM_A_LANDING_DEG = -62.0
-JOURNAL_BORE_FINISH_XY = (0.272, 0.1215)
+JOURNAL_BORE_FINISH_XY = (0.272, 0.127)
 JOURNAL_BORE_FINISH_DEG = -42.0
 
 FOOT_SEAT = requirement(
@@ -443,7 +443,11 @@ SECTION_KEEP = {
 JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
     "CrankAboveCone": (0.208, 0.170),
-    "ConeBossDia": (0.292, 0.172),
+    # 3.5 mm over r16's 0.172: the bore's callout below grows UP from its
+    # shoulder, and its FOR COLLAR SEAT line put its band on this shoulder
+    # (r17 layout audit: 0.70 mm overlap); the block's top stays ~5 mm under
+    # SECTION A-A.
+    "ConeBossDia": (0.292, 0.1755),
     # View C sees the head side-on above the crank boss: its Ø stands over
     # the head, text out left of the head and below the A-A thrust-face
     # station's lower extension line (y ~217-222 over the head).
@@ -505,8 +509,8 @@ JOURNAL_TEXT_OFFSETS = {
 # bore's callout prints the same break as the collar instead of the title
 # block's 0.25, and says why under it (r16 machinist review, rules 4 and 7:
 # a break tighter than the title block's needs its reason at the callout).
-# That line drops the callout's shoulder 5.5 mm, so the Ra under it sits at
-# 121.5 mm rather than r16's 127.
+# That line grows the block UP from its shoulder, so the boss OD's callout
+# above it rises (JOURNAL_KEEP).
 # Each running bore names the shaft that runs in it, the crank-above-cone
 # spacing the mesh it sets, the cone-axis height the tip block whose adjuster
 # cup the shaft's tip must enter, and the cone boss's north-face station the
