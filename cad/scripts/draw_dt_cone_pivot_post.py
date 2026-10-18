@@ -184,19 +184,24 @@ if not DATUM_B_TAG_XY[1] < _front_y(0.0):
 # View C: datum A and the bore's Ra stand OFF the post's face, each on a
 # leader (r13 machinist review, rule 14: inside the body outline they read
 # as features of the face).  The bore's Ø12.281 leaves the lower-right rim
-# (about -24 degrees) for its text right of the view, so both stand right
-# of the view below that text, each leader under the one before it:
-# - the Ra lands at -45 degrees, its symbol under the size's text;
-# - datum A lands at -70 degrees, its frame under the Ra.  The rim is picked
-#   by SHEET POINT: tagged by the edge object, the tag kept its default drop
-#   inside the body whatever the request (r14 sheet: requested 100 mm, printed
-#   114..121; solidworks-drawing-layout-tuning.md "a datum tag that will not
-#   leave its attachment").  -70 keeps the pick 2 mm off the vertical centre
-#   mark and 2.5 mm inside the boss circle.
-DATUM_A_TAG_XY = (0.275, 0.112)
-DATUM_A_LANDING_DEG = -70.0
+# (about -21 degrees) for its text right of the view, so both stand right
+# of the view below that text, each leader landing further round the rim
+# than the one above it, so none crosses another:
+# - the Ra lands at -42 degrees, its symbol under the size's text;
+# - datum A lands at -62 degrees, its frame under the Ra, right of VIEW C's
+#   title.  A tag on a circle lands on the rim facing its leader's junction
+#   (the position), whatever rim point is picked: r16's pick at -70 printed
+#   at -46, facing its junction at (0.275, 0.112), on the Ra's landing (r16
+#   machinist review, non-gating).  So the junction stands on the -62
+#   bearing, below the body.  The rim is still picked by SHEET POINT on that
+#   bearing: tagged by the edge object, the tag kept its default drop inside
+#   the body whatever the request (r14 sheet; solidworks-drawing-layout-
+#   tuning.md "a datum tag that will not leave its attachment").  The frame
+#   prints right of the junction, past a 6.4 mm shoulder (r16 sheet).
+DATUM_A_TAG_XY = (0.266, 0.098)
+DATUM_A_LANDING_DEG = -62.0
 JOURNAL_BORE_FINISH_XY = (0.272, 0.127)
-JOURNAL_BORE_FINISH_DEG = -45.0
+JOURNAL_BORE_FINISH_DEG = -42.0
 
 FOOT_SEAT = requirement(
     "foot_seat", kind="face", faces=(cone.SURFACE_FINISHES[0].face,),
