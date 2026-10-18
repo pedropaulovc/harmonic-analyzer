@@ -2106,3 +2106,12 @@ def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypat
             SimpleNamespace(), view, {"land": (spec_face, view.sheet((0.0, -0.004, 0.010)))},
             label="land",
         )
+
+
+def test_cross_hole_station_text_clears_the_shared_rear_face_witness() -> None:
+    """r2 of #1685: at x 0.1425 the (5.75) text ran 1.8 mm past the head rear
+    face, where the 11.5's witness drops (text-on-line, blocking)."""
+    rear_face = drawing._detail_x(spec.HEAD_REAR_Z)
+    assert drawing.DETAIL_REAR_FACE_X == pytest.approx(rear_face)
+    x, _y = drawing.DETAIL_KEEP["CrossHoleFromHeadRear"]
+    assert rear_face - (x + drawing.CROSS_HOLE_STATION_TEXT_RIGHT) >= 0.002

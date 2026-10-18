@@ -379,6 +379,20 @@ PRINCIPAL_KEEP = {
 # of the crop circle, clear of it like every other detail-A callout; the line
 # crosses the circle once, square, to reach it.
 NECK_DIA_XY = (0.140, 0.2575)
+# The cross hole's (5.75) station reference in detail A.  Its witnesses drop
+# from the axis at the head rear face (shared with the 11.5's) and the hole
+# centre; the text sits left of the rear-face witness.  r2 of #1685 boxed
+# " (5.75) " at 7.5 mm left to 12.8 mm right of its position, and at x 0.1425
+# the 11.5's witness crossed it (text-on-line), so the position now follows
+# from that witness with 2.5 mm of air.
+CROSS_HOLE_STATION_TEXT_RIGHT = 0.0128
+DETAIL_REAR_FACE_X = (
+    DETAIL_CENTER[0] + DETAIL_RATIO * (HEAD_CENTER_Z - HEAD_REAR_Z) / 1000.0
+)
+CROSS_HOLE_STATION_TEXT_XY = (
+    DETAIL_REAR_FACE_X - 0.0025 - CROSS_HOLE_STATION_TEXT_RIGHT,
+    0.2163,
+)
 # Every dimension detail A carries, imported by feature straight into the
 # cropped view (DRAWING_DIMENSIONS names the owners: Head, FrontCapProfile,
 # CrossHoleProfile, CrossHoleStationReference, NeckProfile) BEFORE any other
@@ -397,7 +411,7 @@ DETAIL_KEEP = {
     "CrossHoleDia": (0.245, 0.2525),
     # The hole's reference station rides under the head, its text left of
     # the rear-face witness and clear of the neck above and the 11.5 below.
-    "CrossHoleFromHeadRear": (0.1425, 0.2163),
+    "CrossHoleFromHeadRear": CROSS_HOLE_STATION_TEXT_XY,
     "NeckDia": NECK_DIA_XY,
 }
 # The head sits inside detail A's fence at the right end of the profile (the
