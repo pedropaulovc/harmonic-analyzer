@@ -67,6 +67,7 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _dt_drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
+from _machinist_review_mode import MachinistReviewMode
 import _seat_forensics
 from _session import run_build
 from _simplified_names import simplified_name
@@ -115,6 +116,9 @@ import vn_cone_tip_collar_spec as tip_collar
 from vn_keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 import vn_post_mount_screw_spec as post_screw
 import vn_swing_stop_screw_spec as stop_screw
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_drive_train_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
