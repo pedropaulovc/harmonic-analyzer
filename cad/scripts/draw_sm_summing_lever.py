@@ -215,7 +215,8 @@ RIDGE_DETAIL_LETTER_OFFSET = (0.009, 0.0045)
 # its arrows and letters stand 14..20 mm over it: the cut sits five pitches
 # down the column from its old station, at sheet y ~0.139, its letters at
 # ~0.153..0.159, under the -Z end rib (0.168) and over the mid rib's 5.08
-# (0.131..0.138, left of the cut); its outboard end runs 8.5 mm past the free
+# (its text 0.1355..0.139 right of the free edge, 4.8 mm right of the cut's
+# arrow); its outboard end runs 8.5 mm past the free
 # edge so that letter (x 0.259..0.265) clears the hole column's centre marks.
 PLATE_SECTION_Z = HOLE_Z_LAST - (HOLE_COUNT // 2 + 1.5) * CHANNEL_PITCH
 PLATE_SECTION_X = (14.0, PLATE_W + 8.5)
@@ -1422,9 +1423,16 @@ TOP_KEEP = {
     # stands 3.8 mm left of the finish symbol's text; the text stands above
     # the boss Z location's datum-B extension line (y 0.0919).
     "EdgeRibThickness": (0.2095, 0.1035),
-    # Above the mid rib between the boss and the cylinder, under the web's
-    # upper arc (y 0.146 and up there), the text ending at the line.
-    "MiddleRibThickness": (0.226, 0.1365),
+    # Outside the part, right of the free edge (machinist review b4df34ad9
+    # r2/r3: inside the web, between the R138.85, the boss and the cylinder,
+    # it read as crowded), as the -Z rib's 7.30 does: its extension lines run
+    # from the rib's end across the hole column (one hole sits on the rib's
+    # mid-plane, its rim 0.5 mm inside them) to the line 8 mm past the free
+    # edge (x 0.2576), and the text stands right of the line, 6.2 mm over the
+    # rib's upper face as the 7.30's does: 4.8 mm right of section C-C's
+    # outboard arrow (x 0.2617, tail y 0.139) and 4 mm over the 20X callout's
+    # first line, whose left end moved to 0.277 for its extension lines.
+    "MiddleRibThickness": (0.2655, 0.1374),
     # The cylinder's diameter across its band, from the part's hidden
     # CylinderReference line (machinist review r10: in the front view its
     # leader landed on the rib outline that hides it).  Its text stands left
@@ -1906,8 +1914,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # whose letter prints at x 0.259..0.265, y 0.136..0.143 (farm r3: the
     # leader off the middle hole, y 0.1336, ran 6.2 mm through the letter,
     # then at y 0.129..0.1355). Hole 7 (y 0.1230) keeps the leader clear
-    # under it; the text centres on x 0.304 so the process line's 67 mm
-    # (from x 0.271) clears that letter.  Every callout on
+    # under it; the text centres on x 0.310 so the process line's 67 mm
+    # (from x 0.277) clears that letter and the mid rib's 5.08 extension
+    # lines, which end at x 0.267 (TOP_KEEP).  Every callout on
     # the end hole had to leave it downward and so crossed the plate-end
     # extension lines of 152.40 and the start-Z dimension -- steepening the
     # leader only traded that for text-on-line and arrow-near-text against
@@ -1924,7 +1933,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge=callout_rim.edge,
-        callout_xy=(0.304, _top_xy(HOLE_X, -callout_hole_z)[1] + 0.0015),
+        callout_xy=(0.310, _top_xy(HOLE_X, -callout_hole_z)[1] + 0.0015),
         label="spring-hole pattern",
         process=SPRING_TAP_CALLOUT_PROCESS,
     )
