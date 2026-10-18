@@ -126,6 +126,7 @@ SURFACE_FINISHES = (
 # dimension is the value); GearBlankProfile's own OutsideDia still drives the
 # solid from the same global.
 OUTSIDE_DIA_REFERENCE = "OutsideDiaReference"
+REFERENCE_SKETCHES = (OUTSIDE_DIA_REFERENCE,)
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     OUTSIDE_DIA_REFERENCE: {"OutsideDia"},

@@ -75,6 +75,7 @@ from dt_alignment_pinion_spec import (
     OUTSIDE_DIA,
     OUTSIDE_DIA_BAND,
     OUTSIDE_DIA_REFERENCE,
+    REFERENCE_SKETCHES,
     STOCK_FORM,
     SURFACE_FINISHES,
 )
@@ -200,7 +201,7 @@ async def build(adapter) -> dict[str, str]:
             "End View Note": END_VIEW_NOTE,
         },
     )
-    blank_reference_sketches(adapter, (OUTSIDE_DIA_REFERENCE,))
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 

@@ -143,8 +143,6 @@ def test_crown_radius_is_the_dome_radius_the_part_drives() -> None:
 # crown on the R11 part), True on a radius halves it. A new writer must show
 # its dimension is sheet-made or already the kind it sets, and join this list.
 _DIAMETRIC_WRITERS = {
-    # The OD is the blank's define_circle DIAMETER (build_alignment_pinion).
-    "draw_dt_alignment_pinion.py": 1,
     # A sheet-made edge dimension (AddDimension2), not a model dimension.
     "draw_dt_crank_pin.py": 1,
     # The OD reference is sheet-made; the cross-hole callout is the
