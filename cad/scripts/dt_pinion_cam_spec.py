@@ -1,7 +1,7 @@
 r"""Pure-data dimensional contract shared by the pinion lift cam and its
 manufacturing drawing.
 
-PURE DATA, no SolidWorks/COM imports.  An eccentric steel collar pinned to the
+PURE DATA, no SolidWorks/COM imports.  An eccentric steel collar set-screwed to the
 lift rod: the bore is offset ECC from the collar OD axis, so the two are NOT
 concentric -- the drawing MUST dimension that offset (the cam-note precedent).
 The nominals drive the part's named equation globals AND the drawing's
@@ -11,6 +11,7 @@ in lockstep (``test_dt_pinion_cam_drawing.py``).
 
 from __future__ import annotations
 
+import dt_drive_train_steps
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _gtol_cylinder import CylinderFace
 from dt_pinion_lift_rod_spec import ROD_DIA as LIFT_ROD_DIA
@@ -45,8 +46,26 @@ if SLIP_CLEARANCE_MIN < 0.02 or SLIP_CLEARANCE_MAX > 0.10:
 # offset IS the lift: both are on the drive train's critical list.  Nothing
 # else on this collar mates with anything, so nothing else carries a band.
 # Routine controlling dimensions use the title block's general grade.
+# drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
+# both tight bands name the MHA-DT-025 follower pin they serve (machinist
+# review ENFORCE r1: the bands named no mate).
+FOLLOWER_PIN_NUMBER = "MHA-DT-025"
 COLLAR_OD_TOLERANCE_MM = 0.05
 COLLAR_AXIS_TOLERANCE_MM = 0.05
+BORE_CALLOUT = f"REAM THRU\nSLIP FIT ON LIFT ROD {LIFT_ROD_NUMBER}"
+COLLAR_OD_CALLOUT = f"{FOLLOWER_PIN_NUMBER} FOLLOWER\nPIN RIDES THIS OD"
+ECCENTRICITY_CALLOUT = (
+    f"ECCENTRICITY\nBORE AXIS TO OD AXIS\nSETS {FOLLOWER_PIN_NUMBER} PIN LIFT"
+)
+# drawing-guidelines.md rule 23 (lock threaded joints exposed to operating
+# loads), #1176: MHA-DT-000's cam-collars-set step stakes the tap mouth over
+# the set screw; the tap callout points at that step by key so the number
+# follows the assembly sequence (as MHA-CH-004's keeper does).
+SET_SCREW_STAKE_STEP = dt_drive_train_steps.step_ref("cam-collars-set")
+TAP_DRILL_CALLOUT = (
+    "TAP DRILL THRU TO BORE\nM2.5 X 0.45-6H\n"
+    f"STAKE AT ASSEMBLY PER\n{SET_SCREW_STAKE_STEP}"
+)
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the roughness goes on the surface that runs.  The follower pin rides
 # the cam OD; the set-screwed bore never moves on the rod, so it carries none.

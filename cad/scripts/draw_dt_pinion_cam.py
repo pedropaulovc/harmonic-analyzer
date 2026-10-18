@@ -49,11 +49,14 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_pinion_cam_spec import (
+    BORE_CALLOUT,
     CAM_OD,
+    COLLAR_OD_CALLOUT,
     DRAWING_PRECISION_BY_NAME,
     ECC,
-    LIFT_ROD_NUMBER,
+    ECCENTRICITY_CALLOUT,
     SURFACE_FINISHES,
+    TAP_DRILL_CALLOUT,
 )
 
 
@@ -111,14 +114,17 @@ SIDE_KEEP = {
 }
 # The tap-drill callout sits LEFT of the end view, under the profile view:
 # placed right of it, its diameter line ran out past the view (render r1).
+# ENFORCE r2: far enough left that the stake lines clear the profile view's
+# station witness and the leader passes above the rotated view's title.
 BOTTOM_KEEP = {
-    "TapDrillDia": (0.262, 0.100),
+    "TapDrillDia": (0.215, 0.100),
     "TapCz": (BOTTOM_CENTER[0], BOTTOM_CENTER[1] + 0.035),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"REAM THRU\nSLIP FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
-    "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS",
-    "TapDrillDia": "TAP DRILL THRU TO BORE\nM2.5 X 0.45-6H",
+    "BoreDia": BORE_CALLOUT,
+    "CollarOd": COLLAR_OD_CALLOUT,
+    "CollarCy": ECCENTRICITY_CALLOUT,
+    "TapDrillDia": TAP_DRILL_CALLOUT,
 }
 # Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
 # by build_pinion_cam): two on the critical bore, OD and eccentricity and on

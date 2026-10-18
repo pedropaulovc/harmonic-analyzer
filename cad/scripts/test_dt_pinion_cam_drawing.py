@@ -119,6 +119,26 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     assert "OPTIONAL" not in tap
 
 
+def test_both_tight_collar_bands_name_the_follower_pin_they_serve() -> None:
+    # Rule 4: the OD and eccentricity bands exist for the MHA-DT-025 follower
+    # pin that rides the OD, so each callout names it (ENFORCE r1 blockers).
+    import _config
+
+    pin = _config.parts("dt-pinion-cam-pin")["number"]
+    assert dt_pinion_cam_spec.FOLLOWER_PIN_NUMBER == pin
+    for name in ("CollarOd", "CollarCy"):
+        assert pin in drawing.DIMENSION_CALLOUTS[name], name
+
+
+def test_tap_callout_points_at_the_drive_train_step_that_stakes_it() -> None:
+    # Rule 23 (#1176): the stake is performed at MHA-DT-000's cam-collars-set
+    # step; the pointer follows the step registry, never a typed number.
+    import dt_drive_train_steps as steps
+
+    tap = drawing.DIMENSION_CALLOUTS["TapDrillDia"]
+    assert tap.endswith(f"STAKE AT ASSEMBLY PER\n{steps.step_ref('cam-collars-set')}")
+
+
 def test_set_screw_thread_cannot_break_either_face_at_general_grade() -> None:
     # A 1.7 station once left 0.45 nominal wall between the M2.5 major and the
     # front face; the .X ±0.8 general grade the station prints under then
