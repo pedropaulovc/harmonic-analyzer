@@ -429,9 +429,7 @@ def test_sheet_readback_refuses_a_lost_reference_cut_length(monkeypatch, fault):
         GetText=lambda index: texts.get(index, ""),
         GetPrimaryPrecision2=lambda: bolt.DIMENSION_PRECISION["CutLength"],
     )
-    reference = SimpleNamespace(
-        name="CutLength", GetSpecificAnnotation=lambda: display
-    )
+    reference = SimpleNamespace(name="CutLength", GetSpecificAnnotation=lambda: display)
     banded = [SimpleNamespace(name=name) for name in bolt_drawing.EXPECTED_CONTROLS]
     annotations = [reference, *banded]
     if fault == "driven":

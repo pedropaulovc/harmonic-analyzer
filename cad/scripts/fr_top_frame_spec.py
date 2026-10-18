@@ -172,15 +172,15 @@ HANGER_CROSSBAR_CENTER_TOL = HANGER_CROSSBAR_CENTER_ZONE / 2.0
 HANGER_SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"])
 # The slot's station from its round hole along the slot. The frame's zone holds
 # the slot's width (across the dowel line), at an implied basic zero from its
-# round hole and an implied basic 90 deg to the B-C line; a slot's plain
-# position frame does not reach along the slot (codex review of 0bb6ba81), so
-# that direction is the plain three-place station under the title block's
-# .XXX band (machinist review r1, 2026-10-18: no basic or tolerance in note
-# text).  From the screw axis it sits at the round hole's .XXX band plus its
-# own: 0.26.
+# round hole and an implied basic 90 deg to the B-C line; along the slot the
+# drawing boxes 15.264 BASIC, the frame's located feature (machinist review
+# r2, 2026-10-18).  A slot's position frame is not relied on along the slot
+# (codex review of 0bb6ba81), so the wall and travel stacks charge that
+# direction the title block's .XXX band, wider than any frame zone: from the
+# screw axis the round hole's .XXX band plus its own, 0.26.
 HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 15.264
 HANGER_SLOT_FROM_ROUND_PLACES = 3
-HANGER_SLOT_ALONG_TOL = _XXX  # 0.13, title block .XXX on the 15.264 station
+HANGER_SLOT_ALONG_TOL = _XXX  # 0.13, the .XXX band charged along the slot
 HANGER_SLOT_STATION_TOL = HANGER_PIN_X_TOL + HANGER_SLOT_ALONG_TOL
 # The -X dowel's blind slot retains the round hole's slip width and depth.
 # Its shortest 3.820 takes the required 3.79508 travel. The functional .XXX

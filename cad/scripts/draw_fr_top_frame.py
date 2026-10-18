@@ -57,6 +57,7 @@ from _drawing_dimensions import (
     offset_dimension_text,
     set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
+    set_basic_dimension,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -807,15 +808,15 @@ POCKET_LENGTH_OFFSET_XY = (0.0320, 0.2555)
 # The front pocket end's 43.0 from the front-left socket axis shares that
 # dimension line (front, B, at the bottom of this view: model z runs up),
 # 14.3 mm long on paper between the socket axis's extension line (y 162.7)
-# and the pocket end's (177.0).  Its value parks right of the line on a
-# jog, between those two extension lines and 5 mm left of the front-left
-# barrel.
+# and the pocket end's (177.0).  Its value stands on the line, which breaks
+# round it (about 12 x 3.5 mm, x 18.6 -> 30.2, left of the plan's 36.8).
+# An offset-text jog there threw the whole dimension 24 mm left, off the
+# sheet frame (farm run 20261018T061230033Z-344b527a..., sheet 6).
 BAR_POCKET_FROM_SOCKET = abs(FRONT_COLUMN_Z) - BAR_POCKET_Z
 POCKET_FROM_SOCKET_LINE_XY = (
     POCKET_LENGTH_TEXT_XY[0],
     HUB_BOTTOM_CENTER[1] + (FRONT_COLUMN_Z - BAR_POCKET_Z) / 2.0 * _HUB_BOTTOM_M_PER_MM,
 )
-POCKET_FROM_SOCKET_OFFSET_XY = (0.0305, POCKET_FROM_SOCKET_LINE_XY[1])
 
 # Sheet 1, Section E-E: the side rails and the crossbar T, cut inside the
 # crossbar pockets (|z| <= 69, where the crossbar is a T) and clear of every hole
@@ -1053,19 +1054,23 @@ DETAIL_SECTION_KEEP = {
     # The recess depth reads beside its own band, not under it: the column
     # below belongs to the 47.3 boss height, whose three-line text is 37 mm
     # wide and has nowhere else to sit on this sheet.
-    "CapRecessDepth": (0.386, 0.155),
+    "CapRecessDepth": (0.386, 0.158),
 }
 DETAIL_CALLOUTS = {
     "C0Dia": "4X BOSS",
     "B0Dia": "4X SOCKET, REF: MATCH-FIT\nTO ASSIGNED MHA-FR-003 TUBE,\nCLOSE HAND-SLIP, NO ROCK",
 }
 FRONT_CALLOUTS = {"CB1Dia": "4X COUNTERBORE"}
-# The recess bands are functional at both limits (skirt clearance at the
-# small end, cap ligament and near wall at the large); the callouts name the
-# part they clear (machinist review r1: no free-text fit note).
+# The recess's limits are functional both ways: its low limits clear the
+# MHA-VN-028 skirt, its high limits keep the cross-screw counterbore's 2.0
+# ligament (build_fr_top_frame.COUNTERBORE_PRINTED_CAP_LIGAMENT, 2.04 at
+# Ø27.70 and 16.60 deep), so each callout names the cap it serves and the
+# diameter says why it has a ceiling (machinist review r2).
 SECTION_CALLOUTS = {
-    "CapRecessDia": "4X CAP RECESS\nCLEARS MHA-VN-028 SKIRT",
-    "CapRecessDepth": "4X\nRECESS",
+    "CapRecessDia": (
+        "4X CAP RECESS, CLEARS\nMHA-VN-028 SKIRT; MAX KEEPS\nCROSS-SCREW COUNTERBORE WALL"
+    ),
+    "CapRecessDepth": "4X RECESS,\nMHA-VN-028\nSKIRT DEPTH",
 }
 
 
@@ -2077,12 +2082,13 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         suffix="2X ROUND HOLE FROM\nSCREW AXIS, SAME Z",
         offset_text=PIN_STATION_OFFSET_XY,
     )
-    # The slot's location along the slot: a plain .XXX dimension from the
-    # round hole beside it, so the title block's +/-0.13 is the station band
-    # the spec's wall stack charges (HANGER_SLOT_ALONG_TOL); its position
-    # frame holds the width's median plane only, on an implied basic zero.
-    # No note restates either (machinist review r1).  F-F cuts the rear
-    # station alone, so the native prefix counts both.
+    # The slot's location along the slot: a BASIC 15.264 from the round
+    # datum hole beside it, which the slot's position frame on the plan
+    # locates from (machinist review r2: a frame's located feature carries
+    # its basic).  The spec's wall and travel stacks still charge the title
+    # block's .XXX +/-0.13 along the slot (HANGER_SLOT_ALONG_TOL), more than
+    # the frame's zone allows.  F-F cuts the rear station alone, so the
+    # native prefix counts both.
     slot_station = _checked_dimension(
         adapter, view,
         p0=(SLOT_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z),
@@ -2092,6 +2098,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         entities=(axes[2], axes[1]),
     )
     slot_station.SetText(1, "2X ")  # swDimensionTextPrefix
+    set_basic_dimension(adapter, slot_station, label="dowel slot from dowel hole")
     if str(slot_station.GetText(1) or "") != "2X ":
         raise RuntimeError("dowel slot from dowel hole: 2X prefix did not persist")
     slot_station_annotation = _early_bound(slot_station.GetAnnotation(), "IAnnotation")
@@ -3754,7 +3761,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 pocket_front_end, label="crossbar pocket front end",
             ).edge,
         ),
-        offset_text=POCKET_FROM_SOCKET_OFFSET_XY,
     )
     _checked_dimension(
         adapter, hub_bottom_parent,

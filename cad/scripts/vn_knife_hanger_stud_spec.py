@@ -115,11 +115,7 @@ DIMENSION_TOLERANCE_TYPES = {
 }
 PRINTED_THREAD = f"{THREAD} UNC"  # Class 2A comes from the title block.
 DIMENSION_CALLOUTS = {
-    "CutLength": (
-        "UNDER HEAD TO FINISHED TIP\n"
-        "CUT AT ASSEMBLY\n"
-        "PER MHA-SM-000 STEP 4"
-    ),
+    "CutLength": ("UNDER HEAD TO FINISHED TIP\nCUT AT ASSEMBLY\nPER MHA-SM-000 STEP 4"),
     # The band on the leg is the engagement reason; the native ChamferAngle
     # prints its own 45 degrees.
     "ChamferWidth": (

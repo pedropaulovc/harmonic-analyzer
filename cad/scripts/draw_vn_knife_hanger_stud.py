@@ -136,10 +136,9 @@ def verify_cut_length_reference(adapter: Any, annotations: list[Any]) -> list[An
     if not math.isclose(float(dimension.SystemValue), REFERENCE_NOMINAL, abs_tol=1e-9):
         raise RuntimeError(f"{REFERENCE_CONTROL}: native dimension nominal changed")
     brackets = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
-    if (
-        int(tolerance.Type) != DIMENSION_TOLERANCE_TYPES[REFERENCE_CONTROL]
-        or brackets != ("(", ")")
-    ):
+    if int(tolerance.Type) != DIMENSION_TOLERANCE_TYPES[
+        REFERENCE_CONTROL
+    ] or brackets != ("(", ")"):
         raise RuntimeError(f"{REFERENCE_CONTROL}: reference display did not persist")
     if int(display.GetPrimaryPrecision2()) != DIMENSION_PRECISION[REFERENCE_CONTROL]:
         raise RuntimeError(f"{REFERENCE_CONTROL}: native display precision changed")

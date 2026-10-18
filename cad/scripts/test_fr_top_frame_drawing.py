@@ -4113,17 +4113,25 @@ def test_hanger_section_text_stays_on_the_sheet_off_the_title_block() -> None:
     assert drawing.SLOT_STATION_TEXT_XY[1] > drawing.PIN_STATION_TEXT_XY[1] + 0.004
 
 
-def test_slot_station_is_a_plain_xxx_from_its_round_hole() -> None:
-    # Machinist review r1 (sheet 6): the slot's along-slot station prints as
-    # a plain .XXX, the title block's +/-0.13 band the spec's slot-to-screw
-    # wall stack charges; no BASIC box or note restates it.
+def test_slot_station_is_a_basic_xxx_from_its_round_hole() -> None:
+    # Machinist review r2 (sheet 6, all three runs): the slot's position
+    # frame locates it from its round datum hole, so the along-slot 15.264 is
+    # boxed BASIC, with no note restating it; the spec's wall and travel
+    # stacks still charge the title block's .XXX +/-0.13 in that direction.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     section = source[source.index("def _hanger_section(") : source.index("def _hub_underside_detail(")]
     assert "2X DOWEL SLOT\\nFROM SCREW AXIS" not in section
     assert "p0=(SLOT_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z)" in section
     assert "entities=(axes[2], axes[1])" in section
     assert "expected_mm=HANGER_SLOT_FROM_ROUND" in section
-    assert "set_basic_dimension" not in section
+    assert section.count("set_basic_dimension(") == 1
+    assert (
+        'set_basic_dimension(adapter, slot_station, label="dowel slot from dowel hole")'
+        in section
+    )
+    assert section.index("set_basic_dimension(adapter, slot_station") < section.index(
+        'if str(slot_station.GetText(1) or "") != "2X ":'
+    )
     assert not hasattr(drawing, "SLOT_BASIC_NOTE")
     assert 'location="above"' not in section
     assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(spec.HANGER_ROUND_X - spec.HANGER_SLOT_X)
@@ -4134,6 +4142,24 @@ def test_slot_station_is_a_plain_xxx_from_its_round_hole() -> None:
     # The 7.100 names the round holes it locates and their transverse
     # station: the screw axis's own Z.
     assert 'suffix="2X ROUND HOLE FROM\\nSCREW AXIS, SAME Z"' in source
+
+
+def test_cap_recess_callouts_name_the_cap_and_why_the_ceiling() -> None:
+    # Machinist review r2 (sheet 4): the recess's diameter and depth bands
+    # are tighter than .XX, so each callout names MHA-VN-028, and the
+    # diameter says what its ceiling keeps: the cross-screw counterbore's 2.0
+    # ligament, which the high limits of both bands spend.
+    callouts = drawing.SECTION_CALLOUTS
+    assert set(callouts) == set(drawing.DETAIL_SECTION_KEEP)
+    assert "MHA-VN-028 SKIRT" in callouts["CapRecessDia"]
+    assert "MAX KEEPS" in callouts["CapRecessDia"]
+    assert "COUNTERBORE WALL" in callouts["CapRecessDia"]
+    assert callouts["CapRecessDepth"].replace("\n", " ") == "4X RECESS, MHA-VN-028 SKIRT DEPTH"
+    assert part.CAP_RECESS_DIAMETER_BAND == (0.20, 0.0)
+    assert part.CAP_RECESS_DEPTH_BAND == (0.30, 0.0)
+    assert part.COUNTERBORE_PRINTED_CAP_LIGAMENT == pytest.approx(2.0402450833172)
+    # The depth column beside its band: three rows at most 11 characters.
+    assert max(map(len, callouts["CapRecessDepth"].splitlines())) <= 11
 
 
 def test_slip_hole_size_parks_above_the_plan_right_of_datum_c() -> None:

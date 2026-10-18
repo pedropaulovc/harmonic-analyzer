@@ -219,6 +219,9 @@ def test_hanger_bolts_are_cut_to_the_measured_stack_at_step_4() -> None:
     assert "8.92 ±0.15" in fit_up
     assert "MHA-VN-060" in fit_up and "MHA-VN-024" in fit_up
     assert "MEASURE CROSSBAR UNDERSIDE TO WASHER TOP" in fit_up
+    # The band is tighter than .XX, so the step names the tap it serves and
+    # what both limits keep (assembly machinist review, fr-top-frame r2).
+    assert "(REACH INTO MHA-SM-002 TAP: FULL THREAD, TIP CLEAR OF TAP BOTTOM)" in fit_up
     assert builder.HANGER_REACH_MIN == pytest.approx(
         spec.HANGER_FIT_REACH - spec.HANGER_FIT_REACH_TOL
     )

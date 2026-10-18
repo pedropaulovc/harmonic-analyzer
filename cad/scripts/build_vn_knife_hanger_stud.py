@@ -309,7 +309,9 @@ def _manufacturing_controls(adapter) -> None:
         or (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")")
         or not bool(display.ShowDimensionValue)
     ):
-        raise RuntimeError("CutLength@StockTrimProfile: reference display did not persist")
+        raise RuntimeError(
+            "CutLength@StockTrimProfile: reference display did not persist"
+        )
     # The leg's band holds the chamfer inside the charged incomplete pitch.
     set_dimension_symmetric_tolerance(
         adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE
