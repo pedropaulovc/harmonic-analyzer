@@ -41,7 +41,8 @@ GEAR_DATA = "\n".join(
         # envelope read as limits.
         f"ROOT DIAMETER (mm, REF):  {sum(spec.ROOT_ENVELOPE_DIA_MM) / 2.0:.2f}",
         f"CUTTER PLUNGE (mm):  {spec.WHOLE_DEPTH:.{spec.WHOLE_DEPTH_PLACES}f} "
-        f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}",
+        f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}; "
+        "SETS BACKLASH WITH CONE GEARS MHA-DT-003",
         f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
         f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
         f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
