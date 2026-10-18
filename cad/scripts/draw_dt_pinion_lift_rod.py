@@ -1,10 +1,12 @@
 r"""Create the curated machinist drawing for the pinion lift rod.
 
 A plain 6.35 bearing rod, crowned at its back end, with the MHA-DT-030 pin hole
-match-drilled at assembly near its flat front end (U36).  The 2:1 end view
-carries the bearing diameter; the 1:1 side view carries the length, the crown
-and the bearing finish; a 5:1 detail of the front end carries the pin hole and
-its station from the front face.
+match-drilled at assembly near its flat front end (U36).  The 1:1 side view
+carries everything the lathe needs -- the bearing diameter and its mate, the
+body length, the crown and the (overall) -- plus the bearing finish; a 5:1
+detail of the front end carries the pin hole and its station from the front
+face.  No end view: the diameter lives on the side view (drawing-guidelines.md
+rule 11 (turned parts read like the lathe); machinist review r1, #1013).
 
 Run with SolidWorks open::
 
@@ -28,7 +30,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound, _read_member
-from _drawing_annotation_extent import place_callout_clear
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -54,8 +55,10 @@ from dt_pinion_lift_rod_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_DIMENSIONS,
     PIN_HOLE_CALLOUT,
     ROD_DIA,
+    ROD_DIA_CALLOUT,
     ROD_LEN,
     SURFACE_FINISHES,
 )
@@ -77,15 +80,10 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-END_VIEW_SCALE = 2.0
 # The crown adds CAP_SAG past the nominal length, so the side view's bounding
 # box (and its centre) span ROD_LEN + CAP_SAG.
 HALF_SPAN = (ROD_LEN + CAP_SAG) / 2000.0
-FRONT_CENTER = (0.045, 0.205)
-RIGHT_CENTER = (
-    FRONT_CENTER[0] + HALF_SPAN * SHEET_SCALE[0] + 0.040,
-    FRONT_CENTER[1],
-)
+RIGHT_CENTER = (0.200, 0.215)
 ISO_CENTER = (0.135, 0.125)
 DETAIL_CENTER = (0.335, 0.132)
 DETAIL_SCALE = (5, 1)
@@ -98,16 +96,14 @@ DETAIL_LABEL_XY = (0.391, 0.150)
 # The rod's flank in the *Right view: the bearing finish leader drops onto it.
 ROD_FLANK_Y = RIGHT_CENTER[1] + ROD_DIA * SHEET_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    "RodDia": (
-        FRONT_CENTER[0] - ROD_DIA * END_VIEW_SCALE / 1000.0 - 0.006,
-        FRONT_CENTER[1] + 0.022,
-    ),
-}
 # In the *Right view the part's +Z (crowned back end) points screen-left, so
-# the flat front end (z 0) is the RIGHT silhouette edge.
+# the flat front end (z 0) is the RIGHT silhouette edge.  The diameter and its
+# mate stack above the rod, right of the finish symbol; the body length and
+# the (overall) stack below it, the overall outermost (rule 10).
 RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.022),
+    "RodDia": (RIGHT_CENTER[0] + 0.035, ROD_FLANK_Y + 0.012),
+    "RodBody": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.020),
+    "RodOverall": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.032),
     "CapR": (RIGHT_CENTER[0] - HALF_SPAN - 0.012, RIGHT_CENTER[1] + 0.024),
 }
 DETAIL_KEEP = {
@@ -124,6 +120,8 @@ DIMENSION_CALLOUTS = {
     "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(LEVER_PIN_SET_STEP_KEY)}",
     "PinHoleZ": "FROM FRONT END",
 }
+# The diameter's mate and stock stack ABOVE its value, away from the rod.
+ABOVE_CALLOUTS = {"RodDia": ROD_DIA_CALLOUT}
 
 
 def _front_end_detail(adapter: Any, side: Any) -> Any:
@@ -198,6 +196,29 @@ def _front_end_detail(adapter: Any, side: Any) -> Any:
     return detail
 
 
+def _show_as_reference(
+    adapter: Any, annotations: list[Any], names: frozenset[str]
+) -> None:
+    """Parenthesize each named linear dimension: (199.5), a reference.
+
+    A linear dimension takes ``ShowParenthesis`` (draw_dt_cylinder_gear's cam
+    thickness); each named one must be present exactly once on its view.
+    """
+    for name in sorted(names):
+        found = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(found) != 1:
+            raise RuntimeError(
+                f"expected one {name} on the side view, found {len(found)}"
+            )
+        display = _early_bound(
+            _early_bound(found[0], "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        display.ShowParenthesis = True
+        if not bool(display.ShowParenthesis):
+            raise RuntimeError(f"{name} was not shown as a reference")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -212,8 +233,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
-            "End View Note",
             "Isometric View Note",
         ),
         required=(
@@ -221,8 +240,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
-            "End View Note",
             "Isometric View Note",
         ),
     )
@@ -241,19 +258,11 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (front, right, iso):
+    for view in (right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter,
-        front,
-        keep=FRONT_KEEP,
-        view_label="rod end",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
     right_annotations = curate_view_dimensions(
         adapter,
         right,
@@ -270,13 +279,11 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front-end detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*front_annotations, *right_annotations, *detail_annotations]
+    annotations = [*right_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, annotations, ABOVE_CALLOUTS, location="above")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # SolidWorks classifies a solid circular end silhouette under the same
-    # AutoInsertCenterMarks2 "hole" bit as a bored circle.
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to rod end view")
+    _show_as_reference(adapter, right_annotations, DRAWING_REFERENCE_DIMENSIONS)
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin hole")
 
@@ -287,30 +294,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=(RIGHT_CENTER[0] - 0.045, ROD_FLANK_Y),
-        symbol_xy=(RIGHT_CENTER[0] - 0.045, 0.228),
+        symbol_xy=(RIGHT_CENTER[0] - 0.045, ROD_FLANK_Y + 0.020),
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="lift rod bearing finish",
         entity_type="SILHOUETTE",
         char_height=0.0025,  # the pivot-block size; the default read oversized
     )
 
-    # pc-r7 machinist review: the end view's diameter shoulder ran past the
-    # inner border.  The callout is moved from its read-back box to clear the
-    # zone frame, and the placement is asserted.
-    place_callout_clear(
-        adapter,
-        next(
-            annotation
-            for annotation in front_annotations
-            if dimension_name(adapter, annotation) == "RodDia"
-        ),
-        label="MHA-DT-017 end-view diameter",
-        below={},
-        beside={},
-    )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
     # Under the 1:2 isometric (x 0.098-0.172, bottom y ~0.104).
     add_property_linked_note(adapter, "Isometric View Note", 0.105, 0.097)
 

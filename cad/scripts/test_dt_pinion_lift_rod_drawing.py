@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import _config
+
 import build_dt_pinion_lift_rod as part
 import draw_dt_pinion_lift_rod as drawing
 import dt_pinion_lever_geometry as lever
@@ -26,7 +28,7 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is dt_pinion_lift_rod_spec.DRAWING_DIMENSIONS
     marked = set().union(*dt_pinion_lift_rod_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.DETAIL_KEEP)
+    kept = set(drawing.RIGHT_KEEP) | set(drawing.DETAIL_KEEP)
     assert kept == marked
     assert set(drawing.DETAIL_KEEP) == {"PinHoleDia", "PinHoleZ"}
 
@@ -62,20 +64,48 @@ def test_pin_hole_sits_at_the_lever_mid_engagement() -> None:
     )
 
 
-def test_crown_and_hole_live_on_the_side_view_plane() -> None:
-    # The side view looks along X, so the crown's SR and the pin hole are
-    # sketched on the Right Plane to import there.
+def test_the_lathe_sizes_live_on_the_side_view_plane() -> None:
+    # drawing-guidelines.md rule 11 (turned parts read like the lathe): one
+    # Right-Plane half-profile carries the diameter, body, crown and overall,
+    # so they all import into the side view; the pin hole shares that plane.
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count('adapter.create_sketch("Right")') == 2
-    assert 'set_dimension_prefix(adapter, "BackCapProfile", "CapR", "SR")' in source
-    assert "CapR" in drawing.RIGHT_KEEP
+    assert 'create_sketch("Front")' not in source
+    assert "create_revolve" in source
+    assert 'set_dimension_prefix(adapter, "RodProfile", "CapR", "SR")' in source
+    assert set(dt_pinion_lift_rod_spec.DRAWING_DIMENSIONS["RodProfile"]) == set(
+        drawing.RIGHT_KEEP
+    )
+    assert '"*Front"' not in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
-def test_notes_are_short_and_carry_no_dimension() -> None:
-    notes = dt_pinion_lift_rod_spec.DRAWING_NOTES
-    assert len(notes.splitlines()) <= 4
-    assert not any(ch.isdigit() for ch in notes)
+def test_the_overall_is_a_reference_and_the_body_length_controls() -> None:
+    # Rule 10: the overall to the crown apex is real and conspicuous, printed
+    # in parentheses; the body length carries the .X band the rig stack reads.
+    assert dt_pinion_lift_rod_spec.DRAWING_REFERENCE_DIMENSIONS == {"RodOverall"}
+    assert dt_pinion_lift_rod_spec.DRAWING_PRECISION["RodProfile"]["RodBody"] == 1
+    # Below the rod, the overall outermost.
+    assert drawing.RIGHT_KEEP["RodOverall"][1] < drawing.RIGHT_KEEP["RodBody"][1]
+    assert drawing.RIGHT_KEEP["RodBody"][1] < drawing.RIGHT_CENTER[1]
+
+
+def test_the_bearing_band_names_its_mate() -> None:
+    # drawing-guidelines.md rule 4 (tighten only for function, and name the
+    # mate): the h band and Ra ride the bore the rod runs in.
+    block = _config.parts("dt-pinion-pivot-block")
+    assert dt_pinion_lift_rod_spec.PIVOT_BLOCK_NUMBER == block["number"]
+    callout = dt_pinion_lift_rod_spec.ROD_DIA_CALLOUT
+    assert f"RUNNING FIT IN {block['number']} LIFT BORES" in callout
+    assert "GROUND STOCK OK" in callout
+    assert drawing.ABOVE_CALLOUTS == {"RodDia": callout}
+
+
+def test_the_sheet_has_no_general_notes() -> None:
+    # Machinist review r1: the crown note floated far from the feature it
+    # governs; the SR on the side view defines the crown.
+    assert not hasattr(dt_pinion_lift_rod_spec, "DRAWING_NOTES")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "Manufacturing Notes" not in source
     assert "add_feature_control_frame" not in source
     assert "add_native_axis_datum" not in source
     assert "SetPrecision3" not in source
@@ -85,18 +115,5 @@ def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     assert drawing.DETAIL_SCALE == (5, 1)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(2, 1)" in source  # end view 2:1
     assert "scale=(1, 1)" in source  # side view true scale
-    assert dt_pinion_lift_rod_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
     assert dt_pinion_lift_rod_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
-
-
-def test_the_end_view_diameter_is_placed_inside_the_zone_frame_from_its_read_back() -> (
-    None
-):
-    # pc-r7 machinist review: its shoulder ran past the inner border.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    call = source[source.index("place_callout_clear(") :]
-    call = call[: call.index("add_property_linked_note")]
-    assert '== "RodDia"' in call
-    assert "front_annotations" in call

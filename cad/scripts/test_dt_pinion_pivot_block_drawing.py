@@ -387,7 +387,7 @@ def test_worst_stack_bands_are_the_printed_places() -> None:
     assert dt_pinion_bracket_spec.THICKNESS_BAND == x_band
     assert dt_alignment_pinion_spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1
     assert rig.DRUM_LEN_BAND == x_band
-    assert dt_pinion_lift_rod_spec.DRAWING_PRECISION["Rod"]["Depth"] == 1
+    assert dt_pinion_lift_rod_spec.DRAWING_PRECISION["RodProfile"]["RodBody"] == 1
     assert dt_pinion_pivot_shaft_spec.DRAWING_PRECISION["Shaft"]["Depth"] == 1
     assert rig.LENGTH_BAND == x_band
     assert not hasattr(rig, "STACK_BAND")  # the stacks name every term
