@@ -340,15 +340,18 @@ DETAIL_KEEP = {
 # 0.015: HoldDownZ's arrow stood 1.91 mm over the label's text (layout audit
 # arrow-near-text, clearance 2.0).
 DETAIL_LABEL_LOWER_LEFT = (0.016, 0.0145)
-# The pivot relief-fit note (2.5 mm text, four rows of at most 30
-# characters, ~56 x 14 mm), anchored by its upper-left corner in the open
-# field over section A-A: right of the 213.56 dimension line (x 0.296),
-# over the PlateThk text (top 0.1366), under the isometric caption.  Its
-# leader drops through the pivot bore's gap to where the top relief's floor
-# meets the bore on the right-hand piece (relief_floor_tip_xy), passing
-# left of the Ra 1.6 symbol (x >= 0.373): rule 7, a matched fit is flagged
-# at the feature (machinist review r1: under section C-C it read as C-C's).
-RELIEF_NOTE_XY = (0.300, 0.159)
+# The pivot relief-fit note (2.5 mm text, six rows of at most 23
+# characters), anchored by its upper-left corner in the open field over
+# section A-A: right of the 213.56 dimension line (x 0.296), over the
+# PlateThk text (top 0.1366), under the isometric caption.  Its leader
+# leaves the note's right end and drops through the pivot bore's gap to
+# where the top relief's floor meets the bore on the right-hand piece
+# (relief_floor_tip_xy): rule 7, a matched fit is flagged at the feature
+# (machinist review r1: under section C-C it read as C-C's).  r2's four
+# 30-character rows measured 84 mm wide (2.8 mm a character): their leader
+# left from x 0.3839 and crossed the Ra 1.6 leader (y 0.135, x >= 0.3738);
+# 23 characters end ~0.364, so the leader crosses y 0.135 near x 0.373.
+RELIEF_NOTE_XY = (0.300, 0.172)
 # The leader's tip, this far (model mm) into the relief floor from the bore
 # wall: the leader runs down the bore's gap and must not cross the hatch.
 RELIEF_TIP_INSET_MM = 0.05

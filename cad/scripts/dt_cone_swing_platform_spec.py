@@ -58,13 +58,16 @@ PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
 # sheet flags this on a leader to the relief in section A-A, names the mate
 # by part number, and states an acceptance a machinist can check by hand
 # (machinist review r1: unflagged under section C-C, "MINIMAL AXIAL PLAY"
-# uncheckable).  Four lines of at most 30 characters: the note stands
-# between the 213.56 dimension line and the bore gap it leads into.
+# uncheckable).  Six lines of at most 23 characters: the note stands
+# between the 213.56 dimension line and the bore gap it leads into, and its
+# leader (from the note's right end) must pass left of A-A's Ra 1.6 leader.
 PIVOT_RELIEF_FIT_REQUIREMENT = (
-    "TOP RELIEF: FIT DEPTH TO PLATE\n"
-    "AND MHA-VN-014 SHOULDER SCREW.\n"
-    "LOCK KNOB OFF, SCREW SEATED:\n"
-    "SWINGS FREELY, NO AXIAL SHAKE."
+    "TOP RELIEF: FIT DEPTH\n"
+    "TO PLATE AND MHA-VN-014\n"
+    "SHOULDER SCREW.\n"
+    "LOCK KNOB OFF, SCREW\n"
+    "SEATED: SWINGS FREELY,\n"
+    "NO AXIAL SHAKE."
 )
 
 

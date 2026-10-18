@@ -186,11 +186,10 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     )
     # The fit names its mate and a checkable acceptance (machinist review r1:
     # "MINIMAL AXIAL PLAY" could not be checked).
-    assert spec.PIVOT_RELIEF_FIT_REQUIREMENT.startswith(
-        "TOP RELIEF: FIT DEPTH TO PLATE"
-    )
-    assert "MHA-VN-014" in spec.PIVOT_RELIEF_FIT_REQUIREMENT
-    assert "NO AXIAL SHAKE" in spec.PIVOT_RELIEF_FIT_REQUIREMENT
+    flat = " ".join(spec.PIVOT_RELIEF_FIT_REQUIREMENT.split("\n"))
+    assert flat.startswith("TOP RELIEF: FIT DEPTH TO PLATE")
+    assert "MHA-VN-014 SHOULDER SCREW" in flat
+    assert "NO AXIAL SHAKE" in flat
     # Only the NW fillet reaches over the 10.50 strip, and only by a sliver.
     overlaps = {
         label: part._north_fillet_relief_overlap(label, r)
@@ -1235,11 +1234,26 @@ def test_relief_fit_note_stands_over_section_a_a_clear_of_its_neighbours() -> No
     (machinist review r1 read the note under C-C as C-C's)."""
     x, y = drawing.RELIEF_NOTE_XY
     lines = spec.PIVOT_RELIEF_FIT_REQUIREMENT.split("\n")
-    right = x + max(map(len, lines)) * 0.00186
-    bottom = y - len(lines) * 0.0035
+    # r2 measured the note's rows at 2.8 mm a character, ~4.2 mm a row.
+    right = x + max(map(len, lines)) * 0.0028
+    bottom = y - len(lines) * 0.0042
     assert x > 0.296 + 0.002  # 213.56 dimension line (CapECz)
-    assert right < 0.4189 - 0.005  # border
     assert bottom > 0.1366 + 0.002  # A-A's PlateThk text
     assert y < drawing.ISO_CAPTION_UPPER_LEFT[1] - 0.0048 - 0.002  # iso caption
     assert drawing.ISO_CAPTION_UPPER_LEFT[1] < 0.189 - 0.002  # isometric's ink
     assert drawing.RELIEF_TIP_INSET_MM < spec.PIVOT_BEARING_RELIEF_DIAMETER / 2.0
+    # The leader leaves the top row's right end for the relief floor at the
+    # right-hand bore wall (r2: tip (0.37845, 0.11415)).  It must cross the
+    # Ra 1.6 leader's row (y 0.135) left of its end (x 0.3738; r2's 84 mm
+    # note crossed it) and the plate's bottom face (y 0.1264) in the bore's
+    # gap (x 0.3656..0.3785).
+    start, tip = (right, y - 0.0015), (0.37845, 0.11415)
+
+    def x_at(row_y: float) -> float:
+        return start[0] + (tip[0] - start[0]) * (start[1] - row_y) / (start[1] - tip[1])
+
+    assert x_at(0.135) < 0.3738 - 0.0003
+    assert 0.3656 < x_at(0.1264) < 0.3785
+    # Positive control: r2's start crossed the Ra leader.
+    start = (0.3839, 0.1575)
+    assert x_at(0.135) > 0.3738
