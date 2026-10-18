@@ -50,10 +50,16 @@ flowchart TD
     PNG -.->|ASSETS| APNG[("stage/solidworks/ (flattened P&amp;G)<br/>stage/step/ · stage/stl/ · stage/pdf/<br/>stage/gltf/ · stage/png/ · stage/boxes/")]
 
     PNG --> DIFF["⑩b render_diff.py (uv run)<br/>download prev release →<br/>offscreen render changed parts<br/>(Hausdorff, noise-filtered)"]
-    DIFF -->|no prior / render fails| SKIP["⚠ non-fatal: skip<br/>release continues"]
+    DIFF -->|no prior| SKIP["first release: no geometry baseline"]
     DIFF -->|ok| ADIFF[("stage/diff/*.png<br/>stage/diff/diff_summary.json")]
+    DIFF -->|render fails| FAILR
     SKIP --> BUNDLE
     ADIFF --> BUNDLE
+
+    PNG --> DDIFF["drawing visual diff<br/>select prior published PDF members<br/>red removed · blue added · gray common<br/>omit unchanged and BUILD/REV-only pages"]
+    DDIFF -->|failure| FAILR
+    DDIFF -.->|ASSET| ADDIFF[("harmonic-analyzer-&lt;ver&gt;-drawing-diff.zip<br/>changed-page PNGs + index.html + summary.json")]
+    DDIFF --> BUNDLE
 
     BUNDLE["⑩c make_archive"]
     BUNDLE -.->|ASSET| ABUN[("cad/out/release/<br/>harmonic-analyzer-&lt;ver&gt;.zip<br/>= solidworks + step + stl + pdf +<br/>boxes + png + diff")]
@@ -62,7 +68,7 @@ flowchart TD
     IMAGES -->|ok| TAG["⑩e git tag -a vNN<br/>git push origin vNN"]
     IMAGES -->|fail| FAILR
     TAG --> GH["🚀 ⑩f gh release create vNN"]
-    GH -.->|ASSETS| AGH[("GitHub Release vNN<br/>bundle.zip + diff PNGs<br/>notes: commit SHA · SW rev ·<br/>inventory · changed-parts gallery")]
+    GH -.->|ASSETS| AGH[("GitHub Release vNN<br/>bundle.zip + drawing-diff.zip + diff PNGs<br/>notes: commit SHA · SW rev ·<br/>inventory · changed-parts gallery")]
     GH --> POST["⑩g after successful publish<br/>install prepared README images<br/>advance release.yaml next_revision"]
     POST --> FOLLOWUP["⑩h follow-up PR: ONLY<br/>release.yaml next_revision + generated README images<br/>exempt from normal gates; may merge immediately"]
 
@@ -74,5 +80,5 @@ flowchart TD
     class PG1,AG,VG,PRE,ASMDEC gate;
     class FAIL1,FAIL2,FAILV,FAILR fail;
     class SKIP gate;
-    class APART,AASM,AEXP,APNG,ADIFF,ABUN,AGH asset;
-    class REL,TAG,GH,BUNDLE,IMAGES,POST,FOLLOWUP,PNG,DIFF rel;
+    class APART,AASM,AEXP,APNG,ADIFF,ADDIFF,ABUN,AGH asset;
+    class REL,TAG,GH,BUNDLE,IMAGES,POST,FOLLOWUP,PNG,DIFF,DDIFF rel;

@@ -113,6 +113,17 @@ The bundle's `READOUT.md` is rendered from the error-budget report's canonical
 citations are pinned to the release tag, and third-party reference scans retain
 their source paths without being redistributed.
 
+Every release also attaches `harmonic-analyzer-vNN-drawing-diff.zip`, separate
+from the CAD bundle and geometry-diff PNGs. Extract it and open `index.html`:
+added ink is blue, removed ink red, and common drawing content light gray.
+It compares all drawing PDFs with the highest earlier published release;
+added/removed drawings and pages are included, while unchanged pages and
+title-block BUILD/REV-only changes are omitted. The first release shows all
+drawings as additions. A release with no effective drawing changes still has
+an index and `summary.json`, but no PNGs. Baseline download or PDF-rendering
+errors stop publication before tagging. See the
+[drawing comparison details](../../DEVELOPING.md#supervised-farm-releases).
+
 Submit that post-release refresh in a follow-up PR whose only changes are the
 `cad/config/release.yaml` `next_revision` bump and the regenerated README image
 files. This exact generated-only PR is exempt from the regular build and review

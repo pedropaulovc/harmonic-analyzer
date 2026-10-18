@@ -108,10 +108,25 @@ def paired_keys(old_keys, new_keys, mapping):
 # --------------------------------------------------------------------------- #
 # partial-zip reader (central directory + per-member range fetch)
 # --------------------------------------------------------------------------- #
-def _get(url, start, end):
+def _range_response(url, start, end):
+    """Reject ignored/truncated ranges before reading a potentially huge asset."""
     req = urllib.request.Request(url, headers={"Range": f"bytes={start}-{end}"})
-    with urllib.request.urlopen(req) as r:
-        return r.read()
+    with urllib.request.urlopen(req, timeout=60) as r:
+        match = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)",
+                             r.headers.get("Content-Range", ""))
+        if r.status != 206 or match is None:
+            raise ValueError(f"release asset did not honor HTTP range {start}-{end}")
+        first, last, total = map(int, match.groups())
+        if first != start or last != min(end, total - 1) or last < first:
+            raise ValueError("release asset returned an inconsistent Content-Range")
+        data = r.read(last - first + 2)
+        if len(data) != last - first + 1:
+            raise ValueError("release asset returned a truncated or oversized range")
+        return data, total
+
+
+def _get(url, start, end):
+    return _range_response(url, start, end)[0]
 
 
 def asset_url(tag):
@@ -120,25 +135,39 @@ def asset_url(tag):
 
 
 def central_dir(url):
-    req = urllib.request.Request(url, headers={"Range": "bytes=0-0"})
-    with urllib.request.urlopen(req) as r:
-        total = int(r.headers["Content-Range"].split("/")[1])
-    tail = _get(url, max(0, total - 65536), total - 1)
+    _, total = _range_response(url, 0, 0)
+    tail = _get(url, max(0, total - 65557), total - 1)
     eocd = tail.rfind(b"PK\x05\x06")
-    (_, _, _, _, _, cd_size, cd_off, _) = struct.unpack(
+    if eocd < 0 or len(tail) - eocd < 22:
+        raise ValueError("release asset has no valid ZIP end record")
+    (_, disk, cd_disk, disk_entries, entries, cd_size, cd_off, comment) = struct.unpack(
         "<IHHHHIIH", tail[eocd:eocd + 22])
+    if disk or cd_disk or disk_entries != entries or eocd + 22 + comment != len(tail):
+        raise ValueError("release asset has an invalid or multi-disk ZIP directory")
     if cd_off == 0xFFFFFFFF:
         loc = tail.rfind(b"PK\x06\x07")
         z64 = struct.unpack("<Q", tail[loc + 8:loc + 16])[0]
         z = _get(url, z64, z64 + 56)
         cd_size = struct.unpack("<Q", z[40:48])[0]
         cd_off = struct.unpack("<Q", z[48:56])[0]
+    if cd_off < 0 or cd_size < 0 or cd_off + cd_size > total:
+        raise ValueError("release asset ZIP directory lies outside the asset")
+    if not cd_size:
+        if entries:
+            raise ValueError("release asset has an empty ZIP directory with members")
+        return {}
     cd = _get(url, cd_off, cd_off + cd_size - 1)
     out, p = {}, 0
-    while p < len(cd) and cd[p:p + 4] == b"PK\x01\x02":
+    while p < len(cd):
+        if cd[p:p + 4] != b"PK\x01\x02" or len(cd) - p < 46:
+            raise ValueError("release asset has a malformed ZIP directory entry")
         f = struct.unpack("<IHHHHHHIIIHHHHHII", cd[p:p + 46])
         n, m, k = f[10], f[11], f[12]
-        name = cd[p + 46:p + 46 + n].decode("utf-8", "replace")
+        if p + 46 + n + m + k > len(cd):
+            raise ValueError("release asset has a truncated ZIP directory entry")
+        name = cd[p + 46:p + 46 + n].decode("utf-8" if f[3] & 0x800 else "cp437")
+        if name in out:
+            raise ValueError(f"duplicate release ZIP member: {name!r}")
         extra = cd[p + 46 + n:p + 46 + n + m]
         method, comp, uncomp, lho = f[4], f[8], f[9], f[16]
         ep = 0
@@ -157,20 +186,40 @@ def central_dir(url):
                     bp += 8
             ep += 4 + hsz
         out[name] = dict(name=name, method=method, comp=comp,
-                         uncomp=uncomp, lho=lho, crc=f[7])
+                         uncomp=uncomp, lho=lho, crc=f[7], flags=f[3])
         p += 46 + n + m + k
+    if entries != 0xFFFF and len(out) != entries:
+        raise ValueError("release asset ZIP directory member count does not match")
     return out
 
 
 def extract(url, entry, dest):
     dest = Path(dest)
     if dest.exists() and dest.stat().st_size == entry["uncomp"]:
-        return dest
+        if zlib.crc32(dest.read_bytes()) & 0xFFFFFFFF == entry["crc"]:
+            return dest
+    if entry.get("flags", 0) & 1 or entry["method"] not in (0, 8):
+        raise ValueError(f"unsupported release ZIP member encoding: {entry['name']!r}")
     lh = _get(url, entry["lho"], entry["lho"] + 30 - 1)
+    if lh[:4] != b"PK\x03\x04":
+        raise ValueError("release ZIP member has no valid local header")
+    flags, method = struct.unpack("<HH", lh[6:10])
     n, m = struct.unpack("<HH", lh[26:30])
+    name = _get(url, entry["lho"] + 30, entry["lho"] + 30 + n - 1)
+    name = name.decode("utf-8" if flags & 0x800 else "cp437")
+    if name != entry["name"] or method != entry["method"] or flags != entry["flags"]:
+        raise ValueError(f"release ZIP member identity mismatch: {entry['name']!r}")
     off = entry["lho"] + 30 + n + m
-    raw = _get(url, off, off + entry["comp"] - 1)
-    data = raw if entry["method"] == 0 else zlib.decompress(raw, -15)
+    raw = _get(url, off, off + entry["comp"] - 1) if entry["comp"] else b""
+    if method == 0:
+        data = raw
+    else:
+        inflater = zlib.decompressobj(-15)
+        data = inflater.decompress(raw, entry["uncomp"] + 1)
+        if not inflater.eof or inflater.unconsumed_tail or inflater.unused_data:
+            raise ValueError(f"release ZIP member has invalid/oversized deflate data: {entry['name']!r}")
+    if len(data) != entry["uncomp"] or zlib.crc32(data) & 0xFFFFFFFF != entry["crc"]:
+        raise ValueError(f"release ZIP member size/CRC mismatch: {entry['name']!r}")
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(data)
     return dest
