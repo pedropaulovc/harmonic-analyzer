@@ -891,19 +891,37 @@ def test_section_centerline_is_forced_to_print_black_in_center_font() -> None:
     assert "int(segment.Color) != 0 or int(segment.Style) != _SW_LINE_CENTER" in source
 
 
-def test_turned_diameters_stand_on_their_side_views() -> None:
+def test_turned_diameters_stand_clear_of_the_head() -> None:
     """r8 (rule 11): Ø42.8 was leadered on the plan's end view of the head.
-    The head's Ø stands across it in View C and the crank boss's in the plan,
-    both of which see their cylinder side-on; each names its feature on its
-    row.  Not the elevation: the head's extension lines there crossed the
-    crank-bore Ra's leader (r9)."""
+    The head's Ø stands across it in View C, which sees it side-on.  Not the
+    elevation: the head's extension lines there crossed the crank-bore Ra's
+    leader (r9).  The crank boss's Ø stands on its end circle in the
+    elevation: in the plan its extension lines rose from the profile sketch
+    on the boss's north face through the head circle (r13)."""
     assert "HeadDia" in drawing.JOURNAL_KEEP
     assert not {"HeadDia"} & (set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP))
-    assert "CrankBossDia" in drawing.TOP_KEEP
-    assert "CrankBossDia" not in drawing.FRONT_KEEP
+    assert "CrankBossDia" in drawing.FRONT_KEEP
+    assert "CrankBossDia" not in drawing.TOP_KEEP
+    assert "CrankBossDia" in drawing.NEAR_SIDE_DIAMETERS
     assert drawing.DIMENSION_SUFFIXES["HeadDia"] == " HEAD"
     assert drawing.DIMENSION_CALLOUTS["CrankBossDia"] == "CRANK BOSS"
     assert "HeadDia" not in drawing.DIMENSION_CALLOUTS
+
+
+def test_plan_names_the_ray_its_basic_angle_runs_to() -> None:
+    """r13: the basic 13° ran to an unlabelled dash-dot ray.  A BASIC box
+    drops below-text, so a pointer note in the plan names the ray."""
+    assert "InclineAngle" not in drawing.DIMENSION_CALLOUTS
+    assert drawing.CONE_AXIS_LABEL == "CONE BORE AXIS"
+    # The tip stays inside the head circle, where the ray is drawn alone.
+    assert drawing.CONE_AXIS_LABEL_TIP_RADIUS_MM < spec.HEAD_DIA / 2.0
+    # The text right of the head circle, above the 13° box.
+    assert (
+        drawing.CONE_AXIS_LABEL_XY[0] > drawing.TOP_CENTER[0] + spec.HEAD_DIA / 2000.0
+    )
+    assert drawing.CONE_AXIS_LABEL_XY[1] > drawing.TOP_KEEP["InclineAngle"][1]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "CONE_AXIS_LABEL,\n        text_xy=CONE_AXIS_LABEL_XY," in source
 
 
 def test_crank_bore_thru_rides_the_size_line_so_the_mate_line_stays_narrow() -> None:
@@ -942,6 +960,7 @@ def test_thrust_face_station_names_the_collar_it_bears() -> None:
 def test_diameters_on_circles_run_onto_their_near_rims() -> None:
     """r5 and r8: two rim-to-rim lines through one centre crossed there."""
     assert set(drawing.NEAR_SIDE_DIAMETERS) == {
+        "CrankBossDia",
         "CrankBoreDia",
         "ConeBossDia",
         "JournalBoreDia",
@@ -958,16 +977,20 @@ def test_removed_view_letter_is_not_a_datum_letter() -> None:
     assert '"VIEW B' not in source
 
 
-def test_datum_a_and_journal_finish_stay_off_the_bore_leader() -> None:
-    """r5: datum A sat on Ø12.281's leader and the Ra landed on its triangle."""
+def test_datum_a_and_journal_finish_stand_off_the_body() -> None:
+    """r5: datum A sat on Ø12.281's leader and the Ra landed on its triangle.
+    r13 (rule 14): both stood inside View C's body outline."""
     centre_x = drawing.JOURNAL_CENTER[0]
-    # The tag left of the bore, the size's text right of it.
-    assert (
-        drawing.DATUM_A_TAG_XY[0] < centre_x < drawing.JOURNAL_KEEP["JournalBoreDia"][0]
-    )
-    # The finish up-left of the bore centre, the tag below it.
-    assert drawing.JOURNAL_BORE_FINISH_XY[0] < centre_x
-    assert drawing.JOURNAL_BORE_FINISH_XY[1] > drawing.DATUM_A_TAG_XY[1]
+    # The Ra right of the view, below the size's text, its leader landing
+    # below the size's (about -24 degrees) on the rim.
+    assert drawing.JOURNAL_BORE_FINISH_XY[0] > centre_x + spec.BLOCK_DIA / 2000.0
+    assert drawing.JOURNAL_BORE_FINISH_XY[1] < drawing.JOURNAL_KEEP["JournalBoreDia"][1]
+    assert -90.0 < drawing.JOURNAL_BORE_FINISH_DEG < -30.0
+    # The tag below the body (its frame prints above the knee), the view's
+    # title below the tag.
+    body_bottom = drawing.JOURNAL_CENTER[1] - spec.BLOCK_HEIGHT / 2000.0
+    assert drawing.DATUM_A_TAG_XY[1] + 0.0086 < body_bottom
+    assert drawing.JOURNAL_TITLE_XY[1] < drawing.DATUM_A_TAG_XY[1]
 
 
 def test_section_caption_states_no_scale_at_sheet_scale() -> None:

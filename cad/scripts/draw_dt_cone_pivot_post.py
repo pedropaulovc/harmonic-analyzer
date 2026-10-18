@@ -181,19 +181,23 @@ DATUM_B_TAG_XY = (
 if not DATUM_B_TAG_XY[1] < _front_y(0.0):
     raise AssertionError("datum B's tag no longer sits below the foot seat it tags")
 
-# View B: datum A tags the journal bore's lower-LEFT rim, so the bore's
-# Ø12.281 leader, which leaves the lower-right rim for its text right of the
-# view, no longer runs through the tag (r5 machinist review: at (0.250,
-# 0.128) the tag printed at the lower-right rim, its frame on that leader).
-# The tag's position is its leader's knee; its frame prints ~6.5..13.5 mm
-# left of that, so the knee stands near the bore's vertical centreline to
-# keep the frame on the post's face: from x=0.226 the frame straddled the
-# body's left edge (r6 sheet).
-# The bore's Ra stands on the post's face up-left of the bore, left of the
-# vertical centreline, its leader on the upper-left rim and off the tag; at
-# x=0.219 the symbol's V touched the body's left edge (r6 sheet).
-DATUM_A_TAG_XY = (0.2335, 0.128)
-JOURNAL_BORE_FINISH_XY = (0.221, 0.162)
+# View C: datum A and the bore's Ra stand OFF the post's face, each on a
+# leader (r13 machinist review, rule 14: inside the body outline they read
+# as features of the face).  The bore's Ø12.281 leaves the lower-right rim
+# (about -24 degrees) for its text right of the view, so:
+# - the Ra lands at -45 degrees and stands below that text, right of the
+#   view, its leader under the size's;
+# - datum A tags the bottom of the rim.  A tag's rim landing follows its
+#   bearing from the bore centre (at (0.250, 0.128) it landed lower-right,
+#   r5), so its leader knee stands under the bore centre, below the body.
+#   The frame prints ~6.5..13.5 mm left of the knee and 1.6..8.6 mm above it
+#   (r13 sheet: knee 0.2335, 0.128 -> frame x 221..228, y 129.6..136.6 mm),
+#   here 4 mm under the body's bottom edge (y 112.7) and above VIEW C's
+#   title, which drops to JOURNAL_TITLE_XY to make the room.
+DATUM_A_TAG_XY = (0.234, 0.100)
+JOURNAL_BORE_FINISH_XY = (0.272, 0.127)
+JOURNAL_BORE_FINISH_DEG = -45.0
+JOURNAL_TITLE_XY = (0.202, 0.0975)
 
 FOOT_SEAT = requirement(
     "foot_seat", kind="face", faces=(cone.SURFACE_FINISHES[0].face,),
@@ -292,6 +296,10 @@ FRONT_KEEP = {
     # af13), and at y=0.1475 its text sat 0.44 mm under View B's labelled
     # 38.10 (r3 view-crowding).
     "HeadHt": (0.166, 0.1440),
+    # On the boss's end circle, near-side leader (r5), as in r8's SHIP: its
+    # horizontal text centres on the given x; from x=0.132 the head's right
+    # edge ran through CRANK BOSS's C (r6 sheet).  Not the plan: see TOP_KEEP.
+    "CrankBossDia": (0.1355, 0.120),
     # Held one text height (13.6 mm) left of View C's labelled 38.10: with
     # "THRU, RUNS ON ..." below the size the box ran x 117.7..180.7 mm, 1.42 mm
     # from the 38.10 box at x 173.1 (r4 view-crowding).  THRU rides the size line
@@ -304,6 +312,15 @@ FRONT_KEEP = {
     # crank-bore Ra's leader crossed the left one (r9 leader-crosses-leader).
     "CrankBoreDia": (0.1344, 0.169),
 }
+
+# The plan's angled ray is the cone bore's axis; its basic 13° runs to it
+# from the crank axis.  A pointer note names it, the text right of the head
+# circle above the 13° box and below the counterbore callout's leader, its
+# tip on the ray inside the head circle, below the right counterbore's
+# centre mark (r13 machinist review: "an unlabelled thin dash-dot ray").
+CONE_AXIS_LABEL = "CONE BORE AXIS"
+CONE_AXIS_LABEL_TIP_RADIUS_MM = 16.0
+CONE_AXIS_LABEL_XY = (0.122, 0.2095)
 
 BODY = requirement(
     "body", faces=(CylinderFace(cone.BLOCK_DIA),),
@@ -352,13 +369,11 @@ CRANK_BORE = requirement(
 # plan angle and CrankBossStationReference's ray for the crank boss's
 # north-face station, the face the crank boss length is taken from.
 TOP_KEEP = {
-    # Across the boss's side-on silhouette below the head, text out left
-    # between the 72.0's dimension line (x 40) and the boss's left outline
-    # (x 87), clear of the 72.0's lower extension line at the boss end
-    # (y 172.5) and the head circle.  The label stacks under the size: on
-    # one row the text ran 43 mm wide and its last S sat on the boss outline
-    # (r12 machinist review, rule 14).
-    "CrankBossDia": (0.068, 0.1845),
+    # The crank boss's Ø is not given here: its profile sketch stands on the
+    # boss's north face, so the plan's extension lines ran from that face
+    # through the head circle to a size line below the head, reading as boss
+    # edges seen through the head (r13 machinist review).  It stands on its
+    # end circle in the elevation (FRONT_KEEP).
     # The length stands outboard of the station so the station's stacked
     # label clears its dimension line: with the v36 boss face 2.5 further
     # north, a one-line label spanning both lines was crossed by the length.
@@ -373,6 +388,9 @@ TOP_KEEP = {
     # Outboard of its extension line, mirroring MountEastX: centred between
     # the lines at x=0.110 that line ran up through the text (r5 review).
     "MountWestX": (0.121, 0.2525),
+    # The basic angle's below-text is cleared when it is boxed BASIC
+    # (set_basic_dimension), so the ray it runs to is named by a leader note
+    # instead (CONE_AXIS_LABEL; r13 machinist review: unlabelled ray).
     "InclineAngle": (0.142, _top_y(28.0)),
 }
 
@@ -496,7 +514,6 @@ DIMENSION_CALLOUTS = {
     "ConeBossDia": "CONE JOURNAL BOSS OD",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
     "ConeBossNorthZ": "THRUST FACE FOR\nMHA-DT-004 COLLAR,\nFROM POST AXIS",
-    "InclineAngle": "CONE/CRANK BORE AXES",
     "CrankAboveCone": "16T:64T\nMESH",
     "JournalAxisY": "AXIS MATCHES\nMHA-DT-021",
 }
@@ -510,7 +527,7 @@ DIMENSION_SUFFIXES = {
 # kept off the centre: two leaders through one centre crossed there (the
 # crank bore's and the crank boss's in r5, the cone bore's and its boss's in
 # r8; machinist reviews).
-NEAR_SIDE_DIAMETERS = ("CrankBoreDia", "ConeBossDia", "JournalBoreDia")
+NEAR_SIDE_DIAMETERS = ("CrankBossDia", "CrankBoreDia", "ConeBossDia", "JournalBoreDia")
 _DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
 
 
@@ -1765,9 +1782,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crank bore finish",
         char_height=0.0025,
     )
-    # The journal bore's Ra lands on its upper-left rim, the symbol on the
-    # post's face left of the vertical centreline: from the bottom rim its
-    # leader ended on datum A's triangle (r5 machinist review).
+    # The journal bore's Ra lands on its lower-right rim below the size's
+    # leader, the symbol right of the view (JOURNAL_BORE_FINISH_XY).
     journal_centre = model_point_in_view(
         adapter,
         journal,
@@ -1780,15 +1796,16 @@ async def build(adapter: Any) -> dict[str, str]:
         (0.0, (BORE_HEIGHT + BORE_DIA / 2.0) / 1000.0, 0.0),
         label="cone journal bore top rim",
     )
-    journal_rim = math.dist(journal_centre[:2], journal_top[:2]) / math.sqrt(2.0)
+    journal_radius = math.dist(journal_centre[:2], journal_top[:2])
+    finish_bearing = math.radians(JOURNAL_BORE_FINISH_DEG)
     add_surface_finish(
         adapter,
         journal,
         edge_entity=_bore_rim_edge(journal, diameter_mm=BORE_DIA),
         symbol_xy=JOURNAL_BORE_FINISH_XY,
         leader_attach_xy=(
-            journal_centre[0] - journal_rim,
-            journal_centre[1] + journal_rim,
+            journal_centre[0] + journal_radius * math.cos(finish_bearing),
+            journal_centre[1] + journal_radius * math.sin(finish_bearing),
         ),
         control=surface_finish_by_key(SURFACE_FINISHES, "journal_bore"),
         label="cone journal bore finish",
@@ -1862,8 +1879,19 @@ async def build(adapter: Any) -> dict[str, str]:
     add_note(
         adapter,
         f"VIEW {JOURNAL_VIEW_LETTER} - CONE JOURNAL\nLOOK ALONG CONE AXIS",
-        0.202,
-        0.104,
+        *JOURNAL_TITLE_XY,
+    )
+    incline = math.radians(cone.INCLINE_DEG)
+    add_leader_note(
+        adapter,
+        CONE_AXIS_LABEL,
+        text_xy=CONE_AXIS_LABEL_XY,
+        attach_xy=(
+            _top_x(CONE_AXIS_LABEL_TIP_RADIUS_MM * math.sin(incline)),
+            _top_y(CONE_AXIS_LABEL_TIP_RADIUS_MM * math.cos(incline)),
+        ),
+        view=top,
+        label="plan cone bore axis label",
     )
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps the block at four lines (about 18 mm); the anchor keeps the
     # r7 clearance to the bottom inner border.
