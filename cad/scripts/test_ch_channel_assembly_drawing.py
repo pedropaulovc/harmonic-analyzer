@@ -793,8 +793,17 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     title_block_band = top.PRINTED_LINEAR_BAND_MM[places]
     assert 0.0 < south_margin < title_block_band - band
     assert north_margin > 10 * band
+    # #1660 r6 (rule 4): the lug centre's ±0.10 (owner ruling X-A) is what
+    # keeps the transferred foot tap walled in the rail web (rule 17's 1.5):
+    # at the title block's band the drill wall falls under it.
+    x_band = keeper.KEEPER_FITUP_X_BAND_MM
+    widened = title_block_band - x_band
+    assert top.KEEPER_TAP_DRILL_WALL_MARGIN >= 1.5
+    assert top.KEEPER_TAP_DRILL_WALL_MARGIN - widened < 1.5
     staked_number = steps.step_number(steps.SET_SCREWS_STAKED_KEY)
     for phrase in (
+        "THE LUG CENTRE'S BAND KEEPS EACH FOOT HOLE, TRANSFERRED BELOW, OVER "
+        "THE RAIL WEB WITH A FULL WALL ROUND ITS TAP",
         f"SOUTH FOOT CLEAR OF THE {top_frame} FRONT SOCKET BOSS",
         f"THE {fulcrum_shaft} FLATS ARE A FIXED PITCH APART",
         f"BANDS TOGETHER LEAVE ONE STEP {staked_number} SHAFT POSITION",
