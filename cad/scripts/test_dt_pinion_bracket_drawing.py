@@ -402,9 +402,10 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     bore_r = (geometry.PIVOT_BORE + dt_pinion_bracket_spec.PIVOT_BORE_BAND[0]) / 2.0
     shaft_min = shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[1]
     half = geometry.THICKNESS / 2.0
-    # The hole's centre sits on the pivot-axis line the flank draws: the
-    # webs charge that implied zero the .XX grade of the hole's own station.
-    hole_height = _GENERAL_GRADE[geometry.CROSS_HOLE_CZ_PLACES]
+    # The hole's centre sits on the pivot-axis line the flank draws: an
+    # implied zero has no places, so the webs charge it the coarsest grade.
+    hole_height = _GENERAL_GRADE[pin.IMPLIED_ZERO_PLACES]
+    assert pin.IMPLIED_ZERO_PLACES == min(_GENERAL_GRADE)
     seat_height = _printed_band("PinSeatCy")
     worst = {
         # Cross hole to the far and the near broad face.
@@ -460,4 +461,4 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     # The values the ruling approved.
     assert math.isclose(worst["cross hole far face"], 2.316, abs_tol=5e-4)
     assert math.isclose(worst["seat far face"], 1.544, abs_tol=5e-4)
-    assert math.isclose(worst["shaft wall"], 1.831, abs_tol=5e-4)
+    assert math.isclose(worst["shaft wall"], 1.541, abs_tol=5e-4)

@@ -62,9 +62,11 @@ if not (0.062 * INCH <= HOLE_DIA and HOLE_MAX <= 0.065 * INCH):
 _THICKNESS_LOWER = printed_deviations(THICKNESS, THICKNESS_PLACES)[0]
 _CROSS_HOLE_CZ_UPPER = printed_deviations(THICKNESS / 2.0, CROSS_HOLE_CZ_PLACES)[1]
 # The hole's height prints no offset: its centre sits on the pivot-axis line
-# the flank view draws (an implied zero), charged the .XX grade of the hole's
-# own station.
-_AXIS_OFFSET_MAX = max(abs(d) for d in printed_deviations(0.0, CROSS_HOLE_CZ_PLACES))
+# the flank view draws (an implied zero).  A zero carries no decimal places,
+# so no single title-block row owns it (Codex P1 on #1663): it is charged the
+# COARSEST row, .X, so the budget holds whichever row a shop reads it under.
+IMPLIED_ZERO_PLACES = 1
+_AXIS_OFFSET_MAX = max(abs(d) for d in printed_deviations(0.0, IMPLIED_ZERO_PLACES))
 _R_END_LOWER = printed_deviations(R_END, END_RADIUS_PLACES)[0]
 
 # Web from the cross hole to the FAR broad face (Codex #858 P2).  MHA-DT-014
@@ -84,8 +86,8 @@ FOLLOWER_SEAT_LIGAMENT = abs(PIN_DROP) - HOLE_MAX / 2.0 - PIN_BORE / 2.0
 # axis: an offset e from it thins one side by e.  MHA-DT-014 draws the strap
 # hole's centre ON the pivot-axis line of its flank view (r1 machinist
 # review, ENFORCE #1007: the former 3.18 offset from the pivot-bore wall ran
-# to a hidden line, rule 9), so e is that implied zero at the general .XX
-# grade, 0.51, and the worst wall is 2.341 - 0.51 = 1.831.  That misses the 2.0 web
+# to a hidden line, rule 9), so e is that implied zero at the coarsest
+# general grade, 0.8, and the worst wall is 2.341 - 0.8 = 1.541.  That misses the 2.0 web
 # target (Codex #858, PRRT_kwDOPHDy386mTvki), and no geometry can move to
 # meet it: the MHA-DT-019 shaft is the ruled 1/4 in, the pin is the smallest
 # B18.8.2 size (1/16), and the hole band is already B18.8.2's recommended

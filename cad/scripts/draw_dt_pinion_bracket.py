@@ -229,11 +229,19 @@ DIMENSION_CALLOUTS = {
     # The two held locations name what they serve (rules 3 and 4): the
     # follower's height sets the drum's swing for a given cam lift
     # (DRAWING_PRECISION), and the seat's station keeps it mid-bar
-    # (PIN_SEAT_WEB_WORST, user ruling (a)).
-    "PinSeatCy": "SETS FOLLOWER HEIGHT\nON MHA-DT-023 CAM",
+    # (PIN_SEAT_WEB_WORST, user ruling (a)).  SOLIDWORKS starts the 7.000's
+    # text at its bent dimension line, so that leg touched the leading S of
+    # SETS (r3 review, rule 14); the leading spaces stand the rows off it.
+    "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-023 CAM",
     "PinSeatCz": "CENTRES MHA-DT-025\nFOLLOWER IN BAR",
 }
-PIN_SEAT_DEPTH_CALLOUT = "FOLLOWER SEAT\nREAM DEPTH FROM\nENTRY FACE"
+# The seat floor is modelled sharp; R0.2 MAX lets the builder pick a
+# flat-bottom reamer or end mill (rule 16, r2/r3 review): a stud bottomed on
+# that corner stands off at most 0.2, well inside the seat depth's .X band.
+# Three rows, so the block grows right, not up into the isometric view.
+PIN_SEAT_DEPTH_CALLOUT = (
+    "FOLLOWER SEAT REAM DEPTH\nFROM ENTRY FACE\nFLOOR CORNERS R0.2 MAX"
+)
 
 
 def _overall_reference(adapter: Any, left: Any) -> None:
