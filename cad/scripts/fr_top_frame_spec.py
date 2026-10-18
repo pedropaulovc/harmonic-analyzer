@@ -533,9 +533,9 @@ DRAWING_NOTES = (
 # puts them and both washers bear on the crossbar's faced top; no split-line
 # regions and no geometry change: the model's top is the finished plane.  Its
 # own property, placed beside the keeper callout on HOLES-SOCKETS.  The
-# keeper rail's flatness is its own leadered requirement on that rail
-# (draw_fr_top_frame.KEEPER_FLATNESS_NOTE): the two keepers' lug bores carry
-# one fulcrum shaft in a running fit (blind machinist review, farm 0fbfc4d75).
+# keeper seats carry no flatness frame (rule 5; codex review of PR #1640,
+# owner ruling pending in #1659): MHA-CH-000 pair-reams the keepers and sets
+# them on this face with the shaft through both.
 DRAWING_NOTES_B = f"WHOLE TOP EXCEPT 4 BOSSES:\nRa {SEAT_UM:.1f} UM."
 # User ruling 2026-10-12 (reading (i)): every face on the 999.7 underside
 # plane between the bosses is faced at the seat finish -- the rail web
