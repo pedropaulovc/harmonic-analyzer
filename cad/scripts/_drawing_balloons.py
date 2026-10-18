@@ -26,6 +26,7 @@ from _drawing_common import rebuild_drawing
 from _drawing_projection import model_points_in_view
 from _drawing_scan import _HIT_ZOOM_HALF, _span_scan_attrs, _zoomed_on
 from _drawing_selection import _activate_and_select_view, _select_view_entity
+import _seat_forensics
 import _telemetry
 
 
@@ -900,6 +901,18 @@ _EDGE_SAMPLE_FRACTIONS = (0.1, 0.3, 0.5, 0.7, 0.9)
 _VIEW_ENTITY_EDGE = 1  # swViewEntityType_Edge
 
 
+# A frozen anchor's point lies on its edge within this (metres, part space):
+# the anchors are typed to 0.001 mm, and draw_dt_cone_swing_platform holds an
+# owned arc's closest point to the same physical-edge bound.
+_FROZEN_ON_EDGE_M = 0.00002
+
+
+# A frozen anchor whose hit test found no ink reads every edge the view lists
+# for its instance (one COM proxy each, 5-9 ms to release); it refuses an
+# instance listing more than this rather than spend minutes on one pick.
+_FROZEN_LISTED_EDGES_LIMIT = 2048
+
+
 _SEL_EDGES = 1  # swSelEDGES
 
 
@@ -915,15 +928,19 @@ _WALK_DIRECTIONS: tuple[tuple[float, float, float], ...] = tuple(
 )
 
 
-AnchorMethod = Literal["frozen", "walk", "visible-edge", "shared-edge", "listed-edge"]
+AnchorMethod = Literal[
+    "frozen", "frozen-edge", "walk", "visible-edge", "shared-edge", "listed-edge"
+]
 
 
 @dataclass(frozen=True)
 class _AnchorChoice:
     """The edge one family's balloon attaches to, where, and how it was found.
 
-    ``sheet_xy`` is the sheet point (metres) whose hit test returned ``edge``
-    as the instance's: the balloon's leader must end there. Selected by entity
+    ``sheet_xy`` is the sheet point (metres) where ``edge`` was proven the
+    instance's (a hit test returned it there, or, for ``frozen-edge``, the
+    frozen point projected there lies on it in the model): the balloon's
+    leader must end there. Selected by entity
     alone, SolidWorks picks its own point on the edge, which on a washer or a
     gear rim is often behind another part: on run
     20260928T194845954Z-44f5de00de924735961d14f4aad40337 the thrust washer's
@@ -1077,6 +1094,56 @@ def _visible_edge_points(
 
 
 @dataclass(frozen=True)
+class _FrozenEdge:
+    """What :func:`_frozen_anchor_edge` read: the listed edge through the
+    point (``None`` when none is), how many edges the view lists for the
+    instance, the nearest one's distance from the point (metres, ``None``
+    when none was measured) and how many lie within :data:`_FROZEN_ON_EDGE_M`."""
+
+    edge: Any
+    listed: int
+    nearest_m: float | None
+    matches: int
+
+
+def _frozen_anchor_edge(
+    adapter: Any, view: Any, leaf: _ComponentLeaf, point_m: Sequence[float]
+) -> _FrozenEdge:
+    """The edge of ``leaf`` the view lists as drawn that passes through
+    ``point_m`` (part metres), found in the model, not in the ink.
+
+    A frozen anchor's zoomed hit test reads the polyline the seat has drawn
+    at that moment, and a circle's chord sags off a point between its
+    tessellation's vertices (draw_mg_magnifier_assembly: 0.085 mm on R2.5 at
+    30 degrees). The same anchors, projected to the same sheet point under
+    the same window, hit on one leaf and missed on the next, on one seat
+    process as on another (#1667: fr-harmonic-base ~120 hits, 1 miss).
+    ``IEdge::GetClosestPointOn`` against each edge
+    ``IView::GetVisibleEntities2`` lists for the instance answers the same
+    on every seat. The closest edge wins; several within the bound share
+    the point (a vertex), so any of them lands the leader there.
+    """
+    bound = _early_bound(view, "IView")
+    count = int(bound.GetVisibleEntityCount2(leaf.component, _VIEW_ENTITY_EDGE) or 0)
+    if count <= 0 or count > _FROZEN_LISTED_EDGES_LIMIT:
+        return _FrozenEdge(edge=None, listed=count, nearest_m=None, matches=0)
+    x, y, z = (float(value) for value in point_m)
+    best, nearest, matches = None, None, 0
+    for edge in _sw_drawing.raw_visible_entities(view, leaf.component, _VIEW_ENTITY_EDGE):
+        closest = tuple(_com_invoke(edge, "IEdge", "GetClosestPointOn", x, y, z) or ())
+        if len(closest) < 3:
+            continue
+        distance = math.dist((x, y, z), tuple(float(value) for value in closest[:3]))
+        matches += distance <= _FROZEN_ON_EDGE_M
+        if nearest is None or distance < nearest:
+            best, nearest = edge, distance
+    on_edge = nearest is not None and nearest <= _FROZEN_ON_EDGE_M
+    return _FrozenEdge(
+        edge=best if on_edge else None, listed=count, nearest_m=nearest, matches=matches
+    )
+
+
+@dataclass(frozen=True)
 class _PointHit:
     """One hit-tested point: its index in the tried list, sheet point, the
     edge the hit test returned and that edge's owner."""
@@ -1149,8 +1216,15 @@ def _select_balloon_anchor(
     their COM proxies (#1079).
 
     ``frozen``: hit-test at the anchor's projected ``sheet_xy``. An edge of
-    another instance in front of the point, or no edge, raises; the balloon
-    never falls back to some other edge.
+    another instance in front of the point raises; the balloon never falls
+    back to some other edge. No ink there is not proof the edge is gone: the
+    hit test reads the seat's tessellated drawing, and a circle's chord sags
+    off the point between vertices (#1667). ``frozen-edge`` then asks the
+    model (:func:`_frozen_anchor_edge`): the edge the view lists for the
+    instance that passes through the frozen point, selected through the view
+    and landing at the same projected point. The point on no listed edge
+    raises, through :func:`_seat_forensics.capture_pick_miss`, so the miss
+    records the seat's window and the nearest edge's distance.
 
     ``walk`` (``anchor.point_mm is None``): hit-test the family's first
     instance's body extreme points (:func:`_walk_points`), the instance
@@ -1176,8 +1250,9 @@ def _select_balloon_anchor(
     and where, is in the ``drawing.balloon_anchor`` event (``shared`` names
     the other part).
 
-    Every other method returns the hit-tested sheet point, where the
-    balloon's leader is then made to land
+    Every other method returns the sheet point its edge was proven at (the
+    hit-tested point; for ``frozen-edge`` the anchor's projection), where
+    the balloon's leader is then made to land
     (:func:`_create_component_bom_balloon`).
     """
     first = candidates[0]
@@ -1191,18 +1266,51 @@ def _select_balloon_anchor(
         where = f"sheet ({sheet_xy[0] * 1000.0:.2f}, {sheet_xy[1] * 1000.0:.2f}) mm"
         edge, owner = _hit_test_edge(adapter, sheet_xy)
         tried.append(sheet_xy)
-        if edge is None:
-            raise RuntimeError(
-                f"{label}: {stem} frozen balloon anchor {anchor.point_mm} selects "
-                f"no edge at {where} on {instance}"
-            )
-        if owner.casefold() != instance.casefold():
+        if edge is not None and owner.casefold() != instance.casefold():
             adapter.currentModel.ClearSelection2(True)
             raise RuntimeError(
                 f"{label}: {stem} frozen balloon anchor {anchor.point_mm} at {where} "
                 f"selects an edge of {owner or 'no component'}, not {instance}"
             )
         method, point_mm = "frozen", tuple(anchor.point_mm)
+        if edge is None:
+            adapter.currentModel.ClearSelection2(True)
+            found = _frozen_anchor_edge(
+                adapter, view, first, [value / 1000.0 for value in point_mm]
+            )
+            nearest = (
+                "none measured"
+                if found.nearest_m is None
+                else f"{found.nearest_m * 1000.0:.4f} mm"
+            )
+            scan_attrs = {
+                "visible": f"{instance}={found.listed}",
+                "on_edge_mm": nearest,
+                "on_edge_matches": found.matches,
+            }
+            evidence = (
+                f"{found.listed} listed visible edges of {instance} (searched when "
+                f"1-{_FROZEN_LISTED_EDGES_LIMIT}), nearest {nearest}, "
+                f"{found.matches} within {_FROZEN_ON_EDGE_M * 1000.0:g} mm"
+            )
+            if found.edge is None:
+                _seat_forensics.capture_pick_miss(
+                    adapter,
+                    f"{label}: {stem} frozen balloon anchor {anchor.point_mm} selects "
+                    f"no edge at {where} on {instance}, and lies on none of its "
+                    f"{evidence}",
+                    view=view_name(adapter, view),
+                    entity_type="EDGE",
+                    sheet_xy=sheet_xy,
+                )
+            method, edge = "frozen-edge", found.edge
+            _telemetry.warn(
+                f"{label}: {stem} frozen balloon anchor {anchor.point_mm}: the hit "
+                f"test found no ink at {where}; the point lies on one of the "
+                f"{evidence}: attached to it by entity",
+                stem=stem,
+                instance=instance,
+            )
     else:
         walk_points = _walk_points(adapter, first)
         scan_attrs = {"extremes": len(walk_points)}
@@ -1378,13 +1486,13 @@ def _create_component_bom_balloon(
     selection point (``ISelectionMgr.SetSelectionPoint2``), the landing
     :func:`add_surface_finish` measured to 0.01 mm; without it SolidWorks
     ends the leader at its own point on the edge (:class:`_AnchorChoice`).
-    A ``shared-edge`` or ``listed-edge`` edge is the model edge the view
-    listed, not a hit test's pick, so it is selected through the view. The
-    leader must then read back there; a ``listed-edge`` leader has no
-    proven point to land on, so SolidWorks places it.
+    A ``frozen-edge``, ``shared-edge`` or ``listed-edge`` edge is the model
+    edge the view listed, not a hit test's pick, so it is selected through
+    the view. The leader must then read back there; a ``listed-edge`` leader
+    has no proven point to land on, so SolidWorks places it.
     """
     draw = adapter.currentModel
-    listed = choice.method in ("shared-edge", "listed-edge")
+    listed = choice.method in ("frozen-edge", "shared-edge", "listed-edge")
     if listed:
         draw.ClearSelection2(True)
         if not _early_bound(view, "IView").SelectEntity(choice.edge, False):

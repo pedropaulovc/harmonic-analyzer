@@ -3116,6 +3116,11 @@ class _AnchorEdge:
     def GetCurveParams2(self):
         return (*self._ends, 0.0, 1.0, 0.0, 0.0, 0.0)
 
+    def GetClosestPointOn(self, x, y, z):
+        """The closest of 1,001 points along the curve, as (x, y, z, t, unused)."""
+        t = min((i / 1000.0 for i in range(1001)), key=lambda t: _math.dist(self._at(t), (x, y, z)))
+        return (*self._at(t), t, 0.0)
+
     def Select4(self, _append, _data):
         self.sheet.selected = [self]
         self.sheet.selection_point = None
@@ -3397,12 +3402,57 @@ def test_frozen_anchor_selects_at_its_exploded_projection_and_records_it(monkeyp
     ]
 
 
-def test_frozen_anchor_that_hits_nothing_fails_naming_the_stem(monkeypatch):
-    view = _exploded_view(_instances("dt-cone-gear-1"), [])
+def _frozen_miss(monkeypatch, listed):
+    """A frozen anchor whose zoomed hit test finds no ink at its projection
+    (#1667's tessellation miss); ``listed`` are the edges the view lists for
+    dt-cone-gear-1. The seat's window read is stubbed: it reads the host."""
+    view = _exploded_view(_instances("dt-cone-gear-1"), [], visible={"dt-cone-gear-1": listed})
     sheet = _AnchorSheet({})
+    for edge in listed:
+        edge.sheet = sheet
+    monkeypatch.setattr(_drawing_balloons._seat_forensics, "_display_bags", lambda _a: ({}, {}))
+    return view, sheet
+
+
+def test_frozen_anchor_that_hits_nothing_fails_naming_the_stem(monkeypatch):
+    view, sheet = _frozen_miss(monkeypatch, [])
     with pytest.raises(RuntimeError, match="cone-gear frozen balloon anchor .* selects no edge"):
         _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
     assert sheet.balloons == []
+
+
+def test_frozen_anchor_ink_miss_attaches_to_the_listed_edge_through_its_point(monkeypatch):
+    """#1667: the same frozen point hit on one leaf and found no ink on the
+    next. The model still says which listed edge passes through it: the
+    balloon attaches to that edge and lands at the projected point."""
+    far = _AnchorEdge("dt-cone-gear-1", ends=(0.0, 0.05, 0.0, 0.01, 0.05, 0.0))
+    # The anchor (1, 2, 3) mm is 40% of the way along this edge.
+    through = _AnchorEdge("dt-cone-gear-1", ends=(-0.001, 0.0, 0.001, 0.004, 0.005, 0.006))
+    view, sheet = _frozen_miss(monkeypatch, [far, through])
+    balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
+    assert sheet.hits == [(0.001, 0.002)]
+    assert [note.end for note in balloons] == [(0.001, 0.002)]
+    assert balloons[0].GetAnnotation().GetAttachedEntities3() == (through,)
+    assert sheet.landings[0].sheet_xy == (0.001, 0.002)
+    assert anchors[0]["method"] == "frozen-edge"
+    assert anchors[0]["visible"] == "dt-cone-gear-1=2"
+    assert anchors[0]["on_edge_matches"] == 1
+    assert float(anchors[0]["on_edge_mm"].split()[0]) <= 0.02
+
+
+def test_frozen_anchor_off_every_listed_edge_fails_with_the_nearest_distance(monkeypatch):
+    """Ink missed AND the point lies on no listed edge: the edge is gone or
+    hidden, so the sheet fails, recording the seat's window and how far the
+    nearest listed edge is."""
+    view, sheet = _frozen_miss(
+        monkeypatch, [_AnchorEdge("dt-cone-gear-1", ends=(0.0, 0.05, 0.0, 0.01, 0.05, 0.0))]
+    )
+    warnings = []
+    monkeypatch.setattr(_telemetry, "warn", lambda message, **_kw: warnings.append(message))
+    with pytest.raises(RuntimeError, match=r"selects no edge .* lies on none of its 1 listed .* nearest 48\.\d+ mm"):
+        _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
+    assert sheet.balloons == []
+    assert [message.split(":", 1)[0] for message in warnings] == ["[forensics] t"]
 
 
 def test_frozen_anchor_on_another_components_edge_fails(monkeypatch):

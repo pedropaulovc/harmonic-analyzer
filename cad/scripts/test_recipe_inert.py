@@ -68,6 +68,9 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     # and session, then raises the pick's own failure. It never returns, but a
     # caller can catch the RuntimeError and retry; draw_rocker_arm does so.
     ("_drawing_selection.py", "_select_view_entity"): frozenset({"capture_pick_miss"}),
+    # A frozen balloon anchor whose hit test found no ink AND whose point lies
+    # on none of its instance's listed edges: the same window read, then raise.
+    ("_drawing_balloons.py", "_select_balloon_anchor"): frozenset({"capture_pick_miss"}),
     # PRE-save, after the sheet is fitted: records the window the drawing's
     # coordinate picks hit-test in.  Rule 3 proves it reads only.
     ("_drawing_common.py", "new_project_drawing"): frozenset({"record_drawing_display"}),
