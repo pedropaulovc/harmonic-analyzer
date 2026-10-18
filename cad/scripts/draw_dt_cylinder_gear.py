@@ -44,9 +44,10 @@ from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gear_drawing_entities import visible_circle_edge
 from _gtol_face_read import face_geometry
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -68,6 +69,9 @@ from dt_cylinder_gear_spec import (
     TIP_RADIUS,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_cylinder_gear"]
 PART_STEM = SPEC.artifact_stem
@@ -560,7 +564,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
 
     detail = _notch_detail(adapter, front)
     set_hidden_lines_visible(adapter, detail)
@@ -690,8 +694,12 @@ async def build(adapter: Any) -> dict[str, str]:
         *MANUFACTURING_NOTES_POS,
         char_height=0.0025,
     )
-    for view in (front, right):
-        set_hidden_lines_visible(adapter, view)
+    # Rule 9 (show internal shape in solid lines): the bore is a standard
+    # hole its callout defines, so the parent views carry no hidden lines
+    # (the kerf detail keeps its own mode); the isometric is reset too
+    # before the finalizer shades it (PR #1436).
+    for view in (front, right, iso):
+        set_hidden_lines_removed(adapter, view)
     # Check the complete native requirement after all annotation formatting.
     drawing_model.EditRebuild3()
     drawing_model.GraphicsRedraw2()
