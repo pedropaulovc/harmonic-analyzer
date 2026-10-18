@@ -344,6 +344,7 @@ def test_fitted_bores_name_their_mates_and_fits() -> None:
     # two held locations say what they serve.  The pinned pivot bore runs on
     # nothing, so it carries no roughness symbol (rule 6).
     import _config
+    from machinist_exceptions import load_exceptions
 
     def number(stem: str) -> str:
         return _config.parts(stem)["number"]
@@ -365,9 +366,9 @@ def test_fitted_bores_name_their_mates_and_fits() -> None:
     # (a), RV-01), never above the spec's worst case nor under the 1.5 floor.
     assert callouts["PinSeatCz"].splitlines()[-1] == "WALL 1.5 MIN"
     assert 1.5 <= dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST < 2.0
-    exceptions = _config.parts("dt-pinion-bracket")["machinist_exceptions"]
-    assert [e["id"] for e in exceptions] == ["RV-01"]
-    assert "WALL 1.5 MIN" in exceptions[0]["where"]
+    (wall,) = load_exceptions(_config.CONFIG_DIR, "dt_pinion_bracket", "part")
+    assert (wall.id, wall.kind) == ("RV-01", "accept")
+    assert "WALL 1.5 MIN" in wall.where and "rule 17" in wall.finding
     # The (43.0) stands left of the flank, so no leader to the follower seat
     # (callouts right of the view) crosses its dimension line.
     face_a = drawing.LEFT_CENTER[0] - (
