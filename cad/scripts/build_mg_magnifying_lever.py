@@ -21,22 +21,30 @@ far dome centre.
 ``PressZone`` (blanked, on the Front plane): the cylinder the MHA-MG-001
 bracket collar grips -- PRESS_ZONE_LENGTH back from the east dome TIP to its
 start, running to the dome tangent (mg_lever_press_fit_geom.COLLAR_ENGAGEMENT,
-the R3 dome's shrinking diameter is not banded engagement) -- PRESSED on and
-retained per the bracket sheet. The rod is modelled at its nominal Ø6 end to
-end -- the zone is a band, not a step -- so no model edge bounds it: a
-centerline on the axis from the zone start to the tip, located from the
-origin by the rod length, and a construction witness along the rod's bottom
-outline from the zone start to the tangent carry the zone's start from the
-tip, its cylinder length and its diameter with the press band natively
-(drawing-simplicity-policy.md `How the repository implements the guidelines`: the model, not a note, owns it; ch_rod_pivot_pin's
-``BlankReference``).
+the R3 dome's shrinking diameter is not banded engagement). The collar is
+pressed on at the MHA-MG-000 assembly step. The rod is modelled at its nominal
+Ø6 end to end -- the zone is a band, not a step -- so no model edge bounds it:
+a solid line across the bar at the zone's start marks it on the print (the
+zone reads between that line and the dome's tangent edge) and carries the
+zone's diameter; a construction witness along the rod's bottom outline from
+the zone start to the tangent carries its cylinder length; a construction arc
+along the east dome's lower outline from the tangent to the tip carries the
+tip, so the zone's start is dimensioned from the tip as a native single MIN
+limit (drawing-simplicity-policy.md `How the repository implements the
+guidelines`: the model, not a note, owns it; ch_rod_pivot_pin's
+``BlankReference``). Every other entity lies ON the silhouette, so the shown
+sketch adds no stray line inside the rod.
 
-``RodStock`` (blanked, on the Front plane): the rod's stock diameter with the
-cold-drawn bar's band, printed once at mid-length, away from the press zone.
+``RodStock`` (blanked, on the Front plane): the rod's stock diameter, plain
+bar stock (no band), printed once at mid-length, away from the press zone.
 The revolve profile cannot carry it -- its top line's height is already the
-dome radius's, so a second diameter over-defines the capsule -- hence a
-construction witness from the axis to the top outline, doubled off a short
-centerline on the axis, the PressZone idiom. The front view shows both.
+dome radius's, so a second diameter over-defines the capsule -- hence two
+short construction lines ON the top and bottom outlines, the diameter between
+them. The front view shows both sketches.
+
+The Ø6 body's one cylindrical face carries the part's only finish, the
+MHA-MG-002 clamp screw's Ra 3.2 seat (mg_magnifying_lever_spec), as model PMI
+(SURFACE_FINISHES); the drawing's symbol consumes the same control.
 
 Run (SolidWorks already open)::
 
@@ -68,13 +76,13 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _drawing_dimension_insert import add_diametric_linear_dimension
+import _telemetry
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from mg_lever_press_fit_geom import (
@@ -82,7 +90,6 @@ from mg_lever_press_fit_geom import (
     PRESS_ZONE_DIA,
     PRESS_ZONE_DIA_BAND,
     PRESS_ZONE_LENGTH,
-    PRESS_ZONE_LENGTH_BAND,
     ROD_DIA,
 )
 from mg_magnifying_lever_geom import (
@@ -93,10 +100,9 @@ from mg_magnifying_lever_geom import (
 )
 from mg_magnifying_lever_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     ISO_VIEW_NOTE,
-    ROD_DIA_BAND,
+    PRESS_ZONE_START_TOL_TYPE,
     SURFACE_FINISHES,
 )
 
@@ -116,6 +122,52 @@ if PRESS_ZONE_END - PRESS_ZONE_X[0] != COLLAR_ENGAGEMENT:
 # Where the stock diameter prints: mid-length, under the clamp's travel.
 ROD_DIA_STATION = ROD_LENGTH / 2.0
 
+# The reference sketches' entities, Front-plane part (x, y) mm, rod axis on
+# y = 0.  The zone-start mark is the ONE line the shown sketches draw inside
+# the rod: across the bar at the zone's start, both ends on the outline.
+# Everything else lies ON the silhouette -- the zone's witness on the bottom
+# outline, its tip arc on the east dome's lower outline (centre, start, end;
+# counter-clockwise from the tangent to the tip), the stock's two lines on the
+# top and bottom outlines -- so the print shows no stray line inside the rod.
+PRESS_ZONE_START_LINE = ((PRESS_ZONE_X[0], -R), (PRESS_ZONE_X[0], R))
+PRESS_ZONE_WITNESS = ((PRESS_ZONE_X[0], -R), (PRESS_ZONE_END, -R))
+PRESS_ZONE_TIP_ARC = ((PRESS_ZONE_END, 0.0), (PRESS_ZONE_END, -R), (ROD_LENGTH, 0.0))
+ROD_STOCK_LINES = tuple(
+    ((ROD_DIA_STATION - R, y), (ROD_DIA_STATION + R, y)) for y in (R, -R)
+)
+
+
+def silhouette_offset(x: float, y: float) -> float:
+    """Distance (mm) of a Front-plane point from the capsule's outline: the
+    two straight flanks between the dome tangents, the two hemispheres
+    beyond them.  Zero means ON the silhouette."""
+    if R <= x <= ROD_LENGTH - R:
+        return abs(abs(y) - R)
+    centre = R if x < R else ROD_LENGTH - R
+    return abs(math.hypot(x - centre, y) - R)
+
+
+for _start, _end in (PRESS_ZONE_WITNESS, *ROD_STOCK_LINES):
+    # A straight entity on a flank: both ends on it, at one height.
+    if not (
+        R <= _start[0] < _end[0] <= ROD_LENGTH - R
+        and _start[1] == _end[1]
+        and silhouette_offset(*_start) == silhouette_offset(*_end) == 0.0
+    ):
+        raise AssertionError(f"reference line {(_start, _end)} leaves the outline")
+if not (
+    PRESS_ZONE_TIP_ARC[0] == (ROD_LENGTH - R, 0.0)
+    and all(silhouette_offset(*point) == 0.0 for point in PRESS_ZONE_TIP_ARC[1:])
+):
+    raise AssertionError("the zone's tip arc must lie on the east dome's outline")
+_mark_bottom, _mark_top = PRESS_ZONE_START_LINE
+if not (
+    R < _mark_bottom[0] == _mark_top[0] < ROD_LENGTH - R
+    and silhouette_offset(*_mark_bottom) == silhouette_offset(*_mark_top) == 0.0
+    and _mark_bottom[1] < 0.0 < _mark_top[1]
+):
+    raise AssertionError("the zone-start mark must span the bar inside its outline")
+
 
 def _make_construction(adapter, entity: str) -> None:
     """Turn one sketch segment into construction geometry, and prove it."""
@@ -123,6 +175,32 @@ def _make_construction(adapter, entity: str) -> None:
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError(f"{entity}: failed to become construction geometry")
+
+
+def _press_zone_start_min_limit(adapter) -> None:
+    """PressZoneStart as the single limit "10.0 MIN" (build_vn_knife_hanger_stud's
+    ThreadLengthMin recipe, with the bracket's _arm_root_radius_max_limit
+    readback): swTolMIN prints the model value then MIN, so the nominal IS the
+    limit and carries no deviations; the readback proves the type and the zero
+    values stuck."""
+    _, dimension = _named_dimension(adapter, "PressZone", "PressZoneStart")
+    label = "PressZoneStart@PressZone"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, PRESS_ZONE_LENGTH / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the minimum {PRESS_ZONE_LENGTH}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = PRESS_ZONE_START_TOL_TYPE
+    if not tolerance.SetValues(0.0, 0.0):
+        raise RuntimeError(f"{label}: SetValues rejected the MIN limit's 0/0")
+    if (
+        int(tolerance.Type) != PRESS_ZONE_START_TOL_TYPE
+        or not math.isclose(float(tolerance.GetMinValue()), 0.0, abs_tol=1e-12)
+        or not math.isclose(float(tolerance.GetMaxValue()), 0.0, abs_tol=1e-12)
+    ):
+        raise RuntimeError(f"{label}: MIN-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {PRESS_ZONE_LENGTH:g} MIN")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -242,49 +320,53 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "rod", v_rod, 0.005 * v_rod)
 
     # REFERENCE sketch (blanked before save): the press zone -- see the module
-    # docstring. A centerline on the axis from the zone start to the east tip,
-    # and a witness along the rod's bottom outline from the zone start to the
-    # dome tangent (made construction, so the shown sketch prints no outline
-    # of its own; on the bottom so the zone's lengths print below the rod
-    # with their extension lines clear of it). Four display dims, in creation
-    # order: the tip station from the origin (unmarked; the profile prints the
-    # overall length), the zone's start back from the tip, the cylinder's
-    # length to the tangent (printed as a reference), then the diameter to the
-    # witness's start -- doubled off the axis, the way the pivot pins print
-    # theirs.
+    # docstring and PRESS_ZONE_START_LINE. The zone-start mark across the bar
+    # (a SOLID line: the print shows it), a construction witness along the
+    # rod's bottom outline from the mark's foot to the dome tangent (on the
+    # bottom so the zone's lengths print below the rod with their extension
+    # lines clear of it), and a construction arc along the east dome's lower
+    # outline from the witness's end, tangent to it, to the tip on the axis.
+    # Four display dims, in creation order: the tip station from the origin
+    # (unmarked; the profile prints the overall length), the zone's start back
+    # from the tip, the cylinder's length to the tangent (printed as a
+    # reference), then the diameter across the mark.
     zone = SketchDims()
     check("create_sketch press zone", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    zone_axis = check(
-        "press zone axis",
-        await adapter.add_centerline(PRESS_ZONE_X[0], 0.0, ROD_LENGTH, 0.0),
+    (mark_x0, mark_y0), (mark_x1, mark_y1) = PRESS_ZONE_START_LINE
+    zone_mark = check(
+        "press zone start mark",
+        await adapter.add_line(mark_x0, mark_y0, mark_x1, mark_y1),
     )
+    (witness_x0, witness_y0), (witness_x1, witness_y1) = PRESS_ZONE_WITNESS
     zone_witness = check(
         "press zone witness",
-        await adapter.add_line(PRESS_ZONE_X[0], -R, PRESS_ZONE_END, -R),
+        await adapter.add_line(witness_x0, witness_y0, witness_x1, witness_y1),
+    )
+    (arc_cx, arc_cy), (arc_x0, arc_y0), (arc_x1, arc_y1) = PRESS_ZONE_TIP_ARC
+    zone_tip_arc = check(
+        "press zone tip arc",
+        await adapter.add_arc(arc_cx, arc_cy, arc_x0, arc_y0, arc_x1, arc_y1),
     )
     set_sketch_direct_db(adapter, False)
     _make_construction(adapter, zone_witness)
-    for line in (zone_axis, zone_witness):
+    _make_construction(adapter, zone_tip_arc)
+    for first, second, relation in (
+        (zone_mark, None, "vertical"),
+        (zone_witness, None, "horizontal"),
+        (f"{zone_mark}.start", f"{zone_witness}.start", "coincident"),
+        (f"{zone_witness}.end", f"{zone_tip_arc}.start", "coincident"),
+        (zone_witness, zone_tip_arc, "tangent"),
+        (f"{zone_tip_arc}.center", "origin", "horizontal_points"),
+        (f"{zone_tip_arc}.end", "origin", "horizontal_points"),
+    ):
         check(
-            f"press zone {line} horizontal",
-            await adapter.add_sketch_constraint(line, None, "horizontal"),
+            f"press zone {first} {relation} {second}",
+            await adapter.add_sketch_constraint(first, second, relation),
         )
-    check(
-        "press zone axis on the rod axis",
-        await adapter.add_sketch_constraint(
-            f"{zone_axis}.start", "origin", "horizontal_points"
-        ),
-    )
-    check(
-        "press zone witness start over the axis start",
-        await adapter.add_sketch_constraint(
-            f"{zone_axis}.start", f"{zone_witness}.start", "vertical_points"
-        ),
-    )
     await dimension_between(
         adapter,
-        f"{zone_axis}.end",
+        f"{zone_tip_arc}.end",
         "origin",
         "horizontal_distance",
         ROD_LENGTH,
@@ -294,7 +376,7 @@ async def build(adapter) -> dict[str, str]:
     await dimension_between(
         adapter,
         f"{zone_witness}.start",
-        f"{zone_axis}.end",
+        f"{zone_tip_arc}.end",
         "horizontal_distance",
         PRESS_ZONE_LENGTH,
         "press zone PressZoneStart",
@@ -309,12 +391,13 @@ async def build(adapter) -> dict[str, str]:
         "press zone PressZoneLen",
     )
     zone.record("PressZoneLen", '"CollarLen" - "RodDia" / 2')
-    await add_diametric_linear_dimension(
+    await dimension_between(
         adapter,
-        zone_axis,
-        f"{zone_witness}.start",
-        ((PRESS_ZONE_X[0] + PRESS_ZONE_END) / 2.0, R + 6.0),
-        "PressZoneDia",
+        f"{zone_mark}.start",
+        f"{zone_mark}.end",
+        "vertical_distance",
+        PRESS_ZONE_DIA,
+        "press zone PressZoneDia",
     )
     zone.record("PressZoneDia", '"RodDia"')
     await ensure_fully_defined(adapter, "press zone sketch")
@@ -323,70 +406,67 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += zone.apply(adapter, "PressZone")
 
     # REFERENCE sketch (blanked before save): the stock diameter -- see the
-    # module docstring. A short centerline on the axis, the construction
-    # witness rising from its midpoint to the top outline. Three display dims,
-    # in creation order: the witness's station from the origin and the
-    # centerline's length (both unmarked), then the diameter to the witness's
-    # top, doubled off the centerline.
+    # module docstring and ROD_STOCK_LINES. Two short construction lines on
+    # the top and bottom outlines at mid-length, the bottom one under the top
+    # one. Four display dims, in creation order: the lines' station from the
+    # origin, their length and the top line's height (all unmarked), then the
+    # diameter between the two lines' starts.
     stock = SketchDims()
     check("create_sketch rod stock", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    stock_axis = check(
-        "rod stock axis",
-        await adapter.add_centerline(
-            ROD_DIA_STATION - R, 0.0, ROD_DIA_STATION + R, 0.0
-        ),
-    )
-    stock_witness = check(
-        "rod stock witness",
-        await adapter.add_line(ROD_DIA_STATION, 0.0, ROD_DIA_STATION, R),
-    )
+    stock_lines: list[str] = []
+    for side, ((x0, y0), (x1, y1)) in zip(("top", "bottom"), ROD_STOCK_LINES):
+        stock_lines.append(
+            check(f"rod stock {side} line", await adapter.add_line(x0, y0, x1, y1))
+        )
+    stock_top, stock_bottom = stock_lines
     set_sketch_direct_db(adapter, False)
-    _make_construction(adapter, stock_witness)
-    check(
-        "rod stock axis horizontal",
-        await adapter.add_sketch_constraint(stock_axis, None, "horizontal"),
-    )
-    check(
-        "rod stock witness vertical",
-        await adapter.add_sketch_constraint(stock_witness, None, "vertical"),
-    )
-    check(
-        "rod stock axis on the rod axis",
-        await adapter.add_sketch_constraint(
-            f"{stock_axis}.start", "origin", "horizontal_points"
-        ),
-    )
-    check(
-        "rod stock witness foot at the axis midpoint",
-        await adapter.add_sketch_constraint(
-            f"{stock_witness}.start", stock_axis, "midpoint"
-        ),
-    )
+    for line in (stock_top, stock_bottom):
+        _make_construction(adapter, line)
+    for first, second, relation in (
+        (stock_top, None, "horizontal"),
+        (stock_bottom, None, "horizontal"),
+        (f"{stock_bottom}.start", f"{stock_top}.start", "vertical_points"),
+        (f"{stock_bottom}.end", f"{stock_top}.end", "vertical_points"),
+    ):
+        check(
+            f"rod stock {first} {relation} {second}",
+            await adapter.add_sketch_constraint(first, second, relation),
+        )
     await dimension_between(
         adapter,
-        f"{stock_witness}.start",
+        f"{stock_top}.start",
         "origin",
         "horizontal_distance",
-        ROD_DIA_STATION,
+        ROD_DIA_STATION - R,
         "rod stock RodDiaStation",
     )
-    stock.record("RodDiaStation", '"RodLength" / 2')
+    stock.record("RodDiaStation", '"RodLength" / 2 - "RodDia" / 2')
     await dimension_between(
         adapter,
-        f"{stock_axis}.start",
-        f"{stock_axis}.end",
+        f"{stock_top}.start",
+        f"{stock_top}.end",
         "horizontal_distance",
         ROD_DIA,
-        "rod stock RodStockAxis",
+        "rod stock RodStockSpan",
     )
-    stock.record("RodStockAxis", '"RodDia"')
-    await add_diametric_linear_dimension(
+    stock.record("RodStockSpan", '"RodDia"')
+    await dimension_between(
         adapter,
-        stock_axis,
-        f"{stock_witness}.end",
-        (ROD_DIA_STATION, R + 6.0),
-        "RodDia",
+        f"{stock_top}.start",
+        "origin",
+        "vertical_distance",
+        R,
+        "rod stock RodStockTop",
+    )
+    stock.record("RodStockTop", '"RodDia" / 2')
+    await dimension_between(
+        adapter,
+        f"{stock_bottom}.start",
+        f"{stock_top}.start",
+        "vertical_distance",
+        ROD_DIA,
+        "rod stock RodDia",
     )
     stock.record("RodDia", '"RodDia"')
     await ensure_fully_defined(adapter, "rod stock sketch")
@@ -418,24 +498,23 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: the stock diameter carries the cold-drawn
-    # bar's band, the press zone's diameter the geom's tighter (upper, lower)
-    # band and its start from the tip the collar length's axial band, all
-    # natively (drawing-simplicity-policy.md `How the repository implements the guidelines`), places come from the spec, then mark exactly
-    # the print's dimensions (the drawing recipe imports the marked set and
-    # must find every one of these), author the OD finish on the part, and
-    # stamp the make-critical title-block properties. The reference sketches
-    # are blanked for the assembly renders; the front view shows them per view.
-    set_dimension_bilateral_tolerance(
-        adapter, "RodStock", "RodDia", *deviations(ROD_DIA_BAND)
-    )
+    # Manufacturing drawing support: the stock diameter is plain bar stock
+    # (no band; the title block's .X governs it), the press zone's diameter
+    # carries the geom's tighter (upper, lower) band and its start from the tip
+    # a single MIN limit at the longest collar's length, both natively
+    # (drawing-simplicity-policy.md `How the repository implements the
+    # guidelines`), places come from the spec, then mark exactly the print's
+    # dimensions (the drawing recipe imports the marked set and must find
+    # every one of these) and stamp the make-critical title-block properties.
+    # The body's one finish is the clamp screw's static seat, Ra 3.2 (owner
+    # ruling 2026-10-17; drawing-guidelines.md rule 6), authored as model PMI
+    # on the Ø6 face. The reference sketches are blanked for the assembly
+    # renders; the front view shows them per view.
     set_dimension_bilateral_tolerance(
         adapter, "PressZone", "PressZoneDia", *deviations(PRESS_ZONE_DIA_BAND)
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "PressZone", "PressZoneStart", *deviations(PRESS_ZONE_LENGTH_BAND)
-    )
-    # A diametric linear dimension on a side-view sketch prints no Ø by itself
+    _press_zone_start_min_limit(adapter)
+    # A linear dimension across a side-view sketch prints no Ø by itself
     # (build_dt_pinion_arbor's journals; the v41 sheet read "6.000 0/-0.008").
     set_dimension_prefix(adapter, "PressZone", "PressZoneDia", "<MOD-DIAM>")
     set_dimension_prefix(adapter, "RodStock", "RodDia", "<MOD-DIAM>")
@@ -444,14 +523,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Iso View Note": ISO_VIEW_NOTE,
-        },
-    )
+    apply_drawing_properties(adapter, PART_NAME, {"Iso View Note": ISO_VIEW_NOTE})
     blank_reference_sketches(adapter, ("PressZone", "RodStock"))
     # Annotation changes must leave the rod intact through the final rebuild,
     # not merely at the earlier, pre-annotation equation check.

@@ -609,7 +609,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_latch_hook_bracket_screw",  # #4-40 narrow fillister (McMaster 90280A108, MHA-VN-043), member: 2 into the support_bar's #4-40 through taps
         "vn_magnifying_bracket_screw",  # #2-56 fillister, member: two in bracket counterbores into summing_lever (top-level row)
         "vn_platen_clip_screw",  # #2-56 brass slotted pan head (92446A077, MHA-VN-059), member: 4 into the platen's through taps, clamping the paper clips
-        "mg_magnifying_clamp",  # #4-40 UNC-2B tapped ScrewHole (Hole Wizard), receiver of thumb_screw
+        "mg_magnifying_clamp",  # MHA-MG-002 hex: #4-40 top-face thumb tap (receiver of thumb_screw) + #4-40 bottom-face blind tap (receiver of vertical_rod)
+        "mg_magnifying_vertical_rod",  # MHA-MG-004: #4-40 UNC-2A turned top end with relief, member into the clamp's bottom tap, seats on its shoulder
         "ms_stop_block",  # MHA-MS-002: #4-40 UNC-2B tapped through the floor (receiver of vn_thumb_screw) + 2x #2-56 UNC blind taps (receiver of vn_ms_stop_plate_screw)
         "vn_ms_stop_plate_screw",  # #2-56 x 1/4 brass fillister (McMaster 90114A124, MHA-VN-054), member: 2 into ms_stop_block through the cover plate
         "mg_output_fixture",  # #4-40 UNC axial tap from the spigot face into the rod bore (mg_output_fixture_spec.TAP_SPEC), receiver of the 2nd thumb_screw
@@ -688,9 +689,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the faced crossbar top; no thread
         "pd_latch_hook",  # MHA-PD-014 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "vn_lever_wire",  # wire, wrapped in the fixture's spigot groove; no thread
-        "mg_magnifying_bracket",  # 1018 steel MHA-MG-003 collar light-press seat with Loctite 638; flange has two counterbored normal #2 clearance holes, no thread
-        "mg_magnifying_lever",  # Ø6 domed brass lever; press MHA-MG-001 collar onto its east cylinder while holding the rod near its end, then retain with Loctite 638
-        "mg_magnifying_vertical_rod",  # plain Ø5 domed rod
+        "mg_magnifying_bracket",  # 1018 steel MHA-MG-003 collar light-press seat (press only, #1570); flange has two plain #2 clearance holes (heads on its front face), no thread
+        "mg_magnifying_lever",  # Ø6 domed brass lever; press MHA-MG-001 collar onto its east cylinder while holding the rod near its end; the press alone retains it
         "mg_magnifying_wheel",  # reamed .1890 running bore + two Ø1 wire-tie holes; no thread
         "mg_wheel_drum",  # MHA-MG-010 brass drum pressed on the wheel's spigot; no thread
         "mg_wheel_axle_spacer",  # MHA-MG-011 brass sleeve, drilled clearance on the wheel axle; no thread
@@ -1870,21 +1870,50 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "hand-set operator clamp: pinches the sliding clamp block onto the lever rod at the chosen "
-            "magnification radius; block, rod, vertical rod and fixture then ride the lever as one rigid "
+            "hand-set operator clamp: pinches the hex clamp onto the Ø6 lever rod at the chosen "
+            "magnification radius; clamp, vertical rod and fixture then ride the lever as one rigid "
             "body (lock mates), the lever rocks about the knife line (machine Z) perpendicular to the "
-            "screw axis (machine Y), and the wire pull on the offset vertical rod makes a moment about the "
-            "lever-rod axis (X), so no operating torque acts about the screw axis"
+            "screw axis (machine Y), and the wire pull lies in the plumb plane through the screw axis "
+            "(option A1, #1559), so no operating torque acts about the screw axis"
         ),
-        axial_capture="tip bears on the Ø6 lever rod through the tapped hole that breaks into the lever bore (modelled backed-out, tip tangent)",
+        axial_capture="tip bears on the Ø6 lever rod through the top-face #4-40 tap on the hex axis that breaks into the lever bore across the corners (modelled backed-out, tip tangent)",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
             "build_mg_magnifier_assembly.py:build ('thumb-screw (clamp)', lock_mate 'thumb-screw locked to clamp'; "
-            "docstring 'Documented simplifications'); build_mg_magnifying_clamp.py ScrewHole HoleSpec('tapped','#4-40'); "
+            "docstring 'Documented simplifications'); build_mg_magnifying_clamp.py ThumbTap from "
+            "mg_magnifying_clamp_geom.py THUMB_TAP_SPEC + THUMB_ENGAGEMENT_WORST; "
             "mg_magnifying_clamp_spec.py DRAWING_NOTES; _mcmaster_91882a221.py THUMB_SPEC"
+        ),
+    ),
+    Joint(
+        id="mg-magnifier/vertical-rod-in-clamp",
+        assembly="mg_magnifier",
+        member="mg_magnifying_vertical_rod",
+        receiver="mg_magnifying_clamp",
+        thread="#4-40 UNC",
+        quantity=1,
+        installed_at="",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason=(
+            "screwed home on its shoulder against the clamp's bottom face (owner ruling #1559: no set "
+            "screw, bonding or thread lock); rod, clamp and fixture ride the lever as one rigid body, and "
+            "the lever wire's pull at the fixture hook lies in the plumb plane through the rod axis "
+            "(option A1: hook, rod and drum lane coplanar), so its moment is about machine Z and no "
+            "operating torque acts about the rod's thread axis (machine Y)"
+        ),
+        axial_capture="shoulder seated on the clamp's bottom face by thread torque; worst-case full-thread engagement mg_rod_clamp_joint.ENGAGEMENT_WORST 4.605 >= 1.5D (4.2675)",
+        lock=Lock.NONE,
+        lock_part="",
+        lock_binds=(),
+        lock_step="",
+        evidence=(
+            "build_mg_magnifier_assembly.py:build (lock_mate 'vertical-rod locked to clamp'; VROD_TOP_Y = clamp bottom face + SHOULDER_X); "
+            "build_mg_magnifying_clamp.py RodTap from mg_rod_clamp_joint.py ROD_TAP_SPEC + ENGAGEMENT_WORST; "
+            "mg_magnifying_vertical_rod_geom.py SHOULDER_X + SEAT_LAND_WORST; "
+            "vn_lever_wire_geom.py HOOK_Z == DRUM_END_Z"
         ),
     ),
     Joint(
@@ -1899,7 +1928,7 @@ JOINTS: tuple[Joint, ...] = (
         exposure_reason=(
             "hand-set operator clamp: locks the output fixture's hex body at its set height on the vertical rod "
             "(sets the trace's vertical placement); fixture and rod never move relative in operation, the "
-            "wire pull at the spigot-groove front tangent runs mostly along the rod (Y), and the fixture rides "
+            "wire pull at the spigot groove (in the rod's plane) runs mostly along the rod (Y), and the fixture rides "
             "the lever as one rigid body with the clamp chain, i.e. no operating torque about the horizontal "
             "screw axis (fixture local X, the spigot axis)"
         ),
@@ -2326,6 +2355,9 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     ),
     "mg-magnifier/clamp-thumb-screw": Occurrence(
         "mg_magnifier", "build_mg_magnifier_assembly.py", "thumb-screw locked to clamp"
+    ),
+    "mg-magnifier/vertical-rod-in-clamp": Occurrence(
+        "mg_magnifier", "build_mg_magnifier_assembly.py", "vertical-rod locked to clamp"
     ),
     "mg-magnifier/fixture-thumb-screw": Occurrence(
         "mg_magnifier", "build_mg_magnifier_assembly.py", "output-fixture thumb-screw locked to fixture"

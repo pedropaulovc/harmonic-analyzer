@@ -6,7 +6,7 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
 
 * magnifying-bracket -- the fitting that AFFIXES the lever rod to the pivoted
   summing bar, so it RIDES the lever (locked, like the clamp chain), its collar
-  carrying the rod with a press fit and Loctite 638 at every rock angle. The
+  carrying the rod with a press fit alone (#1570) at every rock angle. The
   lever EXTENDS FROM the pivoted summing bar and pivots WITH it about the
   knife-edge ridge line (engineerguy video 2/4 + 4/4; tip arc ~6 mm), so its
   one DOF is the rock about that Z line; the clamp + thumb screw + vertical rod
@@ -25,11 +25,11 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
   dimensions of a blanked construction chain (mg_magnifier_assembly_spec)
   that the MHA-MG-000 sheet prints.
 * lever-wire -- WIRE 1's straight rest-pose run from the output fixture's
-  spigot-groove front tangent down to the drum tangent. It ARTICULATES like the real wire: a
+  spigot groove (in the rod's plane) down to the drum tangent. It ARTICULATES like the real wire: a
   ball joint at the hook (HookPoint on the wire coincident to the fixture's
   HookAnchorPoint) plus a 0.25 stand-off tangency to the drum,
   so the hook end follows the lever while the drum end hugs the drum (its two
-  residual DOF, swing + spin, are freed operational DOF). Its YokePlane
+  residual DOF, swing + spin, are freed operational DOF). Its Top plane
   carries the WIRE-1 COUPLING mate: the wheel's WireYokePoint held coincident
   to it ties the wheel's spin to the wire's travel along its own axis (the
   linearized inextensible-wire constraint), so with every freed DOF genuinely
@@ -172,21 +172,25 @@ assert math.isclose(BAR_FRONT_Z, WHEEL_BAR_FRONT_Z, abs_tol=1e-9), (
 # plate front face. The clamp + vertical rod ride with it (CLAMP_POS and
 # VROD_TOP_Y derive from LEVER_ROD_Y).
 LEVER_ROD_Y = 979.7
-# DEPTH RE-ANCHOR (2026-07-04): the ch30 p.4 side view shows the whole output
-# line (fixture wire, wheel, rim wire, pen rod) as ONE plumb vertical at the
-# machine front -- the old z -85 (M6.4, low) hung the wire hook 50 behind the
-# wheel plane, an ~8 deg lean the photo refutes. Window RE-SOLVED 2026-08-02
-# for the one-piece top-frame casting (front rail z -93..-131, band
-# y 999.7..1036.2): the exact-stock thumb-screw reach, derived and asserted
-# below, keeps its outer head face beyond the required casting clearance, so
-# the rail imposes NO depth bound at all. The lever rod (Ø6) must clear the
-# front column surface -124.7 by 0.25 (axis <= -127.95); the retained -128.3
-# axis gives a 0.6 surface gap. Keep the accepted lever, vertical-rod and hook
-# datums while the current drum route proves its own rim/spoke/boss clearance
-# through vn_lever_wire_geom.RUN_GAPS; the old hub-lane rim-depth cap no longer
-# describes that route. VROD_Z = -134.8 (clamp's 6.5 skew bore); hook -137.95;
-# the bracket arm reaches back to the unchanged plate flange.
-LEVER_ROD_Z = -128.3
+# DEPTH (option A1, #1559): the ch30 p.4 side view is a TRUE PLUMB PLANE -- the
+# lever rod, the clamp's thumb screw, the vertical rod, the fixture's wire hook
+# and the drum's wire lane all lie in one plane, so WIRE 1 runs straight down
+# it with no depth lean. LEVER_ROD_Z is therefore the drum lane
+# (vn_lever_wire_geom.DRUM_END_Z, asserted below). It stays a module-level
+# literal: web/scripts/native_identity_source.py reads LEVER_ROD_Y,
+# LEVER_ROD_Z and VROD_TOP_Y from this file by AST. The one-piece top-frame
+# casting's front rail imposes no depth bound (the exact-stock thumb-screw
+# reach, asserted below, keeps its head under the rail), and the Ø6 lever's
+# clearance to the front column surface (-124.7) is now ~45.8 -- trivially
+# large. The drum route's rim/spoke/boss clearance is proved in XY by
+# vn_lever_wire_geom.RUN_GAPS; the bracket arm reaches back to the unchanged
+# plate flange (magnifying_bracket_joint_layout).
+LEVER_ROD_Z = -173.51
+from vn_lever_wire_geom import DRUM_END_Z as LEVER_WIRE_DRUM_Z  # noqa: E402
+
+assert math.isclose(LEVER_ROD_Z, LEVER_WIRE_DRUM_Z, abs_tol=1e-9), (
+    f"magnifying group plane {LEVER_ROD_Z} left the drum wire lane {LEVER_WIRE_DRUM_Z}"
+)
 LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
 # placed Ry(180) so the part's local +x runs east toward the summing knife)
 
@@ -243,19 +247,24 @@ assert all(
 # The bracket part imports COLLAR_HALF_LEN from mg_magnifying_lever_geom (which
 # reads output.magnifier_collar_half_len_mm), so the collar length has ONE read
 # point and there is no copy left here to assert equal.
-from mg_magnifying_clamp_geom import (  # noqa: E402
-    BLOCK_DEPTH as CLAMP_DEPTH,
-    LEVER_BORE_Y as CLAMP_BORE_Y,
-    ROD_BORE_X as CLAMP_ROD_DX,
-)
+# The clamp (#1559) is a vertical length of 7/16 hex: placed UNROTATED (hex
+# axis = machine +Y, lever bore along X through the corners), its bottom-face
+# origin LEVER_BORE_Y under the lever axis. The vertical rod screws into the
+# clamp's bottom-face #4-40 tap on the same axis and seats on its shoulder; its
+# thread tip sits SHOULDER_X above that face. mg_rod_clamp_joint's import-time
+# worst-case asserts (engagement, tap depth) gate this assembly.
+import mg_rod_clamp_joint  # noqa: E402, F401
+from mg_magnifying_clamp_geom import LEVER_BORE_Y as CLAMP_BORE_Y  # noqa: E402
+from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X  # noqa: E402
 
-CLAMP_POS = (
-    CLAMP_X - CLAMP_DEPTH / 2.0,  # local z 0..12 -> machine x (Ry+90)
-    LEVER_ROD_Y - CLAMP_BORE_Y,
-    LEVER_ROD_Z,
-)
-VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -134.8 (local +x -> machine -z)
-VROD_TOP_Y = LEVER_ROD_Y + 5.0  # dome inside the clamp's rod bore (rides the rod)
+CLAMP_POS = (CLAMP_X, LEVER_ROD_Y - CLAMP_BORE_Y, LEVER_ROD_Z)
+VROD_Z = LEVER_ROD_Z  # coaxial with the clamp and its thumb screw
+# Thread tip: the shoulder seats on the clamp's bottom face. A literal for the
+# same AST reader as LEVER_ROD_Z, asserted against its derivation.
+VROD_TOP_Y = 967.55
+assert math.isclose(
+    VROD_TOP_Y, LEVER_ROD_Y - CLAMP_BORE_Y + VROD_SHOULDER_X, abs_tol=1e-9
+), "vertical-rod thread tip drifted from the clamp's bottom face + SHOULDER_X"
 from mg_output_fixture_geom import (  # noqa: E402
     FIXTURE_AXIS_Y,
     FIXTURE_YAW_DEG,
@@ -365,7 +374,7 @@ assert min(RUN_GAPS.values()) >= WIRE_CLEARANCE, f"lever-wire run gaps {RUN_GAPS
 
 def _lever_wire_rows() -> list[list[float]]:
     """Rotation rows turning the part's +Y (wire axis) onto the HUB->HOOK
-    direction (the part origin is the hub end -- its Top/YokePlane sit at the
+    direction (the part origin is the hub end -- its Top plane sits at the
     tangency); X' is the horizontal perpendicular, Z' = X' x Y' (proper)."""
     delta = [s - e for s, e in zip(HUB_WIRE_START, HUB_WIRE_END, strict=True)]
     length = math.hypot(*delta)
@@ -693,18 +702,20 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, screw, list(position), BRACKET_SCREW_ROWS)
     # The clamp + vertical rod + output fixture + thumb screw are clamped to the
-    # lever at the set magnification radius (the thumb screw locks the clamp on
-    # the rod): they ride the lever as one rigid body. The output fixture is
-    # where WIRE 1 to the wheel hub hooks -- its (mostly vertical) travel as the
-    # lever rotates is what drives the magnifying wheel in the Motion study, so
-    # these must move WITH the lever, not stay fixed. Lock each to the lever.
-    # Ry(+90): the clamp's lever bore (local Z) turns onto the rod axis (X).
+    # lever at the set magnification radius (the thumb screw pinches the lever
+    # in the clamp; the rod is screwed home on its shoulder): they ride the
+    # lever as one rigid body. The output fixture is where WIRE 1 to the wheel
+    # drum hooks -- its (mostly vertical) travel as the lever rotates is what
+    # drives the magnifying wheel in the Motion study, so these must move WITH
+    # the lever, not stay fixed. Lock each to the lever.
+    # Unrotated: the clamp's hex axis is already machine +Y and its lever bore
+    # already runs along X through the corners.
     clamp = await place_component(
         adapter,
         "mg-magnifying-clamp",
         list(CLAMP_POS),
-        [0.0, 90.0, 0.0],
-        ROT_Y_POS90,
+        [0.0, 0.0, 0.0],
+        IDENTITY,
         ground=False,
     )
     await lock_mate(
@@ -713,16 +724,17 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{ml}", "PLANE"),
         label="mag-clamp locked to lever",
     )
-    # Backed-out thumb screw: the shank tip stays tangent to the rod top (a
-    # seated screw would overlap the rod it pinches -- see module docstring).
+    # Backed-out thumb screw: the shank tip stays tangent to the lever top (a
+    # seated screw would overlap the lever it pinches -- see module docstring).
     # Exact 91882A221 reach comes from the wrapper's stock shank and head-stack
     # constants. The wrapper preserves its outer-head-face local origin, so the
     # target below is that face after placing the tip at THUMB_SCREW_TIP_Y.
     # THUMB_SCREW_RAIL_CLEARANCE proves the head clears the full-depth front
-    # rail while the clamp's #4-40 tap band (block top +7 down to bore top
-    # +3.1) stays fully engaged. Rz(-90) points the shank down the clamp bore;
-    # the extra Ry(180) turns its head features to the machine hand
-    # ([180, 0, -90] is the same rotation's Euler form).
+    # rail while the clamp's #4-40 tap band (block top +9.0 down to the bore
+    # top +3.1: 5.9 of thread) stays fully engaged. It enters the top face on
+    # the hex axis, coaxial with the vertical rod below. Rz(-90) points the
+    # shank down the hex axis; the extra Ry(180) turns its head features to
+    # the machine hand ([180, 0, -90] is the same rotation's Euler form).
     _rz90_ry180 = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
     tscrew = await place_component(
         adapter,
@@ -957,7 +969,9 @@ async def build(adapter) -> dict[str, str]:
 
     # WIRE-1 coupling (replaces the old wheel rock snapshot): the wheel's
     # WireYokePoint (drum pitch circle @ the wire tangency) held coincident to
-    # the lever-wire's YokePlane (perpendicular to the wire axis). The wheel's
+    # the lever-wire's Top plane (perpendicular to the wire axis, through the
+    # drum end; the coplanar A1 route puts the yoke point on it -- asserted in
+    # vn_lever_wire_geom). The wheel's
     # spin -- its one remaining DOF -- is thereby tied to the lever group's
     # travel along the wire: the linearized inextensible-wire constraint, sign
     # and ratio from geometry (build_vn_lever_wire docstring). With every freed
@@ -970,7 +984,7 @@ async def build(adapter) -> dict[str, str]:
     await coincident_mate(
         adapter,
         component_named_ref(wh, "WireYokePoint", "POINT"),
-        named_ref(f"YokePlane@{hw}", "PLANE"),
+        named_ref(f"Top Plane@{hw}", "PLANE"),
         label="WIRE1 yoke fixture->wheel",
         verify=(wh, wh_o),
     )

@@ -6,4 +6,15 @@ mg-magnifying-lever:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing   # the clamp block slides along the rod
-  process: "selected cold-drawn brass rod, body Ø6.00 0/−0.03; 165.0 ±0.8 tip-to-tip with tangent hemispherical ends; select or lap the bracket-end land to Ø6.000 0/−0.006, starting 10.00 +0/−0.05 mm before the tip and ending at its dome tangent (7 mm nominal cylindrical engagement); light-press the MHA-MG-001 collar onto the rod held near its end and retain with Loctite 638, alternative soft solder or braze"
+  process: "selected cold-drawn brass rod, body Ø6.00 0/−0.03; 165.0 ±0.8 tip-to-tip with tangent hemispherical ends; select or lap the bracket-end land to Ø6.000 0/−0.006 and Ra 0.8, starting at least 10.0 mm before the tip (covering the whole MHA-MG-001 collar) and ending at its dome tangent (7 mm nominal cylindrical engagement); light-press the MHA-MG-001 collar onto the rod held near its end; the press alone retains it"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "front view: the Ra 3.2 symbol on the Ø6 body, its reason MHA-MG-002 SCREW SEAT at the symbol."
+      finding: "Ra 3.2 on a set/thumb-screw clamp face: a clamp face carries no symbol (rule 6, roughness symbols only where a surface runs, slides or locates)"
+      reason: "owner ruling 2026-10-17: the Ø6 body is a functional set-screw seat for the MHA-MG-002 clamp screw, which locates the clamp anywhere along its travel from the west tip to the collar (rule 6, one static mating seat that locates the part on its neighbour)."
+    - id: "RV-02"
+      kind: "accept"
+      where: "front view: the Ra 0.8 symbol on the press land between the zone-start line and the dome tangent, its reason MHA-MG-001 PRESS LAND at the symbol."
+      finding: "roughness symbol on a pressed land that neither runs, slides nor locates (rule 6)"
+      reason: "owner ruling #1570 (press only, no bond), as for the MHA-MG-001 bore's Ra 0.8 (its RV-01): the matched fit's 0.007 minimum diametral interference rests on the DIN 7190 smoothing estimate 0.8 x 4 x (0.8 + 0.8) um = 0.00512 (effective minimum 0.00188), which holds only with the land at Ra 0.8; under the body's general Ra 3.2 (RV-01) it would smooth 0.8 x 4 x (3.2 + 0.8) um = 0.01280 (effective minimum -0.00580) and the loosest press would not grip (owner-accepted)"

@@ -360,8 +360,9 @@ def test_press_note_is_model_owned_and_inserted_before_native_finalization(
     assert isinstance(values[0], ast.Name) and values[0].id == "PRESS_INSTALLATION_NOTES"
     assert "COLLAR ONTO LEVER; HOLD ROD NEAR END" in PRESS_INSTALLATION_NOTES
     assert "WITH OUTER FACE" in PRESS_INSTALLATION_NOTES
-    assert "LOCTITE 638" in PRESS_INSTALLATION_NOTES
-    assert "SOFT SOLDER OR BRAZE" in PRESS_INSTALLATION_NOTES
+    # #1570: press only, no bond.
+    assert "LOCTITE" not in PRESS_INSTALLATION_NOTES
+    assert "SOLDER" not in PRESS_INSTALLATION_NOTES
     note_calls = []
     events = []
     source = tmp_path / "magnifier.SLDASM"

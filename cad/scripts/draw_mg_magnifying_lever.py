@@ -5,14 +5,20 @@ smooth, tangent-continuous body with NO flat face and no end-face circle, so
 the print rests on the auto-imported profile marks (the overall length tip to
 tip and the dome radius, a radial reference "(R3.0)": each end is a tangent
 full hemisphere on the selected bar) plus two blanked reference sketches the
-FRONT view shows and dimensions: ``RodStock`` (the stock Ø6 and its
-cold-drawn band at mid-length) and ``PressZone`` (the cylinder the bracket
-collar grips -- its banded start back from the east tip, its length to the
-dome tangent as a reference, and its banded diameter, tied to the MHA-MG-001
-bore it enters).  The OD's finish is the part's native symbol on the rod's
-one Ø6 cylinder face.  The rod axis is local +X, so the FRONT view is the
-long side elevation; an end view of a plain round would show nothing the Ø
-does not, so there is none.
+FRONT view shows and dimensions: ``RodStock`` (the Ø6 as plain bar stock at
+mid-length, at the title block's .X) and ``PressZone`` (the cylinder the
+bracket collar grips -- its start back from the east tip a single MIN limit
+covering the MHA-MG-001 collar, its length to the dome tangent as a
+reference, and its banded diameter, tied to the MHA-MG-001 bore it enters).
+The zone's start is a solid line across the bar, so the zone reads between it
+and the dome's tangent edge; every other reference entity lies on the
+silhouette.  The Ø6 body's general finish, the part-owned Ra 3.2 seat of the
+MHA-MG-002 clamp's screw, and the press land's stricter Ra 0.8 are native
+symbols, each with its reason standing at it.
+The sheet carries no note block: pressing the collar on is the MHA-MG-000
+assembly's step.  The rod axis is local +X, so the FRONT view is the long
+side elevation; an end view of a plain round would show nothing the Ø does
+not, so there is none.
 
 Run with SolidWorks open::
 
@@ -26,6 +32,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     dimension_name,
     place_view,
 )
@@ -38,28 +45,30 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
-from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
-from _gtol_face_resolve import resolve_faces
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _telemetry
+from _surface_finish import surface_finish_by_key
 from mg_lever_press_fit_geom import ROD_DIA
 from mg_magnifying_lever_spec import (
     DRAWING_DIMENSIONS,
+    PRESS_LAND_CALLOUT,
     PRESS_ZONE_DIA_CALLOUT,
     PRESS_ZONE_LENGTH,
+    PRESS_ZONE_START_CALLOUT,
     RADIAL_REFERENCE_DIMENSIONS,
     REFERENCE_DIMENSIONS,
     ROD_LENGTH,
+    SCREW_SEAT_CALLOUT,
     SURFACE_FINISHES,
 )
 
@@ -81,10 +90,11 @@ FRONT_CENTER = (0.115, 0.150)
 ISO_CENTER = (0.350, 0.185)
 ISO_SCALE = (1, 2)
 
-# Sheet stations of the rod's east end, from the model's own constants: the
-# tip, the press zone's start (PRESS_ZONE_LENGTH back from the tip), the dome
-# tangent (one radius back) and the zone cylinder's mid-length; the rod's
-# top outline.
+# Sheet stations of the rod's ends, from the model's own constants: the west
+# tip (the part origin), the east tip, the press zone's start
+# (PRESS_ZONE_LENGTH back from the tip), the dome tangent (one radius back)
+# and the zone cylinder's mid-length; the rod's top outline.
+_ROD_WEST_TIP_X = FRONT_CENTER[0] - ROD_LENGTH * SHEET_SCALE[0] / 2000.0
 _ROD_TIP_X = FRONT_CENTER[0] + ROD_LENGTH * SHEET_SCALE[0] / 2000.0
 _PRESS_ZONE_START_X = _ROD_TIP_X - PRESS_ZONE_LENGTH * SHEET_SCALE[0] / 1000.0
 _DOME_TANGENT_X = _ROD_TIP_X - ROD_DIA / 2.0 * SHEET_SCALE[0] / 1000.0
@@ -92,69 +102,108 @@ _PRESS_ZONE_MID_X = (_PRESS_ZONE_START_X + _DOME_TANGENT_X) / 2.0
 _ROD_TOP_Y = FRONT_CENTER[1] + ROD_DIA / 2.0 * SHEET_SCALE[1] / 1000.0
 
 # The two native profile dims the print keeps: the tip-to-tip length below the
-# rod, outermost (its extension lines drop from both tips), and the dome
-# radius reference right of the east tip, its three rows between the zone
-# diameter's dimension line (left) and block (above).
+# rod, outermost on a line of its own (its extension lines drop from both
+# tips), and the dome radius reference right of the east tip, its three rows
+# between the zone diameter's dimension line (left) and block (above).
+# Machinist review r2: r4 printed the 165.0 line (y 113.5 mm) level with the
+# zone start's (113.1 mm), so the two read as one chain ending at the zone
+# start; it now runs ~13 mm under the zone start's line, the title block's
+# top (y ~65 mm) far below.
 FRONT_KEEP = {
-    "OverallLength": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.034),
+    "OverallLength": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.042),
     "DomeRadius": (_ROD_TIP_X + 0.040, FRONT_CENTER[1] + 0.008),
 }
 # The reference sketches' dims.  The stock diameter above the rod at
-# mid-length.  The press zone's lengths hang below the rod off the witness on
-# its bottom outline and the tip (layout doc: a horizontal dim's rows centre
-# on the requested x): the cylinder's reference length innermost, its row
-# left of the 7 mm span; the start from the tip outside it, its rows right of
-# the tip.  The banded diameter's dimension line stands inside the zone and
-# its rows hang ABOVE the rod, right of that line: the line rises to the
-# shoulder under the block, never alongside a row of text, and the two-row
-# mate callout stays short of the isometric.
+# mid-length, its dimension line just right of its points on the outlines; a
+# plain Ø, no callout.
+# The press zone's lengths hang below the rod off the witness on its bottom
+# outline and the tip (layout doc: a horizontal dim's rows centre on the
+# requested x and y, its line at the lowest row's baseline): the cylinder's
+# reference length innermost, its row left of the 7 mm span; the start from
+# the tip outside it, its three rows wholly right of the tip's extension line
+# (machinist review r2: r4's 52 mm block, centred 24 mm right of the tip, ran
+# that line through its 'M') and under the reference length's line.
+# The banded diameter's dimension line stands inside the zone, between the
+# zone-start line and the dome's tangent edge, and its rows hang ABOVE the
+# rod, right of that line: the line rises to the shoulder under the block,
+# never alongside a row of text, and the two-row mate callout stays short of
+# the isometric.
 REFERENCE_KEEP = {
     "RodDia": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.020),
     "PressZoneLen": (_PRESS_ZONE_START_X - 0.010, FRONT_CENTER[1] - 0.012),
-    "PressZoneStart": (_ROD_TIP_X + 0.024, FRONT_CENTER[1] - 0.024),
+    "PressZoneStart": (_ROD_TIP_X + 0.030, FRONT_CENTER[1] - 0.024),
     "PressZoneDia": (_PRESS_ZONE_MID_X, FRONT_CENTER[1] + 0.030),
 }
 DIMENSION_CALLOUTS = {
     "DomeRadius": "BOTH ENDS\nTANGENT HEMISPHERE",
 }
 REFERENCE_CALLOUTS = {
-    "RodDia": "STOCK OD",
-    "PressZoneStart": "PRESS ZONE START",
+    "PressZoneStart": PRESS_ZONE_START_CALLOUT,
     "PressZoneDia": PRESS_ZONE_DIA_CALLOUT,
 }
-# The OD finish: the part-owned ``rod_od`` control's ONE Ø6 cylinder, resolved
-# on the part the front view references and attached as that model FACE; its
-# leader lands on the rod's top outline in the clamp block's travel, past the
-# west dome and short of the press zone, and the symbol stands above it, left
-# of the stock diameter.  Not a SILHOUETTE pick: on the source-644 native leaf
-# the inserted symbol re-read one live type-46 attachment whose
-# ISilhouetteEdge::GetFace failed IsSame against the picked silhouette's
-# (same_entity=False, dangling=False), so nothing proved which surface it sat
-# on.  ISldWorks::IsSame proves a model face itself, and the 1 mm leader
-# landing pins the flank and station (draw_dt_pinion_arbor's journal finishes).
-FINISH_STATION_MM = ROD_LENGTH / 2.0 - 50.0  # part X, from the west dome tip
-FINISH_LANDING_MODEL = (FINISH_STATION_MM / 1000.0, ROD_DIA / 2000.0, 0.0)
-FINISH_SYMBOL = (FRONT_CENTER[0] - 0.050, FRONT_CENTER[1] + 0.020)
+# The seat's Ra 3.2 (SURFACE_FINISHES "clamp_screw_seat"): a native symbol
+# whose leader lands on the Ø6 face 40 mm in from the west tip, inside the
+# clamp screw's reach and clear of the stock diameter's station (82.5 mm);
+# the symbol stands above-left of the landing, west of the stock diameter's
+# row.
+# The symbol is attached to the OD's FACE: the front view lies in the
+# revolve's profile plane, so its top outline is the cylinder's seam, and a
+# silhouette pick there re-solved onto the other half-face on rebuild (r12
+# leaf 20261017T061433Z-1-6db3cfe0: types=(46,), same_entity=False). A face
+# picked by coordinate keeps its leader at the pick, not at a separate
+# landing (r13 leaf 20261017T065000Z-1-a58d0439), and a pick 0.4 mm inside
+# the outline selected nothing (r14 leaf 20261017T070332Z-1-45a1d3b0), so the
+# pick and the landing are one point midway between the axis and the top
+# outline, where r13 selected and attached the face.
+# add_surface_finish proves the symbol attached to that face (the part's
+# control) and the leader landed where requested.
+SEAT_FINISH_PICK = (_ROD_WEST_TIP_X + 0.040, (FRONT_CENTER[1] + _ROD_TOP_Y) / 2.0)
+SEAT_FINISH_SYMBOL = (_ROD_WEST_TIP_X + 0.030, _ROD_TOP_Y + 0.014)
+# The seat's reason, a free note at the symbol (machinist review r4 read the
+# old reason, a callout on a seat-length dimension 15 mm above, as detached
+# from it): one row whose top-left corner (a note's position) sits 13 mm over
+# the symbol's root, left-aligned with the symbol's bar 2.5 mm west of it, so
+# it stands just over the symbol (r15: its ink reached 7.2 mm over the root)
+# and ~4 mm over the stock diameter's row (its top ~172 mm), well west of the
+# zone diameter's block (x >= ~191 mm).
+SEAT_REASON_XY = (SEAT_FINISH_SYMBOL[0] - 0.0025, SEAT_FINISH_SYMBOL[1] + 0.013)
+# The press land's Ra 0.8 (SURFACE_FINISHES "press_land", #1570): the same Ø6
+# face, picked inside the 7 mm land between the zone-start line and the zone
+# diameter's dimension line (x ~190.8 mm on r15), midway between the axis and
+# the top outline as the seat's pick.  The symbol stands above-left, its
+# "Ra 0.8" ending ~3 mm short of that dimension line and under the zone
+# diameter's block, high enough that the leader crosses the top outline east
+# of the zone-start line.  Its two-row reason stands left of the symbol, the
+# rows straddling the symbol's ink, well east of the stock diameter's row.
+PRESS_LAND_FINISH_PICK = (
+    _PRESS_ZONE_START_X + 0.002,
+    (FRONT_CENTER[1] + _ROD_TOP_Y) / 2.0,
+)
+PRESS_LAND_FINISH_SYMBOL = (_PRESS_ZONE_START_X - 0.015, _ROD_TOP_Y + 0.012)
+PRESS_LAND_REASON_XY = (
+    PRESS_LAND_FINISH_SYMBOL[0] - 0.035,
+    PRESS_LAND_FINISH_SYMBOL[1] + 0.008,
+)
 
 
-def _rod_od_finish_pick(adapter: Any, view: Any) -> tuple[Any, tuple[float, float]]:
-    """The OD finish's target: ``(controlled face, sheet landing)``.
-
-    The face is the one the part's own Ra PMI names (``SURFACE_FINISHES``'
-    ``rod_od`` spec), resolved on the view's referenced part with the
-    exactly-one-match contract the part build's PMI pass used; the landing is
-    the model point on the top outline at ``FINISH_STATION_MM``, projected
-    through the view's current transform.
-    """
-    control = surface_finish_by_key(SURFACE_FINISHES, "rod_od")
-    document = _early_bound(
-        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
-    )
-    face = resolve_faces(document, {control.key: control.face})[control.key]
-    landing = model_point_in_view(
-        adapter, view, FINISH_LANDING_MODEL, label="lever rod OD finish landing"
-    )
-    return face, landing
+def _add_finish_reason(
+    adapter: Any, view: Any, text: str, xy: tuple[float, float], *, what: str
+) -> None:
+    """A finish's reason as a free note owned by ``view`` at ``xy``; a note
+    that did not land in that view raises (the reason-note recipe of
+    draw_mg_magnifying_vertical_rod)."""
+    name = view_name(adapter, view)
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate the lever front view {name!r}")
+    adapter.currentModel.ClearSelection2(True)
+    if add_note(adapter, text, *xy) is None:
+        raise RuntimeError(f"failed to add the lever {what} reason note")
+    texts = [
+        " ".join(str(_early_bound(found, "INote").GetText() or "").split())
+        for found in (_early_bound(view, "IView").GetNotes() or ())
+    ]
+    if texts.count(" ".join(text.split())) != 1:
+        raise RuntimeError(f"lever {what} reason missed its view: {texts!r}")
 
 
 def _set_radial_reference(adapter: Any, annotation: Any, *, label: str) -> None:
@@ -196,7 +245,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Iso View Note",
         ),
         required=(
@@ -204,7 +252,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Iso View Note",
         ),
     )
@@ -256,22 +303,34 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one lever {name} reference dimension")
         set_reference_dimension(adapter, matches[0], label=f"lever {name}")
-    # The clamp block slides on the OD: the part's own finish control, on the
-    # cylinder's model face (the capsule has no model edge along it).
-    od_face, od_landing = _rod_od_finish_pick(adapter, front)
     add_surface_finish(
         adapter,
         front,
-        entity=od_face,
-        leader_attach_xy=od_landing,
-        symbol_xy=FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "rod_od"),
-        label="lever rod OD finish",
+        edge_xy=SEAT_FINISH_PICK,
         entity_type="FACE",
+        symbol_xy=SEAT_FINISH_SYMBOL,
+        leader_attach_xy=SEAT_FINISH_PICK,
+        control=surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat"),
+        label="lever clamp screw seat finish",
         char_height=0.0025,
     )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
+    _add_finish_reason(
+        adapter, front, SCREW_SEAT_CALLOUT, SEAT_REASON_XY, what="screw-seat"
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=PRESS_LAND_FINISH_PICK,
+        entity_type="FACE",
+        symbol_xy=PRESS_LAND_FINISH_SYMBOL,
+        leader_attach_xy=PRESS_LAND_FINISH_PICK,
+        control=surface_finish_by_key(SURFACE_FINISHES, "press_land"),
+        label="lever press land finish",
+        char_height=0.0025,
+    )
+    _add_finish_reason(
+        adapter, front, PRESS_LAND_CALLOUT, PRESS_LAND_REASON_XY, what="press-land"
+    )
     add_property_linked_note(adapter, "Iso View Note", 0.320, 0.140)
 
     return await finalize_drawing(

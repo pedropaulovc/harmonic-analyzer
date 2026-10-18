@@ -8,18 +8,24 @@ places. Sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
 The side view is the ``*Top`` orientation, as in the lathe: the hex axis
-horizontal, looking straight down the reamed rod bore, the flats edge-on top
-and bottom.  It carries every axial station from the free end, the spigot
-and groove sizes and the bore's Ø; the groove's root Ø nests inside the
-spigot's, right of the face, each a dimension line standing across its
-diameter.  The end view looks at the spigot face: its ``*Right`` orientation
-is turned by the measured projected axes until -Z points up, matching the
-side view, and -Y points right.  Its origin is pinned to the side view's
-origin height.  The flats' stock reference, (9.525), stands vertically, and
-the #4-40 native callout states the controlling drill depth and reference
-thread depth, (10.1), INTO BORE.  One native centreline identifies the rod
-bore's Y axis through the corners, independently of the axial tap's small
-centre mark.  Hidden lines stay off: the standard holes' callouts define them.
+horizontal, looking straight down the drilled rod bore, the flats edge-on
+top and bottom.  The rod bore is the axial origin: under the view the
+spigot's length from the faced end, then the bore's stations from the free
+end and to the spigot face, and the overall length REF; over it the groove
+from the spigot face and the bore's Ø.  The groove's root Ø nests inside
+the spigot's, right of the face, each a dimension line standing across its
+diameter, and the groove's R LIMIT, FULL R on its own row under it, reads
+between them and the face, over the root Ø's text.  The
+shoulder's corner R MAX reads over the groove's station, its leader rising
+to the corner's arc.  The end view looks at the spigot face: its ``*Right``
+orientation is turned by the measured projected axes until -Z points up,
+matching the side view, and -Y points right.  Its origin is pinned to the
+side view's origin height.  The flats' stock reference, (11.113), stands
+vertically, and the #4-40 native callout states the controlling drill depth,
+the reference thread depth, (10.1), and, on its own row under the thread,
+FULL THREAD TO ROD BORE.  One native centreline identifies the rod bore's Y
+axis through the corners, independently of the axial tap's small centre
+mark.  Hidden lines stay off: the standard holes' callouts define them.
 
 Run with SolidWorks open::
 
@@ -34,6 +40,7 @@ import math
 import re
 import sys
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -83,10 +90,12 @@ from mg_output_fixture_geom import (
     GROOVE_X,
     HEX_AF,
     HEX_CORNER_RADIUS,
+    SHOULDER_FILLET_R,
     SHOULDER_X,
     ROD_BORE_DIA,
     SPIGOT_DIA,
     SPIGOT_FACE_X,
+    SPIGOT_LENGTH,
     TAP_DRILL_DEPTH,
     TAP_DRILL_DIA,
     TAP_LENGTH,
@@ -94,11 +103,18 @@ from mg_output_fixture_geom import (
 from mg_output_fixture_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    GROOVE_RADIUS_CALLOUT,
+    GROOVE_RADIUS_MIN,
+    GROOVE_RADIUS_TOL_TYPE,
+    GROOVE_STATION,
+    LIMIT_BANDS,
     REFERENCE_DIMENSIONS,
     ROD_BORE_CALLOUT,
+    SINGLE_LIMITS,
     TAP_CALLOUT_PRECISION,
     TAP_DEPTH_PLACES,
     TAP_DRILL_DEPTH_VARIABLE,
+    TAP_EXTENT_CALLOUT,
     TAP_PROCESS,
     TAP_SPEC,
     TAP_THREAD_DEPTH_VARIABLE,
@@ -117,12 +133,14 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A 17.7 x 11 part: 4:1 leaves room for the side view's eight dimensions.
+# An 18.0 x 12.8 part: 4:1 leaves room for the side view's nine dimensions.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 ISO_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-SIDE_CENTER = (0.125, 0.180)
+# Left of the old 125 mm: the radius text now reads right of the spigot face,
+# so the two turned Ø stand further out, clear of the end view's AF.
+SIDE_CENTER = (0.115, 0.180)
 END_CENTER = (0.262, SIDE_CENTER[1])
 # Low right, over the title block: the end view's tap callout runs out to
 # the right at the hole's height, above it.
@@ -146,28 +164,34 @@ def _side_y(sketch_v_mm: float) -> float:
 
 _SIDE_TOP = _side_y(_HALF_AF)
 _SIDE_BOTTOM = _side_y(-_HALF_AF)
-# Printed text extents on the 2026-10-12 farm sheets (the layout audit's
-# boxes), used to hold each text clear of the witnesses beside it.  The two
-# turned Ø texts print the same glyphs: retry09's " Ø9.00 ±0.05 " and
-# " Ø7.00 ±0.05 " each ran 29.8 mm (runs of 1.29, 5.28 and 23.25 mm,
-# 20261012T124257186Z).
-TURNED_DIA_TEXT_HALF_WIDTH = 0.0149
-BORE_CALLOUT_HALF_WIDTH = 0.0138  # Ø5.20 +0.03/0.00 over REAM THRU: 27.5 mm
-BORE_CALLOUT_HALF_HEIGHT = 0.0073  # shoulder to the +0.03 row's top: 14.6 mm
-# Every station on the side view is witnessed from the free end's mid point,
-# the ridge between the two hex faces the view looks across: the hex and
-# groove stations rise from it, the bore's station and the overall length
-# hang from it, so witnesses cover the free end's whole height bar the ridge
-# and fence the bore in from the left.  The bore's Ø therefore reads over
-# the hex, mid-span between the free end's and the shoulder's witnesses, its
-# leader rising from the bore's upper rim across the hex's top edge alone;
-# the hex and groove stations stack over it, each text mid-span.  The
-# overall length runs under the view, outermost; its witness hangs from the
-# spigot face's top corner down the face, with a local gap below the radius
-# shoulder.  The groove's radius reads above the turned Ø witnesses, with
-# its elbow BELOW the arc mouth so the arrow meets the material arc, never
-# its extension in air.  The bore's station (a 20 mm span under a 22 mm text)
-# reads outside, left of the free end.
+# Printed glyph pitch on the 2026-10-12 farm sheets (the layout audit's
+# boxes): retry09's turned Ø text ran 29.8 mm over its 13 glyphs
+# (20261012T124257186Z).  Text extents below are estimates at that pitch,
+# used to hold each text clear of the lines beside it; the layout audit's
+# text-on-line gate (_enforce_fixture_text_on_line) is the proof.
+_GLYPH_PITCH = 0.0298 / 13
+# A turned Ø prints a space, Ø, the .XX value and a space; the spigot's
+# (Ø10.10) is the wider of the two.
+TURNED_DIA_GLYPHS = 3 + len(
+    f"{max(SPIGOT_DIA, GROOVE_ROOT_DIA):.{DRAWING_PRECISION_BY_NAME['SpigotDia']}f}"
+)
+TURNED_DIA_TEXT_HALF_WIDTH = TURNED_DIA_GLYPHS * _GLYPH_PITCH / 2.0
+# Upper bounds from the larger banded, reamed callout (27.5 x 14.6 mm) this
+# bore printed before; the drilled Ø over its one process row is smaller.
+BORE_CALLOUT_HALF_WIDTH = 0.0138
+BORE_CALLOUT_HALF_HEIGHT = 0.0073
+# The rod bore is the axial origin.  The bore's two stations (free end to
+# bore, bore to spigot face) hang under the view on one row, sharing the
+# bore's witness; the overall length, REF, runs outermost under them.  All
+# three are witnessed from axis points, so nothing under the view touches
+# the groove.  The spigot's length, from the faced end to the shoulder (r2
+# review: the lathe's own length), reads innermost under the spigot: the
+# turned profile's corners are on the lower silhouette, so its witnesses
+# drop from the shoulder's and the face's lower corners and end above the
+# stations' row.  The bore's Ø reads over the hex; the groove's station,
+# from the spigot face, over the spigot.  Its face-side witness starts above
+# the face's top corner, so it never runs down the face across the radius
+# leader.
 #
 # The two turned Ø stack right of the face, the smaller inside: the groove
 # root's extension lines run from the two roots across the face-side lip to
@@ -179,55 +203,165 @@ BORE_CALLOUT_HALF_HEIGHT = 0.0073  # shoulder to the +0.03 row's top: 14.6 mm
 # the groove into a 30 mm horizontal shoulder beside the bore's station, and
 # the Ø read as an axial length (machinist review09).
 _FACE_SHEET_X = _side_x(SPIGOT_FACE_X)
-# Air from the root Ø's text to the face and the overall length's witness.
-_TEXT_TO_FACE = 0.004
-# The spigot's dimension line outboard of the root's: each text then clears
-# the other's dimension line by 5 mm.
+_HEX_MID_X = _side_x((FREE_END_X + SHOULDER_X) / 2.0)
+# The groove's radius reads in the open air right of the spigot face, over
+# the root Ø's text and under its upper extension line, inside the root Ø's
+# dimension line.  Its radial leader climbs from the elbow to the
+# face-side material arc (r1 review: the shelf at the OD ran along the
+# spigot Ø's extension and the arrow sat at the mouth).  The leader crosses
+# the face outline and the root Ø's extension line, never a dimension line
+# (drawing-guidelines.md rule 14).  Native15 measured the full shoulder
+# starting 15.2764 mm left of and 2.7781 mm below the keep for its eleven
+# radius glyphs: the run-in is the text's half width plus a lead, so the
+# stack's is estimated from the glyph pitch.  The proofs below need only the
+# arrow on the material arc, the leader radial and the ink clear of the
+# dimension lines, whatever run-in SolidWorks draws.
+RADIUS_INK_SLOP = 0.0004
+RADIUS_STATION_CLEARANCE = 0.002
+# The part's LIMIT band (owner ruling 2026-10-17, review r4) prints two rows,
+# R and the upper limit over the lower limit, at its places (the part owns
+# the text; this only sizes it).  Under them the dimension's own callout row
+# reads FULL R (owner ruling, review r5): the widest of the three rows.
+RADIUS_GLYPHS = 1 + max(
+    len(f"{value:.{DRAWING_PRECISION_BY_NAME['GrooveRadius']}f}")
+    for value in (GROOVE_RADIUS, GROOVE_RADIUS_MIN)
+)
+RADIUS_CALLOUT_GLYPHS = len(GROOVE_RADIUS_CALLOUT)
+RADIUS_TEXT_HALF_WIDTH = max(RADIUS_GLYPHS, RADIUS_CALLOUT_GLYPHS) * _GLYPH_PITCH / 2.0
+_NATIVE15_RADIUS_GLYPHS = 11
+RADIUS_SHOULDER_LEAD = 0.0152764 - _NATIVE15_RADIUS_GLYPHS * _GLYPH_PITCH / 2.0
+RADIUS_SHOULDER_RUN_IN = RADIUS_TEXT_HALF_WIDTH + RADIUS_SHOULDER_LEAD
+RADIUS_SHOULDER_DROP = 0.0027781
+_CALLOUT_BELOW = 4  # swDimensionTextParts_e.swDimensionTextCalloutBelow
+# Row pitches from the layout audits' display data (same template): r12's
+# GrooveRadius (20261017T053834039Z) printed its upper limit on the keep and
+# the lower 4.5257 mm under it, the shoulder under the lower row; a callout
+# row prints 5.5563 mm under the last value row (pd-latch-hook's RoundR,
+# "FULL ROUND", 20261015T223846658Z), and SolidWorks re-centres the stack
+# on the keep, so a callout row under a LIMIT lifts the limits half a
+# callout pitch and drops the shoulder, under the callout, as far:
+# dt-cone-gear's FloorDia, a LIMIT over "ROOT ENVELOPE", hangs its shoulder
+# 7.3038 mm under its keep (20261015T201555493Z).
+LIMIT_ROW_PITCH = 0.0045257
+CALLOUT_ROW_PITCH = 0.0055563
+GROOVE_RADIUS_SHOULDER_DROP = LIMIT_ROW_PITCH + CALLOUT_ROW_PITCH / 2.0
+_GROOVE_CENTRE_XY = (_side_x(GROOVE_X), _side_y(GROOVE_CENTRE_R))
+# The three rows stand 14.5 mm from the shoulder to the upper limit's ink
+# (r12 printed ink from 0.99 mm over a row's position to 4.42 mm over it),
+# and the air over the root Ø's text (its ink tops out 2.03 mm under the
+# axis, r12) up to the root Ø's upper extension line (15.4 mm over the axis)
+# is 17.4 mm.  The shoulder 1 mm under the axis stands the callout row's
+# ink 2.0 mm over the root Ø's text, so the two never read as one row, and
+# the upper limit's 1.9 mm under the extension line.  On r12's keep the
+# callout row would have pushed the upper limit onto that line.  The text
+# runs 2 mm plus its run-in right of the face, as r1-r4's did; the run-in
+# is the callout row's, the widest.
+RADIUS_TEXT_XY = (
+    _FACE_SHEET_X + 0.002 + RADIUS_SHOULDER_RUN_IN,
+    SIDE_CENTER[1] - 0.001 + GROOVE_RADIUS_SHOULDER_DROP,
+)
+RADIUS_ELBOW_XY = (
+    RADIUS_TEXT_XY[0] - RADIUS_SHOULDER_RUN_IN,
+    RADIUS_TEXT_XY[1] - GROOVE_RADIUS_SHOULDER_DROP,
+)
+# Where the radial line from the elbow meets the groove circle.
+_ELBOW_RUN = math.dist(RADIUS_ELBOW_XY, _GROOVE_CENTRE_XY)
+RADIUS_PREDICTED_TIP_XY = tuple(
+    centre + (elbow - centre) * GROOVE_RADIUS * _S / 1000.0 / _ELBOW_RUN
+    for elbow, centre in zip(RADIUS_ELBOW_XY, _GROOVE_CENTRE_XY)
+)
+# The root Ø's dimension line stands where r1-r4 tuned it, 6 mm right of
+# their one-row limit's eight glyphs, centred 2 mm plus that text's run-in
+# right of the face.
+_SINGLE_ROW_RADIUS_GLYPHS = 8
+_R4_RADIUS_TEXT_X = (
+    _FACE_SHEET_X
+    + 0.002
+    + _SINGLE_ROW_RADIUS_GLYPHS * _GLYPH_PITCH / 2.0
+    + RADIUS_SHOULDER_LEAD
+)
 _STACKED_DIA_PITCH = 0.020
 # Each Ø text's offset from the axis: the two texts' centres 10 mm apart.
 _STACKED_DIA_STAGGER = 0.005
-_GROOVE_ROOT_DIA_X = _FACE_SHEET_X + _TEXT_TO_FACE + TURNED_DIA_TEXT_HALF_WIDTH
-_HEX_MID_X = _side_x((FREE_END_X + SHOULDER_X) / 2.0)
-# Native15's radius keep (172.4, 198.8) mm printed its letters across the
-# spigot Ø's top witness at y198 mm.  Its full shoulder starts 15.2764 mm
-# left and 2.7781 mm below the keep.  Put that start ON the face-side
-# material circle, below the spigot mouth by the ink slop: the radial line
-# meets the full shoulder directly, without a tiny elbow jog.  Its printed
-# text clears the top witness and stays right of the station's x147 witness.
-RADIUS_INK_SLOP = 0.0004
-RADIUS_STATION_CLEARANCE = 0.002
-# Native15's calibration offsets come from a 0.1 um-rounded dump.  A 1 um
-# junction allowance is 20 times its half-step uncertainty, still far below
-# printed ink.  Use it for both endpoint matches and numerical-zero legs;
-# a real 0.07 mm jog is 70 times larger and must fail.
-RADIUS_JUNCTION_EPSILON = 1e-6
-RADIUS_SHOULDER_DROP = 0.0027781
-RADIUS_SHOULDER_RUN_IN = 0.0152764
-_RADIUS_SHOULDER_Y = _side_y(SPIGOT_DIA / 2.0) - RADIUS_INK_SLOP
-RADIUS_MATERIAL_TIP_XY = (
-    _side_x(GROOVE_X) + math.sqrt(
-        (GROOVE_RADIUS * _S / 1000.0) ** 2
-        - (_side_y(GROOVE_CENTRE_R) - _RADIUS_SHOULDER_Y) ** 2
+_GROOVE_ROOT_DIA_X = (
+    _R4_RADIUS_TEXT_X + _SINGLE_ROW_RADIUS_GLYPHS * _GLYPH_PITCH / 2.0 + 0.006
+)
+# Rows under the view, 12 mm apart: the spigot's length nearest, then the
+# bore's stations, then the overall REF.
+_SPIGOT_ROW = _SIDE_BOTTOM - 0.010
+_UNDER_ROW = _SIDE_BOTTOM - 0.022
+# The shoulder's corner radius, R0.2 MAX (r2 review, rule 16).  SolidWorks
+# hangs the fillet's radius on one of the two silhouette arcs the corner
+# draws; the part picks the fillet's edge at model -Z (the side view's upper
+# silhouette).  Its text stands in the open air over the groove's station,
+# up-right of the upper corner (the arc's centre side): the leader rises
+# from the arc nearly plumb, 3 mm right of the arc's centre, left of the
+# station's dimension line (r2 sheet: it ran from x 130.58 mm at y 208.28
+# mm), to a shoulder 3 mm over the station's text (its top 1.68 mm over the
+# keep).  Should SolidWorks hang it on the lower arc instead,
+# LOWER_ARC_KEEP stands it right of the face under the spigot's lower
+# extension; its leader then crosses the face's witnesses (extension lines,
+# rule 14) above the spigot's length, whose shoulder witness starts lower.
+# The r2 sheet's R1.2 MAX, the same nine printed glyphs, measured: text
+# 20.83 mm wide centred on its keep, its full shoulder from 13.91 mm left of
+# and RADIUS_SHOULDER_DROP under the keep to 1.74 mm past the text.
+SHOULDER_RADIUS_TEXT_HALF_WIDTH = 0.02083 / 2.0
+SHOULDER_RADIUS_RUN_IN = 0.01391
+SHOULDER_RADIUS_OVERRUN = 0.00174
+_SHOULDER_SHEET_X = _side_x(SHOULDER_X)
+SHOULDER_SHEET_RADIUS = SHOULDER_FILLET_R * _S / 1000.0
+SHOULDER_CORNERS = {
+    "upper": (_SHOULDER_SHEET_X, _side_y(SPIGOT_DIA / 2.0)),
+    "lower": (_SHOULDER_SHEET_X, _side_y(-SPIGOT_DIA / 2.0)),
+}
+SHOULDER_ARC_CENTRES = {
+    "upper": (
+        _SHOULDER_SHEET_X + SHOULDER_SHEET_RADIUS,
+        SHOULDER_CORNERS["upper"][1] + SHOULDER_SHEET_RADIUS,
     ),
-    _RADIUS_SHOULDER_Y,
-)
-RADIUS_TEXT_XY = (
-    RADIUS_MATERIAL_TIP_XY[0] + RADIUS_SHOULDER_RUN_IN,
-    RADIUS_MATERIAL_TIP_XY[1] + RADIUS_SHOULDER_DROP,
-)
+    "lower": (
+        _SHOULDER_SHEET_X + SHOULDER_SHEET_RADIUS,
+        SHOULDER_CORNERS["lower"][1] - SHOULDER_SHEET_RADIUS,
+    ),
+}
+_GROOVE_STATION_TEXT_Y = _SIDE_TOP + 0.012
+_GROOVE_STATION_TEXT_TOP = 0.00168
+SHOULDER_RADIUS_ELBOWS = {
+    "upper": (
+        SHOULDER_ARC_CENTRES["upper"][0] + 0.003,
+        _GROOVE_STATION_TEXT_Y + _GROOVE_STATION_TEXT_TOP + 0.003,
+    ),
+    "lower": (_FACE_SHEET_X + 0.002, SHOULDER_CORNERS["lower"][1] - 0.007),
+}
+SHOULDER_RADIUS_TEXT_XY = {
+    side: (x + SHOULDER_RADIUS_RUN_IN, y + RADIUS_SHOULDER_DROP)
+    for side, (x, y) in SHOULDER_RADIUS_ELBOWS.items()
+}
+# In the lower-arc layout the spigot's length's shoulder-side witness (its
+# first reference, build_mg_output_fixture._turned_profile) starts 3 mm
+# under the corner, clear of the radius's arrow.
+SPIGOT_LENGTH_LOWER_ARC_GAP = 0.003
+# An arrow on the fillet arc stands within (1 + sqrt 2) R (1.9 mm at 4:1) of
+# the sharp corner it rounds; the other corner is 36 mm away.
+SHOULDER_CORNER_TOL = 0.003
+# The rebuilt arrow on the arc, against the projected arc centre.
+SHOULDER_ARC_SLOP = 0.0001
 SIDE_KEEP = {
     "RodBoreDia": (_HEX_MID_X, _SIDE_TOP + 0.011),
-    "HexLength": (_HEX_MID_X, _SIDE_TOP + 0.025),
-    "GrooveStation": (_side_x((FREE_END_X + GROOVE_X) / 2.0), _SIDE_TOP + 0.035),
-    "OverallLength": (_side_x(_AXIAL_MID), _SIDE_BOTTOM - 0.032),
-    "RodStation": (_side_x(FREE_END_X) - 0.015, _SIDE_BOTTOM - 0.010),
+    "GrooveStation": (_side_x((GROOVE_X + SPIGOT_FACE_X) / 2.0), _GROOVE_STATION_TEXT_Y),
+    "SpigotLength": (_side_x((SHOULDER_X + SPIGOT_FACE_X) / 2.0), _SPIGOT_ROW),
+    "RodStation": (_side_x(FREE_END_X / 2.0), _UNDER_ROW),
+    "BoreStation": (_side_x(SPIGOT_FACE_X / 2.0), _UNDER_ROW),
+    "OverallLength": (_side_x(_AXIAL_MID), _UNDER_ROW - 0.012),
     "GrooveRootDia": (_GROOVE_ROOT_DIA_X, SIDE_CENTER[1] - _STACKED_DIA_STAGGER),
     "SpigotDia": (
         _GROOVE_ROOT_DIA_X + _STACKED_DIA_PITCH,
         SIDE_CENTER[1] + _STACKED_DIA_STAGGER,
     ),
     "GrooveRadius": RADIUS_TEXT_XY,
+    "ShoulderRadius": SHOULDER_RADIUS_TEXT_XY["upper"],
 }
+LOWER_ARC_KEEP = {"ShoulderRadius": SHOULDER_RADIUS_TEXT_XY["lower"]}
 # The groove's root Ø is a doubled distance, the groove's axis to its root
 # point (build_mg_output_fixture._groove_profile: AddSpecificDimension
 # swDiametricLinearDimension, Diametric proven on the part), so the sheet
@@ -273,15 +407,22 @@ END_KEEP = {
 }
 # The tap callout reads right of the end view at the hole's height.  Its
 # shoulder clears the corner and the small tap cross; AF witnesses run left.
-# ``callout_xy`` is the text's centre; the shoulder sits under the bottom
-# row, ~5.6 mm below it (the v1 sheet's ink: centre
-# (292, 134), shoulder end (254.0, 128.4)).  The v1 sheet's 28-glyph thread
-# row, TAP TO BORE 4-40 UNC-2B THRU, ran ~76 mm; retry09's
-# TAP INTO BORE 4-40 UNC - 2B (depth) 10.1 printed 81.7 mm, centred on
-# callout_xy (20261012T124257186Z).  The reference brackets, (10.1), add two
-# ~1.2 mm glyphs: ~84 mm, inside the ~87 mm this half width holds.
-_TAP_CALLOUT_HALF_WIDTH = 0.0435
-_TAP_CALLOUT_SHOULDER_DROP = 0.0056
+# ``callout_xy`` is the text block's centre both ways (the r3 sheet,
+# 20261017T032030239Z: two rows inked centred at (336.9, 189.35) mm for
+# (337.2, 189.6)), and the shoulder sits under the bottom row: 5.6 mm under a
+# two-row block's centre (the v1 and r3 sheets' ink).  The rows pitch 6.0 mm
+# (r3), so the extent row, FULL THREAD TO ROD BORE, grows the block a pitch
+# about its centre: the centre rises half a pitch more and the shoulder stays
+# 4 mm over the hole, its leader rising to it, not lying along the bore's
+# centreline.  Widths, in r3's 3.4 mm capitals: TAP INTO BORE 4-40 UNC - 2B
+# (depth) (10.1) printed 85.0 mm; less INTO BORE, the thread row is ~59.3 mm;
+# r3's general note FULL THREAD TO ROD BORE. printed 61.2 mm in the same
+# capitals, so the extent row is ~60.2 mm without its full stop.  This half
+# width holds ~63 mm, the widest row and the 1.5 mm a side the two-row half
+# width (87 mm over ~84) kept, so the text still starts ~6 mm off the corner.
+_TAP_CALLOUT_HALF_WIDTH = 0.0316
+_TAP_CALLOUT_ROW_PITCH = 0.0060
+_TAP_CALLOUT_SHOULDER_DROP = 0.0056 + _TAP_CALLOUT_ROW_PITCH / 2.0
 TAP_CALLOUT_XY = (
     END_CENTER[0] + _END_HALF_WIDTH + 0.006 + _TAP_CALLOUT_HALF_WIDTH,
     END_CENTER[1] + 0.004 + _TAP_CALLOUT_SHOULDER_DROP,
@@ -309,19 +450,13 @@ AUTO_TAPPED_HOLE_NOTES = 0
 PROJECTION_ANGLE_SLOP = 1e-6
 PROJECTION_SLOP_M = 1e-5
 BORE_FACE_SLOP_M = 1e-8
-# Only GrooveStation's centre-side witness gets this local gap.  The root Ø
-# retains EXTENSION_START_GAP and its strict root-to-root ink proof.
+# GrooveStation's witnesses get local gaps (and SpigotLength's shoulder-side
+# one only in the lower-arc radius layout): its centre-side witness starts
+# 3 mm above the arc centre, its face-side one 1 mm above the face's top
+# corner (the dimension's face point is on the axis).  The root Ø retains
+# EXTENSION_START_GAP and its strict root-to-root ink proof.
 GROOVE_STATION_GAP = 0.003
-# The complete 29 mm shoulder still spans the overall face witness's x.
-# End that downward witness at least 2 mm plus the readback slop below the
-# new shoulder; never request a negative gap if the model's face is lower.
-OVERALL_FACE_WITNESS_GAP = max(
-    EXTENSION_START_GAP,
-    _side_y(SPIGOT_DIA / 2.0)
-    - (RADIUS_TEXT_XY[1] - RADIUS_SHOULDER_DROP)
-    + RADIUS_STATION_CLEARANCE
-    + RADIUS_INK_SLOP,
-)
+GROOVE_STATION_FACE_GAP = SPIGOT_DIA / 2.0 * _S / 1000.0 + EXTENSION_START_GAP
 
 
 def _axis_direction(
@@ -437,13 +572,34 @@ def _prove_end_stock_reference(adapter: Any, view: Any, annotation: Any) -> None
     _telemetry.success("HexAf stock REF stands across the end view's vertical AF")
 
 
+def _station_witness(
+    station: list[Segment], foot: tuple[float, float], gap: float, label: str
+) -> tuple[Segment | None, str | None]:
+    """GrooveStation's one vertical witness over ``foot``, starting ``gap``
+    above it; or why there is none."""
+    slop = RADIUS_INK_SLOP
+    witnesses = [
+        stroke for stroke in station
+        if all(abs(point[0] - foot[0]) <= slop for point in stroke)
+        and abs(stroke[1][1] - stroke[0][1]) > slop
+    ]
+    if len(witnesses) != 1:
+        return None, f"station has no unique witness at the {label}"
+    witness = witnesses[0]
+    if abs(min(point[1] for point in witness) - foot[1] - gap) > slop:
+        return None, f"station's {label} witness gap did not reach the rebuilt ink"
+    return witness, None
+
+
 def _groove_radius_ink_problem(
     segments: list[Segment],
     tip: tuple[float, float],
     station: list[Segment],
     centre: tuple[float, float],
+    face: tuple[float, float],
 ) -> str | None:
-    """Require a material-arc arrow and real clearance from the station foot."""
+    """Require a material-arc arrow and real clearance from both of the
+    station's witnesses (``face`` is the spigot face's point on the axis)."""
     slop = RADIUS_INK_SLOP
     radius = GROOVE_RADIUS * _S / 1000.0
     root_y = centre[1] - radius
@@ -458,123 +614,103 @@ def _groove_radius_ink_problem(
         return "radius arrow is not on the face-side material arc"
     if not segments or min(distance_to_point(stroke, tip) for stroke in segments) > slop:
         return "radius arrow has no attached leader ink"
-    witnesses = [
-        stroke for stroke in station
-        if all(abs(point[0] - centre[0]) <= slop for point in stroke)
-        and abs(stroke[1][1] - stroke[0][1]) > slop
-    ]
-    if len(witnesses) != 1:
-        return "station has no unique witness at the groove arc centre"
-    witness = witnesses[0]
-    if abs(min(point[1] for point in witness) - centre[1] - GROOVE_STATION_GAP) > slop:
-        return "station's local witness gap did not reach the rebuilt ink"
-    for stroke in segments:
-        if segments_cross(stroke, witness) or min(
-            *(distance_to_point(witness, point) for point in stroke),
-            *(distance_to_point(stroke, point) for point in witness),
-        ) < RADIUS_STATION_CLEARANCE:
-            return "radius leader is not clear of the station witness"
-    return None
-
-
-def _radius_overall_witness_ink_problem(
-    segments: list[Segment], overall: list[Segment]
-) -> str | None:
-    """Measure the complete rebuilt shoulder/leader against both witnesses."""
-    slop = RADIUS_INK_SLOP
-    shoulders = [
-        stroke for stroke in segments
-        if abs(stroke[1][1] - stroke[0][1]) <= slop
-        and abs(stroke[1][0] - stroke[0][0]) > slop
-    ]
-    if len(shoulders) != 1:
-        return "radius has no unique rebuilt horizontal shoulder"
-    witnesses: list[Segment] = []
-    for x in (_side_x(FREE_END_X), _FACE_SHEET_X):
-        matching = [
-            stroke for stroke in overall
-            if all(abs(point[0] - x) <= slop for point in stroke)
-            and abs(stroke[1][1] - stroke[0][1]) > slop
-        ]
-        if len(matching) != 1:
-            return "overall length has no unique witness at each end"
-        witness = matching[0]
-        if min(point[1] for point in witness) > SIDE_KEEP["OverallLength"][1]:
-            return "overall length witness does not reach its dimension line"
-        witnesses.append(witness)
-    expected_start = _side_y(SPIGOT_DIA / 2.0) - OVERALL_FACE_WITNESS_GAP
-    if abs(max(point[1] for point in witnesses[1]) - expected_start) > slop:
-        return "overall length's face-side gap did not reach the rebuilt ink"
-    # The 0.4 mm slop bounds the readback above; it never reduces the 2 mm
-    # measured clearance.  Use every complete stroke, including the entire
-    # shoulder under the text, not a short elbow stub.
-    for witness in witnesses:
+    for foot, gap, label in (
+        (centre, GROOVE_STATION_GAP, "groove arc centre"),
+        (face, GROOVE_STATION_FACE_GAP, "spigot face"),
+    ):
+        witness, problem = _station_witness(station, foot, gap, label)
+        if problem is not None:
+            return problem
         for stroke in segments:
             if segments_cross(stroke, witness) or min(
                 *(distance_to_point(witness, point) for point in stroke),
                 *(distance_to_point(stroke, point) for point in witness),
             ) < RADIUS_STATION_CLEARANCE:
-                return "radius shoulder/leader is not clear of an overall length witness"
+                return f"radius leader is not clear of the station's {label} witness"
     return None
 
 
-def _radius_direct_junction_ink_problem(
-    segments: list[Segment], tip: tuple[float, float], centre: tuple[float, float]
+def _radius_leader_ink_problem(
+    segments: list[Segment],
+    tip: tuple[float, float],
+    centre: tuple[float, float],
+    root_dia_line_x: float,
 ) -> str | None:
-    """The real centre-to-tip line must meet the full shoulder without a jog."""
-    epsilon = RADIUS_JUNCTION_EPSILON
-    # Normalize only at-most-1 um calibration residuals at this junction.
-    # Every raw stroke still passes the station and overall-clearance proofs
-    # before this helper; numerical normalization never spends their 2 mm floor.
-    ink = [stroke for stroke in segments if math.dist(*stroke) > epsilon]
-    if len(ink) != 2:
-        return "radius does not draw only its radial line and full shoulder"
-    radial = [
-        index for index, stroke in enumerate(ink)
-        if any(
-            math.dist(start, centre) <= epsilon and math.dist(end, tip) <= epsilon
-            for start, end in (stroke, stroke[::-1])
-        )
+    """The radius draws a radial leader through its material tip and one
+    horizontal shoulder from the leader's outer end, in the air over the
+    root Ø's text and under its upper extension line, short of the root Ø's
+    dimension line (rule 14: a leader never crosses a dimension line)."""
+    slop = RADIUS_INK_SLOP
+    radius = GROOVE_RADIUS * _S / 1000.0
+    ink = [stroke for stroke in segments if math.dist(*stroke) > slop]
+    ux, uy = ((tip[0] - centre[0]) / radius, (tip[1] - centre[1]) / radius)
+
+    def on_ray(point: tuple[float, float]) -> bool:
+        return abs((point[0] - centre[0]) * uy - (point[1] - centre[1]) * ux) <= slop
+
+    # A stroke on the radial line through the tip is leader, even when that
+    # line runs nearly level (r1's shelf at the OD); the shoulder is the one
+    # level stroke off it.
+    radial = [stroke for stroke in ink if all(on_ray(point) for point in stroke)]
+    if not radial:
+        return "radius draws no radial leader"
+    rest = [stroke for stroke in ink if not all(on_ray(point) for point in stroke)]
+    shoulders = [
+        stroke for stroke in rest
+        if abs(stroke[1][1] - stroke[0][1]) <= slop
+        and abs(stroke[1][0] - stroke[0][0]) > slop
     ]
-    if len(radial) != 1:
-        return "radius has no unique real centre-to-tip segment"
-    shoulder = ink[1 - radial[0]]
-    if abs(shoulder[1][1] - shoulder[0][1]) > epsilon:
-        return "radius shoulder is not a straight horizontal stroke"
-    if min(math.dist(point, tip) for point in shoulder) > epsilon:
-        return "radius shoulder endpoint does not meet the material arrow tip"
+    if len(rest) != len(shoulders):
+        return "radius leader is not on the radial line through its tip"
+    if len(shoulders) != 1:
+        return "radius has no unique horizontal shoulder"
+    shoulder = shoulders[0]
+    ends = [point for stroke in radial for point in stroke]
+    elbow = max(ends, key=lambda p: (p[0] - centre[0]) * ux + (p[1] - centre[1]) * uy)
+    if (elbow[0] - centre[0]) * ux + (elbow[1] - centre[1]) * uy < radius - slop:
+        return "radius leader's outer end stops inside the groove circle"
+    start = min(shoulder, key=lambda p: p[0])
+    if math.dist(start, elbow) > slop or max(p[0] for p in shoulder) <= elbow[0] + slop:
+        return "radius shoulder does not run right from the leader's outer end"
+    axis_y = centre[1] - GROOVE_CENTRE_R * _S / 1000.0
+    root_y = centre[1] - radius
+    # The floor is the root Ø's text, whose ink tops out 2 mm under the axis
+    # (r12: 177.97 mm); the shoulder stands 1 mm under the axis so the three
+    # rows over it clear the extension line (RADIUS_TEXT_XY).
+    if not (
+        axis_y - RADIUS_STATION_CLEARANCE
+        <= start[1]
+        <= root_y - RADIUS_STATION_CLEARANCE
+    ):
+        return "radius shoulder is not between the root Ø's text and its extension"
+    if max(point[0] for stroke in ink for point in stroke) > (
+        root_dia_line_x - RADIUS_STATION_CLEARANCE
+    ):
+        return "radius ink reaches the root Ø's dimension line"
     return None
 
 
-def _place_groove_radius(adapter: Any, radius: Any, station: Any, overall: Any) -> None:
+def _place_groove_radius(adapter: Any, radius: Any, station: Any) -> None:
     display = _model_display(radius, "GrooveRadius", "GrooveProfile", GROOVE_RADIUS)
     if int(display.Type2) != 5 or display.Diametric is not False:  # swRadialDimension
         raise RuntimeError("GrooveRadius is not the model's genuine radial dimension")
     display.ArcExtensionLineOrOppositeSide = False
     if display.ArcExtensionLineOrOppositeSide is not False:
         raise RuntimeError("GrooveRadius still attaches to an arc extension/opposite side")
-    # The builder dimensions axis.start -> toward_free_end.center; witness
-    # index 1 is C.  The rebuilt ink below proves that this, not the root Ø
-    # or the free-end witness, got the new gap.
+    # The builder dimensions axis.end (the spigot face on the axis) ->
+    # toward_free_end.center: witness 0 is the face, witness 1 the centre.
+    # The rebuilt ink below proves each got its own gap.
     station_display = _model_display(
-        station, "GrooveStation", "GrooveProfile", GROOVE_X - FREE_END_X
+        station, "GrooveStation", "GrooveProfile", GROOVE_STATION
     )
     if station_display.SetWitnessLineGap(1, False, GROOVE_STATION_GAP) is not True:
         raise RuntimeError("GrooveStation refused its centre-side witness gap")
-    # TurnedProfile dimensions free_end -> spigot face top corner: witness
-    # 1 is the face side.  Its still-associated extension remains downward;
-    # shortening only its start cannot put new ink across another annotation.
-    overall_display = _model_display(
-        overall, "OverallLength", "TurnedProfile", SPIGOT_FACE_X - FREE_END_X
-    )
-    if overall_display.SetWitnessLineGap(1, False, OVERALL_FACE_WITNESS_GAP) is not True:
-        raise RuntimeError("OverallLength refused its face-side witness gap")
+    if station_display.SetWitnessLineGap(0, False, GROOVE_STATION_FACE_GAP) is not True:
+        raise RuntimeError("GrooveStation refused its face-side witness gap")
     rebuild_drawing(adapter, label="place fixture material-arc radius")
 
 
-def _prove_groove_radius(
-    adapter: Any, view: Any, radius: Any, station: Any, overall: Any
-) -> None:
+def _prove_groove_radius(adapter: Any, view: Any, radius: Any, station: Any) -> None:
     annotation = _early_bound(radius, "IAnnotation")
     if annotation.IsDangling() is not False or int(annotation.OwnerType) != 0:
         raise RuntimeError("GrooveRadius is dangling or not owned by its drawing view")
@@ -585,39 +721,189 @@ def _prove_groove_radius(
         or display.ArcExtensionLineOrOppositeSide is not False
     ):
         raise RuntimeError("GrooveRadius lost its native material-arc radial style")
-    raw = display.GetDisplayData()
-    if raw is None:
-        raise RuntimeError("GrooveRadius has no rebuilt display data")
-    data = _early_bound(raw, "IDisplayData")
-    if int(data.GetArrowHeadCount()) != 1:
-        raise RuntimeError("GrooveRadius must draw exactly one radial arrow")
-    arrow = tuple(float(v) for v in data.GetArrowHeadAtIndex2(0))
-    if len(arrow) != 12 or not all(math.isfinite(v) for v in arrow):
-        raise RuntimeError("GrooveRadius has incomplete arrow-head coordinates")
+    tolerance = _early_bound(
+        _early_bound(display.GetDimension2(0), "IDimension").Tolerance,
+        "IDimensionTolerance",
+    )
+    # The part's LIMIT band, read back (the sheet never writes a band).
+    lower, upper = LIMIT_BANDS["GrooveRadius"][1]
+    if (
+        int(tolerance.Type) != GROOVE_RADIUS_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, rel_tol=0.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, rel_tol=0.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError("GrooveRadius lost the part's LIMIT band")
+    # The dimension's own callout row, read back: FULL R defines the groove's
+    # width (2R) and walls across the whole band (owner ruling, review r5).
+    callout = str(display.GetText(_CALLOUT_BELOW) or "")
+    if callout != GROOVE_RADIUS_CALLOUT:
+        raise RuntimeError(
+            f"GrooveRadius lost its {GROOVE_RADIUS_CALLOUT} callout row: read {callout!r}"
+        )
+    tip = _single_arrow_tip(display, "GrooveRadius")
     centre = model_point_in_view(
         adapter, view, (GROOVE_X / 1000.0, 0.0, -GROOVE_CENTRE_R / 1000.0),
         label="groove material-arc centre",
     )
+    face = model_point_in_view(
+        adapter, view, (SPIGOT_FACE_X / 1000.0, 0.0, 0.0), label="spigot face on the axis"
+    )
     radius_ink = dimension_segments(radius)
     problem = _groove_radius_ink_problem(
-        radius_ink, (arrow[0], arrow[1]), dimension_segments(station), centre
+        radius_ink, tip, dimension_segments(station), centre, face
     )
     if problem is not None:
         raise RuntimeError(f"GrooveRadius does not land clear on material: {problem}")
-    _model_display(
-        overall, "OverallLength", "TurnedProfile", SPIGOT_FACE_X - FREE_END_X
+    problem = _radius_leader_ink_problem(
+        radius_ink, tip, centre, SIDE_KEEP["GrooveRootDia"][0]
     )
-    problem = _radius_overall_witness_ink_problem(radius_ink, dimension_segments(overall))
     if problem is not None:
-        raise RuntimeError(f"GrooveRadius does not clear the overall length: {problem}")
-    problem = _radius_direct_junction_ink_problem(radius_ink, (arrow[0], arrow[1]), centre)
-    if problem is not None:
-        raise RuntimeError(f"GrooveRadius does not have a direct junction: {problem}")
+        raise RuntimeError(f"GrooveRadius leader does not read in open air: {problem}")
     _telemetry.success(
-        f"genuine GrooveRadius material-arc tip {(arrow[0], arrow[1])}, direct shoulder junction; "
-        f"station witness gap {GROOVE_STATION_GAP * 1000:g} mm, "
-        f"leader clearance >= {RADIUS_STATION_CLEARANCE * 1000:g} mm "
-        "from the station and both overall length witnesses"
+        f"genuine GrooveRadius LIMIT over {GROOVE_RADIUS_CALLOUT}, material-arc tip {tip}, "
+        f"radial leader to a shoulder over the root Ø's text, inside its dimension line; "
+        f"station witness gaps "
+        f"{GROOVE_STATION_GAP * 1000:g} mm (centre) and "
+        f"{GROOVE_STATION_FACE_GAP * 1000:g} mm (face), leader clearance >= "
+        f"{RADIUS_STATION_CLEARANCE * 1000:g} mm from both"
+    )
+
+
+def _single_arrow_tip(display: Any, label: str) -> tuple[float, float]:
+    """The rebuilt sheet point of a radial display dimension's one arrow."""
+    raw = display.GetDisplayData()
+    if raw is None:
+        raise RuntimeError(f"{label} has no rebuilt display data")
+    data = _early_bound(raw, "IDisplayData")
+    if int(data.GetArrowHeadCount()) != 1:
+        raise RuntimeError(f"{label} must draw exactly one radial arrow")
+    arrow = tuple(float(v) for v in data.GetArrowHeadAtIndex2(0))
+    if len(arrow) != 12 or not all(math.isfinite(v) for v in arrow):
+        raise RuntimeError(f"{label} has incomplete arrow-head coordinates")
+    return (arrow[0], arrow[1])
+
+
+def _shoulder_radius_side(tip: tuple[float, float]) -> str | None:
+    """The shoulder corner ("upper"/"lower") the radius's arrow lands at, or
+    None."""
+    sides = [
+        side
+        for side, corner in SHOULDER_CORNERS.items()
+        if math.dist(tip, corner) <= SHOULDER_CORNER_TOL
+    ]
+    return sides[0] if len(sides) == 1 else None
+
+
+def _shoulder_radius_ink_problem(
+    segments: list[Segment],
+    tip: tuple[float, float],
+    side: str,
+    centre: tuple[float, float],
+    others: dict[str, list[Segment]],
+) -> str | None:
+    """The arrow on the corner's fillet circle about ``centre``, leader ink at it, and
+    no other dimension's ink crossed (rule 14).  On the lower arc the leader
+    may cross the face's witnesses, the extension lines at the spigot face."""
+    slop = RADIUS_INK_SLOP
+    cx, cy = centre
+    # The arrow on the fillet's circle, R round its centre.  The 0.8 mm arc
+    # needs a tighter radius check than the ink's slop: the sharp corner
+    # itself stands only 0.33 mm off it.  Either side of the centre: with
+    # its text outside the arc's quarter SolidWorks ends the leader on the
+    # circle point facing the text, the arc's extension (the vertical rod's
+    # relief root, farm r4, 0676a2115), and _shoulder_radius_side has
+    # already held the arrow to this corner.
+    if not all(math.isfinite(v) for v in tip) or (
+        abs(math.dist(tip, (cx, cy)) - SHOULDER_SHEET_RADIUS) > SHOULDER_ARC_SLOP
+    ):
+        return (
+            f"radius arrow is not on the shoulder corner's arc: tip {tip}, "
+            f"centre {centre}, R {SHOULDER_SHEET_RADIUS}"
+        )
+    ink = [stroke for stroke in segments if math.dist(*stroke) > slop]
+    if not ink or min(distance_to_point(stroke, tip) for stroke in ink) > slop:
+        return "radius arrow has no attached leader ink"
+    for name, strokes in others.items():
+        for stroke in strokes:
+            if side == "lower" and all(abs(p[0] - _FACE_SHEET_X) <= slop for p in stroke):
+                continue
+            if any(segments_cross(mine, stroke) for mine in ink):
+                return f"radius leader crosses {name}'s ink"
+    return None
+
+
+def _place_shoulder_radius(adapter: Any, radius: Any, spigot_length: Any) -> str:
+    """The part's ShoulderRadius in the native radial style, laid out for the
+    silhouette arc SolidWorks hung it on; returns that arc's side."""
+    display = _model_display(radius, "ShoulderRadius", "ShoulderFillet", SHOULDER_FILLET_R)
+    if int(display.Type2) != 5 or display.Diametric is not False:  # swRadialDimension
+        raise RuntimeError("ShoulderRadius is not the model's genuine radial dimension")
+    display.ArcExtensionLineOrOppositeSide = False
+    if display.ArcExtensionLineOrOppositeSide is not False:
+        raise RuntimeError("ShoulderRadius still attaches to an arc extension/opposite side")
+    rebuild_drawing(adapter, label="settle fixture shoulder radius")
+    side = _shoulder_radius_side(_single_arrow_tip(display, "ShoulderRadius"))
+    if side is None:
+        raise RuntimeError("ShoulderRadius's arrow is at neither shoulder corner")
+    if side == "lower":
+        annotation = _early_bound(radius, "IAnnotation")
+        if annotation.SetPosition2(*LOWER_ARC_KEEP["ShoulderRadius"], 0.0) is not True:
+            raise RuntimeError("ShoulderRadius refused its lower-arc position")
+        length = _model_display(spigot_length, "SpigotLength", "TurnedProfile", SPIGOT_LENGTH)
+        if length.SetWitnessLineGap(0, False, SPIGOT_LENGTH_LOWER_ARC_GAP) is not True:
+            raise RuntimeError("SpigotLength refused its shoulder-side witness gap")
+        rebuild_drawing(adapter, label="lay out fixture shoulder radius on the lower arc")
+    _telemetry.info(f"ShoulderRadius hangs on the shoulder's {side} arc")
+    return side
+
+
+def _prove_shoulder_radius(
+    adapter: Any, view: Any, radius: Any, side: str, others: dict[str, Any]
+) -> None:
+    annotation = _early_bound(radius, "IAnnotation")
+    if annotation.IsDangling() is not False or int(annotation.OwnerType) != 0:
+        raise RuntimeError("ShoulderRadius is dangling or not owned by its drawing view")
+    display = _model_display(radius, "ShoulderRadius", "ShoulderFillet", SHOULDER_FILLET_R)
+    if (
+        int(display.Type2) != 5
+        or display.Diametric is not False
+        or display.ArcExtensionLineOrOppositeSide is not False
+    ):
+        raise RuntimeError("ShoulderRadius lost its native radial style")
+    tolerance = _early_bound(
+        _early_bound(display.GetDimension2(0), "IDimension").Tolerance,
+        "IDimensionTolerance",
+    )
+    if int(tolerance.Type) != SINGLE_LIMITS["ShoulderRadius"][1]:
+        raise RuntimeError("ShoulderRadius lost the part's single MAX limit")
+    tip = _single_arrow_tip(display, "ShoulderRadius")
+    if _shoulder_radius_side(tip) != side:
+        raise RuntimeError(f"ShoulderRadius left the shoulder's {side} arc")
+    # The fillet's centre, R out from the shoulder and the OD on the side the
+    # arrow landed (the side view's upper silhouette is model -Z).
+    centre_z = (SPIGOT_DIA / 2.0 + SHOULDER_FILLET_R) * (-1.0 if side == "upper" else 1.0)
+    centre = model_point_in_view(
+        adapter,
+        view,
+        ((SHOULDER_X + SHOULDER_FILLET_R) / 1000.0, 0.0, centre_z / 1000.0),
+        label=f"shoulder fillet's {side} arc centre",
+    )
+    problem = _shoulder_radius_ink_problem(
+        dimension_segments(radius),
+        tip,
+        side,
+        centre,
+        {name: dimension_segments(other) for name, other in others.items()},
+    )
+    if problem is not None:
+        raise RuntimeError(f"ShoulderRadius does not read clear: {problem}")
+    _telemetry.success(
+        f"genuine ShoulderRadius MAX on the shoulder's {side} arc, tip {tip}, "
+        f"leader crossing no other dimension's line"
     )
 
 
@@ -634,21 +920,32 @@ def _states_depth(text: str, depth_mm: float, *, reference: bool) -> bool:
 
 def _tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
     """Whether the thumb-screw tap's callout reads as a blind tap into the
-    bore: one thread row carries the process, the thread, its class and its
-    nominal thread depth as a reference, (10.1), never bare; the drill row
-    its controlling depth, bare; nothing is banded; and nothing says THRU
-    (the tap stops in the bore, short of its far wall)."""
+    bore: the prefix row opens with the process and carries the thread, its
+    class and its nominal thread depth as a reference, (10.1), never bare;
+    the below row, under it, the thread's extent, FULL THREAD TO ROD BORE,
+    stated nowhere else; the drill row its controlling depth, bare; nothing
+    is banded; and nothing says THRU (the tap stops in the bore, short of its
+    far wall)."""
     lines = [text for text in resolved_parts.values() if text.strip()]
     thread = [text for text in lines if _TAP_THREAD_TEXT in text]
-    drill = [text for text in lines if _TAP_THREAD_TEXT not in text]
+    drill = [
+        text
+        for text in lines
+        if _TAP_THREAD_TEXT not in text and TAP_EXTENT_CALLOUT not in text
+    ]
+    prefix = resolved_parts.get(_CALLOUT_DEFINITION_PARTS[_CALLOUT_PREFIX_DEFINITION], "")
+    below = resolved_parts.get(_CALLOUT_DEFINITION_PARTS[_CALLOUT_BELOW_DEFINITION], "")
     return (
         not any("THRU" in text for text in lines)
         and not any(mark in text for text in lines for mark in _BAND_MARKS)
         and len(thread) == 1
-        and TAP_PROCESS in thread[0]
+        and thread[0] == prefix
+        and thread[0].lstrip().startswith(f"{TAP_PROCESS} ")
         and TAP_SPEC.thread_class in thread[0]
         and _states_depth(thread[0], TAP_LENGTH, reference=True)
         and not _states_depth(thread[0], TAP_LENGTH, reference=False)
+        and below.strip() == TAP_EXTENT_CALLOUT
+        and sum(TAP_EXTENT_CALLOUT in text for text in lines) == 1
         and any(_states_depth(text, TAP_DRILL_DEPTH, reference=False) for text in drill)
         and not any(_states_depth(text, TAP_DRILL_DEPTH, reference=True) for text in lines)
     )
@@ -657,8 +954,11 @@ def _tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
 # swDimensionTextParts_e: a hole callout's definitions (5-8: prefix, suffix,
 # callout above, callout below) and the writable part each is set through
 # (1-4), as draw_fr_harmonic_base._set_cross_tap_callout_text writes 3 and
-# reads back 7.
+# reads back 7.  The native thread row is the prefix's (retry09), so the
+# below definition prints the extent row directly under the thread.
 _CALLOUT_DEFINITION_PARTS = {5: 1, 6: 2, 7: 3, 8: 4}
+_CALLOUT_PREFIX_DEFINITION = 5
+_CALLOUT_BELOW_DEFINITION = 8
 _THREAD_DEPTH_TOKEN = f"<{TAP_THREAD_DEPTH_VARIABLE}>"
 _DRILL_DEPTH_TOKEN = f"<{TAP_DRILL_DEPTH_VARIABLE}>"
 
@@ -689,36 +989,90 @@ def reference_thread_depth_definitions(definitions: dict[int, str]) -> dict[int,
     }
 
 
+def thread_extent_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """The callout's definitions with the thread's extent,
+    ``TAP_EXTENT_CALLOUT``, written into the empty below definition, so it
+    prints as a row under the thread, and every other definition as it was.
+
+    The prefix definition must hold the thread depth (the row the extent
+    reads under is the thread's), the below definition must be empty, and
+    nothing may state the extent yet (draw_sm_knife_mount's reason row).
+    """
+    if (
+        _THREAD_DEPTH_TOKEN not in definitions[_CALLOUT_PREFIX_DEFINITION]
+        or definitions[_CALLOUT_BELOW_DEFINITION].strip()
+        or any(TAP_EXTENT_CALLOUT in text for text in definitions.values())
+    ):
+        raise RuntimeError(
+            f"expected {_THREAD_DEPTH_TOKEN} in the prefix definition, an empty "
+            f"below definition and no {TAP_EXTENT_CALLOUT!r} in the tap callout's "
+            f"definitions: {definitions!r}"
+        )
+    return {**definitions, _CALLOUT_BELOW_DEFINITION: TAP_EXTENT_CALLOUT}
+
+
+def _write_tap_definition(
+    display: Any,
+    wanted_of: Callable[[dict[int, str]], dict[int, str]],
+    *,
+    failure: str,
+    success: str,
+) -> None:
+    """Write the one callout definition ``wanted_of`` changes and read all
+    four back: every other definition, the process prefix and the bare drill
+    depth included, must hold as it was."""
+    before = {part: str(display.GetText(part) or "") for part in _CALLOUT_DEFINITION_PARTS}
+    wanted = wanted_of(before)
+    (part,) = [part for part in before if wanted[part] != before[part]]
+    display.SetText(_CALLOUT_DEFINITION_PARTS[part], wanted[part])
+    after = {part: str(display.GetText(part) or "") for part in _CALLOUT_DEFINITION_PARTS}
+    if after != wanted:
+        raise RuntimeError(
+            f"thumb-screw tap {failure}: wanted {wanted!r}, read {after!r}"
+        )
+    _telemetry.success(f"thumb-screw tap {success}: definition {part} {wanted[part]!r}")
+
+
 def _reference_thread_depth(display: Any) -> None:
     """Bracket the native callout's thread depth as REF, in the definition.
 
     Only the definition holding the thread depth is written; the readback
     must hold all four, the process prefix and the bare drill depth included.
     """
-    before = {part: str(display.GetText(part) or "") for part in _CALLOUT_DEFINITION_PARTS}
-    wanted = reference_thread_depth_definitions(before)
-    (part,) = [part for part in before if wanted[part] != before[part]]
-    display.SetText(_CALLOUT_DEFINITION_PARTS[part], wanted[part])
-    after = {part: str(display.GetText(part) or "") for part in _CALLOUT_DEFINITION_PARTS}
-    if after != wanted:
-        raise RuntimeError(
-            f"thumb-screw tap thread depth did not persist as REF: wanted {wanted!r}, "
-            f"read {after!r}"
-        )
-    _telemetry.success(
-        f"thumb-screw tap thread depth bracketed REF: definition {part} {wanted[part]!r}"
+    _write_tap_definition(
+        display,
+        reference_thread_depth_definitions,
+        failure="thread depth did not persist as REF",
+        success="thread depth bracketed REF",
+    )
+
+
+def _state_thread_extent(display: Any) -> None:
+    """Write the thread's extent as the callout's row under the thread
+    (drawing-guidelines.md rule 7: on the feature, not a general note).
+
+    Only the below definition is written; the readback must hold all four,
+    the bracketed REF thread depth included.
+    """
+    _write_tap_definition(
+        display,
+        thread_extent_definitions,
+        failure="extent row did not persist",
+        success="extent row stated",
     )
 
 
 def _check_tap_callout(display: Any) -> None:
-    """Prove the callout states the tap, its depths and its process."""
+    """Prove the callout states the tap, its depths, its process and the
+    thread's extent."""
     resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
     if not _tap_callout_resolved(resolved):
         raise RuntimeError(
             f"thumb-screw tap callout does not state {TAP_PROCESS} "
             f"{_TAP_THREAD_TEXT}-{TAP_SPEC.thread_class} to "
             f"({TAP_LENGTH:.{TAP_DEPTH_PLACES}f}) REF over a bare "
-            f"{TAP_DRILL_DEPTH:.{TAP_DEPTH_PLACES}f} drill: {resolved!r}"
+            f"{TAP_DRILL_DEPTH:.{TAP_DEPTH_PLACES}f} drill, {TAP_EXTENT_CALLOUT} "
+            f"under the thread: {resolved!r}"
         )
     _telemetry.success(f"thumb-screw tap callout reads {resolved!r}")
 
@@ -876,7 +1230,7 @@ def _prove_tap_centre_mark(adapter: Any, view: Any, drill_edge: Any) -> Any:
 
 
 def _is_rod_bore_cylinder(parameters: tuple[float, ...]) -> bool:
-    """Only the Ø5.20 Y-axis bore, never the X-axis tap/spigot."""
+    """Only the Ø5.2 Y-axis bore, never the X-axis tap/spigot."""
     return (
         len(parameters) == 7
         and all(math.isfinite(v) for v in parameters)
@@ -1121,7 +1475,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Output Fixture Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "output fixture; 3/8 hex brass; reamed rod bore; wire groove; #4-40 tap",
+            3: "output fixture; 7/16 hex brass; drilled rod bore; wire groove; #4-40 tap",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -1152,21 +1506,30 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(
         adapter, [*side_annotations, *end_annotations], DRAWING_PRECISION_BY_NAME
     )
-    set_dimension_callouts(adapter, side_annotations, {"RodBoreDia": ROD_BORE_CALLOUT})
+    # Each below its value: the bore's process, and the groove radius's
+    # profile under its LIMIT (read back in _prove_groove_radius).
+    set_dimension_callouts(
+        adapter,
+        side_annotations,
+        {"RodBoreDia": ROD_BORE_CALLOUT, "GrooveRadius": GROOVE_RADIUS_CALLOUT},
+    )
     # The flats are the bar's as supplied: a stock reference, not a size the
-    # shop holds to three places.
+    # shop holds to three places.  The overall length is the part's driven
+    # sum of the bore's two stations: a reference, never a third control.
+    side_by_name = {dimension_name(adapter, a): a for a in side_annotations}
     end_by_name = {dimension_name(adapter, a): a for a in end_annotations}
+    by_name = {**side_by_name, **end_by_name}
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(
-            adapter, end_by_name[name], label=f"MHA-MG-006 {name} stock reference"
+            adapter, by_name[name], label=f"MHA-MG-006 {name} reference"
         )
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add the rod bore's center mark to the side view")
     # The tap drill's edge on the spigot face: the one visible circle of the
     # Hole Wizard feature from the end.  Its axis carries the view's one
-    # centre mark, and the native callout prints the drill row and, under
-    # it, the process on the thread row; both depths print at one place, the
-    # thread's bracketed as REF.
+    # centre mark, and the native callout prints the drill row, under it the
+    # process on the thread row, and under that the thread's extent; both
+    # depths print at one place, the thread's bracketed as REF.
     tap_drill = visible_circle_edge(adapter, end, TAP_DRILL_DIA)
     tap_mark = _prove_tap_centre_mark(adapter, end, tap_drill)
     bore_axis, bore_face = _add_rod_bore_axis(adapter, end, tap_mark)
@@ -1179,13 +1542,15 @@ async def build(adapter: Any) -> dict[str, str]:
         process=TAP_PROCESS,
     )
     _reference_thread_depth(tap_callout)
+    _state_thread_extent(tap_callout)
     set_hole_callout_precision(
         tap_callout, TAP_CALLOUT_PRECISION, label="#4-40 thumb-screw tap depths"
     )
-    side_by_name = {dimension_name(adapter, a): a for a in side_annotations}
     _place_groove_radius(
-        adapter, side_by_name["GrooveRadius"], side_by_name["GrooveStation"],
-        side_by_name["OverallLength"],
+        adapter, side_by_name["GrooveRadius"], side_by_name["GrooveStation"]
+    )
+    shoulder_side = _place_shoulder_radius(
+        adapter, side_by_name["ShoulderRadius"], side_by_name["SpigotLength"]
     )
     # Rebuilt, final frame/ink: these proofs never exempt the root Ø or tap.
     _prove_end_stock_reference(adapter, end, end_by_name["HexAf"])
@@ -1193,8 +1558,14 @@ async def build(adapter: Any) -> dict[str, str]:
     _prove_rod_bore_axis(adapter, end, bore_axis, bore_face, tap_mark)
     _check_tap_callout(tap_callout)
     _prove_groove_radius(
-        adapter, side, side_by_name["GrooveRadius"], side_by_name["GrooveStation"],
-        side_by_name["OverallLength"],
+        adapter, side, side_by_name["GrooveRadius"], side_by_name["GrooveStation"]
+    )
+    _prove_shoulder_radius(
+        adapter,
+        side,
+        side_by_name["ShoulderRadius"],
+        shoulder_side,
+        {name: a for name, a in side_by_name.items() if name != "ShoulderRadius"},
     )
     _prove_groove_root_diameter(side_by_name["GrooveRootDia"])
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
