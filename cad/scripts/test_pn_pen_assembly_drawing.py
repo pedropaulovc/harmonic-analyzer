@@ -9,6 +9,7 @@ import draw_pn_pen_assembly as drawing
 import pn_pen_adjust_screw_spec as stud
 import pn_pen_assembly_notes as notes
 import pn_pen_assembly_spec as spec
+import pn_pen_explode_spec as explode
 import pn_pen_carriage_geom as carriage
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as v_block
@@ -142,49 +143,96 @@ def test_bom_covers_every_family_in_builder_order_with_registry_identity() -> No
 
 def test_explode_names_match_the_builder() -> None:
     assert drawing.EXPLODED_VIEW_NAMES == {
-        "Default": spec.EXPLODED_VIEW_NAME,
-        "Default Simplified": simplified_name(spec.EXPLODED_VIEW_NAME),
+        "Default": explode.EXPLODED_VIEW_NAME,
+        "Default Simplified": simplified_name(explode.EXPLODED_VIEW_NAME),
     }
     for configuration, name in drawing.EXPLODED_VIEW_NAMES.items():
-        assert builder.pn_exploded_view_name(configuration) == name
+        assert explode.exploded_view_name(configuration) == name
+    with pytest.raises(ValueError):
+        explode.exploded_view_name("Operational")
+
+
+def _moves(stems: tuple[str, ...]) -> list[float]:
+    """The summed world move of the explode steps that move exactly ``stems``."""
+    moves = [0.0, 0.0, 0.0]
+    for _label, step_stems, key, distance in explode.EXPLODE_STEPS:
+        if step_stems == stems:
+            moves["xyz".index(key)] += distance
+    return moves
+
+
+def _along(vector: list[float], axis: tuple[float, ...]) -> float:
+    """``vector``'s length, asserting it runs along the unit ``axis``."""
+    length = sum(value * value for value in vector) ** 0.5
+    assert all(abs(v - length * a) < 1e-9 for v, a in zip(vector, axis)), (vector, axis)
+    return length
+
+
+def _block_axis(index: int, sign: float = 1.0) -> tuple[float, ...]:
+    return tuple(sign * value for value in carriage.BLOCK_ROWS[index])
 
 
 def test_exploded_octant_faces_the_set_screw_tap_and_explodes_along_it() -> None:
     assert drawing.EXPLODED_ORIENTATION == octant_view_name(*spec.EXPLODED_OCTANT)
     # The tap opens on the block's front face (local -Z, BODY_Z0).
-    rows = carriage.BLOCK_ROWS
-    normal = tuple(-rows[2][axis] for axis in range(3))
+    normal = _block_axis(2, -1.0)
     viewer = octant_axes(*spec.EXPLODED_OCTANT)[2]
     assert sum(n * v for n, v in zip(normal, viewer)) > 0.5
-    moves = [0.0, 0.0, 0.0]
-    for _label, stems, key, distance in spec.EXPLODE_STEPS:
-        if stems == (spec.ROD_SET_SCREW,):
-            moves["xyz".index(key)] += distance
-    length = sum(value * value for value in moves) ** 0.5
     # Straight out of the tap, and past the screw's own recess in it.
-    assert all(abs(m / length - n) < 1e-9 for m, n in zip(moves, normal))
+    length = _along(_moves((spec.ROD_SET_SCREW,)), normal)
     assert length > v_block.SET_SCREW_TAP_LENGTH + 2 * rod_set_screw.LENGTH
 
 
 def test_rod_set_screw_trail_runs_up_the_tap_axis_to_its_mouth() -> None:
-    moves = [0.0, 0.0, 0.0]
-    for _label, stems, key, distance in spec.EXPLODE_STEPS:
-        if stems == (spec.ROD_SET_SCREW,):
-            moves["xyz".index(key)] += distance
+    out = _along(_moves((spec.ROD_SET_SCREW,)), _block_axis(2, -1.0))
     cup, mouth = notes.ROD_SET_SCREW_TRAIL
     trail = [b - a for a, b in zip(cup, mouth)]
-    out = sum(value * value for value in moves) ** 0.5
-    length = sum(value * value for value in trail) ** 0.5
     # Back along the screw's own way out, short of it by the tap's depth.
-    assert all(abs(t + m * length / out) < 1e-9 for t, m in zip(trail, moves))
+    length = _along(trail, _block_axis(2))
     assert abs(length - (out - v_block.SET_SCREW_TAP_LENGTH)) < 1e-6
 
 
+def test_thumb_screw_explodes_down_its_tap_axis_clear_of_the_bottom_rail() -> None:
+    """Machinist review 2026-10-17: the thumb screw sat under the V-block with
+    no trail, its tap in the stirrup's bottom rail unshown."""
+    # The tap's axis is the stirrup's (and the block's) vertical.
+    assert _block_axis(1) == tuple(carriage.FRAME_ROWS[1])
+    down = _along(_moves((spec.THUMB_SCREW,)), _block_axis(1, -1.0))
+    engaged = carriage.MARKER_BOTTOM_LOCAL_Y - carriage.FRAME_ORIGIN_LOCAL[1]
+    assert down == pytest.approx(engaged + explode.THUMB_SCREW_TRAIL_GAP)
+    # The trail runs from the exploded tip straight up the axis to the tap's
+    # mouth on the exploded bottom rail's underside.
+    tip, mouth = notes.THUMB_SCREW_TRAIL
+    trail = [b - a for a, b in zip(tip, mouth)]
+    assert _along(trail, _block_axis(1)) == pytest.approx(explode.THUMB_SCREW_TRAIL_GAP)
+
+
+def test_stirrup_slides_off_the_paper_end_with_its_thumb_screw_on_its_tap() -> None:
+    """Machinist review 2026-10-17: the stirrup was drawn displaced diagonally,
+    not along the neck it slides onto."""
+    # Off the block, the stirrup moves in one step with its thumb screw, so the
+    # screw stays on the rail's tap axis; no step moves the stirrup alone.
+    frame_steps = {
+        stems
+        for _label, stems, _key, _d in explode.EXPLODE_STEPS
+        if spec.FRAME in stems and spec.V_BLOCK not in stems
+    }
+    assert frame_steps == {(spec.FRAME, spec.THUMB_SCREW)}
+    off = _along(_moves((spec.FRAME, spec.THUMB_SCREW)), _block_axis(0, -1.0))
+    assert off == pytest.approx(carriage.FRAME_ORIGIN_LOCAL[0] + explode.STIRRUP_CLEAR)
+    # In the octant view the slide-off axis lies in the sheet, running
+    # sheet-right: the stirrup stands off the block's paper end at full length.
+    sx, _sy, sz = spec.EXPLODED_OCTANT
+    viewer = octant_axes(*spec.EXPLODED_OCTANT)[2]
+    assert abs(sum(a * v for a, v in zip(_block_axis(0), viewer))) < 1e-12
+    assert _block_axis(0, -1.0)[0] * sz + _block_axis(0, -1.0)[2] * -sx > 0.0
+    face, end = notes.STIRRUP_TRAIL
+    trail = [b - a for a, b in zip(face, end)]
+    assert _along(trail, _block_axis(0)) == pytest.approx(explode.STIRRUP_CLEAR)
+
+
 def test_wire_explodes_up_then_straight_to_the_sheet_left() -> None:
-    moves = [0.0, 0.0, 0.0]
-    for _label, stems, key, distance in spec.EXPLODE_STEPS:
-        if stems == (spec.WIRE,):
-            moves["xyz".index(key)] += distance
+    moves = _moves((spec.WIRE,))
     sx, _sy, sz = spec.EXPLODED_OCTANT
     # The octant view's sheet-right is (sz, 0, -sx); the aside pair runs
     # against it with no out-of-plane part.
@@ -192,6 +240,23 @@ def test_wire_explodes_up_then_straight_to_the_sheet_left() -> None:
     assert moves[0] * sz + moves[2] * -sx < 0.0
     assert moves[0] * -sx + moves[2] * -sz == 0.0
     assert drawing.BALLOON_ANCHORS[spec.WIRE].point_mm is not None
+
+
+def test_explode_module_qualifies_for_the_explode_tier() -> None:
+    from _refresh_tier import explode_plan
+
+    plan = explode_plan("pn_pen")
+    assert (plan.decline, plan.module, plan.function) == (
+        "",
+        "_pn_pen_explode",
+        "create_pn_explode",
+    )
+    # The global explode axes' helper is the explode's alone, as in pd.
+    assert {Path(path).name for path in plan.closure} == {
+        "_pn_pen_explode.py",
+        "pn_pen_explode_spec.py",
+        "_assembly_patterns.py",
+    }
 
 
 def test_hanger_balloon_lands_mid_strap_clear_of_the_hanger_screw() -> None:
@@ -249,6 +314,33 @@ def test_each_detail_title_carries_its_letter_and_any_other_direction() -> None:
         else:
             assert " - FROM " in first
     assert len(set(notes.DETAIL_LETTERS.values())) == len(drawing.DETAILS)
+
+
+def test_stirrup_detail_shows_the_window_and_the_thumb_screw_tap_off_the_title_block() -> None:
+    """Machinist review 2026-10-17: the stirrup's window and the thumb screw's
+    tap in its bottom rail showed nowhere the reader could read them; the
+    exploded view sees the stirrup edge-on."""
+    detail = drawing.STIRRUP_DETAIL
+    assert detail in drawing.DETAILS and detail.feature is None
+    assert {spec.FRAME, spec.THUMB_SCREW, spec.V_BLOCK} <= detail.stems
+    # The crop reaches the thumb screw's head below the rail and the block top.
+    head_y = carriage.THUMB_SCREW_POS[1]
+    block_top_y = carriage.BLOCK_TOP_Y
+    centre_y = detail.model_centre[1]
+    assert centre_y - detail.radius_mm < head_y and centre_y + detail.radius_mm > block_top_y
+    # Front views project Z away: the centre sits on the stirrup's mid-depth.
+    frame_mid = carriage.block_to_machine(
+        (carriage.FRAME_X_CENTER_LOCAL, 0.0, v_block.DEPTH_MID_Z)
+    )
+    assert detail.model_centre[0] == pytest.approx(frame_mid[0])
+    x, y = detail.centre
+    r = detail.crop_radius
+    assert drawing._sheet_findings((x - r, y - r, x + r, y + r)) == []
+    # Under the as-shipped note's top line and clear of DETAIL C's circle.
+    assert y + r < drawing.SETTINGS_NOTE_XY[1]
+    c = drawing.CARRIAGE_DETAIL
+    assert (x - c.centre[0]) ** 2 + (y - c.centre[1]) ** 2 > (r + c.crop_radius) ** 2
+    assert detail.label_xy[0] > x + r
 
 
 def test_text_blocks_respect_the_measured_note_width() -> None:

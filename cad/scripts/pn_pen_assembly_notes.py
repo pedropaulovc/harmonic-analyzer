@@ -53,8 +53,8 @@ from pn_pen_assembly_spec import (
     YAW_DEG,
     YAW_DIMENSION,
     YAW_TOLERANCE_DEG,
-    exploded_point,
 )
+from pn_pen_explode_spec import exploded_point
 
 
 def _inch(mm: float) -> str:
@@ -94,11 +94,12 @@ BOM_DESCRIPTIONS = {
 if set(BOM_DESCRIPTIONS) != set(BOM_ORDER):
     raise AssertionError("every BOM row needs exactly one description")
 
-# The rod set screw's trail on the exploded view: from its exploded cup back
-# to its tap's mouth on the exploded block's front face. Along the tap's axis
-# the octant view draws the screw's way out straight down the sheet, where it
-# read as entering the block's bottom (machinist review r4); the trail lands
-# it on the front-face tap step 4 names.
+# --- explode trails (machine mm, exploded): from the moved part back to where it
+# fits, along the move ---------------------------------------------------------------
+# The rod set screw: from its exploded cup back to its tap's mouth on the
+# exploded block's front face. Along the tap's axis the octant view draws the
+# screw's way out straight down the sheet; the trail lands it on the
+# front-face tap step 4 names.
 ROD_SET_SCREW_TRAIL = (
     exploded_point(ROD_SET_SCREW, carriage.ROD_SET_SCREW_POS),
     exploded_point(
@@ -108,6 +109,54 @@ ROD_SET_SCREW_TRAIL = (
         ),
     ),
 )
+# The thumb screw: from its exploded tip up its axis to the tap's mouth on the
+# exploded stirrup's bottom-rail underside (step 3).
+THUMB_SCREW_TRAIL = (
+    exploded_point(
+        THUMB_SCREW,
+        carriage.block_to_machine(
+            (
+                carriage.FRAME_X_CENTER_LOCAL,
+                carriage.MARKER_BOTTOM_LOCAL_Y,
+                v_block.DEPTH_MID_Z,
+            )
+        ),
+    ),
+    exploded_point(
+        FRAME,
+        carriage.block_to_machine(
+            (
+                carriage.FRAME_X_CENTER_LOCAL,
+                carriage.FRAME_ORIGIN_LOCAL[1],
+                v_block.DEPTH_MID_Z,
+            )
+        ),
+    ),
+)
+# The stirrup: from its exploded rod-side face, at the block's mid-height on
+# the section's centre line, back along the slide-on axis to the block's
+# paper-end face, which it seats flush with (step 3).
+_STIRRUP_TRAIL_Y = v_block.BLOCK_HEIGHT / 2.0
+STIRRUP_TRAIL = (
+    exploded_point(
+        FRAME,
+        carriage.block_to_machine(
+            (carriage.FRAME_ORIGIN_LOCAL[0], _STIRRUP_TRAIL_Y, v_block.DEPTH_MID_Z)
+        ),
+    ),
+    exploded_point(
+        V_BLOCK,
+        carriage.block_to_machine(
+            (carriage.FRAME_X0_LOCAL, _STIRRUP_TRAIL_Y, v_block.DEPTH_MID_Z)
+        ),
+    ),
+)
+EXPLODE_TRAILS = {
+    "rod set screw": ROD_SET_SCREW_TRAIL,
+    "thumb screw": THUMB_SCREW_TRAIL,
+    "stirrup": STIRRUP_TRAIL,
+}
+
 EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
 
 # The nib preset's text point, sketch mm: on the side of the marker-axis arm
@@ -175,14 +224,32 @@ CARRIAGE_DETAIL_RADIUS = 20.0
 # The two points whose sheet direction the turned detail lays along +X.
 CARRIAGE_AXIS_POINTS = (carriage.MARKER_POS, CARRIAGE_END_MACHINE)
 
+# DETAIL D, from the front at 1:1: the stirrup on the block's paper end, its
+# window round the marker grip, and the thumb screw up through the bottom
+# rail's tap to the grip -- what step 3 assembles and the exploded view's
+# edge-on stirrup cannot show. Its crop runs from the thumb screw's head up
+# to the block top, centred on the stirrup's depth.
+_THUMB_SCREW_HEAD_LOCAL_Y = carriage.MARKER_BOTTOM_LOCAL_Y - carriage.THUMB_SCREW_REACH
+STIRRUP_DETAIL_CENTRE = carriage.block_to_machine(
+    (
+        carriage.FRAME_X_CENTER_LOCAL,
+        (_THUMB_SCREW_HEAD_LOCAL_Y + v_block.BLOCK_HEIGHT) / 2.0,
+        v_block.DEPTH_MID_Z,
+    )
+)
+STIRRUP_DETAIL_RADIUS = (v_block.BLOCK_HEIGHT - _THUMB_SCREW_HEAD_LOCAL_Y) / 2.0 + 2.0
+
 # A and B are bounded on RIGHT and drawn from the right; C is the turned
-# plan, so its title names its viewing direction.
-DETAIL_LETTERS = {"stud": "A", "hanger": "B", "carriage": "C"}
+# plan and D the front view's stirrup, so their titles name their viewing
+# directions.
+DETAIL_LETTERS = {"stud": "A", "hanger": "B", "carriage": "C", "stirrup": "D"}
 SHEET_TITLES = {
     "carriage": f"DETAIL {DETAIL_LETTERS['carriage']} - FROM ABOVE\n"
     "PEN YAW + NIB PRESET\nSCALE 2 : 1",
     "stud": f"DETAIL {DETAIL_LETTERS['stud']}\nSTUD HEIGHT + LOCK\nSCALE 2 : 1",
     "hanger": f"DETAIL {DETAIL_LETTERS['hanger']}\nHANGER SCREW LOCK\nSCALE 2 : 1",
+    "stirrup": f"DETAIL {DETAIL_LETTERS['stirrup']} - FROM THE FRONT\n"
+    "STIRRUP + THUMB SCREW\nSCALE 1 : 1",
 }
 VIEW_TITLES = {
     "front": "FRONT\nSCALE 1 : 2",
@@ -211,7 +278,8 @@ ASSEMBLY_STEPS = (
     "ROUND ITSELF, TRIM THE TAIL. LEAVE THE UPPER END LONG.",
     f"3. STIRRUP: SLIDE THE STIRRUP (ITEM {ITEM[FRAME]}) ONTO THE V-BLOCK "
     f"(ITEM {ITEM[V_BLOCK]}) FLUSH WITH ITS PAPER END. START THE THUMB SCREW "
-    f"(ITEM {ITEM[THUMB_SCREW]}) UP INTO THE STIRRUP'S BOTTOM-RAIL TAP.",
+    f"(ITEM {ITEM[THUMB_SCREW]}) UP INTO THE STIRRUP'S BOTTOM-RAIL TAP "
+    "(DETAIL D).",
     "4. PEN YAW: DROP THE ROD'S TURNED PIVOT INTO THE V-BLOCK BORE, SQUARE "
     "SHOULDER DOWN ON THE BLOCK TOP. TURN THE BLOCK UNTIL ITS V STANDS "
     f"{_YAW_SETTING} TO A ROD FLAT (DETAIL C; PROTRACTOR ON THE BLOCK SIDE "

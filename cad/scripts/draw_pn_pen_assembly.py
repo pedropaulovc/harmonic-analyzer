@@ -1,14 +1,16 @@
 r"""Create the three-sheet pen fitter package (MHA-PN-000).
 
-Sheet 1 shows the pen assembled (front and right) beside three details that
-carry its settings as the builder's driving, toleranced model dimensions:
-DETAIL A the stud height and its jam nut (``StudSetting``), DETAIL B the
-hanger screw's nut and jam nut, DETAIL C the pen yaw and nib preset
-(``CarriageSetting``), with the as-shipped note; sheet 2 the builder-owned
-``PN_EXPLODED`` presentation with the BOM (numbers, descriptions, vendor SKU,
-quantity) and a balloon on every row; sheet 3 the finished isometric beside
-the numbered assembly sequence and checks. Every setting and pose comes from
-``pn_pen_assembly_spec``, every printed text and detail region from
+Sheet 1 shows the pen assembled (front and right) beside four details, three
+of which carry its settings as the builder's driving, toleranced model
+dimensions: DETAIL A the stud height and its jam nut (``StudSetting``),
+DETAIL B the hanger screw's nut and jam nut, DETAIL C the pen yaw and nib
+preset (``CarriageSetting``), DETAIL D the stirrup and its thumb screw on the
+block, with the as-shipped note; sheet 2 the builder-owned ``PN_EXPLODED``
+presentation (``pn_pen_explode_spec``) with its explode trails, the BOM
+(numbers, descriptions, vendor SKU, quantity) and a balloon on every row;
+sheet 3 the finished isometric beside the numbered assembly sequence and
+checks. Every setting and pose comes from ``pn_pen_assembly_spec``, every
+printed text and detail region from
 ``pn_pen_assembly_notes``, the rest from the part registry; this recipe only
 lays the sheets out. It never edits the source assembly or its explodes.
 """
@@ -28,6 +30,7 @@ import _telemetry
 import pn_pen_adjust_screw_spec as stud
 import pn_pen_assembly_notes as notes
 import pn_pen_assembly_spec as spec
+import pn_pen_explode_spec as explode
 import pn_pen_hanger_spec as hanger
 import pn_pen_rod_spec as rod
 import vn_pen_wire_geom as wire
@@ -69,7 +72,6 @@ from _drawing_view_configuration import (
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _named_views import octant_view_name
-from _simplified_names import simplified_name
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -237,7 +239,20 @@ CARRIAGE_DETAIL = Detail(
     label_xy=(0.156, 0.090),
     axis_points=notes.CARRIAGE_AXIS_POINTS,
 )
-DETAILS = (STUD_DETAIL, HANGER_DETAIL, CARRIAGE_DETAIL)
+# D sits in the free band right of C's title, between the as-shipped note
+# and the title block, its title to its right.
+STIRRUP_DETAIL = Detail(
+    key="stirrup",
+    orientation="*Front",
+    scale=(1, 1),
+    model_centre=notes.STIRRUP_DETAIL_CENTRE,
+    radius_mm=notes.STIRRUP_DETAIL_RADIUS,
+    centre=(0.262, 0.099),
+    stems=_CARRIAGE_STEMS,
+    feature=None,
+    label_xy=(0.294, 0.113),
+)
+DETAILS = (STUD_DETAIL, HANGER_DETAIL, CARRIAGE_DETAIL, STIRRUP_DETAIL)
 
 
 def _top_plan_point(uv: tuple[float, float]) -> tuple[float, float, float]:
@@ -387,10 +402,12 @@ BALLOON_ANCHORS = {
 EXPLODED_ORIENTATION = octant_view_name(*spec.EXPLODED_OCTANT)
 
 EXPLODED_VIEW_NAMES = {
-    ASSEMBLY_VIEW_CONFIGURATION: spec.EXPLODED_VIEW_NAME,
-    SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(spec.EXPLODED_VIEW_NAME),
+    ASSEMBLY_VIEW_CONFIGURATION: explode.exploded_view_name(ASSEMBLY_VIEW_CONFIGURATION),
+    SIMPLIFIED_VIEW_CONFIGURATION: explode.exploded_view_name(
+        SIMPLIFIED_VIEW_CONFIGURATION
+    ),
 }
-if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
+if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the pen explode is authored in Default")
 
 # --- sheet 3: the finished isometric beside the sequence and checks --------------
@@ -932,7 +949,7 @@ def _assert_settings(displays: list[tuple[str, Any]], *, when: str) -> None:
 
 
 def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
-    """Front and right at 1:2, the three details, the as-shipped note; returns
+    """Front and right at 1:2, the four details, the as-shipped note; returns
     the check that re-reads every setting once the drawing has settled."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     _placed_base_view(
@@ -1256,12 +1273,8 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
             f"pen exploded view carries {len(landings)} balloons, expected one per "
             f"component ({sum(BOM_QUANTITIES.values())})"
         )
-    _add_explode_trail(
-        adapter,
-        exploded,
-        notes.ROD_SET_SCREW_TRAIL,
-        label="pen rod set screw explode trail",
-    )
+    for name, trail in notes.EXPLODE_TRAILS.items():
+        _add_explode_trail(adapter, exploded, trail, label=f"pen {name} explode trail")
     _add_note_block(
         adapter,
         SHEET_NAMES[1],

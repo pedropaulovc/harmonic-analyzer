@@ -1,9 +1,10 @@
-"""Pure fitting contract for pn-pen.SLDASM (MHA-PN-000): inventory, explode
-and the three carriage settings.
+"""Pure fitting contract for pn-pen.SLDASM (MHA-PN-000): inventory, the
+exploded view's octant and the three carriage settings.
 
 The builder (``build_pn_pen_assembly``) authors the settings as blanked
-construction sketches carrying driving, toleranced model dimensions and the
-``PN_EXPLODED`` presentation from ``EXPLODE_STEPS``; the fitter drawing
+construction sketches carrying driving, toleranced model dimensions; its
+explode module (``_pn_pen_explode``) authors the ``PN_EXPLODED``
+presentation from ``pn_pen_explode_spec``; the fitter drawing
 (``draw_pn_pen_assembly``) imports those dimensions. The BOM descriptions,
 callouts, detail regions, steps and checks the sheets print live in
 ``pn_pen_assembly_notes``, which only the drawing reads, so a wording edit
@@ -78,62 +79,16 @@ QUANTITIES = {stem: 1 for stem in BOM_ORDER}
 ITEM = {stem: index for index, stem in enumerate(BOM_ORDER, 1)}
 
 
-# --- explode -----------------------------------------------------------------
-# The disassembly order, the notes' ASSEMBLY_STEPS read back to front: the hanger's
-# loose fastening off, the wire off the eye, the carriage out of the U guides'
-# open front ends, the stud and its jam nut up off the rod top, the carriage
-# down off the rod's pivot, the rod set screw back out along its tap, the
-# marker back out along its own axis, the thumb screw down, the stirrup off
-# the paper end. (label, families, axis, signed distance mm), all along the
-# assembly's global axes; a move along the yawed block's axes is a pair of
-# equal X/Z steps.
-EXPLODED_VIEW_NAME = "PN_EXPLODED"
-SOURCE_CONFIGURATION = "Default"
-# The exploded view's viewer octant (_named_views): REAR-TOP-LEFT. The rod set
-# screw's tap opens on the yawed block's front face, whose normal is machine
-# (-X, -Z); the built-in *Isometric (+X+Y+Z) sees that face edge-on from
-# behind, so its set screw read as a part in the block's top bore. From
+# --- exploded view -------------------------------------------------------------
+# The named explode and its steps live in pn_pen_explode_spec, which only the
+# builder's explode module and the drawing read (the EXPLODE refresh tier).
+# The exploded view's viewer octant (_named_views) stays here: the builder
+# names that octant view in the operational model. REAR-TOP-LEFT: the rod
+# set screw's tap opens on the yawed block's front face, whose normal is
+# machine (-X, -Z); the built-in *Isometric (+X+Y+Z) sees that face edge-on
+# from behind, so its set screw read as a part in the block's top bore. From
 # (-1, +1, -1) the face and the tap's axis come toward the reader.
 EXPLODED_OCTANT = (-1, 1, -1)
-_CARRIAGE = (V_BLOCK, ROD_SET_SCREW, FRAME, THUMB_SCREW, MARKER)
-# The wire's sideways explode, each of X and -Z: 35 mm on the sheet at 1:2.
-WIRE_ASIDE = 50.0
-EXPLODE_STEPS = (
-    ("hanger jam nut off", (HANGER_JAM_NUT,), "z", -26.0),
-    ("hanger nut off", (HANGER_NUT,), "z", -14.0),
-    ("hanger screw out behind", (HANGER_SCREW,), "z", 22.0),
-    # Up off the eye, then an equal +X/-Z pair: straight to the reader's left
-    # in the REAR-TOP-LEFT view, clear of the rod and stud. Left in place, its
-    # run read through hanger nut 13 (machinist review r3); lifted 60 instead,
-    # its balloons crossed the sheet's top border and its leader lay on the
-    # stud's ray and crossed balloon 8's.
-    ("wire off the stud eye", (WIRE,), "y", 26.0),
-    ("wire aside x", (WIRE,), "x", WIRE_ASIDE),
-    ("wire aside z", (WIRE,), "z", -WIRE_ASIDE),
-    ("rod out of the guides", (ROD, STUD, STUD_NUT, *_CARRIAGE), "z", -48.0),
-    ("stud out of the rod", (STUD, STUD_NUT), "y", 12.0),
-    ("jam nut off the stud", (STUD,), "y", 10.0),
-    ("carriage off the pivot", _CARRIAGE, "y", -24.0),
-    # 36.8 mm along the tap: the screw's cup clears the block's front face
-    # and its silhouette below the face's lower edge in the octant view.
-    ("rod set screw out x", (ROD_SET_SCREW,), "x", -26.0),
-    ("rod set screw out z", (ROD_SET_SCREW,), "z", -26.0),
-    ("marker back x", (MARKER,), "x", 36.0),
-    ("marker back z", (MARKER,), "z", -36.0),
-    ("thumb screw down", (THUMB_SCREW,), "y", -16.0),
-    ("stirrup off x", (FRAME,), "x", -16.0),
-    ("stirrup off z", (FRAME,), "z", 16.0),
-)
-
-
-def exploded_point(stem: str, point: tuple[float, float, float]) -> tuple[float, ...]:
-    """``point`` (machine mm, assembled) carried by every step that moves
-    ``stem``."""
-    moved = list(point)
-    for _label, stems, key, distance in EXPLODE_STEPS:
-        if stem in stems:
-            moved["xyz".index(key)] += distance
-    return tuple(moved)
 
 
 # --- settings ----------------------------------------------------------------
@@ -243,10 +198,6 @@ DIMENSION_NOMINALS = {STUD_DIMENSION: STUD_HEIGHT, NIB_DIMENSION: NIB_PROTRUSION
 
 # --- contract asserts ---------------------------------------------------------
 assert sorted(QUANTITIES) == sorted(BOM_ORDER)
-assert {stem for _label, stems, _key, _d in EXPLODE_STEPS for stem in stems} == set(
-    BOM_ORDER
-) - {HANGER}, "every family but the ground hanger moves in the explode"
-assert all(key in "xyz" and distance != 0.0 for _l, _s, key, distance in EXPLODE_STEPS)
 assert math.isclose(
     STUD_HEIGHT, stud_head_setting(stud.OVERALL_LENGTH), abs_tol=1e-9
 )

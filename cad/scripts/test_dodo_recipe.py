@@ -3381,17 +3381,20 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     keying the guard on the label dropped it for every assembly build. The guard
     is keyed on the doit task instead, whatever the display label says."""
     dodo = _load_dodo()
-    # Exercise a narrowed assembly's guard plumbing independently of the pen's
-    # now-pure dimension closure (its actual no-row contract is tested above).
+    # Exercise a narrowed assembly's guard plumbing on an assembly with no
+    # explode-tier plan (the pen's explode qualifies since #1603, so its FULL
+    # path first probes an explode base); the row is a stand-in.
     monkeypatch.setitem(
-        dodo._FASTENER_ROWS, "assembly:pn_pen", frozenset({"vn-pen-set-screw"})
+        dodo._FASTENER_ROWS, "assembly:ms_measuring_stick", frozenset({"vn-pen-set-screw"})
     )
-    fit_groups = dodo._fit_groups_env("assembly:pn_pen")
-    launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "pn_pen", mode=mode)
+    fit_groups = dodo._fit_groups_env("assembly:ms_measuring_stick")
+    launched = _assembly_subprocess_envs(
+        dodo, monkeypatch, tmp_path, "ms_measuring_stick", mode=mode
+    )
 
     scripts = [name for name, _env in launched]
     if mode == "full":
-        assert scripts == ["build_pn_pen_assembly.py", "hook_probe.py"]
+        assert scripts == ["build_ms_measuring_stick_assembly.py", "hook_probe.py"]
     else:
         assert scripts == ["refresh_assembly.py"]
     for name, env in launched:
@@ -4272,7 +4275,7 @@ def test_forced_refresh_never_restores_and_requires_a_stored_result(
     dodo = _load_dodo()
     labels = {
         "part": "part:pn_pen_rod",
-        "assembly": "assembly:pn_pen",
+        "assembly": "assembly:ms_measuring_stick",
         "explode_assembly": "assembly:pd_paper_drive",
         "gate": "verify:kinematics",
     }
@@ -4332,7 +4335,7 @@ def test_forced_refresh_never_restores_and_requires_a_stored_result(
             run()
     assert builds == [label]
     if kind == "assembly":
-        assert Path(commands[0][1]).name == "build_pn_pen_assembly.py"
+        assert Path(commands[0][1]).name == "build_ms_measuring_stick_assembly.py"
     if kind == "explode_assembly":
         assert Path(commands[0][1]).name == "build_pd_paper_drive_assembly.py"
     expected = [("a" * 64, [output], label)]
