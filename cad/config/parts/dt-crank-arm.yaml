@@ -1,7 +1,7 @@
 dt-crank-arm:
   number: MHA-DT-006
-  material: SAE 1018 CF bar, ASTM A108-24
-  material_specification: SAE 1018 CF bar, ASTM A108-24
+  material: LOW-CARBON STEEL, E.G. 1018 CF
+  material_specification: LOW-CARBON STEEL, E.G. 1018 CF
   finish: bright machined, oiled
   quantity: 1
   tolerance_class: machined_block
