@@ -8,9 +8,10 @@ Every nominal, decimal place and tolerance band is imported from the model.
 
 The print is deliberately plain (cad/docs/drawing-guidelines.md): a
 bracket carries no datums and no feature-control frames, and it carries no
-manufacturing-note block either -- the outline, three bore callouts, two
-roughness symbols and the title block say everything.  Three bands survive,
-one per fitted bore, each from a named fit class.
+manufacturing-note block either -- the outline, the hole callouts (each fitted
+bore naming its mate and fit), one roughness symbol and the title block say
+everything.  Three bands survive, one per fitted bore, each from a named fit
+class, plus the follower seat's station and the cross hole's pin band.
 
 Two orthographic views at the 2:1 sheet scale, a follower-seat section, plus
 the isometric:
@@ -21,8 +22,7 @@ the isometric:
   (43.0) overall as a reference, so nobody saws the bar short of the two
   end radii the 28.00 centre distance does not include.  The option E-a
   set-pin cross hole's mouth is a solid circle here too, located by its
-  station from broad face A and its height from the pivot-bore wall (the
-  part's hidden CrossHoleAxisReference sketch, shown in this view only).
+  station from broad face A, its centre on the pivot-axis line the view draws.
 * SECTION B-B -- a cut through the follower-seat axis showing its legitimate
   blind depth and solid flat bottom.
 
@@ -34,7 +34,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -61,9 +60,6 @@ from _drawing_dimensions import (
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
-from _drawing_hidden_sketches import (
-    curate_view_dimensions as curate_hidden_owner_dimensions,
-)
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -83,7 +79,6 @@ from dt_pinion_bracket_spec import (
     DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
     PIN_DROP,
-    PIVOT_BORE,
     R_END,
     SURFACE_FINISHES,
 )
@@ -131,6 +126,16 @@ def _flank_y(model_y_mm: float) -> float:
     return LEFT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * SHEET_SCALE[0] / 1000.0
 
 
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+FRONT_CENTER_MARKS = 2  # the pivot and arbor bores
+LEFT_CENTER_MARKS = 1  # the follower-seat mouth
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
@@ -139,27 +144,35 @@ def _flank_y(model_y_mm: float) -> float:
 # geometry; the relief detail owns the lower pivot bore, and the seat section
 # owns depth.
 FRONT_KEEP = {
-    "ArborBoreDia": (0.256, 0.214),
+    "ArborBoreDia": (0.260, 0.214),
     "ArborBoreCz": (0.240, 0.151),
     # r6 eye-pass: at (0.250, 0.080) it overprinted the pivot bore's REAM
-    # THRU; the lower-left field is clear of the pivot Ra and the title block.
+    # THRU; the lower-left field is clear of the title block.
     "BottomCapRadius": (0.170, 0.072),
     "TopCapRadius": (0.188, 0.245),
-    "PivotBoreDia": (0.256, 0.086),
+    # Five rows with its mate and fit: right of the face view's outline, its
+    # foot clear of the title block and its head under the B label.
+    "PivotBoreDia": (0.260, 0.095),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
 LEFT_KEEP = {
-    "Depth": (0.080, 0.212),
-    "PinSeatCy": (0.130, 0.125),
+    # Under the 7.000 at the top, inside the 4.50 station (r1: 9.0 at y 0.212
+    # had no room for the station's two callout rows beneath it).
+    "Depth": (0.080, 0.222),
+    # Its function rows hang below the lower witness line: between the two
+    # witnesses they would run through the lower one.
+    "PinSeatCy": (0.130, 0.108),
     # r6 eye-pass: beside the view its widest callout line ran across the
     # flank.  Converged-r7: above the view the leader crossed the 9.0 thickness
     # dimension.  pc-ra eye pass (Main, nit C): below-right, its leader ran
     # a few pixels from the cross-hole callout's and grazed the cross hole's
-    # rim, so the callout sits up-right in the lane between the views --
-    # right of the (43.0), above the 7.000, under the arbor finish leader --
-    # and its leader comes down onto the seat from the upper right.
-    "PinSeatDia": (0.156, 0.170),
+    # rim, so the callout sits up-right in the lane between the views, above
+    # the 7.000 and under the arbor finish leader, and its leader comes down
+    # onto the seat from the upper right.  r1 machinist review (#1007, #1217):
+    # that leader crossed the (43.0) dimension line, so the (43.0) moved to
+    # the view's left and the callout shifted left, clear of the face view.
+    "PinSeatDia": (0.145, 0.170),
     # Option E-a: the cross-hole mouth sits on the flank at the pivot-bore
     # axis height, below the seat.  pc-ea eye pass: left of the view its
     # 32-character line ran off the sheet's left border, so the callout sits
@@ -168,17 +181,17 @@ LEFT_KEEP = {
     "CrossHoleDia": (0.053, 0.045),
     # Codex #858 P2, user ruling (a): both through-thickness stations run from
     # broad face A (the view's left edge) -- the cross hole's under the view,
-    # left of both callout leaders, the seat's above it, under the 9.0 -- and
-    # the cross hole's height from the pivot-bore wall sits in the clear field
-    # left of the view.  pc-ra eye pass: centred between its witnesses the
-    # seat's 4.50 was cut by the seat-axis witness, so its text sits left of
-    # face A, outside the extension lines like the 3.18.  pc-rc eye pass (nit
-    # D): centred, the cross hole's 4.50 threw its right arrow outside the
-    # span, where the THRU callout's leader cut through it -- so it sits left
-    # of face A too, arrows inside, nothing right of the hole's witness.
+    # left of both callout leaders, the seat's above it, under the 9.0.
+    # pc-ra eye pass: centred between its witnesses the seat's 4.50 was cut
+    # by the seat-axis witness, so its text sits left of face A, outside the
+    # extension lines.  pc-rc eye pass (nit D): centred, the cross hole's
+    # 4.50 threw its right arrow outside the span, where the THRU callout's
+    # leader cut through it -- so it sits left of face A too, arrows inside,
+    # nothing right of the hole's witness.  The seat's carries two reason
+    # rows (r1), so it stands further left and higher, its right end short
+    # of face A.
     "CrossHoleCz": (0.058, 0.099),
-    "PinSeatCz": (0.058, 0.2025),
-    "CrossHoleFromBoreWall": (0.058, 0.119),
+    "PinSeatCz": (0.043, 0.2055),
 }
 SECTION_CENTER = (0.350, 0.115)
 # The cut's B labels hang under its ends.  Ending at the 28.00's dimension
@@ -189,39 +202,35 @@ SECTION_LINE_X = (0.180, 0.250)
 # Right of the seat's witness lines (x <= 0.3394), callout below the value:
 # the above-lane callout never rendered and left a bare 66 mm dimension line.
 SECTION_KEEP = {"PinSeatDepth": (0.361, 0.160)}
-# The flank's top and bottom edges are the strap's two extreme lines. Put the
-# overall on its clear right, between the third-angle left and front views.
-OVERALL_XY = (0.112, 0.168)
+# The flank's top and bottom edges are the strap's two extreme lines.  The
+# overall sits on the view's clear left: on its right the follower-seat
+# leader crossed its dimension line (r1 machinist review, rule 14).
+OVERALL_XY = (0.040, 0.150)
 # The arbor symbol has a short leader to the bore's unobstructed left edge.
 ARBOR_FINISH_EDGE = (_front_x(-ARBOR_BORE / 2.0), _front_y(C2C))
 ARBOR_FINISH_XY = (0.155, 0.205)
-# Low and far left, with the leader to the bore's lower-left quadrant: a
-# shallow rise keeps it under the symbol's own Ra text and the B label.
-# The edge is PICKED at that same 45-degree point.  Landing by selection
-# point (45d0a46da) puts the leader on the pick, not the selection point:
-# picked at 9 o'clock the leader ended at (203.7, 122.1), 4.6 mm above this
-# point, and at x 180 that raised it from y 112.9 to 115.9, through the
-# bottom of section line B's left label (115.7-121.8; leader-through-text,
-# leaf 20260928T073154Z-1-39ba7421).
-PIVOT_FINISH_XY = (0.136, 0.106)
-PIVOT_FINISH_LEADER = (
-    _front_x(-PIVOT_BORE / 2.0 * math.cos(math.radians(45.0))),
-    _front_y(-PIVOT_BORE / 2.0 * math.sin(math.radians(45.0))),
-)
-PIVOT_FINISH_EDGE = PIVOT_FINISH_LEADER
 # A callout says only what a dimension cannot: how the feature is made, where
-# it stops, and -- for the one dimension held finer than the general grade --
-# why it is held there.  Naming both follower-seat annotations ties the native
-# diameter and native depth together without copying either model value into
-# note text; the depth then reads explicitly from the depicted entry face.
+# it stops, what it mates with and the fit it needs (rule 4), and -- for the
+# dimensions held finer than the general grade -- why they are held there.
+# Naming both follower-seat annotations ties the native diameter and native
+# depth together without copying either model value into note text; the
+# depth then reads explicitly from the depicted entry face.  The pivot bore
+# is a slide fit so the strap goes onto the shaft for fit-up, then pinned
+# (option E-a); the arbor runs in its bore; the follower stud slips into its
+# seat and is bonded (LOCTITE 638, dt_pinion_cam_pin_spec's bond gap).
 DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "REAM THRU",
-    "ArborBoreDia": "REAM THRU",
-    "PinSeatDia": "FOLLOWER SEAT FOR MHA-DT-025\nBLIND FLAT-BOTTOM\nREAM",
+    "PivotBoreDia": "REAM THRU\nSLIDE FIT ON SHAFT\nMHA-DT-019, PINNED",
+    "ArborBoreDia": "REAM THRU\nRUNNING FIT ON\nARBOR MHA-DT-022",
+    "PinSeatDia": "FOLLOWER SEAT FOR MHA-DT-025\nBONDED SLIP FIT\nBLIND FLAT-BOTTOM REAM",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
+    # The two held locations name what they serve (rules 3 and 4): the
+    # follower's height sets the drum's swing for a given cam lift
+    # (DRAWING_PRECISION), and the seat's station keeps it mid-bar
+    # (PIN_SEAT_WEB_WORST, user ruling (a)).
+    "PinSeatCy": "SETS FOLLOWER HEIGHT\nON MHA-DT-023 CAM",
+    "PinSeatCz": "CENTRES MHA-DT-025\nFOLLOWER IN BAR",
 }
 PIN_SEAT_DEPTH_CALLOUT = "FOLLOWER SEAT\nREAM DEPTH FROM\nENTRY FACE"
-
 
 
 def _overall_reference(adapter: Any, left: Any) -> None:
@@ -353,9 +362,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="strap face",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The part saves CrossHoleAxisReference hidden, so the side view imports
-    # through the hidden-owner form, which shows that sketch here only.
-    left_annotations = curate_hidden_owner_dimensions(
+    left_annotations = curate_view_dimensions(
         adapter,
         left,
         keep=LEFT_KEEP,
@@ -363,9 +370,24 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _overall_reference(adapter, left)
-    for view, label in ((front, "strap face"), (left, "seat flank")):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+    # #913: the template marks the holes as each view is placed, and the
+    # explicit AutoInsertCenterMarks2 then printed every mark twice (v43
+    # layout audit: DetailItem347/351, 348/352 on the face, 349/353 on the
+    # flank).  Add marks only to a bare view, then prove exactly one per hole:
+    # both bores on the face, the follower-seat mouth on the flank.
+    for view, label, expected in (
+        (front, "strap face", FRONT_CENTER_MARKS),
+        (left, "seat flank", LEFT_CENTER_MARKS),
+    ):
+        if _center_mark_count(view) == 0 and not auto_center_marks(
+            adapter, view, holes=True, size=0.0025
+        ):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
+        found = _center_mark_count(view)
+        if found != expected:
+            raise RuntimeError(
+                f"expected {expected} centre marks in the {label} view, found {found}"
+            )
     add_surface_finish(
         adapter,
         front,
@@ -374,16 +396,6 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
         char_height=0.0025,  # the pivot-block size; the default read oversized
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=PIVOT_FINISH_EDGE,
-        symbol_xy=PIVOT_FINISH_XY,
-        leader_attach_xy=PIVOT_FINISH_LEADER,
-        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
-        label="pivot bore finish",
-        char_height=0.0025,
     )
     seat_depth = _seat_depth_dimension(adapter, seat_section)
 

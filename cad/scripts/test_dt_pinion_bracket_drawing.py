@@ -157,7 +157,6 @@ def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
         "CrossHoleDia",
         "CrossHoleCz",
         "PinSeatCz",
-        "CrossHoleFromBoreWall",
     }
 
 
@@ -299,13 +298,15 @@ def test_part_config_supplies_the_title_block_fields() -> None:
 def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     # Codex #858 P2, user ruling (a): no location lives in prose.  Through the
     # thickness the model's own CrossHoleCz (half the thickness from broad
-    # face A) prints at .XX; across the bar a hidden construction reference
-    # sketch owns the hole's distance from the pivot-bore wall ("PivotBore" /
-    # 2), which the side view shows and prints at .XX.  The callout keeps only
-    # THRU and the pin it takes.  Main overrode the loose-SUPPLY wording once
-    # MHA-VN-033 became a modelled BOM line (2 used): supplying one per strap
-    # would double the order, so the callout names the part, and its number
-    # is the parts registry's.
+    # face A) prints at .XX; across the bar the hole's centre sits ON the
+    # pivot-axis line the side view draws, so it prints no offset.  The r1
+    # machinist review (#1007) found the former 3.18 from the pivot-bore wall
+    # ran to a hidden line (rule 9), so its hidden reference sketch is gone.
+    # The callout keeps the process (rule 12), THRU and the pin it takes.
+    # Main overrode the loose-SUPPLY wording once MHA-VN-033 became a
+    # modelled BOM line (2 used): supplying one per strap would double the
+    # order, so the callout names the part, and its number is the parts
+    # registry's.
     import inspect
 
     import _config
@@ -315,28 +316,53 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     assert "AXIS" not in callout and "CENTRED" not in callout
     assert "SUPPLY" not in callout and "LOOSE" not in callout
     number = _config.parts("vn-pinion-strap-pin")["number"]
-    assert callout.splitlines() == ["THRU", f"FOR {number} SPRING PIN"]
+    assert callout.splitlines() == ["DRILL THRU", f"FOR {number} SPRING PIN"]
     dims = dt_pinion_bracket_spec.DRAWING_DIMENSIONS
     assert dims["CrossHoleProfile"] == {"CrossHoleDia", "CrossHoleCz"}
-    assert dims["CrossHoleAxisReference"] == {"CrossHoleFromBoreWall"}
     by_name = dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME
     assert by_name["CrossHoleDia"] == 2
     assert by_name["CrossHoleCz"] == 2
-    assert by_name["CrossHoleFromBoreWall"] == 2
-    # Both locations are the model's relations to its globals, not typed
-    # numbers, and the reference sketch is saved hidden so it never renders
-    # in an assembly.
+    # The station is the model's relation to its globals, not a typed number,
+    # and no hidden sketch is left for a hidden-owner import.
     build_source = inspect.getsource(bracket)
     assert "'\"StrapThickness\" / 2'" in build_source
-    assert "(wall_dims[0], '\"PivotBore\" / 2')" in build_source
-    assert 'blank_sketch(adapter, "CrossHoleAxisReference")' in build_source
-    # A part-hidden owner sketch delivers nothing to the plain import, so the
-    # side view that keeps its dimension imports through the hidden-owner form.
+    assert "CrossHoleAxisReference" not in build_source
     draw_source = inspect.getsource(drawing)
-    assert "left_annotations = curate_hidden_owner_dimensions(" in draw_source
+    assert "curate_hidden_owner_dimensions" not in draw_source
     assert dt_pinion_bracket_spec.CROSS_HOLE_DIA == 25.4 / 16.0
     # The spring pin's own band, resolvable at two places.
     assert dt_pinion_bracket_spec.CROSS_HOLE_BAND == (0.06, 0.0)
+
+
+def test_fitted_bores_name_their_mates_and_fits() -> None:
+    # Rule 4 (r1 machinist review, #1007): every REAM band names the mate and
+    # the fit it needs at its own callout, by the parts registry's number; the
+    # two held locations say what they serve.  The pinned pivot bore runs on
+    # nothing, so it carries no roughness symbol (rule 6).
+    import _config
+
+    def number(stem: str) -> str:
+        return _config.parts(stem)["number"]
+
+    callouts = drawing.DIMENSION_CALLOUTS
+    expected = {
+        "PivotBoreDia": ("SLIDE FIT", number("dt-pinion-pivot-shaft"), "PINNED"),
+        "ArborBoreDia": ("RUNNING FIT", number("dt-pinion-arbor")),
+        "PinSeatDia": ("SLIP FIT", number("dt-pinion-cam-pin")),
+        "PinSeatCy": (number("dt-pinion-cam"),),
+        "PinSeatCz": (number("dt-pinion-cam-pin"),),
+    }
+    for name, words in expected.items():
+        text = " ".join(callouts[name].splitlines())
+        for word in words:
+            assert word in text, (name, word)
+    assert {c.key for c in dt_pinion_bracket_spec.SURFACE_FINISHES} == {"arbor_bore"}
+    # The (43.0) stands left of the flank, so no leader to the follower seat
+    # (callouts right of the view) crosses its dimension line.
+    face_a = drawing.LEFT_CENTER[0] - (
+        dt_pinion_bracket_geometry.THICKNESS * drawing.SHEET_SCALE[0] / 2000.0
+    )
+    assert drawing.OVERALL_XY[0] < face_a < drawing.LEFT_KEEP["PinSeatDia"][0]
 
 
 # Title-block general grades by printed decimal places (.X, .XX, .XXX).
@@ -372,13 +398,9 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     bore_r = (geometry.PIVOT_BORE + dt_pinion_bracket_spec.PIVOT_BORE_BAND[0]) / 2.0
     shaft_min = shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[1]
     half = geometry.THICKNESS / 2.0
-    # The bore-wall offset's nominal (3.175) does not print exactly at two
-    # places, so the offset carries its rounding too (restricted review).
-    places = dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME["CrossHoleFromBoreWall"]
-    wall = geometry.PIVOT_BORE / 2.0
-    hole_height = _printed_band("CrossHoleFromBoreWall") + abs(
-        round(wall, places) - wall
-    )
+    # The hole's centre sits on the pivot-axis line the flank draws: the
+    # webs charge that implied zero the .XX grade of the hole's own station.
+    hole_height = _GENERAL_GRADE[geometry.CROSS_HOLE_CZ_PLACES]
     seat_height = _printed_band("PinSeatCy")
     worst = {
         # Cross hole to the far and the near broad face.
@@ -425,7 +447,6 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     for name, places in (
         ("Depth", geometry.THICKNESS_PLACES),
         ("CrossHoleCz", geometry.CROSS_HOLE_CZ_PLACES),
-        ("CrossHoleFromBoreWall", geometry.CROSS_HOLE_FROM_BORE_WALL_PLACES),
         ("BottomCapRadius", geometry.END_RADIUS_PLACES),
         ("TopCapRadius", geometry.END_RADIUS_PLACES),
     ):
@@ -435,4 +456,4 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     # The values the ruling approved.
     assert math.isclose(worst["cross hole far face"], 2.316, abs_tol=5e-4)
     assert math.isclose(worst["seat far face"], 1.544, abs_tol=5e-4)
-    assert math.isclose(worst["shaft wall"], 1.826, abs_tol=5e-4)
+    assert math.isclose(worst["shaft wall"], 1.831, abs_tol=5e-4)
