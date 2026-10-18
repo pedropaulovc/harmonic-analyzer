@@ -552,7 +552,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         > drawing.RIGHT_KEEP["OverallLength"][1]
     )
     assert drawing.RIGHT_KEEP["ShoulderLength"][0] < face_x - 0.020
-    assert drawing.RIGHT_KEEP["FaceWidth"][0] > drawing._side_x(spec.FACE_WIDTH) + 0.020
+    assert drawing.RIGHT_KEEP["FaceWidth"][0] > drawing._side_x(spec.OVERALL_LENGTH) + 0.025
     pin_x, _pin_y = drawing.RIGHT_KEEP["PinFromBossEnd"]
     assert drawing._side_x(spec.PIN_STATION) < pin_x < drawing._side_x(spec.OVERALL_LENGTH)
     # The pin hole's reference diameter leads up and right from the hole's

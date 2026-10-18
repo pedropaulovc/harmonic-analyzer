@@ -76,7 +76,6 @@ from dt_crank_pinion_spec import (
     CONE_GEAR_NUMBER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    FACE_WIDTH,
     MESH_GEAR_NUMBER,
     OUTSIDE_DIA,
     OVERALL_LENGTH,
@@ -210,7 +209,7 @@ FRONT_KEEP: dict[str, tuple[float, float]] = {}
 # banded two carry their stack callouts, so their text stands outside their
 # spans, where the callout lines clear every extension line: the shoulder's
 # left of the faced end, below the end view's lower A, the face width's right
-# of the shoulder, so neither block's lines run through the other's limits
+# of the boss end, so neither block's lines run through the other's limits
 # (r2: stacked on one side, the 8.5 line struck the 11.6's "0.0" and the A
 # touched the 8.5's callout). The pin's station reads from the boss's north
 # face on the first row. The boss
@@ -226,8 +225,10 @@ BOSS_DIA_TEXT_X = _side_x(OVERALL_LENGTH) + 0.049
 # Outside the faced end: centred clear of the end view's A arrow, with the
 # widest stack callout still left of the faced end's extension line.
 _LENGTH_TEXT_X = _side_x(0.0) - 0.0295
-# Its mirror right of the shoulder's extension line.
-_FACE_WIDTH_TEXT_X = _side_x(FACE_WIDTH) + 0.029
+# Its mirror right of the boss end's extension line (the overall length's
+# and pin station's), the last line the block's dimension line crosses (r3:
+# placed between the shoulder and the boss end, that line struck the text).
+_FACE_WIDTH_TEXT_X = _side_x(OVERALL_LENGTH) + 0.030
 # The turned diameter's and pin hole's callouts share the top row; the
 # turned diameter's block grows left from its leader, so it rises clear of
 # the gear data's long rows.
@@ -247,7 +248,7 @@ RIGHT_KEEP = {
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.043),
 }
 # The section caption sits right of the face width's callout block.
-SECTION_CAPTION_XY = (0.302, 0.085)
+SECTION_CAPTION_XY = (0.335, 0.085)
 DIMENSION_TEXT_LINE_GAP = 0.0005
 # The boss diameter's text is centred on its dimension line; it read 13.1 mm
 # wide on the f0c105531 render. Its right edge plus a clearance bounds where
