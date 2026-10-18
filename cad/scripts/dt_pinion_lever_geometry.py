@@ -11,11 +11,21 @@ HUB_OD = 13.0
 HUB_LEN = 10.0
 BORE = 6.35  # nominal; the REAM_SLIDE band (dt_pinion_lever_spec) opens it 0.010-0.025
 WALL_T = 2.0
-CAP_SAG = 1.5
+# ENFORCE r1 of MHA-DT-016 (#1011): the end wall behind the blind bore now
+# reads from two .X baselines on face B -- the bore depth and the overall
+# length to the crown apex -- instead of a tight band of its own (rule 17:
+# fix the wall with geometry, never a tighter band).  A 2.2 sagitta (was 1.5,
+# a photo estimate) keeps the crown "slightly domed" and leaves the wall 2.6
+# on the axis and 2.07 at the floor's corner at the worst of both bands
+# (dt_pinion_lever_spec asserts both reach the 2.0 target; ENFORCE r5's
+# minor read 1.9 at the corner on the former 2.0 sagitta).
+CAP_SAG = 2.2
 CAP_RADIUS = ((HUB_OD / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
+OVERALL_FROM_B = HUB_LEN + CAP_SAG  # mouth face B to the crown apex
 # Printed places of the dimensions that station the grip on the lift rod (the
 # rig layout books their bands; dt_pinion_lever_spec.DRAWING_PRECISION states them).
-BORE_DEPTH_PLACES = 1  # BoreDepth: mouth face B to the floor the rod seats on
+BORE_DEPTH_PLACES = 1  # BoreDepthFromB: mouth face B to the floor the rod seats on
+OVERALL_FROM_B_PLACES = 1  # OverallFromB: mouth face B to the crown apex
 GRIP_FROM_B_PLACES = 2  # GripFromB: the grip axis from face B
 ROD_DIA_PLACES = 1  # RodDia
 

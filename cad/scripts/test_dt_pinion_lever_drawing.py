@@ -36,10 +36,14 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert kept == marked
     assert sum(len(keep) for keep in keeps) == len(marked)  # each dimension once
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    # The hub's axial stations all read from face B in the one side detail.
-    assert {"BoreDepth", "EndWall", "GripFromB", "PinHoleFromB", "PinHoleDia"} == set(
-        drawing.DETAIL_KEEP
-    )
+    # The hub's axial stations all read from face B in the one hub detail.
+    assert {
+        "BoreDepthFromB",
+        "OverallFromB",
+        "GripFromB",
+        "PinHoleFromB",
+        "PinHoleDia",
+    } == set(drawing.DETAIL_KEEP)
 
 
 def test_bore_band_is_a_slip_fit_on_the_lift_rod() -> None:
@@ -58,13 +62,25 @@ def test_bore_band_is_a_slip_fit_on_the_lift_rod() -> None:
     min_clearance = low - (ROD_DIA + SHAFT_H[0])
     assert min_clearance > 0.0
     assert round(min_clearance, 6) == 0.01
+    # ENFORCE r1 (#1011): the bore is the one band; the end wall's own
+    # +/-0.25 rescued a wall and named no mate, so it went.
     assert model_toleranced_dimensions(lever) == {
         ("BarrelProfile", "HubBore"): "*deviations(BORE_BAND)",
-        ("Wall", "EndWall"): "END_WALL_TOLERANCE_MM",
     }
     assert dt_pinion_lever_spec.DRAWING_PRECISION_BY_NAME["HubBore"] == 3
-    assert dt_pinion_lever_spec.DRAWING_PRECISION_BY_NAME["EndWall"] == 2
-    assert dt_pinion_lever_spec.WALL_T - dt_pinion_lever_spec.END_WALL_TOLERANCE_MM >= 1.5
+    assert not hasattr(dt_pinion_lever_spec, "END_WALL_TOLERANCE_MM")
+
+
+def test_end_wall_holds_rule_17_from_the_two_x_baselines() -> None:
+    # Bore depth and overall length to the crown apex both print .X from B;
+    # the end wall is what they leave, at the worst of both bands.
+    spec = dt_pinion_lever_spec
+    assert spec.DRAWING_PRECISION_BY_NAME["BoreDepthFromB"] == 1
+    assert spec.DRAWING_PRECISION_BY_NAME["OverallFromB"] == 1
+    assert spec.OVERALL_FROM_B == spec.HUB_LEN + spec.CAP_SAG == 12.2
+    assert round(spec.END_WALL_ON_AXIS_WORST, 6) == 2.6
+    # ENFORCE r5 (minor): the 2.0 sagitta left 1.9 at the floor's corner.
+    assert spec.END_WALL_AT_FLOOR_CORNER_WORST >= 2.0
 
 
 def test_grip_rod_is_a_straight_six() -> None:
@@ -118,18 +134,32 @@ def test_sheet_carries_no_gdt_finish_or_literal_precision() -> None:
     assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 3
 
 
-def test_notes_are_short_and_carry_no_dimension() -> None:
-    notes = dt_pinion_lever_spec.DRAWING_NOTES
-    assert len(notes.splitlines()) <= 4
-    assert not any(ch.isdigit() for ch in notes)
-    assert "EDGE-BREAK" in notes
+def test_notes_are_one_inside_corner_ceiling() -> None:
+    # Owner ruling 2026-10-18 (fr-top-frame precedent): the shop's inside-
+    # corner ceiling prints as a note until #1625 moves it to the title block;
+    # the crown-root "leave sharp" note went in ENFORCE r1 (#1011).
+    assert dt_pinion_lever_spec.DRAWING_NOTES == "INSIDE CORNERS R1.0 MAX."
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    import _config
+
+    (exception,) = _config.parts("dt-pinion-lever")["machinist_exceptions"]
+    assert exception["id"] == "RV-01"
+    assert "#1625" in exception["reason"]
 
 
-def test_sheet_runs_at_1_to_1_with_a_3_to_1_hub_detail() -> None:
+def test_sheet_runs_at_1_to_1_with_a_3_to_1_detail_of_section_a_a() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
+    assert drawing.SECTION_SCALE == (1, 1)
     assert drawing.DETAIL_SCALE == (3, 1)
+    # The cut runs down the grip axis from below the hub to past the tip.
+    (x0, y0, z0), (x1, y1, z1) = drawing.SECTION_LINE_MODEL_MM
+    assert x0 == x1 == z0 == z1 == 0.0
+    assert y0 < -dt_pinion_lever_spec.HUB_OD / 2.0
+    assert y1 > dt_pinion_lever_spec.ROD_LEN
+    # The detail fence takes the whole hub, crown apex included.
+    apex = dt_pinion_lever_spec.HUB_LEN / 2.0 + dt_pinion_lever_spec.CAP_SAG
+    assert drawing.DETAIL_RADIUS_MM > apex
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 1)" in source
     assert dt_pinion_lever_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
@@ -199,7 +229,12 @@ def _with_block(source: str, opener: str) -> tuple[str, str]:
 def test_station_reference_sketches_are_saved_hidden() -> None:
     # #880 (Main, via dtrefactor): the lever's two station sketches rendered
     # in the drive-train; the part saves them hidden.
-    expected = ("GripStationReference", "PinHoleStationReference")
+    expected = (
+        "GripStationReference",
+        "PinHoleStationReference",
+        "BoreDepthReference",
+        "OverallLengthReference",
+    )
     assert dt_pinion_lever_spec.REFERENCE_SKETCHES == expected
     assert set(expected) == {
         name
@@ -227,7 +262,8 @@ def test_station_reference_blank_reads_every_sketch_back_hidden(monkeypatch) -> 
 def test_hub_detail_is_created_and_dimensioned_while_the_part_shows_them() -> None:
     # A detail takes a hidden sketch's visibility from the part when it is
     # created and refuses the per-view override (_drawing_hidden_sketches), so
-    # the detail is created and curated inside part_sketches_shown.
+    # section A-A and its detail are created and curated inside
+    # part_sketches_shown.
     source = Path(drawing.__file__).read_text(encoding="utf-8").replace("\r\n", "\n")
     assert "from _drawing_hidden_sketches import" in source
     imports = [
@@ -252,9 +288,11 @@ def test_hub_detail_is_created_and_dimensioned_while_the_part_shows_them() -> No
     header, block = _with_block(source, "with part_sketches_shown(")
     assert "source_model" in header
     assert "REFERENCE_SKETCHES" in header
-    # The detail's items select through the side view, so it shows them too.
-    assert "base_view=side" in header
-    assert "_hub_detail(adapter, side)" in block
+    # The section's items select through the front view it is cut from, so
+    # that view shows them too.
+    assert "base_view=front" in header
+    assert "_lever_section(adapter, front)" in block
+    assert "_hub_detail(adapter, section)" in block
     assert "set_hidden_lines_removed(adapter, detail)" in block
     assert "keep=DETAIL_KEEP" in block
     assert "auto_center_marks" not in block
@@ -268,3 +306,43 @@ def test_hub_detail_is_created_and_dimensioned_while_the_part_shows_them() -> No
     )
     assert reference_dims <= set(drawing.DETAIL_KEEP)
     assert not reference_dims & (set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP))
+
+
+def test_every_projected_view_and_the_section_hide_their_hidden_lines() -> None:
+    # PR #1436: the isometric stays in the hidden-lines loop.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for view in (front, top, iso):" in source
+    assert "set_hidden_lines_removed(adapter, section)" in source
+    assert '"*Right"' not in source
+
+
+def test_detail_fence_and_rod_axis_go_straight_to_the_database() -> None:
+    # ENFORCE r2 (#1011): an inferred fence snapped to B and the crown apex
+    # (a 6 mm detail), and GRIP AXIS had no rod axis to land on.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for name in ("_hub_detail", "_rod_axis_in_detail"):
+        body = source[source.index(f"def {name}(") :]
+        body = body[: body.index("\ndef ")]
+        assert "manager.AddToDB = True" in body, name
+    assert "_rod_axis_in_detail(adapter, detail)" in source
+    assert "circle.SetLabelPosition(*DETAIL_LETTER_XY)" in source
+    # The rod axis runs from inside the hub to just past the fence.
+    low, high = drawing.ROD_AXIS_MODEL_Y_MM
+    assert low < dt_pinion_lever_spec.HUB_OD / 2.0 < drawing.DETAIL_RADIUS_MM < high
+
+
+def test_station_references_are_points_and_hub_diameters_near_side() -> None:
+    # ENFORCE r3 (#1011): detail B kept the reference lines the part showed
+    # while it was dimensioned, and they read as hidden edges across the cut;
+    # and both hub diameters crossed at the hub centre.
+    import build_dt_pinion_lever
+
+    source = Path(build_dt_pinion_lever.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def _station_reference(") :]
+    body = body[: body.index("\nasync def ")]
+    assert body.count("_add_reference_point(") == 2
+    assert "add_line" not in body
+    assert drawing.NEAR_SIDE_DIAMETERS == ("HubOd", "HubBore")
+    assert set(drawing.NEAR_SIDE_DIAMETERS) <= set(drawing.FRONT_KEEP)
+    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'set_near_side_diameter(matches[0], f"lever {name}")' in draw_source
