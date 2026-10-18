@@ -1014,6 +1014,9 @@ class _PixelLabel:
     def true_lower_left(self) -> tuple[float, float]:
         return tuple(a + o for a, o in zip(self.anchor, self.corner_offset))
 
+    def GetText(self):  # noqa: N802
+        return "DETAIL B\nSCALE 2 : 1"
+
     def GetExtent(self):  # noqa: N802
         px = self.window.px_per_m
         self.read_px_per_m.append(px)
@@ -1053,7 +1056,9 @@ def test_detail_label_is_placed_and_read_zoomed_onto_its_box(monkeypatch) -> Non
         corner_offset=(-0.01585, -0.01637),
         size=(0.03145, 0.01668),
     )
-    view = types.SimpleNamespace(GetNotes=lambda: (label,))
+    # Section C-C also carries the script's face labels (r4 failed on them).
+    face_label = types.SimpleNamespace(GetText=lambda: "UNDERSIDE")
+    view = types.SimpleNamespace(GetNotes=lambda: (face_label, label))
     adapter = types.SimpleNamespace(currentModel=window)
 
     drawing._position_view_label(adapter, view, target, label="detail B label")
