@@ -1020,14 +1020,18 @@ JOINTS: tuple[Joint, ...] = (
             "shoulder seated tight on the arm's outboard face (ArmSeat on HandleSeat); thread "
             "through the arm's #4-40 tap, tip filed flush with the inboard face"
         ),
-        lock=Lock.THREADLOCKER_ONLY,
+        # Rule 23 staked end (#1174), after the PD pivot screw's user ruling
+        # 2026-10-15 and the standing no-threadlocker rule (2026-10-16).
+        lock=Lock.STAKED,
+        lock_part="dt_crank_arm:staked tap mouth",
+        lock_binds=("dt_crank_handle_pivot_screw", "dt_crank_arm"),
         lock_step="crank-handle-fitted",
         evidence=(
-            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 7 (crank-handle-fitted 'THREAD IT INTO "
-            "MHA-DT-006 WITH LOCTITE 222, SHOULDER TIGHT; ... FILE THE TIP FLUSH'), CONSUMABLES_NOTES; "
-            "build_dt_drive_train_assembly.py handle_screw placement and 'MHA-DT-032 shoulder seated' "
-            "mates; crank_handle_pivot_screw_spec THREAD_SIZE; crank_arm_spec "
-            "HANDLE_PIVOT_HOLE_SPEC; pending exception ruling #1375 MHA-DT-035 ('the head bears on the floor')"
+            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 7 (crank-handle-fitted 'NO THREADLOCKER, "
+            "SHOULDER TIGHT. FILE THE TIP FLUSH ... THEN STAKE THE TAP MOUTH ONTO IT AT 2 OPPOSITE "
+            "POINTS') and HANDLE_STAKE_NOTE; build_dt_drive_train_assembly.py handle_screw placement "
+            "and 'MHA-DT-032 shoulder seated' mates; crank_handle_pivot_screw_spec THREAD_SIZE and "
+            "INSTALLED_CONFIG (tip filed flush); crank_arm_spec HANDLE_PIVOT_HOLE_SPEC"
         ),
     ),
     Joint(

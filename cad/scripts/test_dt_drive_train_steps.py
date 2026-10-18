@@ -48,10 +48,7 @@ def test_a_key_resolves_to_its_position_and_prints_a_pointer() -> None:
 
 @pytest.mark.parametrize(
     ("text", "key", "phrase"),
-    (
-        (drawing.CHECKS, "rig-located", TIP_GAP_FEELER),
-        (drawing.CONSUMABLES_NOTES, "crank-handle-fitted", "LOCTITE 222"),
-    ),
+    ((drawing.CHECKS, "rig-located", TIP_GAP_FEELER),),
 )
 def test_each_typed_step_cite_names_the_step_that_does_it(
     text: str, key: str, phrase: str
@@ -152,7 +149,7 @@ def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> N
         f"SET MHA-DT-010 {pinion.SEAT_FEELER_MM:.2f} OFF",
         shared_check,
         "TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND",
-        "THEN MATCH-DRILL/REAM MHA-DT-029",
+        "THEN MATCH-DRILL MHA-DT-010 AND MHA-DT-011",
         "RE-CHECK NO BINDING",
     )
     positions = [fitup.index(phrase) for phrase in order]
@@ -189,7 +186,7 @@ def test_crank_end_fit_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -
     order = (
         "MHA-DT-011 COLLAR REAR FACE HARD ON THE MHA-DT-005 BOSS SOUTH FACE",
         f"MHA-DT-010 ON THE {pinion.SEAT_FEELER_MM:.2f} FEELER OFF THE BOSS NORTH FACE",
-        "MATCH-DRILL/REAM MHA-DT-029 AT BOSS MID-LENGTH",
+        "MATCH-DRILL AND REAM FOR MHA-DT-029",
         "END PLAY = THE FEELER",
         f"END STANDS {least:.2f}-{most:.2f} PROUD OF MHA-DT-010 NORTH FACE",
         "DO NOT FACE",
@@ -205,7 +202,7 @@ def test_step_four_holds_the_collar_before_the_feeler_and_the_pin() -> None:
     positions = [
         body.index("HOLD THE MHA-DT-011 COLLAR HARD ON THE BOSS SOUTH FACE"),
         body.index("OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER"),
-        body.index("MATCH-DRILL/REAM"),
+        body.index("MATCH-DRILL MHA-DT-010"),
     ]
     assert positions == sorted(positions)
 

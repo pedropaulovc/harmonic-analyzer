@@ -28,7 +28,15 @@ RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
 # Step 10 sets the channel's north MHA-CH-008 on the frame's MHA-FR-005 (#936 P1 b),
 # offset by the miced north MHA-VN-070 washer (user, 2026-10-10).
-EXTERNAL_NUMBERS = frozenset({"MHA-FR-001", "MHA-FR-005", "MHA-CH-008", "MHA-VN-070"})
+EXTERNAL_NUMBERS = frozenset(
+    {
+        "MHA-FR-001",
+        "MHA-FR-005",
+        "MHA-CH-008",
+        "MHA-VN-070",
+        drawing.NORTH_BRACKET_SCREW,
+    }
+)
 # Named installation assemblies are external interfaces, not drive-train BOM rows.
 EXTERNAL_NUMBERS |= frozenset(
     assembly_contract(stem).number
@@ -204,13 +212,8 @@ def _spare(field: drawing.NoteField) -> float:
 
 def test_every_note_field_holds_its_stacked_blocks() -> None:
     """Every produced block fits its field at the native-measured line pitch."""
-    fields = drawing.package_note_fields(_drawing_facts())
-    for field in fields:
+    for field in drawing.package_note_fields(_drawing_facts()):
         assert _spare(field) >= 0, (field.label, _spare(field))
-    assert not any(
-        field.sheet == drawing.SEQUENCE_SHEET and field.bounds[0] >= drawing.NOTE_FIELD_RIGHT[0]
-        for field in fields
-    ), "sheet 6's right field remains reserved for D1"
 
 
 def test_the_package_prints_each_numbered_assembly_step_once() -> None:
@@ -237,19 +240,19 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
         drawing.SEQUENCE_SHEET,
         drawing.BANK_SHEET,
         drawing.FIT_SHEET,
-        drawing.CHECKS_SHEET,
+        drawing.CONTINUATION_SHEET,
         drawing.FULL_DETAIL_SHEET,
-    ) == (6, 7, 8, 9, 10), "existing package page references remain stable"
-    assert drawing.CONTINUATION_SHEET > drawing.FULL_DETAIL_SHEET
+        drawing.CHECKS_SHEET,
+    ) == (7, 8, 9, 10, 11, 12), "the numbered steps read in sheet order"
     assert names[drawing.FULL_DETAIL_SHEET - 1] == "FULL-DETAIL SIDE VIEW"
     assert f"FULL DETAIL: SHEET {drawing.FULL_DETAIL_SHEET}." in drawing.ASSEMBLED_HEADING
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
     assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. + FIT"
-    assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5]
+    assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5, 6]
     assert set(drawing.SHEET_SCALES) == set(names)
-    assert "BALLOONS ON SHEETS 3-5" in drawing.BOM_REFERENCE_NOTES
+    assert "BALLOONS ON SHEETS 3-6" in drawing.BOM_REFERENCE_NOTES
     assert f"STATIONS: SHEET {drawing.FIT_SHEET}" in drawing.BOM_REFERENCE_NOTES
     assert f"CYLINDER BANK: SHEET {drawing.BANK_SHEET}." in drawing.CONE_CRANK_STEPS
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
@@ -441,9 +444,6 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
         f"STEP {steps.step_number('rig-located')})"
     ) in check
     assert f"SEE SHEET {drawing.CHECKS_SHEET}" in drawing.ASSEMBLED_HEADING
-    assert f"SEE SHEET {drawing.CHECKS_SHEET}, EXTERNAL" in _rig_step_body(
-        "other-base-mounting"
-    )
     assert f"PINION RIG: CONT. ON SHEET {drawing.FIT_SHEET}." in drawing.BANK_STEPS
     # The seats are spotted after RIG SET, and drilled per the base's own
     # transfer callouts, not a second copy of their sizes.
@@ -879,10 +879,10 @@ def test_a_preferred_scale_off_the_ladder_is_refused() -> None:
 
 
 def test_the_sheet_scales_follow_the_chosen_cluster_and_full_detail_scales() -> None:
-    chosen = {**drawing.CLUSTER_SCALES, "cone-crank": (1.0, 4.0)}
+    chosen = {**drawing.CLUSTER_SCALES, "crank": (1.0, 4.0)}
     scales = drawing.package_sheet_scales(chosen, (2.0, 3.0))
     assert set(scales) == set(drawing.SHEET_NAMES)
-    assert scales[drawing.SHEET_NAMES[drawing.CLUSTER_SHEETS["cone-crank"] - 1]] == (1.0, 4.0)
+    assert scales[drawing.SHEET_NAMES[drawing.CLUSTER_SHEETS["crank"] - 1]] == (1.0, 4.0)
     assert scales[drawing.SHEET_NAMES[drawing.FULL_DETAIL_SHEET - 1]] == (2.0, 3.0)
     assert drawing.package_sheet_scales(drawing.CLUSTER_SCALES) == drawing.SHEET_SCALES
 
@@ -1184,8 +1184,8 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     steps = _flat(drawing.BANK_STEPS)
     thickness = bank.OVERALL_THICKNESS
     upper, lower = bank.OVERALL_THICKNESS_BAND
-    # The gear's authoritative overall-thickness band is exact at four places.
-    assert limits(thickness + lower, thickness + upper, 4) in steps
+    # The gear's own thickness band is the MHA-DT-012 print's (rules 2 and 24).
+    assert limits(thickness + lower, thickness + upper, 4) not in steps
     assert limits(*bank.STACK_L20_ACCEPT, 2) in steps
     short = f"SHORT OF {bank.STACK_L20_ACCEPT[0]:.2f}: REMAKE THE THINNEST GEAR"
     assert short in " ".join(steps.split())
@@ -1216,14 +1216,13 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
         f"EAR INNER FACE TO Y {limits(ear_y - ear_band, ear_y + ear_band, 2)} "
         f"LESS (W - {rocker_washer_thick})" in steps
     )
-    assert steps.index("MIC ONE MHA-VN-070, W") < steps.index("EAR INNER FACE")
+    assert steps.index("MIC THE MHA-VN-070, W") < steps.index("EAR INNER FACE")
     assert "LIFT IT OFF" not in steps
     assert "SHOULDER" not in steps
     # The front strap is set one spring-set blade off the front washer, the
     # MHA-VN-052 beside it; the bank then has no end play to read.
     assert f"A {bank.BANK_SPRING_SET:.2f} BLADE BETWEEN ITS STRAP" in steps
     assert "BESIDE MHA-VN-052" in steps
-    assert "MHA-VN-052 THAT SLIDES FREE ON THE MHA-DT-013 BAR" in steps
     assert "REMOVE THE BLADE" in steps
     for gone in ("MHA-125", "0.025", "-6.0", "END PLAY", "LEAF", "0.45"):
         assert gone not in steps, gone

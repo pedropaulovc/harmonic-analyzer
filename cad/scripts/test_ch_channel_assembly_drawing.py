@@ -144,7 +144,7 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     # and the channel sheet threads the shaft and the washer measured there
     # from the north.
     assert "LIFT IT OFF" not in north
-    assert "MIC ONE MHA-VN-070, W" in north
+    assert "MIC THE MHA-VN-070, W" in north
     north_ear = _step_body("north-ear-datum")
     washer = _config.parts("vn-rocker-thrust-washer")["number"]
     assert "FLATS UP" in north_ear and "SOUTH THROUGH THE EAR" in north_ear

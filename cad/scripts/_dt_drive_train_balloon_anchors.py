@@ -39,7 +39,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "dt-cylinder-gear": BalloonAnchor(),
         "vn-pedestal-hold-down-screw": BalloonAnchor(instance="vn-pedestal-hold-down-screw-1"),
     },
-    "cone-crank": {
+    "cone-set": {
         "dt-cone-swing-platform": BalloonAnchor(),
         "dt-cone-pivot-post": BalloonAnchor(),
         "vn-post-mount-screw": BalloonAnchor(),
@@ -54,6 +54,8 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "dt-cone-gear-shaft": BalloonAnchor(),
         "dt-crank-drive-gear": BalloonAnchor(),
         "dt-cone-gear": BalloonAnchor(),
+    },
+    "crank": {
         "dt-crankshaft": BalloonAnchor(),
         "vn-crank-seat-drive-pin": BalloonAnchor(),
         "dt-crank-pinion": BalloonAnchor(),
