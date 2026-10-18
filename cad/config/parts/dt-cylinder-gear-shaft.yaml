@@ -1,7 +1,13 @@
 dt-cylinder-gear-shaft:
   number: MHA-DT-013
-  material: SAE 1018 CF bar, ASTM A108-24
-  material_specification: SAE 1018 CF bar, ASTM A108-24
+  material: SAE 1018 CF or 1045 ground bar
+  # Explicit alternatives (drawing-guidelines.md rule 2): the note "3/8 IN
+  # GROUND STOCK OK." invites ground bar, which the single-grade field forbade
+  # (r1 machinist review). 1045 ground (turned-ground-polished) bar is unhardened
+  # shafting: the domes are turned and the set-screw spots drilled after
+  # assembly. Kept to one line of the title block's MATERIAL cell (~30
+  # characters; a longer entry wrapped onto the DRAWN PER line, r2 review).
+  material_specification: SAE 1018 CF or 1045 ground bar
   finish: oiled
   quantity: 1
   tolerance_class: machined_block

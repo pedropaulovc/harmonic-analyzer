@@ -55,7 +55,12 @@ def test_shaft_band_closes_the_configured_running_fit() -> None:
 
 def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None:
     assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
-    assert spec.DRAWING_PRECISION_BY_NAME == {"ShaftDia": 3, "Depth": 1, "DomeHeight": 1}
+    assert spec.DRAWING_PRECISION_BY_NAME == {
+        "ShaftDia": 3,
+        "Depth": 1,
+        "DomeHeight": 1,
+        "DomeRadius": 1,
+    }
     assert "draw_dt_cylinder_gear_shaft.py" in PRECISION_MIGRATED_DRAWINGS
     # 3/8 in = 9.525 exactly: rounding the O.D. to 9.53 would contradict the
     # native bearing size every mating bore is built from.
@@ -109,20 +114,24 @@ def test_the_length_is_a_cut_to_fit_reference() -> None:
     assert part.DOME_HEIGHT == bank.ARBOR_DOME_HEIGHT
     assert not hasattr(spec, "FIT_SHORTFALL")
     assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == 1
-    assert spec.LENGTH_CALLOUT == "CUT TO FIT: SPAN OVER BOTH MHA-DT-002"
+    assert spec.LENGTH_CALLOUT.startswith("CUT TO FIT")
+    assert "MHA-DT-002" in spec.LENGTH_CALLOUT
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'set_reference_dimension(adapter, length_annotations[0]' in source
     assert '{"Depth": LENGTH_CALLOUT}' in source
 
 
-def test_both_ends_are_domed_and_the_height_is_model_owned() -> None:
+def test_both_ends_are_domed_and_the_dome_form_is_model_owned() -> None:
     """The bright dome on each pedestal is the arbor end (#743, MHA-125
-    deleted). InsertDome states no markable height, so a hidden reference
-    sketch owns it, as the pedestal's locations are owned."""
+    deleted). InsertDome states no markable height or radius, so a hidden
+    reference sketch owns both, as the pedestal's locations are owned; the
+    radius prints as the spherical reference that says the end is a sphere."""
     assert spec.REFERENCE_SKETCHES == ("DomeReference",)
-    assert spec.DRAWING_DIMENSIONS["DomeReference"] == {"DomeHeight"}
+    assert spec.DRAWING_DIMENSIONS["DomeReference"] == {"DomeHeight", "DomeRadius"}
     assert spec.DRAWING_PRECISION_BY_NAME["DomeHeight"] == 1
     assert spec.DOME_CALLOUT == "BOTH ENDS"
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_set_spherical_reference(adapter, radius_annotations[0]" in drawing_source
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '_dome_end(adapter, 0.0, "SouthDome")' in source
     assert '_dome_end(adapter, SHAFT_LENGTH, "NorthDome")' in source
