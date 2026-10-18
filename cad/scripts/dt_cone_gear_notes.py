@@ -74,7 +74,9 @@ def gear_data(teeth: int) -> str:
         # the shop needs: the plunge from the blank OD is (ENFORCE round 1 of
         # #971: "TOOL T" was undefined).
         ("CUTTER PLUNGE FROM BLANK OD (mm, REF)", f"{profile.plunge_mm:.4f}"),
-        ("WHOLE DEPTH MAX / ROOT ARC R (mm, REF)", f"{whole_depth_max:.4f} / {profile.template.root_radius_mm:.4f}"),
+        # The arc is the cutter template's, which is the gear's own only on
+        # the custom-cutter sheets (ENFORCE round 3 of #971).
+        ("WHOLE DEPTH MAX / CUTTER ROOT ARC R (mm, REF)", f"{whole_depth_max:.4f} / {profile.template.root_radius_mm:.4f}"),
         ("TOOTH FORM", _tooth_form(profile.template)),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T; INCLINED AXES"),
         ("BACKLASH WITH MATE (mm, REF)", f"{minimum:.2f} TO {maximum:.2f}"),

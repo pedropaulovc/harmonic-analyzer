@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import math
 import re
 from pathlib import Path
@@ -418,13 +419,16 @@ def test_custom_six_sheet_defines_the_tooth_space_point_by_point() -> None:
     """The last sheet defines the T006 tooth space (3 places, one-sided form
     tolerance), which is DT6-FORM1's edge; the gear is accepted over pins.
     ENFORCE round 1 of #971: as a tool drawing it carried the gear's title
-    block and told the shop how to inspect its tool."""
+    block and told the shop how to inspect its tool. Round 3: the form
+    tolerance names the mesh it sets, and the acceptance names its sheet."""
     profile = spec.stock_form_profile(6)
     template = profile.template
     data = drawing.cutter_grind_data()
     lines = data.splitlines()
     assert lines[0] == "T006 TOOTH SPACE FORM, mm"
-    assert lines[-1] == "ACCEPT T006 OVER PINS PER SHEET T006"
+    assert drawing.SHEET_NAMES[0] == "T006"
+    assert lines[-1] == "ACCEPT OVER PINS PER SHEET 1 (T006 GEAR DATA)"
+    assert lines[-2] == f"WIDE ONLY: SETS BACKLASH WITH {notes.CYLINDER_MATE_NUMBER}"
     assert "(REF)" not in data
     assert "COMPARATOR" not in data and "TIF" not in data
     assert "INSPECT" not in data and "TOOL" not in data and "GRIND" not in data
@@ -544,31 +548,24 @@ def test_over_pins_acceptance_matches_the_closed_form_involute() -> None:
     assert maximum - minimum == pytest.approx(0.063, abs=0.002)
 
 
-def test_custom_gap_detail_crop_contains_every_real_boundary() -> None:
-    profile = spec.stock_form_profile(6)
-    center_x, center_y, radius = drawing.cutter_detail_window_mm()
-    phase = math.pi / profile.teeth
-    for segment in profile.gap_segments():
-        if segment.kind == "tip_arc":
-            continue
-        for index in range(129):
-            x, y = segment.point(index / 128)
-            rotated = (
-                math.cos(phase) * x - math.sin(phase) * y,
-                math.sin(phase) * x + math.cos(phase) * y,
-            )
-            assert math.dist((center_x, center_y), rotated) < radius
+def test_tooth_space_sheet_prints_the_table_alone() -> None:
+    """ENFORCE round 3 of #971: the cropped, rotated illustration showed no
+    CL, axes or stations, so it raised the question the table answers. The
+    sheet keeps one T006 view only as its title block's property source,
+    hidden, clear of the table and inside the border."""
+    source = inspect.getsource(drawing.build)
+    assert '"*Front", *CUTTER_SOURCE_VIEW_CENTER' in source
+    assert "_hide_title_block_source(adapter, source_view)" in source
+    assert "ILLUSTRATION" not in inspect.getsource(drawing)
     numerator, denominator = drawing.SHEET_SCALES[notes.CUTTER_DETAIL_SHEET]
-    rendered_radius = radius * numerator / denominator / 1000.0
-    # The grind data at the default note height: 2.4 mm a character, measured
-    # on the run-20261010T051729717Z render of this sheet's 47-character
-    # installed-gap label (113 mm).
+    rendered_half_od = drawing.outside_dia_mm(6) * numerator / denominator / 2000.0
+    # The table at the default note height: 2.4 mm a character, measured on
+    # the run-20261010T051729717Z render of this sheet (113 mm, 47 characters).
     widest = max(map(len, drawing.cutter_grind_data().splitlines()))
-    assert drawing.CUTTER_DETAIL_VIEW_CENTER[0] - rendered_radius > (
-        drawing.CUTTER_DETAIL_POS[0] + widest * 0.0024 + 0.005
-    )
-    assert drawing.CUTTER_DETAIL_VIEW_CENTER[0] + rendered_radius < 0.420
-    assert drawing.CUTTER_DETAIL_VIEW_CENTER[1] - rendered_radius > 0.100
+    center_x, center_y = drawing.CUTTER_SOURCE_VIEW_CENTER
+    assert center_x - rendered_half_od > drawing.CUTTER_DETAIL_POS[0] + widest * 0.0024 + 0.005
+    assert center_x + rendered_half_od < 0.420
+    assert center_y - rendered_half_od > 0.100
 
 
 def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> None:
