@@ -631,7 +631,16 @@ PIN_STATION_CALLOUT = "2X ROUND HOLE FROM\nSCREW AXIS, SAME Z;\nMATCHES MHA-SM-0
 SLOT_STATION_TEXT_XY = _hanger_section_xy((SLOT_X + PIN_HOLE_X) / 2.0, HALF_H + 14.0)
 SLOT_STATION_OFFSET_XY = (0.104, 0.1115)
 SLOT_LENGTH_TEXT_XY = _hanger_section_xy(SLOT_X, -HALF_H - 12.0)
-SLOT_LENGTH_OFFSET_XY = (0.0895, 0.024)
+# Left of its line the leader landed on the underline's right end through
+# the last "L" of TRAVEL (r5 render: leader 112.4 -> 121.3 mm, underline end
+# 121.3; machinist review r6, two runs).  Now the 63.5 mm block stands right
+# of the line, its underline's left end at 134.6 mm, 22 mm right of where
+# the leader leaves the dimension line (112.4 mm), so the leader comes down
+# from the left and passes 2.7 mm clear of the first glyph at cap height
+# (07527cf4's right-side block, its end almost under the line, ran it
+# through "2X").  The block spans 134.6 -> 198.1 mm, short of the title
+# block (216).
+SLOT_LENGTH_OFFSET_XY = (0.1664, 0.024)
 HANGER_SECTION_KEEP = {
     "HangerPinHoleDepth": _hanger_section_xy(
         BAR_X1 + HANGER_SECTION_GUSSET_REACH + 8.0, -HALF_H + HANGER_PIN_HOLE_DEPTH / 2.0
