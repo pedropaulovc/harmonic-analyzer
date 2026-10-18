@@ -56,6 +56,18 @@ width. To check weights in an exported PDF, read the stroke widths from its
 drawing operators with PyMuPDF `page.get_drawings()`, and multiply by
 25.4/72 to get millimetres.
 
+The summing-lever line-weight trial overrides only its drawing document:
+visible edges use Thick (0.35 mm), while dimensions use Thin (0.13 mm).
+Farm run `20261018T022055482Z-aa2a1714c64e494d8908f9abf67e85f5`
+exported both widths on both sheets. This is not a template-wide change.
+
+For a permanent default, save the Line Font category assignments and Line
+Thickness width table in both `.DRWDOT` templates. Each drawing already
+declares its selected template as a cache input, so this needs neither
+per-recipe overrides nor per-edge iteration. SOLIDWORKS recommends these
+document-level settings over its obsolete system-level printer weights;
+do not use worker-local printer preferences as the drawing standard.
+
 `third-angle-projection.SLDBLK` is the projection-symbol block embedded in both
 templates and remains the editable source for future template work.
 
