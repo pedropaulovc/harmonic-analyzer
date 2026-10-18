@@ -8,7 +8,6 @@ import build_dt_crank_pin as part
 import dt_crank_pin_spec
 import draw_dt_crank_pin as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gtol_cone import ConeFace
 
 
 def test_required_drawing_paths() -> None:
@@ -22,7 +21,24 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is dt_crank_pin_spec.DRAWING_DIMENSIONS
     marked = set().union(*dt_crank_pin_spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.FRONT_KEEP) == marked
+    assert set(drawing.DRAWING_PRECISION_BY_NAME) == marked
+    assert set(dt_crank_pin_spec.DIMENSION_CALLOUTS) <= marked
     assert drawing.PIN_LENGTH == dt_crank_pin_spec.PIN_LENGTH
+
+
+def test_cross_hole_prints_natively_not_in_a_note() -> None:
+    """Rule 7: the keeper-ring hole's size and station are model dimensions
+    at two places (a drilled hole and a routine station), not note text."""
+    spec = dt_crank_pin_spec
+    assert spec.DRAWING_DIMENSIONS["RingHoleProfile"] == {"RingHoleX", "RingHoleDia"}
+    assert spec.DRAWING_PRECISION["RingHoleProfile"] == {
+        "RingHoleX": 2,
+        "RingHoleDia": 2,
+    }
+    assert spec.DIMENSION_CALLOUTS["RingHoleDia"].splitlines()[0] == "DRILL THRU"
+    for value in (spec.RING_HOLE_DIA, spec.RING_HOLE_X, spec.PIN_LENGTH):
+        assert f"{value:.2f}" not in spec.DRAWING_NOTES
+        assert f"{value:.1f}" not in spec.DRAWING_NOTES
 
 
 def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
@@ -32,33 +48,47 @@ def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
     assert source.count("_add_end_diameter(") >= 3  # definition + both ends
     assert 'below="BIG END"' in source
     assert 'below="SMALL END"' in source
-    # Custom 1:48 taper over 45 mm -> 0.9375 on diameter.  MHA-DT-031 and the
-    # shaft are match-reamed together to suit this removable service pin.
+    # Custom 1:48 taper over 45 mm -> 0.9375 on diameter.
     taper_on_dia = dt_crank_pin_spec.BIG_END_DIA - dt_crank_pin_spec.SMALL_END_DIA
     assert round(taper_on_dia, 4) == round(dt_crank_pin_spec.PIN_LENGTH / 48.0, 4)
-    assert round(taper_on_dia, 4) == 0.9375
     assert "1:48" in dt_crank_pin_spec.DRAWING_NOTES
-    assert "0.9375 ON DIA OVER 45.0" in dt_crank_pin_spec.DRAWING_NOTES
-    assert "CRANK-HUB CROSS-HOLE" in dt_crank_pin_spec.DRAWING_NOTES
 
-def test_linked_notes_define_remaining_pin_operations() -> None:
+
+def test_matched_taper_fit_names_both_mates() -> None:
+    """Rule 4: the hub and shaft are taper-reamed together to suit the pin,
+    so the fit names both mates by name and number."""
+    import _config
+
+    notes = " ".join(dt_crank_pin_spec.DRAWING_NOTES.split())
+    for stem, name in (("dt-crank-hub", "CRANK HUB"), ("dt-crankshaft", "CRANKSHAFT")):
+        assert f"{name} {_config.parts(stem)['number']}" in notes
+    assert "LIGHT DRIVE FIT" in notes
+    assert len(dt_crank_pin_spec.DRAWING_NOTES.splitlines()) <= 4
+
+
+def test_web_shortfall_is_stated_on_the_hole_callout() -> None:
+    """Rule 20: the pending web shortfall prints where it applies."""
+    callout = dt_crank_pin_spec.DIMENSION_CALLOUTS["RingHoleDia"]
+    assert callout.splitlines()[-1] == dt_crank_pin_spec.CROSS_HOLE_WEB_CALLOUT
+
+
+def test_the_one_note_is_flagged_on_the_taper() -> None:
     notes = dt_crank_pin_spec.DRAWING_NOTES
     # Deburr/edge-break is a title-block note; repeating it here would duplicate it.
     assert "DEBURR" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert 'property_link("Manufacturing Notes")' in source
+    assert "attach_xy=TAPER_SILHOUETTE_PICK" in source
     assert "def _manufacturing_notes" not in source
 
 
-def test_native_finish_symbol_controls_taper_seat() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_surface_finish(") == 1
-    assert isinstance(dt_crank_pin_spec.SURFACE_FINISHES[0].face, ConeFace)
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "taper_seat")' in source
-    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
-        part.__file__
-    ).read_text(encoding="utf-8")
+def test_pinned_taper_carries_no_roughness_symbol() -> None:
+    """Rule 6: a pinned drive fit neither runs nor slides."""
+    assert dt_crank_pin_spec.SURFACE_FINISHES == ()
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "add_surface_finish(" not in drawing_source
+    assert "author_part_pmi" not in Path(part.__file__).read_text(encoding="utf-8")
 
 
 def test_view_scales_are_explicit() -> None:
@@ -101,7 +131,8 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
     ) / 2.0
     assert worst_web >= 1.5
     assert dt_crank_pin_spec.CROSS_HOLE_WEB_MIN <= worst_web < dt_crank_pin_spec.CROSS_HOLE_WEB_MIN + 0.01
-    assert f"{dt_crank_pin_spec.CROSS_HOLE_WEB_MIN:.2f} MIN" in dt_crank_pin_spec.DRAWING_NOTES
+    web = dt_crank_pin_spec.CROSS_HOLE_WEB_MIN
+    assert dt_crank_pin_spec.CROSS_HOLE_WEB_CALLOUT == f"WEB {web:.2f} MIN"
     # The ligament to the big-end face meets the 2.0 target at the worst case
     # of the printed bands (.XX station, DRILLED HOLES +0.10).
     ligament = dt_crank_pin_spec.RING_HOLE_X - 0.51 - (dt_crank_pin_spec.RING_HOLE_DIA + 0.10) / 2.0
