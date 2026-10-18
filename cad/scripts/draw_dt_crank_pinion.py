@@ -5,15 +5,19 @@ view, longitudinal section and isometric of a toothed disc with a hub boss.
 Every turned diameter sits beside its axial extent on the longitudinal
 section: tooth-tip blank, turned north band, reamed bore and boss, with
 shoulder length, face width and overall length from the toothed south face.
-The retention pin's matched-fit callout and the normal-pitch gear-data block
-carry the requirements geometry cannot convey.
+The retention pin's reference diameter, its station from the boss's north
+face and the normal-pitch gear-data block carry the requirements geometry
+cannot convey.
 
-No datums, no feature control frames, one roughness symbol (the bore): a
-custom pinion pinned to its crankshaft is not on the GD&T allowlist
-(drawing-guidelines.md rule 5 (avoid excessive GD&T) and drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)). The bore's native limits and feature callout jointly identify its
-mating crankshaft and required diametral clearance. The decimal places are the
-PART's (``crank_pinion_spec.DRAWING_PRECISION``, applied natively by
-``build_crank_pinion``); this script only reads them back off the sheet.
+No datums, no feature control frames, no roughness symbol: a custom pinion
+pinned to its crankshaft is not on the GD&T allowlist, and its pinned bore
+neither runs, slides nor locates (drawing-guidelines.md rule 5 (avoid
+excessive GD&T) and rule 6 (roughness symbols only where a surface runs,
+slides or locates)). The bore's native limits and feature callout jointly
+identify its mating crankshaft and required diametral clearance. The decimal
+places are the PART's (``crank_pinion_spec.DRAWING_PRECISION``, applied
+natively by ``build_crank_pinion``); this script only reads them back off the
+sheet.
 
 Drawn 3:1: the longitudinal section and its diameter/length dimensions
 clear the end view and isometric at this common sheet scale.
@@ -44,8 +48,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_finish import add_surface_finish
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimensions,
+)
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_leader_notes import add_leader_note
 from _drawing_leaders import (
@@ -57,28 +64,30 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
-from _gear_drawing_entities import visible_circle_edge
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_crank_pinion_spec import (
     BORE_DIA,
     BORE_FIT_CALLOUT,
     BORE_PROCESS_CALLOUT,
     BOSS_DIA,
+    CONE_GEAR_NUMBER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    FACE_WIDTH,
+    MESH_GEAR_NUMBER,
     OUTSIDE_DIA,
     OVERALL_LENGTH,
-    PIN_DIA,
     PIN_HOLE_PROCESS,
     PIN_STATION,
     SHOULDER_LENGTH,
-    SURFACE_FINISHES,
+    TURNED_DIA_FITUP_CALLOUT,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_crank_pinion"]
 PART_STEM = SPEC.artifact_stem
@@ -188,38 +197,58 @@ def _position_section_caption(
 # (drawing-guidelines.md rule 11 (turned parts read like the lathe)); ``BossProfile`` supplies the tooth-tip and bore as construction-only
 # native model dimensions so they import without sheet-authored numbers.
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
-# Longitudinal section: the tooth-tip diameter sits above its axial span; the
-# bore diameter stands off the toothed face, its text above-left of the view
-# and clear of the end view. The turned-band diameter sits above the band,
-# its text at the bore diameter's height so it stays clear of the tip
-# diameter's. The three lengths stay baseline-stacked below the view from the
-# toothed south face, shortest innermost (drawing-guidelines.md rule 11 (turned parts read like the lathe): one origin per view,
-# baseline not chained). The boss diameter reads on a vertical dimension line
-# beyond the boss end, its text on the axis between the extension lines: at
-# +0.020 it sat on the upper extension line (machinist review of 4d4e038e3),
-# which ``_boss_dia_text_crossings`` now rejects on the sheet.
+# Longitudinal section. Above the view the three diameters stand on the
+# toothed face's side, stepped so no dimension line runs through another's
+# text: the bore lowest and the tip diameter next, both outside the faced
+# end with their text to the left, and the turned band's highest, its line
+# rising inside the band past both. Each diameter's reason rides its own
+# callout (machinist review r1 of #1652). The lengths stand on the LOWER
+# outline's witnesses, baseline-stacked below the view from the toothed
+# south face, shortest innermost (drawing-guidelines.md rule 11 (turned parts
+# read like the lathe): one origin per view, baseline not chained); the
+# banded two carry their stack callouts, so their text stands outside their
+# spans, where the callout lines clear every extension line: the shoulder's
+# left of the faced end, below the end view's lower A, the face width's right
+# of the boss end, so neither block's lines run through the other's limits
+# (r2: stacked on one side, the 8.5 line struck the 11.6's "0.0" and the A
+# touched the 8.5's callout). The pin's station reads from the boss's north
+# face on the first row. The boss
+# diameter reads on a vertical dimension line beyond the boss end, its text
+# on the axis between the extension lines: at +0.020 it sat on the upper
+# extension line (machinist review of 4d4e038e3), which
+# ``_boss_dia_text_crossings`` now rejects on the sheet. The pin hole's
+# reference diameter leads up and right through the boss's top wall to its
+# callout, clear of the boss diameter's extension lines.
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
+_SIDE_TOP = RIGHT_CENTER[1] + HALF_OD
 BOSS_DIA_TEXT_X = _side_x(OVERALL_LENGTH) + 0.049
+# Outside the faced end: centred clear of the end view's A arrow, with the
+# widest stack callout still left of the faced end's extension line.
+_LENGTH_TEXT_X = _side_x(0.0) - 0.0295
+# Its mirror right of the boss end's extension line (the overall length's
+# and pin station's), the last line the block's dimension line crosses (r3:
+# placed between the shoulder and the boss end, that line struck the text).
+_FACE_WIDTH_TEXT_X = _side_x(OVERALL_LENGTH) + 0.030
+# The turned diameter's and pin hole's callouts share the top row; the
+# turned diameter's block grows left from its leader, so it rises clear of
+# the gear data's long rows.
+_TOP_ROW_Y = _SIDE_TOP + 0.065
 RIGHT_KEEP = {
-    "OutsideDia": (
-        (_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0,
-        RIGHT_CENTER[1] + HALF_OD + 0.012,
-    ),
-    "TurnedDia": (
-        (_side_x(SHOULDER_LENGTH) + _side_x(FACE_WIDTH)) / 2.0,
-        RIGHT_CENTER[1] + HALF_OD + 0.025,
-    ),
+    "BoreDia": (_side_x(0.0) - 0.0095, _SIDE_TOP + 0.012),
+    "OutsideDia": (_side_x(0.0) - 0.003, _SIDE_TOP + 0.027),
+    "TurnedDia": (_side_x(SHOULDER_LENGTH + 1.5), _TOP_ROW_Y),
     "BossDia": (BOSS_DIA_TEXT_X, RIGHT_CENTER[1]),
-    # Left of the toothed face: right of the boss its extension lines ran the
-    # bore's full length and fenced the pin-hole leader (leader-crosses-line).
-    "BoreDia": (_side_x(0.0) - 0.0075, RIGHT_CENTER[1] + HALF_OD + 0.025),
-    "ShoulderLength": (
-        (_side_x(0.0) + _side_x(SHOULDER_LENGTH)) / 2.0,
-        _SIDE_BOTTOM - 0.014,
+    "PinHoleDia": (0.275, _TOP_ROW_Y),
+    "ShoulderLength": (_LENGTH_TEXT_X, _SIDE_BOTTOM - 0.019),
+    "PinFromBossEnd": (
+        (_side_x(PIN_STATION) + _side_x(OVERALL_LENGTH)) / 2.0,
+        _SIDE_BOTTOM - 0.006,
     ),
-    "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.026),
-    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.038),
+    "FaceWidth": (_FACE_WIDTH_TEXT_X, _SIDE_BOTTOM - 0.026),
+    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.043),
 }
+# The section caption sits right of the face width's callout block.
+SECTION_CAPTION_XY = (0.335, 0.085)
 DIMENSION_TEXT_LINE_GAP = 0.0005
 # The boss diameter's text is centred on its dimension line; it read 13.1 mm
 # wide on the f0c105531 render. Its right edge plus a clearance bounds where
@@ -227,11 +256,26 @@ DIMENSION_TEXT_LINE_GAP = 0.0005
 BOSS_DIA_TEXT_HALF_WIDTH = 0.0075
 ISO_TEXT_CLEARANCE = 0.003
 
+# The stack each banded length sets: its short limit keeps full tips in the
+# 64T mesh, its long one the T120 clearance (build_dt_drive_train_assembly
+# proves both at these bands).
+_LENGTH_STACK_CALLOUT = "\n".join(
+    (f"{MESH_GEAR_NUMBER} MESH,", f"{CONE_GEAR_NUMBER} T120 CLR")
+)
 DIMENSION_CALLOUTS = {
     # The native value/limits define the bore; this short feature callout adds
     # the process and extent without tangling its native diameter leaders.
     "BoreDia": BORE_PROCESS_CALLOUT,
+    # The tip diameter's band is the 64T mesh's tip-to-root air.
+    "OutsideDia": f"{MESH_GEAR_NUMBER} MESH",
+    "TurnedDia": TURNED_DIA_FITUP_CALLOUT,
+    "ShoulderLength": _LENGTH_STACK_CALLOUT,
+    "FaceWidth": _LENGTH_STACK_CALLOUT,
+    # Reamed to the pin, so the size is a reference; the words carry the
+    # operation, the mate, the pin, the fit's acceptance and flush.
+    "PinHoleDia": PIN_HOLE_PROCESS,
 }
+REFERENCE_DIMENSIONS = ("PinHoleDia",)
 
 
 Point = tuple[float, float]
@@ -307,22 +351,6 @@ def _isometric_clears_boss_dia(iso: Any) -> None:
             f"isometric outline {outline} left the inner border {SHEET_INNER_BORDER}"
         )
 
-# The retention-pin cross-hole is cut in section at the boss mid-length. Keep
-# its matched-fit callout above-right of the section so its leader leaves the
-# text cleanly, crosses only the boss, and lands at the upper cut edge.
-PIN_HOLE_EDGE = (
-    _side_x(PIN_STATION),
-    RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
-)
-PIN_HOLE_CALLOUT = (0.260, RIGHT_CENTER[1] + HALF_OD + 0.056)
-# The shared matched-fit note (crank_pinion_spec.pin_hole_note): match drill
-# with the shaft at the boss mid-length, ream to fit the named pin (the fit to
-# the actual pin governs the hole, not a drill size), the fit's acceptance and
-# flush both sides.
-PIN_HOLE_NOTE = PIN_HOLE_PROCESS
-# 2.5 mm text, anchored upper-left; the read-back extent, leader included,
-# must stay inside the B sheet's inner border.
-PIN_HOLE_NOTE_HEIGHT = 0.0025
 SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
 _BORE_GAP_ANGLE_RAD = math.radians(168.75)
@@ -331,39 +359,27 @@ BORE_FIT_ATTACH = (
     FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(_BORE_GAP_ANGLE_RAD),
     FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(_BORE_GAP_ANGLE_RAD),
 )
-# The bore finish lands at -45 degrees, lower right: dropped straight to the
-# bore's bottom, its leader started on the A-A cutting-plane line (eye pass of
-# w15-3d3a9d762). The symbol stands right of the end view, clear of the teeth
-# and of the lower A arrow; ``_bore_leaders_clear_section_line`` reads the
-# cutting line back and fails on any crossing or overlap with it.
-FINISH_ATTACH = (
-    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(-45.0)),
-    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(-45.0)),
-)
-FINISH_SYMBOL = (FRONT_CENTER[0] + HALF_OD + 0.010, FRONT_CENTER[1] - 0.015)
-# Where each stroke must END, from the bore centre (sheet metres): both bore
-# leaders on the rim; the cutting line at its ends past the tooth tips. A
+# Where each stroke must END, from the bore centre (sheet metres): the bore
+# leader on the rim; the cutting line at its ends past the tooth tips. A
 # reading outside the band means the strokes are not sheet metres.
 BORE_LANDING = (0.5 * _BORE_SHEET_RADIUS, 1.5 * _BORE_SHEET_RADIUS)
 SECTION_LINE_LANDING = (0.0, HALF_OD + 0.010)
+# Below the length stack, clear of its stack callouts and the title block.
+MANUFACTURING_NOTES_XY = (0.016, 0.076)
 
 
-def _bore_leaders_clear_section_line(
-    adapter: Any, front: Any, bore_fit: Any, finish: Any
-) -> None:
-    """Fail when either bore leader crosses or runs along the A-A cutting line."""
-    rebuild_drawing(adapter, label="bore leaders vs section line")
+def _bore_leader_clears_section_line(adapter: Any, front: Any, bore_fit: Any) -> None:
+    """Fail when the bore leader crosses or runs along the A-A cutting line."""
+    rebuild_drawing(adapter, label="bore leader vs section line")
     assert_leaders_clear(
         {
             "BoreFit": leader_segments(_early_bound(bore_fit, "INote").GetAnnotation()),
-            "BoreFinish": leader_segments(finish.GetAnnotation()),
             "SectionLine": section_line_segments(adapter, front),
         },
         centre=FRONT_CENTER,
         keep_out={},
         lands_within={
             "BoreFit": BORE_LANDING,
-            "BoreFinish": BORE_LANDING,
             "SectionLine": SECTION_LINE_LANDING,
         },
         label="crank pinion end view",
@@ -422,7 +438,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="crank pinion longitudinal centre section",
     )
-    _position_section_caption(adapter, right, (0.290, 0.085))
+    _position_section_caption(adapter, right, SECTION_CAPTION_XY)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
@@ -445,6 +461,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
+    # The hole is reamed to fit the pin, so its modeled size reads as a
+    # reference nominal; the callout under it carries what governs.
+    set_reference_dimensions(adapter, right_annotations, REFERENCE_DIMENSIONS)
     assert_imported_precision(
         adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
     )
@@ -462,32 +481,6 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         label="crank pinion axis",
     )
-    # The cross-hole is governed by a matched fit, not the model's nominal
-    # drill diameter. The pinion's boss guides the drill, so its rim carries
-    # the operation, where it runs, the mating part, the pin it is reamed to,
-    # the fit's acceptance and the flush condition.
-    # A longitudinal section presents the radial through-hole as cut edges, not
-    # a selectable model circle, so this view-owned pointer names its cut
-    # location without dimensioning that hole.
-    pin_note = add_leader_note(
-        adapter,
-        PIN_HOLE_NOTE,
-        text_xy=PIN_HOLE_CALLOUT,
-        attach_xy=PIN_HOLE_EDGE,
-        label="retention-pin matched cross-hole",
-        view=right,
-        height=PIN_HOLE_NOTE_HEIGHT,
-    )
-    adapter.currentModel.GraphicsRedraw2()
-    extent = tuple(float(v) for v in (_early_bound(pin_note, "INote").GetExtent() or ()))
-    _telemetry.info(f"retention-pin note extent {extent}")
-    x0, y0, x1, y1 = SHEET_INNER_BORDER
-    if len(extent) < 5 or not (
-        x0 <= extent[0] and y0 <= extent[1] and extent[3] <= x1 and extent[4] <= y1
-    ):
-        raise RuntimeError(
-            f"retention-pin note extent {extent} left the inner border {SHEET_INNER_BORDER}"
-        )
     # Put the fit note immediately left of the end view and send its short
     # leader radially through the upper-left tooth gap to the visible bore.
     # The native section-view diameter remains beside its axial extent (drawing-guidelines.md rule 11 (turned parts read like the lathe)).
@@ -500,30 +493,11 @@ async def build(adapter: Any) -> dict[str, str]:
         view=front,
         height=0.0022,
     )
-    # The fit note and finish symbol use different bore quadrants, so their
-    # leaders cannot be mistaken for one another.
-    # The bore is the part's one fit surface, and a fit is a function of the
-    # peaks as well as the size: REAM names the operation, not the finish it
-    # leaves. The roughness is the project's general machined grade, authored
-    # on the PART and read back here (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)'s "a surface that has to
-    # work" case). A surface symbol's native anchor is its lower-left corner,
-    # and its text grows rightward; place it right of the face view, clear of
-    # the A-A cutting-plane line.
-    finish = add_surface_finish(
-        adapter,
-        front,
-        symbol_xy=FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "crank_pinion_bore"),
-        label="crank pinion bore finish",
-        entity=visible_circle_edge(adapter, front, BORE_DIA),
-        leader_attach_xy=FINISH_ATTACH,
-        char_height=0.0025,
-    )
-    _bore_leaders_clear_section_line(adapter, front, bore_fit, finish)
+    _bore_leader_clears_section_line(adapter, front, bore_fit)
 
     add_property_linked_note(adapter, "Gear Data", 0.016, 0.258, char_height=0.0025)
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, 0.082, char_height=0.0025
+        adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_XY, char_height=0.0025
     )
     rebuild_drawing(adapter, label="crank pinion layout audit")
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
