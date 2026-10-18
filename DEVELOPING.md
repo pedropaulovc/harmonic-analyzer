@@ -107,10 +107,11 @@ configured draws, seeds, reference cases and numerical acceptance checks.
 ### Recipe gate file parallelism
 
 `check:recipe` alone runs its complete explicit test inventory with
-`pytest -q -p no:cacheprovider -n 4 --dist loadfile`. Other `check:*` gates
-remain serial internally. Four workers bound the additional local processes:
-the farm launcher already permits eight simultaneous doit tasks, so `-n auto`
-inside a gate would compete with sibling checks for every CPU. This is a
+`pytest -q -p no:cacheprovider -n 8 --dist loadfile`. Other `check:*` gates
+remain serial internally. Eight workers bound the additional local processes:
+the measured development host has 16 logical CPUs, and the farm launcher already
+permits eight simultaneous doit tasks. Using `-n auto` inside the recipe gate
+would occupy every CPU before accounting for sibling checks. This is a
 conservative first step, not a claim of a fivefold speedup. File scheduling keeps
 each module's tests and module-scoped fixtures on one worker; the longest module
 still sets a lower bound on wall time, and every worker pays collection costs.

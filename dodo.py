@@ -3895,7 +3895,7 @@ def task_check():
                 # (eight tasks by default on the farm). Keep each module on one
                 # worker so its module-scoped fixtures are not duplicated.
                 "-n",
-                "4",
+                "8",
                 "--dist",
                 "loadfile",
                 *(
