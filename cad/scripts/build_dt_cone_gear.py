@@ -35,7 +35,6 @@ from _simplified_part import (
 )
 from _fit_deviations import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
-from _part_pmi import author_part_pmi
 from _cone_gear_geometry import R_CLEAR_MM, bore_area_mm2
 from _cone_gear_readback import (
     _BANDED_DIMENSIONS,
@@ -64,7 +63,6 @@ from dt_cone_gear_spec import (
     MM_PER_IN,
     REFERENCE_SKETCHES,
     SIMPLIFIED_FEATURES_BY_CONFIGURATION,
-    SURFACE_FINISHES,
     TOOTH_REFERENCE_SKETCH,
     TOOTH_THICKNESS_BAND,
     bore_dia_mm,
@@ -877,13 +875,8 @@ async def build(adapter) -> dict[str, str]:
         )
         _restrict_to_configuration(adapter, teeth)
     _suppress_rows_and_hide_references(adapter, pattern_axis)
-    check("activate T120 for native PMI", await adapter.set_active_configuration("T120"))
+    check("activate T120 for the save", await adapter.set_active_configuration("T120"))
 
-    # Author before the existing 20-configuration regeneration sweep.  This is
-    # the live regression gate for the model-owned symbol: a face-attached
-    # symbol created in the 120T geometry makes every other configuration's
-    # component feature rebuild with swFeatureErrorUnknown.
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     # Establish the final path once while T120 is active. The per-configuration
     # sweep can then use IModelDoc2.Save3 directly; the adapter's in-place save
     # deliberately adds AvoidRebuildOnSave, which live probes proved does not

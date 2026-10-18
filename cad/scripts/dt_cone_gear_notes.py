@@ -33,7 +33,10 @@ def root_to_bore_web_min_mm(teeth: int) -> float:
 def cutter_description(teeth: int) -> str:
     template = spec.stock_form_profile(teeth).template
     if template.cutter_number is None:
-        return f"{template.name} PER LAST SHEET; NOT STOCK"
+        # The tool is ground to the T006 tooth space; sheet 21 defines that
+        # space as T006 geometry (ENFORCE round 1 of #971: as a tool sheet it
+        # carried the gear's title block and no tool material).
+        return f"NOT STOCK; FORM = TOOTH SPACE, SHEET {len(spec.CONFIGURATION_TEETH) + 1}"
     minimum, maximum = template.teeth_range
     upper = "UP" if maximum is None else str(maximum)
     return f"#{template.cutter_number} {minimum}-{upper}T; TEMPLATE {template.reference_teeth}T"
@@ -62,11 +65,15 @@ def gear_data(teeth: int) -> str:
         corner.blank_radius_mm - corner.root_radius_min_mm
         for corner in spec.manufacturing_corner_profiles(teeth)
     ) * 1e4) / 1e4
+    low, high = spec.over_pins_limits_mm(teeth)
     rows = (
         ("CONFIGURATION / TEETH", f"T{teeth:03d} / {teeth}"),
         ("DIAMETRAL PITCH / PRESSURE ANGLE", f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("CUTTER", cutter_description(teeth)),
-        ("TOOL T / PLUNGE (mm, REF)", f"{profile.radial_translation_mm:.4f} / {profile.plunge_mm:.4f}"),
+        # The cutter's own radial offset is a setup quantity, not something
+        # the shop needs: the plunge from the blank OD is (ENFORCE round 1 of
+        # #971: "TOOL T" was undefined).
+        ("CUTTER PLUNGE FROM BLANK OD (mm, REF)", f"{profile.plunge_mm:.4f}"),
         ("WHOLE DEPTH MAX / ROOT ARC R (mm, REF)", f"{whole_depth_max:.4f} / {profile.template.root_radius_mm:.4f}"),
         ("TOOTH FORM", _tooth_form(profile.template)),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T; INCLINED AXES"),
@@ -77,15 +84,14 @@ def gear_data(teeth: int) -> str:
         # cone_set_stack books each gear's tooth runout about its bore.
         ("TOOTH CUTTING SETUP, ACCEPT AT SETUP",
          f"{cone_set_stack.TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE"),
-    )
-    if teeth == 6:
-        # DT6-FORM1's edge is defined on the last sheet; the cut gear is
-        # accepted here.
-        low, high = spec.custom_six_over_pins_limits_mm()
-        rows += ((
-            f"OVER 2 PINS \u00d8{spec.CUSTOM_SIX_PIN_DIA_MM:.2f}, OPPOSITE GAPS (mm)",
+        # The measurable acceptance of the circular tooth thickness band
+        # (spec.over_pins_limits_mm): every sheet, not only T006 (ENFORCE
+        # round 1 of #971).
+        (
+            f"OVER 2 PINS \u00d8{spec.over_pins_pin_dia_mm(teeth):.2f}, OPPOSITE GAPS (mm)",
             f"{low:.3f} TO {high:.3f}",
-        ),)
+        ),
+    )
     return "\n".join(("GEAR DATA", *(f"{label}:  {value}" for label, value in rows)))
 
 
