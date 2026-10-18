@@ -3651,6 +3651,39 @@ def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
     assert [item["decision"] for item in aggregate["rejected"]] == ["misread", "not_gating"]
 
 
+@pytest.mark.parametrize(
+    ("members", "verdict"),
+    [(["r1.blockers.1"], "SHIP"), (["r1.blockers.1", "r3.blockers.1"], "FIX")],
+)
+def test_aggregate_gates_only_findings_raised_by_two_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, members: list[str], verdict: str,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png")
+
+    def reply(command: list[str], **kwargs: Any):
+        findings = _judge_inputs(kwargs["input"])
+        if findings is None:
+            return _session_reply(command, kwargs, _finding_verdict())
+        rest = [finding["id"] for finding in findings if finding["id"] not in members]
+        value = {"clusters": [
+            _judge_cluster(members),
+            _judge_cluster(rest, decision="misread"),
+        ]}
+        return _session_reply(command, kwargs, value)
+
+    monkeypatch.setattr(mr.subprocess, "run", reply)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=3,
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+    )
+    assert aggregate["verdict"] == verdict
+    assert aggregate["gating_count"] == (verdict == "FIX")
+    assert [item["gating"] for item in aggregate["confirmed"]] == [verdict == "FIX"]
+    report = (tmp_path / "reports" / "sample.aggregate.md").read_text(encoding="utf-8")
+    assert ("non-gating" in report) == (verdict == "SHIP")
+
+
+
 @pytest.mark.parametrize("decision", ["misread", "not_gating", "confirmed"])
 def test_aggregate_ship_uses_judged_category_not_raw_verdict(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, decision: str,
