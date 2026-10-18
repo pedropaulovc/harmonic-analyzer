@@ -12,15 +12,20 @@ import _config
 import build_sm_summing_assembly as builder
 import draw_sm_summing_assembly as drawing
 import joint_retention
+import settled_spring_seats
 import sm_summing_assembly_sheet as notes
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
+import sm_summing_lever_spec as lever
+import vn_boss_hook_jam_nut_spec as jam_nut
+import vn_counter_spring_stock_geom as counter_stock
 import vn_knife_hanger_stud_spec as hanger_bolt
 from _assembly_contract import assembly_contract
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _sm_summing_explode import station_of, summing_exploded_view_name
 from dt_cone_pivot_post_installation import SUMMING_Z
+from vn_counter_spring_spec import INSTALLED_LENGTH_MM
 
 
 def _printed_text() -> str:
@@ -91,6 +96,55 @@ def test_bom_rows_come_from_the_part_registry() -> None:
     assert drawing.BOM_SKUS[spec.BOSS_HOOK] == "9490T1"
     assert set(drawing.BALLOON_ANCHORS) == set(notes.BOM_ORDER)
     assert spec.QUANTITIES[spec.DOWEL] == builder.knife_dowel.PER_MOUNT * 2
+
+
+def _faces_viewer(normal: tuple[float, ...], rows: list[list[float]]) -> float:
+    """Cosine between a part-frame normal, placed by Transform2 ``rows``, and
+    the *Isometric view direction (+X+Y+Z)."""
+    machine = [sum(normal[i] * rows[i][j] for i in range(3)) for j in range(3)]
+    return sum(machine) / (math.sqrt(3.0) * math.hypot(*normal))
+
+
+def test_balloons_5_7_and_8_are_pinned_on_viewer_facing_edges_of_their_parts() -> None:
+    # The body walk moved these between runs on identical geometry (machinist
+    # review r1-r3); each frozen point lies on an edge of its own part, and
+    # the edge's outward normal faces the viewer once the builder's placement
+    # turns it into the machine frame. The hook (6) stays on the walk: frozen
+    # hook points missed their hit test on 3 of 4 farm runs.
+    anchors = drawing.BALLOON_ANCHORS
+    pinned = {stem for stem, anchor in anchors.items() if anchor.point_mm is not None}
+    assert pinned == {spec.LEVER, spec.BOSS_JAM_NUT, spec.COUNTER_SPRING}
+    assert all(anchor.instance is None for anchor in anchors.values())
+
+    # Lever (identity): the plate's free top edge, on the -Z half.
+    x, y, z = anchors[spec.LEVER].point_mm
+    assert (x, y) == (lever.PLATE_W, lever.PLATE_T / 2.0)
+    assert -lever.PLATE_L / 2.0 < z < 0.0
+
+    # Jam nut: the middle of a flat's top edge, on the flat facing the
+    # viewer most squarely (flats at multiples of 60 deg, corners on +-Y).
+    x, y, z = anchors[spec.BOSS_JAM_NUT].point_mm
+    assert z == pytest.approx(jam_nut.THICKNESS)
+    assert math.hypot(x, y) == pytest.approx(jam_nut.ACROSS_FLATS / 2.0)
+    angle = math.degrees(math.atan2(y, x)) % 360.0
+    assert angle == pytest.approx(300.0)
+    rows = builder.JAM_NUT_ROWS
+    flats = [math.radians(60.0 * k) for k in range(6)]
+    best = max(
+        flats, key=lambda a: _faces_viewer((math.cos(a), math.sin(a), 0.0), rows)
+    )
+    assert math.degrees(best) == pytest.approx(angle)
+
+    # Counter spring: a wire radius off the +X coil-end junction centre.
+    centre = (
+        -counter_stock.coil_start_x_mm(INSTALLED_LENGTH_MM),
+        0.0,
+        -counter_stock.COIL_MEAN_RADIUS_MM,
+    )
+    offset = [p - c for p, c in zip(anchors[spec.COUNTER_SPRING].point_mm, centre)]
+    assert math.hypot(*offset) == pytest.approx(counter_stock.WIRE_RADIUS_MM, abs=1e-3)
+    seat, _gooseneck_y = settled_spring_seats.counter_seat()
+    assert _faces_viewer(tuple(offset), seat.pose.rotation_rows) > 0.4
 
 
 def test_every_bom_part_is_installed_by_a_numbered_step() -> None:
