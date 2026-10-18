@@ -16,10 +16,12 @@ inner faces. The spring set and the closed-up stack length are the fit-up's
 two settings (rocker_bank_layout); the lug span is shown as a reference, the
 pair being set off the top frame. ``KEEPER_PLAN_FEATURE``, on the Top plane
 (sketch x is machine x, sketch y machine -z), is that setting: the
-MHA-FR-002 datums (the frame is not in this assembly) -- its west rail's web
-centre line (the socket axis) and the line of its upper socket centres --
-and the lug centre line, dimensioned to the lug centre (X) and the two lug
-inner faces (Z), each within KEEPER_FITUP_LOCATION_BAND_MM.
+MHA-FR-002 features it is set from, in phantom (the frame is not in this
+assembly) -- its west front upper socket (bore and boss), the line of the
+upper socket centres through it, and the west rail's web faces leaving the
+boss with the web centre line splitting them -- and the lug centre line,
+dimensioned to the lug centre (X, within KEEPER_FITUP_X_BAND_MM) and the
+two lug inner faces (Z, each within KEEPER_FITUP_LOCATION_BAND_MM).
 
 Explode (``EXPLODED_VIEW_NAME``): every channel alike, end hardware out along
 z on its own side, fasteners up out of their taps, the rods down off the
@@ -32,6 +34,7 @@ levers and springs stay put.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
@@ -40,6 +43,7 @@ from ch_fulcrum_keeper_spec import (
     FULCRUM_KEEPER_CENTRE_Z,
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_PLACES,
+    KEEPER_FITUP_X_BAND_MM,
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
     KEEPER_INNER_FACE_SPAN_MM,
@@ -48,6 +52,9 @@ from ch_fulcrum_keeper_spec import (
 )
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
+from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
+from fr_top_frame_spec import BOSS_DIA as SOCKET_BOSS_DIA
+from fr_top_frame_spec import WEB_T as RAIL_WEB_T
 from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
     HUB0_SOUTH_FACE_Z,
@@ -90,12 +97,22 @@ FULCRUM_Y = LEVER_FULCRUM_XY[1]
 # Keeper plan (machine x, z): the west rail's front socket centre, where its
 # web centre line (the socket axis, x = COLUMN_X) meets the line of the
 # upper socket centres (z = FRAME_FRONT_COLUMN_Z); the lug centre line
-# KEEPER_FITUP_X_FROM_WEB_MM west of it. Both datum lines are drawn only
-# these lengths: enough to read and to point at, clear of the keepers.
+# KEEPER_FITUP_X_FROM_WEB_MM west of it. The frame features are drawn in
+# phantom (b9ae review rule 10: the settings run from drawn features): the
+# socket's bore and boss; the web faces from where they leave the boss to
+# the front lug inner face station, under the front keeper, with the web
+# centre line between them over the same run; the socket line east past the
+# boss, toward its pair.
 KEEPER_SOCKET_XZ = (COLUMN_X, FRAME_FRONT_COLUMN_Z)
 KEEPER_LUG_X = COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM
-KEEPER_PLAN_SOCKET_LINE = 15.0  # east from the socket centre, toward its pair
-KEEPER_PLAN_WEB_LINE = 15.0  # rearward from the socket centre
+KEEPER_PLAN_SOCKET_LINE = 30.0  # east from the socket centre, past the boss
+KEEPER_PLAN_WEB_HALF_T = RAIL_WEB_T / 2.0
+# Where each web face leaves the boss, rearward of the socket centre.
+KEEPER_PLAN_WEB_FACE_FROM_SOCKET = math.sqrt(
+    (SOCKET_BOSS_DIA / 2.0) ** 2 - KEEPER_PLAN_WEB_HALF_T**2
+)
+if KEEPER_PLAN_SOCKET_LINE <= SOCKET_BOSS_DIA / 2.0:
+    raise AssertionError("the keeper plan's socket line ends inside the boss")
 if abs(KEEPER_LUG_X - LEVER_FULCRUM_XY[0]) > 1e-9:
     raise AssertionError("the keeper plan's lug centre line is off the fulcrum")
 if any(
@@ -103,6 +120,8 @@ if any(
     for face, offset in zip(LUG_INNER_FACE_Z, KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM)
 ):
     raise AssertionError("the keeper plan's faces are not the fit-up stations")
+if FRAME_FRONT_COLUMN_Z + KEEPER_PLAN_WEB_FACE_FROM_SOCKET >= LUG_INNER_FACE_Z[0]:
+    raise AssertionError("the keeper plan's web faces end before they start")
 
 if abs(PIVOT_CHAIN_Z[1] - PIVOT_CHAIN_Z[0] - ROCKER_SPRING_SET) > 1e-9:
     raise AssertionError("the spring-set leg is not ROCKER_SPRING_SET")
@@ -138,19 +157,17 @@ DIMENSION_FEATURE = {
 }
 TOLERANCE_PRECISION = 2
 # (lower, upper) deviations; the stack accepts only long (STACK_L20_ACCEPT).
-# The keeper plan's three each carry the fit-up band on their own dimension
-# (owner ruling X1+B1, 2026-10-18): the lug centre off the web centre and
-# each inner face off the socket line.
+# The keeper plan's three each carry their fit-up band on their own
+# dimension (owner ruling X1+B1, 2026-10-18): each inner face off the socket
+# line the location band, the lug centre off the web centre its own looser
+# band (owner ruling X-A, 2026-10-18).
 DIMENSION_TOLERANCES = {
     SPRING_SET_DIMENSION: (-ROCKER_SPRING_SET_BAND, ROCKER_SPRING_SET_BAND),
     STACK_LENGTH_DIMENSION: (-STACK_L20_ACCEPT_BAND[1], STACK_L20_ACCEPT_BAND[0]),
+    KEEPER_X_DIMENSION: (-KEEPER_FITUP_X_BAND_MM, KEEPER_FITUP_X_BAND_MM),
     **{
         name: (-KEEPER_FITUP_LOCATION_BAND_MM, KEEPER_FITUP_LOCATION_BAND_MM)
-        for name in (
-            KEEPER_X_DIMENSION,
-            KEEPER_FRONT_Z_DIMENSION,
-            KEEPER_REAR_Z_DIMENSION,
-        )
+        for name in (KEEPER_FRONT_Z_DIMENSION, KEEPER_REAR_Z_DIMENSION)
     },
 }
 REFERENCE_DIMENSIONS = frozenset({LUG_SPAN_DIMENSION})

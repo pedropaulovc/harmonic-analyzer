@@ -180,11 +180,12 @@ CROWN_ROUND_CALLOUT = "FULL ROUND TANGENT TO BOTH\nSIDES, CENTER AT BORE HEIGHT"
 
 # --- Fit-up on the top frame (MHA-CH-000): the pair goes on with the shaft
 # through both bores and is set by DRO, the lug centres on the fulcrum line
-# and the lug INNER faces off the front column socket, each within
-# KEEPER_FITUP_LOCATION_BAND_MM; the frame's keeper taps are then transferred
-# from the foot holes, so no frame-tap or foot-hole station reaches the
-# keeper's place. The step prints these distances to KEEPER_FITUP_PLACES;
-# build_fr_top_frame reads the same names for the foot-to-boss stack. ---
+# within KEEPER_FITUP_X_BAND_MM and the lug INNER faces off the front column
+# socket each within KEEPER_FITUP_LOCATION_BAND_MM; the frame's keeper taps
+# are then transferred from the foot holes, so no frame-tap or foot-hole
+# station reaches the keeper's place. The step prints these distances to
+# KEEPER_FITUP_PLACES; build_fr_top_frame reads the same names for the
+# foot-to-boss stack. ---
 KEEPER_FITUP_LOCATION_BAND_MM = 0.02
 KEEPER_FITUP_PLACES = 2
 # Each lug centre stands this far west (+x) of the centre of the top-frame
@@ -192,6 +193,13 @@ KEEPER_FITUP_PLACES = 2
 # datum on the receiving web). Restated here so the spec stays config-free;
 # draw_ch_channel_assembly pins it to the fulcrum line and the column line.
 KEEPER_FITUP_X_FROM_WEB_MM = 2.9
+# The lug centre's own band (owner ruling X-A, 2026-10-18, on the 5d5245a48
+# machinist review): no mate needs the lateral X held tight -- the pair is
+# reamed together and set with the shaft through both, the fulcrum's gain
+# sensitivity is ~0.04 %/mm and common to every channel -- so it carries a
+# looser band than the inner faces (KEEPER_FITUP_LOCATION_BAND_MM, which the
+# shaft flats need). build_fr_top_frame reads it for its X-side stacks.
+KEEPER_FITUP_X_BAND_MM = 0.10
 KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM = tuple(
     FULCRUM_KEEPER_CENTRE_Z + side * (KEEPER_Z_OFF - LUG_HALF_T) - FRAME_FRONT_COLUMN_Z
     for side in (-1.0, 1.0)

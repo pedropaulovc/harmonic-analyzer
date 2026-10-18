@@ -54,6 +54,9 @@ BOSS_DIA = (
     45.0  # user ruling: all four upper/lower bosses clear the outward keeper feet
 )
 BORE_DIA = COLUMN_SOCKET_DIAMETER
+# Every rail's web thickness, centred on its centreline (the keeper plan of
+# MHA-CH-000 draws the west rail's web faces from it).
+WEB_T = 13.0  # user ruling: retain loose bands plus realistic deep-drill wander
 CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.45
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
 GOOSENECK_BORE_DIA = 17.0  # O16 post slides through

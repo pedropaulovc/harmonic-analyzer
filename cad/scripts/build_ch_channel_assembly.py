@@ -1035,8 +1035,9 @@ async def _author_settings_reference(adapter) -> None:
     construction sketch per bank view (ch_channel_assembly_spec) -- a chain on
     the pivot axis (south ear inner face, south washer, hub 0, hub 19) and a
     leg on the fulcrum axis between the keeper lugs' inner faces -- and one
-    for the keeper plan view (the MHA-FR-002 web centre and socket lines, the
-    lug centre line and the two inner-face stations), each dimensioned from
+    for the keeper plan view (the MHA-FR-002 socket bore and boss, socket
+    line, web faces and web centre line, the lug centre line and the two
+    inner-face stations), each dimensioned from
     globals, banded, marked for the drawing and blanked (the mg
     AxleStackReference pattern). On the Right plane, sketch x is machine -z
     and sketch y is machine y; on the Top plane, sketch x is machine x and
@@ -1059,7 +1060,10 @@ async def _author_settings_reference(adapter) -> None:
         ("ChKeeperSocketX", socket_x),
         ("ChKeeperSocketZ", socket_y),
         ("ChKeeperSocketLine", spec.KEEPER_PLAN_SOCKET_LINE),
-        ("ChKeeperWebLine", spec.KEEPER_PLAN_WEB_LINE),
+        ("ChKeeperSocketBore", spec.SOCKET_BORE_DIA),
+        ("ChKeeperSocketBoss", spec.SOCKET_BOSS_DIA),
+        ("ChKeeperWebHalfT", spec.KEEPER_PLAN_WEB_HALF_T),
+        ("ChKeeperWebFaceFromSocket", spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET),
         ("ChKeeperLugX", spec.KEEPER_LUG_X - socket_x),
         ("ChKeeperFrontFaceZ", socket_y - face_ys[0]),
         ("ChKeeperRearFaceZ", socket_y - face_ys[1]),
@@ -1117,21 +1121,44 @@ async def _author_settings_reference(adapter) -> None:
     dims = SketchDims()
     check("create keeper-plan settings sketch", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    # The socket line runs east (-x) toward the upper-left socket, the web
-    # centre line rearward (+z, sketch -y); the lug centre line runs from the
-    # socket line through both inner-face stations, front then rear.
+    # The MHA-FR-002 features, all construction (phantom on the sheet): the
+    # socket line runs east (-x) past the boss toward the upper-left socket;
+    # the socket's bore and boss circles sit on its centre; the web centre
+    # line and both web faces run rearward (+z, sketch -y) to the front lug
+    # inner-face station, the faces from where they leave the boss. The lug
+    # centre line runs from the socket line through both inner-face
+    # stations, front then rear.
     socket_line = check(
         "keeper-plan socket line",
         await adapter.add_line(
             socket_x, socket_y, socket_x - spec.KEEPER_PLAN_SOCKET_LINE, socket_y
         ),
     )
+    socket_circles = [
+        check(
+            f"keeper-plan socket {label} circle",
+            await adapter.add_circle(socket_x, socket_y, diameter / 2.0),
+        )
+        for label, diameter in (
+            ("bore", spec.SOCKET_BORE_DIA),
+            ("boss", spec.SOCKET_BOSS_DIA),
+        )
+    ]
     web_line = check(
         "keeper-plan web centre line",
-        await adapter.add_line(
-            socket_x, socket_y, socket_x, socket_y - spec.KEEPER_PLAN_WEB_LINE
-        ),
+        await adapter.add_line(socket_x, socket_y, socket_x, face_ys[0]),
     )
+    web_face_y = socket_y - spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET
+    web_faces = [
+        check(
+            f"keeper-plan {side} web face",
+            await adapter.add_line(x, web_face_y, x, face_ys[0]),
+        )
+        for side, x in (
+            ("outer", socket_x + spec.KEEPER_PLAN_WEB_HALF_T),
+            ("inner", socket_x - spec.KEEPER_PLAN_WEB_HALF_T),
+        )
+    ]
     lug_ys = [socket_y, *face_ys]
     lug_legs = [
         check(
@@ -1141,14 +1168,15 @@ async def _author_settings_reference(adapter) -> None:
         for index, (y0, y1) in enumerate(zip(lug_ys, lug_ys[1:]))
     ]
     set_sketch_direct_db(adapter, False)
-    for line in (socket_line, web_line, *lug_legs):
-        segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    for entity in (socket_line, *socket_circles, web_line, *web_faces, *lug_legs):
+        segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
-            raise RuntimeError(f"keeper-plan line {line} is not construction")
+            raise RuntimeError(f"keeper-plan entity {entity} is not construction")
     for line, relation in (
         (socket_line, "horizontal"),
         (web_line, "vertical"),
+        *((face, "vertical") for face in web_faces),
         *((leg, "vertical") for leg in lug_legs),
     ):
         check(
@@ -1157,10 +1185,14 @@ async def _author_settings_reference(adapter) -> None:
         )
     socket = f"{socket_line}.start"
     lug_start = f"{lug_legs[0]}.start"
+    front_station = f"{lug_legs[0]}.end"
     for first, second, relation in (
+        *((f"{circle}.center", socket, "coincident") for circle in socket_circles),
         (f"{web_line}.start", socket, "coincident"),
-        (f"{lug_legs[0]}.end", f"{lug_legs[1]}.start", "coincident"),
+        (front_station, f"{lug_legs[1]}.start", "coincident"),
         (lug_start, socket, "horizontal_points"),
+        (f"{web_line}.end", front_station, "horizontal_points"),
+        *((f"{face}.end", front_station, "horizontal_points") for face in web_faces),
     ):
         check(
             f"keeper-plan {first} {relation} {second}",
@@ -1171,6 +1203,18 @@ async def _author_settings_reference(adapter) -> None:
     )
     dims.record("KeeperSocketX", '"ChKeeperSocketX"')
     dims.record("KeeperSocketZ", '"ChKeeperSocketZ"')
+    for circle, value, name, drive in zip(
+        socket_circles,
+        (spec.SOCKET_BORE_DIA, spec.SOCKET_BOSS_DIA),
+        ("KeeperSocketBore", "KeeperSocketBoss"),
+        ('"ChKeeperSocketBore"', '"ChKeeperSocketBoss"'),
+        strict=True,
+    ):
+        check(
+            f"keeper-plan {name} diameter",
+            await adapter.add_sketch_dimension(circle, None, "diameter", value),
+        )
+        dims.record(name, drive)
     for first, second, kind, value, name, drive in (
         (
             socket,
@@ -1180,13 +1224,27 @@ async def _author_settings_reference(adapter) -> None:
             "KeeperSocketLine",
             '"ChKeeperSocketLine"',
         ),
-        (
-            socket,
-            f"{web_line}.end",
-            "vertical_distance",
-            spec.KEEPER_PLAN_WEB_LINE,
-            "KeeperWebLine",
-            '"ChKeeperWebLine"',
+        *(
+            dimension
+            for face, side in zip(web_faces, ("Outer", "Inner"), strict=True)
+            for dimension in (
+                (
+                    socket,
+                    f"{face}.start",
+                    "horizontal_distance",
+                    spec.KEEPER_PLAN_WEB_HALF_T,
+                    f"Keeper{side}WebFaceX",
+                    '"ChKeeperWebHalfT"',
+                ),
+                (
+                    socket,
+                    f"{face}.start",
+                    "vertical_distance",
+                    spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET,
+                    f"Keeper{side}WebFaceZ",
+                    '"ChKeeperWebFaceFromSocket"',
+                ),
+            )
         ),
         (
             socket,
@@ -1198,7 +1256,7 @@ async def _author_settings_reference(adapter) -> None:
         ),
         (
             lug_start,
-            f"{lug_legs[0]}.end",
+            front_station,
             "vertical_distance",
             socket_y - face_ys[0],
             spec.KEEPER_FRONT_Z_DIMENSION,

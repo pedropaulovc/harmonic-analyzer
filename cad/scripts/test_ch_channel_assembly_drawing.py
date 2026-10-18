@@ -689,18 +689,15 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
         drawing.asm.LUG_INNER_FACE_Z[1] - drawing.asm.LUG_INNER_FACE_Z[0]
     )
     assert "BORE AXIS PARALLEL TO THE FLAT" in reamed
-    # Machinist gate 2026-10-17 (rule 7): the step states the bores it leaves,
-    # the keeper print's 6.350 +0.050/+0.038, and their acceptance, never the
-    # operation or the made-to-order reamer (still sized against that band in
-    # ch_fulcrum_keeper_spec).
-    upper, lower = keeper.BORE_DIA_BAND
-    assert (keeper.BORE_DIA + lower, keeper.BORE_DIA + upper) == pytest.approx(
-        (6.388, 6.400)
-    )
+    # Machinist gate 2026-10-17 (rule 7): the step states the bores' acceptance,
+    # never the operation or the made-to-order reamer (sized against the keeper
+    # print's band in ch_fulcrum_keeper_spec). 5d5245a48 review (rule 24): the
+    # bore limits are the keeper print's, not this sheet's.
     assert (
-        f"FLAT. BOTH {number} BORES 6.388 TO 6.400 DIA, IN LINE: THE "
+        f"FLAT. BOTH {number} BORES IN LINE: THE "
         f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED." in reamed
     )
+    assert "6.388" not in reamed and "6.400" not in reamed
     for method in ("REAM", "0.2515", " IN LONG", " PASS"):
         assert method not in reamed
     assert keeper.PAIR_REAMER_REACH_MARGIN_MM > 0.0
@@ -732,12 +729,13 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     for value in (keeper.KEEPER_FITUP_X_FROM_WEB_MM, front, rear):
         assert f"{value:.{places}f}" not in fitted
     asm = drawing.asm
-    for name in (
-        asm.KEEPER_X_DIMENSION,
-        asm.KEEPER_FRONT_Z_DIMENSION,
-        asm.KEEPER_REAR_Z_DIMENSION,
+    # Owner ruling X-A: the lug centre carries its own looser band, the
+    # inner faces the location band.
+    for name, band in (
+        (asm.KEEPER_X_DIMENSION, keeper.KEEPER_FITUP_X_BAND_MM),
+        (asm.KEEPER_FRONT_Z_DIMENSION, keeper.KEEPER_FITUP_LOCATION_BAND_MM),
+        (asm.KEEPER_REAR_Z_DIMENSION, keeper.KEEPER_FITUP_LOCATION_BAND_MM),
     ):
-        band = keeper.KEEPER_FITUP_LOCATION_BAND_MM
         assert asm.DIMENSION_TOLERANCES[name] == (-band, band)
         assert asm.DRAWING_PRECISION[asm.KEEPER_PLAN_FEATURE][name] == places
     assert asm.KEEPER_LUG_X - asm.KEEPER_SOCKET_XZ[0] == pytest.approx(

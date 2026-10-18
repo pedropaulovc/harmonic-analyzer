@@ -87,7 +87,6 @@ import ch_channel_assembly_spec as asm
 import ch_channel_assembly_steps as steps
 from ch_fulcrum_keeper_spec import (
     BORE_DIA as KEEPER_BORE_DIA,
-    BORE_DIA_BAND as KEEPER_BORE_DIA_BAND,
     CROWN_LEAST_R,
     CROWN_MOST_R,
     CROWN_R,
@@ -491,11 +490,14 @@ LEVER_BANK = BankView(
 # The keepers on MHA-FR-002 in plan at 1:2, machine front up as the frame's
 # own plan prints it (b9ae machinist review: step 10's settings had no view,
 # and its X datum, the web centre, is no face to touch). The frame is not in
-# this assembly, so the hidden KEEPER_PLAN_FEATURE sketch draws its datums
-# as construction lines and carries the three settings (owner ruling
-# X1+B1). Placed under the lever bank: the socket line 0.120 up. The
-# farm-measured outline (c80bb08be) runs 0.0064 above the socket line to
-# 0.1051 below it, so its bottom clears the border by 2.2 mm.
+# this assembly, so the hidden KEEPER_PLAN_FEATURE sketch draws, in phantom,
+# the frame features the settings run from (5d5245a review rule 10): the
+# west front upper socket's bore and boss, the line of the upper socket
+# centres, the web faces and the web centre line splitting them; it carries
+# the three settings (owner rulings X1+B1, X-A). Placed under the lever bank:
+# the socket line 0.120 up. The farm-measured outline (c80bb08be) ran 0.1051
+# below the socket line, so its bottom clears the border by 2.2 mm; the boss
+# now tops it 0.0113 above.
 KEEPER_PLAN_SOCKET_Y = 0.120
 _PLAN_CENTRE_Y = 0.070
 _TOP_FRAME_NUMBER = str(_config.parts("fr-top-frame")["number"])
@@ -524,13 +526,14 @@ _PLAN_LUG = KEEPER_PLAN.plan_xy(asm.KEEPER_LUG_X, asm.KEEPER_SOCKET_XZ[1])
 _PLAN_FACES = tuple(
     KEEPER_PLAN.plan_xy(asm.KEEPER_LUG_X, z) for z in asm.LUG_INNER_FACE_Z
 )
-# The X text right of its 1.45 mm span, above the socket line; each Z text
-# centred on its own dimension line west of the keepers, the rear's inside
-# the front's so neither text sits on the other's line (the front line
-# stops at the front face, above the rear text; the front text clears the
-# rear line by 3 mm).
+# The X text above the boss, its dimension line clear of the boss top and
+# off the inner-face dimensions' shared extension line on the socket line
+# (5d5245a review); each Z text centred on its own dimension line west of
+# the keepers, the rear's inside the front's so neither text sits on the
+# other's line (the front line stops at the front face, above the rear text;
+# the front text clears the rear line by 3 mm).
 PLAN_KEEP = {
-    asm.KEEPER_X_DIMENSION: (_PLAN_LUG[0] + 0.016, KEEPER_PLAN_SOCKET_Y + 0.005),
+    asm.KEEPER_X_DIMENSION: (_PLAN_LUG[0] + 0.016, KEEPER_PLAN_SOCKET_Y + 0.017),
     asm.KEEPER_REAR_Z_DIMENSION: (
         _PLAN_LUG[0] + 0.035,
         (KEEPER_PLAN_SOCKET_Y + _PLAN_FACES[1][1]) / 2.0,
@@ -542,13 +545,15 @@ PLAN_KEEP = {
 }
 # The two frame datums the sketch draws, named where they are drawn (owner
 # ruling: the web centre reads as the split of both web faces), the texts
-# east of the view, each leader under or over the other's.
+# east of the view: the socket line's leader lands past the boss, the web
+# centre's inside the boss annulus, between the bore and the web faces.
 PLAN_POINTERS = (
     (
         f"{_TOP_FRAME_NUMBER} LINE OF THE\nUPPER SOCKET CENTRES",
         (0.020, 0.131),
         KEEPER_PLAN.plan_xy(
-            asm.KEEPER_SOCKET_XZ[0] - 2.0 * asm.KEEPER_PLAN_SOCKET_LINE / 3.0,
+            asm.KEEPER_SOCKET_XZ[0]
+            - (asm.SOCKET_BOSS_DIA / 2.0 + asm.KEEPER_PLAN_SOCKET_LINE) / 2.0,
             asm.KEEPER_SOCKET_XZ[1],
         ),
     ),
@@ -557,7 +562,8 @@ PLAN_POINTERS = (
         (0.020, 0.114),
         KEEPER_PLAN.plan_xy(
             asm.KEEPER_SOCKET_XZ[0],
-            asm.KEEPER_SOCKET_XZ[1] + asm.KEEPER_PLAN_WEB_LINE / 2.0,
+            asm.KEEPER_SOCKET_XZ[1]
+            + (asm.SOCKET_BORE_DIA / 2.0 + asm.KEEPER_PLAN_WEB_FACE_FROM_SOCKET) / 2.0,
         ),
     ),
 )
@@ -877,9 +883,7 @@ def _fitup_notes() -> tuple[str, str]:
         steps.KEEPERS_PAIR_REAMED_KEY: (
             f"CLAMP BOTH {keeper}, FEET OUTBOARD ON ONE FLAT, INNER LUG FACES "
             "AT THE LEVER BANK VIEW'S LUG SPAN, BORE AXIS PARALLEL TO THE "
-            f"FLAT. BOTH {keeper} BORES "
-            f"{KEEPER_BORE_DIA + KEEPER_BORE_DIA_BAND[1]:.3f} TO "
-            f"{KEEPER_BORE_DIA + KEEPER_BORE_DIA_BAND[0]:.3f} DIA, IN LINE: THE "
+            f"FLAT. BOTH {keeper} BORES IN LINE: THE "
             f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED. THEN, ON "
             f"A {KEEPER_BORE_DIA:.2f} PIN IN EACH BORE, ROUND ITS CROWN TO THE "
             f"{keeper} CROWN R{CROWN_R:.1f} ABOUT THE PIN AND TAP IT "
