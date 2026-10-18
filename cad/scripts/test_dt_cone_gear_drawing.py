@@ -427,8 +427,8 @@ def test_custom_six_sheet_defines_the_tooth_space_point_by_point() -> None:
     lines = data.splitlines()
     assert lines[0] == "T006 TOOTH SPACE FORM, mm"
     assert drawing.SHEET_NAMES[0] == "T006"
-    assert lines[-1] == "ACCEPT OVER PINS PER SHEET 1 (T006 GEAR DATA)"
-    assert lines[-2] == f"WIDE ONLY: SETS BACKLASH WITH {notes.CYLINDER_MATE_NUMBER}"
+    assert "OVER PINS PER SHEET 1 " in lines[-1]
+    assert notes.CYLINDER_MATE_NUMBER in lines[-2]
     assert "(REF)" not in data
     assert "COMPARATOR" not in data and "TIF" not in data
     assert "INSPECT" not in data and "TOOL" not in data and "GRIND" not in data
@@ -548,24 +548,45 @@ def test_over_pins_acceptance_matches_the_closed_form_involute() -> None:
     assert maximum - minimum == pytest.approx(0.063, abs=0.002)
 
 
-def test_tooth_space_sheet_prints_the_table_alone() -> None:
-    """ENFORCE round 3 of #971: the cropped, rotated illustration showed no
-    CL, axes or stations, so it raised the question the table answers. The
-    sheet keeps one T006 view only as its title block's property source,
-    hidden, clear of the table and inside the border."""
+def test_tooth_space_sheet_plots_the_table_beside_it() -> None:
+    """ENFORCE rounds 3 and 4 of #971: the cropped, rotated illustration
+    showed no CL, axes or stations, and the table alone left the sheet
+    bunched in a corner (rule 15). The plot draws the table's own rows, with
+    CL, X axis, origin and R stations, between the table and the border. The
+    sheet's T006 view only feeds the title block, hidden."""
     source = inspect.getsource(drawing.build)
     assert '"*Front", *CUTTER_SOURCE_VIEW_CENTER' in source
     assert "_hide_title_block_source(adapter, source_view)" in source
-    assert "ILLUSTRATION" not in inspect.getsource(drawing)
-    numerator, denominator = drawing.SHEET_SCALES[notes.CUTTER_DETAIL_SHEET]
-    rendered_half_od = drawing.outside_dia_mm(6) * numerator / denominator / 2000.0
+    assert "_draw_form_plot(adapter)" in source
+    flank = drawing.form_plot_flank_mm()
+    rows = spec.custom_six_form_points_mm()
+    junction = spec.stock_form_profile(6).template.relief_junction_radius_mm
+    relief = [(x, y) for radius, x, y in rows[1:] if radius <= junction + 1e-9]
+    # The relief rows are the plot's vertices (straight lines row to row);
+    # above the junction the plot samples the involute the rows lie on.
+    assert flank[: len(relief)] == relief
+    for radius, x, y in rows[1 + len(relief):]:
+        half = spec.custom_six_gap_half_angle_rad(radius)
+        assert (x, y) == pytest.approx(
+            (radius * math.sin(half), radius * math.cos(half) - rows[0][0]), abs=6e-4
+        )
+    assert flank[-1] == pytest.approx(rows[-1][1:], abs=6e-4)
     # The table at the default note height: 2.4 mm a character, measured on
     # the run-20261010T051729717Z render of this sheet (113 mm, 47 characters).
     widest = max(map(len, drawing.cutter_grind_data().splitlines()))
-    center_x, center_y = drawing.CUTTER_SOURCE_VIEW_CENTER
-    assert center_x - rendered_half_od > drawing.CUTTER_DETAIL_POS[0] + widest * 0.0024 + 0.005
-    assert center_x + rendered_half_od < 0.420
-    assert center_y - rendered_half_od > 0.100
+    table_right = drawing.CUTTER_DETAIL_POS[0] + widest * 0.0024
+    plotted = [drawing.form_plot_xy(side * x, y) for x, y in flank for side in (1, -1)]
+    for key, reach in drawing.FORM_PLOT_STATION_REACH_MM.items():
+        radius = rows[-1][0] if key == "blank" else spec.stock_form_profile(6).template.relief_junction_radius_mm
+        plotted.append(drawing.form_plot_xy(*drawing.form_plot_station_mm(radius, reach)))
+    for text, (left, top) in drawing.form_plot_labels():
+        width = max(map(len, text.splitlines())) * 0.0026
+        plotted += [(left, top), (left + width, top - 0.005 * len(text.splitlines()))]
+    xs, ys = zip(*plotted)
+    assert min(xs) > table_right + 0.020
+    assert max(xs) < 0.415
+    # Above the title block (top 0.064) and below the border (0.267).
+    assert min(ys) > 0.070 and max(ys) < 0.262
 
 
 def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> None:

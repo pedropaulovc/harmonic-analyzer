@@ -58,7 +58,7 @@ from _drawing_dimensions import assert_imported_precision, set_dimension_callout
 from _drawing_edges import visible_view_entities
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_layout_collect import check_drawing_layout
-from _drawing_leaders import ARROW_TEXT_CLEARANCE
+from _drawing_leaders import ARROW_TEXT_CLEARANCE, set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -86,6 +86,7 @@ from dt_cone_gear_spec import (
     outside_dia_mm,
     tooth_thickness_mm,
     custom_six_form_points_mm,
+    custom_six_gap_half_angle_rad,
     stock_form_profile,
 )
 
@@ -254,6 +255,169 @@ CUTTER_DETAIL_POS = (0.015, 0.263)
 # Where the tooth-space sheet's hidden title-block source view stands (see
 # build): clear of the table, inside the border.
 CUTTER_SOURCE_VIEW_CENTER = (0.325, 0.155)
+# The tooth-space plot beside the table (ENFORCE round 4 of #971: a table
+# alone left the sheet bunched in one corner, rule 15). The table governs; the
+# plot draws the same rows at FORM_PLOT_SCALE with Y0 on the CL at
+# FORM_PLOT_ORIGIN. At 75:1 the space spans x 0.207-0.353 and y 0.139-0.202,
+# right of the table (x <= ~0.125) and above the title block (y 0.064).
+FORM_PLOT_SCALE = 75.0
+FORM_PLOT_ORIGIN = (0.280, 0.140)
+# The CL runs this far below Y0 and above the blank OD; the X axis this far
+# right of the CL.
+FORM_PLOT_CL_OVERRUN = 0.008
+FORM_PLOT_X_AXIS_LENGTH = 0.085
+# The R stations are drawn left of the CL only, out to these |X| (mm), so
+# their labels stand clear of the X axis.
+FORM_PLOT_STATION_REACH_MM = {"junction": 1.10, "blank": 1.25}
+FORM_PLOT_INVOLUTE_SAMPLES = 16
+FORM_PLOT_TITLE_POS = (0.205, 0.240)
+FORM_PLOT_ORIGIN_NOTE_OFFSET = (0.004, -0.008)
+# A station label's top-left, from its arc's left end: wholly left of the end,
+# where the arc only rises away to the right.
+FORM_PLOT_STATION_LABEL_OFFSET = (-0.019, 0.002)
+
+
+def form_plot_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
+    """Sheet position (m) of table point (X, Y) mm on the tooth-space plot."""
+    return (
+        FORM_PLOT_ORIGIN[0] + x_mm * FORM_PLOT_SCALE / 1000.0,
+        FORM_PLOT_ORIGIN[1] + y_mm * FORM_PLOT_SCALE / 1000.0,
+    )
+
+
+def form_plot_flank_mm() -> list[tuple[float, float]]:
+    """One flank (+X) of the T006 space as table (X, Y), root arc end up.
+
+    Straight lines row to row from where the relief leaves the root arc to the
+    junction (the table's own rule), then the involute sampled to the blank.
+    """
+    points = custom_six_form_points_mm()
+    template = stock_form_profile(6).template
+    root = template.root_radius_mm
+    junction = template.relief_junction_radius_mm
+    blank = points[-1][0]
+    flank = [(x, y) for radius, x, y in points[1:] if radius <= junction + 1e-9]
+    for index in range(1, FORM_PLOT_INVOLUTE_SAMPLES + 1):
+        radius = junction + (blank - junction) * index / FORM_PLOT_INVOLUTE_SAMPLES
+        half = custom_six_gap_half_angle_rad(radius)
+        flank.append((radius * math.sin(half), radius * math.cos(half) - root))
+    return flank
+
+
+def form_plot_station_mm(radius_mm: float, reach_mm: float) -> tuple[float, float]:
+    """Table (X, Y) where the station arc of ``radius_mm`` stops, left of CL."""
+    root = stock_form_profile(6).template.root_radius_mm
+    return (-reach_mm, math.sqrt(radius_mm**2 - reach_mm**2) - root)
+
+
+def form_plot_labels() -> list[tuple[str, tuple[float, float]]]:
+    """(text, top-left sheet position) of the plot's notes."""
+    template = stock_form_profile(6).template
+    blank = custom_six_form_points_mm()[-1][0]
+    junction = template.relief_junction_radius_mm
+    top = form_plot_xy(0.0, custom_six_form_points_mm()[-1][2])[1]
+    labels = [
+        (
+            f"T006 TOOTH SPACE PLOTTED {FORM_PLOT_SCALE:.0f}:1 FROM THE TABLE "
+            "(TABLE GOVERNS)",
+            FORM_PLOT_TITLE_POS,
+        ),
+        ("CL", (FORM_PLOT_ORIGIN[0] - 0.003, top + FORM_PLOT_CL_OVERRUN + 0.006)),
+        (
+            "+X",
+            (FORM_PLOT_ORIGIN[0] + FORM_PLOT_X_AXIS_LENGTH + 0.002,
+             FORM_PLOT_ORIGIN[1] + 0.002),
+        ),
+        (
+            f"X0 Y0 ON CL AT ROOT R{template.root_radius_mm:.3f}\n"
+            f"GEAR AXIS {template.root_radius_mm:.3f} BELOW Y0 ON CL",
+            (FORM_PLOT_ORIGIN[0] + FORM_PLOT_ORIGIN_NOTE_OFFSET[0],
+             FORM_PLOT_ORIGIN[1] + FORM_PLOT_ORIGIN_NOTE_OFFSET[1]),
+        ),
+    ]
+    for key, radius in (("junction", junction), ("blank", blank)):
+        x, y = form_plot_xy(
+            *form_plot_station_mm(radius, FORM_PLOT_STATION_REACH_MM[key])
+        )
+        labels.append((
+            f"R{radius:.3f}",
+            (x + FORM_PLOT_STATION_LABEL_OFFSET[0], y + FORM_PLOT_STATION_LABEL_OFFSET[1]),
+        ))
+    return labels
+
+
+def _draw_form_plot(adapter: Any) -> None:
+    """Sketch the tooth-space plot on the active sheet and label it.
+
+    Sheet sketch lines carry no dimensions: the sizes stay in the table.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    draw.ClearSelection2(True)
+    ddoc.EditSheet()
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    root = stock_form_profile(6).template.root_radius_mm
+    axis = form_plot_xy(0.0, -root)
+    flank = form_plot_flank_mm()
+    created = []
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        for side in (1.0, -1.0):
+            sheet_points = [form_plot_xy(side * x, y) for x, y in flank]
+            for start, end in zip(sheet_points, sheet_points[1:]):
+                created.append(("flank", manager.CreateLine(*start, 0.0, *end, 0.0)))
+        root_right = form_plot_xy(*flank[0])
+        root_left = form_plot_xy(-flank[0][0], flank[0][1])
+        # +1: counter-clockwise from the right end over the CL to the left.
+        created.append((
+            "root arc",
+            manager.CreateArc(*axis, 0.0, *root_right, 0.0, *root_left, 0.0, 1),
+        ))
+        top = form_plot_xy(0.0, custom_six_form_points_mm()[-1][2])[1]
+        created.append((
+            "CL",
+            manager.CreateCenterLine(
+                FORM_PLOT_ORIGIN[0], FORM_PLOT_ORIGIN[1] - FORM_PLOT_CL_OVERRUN, 0.0,
+                FORM_PLOT_ORIGIN[0], top + FORM_PLOT_CL_OVERRUN, 0.0,
+            ),
+        ))
+        created.append((
+            "X axis",
+            manager.CreateCenterLine(
+                *FORM_PLOT_ORIGIN, 0.0,
+                FORM_PLOT_ORIGIN[0] + FORM_PLOT_X_AXIS_LENGTH, FORM_PLOT_ORIGIN[1], 0.0,
+            ),
+        ))
+        template = stock_form_profile(6).template
+        blank = custom_six_form_points_mm()[-1][0]
+        for key, radius in (
+            ("junction", template.relief_junction_radius_mm), ("blank", blank)
+        ):
+            start = form_plot_xy(0.0, radius - root)
+            end = form_plot_xy(
+                *form_plot_station_mm(radius, FORM_PLOT_STATION_REACH_MM[key])
+            )
+            arc = manager.CreateArc(*axis, 0.0, *start, 0.0, *end, 0.0, 1)
+            created.append((f"R{radius:.3f} station", arc))
+            if arc is not None:
+                _early_bound(arc, "ISketchSegment").ConstructionGeometry = True
+    finally:
+        manager.AddToDB = previous_add_to_db
+    missing = sorted({label for label, segment in created if segment is None})
+    if missing:
+        raise RuntimeError(f"failed to sketch the tooth-space plot's {missing}")
+    draw.ClearSelection2(True)
+    for text, position in form_plot_labels():
+        if add_note(adapter, text, *position) is None:
+            raise RuntimeError(f"failed to add the tooth-space plot note {text!r}")
+    _telemetry.info(
+        f"T006 tooth-space plot: {len(created)} sheet sketch entities at "
+        f"{FORM_PLOT_SCALE:.0f}:1, Y0 at "
+        f"{tuple(round(value * 1000, 1) for value in FORM_PLOT_ORIGIN)} mm"
+    )
+
+
 
 
 def cutter_grind_data() -> str:
@@ -672,6 +836,19 @@ def _configure_views(
             raise RuntimeError(
                 f"view configuration readback {observed!r} != {configuration!r}"
             )
+
+
+def _hide_tangent_edges(view: Any, configuration: str) -> None:
+    """Drop the end view's tangent edges, and prove they went.
+
+    ENFORCE round 4 of #971: a grey circle at the root radius crossed every
+    tooth base, an edge between smooth faces that reads as a hub step or a
+    reference circle (draw_dt_crank_drive_gear does the same).
+    """
+    view.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
+    if int(view.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError(f"failed to hide the {configuration} front view's tangent edges")
+    view.UpdateViewDisplayGeometry()
 
 
 def _assert_tooth_geometry(front: Any, configuration: str, teeth: int) -> None:
@@ -1176,6 +1353,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _configure_views(adapter, configuration, views)
         for view in views:
             set_hidden_lines_removed(adapter, view)
+        _hide_tangent_edges(front, configuration)
         _assert_tooth_geometry(front, configuration, teeth)
         _center_bore_view(adapter, bore_view, configuration)
 
@@ -1208,6 +1386,19 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
         _assert_sheet_bands(adapter, front_annotations, configuration, teeth)
+        # ENFORCE round 4 of #971: the OD's and the root envelope's
+        # dimension lines crossed at the centre and over the bore; the OD
+        # leader now stops on its near rim.
+        blank_dia = [
+            item for item in front_annotations
+            if dimension_name(adapter, item) == "BlankDia"
+        ]
+        if len(blank_dia) != 1:
+            raise RuntimeError(
+                f"{configuration}: expected one BlankDia dimension, found {len(blank_dia)}"
+            )
+        set_near_side_diameter(blank_dia[0], f"{configuration} blank diameter")
+        rebuild_drawing(adapter, label=f"{configuration} blank diameter near-side leader")
         right_annotations = _curate_repeated_dimensions(
             adapter,
             right,
@@ -1251,6 +1442,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # cutter_grind_data).
     if add_note(adapter, cutter_grind_data(), *CUTTER_DETAIL_POS) is None:
         raise RuntimeError("failed to add the T006 tooth-space table")
+    _draw_form_plot(adapter)
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*SHEET_SCALES[CUTTER_DETAIL_SHEET], False, False):
         raise RuntimeError("failed to pin the DT6-FORM1 detail sheet scale")
