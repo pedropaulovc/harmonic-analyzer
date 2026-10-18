@@ -73,9 +73,11 @@ def test_overall_length_is_a_tip_to_tip_reference_over_the_body() -> None:
     source = Path(shaft.__file__).read_text(encoding="utf-8")
     assert 'pin_holes.record("OverallLength", \'"ShaftLen" + 2 * "CapSag"\')' in source
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # Singular helper, so it prints "(189.4)" with no diameter glyph (r3).
+    assert "set_reference_dimensions(" not in drawing_source
     assert (
-        'set_reference_dimensions(adapter, profile_annotations, ("OverallLength",))'
-        in (drawing_source)
+        'set_reference_dimension(adapter, overall[0], label="overall length")'
+        in drawing_source
     )
     # Overall outermost, over the body length.
     assert (
@@ -96,10 +98,15 @@ def test_running_fit_names_its_mate_and_the_sheet_carries_no_gdt() -> None:
     assert not hasattr(dt_pinion_pivot_shaft_spec, "GEOMETRIC_TOLERANCES_MM")
     assert 'entity_type="SILHOUETTE"' in source
     assert "char_height=FINISH_CHAR_HEIGHT" in source
-    # The diameter stands outside the back end, the pin-hole callout under
-    # the front hole: neither on the part.
-    assert drawing.PROFILE_KEEP["ShaftDia"][0] < drawing.BACK_END_X
+    # The diameter stands outside the front end, short of DETAIL A's fence
+    # (inside the border: left of the back end it ran over it, r3); the
+    # pin-hole callout under the bar, left of the front hole it leads to.
+    assert drawing.PROFILE_KEEP["ShaftDia"][0] > drawing.FRONT_END_X
+    assert drawing.PROFILE_KEEP["ShaftDia"][0] < (
+        drawing.DETAIL_CENTER[0] - drawing._DETAIL_FENCE_R - 0.020
+    )
     assert drawing.PROFILE_KEEP["PinHoleDia"][1] < drawing.SHAFT_LOWER_FLANK_Y
+    assert drawing.PROFILE_KEEP["PinHoleDia"][0] < drawing.FRONT_PIN_X - 0.030
 
 
 def test_linked_notes_are_few_and_carry_no_dimension_or_general_tolerance() -> None:
@@ -146,6 +153,7 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
     # that step through the registry, so a renumbered sequence carries it
     # (Codex #858, PRRT_kwDOPHDy386mTbPB).  The pointer is sheet text: the
     # part's spec never reads the registry (Main's TbPB ruling 1).
+    import _config
     import dt_drive_train_steps
 
     key = drawing.SHAFT_DRILL_STEP_KEY
@@ -154,8 +162,10 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
         "MATCH-DRILL THRU AT ASSEMBLY",
         "IN MHA-DT-014 CROSS HOLES, 2 PL",
     ]
+    pin = _config.parts("vn-pinion-strap-pin")["number"]
     assert callout == (
         f"{dt_pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT},\n"
+        f"PRESS FIT FOR {pin} SPRING PIN,\n"
         f"PER {dt_drive_train_steps.step_ref(key)}"
     )
     assert "dt_drive_train_steps" not in Path(

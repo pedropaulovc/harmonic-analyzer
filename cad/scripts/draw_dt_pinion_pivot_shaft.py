@@ -41,7 +41,7 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
-    set_reference_dimensions,
+    set_reference_dimension,
 )
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
@@ -113,13 +113,19 @@ SHAFT_FIT_CALLOUT = (
     f"RUNNING FIT IN\n{_config.parts('dt-pinion-pivot-block')['number']} BORES"
 )
 # The holes are drilled at MHA-DT-000's SHAFT DRILL SET, so the callout points
-# at that step through the registry (Codex #858, PRRT_kwDOPHDy386mTbPB).
+# at that step through the registry (Codex #858, PRRT_kwDOPHDy386mTbPB). The
+# +0.06/0 band is the spring pin's hole, so the callout names the pin and its
+# fit (rule 4; r3 review), with the fleet's "FOR <pin> SPRING PIN" wording.
 SHAFT_DRILL_STEP_KEY = "straps-pinned-to-torque-shaft"
+STRAP_PIN_NUMBER = _config.parts("vn-pinion-strap-pin")["number"]
+PIN_HOLE_FIT = f"PRESS FIT FOR {STRAP_PIN_NUMBER} SPRING PIN"
 DIMENSION_CALLOUTS = {
     "ShaftDia": SHAFT_FIT_CALLOUT,
     # The overall (reference) runs tip to tip over it; this is the cylinder.
     "ShaftLength": "CYLINDRICAL BODY",
-    "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(SHAFT_DRILL_STEP_KEY)}",
+    "PinHoleDia": (
+        f"{PIN_HOLE_CALLOUT},\n{PIN_HOLE_FIT},\nPER {step_ref(SHAFT_DRILL_STEP_KEY)}"
+    ),
 }
 
 PROFILE_KEEP = {
@@ -127,14 +133,18 @@ PROFILE_KEEP = {
     # the body length under it, end face to end face.
     "OverallLength": (PROFILE_CENTER[0], 0.252),
     "ShaftLength": (PROFILE_CENTER[0], 0.234),
-    # Left of the back end and under the bar's lower flank, outside the
-    # witness pair, so the toleranced text and its fit callout sit clear of
-    # both extension lines.
-    "ShaftDia": (BACK_END_X - 0.030, PROFILE_CENTER[1] - 0.012),
+    # Right of the front end, between it and DETAIL A's fence, under the
+    # bar's centre: outside the witness pair. Left of the back end (r3) the
+    # fit callout ran over the inner border into the zone margin; the text
+    # runs away from the dimension line (r3 audit: 43 mm wide there), so
+    # 12 mm out it ends ~12 mm short of the fence.
+    "ShaftDia": (FRONT_END_X + 0.012, PROFILE_CENTER[1] - 0.012),
     # Option E-a: the set-pin holes read as solid circles in the side view.
-    # Only the size prints; the match-drill callout carries the location. Under
-    # the front hole, its leader rising onto it.
-    "PinHoleDia": (FRONT_PIN_X - 0.008, PROFILE_CENTER[1] - 0.028),
+    # Only the size prints; the match-drill callout carries the location.
+    # Under the bar, LEFT of the front hole, so the leader leaves the text
+    # block's right end and rises onto the hole clear of the lettering (r3:
+    # centred under the hole, the leader struck its own text).
+    "PinHoleDia": (PROFILE_CENTER[0] - 0.005, PROFILE_CENTER[1] - 0.028),
 }
 
 # DETAIL A: the crown is a 1.2 mm feature. At 1:1 its height, its sphere and
@@ -381,8 +391,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, profile_annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, detail_annotations, {"CapFrontSag": CROWN_CALLOUT})
-    # The overall length is the two crowns on the body: a reference.
-    set_reference_dimensions(adapter, profile_annotations, ("OverallLength",))
+    # The overall length is the two crowns on the body: a reference. A plain
+    # "(189.4)": the plural helper's "(<MOD-DIAM>" printed "(Ø189.4)" (r3).
+    overall = [
+        annotation
+        for annotation in profile_annotations
+        if dimension_name(adapter, annotation) == "OverallLength"
+    ]
+    if len(overall) != 1:
+        raise RuntimeError("profile does not carry exactly one overall length")
+    set_reference_dimension(adapter, overall[0], label="overall length")
     radius_annotations = [
         annotation
         for annotation in detail_annotations
