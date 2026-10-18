@@ -406,19 +406,15 @@ FILLET_RADIUS = 0.10
 # build_dt_cone_gear_shaft), one fillet feature, one radius dimension.
 FILLET_CALLOUT = "3X"
 
-# Surface texture, on the two lands that bear: the Ø12.2308 journal turns in
-# the pivot post bore, and the terminal land's round carries the MHA-VN-016
-# thrust spacer's round bore and ends in the adjuster's cup.  (It is a D, not
-# a running journal, since its flat runs out through the tip.)  The three
-# intermediate lands only carry gears, so
-# they are left to the title-block process row.
+# Surface texture, on the one land that runs: the Ø12.2308 journal turns in
+# the pivot post bore.  Every other land only carries parts locked to the
+# shaft -- the gears slide on and are driven by the flats, the MHA-VN-016
+# collar is screwed to the terminal flat -- and the tip bears on the
+# adjuster's cup with its end, not its round, so they are left to the
+# title-block process row (drawing-guidelines.md rule 6; machinist review
+# r5, 20261018T080102803Z, which found the tip land's Ra 1.6 unexplained).
 SURFACE_FINISHES = (
     SurfaceFinishControl("pivot_journal", MACHINED_UM, CylinderFace(JOURNAL_DIA)),
-    SurfaceFinishControl(
-        "tip_land",
-        MACHINED_UM,
-        CylinderFace(SECTION_DIAS[-1], tolerance_mm=0.01),
-    ),
 )
 
 # What the native dimensions cannot say.  The seats, flats, steps and web

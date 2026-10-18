@@ -1300,12 +1300,11 @@ def test_the_sheet_carries_no_datums_or_feature_control_frames() -> None:
         "add_datum_feature(",
     ):
         assert banned not in source
-    # The journal that runs and the tip land T012, T006 and the MHA-VN-016
-    # collar ride keep their roughness symbol; nothing else does.
-    assert source.count("add_surface_finish(") == 2
+    # Only the journal that runs keeps its roughness symbol: the tip land's
+    # parts are locked to it and the tip bears with its end (rule 6, r5).
+    assert source.count("add_surface_finish(") == 1
     assert tuple(control.key for control in dt_cone_gear_shaft_spec.SURFACE_FINISHES) == (
         "pivot_journal",
-        "tip_land",
     )
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in part_source

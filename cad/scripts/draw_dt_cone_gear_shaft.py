@@ -200,9 +200,8 @@ STATION_TEXT_CLEARANCE = 0.002
 # its right-hand neighbours' lines: the tip's text sits highest and each
 # neighbour to the right steps down, so no line rises through a text (codex,
 # 18395f30).  Lands 2 and 3 carry their lines mid-land; the tip's line stays
-# 3.0 mm in from the tip face, right of the tip finish leader's landing 0.8
-# mm in (at 1.7 mm and 2.0 mm the leader ended on the line's arrowhead, r4b),
-# and follows the
+# 3.0 mm in from the tip face (r5's, clear of where the old tip finish leader
+# landed) and follows the
 # tip face when its station moves.  With its suffix the Ø6.350 text runs over
 # A-A's upper letter, so the three tip-end texts stand 2.5 mm higher than
 # r1's (the tip detail with them); Ø9.525 stands right of all three suffixes,
@@ -1476,7 +1475,6 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     pivot_face = _cylindrical_face(adapter, side, JOURNAL_DIA)
-    tip_face = _cylindrical_face(adapter, side, SECTION_DIAS[-1])
     _add_shaft_axis(adapter, side)
 
     # The donor is curated FIRST so the diameters cannot be claimed (and then
@@ -1565,20 +1563,10 @@ async def build(adapter: Any) -> dict[str, str]:
             f"the {len(annotations) - 1} beside the collar uniquely"
         )
 
-    # Leader anchors for the two lands that RUN (sheet metres).  The tip
-    # symbol stands above the tip with its glyph LEFT of the terminal diameter
-    # line and its text ABOVE that native diameter text, inside the left border
-    # (x 0.012; a glyph at 0.016 poked through it, codex c4720c62); the
-    # leader drops onto the tip's top flank 0.8 mm into the land, left of the
-    # terminal diameter's line and arrowhead (SIDE_DIAMETERS["Sec4Dia"]).
-    # No length extension line runs up there (they all hang from the bottom
-    # flank) and no diameter line stands left of the terminal diameter's.
+    # Leader anchor for the land that RUNS (sheet metres): the journal's top
+    # flank, 20 mm in from the faced end.
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
-    tip_top = (
-        big_end_x - SHAFT_LENGTH / 1000.0 + 0.0008,
-        SIDE_CENTER[1] + SECTION_DIAS[-1] / 2000.0,
-    )
     pivot_finish = add_surface_finish(
         adapter,
         side,
@@ -1589,17 +1577,6 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="FACE",
         entity=pivot_face,
         leader_attach_xy=pivot_top,
-    )
-    add_surface_finish(
-        adapter,
-        side,
-        symbol_xy=(0.0240, 0.1960),
-        control=surface_finish_by_key(SURFACE_FINISHES, "tip_land"),
-        label="tip land finish",
-        char_height=0.0025,
-        entity_type="FACE",
-        entity=tip_face,
-        leader_attach_xy=tip_top,
     )
     _clear_collar_callout(adapter, collar, pivot_finish, collar_neighbours)
     _prove_section_layout(
