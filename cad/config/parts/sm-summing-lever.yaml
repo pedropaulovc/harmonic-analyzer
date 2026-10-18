@@ -1,13 +1,30 @@
 sm-summing-lever:
   number: MHA-SM-003
   material_family: ferrous_noncritical
-  finish: green enamel; knife edges machined, spring-anchor and bracket seats tapped
+  finish: green enamel; mask knife edges and tapped holes; oil bare machined surfaces
   quantity: 1
   tolerance_class: machined_block
-  process: "machined from solid stock or casting"
+  process: "machined from solid stock"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
       where: "the knife-seat and 20-hole spring-pattern position frame (Ø0.15 RFS)"
       finding: "pattern position frame over-specified (rule 5)"
       reason: "one pattern control keeps the 20 channels spring geometry consistent; its Ø0.15 zone, tightened from Ø0.30 by owner ruling on code review C06, keeps neighbouring MHA-CH-014 jam nuts 0.25 apart with both taps at their worst (owner-accepted)"
+    # TODO(#1625): remove RV-02 when the title block gains its inside-corner
+    # default and this lever models R0.5 MAX stub roots / R0.4 MAX rib ends.
+    - id: "RV-02"
+      kind: "accept"
+      where: "internal corners at the rib, web, boss, cylinder and plate junctions, the plate-to-pad step and the stub-to-end-rib shoulders"
+      finding: "sharp internal corners with no stated fillet or maximum radius (rules 11, 16)"
+      reason: "owner ruling 2026-10-18: machined from solid with an R1.0 MAX inside-corner ceiling; the shop-wide default goes in the title block under #1625, which also adds the local R0.5 MAX stub-root and R0.4 MAX rib-end limits (owner-accepted)"
+    - id: "RV-03"
+      kind: "accept"
+      where: "front view, 2X R138.85 web arcs; words added to the Ø19.05 callout: 'WEB ARCS RUN FROM QUADRANTS TO AXIS A AT ENDS'"
+      finding: "the web arc endpoints are defined only in words added to the boss-diameter callout, and the arc centres are never located"
+      reason: "owner ruling 2026-10-18: the arcs are non-functional web clearance, located by the boss Ø19.05 and stub geometry they join (owner-accepted)"
+    - id: "RV-04"
+      kind: "accept"
+      where: "View G, end-rib tip, '(0.44) END RIBS ABOVE PLATE TOP FACE'"
+      finding: "the rib-end height that fixes the flank's slope is given only as the reference value (0.44), and no other dimension defines it"
+      reason: "owner ruling 2026-10-18: the ledge is as modelled, a non-functional consequence of the rib taper (owner-accepted)"

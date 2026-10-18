@@ -609,12 +609,12 @@ def rot_z_rows(deg: float) -> list[list[float]]:
     return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
 
 
-# MHA-CH-014 on each anchor axis, its z = 0 bearing face on the plate
-# underside: ROT_X_POS90 turns the nut's local +Z thread axis to machine -Y,
-# so the round nut hangs below the plate around the anchor's protruding shank.
+# MHA-CH-014 on each anchor axis, its z = 0 bearing face on the lever's spring
+# pad underside: ROT_X_POS90 turns the nut's local +Z thread axis to machine
+# -Y, so the round nut hangs below the pad around the anchor's protruding shank.
 CHANNEL_ANCHOR_NUT_XY = (
     spring_mounts.CHANNEL_ANCHOR_XY[0],
-    spring_mounts.PLATE_TOP_Y - sm_summing_lever_spec.PLATE_T,
+    spring_mounts.PLATE_TOP_Y - sm_summing_lever_spec.SPRING_SEAT_T,
 )
 CHANNEL_ANCHOR_NUT_ROWS = ROT_X_POS90
 
@@ -924,7 +924,7 @@ def _assert_spring_mount(
     if tap.kind != "tapped" or tap.size != anchor.thread_size:
         raise RuntimeError("channel anchor requires its matching native through tap")
     top = spring_mounts.PLATE_TOP_Y
-    bottom = top - sm_summing_lever_spec.PLATE_T
+    bottom = top - sm_summing_lever_spec.SPRING_SEAT_T  # the pad underside
     anchor_y = spring_mounts.CHANNEL_ANCHOR_XY[1]
     thread_top = anchor_y + anchor.thread_start_y_mm
     # The Ø3.175 neck cannot enter the tap, so the neck shoulders on the plate's
@@ -944,13 +944,10 @@ def _assert_spring_mount(
         )
     # The cut end crosses the plate and carries the MHA-CH-014 jam nut on the
     # underside; at the worst case (shortest in-band part under the thickest
-    # nut, backed out the whole calibration budget) full threads must still
-    # show below the nut.
+    # nut, through the thickest in-band pad, backed out the whole calibration
+    # budget) full threads must still show below the nut.
     protrusion = bottom - thread_bottom
-    nominal_protrusion = (
-        vn_spring_hook_spec.PROTRUSION_MAX_MM
-        - vn_spring_hook_spec.LENGTH_BAND_WORST_MM
-    )
+    nominal_protrusion = vn_spring_hook_spec.PROTRUSION_MM
     if abs(protrusion - nominal_protrusion) > 1e-6:
         raise RuntimeError(
             f"channel anchor cut end hangs {protrusion:.4f} mm below the plate "
