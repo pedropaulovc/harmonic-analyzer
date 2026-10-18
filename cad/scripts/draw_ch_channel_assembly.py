@@ -518,7 +518,10 @@ KEEPER_PLAN = BankView(
             asm.KEEPER_SET_SCREW,
         }
     ),
-    parts=f"ON {_TOP_FRAME_NUMBER}, FRONT UP",
+    # The frame's front is the bank's south end (machine -z: the front
+    # socket line, and the south end of every Right view); the Z callouts
+    # name the faces by end, as the steps do (042726e review).
+    parts=f"ON {_TOP_FRAME_NUMBER}, FRONT (SOUTH) UP",
     orientation="*Top",
     label_xy=(0.020, 0.090),
 )
@@ -704,14 +707,19 @@ def _end_labels(
     south_z: float,
     y: float,
     names: tuple[str, str],
+    *,
+    drop_mm: float = END_LABEL_DROP_MM,
+    x_offsets: tuple[float, float] = (0.0, -0.034),
 ) -> tuple[tuple[str, tuple[float, float]], ...]:
-    """NORTH/SOUTH end labels under a bank's ends (a review asked which end is which)."""
-    drop = y - END_LABEL_DROP_MM
+    """NORTH/SOUTH end labels under a bank's ends (a review asked which end is
+    which): ``drop_mm`` under the axis, each label's note point ``x_offsets``
+    (sheet m) from its end's station."""
+    drop = y - drop_mm
     north = view.sheet_xy(north_z, drop)
     south = view.sheet_xy(south_z, drop)
     return (
-        (names[0], north),
-        (names[1], (south[0] - 0.034, south[1])),
+        (names[0], (north[0] + x_offsets[0], north[1])),
+        (names[1], (south[0] + x_offsets[1], south[1])),
     )
 
 
@@ -722,13 +730,22 @@ ROCKER_END_LABELS = _end_labels(
     _PIVOT_Y,
     ("NORTH END, HUB 19", "SOUTH END, HUB 0"),
 )
+# Inside the lever bank, between the lever band (6 mm under the axis) and
+# the keeper feet, each label inboard of its keeper's inner face: at 52 mm
+# down they sat under the view, on the keeper plan's LUG CENTRE line, and
+# read as that view's labels (042726e review). The south label's note
+# point is its 0.045 width plus 3 mm inboard of the south lug inner face.
 LEVER_END_LABELS = _end_labels(
     LEVER_BANK,
     asm.LUG_INNER_FACE_Z[1],
     asm.LUG_INNER_FACE_Z[0],
     _FULCRUM_Y,
     ("NORTH END, LEVER 19", "SOUTH END, LEVER 0"),
+    drop_mm=14.0,
+    x_offsets=(0.003, -0.049),
 )
+if not asm.KEEPER_SOCKET_XZ[1] < asm.LUG_INNER_FACE_Z[0] < asm.LUG_INNER_FACE_Z[1]:
+    raise AssertionError("the keeper plan's front face is not the south end's")
 
 ROCKER_KEYS = tuple(
     steps.SEQUENCE[: steps.SEQUENCE.index(steps.KEEPERS_PAIR_REAMED_KEY)]

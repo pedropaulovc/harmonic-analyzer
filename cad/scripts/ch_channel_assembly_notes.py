@@ -40,9 +40,12 @@ DIMENSION_CALLOUTS = {
     STACK_LENGTH_DIMENSION: "STACK, CLOSED UP: STRAP PITCH TO RODS AND BARS",
     LUG_SPAN_DIMENSION: "LUG SPAN",
     # The keeper plan view: what each fit-up band sets (step 10's reason).
+    # The faces are named by bank end as the steps and the lever bank view
+    # name them (042726e review); the frame's front is the south end, which
+    # the plan view's label states (draw_ch_channel_assembly.KEEPER_PLAN).
     KEEPER_X_DIMENSION: "LUG CENTRE",
-    KEEPER_FRONT_Z_DIMENSION: "FRONT LUG INNER FACE",
-    KEEPER_REAR_Z_DIMENSION: "REAR LUG INNER FACE",
+    KEEPER_FRONT_Z_DIMENSION: "SOUTH LUG INNER FACE",
+    KEEPER_REAR_Z_DIMENSION: "NORTH LUG INNER FACE",
 }
 if set(DIMENSION_CALLOUTS) != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension carries a callout")
