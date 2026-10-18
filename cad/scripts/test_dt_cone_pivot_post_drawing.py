@@ -980,17 +980,18 @@ def test_removed_view_letter_is_not_a_datum_letter() -> None:
 def test_datum_a_and_journal_finish_stand_off_the_body() -> None:
     """r5: datum A sat on Ø12.281's leader and the Ra landed on its triangle.
     r13 (rule 14): both stood inside View C's body outline."""
-    centre_x = drawing.JOURNAL_CENTER[0]
-    # The Ra right of the view, below the size's text, its leader landing
-    # below the size's (about -24 degrees) on the rim.
-    assert drawing.JOURNAL_BORE_FINISH_XY[0] > centre_x + spec.BLOCK_DIA / 2000.0
-    assert drawing.JOURNAL_BORE_FINISH_XY[1] < drawing.JOURNAL_KEEP["JournalBoreDia"][1]
-    assert -90.0 < drawing.JOURNAL_BORE_FINISH_DEG < -30.0
-    # The tag below the body (its frame prints above the knee), the view's
-    # title below the tag.
-    body_bottom = drawing.JOURNAL_CENTER[1] - spec.BLOCK_HEIGHT / 2000.0
-    assert drawing.DATUM_A_TAG_XY[1] + 0.0086 < body_bottom
-    assert drawing.JOURNAL_TITLE_XY[1] < drawing.DATUM_A_TAG_XY[1]
+    right_of_body = drawing.JOURNAL_CENTER[0] + spec.BLOCK_DIA / 2000.0
+    # Both right of the view, below the size's text; each leader lands
+    # further round the rim than the one above it (the size's at about
+    # -24 degrees), so none crosses another.
+    for xy in (drawing.JOURNAL_BORE_FINISH_XY, drawing.DATUM_A_TAG_XY):
+        assert xy[0] > right_of_body
+        assert xy[1] < drawing.JOURNAL_KEEP["JournalBoreDia"][1]
+    assert drawing.DATUM_A_TAG_XY[1] < drawing.JOURNAL_BORE_FINISH_XY[1]
+    assert -90.0 < drawing.DATUM_A_LANDING_DEG < drawing.JOURNAL_BORE_FINISH_DEG < -30.0
+    # r14: a tag on the bore's edge OBJECT kept its default drop.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "position=DATUM_A_TAG_XY,\n                attachment_xy=(" in source
 
 
 def test_section_caption_states_no_scale_at_sheet_scale() -> None:

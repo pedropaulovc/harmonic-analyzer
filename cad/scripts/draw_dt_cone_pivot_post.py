@@ -184,20 +184,19 @@ if not DATUM_B_TAG_XY[1] < _front_y(0.0):
 # View C: datum A and the bore's Ra stand OFF the post's face, each on a
 # leader (r13 machinist review, rule 14: inside the body outline they read
 # as features of the face).  The bore's Ø12.281 leaves the lower-right rim
-# (about -24 degrees) for its text right of the view, so:
-# - the Ra lands at -45 degrees and stands below that text, right of the
-#   view, its leader under the size's;
-# - datum A tags the bottom of the rim.  A tag's rim landing follows its
-#   bearing from the bore centre (at (0.250, 0.128) it landed lower-right,
-#   r5), so its leader knee stands under the bore centre, below the body.
-#   The frame prints ~6.5..13.5 mm left of the knee and 1.6..8.6 mm above it
-#   (r13 sheet: knee 0.2335, 0.128 -> frame x 221..228, y 129.6..136.6 mm),
-#   here 4 mm under the body's bottom edge (y 112.7) and above VIEW C's
-#   title, which drops to JOURNAL_TITLE_XY to make the room.
-DATUM_A_TAG_XY = (0.234, 0.100)
+# (about -24 degrees) for its text right of the view, so both stand right
+# of the view below that text, each leader under the one before it:
+# - the Ra lands at -45 degrees, its symbol under the size's text;
+# - datum A lands at -70 degrees, its frame under the Ra.  The rim is picked
+#   by SHEET POINT: tagged by the edge object, the tag kept its default drop
+#   inside the body whatever the request (r14 sheet: requested 100 mm, printed
+#   114..121; solidworks-drawing-layout-tuning.md "a datum tag that will not
+#   leave its attachment").  -70 keeps the pick 2 mm off the vertical centre
+#   mark and 2.5 mm inside the boss circle.
+DATUM_A_TAG_XY = (0.275, 0.112)
+DATUM_A_LANDING_DEG = -70.0
 JOURNAL_BORE_FINISH_XY = (0.272, 0.127)
 JOURNAL_BORE_FINISH_DEG = -45.0
-JOURNAL_TITLE_XY = (0.202, 0.0975)
 
 FOOT_SEAT = requirement(
     "foot_seat", kind="face", faces=(cone.SURFACE_FINISHES[0].face,),
@@ -1831,7 +1830,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # #906 (USER RULING 2026-09-26): the crank bore's angularity to the cone
     # journal, model PMI (cone_pivot_post_spec.PART_DATUMS /
     # GEOMETRIC_CONTROLS) projected here.  Datum A tags the journal bore in
-    # View B, the only view that shows it true; datum B tags the foot seat
+    # View C, the only view that shows it true; datum B tags the foot seat
     # edge-on in the elevation, left of the body and clear of the foot-seat
     # finish on the right; the frame hangs off the crank bore rim in the
     # elevation, right of the body and below the bore callout.
@@ -1841,7 +1840,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "datum:A": PmiDrawingPlacement(
                 view=journal,
                 position=DATUM_A_TAG_XY,
-                edge_entity=_bore_rim_edge(journal, diameter_mm=BORE_DIA),
+                attachment_xy=(
+                    journal_centre[0]
+                    + journal_radius * math.cos(math.radians(DATUM_A_LANDING_DEG)),
+                    journal_centre[1]
+                    + journal_radius * math.sin(math.radians(DATUM_A_LANDING_DEG)),
+                ),
             ),
             "datum:B": PmiDrawingPlacement(
                 view=front,
@@ -1879,8 +1883,15 @@ async def build(adapter: Any) -> dict[str, str]:
     add_note(
         adapter,
         f"VIEW {JOURNAL_VIEW_LETTER} - CONE JOURNAL\nLOOK ALONG CONE AXIS",
-        *JOURNAL_TITLE_XY,
+        0.202,
+        0.104,
     )
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps the block at four lines (about 18 mm); the anchor keeps the
+    # r7 clearance to the bottom inner border.
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
+    # Last of the notes: a view-owned note leaves its view active, and a
+    # sheet note inserted after it joins that view (the notes block did, and
+    # crowded datum B across views: r14 view-crowding).
     incline = math.radians(cone.INCLINE_DEG)
     add_leader_note(
         adapter,
@@ -1893,9 +1904,6 @@ async def build(adapter: Any) -> dict[str, str]:
         view=top,
         label="plan cone bore axis label",
     )
-    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps the block at four lines (about 18 mm); the anchor keeps the
-    # r7 clearance to the bottom inner border.
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
 
     # Attaching dimensions and symbols can leave a stale hidden-line display.
     # Reassert each manufacturing view after its final annotation.
