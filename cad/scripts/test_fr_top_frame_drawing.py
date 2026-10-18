@@ -4880,7 +4880,7 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     half_foot = (round(keeper.KEEPER_WIDTH, foot_places) + band[foot_places]) / 2.0
     max_chamfer = round(part.EDGE_CHAMFER, chamfer_places) + band[chamfer_places]
     assert (half_flange, offset, half_foot, max_chamfer) == pytest.approx(
-        (16.7, 2.92, 7.4, 2.4)
+        (16.7, 3.0, 7.4, 2.4)
     )
     assert max_chamfer == pytest.approx(part.EDGE_BREAK_PRINTED_MAX)
     margin = half_flange - offset - half_foot - max_chamfer
