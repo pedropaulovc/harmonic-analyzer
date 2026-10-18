@@ -799,7 +799,11 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     break_max = shaft.THRUST_EDGE_BREAK_MAX
     assert f"RIMS BREAK {break_max:.1f} MAX" == shaft.POST_JOURNAL_RIM_BREAK
     bore_callout = drawing.DIMENSION_CALLOUTS["JournalBoreDia"]
-    assert bore_callout.splitlines()[-1] == shaft.POST_JOURNAL_RIM_BREAK
+    # r16 (rules 4 and 7): the tighter break carries its reason under it.
+    assert bore_callout.splitlines()[-2:] == [
+        shaft.POST_JOURNAL_RIM_BREAK,
+        "FOR COLLAR SEAT",
+    ]
     assert f"EDGE BREAK {break_max:.1f} MAX" in shaft.COLLAR_STOCK_CALLOUT
     ring = shaft.THRUST_RING_MIN
     assert ring - 2.0 * break_max >= shaft.THRUST_RING_FLOOR

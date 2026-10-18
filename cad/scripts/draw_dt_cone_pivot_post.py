@@ -200,7 +200,7 @@ if not DATUM_B_TAG_XY[1] < _front_y(0.0):
 #   prints right of the junction, past a 6.4 mm shoulder (r16 sheet).
 DATUM_A_TAG_XY = (0.266, 0.098)
 DATUM_A_LANDING_DEG = -62.0
-JOURNAL_BORE_FINISH_XY = (0.272, 0.127)
+JOURNAL_BORE_FINISH_XY = (0.272, 0.1215)
 JOURNAL_BORE_FINISH_DEG = -42.0
 
 FOOT_SEAT = requirement(
@@ -503,7 +503,10 @@ JOURNAL_TEXT_OFFSETS = {
 # The cone bore's rims bound the thrust ring the shaft collar bears on, with
 # the collar's OD edge (cone_gear_shaft_spec: ring - 2 x break >= 1.5), so the
 # bore's callout prints the same break as the collar instead of the title
-# block's 0.25.
+# block's 0.25, and says why under it (r16 machinist review, rules 4 and 7:
+# a break tighter than the title block's needs its reason at the callout).
+# That line drops the callout's shoulder 5.5 mm, so the Ra under it sits at
+# 121.5 mm rather than r16's 127.
 # Each running bore names the shaft that runs in it, the crank-above-cone
 # spacing the mesh it sets, the cone-axis height the tip block whose adjuster
 # cup the shaft's tip must enter, and the cone boss's north-face station the
@@ -514,7 +517,7 @@ DIMENSION_CALLOUTS = {
     "CrankBossLen": "CRANK BOSS\nLENGTH",
     "CrankBossStartZ": "CRANK BOSS\nFACE",
     "CrankBoreDia": "RUNS ON MHA-DT-011",
-    "JournalBoreDia": f"CONE BORE THRU\nRUNS ON MHA-DT-004\n{POST_JOURNAL_RIM_BREAK}",
+    "JournalBoreDia": f"CONE BORE THRU\nRUNS ON MHA-DT-004\n{POST_JOURNAL_RIM_BREAK}\nFOR COLLAR SEAT",
     "ConeBossDia": "CONE JOURNAL BOSS OD",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
     "ConeBossNorthZ": "THRUST FACE FOR\nMHA-DT-004 COLLAR,\nFROM POST AXIS",
