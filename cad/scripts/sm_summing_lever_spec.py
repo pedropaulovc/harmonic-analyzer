@@ -68,8 +68,9 @@ SURFACE_FINISHES = (
 )
 
 # The 20 channel-spring lower anchors (McMaster 9489T111, part ``vn-spring-hook``)
-# thread DIRECTLY into the coefficient plate -- the plate is their nut, the
-# supplied one is discarded -- so each station is a through tap, not a bore:
+# thread DIRECTLY into the coefficient plate -- the supplied nut is discarded
+# and each is locked by an MHA-CH-014 jam nut on the plate underside -- so
+# each station is a through tap, not a bore:
 # one native seed + a linear pattern. The size is the anchor's own thread, so a
 # supplier change can never leave the lever tapped for the wrong screw.
 HOLE_SPEC = HoleSpec("tapped", ANCHOR_9489T111.thread_size)
@@ -110,5 +111,9 @@ HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "summation anchor position": "0.30",
-    "spring-hole pattern position": "0.30",
+    # Ø0.15, tightened from 0.30 (owner ruling on code review
+    # C06): two neighbouring MHA-CH-014 jam nuts stand on adjacent taps, and
+    # at Ø0.30 their worst approach leaves no O.D. both the wall floor and the
+    # 0.25 neighbour clearance admit (ch_anchor_jam_nut_spec).
+    "spring-hole pattern position": "0.15",
 }

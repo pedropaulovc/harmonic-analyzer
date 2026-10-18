@@ -98,6 +98,11 @@ QUALIFYING_EXPLODES = {
         "create_pn_explode",
         ("_pn_pen_explode.py", "pn_pen_explode_spec.py", "_assembly_patterns.py"),
     ),
+    "sm_summing": (
+        "_sm_summing_explode",
+        "create_summing_explode",
+        ("_sm_summing_explode.py", "_assembly_patterns.py"),
+    ),
 }
 
 

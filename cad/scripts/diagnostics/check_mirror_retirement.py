@@ -86,6 +86,13 @@ expect(
     "sm-summing-lever",
 )
 expect("sm-summing", "vn-boss-hook-1", list(s.BOSS_HOOK_POS), IDENTITY, "vn-boss-hook")
+expect(
+    "sm-summing",
+    "vn-boss-hook-jam-nut-1",
+    list(s.JAM_NUT_POS),
+    s.JAM_NUT_ROWS,
+    "vn-boss-hook-jam-nut",
+)
 # The counter and gooseneck now seat on unchanged native supplier surfaces.
 # Their analytical insertion seeds are not their final placements and cannot
 # be compared against this historical static mirror-retirement pose dump.
@@ -793,6 +800,13 @@ for j in range(20):
         [*spring_mount_geom.CHANNEL_ANCHOR_XY, z_mid],
         IDENTITY,
         f"spring-hook ch{j:02d}",
+    )
+    expect(
+        CH,
+        f"ch-anchor-jam-nut-{j + 1}",
+        [*c.CHANNEL_ANCHOR_NUT_XY, z_mid],
+        c.CHANNEL_ANCHOR_NUT_ROWS,
+        f"spring-hook jam nut ch{j:02d}",
     )
 
 # ---- paper-drive -------------------------------------------------------------

@@ -3,12 +3,14 @@
 The single open routing eyebolt that hangs the master (counter) spring from the
 summing lever's summation-anchor boss. It threads DIRECTLY into the #10-24 tap
 through that boss (``sm_summing_lever_spec.COUNTER_HOLE_SPEC``, sourced from this
-same anchor record) -- no nut, no separate link ring.
+same anchor record) and is locked by the MHA-VN-072 jam nut on the boss top face
+-- no separate link ring.
 
 The one supplier option this production part takes is LENGTH: the vendor's
 58.7375 mm shank is cut back to the boss height it engages (19.05 mm, the
-lever's ``ANCHOR_H``) with the 45 deg deburr restored at the new end, so the
-thread ends at y -27.84475 and the factory thread phase is preserved.
+lever's ``ANCHOR_H``) plus the jam nut's thread above the boss
+(``vn_boss_hook_spec.JAM_NUT_THREAD_MM``) with the 45 deg deburr restored at the
+new end, so the factory thread phase is preserved.
 
 The tracked diagnostic recipe is an exact geometric replay of the supplied
 vendor SLDPRT and stays in the vendor's own frame -- eye centre at the origin,

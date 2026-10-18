@@ -124,7 +124,7 @@ greatest term, mean absolute error; Gaussian input | two-channel input):
 the tooth-in-gap lock, [#749](https://github.com/pedropaulovc/harmonic-analyzer/issues/749) —
 and that common phase adds 0.30 | 0.80 that no step here can remove: it is the sine transform)
 
-against 0.158 from the combined part and station-setting scatter. The corrections are where the
+against 0.155 from the combined part and station-setting scatter. The corrections are where the
 accuracy lives; the drawings and setup are where that scatter lives. That is the whole point of
 the error budget, and why `READOUT.md` ships beside the drawings as a manufacturing
 output, not as a footnote.
