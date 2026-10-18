@@ -352,8 +352,15 @@ BOM_NORMALIZED_ALIASES = {
 # leaders 2/9 and 8/9 crossed (farm run 20261016T061511876Z). The rod's
 # balloon takes the vertical corner of its square nearest the viewer, low down
 # (part mm: square x, z +-S/2, y up from the shoulder; the rod is placed
-# unrotated); the stud's the sheet-rightmost point of its head's top edge
-# (revolved about +Y; the octant's sheet-right is (sz, 0, -sx)). The wire's
+# unrotated), 15 mm above the shoulder: at 40 its bearing from the view centre
+# (-55.7 deg) sat 3 deg anticlockwise of thumb screw 6's tip (-58.9 deg), out
+# where the stirrup's explode carries it, so ring slot 2 came first and the
+# near-centre rod leader ran down-right across leader 6 (final build b9ae,
+# 20261018T015314587Z). At 15 the bearing is ~-67 deg, past the thumb screw's,
+# so balloon 2 rings below and left of 6 and its leader passes left of the
+# thumb screw and the rod set screw. The stud's takes the sheet-rightmost
+# point of its head's top edge (revolved about +Y; the octant's sheet-right is
+# (sz, 0, -sx)). The wire's
 # takes the sheet-leftmost point of its top end (extruded up +Y from the
 # origin, unrotated): walked, it took the end by the strap's corner and its
 # leader crossed the strap and the hanger screw (machinist review r3). The
@@ -364,7 +371,7 @@ BOM_NORMALIZED_ALIASES = {
 # 2026-10-17). Sheet-right (-1, 0, 1) makes that edge the strap's -x side on
 # its bar-seat face: a silhouette, clear of the screw, nuts and U guides.
 _OCTANT_X, _, _OCTANT_Z = spec.EXPLODED_OCTANT
-_ROD_ANCHOR_Y = 40.0
+_ROD_ANCHOR_Y = 15.0
 _HEAD_R = stud.HEAD_DIA / 2.0
 _WIRE_R = wire.WIRE_DIA / 2.0
 if (_OCTANT_Z, -_OCTANT_X) != (-1, 1):

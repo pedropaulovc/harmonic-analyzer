@@ -281,6 +281,20 @@ def test_hanger_balloon_lands_mid_strap_clear_of_the_hanger_screw() -> None:
     assert y > max(hanger.GUIDE_PLATE_YS) + hanger.GUIDE_PLATE_T + 30.0
 
 
+def test_rod_balloon_lands_low_on_its_viewer_corner() -> None:
+    """Final build b9ae: anchored 40 mm up the square, the rod's bearing from
+    the exploded view's centre sat just anticlockwise of thumb screw 6's tip,
+    so leader 2 crossed leader 6. 15 mm up turns it past the thumb screw's."""
+    import pn_pen_rod_spec as rod
+
+    x, y, z = drawing.BALLOON_ANCHORS[spec.ROD].point_mm
+    sx, _sy, sz = spec.EXPLODED_OCTANT
+    # The square's vertical corner nearest the viewer, on the square itself.
+    assert (x, z) == (sx * rod.ROD_SECTION / 2.0, sz * rod.ROD_SECTION / 2.0)
+    assert y == 15.0
+    assert 0.0 < y < rod.SQUARE_LENGTH / 4.0
+
+
 def test_every_setting_is_printed_with_a_callout_beside_its_detail() -> None:
     printed = {
         name for points in drawing.DIMENSION_TEXT_POINTS.values() for name in points
