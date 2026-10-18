@@ -902,8 +902,8 @@ def test_turned_diameters_stand_on_their_side_views() -> None:
     assert "CrankBossDia" in drawing.TOP_KEEP
     assert "CrankBossDia" not in drawing.FRONT_KEEP
     assert drawing.DIMENSION_SUFFIXES["HeadDia"] == " HEAD"
-    assert drawing.DIMENSION_SUFFIXES["CrankBossDia"] == " CRANK BOSS"
-    assert not {"HeadDia", "CrankBossDia"} & set(drawing.DIMENSION_CALLOUTS)
+    assert drawing.DIMENSION_CALLOUTS["CrankBossDia"] == "CRANK BOSS"
+    assert "HeadDia" not in drawing.DIMENSION_CALLOUTS
 
 
 def test_crank_bore_thru_rides_the_size_line_so_the_mate_line_stays_narrow() -> None:

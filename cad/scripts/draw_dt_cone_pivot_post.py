@@ -353,8 +353,12 @@ CRANK_BORE = requirement(
 # north-face station, the face the crank boss length is taken from.
 TOP_KEEP = {
     # Across the boss's side-on silhouette below the head, text out left
-    # clear of the 72.0's lower extension line at the boss end (y 172.5).
-    "CrankBossDia": (0.0655, 0.182),
+    # between the 72.0's dimension line (x 40) and the boss's left outline
+    # (x 87), clear of the 72.0's lower extension line at the boss end
+    # (y 172.5) and the head circle.  The label stacks under the size: on
+    # one row the text ran 43 mm wide and its last S sat on the boss outline
+    # (r12 machinist review, rule 14).
+    "CrankBossDia": (0.068, 0.1845),
     # The length stands outboard of the station so the station's stacked
     # label clears its dimension line: with the v36 boss face 2.5 further
     # north, a one-line label spanning both lines was crossed by the length.
@@ -484,6 +488,7 @@ JOURNAL_TEXT_OFFSETS = {
 # part whose collar thrusts on that face (r1 and r5 machinist reviews, rule 4:
 # its ±0.25 is the stacks' half band, cone_pivot_post_spec).
 DIMENSION_CALLOUTS = {
+    "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "CRANK BOSS\nLENGTH",
     "CrankBossStartZ": "CRANK BOSS\nFACE",
     "CrankBoreDia": "RUNS ON MHA-DT-011",
@@ -495,13 +500,11 @@ DIMENSION_CALLOUTS = {
     "CrankAboveCone": "16T:64T\nMESH",
     "JournalAxisY": "AXIS MATCHES\nMHA-DT-021",
 }
-# Text after the size and its band, on the same line: one row keeps the head
-# and crank boss diameters' text in the narrow bands beside the head and the
-# boss.
+# Text after the size and its band, on the same line: one row keeps the
+# head's Ø in the narrow band between View C's head and the A-A station.
 DIMENSION_SUFFIXES = {
     "CrankBoreDia": " THRU",
     "HeadDia": " HEAD",
-    "CrankBossDia": " CRANK BOSS",
 }
 # Diameters given on their circles land one arrow on the near rim, the line
 # kept off the centre: two leaders through one centre crossed there (the
@@ -586,12 +589,16 @@ _NORTH_BOSS_FINISH_OFFSET = (-0.006, 0.008)
 
 CONE_BOSS_NORTH_FACE = requirement(
     "cone_boss_north_face", kind="face", faces=(cone.SURFACE_FINISHES[3].face,),
-    requirements=("length", "finish_ra"), fields={
+    requirements=("length", "station", "finish_ra"), fields={
         "length": (_band(cone.CONE_BOSS_LENGTH, _P["ConeBossLen"]), ("CONE_BOSS_LENGTH",)),
         "length_nominal": (cone.CONE_BOSS_LENGTH, ("CONE_BOSS_LENGTH",)),
+        # The collar's thrust face from the post axis, at the stacks' half
+        # band (DIMENSION_CALLOUTS names the collar).
+        "station": (_band(cone.CONE_BOSS_NORTH_STATION, _P["ConeBossNorthZ"], (cone.CONE_BOSS_NORTH_STATION_TOLERANCE_MM, -cone.CONE_BOSS_NORTH_STATION_TOLERANCE_MM)), ("CONE_BOSS_NORTH_STATION", "CONE_BOSS_NORTH_STATION_TOLERANCE_MM")),
+        "station_nominal": (cone.CONE_BOSS_NORTH_STATION, ("CONE_BOSS_NORTH_STATION",)),
         "normal": (list(_NORMAL), ("SURFACE_FINISHES",)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-    }, precision={"length": _P["ConeBossLen"]},
+    }, precision={"length": _P["ConeBossLen"], "station": _P["ConeBossNorthZ"]},
 )
 CONE_BOSS_SOUTH_FACE = requirement(
     "cone_boss_south_face", kind="face",

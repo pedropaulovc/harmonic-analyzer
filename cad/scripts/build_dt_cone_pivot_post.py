@@ -581,6 +581,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ConeShaftBore")
+    # The bore runs boss face to boss face: its depth follows the boss's
+    # length global, so a longer boss cannot leave a skin across the bore
+    # (Codex P2 on #1642).
+    bore_length = name_dimensions(adapter, "ConeShaftBore", ["ConeBoreLen"])
+    drive_jobs.append((bore_length[0], '"ConeBossLength"'))
     volume -= CONE_BORE_MM3
     await volume_check(adapter, "v2 cone bore", volume, 0.001 * volume)
 
