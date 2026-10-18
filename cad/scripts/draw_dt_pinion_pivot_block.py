@@ -131,7 +131,11 @@ PIVOT_FINISH_XY = (0.208, FRONT_TOP_Y + 0.01125)
 FRONT_KEEP = {
     "BlockWidth": (_front_x(FRONT_BBOX_CX), 0.074),
     "AnchorX": (_front_x(-BLOCK_WEST / 2.0), 0.084),
-    "LiftBoreX": (_front_x(-LIFT_BORE_SPACING / 2.0), FRONT_TOP_Y + 0.00625),
+    # The position anchors the text stack, and the one-line function callout
+    # above it pushes the dimension line down: at +0.00625 farm r3 drew the
+    # line ~1 mm over the block's top edge (review r3, #1014), so the stack
+    # rises until the line stands ~8 mm clear, like 26.00 below the view.
+    "LiftBoreX": (_front_x(-LIFT_BORE_SPACING / 2.0), FRONT_TOP_Y + 0.0135),
     "BlockHeight": (0.226, 0.123),
     "AnchorZ": (0.212, 0.113),
     # Outside the west end: the pivot-centre witness runs west through the
