@@ -903,6 +903,12 @@ def test_crank_boss_od_is_labelled_as_the_boss() -> None:
     assert drawing.DIMENSION_CALLOUTS["CrankBossDia"] == "CRANK BOSS"
 
 
+def test_crank_bore_thru_rides_the_size_line_so_the_mate_line_stays_narrow() -> None:
+    """r4 view-crowding: "THRU, RUNS ON ..." below the size reached the 38.10."""
+    assert drawing.DIMENSION_SUFFIXES == {"CrankBoreDia": " THRU"}
+    assert drawing.DIMENSION_CALLOUTS["CrankBoreDia"] == "RUNS ON MHA-DT-011"
+
+
 def test_section_caption_states_no_scale_at_sheet_scale() -> None:
     assert drawing.SECTION_SCALE == drawing.SHEET_SCALE
     source = Path(drawing.__file__).read_text(encoding="utf-8")

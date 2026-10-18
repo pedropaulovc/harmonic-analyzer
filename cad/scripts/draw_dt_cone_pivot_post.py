@@ -278,9 +278,14 @@ FRONT_KEEP = {
     # 38.10 (r3 view-crowding).
     "HeadHt": (0.166, 0.1440),
     "CrankBossDia": (0.132, 0.120),
-    # Held 10 mm clear of View B's toleranced crank-above-cone text: at
-    # x=0.155 the two sat 4.15 mm apart, under one text height (r7 audit).
-    "CrankBoreDia": (0.149, 0.172),
+    # Held one text height (13.6 mm) left of View B's labelled 38.10: with
+    # "THRU, RUNS ON ..." below the size the box ran x 117.7..180.7 mm, 1.42 mm
+    # from the 38.10 box at x 173.1 (r4 view-crowding).  THRU rides the size line
+    # (DIMENSION_SUFFIXES), so the widest line is the ~49 mm mate; centred
+    # at x=0.134 it ends ~15 mm short of the 38.10, and at y=0.169 the size
+    # line passes ~2 mm under the 13° arc where it meets the plan's lower edge
+    # and the mate's shoulder ~2 mm over the head's top extension line.
+    "CrankBoreDia": (0.134, 0.169),
 }
 
 BODY = requirement(
@@ -310,7 +315,7 @@ CRANK_BORE = requirement(
         "at": ([0.0, cone.CRANK_BORE_HEIGHT, 0.0], ("CRANK_BORE_HEIGHT",)),
         "axis": ([0.0, 0.0, 1.0], ("INCLINE_DEG",)),
         "dia": (_band(cone.CRANK_BORE_DIA, _P["CrankBoreDia"], cone.RUNNING_BORE_BAND), ("CRANK_BORE_DIA", "RUNNING_BORE_BAND")),
-        "nominal_dia": (cone.CRANK_BORE_DIA, ("CRANK_BORE_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "DIMENSION_CALLOUTS"),)),
+        "nominal_dia": (cone.CRANK_BORE_DIA, ("CRANK_BORE_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "DIMENSION_SUFFIXES"),)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
         "separation": (_band(cone.CRANK_ABOVE_CONE, _P["CrankAboveCone"], cone.CRANK_ABOVE_CONE_BAND), ("CRANK_ABOVE_CONE", "CRANK_ABOVE_CONE_BAND")),
         "height_from": ("journal_bore", (("draw_dt_cone_pivot_post", "build"),)),
@@ -453,7 +458,7 @@ DIMENSION_CALLOUTS = {
     "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "CRANK BOSS\nLENGTH",
     "CrankBossStartZ": "CRANK BOSS\nFACE",
-    "CrankBoreDia": "THRU, RUNS ON MHA-DT-011",
+    "CrankBoreDia": "RUNS ON MHA-DT-011",
     "JournalBoreDia": f"CONE BORE THRU\nRUNS ON MHA-DT-004\n{POST_JOURNAL_RIM_BREAK}",
     "ConeBossDia": "CONE JOURNAL BOSS OD",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
@@ -462,6 +467,9 @@ DIMENSION_CALLOUTS = {
     "CrankAboveCone": "16T:64T\nMESH",
     "JournalAxisY": "AXIS MATCHES\nMHA-DT-021",
 }
+# Text after the size and its band, on the same line.
+DIMENSION_SUFFIXES = {"CrankBoreDia": " THRU"}
+_DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
 
 
 # COM edge-scan match slack; a selection aid, not product definition.
@@ -1145,6 +1153,30 @@ def _clear_journal_axis_text(adapter: Any, journal_annotations: list[Any]) -> No
     )
 
 
+def _set_dimension_suffixes(adapter: Any, annotations: list[Any]) -> None:
+    """Write each ``DIMENSION_SUFFIXES`` text after its dimension's size and
+    band, failing loud unless every named dimension takes it exactly once."""
+    applied: dict[str, int] = {}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        suffix = DIMENSION_SUFFIXES.get(name)
+        if suffix is None:
+            continue
+        annotation = _early_bound(annotation, "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(_DIMENSION_TEXT_SUFFIX, suffix)
+        actual = str(display.GetText(_DIMENSION_TEXT_SUFFIX) or "")
+        if actual != suffix:
+            raise RuntimeError(
+                f"{name}: suffix {suffix!r} did not persist, read {actual!r}"
+            )
+        applied[name] = applied.get(name, 0) + 1
+    if applied != dict.fromkeys(DIMENSION_SUFFIXES, 1):
+        raise RuntimeError(
+            f"expected each of {sorted(DIMENSION_SUFFIXES)} suffixed once, got {applied}"
+        )
+
+
 def _pin_sheet_scale(adapter: Any) -> None:
     """Re-pin the sheet's scale before the native gate reads (or its failure
     PDF prints) the title block.
@@ -1512,6 +1544,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *section_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _set_dimension_suffixes(adapter, annotations)
     crank_height = [
         annotation
         for annotation in front_annotations
