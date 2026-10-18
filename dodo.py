@@ -3891,6 +3891,13 @@ def task_check():
             # command line (WinError 206), failing the gate before pytest runs.
             "cmd": [
                 *pytest_cmd,
+                # Bound nested parallelism: doit already fans out other gates
+                # (eight tasks by default on the farm). Keep each module on one
+                # worker so its module-scoped fixtures are not duplicated.
+                "-n",
+                "4",
+                "--dist",
+                "loadfile",
                 *(
                     str(path.resolve().relative_to(REPO_ROOT.resolve()))
                     for path in recipe_tests
