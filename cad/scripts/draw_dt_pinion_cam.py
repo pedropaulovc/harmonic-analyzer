@@ -282,8 +282,10 @@ async def build(adapter: Any) -> dict[str, str]:
         screw_station[0],
         side,
         # Outside the right face (x 0.273): on the hole axis its centreline
-        # ran through the 4.5.
-        (SIDE_CENTER[0] + 0.021, SIDE_CENTER[1] + 0.030),
+        # ran through the 4.5.  Below the profile, on the side the tap opens
+        # (ENFORCE r3): placed above, its hole-axis witness ran the full
+        # height of the plain cylinder and read as an edge.
+        (SIDE_CENTER[0] + 0.021, SIDE_CENTER[1] - 0.035),
         source_view=bottom,
     )
     bottom_annotations = [
