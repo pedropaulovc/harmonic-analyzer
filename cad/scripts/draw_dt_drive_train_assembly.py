@@ -702,15 +702,15 @@ CAM_STAKE_NOTE = "\n".join(
         f"(STEP {steps.step_number('cam-collars-set')})",
     )
 )
-# Sheet 11's Right view shows the front cam's tap end-on just above the front
-# MHA-DT-018, the base plate and its hold-down screws below it, and the
-# caption under the view (run 20261018T134956953Z: tap near (255, 139) mm,
-# the front screws at x 237-248 mm down to y 106 mm, caption top near y 95
-# mm). The note stands below and left of the tap, under the base plate and
-# left of those screws, so its leader leaves the text's right end and climbs
-# to the tap.
+# Sheet 11's Right view puts the front cam's tap at (229.2, 129.2) mm, above
+# the base plate (bottom near y 119 mm), with its hold-down screws hanging to
+# y 106 mm at x 142-145 mm and x 237-248 mm and the caption at y 90.6-95.4 mm
+# (run 20261018T154747118Z, whose 22.5 mm drop overlapped the caption by
+# 2.4 mm). The three-line note (about 13.7 mm tall) stands below and left of
+# the tap: under the base plate, between those screws and clear above the
+# caption. Its leader leaves the text's right end and climbs to the tap.
 CAM_STAKE_NOTE_GAP = 0.022
-CAM_STAKE_NOTE_DROP = 0.0225
+CAM_STAKE_NOTE_DROP = 0.0125
 CAM_STAKE_NOTE_WIDTH = (
     max(len(line) for line in CAM_STAKE_NOTE.splitlines())
     * (NOTE_FIELD_LEFT[2] - NOTE_FIELD_LEFT[0])
