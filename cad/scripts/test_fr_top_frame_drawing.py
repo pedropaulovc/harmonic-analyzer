@@ -3335,7 +3335,7 @@ def test_dowel_slot_contract() -> None:
     assert spec.HANGER_SLOT_LENGTH - spec.HANGER_SLOT_LENGTH_TOL > spec.HANGER_SLOT_LENGTH_REQUIRED
     assert spec.HANGER_SLOT_DEPTH == spec.HANGER_PIN_HOLE_DEPTH
     assert part.SLOT_FLAT == pytest.approx(0.71)
-    # BASIC 15.264 span, centre +/-0.13 along slot; from the bolt axis
+    # Plain .XXX 15.264 span, centre +/-0.13 along slot; from the bolt axis
     # the slot carries both .XXX bands.
     assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(15.264)
     assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(0.26)
@@ -3601,7 +3601,7 @@ def test_slots_are_positioned_to_the_round_holes_with_translation() -> None:
     assert '("rear", STUD_Z_REAR, ("C", "B"))' in underside
     assert "translated=datums[1:]" in underside
     assert "quantity=HANGER_SLOT_FRAME_QUANTITY," in underside
-    assert drawing.HANGER_SLOT_FRAME_QUANTITY == "DOWEL SLOT"
+    assert drawing.HANGER_SLOT_FRAME_QUANTITY == "SLOT WIDTH"
     assert 'GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"]' in underside
     assert '"HangerSlotWidth": HANGER_SLOT_WIDTH_TEXT_XY' in underside
     assert '"HangerPinHoleDia": HANGER_PIN_DIA_TEXT_XY' in underside
@@ -4113,25 +4113,20 @@ def test_hanger_section_text_stays_on_the_sheet_off_the_title_block() -> None:
     assert drawing.SLOT_STATION_TEXT_XY[1] > drawing.PIN_STATION_TEXT_XY[1] + 0.004
 
 
-def test_slot_station_is_a_basic_xxx_from_its_round_hole() -> None:
-    # Machinist review r2 (sheet 6, all three runs): the slot's position
-    # frame locates it from its round datum hole, so the along-slot 15.264 is
-    # boxed BASIC, with no note restating it; the spec's wall and travel
-    # stacks still charge the title block's .XXX +/-0.13 in that direction.
+def test_slot_station_is_a_plain_xxx_from_its_round_hole() -> None:
+    # The slot's position frame holds its width's median plane only (its name
+    # says WIDTH), so along the slot the 15.264 is an ordinary .XXX band, the
+    # one the spec's wall and travel stacks charge.  Boxed BASIC (machinist
+    # review r2) it left that direction with no limit (codex review of
+    # 06d0bbc59); no note restates the band.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     section = source[source.index("def _hanger_section(") : source.index("def _hub_underside_detail(")]
     assert "2X DOWEL SLOT\\nFROM SCREW AXIS" not in section
     assert "p0=(SLOT_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z)" in section
     assert "entities=(axes[2], axes[1])" in section
     assert "expected_mm=HANGER_SLOT_FROM_ROUND" in section
-    assert section.count("set_basic_dimension(") == 1
-    assert (
-        'set_basic_dimension(adapter, slot_station, label="dowel slot from dowel hole")'
-        in section
-    )
-    assert section.index("set_basic_dimension(adapter, slot_station") < section.index(
-        'if str(slot_station.GetText(1) or "") != "2X ":'
-    )
+    assert "set_basic_dimension(" not in source
+    assert 'slot_station.SetText(1, "2X ")' in section
     assert not hasattr(drawing, "SLOT_BASIC_NOTE")
     assert 'location="above"' not in section
     assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(spec.HANGER_ROUND_X - spec.HANGER_SLOT_X)
@@ -4771,29 +4766,26 @@ def test_crossbar_pocket_depth_stands_between_the_side_rail_and_the_t() -> None:
 # --- The faced keeper-rail top (user ruling 2026-10-11) ---------------------
 
 
-def test_keeper_facing_note_is_the_part_property_carrying_the_keeper_budget() -> None:
+def test_keeper_facing_note_is_the_part_property_and_the_seats_carry_no_frame() -> None:
     import ast
 
-    budget = keeper.KEEPER_SEAT_FLATNESS_BUDGET_MM
-    assert budget == 0.04
-    # The frame's spec prints the keeper's budget; the keeper never imports
-    # the frame.
-    assert spec.GEOMETRIC_TOLERANCES_MM["keeper seat flatness"] == f"{budget:.2f}" == "0.04"
-    assert not hasattr(spec, "KEEPER_SEAT_FLATNESS_BUDGET_MM")
-    assert not hasattr(drawing, "KEEPER_SEAT_FLATNESS_BUDGET_MM")
+    # Rule 5 names flatness on a clamp face over-specification and no user
+    # ruling accepts a keeper-seat frame (codex review of 06d0bbc59): the
+    # faced top carries the seats, with no flatness value of its own.
+    assert set(spec.GEOMETRIC_TOLERANCES_MM) == {
+        "knife-hanger slot position",
+        "knife-hanger crossbar centring",
+    }
     assert "fr_top_frame_spec" not in Path(keeper.__file__).read_text(encoding="utf-8")
     # One facing requirement on the whole top except the four corner bosses
     # (user ruling 2026-10-14).  No region size, no edge margin, no setup
-    # method, no new dimension (machinist review r13).  The keeper seats'
-    # flatness is a native frame on the rail it controls, naming the seats
-    # and the shaft they align (machinist review r3 of the ENFORCE pass: as
-    # note text it read as an unexplained requirement).
+    # method, no new dimension (machinist review r13).
     assert spec.DRAWING_NOTES_B.splitlines() == [
         "WHOLE TOP EXCEPT 4 BOSSES:",
         "Ra 3.2 UM.",
     ]
-    assert drawing.KEEPER_FLATNESS_QUALIFIER == "MHA-CH-007 SEATS IN LINE"
-    assert not hasattr(drawing, "KEEPER_FLATNESS_NOTE")
+    for name in ("KEEPER_FLATNESS_NOTE", "KEEPER_FLATNESS_QUALIFIER", "KEEPER_FLATNESS_FRAME_XY"):
+        assert not hasattr(drawing, name), name
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     (notes,) = [
         node.value
@@ -4843,24 +4835,11 @@ def test_keeper_facing_note_is_the_part_property_carrying_the_keeper_budget() ->
     assert len(linked) == 1
     assert ast.unparse(linked[0].args[2]) == "*keeper_facing_note_xy(keeper_callout_xy)"
     assert _keyword(linked[0], "char_height").id == "FACING_NOTE_HEIGHT"
-    (flatness,) = [
+    assert not [
         call
         for call in _named_calls(drawing_tree, "add_feature_control_frame")
-        if ast.unparse(_keyword(call, "label")) == "'keeper seat flatness'"
+        if "flatness" in ast.unparse(call)
     ]
-    assert ast.unparse(flatness.args[1]) == "detail_top"
-    assert ast.literal_eval(_keyword(flatness, "characteristic")) == "flatness"
-    assert ast.literal_eval(_keyword(flatness, "entity_type")) == "FACE"
-    assert ast.unparse(_keyword(flatness, "entity")) == "keeper_seat_face"
-    assert ast.unparse(_keyword(flatness, "tolerance")) == (
-        "GEOMETRIC_TOLERANCES_MM['keeper seat flatness']"
-    )
-    assert ast.unparse(_keyword(flatness, "frame_xy")) == "KEEPER_FLATNESS_FRAME_XY"
-    assert ast.unparse(_keyword(flatness, "quantity")) == "KEEPER_FLATNESS_QUALIFIER"
-    assert "datums" not in {keyword.arg for keyword in flatness.keywords}
-    assert drawing.KEEPER_FLATNESS_TIP_Z == pytest.approx(
-        (part.KEEPER_TAP_Z_FRONT + part.KEEPER_TAP_Z_REAR) / 2.0
-    )
 
 
 def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> None:

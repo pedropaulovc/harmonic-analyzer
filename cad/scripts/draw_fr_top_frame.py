@@ -57,7 +57,6 @@ from _drawing_dimensions import (
     offset_dimension_text,
     set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
-    set_basic_dimension,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -83,7 +82,6 @@ from _drawing_sheets import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
-from _gtol_planar import PlanarFace
 from _layout_audit import display_box, estimated_text_runs
 from _mcmaster_90280a837 import (
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,
@@ -386,23 +384,10 @@ KEEPER_CALLOUT_EXTENT = (
     _KEEPER_NATIVE_CALLOUT_EXTENT[2] + KEEPER_TRANSFER_EXTRA_WIDTH,
     _KEEPER_NATIVE_CALLOUT_EXTENT[3] + KEEPER_TRANSFER_EXTRA_HEIGHT,
 )
-# Both facing notes set at the edge-break note block's 3.5 mm height, which
+# The facing note sets at the edge-break note block's 3.5 mm height, which
 # renders about 2.6 mm per character on a 5.1 mm row (farm 30394c1da: its
 # then 70-character line spanned 30 -> 208 mm).
 FACING_NOTE_HEIGHT = 0.0035
-# The keeper seats' flatness is a native frame on the faced top, leadered to
-# the rail top at the rail's centreline midway between the keepers (z -0.5,
-# sheet about (291.5, 160.8) mm on the r1 render), its frame's top-left where
-# the r2 note's text stood, in the open window between the rail (outer edge
-# 296) and the 194.5 REAR KEEPER Z line, over that dimension's text (top
-# 165).  The row under the frame names the seats it covers and what their
-# flatness buys: 24 characters at the row's measured 2.63 mm (r4: 39 ran
-# 302 -> 404.5) end at 365, 7 mm short of the 194.5's line at x 372, which
-# r4's longer row ran through (machinist review r3: a 0.04 flatness is a
-# control with its function, not note text; r4: no text struck by a line).
-KEEPER_FLATNESS_QUALIFIER = "MHA-CH-007 SEATS IN LINE"
-KEEPER_FLATNESS_FRAME_XY = (0.302, 0.185)
-KEEPER_FLATNESS_TIP_Z = (KEEPER_TAP_Z_FRONT + KEEPER_TAP_Z_REAR) / 2.0
 # Native SolidWorks centres the four-row RD4 block on its callout point and
 # lands the leader on an underline below the bottom row, 11.15 mm under that
 # point (HOLES-SOCKETS, farm 9e13b1b78 and b51258927: rows 91.7 -> 112.0 mm
@@ -727,7 +712,10 @@ HANGER_SLOT_FRAME_SHOULDER = 0.00635
 # clear of that line, at a height where the leader passes 2.4 mm from both the
 # rear-right boss and the front round hole.  Above the plan, it would have
 # fenced the rear round hole's size off from every band wide enough for it.
-HANGER_SLOT_FRAME_QUANTITY = "DOWEL SLOT"
+# The name says the frame holds the slot's width (its median plane), not its
+# station along the slot, which the plain .XXX 15.264 in F-F bands (codex
+# review of 06d0bbc59); 10 glyphs, inside the 39.1 mm outline's reach.
+HANGER_SLOT_FRAME_QUANTITY = "SLOT WIDTH"
 HANGER_SLOT_FRAME_QUANTITY_BOX = (
     0.0, -0.0116, 0.0026 * len(HANGER_SLOT_FRAME_QUANTITY), -0.0080
 )
@@ -2149,13 +2137,14 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         suffix=PIN_STATION_CALLOUT,
         offset_text=PIN_STATION_OFFSET_XY,
     )
-    # The slot's location along the slot: a BASIC 15.264 from the round
-    # datum hole beside it, which the slot's position frame on the plan
-    # locates from (machinist review r2: a frame's located feature carries
-    # its basic).  The spec's wall and travel stacks still charge the title
-    # block's .XXX +/-0.13 along the slot (HANGER_SLOT_ALONG_TOL), more than
-    # the frame's zone allows.  F-F cuts the rear station alone, so the
-    # native prefix counts both.
+    # The slot's location along the slot: a plain .XXX 15.264 from the round
+    # hole beside it, so the title block's +/-0.13 is the station band the
+    # spec's wall and travel stacks charge (HANGER_SLOT_ALONG_TOL).  The
+    # slot's position frame on the plan holds its width's median plane only,
+    # on an implied basic zero, and says so ("SLOT WIDTH"); boxed BASIC
+    # (machinist review r2) the station had no limit along the slot (codex
+    # review of 06d0bbc59).  F-F cuts the rear station alone, so the native
+    # prefix counts both.
     slot_station = _checked_dimension(
         adapter, view,
         p0=(SLOT_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z),
@@ -2165,7 +2154,6 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         entities=(axes[2], axes[1]),
     )
     slot_station.SetText(1, "2X ")  # swDimensionTextPrefix
-    set_basic_dimension(adapter, slot_station, label="dowel slot from dowel hole")
     if str(slot_station.GetText(1) or "") != "2X ":
         raise RuntimeError("dowel slot from dowel hole: 2X prefix did not persist")
     slot_station_annotation = _early_bound(slot_station.GetAnnotation(), "IAnnotation")
@@ -3265,35 +3253,8 @@ async def build(adapter: Any) -> dict[str, str]:
         *keeper_facing_note_xy(keeper_callout_xy),
         char_height=FACING_NOTE_HEIGHT,
     )
-    # The keeper seats' flatness: a native frame on the faced top it controls,
-    # leadered to the rail between the keepers (machinist review r3: a 0.04
-    # flatness in note text read as an unexplained requirement).  The face is
-    # resolved by its plane and a point on the keeper rail, so the frame
-    # cannot land on another coplanar face.
-    keeper_seat_face = resolve_faces(
-        _early_bound(_early_bound(detail_top, "IView").ReferencedDocument, "IModelDoc2"),
-        {
-            "keeper seats": PlanarFace(
-                (0.0, 1.0, 0.0), HALF_H,
-                contains_x_mm=COLUMN_X, contains_z_mm=KEEPER_FLATNESS_TIP_Z,
-            )
-        },
-    )["keeper seats"]
-    add_feature_control_frame(
-        adapter, detail_top,
-        entity=keeper_seat_face,
-        entity_type="FACE",
-        leader_attach_xy=model_point_in_view(
-            adapter, detail_top,
-            (COLUMN_X / 1000.0, HALF_H / 1000.0, KEEPER_FLATNESS_TIP_Z / 1000.0),
-            label="keeper seat flatness leader",
-        ),
-        frame_xy=KEEPER_FLATNESS_FRAME_XY,
-        characteristic="flatness",
-        tolerance=GEOMETRIC_TOLERANCES_MM["keeper seat flatness"],
-        quantity=KEEPER_FLATNESS_QUALIFIER,
-        label="keeper seat flatness",
-    )
+    # The keeper seats carry no flatness frame: the faced top above holds them
+    # (fr_top_frame_spec.GEOMETRIC_TOLERANCES_MM; codex review of 06d0bbc59).
     upper_right_rim = (COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     hanger_x = HANGER_X
     keeper_drill_r = TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0

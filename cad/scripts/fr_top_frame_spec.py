@@ -18,7 +18,6 @@ from __future__ import annotations
 from math import radians, sqrt, tan
 
 import _config
-import ch_fulcrum_keeper_spec as FULCRUM_KEEPER
 import vn_knife_hanger_stud_spec as HANGER_SCREW
 import vn_knife_hanger_washer_spec as HANGER_WASHER
 import vn_knife_mount_dowel_spec as KNIFE_DOWEL
@@ -159,40 +158,29 @@ if HANGER_PIN_SLIP_CLEARANCE_MIN < 0.02 or HANGER_PIN_SLIP_CLEARANCE_MAX > 0.10:
         f"{HANGER_PIN_SLIP_CLEARANCE_MAX} is outside 0.02-0.10"
     )
 # Manufacturing GD&T limits consumed by the part's drawing projection: each
-# slot to its round hole (datum B front, C rear), at their BASIC span,
-# oriented by the other round hole with its location released (translation
-# modifier), so the two mounts' dowel lines stay square to the B-C line.  The
-# faced top's flatness across both MHA-CH-007 keeper seats is the keeper's own
-# budget (ch_fulcrum_keeper_spec owns it and proves the MHA-CH-004 shaft
-# stack with it), printed as a native frame on the rail (machinist review
-# r3: a tolerance is a control on its feature, not note text).  The values
-# stay literals (the FCF provenance scan reads them); the guard below ties
-# the flatness to the keeper's budget.
+# slot's width to its round hole (datum B front, C rear), oriented by the
+# other round hole with its location released (translation modifier), so the
+# two mounts' dowel lines stay square to the B-C line.  The values stay
+# literals (the FCF provenance scan reads them).  The keeper seats carry no
+# frame: rule 5 names flatness on a clamp face over-specification and no
+# user ruling accepts one (codex review of 06d0bbc59); the faced top (RV-03)
+# carries them.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-hanger slot position": "0.05",
     "knife-hanger crossbar centring": "0.10",
-    "keeper seat flatness": "0.04",
 }
-if float(GEOMETRIC_TOLERANCES_MM["keeper seat flatness"]) != (
-    FULCRUM_KEEPER.KEEPER_SEAT_FLATNESS_BUDGET_MM
-):
-    raise AssertionError(
-        "keeper seat flatness must print MHA-CH-007's budget "
-        f"{FULCRUM_KEEPER.KEEPER_SEAT_FLATNESS_BUDGET_MM}"
-    )
 HANGER_CROSSBAR_CENTER_ZONE = float(
     GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"]
 )
 HANGER_CROSSBAR_CENTER_TOL = HANGER_CROSSBAR_CENTER_ZONE / 2.0
 HANGER_SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"])
-# The slot's station from its round hole along the slot. The frame's zone holds
-# the slot's width (across the dowel line), at an implied basic zero from its
-# round hole and an implied basic 90 deg to the B-C line; along the slot the
-# drawing boxes 15.264 BASIC, the frame's located feature (machinist review
-# r2, 2026-10-18).  A slot's position frame is not relied on along the slot
-# (codex review of 0bb6ba81), so the wall and travel stacks charge that
-# direction the title block's .XXX band, wider than any frame zone: from the
-# screw axis the round hole's .XXX band plus its own, 0.26.
+# The slot's station from its round hole along the slot.  The frame's zone
+# holds the slot's width (across the dowel line), at an implied basic zero
+# from its round hole and an implied basic 90 deg to the B-C line; it does
+# not reach along the slot, so the 15.264 there is an ordinary .XXX
+# dimension, not a basic (codex review of 06d0bbc59: boxed, it left that
+# direction with no limit).  The wall and travel stacks charge that band:
+# from the screw axis the round hole's .XXX band plus its own, 0.26.
 HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 15.264
 HANGER_SLOT_FROM_ROUND_PLACES = 3
 HANGER_SLOT_ALONG_TOL = _XXX  # 0.13, the .XXX band charged along the slot
