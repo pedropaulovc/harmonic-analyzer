@@ -112,9 +112,11 @@ BRACKET_SCREW_NUMBER = "MHA-VN-050"  # vn-magnifying-bracket-screw
 # the ridge pair's line.
 # Both stubs are one prism, so their side faces share two planes
 # (``build_sm_summing_lever._hex_knife``), which ties the -Z ridge to datum A
-# within ``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``.  No view can
-# show that: the pivot cylinder hides the planes between the stubs, so the
-# pair's callouts state it (owner: symmetry is critical).  Lines of at most
+# within ``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``.  The model
+# carries that; the print carries the owner's C09 wording, KNIFE EDGE
+# SYMMETRIC TO SIDES, BOTH STUBS, split across the pair, and no coplanarity
+# requirement of its own (machinist review bdc033f13: "SIDES IN ONE PLANE"
+# stated a requirement with no limit).  Lines of at most
 # RIDGE_CALLOUT_MAX_CHARS keep the +X block under the border and left of
 # view G (stack r4: six short lines on the -X one rose over the border).
 RIDGE_CALLOUT_MAX_CHARS = 30
@@ -124,9 +126,7 @@ DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "RidgeFromLeft": f"{KNIFE_MOUNT_NUMBER} SEAT;\nSYMMETRIC TO SIDES",
-    "RidgeFromRight": (
-        f"KNIFE-EDGE SEAT IN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS, SIDES IN ONE PLANE"
-    ),
+    "RidgeFromRight": f"KNIFE-EDGE SEAT IN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS",
     "FlankToSide": f"{KNIFE_MOUNT_NUMBER} SEAT",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
@@ -208,9 +208,14 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
 # Sheet 2's view looks at the -Z end face (the bracket receiver): sheet 1's
 # plan carries a lettered viewing arrow onto that face, and the view is
 # named by the letter (machinist review r10 read "BACK VIEW" as looking from
-# below).  A, B are datums; C the section; D, E the details.
+# below).  A, B are datums; C the section; D, E the details.  The view is
+# SolidWorks' Back view, +Y up; projected from the plan's arrow it would keep
+# the plan's X (boss left) with +Y towards the plan, so it is the projection
+# turned half a turn and says so (machinist review bdc033f13: boss on the
+# right against the front view and VIEW G).  Drawn as projected, every
+# sheet-2 dimension and callout would have to be re-placed upside down.
 BACK_VIEW_LETTER = "F"
-BACK_VIEW_NOTE = f"VIEW {BACK_VIEW_LETTER} SCALE 1:1"
+BACK_VIEW_NOTE = f"VIEW {BACK_VIEW_LETTER} SCALE 1:1 ROTATED 180°"
 # Sheet 1's end profile looks at the +Z end face (datum B) but stands above
 # the plan, out of third-angle order (machinist review r15 read it as the
 # -Z end, so as VIEW F's mirror missing its taps): it is a removed view too,

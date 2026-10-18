@@ -408,8 +408,10 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) ->
         " ".join(notes.DIMENSION_CALLOUTS_BELOW[name].split())
         for name in ("RidgeFromLeft", "RidgeFromRight")
     )
-    assert "SYMMETRIC TO SIDES" in pair
-    assert "BOTH STUBS, SIDES IN ONE PLANE" in pair
+    assert "SYMMETRIC TO SIDES" in pair and "BOTH STUBS" in pair
+    # The model holds the sides in one plane; the print states no limitless
+    # coplanarity requirement (machinist review bdc033f13).
+    assert "PLANE" not in pair
     every_callout = {**notes.DIMENSION_CALLOUTS_ABOVE, **notes.DIMENSION_CALLOUTS_BELOW}
     assert "HexWidth" not in every_callout
     assert (spec.RIDGE_FROM_SIDE, spec.RIDGE_FROM_SIDE_TOL) == (4.040, 0.05)
@@ -580,7 +582,7 @@ def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -
     assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(spec.HEX_Z_INNER + spec.HEX_Z_OUTER)
     assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.077, abs=5e-4)
     callout = " ".join(notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"].split())
-    assert "BOTH STUBS, SIDES IN ONE PLANE" in callout
+    assert "BOTH STUBS" in callout and "PLANE" not in callout
     assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
     assert lever_build.KNIFE_SIDE_PLANE_TOL == 1e-6
     assert "_assert_knife_sides_coplanar" in [
