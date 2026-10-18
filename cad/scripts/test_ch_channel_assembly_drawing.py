@@ -706,17 +706,29 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     for method in ("REAM", "0.2515", " IN LONG", " PASS"):
         assert method not in reamed
     assert keeper.PAIR_REAMER_REACH_MARGIN_MM > 0.0
-    # r10 machinist blocker (Main's ruling A): the crown is finished to the
-    # keeper print's crown radius about a pin in its own bore, then tapped,
-    # and gauged over the pin. The gauge's low limit never admits a crown
-    # under the least full round the crown thread's 1.5D is proved at.
-    assert (
-        f"ON A 6.35 PIN IN EACH BORE, ROUND ITS CROWN TO THE {number} CROWN R7.0 "
-        "ABOUT THE PIN AND TAP IT #1-72 TO THE BORE." in reamed
+    # #1660 r2 (rules 22 and 24): the crown and its tap centre on the bore
+    # made here, so the keeper is finished in this step, but its sizes and the
+    # tap's place are the keeper print's (CrownRadius and the crown tap, which
+    # point back at this step); the assembly sheet restates none of them.
+    assert f"TO THE {number} DRAWING." in reamed
+    for part_data in ("R7.0", "#1-72", " PIN ", "CROWN TOP", "9.8", "10.6"):
+        assert part_data not in reamed
+    assert keeper_drawing.DIMENSION_CALLOUTS["CrownRadius"].endswith(
+        f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
     )
-    assert reamed.endswith("ACCEPT: CROWN TOP 9.8 TO 10.6 OVER THE PIN'S UNDERSIDE.")
-    assert 9.8 - keeper.BORE_DIA / 2.0 >= keeper.CROWN_LEAST_R
-    assert 10.6 - keeper.BORE_DIA / 2.0 <= keeper.CROWN_MOST_R + 0.05
+    # #1660 r2 (rule 19): the lever bank has no stack fit-up because it needs
+    # none. Twenty hubs at the top of their band leave end play at the
+    # shortest lug span the two inner-face bands allow, and the bars on the
+    # rocker straps locate the bank. The step says so and gauges it.
+    from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB, HUB_LENGTH_BAND
+
+    span_min = (
+        keeper.KEEPER_INNER_FACE_SPAN_MM - 2 * keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    )
+    assert span_min - drawing.COUNT * (LEVER_HUB + HUB_LENGTH_BAND[0]) > 0.2
+    threaded = _step_body(steps.LEVER_BANK_THREADED_KEY)
+    assert "THE BARS ON THE STRAPS LOCATE THE LEVER BANK" in threaded
+    assert "SLIDES ALONG THE SHAFT BETWEEN THE LUGS" in threaded
     assert keeper.SET_SCREW_ENGAGEMENT_D >= keeper.SET_SCREW_MIN_ENGAGEMENT_D
     fitted = _step_body(steps.KEEPERS_SET_KEY)
     assert f"{top_frame} ON THE MILL:" in fitted

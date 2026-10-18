@@ -28,7 +28,6 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
-import math
 import sys
 import textwrap
 from pathlib import Path
@@ -86,17 +85,17 @@ import _telemetry
 import ch_channel_assembly_notes as notes
 import ch_channel_assembly_spec as asm
 import ch_channel_assembly_steps as steps
+from ch_channel_lever_spec import (
+    HUB_LENGTH as LEVER_HUB_LENGTH,
+    HUB_LENGTH_BAND as LEVER_HUB_LENGTH_BAND,
+)
 from ch_fulcrum_keeper_spec import (
-    BORE_DIA as KEEPER_BORE_DIA,
-    CROWN_LEAST_R,
-    CROWN_MOST_R,
-    CROWN_R,
     FULCRUM_KEEPER_CENTRE_Z,
+    KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
     KEEPER_INNER_FACE_SPAN_MM,
     KEEPER_Z_OFF,
-    SET_SCREW_THREAD as KEEPER_SET_SCREW_THREAD,
 )
 from ch_pivot_bracket_sides import FOOT_Z1 as BRACKET_FOOT_Z1
 from ch_pivot_bracket_spec import (
@@ -844,19 +843,23 @@ def _fitup_notes() -> tuple[str, str]:
     # ruling): the lever-bank view's reference lug span.
     if abs(rear_face - front_face - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
         raise AssertionError("the pair-ream span is not the fit-up span")
-    # Each crown is finished at the bench to the MHA-CH-007 crown radius
-    # (CrownRadius, printed .X: "FULL ROUND TANGENT TO BOTH SIDES, CENTER AT
-    # BORE HEIGHT, PER" this step), turned or filed about a gauge pin in its
-    # own reamed bore, and only then tapped through to the bore ("ON BORE AXIS
-    # AFTER REAM"). The fitter gauges it as crown top over the pin's underside,
-    # the crown radius plus the pin's, across the spec's CROWN_LEAST_R ..
-    # CROWN_MOST_R band, with the low limit rounded up (Main's ruling,
-    # 2026-10-16).
-    pin_r = KEEPER_BORE_DIA / 2.0
-    crown_over_pin = (
-        math.ceil((CROWN_LEAST_R + pin_r) * 10.0 - 1e-9) / 10.0,
-        round(CROWN_MOST_R + pin_r, 1),
-    )
+    # The crown and its tap centre on the bore this step makes, so each
+    # keeper is finished here, but to its own print: MHA-CH-007 sizes the
+    # crown (CrownRadius, "FULL ROUND TANGENT TO BOTH SIDES, CENTER AT BORE
+    # HEIGHT, PER" this step) and sizes and places the crown tap ("ON BORE
+    # AXIS AFTER REAM", its station in the plan). The step carries none of
+    # that part data (rule 24; #1660 r2 confirmed it on the assembly sheet).
+    # The lever bank is never fitted like the rocker stack: the bars on the
+    # straps locate it, and twenty hubs at the top of their band still leave
+    # end play between the lugs at the extremes of both inner-face bands
+    # (#1660 r2: the step says so and gauges it as the bank sliding).
+    lever_stack_max = COUNT * (LEVER_HUB_LENGTH + LEVER_HUB_LENGTH_BAND[0])
+    lug_span_min = KEEPER_INNER_FACE_SPAN_MM - 2.0 * KEEPER_FITUP_LOCATION_BAND_MM
+    if lug_span_min - lever_stack_max <= 0.0:
+        raise AssertionError(
+            "step 12 says the lever bank has end play, but the longest hubs "
+            "fill the shortest lug span"
+        )
     text = {
         # The rings are captured in the closed cam slots as the cylinder stack
         # goes together, and the pressed pin needs its far tine backed on the
@@ -919,12 +922,9 @@ def _fitup_notes() -> tuple[str, str]:
             f"CLAMP BOTH {keeper}, FEET OUTBOARD ON ONE FLAT, INNER LUG FACES "
             "AT THE LEVER BANK VIEW'S LUG SPAN, BORE AXIS PARALLEL TO THE "
             f"FLAT. BOTH {keeper} BORES IN LINE: THE "
-            f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED. THEN, ON "
-            f"A {KEEPER_BORE_DIA:.2f} PIN IN EACH BORE, ROUND ITS CROWN TO THE "
-            f"{keeper} CROWN R{CROWN_R:.1f} ABOUT THE PIN AND TAP IT "
-            f"{KEEPER_SET_SCREW_THREAD} TO THE BORE. ACCEPT: CROWN TOP "
-            f"{crown_over_pin[0]:.1f} TO {crown_over_pin[1]:.1f} OVER THE PIN'S "
-            "UNDERSIDE."
+            f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED. EACH "
+            "CROWN AND CROWN TAP CENTRES ON THE BORE MADE HERE: FINISH BOTH "
+            f"NOW, TO THE {keeper} DRAWING."
         ),
         steps.KEEPERS_SET_KEY: (
             f"{top_frame} ON THE MILL: SHAFT THROUGH BOTH KEEPERS, FEET "
@@ -949,7 +949,10 @@ def _fitup_notes() -> tuple[str, str]:
             f"DRAW THE {fulcrum_shaft} SHAFT OUT NORTH. PUSH IT BACK SOUTH "
             f"THROUGH THE NORTH {keeper}, LEVERS {last} TO 0 IN CHANNEL ORDER "
             f"AND THE SOUTH {keeper}, EACH BAR'S FOOT NOTCH ASTRIDE ITS {arm} "
-            "STRAP. ACCEPT IF EVERY LEVER SWINGS FREE."
+            "STRAP. THE BARS ON THE STRAPS LOCATE THE LEVER BANK; EVEN AT "
+            f"THEIR LONGEST THE {COUNT} LEVER HUBS ARE SHORTER THAN THE LUG "
+            "SPAN. ACCEPT IF EVERY LEVER SWINGS FREE AND THE BANK SLIDES ALONG "
+            "THE SHAFT BETWEEN THE LUGS."
         ),
         steps.SET_SCREWS_STAKED_KEY: (
             f"WITH THE LEVER BANK ON IT, SLIDE THE {fulcrum_shaft} SHAFT UNTIL "
