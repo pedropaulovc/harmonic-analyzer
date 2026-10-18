@@ -695,6 +695,7 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
         "BoreSpacingReference",
         "JournalPlanReference",
         "CrankBossStationReference",
+        "ConeBossStationReference",
     }
     # Blanked inside paper_drive_stock_native.author_span/author_root_envelope
     # (PD farm run 9, drawing:pd_rack_pinion and :pd_transgear_feed_pinion:
