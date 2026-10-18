@@ -80,6 +80,7 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 import _seat_forensics
 from _session import run_build
@@ -120,6 +121,8 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SHEET_SCALE = (1.0, 1.0)
 _S = SHEET_SCALE[0] / 1000.0
