@@ -129,11 +129,17 @@ HOLE_LATERAL_XY = (TOP_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _top_y(FOOT_NEAR_Z) + 
 
 # The elevation carries the height chain off the foot seat plus the fitted
 # bore; the plan carries the foot rectangle, the strap band and the hold-down
-# hole. Nested left lanes work outward from the shortest span (foot height,
-# journal axis, overall reference) off the one datum a machinist actually
-# clamps to -- the seat.
+# hole. Nested left lanes work outward from the shorter span (journal axis,
+# then overall reference) off the one datum a machinist actually clamps to --
+# the seat; the foot height sits east of the elevation, off the same seat.
 FRONT_KEEP = {
-    "FootHt": (FRONT_CENTER[0] - 0.034, _front_y(FOOT_HEIGHT / 2.0)),
+    # Right of the elevation: the model dimension's upper witness leaves the
+    # foot corner at the east taper kink. From a left lane that witness ran
+    # across the whole upright face and read as a visible edge (ENFORCE r2).
+    "FootHt": (
+        FRONT_CENTER[0] + FOOT_WIDTH * _S / 2.0 + 0.016,
+        _front_y(FOOT_HEIGHT / 2.0),
+    ),
     "BoreHeight": (FRONT_CENTER[0] - 0.046, _front_y(BORE_HEIGHT / 2.0)),
     # Right of the elevation, far enough out that the three-line callout's
     # widest row ("ARBOR MHA-DT-013", ~42 mm) clears the tapered flank.
@@ -632,14 +638,14 @@ async def build(adapter: Any) -> dict[str, str]:
             _front_y(BORE_HEIGHT),
         ),
     )
-    # Below and right of the seat. The foot's width is dimensioned in the
-    # plan, so nothing here owns a witness line the leader could cross: it
-    # leaves the vee's left side, runs up-left to the seat's right quarter,
-    # and the "Ra 3.2" text hangs right of the symbol into empty sheet.
+    # Under the seat's east half, between the bore lateral's witness at the
+    # centreline and the foot-height lane east of the elevation: the leader
+    # drops from the seat's right quarter and the "Ra 3.2" text hangs right
+    # of the vee, short of the 5.0's lower arrow.
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.035, _front_y(0.0) - 0.010),
+        symbol_xy=(FRONT_CENTER[0] + 0.017, _front_y(0.0) - 0.011),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         label="foot seat finish",
         char_height=0.0025,
