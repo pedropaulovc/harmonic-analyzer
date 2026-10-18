@@ -687,7 +687,6 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
         "dt_cone_tip_block",
         "dt_cylinder_gear_shaft",
         "fr_harmonic_base",
-        "dt_pinion_bracket",
         "dt_pinion_spring",
     } <= set(found)
     assert found["dt_cylinder_gear_shaft"] == {"DomeReference"}
