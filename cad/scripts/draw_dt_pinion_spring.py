@@ -54,7 +54,6 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from _layout_audit import arc_segments
 from dt_pinion_spring_geometry import (
     BEND_CX,
     FLAT_TIP,
@@ -681,6 +680,62 @@ def kink_arc_mean_offset_deg(
     return math.degrees(math.acos(max(-1.0, min(1.0, cos))))
 
 
+def kink_arc_summary(
+    arcs: list[tuple[tuple[float, float], list[tuple[float, float]]]],
+    vertex: tuple[float, float],
+) -> str:
+    """Each drawn arc's centre offset and radius (mm) and its first, last,
+    least and greatest direction off the included wedge's bisector (deg),
+    for the leaf log."""
+    bisector = math.atan2(
+        FREE_KINK_INCLUDED_BISECTOR[1], FREE_KINK_INCLUDED_BISECTOR[0]
+    )
+    parts = []
+    for centre, points in arcs:
+        offsets = [
+            math.degrees(
+                (math.atan2(y - vertex[1], x - vertex[0]) - bisector + math.pi)
+                % (2.0 * math.pi)
+                - math.pi
+            )
+            for x, y in points
+        ]
+        radius = math.dist(points[0], centre) if points else 0.0
+        parts.append(
+            f"arc centre {math.dist(centre, vertex) * 1000:.2f} mm off, "
+            f"r {radius * 1000:.2f} mm, {len(points)} pts, deg first "
+            f"{offsets[0]:.1f} last {offsets[-1]:.1f} min {min(offsets):.1f} "
+            f"max {max(offsets):.1f}"
+            if offsets
+            else "empty arc"
+        )
+    return f"{len(arcs)} arc(s) [{' | '.join(parts)}]"
+
+
+def minor_arc_points(
+    centre: tuple[float, float],
+    start: tuple[float, float],
+    end: tuple[float, float],
+    steps: int = 16,
+) -> list[tuple[float, float]]:
+    """Points along the arc from ``start`` to ``end`` about ``centre`` the
+    short way round.  An angle dimension's arc never sweeps past 180 deg, and
+    its GetArcAtIndex2 sense flag is not read: at r9, read through the
+    flag-driven tessellation (_layout_audit.arc_segments), the 155 deg arc
+    had points up to 180 deg off its wedge's bisector."""
+    radius = math.dist(start, centre)
+    first = math.atan2(start[1] - centre[1], start[0] - centre[0])
+    last = math.atan2(end[1] - centre[1], end[0] - centre[0])
+    sweep = (last - first + math.pi) % (2.0 * math.pi) - math.pi
+    return [
+        (
+            centre[0] + radius * math.cos(first + sweep * step / steps),
+            centre[1] + radius * math.sin(first + sweep * step / steps),
+        )
+        for step in range(steps + 1)
+    ]
+
+
 def _kink_arcs(
     display: Any,
 ) -> list[tuple[tuple[float, float], list[tuple[float, float]]]]:
@@ -688,11 +743,15 @@ def _kink_arcs(
     arcs = []
     for index in range(int(data.GetArcCount())):
         raw = tuple(float(value) for value in (data.GetArcAtIndex2(index) or ()))
-        segments = arc_segments(raw)
-        if segments:
-            points = [(segments[0].x0, segments[0].y0)]
-            points += [(s.x1, s.y1) for s in segments]
-            arcs.append(((raw[10], raw[11]), points))
+        if len(raw) < 17:
+            continue
+        centre = (raw[10], raw[11])
+        start, end = (raw[4], raw[5]), (raw[7], raw[8])
+        _telemetry.info(
+            f"kink angle arc {index}: start {start} end {end} centre {centre} "
+            f"normal z {raw[15]} direction {raw[16]}"
+        )
+        arcs.append((centre, minor_arc_points(centre, start, end)))
     return arcs
 
 
@@ -720,6 +779,7 @@ def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -
     )
     arcs = _kink_arcs(display)
     faults = kink_arc_faults(arcs, vertex)
+    placed = f"{kink_arc_summary(arcs, vertex)}; faults {faults}"
     turned = False
     if faults and arcs and kink_arc_mean_offset_deg(arcs, vertex) > 90.0:
         if not display.VerticallyOppositeAngle():
@@ -732,9 +792,10 @@ def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -
     if abs(value - math.radians(KINK_INCLUDED_DEG)) > 1e-8:
         faults.append(f"value {math.degrees(value):.6f} deg, not {KINK_INCLUDED_DEG:g}")
     _telemetry.info(
-        f"kink angle: {len(arcs)} arc(s) about the free kink vertex "
-        f"{tuple(round(v * 1000, 2) for v in vertex)} mm; "
-        f"turned vertically opposite {turned}; faults {faults}",
+        f"kink angle: free kink vertex "
+        f"{tuple(round(v * 1000, 2) for v in vertex)} mm; as placed {placed}; "
+        f"turned vertically opposite {turned}: "
+        f"{kink_arc_summary(arcs, vertex)}; faults {faults}",
         kink_arc_count=len(arcs),
         kink_arc_turned=turned,
     )

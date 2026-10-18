@@ -309,6 +309,24 @@ def test_kink_arc_faults_reads_the_wedge_the_arc_sweeps() -> None:
     assert side == pytest.approx(90.0, abs=1e-4)
 
 
+def test_minor_arc_points_sweep_the_short_way_either_sense() -> None:
+    # The convex wedge's 155 deg arc, given end-first or start-first, reads
+    # inside the wedge: the arc's sense flag is not consulted.
+    vertex = (0.087, 0.152)
+    half = geometry.KINK_INCLUDED_DEG / 2
+    ((_, points),) = _arc(vertex, 0.0, half)
+    for start, end in ((points[0], points[-1]), (points[-1], points[0])):
+        arc = [(vertex, drawing.minor_arc_points(vertex, start, end))]
+        assert drawing.kink_arc_faults(arc, vertex) == []
+        swept = arc[0][1]
+        assert swept[0] == pytest.approx(start)
+        assert swept[-1] == pytest.approx(end)
+    # The opposite included wedge stays opposite.
+    ((_, across),) = _arc(vertex, 180.0, half)
+    arc = [(vertex, drawing.minor_arc_points(vertex, across[0], across[-1]))]
+    assert drawing.kink_arc_faults(arc, vertex)
+
+
 class _KinkView:
     """A recording IView double for the kink detail's place-move-crop."""
 
