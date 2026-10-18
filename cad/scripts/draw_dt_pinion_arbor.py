@@ -262,8 +262,10 @@ FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
 # Its lines name every Ø8 span but the lands, so it no longer reads as the
 # front "JOURNAL" shelf's pair (Main and Fable, 63468ee9).  Its arrows sit
 # inside the flanks (ARROWS_INSIDE): an outside tail would rise into the back
-# Ra symbol over the shaft.
-BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.153)
+# Ra symbol over the shaft.  r3 added a third line (the drum's ends on the
+# journals), so the shoulder drops one line pitch and the top stays put; the
+# block now ends left of the drum station's text instead of over it.
+BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474)
 # The drum-station and bond-zone reference sketches stand alone, so the
 # profile shows them, and each ends on a short construction witness lying ON
 # the lower Ø8 outline.  The view paints that witness construction grey over
@@ -379,12 +381,13 @@ PRINCIPAL_KEEP = {
 # of the crop circle, clear of it like every other detail-A callout; the line
 # crosses the circle once, square, to reach it.
 NECK_DIA_XY = (0.140, 0.2575)
-# The cross hole's (5.75) station reference in detail A.  Its witnesses drop
-# from the axis at the head rear face (shared with the 11.5's) and the hole
-# centre; the text sits left of the rear-face witness.  r2 of #1685 boxed
-# " (5.75) " at 7.5 mm left to 12.8 mm right of its position, and at x 0.1425
-# the 11.5's witness crossed it (text-on-line), so the position now follows
-# from that witness with 2.5 mm of air.
+# The cross hole's 5.750 station in detail A (a (5.75) reference at r2,
+# toleranced since r3 of #1685).  Its witnesses drop from the axis at the
+# head rear face (shared with the 11.50's) and the hole centre; the text sits
+# left of the rear-face witness.  r2 boxed " (5.75) " at 7.5 mm left to
+# 12.8 mm right of its position, and at x 0.1425 the head length's witness
+# crossed it (text-on-line), so the position now follows from that witness
+# with 2.5 mm of air; the shorter "5.750" only adds to it.
 CROSS_HOLE_STATION_TEXT_RIGHT = 0.0128
 DETAIL_REAR_FACE_X = (
     DETAIL_CENTER[0] + DETAIL_RATIO * (HEAD_CENTER_Z - HEAD_REAR_Z) / 1000.0
@@ -406,11 +409,11 @@ DETAIL_KEEP = {
     "HeadCapR": (0.205, 0.257),
     "HeadCapSagDim": (0.205, 0.210),
     # Above the hole's centre line, so the leader drops onto the hole edge.
-    # Three callout lines (r1 of #1685) under the value: the block's top
-    # stays 2 mm inside the border and its shoulder 4 mm over the pin hole's.
+    # Two callout lines (r3 of #1685) under the value: the block's top stays
+    # inside the border and its shoulder well over the pin hole's.
     "CrossHoleDia": (0.245, 0.2525),
-    # The hole's reference station rides under the head, its text left of
-    # the rear-face witness and clear of the neck above and the 11.5 below.
+    # The hole's station rides under the head, its text left of the
+    # rear-face witness and clear of the neck above and the 11.50 below.
     "CrossHoleFromHeadRear": CROSS_HOLE_STATION_TEXT_XY,
     "NeckDia": NECK_DIA_XY,
 }
@@ -1264,7 +1267,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "HeadCapSagDim": "front-crown height reference",
         "BackCapSagDim": "back-crown descriptive reference",
         "OverallLen": "overall length reference",
-        "CrossHoleFromHeadRear": "cross-hole station reference",
     }.items():
         matches = [
             annotation

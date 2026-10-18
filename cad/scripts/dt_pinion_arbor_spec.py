@@ -25,12 +25,18 @@ from dt_pinion_arbor_geometry import (
     BOND_ZONE_LAND_CLEARANCE as BOND_ZONE_LAND_CLEARANCE,
     CROSS_HOLE_DIA as CROSS_HOLE_DIA,
     CROSS_HOLE_DIA_BAND as CROSS_HOLE_DIA_BAND,
+    CROSS_HOLE_FRONT_WEB_WORST as CROSS_HOLE_FRONT_WEB_WORST,
+    CROSS_HOLE_REAR_WEB_WORST as CROSS_HOLE_REAR_WEB_WORST,
+    CROSS_HOLE_STATION as CROSS_HOLE_STATION,
+    CROSS_HOLE_STATION_BAND as CROSS_HOLE_STATION_BAND,
+    CROSS_HOLE_STATION_PLACES as CROSS_HOLE_STATION_PLACES,
     CROSS_HOLE_WEB_TARGET as CROSS_HOLE_WEB_TARGET,
     CROSS_HOLE_WEB_WORST as CROSS_HOLE_WEB_WORST,
     CROSSROD_MAX_CLEARANCE as CROSSROD_MAX_CLEARANCE,
     CROSSROD_MIN_CLEARANCE as CROSSROD_MIN_CLEARANCE,
     DRUM_AFT_SHIFT as DRUM_AFT_SHIFT,
     DRUM_FRONT_Z_AS_BUILT as DRUM_FRONT_Z_AS_BUILT,
+    DRUM_LEN as DRUM_LEN,
     DRUM_LEN_BAND as DRUM_LEN_BAND,
     DRUM_STATION as DRUM_STATION,
     DRUM_STATION_AS_BUILT as DRUM_STATION_AS_BUILT,
@@ -112,11 +118,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FrontCapProfile": {"HeadCapR", "HeadCapSagDim"},
     "BackCapProfile": {"BackCapR", "BackCapSagDim"},
     "CrossHoleProfile": {"CrossHoleDia"},
-    # Machinist review r1 of #1685 (clarity): the hole was located only by
-    # "CENTRED ON Ø15 CYLINDER LENGTH", so the shop had to work out the mid
-    # point.  This prints the mid point as a reference from the head rear
-    # face; the requirement stays the centring, so only HeadLen's .X band
-    # reaches the web (CROSS_HOLE_WEB_WORST), never a station band.
+    # Machinist review r1/r3 of #1685 (clarity): the hole was located only by
+    # "CENTRED ON Ø15 CYLINDER LENGTH", with no datum face and no band.  It
+    # prints as an ordinary .XXX station from the head rear face, the face
+    # every other station runs from; with HeadLen at .XX both webs hold the
+    # 2.0 target (CROSS_HOLE_WEB_WORST).
     "CrossHoleStationReference": {"CrossHoleFromHeadRear"},
     # R1a: the collar's spring-pin hole, from the same head rear face.
     "PinHoleProfile": {"PinHoleDia"},
@@ -159,7 +165,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FrontCapProfile": {"HeadCapR": 1, "HeadCapSagDim": HEAD_CAP_SAG_PLACES},
     "BackCapProfile": {"BackCapR": 1, "BackCapSagDim": 1},
     "CrossHoleProfile": {"CrossHoleDia": 2},
-    "CrossHoleStationReference": {"CrossHoleFromHeadRear": 2},
+    "CrossHoleStationReference": {"CrossHoleFromHeadRear": CROSS_HOLE_STATION_PLACES},
     "PinHoleProfile": {"PinHoleDia": 2},
     "PinStationReference": {"PinStationFromHeadRear": 1},
     "BackRimReference": {"BackRimFromHeadRear": 1},
@@ -183,11 +189,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked integral-arbor dimension needs authored places")
 
-# The cross hole's mid-length station from the head rear face, printed as a
-# reference only (see DRAWING_DIMENSIONS).
+# The cross hole's mid-length station from the head rear face, printed at
+# .XXX (see DRAWING_DIMENSIONS); the model hole sits on it.
 CROSS_HOLE_FROM_HEAD_REAR = HEAD_REAR_Z - HEAD_CENTER_Z
-if abs(CROSS_HOLE_FROM_HEAD_REAR - HEAD_LEN / 2.0) > 1e-9:
-    raise AssertionError("the crossrod hole must stay centred on the Ø15 cylinder")
+if abs(CROSS_HOLE_FROM_HEAD_REAR - CROSS_HOLE_STATION) > 1e-9:
+    raise AssertionError("the model crossrod hole left its printed station")
 
 # Mating parts the callouts name (drawing-guidelines.md rule 4: every tight
 # band names its mate and fit).
@@ -199,24 +205,38 @@ DRUM_NUMBER = "MHA-DT-001"
 # it meant the straight Ø15 cylinder or the whole crowned head, which put the
 # hole in two places.  It names the cylinder the HeadLen dimension measures.
 # Machinist review r1 of #1685 (blocker): the +0.1/0.0 band named no mate, so
-# the callout names the bonded MHA-DT-015 crossrod.  The widest line is last:
-# the block's bottom line clears the SR10.9 text above-left of it.
-# <MOD-DIAM> carries its own leading gap, so no space before it.
-CROSS_HOLE_CALLOUT = (
-    "REAM THRU, BONDED FIT\n"
-    f"ON {CROSSROD_NUMBER} CROSSROD,\n"
-    f"CENTRED ON<MOD-DIAM>{HEAD_DIA:.0f} CYLINDER LENGTH"
-)
+# the callout names the bonded MHA-DT-015 crossrod.  Machinist review r3: the
+# hole's station is a toleranced dimension (CrossHoleFromHeadRear), so the
+# callout no longer says CENTRED.
+CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT\nON {CROSSROD_NUMBER} CROSSROD"
 # Machinist review r1 of #1685 (clarity): each land's callout names the bore
 # it runs in, where the general note used to.
 JOURNAL_CALLOUT = f"JOURNAL,\nRUNS IN {STRAP_NUMBER}"
 # Machinist review r1 of #1685 (blocker): the -0.01/-0.10 band named no mate,
 # and the Ø8 spans either side of the lands carried no diameter (owner,
 # 2026-10-12).  One callout covers every Ø8 surface but the two lands and
-# names the drum bonded on it.
+# names the drum bonded on it.  Machinist review r3 (blocker): the 61.05
+# drum station falls on the front journal, which read as the drum confined
+# to the non-journal Ø8.  The lands run past the straps' inner faces to hold
+# them through the drum's float (LAND_MARGINS_AT_STOPS), so each drum end
+# rests on its land's inner end at every limit; the callout says so.
 BOND_ZONE_CALLOUT = (
-    f"ALL<MOD-DIAM>{SHAFT_DIA:.0f} EXCEPT JOURNALS;\n{DRUM_NUMBER} BOND ZONE"
+    f"ALL<MOD-DIAM>{SHAFT_DIA:.0f} EXCEPT JOURNALS;\n"
+    f"{DRUM_NUMBER} BOND ZONE,\n"
+    "DRUM ENDS ON JOURNALS"
 )
+# Smallest overlap of each drum end on its land's inner end, every printed
+# band at its limit: the front land's inner end from its .X station and .X
+# length, the back land's from its .X station, the drum from its .X station
+# and length.
+DRUM_FRONT_END_ON_JOURNAL_MIN = (
+    FRONT_JOURNAL_FROM_HEAD_REAR - LINEAR_X_BAND + JOURNAL_LEN - LINEAR_X_BAND
+) - (DRUM_STATION + DRUM_STATION_BAND)
+DRUM_BACK_END_ON_JOURNAL_MIN = (
+    DRUM_STATION - DRUM_STATION_BAND + DRUM_LEN + DRUM_LEN_BAND[1]
+) - (BACK_JOURNAL_FROM_HEAD_REAR + LINEAR_X_BAND)
+if min(DRUM_FRONT_END_ON_JOURNAL_MIN, DRUM_BACK_END_ON_JOURNAL_MIN) <= 0.0:
+    raise AssertionError("a drum end can leave its journal; BOND_ZONE_CALLOUT lies")
 # Notes never carry dimensions (Codex P1 on #814): the drum station is the
 # model's DrumStationFromHeadRear, printed on the profile with its .X band.
 # Machinist review r1 of #1685 (clarity): it ended on no feature of this part,

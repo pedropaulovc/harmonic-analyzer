@@ -23,6 +23,7 @@ import dt_pinion_handle_geometry as rod_geometry
 import dt_pinion_handle_spec as crossrod
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _printed_tolerance import printed_band_mm
 
 
 def test_required_drawing_paths_and_registry() -> None:
@@ -73,7 +74,9 @@ def test_only_the_drum_station_prints_two_places() -> None:
     """Machinist review of 7f7fc1717: NeckLen printed 11.25 at .XX.  Every
     station runs from the head rear face, so the head and neck shoulder are
     chosen so every turned length lands on .X; the drum station, an assembly
-    station, is the one .XX length (as at 61.55)."""
+    station, is the one .XX length (as at 61.55).  The head length prints
+    11.50 for its band, not its value (r3 of #1685: the crossrod hole's
+    toleranced station keeps both webs at the target only under .XX)."""
     lengths = {
         "HeadLen": spec.HEAD_LEN,
         "NeckLen": spec.NECK_LEN,
@@ -88,50 +91,55 @@ def test_only_the_drum_station_prints_two_places() -> None:
     two_places = {
         name for name in lengths if spec.DRAWING_PRECISION_BY_NAME[name] == 2
     }
-    assert two_places == {"DrumStationFromHeadRear"}
+    assert two_places == {"DrumStationFromHeadRear", "HeadLen"}
+    assert spec.HEAD_LEN_PLACES == 2
     for name, value in lengths.items():
-        if name in two_places:
+        if name == "DrumStationFromHeadRear":
             assert value != pytest.approx(round(value, 1), abs=1e-9), name
 
 
-def test_crossrod_hole_is_centred_with_a_rule_12_web() -> None:
-    # Printed centred on the Ø15 cylinder's length: only HeadLen's .X band
-    # reaches the web, never a separate station band.  The machinist review of
-    # 7f7fc1717 holds the web to the novice-machinist 2.0 target.  Machinist
-    # review r1 of #1685: the mid point prints too, but as a (5.75)
-    # reference, so it adds no band.
+def test_crossrod_hole_station_is_toleranced_with_a_rule_12_web() -> None:
+    # Machinist review r3 of #1685 (clarity, 3 of 3 runs): CENTRED gave no
+    # datum face and no band, so the hole prints an ordinary .XXX station
+    # from the head rear face.  Both webs hold the novice-machinist 2.0
+    # target held since the review of 7f7fc1717, with HeadLen at .XX.
     assert spec.DRAWING_DIMENSIONS["CrossHoleStationReference"] == {
         "CrossHoleFromHeadRear"
     }
-    assert spec.CROSS_HOLE_FROM_HEAD_REAR == pytest.approx(spec.HEAD_LEN / 2.0)
-    assert spec.DRAWING_PRECISION_BY_NAME["CrossHoleFromHeadRear"] == 2
+    assert spec.CROSS_HOLE_FROM_HEAD_REAR == pytest.approx(spec.CROSS_HOLE_STATION)
+    assert spec.CROSS_HOLE_STATION == pytest.approx(spec.HEAD_LEN / 2.0)
+    assert spec.DRAWING_PRECISION_BY_NAME["CrossHoleFromHeadRear"] == 3
+    assert spec.CROSS_HOLE_STATION_BAND == printed_band_mm(3)
+    assert spec.HEAD_LEN_BAND == printed_band_mm(2)
     assert "CrossHoleFromHeadRear" in drawing.DETAIL_KEEP
+    # Printed toleranced, never as a reference.
     build = inspect.getsource(drawing.build)
-    assert '"CrossHoleFromHeadRear": "cross-hole station reference"' in build
+    assert '"CrossHoleFromHeadRear"' not in build
     source = inspect.getsource(part.build)
     call = source[source.index('feature_name="CrossHoleStationReference"') :]
     call = call[: call.index("\n    )")]
     assert "drive_expression='\"HeadLen\" / 2'" in call
     assert "end_v=-HEAD_CENTER_Z" in call
-    assert f"CENTRED ON<MOD-DIAM>{spec.HEAD_DIA:.0f} CYLINDER LENGTH" in (
-        spec.CROSS_HOLE_CALLOUT
+    assert "CENTRED" not in spec.CROSS_HOLE_CALLOUT
+    hole_upper = (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]) / 2.0
+    rear = spec.CROSS_HOLE_STATION - spec.CROSS_HOLE_STATION_BAND - hole_upper
+    front = (
+        (spec.HEAD_LEN - spec.HEAD_LEN_BAND)
+        - (spec.CROSS_HOLE_STATION + spec.CROSS_HOLE_STATION_BAND)
+        - hole_upper
     )
-    assert spec.CROSS_HOLE_WEB_WORST == pytest.approx(
-        (spec.HEAD_LEN - spec.HEAD_LEN_BAND) / 2.0
-        - (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]) / 2.0
-    )
+    assert spec.CROSS_HOLE_WEB_WORST == pytest.approx(min(rear, front))
     assert spec.CROSS_HOLE_WEB_TARGET == 2.0
     assert spec.CROSS_HOLE_WEB_WORST >= spec.CROSS_HOLE_WEB_TARGET
 
 
-def test_cross_hole_callout_names_the_cylinder_not_the_crowned_head() -> None:
+def test_cross_hole_callout_does_not_name_the_crowned_head() -> None:
     """Machinist review of 7f7fc1717 (blocker): "CENTRED ON HEAD LENGTH" could
-    mean the straight Ø15 cylinder or the whole crowned head.  The callout
-    names the cylinder, its Ø read from the spec rather than typed."""
+    mean the straight Ø15 cylinder or the whole crowned head.  Since r3 of
+    #1685 the station is a dimension from the head rear face, and the
+    callout names only the process and the mate."""
     assert "HEAD LENGTH" not in spec.CROSS_HOLE_CALLOUT
-    assert f"<MOD-DIAM>{spec.HEAD_DIA:.0f} CYLINDER" in spec.CROSS_HOLE_CALLOUT
-    typed = spec.CROSS_HOLE_CALLOUT.replace(spec.CROSSROD_NUMBER, "")
-    assert "15" not in typed.replace(f"{spec.HEAD_DIA:.0f}", "", 1)
+    assert "CYLINDER" not in spec.CROSS_HOLE_CALLOUT
 
 
 def test_integral_head_owns_the_crossrod_interface() -> None:
@@ -140,10 +148,7 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert spec.NECK_LEN == pytest.approx(spec.NECK_END_Z - spec.HEAD_REAR_Z)
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is spec.CROSS_HOLE_CALLOUT
-    assert callout == (
-        "REAM THRU, BONDED FIT\nON MHA-DT-015 CROSSROD,\n"
-        "CENTRED ON<MOD-DIAM>15 CYLINDER LENGTH"
-    )
+    assert callout == "REAM THRU, BONDED FIT\nON MHA-DT-015 CROSSROD"
     # Machinist review r1 of #1685 (blocker): the band names its mate, and
     # every mate a callout names is the registry's part number.
     import _config
@@ -407,12 +412,11 @@ def test_bond_zone_callout_hangs_below_the_shaft_clear_of_its_neighbours() -> No
     journal_width, _ = drawing._diameter_block_size(spec.JOURNAL_CALLOUT)
     front_x = drawing.PRINCIPAL_KEEP["FrontJournalDia"][0]
     assert front_x - journal_width - right >= 0.008
-    # Over the drum station's text block, whose shoulder is its line.
-    drum_x, drum_y = drawing.DRUM_STATION_TEXT_XY
-    drum_lines = drawing.DRUM_STATION_CALLOUT.count("\n") + 2
-    drum_top = drum_y - 0.00105 + (0.0035 + (drum_lines - 1) * 0.0056) / 2.0
-    assert right <= drum_x + drawing.DRUM_STATION_TEXT_WIDTH / 2.0
-    assert bottom - drum_top >= 0.003
+    # Left of the drum station's text block (r3 of #1685: three lines put
+    # its bottom level with that block's top), and over the 199.0's text.
+    drum_x, _drum_y = drawing.DRUM_STATION_TEXT_XY
+    assert drum_x - drawing.DRUM_STATION_TEXT_WIDTH / 2.0 - right >= 0.0015
+    assert bottom >= 0.125
     # Its arrows sit between the flanks: an outside tail would rise into the
     # back Ra symbol over the shaft.
     assert "BondZoneDia" in drawing.ARROWS_INSIDE
@@ -511,8 +515,22 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert spec.DRAWING_DIMENSIONS["BondZoneReference"] == {"BondZoneDia"}
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is spec.BOND_ZONE_CALLOUT
     assert spec.BOND_ZONE_CALLOUT == (
-        "ALL<MOD-DIAM>8 EXCEPT JOURNALS;\nMHA-DT-001 BOND ZONE"
+        "ALL<MOD-DIAM>8 EXCEPT JOURNALS;\nMHA-DT-001 BOND ZONE,\nDRUM ENDS ON JOURNALS"
     )
+    # Machinist review r3 of #1685 (blocker): the drum station falls on the
+    # front land; each drum end rests on its land at every printed limit.
+    front_min = (
+        spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN - 2 * spec.LINEAR_X_BAND
+    ) - (spec.DRUM_STATION + spec.DRUM_STATION_BAND)
+    back_min = (
+        spec.DRUM_STATION
+        - spec.DRUM_STATION_BAND
+        + geometry.DRUM_LEN
+        + geometry.DRUM_LEN_BAND[1]
+    ) - (spec.BACK_JOURNAL_FROM_HEAD_REAR + spec.LINEAR_X_BAND)
+    assert spec.DRUM_FRONT_END_ON_JOURNAL_MIN == pytest.approx(front_min)
+    assert spec.DRUM_BACK_END_ON_JOURNAL_MIN == pytest.approx(back_min)
+    assert min(front_min, back_min) > 0.0
     station = spec.BOND_ZONE_DIA_FROM_HEAD_REAR
     clear = spec.BOND_ZONE_LAND_CLEARANCE
     assert spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN + clear <= station
@@ -587,7 +605,8 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         rig.DRUM_END_SHIM,
         rig.DRUM_END_SHIM_SET_ERROR,
     )
-    assert spec.LINEAR_X_BAND == spec.HEAD_LEN_BAND == printed_band_mm(1)
+    assert spec.LINEAR_X_BAND == printed_band_mm(1)
+    assert spec.HEAD_LEN_BAND == printed_band_mm(2)
     assert geometry.DRUM_LEN == rig.DRUM_LEN
     assert geometry.STRAP_T_BAND == strap.THICKNESS_BAND
     spec_source = inspect.getsource(spec)

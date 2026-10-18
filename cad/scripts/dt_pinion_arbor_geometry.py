@@ -52,7 +52,9 @@ JOURNAL_DIA_BAND = (-0.010, -0.030)
 # band reaches the web.  The machinist review of 7f7fc1717 then flagged that
 # web, (10.5 - 0.8) / 2 - 6.10 / 2 = 1.80, under the novice-machinist 2.0
 # target; Main's ruling (option 2) grows the head to 11.5, again about the
-# crossrod station: 2.30 worst case (CROSS_HOLE_WEB_WORST below).
+# crossrod station: 2.30 worst case.  Machinist review r3 of #1685 then
+# asked for a toleranced station in place of CENTRED, which the .XX HeadLen
+# holds at the target (CROSS_HOLE_WEB_WORST below).
 #
 # Every station on the print runs from the head rear face, so its position
 # decides which lengths print exactly at .X.  With SHAFT_LEN released, the
@@ -233,15 +235,31 @@ BACK_RIM_FROM_HEAD_REAR = SHAFT_LEN - HEAD_REAR_Z
 FRONT_JOURNAL_Z = HEAD_REAR_Z + FRONT_JOURNAL_FROM_HEAD_REAR
 BACK_JOURNAL_Z = HEAD_REAR_Z + BACK_JOURNAL_FROM_HEAD_REAR
 
-# drawing-guidelines.md rule 17 (walls and webs) worst-case web from the centred crossrod hole to either head face:
-# the .X HeadLen band split over both sides, the hole at its upper limit.
-HEAD_LEN_PLACES = 1  # HeadLen
+# drawing-guidelines.md rule 17 (walls and webs) worst-case web from the crossrod hole to either head
+# face.  Machinist review r3 of #1685 (clarity, 3 of 3 runs): "CENTRED ON Ø15
+# CYLINDER LENGTH" told the shop neither where to measure from nor how
+# closely, so the hole is now an ordinary toleranced station from the head
+# rear face, mid-length at .XXX.  At the .X HeadLen the front web would fall
+# to (11.5 - 0.8) - (5.75 + 0.13) - 6.10 / 2 = 1.77, under the 2.0 target, so
+# HeadLen prints at .XX: the front web is then 2.06 and the rear 2.57.
+HEAD_LEN_PLACES = 2  # HeadLen
 HEAD_CAP_SAG_PLACES = 1  # HeadCapSagDim
 NECK_LEN_PLACES = 1  # NeckLen
-HEAD_LEN_BAND = printed_band_mm(HEAD_LEN_PLACES)  # .X title-block row
-CROSS_HOLE_WEB_WORST = (HEAD_LEN - HEAD_LEN_BAND) / 2.0 - (
-    CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[0]
-) / 2.0
+HEAD_LEN_BAND = printed_band_mm(HEAD_LEN_PLACES)  # .XX title-block row
+CROSS_HOLE_STATION = HEAD_LEN / 2.0  # from the head rear face
+CROSS_HOLE_STATION_PLACES = 3  # CrossHoleFromHeadRear
+CROSS_HOLE_STATION_BAND = printed_band_mm(CROSS_HOLE_STATION_PLACES)
+CROSS_HOLE_REAR_WEB_WORST = (
+    CROSS_HOLE_STATION
+    - CROSS_HOLE_STATION_BAND
+    - (CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[0]) / 2.0
+)
+CROSS_HOLE_FRONT_WEB_WORST = (
+    (HEAD_LEN - HEAD_LEN_BAND)
+    - (CROSS_HOLE_STATION + CROSS_HOLE_STATION_BAND)
+    - (CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[0]) / 2.0
+)
+CROSS_HOLE_WEB_WORST = min(CROSS_HOLE_REAR_WEB_WORST, CROSS_HOLE_FRONT_WEB_WORST)
 # Crossrod bond: the rod must still enter the hole at its tightest pair, and
 # the loosest pair must stay inside the retaining compound's gap.
 CROSSROD_MIN_CLEARANCE = (CROSS_HOLE_DIA + CROSS_HOLE_DIA_BAND[1]) - (
