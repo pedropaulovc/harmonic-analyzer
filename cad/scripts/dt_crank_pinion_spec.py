@@ -33,9 +33,8 @@ import dt_cone_pivot_post_installation
 import dt_crank_drive_gear_spec
 import dt_crank_hub_geometry
 from _fit_deviations import deviations
-from _gtol_cylinder import CylinderFace
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import SurfaceFinishControl
 from stock_form_cutter import (
     StockFormProfile,
     template_for_teeth,
@@ -403,6 +402,26 @@ if (
     >= PIN_EDGE_MIN_WORST - 1e-9
 ):
     raise AssertionError("a boss one print step shorter still holds W15: not the shortest")
+# The print locates the match-drilled hole from the boss's north face, the
+# faced end whose wall the hole must keep (drawing-guidelines.md rule 10: a
+# centre from a real feature, never "mid-length" in words; machinist review
+# r1 of #1652). At that dimension's own .X row the hole still keeps the W15
+# floor to the north face.
+PIN_FROM_BOSS_END = BOSS_LENGTH / 2.0
+PIN_FROM_BOSS_END_PLACES = BOSS_LENGTH_PLACES
+if abs(PIN_FROM_BOSS_END - round(PIN_FROM_BOSS_END, PIN_FROM_BOSS_END_PLACES)) > 1e-9:
+    raise AssertionError("the pin's station from the boss end does not print exactly")
+PIN_FROM_BOSS_END_LIGAMENT_WORST = (
+    PIN_FROM_BOSS_END
+    - printed_band_mm(PIN_FROM_BOSS_END_PLACES)
+    - PIN_DIA / 2.0
+    - _PIN_HOLE_RADIUS_GROWTH
+)
+if PIN_FROM_BOSS_END_LIGAMENT_WORST < PIN_EDGE_MIN_WORST - 1e-9:
+    raise AssertionError("the printed pin station lets the hole break the boss's north wall")
+# The hole is reamed to fit the pin, so its printed size is a reference
+# nominal from the pin's own diameter, at the drilled-hole row's two places.
+PIN_HOLE_DIA_PLACES = 2
 
 
 def pitch_point_azimuths(
@@ -488,14 +507,20 @@ if not 0.0 <= PIN_CLOCKING_DEG < 360.0 / TEETH:
 
 
 # The matched-hole callout on both part records identifies both seated parts,
-# the shared boss-mid-length operation and the actual fitted pin. It deliberately
-# omits the modeled hole nominal: reaming to a functional acceptance governs,
-# and the pin identity plus flush condition stay on the feature callout.
+# the shared operation and the actual fitted pin. Reaming to a functional
+# acceptance governs, so the pinion prints the hole's size only as a
+# reference nominal on its native diameter, and locates it from the boss's
+# north face (PIN_FROM_BOSS_END); the pin identity, acceptance and flush
+# condition ride that callout.
 # The part numbers are hard-coded, not read from ``_config.parts``.
 # test_dt_crank_pinion_drawing checks them against the registry offline.
 CRANKSHAFT_NUMBER = "MHA-DT-011"
 PINION_NUMBER = "MHA-DT-010"
 PIN_NUMBER = "MHA-DT-029"
+# The 64T this pinion meshes with, and the cone gear whose T120 the turned
+# band and the shoulder clear (MHA-DT-000's T120 check).
+MESH_GEAR_NUMBER = "MHA-DT-007"
+CONE_GEAR_NUMBER = "MHA-DT-003"
 BORE_PROCESS_CALLOUT = "REAM THRU"
 BORE_FIT_CALLOUT = "\n".join(
     (
@@ -521,38 +546,53 @@ def pin_hole_note(mate_number: str, where: str) -> str:
     return "\n".join((f"MATCH DRILL AT ASSY WITH {mate_number}", where, *PIN_FIT_LINES))
 
 
-PIN_HOLE_PROCESS = pin_hole_note(CRANKSHAFT_NUMBER, "AT BOSS MID-LENGTH")
+# The pinion's callout hangs under its reference Ø: the station is a native
+# dimension now, so the words carry only the operation, mate and fit.
+PIN_HOLE_PROCESS = "\n".join(
+    (f"MATCH DRILL AT ASSY WITH {CRANKSHAFT_NUMBER}", *PIN_FIT_LINES)
+)
 # The shaft's narrower field needs the reaming instruction split before the
 # pin identity, without changing any process words or the four-line height.
 CRANKSHAFT_PIN_HOLE_PROCESS = pin_hole_note(
     PINION_NUMBER, "AT ITS BOSS MID-LENGTH"
 ).replace("\nREAM TO FIT PIN ", " REAM TO FIT\nPIN ")
 
-# One roughness, on the one surface whose function depends on it: the bore is
-# a size-toleranced fit onto the crankshaft, and a fit lives on the peaks as
-# much as on the limits, so the bore carries the project's general machined
-# grade. Nothing runs on the teeth or the faces -- they are as the title
-# block's process row states (cad/docs/drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
-SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
-    SurfaceFinishControl("crank_pinion_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
-)
+# No roughness symbol: the bore is pinned to the crankshaft (match-drilled
+# pin MHA-DT-029), so it turns with the shaft and never runs, slides or
+# locates against it (drawing-guidelines.md rule 6: pinned bores carry no
+# symbol; machinist review r1 of #1652). The reamed limits and the named mate
+# control the fit.
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_dt_crank_pinion`` marks exactly these; ``draw_dt_crank_pinion``
 # keeps exactly their union across its per-view ``keep`` maps. The
 # ``BossProfile`` is a Right-plane revolve profile with construction-only
-# witnesses for the tooth blank and bore. It therefore owns all four printed
-# turned diameters/lengths on the side view without changing the solid:
-# ``BossDia`` and ``OverallLength`` drive the revolve, while ``OutsideDia`` and
-# ``BoreDia`` are equation-driven native reference dimensions attached to the
-# matching axial extents (drawing-simplicity-policy.md `How the repository implements the guidelines`'s reference-sketch allowance and drawing-guidelines.md rule 11 (turned parts read like the lathe)'s
-# turned-part layout). The ``TurnedBandProfile`` is the Right-plane revolve
-# cut that turns the teeth down north of the shoulder; its shoulder length
-# (from the same faced end) and turned diameter drive it. ---
+# witnesses. It therefore owns every printed turned diameter and length on the
+# side view but the turned band's, without changing the solid: ``BossDia``
+# and ``OverallLength`` drive the revolve, while ``OutsideDia``, ``BoreDia``,
+# ``FaceWidth``, ``ShoulderLength``, ``PinHoleDia`` and ``PinFromBossEnd`` are
+# equation-driven native reference dimensions on construction witnesses
+# (drawing-simplicity-policy.md `How the repository implements the
+# guidelines`'s reference-sketch allowance and drawing-guidelines.md rule 11
+# (turned parts read like the lathe)'s turned-part layout). The lengths ride a
+# witness along the section's LOWER outline, so their extension lines start at
+# the corners they measure instead of crossing the hatch and the bore from the
+# upper half-profile (machinist review r1 of #1652). The
+# ``TurnedBandProfile`` is the Right-plane revolve cut that turns the teeth
+# down north of the shoulder; its turned diameter drives it. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "GearBlank": {"FaceWidth"},
-    "BossProfile": {"OutsideDia", "BoreDia", "BossDia", "OverallLength"},
-    "TurnedBandProfile": {"ShoulderLength", "TurnedDia"},
+    "BossProfile": {
+        "OutsideDia",
+        "BoreDia",
+        "BossDia",
+        "OverallLength",
+        "FaceWidth",
+        "ShoulderLength",
+        "PinHoleDia",
+        "PinFromBossEnd",
+    },
+    "TurnedBandProfile": {"TurnedDia"},
 }
 
 # --- Decimal places, authored ON THE PART ------------------------------------
@@ -570,21 +610,22 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # clearance at its long one. The shoulder length prints one place and the
 # turned diameter two, each with the band its reason is recorded at above.
 # The boss diameter is routine .XX, not a running surface. The match-drilled
-# pin station is absent: its callout locates it at boss mid-length and the
-# crankshaft/pinion stack sets it. The overall length prints one place like
-# the face, with the W15 boss sized for the pin's wall to its north face.
+# hole prints its reference size at two places and its station from the
+# boss's north face at one (PIN_FROM_BOSS_END). The overall length prints
+# one place like the face, with the W15 boss sized for the pin's wall to its
+# north face.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "BossProfile": {
         "OutsideDia": 2,
         "BoreDia": 3,
         "BossDia": BOSS_DIA_PLACES,
         "OverallLength": OVERALL_LENGTH_PLACES,
-    },
-    "TurnedBandProfile": {
+        "FaceWidth": FACE_WIDTH_PLACES,
         "ShoulderLength": SHOULDER_LENGTH_PLACES,
-        "TurnedDia": TURNED_DIA_PLACES,
+        "PinHoleDia": PIN_HOLE_DIA_PLACES,
+        "PinFromBossEnd": PIN_FROM_BOSS_END_PLACES,
     },
+    "TurnedBandProfile": {"TurnedDia": TURNED_DIA_PLACES},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is
@@ -617,17 +658,22 @@ TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.
 # sheet permits it only as that check directs and states the floor, so the
 # part stays conforming after the fit-up cut.  Codex P1 on #1154 (review 3).
 # The worst-case clearances to T120 are a design-check result, so only the
-# assembly's crank step prints them (T120_FITUP_ASSEMBLY_CHECK).  The note
+# assembly's crank step prints them (T120_FITUP_ASSEMBLY_CHECK).  The sheet
 # names the check, not its step number: a part never reads the step registry
-# (Main's TbPB ruling 2; test_part_isolation).
+# (Main's TbPB ruling 2; test_part_isolation).  The allowance rides the
+# turned diameter's own callout, so it cannot be read against the tip
+# diameter (machinist review r1 of #1652).
 T120_SHOULDER_CLEARANCE_TEXT = (
     "NO AXIAL OVERLAP"
     if T120_SHOULDER_AIR_WORST == math.inf
     else f"{T120_SHOULDER_AIR_WORST:.2f}"
 )
-TURNED_BAND_FITUP_NOTE = (
-    "TURNED BAND MAY BE TURNED DOWN PER MHA-DT-000 T120 CHECK, "
-    f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN."
+TURNED_DIA_FITUP_CALLOUT = "\n".join(
+    (
+        f"{CONE_GEAR_NUMBER} T120 CLR",
+        "MHA-DT-000 CHECK MAY",
+        f"TURN TO Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN",
+    )
 )
 # Section A-A cuts through a tooth, so the band reads as a solid ring and the
 # spaces seem to stop against it (machinist review of the stack build). They
@@ -640,7 +686,7 @@ TOOTH_RUNOUT_NOTE = (
 )
 if not BOSS_DIA <= ROOT_DIA_MIN:
     raise AssertionError("the 16T boss must be turned to the root for the cutter runout")
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, TOOTH_RUNOUT_NOTE, TURNED_BAND_FITUP_NOTE))
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, TOOTH_RUNOUT_NOTE))
 # The MHA-DT-000 crank step's T120 check (user, 2026-09-30, #1154), printed by
 # draw_dt_drive_train_assembly: the pinion on its seat feeler, MHA-DT-010 and T120
 # pushed toward each other (taking up every running play), turned by hand and

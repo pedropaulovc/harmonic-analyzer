@@ -76,6 +76,7 @@ from dt_crank_pinion_spec import (
     OVERALL_LENGTH,
     PIN_DIA,
     PIN_HOLE_SPEC,
+    PIN_FROM_BOSS_END,
     PIN_STATION,
     SHOULDER_LENGTH,
     SHOULDER_LENGTH_LIMITS,
@@ -234,12 +235,41 @@ async def build(adapter) -> dict[str, str]:
         "bore-diameter reference line",
         await adapter.add_line(0.0, BORE_DIAMETER / 2.0, -OVERALL_LENGTH, BORE_DIAMETER / 2.0),
     )
+    # Construction witnesses along the LOWER half-profile carry the printed
+    # lengths: the faced end at the tip line, the shoulder, the tooth face,
+    # the step down to the boss, the pin station and the boss end.  Their
+    # extension lines then start at the corners they measure on the section's
+    # lower outline and run down to the stack below the view, instead of
+    # crossing the hatch and the bore from the upper outline (machinist
+    # review r1 of #1652).  The pin station is measured from the boss's north
+    # face, the wall the match-drilled hole must keep, and a construction
+    # circle on the hole's axis carries its reference diameter.
+    lower_pts = [
+        (0.0, -OUTSIDE_DIA / 2.0),
+        (-SHOULDER_LENGTH, -OUTSIDE_DIA / 2.0),
+        (-FACE_WIDTH, -OUTSIDE_DIA / 2.0),
+        (-FACE_WIDTH, -BOSS_DIA / 2.0),
+        (-PIN_STATION, -BOSS_DIA / 2.0),
+        (-OVERALL_LENGTH, -BOSS_DIA / 2.0),
+    ]
+    lower = await add_line_chain(adapter, lower_pts, close=False)
+    pin_ref = check(
+        "pin-hole reference circle",
+        await adapter.add_circle(-PIN_STATION, 0.0, PIN_DIA / 2.0),
+    )
     set_sketch_direct_db(adapter, False)
-    for line in (outside_ref, bore_ref):
-        segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    for entity in (outside_ref, bore_ref, *lower, pin_ref):
+        segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not bool(segment.ConstructionGeometry):
-            raise RuntimeError(f"{line}: failed to become construction geometry")
+            raise RuntimeError(f"{entity}: failed to become construction geometry")
+    for i, line in enumerate(lower):
+        (_, y1), (_, y2) = lower_pts[i], lower_pts[i + 1]
+        direction = "horizontal" if y1 == y2 else "vertical"
+        check(
+            f"lower witness {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
     for i, line in enumerate(boss_lines):
         (_, y1), (_, y2) = boss_pts[i], boss_pts[(i + 1) % len(boss_lines)]
         direction = "horizontal" if y1 == y2 else "vertical"
@@ -268,15 +298,71 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     boss_outline = boss_lines[1]
+    # The boss end rides the lower witness's end, so the overall length
+    # below the view drives the revolve.
+    check(
+        "boss end over the lower witness end",
+        await adapter.add_sketch_constraint(
+            f"{boss_lines[2]}.start", f"{lower[4]}.end", "vertical_points"
+        ),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{lower[0]}.start", 0.0, -OUTSIDE_DIA / 2.0, "lower witness start"
+    )
+    boss.record(None, '"OutsideDia" / 2')
+    for label, point, value in (
+        ("ShoulderLength", f"{lower[0]}.end", SHOULDER_LENGTH),
+        ("FaceWidth", f"{lower[1]}.end", FACE_WIDTH),
+    ):
+        await dimension_between(
+            adapter, f"{lower[0]}.start", point, "horizontal_distance", value,
+            f"lower witness {label}",
+        )
+        boss.record(label, f'"{label}"')
     await dimension_between(
         adapter,
-        f"{boss_outline}.end",
-        "origin",
+        f"{lower[2]}.start",
+        f"{lower[2]}.end",
+        "vertical_distance",
+        (OUTSIDE_DIA - BOSS_DIA) / 2.0,
+        "lower witness step to the boss",
+    )
+    boss.record(None, '("OutsideDia" - "BossDia") / 2')
+    await dimension_between(
+        adapter,
+        f"{lower[0]}.start",
+        f"{lower[4]}.end",
         "horizontal_distance",
         OVERALL_LENGTH,
         "boss OverallLength",
     )
     boss.record("OverallLength", '"FaceWidth" + "BossLength"')
+    await dimension_between(
+        adapter,
+        f"{lower[4]}.start",
+        f"{lower[4]}.end",
+        "horizontal_distance",
+        BOSS_LENGTH - PIN_FROM_BOSS_END,
+        "pin station from the boss end",
+    )
+    boss.record("PinFromBossEnd", '"BossLength" / 2')
+    check(
+        "pin-hole reference on the axis",
+        await adapter.add_sketch_constraint(
+            f"{pin_ref}.center", "origin", "horizontal_points"
+        ),
+    )
+    check(
+        "pin-hole reference over the pin station",
+        await adapter.add_sketch_constraint(
+            f"{pin_ref}.center", f"{lower[3]}.end", "vertical_points"
+        ),
+    )
+    check(
+        "pin-hole reference diameter",
+        await adapter.add_sketch_dimension(pin_ref, None, "diameter", PIN_DIA),
+    )
+    boss.record("PinHoleDia", None)
     await add_diametric_linear_dimension(
         adapter,
         boss_axis,
@@ -383,7 +469,9 @@ async def build(adapter) -> dict[str, str]:
         SHOULDER_LENGTH,
         "turned band ShoulderLength",
     )
-    band.record("ShoulderLength", '"ShoulderLength"')
+    # Definition only: the printed shoulder length is BossProfile's lower
+    # witness, on the same faced end and global.
+    band.record(None, '"ShoulderLength"')
     await add_diametric_linear_dimension(
         adapter,
         band_axis,
@@ -510,14 +598,15 @@ async def build(adapter) -> dict[str, str]:
     )
     # The face's own +0/-0.30: the drive train proves the 64T row engagement
     # at its short limit and the turned band's T120 clearance at its long one
-    # (Codex P1 on #1128; user ruling 2026-09-30).
+    # (Codex P1 on #1128; user ruling 2026-09-30).  It rides the printed
+    # lower witness; the blank's own extrude depth stays definition-only.
     set_dimension_bilateral_tolerance(
-        adapter, "GearBlank", "FaceWidth", *FACE_WIDTH_LIMITS
+        adapter, "BossProfile", "FaceWidth", *FACE_WIDTH_LIMITS
     )
     # The shoulder's +0/-0.30 and the turned diameter's +/-0.10: the drive
     # train proves the T120 air and radial clearance at their long/large limits.
     set_dimension_bilateral_tolerance(
-        adapter, "TurnedBandProfile", "ShoulderLength", *SHOULDER_LENGTH_LIMITS
+        adapter, "BossProfile", "ShoulderLength", *SHOULDER_LENGTH_LIMITS
     )
     set_dimension_symmetric_tolerance(
         adapter, "TurnedBandProfile", "TurnedDia", TURNED_DIA_TOLERANCE_MM

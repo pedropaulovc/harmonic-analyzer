@@ -12,14 +12,12 @@ import build_dt_cone_gear_shaft
 import build_dt_cone_swing_platform
 import build_ch_connecting_rod
 import build_ch_channel_lever
-import build_dt_crank_pinion
 import build_dt_crankshaft
 import build_dt_cylinder_gear_shaft
 import dt_cone_gear_shaft_spec
 import dt_cone_swing_platform_spec
 import ch_connecting_rod_spec
 import ch_channel_lever_spec
-import dt_crank_pinion_spec
 import dt_crankshaft_spec
 import dt_cylinder_gear_shaft_spec
 import draw_dt_alignment_pinion
@@ -28,7 +26,6 @@ import draw_dt_cone_gear_shaft
 import draw_dt_cone_swing_platform
 import draw_ch_connecting_rod
 import draw_ch_channel_lever
-import draw_dt_crank_pinion
 import draw_dt_crankshaft
 import draw_dt_cylinder_gear_shaft
 from _gtol_cylinder import CylinderFace
@@ -126,18 +123,9 @@ CASES = (
     # pinned by test_crank_arm_drawing.
     # crank_drive_gear: none either -- its D-bore is a gear seat that does not
     # run (rule 6); test_dt_crank_drive_gear_drawing pins the empty tuple.
-    (
-        dt_crank_pinion_spec,
-        build_dt_crank_pinion,
-        draw_dt_crank_pinion,
-        (
-            SurfaceFinishControl(
-                "crank_pinion_bore",
-                MACHINED_UM,
-                CylinderFace(dt_crank_pinion_spec.BORE_DIA),
-            ),
-        ),
-    ),
+    # crank_pinion: no finish controls -- the pinion is pinned to its shaft,
+    # nothing runs on the bore (drawing-guidelines.md rule 6); its empty
+    # tuple is pinned by test_dt_crank_pinion_drawing.
     (
         dt_crankshaft_spec,
         build_dt_crankshaft,
