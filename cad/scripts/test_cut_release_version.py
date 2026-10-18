@@ -660,8 +660,6 @@ def feature_release(
 
 
 def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path) -> None:
-    import export_features
-
     out = feature_release
     before_certificate = (out / "reports" / "release-neutral.json").read_bytes()
     expected = {
@@ -690,14 +688,8 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
             if relative.endswith("/features.toml"):
                 manifest = tomllib.loads(content.decode("utf-8"))
                 directory = Path(relative).parent.as_posix()
-                # The bundle carries its manifest STEP plus one STEP per
-                # configuration the part declares (export_features).
-                configurations = {
-                    f"{directory}/{Path(manifest['step']).stem}-{name}.STEP"
-                    for name in export_features.step_configurations(Path(directory).name)
-                }
                 assert {name for name in expected if name.startswith(f"{directory}/")} == {
-                    f"{directory}/{manifest['step']}", relative, *configurations,
+                    f"{directory}/{manifest['step']}", relative,
                 }
                 adjacent = archive.read(f"{directory}/{manifest['step']}")
                 full = archive.read(f"step/{manifest['step']}")
