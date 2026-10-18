@@ -230,8 +230,10 @@ DIMENSION_CALLOUTS = {
 }
 DIMENSION_CALLOUTS_ABOVE = {
     # The +X face stands over the platform's narrow west edge
-    # (build_dt_drive_train_assembly's print-worst containment).
-    "Width": "STAYS ON MHA-DT-020",
+    # (build_dt_drive_train_assembly's print-worst containment): no fit, so
+    # rule 4's few words of reason name the edge it keeps inside (machinist
+    # review of c4c0e848a: "STAYS ON" named no feature).
+    "Width": "WITHIN MHA-DT-020 EDGE",
     # The adjuster axis across the block: the shaft tip's lateral stack.
     "PassageCenter": "LOCATES MHA-DT-004 TIP",
 }
@@ -256,10 +258,11 @@ def _callout_half_width(text: str) -> float:
 AXIS_HEIGHT_LINE_DX = 0.031
 BLOCK_HEIGHT_LINE_DX = 0.052
 # The width's value and its function line are wider than its span, so they
-# stand right of the +X extension line on the extended dimension line, 5 mm
-# under the foot: the hold-down tap's callout below keeps the air the
-# view-crowding check asks (the taller box's height) under them.
-WIDTH_LINE_DROP = 0.005
+# stand right of the +X extension line on the extended dimension line, 3.5
+# mm under the foot (5 until the tap's callout grew a mate line, machinist
+# review of c4c0e848a): the hold-down tap's callout below keeps the air the
+# view-crowding check asks (the shorter box's height) under them.
+WIDTH_LINE_DROP = 0.0035
 FRONT_KEEP = {
     "Width": (
         FRONT_CENTER[0]
@@ -403,11 +406,14 @@ PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] + 0.0035 - 0.0264, 0.2013)
 PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.015, 0.1978)
 # The hold-down tap's callout stands above the bottom view, right of the
 # FootTapX value and under the front view's Width text, so its leader drops
-# steeply through the view's north edge.  With the tap 1.00 toward -X
-# (2026-09-29) a callout right of the view ran 5.4 mm longer over the part
-# than the tap's shortest approach.  6.6 mm over the north edge clears the
-# outline under the text.
-FOOT_TAP_CALLOUT_XY = (FOOT_TAP_CENTER[0] + 0.035, _bottom_y(Z_NORTH) + 0.0066)
+# steeply (53 degrees) through the view's north edge.  With the tap 1.00
+# toward -X (2026-09-29) a callout right of the view ran 5.4 mm longer over
+# the part than the tap's shortest approach.  SolidWorks centres the block
+# on the point, so the mate line (machinist review of c4c0e848a) dropped the
+# shoulder 2.8 mm onto the north edge and the 4.875's witness; 10.0 mm over
+# the edge the shoulder clears it by 1.65, as the two-line block's did, and
+# the block's left end stands 8.5 mm right of the tap.
+FOOT_TAP_CALLOUT_XY = (FOOT_TAP_CENTER[0] + 0.0373, _bottom_y(Z_NORTH) + 0.0100)
 # Under section A-A's native label (SECTION_LABEL_BOX), centred on it with
 # 2.0 mm of air.  At 5.4 under the view (287c, when a 3:2 section printed a
 # SCALE line under its label) it overprinted the label on the 2:1 sheet
@@ -461,7 +467,9 @@ def _sheet_notes(
     shaft_entry_center = BACK_CENTER if adjuster_center == FRONT_CENTER else FRONT_CENTER
     return (
         ("VIEW C\nSHAFT ENTRY", shaft_entry_center[0] - 0.021, CAPTION_Y),
-        ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, CAPTION_Y),
+        # 8.5 mm right of its old place (machinist review of c4c0e848a): the
+        # Width's mate line ends above its upper-left corner.
+        ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.0175, CAPTION_Y),
         ("VIEW B\nPINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, CAPTION_Y),
         ("BOTTOM VIEW\nHOLD-DOWN TAP", *BOTTOM_CAPTION_XY),
         # Review: named above the thread callout it describes.
@@ -566,16 +574,11 @@ PINCH_CLEARANCE_CALLOUT_EXTENT = (
 PINCH_THREAD_CALLOUT_EXTENT = (0.0322, 0.0085, 0.0310, 0.0078)
 # The hold-down tap's lines (the tap drill and its depth, the thread and its
 # full-thread depth, then the mate its stations locate on) plus the
-# shoulder: the d84a42ca7 render measured the two native lines 44 mm wide,
-# 4.9 mm over the point and the shoulder 5.6 under it; the mate line is one
-# more row, 21 glyphs wide.  The text grows up from its shoulder.
+# shoulder, measured on the c4c0e848a render: SolidWorks centres the block
+# on the point, 7.8 mm over it to the shoulder 8.35 under it, and the mate
+# line prints 57.6 mm wide.
 FOOT_TAP_QUALIFIER = "LOCATES ON MHA-DT-020"
-FOOT_TAP_CALLOUT_EXTENT = (
-    max(0.022, _callout_half_width(FOOT_TAP_QUALIFIER)) + 0.0010,
-    0.0060,
-    max(0.022, _callout_half_width(FOOT_TAP_QUALIFIER)) + 0.0010,
-    0.0055 + TEXT_ROW_HEIGHT,
-)
+FOOT_TAP_CALLOUT_EXTENT = (0.0293, 0.0086, 0.0293, 0.0080)
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
     "ADJUSTER ENTRY": ADJUSTER_ENTRY_EXTENT,
