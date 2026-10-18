@@ -193,10 +193,19 @@ SEAT_MATE_CALLOUTS = {
     "Sec0Dia": "RUNNING FIT IN\nMHA-DT-005 BORE",
     "Sec1Dia": f"SLIDES IN 64T AND\n{_land_1_gears()}",
 }
+# The terminal land's band also carries the MHA-VN-016 collar, whose bore
+# clearance is derived from this diameter (vn_cone_tip_collar_spec; codex
+# review of #1644 at fd9aa2df7), so its callout names the collar too.
+TERMINAL_LAND = 4
 SEAT_MATE_SUFFIXES = {
     f"Sec{land}Dia": " SLIDES IN "
-    + ", ".join(_gear(t) for t in SECTION_CONE_GEAR_TEETH[land])
-    for land in (2, 3, 4)
+    + ", ".join(
+        (
+            *(_gear(t) for t in SECTION_CONE_GEAR_TEETH[land]),
+            *(("MHA-VN-016",) if land == TERMINAL_LAND else ()),
+        )
+    )
+    for land in (2, 3, TERMINAL_LAND)
 }
 FLAT_MATE_SUFFIXES = {
     "Sec1AF": f" 64T, {_land_1_gears()}",

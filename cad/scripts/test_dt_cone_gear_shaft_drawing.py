@@ -240,7 +240,7 @@ def test_every_tight_band_names_its_mate_at_its_callout():
     assert drawing.DIMENSION_SUFFIXES == {
         "Sec2Dia": " SLIDES IN T024",
         "Sec3Dia": " SLIDES IN T018",
-        "Sec4Dia": " SLIDES IN T006, T012",
+        "Sec4Dia": " SLIDES IN T006, T012, MHA-VN-016",
         "Sec1End": " INSIDE T030 BORE",
         "Sec2End": " INSIDE T024 BORE",
         "Sec3End": " INSIDE T018 BORE",
