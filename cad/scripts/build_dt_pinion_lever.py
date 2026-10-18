@@ -13,7 +13,7 @@ disengaged, folded flat = engaged; the model carries the DISENGAGED
 rest pose.
 
 Layout: hub axis Z centred at the origin (z -5..+5), BLIND bore Ø6.35
-from the +Z face down to z -3 (2 wall behind), domed cap (sagitta 1.5)
+from the +Z face down to z -3 (2 wall behind), domed cap (sagitta 2.0)
 proud of the -Z face -- the lift rod's front end hides inside. Rod: a
 radius-3 cylinder revolved about +Y from y RodY0 (buried in the hub) to
 86. Revolve LAST (nothing later crosses its axis -- the on-axis-revolve
@@ -68,10 +68,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
@@ -83,7 +80,6 @@ from dt_pinion_lever_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    END_WALL_TOLERANCE_MM,
     HUB_LEN,
     HUB_OD,
     ISOMETRIC_VIEW_NOTE,
@@ -111,11 +107,11 @@ _SAVED_DRAWING_PROPERTIES = (
 ROD_R = ROD_DIA / 2.0
 HUB_R = HUB_OD / 2.0
 BORE_R = BORE / 2.0
-CAP_R = (HUB_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 14.83 crown sphere radius
+CAP_R = (HUB_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 11.56 crown sphere radius
 
 V_ANNULUS = math.pi * (HUB_R**2 - BORE_R**2) * (HUB_LEN - WALL_T)
 V_WALL = math.pi * HUB_R**2 * WALL_T
-V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 101.3
+V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 136.9
 V_ROD = math.pi * ROD_R**2 * (ROD_LEN - ROD_Y0)
 
 
@@ -484,7 +480,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Stations printed from face B (the flat mouth face, z +HUB_LEN/2): the
     # grip axis (z 0) along the hub's top silhouette, the pin hole along its
-    # bottom one.
+    # bottom one, the bore floor along the bore's lower wall, and the crown
+    # apex along the hub axis (the overall length; the end wall is what it
+    # leaves past the bore depth, dt_pinion_lever_spec END_WALL_*).
     drive_jobs += await _station_reference(
         adapter,
         feature="GripStationReference",
@@ -502,6 +500,24 @@ async def build(adapter) -> dict[str, str]:
         u_end=-PIN_HOLE_Z,
         v=-HUB_OD / 2.0,
         drive='("HubLen" - "WallT") / 2',
+    )
+    drive_jobs += await _station_reference(
+        adapter,
+        feature="BoreDepthReference",
+        name="BoreDepthFromB",
+        u_start=-HUB_LEN / 2.0,
+        u_end=-HUB_LEN / 2.0 + HUB_LEN - WALL_T,
+        v=-BORE / 2.0,
+        drive='"HubLen" - "WallT"',
+    )
+    drive_jobs += await _station_reference(
+        adapter,
+        feature="OverallLengthReference",
+        name="OverallFromB",
+        u_start=-HUB_LEN / 2.0,
+        u_end=HUB_LEN / 2.0 + CAP_SAG,
+        v=0.0,
+        drive='"HubLen" + "CapSag"',
     )
 
     # Named hub-bore axis (Axis1): the assembly clamps the lever coaxial on
@@ -526,13 +542,12 @@ async def build(adapter) -> dict[str, str]:
         0.01 * V_ROD,
     )
 
-    # Manufacturing drawing support: the slip bore and the end wall carry the
-    # only bands (both named in the spec); everything else rides the title
-    # block at the part-authored decimal places.
+    # Manufacturing drawing support: the slip bore carries the only band
+    # (named in the spec); everything else rides the title block at the
+    # part-authored decimal places.
     set_dimension_bilateral_tolerance(
         adapter, "BarrelProfile", "HubBore", *deviations(BORE_BAND)
     )
-    set_dimension_symmetric_tolerance(adapter, "Wall", "EndWall", END_WALL_TOLERANCE_MM)
     set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

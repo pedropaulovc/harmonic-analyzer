@@ -1,9 +1,17 @@
 dt-pinion-lever:
   title: Pinion Engage Lever
   number: MHA-DT-016
-  material: AISI 1018 cold-finished steel
-  material_specification: AISI 1018 cold-finished steel
+  material: LOW-CARBON STEEL, E.G. 1018 CF
+  material_specification: LOW-CARBON STEEL, E.G. 1018 CF
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"
+  machinist_exceptions:
+    # TODO(#1625): remove RV-01 and the INSIDE CORNERS note when the title
+    # block gains its inside-corner default.
+    - id: "RV-01"
+      kind: "accept"
+      where: "inside corner where the grip rod's root meets the hub OD (rod-to-hub junction)"
+      finding: "sharp internal corner with no stated fillet or maximum radius (rules 16, 21)"
+      reason: "owner ruling 2026-10-18 (fr-top-frame precedent): sharp inside corners take the shop's R1.0 MAX ceiling, printed as the note INSIDE CORNERS R1.0 MAX. until the shop-wide default goes in the title block under #1625; one piece machined from solid, as section A-A hatches it; no geometry change (owner-accepted)"
