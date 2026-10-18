@@ -1461,6 +1461,8 @@ def test_assemblies_depend_on_assembly_helpers():
                 "ms_measuring_stick",
                 "pn_pen",
                 "sm_summing",
+                # its explode selects the global axes (_ha_harmonic_analyzer_explode)
+                "ha_harmonic_analyzer",
             },
         ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),

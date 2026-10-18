@@ -25,3 +25,13 @@ free_dof: 0
 # carries_chain: wraps the roller chain, so verify:soundness's interference
 #   gate gets the authored wheel mounts, as the assembly build does (541011de0).
 carries_chain: true
+# machinist_exceptions: the fitter package's owner-declared machinist-review
+#   exceptions (drawing-simplicity-policy.md "Named exceptions"); read by
+#   machinist_exceptions.load_exceptions for ha_harmonic_analyzer_assembly,
+#   ignored by the build.
+machinist_exceptions:
+  - id: "U-MHA-VN-023-no-lock"
+    kind: "accept"
+    where: "sheet 4, integration step 6 (GOOSENECK AND LEVEL): MHA-VN-023 tightened on the MHA-SM-001 gooseneck post, NO LOCK; RE-SET IF IT DRIFTS"
+    finding: "MHA-VN-023 gooseneck set screw carries no mechanical lock (rule 23, lock threaded joints exposed to operating loads)"
+    reason: "user ruling 2026-10-12 on PR #1348 (Q5, option (a), no jam nut): the cup point sets the gooseneck post's slid-to-level height, adjustable by design with periodic re-set, so the screw stays bare in the hub boss's spot-faced tap (joint_retention ruling U-MHA-VN-023-no-lock)"

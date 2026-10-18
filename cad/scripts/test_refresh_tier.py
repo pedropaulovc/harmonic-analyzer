@@ -108,6 +108,11 @@ QUALIFYING_EXPLODES = {
         "create_channel_explode",
         ("_ch_channel_explode.py", "_assembly_patterns.py"),
     ),
+    "ha_harmonic_analyzer": (
+        "_ha_harmonic_analyzer_explode",
+        "create_harmonic_analyzer_explode",
+        ("_ha_harmonic_analyzer_explode.py", "_assembly_patterns.py"),
+    ),
 }
 
 

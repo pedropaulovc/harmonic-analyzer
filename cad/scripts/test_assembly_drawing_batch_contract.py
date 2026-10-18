@@ -61,7 +61,9 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     # magnifier left it with the axle-stack details (Codex PR #1330) and is
     # now a four-sheet fitter package (BOM, explode, steps); the pen sheet is a
     # full fitter package (settings details, BOM, explode, steps); the summing
-    # sheet is a full fitter package (settings, BOM, explode, steps).
+    # sheet is a full fitter package (settings, BOM, explode, steps); the
+    # complete-machine sheet is a four-sheet fitter package (BOM, explode,
+    # integration steps).
     if drawing
     not in (
         draw_fr_frame_assembly,
@@ -72,6 +74,7 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
         draw_mg_magnifier_assembly,
         draw_pn_pen_assembly,
         draw_sm_summing_assembly,
+        draw_ha_harmonic_analyzer_assembly,
     )
 )
 
@@ -208,6 +211,23 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             assert {
                 str(scripts_dir / name)
                 for name in ("sm_summing_assembly_spec.py", "sm_summing_assembly_notes.py")
+            } <= set(deps)
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_ha_harmonic_analyzer_assembly:
+            scripts_dir = Path(draw_ha_harmonic_analyzer_assembly.__file__).resolve().parent
+            # The spec (BOM, explode, settings, step text), its step order,
+            # and the sibling step lists and pose sources it cites.
+            assert {
+                str(scripts_dir / name)
+                for name in (
+                    "ha_harmonic_analyzer_assembly_spec.py",
+                    "ha_harmonic_analyzer_assembly_notes.py",
+                    "ha_harmonic_analyzer_assembly_steps.py",
+                    "dt_drive_train_steps.py",
+                    "pd_paper_drive_assembly_steps.py",
+                    "vn_pen_wire_geom.py",
+                    "pn_pen_carriage_geom.py",
+                )
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
