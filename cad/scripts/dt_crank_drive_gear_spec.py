@@ -291,10 +291,11 @@ MIN_FLAT_CUTTER_RADIUS = 4.0  # ≥Ø8 end mill
 # to move the nominal rather than print a tight band).
 BORE_SOUTH_CHAMFER = 1.50
 BORE_SOUTH_CHAMFER_PLACES = 2
-BORE_SOUTH_CHAMFER_BAND = (
-    printed_band_mm(BORE_SOUTH_CHAMFER_PLACES),
-    -printed_band_mm(BORE_SOUTH_CHAMFER_PLACES),
-)
+# The limits a part accepted against the printed leg may show: the general
+# .XX row read at the places the leg prints. Not a fit band (the part
+# authors no tolerance on the leg), so plain limits, not a band tuple.
+BORE_SOUTH_CHAMFER_MIN = BORE_SOUTH_CHAMFER - printed_band_mm(BORE_SOUTH_CHAMFER_PLACES)
+BORE_SOUTH_CHAMFER_MAX = BORE_SOUTH_CHAMFER + printed_band_mm(BORE_SOUTH_CHAMFER_PLACES)
 # The shaft's nominal Sec1 Ø is BORE_DIA; the drawing contract tests it
 # against dt_cone_gear_shaft_spec.SECTION_DIAS[1] without a circular import.
 _SHAFT_MAX_R = (BORE_DIA + cone_shaft_land_bands.SECTION_DIA_BANDS[1][0]) / 2.0
@@ -306,10 +307,10 @@ _MAX_CUTTER_RUNOUT = MIN_FLAT_CUTTER_RADIUS - math.sqrt(
     MIN_FLAT_CUTTER_RADIUS**2 - _HALF_CHORD**2
 )
 MAX_FLAT_CRESCENT = max(_MAX_HORN, _MAX_CUTTER_RUNOUT)
-if MAX_FLAT_CRESCENT >= BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[1]:
+if MAX_FLAT_CRESCENT >= BORE_SOUTH_CHAMFER_MIN:
     raise AssertionError(
         f"Sec1 end-mill horn + runout {MAX_FLAT_CRESCENT:.4f} reaches "
-        f"the south bore chamfer {BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[1]:.4f}"
+        f"the south bore chamfer {BORE_SOUTH_CHAMFER_MIN:.4f}"
     )
 
 # Even at the collar's supplied 5/8-in stock lower bound and the bore/chamfer
@@ -321,14 +322,10 @@ _COLLAR_MIN_R = (0.625 * MM_PER_IN - 0.002 * MM_PER_IN) / 2.0
 _BORE_MAX_R = (
     BORE_DIA + gear_seat_fit.seat_bore_band(cone_shaft_land_bands.GEAR_SEAT_BAND)[0]
 ) / 2.0
-COLLAR_BEARING_ANNULUS = _COLLAR_MIN_R - (
-    _BORE_MAX_R + BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[0]
-)
+COLLAR_BEARING_ANNULUS = _COLLAR_MIN_R - (_BORE_MAX_R + BORE_SOUTH_CHAMFER_MAX)
 if COLLAR_BEARING_ANNULUS <= 0:
     raise AssertionError("the chamfer reaches the collar's bearing outer rim")
-FLAT_ENGAGEMENT_MIN = FACE_WIDTH + FACE_WIDTH_BAND[1] - (
-    BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[0]
-)
+FLAT_ENGAGEMENT_MIN = FACE_WIDTH + FACE_WIDTH_BAND[1] - BORE_SOUTH_CHAMFER_MAX
 
 # No roughness symbol: the D-bore is a gear seat that drives through its flat
 # and does not run, and drawing-guidelines.md rule 6 (roughness symbols only

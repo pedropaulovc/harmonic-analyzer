@@ -173,10 +173,12 @@ def test_south_chamfer_covers_print_worst_end_mill_crescent() -> None:
     assert spec.MAX_FLAT_CRESCENT == pytest.approx(samples[-1])
     # The leg prints at .XX under the title block's band alone, and that band's
     # minimum still clears the crescent; the part authors no band of its own.
-    assert spec.BORE_SOUTH_CHAMFER_BAND == (printed_band_mm(2), -printed_band_mm(2))
+    grade = printed_band_mm(2)
+    assert spec.BORE_SOUTH_CHAMFER_MIN == pytest.approx(spec.BORE_SOUTH_CHAMFER - grade)
+    assert spec.BORE_SOUTH_CHAMFER_MAX == pytest.approx(spec.BORE_SOUTH_CHAMFER + grade)
     assert spec.DRAWING_PRECISION["BoreSouthChamfer"]["BoreSouthChamferSize"] == 2
-    assert spec.MAX_FLAT_CRESCENT < spec.BORE_SOUTH_CHAMFER + spec.BORE_SOUTH_CHAMFER_BAND[1]
-    assert "BORE_SOUTH_CHAMFER_BAND" not in _build_source()
+    assert spec.MAX_FLAT_CRESCENT < spec.BORE_SOUTH_CHAMFER_MIN
+    assert '"BoreSouthChamfer", "BoreSouthChamferSize"' not in _build_source()
 
 
 def test_chamfer_leaves_a_collar_bearing_annulus_and_flat_engagement() -> None:
@@ -185,7 +187,7 @@ def test_chamfer_leaves_a_collar_bearing_annulus_and_flat_engagement() -> None:
         + dt_cone_gear_shaft_spec.STOCK_DIA_BAND[1]
     ) / 2
     bore_max_r = (spec.BORE_DIA + spec.BORE_DIA_BAND[0]) / 2
-    chamfer_max = spec.BORE_SOUTH_CHAMFER + spec.BORE_SOUTH_CHAMFER_BAND[0]
+    chamfer_max = spec.BORE_SOUTH_CHAMFER_MAX
     annulus = collar_min_r - bore_max_r - chamfer_max
     assert spec.COLLAR_BEARING_ANNULUS == pytest.approx(annulus)
     assert annulus > 0.0
