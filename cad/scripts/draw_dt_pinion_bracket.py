@@ -79,7 +79,8 @@ from dt_pinion_bracket_spec import (
     DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
     PIN_DROP,
-    PIN_SEAT_WEB_WORST,
+    PIN_SEAT_DEPTH_CALLOUT,
+    PIN_SEAT_WALL_CALLOUT,
     R_END,
     SURFACE_FINISHES,
 )
@@ -237,20 +238,9 @@ DIMENSION_CALLOUTS = {
     # SETS (r3 review, rule 14); the leading spaces stand the rows off it.
     "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-023 CAM",
     # The station's band leaves the far-face wall under rule 17's 2.0 target.
-    # Emits the fact declared by RV-01 (owner ruling (a)): the minimum the
-    # wall holds at the worst printed bands, rounded down.
-    "PinSeatCz": (
-        "CENTRES MHA-DT-025\nFOLLOWER IN BAR\n"
-        f"WALL {int(PIN_SEAT_WEB_WORST * 10) / 10:.1f} MIN"
-    ),
+    # Emits the fact declared by RV-01 (owner ruling (a)), from the spec.
+    "PinSeatCz": "CENTRES MHA-DT-025\nFOLLOWER IN BAR\n" + PIN_SEAT_WALL_CALLOUT,
 }
-# The seat floor is modelled sharp; R0.2 MAX lets the builder pick a
-# flat-bottom reamer or end mill (rule 16, r2/r3 review): a stud bottomed on
-# that corner stands off at most 0.2, well inside the seat depth's .X band.
-# Three rows, so the block grows right, not up into the isometric view.
-PIN_SEAT_DEPTH_CALLOUT = (
-    "FOLLOWER SEAT REAM DEPTH\nFROM ENTRY FACE\nFLOOR CORNERS R0.2 MAX"
-)
 
 
 def _overall_reference(adapter: Any, left: Any) -> None:

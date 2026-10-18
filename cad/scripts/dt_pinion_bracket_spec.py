@@ -19,6 +19,8 @@ marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
+import math
+
 from _fit_ream_h7 import REAM_H7
 from _fit_ream_slide import REAM_SLIDE
 from _gtol_cylinder import CylinderFace
@@ -106,6 +108,21 @@ if PIN_SEAT_WEB_WORST < 1.5:
     raise AssertionError(
         f"follower-seat web {PIN_SEAT_WEB_WORST:.2f} is under the 1.5 floor"
     )
+# The sheet states the far-face wall as a plain fact (rule 20), rounded down
+# so it never claims more than the worst case: the owner-ruled shortfall
+# declared as RV-01 in cad/config/parts/dt-pinion-bracket.yaml.
+PIN_SEAT_WALL_CALLOUT = f"WALL {math.floor(PIN_SEAT_WEB_WORST * 10) / 10:.1f} MIN"
+
+# The seat floor is modelled sharp; the corner allowance lets the builder pick
+# a flat-bottom reamer or end mill (rule 16, r2/r3 machinist review, #1007):
+# a stud bottomed on that corner stands off at most this radius, well inside
+# the seat depth's .X band.  Three rows, so the block grows right, not up
+# into the isometric view.
+PIN_SEAT_FLOOR_CORNER_R_MAX = 0.2
+PIN_SEAT_DEPTH_CALLOUT = (
+    "FOLLOWER SEAT REAM DEPTH\nFROM ENTRY FACE\n"
+    f"FLOOR CORNERS R{PIN_SEAT_FLOOR_CORNER_R_MAX:.1f} MAX"
+)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_dt_pinion_bracket`` marks exactly these; ``draw_dt_pinion_bracket``
