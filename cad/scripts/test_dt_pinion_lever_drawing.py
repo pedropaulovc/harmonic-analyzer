@@ -77,9 +77,10 @@ def test_end_wall_holds_rule_17_from_the_two_x_baselines() -> None:
     spec = dt_pinion_lever_spec
     assert spec.DRAWING_PRECISION_BY_NAME["BoreDepthFromB"] == 1
     assert spec.DRAWING_PRECISION_BY_NAME["OverallFromB"] == 1
-    assert spec.OVERALL_FROM_B == spec.HUB_LEN + spec.CAP_SAG == 12.0
-    assert round(spec.END_WALL_ON_AXIS_WORST, 6) == 2.4
-    assert spec.END_WALL_AT_FLOOR_CORNER_WORST >= 1.5
+    assert spec.OVERALL_FROM_B == spec.HUB_LEN + spec.CAP_SAG == 12.2
+    assert round(spec.END_WALL_ON_AXIS_WORST, 6) == 2.6
+    # ENFORCE r5 (minor): the 2.0 sagitta left 1.9 at the floor's corner.
+    assert spec.END_WALL_AT_FLOOR_CORNER_WORST >= 2.0
 
 
 def test_grip_rod_is_a_straight_six() -> None:

@@ -56,7 +56,8 @@ _FLOOR_CORNER_R = BORE / 2.0 + BORE_BAND[0]
 END_WALL_AT_FLOOR_CORNER_WORST = END_WALL_ON_AXIS_WORST - (
     _CAP_R_MIN - (_CAP_R_MIN**2 - _FLOOR_CORNER_R**2) ** 0.5
 )
-if END_WALL_ON_AXIS_WORST < 2.0 or END_WALL_AT_FLOOR_CORNER_WORST < 1.5:
+# Rule 17's 2.0 target, not only its 1.5 floor, at both stations.
+if END_WALL_ON_AXIS_WORST < 2.0 or END_WALL_AT_FLOOR_CORNER_WORST < 2.0:
     raise AssertionError(
         f"end wall {END_WALL_ON_AXIS_WORST:.2f} on the axis, "
         f"{END_WALL_AT_FLOOR_CORNER_WORST:.2f} at the floor corner: rule 17"
@@ -70,8 +71,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinHoleProfile": {"PinHoleDia"},
     # drawing-simplicity-policy.md `How the repository implements the guidelines` reference sketches: every axial station is
     # printed from face B (the flat mouth face, rule 10's one baseline), but
-    # none is any feature's own dimension, so each gets a one-line
-    # construction sketch whose single driving dimension IS the value.
+    # none is any feature's own dimension, so each gets a two-point
+    # reference sketch whose single driving dimension IS the value.
     "GripStationReference": {"GripFromB"},
     "PinHoleStationReference": {"PinHoleFromB"},
     "BoreDepthReference": {"BoreDepthFromB"},

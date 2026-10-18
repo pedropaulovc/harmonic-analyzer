@@ -14,10 +14,12 @@ WALL_T = 2.0
 # ENFORCE r1 of MHA-DT-016 (#1011): the end wall behind the blind bore now
 # reads from two .X baselines on face B -- the bore depth and the overall
 # length to the crown apex -- instead of a tight band of its own (rule 17:
-# fix the wall with geometry, never a tighter band).  A 2.0 sagitta (was 1.5,
-# a photo estimate) keeps the crown "slightly domed" and leaves the wall 2.4
-# on the axis at the worst of both bands (dt_pinion_lever_spec asserts it).
-CAP_SAG = 2.0
+# fix the wall with geometry, never a tighter band).  A 2.2 sagitta (was 1.5,
+# a photo estimate) keeps the crown "slightly domed" and leaves the wall 2.6
+# on the axis and 2.07 at the floor's corner at the worst of both bands
+# (dt_pinion_lever_spec asserts both reach the 2.0 target; ENFORCE r5's
+# minor read 1.9 at the corner on the former 2.0 sagitta).
+CAP_SAG = 2.2
 CAP_RADIUS = ((HUB_OD / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 OVERALL_FROM_B = HUB_LEN + CAP_SAG  # mouth face B to the crown apex
 # Printed places of the dimensions that station the grip on the lift rod (the

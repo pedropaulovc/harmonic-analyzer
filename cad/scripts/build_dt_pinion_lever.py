@@ -13,7 +13,7 @@ disengaged, folded flat = engaged; the model carries the DISENGAGED
 rest pose.
 
 Layout: hub axis Z centred at the origin (z -5..+5), BLIND bore Ø6.35
-from the +Z face down to z -3 (2 wall behind), domed cap (sagitta 2.0)
+from the +Z face down to z -3 (2 wall behind), domed cap (sagitta 2.2)
 proud of the -Z face -- the lift rod's front end hides inside. Rod: a
 radius-3 cylinder revolved about +Y from y RodY0 (buried in the hub) to
 86. Revolve LAST (nothing later crosses its axis -- the on-axis-revolve
@@ -107,11 +107,11 @@ _SAVED_DRAWING_PROPERTIES = (
 ROD_R = ROD_DIA / 2.0
 HUB_R = HUB_OD / 2.0
 BORE_R = BORE / 2.0
-CAP_R = (HUB_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 11.56 crown sphere radius
+CAP_R = (HUB_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 10.70 crown sphere radius
 
 V_ANNULUS = math.pi * (HUB_R**2 - BORE_R**2) * (HUB_LEN - WALL_T)
 V_WALL = math.pi * HUB_R**2 * WALL_T
-V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 136.9
+V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 151.6
 V_ROD = math.pi * ROD_R**2 * (ROD_LEN - ROD_Y0)
 
 
