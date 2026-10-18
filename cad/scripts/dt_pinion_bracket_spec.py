@@ -75,8 +75,10 @@ CROSS_HOLE_DIA = _strap_pin.HOLE_DIA
 CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
 # The pin is its own BOM line (MHA-VN-033), so the callout names it
 # instead of supplying one loose with each strap; test_dt_pinion_bracket_drawing
-# keeps the number in step with the parts registry.
-CROSS_HOLE_CALLOUT = "DRILL THRU\nFOR MHA-VN-033 SPRING PIN"
+# keeps the number in step with the parts registry.  The band is tighter than
+# DRILLED HOLES, so the callout also names the fit (rule 4; r2 review): a
+# slotted spring pin grips its hole by compression.
+CROSS_HOLE_CALLOUT = "DRILL THRU\nFOR MHA-VN-033\nSPRING PIN, PRESS FIT"
 
 # drawing-guidelines.md rule 17 (walls and webs) (#842, U27; audit W23) worst-case web from the blind seat to a broad
 # face.  Codex #858 P2, user ruling (a) (2026-09-25): the seat's station is

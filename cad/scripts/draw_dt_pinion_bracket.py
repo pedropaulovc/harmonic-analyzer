@@ -176,9 +176,12 @@ LEFT_KEEP = {
     # Option E-a: the cross-hole mouth sits on the flank at the pivot-bore
     # axis height, below the seat.  pc-ea eye pass: left of the view its
     # 32-character line ran off the sheet's left border, so the callout sits
-    # in the clear field under the view, left of the follower-seat callout's
-    # underline, and its leader rises to the mouth.
-    "CrossHoleDia": (0.053, 0.045),
+    # in the clear field under the view and its leader rises to the mouth.
+    # r2 review (rule 14 polish): from under the view its leader rose almost
+    # along the 4.50's hole witness, past that dimension's arrowhead, so it
+    # sits down-right, under the 7.000, and its leader climbs at a slant,
+    # right of the witness and clear of the 4.50 dimension line.
+    "CrossHoleDia": (0.125, 0.078),
     # Codex #858 P2, user ruling (a): both through-thickness stations run from
     # broad face A (the view's left edge) -- the cross hole's under the view,
     # left of both callout leaders, the seat's above it, under the 9.0.

@@ -316,7 +316,11 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     assert "AXIS" not in callout and "CENTRED" not in callout
     assert "SUPPLY" not in callout and "LOOSE" not in callout
     number = _config.parts("vn-pinion-strap-pin")["number"]
-    assert callout.splitlines() == ["DRILL THRU", f"FOR {number} SPRING PIN"]
+    assert callout.splitlines() == [
+        "DRILL THRU",
+        f"FOR {number}",
+        "SPRING PIN, PRESS FIT",
+    ]
     dims = dt_pinion_bracket_spec.DRAWING_DIMENSIONS
     assert dims["CrossHoleProfile"] == {"CrossHoleDia", "CrossHoleCz"}
     by_name = dt_pinion_bracket_spec.DRAWING_PRECISION_BY_NAME
