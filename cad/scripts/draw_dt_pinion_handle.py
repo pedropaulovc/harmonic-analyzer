@@ -55,14 +55,17 @@ SHEET_SCALE = (2.0, 1.0)
 # Machinist review of 7f7fc1717: the group sat low and right, leaving a large
 # empty field above and to the left.  The profile, its two dimensions and the
 # isometric now centre on the field between the inner border's top and the
-# title block's (FIELD_Y), and span it left to right.
+# title block's (FIELD_Y), and span it left to right.  ENFORCE r1 (#1010):
+# the 65.0 OAL stood 50 mm under the profile on long extension lines; it now
+# sits about 12 mm under the rod, the Ø and the isometric note close in to
+# match, and the whole group drops so it still centres on the field.
 FIELD_Y = (0.065, 0.266)  # title-block top, inner-border top
-PRINCIPAL_CENTER = (0.160, 0.172)
-ISO_CENTER = (0.330, 0.165)
-ISO_NOTE_XY = (0.295, 0.222)
+PRINCIPAL_CENTER = (0.160, 0.1565)
+ISO_CENTER = (0.330, 0.1565)
+ISO_NOTE_XY = (0.295, 0.1995)
 DONOR_KEEP = {"RodDia": (0.035, 0.205)}
-PRINCIPAL_KEEP = {"RodSpan": (PRINCIPAL_CENTER[0], 0.117)}
-ROD_DIAMETER_XY = (0.235, 0.207)
+PRINCIPAL_KEEP = {"RodSpan": (PRINCIPAL_CENTER[0], 0.1335)}
+ROD_DIAMETER_XY = (0.235, 0.1915)
 DIMENSION_CALLOUTS = {"RodSpan": "OAL"}
 
 
