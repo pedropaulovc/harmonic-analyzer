@@ -67,7 +67,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from dt_crank_arm_notes import HUB_SEAT_CALLOUT, SEAM_CALLOUT
+from dt_crank_arm_notes import HUB_SEAT_CALLOUT, PIVOT_TAP_PROCESS, SEAM_CALLOUT
 from dt_crank_arm_spec import (
     ANCHOR_HOLE_SPEC,
     ANCHOR_SCREW_X,
@@ -239,6 +239,9 @@ SEAM_CALLOUT_XY = (0.104, 0.250)
 _END_PICK_DY_SHEET = 0.004
 _END_PICK_DX = math.sqrt(HALF_WIDTH**2 - (_END_PICK_DY_SHEET * 1000.0 / SHEET_SCALE[0]) ** 2)
 ANCHOR_CALLOUT_XY = (0.195, 0.205)
+# Centre of the four-line pivot callout: its bottom row stays clear above
+# the arm's top edge, its right end left of the isometric view.
+PIVOT_CALLOUT_XY = (0.270, 0.190)
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
 
@@ -423,13 +426,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Handle pivot tap (MHA-DT-032): above and just right of the arm, arrow on
     # the hole's top rim, clear of the full principal view.  Thread and tap
-    # drill ride the native callout; the class is the title block's.
+    # drill ride the native callout; the class is the title block's.  The
+    # mouth limit leads it, so it names this tap, not the identical anchor.
     pivot_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=handle_edge,
-        callout_xy=(0.270, 0.180),
+        callout_xy=PIVOT_CALLOUT_XY,
         label="handle pivot tap",
+        process=PIVOT_TAP_PROCESS,
     )
     _omit_title_block_thread_class(pivot_callout)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.060)

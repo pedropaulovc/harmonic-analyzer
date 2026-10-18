@@ -29,7 +29,6 @@ import math
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SurfaceFinishControl
-from dt_crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX as _PIVOT_TAPPED_MOUTH_DIA_MAX
 from dt_crank_handle_pivot_screw_spec import THREAD_SIZE as PIVOT_SCREW_THREAD_SIZE
 from dt_crank_hub_geometry import (
     ARM_FIDUCIAL_RADIUS,
@@ -183,7 +182,6 @@ DRAWING_NOTES = "\n".join(
     (
         "PUNCH FIDUCIAL MARK WHERE SHOWN; LOCATE BY EYE.",
         STOCK_NOTE,
-        f"HANDLE PIVOT TAP'S MOUTH <MOD-DIAM>{_PIVOT_TAPPED_MOUTH_DIA_MAX:.1f} MAX ON THE HANDLE FACE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
