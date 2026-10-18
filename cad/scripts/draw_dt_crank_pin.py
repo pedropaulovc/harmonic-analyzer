@@ -81,9 +81,10 @@ TAPER_SILHOUETTE_PICK = (
     BIG_END_EDGE[0] + TAPER_PICK_X * SHEET_SCALE[0] / 1000.0,
     FRONT_CENTER[1] + _TAPER_PICK_R * SHEET_SCALE[0] / 1000.0,
 )
-# The taper note's top-left corner: above the pin, right of the big end's Ø
-# callout, left of the small end's and above the hole station.
-TAPER_NOTE_XY = (BIG_END_EDGE[0] - 0.007, FRONT_CENTER[1] + 0.063)
+# The taper note's top-left corner: above the pin and just right of the
+# leader tip, so the leader leaves the start of the first line down-left,
+# outside the text block (round 2 had it run back through all four lines).
+TAPER_NOTE_XY = (TAPER_SILHOUETTE_PICK[0] + 0.006, FRONT_CENTER[1] + 0.063)
 
 # The ring cross-hole, seen end-on as a circle on the axis.
 RING_HOLE_CENTER = (
