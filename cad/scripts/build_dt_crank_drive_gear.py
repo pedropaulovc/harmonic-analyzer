@@ -20,7 +20,7 @@ Appendix C #9.
 ATTACHMENT (user ruling 2026-09-28): the 64T slides onto MHA-DT-004's
 Sec1 D-flat land with one matching flat, normal to local +X. The round
 and across-flat bore bands are derived from that land's two printed
-bands. Its south bore entry has a 1.00 x 45° chamfer across the entire
+bands. Its south bore entry has a 1.50 x 45° chamfer across the entire
 D-profile to swallow the flat mill's runout crescent against the square
 shaft collar; the bearing annulus remains intact. Its south face butts
 against the MHA-DT-004 thrust collar; the north face touches T120 in the
@@ -60,13 +60,12 @@ from _fit_deviations import deviations
 from _simplified_part import save_simplified_part
 from _gear import build_stock_form_gear, volume_check
 from _part_pmi import author_part_pmi
-from dt_crank_drive_gear_notes import DRAWING_NOTES, GEAR_DATA
+from dt_crank_drive_gear_notes import GEAR_DATA
 from dt_crank_drive_gear_spec import (
     BORE_AF,
     BORE_AF_BAND,
     BORE_DIA_BAND,
     BORE_SOUTH_CHAMFER,
-    BORE_SOUTH_CHAMFER_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
@@ -287,10 +286,6 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreAF", *deviations(BORE_AF_BAND)
     )
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreSouthChamfer", "BoreSouthChamferSize",
-        *deviations(BORE_SOUTH_CHAMFER_BAND),
-    )
     await volume_check(
         adapter, "driven crank-drive gear (equations neutral)",
         expected, 0.03 * v_chamfer + 0.15,
@@ -329,11 +324,7 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
-    )
+    apply_drawing_properties(adapter, PART_NAME, {"Gear Data": GEAR_DATA})
     # The reference sketch owns printed dimensions but no geometry: hide it so
     # no assembly instance renders it (#880).  The drawing shows it per view
     # through _drawing_hidden_sketches to import those dimensions.

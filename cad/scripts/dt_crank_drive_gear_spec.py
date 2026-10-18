@@ -7,9 +7,10 @@ reduction).
 Recreated under ``cad/docs/drawing-guidelines.md``. The five blank,
 bore and entry sizes -- outside diameter, face width, round bore, D-bore
 across-flat and south bore chamfer -- are NATIVE model dimensions carrying
-their own decimal places and bands; the tooth system a cut-gear print cannot
-express as dimensions stays in the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method) allows, with every
-generating number marked REF.
+their own decimal places and, where a mate needs one, their own bands; the
+tooth system a cut-gear print cannot express as dimensions stays in the
+gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a
+method) allows, with every generating number marked REF.
 
 PURE DATA, no SolidWorks/COM imports: ``build_dt_crank_drive_gear`` marks and
 tolerances exactly ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model,
@@ -25,8 +26,8 @@ import _config
 import cone_line
 import cone_shaft_land_bands
 import gear_seat_fit
-from _gtol_cylinder import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _printed_tolerance import printed_band_mm
+from _surface_finish import SurfaceFinishControl
 from stock_form_cutter import (
     StockFormProfile,
     template_for_teeth,
@@ -282,11 +283,19 @@ if BORE_AF is None:
 # sum increases monotonically from the flat midpoint to a chord corner;
 # using the upper shaft diameter and lower shaft AF is print-worst.
 MIN_FLAT_CUTTER_RADIUS = 4.0  # ≥Ø8 end mill
-BORE_SOUTH_CHAMFER = 1.00
-# The south entry is functional: .X's general band could accept a chamfer
-# smaller than the cutter crescent. A native +0.10/-0.00 leg band preserves
-# the full 1.00-mm minimum without constraining the harmless upper end.
-BORE_SOUTH_CHAMFER_BAND = (0.10, 0.00)
+# The south entry is functional, but it needs no band of its own: the nominal
+# is chosen so the title block's .XX band alone keeps the chamfer's minimum
+# outside the print-worst cutter crescent (machinist review r1 of #1641: a
+# 1.00 +0.10/0 leg read as a tight band with no named mate; rule 4 (tighten
+# only for function, and name the mate) and the owner's standing preference
+# to move the nominal rather than print a tight band).
+BORE_SOUTH_CHAMFER = 1.50
+BORE_SOUTH_CHAMFER_PLACES = 2
+# The limits a part accepted against the printed leg may show: the general
+# .XX row read at the places the leg prints. Not a fit band (the part
+# authors no tolerance on the leg), so plain limits, not a band tuple.
+BORE_SOUTH_CHAMFER_MIN = BORE_SOUTH_CHAMFER - printed_band_mm(BORE_SOUTH_CHAMFER_PLACES)
+BORE_SOUTH_CHAMFER_MAX = BORE_SOUTH_CHAMFER + printed_band_mm(BORE_SOUTH_CHAMFER_PLACES)
 # The shaft's nominal Sec1 Ø is BORE_DIA; the drawing contract tests it
 # against dt_cone_gear_shaft_spec.SECTION_DIAS[1] without a circular import.
 _SHAFT_MAX_R = (BORE_DIA + cone_shaft_land_bands.SECTION_DIA_BANDS[1][0]) / 2.0
@@ -298,10 +307,10 @@ _MAX_CUTTER_RUNOUT = MIN_FLAT_CUTTER_RADIUS - math.sqrt(
     MIN_FLAT_CUTTER_RADIUS**2 - _HALF_CHORD**2
 )
 MAX_FLAT_CRESCENT = max(_MAX_HORN, _MAX_CUTTER_RUNOUT)
-if MAX_FLAT_CRESCENT >= BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[1]:
+if MAX_FLAT_CRESCENT >= BORE_SOUTH_CHAMFER_MIN:
     raise AssertionError(
         f"Sec1 end-mill horn + runout {MAX_FLAT_CRESCENT:.4f} reaches "
-        f"the south bore chamfer {BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[1]:.4f}"
+        f"the south bore chamfer {BORE_SOUTH_CHAMFER_MIN:.4f}"
     )
 
 # Even at the collar's supplied 5/8-in stock lower bound and the bore/chamfer
@@ -313,23 +322,17 @@ _COLLAR_MIN_R = (0.625 * MM_PER_IN - 0.002 * MM_PER_IN) / 2.0
 _BORE_MAX_R = (
     BORE_DIA + gear_seat_fit.seat_bore_band(cone_shaft_land_bands.GEAR_SEAT_BAND)[0]
 ) / 2.0
-COLLAR_BEARING_ANNULUS = _COLLAR_MIN_R - (
-    _BORE_MAX_R + BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[0]
-)
+COLLAR_BEARING_ANNULUS = _COLLAR_MIN_R - (_BORE_MAX_R + BORE_SOUTH_CHAMFER_MAX)
 if COLLAR_BEARING_ANNULUS <= 0:
     raise AssertionError("the chamfer reaches the collar's bearing outer rim")
-FLAT_ENGAGEMENT_MIN = FACE_WIDTH + FACE_WIDTH_BAND[1] - (
-    BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[0]
-)
+FLAT_ENGAGEMENT_MIN = FACE_WIDTH + FACE_WIDTH_BAND[1] - BORE_SOUTH_CHAMFER_MAX
 
-# One roughness, on the one surface whose function depends on it: the bore is a
-# size-toleranced fit onto the cone shaft's land, and a fit lives on the peaks
-# as much as on the limits, so the bore carries the project's general machined
-# grade. Nothing runs on the teeth or the end faces -- they are as the title
-# block's process row states (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
-SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
-    SurfaceFinishControl("crank_drive_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
-)
+# No roughness symbol: the D-bore is a gear seat that drives through its flat
+# and does not run, and drawing-guidelines.md rule 6 (roughness symbols only
+# where a surface runs, slides or locates) puts no symbol on a gear's D-bore or
+# seat bore (machinist review r1 of #1641, all three runs). The teeth and end
+# faces carry none either; the title block's process row covers them.
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_dt_crank_drive_gear`` marks exactly these;
@@ -359,12 +362,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # The outside diameter prints two with +/-0.10. The face width is the four-place
 # ±0.025 member of the solid gear stack; its south face seats on the collar
 # and the tolerance only shifts the north face. The south chamfer leg prints
-# two places with its explicitly unilateral functional band.
+# two places under the title block's .XX band, with no band of its own.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutsideDiaReference": {"OutsideDia": 2},
     "GearBlank": {"FaceWidth": 4},
     "BoreProfile": {"BoreDia": 3, "BoreAF": 3},
-    "BoreSouthChamfer": {"BoreSouthChamferSize": 2},
+    "BoreSouthChamfer": {"BoreSouthChamferSize": BORE_SOUTH_CHAMFER_PLACES},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is

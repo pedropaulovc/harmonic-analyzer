@@ -10,3 +10,9 @@ dt-crank-drive-gear:
   # Beta follows the 13.001107-degree cone incline; lead 945.862339 mm/rev.
   # Cutter #2 uses its actual 55T stock form, not an ideal 69.185T virtual flank.
   # No compatible low-angle stock 64T helical gear is verified.
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "front view, the D-bore callout Ø9.525 +0.055/+0.025 THRU (0.025-0.105 DIAMETRAL CLEARANCE ON CONE GEAR SHAFT MHA-DT-004), with its BORE ACROSS FLAT 8.763 +0.02/+0.01 partner"
+      finding: "the D-bore callout names no process word (REAM, DRILL or BORE) under rule 12"
+      reason: "owner ruling 2026-09-29 (commit 7b9ed6891, codex machinist review of the #1128 full build): the process word is ruled off both D-bores. A through reamer cuts away the material the retained flat needs, so REAM would be false, and the native limits on the round and across-flat dimensions define the D-profile; the route belongs in the book and logbook, not on the print (owner-accepted)"
