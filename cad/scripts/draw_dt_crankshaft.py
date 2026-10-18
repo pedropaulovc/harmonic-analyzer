@@ -31,6 +31,7 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     _SW_LENGTH_MM,
     _SW_PREF_UNITS_LINEAR,
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -70,6 +71,7 @@ import _telemetry
 from build_dt_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
 from dt_crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
 from dt_crankshaft_notes import (
+    CENTRES_NOTE,
     CHAIN_AIR_MATE,
     COLLAR_REAR_MATE,
     COLLAR_SEAT_MATE,
@@ -402,6 +404,9 @@ PINION_PIN_HOLE_WINDOW = (
 )
 NOTE_FIELD_MARGIN = 0.001
 NOTES_XY = (0.016, 0.062)
+# One row under the general note (drawing-guidelines.md rule 11: say CENTRES
+# OK where centre holes do no harm; machinist review of 9d262bff5).
+CENTRES_NOTE_XY = (NOTES_XY[0], NOTES_XY[1] - 0.0055)
 ISO_NOTE_XY = (0.376, 0.108)
 
 
@@ -1096,6 +1101,9 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    centres = add_note(adapter, CENTRES_NOTE, *CENTRES_NOTE_XY)
+    if centres is None or str(centres.GetText() or "").replace("\r", "") != CENTRES_NOTE:
+        raise RuntimeError("failed to add the crankshaft centres note")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     # The end view prints hidden lines removed with the rest (drawing-guidelines.md
     # rule 9 (show internal shape in solid lines)): the punch mark is flagged by

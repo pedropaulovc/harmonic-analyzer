@@ -70,7 +70,7 @@ DRIVE_PIN_CALLOUT = "\n".join(
 # callout's own format text, in mm: draw_crankshaft refuses a non-mm sheet.
 DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{DRIVE_PIN_DEPTH_TOL:.2f}"
 
-# Under the lower 7.000 location: the mate the +/-0.025 serves.  The MHA-PD-009
+# Under each 7.000 location: the mate the +/-0.025 serves.  The MHA-PD-009
 # holes (2.5, drilled +0.10/0) slip over the pressed dowels (Ø2.389 max) with
 # 0.111 diametral clearance, which must absorb the pin-spacing error of both
 # parts: 2 x (2 x 0.025) = 0.100 < 0.111.  The title block's .XXX +/-0.13
@@ -92,3 +92,8 @@ KNOCKOUT_CALLOUT_BELOW = "DRIVE-PIN KNOCKOUT"
 # (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); its
 # exact spot is deliberately free.
 FIDUCIAL_NOTE = "PUNCH\nMARK\nBY EYE"
+
+# Where the shop may centre the shaft (drawing-guidelines.md rule 11): the
+# plain Ø9.000 end; never the dome, whose finished sphere carries the punched
+# witness.  Pending owner confirmation (#991).
+CENTRES_NOTE = "CENTRES OK AT PLAIN END ONLY."
