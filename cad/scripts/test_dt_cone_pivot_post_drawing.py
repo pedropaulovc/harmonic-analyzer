@@ -188,6 +188,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "CrankBossDia",
         "CrankBossLen",
         "ConeBossLen",
+        "ConeBossNorthZ",
         "CrankBoreDia",
         "JournalAxisY",
         "ConeBossDia",
@@ -246,7 +247,7 @@ def test_finish_extent_uses_the_template_rules(
         keep_outs=keep_outs,
         annotations=tuple(
             SimpleNamespace(label=label, kind="dimension")
-            for label in ("CrankBossStartZ", "InclineAngle")
+            for label in ("CrankBossStartZ", "InclineAngle", "ConeBossNorthZ")
         ),
     )
     note = SimpleNamespace(
@@ -306,22 +307,27 @@ def _plan_gate(monkeypatch: pytest.MonkeyPatch, labels: list[str]) -> None:
 
 def test_the_station_must_survive_its_hidden_sketch(monkeypatch: pytest.MonkeyPatch) -> None:
     """Hiding a sketch in a view hides what was imported from it (rim-aba9
-    lost the station so), so the station and the plan angle come through the
-    hidden-owner import, and the gate fails a sheet that lost either."""
+    lost the station so), so the stations and the plan angle come through the
+    hidden-owner import, and the gate fails a sheet that lost any of them."""
     with pytest.raises(RuntimeError, match=r"\['CrankBossStartZ'\] once"):
-        _plan_gate(monkeypatch, ["InclineAngle"])
+        _plan_gate(monkeypatch, ["InclineAngle", "ConeBossNorthZ"])
     # Printed twice is as wrong as lost.
     with pytest.raises(RuntimeError, match=r"\['CrankBossStartZ'\] once"):
-        _plan_gate(monkeypatch, ["CrankBossStartZ", "CrankBossStartZ", "InclineAngle"])
+        _plan_gate(
+            monkeypatch,
+            ["CrankBossStartZ", "CrankBossStartZ", "InclineAngle", "ConeBossNorthZ"],
+        )
     with pytest.raises(RuntimeError, match=r"\['InclineAngle'\] once"):
-        _plan_gate(monkeypatch, ["CrankBossStartZ"])
-    # With both present the gate moves on to the title block.
+        _plan_gate(monkeypatch, ["CrankBossStartZ", "ConeBossNorthZ"])
+    with pytest.raises(RuntimeError, match=r"\['ConeBossNorthZ'\] once"):
+        _plan_gate(monkeypatch, ["CrankBossStartZ", "InclineAngle"])
+    # With all present the gate moves on to the title block.
     def title_block(_obj, _iface):
         raise LookupError("title block")
 
     monkeypatch.setattr(drawing, "_early_bound", title_block)
     with pytest.raises(LookupError, match="title block"):
-        _plan_gate(monkeypatch, ["CrankBossStartZ", "InclineAngle"])
+        _plan_gate(monkeypatch, ["CrankBossStartZ", "InclineAngle", "ConeBossNorthZ"])
 
 
 def test_view_placement_flags_the_border_and_the_title_block() -> None:
@@ -502,11 +508,12 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
     The cast body, head and boss diameters and the mounting-hole stations
     are not accuracy features (cad/docs/tolerance-policy.md, "Result"), so the
     part must not author a tolerance on them at all: the title block's general
-    grade is the whole specification.
+    grade is the whole specification.  The symmetric bands are the cone-axis
+    height and the collar thrust face's station.
     """
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 3
-    assert source.count("set_dimension_symmetric_tolerance(") == 1
+    assert source.count("set_dimension_symmetric_tolerance(") == 2
     assert source.count("deviations(RUNNING_BORE_BAND)") == 2
     assert source.count("deviations(CRANK_ABOVE_CONE_BAND)") == 1
     assert not hasattr(spec, "TURNED_DIAMETER_TOLERANCE_MM")
@@ -602,7 +609,14 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0795
     assert part.PART_DATUMS is spec.PART_DATUMS
     assert part.GEOMETRIC_CONTROLS is spec.GEOMETRIC_CONTROLS
-    (exception,) = load_exceptions(_config.CONFIG_DIR, "dt_cone_pivot_post", "part")
+    exceptions = {
+        exception.id: exception
+        for exception in load_exceptions(
+            _config.CONFIG_DIR, "dt_cone_pivot_post", "part"
+        )
+    }
+    assert set(exceptions) == {"RV-01", "RV-02"}
+    exception = exceptions["RV-01"]
     assert exception.kind == "accept"
     assert "crank-bore diametral angularity frame" in exception.where
     source = Path(drawing.__file__).read_text(encoding="utf-8")
