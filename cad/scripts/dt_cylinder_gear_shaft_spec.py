@@ -27,6 +27,11 @@ SHAFT_DIA_BAND = SHAFT_H
 # the same measurement) and that span is the cylinder.
 LENGTH_CALLOUT = "CUT TO FIT: SPAN OVER BOTH MHA-DT-002"
 DOME_CALLOUT = "BOTH ENDS"
+# drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
+# the O.D. band exists for the 20 MHA-DT-012 gears that run on it (their
+# bores are matched to this finished bar) and the two MHA-DT-002 strap bores
+# it fills, so the callout names both at the dimension.
+SHAFT_DIA_CALLOUT = "RUNNING FIT IN MHA-DT-012 AND MHA-DT-002 BORES"
 ARBOR_BEARING_PROBE_Y_MM = 10.0
 
 # The arbor is one plain cylinder extruded +Y from the origin (y 0..ARBOR_LENGTH,
