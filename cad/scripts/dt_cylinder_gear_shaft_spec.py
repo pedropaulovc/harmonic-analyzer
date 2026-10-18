@@ -25,9 +25,11 @@ SHAFT_DIA_BAND = SHAFT_H
 # The print's one statement of how the length is set: the fitter measures the
 # span over both installed MHA-DT-002 straps (drive-train assembly steps 8-9 carry
 # the same measurement) and that span is the cylinder, so its acceptance is
-# that both ends finish flush with the straps' outer faces (r1 machinist
-# review: "span over" alone left the end condition open).
-LENGTH_CALLOUT = "CUT TO FIT: ENDS FLUSH WITH MHA-DT-002 OUTER FACES"
+# that both dome roots (the cylinder's ends) finish at the straps' outer
+# faces, each dome standing proud beyond (r1 machinist review: "span over"
+# alone left the end condition open; PR #1658 Codex review: a bare "ENDS
+# FLUSH" reads as the dome tips, 3 mm short).
+LENGTH_CALLOUT = "CUT TO FIT: DOME ROOTS AT MHA-DT-002 OUTER FACES"
 DOME_CALLOUT = "BOTH ENDS"
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
 # the O.D. band exists for the 20 MHA-DT-012 gears that run on it (their

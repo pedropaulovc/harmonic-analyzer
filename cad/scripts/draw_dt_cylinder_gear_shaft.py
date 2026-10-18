@@ -113,6 +113,20 @@ CALLOUT_WITNESS_GAP = 0.003
 DOME_TIP_X = SHAFT_RIGHT_X + ARBOR_DOME_HEIGHT * SHEET_SCALE[0] / 1000.0
 # The sphere's centre sits on the axis, inside the bar.
 DOME_CENTRE_X = DOME_TIP_X - DOME_SPHERE_RADIUS * SHEET_SCALE[0] / 1000.0
+# A radial dimension's line runs from the sphere's centre to the LEFT end of
+# the text's underline (the leader shoulder under "BOTH ENDS"), not to the
+# text position: on the r4 render (keep (0.2500, 0.1780)) the shoulder began
+# 14.15 mm left of and 5.5 mm below it, so the line ran out at ~40 deg below
+# the axis, past the dome's rim, and its arrow sat on the length's witness
+# (r4 machinist review). The keep below puts the shoulder on the line from
+# the centre at ~17 deg, mid-way down the dome's lower arc (which spans ~35
+# deg from the axis to the rim).
+RADIUS_SHOULDER_OFFSET = (-0.01415, -0.0055)
+DOME_RADIUS_LEADER_DEG = 17.0
+_SHOULDER_X = DOME_TIP_X + 0.020
+_SHOULDER_Y = PROFILE_CENTER[1] - (_SHOULDER_X - DOME_CENTRE_X) * math.tan(
+    math.radians(DOME_RADIUS_LEADER_DEG)
+)
 
 PROFILE_KEEP = {
     "Depth": (PROFILE_CENTER[0], 0.158),
@@ -122,23 +136,13 @@ PROFILE_KEEP = {
         DOME_TIP_X + CALLOUT_WITNESS_GAP + len(DOME_CALLOUT) * CALLOUT_CHAR_WIDTH / 2.0,
         0.206,
     ),
-    # Down-right of the same dome, right of the length's end witness: the
-    # leader runs from the text toward the sphere's centre and lands on the
-    # lower half of the dome's arc (~20 deg below the axis; the arc spans
-    # ~35 deg either side of it).
-    "DomeRadius": (DOME_TIP_X + 0.026, PROFILE_CENTER[1] - 0.012),
+    # Right of the same dome, level with the bar's lower half: the leader
+    # runs from the shoulder toward the sphere's centre.
+    "DomeRadius": (
+        _SHOULDER_X - RADIUS_SHOULDER_OFFSET[0],
+        _SHOULDER_Y - RADIUS_SHOULDER_OFFSET[1],
+    ),
 }
-if not (
-    -math.radians(35.0)
-    < math.atan2(
-        PROFILE_KEEP["DomeRadius"][1] - PROFILE_CENTER[1],
-        PROFILE_KEEP["DomeRadius"][0] - DOME_CENTRE_X,
-    )
-    < 0.0
-):
-    raise AssertionError(
-        "the dome radius text must aim its leader at the dome's lower arc"
-    )
 # Ra on the one running surface: the O.D. the 20 cylinder gears turn on and
 # both pedestals journal.  A revolved/extruded flank is a drawing SILHOUETTE,
 # not a model edge, so the pick names that entity type.
