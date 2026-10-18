@@ -18,18 +18,22 @@ Engagement is at least 1.5 diameters, except on two joints, each recorded in
 the row:
 
 * Carriage (M4 x 20): the HGH15CA's M4 x 5 holes limit it to 4.4 (1.1 D).
-* Feed lever (5/16-18 x 7/8): the 12 carrier limits it to 9.5 (1.2 D) with
-  nothing below the carrier. A 1 in screw would stand 0.7 out of the
-  underside.
+* Feed lever (5/16-18 x 1): the 12 carrier limits it to 10.4 (1.3 D) with
+  nothing below the carrier; the screw ends inside the plate (a 1-1/8 in
+  screw would stand 1.6 out of the underside).
 
-Washers: none. Every head seats in a counterbore or countersink, or on a
-flat face. Hold-down studs: 1/2-13 x 3 in only, from the clamping kit. A
-longer stud reaches the swinging carrier (``clearance_report``'s
-``stud_length_max``).
+Washers: a wedge-lock pair under each head of two joints (``WASHERS``), each
+screw carrying a reversing load, so rule 23 wants a mechanical lock: the two
+TL-29 block screws (the leadscrew's reversing thrust, TL-50) and the two
+feed lever screws (the operator's push and pull on the lever, TL-51). Each
+pair's stack adds to its row's grip. Every other head seats in a counterbore
+or countersink, or on a flat face. Hold-down studs: 1/2-13 x 3 in only, from
+the clamping kit. A longer stud reaches the swinging carrier (the jig spec's
+``STUD_LENGTH_MAX``).
 
-These screws are not BOM rows. The fitter BOM lists bought items by
-shop-inventory id, and the inventory carries no screw stock, so the assembly
-steps name each screw by its callout (``callout``) instead.
+Each joint's screw is its own bought part and BOM row (TL-41 to TL-49, the
+wedge-lock pairs TL-50 and TL-51); the assembly steps name each by its
+callout (``callout``) and its item number.
 """
 
 from __future__ import annotations
@@ -52,6 +56,9 @@ SHCS = "SHCS"
 # The riser's countersinks take only the B18.6.3 machine-screw head; a B18.3
 # socket flat head stands proud of them (trammel spec; Codex #1583).
 FLAT_HEAD = "B18.6.3 FLAT HEAD"
+# The TL-51 wedge-lock pair's stack under each feed lever screw head: the
+# 91812A230 band's 0.090 in maximum (the lever washer spec pins it).
+LEVER_LOCK_STACK = 0.090 * INCH  # 2.286
 
 
 def inch_mm(length: str) -> float:
@@ -98,6 +105,17 @@ class Fastener:
         return self.engagement_mm - self.thread_depth_mm
 
 
+@dataclass(frozen=True)
+class Washer:
+    """A washer under a row's heads: its stack adds to that row's grip."""
+
+    joint: str  # the Fastener row's joint it sits in
+    size: str  # the screw size it fits: "#8"
+    kind: str  # as the fitter names it
+    count: int  # one per screw of its row
+    thickness_mm: float  # the installed stack under one head
+
+
 _METRIC_PITCH = {"M3": "0.5", "M4": "0.7"}
 
 
@@ -131,7 +149,8 @@ NUT_BRACKET_TO_BLOCK = Fastener(
     SHCS,
     leadscrew.BLOCK_SCREW_LENGTH,
     len(leadscrew.PIVOT_BLOCK_HOLES),
-    leadscrew.BLOCK_SCREW_GRIP,  # head recessed in TL-22's 4.40 counterbore
+    # head on the TL-50 pair, on TL-22's 4.40 counterbore floor
+    leadscrew.BLOCK_SCREW_GRIP + leadscrew.BLOCK_SCREW_LOCK_STACK,
     leadscrew.NUT_BRACKET_TAP_DEPTH,  # blind
 )
 BLOCK_TO_CARRIAGE = Fastener(
@@ -186,11 +205,12 @@ LEVER_TO_CARRIER = Fastener(
     "TL-26 feed lever to TL-21 carrier",
     carrier.LEVER_THREAD,
     SHCS,
-    "7/8",
+    "1",
     len(carrier.LEVER_HOLES),
-    feed_lever.LEVER_THICK,
+    # head on the TL-51 pair, on the lever's top face
+    feed_lever.LEVER_THICK + LEVER_LOCK_STACK,
     carrier.THICKNESS,  # tapped THRU
-    min_engagement_d=1.2,
+    min_engagement_d=1.3,
     note="the 12 carrier limits the engagement; nothing stands below it",
 )
 FASTENERS: tuple[Fastener, ...] = (
@@ -204,7 +224,21 @@ FASTENERS: tuple[Fastener, ...] = (
     CR_CLAMP,
     LEVER_TO_CARRIER,
 )
-WASHERS: tuple[Fastener, ...] = ()  # none: every head seats on its own part
+BLOCK_LOCK_WASHER = Washer(
+    NUT_BRACKET_TO_BLOCK.joint,
+    "#8",
+    "WEDGE-LOCK WASHER PAIR",
+    NUT_BRACKET_TO_BLOCK.count,
+    leadscrew.BLOCK_SCREW_LOCK_STACK,
+)
+LEVER_LOCK_WASHER = Washer(
+    LEVER_TO_CARRIER.joint,
+    "5/16",
+    "WEDGE-LOCK WASHER PAIR",
+    LEVER_TO_CARRIER.count,
+    LEVER_LOCK_STACK,
+)
+WASHERS: tuple[Washer, ...] = (BLOCK_LOCK_WASHER, LEVER_LOCK_WASHER)
 
 # Hold-down studs, from the clamping kit (fixtures.clamping-kit-pm-52pcck-14mm).
 HOLD_DOWN_STUD_THREAD = "1/2-13"

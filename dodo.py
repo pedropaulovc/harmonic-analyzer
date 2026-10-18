@@ -1774,6 +1774,10 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
         outs += _channel_spring_variants()
     if stem == "ha_harmonic_analyzer":
         outs.append(CAD_OUT / "ha-harmonic-analyzer-bom.csv")
+    if stem == "ch_rocker_arm_tl_oblique_jig":
+        # The jig's pass-sweep sidecar: verify_soundness walks both passes from
+        # it, so a cache consumer needs it beside the .SLDASM.
+        outs.append(Path(_sweep_json(stem)))
     return outs
 
 
@@ -1965,6 +1969,13 @@ def _dof_json(stem: str) -> str:
     return str(sldasm.parent / f".{sldasm.stem}.dof.json")
 
 
+def _sweep_json(stem: str) -> str:
+    """The jig's pass-sweep sidecar beside its DOF manifest (gate input, written
+    by the build from the jig spec's sweep poses)."""
+    sldasm = Path(_sldasm(stem))
+    return str(sldasm.parent / f".{sldasm.stem}.sweep.json")
+
+
 def _cad_identity_deps() -> list[str]:
     """Every built model plus its execution token -- the exact CAD identity the
     fleet-wide stages (neutral export, release packaging) consume. The token is
@@ -1994,6 +2005,10 @@ def _soundness_file_deps(stem: str) -> list[str]:
     ]
     if stem == "pd_paper_drive":
         deps.append(_dof_json(stem))
+    if stem == "ch_rocker_arm_tl_oblique_jig":
+        # The pass sweep replays the recorded slide from the DOF manifest and
+        # walks the sweep sidecar's poses.
+        deps += [_dof_json(stem), _sweep_json(stem)]
     return deps
 
 

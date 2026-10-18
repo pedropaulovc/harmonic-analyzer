@@ -1,0 +1,13 @@
+ch-rocker-arm-tl-oblique-handwheel:
+  title: Rocker Oblique Trammel Handwheel
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-37
+  stock_name: MISUMI Aluminum Knurled Handwheel D40, revolving grip, HC8 bore
+  supplier: MISUMI
+  supplier_skus: ["HOK40-HC8"]
+  material: 6061 Alloy
+  material_specification: "5056 aluminium, nylon 6 grip"
+  finish: black anodize
+  quantity: 1
+  tolerance_class: visual_noncritical
+  process: purchased

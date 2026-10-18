@@ -107,6 +107,9 @@ CARRIER_LENGTH = trammel.CARRIER_THICK - CARRIER_TOP_SHORTFALL  # ⚙ 11.0
 COLLAR_STATION = BEARING_LENGTH  # bottom end to the collar's seat face
 CARRIER_STATION = COLLAR_STATION + COLLAR_HEIGHT  # bottom end to the collar top
 OVERALL_LENGTH = CARRIER_STATION + CARRIER_LENGTH
+# The hidden named axis on the turned axis that the jig assembly mates the
+# carrier's holes on: a name pick is view-independent, a face point is not.
+AXIS_NAME = "PinAxis"
 # The print reads from the top end, faced in the turning chucking (rule 11):
 # top to the collar top, top to the collar seat, and the overall length.
 TOP_TO_COLLAR_SEAT = OVERALL_LENGTH - COLLAR_STATION
