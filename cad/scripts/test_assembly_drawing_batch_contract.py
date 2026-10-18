@@ -238,13 +238,14 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_ha_harmonic_analyzer_assembly:
             scripts_dir = Path(draw_ha_harmonic_analyzer_assembly.__file__).resolve().parent
-            # The spec (BOM, explode, settings, step text), its step order,
-            # and the sibling step lists and pose sources it cites.
+            # The spec (BOM, explode, settings), the sheet module (step text),
+            # its step order, and the sibling step lists and pose sources it
+            # cites.
             assert {
                 str(scripts_dir / name)
                 for name in (
                     "ha_harmonic_analyzer_assembly_spec.py",
-                    "ha_harmonic_analyzer_assembly_notes.py",
+                    "ha_harmonic_analyzer_assembly_sheet.py",
                     "ha_harmonic_analyzer_assembly_steps.py",
                     "dt_drive_train_steps.py",
                     "pd_paper_drive_assembly_steps.py",

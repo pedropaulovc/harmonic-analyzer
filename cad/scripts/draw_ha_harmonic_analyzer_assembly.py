@@ -5,8 +5,9 @@ the two settings only the complete machine makes, imported as the builder's
 driving dimensions; sheet 2 the finished machine in full detail; sheet 3 the
 builder-owned ``HA_EXPLODED`` presentation with the top-level BOM (one row per
 subassembly) and a balloon on every row; sheet 4 the integration sequence and
-checks. Every text, pose and setting comes from
-``ha_harmonic_analyzer_assembly_spec``; this recipe only lays the sheets out.
+checks. Every pose and setting comes from
+``ha_harmonic_analyzer_assembly_spec``, every printed text from
+``ha_harmonic_analyzer_assembly_sheet``; this recipe only lays the sheets out.
 It never edits the source assembly or its explodes.
 """
 
@@ -19,7 +20,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import _telemetry
-import ha_harmonic_analyzer_assembly_notes as notes
+import ha_harmonic_analyzer_assembly_sheet as notes
 import ha_harmonic_analyzer_assembly_spec as spec
 from _assembly_contract import assembly_contract
 from _check import check

@@ -2,9 +2,9 @@
 
 The BOM descriptions, balloon targets, setting callouts, integration steps
 and checks the sheets print. Only draw_ha_harmonic_analyzer_assembly (and its
-tests) import this module; the builder reads ha_harmonic_analyzer_assembly_spec
-alone, so a wording edit here does not rebuild the complete-machine assembly.
-No SolidWorks.
+tests) import this module; no assembly builder may
+(``test_assembly_sheet_isolation`` pins it), so a wording edit here does not
+rebuild the complete-machine assembly. No SolidWorks.
 """
 
 from __future__ import annotations

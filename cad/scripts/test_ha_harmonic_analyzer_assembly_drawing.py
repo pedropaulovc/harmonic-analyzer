@@ -9,7 +9,7 @@ import ch_channel_assembly_steps
 import draw_ha_harmonic_analyzer_assembly as drawing
 import fr_top_frame_spec
 import fr_tube_frame_spec
-import ha_harmonic_analyzer_assembly_notes as notes
+import ha_harmonic_analyzer_assembly_sheet as notes
 import ha_harmonic_analyzer_assembly_spec as spec
 import ha_harmonic_analyzer_assembly_steps as steps
 import joint_retention
@@ -72,8 +72,8 @@ def test_builder_recipe_does_not_read_the_sheet_text() -> None:
     # Wording edits must not rebuild the complete-machine assembly.
     for module in (builder, spec):
         source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "import ha_harmonic_analyzer_assembly_notes" not in source
-        assert "from ha_harmonic_analyzer_assembly_notes" not in source
+        assert "import ha_harmonic_analyzer_assembly_sheet" not in source
+        assert "from ha_harmonic_analyzer_assembly_sheet" not in source
 
 
 def test_explode_moves_every_subassembly_but_the_frame_once_each() -> None:
