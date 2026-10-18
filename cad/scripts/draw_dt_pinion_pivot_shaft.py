@@ -98,6 +98,7 @@ FRONT_TIP_X = FRONT_END_X + CAP_SAG * _MM
 BACK_END_X = FRONT_END_X - SHAFT_LEN * _MM
 FRONT_PIN_X = FRONT_END_X - PIN_HOLE_Z[0] * _MM
 SHAFT_LOWER_FLANK_Y = PROFILE_CENTER[1] - SHAFT_DIA * _MM / 2.0
+SHAFT_UPPER_FLANK_Y = PROFILE_CENTER[1] + SHAFT_DIA * _MM / 2.0
 # 1:2: at 1:1 the ~190 mm isometric bar runs over the drawable band, so the
 # pictorial is halved and says so. It stands in the open field under the
 # profile, right of the notes and left of the title block (x 0.216).
@@ -190,12 +191,15 @@ DETAIL_KEEP = {
 
 # Ra on the running face, the body both pivot-block bores run on. A revolved
 # flank is a drawing SILHOUETTE, not a model edge, so the pick names that
-# entity type; the straight leader keeps off the geometry. Note text height,
+# entity type; the straight leader keeps off the geometry. The UPPER flank,
+# as on MHA-CH-005: on the lower one (r2, swmaker000005) the symbol re-solved
+# onto a silhouette of another face and the attachment check failed. Left of
+# the body length's callout and right of the back pin hole. Note text height,
 # as on the other part sheets: at the template default the symbol printed
 # about twice the text height (#1015).
 FINISH_CHAR_HEIGHT = 0.0025
-BEARING_FINISH_EDGE = (PROFILE_CENTER[0] - 0.020, SHAFT_LOWER_FLANK_Y)
-BEARING_FINISH_SYMBOL = (BEARING_FINISH_EDGE[0], SHAFT_LOWER_FLANK_Y - 0.013)
+BEARING_FINISH_EDGE = (PROFILE_CENTER[0] - 0.055, SHAFT_UPPER_FLANK_Y)
+BEARING_FINISH_SYMBOL = (BEARING_FINISH_EDGE[0], SHAFT_UPPER_FLANK_Y + 0.013)
 
 
 def _front_end_detail(adapter: Any, profile: Any) -> Any:
