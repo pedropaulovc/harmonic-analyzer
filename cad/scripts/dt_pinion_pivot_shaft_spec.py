@@ -1,11 +1,18 @@
-r"""Pure-data dimensional contract shared by the pinion strap torque shaft and
-its manufacturing drawing.
+r"""Pure-data dimensional contract shared by the pinion strap torque shaft
+(MHA-DT-019) and its manufacturing drawing.
 
-PURE DATA, no SolidWorks/COM imports.  A plain Ø6.35 turned steel shaft with a
+PURE DATA, no SolidWorks/COM imports.  A plain Ø6.35 steel shaft with a
 shallow spherical crown at each end -- the pivot the two swing straps rock on.
-The nominals drive the part's named equation globals AND the drawing's
-coordinate math; the marked-dimension map keeps the part marks and the drawing
-keeps in lockstep (``test_dt_pinion_pivot_shaft_drawing.py``).
+
+Part frame: axis along Z, origin on the axis at the FRONT end of the cylinder,
+the body running toward +Z.  It is modelled as one Right-plane half-profile
+revolved (sketch u = -z), so the diameter and the body length import into
+the side view (drawing-guidelines.md rule 11 (turned parts read like the
+lathe)), one Right-plane revolved crown at each end, and one Right-plane cut
+for both pin holes, whose sketch also carries the overall length between the
+two crown tips.  The nominals drive the part's named equation globals AND
+the drawing's coordinate math; the marked-dimension map keeps the part marks
+and the drawing in lockstep (``test_dt_pinion_pivot_shaft_drawing.py``).
 """
 
 from __future__ import annotations
@@ -41,10 +48,15 @@ SHAFT_DIA_BAND = SHAFT_H
 # MHA-DT-016 lever, rides the lift rod 18.63 off it -- hub 8.95 radial clear,
 # arm >= 12.42 clear over the -82 degree throw (test_dt_drive_train_support_layout::
 # test_torque_shaft_length_band_clears_both_ends).
+# Decimal places are the tolerance (drawing-guidelines.md rule 3).  The body
+# length, its crown height and the overall length read the title-block .X
+# band; the O.D. carries its running band at two places, the spring pin's
+# +0.06/0 hole band reads at two places too.  The crown's sphere radius is a
+# reference: the crown height on the toleranced diameter already fixes it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "Shaft": {"Depth": 1},
-    # Two places resolve the spring pin's +0.06/0 hole band.
-    "PinHoleProfile": {"PinHoleDia": 2},
+    "ShaftProfile": {"ShaftDia": 2, "ShaftLength": 1},
+    "CapFrontProfile": {"CapFrontSag": 1, "CapFrontR": 1},
+    "PinHoleProfile": {"PinHoleDia": 2, "OverallLength": 1},
 }
 
 # Option E-a set pins (vn_pinion_strap_pin_spec): one cross hole under each
@@ -76,32 +88,25 @@ SURFACE_FINISHES = (
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "ShaftProfile": {"ShaftDia"},
-    "Shaft": {"Depth"},
-    "PinHoleProfile": {"PinHoleDia"},
+    feature: set(names) for feature, names in DRAWING_PRECISION.items()
 }
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for names in DRAWING_PRECISION.values()
+    for name, places in names.items()
+}
+if len(DRAWING_PRECISION_BY_NAME) != sum(map(len, DRAWING_PRECISION.values())):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-DRAWING_NOTES = "\n".join(
-    (
-        "CYLINDRICAL BODY HAS NO FLATS OR STEPS.",
-        "DATUM A IS THE CYLINDRICAL BODY'S DERIVED AXIS.",
-        "BOTH SPHERICAL CROWN SURFACES: PROFILE 0.05, FORM ONLY (NO DATUM);",
-        "  EACH CROWN IS INSPECTED INDEPENDENTLY.",
-        f"  SR{CAP_RADIUS:.2f}+/-0.05 GOVERNS SIZE; ({CAP_SAG:.2f}) REF AXIAL HEIGHT",
-        "  FROM EACH CROWN ROOT CIRCLE.",
-        "CROWN ROOT CIRCLES ARE SHARP THEORETICAL PROFILE BREAKS;",
-        "  EXEMPT FROM TITLE-BLOCK EDGE-BREAK REQUIREMENT.",
-    )
-)
-END_VIEW_NOTE = "END VIEW SCALE 4:1"
+# The two crowns are one recipe: the front one prints for BOTH ENDS.
+CROWN_CALLOUT = "BOTH ENDS"
+OVERALL_LEN = SHAFT_LEN + 2.0 * CAP_SAG  # tip to tip, a reference
+
+# Part-specific facts a machinist cannot read off the views
+# (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
+# A 187 mm Ø6.35 bar is turned between centres; nothing bears on either
+# crown's apex, so a centre hole there does no harm.
+DRAWING_NOTES = "CENTRES OK."
 # The isometric renders at ISO_SCALE (1, 2) while the sheet/title block reads
-# 1:1, so without this the pictorial is silently half scale.  Mirrors
-# fulcrum-shaft / cylinder-gear-shaft, whose identical 1:2 iso carry the note.
+# 1:1, so without this the pictorial is silently half scale.
 ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "pinion pivot cylindrical body": "0.01",
-    "pinion pivot crown profile": "0.05",
-}
