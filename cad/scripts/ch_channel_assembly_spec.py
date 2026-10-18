@@ -14,7 +14,12 @@ south washer south face, hub 0 south face, hub 19 north face;
 ``FULCRUM_FEATURE`` one leg on the fulcrum axis between the keeper lugs'
 inner faces. The spring set and the closed-up stack length are the fit-up's
 two settings (rocker_bank_layout); the lug span is shown as a reference, the
-pair being set off the top frame.
+pair being set off the top frame. ``KEEPER_PLAN_FEATURE``, on the Top plane
+(sketch x is machine x, sketch y machine -z), is that setting: the
+MHA-FR-002 datums (the frame is not in this assembly) -- its west rail's web
+centre line (the socket axis) and the line of its upper socket centres --
+and the lug centre line, dimensioned to the lug centre (X) and the two lug
+inner faces (Z), each within KEEPER_FITUP_LOCATION_BAND_MM.
 
 Explode (``EXPLODED_VIEW_NAME``): every channel alike, end hardware out along
 z on its own side, fasteners up out of their taps, the rods down off the
@@ -33,11 +38,17 @@ from typing import Literal
 
 from ch_fulcrum_keeper_spec import (
     FULCRUM_KEEPER_CENTRE_Z,
+    KEEPER_FITUP_LOCATION_BAND_MM,
+    KEEPER_FITUP_PLACES,
+    KEEPER_FITUP_X_FROM_WEB_MM,
+    KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
     KEEPER_INNER_FACE_SPAN_MM,
     KEEPER_Z_OFF,
     LUG_HALF_T,
 )
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
+from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
+from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
     HUB0_SOUTH_FACE_Z,
     HUB19_NORTH_FACE_Z,
@@ -53,10 +64,14 @@ from rocker_bank_layout import (
 # --- Settings reference sketches --------------------------------------------
 PIVOT_FEATURE = "RockerBankSettingsReference"
 FULCRUM_FEATURE = "LeverBankSettingsReference"
-FEATURES = (PIVOT_FEATURE, FULCRUM_FEATURE)
+KEEPER_PLAN_FEATURE = "KeeperPlanSettingsReference"
+FEATURES = (PIVOT_FEATURE, FULCRUM_FEATURE, KEEPER_PLAN_FEATURE)
 SPRING_SET_DIMENSION = "RockerSpringSet"
 STACK_LENGTH_DIMENSION = "RockerStackLength"
 LUG_SPAN_DIMENSION = "KeeperLugSpan"
+KEEPER_X_DIMENSION = "KeeperLugX"
+KEEPER_FRONT_Z_DIMENSION = "KeeperFrontFaceZ"
+KEEPER_REAR_Z_DIMENSION = "KeeperRearFaceZ"
 
 # Pivot-axis chain stations, machine z, south to north.
 PIVOT_CHAIN_Z = (
@@ -72,6 +87,22 @@ LUG_INNER_FACE_Z = (
 )
 PIVOT_Y = ROCKER_PIVOT_XY[1]
 FULCRUM_Y = LEVER_FULCRUM_XY[1]
+# Keeper plan (machine x, z): the west rail's front socket centre, where its
+# web centre line (the socket axis, x = COLUMN_X) meets the line of the
+# upper socket centres (z = FRAME_FRONT_COLUMN_Z); the lug centre line
+# KEEPER_FITUP_X_FROM_WEB_MM west of it. Both datum lines are drawn only
+# these lengths: enough to read and to point at, clear of the keepers.
+KEEPER_SOCKET_XZ = (COLUMN_X, FRAME_FRONT_COLUMN_Z)
+KEEPER_LUG_X = COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM
+KEEPER_PLAN_SOCKET_LINE = 15.0  # east from the socket centre, toward its pair
+KEEPER_PLAN_WEB_LINE = 15.0  # rearward from the socket centre
+if abs(KEEPER_LUG_X - LEVER_FULCRUM_XY[0]) > 1e-9:
+    raise AssertionError("the keeper plan's lug centre line is off the fulcrum")
+if any(
+    abs(face - FRAME_FRONT_COLUMN_Z - offset) > 1e-9
+    for face, offset in zip(LUG_INNER_FACE_Z, KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM)
+):
+    raise AssertionError("the keeper plan's faces are not the fit-up stations")
 
 if abs(PIVOT_CHAIN_Z[1] - PIVOT_CHAIN_Z[0] - ROCKER_SPRING_SET) > 1e-9:
     raise AssertionError("the spring-set leg is not ROCKER_SPRING_SET")
@@ -80,23 +111,47 @@ if abs(PIVOT_CHAIN_Z[3] - PIVOT_CHAIN_Z[2] - STACK_L20_ACCEPT[0]) > 1e-9:
 if abs(LUG_INNER_FACE_Z[1] - LUG_INNER_FACE_Z[0] - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
     raise AssertionError("the lug leg is not the keeper inner-face span")
 
-# Marked for the drawing: the two settings and the reference span.
+# Marked for the drawing: the settings and the reference span.
 DRAWING_DIMENSIONS = {
     PIVOT_FEATURE: {SPRING_SET_DIMENSION, STACK_LENGTH_DIMENSION},
     FULCRUM_FEATURE: {LUG_SPAN_DIMENSION},
+    KEEPER_PLAN_FEATURE: {
+        KEEPER_X_DIMENSION,
+        KEEPER_FRONT_Z_DIMENSION,
+        KEEPER_REAR_Z_DIMENSION,
+    },
 }
 DRAWING_PRECISION = {
     PIVOT_FEATURE: {SPRING_SET_DIMENSION: 2, STACK_LENGTH_DIMENSION: 2},
     FULCRUM_FEATURE: {LUG_SPAN_DIMENSION: 2},
+    KEEPER_PLAN_FEATURE: {
+        name: KEEPER_FITUP_PLACES
+        for name in (
+            KEEPER_X_DIMENSION,
+            KEEPER_FRONT_Z_DIMENSION,
+            KEEPER_REAR_Z_DIMENSION,
+        )
+    },
 }
 DIMENSION_FEATURE = {
     name: feature for feature, names in DRAWING_DIMENSIONS.items() for name in names
 }
 TOLERANCE_PRECISION = 2
 # (lower, upper) deviations; the stack accepts only long (STACK_L20_ACCEPT).
+# The keeper plan's three each carry the fit-up band on their own dimension
+# (owner ruling X1+B1, 2026-10-18): the lug centre off the web centre and
+# each inner face off the socket line.
 DIMENSION_TOLERANCES = {
     SPRING_SET_DIMENSION: (-ROCKER_SPRING_SET_BAND, ROCKER_SPRING_SET_BAND),
     STACK_LENGTH_DIMENSION: (-STACK_L20_ACCEPT_BAND[1], STACK_L20_ACCEPT_BAND[0]),
+    **{
+        name: (-KEEPER_FITUP_LOCATION_BAND_MM, KEEPER_FITUP_LOCATION_BAND_MM)
+        for name in (
+            KEEPER_X_DIMENSION,
+            KEEPER_FRONT_Z_DIMENSION,
+            KEEPER_REAR_Z_DIMENSION,
+        )
+    },
 }
 REFERENCE_DIMENSIONS = frozenset({LUG_SPAN_DIMENSION})
 if set(DIMENSION_TOLERANCES) | REFERENCE_DIMENSIONS != set(DIMENSION_FEATURE):

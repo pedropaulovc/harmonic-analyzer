@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 import re
 
@@ -292,6 +293,7 @@ def test_the_package_sheets_and_settings_contract() -> None:
         **drawing.STACK_KEEP,
         **drawing.SPRING_KEEP,
         **drawing.LUG_KEEP,
+        **drawing.PLAN_KEEP,
     }
     assert sorted(kept) == sorted(asm.DIMENSION_FEATURE)
     # Each bank view shows only its own axis's sketch.
@@ -301,6 +303,9 @@ def test_the_package_sheets_and_settings_contract() -> None:
     assert {
         asm.DIMENSION_FEATURE[name] for name in (*drawing.STACK_KEEP, *drawing.SPRING_KEEP)
     } == {asm.PIVOT_FEATURE}
+    assert {asm.DIMENSION_FEATURE[name] for name in drawing.PLAN_KEEP} == {
+        asm.KEEPER_PLAN_FEATURE
+    }
     assert set(drawing.notes.DIMENSION_CALLOUTS) == set(kept)
     assert asm.REFERENCE_DIMENSIONS == {asm.LUG_SPAN_DIMENSION}
     assert set(asm.DIMENSION_TOLERANCES) == set(kept) - asm.REFERENCE_DIMENSIONS
@@ -313,9 +318,30 @@ def test_the_package_sheets_and_settings_contract() -> None:
     # The south-end detail's spring-set text sits above its crop circle,
     # clear of the arc (r7 layout audit: inside it, the arc crossed the text).
     detail = drawing.SOUTH_END
-    _, y = drawing.SPRING_KEEP[asm.SPRING_SET_DIMENSION]
+    x, y = drawing.SPRING_KEEP[asm.SPRING_SET_DIMENSION]
     radius = detail.crop_radius_mm * detail.mm
     assert y > detail.centre[1] + radius
+    # ...and wholly south of the ear-side extension line (b9ae review: centred
+    # on the gap, the text sat on its own dimension and extension lines).
+    ear_x, _ = detail.sheet_xy(asm.PIVOT_CHAIN_Z[0], 0.0)
+    callout = drawing.notes.DIMENSION_CALLOUTS[asm.SPRING_SET_DIMENSION]
+    assert x - len(callout) * NOTE_CHAR_WIDTH / 2.0 > ear_x
+    # Detail A names the four bodies its caption lists, each pointer tip
+    # inside the crop circle and each text outside it.
+    assert [text.split()[0] for text, _, _ in drawing.DETAIL_POINTERS] == [
+        drawing.BOM_PART_NUMBERS[stem]
+        for stem in ("ch-rocker-arm", asm.WASHER, asm.BANK_SPRING, asm.BRACKET)
+    ]
+    for text, (tx, ty), (px, py) in drawing.DETAIL_POINTERS:
+        assert (px - detail.centre[0]) ** 2 + (py - detail.centre[1]) ** 2 < radius**2
+        lines = text.splitlines()
+        width = max(map(len, lines)) * NOTE_CHAR_WIDTH
+        bottom = ty - len(lines) * NOTE_LINE_PITCH
+        near_x = min(max(detail.centre[0], tx), tx + width)
+        near_y = min(max(detail.centre[1], bottom), ty)
+        assert math.dist((near_x, near_y), detail.centre) > radius
+        assert drawing.BORDER < tx and tx + width < drawing.STEPS_XY[0]
+        assert ty < y - NOTE_LINE_PITCH
     # The parent rocker-bank view carries the detail's boundary, about the
     # same model point the detail is centred on, lettered outside it; the
     # detail's title and step 5 cite the same letter.
@@ -692,23 +718,47 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert keeper.SET_SCREW_ENGAGEMENT_D >= keeper.SET_SCREW_MIN_ENGAGEMENT_D
     fitted = _step_body(steps.KEEPERS_SET_KEY)
     assert f"{top_frame} ON THE MILL:" in fitted
-    # Main's ruling: X off the receiving web, Z off the upper-left socket.
+    # Main's ruling: X off the receiving web, Z off the upper socket line; the
+    # owner's (X1+B1, b9ae review): the settings are the keeper plan view's
+    # own banded dimensions, the step carries no number of them.
     assert keeper.KEEPER_FITUP_X_FROM_WEB_MM == pytest.approx(
         LEVER_FULCRUM_XY[0] - COLUMN_X
     )
-    x = f"{keeper.KEEPER_FITUP_X_FROM_WEB_MM:.{places}f}"
-    assert f"{x} WEST OF THE RAIL WEB CENTRE BELOW IT" in fitted
-    z = f"Z {front:.{places}f} AND {rear:.{places}f} FROM THE UPPER-LEFT SOCKET"
-    assert z in fitted
-    assert f"WITHIN {keeper.KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}: THE " in fitted
+    assert (
+        "SET EACH LUG CENTRE OFF THE RAIL WEB CENTRE BELOW IT AND THE LUG INNER "
+        "FACES OFF THE LINE OF THE UPPER SOCKET CENTRES, TO THE KEEPER PLAN VIEW"
+    ) in fitted
+    assert drawing.KEEPER_PLAN.title == "KEEPER PLAN VIEW"
+    for value in (keeper.KEEPER_FITUP_X_FROM_WEB_MM, front, rear):
+        assert f"{value:.{places}f}" not in fitted
+    asm = drawing.asm
+    for name in (
+        asm.KEEPER_X_DIMENSION,
+        asm.KEEPER_FRONT_Z_DIMENSION,
+        asm.KEEPER_REAR_Z_DIMENSION,
+    ):
+        band = keeper.KEEPER_FITUP_LOCATION_BAND_MM
+        assert asm.DIMENSION_TOLERANCES[name] == (-band, band)
+        assert asm.DRAWING_PRECISION[asm.KEEPER_PLAN_FEATURE][name] == places
+    assert asm.KEEPER_LUG_X - asm.KEEPER_SOCKET_XZ[0] == pytest.approx(
+        keeper.KEEPER_FITUP_X_FROM_WEB_MM
+    )
+    assert [z - asm.KEEPER_SOCKET_XZ[1] for z in asm.LUG_INNER_FACE_Z] == pytest.approx(
+        [front, rear]
+    )
+    # The web centre label reads as the split of both web faces (owner ruling).
+    assert any(
+        "WEB CENTRE,\nSPLIT OF BOTH WEB FACES" in text
+        for text, _, _ in drawing.PLAN_POINTERS
+    )
     # The band's function (Main's ruling, 2026-10-16): the shaft's flat-station
     # window, 0.14 at 0.02 and gone by 0.09 (ch_fulcrum_shaft_spec). The slide
     # (r11 review) moves both flats at once; the band is what leaves it a seat.
     staked_number = steps.step_number(steps.SET_SCREWS_STAKED_KEY)
     assert (
-        f"THE {fulcrum_shaft} FLATS ARE A FIXED PITCH APART, AND THIS BAND LEAVES "
-        f"ONE STEP {staked_number} SHAFT POSITION WITH BOTH FLATS UNDER THEIR "
-        "CROWN TAPS AND NO LEVER HUB ON A FLAT."
+        f"THE {fulcrum_shaft} FLATS ARE A FIXED PITCH APART, AND THE INNER-FACE "
+        f"BANDS LEAVE ONE STEP {staked_number} SHAFT POSITION WITH BOTH FLATS "
+        "UNDER THEIR CROWN TAPS AND NO LEVER HUB ON A FLAT."
     ) in fitted
     assert "EACH FLAT LIES UNDER ITS CROWN TAP" in _step_body(
         steps.SET_SCREWS_STAKED_KEY

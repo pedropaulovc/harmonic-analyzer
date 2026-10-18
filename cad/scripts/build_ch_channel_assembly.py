@@ -1034,14 +1034,19 @@ async def _author_settings_reference(adapter) -> None:
     """The fit-up's settings as model dimensions: no solid or pose edits, one
     construction sketch per bank view (ch_channel_assembly_spec) -- a chain on
     the pivot axis (south ear inner face, south washer, hub 0, hub 19) and a
-    leg on the fulcrum axis between the keeper lugs' inner faces -- each
-    dimensioned from globals, banded, marked for the drawing and blanked (the
-    mg AxleStackReference pattern). On the Right plane, sketch x is machine
-    -z and sketch y is machine y."""
+    leg on the fulcrum axis between the keeper lugs' inner faces -- and one
+    for the keeper plan view (the MHA-FR-002 web centre and socket lines, the
+    lug centre line and the two inner-face stations), each dimensioned from
+    globals, banded, marked for the drawing and blanked (the mg
+    AxleStackReference pattern). On the Right plane, sketch x is machine -z
+    and sketch y is machine y; on the Top plane, sketch x is machine x and
+    sketch y is machine -z."""
     spec = settings_spec
     pivot_xs = [-z for z in spec.PIVOT_CHAIN_Z]
     lug_xs = [-z for z in spec.LUG_INNER_FACE_Z]
     washer_t = spec.PIVOT_CHAIN_Z[2] - spec.PIVOT_CHAIN_Z[1]
+    socket_x, socket_y = spec.KEEPER_SOCKET_XZ[0], -spec.KEEPER_SOCKET_XZ[1]
+    face_ys = [-z for z in spec.LUG_INNER_FACE_Z]
     for name, value in (
         ("ChSouthEarInnerX", pivot_xs[0]),
         ("ChPivotAxisY", spec.PIVOT_Y),
@@ -1051,6 +1056,13 @@ async def _author_settings_reference(adapter) -> None:
         ("ChSouthLugInnerX", lug_xs[0]),
         ("ChFulcrumAxisY", spec.FULCRUM_Y),
         ("ChKeeperLugSpan", spec.LUG_INNER_FACE_Z[1] - spec.LUG_INNER_FACE_Z[0]),
+        ("ChKeeperSocketX", socket_x),
+        ("ChKeeperSocketZ", socket_y),
+        ("ChKeeperSocketLine", spec.KEEPER_PLAN_SOCKET_LINE),
+        ("ChKeeperWebLine", spec.KEEPER_PLAN_WEB_LINE),
+        ("ChKeeperLugX", spec.KEEPER_LUG_X - socket_x),
+        ("ChKeeperFrontFaceZ", socket_y - face_ys[0]),
+        ("ChKeeperRearFaceZ", socket_y - face_ys[1]),
     ):
         await set_global(adapter, name, f"{value}mm")
     drives = []
@@ -1101,6 +1113,111 @@ async def _author_settings_reference(adapter) -> None:
     await ensure_fully_defined(adapter, "lever-bank settings")
     check("exit lever-bank settings sketch", await adapter.exit_sketch())
     drives += _finish_settings_feature(adapter, spec.FULCRUM_FEATURE, dims)
+
+    dims = SketchDims()
+    check("create keeper-plan settings sketch", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    # The socket line runs east (-x) toward the upper-left socket, the web
+    # centre line rearward (+z, sketch -y); the lug centre line runs from the
+    # socket line through both inner-face stations, front then rear.
+    socket_line = check(
+        "keeper-plan socket line",
+        await adapter.add_line(
+            socket_x, socket_y, socket_x - spec.KEEPER_PLAN_SOCKET_LINE, socket_y
+        ),
+    )
+    web_line = check(
+        "keeper-plan web centre line",
+        await adapter.add_line(
+            socket_x, socket_y, socket_x, socket_y - spec.KEEPER_PLAN_WEB_LINE
+        ),
+    )
+    lug_ys = [socket_y, *face_ys]
+    lug_legs = [
+        check(
+            f"keeper-plan lug centre leg {index}",
+            await adapter.add_line(spec.KEEPER_LUG_X, y0, spec.KEEPER_LUG_X, y1),
+        )
+        for index, (y0, y1) in enumerate(zip(lug_ys, lug_ys[1:]))
+    ]
+    set_sketch_direct_db(adapter, False)
+    for line in (socket_line, web_line, *lug_legs):
+        segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"keeper-plan line {line} is not construction")
+    for line, relation in (
+        (socket_line, "horizontal"),
+        (web_line, "vertical"),
+        *((leg, "vertical") for leg in lug_legs),
+    ):
+        check(
+            f"keeper-plan {line} {relation}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    socket = f"{socket_line}.start"
+    lug_start = f"{lug_legs[0]}.start"
+    for first, second, relation in (
+        (f"{web_line}.start", socket, "coincident"),
+        (f"{lug_legs[0]}.end", f"{lug_legs[1]}.start", "coincident"),
+        (lug_start, socket, "horizontal_points"),
+    ):
+        check(
+            f"keeper-plan {first} {relation} {second}",
+            await adapter.add_sketch_constraint(first, second, relation),
+        )
+    await anchor_point_to_origin(
+        adapter, socket, socket_x, socket_y, "keeper-plan socket centre"
+    )
+    dims.record("KeeperSocketX", '"ChKeeperSocketX"')
+    dims.record("KeeperSocketZ", '"ChKeeperSocketZ"')
+    for first, second, kind, value, name, drive in (
+        (
+            socket,
+            f"{socket_line}.end",
+            "horizontal_distance",
+            spec.KEEPER_PLAN_SOCKET_LINE,
+            "KeeperSocketLine",
+            '"ChKeeperSocketLine"',
+        ),
+        (
+            socket,
+            f"{web_line}.end",
+            "vertical_distance",
+            spec.KEEPER_PLAN_WEB_LINE,
+            "KeeperWebLine",
+            '"ChKeeperWebLine"',
+        ),
+        (
+            socket,
+            lug_start,
+            "horizontal_distance",
+            spec.KEEPER_LUG_X - socket_x,
+            spec.KEEPER_X_DIMENSION,
+            '"ChKeeperLugX"',
+        ),
+        (
+            lug_start,
+            f"{lug_legs[0]}.end",
+            "vertical_distance",
+            socket_y - face_ys[0],
+            spec.KEEPER_FRONT_Z_DIMENSION,
+            '"ChKeeperFrontFaceZ"',
+        ),
+        (
+            lug_start,
+            f"{lug_legs[1]}.end",
+            "vertical_distance",
+            socket_y - face_ys[1],
+            spec.KEEPER_REAR_Z_DIMENSION,
+            '"ChKeeperRearFaceZ"',
+        ),
+    ):
+        await dimension_between(adapter, first, second, kind, value, name)
+        dims.record(name, drive)
+    await ensure_fully_defined(adapter, "keeper-plan settings")
+    check("exit keeper-plan settings sketch", await adapter.exit_sketch())
+    drives += _finish_settings_feature(adapter, spec.KEEPER_PLAN_FEATURE, dims)
 
     for name, expression in drives:
         await drive_dimension(adapter, name, expression)

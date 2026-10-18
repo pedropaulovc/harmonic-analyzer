@@ -21,7 +21,10 @@ from ch_channel_assembly_spec import (
     HOOK,
     KEEPER,
     KEEPER_FOOT_SCREW,
+    KEEPER_FRONT_Z_DIMENSION,
+    KEEPER_REAR_Z_DIMENSION,
     KEEPER_SET_SCREW,
+    KEEPER_X_DIMENSION,
     LUG_SPAN_DIMENSION,
     ROD,
     SPRING_SET_DIMENSION,
@@ -36,6 +39,10 @@ DIMENSION_CALLOUTS = {
     # budget); r10 machinist review: name what the tight band sets (rule 4).
     STACK_LENGTH_DIMENSION: "STACK, CLOSED UP: STRAP PITCH TO RODS AND BARS",
     LUG_SPAN_DIMENSION: "LUG SPAN",
+    # The keeper plan view: what each fit-up band sets (step 10's reason).
+    KEEPER_X_DIMENSION: "LUG CENTRE",
+    KEEPER_FRONT_Z_DIMENSION: "FRONT LUG INNER FACE",
+    KEEPER_REAR_Z_DIMENSION: "REAR LUG INNER FACE",
 }
 if set(DIMENSION_CALLOUTS) != set(DIMENSION_FEATURE):
     raise AssertionError("every marked dimension carries a callout")

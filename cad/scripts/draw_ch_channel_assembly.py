@@ -11,13 +11,15 @@ r"""Create the MHA-CH-000 channel assembly fitter package (four sheets).
    the bank north, and the plain pivot shaft is cut to fit and held by a set
    screw in each ear (#948 ruling R, PR #1292; user, 2026-10-10).
 4. LEVER BANK FIT-UP: the keepers, fulcrum shaft and levers isolated at 1:1
-   with the keeper lug span, and the remaining steps: the keepers' bench
-   pair-ream and DRO fit-up on the top frame, the bars pinned to the levers,
-   the lever bank threaded, the set screws staked and the springs hooked.
+   with the keeper lug span, the 1:2 keeper plan view with the keepers'
+   three settings off the top frame's datums, and the remaining steps: the
+   keepers' bench pair-ream and DRO fit-up on the top frame, the bars pinned
+   to the levers, the lever bank threaded, the set screws staked and the
+   springs hooked.
 
-The settings are the assembly's own model dimensions (the hidden rocker- and
-lever-bank settings sketches, build_ch_channel_assembly), not numbers in note
-text; the steps are numbered by ``ch_channel_assembly_steps``.
+The settings are the assembly's own model dimensions (the hidden rocker-bank,
+lever-bank and keeper-plan settings sketches, build_ch_channel_assembly), not
+numbers in note text; the steps are numbered by ``ch_channel_assembly_steps``.
 """
 
 from __future__ import annotations
@@ -62,6 +64,7 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import _show_base_view_sketches
+from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
@@ -89,8 +92,6 @@ from ch_fulcrum_keeper_spec import (
     CROWN_MOST_R,
     CROWN_R,
     FULCRUM_KEEPER_CENTRE_Z,
-    KEEPER_FITUP_LOCATION_BAND_MM,
-    KEEPER_FITUP_PLACES,
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
     KEEPER_INNER_FACE_SPAN_MM,
@@ -354,6 +355,7 @@ class BankView:
     exploded: bool = False
     letter: str = ""  # a detail's letter, at its boundary in the parent
     letter_corner: tuple[int, int] = (1, 1)  # letter_xy's corner for it
+    label_xy: tuple[float, float] | None = None  # caption point, if not under it
 
     @property
     def mm(self) -> float:
@@ -367,6 +369,16 @@ class BankView:
         return (
             self.centre[0] - (z - self.centre_xyz[2]) * self.mm,
             self.centre[1] + (y - self.centre_xyz[1]) * self.mm,
+        )
+
+    def plan_xy(self, x: float, z: float) -> tuple[float, float]:
+        """Machine (x, z) in a *Top view's plane, on the sheet: west (+x)
+        right, the machine front (-z) up."""
+        if self.orientation != "*Top":
+            raise ValueError(f"{self.title} is not a *Top view")
+        return (
+            self.centre[0] + (x - self.centre_xyz[0]) * self.mm,
+            self.centre[1] - (z - self.centre_xyz[2]) * self.mm,
         )
 
     @property
@@ -476,6 +488,78 @@ LEVER_BANK = BankView(
         }
     ),
 )
+# The keepers on MHA-FR-002 in plan at 1:2, machine front up as the frame's
+# own plan prints it (b9ae machinist review: step 10's settings had no view,
+# and its X datum, the web centre, is no face to touch). The frame is not in
+# this assembly, so the hidden KEEPER_PLAN_FEATURE sketch draws its datums
+# as construction lines and carries the three settings (owner ruling
+# X1+B1). Placed under the lever bank: the socket line 0.116 up, the rear
+# foot tip (z 87.0) 3.5 mm over the border.
+KEEPER_PLAN_SOCKET_Y = 0.116
+_PLAN_CENTRE_Y = 0.066
+_TOP_FRAME_NUMBER = str(_config.parts("fr-top-frame")["number"])
+KEEPER_PLAN = BankView(
+    "KEEPER PLAN VIEW",
+    (1, 2),
+    (
+        asm.KEEPER_LUG_X,
+        _FULCRUM_Y,
+        asm.KEEPER_SOCKET_XZ[1] + (KEEPER_PLAN_SOCKET_Y - _PLAN_CENTRE_Y) * 2000.0,
+    ),
+    (0.112, _PLAN_CENTRE_Y),
+    frozenset(
+        {
+            "ch-fulcrum-shaft",
+            asm.KEEPER,
+            asm.KEEPER_FOOT_SCREW,
+            asm.KEEPER_SET_SCREW,
+        }
+    ),
+    parts=f"ON {_TOP_FRAME_NUMBER}, FRONT UP",
+    orientation="*Top",
+    label_xy=(0.020, 0.090),
+)
+_PLAN_LUG = KEEPER_PLAN.plan_xy(asm.KEEPER_LUG_X, asm.KEEPER_SOCKET_XZ[1])
+_PLAN_FACES = tuple(
+    KEEPER_PLAN.plan_xy(asm.KEEPER_LUG_X, z) for z in asm.LUG_INNER_FACE_Z
+)
+# The X text right of its 1.45 mm span, above the socket line; each Z text
+# centred on its own dimension line west of the keepers, the rear's inside
+# the front's so neither text sits on the other's line (the front line
+# stops at the front face, above the rear text; the front text clears the
+# rear line by 3 mm).
+PLAN_KEEP = {
+    asm.KEEPER_X_DIMENSION: (_PLAN_LUG[0] + 0.016, KEEPER_PLAN_SOCKET_Y + 0.005),
+    asm.KEEPER_REAR_Z_DIMENSION: (
+        _PLAN_LUG[0] + 0.035,
+        (KEEPER_PLAN_SOCKET_Y + _PLAN_FACES[1][1]) / 2.0,
+    ),
+    asm.KEEPER_FRONT_Z_DIMENSION: (
+        _PLAN_LUG[0] + 0.066,
+        (KEEPER_PLAN_SOCKET_Y + _PLAN_FACES[0][1]) / 2.0,
+    ),
+}
+# The two frame datums the sketch draws, named where they are drawn (owner
+# ruling: the web centre reads as the split of both web faces), the texts
+# east of the view, each leader under or over the other's.
+PLAN_POINTERS = (
+    (
+        f"{_TOP_FRAME_NUMBER} LINE OF THE\nUPPER SOCKET CENTRES",
+        (0.020, 0.131),
+        KEEPER_PLAN.plan_xy(
+            asm.KEEPER_SOCKET_XZ[0] - 2.0 * asm.KEEPER_PLAN_SOCKET_LINE / 3.0,
+            asm.KEEPER_SOCKET_XZ[1],
+        ),
+    ),
+    (
+        f"{_TOP_FRAME_NUMBER} WEB CENTRE,\nSPLIT OF BOTH WEB FACES",
+        (0.020, 0.114),
+        KEEPER_PLAN.plan_xy(
+            asm.KEEPER_SOCKET_XZ[0],
+            asm.KEEPER_SOCKET_XZ[1] + asm.KEEPER_PLAN_WEB_LINE / 2.0,
+        ),
+    ),
+)
 
 
 def exploded_offset(stem: str, side: asm.Side) -> tuple[float, float, float]:
@@ -550,10 +634,54 @@ STACK_KEEP = {
     asm.STACK_LENGTH_DIMENSION: ROCKER_BANK.sheet_xy(_STACK_MID, _PIVOT_Y + 40.0)
 }
 # Above the 8 mm crop circle: at +6 the circle's arc crossed the callout
-# text (r7 layout audit, text-on-line).
+# text (r7 layout audit, text-on-line). South of the ear-side extension line,
+# not between the two: centred on the 0.60 gap the text sat on its own
+# dimension line and the washer-side extension line rose into it (b9ae
+# machinist review). 6.5 mm south of the ear face puts the callout's ~40 mm
+# block wholly south of that line.
 SPRING_KEEP = {
-    asm.SPRING_SET_DIMENSION: SOUTH_END.sheet_xy(_SPRING_MID, _PIVOT_Y + 9.5)
+    asm.SPRING_SET_DIMENSION: SOUTH_END.sheet_xy(
+        asm.PIVOT_CHAIN_Z[0] - 6.5, _PIVOT_Y + 9.5
+    )
 }
+# Detail A names the four bodies the blade is read against (b9ae machinist
+# review: the caption listed them, nothing in the view said which outline was
+# which): (text, text upper-left on the sheet, pointer tip in the detail's
+# plane as machine (z, y)). Hub 0 north of the circle, above the axis; the
+# washer, spring and ear to the south, under the set dimension's text, rows
+# in their tips' top-to-bottom order so no two leaders cross, each tip below
+# the axis so no leader crosses the set dimension's extension lines (they
+# run from the axis up).
+_WASHER_MID = sum(asm.SOUTH_WASHER_Z) / 2.0
+DETAIL_POINTERS = tuple(
+    (text, xy, SOUTH_END.sheet_xy(z, _PIVOT_Y + dy))
+    for text, xy, z, dy in (
+        (
+            f"{BOM_PART_NUMBERS['ch-rocker-arm']}\nHUB 0",
+            (0.018, 0.131),
+            asm.PIVOT_CHAIN_Z[2] + 1.0,
+            3.0,
+        ),
+        (
+            f"{BOM_PART_NUMBERS[asm.WASHER]} WASHER",
+            (0.110, 0.121),
+            _WASHER_MID,
+            -1.5,
+        ),
+        (
+            f"{BOM_PART_NUMBERS[asm.BANK_SPRING]} SPRING",
+            (0.110, 0.108),
+            _SPRING_MID,
+            -3.0,
+        ),
+        (
+            f"{BOM_PART_NUMBERS[asm.BRACKET]} EAR",
+            (0.110, 0.095),
+            asm.PIVOT_CHAIN_Z[0] - 3.0,
+            -4.5,
+        ),
+    )
+)
 LUG_KEEP = {asm.LUG_SPAN_DIMENSION: LEVER_BANK.sheet_xy(_LUG_MID, _FULCRUM_Y + 32.0)}
 # swDimensionTextParts_e compartments.
 CALLOUT_TEXT_PART = 3  # swDimensionTextCalloutAbove
@@ -662,11 +790,11 @@ def _fitup_notes() -> tuple[str, str]:
     # (rocker_bank_layout checks the worst case).
     tip_low, tip_high = DOME_HEIGHT - SHAFT_TIP_SET_BAND, DOME_HEIGHT + SHAFT_TIP_SET_BAND
     # Each keeper lug is set off the top-frame rail web under it (its column's
-    # socket axis) in X and off the frame's hole-station origin, the upper-left
-    # socket, in Z (Main's ruling): the lug centre on the fulcrum line, its
-    # inner face off the front socket line. The frame is not in this
-    # assembly, so these set-points stay in the step text.
-    places = KEEPER_FITUP_PLACES
+    # socket axis) in X and off the frame's hole-station origin line, the
+    # upper socket centres, in Z (Main's ruling): the lug centre on the
+    # fulcrum line, its inner face off the front socket line. The frame is not
+    # in this assembly, so the keeper plan view draws both datums and prints
+    # the three settings, each banded (owner ruling X1+B1, b9ae review).
     if abs(LEVER_FULCRUM_XY[0] - COLUMN_X - KEEPER_FITUP_X_FROM_WEB_MM) > 1e-9:
         raise AssertionError("KEEPER_FITUP_X_FROM_WEB_MM is off the fulcrum line")
     front_face, rear_face = KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
@@ -760,12 +888,11 @@ def _fitup_notes() -> tuple[str, str]:
         ),
         steps.KEEPERS_SET_KEY: (
             f"{top_frame} ON THE MILL: SHAFT THROUGH BOTH KEEPERS, FEET "
-            "OUTBOARD ON THE RAIL. SET EACH LUG CENTRE "
-            f"{KEEPER_FITUP_X_FROM_WEB_MM:.{places}f} WEST OF THE RAIL WEB "
-            f"CENTRE BELOW IT, LUG INNER FACES AT Z {front_face:.{places}f} AND "
-            f"{rear_face:.{places}f} FROM THE UPPER-LEFT SOCKET, EACH WITHIN "
-            f"{KEEPER_FITUP_LOCATION_BAND_MM:.{places}f}: THE {fulcrum_shaft} "
-            "FLATS ARE A FIXED PITCH APART, AND THIS BAND LEAVES ONE STEP "
+            "OUTBOARD ON THE RAIL. SET EACH LUG CENTRE OFF THE RAIL WEB CENTRE "
+            "BELOW IT AND THE LUG INNER FACES OFF THE LINE OF THE UPPER SOCKET "
+            "CENTRES, TO THE KEEPER PLAN "
+            f"VIEW: THE {fulcrum_shaft} FLATS ARE A FIXED PITCH APART, AND THE "
+            "INNER-FACE BANDS LEAVE ONE STEP "
             f"{steps.step_number(steps.SET_SCREWS_STAKED_KEY)} SHAFT POSITION "
             "WITH BOTH FLATS UNDER THEIR CROWN TAPS AND NO LEVER HUB ON A FLAT. "
             f"CLAMP; TRANSFER EACH FOOT HOLE INTO THE RAIL, TAP AS {top_frame}, "
@@ -1191,7 +1318,7 @@ def _placed_bank_view(adapter: Any, bank: BankView) -> Any:
         "IView",
     )
     label = f"{bank.title} centre"
-    pictorial = bank.orientation != "*Right"
+    pictorial = bank.orientation == "*Isometric"
     if pictorial:
         # Display mode first, as the exploded view: the configuration
         # policy judges a pictorial view shaded with edges.
@@ -1336,11 +1463,16 @@ def _dimensioned_bank(
     keep: dict[str, tuple[float, float]],
     *,
     detail: BankView | None = None,
+    pointers: tuple[
+        tuple[str, tuple[float, float], tuple[float, float]], ...
+    ] = (),
 ) -> list[Any]:
     """Place ``bank``, show its own settings sketch in it (the other bank's
     lies off the sheet), import ``keep``, crop it if it is a detail, prove the
     kept dimensions survived, and label it. ``detail``, a detail taken from
-    ``bank``, gets its boundary circle and letter drawn in ``bank``."""
+    ``bank``, gets its boundary circle and letter drawn in ``bank``; each of
+    ``pointers`` (text, text point, tip) names a body with a view-owned
+    leader."""
     view = _placed_bank_view(adapter, bank)
     features = tuple(dict.fromkeys(asm.DIMENSION_FEATURE[name] for name in keep))
     _show_base_view_sketches(adapter, view, features, label=bank.title)
@@ -1368,13 +1500,22 @@ def _dimensioned_bank(
         x0, y0 = bank.crop_label_xy
     else:
         _assert_view_on_sheet(view, label=bank.title)
-        x0, y0 = (
+        x0, y0 = bank.label_xy or (
             bank.centre[0] - 0.016,
             _view_outline(view, label=bank.title)[1] - 0.004,
         )
     _activate_view(adapter, view, label=bank.title)
     if add_note(adapter, bank.label_text, x0, y0) is None:
         raise RuntimeError(f"failed to label {bank.title}")
+    for text, text_xy, tip in pointers:
+        add_leader_note(
+            adapter,
+            text,
+            text_xy=text_xy,
+            attach_xy=tip,
+            label=f"{bank.title} {text.splitlines()[0]}",
+            view=view,
+        )
     return annotations
 
 
@@ -1431,12 +1572,17 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     """Sheets 3 and 4: the isolated banks with their settings, the steps."""
     _activate_sheet(adapter, SHEET_NAMES[2])
     annotations = _dimensioned_bank(adapter, ROCKER_BANK, STACK_KEEP, detail=SOUTH_END)
-    annotations += _dimensioned_bank(adapter, SOUTH_END, SPRING_KEEP)
+    annotations += _dimensioned_bank(
+        adapter, SOUTH_END, SPRING_KEEP, pointers=DETAIL_POINTERS
+    )
     _place_labels(adapter, SHEET_NAMES[2], ROCKER_END_LABELS)
     _place_steps(adapter, SHEET_NAMES[2], FITUP_NOTES[0], label="rocker-bank steps")
 
     _activate_sheet(adapter, SHEET_NAMES[3])
     annotations += _dimensioned_bank(adapter, LEVER_BANK, LUG_KEEP)
+    annotations += _dimensioned_bank(
+        adapter, KEEPER_PLAN, PLAN_KEEP, pointers=PLAN_POINTERS
+    )
     _place_labels(adapter, SHEET_NAMES[3], LEVER_END_LABELS)
     _place_steps(adapter, SHEET_NAMES[3], FITUP_NOTES[1], label="lever-bank steps")
 
