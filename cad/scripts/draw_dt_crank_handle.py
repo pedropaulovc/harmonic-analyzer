@@ -66,7 +66,6 @@ import _telemetry
 from dt_crank_handle_spec import (
     COUNTERBORE_DEPTH,
     COUNTERBORE_FIT_NOTE,
-    COUNTERBORE_FLOOR_X,
     DOME_CENTER,
     DOME_R,
     DRAWING_DIMENSIONS,
@@ -153,8 +152,8 @@ def _on_radius(
 # from the oak end on the second row.
 _ROW = (0.195, 0.205, 0.242, 0.250, 0.258)
 # A diameter's text hangs on a shelf off its dimension line, on the side the
-# text stands from the feature it measures: each stands 1.5 right of its
-# feature, so every shelf runs right.
+# text stands from the point it measures to (a line's END point; r2/r3 sheets):
+# each stands right of it, so every shelf runs right.
 _SHELF = 0.0015
 _BELOW = 0.098
 _CALLOUT_ROW = 0.080
@@ -174,16 +173,13 @@ FRONT_KEEP = {
     "DomeR": _on_radius(DOME_CENTER, DOME_R + 5.0, 78.0),
     "EndRoundR": _on_radius(END_ROUND_CENTER, 8.1, 42.5),
     # Diameters across their own cut.  The shoulder and waist shelves sit
-    # under the section; the fitted tenon's, the reamed bore's and the
-    # counterbore's callout blocks stand side by side below them, above the
-    # title block.
+    # under the section; the fitted tenon's and the counterbore's callout
+    # blocks stand below them, above the title block, and the reamed bore's
+    # lower still between them, clear of the swell.
     "ShoulderDia": (_front_x(SHOULDER_X) + _SHELF, _BELOW),
     "WaistDia": (_front_x(WAIST_X) + _SHELF, _BELOW),
-    "TenonDia": (_front_x((TENON_X0 + SHOULDER_X) / 2.0) + 2.0 * _SHELF, _CALLOUT_ROW),
-    "PivotBoreDia": (
-        (_front_x(TENON_X0) + _front_x(COUNTERBORE_FLOOR_X)) / 2.0 + _SHELF,
-        _CALLOUT_ROW,
-    ),
+    "TenonDia": (_front_x(TENON_X0) + 4.0 * _SHELF, _CALLOUT_ROW),
+    "PivotBoreDia": (0.140, 0.068),
     "CounterboreDia": (
         _front_x(OAK_END_X - COUNTERBORE_DEPTH / 2.0) + _SHELF,
         _CALLOUT_ROW,

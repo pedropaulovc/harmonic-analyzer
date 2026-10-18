@@ -300,10 +300,13 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(tenon_top, None, "linear", TENON_LENGTH),
     )
     profile.record("TenonLength", '"TenonLength"')
+    # To the tenon end face's corner, not the OD line: the drawing hangs the
+    # diameter's shelf on the side its text stands from the measured point, so
+    # the fitted tenon's long callout can run right, into the sheet.
     await add_diametric_linear_dimension(
         adapter,
         centerline,
-        tenon_top,
+        f"{tenon_end}.end",
         ((TENON_X0 + SHOULDER_X) / 2.0, TENON_R + 4.0),
         "TenonDia",
     )
