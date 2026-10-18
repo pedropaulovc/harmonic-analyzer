@@ -361,6 +361,13 @@ def test_fitted_bores_name_their_mates_and_fits() -> None:
         for word in words:
             assert word in text, (name, word)
     assert {c.key for c in dt_pinion_bracket_spec.SURFACE_FINISHES} == {"arbor_bore"}
+    # The far-face wall under the 2.0 target prints its minimum (owner ruling
+    # (a), RV-01), never above the spec's worst case nor under the 1.5 floor.
+    assert callouts["PinSeatCz"].splitlines()[-1] == "WALL 1.5 MIN"
+    assert 1.5 <= dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST < 2.0
+    exceptions = _config.parts("dt-pinion-bracket")["machinist_exceptions"]
+    assert [e["id"] for e in exceptions] == ["RV-01"]
+    assert "WALL 1.5 MIN" in exceptions[0]["where"]
     # The (43.0) stands left of the flank, so no leader to the follower seat
     # (callouts right of the view) crosses its dimension line.
     face_a = drawing.LEFT_CENTER[0] - (

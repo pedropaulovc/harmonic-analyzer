@@ -79,6 +79,7 @@ from dt_pinion_bracket_spec import (
     DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
     PIN_DROP,
+    PIN_SEAT_WEB_WORST,
     R_END,
     SURFACE_FINISHES,
 )
@@ -204,7 +205,9 @@ SECTION_CENTER = (0.350, 0.115)
 SECTION_LINE_X = (0.180, 0.250)
 # Right of the seat's witness lines (x <= 0.3394), callout below the value:
 # the above-lane callout never rendered and left a bare 66 mm dimension line.
-SECTION_KEEP = {"PinSeatDepth": (0.361, 0.160)}
+# Its widest row (24 characters, ~65 mm) starts right of the entry-face
+# witness: centred at 0.361 the floor-corner row sat on that witness (r4).
+SECTION_KEEP = {"PinSeatDepth": (0.374, 0.160)}
 # The flank's top and bottom edges are the strap's two extreme lines.  The
 # overall sits on the view's clear left: on its right the follower-seat
 # leader crossed its dimension line (r1 machinist review, rule 14).
@@ -233,7 +236,13 @@ DIMENSION_CALLOUTS = {
     # text at its bent dimension line, so that leg touched the leading S of
     # SETS (r3 review, rule 14); the leading spaces stand the rows off it.
     "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-023 CAM",
-    "PinSeatCz": "CENTRES MHA-DT-025\nFOLLOWER IN BAR",
+    # The station's band leaves the far-face wall under rule 17's 2.0 target
+    # (owner ruling (a), RV-01): the sheet states the minimum it holds, at the
+    # worst printed bands, rounded down (the ch-anchor-jam-nut precedent).
+    "PinSeatCz": (
+        "CENTRES MHA-DT-025\nFOLLOWER IN BAR\n"
+        f"WALL {int(PIN_SEAT_WEB_WORST * 10) / 10:.1f} MIN"
+    ),
 }
 # The seat floor is modelled sharp; R0.2 MAX lets the builder pick a
 # flat-bottom reamer or end mill (rule 16, r2/r3 review): a stud bottomed on
