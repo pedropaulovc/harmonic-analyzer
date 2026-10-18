@@ -163,13 +163,20 @@ def _pin_hole_removed() -> float:
     return 2.0 * total * h / 3.0
 
 
-def _as_construction(adapter: Any, entity_id: str) -> None:
-    """Flag a registered sketch line as construction geometry (the
-    build_fr_harmonic_base reference-sketch idiom)."""
-    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{entity_id} did not take the construction flag")
+def _add_reference_point(adapter: Any, uv: tuple[float, float], label: str) -> str:
+    """One sketch point straight into the sketch DB (no inference snap),
+    registered for the adapter's dimension refs
+    (build_ch_rocker_arm_tl_oblique_nut_bracket's idiom)."""
+    sketch_manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    previous = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        point = sketch_manager.CreatePoint(uv[0] / 1000.0, uv[1] / 1000.0, 0.0)
+    finally:
+        sketch_manager.AddToDB = previous
+    if point is None:
+        raise RuntimeError(f"cannot create the {label} reference point")
+    return adapter._register_sketch_entity("Point", point)
 
 
 async def _station_reference(
@@ -182,28 +189,30 @@ async def _station_reference(
     v: float,
     drive: str,
 ) -> list[tuple[str, str]]:
-    """One construction line on the Right Plane whose ONE driving dimension
-    is a station measured from face B (drawing-simplicity-policy.md `How the repository implements the guidelines`: a printed value no
-    feature carries is modelled, never typed on the sheet).  Right-plane
-    sketch u is model -z, v is model y."""
+    """Two points on the Right Plane whose ONE driving dimension is a
+    station measured from face B (drawing-simplicity-policy.md `How the
+    repository implements the guidelines`: a printed value no feature
+    carries is modelled, never typed on the sheet).  Right-plane sketch u is
+    model -z, v is model y.  Points, not a construction line: section A-A's
+    detail keeps the sketches the part showed while it was dimensioned, and
+    ENFORCE r3 (#1011) read those lines as hidden edges across the cut face
+    (the TL-22 nut bracket's points-only precedent)."""
     check(f"create_sketch {feature}", await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)
-    line = check(f"{feature} line", await adapter.add_line(u_start, v, u_end, v))
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, line)
+    start = _add_reference_point(adapter, (u_start, v), f"{feature} start")
+    end = _add_reference_point(adapter, (u_end, v), f"{feature} end")
     check(
         f"{feature} horizontal",
-        await adapter.add_sketch_constraint(line, None, "horizontal"),
+        await adapter.add_sketch_constraint(start, end, "horizontal_points"),
     )
     await dimension_between(
         adapter,
-        f"{line}.start",
-        f"{line}.end",
+        start,
+        end,
         "horizontal_distance",
         abs(u_end - u_start),
         feature,
     )
-    await anchor_point_to_origin(adapter, f"{line}.start", u_start, v, feature)
+    await anchor_point_to_origin(adapter, start, u_start, v, feature)
     await ensure_fully_defined(adapter, f"{feature} sketch")
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)

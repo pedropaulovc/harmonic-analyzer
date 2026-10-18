@@ -328,3 +328,20 @@ def test_detail_fence_and_rod_axis_go_straight_to_the_database() -> None:
     # The rod axis runs from inside the hub to just past the fence.
     low, high = drawing.ROD_AXIS_MODEL_Y_MM
     assert low < dt_pinion_lever_spec.HUB_OD / 2.0 < drawing.DETAIL_RADIUS_MM < high
+
+
+def test_station_references_are_points_and_hub_diameters_near_side() -> None:
+    # ENFORCE r3 (#1011): detail B kept the reference lines the part showed
+    # while it was dimensioned, and they read as hidden edges across the cut;
+    # and both hub diameters crossed at the hub centre.
+    import build_dt_pinion_lever
+
+    source = Path(build_dt_pinion_lever.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def _station_reference(") :]
+    body = body[: body.index("\nasync def ")]
+    assert body.count("_add_reference_point(") == 2
+    assert "add_line" not in body
+    assert drawing.NEAR_SIDE_DIAMETERS == ("HubOd", "HubBore")
+    assert set(drawing.NEAR_SIDE_DIAMETERS) <= set(drawing.FRONT_KEEP)
+    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'set_near_side_diameter(matches[0], f"lever {name}")' in draw_source

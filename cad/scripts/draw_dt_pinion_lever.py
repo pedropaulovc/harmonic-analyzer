@@ -24,6 +24,7 @@ from typing import Any
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
     view_name,
 )
@@ -40,6 +41,7 @@ from _drawing_common import (
 )
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -132,6 +134,7 @@ FRONT_KEEP = {
     "RodDia": (0.105, _front_y(ROD_DIA_TEXT_Y)),
 }
 TOP_KEEP = {"CapR": (0.105, TOP_CENTER[1] + 0.012)}
+NEAR_SIDE_DIAMETERS = ("HubOd", "HubBore")
 # Section A-A keeps the old side view's frame (B, the mouth face at model
 # z +5, the LEFT end; the crown the right; the grip up), and its detail keeps
 # it at 3:1, so a model (z, y) lands at DETAIL_CENTER + (-z, y) * 3:1.
@@ -506,6 +509,15 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="lever front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # ENFORCE r3 (#1011): native, both hub diameters ran rim to rim through
+    # the centre and crossed there; one arrow on the rim nearest each text
+    # (draw_dt_crank_drive_gear's tip and bore).
+    for name in NEAR_SIDE_DIAMETERS:
+        matches = [a for a in front_annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+        set_near_side_diameter(matches[0], f"lever {name}")
+    rebuild_drawing(adapter, label="hub diameters' near-side leaders")
     top_annotations = curate_view_dimensions(
         adapter,
         top,
