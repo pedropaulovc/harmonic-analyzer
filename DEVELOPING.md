@@ -104,6 +104,25 @@ bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
 
+### Finite stock-envelope endpoint reuse
+
+`paper_drive_stock_envelope._endcut_integral_bounds` carries each branch cell's
+evaluated endpoints into its children and evaluates their shared midpoint once.
+Reuse is confined to the same profile, branch and exact parameter within one
+invocation; there is no persistent point cache. Cell arithmetic, heap priority
+and serial ordering, left/right child order, outward `nextafter` accumulation
+and stopping decisions must remain unchanged.
+
+For #1621, a controlled fresh-process comparison matched all 31 hexadecimal
+value rows, including every hub seat-area corner and feed-pinion/knob consumer
+bounds. Instrumented point calls fell from 1,167,916 to 292,195; worker elapsed
+time was 4.7161 s before versus 2.7085 s after, with hub import 3.4351 s versus
+1.9520 s. These measurements cover one paired pure-data import/bounds comparison
+with the same counting wrapper, not recipe-gate, native-build or whole-build
+timings. Changing this helper still changes source digests for native consumers whose
+dependency closures include it; exact numerical bounds do not avoid that
+cache invalidation or replace the applicable native gate.
+
 ### Recipe gate scheduling
 
 `check:recipe` alone runs its complete explicit test inventory with
