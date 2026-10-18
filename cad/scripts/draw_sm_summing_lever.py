@@ -99,6 +99,7 @@ from sm_summing_lever_notes import (
     DIMENSION_CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
     FRONT_VIEW_LETTER,
+    REFERENCE_DIMENSIONS,
     SPRING_TAP_CALLOUT_PROCESS,
 )
 from sm_summing_lever_spec import (
@@ -887,18 +888,11 @@ def _sheet_to_view_sketch(
     return points
 
 
-def _section_thread_on_visible_layer(adapter: Any, section: Any) -> None:
-    """Import section H-H's cosmetic thread and print it thin and solid.
-
-    draw_pn_pen_v_block's ``_section_thread_on_visible_layer``: the layer is
-    created thin continuous (``ILayerMgr::AddLayer``), its state and every
-    thread annotation's layer read back.
-    """
-    threads = import_cosmetic_threads(adapter, section)
-    if threads[1] < 1:
-        raise RuntimeError("section H-H has no native cosmetic-thread instance")
-    draw = adapter.currentModel
-    manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
+def _thin_visible_layer(adapter: Any) -> None:
+    """Create (once) TAP_THREAD_LAYER, black thin continuous, and read its
+    state back: section H-H's cosmetic thread and its break line print on
+    it."""
+    manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
     layer = manager.GetLayer(TAP_THREAD_LAYER)
     if layer is None:
         # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
@@ -915,6 +909,19 @@ def _section_thread_on_visible_layer(adapter: Any, section: Any) -> None:
             f"layer {TAP_THREAD_LAYER} reads visible={layer.Visible!r}, style "
             f"{layer.Style!r}, width {layer.Width!r}; wanted visible thin continuous"
         )
+
+
+def _section_thread_on_visible_layer(adapter: Any, section: Any) -> None:
+    """Import section H-H's cosmetic thread and print it thin and solid.
+
+    draw_pn_pen_v_block's ``_section_thread_on_visible_layer``: the layer is
+    created thin continuous (``ILayerMgr::AddLayer``), its state and every
+    thread annotation's layer read back.
+    """
+    threads = import_cosmetic_threads(adapter, section)
+    if threads[1] < 1:
+        raise RuntimeError("section H-H has no native cosmetic-thread instance")
+    _thin_visible_layer(adapter)
     moved = 0
     for raw_annotation in _early_bound(section, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw_annotation, "IAnnotation")
@@ -1087,6 +1094,9 @@ def _tap_section(adapter: Any, front: Any) -> Any:
 
     # The break line, thin, in the section's own sketch; AddToDB keeps sketch
     # inference from snapping its short segments onto the cut face's edges.
+    # On the black thin layer: a layer-less view-sketch line prints grey
+    # (machinist review 20261018 read the break as a construction line).
+    _thin_visible_layer(adapter)
     break_points = model_points_in_view(
         adapter,
         native,
@@ -1101,8 +1111,16 @@ def _tap_section(adapter: Any, front: Any) -> Any:
     sketch_manager.AddToDB = True
     try:
         for index in range(len(points) - 1):
-            if sketch_manager.CreateLine(*points[index], *points[index + 1]) is None:
+            created = sketch_manager.CreateLine(*points[index], *points[index + 1])
+            if created is None:
                 raise RuntimeError(f"section H-H break line segment {index} failed")
+            segment = _early_bound(created, "ISketchSegment")
+            segment.Layer = TAP_THREAD_LAYER
+            if str(segment.Layer or "") != TAP_THREAD_LAYER:
+                raise RuntimeError(
+                    f"section H-H break line segment {index} refused layer "
+                    f"{TAP_THREAD_LAYER}"
+                )
     finally:
         sketch_manager.AddToDB = previous_add_to_db
     draw.ClearSelection2(True)
@@ -1333,21 +1351,23 @@ FRONT_KEEP = {
 # the border and the fence, its three callout lines below the value; its
 # extension lines cross only the side faces' extensions.  Code review C09
 # (owner ruling T1): the ridge-to-side pair shares one dimension line at
-# 0.245 over the vertex, each text outside its own span; the +X one carries
-# the two-line symmetry callout under its value (keep 5.5 mm higher for the
-# same line), right of its extension lines and left of view G, its top line
-# under the border.  The flank-to-side angle stands up-right of the +X
-# shoulder, in the wedge opposite the solid's corner (inside the hexagon,
-# machinist reviews r7/r8 read its text as a feature), its text outside the
-# fence and its arc (~23.5 mm round the shoulder) topping out under the ridge
-# pair's line; nothing else stands in that wedge (stack r4: the vertex
-# height's line and text crossed the angle's text and extension).
+# 0.2455 over the vertex, each text outside its own span, each with two
+# callout lines under its value (keeps 5.5 mm higher for the same line):
+# the +X one right of its extension lines and left of view G, its top line
+# under the border; the -X one between the border and the -X extension
+# line.  The flank-to-side angle, its seat line under its value, stands
+# up-right of the +X shoulder, in the wedge opposite the solid's corner
+# (inside the hexagon, machinist reviews r7/r8 read its text as a feature),
+# its text outside the fence and its arc (~24 mm round the shoulder) topping
+# out under the ridge pair's line; nothing else stands in that wedge (stack
+# r4: the vertex height's line and text crossed the angle's text and
+# extension).
 DETAIL_KEEP = {
     "HexWidth": (0.125, 0.1845),
     "HexHeight": (0.0342, DETAIL_CENTER[1]),
-    "RidgeFromLeft": (0.043, 0.2478),
-    "RidgeFromRight": (0.1355, 0.2533),
-    "FlankToSide": (0.1165, 0.2280),
+    "RidgeFromLeft": (0.0378, 0.2538),
+    "RidgeFromRight": (0.1355, 0.2538),
+    "FlankToSide": (0.1164, 0.2309),
 }
 # Detail E: the round's R MAX up-right of the vertex, its text right of E's
 # fence and of datum A's box (RIDGE_DATUM_RISE), its leader ~30 deg up the
@@ -1364,7 +1384,8 @@ TOP_KEEP = {
     # text sits right of the span, clear of B.
     "PlateWidth": (0.266, 0.0813),
     # Right of the -Z rib's three lines (they end at x 0.4007; at 0.395 its
-    # line crossed "DRILL", farm r7).
+    # line crossed "DRILL", farm r7).  Its two callout lines (BODY END FACES,
+    # 9 characters) end 2.9 mm inside the border.
     "PlateLength": (0.405, TOP_CENTER[1]),
     # -Z receiver rib (Top prints model +Z down): beside it, its witness lines
     # 17 mm from the free edge (x 0.2542; at 0.325 they ran 70 mm across the
@@ -1606,6 +1627,13 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *top_annotations, *detail_annotations],
         label="lever geometry",
     )
+    # Derived values print in parentheses: linear, so the singular helper
+    # (the plural forces a Ø glyph).
+    for name in sorted(REFERENCE_DIMENSIONS):
+        matches = [a for a in front_annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one front {name} to mark as reference")
+        set_reference_dimension(adapter, matches[0], label=f"front {name}")
 
     # Counter-anchor tap native callout (thread + depth) in the top plan.  Pick
     # a point on the hole rim (not its centre) so SolidWorks catches the

@@ -202,6 +202,22 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert "v_built, 1e-5 * v_built" in source
 
 
+def test_nothing_reads_as_an_overall_or_a_band_it_is_not() -> None:
+    """Machinist review 20261018: the plan's 152.40 read as the overall (the
+    stubs stand 2X 21.72 past it) and the 0.44 rib-end step as a tight band
+    (it is derived from the slant and the plate)."""
+    plate_length = notes.DIMENSION_CALLOUTS_BELOW["PlateLength"]
+    assert " ".join(plate_length.split()) == "BODY END FACES"
+    assert "PlateLength" in drawing.TOP_KEEP
+    x, _ = drawing.TOP_KEEP["PlateLength"]
+    widest = max(len("152.40"), *map(len, plate_length.split("\n")))
+    assert x + _CHAR_M * widest / 2.0 < 0.4191 - 0.002  # under the right border
+    assert notes.REFERENCE_DIMENSIONS == {"EdgeRibFrontEndStep"}
+    assert set(notes.REFERENCE_DIMENSIONS) <= set(drawing.FRONT_KEEP)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for name in sorted(REFERENCE_DIMENSIONS):" in source
+
+
 def test_receiver_rim_scan_uses_back_entry_face() -> None:
     import magnifying_bracket_joint_layout as joint
     calls = []
@@ -381,11 +397,19 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) ->
     assert prefixes[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
     assert prefixes[("KnifeEnvelopeReference", "RidgeFromRight")] == "2X "
     assert prefixes[("KnifeEnvelopeReference", "FlankToSide")] == "4X "
-    callout = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"]
-    assert " ".join(callout.split()) == (
-        "KNIFE EDGE SYMMETRIC TO SIDES, BOTH STUBS; SIDES IN ONE PLANE"
+    # Each band on the knife edge names its seat, as the vertex height does
+    # (machinist review 20261018), and the pair states the symmetry.
+    seat_bands = ("RidgeFromLeft", "RidgeFromRight", "FlankToSide", "HexHeight")
+    for name in seat_bands:
+        callout = notes.DIMENSION_CALLOUTS_BELOW[name]
+        assert notes.KNIFE_MOUNT_NUMBER in callout, name
+        assert "MILL" not in callout and "PASS" not in callout, name
+    pair = " ".join(
+        " ".join(notes.DIMENSION_CALLOUTS_BELOW[name].split())
+        for name in ("RidgeFromLeft", "RidgeFromRight")
     )
-    assert "MILL" not in callout and "PASS" not in callout
+    assert "SYMMETRIC TO SIDES" in pair
+    assert "BOTH STUBS, SIDES IN ONE PLANE" in pair
     every_callout = {**notes.DIMENSION_CALLOUTS_ABOVE, **notes.DIMENSION_CALLOUTS_BELOW}
     assert "HexWidth" not in every_callout
     assert (spec.RIDGE_FROM_SIDE, spec.RIDGE_FROM_SIDE_TOL) == (4.040, 0.05)
@@ -556,7 +580,7 @@ def test_the_between_stub_ridge_bound_holds_only_with_the_sides_in_one_plane() -
     assert spec.KNIFE_RIDGE_CONTACT_SPAN == pytest.approx(spec.HEX_Z_INNER + spec.HEX_Z_OUTER)
     assert spec.KNIFE_HOOK_ARM_SPREAD_MAX == pytest.approx(0.077, abs=5e-4)
     callout = " ".join(notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"].split())
-    assert "BOTH STUBS" in callout and "SIDES IN ONE PLANE" in callout
+    assert "BOTH STUBS, SIDES IN ONE PLANE" in callout
     assert notes.DIMENSION_PREFIXES[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
     assert lever_build.KNIFE_SIDE_PLANE_TOL == 1e-6
     assert "_assert_knife_sides_coplanar" in [
@@ -676,11 +700,15 @@ def test_the_knife_detail_text_stands_clear_of_the_hexagon() -> None:
     assert r_x > ex + 0.020  # right of datum A's box over the vertex
 
 
-def test_the_ridge_callout_is_two_wide_lines() -> None:
+def test_the_ridge_callouts_fit_detail_d() -> None:
+    """The +X ridge band takes two wide lines; the -X one and the angle sit
+    in tighter room (the border, the fence, the angle's arc), so they take
+    short lines: the layout test above places them."""
     lines = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"].split("\n")
     assert len(lines) == 2
     assert max(map(len, lines)) <= notes.RIDGE_CALLOUT_MAX_CHARS
-    assert "RidgeFromLeft" not in notes.DIMENSION_CALLOUTS_BELOW
+    assert len(notes.DIMENSION_CALLOUTS_BELOW["RidgeFromLeft"].split("\n")) == 2
+    assert "\n" not in notes.DIMENSION_CALLOUTS_BELOW["FlankToSide"]
 
 
 def test_notes_are_short_stated_shortfalls() -> None:
@@ -925,3 +953,9 @@ def test_tap_section_cuts_the_outer_tap_through_the_rib_into_solid_plate() -> No
     face_exit = centre_z + math.sqrt(radius**2 - (lever_build.PLATE_T / 2.0) ** 2)
     assert far_z < face_exit < far_z + 0.5
     assert drawing.TAP_SECTION_SCALE == (4, 1)
+    # The break prints on the black thin layer, not as a grey sketch line.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("def _tap_section") :]
+    body = body[: body.index("\ndef ")]
+    assert body.index("_thin_visible_layer(adapter)") < body.index("CreateLine")
+    assert "segment.Layer = TAP_THREAD_LAYER" in body

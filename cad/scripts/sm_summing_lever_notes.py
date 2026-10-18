@@ -104,22 +104,30 @@ BRACKET_SCREW_NUMBER = "MHA-VN-050"  # vn-magnifying-bracket-screw
 # the plate's length.  The ridge-to-side pair and the flank-to-side angle
 # hold the knife edge for the trunnion's worst-case free rock in the knife
 # mount's bore (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``, code
-# review C09); the +X one says so, two lines under its value, right of its
-# extension lines.
+# review C09); each names that seat, as the vertex height does (machinist
+# review 20261018: the pair and the angle read as bare bands beside the
+# height's reason).  Detail D's room sets their length: the +X ridge band
+# two lines under its value, right of its extension lines; the -X one two
+# short lines, left of its span; the angle one short line, its arc under
+# the ridge pair's line.
 # Both stubs are one prism, so their side faces share two planes
 # (``build_sm_summing_lever._hex_knife``), which ties the -Z ridge to datum A
 # within ``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``.  No view can
 # show that: the pivot cylinder hides the planes between the stubs, so the
-# callout states it (owner: symmetry is critical).  Two lines of at most
-# RIDGE_CALLOUT_MAX_CHARS keep the block under the border and left of view G
-# (stack r4: six short lines on the -X one rose over the border).
+# pair's callouts state it (owner: symmetry is critical).  Lines of at most
+# RIDGE_CALLOUT_MAX_CHARS keep the +X block under the border and left of
+# view G (stack r4: six short lines on the -X one rose over the border).
 RIDGE_CALLOUT_MAX_CHARS = 30
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "EdgeRibFrontEndTopX": "ALL RIBS",
     "ReceiverY0": f"LOCATES {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
-    "RidgeFromRight": "KNIFE EDGE SYMMETRIC TO SIDES,\nBOTH STUBS; SIDES IN ONE PLANE",
+    "RidgeFromLeft": f"{KNIFE_MOUNT_NUMBER} SEAT;\nSYMMETRIC TO SIDES",
+    "RidgeFromRight": (
+        f"KNIFE-EDGE SEAT IN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS, SIDES IN ONE PLANE"
+    ),
+    "FlankToSide": f"{KNIFE_MOUNT_NUMBER} SEAT",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
@@ -140,9 +148,20 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     # is located from the plate's top face, the face the receiver row height
     # uses (machinist review r10: from the mid-plane the origin was in air).
     # No tap-wall words: the taps sit inboard of the step, under the slant,
-    # and r11 read them as walled by the step's 0.44 band.
+    # and r11 read them as walled by the step's 0.44 band.  The step is
+    # derived from the slant and the plate (no knob), so it prints as a
+    # reference (REFERENCE_DIMENSIONS; machinist review 20261018 read a
+    # bare 0.44 band as a tight step to hold).
     "EdgeRibFrontEndStep": "END RIBS ABOVE\nPLATE TOP FACE",
+    # The plan's 152.40 is the body's end-face span, not the part's overall:
+    # the stubs stand 2X 21.72 past it (machinist review 20261018 read it
+    # as the overall; drawing-guidelines: nothing reads like an overall that
+    # is not one).  Short lines: the block stands 14 mm from the border.
+    "PlateLength": "BODY\nEND FACES",
 }
+# Dimensions the sheet parenthesizes as reference (drawing-guidelines:
+# reference dimensions in parentheses are welcome): linear, no Ø glyph.
+REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"EdgeRibFrontEndStep"})
 
 # Leads the 2-56 receiver callout: what its two depth limits hold.  The full
 # thread prints as a minimum; the drill's band keeps the bottoming tap's two
