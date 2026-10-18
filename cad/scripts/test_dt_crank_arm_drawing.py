@@ -317,15 +317,31 @@ def test_arm_states_no_engagement_exception_for_the_4_40_pivot() -> None:
     # the tapped arm no longer states the #8-32's named exception.
     assert not hasattr(spec, "PIVOT_ENGAGEMENT_NOTE")
     assert "THREAD ENGAGEMENT" not in spec.DRAWING_NOTES
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert lines[1] == spec.STOCK_NOTE
+    assert spec.STOCK_NOTE in spec.DRAWING_NOTES.splitlines()
     # The tapped mouth's limit (MHA-DT-032 shoulder seat, local review of
     # fbf82ad96) rides the pivot's own callout, not a general note (#984 r1).
     import dt_crank_handle_pivot_screw_spec as screw
 
     assert "MOUTH" not in spec.DRAWING_NOTES
-    assert f"{screw.TAPPED_MOUTH_DIA_MAX:.1f} MAX" in notes.PIVOT_TAP_PROCESS
-    assert "MHA-DT-032" in notes.PIVOT_TAP_PROCESS
+    assert f"{screw.TAPPED_MOUTH_DIA_MAX:.1f} MAX" in notes.PIVOT_TAP_ROWS
+    assert "MHA-DT-032" in notes.PIVOT_TAP_ROWS
+
+
+def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
+    # #984 review r2/r3: the fiducial is flagged at the mark, not in a note.
+    assert "FIDUCIAL" not in spec.DRAWING_NOTES
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    cx = drawing._sheet_x(spec.FIDUCIAL_X)
+    cy = drawing.FRONT_CENTER[1] + spec.FIDUCIAL_Y * scale
+    x, y = drawing.FIDUCIAL_EDGE_PICK
+    r = spec.FIDUCIAL_MODEL_DIA / 2.0 * scale
+    assert (x - cx) ** 2 + (y - cy) ** 2 == pytest.approx(r**2)
+    # The note stands above the arm's top edge, left of the hub-seat leader.
+    assert drawing.FIDUCIAL_CALLOUT_XY[1] > drawing.ARM_SILHOUETTE[3]
+    assert drawing.FIDUCIAL_CALLOUT_XY[0] < cx
+
+
+def test_stock_line_comes_from_the_one_stock_constant() -> None:
     # The stock line comes from the one stock constant.
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
     assert spec.STOCK_NOTE == "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED."

@@ -7,7 +7,11 @@ Imported ONLY by ``draw_crank_arm`` and its offline test (codex #361; see
 from __future__ import annotations
 
 from dt_crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX
-from dt_crank_hub_geometry import AXIAL_PIN_DIA, AXIAL_PIN_LENGTH, SEAT_PRESS_INTERFERENCE
+from dt_crank_hub_geometry import (
+    AXIAL_PIN_DIA,
+    AXIAL_PIN_LENGTH,
+    SEAT_PRESS_INTERFERENCE,
+)
 
 # Short lines: the callout is centred under the diameter, so its widest line
 # sets how close to the left border the hub-end dimension can stand.  The
@@ -36,11 +40,15 @@ SEAM_CALLOUT = "\n".join(
         "LIGHT DRIVE FIT; PRESSING MHA-DT-031 OUT FREES THE PIN",
     )
 )
-# The handle-pivot tap's mouth limit rides its own callout, ahead of the
-# native size, on the face the front view shows: the MHA-DT-032 shoulder
-# seats round it (#984 machinist review r1: as a general note it named
-# neither of the two identical taps nor the face).
-PIVOT_TAP_PROCESS = (
-    "MHA-DT-032 HANDLE PIVOT:\n"
-    f"MOUTH <MOD-DIAM>{TAPPED_MOUTH_DIA_MAX:.1f} MAX, NEAR SIDE\n"
+# The handle-pivot tap's mouth limit rides its own callout, under the native
+# size, on the face the front view shows: the MHA-DT-032 shoulder seats
+# round it (#984 machinist review r1: as a general note it named neither of
+# the two identical taps nor the face).
+PIVOT_TAP_ROWS = (
+    "FOR MHA-DT-032 HANDLE PIVOT;\n"
+    f"MOUTH <MOD-DIAM>{TAPPED_MOUTH_DIA_MAX:.1f} MAX, NEAR SIDE"
 )
+# The punched fiducial is flagged at the mark, not in the general notes
+# (#984 machinist review r2/r3: an unlabelled crosshair could read as an
+# undimensioned hole).
+FIDUCIAL_CALLOUT = "PUNCH FIDUCIAL MARK;\nLOCATE BY EYE"
