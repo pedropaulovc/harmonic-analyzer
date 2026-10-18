@@ -7,11 +7,14 @@ modules -- ``draw_*.py``, ``*_assembly_sheet.py`` and the ``*_steps.py``
 assembly sequences -- that no builder may import, or a wording edit re-keys
 and rebuilds the assembly (and every gate behind it). Explode data the builder
 authors lives in a pure ``*_explode_spec.py`` beside the builder's placement
-spec.
+spec. A ``<stem>_assembly_*`` module only the drawing reaches must carry one
+of those drawing-only names, or neither guard would see it.
 
 The sheet and steps modules print numbers only by interpolating spec/model
 symbols: a decimal, an inch fraction or a Ø size typed into one of their
-string literals is a dimension restated by hand, and fails here.
+string literals is a dimension restated by hand, and fails here. Nor do they
+rebind a name their assembly's spec or explode spec defines, so a setting
+value has one source.
 """
 
 from __future__ import annotations
@@ -58,6 +61,66 @@ def drawing_only_deps(builder: Path) -> list[str]:
         Path(dep).name
         for dep in _buildgraph.module_deps_of(builder)
         if is_drawing_only(Path(dep).name)
+    )
+
+
+def assembly_drawing_stems() -> tuple[str, ...]:
+    """Assembly stems whose fitter package has a ``draw_*`` recipe."""
+    return tuple(
+        stem
+        for stem in _buildgraph.ASSEMBLY_ORDER
+        if (SCRIPTS / f"draw_{stem}_assembly.py").exists()
+    )
+
+
+def unguarded_drawing_modules(stem: str) -> list[str]:
+    """``<stem>_assembly_*`` modules only the drawing reaches, named so that
+    neither guard sees them (a ``*_assembly_notes.py``, say)."""
+    drawing = SCRIPTS / f"draw_{stem}_assembly.py"
+    built = {
+        Path(dep).name
+        for dep in _buildgraph.module_deps_of(_buildgraph.script_for(stem))
+    }
+    return sorted(
+        name
+        for name in (Path(dep).name for dep in _buildgraph.module_deps_of(drawing))
+        if name.startswith(f"{stem}_assembly_")
+        and name not in built
+        and not is_drawing_only(name)
+    )
+
+
+def bound_names(path: Path) -> set[str]:
+    """Public top-level names ``path`` binds by assignment, def or class."""
+    found = set()
+    for node in ast.parse(path.read_text(encoding="utf-8")).body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            found.add(node.name)
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            found.update(
+                name.id
+                for target in targets
+                for name in ast.walk(target)
+                if isinstance(name, ast.Name)
+            )
+    return {name for name in found if not name.startswith("_")}
+
+
+def spec_modules_of(module: Path) -> tuple[Path, ...]:
+    """The builder-reachable spec modules of a sheet/steps module's assembly."""
+    stem = (
+        module.stem.removesuffix("_assembly_sheet")
+        .removesuffix("_assembly_steps")
+        .removesuffix("_steps")
+    )
+    return tuple(
+        path
+        for path in (
+            SCRIPTS / f"{stem}_assembly_spec.py",
+            SCRIPTS / f"{stem}_explode_spec.py",
+        )
+        if path.exists()
     )
 
 
@@ -119,12 +182,30 @@ def test_sheet_modules_exist_to_scan() -> None:
         "pd_paper_drive_assembly_steps.py",
         "ch_channel_assembly_steps.py",
         "dt_drive_train_steps.py",
+        "mg_magnifier_assembly_sheet.py",
+        "mg_magnifier_assembly_steps.py",
+        "pn_pen_assembly_sheet.py",
+        "sm_summing_assembly_sheet.py",
+        "ch_channel_assembly_sheet.py",
+        "ha_harmonic_analyzer_assembly_sheet.py",
+        "ha_harmonic_analyzer_assembly_steps.py",
     } <= names
+
+
+@pytest.mark.parametrize("stem", assembly_drawing_stems())
+def test_assembly_drawing_modules_are_named_for_the_guards(stem: str) -> None:
+    assert unguarded_drawing_modules(stem) == []
 
 
 @pytest.mark.parametrize("module", sheet_modules(), ids=lambda path: path.stem)
 def test_sheet_text_interpolates_every_printed_number(module: Path) -> None:
     assert typed_dimensions(module.read_text(encoding="utf-8")) == []
+
+
+@pytest.mark.parametrize("module", sheet_modules(), ids=lambda path: path.stem)
+def test_sheet_rebinds_no_spec_name(module: Path) -> None:
+    spec_names = set().union(*(bound_names(spec) for spec in spec_modules_of(module)))
+    assert sorted(bound_names(module) & spec_names) == []
 
 
 def test_drawing_only_names() -> None:
