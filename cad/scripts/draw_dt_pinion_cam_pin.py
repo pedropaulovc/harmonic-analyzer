@@ -5,7 +5,8 @@ MHA-DT-014 strap's follower seat.  The sheet runs at 8:1 so the 20.8-long pin
 reads at arm's length.  The side view lies as the pin is turned (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and
 carries every dimension: the diameter, the length, the crown radius and a
 reference overall.  The end view projects to its left (third angle), and a
-4:1 isometric sits clear of the title block.
+4:1 isometric sits clear of the title block.  No face carries a roughness
+symbol and the sheet has no general notes (dt_pinion_cam_pin_spec).
 
 Run with SolidWorks open::
 
@@ -15,7 +16,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -42,27 +42,24 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension
-from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
-from _gtol_face_resolve import resolve_faces
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_pinion_cam_pin_spec import (
-    CAP_RADIUS,
+    CAP_RADIUS_CALLOUT,
     CAP_SAG,
+    DEPTH_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     PIN_DIA as PIN_DIA,
     PIN_DIA_CALLOUT,
     PIN_LEN,
-    SURFACE_FINISHES,
 )
 
 
@@ -104,10 +101,10 @@ def side_view_x(z_mm: float) -> float:
 
 
 # Both lengths sit ABOVE the side view (Depth inner, the reference overall
-# outer), so every extension line runs up and the crown's radius and
-# roughness leaders reach it from the lower left without crossing one.  The
-# diameter sits below, its dimension line right of centre so the
-# axis-centerline pick at the view's middle lands on bare face.
+# outer), so every extension line runs up and the crown's radius leader
+# reaches it from the lower left without crossing one.  The diameter sits
+# below, its dimension line right of centre so the axis-centerline pick at
+# the view's middle lands on bare face.
 RIGHT_KEEP = {
     "PinDia": (RIGHT_CENTER[0] + 0.040, RIGHT_CENTER[1] - HALF_DIA - 0.030),
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.031),
@@ -116,44 +113,11 @@ RIGHT_KEEP = {
     "CapR": (0.105, 0.110),
 }
 OVERALL_TEXT_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.059)
-# The crown's roughness leader leaves the symbol's shelf end and rises to the
-# crown, while its "Ra 1.6" text sits above the shelf to the right of that
-# end.  At (0.120, 0.140) the leader climbed 19 mm over 26 mm and ran through
-# the "1.6" (pc-r4-860 render; codex machinist review of 7b21b56c0).  Raised
-# 10 mm, it climbs 9 mm and passes under the text.
-CROWN_FINISH_SYMBOL_XY = (0.120, 0.150)
-CROWN_FINISH_FROM_ROOT_MM = 0.7
 DIMENSION_CALLOUTS = {
     "PinDia": PIN_DIA_CALLOUT,
-    "Depth": "SEATED FLAT END\nTO CROWN ROOT",
-    "CapR": "OUTER CROWN",
+    "Depth": DEPTH_CALLOUT,
+    "CapR": CAP_RADIUS_CALLOUT,
 }
-
-
-def _crown_point(axial_from_root_mm: float) -> tuple[float, float, float]:
-    """Model point on the crown's -Y silhouette (the side view's lower flank),
-    measured from the crown root."""
-    rise = CAP_RADIUS - CAP_SAG + axial_from_root_mm
-    radial = math.sqrt(CAP_RADIUS**2 - rise**2)
-    return (0.0, -radial / 1000.0, (PIN_LEN + axial_from_root_mm) / 1000.0)
-
-
-def _crown_face(view: Any) -> Any:
-    """The crown's one controlled spherical model face, for a FACE finish.
-
-    Resolved on the part ``view`` references (exactly one match for the
-    part-owned control, as the part build's own PMI pass resolved it), not
-    hit-tested as a transient silhouette: on the first cold v39 build (farm
-    run 20261002T180658288Z, workers @9 and @15) the silhouette picked at the
-    crown point re-solved after insertion to a silhouette whose face was not
-    the selected one (``same_entity=False``).  A model face keeps its identity
-    through the rebuild, and the leader-landing readback keeps the crown point.
-    """
-    document = _early_bound(
-        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
-    )
-    control = surface_finish_by_key(SURFACE_FINISHES, "crown")
-    return resolve_faces(document, {control.key: control.face})[control.key]
 
 
 def _overall_reference(adapter: Any, right: Any) -> None:
@@ -205,7 +169,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -213,7 +176,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -260,28 +222,6 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.004),
         label="pinion cam-pin shank axis centerline",
     )
-    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the crown rides the cam, so it carries the one roughness symbol.
-    # Its leader meets the crown's lower flank near the apex from the lower
-    # left, above the CapR leader (which lands further round the crown).
-    crown_finish_point = model_point_in_view(
-        adapter,
-        right,
-        _crown_point(CROWN_FINISH_FROM_ROOT_MM),
-        label="cam-pin crown finish point",
-    )
-    add_surface_finish(
-        adapter,
-        right,
-        entity=_crown_face(right),
-        leader_attach_xy=crown_finish_point,
-        symbol_xy=CROWN_FINISH_SYMBOL_XY,
-        control=surface_finish_by_key(SURFACE_FINISHES, "crown"),
-        label="cam-pin crown finish",
-        entity_type="FACE",
-        char_height=0.0025,  # the pivot-block size; the default read oversized at 8:1
-    )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.058)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
