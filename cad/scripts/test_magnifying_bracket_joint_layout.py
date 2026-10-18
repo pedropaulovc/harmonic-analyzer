@@ -150,7 +150,7 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
         ("THREAD_DEPTH = 4.95", "bottoms"),
         ("RIB_DEPTH = 7.3", "breaks out of the front rib"),
         ("RIB_DEPTH_BAND = LINEAR_BAND", "breaks out of the front rib"),
-        ("DRILL_DEPTH = 6.05", "bottoming-tap lead"),
+        ("DRILL_DEPTH_DEVIATIONS = (0.0, 0.10)", "bottoming-tap lead"),
         ("SIDE_PLATE_HEIGHT = 12.7", r"drawing-guidelines\.md rule 17 \(walls and webs\) wall"),
         ("COUNTERBORE_DIA = 3.8", "head float"),
     ),
@@ -163,7 +163,8 @@ def test_joint_guards_reject_lost_margins(replacement: str, failure: str) -> Non
         "THREAD_DEPTH": 4.85,
         "RIB_DEPTH": 7.2,
         "RIB_DEPTH_BAND": 0.60,
-        "DRILL_DEPTH": 6.00,
+        # A 0.15 undercut of the shallowest drill (0.143 of lead) loses it.
+        "DRILL_DEPTH_DEVIATIONS": (-0.15, 0.10),
         "SIDE_PLATE_HEIGHT": 8.0,
         "COUNTERBORE_DIA": 3.70,
     }[replacement.split(" = ")[0]]

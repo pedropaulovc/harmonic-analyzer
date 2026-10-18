@@ -2034,7 +2034,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ):
             raise RuntimeError(
                 f"bracket mounting callout tolerance for {variable_name} did not "
-                f"persist: wanted bilateral {upper:+g}/{lower:+g} mm at 2 places"
+                f"persist: wanted swTolBILAT (lower, upper) {DRILL_DEPTH_DEVIATIONS!r} "
+                "mm at 2 places"
             )
     if required_depths:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
