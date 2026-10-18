@@ -112,6 +112,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FrontCapProfile": {"HeadCapR", "HeadCapSagDim"},
     "BackCapProfile": {"BackCapR", "BackCapSagDim"},
     "CrossHoleProfile": {"CrossHoleDia"},
+    # Machinist review r1 of #1685 (clarity): the hole was located only by
+    # "CENTRED ON Ø15 CYLINDER LENGTH", so the shop had to work out the mid
+    # point.  This prints the mid point as a reference from the head rear
+    # face; the requirement stays the centring, so only HeadLen's .X band
+    # reaches the web (CROSS_HOLE_WEB_WORST), never a station band.
+    "CrossHoleStationReference": {"CrossHoleFromHeadRear"},
     # R1a: the collar's spring-pin hole, from the same head rear face.
     "PinHoleProfile": {"PinHoleDia"},
     "PinStationReference": {"PinStationFromHeadRear"},
@@ -139,6 +145,7 @@ REFERENCE_SKETCHES = (
     "BondZoneReference",
     "DrumStationReference",
     "PinStationReference",
+    "CrossHoleStationReference",
     "OverallReference",
 )
 
@@ -152,6 +159,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FrontCapProfile": {"HeadCapR": 1, "HeadCapSagDim": HEAD_CAP_SAG_PLACES},
     "BackCapProfile": {"BackCapR": 1, "BackCapSagDim": 1},
     "CrossHoleProfile": {"CrossHoleDia": 2},
+    "CrossHoleStationReference": {"CrossHoleFromHeadRear": 2},
     "PinHoleProfile": {"PinHoleDia": 2},
     "PinStationReference": {"PinStationFromHeadRear": 1},
     "BackRimReference": {"BackRimFromHeadRear": 1},
@@ -175,22 +183,56 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked integral-arbor dimension needs authored places")
 
+# The cross hole's mid-length station from the head rear face, printed as a
+# reference only (see DRAWING_DIMENSIONS).
+CROSS_HOLE_FROM_HEAD_REAR = HEAD_REAR_Z - HEAD_CENTER_Z
+if abs(CROSS_HOLE_FROM_HEAD_REAR - HEAD_LEN / 2.0) > 1e-9:
+    raise AssertionError("the crossrod hole must stay centred on the Ø15 cylinder")
+
+# Mating parts the callouts name (drawing-guidelines.md rule 4: every tight
+# band names its mate and fit).
+CROSSROD_NUMBER = "MHA-DT-015"
+STRAP_NUMBER = "MHA-DT-014"
+DRUM_NUMBER = "MHA-DT-001"
+
 # Machinist review of 7f7fc1717 (blocker): "HEAD LENGTH" did not say whether
 # it meant the straight Ø15 cylinder or the whole crowned head, which put the
 # hole in two places.  It names the cylinder the HeadLen dimension measures.
+# Machinist review r1 of #1685 (blocker): the +0.1/0.0 band named no mate, so
+# the callout names the bonded MHA-DT-015 crossrod.  The widest line is last:
+# the block's bottom line clears the SR10.9 text above-left of it.
 # <MOD-DIAM> carries its own leading gap, so no space before it.
 CROSS_HOLE_CALLOUT = (
-    "REAM THRU,\n"
+    "REAM THRU, BONDED FIT\n"
+    f"ON {CROSSROD_NUMBER} CROSSROD,\n"
     f"CENTRED ON<MOD-DIAM>{HEAD_DIA:.0f} CYLINDER LENGTH"
 )
+# Machinist review r1 of #1685 (clarity): each land's callout names the bore
+# it runs in, where the general note used to.
+JOURNAL_CALLOUT = f"JOURNAL,\nRUNS IN {STRAP_NUMBER}"
+# Machinist review r1 of #1685 (blocker): the -0.01/-0.10 band named no mate,
+# and the Ø8 spans either side of the lands carried no diameter (owner,
+# 2026-10-12).  One callout covers every Ø8 surface but the two lands and
+# names the drum bonded on it.
+BOND_ZONE_CALLOUT = (
+    f"ALL<MOD-DIAM>{SHAFT_DIA:.0f} EXCEPT JOURNALS;\n{DRUM_NUMBER} BOND ZONE"
+)
 # Notes never carry dimensions (Codex P1 on #814): the drum station is the
-# model's DrumStationFromHeadRear, printed on the profile as "DRUM STATION"
-# with its .X band, and the note only names it.
+# model's DrumStationFromHeadRear, printed on the profile with its .X band.
+# Machinist review r1 of #1685 (clarity): it ended on no feature of this part,
+# so its callout names what it locates -- the MHA-DT-001 drum's front end,
+# set when the drum is bonded on (drawing-guidelines.md rule 19).
+DRUM_STATION_CALLOUT = f"DRUM STATION:\n{DRUM_NUMBER} FRONT END,\nSET AT ASSEMBLY"
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): assembly requirements belong on the feature callout or the
 # assembly step, never in a part's general notes.  ASSEMBLY_STEP is the
 # pinion fit-up step text (pinion_rig_fitup) that owns this joint.
 # The drum joint's one step covers MHA-DT-001 too (dt_alignment_pinion_spec).
-DRAWING_NOTES = "JOURNALS RUN IN MHA-DT-014 REAMED BORES."
+# The journals' bore moved onto their callouts (JOURNAL_CALLOUT), so the one
+# note is the inside-corner ceiling at the Ø8/Ø10.5 and Ø10.5/Ø15 shoulders
+# (machinist review r1 of #1685; the dt-crankshaft precedent: the title
+# block's R0.25 edge break, until #1625 puts the default in the title block).
+INSIDE_CORNER_R_MAX = 0.25
+DRAWING_NOTES = f"INSIDE CORNERS R{INSIDE_CORNER_R_MAX:.2f} MAX."
 ASSEMBLY_STEP = (
     f"SLIDE MHA-DT-022 INTO MHA-DT-001 AND BOND WITH {RETAINING_COMPOUND}, DRUM FRONT "
     "END AT MHA-DT-022 DRUM STATION; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."

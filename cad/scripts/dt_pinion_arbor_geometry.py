@@ -284,8 +284,12 @@ if (
 # that circle sits in the neck face on the Front plane, so its witnesses ran
 # along the neck and out through the detail-A fence (run 492a7be5).  The
 # witness station lies inside the drum's bond zone, clear of both lands, so
-# the diameter reads as the bond zone's.
-BOND_ZONE_DIA_FROM_HEAD_REAR = 113.0
+# the diameter reads as the bond zone's.  Machinist review r1 of #1685: the
+# callout grew to name its scope and the drum, too tall for the gap above the
+# shaft under detail A, so the witness moved back to 188.0, 11 mm short of
+# the back land, where the callout hangs below the shaft in the open run
+# between the back land and the drum station's text.
+BOND_ZONE_DIA_FROM_HEAD_REAR = 188.0
 BOND_ZONE_DIA_Z = HEAD_REAR_Z + BOND_ZONE_DIA_FROM_HEAD_REAR
 BOND_ZONE_LAND_CLEARANCE = 10.0
 if not (

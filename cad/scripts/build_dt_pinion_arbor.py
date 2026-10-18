@@ -848,6 +848,17 @@ async def build(adapter) -> dict[str, str]:
         end_v=-PIN_Z,
         drive_expression='"PinStationFromHeadRear"',
     )
+    # Machinist review r1 of #1685: the cross hole's mid-length station from
+    # the same face, a reference the drawing prints in parentheses (the hole
+    # stays CENTRED on the Ø15 cylinder), driven by the head length.
+    drive_jobs += await _add_axial_reference(
+        adapter,
+        feature_name="CrossHoleStationReference",
+        dimension_name="CrossHoleFromHeadRear",
+        start_v=-HEAD_REAR_Z,
+        end_v=-HEAD_CENTER_Z,
+        drive_expression='"HeadLen" / 2',
+    )
     drive_jobs += await _add_axial_reference(
         adapter,
         feature_name="OverallReference",
