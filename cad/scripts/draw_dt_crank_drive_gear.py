@@ -45,12 +45,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leaders import (
     assert_leaders_clear,
     dimension_segments,
-    leader_segments,
     section_line_segments,
     set_near_side_diameter,
 )
@@ -59,11 +57,9 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
-from _gear_drawing_entities import visible_circle_edge
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_crank_drive_gear_notes import GEAR_DATA, SHAFT_MATE_NUMBER
 from dt_crank_drive_gear_spec import (
@@ -73,7 +69,6 @@ from dt_crank_drive_gear_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     OUTSIDE_DIA,
-    SURFACE_FINISHES,
 )
 from gear_seat_fit import FLAT_AF_CLEARANCE
 
@@ -102,11 +97,10 @@ GEAR_DATA_POS = (0.016, 0.262)
 # The property-linked block hangs down from GEAR_DATA_POS one 2.5 mm note line
 # per row: on farm run 20261001T110844152Z the 15 rows' cap tops ran 261.7 to
 # 212.8 mm (3.50 mm pitch) and the last row's descenders reached 208.9 mm.
+# The tooth-edge requirement is one of its rows, so the sheet has no other
+# note (machinist review r1 of #1641: a free-floating note).
 GEAR_DATA_LINE_PITCH = 0.0035
 GEAR_DATA_BOTTOM = GEAR_DATA_POS[1] - len(GEAR_DATA.splitlines()) * GEAR_DATA_LINE_PITCH
-# One short tooth-edge note below the gear data; the D-bore fit is carried by
-# the two native model dimensions and their feature callout.
-MANUFACTURING_NOTES_POS = (0.016, 0.042)
 
 # Half the printed tooth-tip circle, in sheet metres: the face view's silhouette
 # radius and the section's half-height, which every dimension is placed clear
@@ -117,26 +111,22 @@ HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 
 # End view: round diameter on the lower left, AF in the lane right of the
-# tooth tips and tip diameter above. Dimension text centres on its keep
+# tooth tips and tip diameter above it. Dimension text centres on its keep
 # point. The A-A cutting line crosses the face on the bore axis, below the
-# tip leader and above the bore and finish leaders; only AF's witness lines,
-# which start on the axis, meet it. The flat itself appears on local +X in
-# the face view.
+# tip leader and above the bore leader; only AF's witness lines, which start
+# on the axis, meet it. The flat itself appears on local +X in the face view.
 #
-# The tip text hangs under the complete gear-data block. Its left-offset lane
-# also pays the larger finite-supported tip circle when stock-form inspection
-# and assembly-requirement rows grow the block. Native layout remains the gate.
-TIP_DIA_TEXT_HALF_HEIGHT = 0.002
-TIP_DIA_TEXT_GAP = 0.004
+# The tip text sits up and right of the teeth, right of every gear-data row
+# that reaches its height and under the face-width block, so its callout can
+# name the mesh its band serves (machinist review r1 of #1641: the mate was
+# named only in GEAR DATA).
+TIP_DIA_CALLOUT = "FIXED-CENTRE MESH\nWITH MHA-DT-010"
 # The full mate Number makes the AF block 70.8 mm wide at the calibrated
 # dimension font. This lane leaves over 3 mm beyond the padded front-view
 # clearance guard and over 14 mm to the padded section, without moving its
 # model anchors or the chamfer below it.
 FRONT_KEEP = {
-    "OutsideDia": (
-        FRONT_CENTER[0] - 0.055,
-        GEAR_DATA_BOTTOM - TIP_DIA_TEXT_GAP - TIP_DIA_TEXT_HALF_HEIGHT,
-    ),
+    "OutsideDia": (FRONT_CENTER[0] + 0.055, FRONT_CENTER[1] + 0.067),
     "BoreDia": (FRONT_CENTER[0] - 0.078, FRONT_CENTER[1] - 0.062),
     "BoreAF": (FRONT_CENTER[0] + 0.099, FRONT_CENTER[1] + 0.028),
 }
@@ -155,12 +145,18 @@ FRONT_KEEP = {
 SECTION_LINE_OVERRUN = 0.005
 # The native caption's top centre, under the section and above the title block.
 SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.085)
-# Face width above the section; the chamfer's leg dimension runs left off the
-# south face into the lane under the AF callout, as RimChamferSize does.
+# Face width up and left of the section, its dimension line run out past the
+# south witness line so neither witness line strikes the text (machinist
+# review r1 of #1641); the chamfer's leg dimension runs left off the south
+# face into the lane under the AF callout, as RimChamferSize does.
 SECTION_KEEP = {
-    "FaceWidth": (SECTION_CENTER[0], SECTION_CENTER[1] + HALF_OD + 0.014),
-    "BoreSouthChamferSize": (SECTION_CENTER[0] - 0.045, SECTION_CENTER[1] - 0.005),
+    "FaceWidth": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1] + HALF_OD + 0.016),
+    "BoreSouthChamferSize": (SECTION_CENTER[0] - 0.028, SECTION_CENTER[1] - 0.005),
 }
+# The face width's +/-0.025 is the gear's term in the solid cone-gear stack
+# on the cone gear shaft (dt_cone_gear_stack); rule 4 asks that the stack be
+# named where the band prints.
+FACE_WIDTH_CALLOUT = "SETS CONE GEAR STACK\nON MHA-DT-004"
 
 # Native bands on both bore dimensions set the fitted clearance. The callout
 # adds extent and the mating part by name and number; it does not repeat
@@ -181,29 +177,24 @@ AF_CALLOUT = (
     f"ON {SHAFT_MATE_NAME} {SHAFT_MATE_NUMBER})"
 )
 DIMENSION_CALLOUTS = {
+    "OutsideDia": TIP_DIA_CALLOUT,
     "BoreDia": BORE_CALLOUT,
     "BoreAF": AF_CALLOUT,
-    # The leg and its +0.10/-0.00 band are native; the chamfer feature is
-    # 45° on the model, and this suffix identifies the south entry only.
-    "BoreSouthChamferSize": " X 45 DEG\nSOUTH BORE ENTRY",
+    "FaceWidth": FACE_WIDTH_CALLOUT,
+    # The leg is native and prints under the title block's .XX band; the
+    # chamfer feature is 45° on the model. The callout says the chamfer is on
+    # one end only and why (the leader shows which end); the short last line
+    # keeps the leg's own dimension line off the text.
+    "BoreSouthChamferSize": " X 45 DEG, THIS END\nCLEARS FLAT RUNOUT\nOF MHA-DT-004",
 }
 
-# The tip diameter lands on its near (top) rim, the round clearance on
-# the lower left, the AF callout on the upper right and the finish on the
-# lower right of the surviving circular bore wall.
+# The tip diameter lands on its near (upper right) rim and the round
+# clearance on the lower left of the surviving circular bore wall.
 BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
-FINISH_ATTACH = (
-    FRONT_CENTER[0] + BORE_SHEET_RADIUS * math.cos(math.pi / 4.0),
-    FRONT_CENTER[1] - BORE_SHEET_RADIUS * math.sin(math.pi / 4.0),
-)
-FINISH_SYMBOL = (FRONT_CENTER[0] + 0.045, FRONT_CENTER[1] - 0.062)
-# The finish symbol reads at the sheet's note height, like every other Ra
-# in the set; left at the document default it printed twice that.
-FINISH_CHAR_HEIGHT = 0.0025
 # Past the bore's own radius, only the leaders that land on it arrive.
 TIP_DIA_KEEP_OUT = 2.0 * BORE_SHEET_RADIUS
 # Where each leader must END, from the gear centre (sheet metres): the tip
-# diameter on the tip circle, the bore callout and finish on the bore rim.
+# diameter on the tip circle, the bore callout on the bore rim.
 # A reading outside its band means the segments are not sheet metres.
 TIP_DIA_LANDING = (0.8 * HALF_OD, 1.2 * HALF_OD)
 BORE_LANDING = (0.5 * BORE_SHEET_RADIUS, 1.5 * BORE_SHEET_RADIUS)
@@ -315,15 +306,9 @@ def _add_bore_arc_center_mark(adapter: Any, view: Any) -> None:
         raise RuntimeError("failed to mark the D-bore axis")
 
 
-def _bore_leaders_clear(
-    adapter: Any, front: Any, annotations: list[Any], finish: Any
-) -> None:
-    """Fail unless the finish reads at note height, no two bore leaders cross,
-    and none but the AF dimension touches the A-A cutting line."""
-    finish_annotation = finish.GetAnnotation()
-    height = float(finish_annotation.GetTextFormat(0).CharHeight)
-    if abs(height - FINISH_CHAR_HEIGHT) > 1e-6:
-        raise RuntimeError(f"bore finish text height {height} is not {FINISH_CHAR_HEIGHT}")
+def _bore_leaders_clear(adapter: Any, front: Any, annotations: list[Any]) -> None:
+    """Fail unless no two face-view leaders cross and none but the AF
+    dimension touches the A-A cutting line."""
     tip = _named(adapter, annotations, "OutsideDia")
     set_near_side_diameter(tip, "tip diameter")
     # Native, the bore diameter's line runs rim to rim through the centre,
@@ -334,13 +319,11 @@ def _bore_leaders_clear(
     rebuild_drawing(adapter, label="tip and bore diameter near-side leaders")
     tip_segments = dimension_segments(tip)
     bore_segments = dimension_segments(bore)
-    finish_segments = leader_segments(finish_annotation)
     assert_leaders_clear(
         {
             "OutsideDia": tip_segments,
             "BoreDia": bore_segments,
             "BoreAF": dimension_segments(_named(adapter, annotations, "BoreAF")),
-            "BoreFinish": finish_segments,
         },
         centre=FRONT_CENTER,
         keep_out={"OutsideDia": TIP_DIA_KEEP_OUT},
@@ -348,7 +331,6 @@ def _bore_leaders_clear(
             "OutsideDia": TIP_DIA_LANDING,
             "BoreDia": BORE_LANDING,
             "BoreAF": BORE_LANDING,
-            "BoreFinish": BORE_LANDING,
         },
         label="crank drive gear bore",
     )
@@ -358,7 +340,6 @@ def _bore_leaders_clear(
         {
             "OutsideDia": tip_segments,
             "BoreDia": bore_segments,
-            "BoreFinish": finish_segments,
             "SectionLine": section_line_segments(adapter, front),
         },
         centre=FRONT_CENTER,
@@ -366,7 +347,6 @@ def _bore_leaders_clear(
         lands_within={
             "OutsideDia": TIP_DIA_LANDING,
             "BoreDia": BORE_LANDING,
-            "BoreFinish": BORE_LANDING,
             "SectionLine": SECTION_LINE_LANDING,
         },
         label="crank drive gear leaders vs A-A",
@@ -388,7 +368,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
@@ -396,7 +375,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Gear Data",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -449,6 +427,8 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # The tip, bore and AF callouts read below their values; the face width's
+    # reads above, away from the section it measures.
     set_dimension_callouts(
         adapter, front_annotations,
         {name: DIMENSION_CALLOUTS[name] for name in FRONT_KEEP if name in DIMENSION_CALLOUTS},
@@ -457,31 +437,20 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, section_annotations,
         {"BoreSouthChamferSize": DIMENSION_CALLOUTS["BoreSouthChamferSize"]},
     )
+    set_dimension_callouts(
+        adapter, section_annotations,
+        {"FaceWidth": DIMENSION_CALLOUTS["FaceWidth"]},
+        location="above",
+    )
     assert_imported_precision(
         adapter, front_annotations + section_annotations, DRAWING_PRECISION_BY_NAME
     )
     _add_bore_arc_center_mark(adapter, front)
-    # The bore is the part's one fit surface, and a fit is a function of the
-    # peaks as well as the size, so the bore carries its own roughness; the
-    # THRU callout names no process to imply one. The roughness is the
-    # project's general machined grade, authored on the PART and read back
-    # here (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)'s running-surface case).
-    finish = add_surface_finish(
-        adapter,
-        front,
-        symbol_xy=FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "crank_drive_gear_bore"),
-        label="crank-drive gear bore finish",
-        entity=visible_circle_edge(adapter, front, BORE_DIA),
-        leader_attach_xy=FINISH_ATTACH,
-        char_height=FINISH_CHAR_HEIGHT,
-    )
-    _bore_leaders_clear(adapter, front, front_annotations, finish)
+    # No roughness symbol: the D-bore is a gear seat, not a running surface
+    # (drawing-guidelines.md rule 6; dt_crank_drive_gear_spec.SURFACE_FINISHES).
+    _bore_leaders_clear(adapter, front, front_annotations)
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_POS, char_height=0.0025
-    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,

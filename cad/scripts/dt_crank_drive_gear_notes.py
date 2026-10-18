@@ -44,10 +44,10 @@ GEAR_DATA = gear_data_note(
         ("DIAMETRAL PITCH, TRANSVERSE (REF)", f"{spec.DIAMETRAL_PITCH:.2f}"),
         ("PRESSURE ANGLE, TRANSVERSE (REF)", f"{spec.PRESSURE_ANGLE_DEG:.2f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{spec.PITCH_DIA:.2f}"),
-        (
-            "ACTUAL ROOT DIA MIN-MAX / MAX CUT DEPTH (mm, REF)",
-            f"{spec.ROOT_DIA_MIN:.3f}-{spec.ROOT_DIA_MAX:.3f} / {spec.WHOLE_DEPTH:.3f}",
-        ),
+        # One rounded REF root: the envelope's 0.0014 mm spread is not a
+        # range a turner can read (machinist review r1 of #1641), and the
+        # plunge row below carries the cut depth.
+        ("ROOT DIAMETER (mm, REF)", f"{spec.ROOT_DIA_MIN:.2f}"),
         (
             "HELIX AT PITCH DIA",
             f"{spec.HELIX_ANGLE_DEG:.{spec.GEAR_DATA_HELIX_PLACES}f} "
@@ -76,7 +76,11 @@ GEAR_DATA = gear_data_note(
             f"{spec.TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE",
         ),
         ("TOOTH FORM", "HELICAL INVOLUTE, FULL DEPTH, AS CUT BY THE FORM CUTTER"),
-        ("MATES WITH", "CRANK PINION MHA-DT-010, 16T STOCK #7/14T STRAIGHT SPUR"),
+        # The title block's general edge break would erase too much of these
+        # fine teeth; the requirement is a tooth fact, so it reads with them
+        # (machinist review r1 of #1641: a free-floating note).
+        ("TOOTH EDGES", "DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS"),
+        ("MATES WITH", "CRANK PINION MHA-DT-010, 16T SPUR"),
     ]
 )
 
@@ -88,8 +92,3 @@ GEAR_DATA = gear_data_note(
 # a rebuild dependency of this gear. ``test_crank_drive_gear_drawing`` checks
 # it against the registry offline, where a cross-check costs nothing.
 SHAFT_MATE_NUMBER = "MHA-DT-004"
-
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s only note: the standard title-block edge break would erase too
-# much of these fine teeth. The D-bore, its AF band and its shaft mate are
-# defined by the model dimensions and fit callout, not by another note.
-DRAWING_NOTES = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."

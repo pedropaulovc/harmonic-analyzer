@@ -25,6 +25,7 @@ import dt_crank_drive_gear_spec as spec
 import dt_crank_pinion_spec as pinion_spec
 import draw_dt_crank_drive_gear as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+from _printed_tolerance import printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -170,9 +171,12 @@ def test_south_chamfer_covers_print_worst_end_mill_crescent() -> None:
     samples = [horn_plus_runout(half_chord * i / 128) for i in range(129)]
     assert samples == sorted(samples)
     assert spec.MAX_FLAT_CRESCENT == pytest.approx(samples[-1])
-    assert spec.BORE_SOUTH_CHAMFER == 1.00
-    assert spec.BORE_SOUTH_CHAMFER_BAND == (0.10, 0.00)
+    # The leg prints at .XX under the title block's band alone, and that band's
+    # minimum still clears the crescent; the part authors no band of its own.
+    assert spec.BORE_SOUTH_CHAMFER_BAND == (printed_band_mm(2), -printed_band_mm(2))
+    assert spec.DRAWING_PRECISION["BoreSouthChamfer"]["BoreSouthChamferSize"] == 2
     assert spec.MAX_FLAT_CRESCENT < spec.BORE_SOUTH_CHAMFER + spec.BORE_SOUTH_CHAMFER_BAND[1]
+    assert "BORE_SOUTH_CHAMFER_BAND" not in _build_source()
 
 
 def test_chamfer_leaves_a_collar_bearing_annulus_and_flat_engagement() -> None:
@@ -248,27 +252,24 @@ def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
     assert pinion_spec.FACE_WIDTH > spec.FACE_WIDTH
 
 
-def test_print_carries_no_gdt_or_basic_dimensions() -> None:
-    # drawing-guidelines.md rule 5 (avoid excessive GD&T): a gear on a shaft land is not on the GD&T allowlist, so the
-    # end-face perpendicularity frame, the tooth-tip runout frame and the bore
-    # datum are gone. The ONE roughness it keeps is drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)'s exception -- the
-    # bore is a size-toleranced fit, and a fit depends on the peaks as well as
-    # on the size.
+def test_print_carries_no_gdt_basic_dimensions_or_roughness() -> None:
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T): a gear on a shaft
+    # land is not on the GD&T allowlist, so the end-face perpendicularity
+    # frame, the tooth-tip runout frame and the bore datum are gone. Rule 6
+    # puts no roughness on a gear's D-bore or seat bore: it does not run.
     source = _source()
     for helper in (
         "add_datum_feature(",
         "add_feature_control_frame(",
         "set_basic_dimension(",
         "project_part_pmi(",
+        "add_surface_finish(",
     ):
         assert helper not in source, helper
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
     assert not hasattr(spec, "PART_DATUMS")
-    assert [control.key for control in spec.SURFACE_FINISHES] == [
-        "crank_drive_gear_bore"
-    ]
-    assert spec.SURFACE_FINISHES[0].face.diameter_mm == spec.BORE_DIA
+    assert spec.SURFACE_FINISHES == ()
     assert "surface_finishes=SURFACE_FINISHES" in _build_source()
 
 
@@ -282,13 +283,14 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "DIAMETRAL PITCH, TRANSVERSE (REF)",
         "PRESSURE ANGLE, TRANSVERSE (REF)",
         "PITCH DIAMETER (mm, REF)",
-        "ACTUAL ROOT DIA MIN-MAX / MAX CUT DEPTH (mm, REF)",
+        "ROOT DIAMETER (mm, REF)",
         "FORM CUTTER / REFERENCE TEETH / VIRTUAL TEETH (REF)",
         "HELIX AT PITCH DIA",
         "LEAD (mm/rev, REF)",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL (mm), ACCEPT ON THIS PART",
         "TRANSVERSE BACKLASH WITH MHA-DT-010, ACCEPT AT ASSEMBLY (mm)",
         "TOOTH FORM",
+        "TOOTH EDGES",
         "MATES WITH",
     ):
         assert field in data, field
@@ -329,7 +331,8 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         assert " +" not in value and " TO " not in value, line
     source = _source()
     assert 'adapter, "Gear Data"' in source
-    assert 'adapter, "Manufacturing Notes"' in source
+    assert "Manufacturing Notes" not in source
+    assert "Manufacturing Notes" not in _build_source()
 
 
 @pytest.mark.parametrize("part_spec", (spec, pinion_spec))
@@ -478,7 +481,13 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
 
 
 def test_notes_do_not_substitute_for_native_fit_dimensions() -> None:
-    assert notes.DRAWING_NOTES == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
+    # The one shop requirement the title block's edge break would violate is
+    # a gear-data row, not a free-floating note.
+    assert not hasattr(notes, "DRAWING_NOTES")
+    assert any(
+        line.startswith("TOOTH EDGES:") and "DO NOT BREAK" in line
+        for line in notes.GEAR_DATA.splitlines()
+    )
     assert notes.SHAFT_MATE_NUMBER == _config.parts("dt-cone-gear-shaft")["number"]
     assert drawing.SHAFT_MATE_NAME == _config.parts("dt-cone-gear-shaft")["title"].upper()
     assert not hasattr(notes, "ATTACHMENT_PROCESS")
@@ -556,7 +565,6 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         *drawing.FRONT_KEEP.values(),
         *drawing.SECTION_KEEP.values(),
         drawing.GEAR_DATA_POS,
-        drawing.MANUFACTURING_NOTES_POS,
     )
     for x, y in positions:
         assert 0.012 < x < 0.420
@@ -569,13 +577,16 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     # The gear-data column stays left of every dimension the face view places.
     assert drawing.GEAR_DATA_POS[0] < min(x for x, _ in drawing.FRONT_KEEP.values())
     # The AF callout and the chamfer stand in the lane between the tooth tips
-    # and the section's south face, the chamfer under the AF block.
+    # and the section's south face, the chamfer under the AF block. The leg's
+    # text sits left of its dimension line, which stands at the keep x (r1 of
+    # #1641 read the text's right edge back at the keep).
     af = _text_box(drawing.FRONT_KEEP["BoreAF"], drawing.AF_CALLOUT, "8.763 +0.020")
-    chamfer = _text_box(
-        drawing.SECTION_KEEP["BoreSouthChamferSize"],
-        drawing.DIMENSION_CALLOUTS["BoreSouthChamferSize"],
-        "1.00 +0.10",
+    chamfer_keep = drawing.SECTION_KEEP["BoreSouthChamferSize"]
+    centred = _text_box(
+        chamfer_keep, drawing.DIMENSION_CALLOUTS["BoreSouthChamferSize"], "1.50"
     )
+    shift = chamfer_keep[0] - centred[2]
+    chamfer = (centred[0] + shift, centred[1], centred[2] + shift, centred[3])
     section_left = sx - face_half - _VIEW_OUTLINE_PAD
     for box in (af, chamfer):
         assert _box_distance(box, drawing.FRONT_CENTER) > half_od + _VIEW_OUTLINE_PAD + 0.003
@@ -617,21 +628,31 @@ def _tip_dia_text_box(centre: tuple[float, float]) -> tuple[float, ...]:
     return (x - half_w, y - half_h, x + half_w, y + half_h)
 
 
-def test_tip_diameter_text_hangs_under_every_gear_data_row_and_over_the_teeth() -> None:
-    # The tip text must retain both the under-note gap and air off the real
-    # blank silhouette.
+def test_tip_diameter_block_stands_clear_of_the_gear_data_teeth_and_section() -> None:
+    # The tip value with its mesh callout under it hangs up and right of the
+    # teeth: right of every gear-data row at its height, over the tooth tips
+    # with room for the leader's shoulder, and left of the face-width block.
     block = _gear_data_box()
-    assert notes.GEAR_DATA.splitlines()[-1].startswith("MATES WITH")
-    tip = _tip_dia_text_box(drawing.FRONT_KEEP["OutsideDia"])
-    # The text sits under the block's columns, so its clearance is vertical.
-    assert block[0] < tip[0] < block[2]
-    assert block[1] - tip[3] >= 0.003
-    # ... and over the tooth-tip circle, with room for the leader's shoulder.
+    tip_keep = drawing.FRONT_KEEP["OutsideDia"]
+    tip = _text_box(tip_keep, drawing.TIP_DIA_CALLOUT, _TIP_DIA_TEXT)
+    rows = notes.GEAR_DATA.splitlines()
+    left, top = drawing.GEAR_DATA_POS
+    for index, row in enumerate(rows):
+        row_top = top - index * _NOTE_LINE_PITCH
+        row_bottom = row_top - _NOTE_LINE_PITCH - _NOTE_DESCENDER
+        if row_bottom < tip[3] and row_top > tip[1]:
+            assert left + _NOTE_CHAR_WIDTH * len(row) < tip[0] - 0.005, row
+    assert block[3] > tip[3]
     assert _box_distance(tip, drawing.FRONT_CENTER) > drawing.HALF_OD + 0.005
-    # A fixed placement above the tips can still print through the longer block.
-    cx, cy = drawing.FRONT_CENTER
-    old = _tip_dia_text_box((cx - 0.035, cy + drawing.HALF_OD + 0.016))
-    assert old[3] > block[1]
+    face = _text_box(
+        drawing.SECTION_KEEP["FaceWidth"], drawing.FACE_WIDTH_CALLOUT, "7.2244 ±0.025"
+    )
+    assert tip[2] < face[0] - 0.005
+    # The face-width block stands above the section and left of its south
+    # witness line, so neither witness line runs through its text.
+    sx, sy = drawing.SECTION_CENTER
+    assert face[1] > sy + drawing.HALF_OD
+    assert face[2] < sx - drawing.FACE_WIDTH_HALF
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -667,51 +688,46 @@ def test_outside_dia_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "OutsideDiaReference" in spec.DRAWING_DIMENSIONS
 
 
-def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -> None:
-    # The round diameter, AF and finish all need room around the D-bore;
-    # the tip-diameter arrow belongs on the near tooth silhouette, and only
-    # the AF dimension (it spans the axis) may meet the A-A cutting line.
+def test_face_view_leaders_have_separate_landings() -> None:
+    # The round diameter and AF need room around the D-bore; the
+    # tip-diameter arrow belongs on the near tooth silhouette, and only the
+    # AF dimension (it spans the axis) may meet the A-A cutting line.
     import _drawing_leaders as leaders
-
-    assert drawing.FINISH_CHAR_HEIGHT == 0.0025  # the Gear Data / notes height
 
     cx, cy = drawing.FRONT_CENTER
     r = drawing.BORE_SHEET_RADIUS
     assert r == pytest.approx(spec.BORE_DIA * 1.5 / 2000.0)
-    ax, ay = drawing.FINISH_ATTACH
-    assert math.hypot(ax - cx, ay - cy) == pytest.approx(r)
-    assert ax > cx and ay < cy  # lower right, opposite the bore callout
     tip_text = drawing.FRONT_KEEP["OutsideDia"]
     bore_text = drawing.FRONT_KEEP["BoreDia"]
     af_text = drawing.FRONT_KEEP["BoreAF"]
     assert bore_text[0] < cx and bore_text[1] < cy
     assert af_text[0] > cx and af_text[1] > cy
+    assert tip_text[0] > cx and tip_text[1] > cy + drawing.HALF_OD
     angle = math.atan2(bore_text[1] - cy, bore_text[0] - cx)
     bore = [(bore_text, (cx + r * math.cos(angle), cy + r * math.sin(angle)))]
     flat_x = (spec.BORE_AF - spec.BORE_DIA / 2) * drawing.VIEW_SCALE[0] / (
         1000 * drawing.VIEW_SCALE[1]
     )
     af = [(af_text, (cx + flat_x, cy))]
-    # The broken leader leaves the current native text's near end aimed
-    # at the centre; the four-digit tip value keeps the same text envelope.
-    near_end = (tip_text[0] + 0.014, tip_text[1])
+    # The broken leader leaves the shelf under the callout's last line at
+    # its end nearer the gear, aimed at the centre.
+    tip_box = _text_box(tip_text, drawing.TIP_DIA_CALLOUT, _TIP_DIA_TEXT)
+    near_end = (tip_box[0], tip_box[1])
     aim = math.atan2(near_end[1] - cy, near_end[0] - cx)
     rim = (math.cos(aim) * drawing.HALF_OD, math.sin(aim) * drawing.HALF_OD)
     old_tip = [(near_end, (cx - rim[0], cy - rim[1]))]
     new_tip = [(near_end, (cx + rim[0], cy + rim[1]))]
-    finish = [(drawing.FINISH_SYMBOL, drawing.FINISH_ATTACH)]
     reach = drawing.HALF_OD + drawing.SECTION_LINE_OVERRUN
     cutting_line = [((cx - reach, cy), (cx + reach, cy))]
     assert leaders.distance_to_point(old_tip[0], (cx, cy)) < drawing.TIP_DIA_KEEP_OUT
     leaders.assert_leaders_clear(
-        {"OutsideDia": new_tip, "BoreDia": bore, "BoreAF": af, "BoreFinish": finish},
+        {"OutsideDia": new_tip, "BoreDia": bore, "BoreAF": af},
         centre=(cx, cy),
         keep_out={"OutsideDia": drawing.TIP_DIA_KEEP_OUT},
         lands_within={
             "OutsideDia": drawing.TIP_DIA_LANDING,
             "BoreDia": drawing.BORE_LANDING,
             "BoreAF": drawing.BORE_LANDING,
-            "BoreFinish": drawing.BORE_LANDING,
         },
         label="gear bore layout",
     )
@@ -719,7 +735,6 @@ def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -
         {
             "OutsideDia": new_tip,
             "BoreDia": bore,
-            "BoreFinish": finish,
             "SectionLine": cutting_line,
         },
         centre=(cx, cy),
@@ -727,16 +742,14 @@ def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -
         lands_within={
             "OutsideDia": drawing.TIP_DIA_LANDING,
             "BoreDia": drawing.BORE_LANDING,
-            "BoreFinish": drawing.BORE_LANDING,
             "SectionLine": drawing.SECTION_LINE_LANDING,
         },
         label="gear leaders vs A-A",
     )
     # The cut runs along the bore axis through the flat: the tip leader stays
-    # above it, the bore and finish leaders below it.
+    # above it, the bore leader below it.
     assert min(new_tip[0][0][1], new_tip[0][1][1]) > cy + 0.005
-    for name, segments in (("BoreDia", bore), ("BoreFinish", finish)):
-        assert max(segments[0][0][1], segments[0][1][1]) < cy, name
+    assert max(bore[0][0][1], bore[0][1][1]) < cy
 
 
 def test_both_shop_gears_state_the_source_owned_tooth_cutting_setup_not_a_form_class() -> None:
