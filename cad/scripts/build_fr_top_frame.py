@@ -47,9 +47,10 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   from each #10 hole's axis there (sheet 6
   dimensions them in the underside view). Each axis is therefore true at
   the knife-mount seat and its drift grows toward the top. The finished
-  top-to-underside grip is 36.50 +/-0.05: HangerGrip, the crossbar's own
-  full-height extrude depth, is driven by the RingHeight global and carries
-  the band the sheet imports.
+  top-to-underside grip is 36.50 at the title block's .XX band: HangerGrip,
+  the crossbar's own full-height extrude depth, is driven by the RingHeight
+  global and carries no band of its own (owner ruling 2026-10-18: each
+  MHA-VN-024 is cut to the measured grip at MHA-SM-000).
   Datum D on the native crossbar width establishes BOTH-face median plane;
   the hanger axes' linear position zone centres them within +/-0.05 of it.
 * Gooseneck hub on the east rail (-X) at z +3.088: full-height rib 28 wide,
@@ -808,10 +809,12 @@ for _label, _value in (
 # Crossbar pockets (drawing-guidelines.md rule 17 (walls and webs), print-worst): every hanger hole stays in the
 # full-depth junction beyond the pocket end. The nearer (front) station
 # keeps its wall in z with the station at its .X band from the socket axis,
-# each pocket end a full band of its printed .X length out (the length's
-# band, then as much again for the pocket's centring), the largest printed
-# hole and the 0.3 deg drill drift from the faced underside. The through
-# hole's longest path to the highest pocket roof is charged.
+# each pocket end two .X bands out: the sheet locates the front end from
+# the front socket axis and chains the .X length to the rear end, so the
+# rear end carries both bands (the front end, nearer its station, only
+# one).  Then the largest printed hole and the 0.3 deg drill drift from the
+# faced underside: the through hole's longest path to the highest pocket
+# roof is charged.
 _POCKET_STATION = min(abs(STUD_Z_FRONT), abs(STUD_Z_REAR)) - PRINTED_LINEAR_BAND_MM[1]
 _POCKET_LENGTH_PLACES = DRAWING_REFERENCE_PRECISION["crossbar pocket length"]
 _POCKET_END = (
@@ -2355,28 +2358,16 @@ def _qualify_machined_faces(adapter) -> None:
     ``resolve_faces`` already proves each spec names exactly ONE face; the
     area proves it named the RIGHT one, so a station typo ships a build failure
     instead of a roughness symbol on the wrong surface (build_fr_harmonic_base's
-    _paint_machined_faces_black precedent). Expectations are the full analytic
-    wall/annulus areas; the 5% band absorbs the cross-screw and set-screw tap
+    _paint_machined_faces_black precedent). Each socket wall's expectation is
+    the full analytic cylinder; the 5% band absorbs the cross-screw tap
     windows that break into the bores (~1% each) and the C1 bore-top breaks.
     """
     faces = resolve_faces(
         adapter.currentModel,
         {control.key: control.face for control in SURFACE_FINISHES},
     )
-    socket_wall = math.pi * BORE_DIA * (CAP_RECESS_FLOOR_Y + HALF_H + BOSS_BELOW)
-    hub_wall = (
-        math.pi * GOOSENECK_BORE_DIA * (HUB_BOSS_DROP + 2.0 * HALF_H - BORE_CHAMFER)
-    )
-    spot_face = (
-        math.pi / 4.0 * (HUB_SET_SPOT_DIA**2 - TAP_DRILL_MM[SET_SCREW_THREAD] ** 2)
-    )
+    expected = math.pi * BORE_DIA * (CAP_RECESS_FLOOR_Y + HALF_H + BOSS_BELOW)
     for key, face in faces.items():
-        if key == "hub_bore":
-            expected = hub_wall
-        elif key == "hub_set_spot_face":
-            expected = spot_face
-        else:
-            expected = socket_wall
         area = float(face.GetArea()) * 1e6
         if abs(area - expected) > 0.05 * expected:
             raise RuntimeError(
@@ -3539,8 +3530,6 @@ async def build(adapter) -> dict[str, str]:
         set_dimension_symmetric_tolerance(
             adapter, "HangerSlotProfile", slot_width_name, slot_upper
         )
-    # The finished grip's band lives on the model's own driving dimension.
-    set_dimension_symmetric_tolerance(adapter, "Crossbar", "HangerGrip", HANGER_GRIP_TOL)
     volume = await volume_check(
         adapter, "driven casting (equations neutral)", volume, 200.0
     )

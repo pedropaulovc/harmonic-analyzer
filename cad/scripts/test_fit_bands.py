@@ -308,10 +308,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the title-block DRILLED HOLES +0.10/0 tap-pilot diameter: indexed into "
         "accepted limits, without a redundant explicit callout band"
     ),
-    ("vn_knife_hanger_stud_spec", "LENGTH_BAND"): (
-        "the finished cut-to-length hex bolt's inspection band: indexed into "
-        "LENGTH_MIN/LENGTH_MAX and its native CutLength control"
-    ),
     ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"): (
         "indexed by _printed_limits.limits for the stud-drill inspection limits"
     ),

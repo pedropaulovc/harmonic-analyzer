@@ -11,9 +11,11 @@ boss-hook / counter-spring / gooseneck chain.
 * knife-mount x2 -- the bearing supports, one per hex trunnion, centred on
   ``SUMMING_Z`` and separated by ``+/-HEX_Z_MID``; each top seat is clamped
   to the crossbar underside (``MOUNT_GAP`` 0).
-* knife-hanger-stud x2 -- McMaster 92314A253 #10-24 plain hex bolts,
-  cut from 2 in stock to 46.70 +/-0.15 mm under the head; each passes the
-  crossbar's #10 loose clearance hole and threads into the knife-mount tap.
+* knife-hanger-stud x2 -- McMaster 92314A253 #10-24 plain hex bolts from
+  2 in stock, each cut at this assembly to the stack measured at its hole
+  plus the 8.92 +/-0.15 mm fit-up reach (46.70 nominal under the head);
+  each passes the crossbar's #10 loose clearance hole and threads into the
+  knife-mount tap.
 * knife-hanger-washer x2 -- new McMaster 96659A104 18-8 SAE washers,
   one beneath each hex head, seated on the crossbar's faced top.
 * knife-mount-dowel x4 -- McMaster 98381A473 1/8 x 3/4 dowels, two per
@@ -136,28 +138,38 @@ CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + top_frame.RING_HEIGHT  # 1036.2, faced
 HANGER_WASHER_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1036.2, local Y=0
 HANGER_UNDERHEAD_Y = HANGER_WASHER_Y + hanger_washer.THICKNESS  # 1037.4827
 HANGER_STUD_Y = HANGER_UNDERHEAD_Y - hanger_screw.LENGTH  # 990.7827 (cut tip)
-HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y  # 8.9173
-# Worst-case stack (drawing-guidelines.md rules 18–19): cut length +/-0.15,
-# finished-underface grip +/-0.05, and catalogue washer thickness limits
-# all enter independently; 8.349..9.4856.
-HANGER_REACH_MIN = (
-    hanger_screw.LENGTH_MIN
-    - (top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL)
-    - hanger_washer.THICKNESS_MAX
+HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y  # 8.9173, the modelled nominal
+# Worst-case stack (drawing-guidelines.md rules 18–19): MHA-SM-000 step 4
+# cuts each bolt to the crossbar-underside-to-washer-top height measured at
+# its own hole plus the fit-up reach, so the printed grip band and the
+# washer's catalogue thickness spread are measured out and only the cut's
+# own band reaches the tap: 8.77..9.07.
+HANGER_REACH_MIN = spec.HANGER_FIT_REACH - spec.HANGER_FIT_REACH_TOL
+HANGER_REACH_MAX = spec.HANGER_FIT_REACH + spec.HANGER_FIT_REACH_TOL
+# The cut must come out of the 2 in stock and remove its factory end: the
+# longest cut is the thickest printed grip plus the thickest washer plus
+# the longest reach, 37.01 + 1.651 + 9.07 = 47.731; the shortest is
+# 35.99 + 0.9144 + 8.77 = 45.6744.
+HANGER_CUT_LENGTH_MIN = (
+    top_frame.HANGER_GRIP
+    - top_frame.HANGER_GRIP_TOL
+    + hanger_washer.THICKNESS_MIN
+    + HANGER_REACH_MIN
 )
-HANGER_REACH_MAX = (
-    hanger_screw.LENGTH_MAX
-    - (top_frame.HANGER_GRIP - top_frame.HANGER_GRIP_TOL)
-    - hanger_washer.THICKNESS_MIN
+HANGER_CUT_LENGTH_MAX = (
+    top_frame.HANGER_GRIP
+    + top_frame.HANGER_GRIP_TOL
+    + hanger_washer.THICKNESS_MAX
+    + HANGER_REACH_MAX
 )
 # Charge the cut end's maximum incomplete lead, one pitch:
-# 7.2906667 >= 1.5D = 7.239.
+# 7.7116667 >= 1.5D = 7.239.
 HANGER_ENGAGEMENT_MIN = HANGER_REACH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
 HANGER_ENGAGEMENT_FLOOR = hanger_screw.ENGAGEMENT_MIN_D * hanger_screw.SHANK_DIA
-# Longest reach under the shallowest full tap: 9.52 - 9.4856 = 0.0344 air.
+# Longest reach under the shallowest full tap: 9.52 - 9.07 = 0.45 air.
 HANGER_TIP_CLEARANCE = knife_mount.STUD_TAP_THREAD_DEPTH_MIN - HANGER_REACH_MAX
 # Modified-part inspection acceptance, not a vendor thread-to-head claim:
-# the useful full-form tail (10.62 less one incomplete pitch) spans 9.4856.
+# the useful full-form tail (10.62 less one incomplete pitch) spans 9.07.
 HANGER_THREAD_SPARE = (
     hanger_screw.THREAD_LENGTH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
 ) - HANGER_REACH_MAX
@@ -199,9 +211,9 @@ HANGER_SCREW_MISMATCH_Z = (
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
 # The hole is drilled from the finished underside. Prove drift over the FULL
 # crossbar body to the hole's top end at the faced top, at the longest
-# finished grip: tan(0.3 deg) * (36.50 + 0.05) = 0.19137710. The #10 loose
+# printed grip: tan(0.3 deg) * (36.50 + 0.51) = 0.19378568. The #10 loose
 # hole's 0.6095 radial float covers this plus the station mismatch, with
-# 0.00635242 spare.
+# 0.00394385 spare.
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
     top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
 )
@@ -300,6 +312,17 @@ def _assert_knife_hanger_stack() -> None:
         raise RuntimeError(
             f"knife-hanger bolt under-head face {under_head_y:.4f} is not on "
             f"the washer upper face {washer_top_y:.4f}"
+        )
+    if not HANGER_REACH_MIN <= HANGER_REACH <= HANGER_REACH_MAX:
+        raise RuntimeError(
+            f"modelled knife-hanger reach {HANGER_REACH:.4f} is outside the "
+            f"fit-up cut {HANGER_REACH_MIN:.2f}..{HANGER_REACH_MAX:.2f}"
+        )
+    if hanger_screw.CATALOG_LENGTH - HANGER_CUT_LENGTH_MAX <= hanger_screw.PITCH:
+        raise RuntimeError(
+            f"longest knife-hanger cut {HANGER_CUT_LENGTH_MAX:.4f} mm leaves "
+            f"{hanger_screw.CATALOG_LENGTH:.2f} mm stock without removing its "
+            f"factory end ({hanger_screw.PITCH:.4f} mm)"
         )
     if HANGER_ENGAGEMENT_MIN < HANGER_ENGAGEMENT_FLOOR:
         raise RuntimeError(

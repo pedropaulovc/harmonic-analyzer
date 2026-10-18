@@ -6,7 +6,7 @@ Catalogue checked 2026-10-13: https://www.mcmaster.com/92314A253/.
 specification standard and head/length tolerances. Published UNC-2A thread
 major limits are separate from those unspecified supplier tolerances.
 
-The finished cut band and thread-tail MIN below are MODIFIED-PART acceptance,
+The chamfer band and thread-tail MIN below are MODIFIED-PART acceptance,
 not supplier tolerances. Retain a continuous usable tail through at least
 10.62 mm from the finished tip, with at most one pitch of incomplete thread
 at that tip. Gauge the rest of that tail to the stock's UNC-2A class; the
@@ -20,7 +20,8 @@ this static clamp needs one 18-8 grade. ``_fastener_catalog`` keeps AISI 304
 only as the SOLIDWORKS library stand-in for rendering and mass; it is not a
 supplier grade.
 
-Part frame: finished tip Y=0, axis +Y, bearing face Y=46.70.
+Part frame: finished tip Y=0, axis +Y, bearing face Y=46.70 (nominal: the
+length is cut at MHA-SM-000 assembly to the stack measured at its hole).
 """
 
 import math
@@ -44,17 +45,16 @@ SHANK_DIA_MIN = THREAD_MAJOR_MIN
 SHANK_DIA_MAX = THREAD_MAJOR_MAX
 PITCH = DIMS.pitch
 CATALOG_LENGTH = DIMS.length
-# Under-head length that holds the cut tip at assembly Y 990.7827: the
-# MHA-FR-002 grip 36.50 (finished underside to the faced top the washer
-# bears on), plus the 96659A104 nominal thickness 1.2827, plus the 8.9173
-# nominal reach into the MHA-SM-002 tap. A literal, so this purchased-part
-# spec stays free of the frame spec that imports it;
-# build_sm_summing_assembly asserts the stack and its worst-case reach.
+# Nominal under-head length that holds the modelled tip at assembly Y
+# 990.7827: the MHA-FR-002 grip 36.50 (finished underside to the faced top
+# the washer bears on), plus the 96659A104 nominal thickness 1.2827, plus the
+# 8.9173 nominal reach into the MHA-SM-002 tap. A literal, so this
+# purchased-part spec stays free of the frame spec that imports it. The
+# length carries no band of its own: MHA-SM-000 cuts each bolt to its
+# measured stack plus the fit-up reach (sm_summing_assembly_spec
+# HANGER_FIT_REACH), and build_sm_summing_assembly asserts that reach.
 LENGTH = 46.70
 UNDERHEAD_LEN = LENGTH
-LENGTH_BAND = (0.15, -0.15)  # Finished part, (upper, lower), mm.
-LENGTH_MIN = LENGTH + LENGTH_BAND[1]
-LENGTH_MAX = LENGTH + LENGTH_BAND[0]
 HEAD_AF = DIMS.head_af
 HEAD_H = DIMS.head_h
 THREAD_LENGTH = LENGTH  # Nominal catalogue fully-threaded depiction.
@@ -75,15 +75,16 @@ CHAMFER_ANGLE = 45.0  # Native driving angle between tip face and chamfer.
 # Printed natively without a band: the title block's angular row governs it.
 CHAMFER_ANGLE_TOLERANCE = angular_band_deg()
 # Worst axial tip loss: the widest radial leg at the steepest title-block
-# angle. It must stay inside the one incomplete pitch that the worst-case
-# engagement (reach MIN less one pitch >= 1.5D) already charges.
+# angle. It must stay inside the one incomplete pitch that the thread tail's
+# acceptance allows and the worst-case engagement (reach MIN less one pitch
+# >= 1.5D) charges.
 CHAMFER_AXIAL_MAX = CHAMFER_WIDTH_MAX * math.tan(
     math.radians(CHAMFER_ANGLE + CHAMFER_ANGLE_TOLERANCE)
 )
-# The same leg left to the title block's two-place row (0.60 +/-0.51): it
-# would cost more than the charged pitch and break the 1.5D engagement, and
-# its smallest leg would leave the thread start's feather edge outside the
-# MHA-SM-002 tap drill. The explicit band is therefore functional.
+# The same leg left to the title block's two-place row (0.60 +/-0.51): its
+# widest leg would exceed that one-pitch incomplete tip, and its smallest
+# would leave the thread start's feather edge outside the MHA-SM-002 tap
+# drill. The explicit band is therefore functional.
 CHAMFER_WIDTH_TITLE_BLOCK_BAND = printed_band_mm(2)
 CHAMFER_AXIAL_MAX_AT_TITLE_BLOCK = (
     CHAMFER_WIDTH + CHAMFER_WIDTH_TITLE_BLOCK_BAND
@@ -107,7 +108,7 @@ DIMENSION_PRECISION = {
     for name, digits in dimensions.items()
 }
 DIMENSION_TOLERANCE_TYPES = {
-    "CutLength": 4,
+    "CutLength": 0,  # Reference: cut at MHA-SM-000 assembly.
     "ChamferWidth": 4,
     "ChamferAngle": 11,  # swTolGeneral: native band, title-block print.
     "ThreadLengthMin": 5,
@@ -116,9 +117,8 @@ PRINTED_THREAD = f"{THREAD} UNC"  # Class 2A comes from the title block.
 DIMENSION_CALLOUTS = {
     "CutLength": (
         "UNDER HEAD TO FINISHED TIP\n"
-        "MATE: MHA-SM-002 KNIFE MOUNT\n"
-        "SETS THREAD ENGAGEMENT\n"
-        "AND TIP CLEARANCE"
+        "CUT AT ASSEMBLY\n"
+        "PER MHA-SM-000 STEP 4"
     ),
     # The band on the leg is the engagement reason; the native ChamferAngle
     # prints its own 45 degrees.

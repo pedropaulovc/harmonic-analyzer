@@ -869,12 +869,15 @@ Catalog specifications checked on September 10, 2026:
   a conformity standard; no supplier head tolerance or under-head bearing
   circle bound is inferred. The ordinary hex-head-on-SAE-washer joint is
   accepted practice, not a guaranteed stress or material allowable.
-  Cut the under-head length to **46.70 ±0.15 mm** from the 50.8 mm stock.
+  MHA-SM-000 step 4 cuts each bolt from the 50.8 mm stock to its own
+  hole's measured crossbar-underside-to-washer-top stack plus
+  **8.92 ±0.15 mm** under the head (46.70 mm nominal, printed as a
+  reference on the part drawing).
   Finished-part acceptance retains a threaded tail **MIN 10.62 mm from the cut end**, with
   **MAX 1 P cut chamfer**, leaving at least 9.561667 mm full-form tail.
   These are manufactured acceptance constraints, not vendor grades.
   Retain the native cut-end prep **RADIAL 0.60 ±0.05 mm ×45 ±1°** and
-  independently inspect the finished length, tail and
+  independently inspect the cut bolt's tail and
   #10-24 class 2A thread; none is a new supplied SKU length or tolerance.
   The head bears on the new washer, not the obsolete #6 counterbore floor.
 - [96659A104](https://www.mcmaster.com/96659A104/) supplies the new
@@ -893,9 +896,9 @@ Catalog specifications checked on September 10, 2026:
   adds hanger-pattern mismatch, through-hole drift and washer eccentricity
   in its top-seat support proof.
   The washer seats on the frame's whole faced top, except the four proud
-  corner bosses. The governing **36.50 ±0.05 mm** top-to-finished-underside
-  grip is the model's actual `HangerGrip@Crossbar` driving dimension,
-  toleranced in the part builder and imported unchanged by section F-F.
+  corner bosses. The **36.50 mm** top-to-finished-underside grip is the
+  model's actual `HangerGrip@Crossbar` driving dimension, printed bare by
+  section F-F under the title block's .XX ±0.51 mm band.
   There are no hanger spotfaces, separate floor driver or cleanup offset.
   The two Ø6.045 +0.13/0 clearance holes are drilled from the finished
   underside; their charged drift grows toward the top washer seat.
@@ -914,13 +917,14 @@ Catalog specifications checked on September 10, 2026:
   attachment, label and dangling guards remain mandatory. Stale handles
   are a possibility, not a demonstrated root cause; the final-source
   selection and median-plane datum layout require the scoped native proof.
-  The washer seats on the **whole faced top**, **36.50 ±0.05 mm
-  above the finished crossbar underside**. With the 46.70 mm cut bolt, nominal tip
-  reach is 8.9173 mm, bounded by 8.349–9.4856 mm. Subtracting one #10-24
-  pitch gives minimum full-form engagement 7.290667 mm, above 1.5D =
+  The washer seats on the **whole faced top**, **36.50 ±0.51 mm
+  above the finished crossbar underside**. Cut to the measured stack, the
+  bolt's tip reach is 8.92 ±0.15 mm (8.9173 mm modelled nominal), bounded
+  by 8.77–9.07 mm. Subtracting one #10-24
+  pitch gives minimum full-form engagement 7.711667 mm, above 1.5D =
   7.239 mm. Full-thread depth **9.65 ±0.13 mm** (MIN 9.52) leaves
-  0.0344 mm tip air at maximum reach; the inspected full-form tail leaves
-  9.561667 − 9.4856 = 0.076066667 mm coverage beyond maximum reach.
+  0.45 mm tip air at maximum reach; the inspected full-form tail leaves
+  9.561667 − 9.07 = 0.491667 mm coverage beyond maximum reach.
   These are the stated stack margins, not extra tolerance reserves.
   The receiver's cylindrical drill depth is **11.24 ±0.05 mm**. Its
   corrected crown proof charges physical pilot oversize and point-angle

@@ -1,6 +1,6 @@
 """Build MHA-VN-024 from complete 92314A253 hex stock, then trim and deburr.
 
-Finished frame: tip Y=0, bearing face Y=46.70, screw axis +Y. The stock
+Finished frame: tip Y=0, nominal bearing face Y=46.70, screw axis +Y. The stock
 recipe is positioned before cutting, so both the solid and its native
 manufacturing/inspection sketches share that frame without a body-only move.
 The catalogue's factory helix survives the actual trim; no socket is added.
@@ -50,7 +50,6 @@ from vn_knife_hanger_stud_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     LENGTH,
-    LENGTH_BAND,
     SHANK_DIA,
     SKU,
     THREAD_LENGTH_MIN,
@@ -297,9 +296,20 @@ async def _thread_tail_acceptance(adapter) -> None:
 def _manufacturing_controls(adapter) -> None:
     clear_dimensions_for_drawing(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    set_dimension_symmetric_tolerance(
-        adapter, "StockTrimProfile", "CutLength", LENGTH_BAND[0]
-    )
+    # MHA-SM-000 cuts the length to the stack measured at each hole, so the
+    # driving CutLength prints as a reference nominal through the native
+    # prefix/suffix channel, not ShowParenthesis.
+    display, dimension = _named_dimension(adapter, "StockTrimProfile", "CutLength")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 0  # swTolType_e.swTolNONE; property put, no success retval
+    display.SetText(1, "(")
+    display.SetText(2, ")")
+    if (
+        int(tolerance.Type) != 0
+        or (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")")
+        or not bool(display.ShowDimensionValue)
+    ):
+        raise RuntimeError("CutLength@StockTrimProfile: reference display did not persist")
     # The leg's band holds the chamfer inside the charged incomplete pitch.
     set_dimension_symmetric_tolerance(
         adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE
