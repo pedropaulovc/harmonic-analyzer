@@ -812,14 +812,6 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     assert shaft.POST_JOURNAL_BORE_BAND == spec.RUNNING_BORE_BAND
 
 
-def test_head_diameter_lives_on_its_plan_circle() -> None:
-    """The front-view crank-bore leaders must not cross a head dimension line."""
-    assert "HeadDia" in drawing.TOP_KEEP
-    assert "HeadDia" not in drawing.FRONT_KEEP
-    # Names the feature, not a process: the part may be turned from bar stock.
-    assert drawing.DIMENSION_CALLOUTS["HeadDia"] == "HEAD"
-
-
 def test_collar_thrust_face_adds_no_setup_note() -> None:
     """#914: the collar face gets a finish symbol, not a method note (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 
@@ -898,14 +890,22 @@ def test_section_centerline_is_forced_to_print_black_in_center_font() -> None:
     assert "int(segment.Color) != 0 or int(segment.Style) != _SW_LINE_CENTER" in source
 
 
-def test_crank_boss_od_is_labelled_as_the_boss() -> None:
-    """The elevation sees the boss's far end: its Ø is the boss."""
-    assert drawing.DIMENSION_CALLOUTS["CrankBossDia"] == "CRANK BOSS"
+def test_turned_diameters_stand_on_their_side_views() -> None:
+    """r8 (rule 11): Ø42.8 was leadered on the plan's end view of the head.
+    The head's Ø stands across it in the elevation and the crank boss's in
+    the plan, which sees the boss side-on; each names its feature on its row."""
+    assert "HeadDia" in drawing.FRONT_KEEP
+    assert "HeadDia" not in drawing.TOP_KEEP
+    assert "CrankBossDia" in drawing.TOP_KEEP
+    assert "CrankBossDia" not in drawing.FRONT_KEEP
+    assert drawing.DIMENSION_SUFFIXES["HeadDia"] == " HEAD"
+    assert drawing.DIMENSION_SUFFIXES["CrankBossDia"] == " CRANK BOSS"
+    assert not {"HeadDia", "CrankBossDia"} & set(drawing.DIMENSION_CALLOUTS)
 
 
 def test_crank_bore_thru_rides_the_size_line_so_the_mate_line_stays_narrow() -> None:
     """r4 view-crowding: "THRU, RUNS ON ..." below the size reached the 38.10."""
-    assert drawing.DIMENSION_SUFFIXES == {"CrankBoreDia": " THRU"}
+    assert drawing.DIMENSION_SUFFIXES["CrankBoreDia"] == " THRU"
     assert drawing.DIMENSION_CALLOUTS["CrankBoreDia"] == "RUNS ON MHA-DT-011"
 
 
@@ -936,10 +936,15 @@ def test_thrust_face_station_names_the_collar_it_bears() -> None:
     assert drawing.SECTION_KEEP["ConeBossNorthZ"][1] > 0.250
 
 
-def test_crank_boss_diameter_runs_onto_its_near_rim() -> None:
-    """r5: Ø21.9's rim-to-rim line crossed Ø11.438's leader at the centre."""
+def test_diameters_on_circles_run_onto_their_near_rims() -> None:
+    """r5 and r8: two rim-to-rim lines through one centre crossed there."""
+    assert set(drawing.NEAR_SIDE_DIAMETERS) == {
+        "CrankBoreDia",
+        "ConeBossDia",
+        "JournalBoreDia",
+    }
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'set_near_side_diameter(crank_boss[0], "crank boss diameter")' in source
+    assert 'set_near_side_diameter(annotation, f"{name} near-side leader")' in source
 
 
 def test_removed_view_letter_is_not_a_datum_letter() -> None:

@@ -292,19 +292,17 @@ FRONT_KEEP = {
     # af13), and at y=0.1475 its text sat 0.44 mm under View B's labelled
     # 38.10 (r3 view-crowding).
     "HeadHt": (0.166, 0.1440),
-    # Near-side leader (r5): its horizontal text centres on the given x; from
-    # x=0.132 the head's right edge ran through CRANK BOSS's C (r6 sheet).
-    "CrankBossDia": (0.1355, 0.120),
-    # Held one text height (13.6 mm) left of View B's labelled 38.10: with
-    # "THRU, RUNS ON ..." below the size the box ran x 117.7..180.7 mm, 1.42 mm
-    # from the 38.10 box at x 173.1 (r4 view-crowding).  THRU rides the size line
-    # (DIMENSION_SUFFIXES), so the widest line is the 49 mm mate; centred at
-    # x=0.1344 it ends 14.1 mm short of the 38.10 (at 0.1356, 12.94 mm: r6
-    # view-crowding), the 13° arrow's tip ~1 mm off its size line's left end
-    # (r5 layout audit, advisory), and at y=0.169 the size line passes under
-    # the 13° arc where it meets the plan's lower edge and the mate's shoulder
-    # stays over the head's top extension line.
-    "CrankBoreDia": (0.1344, 0.169),
+    # The head's Ø across its silhouette, its one-row text out left in the
+    # band over the head: between the 94.7's top extension line (y 159.2)
+    # and the plan's 72.0 lower one (y 172.5), clear of the plan's outline.
+    "HeadDia": (0.060, 0.1655),
+    # Where the crank boss's Ø21.9 stood before it moved to the plan: right
+    # of the head under the angularity frame, its near-side leader (centred
+    # on its x) rising to the bore's lower-right rim above the A-A cutting
+    # line's corner.  In the band over the head (r5..r8) it left no room for
+    # the head's Ø, and its box had to dodge View C's 38.10 by one text
+    # height (r4, r6 view-crowding) and the 13° arrow (r5 layout audit).
+    "CrankBoreDia": (0.146, 0.1215),
 }
 
 BODY = requirement(
@@ -354,7 +352,9 @@ CRANK_BORE = requirement(
 # plan angle and CrankBossStationReference's ray for the crank boss's
 # north-face station, the face the crank boss length is taken from.
 TOP_KEEP = {
-    "HeadDia": (0.071, 0.188),
+    # Across the boss's side-on silhouette below the head, text out left
+    # clear of the 72.0's lower extension line at the boss end (y 172.5).
+    "CrankBossDia": (0.0655, 0.182),
     # The length stands outboard of the station so the station's stacked
     # label clears its dimension line: with the v36 boss face 2.5 further
     # north, a one-line label spanning both lines was crossed by the length.
@@ -462,8 +462,10 @@ JOURNAL_TEXT_OFFSETS = {
     "CrankAboveCone": (0.193, 0.183),
 }
 # The non-preferred bore limits tell the shop what to inspect without imposing
-# a particular cutting method.  Ø21.93 is the crank boss OD -- the elevation
-# looks at the boss's far end, so it is labelled as the boss -- and the plan's
+# a particular cutting method.  Ø21.9 is the crank boss OD, given across the
+# boss where the plan sees it side-on, and Ø42.8 the head's, given across the
+# head in the elevation (rule 11: turned diameters on the side view, not the
+# end view; r8 machinist review) -- and the plan's
 # station locates the boss's north face from the post axis; that face stands
 # on the head's tangent plane, so no depth is taken against the curved head.
 # The station is labelled: Main's rim-8339 ruling found the spot-face era's
@@ -478,8 +480,6 @@ JOURNAL_TEXT_OFFSETS = {
 # part whose collar thrusts on that face (r1 and r5 machinist reviews, rule 4:
 # its ±0.25 is the stacks' half band, cone_pivot_post_spec).
 DIMENSION_CALLOUTS = {
-    "HeadDia": "HEAD",
-    "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "CRANK BOSS\nLENGTH",
     "CrankBossStartZ": "CRANK BOSS\nFACE",
     "CrankBoreDia": "RUNS ON MHA-DT-011",
@@ -491,8 +491,19 @@ DIMENSION_CALLOUTS = {
     "CrankAboveCone": "16T:64T\nMESH",
     "JournalAxisY": "AXIS MATCHES\nMHA-DT-021",
 }
-# Text after the size and its band, on the same line.
-DIMENSION_SUFFIXES = {"CrankBoreDia": " THRU"}
+# Text after the size and its band, on the same line: one row keeps the head
+# and crank boss diameters' text in the narrow bands beside the head and the
+# boss.
+DIMENSION_SUFFIXES = {
+    "CrankBoreDia": " THRU",
+    "HeadDia": " HEAD",
+    "CrankBossDia": " CRANK BOSS",
+}
+# Diameters given on their circles land one arrow on the near rim, the line
+# kept off the centre: two leaders through one centre crossed there (the
+# crank bore's and the crank boss's in r5, the cone bore's and its boss's in
+# r8; machinist reviews).
+NEAR_SIDE_DIAMETERS = ("CrankBoreDia", "ConeBossDia", "JournalBoreDia")
 _DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
 
 
@@ -1630,19 +1641,14 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _set_dimension_suffixes(adapter, annotations)
-    # The crank boss's Ø21.9 runs one arrow onto its near rim: native, its
-    # line ran rim to rim through the centre and crossed the crank bore's
-    # Ø11.438 leader there (r5 machinist review).
-    crank_boss = [
-        annotation
-        for annotation in front_annotations
-        if dimension_name(adapter, annotation) == "CrankBossDia"
-    ]
-    if len(crank_boss) != 1:
-        raise RuntimeError(
-            f"expected one CrankBossDia in the front view, found {len(crank_boss)}"
-        )
-    set_near_side_diameter(crank_boss[0], "crank boss diameter")
+    near_side = {name: 0 for name in NEAR_SIDE_DIAMETERS}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in near_side:
+            set_near_side_diameter(annotation, f"{name} near-side leader")
+            near_side[name] += 1
+    if set(near_side.values()) != {1}:
+        raise RuntimeError(f"expected each near-side diameter once, got {near_side}")
     crank_height = [
         annotation
         for annotation in front_annotations
@@ -1820,8 +1826,8 @@ async def build(adapter: Any) -> dict[str, str]:
             # lines, 3.7 mm below the crank axis, so it rides with the head
             # when the post's height moves (a fixed y=0.138 met HeadHt's lower
             # witness once the inch-train body grew to 94.7). Its leader lands
-            # on the bore rim at -28 degrees, between the CRANK BOSS diameter
-            # line and the centre-mark arm:
+            # on the bore rim at -28 degrees, above the bore's own near-side
+            # leader and clear of the centre-mark arm:
             # from (0.160, 0.128) to the natural lower-left landing it
             # crossed HeadHt's and CrankBossDia's lines (leader-crosses-line,
             # af13).  A sheet-point pick sets the landing; explicit leader
