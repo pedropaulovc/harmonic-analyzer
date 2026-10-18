@@ -69,6 +69,7 @@ from dt_pinion_spring_geometry import (
     KINK_C,
     KINK_EXIT,
     KINK_INCLUDED_DEG,
+    PAD_HOLE_WEB_MIN,
     PAD_WIDTH,
     PAD_WING_LEN,
     PAD_Z,
@@ -183,13 +184,16 @@ QUALIFIER_HALF_WIDTH = {
 # The dimensions banded +/-0.5 set the crest's preload on the MHA-DT-014 strap
 # (dt_pinion_spring_spec.FORMED_BANDED_DIMENSIONS), so each names that mate
 # (drawing-guidelines.md rule 4); the kink angle and FlatLen ride the
-# title-block rows, bare.
+# title-block rows, bare.  The wing's .XXX length keeps it and its relief round
+# clear of the bend at FootLen's low limit, and the web it leaves the hole is
+# stated (rule 20; Codex, PR #1675).
 DIMENSION_CALLOUTS = {
     "FootLen": f"TO BEND TANGENT\n{PRELOAD_REASON}",
     "FreeKinkH": f"FREE, TO KINK TANGENT\n{PRELOAD_REASON}",
     "FreeKinkV": f"FREE, TO KINK TANGENT\n{PRELOAD_REASON}",
     "BendR": PRELOAD_REASON,
     "KinkR": PRELOAD_REASON,
+    "PadLen": f"CLEARS BEND\nHOLE WEB {PAD_HOLE_WEB_MIN:.2f} MIN",
 }
 
 

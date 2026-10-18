@@ -70,8 +70,9 @@ FORMED_BANDED_DIMENSIONS: dict[str, set[str]] = {
 if set().union(*FORMED_BANDED_DIMENSIONS.values()) != set(FORMED_CONTACT_BANDS):
     raise AssertionError("every preload-setting formed dimension must carry the band")
 # The pad's bend relief prints as a single limit, R0.25 MAX (swTolMAX prints the
-# nominal, so the nominal is the limit), down to sharp: either end keeps the
-# hole's webs, and the round never reaches past the bend tangent.
+# nominal, so the nominal is the limit), down to sharp: the wing's .XXX length
+# keeps either end clear of the bend at FootLen's low limit
+# (dt_pinion_spring_geometry.PAD_WING_LEN).
 PAD_RELIEF_FEATURE = "PadRelief"
 PAD_RELIEF_DIMENSION = "PadReliefR"
 PAD_RELIEF_TOL_TYPE = 6  # swTolType_e.swTolMAX
@@ -79,8 +80,9 @@ PAD_RELIEF_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # Everything the print carries.  The profile is baselined from the foot's free
 # end (drawing-guidelines.md rule 10 (dimension from a real feature)): the FREE kink start is located from it, never
 # from the model origin.  The pad, the strip width and the hole location are
-# cut with the flat blank, so they take the title-block .XX row (the relief
-# round is its single MAX limit); the strip width and the hole location are
+# cut with the flat blank, so they take the title-block .XX row (the wing's
+# length .XXX, to clear the bend; the relief round is its single MAX limit);
+# the strip width and the hole location are
 # sheet dimensions picked on the blank's edges
 # (draw_dt_pinion_spring._blank_dimensions).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

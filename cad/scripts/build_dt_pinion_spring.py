@@ -23,8 +23,8 @@ Traced that way the one-sided thin wall lands right of travel -- west of the
 blade, under the foot -- so the blade's west face is the contact face.  The
 pad-merge volume gate proves the foot side and a west-extreme probe the
 blade side.  Thin mid-plane extrude, WIDTH symmetric about z 0, plus a square
-screw pad (PAD_WIDTH x PAD_LEN) at the foot's free end, its wing set back
-behind a PAD_RELIEF_R MAX bend relief, cut with the flat blank.
+screw pad (PAD_WIDTH x PAD_LEN) at the foot's free end, its wing stopped short
+of the bend with a PAD_RELIEF_R MAX round in its corner, cut with the flat blank.
 
 The model is the INSTALLED, parked shape (O2); the maker forms the free shape,
 PRESET_DEG more bend (dt_pinion_spring_geometry).
@@ -491,8 +491,9 @@ async def build(adapter) -> dict[str, str]:
     padded = await volume_check(adapter, "pad", volume, 0.02 * PAD_VOLUME)
 
     # Bend relief: the wing's inside corner, where its west edge meets the
-    # strip's forward edge PAD_RELIEF_R east of the bend tangent, rounds at
-    # PAD_RELIEF_R, so the round ends tangent to the strip AT the bend tangent.
+    # strip's forward edge short of the bend (PAD_WING_LEN keeps the round's
+    # end clear of the bend tangent at the printed worst case), rounds at
+    # PAD_RELIEF_R.
     # The volume gate is on the measured step: the concave round ADDS its
     # spandrel (a round on a convex edge would remove one).
     check(

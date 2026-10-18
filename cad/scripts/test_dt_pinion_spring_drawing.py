@@ -15,7 +15,7 @@ import dt_pinion_spring_section as section
 import dt_pinion_spring_spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import printed_band_mm, printed_deviations
 
 _XX_BAND = float(_config.title_block("linear_2pl")["value_in"]) * 25.4
 _HOLE_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
@@ -77,8 +77,9 @@ def test_preload_setting_formed_features_carry_the_formed_band() -> None:
     linear = formed - {dt_pinion_spring_spec.FREE_KINK_ANGLE}
     assert {name: precision[name] for name in linear} == dict.fromkeys(linear, 1)
     assert precision[dt_pinion_spring_spec.FREE_KINK_ANGLE] == 0
-    for name in ("PadWidth", "PadLen", "PadReliefR"):
+    for name in ("PadWidth", "PadReliefR"):
         assert precision[name] == 2
+    assert precision["PadLen"] == 3
     source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "_pad_relief_max_limit(adapter)" in source
 
@@ -96,30 +97,34 @@ def test_profile_is_baselined_from_the_foots_free_end() -> None:
 
 def test_pad_webs_clear_two_millimetres_at_the_printed_worst_case() -> None:
     radius = (geometry.HOLE_DIA + _HOLE_OVERSIZE) / 2.0
-    width_min = geometry.PAD_WIDTH - _XX_BAND
     across = geometry.PAD_WIDTH / 2.0  # hole from the pad's lower edge
-    side_near = across - _XX_BAND - radius
-    side_far = width_min - (across + _XX_BAND) - radius
-    end_web = geometry.HOLE_FROM_END - _XX_BAND - radius
-    webs = {"near side": side_near, "far side": side_far, "end": end_web}
-    # Toward the strip: the wing's inside corner, at the bend relief's limits
-    # (sharp, or the MAX round), with the wing short, the hole long and
-    # nearest the strip's forward edge: the strip narrow, the pad wide and the
-    # hole short of its lower (forward) edge, all measured from the aft edge.
-    hole_along = geometry.HOLE_FROM_END + _XX_BAND
-    hole_from_aft = (geometry.PAD_WIDTH + _XX_BAND) - (across - _XX_BAND)
-    hole_aft_of_strip_edge = (geometry.WIDTH - _XX_BAND) - hole_from_aft
-    for relief in (0.0, geometry.PAD_RELIEF_R):
-        corner_along = geometry.PAD_WING_LEN - _XX_BAND + relief
-        corner_out = relief  # the round's centre, forward of the strip edge
-        webs[f"toward the strip, R{relief:g}"] = (
-            math.hypot(corner_along - hole_along, corner_out + hole_aft_of_strip_edge)
-            - relief
-            - radius
-        )
-    assert min(webs.values()) >= _WEB_TARGET, webs
-    # The round ends tangent to the strip at the bend tangent, never past it.
-    assert geometry.PAD_WING_LEN + geometry.PAD_RELIEF_R == geometry.FOOT_LEN
+    webs = geometry.pad_hole_webs()
+    assert webs["near side"] == pytest.approx(across - _XX_BAND - radius, abs=0.01)
+    assert webs["end"] == pytest.approx(
+        geometry.HOLE_FROM_END - _XX_BAND - radius, abs=0.01
+    )
+    toward = {name: web for name, web in webs.items() if name.startswith("toward")}
+    assert min(set(webs.values()) - set(toward.values())) >= _WEB_TARGET, webs
+    # The bend's clearance leaves the web to the wing's corner under target:
+    # printed on PadLen (rule 20), rounded down.
+    assert geometry.PAD_HOLE_WEB_MIN == math.floor(min(toward.values()) * 100) / 100
+    assert geometry.PAD_HOLE_WEB_MIN == pytest.approx(1.79)
+    assert (
+        f"HOLE WEB {geometry.PAD_HOLE_WEB_MIN:.2f} MIN"
+        in drawing.DIMENSION_CALLOUTS["PadLen"].split("\n")
+    )
+
+
+def test_pad_wing_and_its_round_clear_the_bend_at_the_printed_worst_case() -> None:
+    # Codex P1 (PR #1675): the wing at its longest, the round at its MAX and the
+    # bend tangent at FootLen's low limit still leave the round's end short of
+    # the bend.
+    longest = geometry.PAD_WING_LEN + printed_band_mm(geometry.PAD_LEN_PLACES)
+    nearest_bend = geometry.FOOT_LEN - geometry.FORMED_BAND_MM
+    assert longest + geometry.PAD_RELIEF_R <= nearest_bend + 1e-9
+    assert geometry.PAD_WING_LEN == pytest.approx(8.62)
+    # At .XX the same clearance would leave about a 1.0 web.
+    assert nearest_bend - printed_band_mm(2) - geometry.PAD_RELIEF_R < 8.5
 
 
 def test_hole_callout_picks_the_hole_rim_where_the_pad_puts_it() -> None:
