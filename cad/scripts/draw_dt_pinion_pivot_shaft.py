@@ -164,9 +164,10 @@ if DETAIL_RADIUS_MM <= abs(
     raise AssertionError("DETAIL A's fence must take in the crown's apex and its rim")
 # The label anchors at its top centre, under the crown's callout.
 DETAIL_LABEL_XY = (DETAIL_CENTER[0], DETAIL_CENTER[1] - _DETAIL_FENCE_R - 0.032)
-# The circle's letter on the profile: up-right of the front tip, right of
-# its overall-length witness line.
-DETAIL_LETTER_XY = (FRONT_TIP_X + 0.008, PROFILE_CENTER[1] + 0.012)
+# The circle's letter on the profile: up-left of the front end, left of its
+# two length witness lines, as on MHA-CH-005. Up-right (r4) the diameter's
+# upper dimension line ran onto its foot.
+DETAIL_LETTER_XY = (FRONT_END_X - 0.010, PROFILE_CENTER[1] + 0.012)
 
 # A short dimension's callout is far wider than the span it measures, so its
 # text stands OUTSIDE the witness pair. Callout text runs ~2.75 mm a character
