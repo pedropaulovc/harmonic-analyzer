@@ -52,6 +52,13 @@ the DOF manifest, never authored); the carriage parts placed on-solution and
 lock-mated to the rod; transforms asserted by read-back; zero interference
 beyond the thread-envelope allowances in ``_interference_contracts``.
 
+Fitter package (draw_pn_pen_assembly.py, MHA-PN-000): the three carriage
+settings -- stud height, pen yaw and nib preset -- are blanked construction
+sketches (``StudSetting`` on the Right plane, ``CarriageSetting`` on the Top
+plane) whose driving, toleranced dimensions the drawing imports, and the
+``PN_EXPLODED`` presentation is authored by ``_pn_pen_explode`` from
+``pn_pen_explode_spec.EXPLODE_STEPS`` in both drawing configurations.
+
 Dimensions: cad/config/dimensions.yaml ch. 24.
 
 Run (SolidWorks already open)::
@@ -63,13 +70,34 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import Any
 
+import _telemetry
+import pn_pen_assembly_spec as spec
 from _check import check
+from _com import _early_bound
 from _custom_properties import apply_custom_properties
 from _session import run_build
-from _drawing_marks import DRAWN_BY
+from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
+from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import (
+    set_dimension_symmetric_angular_tolerance,
+    set_dimension_symmetric_tolerance,
+)
+from _feature_tree import name_last_feature
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
+from _named_views import name_octant_views, octant_key
+from _pn_pen_explode import create_pn_explode
 from _assembly import (
     activate_assembly_contract,
+    author_in_drawing_configurations,
     angle_driver,
     assembly_title_properties,
     assert_component_placed,
@@ -136,6 +164,7 @@ from pn_pen_carriage_geom import (
 )
 
 ASM_NAME = "pn-pen"
+assert ASM_NAME == spec.ASM_NAME, (ASM_NAME, spec.ASM_NAME)
 
 # --- hanger guides: the rod square stays in both U guides over the full travel,
 # and nothing riding the rod reaches the lower guide --------------------------------
@@ -224,6 +253,137 @@ RIDERS = (
     ("vn-pen-adjust-nut", NUT_POS, NUT_ROWS),
     ("vn-pen-wire", PEN_WIRE_BOTTOM, IDENTITY),
 )
+
+
+def _construction(adapter: Any, line: str, label: str) -> None:
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{label} is not construction")
+
+
+async def _author_stud_setting(adapter: Any) -> None:
+    """STUD HEIGHT: a vertical construction line on the rod axis from the
+    rod's top face to the stud's head top (Right plane, sketch = machine -Z,
+    Y), its length the nominal stud's setting. It carries no band: the stud
+    is set from its measured length (``spec.stud_head_setting``), so the
+    drawing prints it as a reference. No solid or pose edits."""
+    (u, rod_top_y), (_u, head_top_y) = spec.STUD_LINE
+    dims = SketchDims()
+    check("create stud setting sketch", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    line = check("stud setting line", await adapter.add_line(u, rod_top_y, u, head_top_y))
+    set_sketch_direct_db(adapter, False)
+    _construction(adapter, line, "stud setting line")
+    check("stud setting vertical", await adapter.add_sketch_constraint(line, None, "vertical"))
+    await anchor_point_to_origin(adapter, f"{line}.start", u, rod_top_y, "rod top on axis")
+    dims.record("StudRodAxisZ")
+    dims.record("StudRodTopY")
+    await dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "vertical_distance",
+        spec.STUD_HEIGHT, "stud head top above rod top",
+    )
+    dims.record(spec.STUD_DIMENSION)
+    await ensure_fully_defined(adapter, "stud setting")
+    check("exit stud setting sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, spec.STUD_FEATURE)
+    dims.apply(adapter, spec.STUD_FEATURE)
+
+
+def _add_driving_yaw_angle(adapter: Any, nib_line: str, flat_line: str) -> None:
+    """The marker axis's angle to the rod-flat arm, as a DRIVING dimension.
+
+    ``build_pn_pen_v_block._add_driving_flank_angle``'s recipe: both lines
+    selected as segments, the text point inside the wedge passed as sketch
+    (u, v) in the x / y slots and as the model point (Z = -v on the Top plane)
+    in the z slot, so it lands in the wedge whichever space SOLIDWORKS reads
+    it in; the measured value is checked before the dimension drives."""
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    u, v = (value / 1000.0 for value in spec.YAW_TEXT_UV)
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [nib_line, flat_line], 0)
+    extension = _sw_type_info.early_bound_or_flag(
+        model.Extension, "IModelDocExtension", "AddSpecificDimension"
+    )
+    display, status = extension.AddSpecificDimension(
+        u,
+        v,
+        -v,
+        3,  # swDimensionType_e.swAngularDimension
+        0,
+    )
+    model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"pen yaw: AddSpecificDimension(angular) failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    actual_rad = abs(float(dimension.SystemValue))
+    if abs(actual_rad - math.radians(spec.YAW_DEG)) > 1e-8:
+        raise RuntimeError(
+            f"pen yaw: measured {math.degrees(actual_rad):.6f} deg, "
+            f"expected {spec.YAW_DEG:.6f} deg"
+        )
+    dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
+    if int(dimension.DrivenState) != 2:
+        raise RuntimeError("pen yaw: angular dimension did not become driving")
+    _telemetry.success(f"driving pen yaw: {spec.YAW_DEG:g} deg")
+
+
+async def _author_carriage_setting(adapter: Any) -> None:
+    """PEN YAW and NIB PRESET on the Top plane (sketch u, v = machine X, -Z):
+    from the marker axis at the block's paper-end face, a rod-flat arm along
+    machine -X and the marker-axis arm to the nib tip. Their angle is the yaw,
+    the second arm's length the nib preset. No solid or pose edits."""
+    end_u, end_v = spec.CARRIAGE_END_UV
+    dims = SketchDims()
+    check("create carriage setting sketch", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    # Both arms start on the one end-face point (exactly coincident
+    # endpoints merge in the sketch database).
+    flat = check("rod-flat arm", await adapter.add_line(end_u, end_v, *spec.FLAT_END_UV))
+    nib = check("marker-axis arm", await adapter.add_line(end_u, end_v, *spec.NIB_UV))
+    set_sketch_direct_db(adapter, False)
+    _construction(adapter, flat, "rod-flat arm")
+    _construction(adapter, nib, "marker-axis arm")
+    check("rod-flat arm horizontal", await adapter.add_sketch_constraint(flat, None, "horizontal"))
+    await anchor_point_to_origin(adapter, f"{flat}.start", end_u, end_v, "paper-end point")
+    dims.record("CarriageEndX")
+    dims.record("CarriageEndZ")
+    await dimension_between(
+        adapter, f"{flat}.start", f"{flat}.end", "horizontal_distance",
+        spec.FLAT_LINE_LENGTH, "rod-flat arm",
+    )
+    dims.record("RodFlatArm")
+    await dimension_between(
+        adapter, f"{nib}.start", f"{nib}.end", "distance",
+        spec.NIB_PROTRUSION, "nib beyond the paper-end face",
+    )
+    dims.record(spec.NIB_DIMENSION)
+    _add_driving_yaw_angle(adapter, nib, flat)
+    dims.record(spec.YAW_DIMENSION)
+    await ensure_fully_defined(adapter, "carriage setting")
+    check("exit carriage setting sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, spec.CARRIAGE_FEATURE)
+    dims.apply(adapter, spec.CARRIAGE_FEATURE)
+    set_dimension_symmetric_tolerance(
+        adapter, spec.CARRIAGE_FEATURE, spec.NIB_DIMENSION, spec.NIB_TOLERANCE_MM
+    )
+    set_dimension_symmetric_angular_tolerance(
+        adapter, spec.CARRIAGE_FEATURE, spec.YAW_DIMENSION, spec.YAW_TOLERANCE_DEG
+    )
+
+
+async def _author_settings(adapter: Any) -> None:
+    """Both setting sketches, their places, drawing marks, then blanked."""
+    await _author_stud_setting(adapter)
+    await _author_carriage_setting(adapter)
+    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    for feature, names in spec.DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature, names)
+        blank_sketch(adapter, feature)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -384,21 +544,37 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
-    # Title-block identity for the assembly drawing (draw_pn_pen_assembly.py):
+    # The fitter drawing's settings: driving, toleranced model dimensions on
+    # blanked construction sketches, authored once the as-built model is
+    # certified (they touch no component, mate or pose).
+    await _author_settings(adapter)
+    # Title-block identity for the fitter drawing (draw_pn_pen_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
-    # finalize_drawing requires without consulting the part registry; material and
-    # finish defer to the parts list, standard assembly-drawing practice.
+    # finalize_drawing requires; material and finish are per component (each
+    # component drawing), so the assembly's own cells defer to them.
     apply_custom_properties(
         adapter,
         {
             **assembly_title_properties(ASM_NAME),
             "Revision Description": "Initial release",
-            "Material": "SEE PARTS LIST",
-            "Material Specification": "SEE PARTS LIST",
-            "Finish": "SEE PARTS LIST",
+            "Material": "SEE COMPONENT DRAWINGS",
+            "Material Specification": "SEE COMPONENT DRAWINGS",
+            "Finish": "SEE COMPONENT DRAWINGS",
             "Quantity": "1",
             "Drawn By": DRAWN_BY,
         },
+    )
+    # The fitter drawing's exploded view references Default Simplified, so
+    # the explode is authored in both drawing configurations.
+    author_in_drawing_configurations(
+        adapter, ASM_NAME, lambda configuration: create_pn_explode(adapter, configuration)
+    )
+    # The exploded view looks from the octant that sees the v-block's front
+    # face and the set screw's tap in it (spec.EXPLODED_OCTANT).
+    name_octant_views(
+        adapter,
+        octants={octant_key(*spec.EXPLODED_OCTANT): spec.EXPLODED_OCTANT},
+        label=ASM_NAME,
     )
     return await save_assembly_and_images(adapter, ASM_NAME)
 

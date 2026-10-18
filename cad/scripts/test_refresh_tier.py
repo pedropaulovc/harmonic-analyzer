@@ -93,6 +93,11 @@ QUALIFYING_EXPLODES = {
         "create_mg_magnifier_explode",
         ("_mg_magnifier_explode.py", "mg_magnifier_explode_spec.py"),
     ),
+    "pn_pen": (
+        "_pn_pen_explode",
+        "create_pn_explode",
+        ("_pn_pen_explode.py", "pn_pen_explode_spec.py", "_assembly_patterns.py"),
+    ),
 }
 
 
@@ -108,10 +113,9 @@ def test_qualifying_explode_plans():
         }, stem
     # The drive train's explode takes build-time collar-pin roles.
     assert "found 0" in plans["dt_drive_train"].decline
-    # The frame, measuring stick and pen author their explodes inline.
+    # The frame and measuring stick author their explodes inline.
     assert "no _fr_frame_explode.py" in plans["fr_frame"].decline
     assert "no _ms_measuring_stick_explode.py" in plans["ms_measuring_stick"].decline
-    assert "no _pn_pen_explode.py" in plans["pn_pen"].decline
 
 
 @pytest.mark.parametrize("stem", sorted(QUALIFYING_EXPLODES))
