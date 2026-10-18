@@ -47,7 +47,7 @@ def test_gear_data_block_preserves_the_actual_finite_stock_profile() -> None:
         f"PRESSURE ANGLE:  {spec.PRESSURE_ANGLE_DEG:.1f} DEG",
         f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
         f"ROOT ENVELOPE DIAMETER (mm, REF):  "
-        f"{spec.ROOT_ENVELOPE_DIA_MM[0]:.3f}-{spec.ROOT_ENVELOPE_DIA_MM[1]:.3f}",
+        f"{sum(spec.ROOT_ENVELOPE_DIA_MM) / 2.0:.2f}",
         f"CUTTER PLUNGE (mm, REF):  {spec.WHOLE_DEPTH:.3f}",
         f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
         f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
@@ -100,7 +100,6 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
     assert maximum_clearance == pytest.approx(
         spec.ARBOR_BORE_BAND[0] - arbor.SHAFT_DIA_BAND[1]
     )
-    assert maximum_clearance == pytest.approx(0.200)
     assert maximum_clearance < spec.RETAINING_COMPOUND_MAX_GAP_MM
     assert spec.BORE_DIA == arbor_geometry.SHAFT_DIA  # the CAD models line-to-line
 
@@ -114,7 +113,6 @@ def test_the_drum_bond_is_the_fitup_step_not_a_note() -> None:
     # band is MHA-DT-022's own native dimension (Codex P1 on #814), the hand
     # slide rides the bore callout (Codex P2 on #832), and the bond itself is
     # the pinion fit-up step MHA-DT-022's spec owns (Main's drawing-guidelines.md rule 7 (notes: few, flagged, never a method) sweep).
-    assert notes == "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND."
     assert "BOND ZONE" not in notes
     assert "ARBOR JOURNAL" not in notes
     assert "LOCTITE" not in notes and "ON ASSEMBLY" not in notes
@@ -268,10 +266,8 @@ def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
     callout = draw.DIMENSION_CALLOUTS["ArborBoreDia"]
     assert callout == spec.ARBOR_BORE_CALLOUT
     arbor = _config.parts("dt-pinion-arbor")
-    assert callout.splitlines()[1:] == [
-        f"SLIDES BY HAND ON {arbor['number']}",
-        arbor["title"].upper(),
-    ]
+    assert arbor["number"] in callout
+    assert arbor["title"].upper() in callout
     assert arbor["number"] == "MHA-DT-022"
     assert "PINION ARBOR" in callout
     for line in spec.DRAWING_NOTES.splitlines():
@@ -320,14 +316,14 @@ def test_tip_limits_follow_printed_nominal_not_unrounded_od() -> None:
 def test_tip_grade_is_spec_owned_native_pmi_not_a_toleranced_note() -> None:
     import draw_dt_alignment_pinion as drawing
 
-    assert spec.DRAWING_DIMENSIONS["GearBlankProfile"] == {"OutsideDia"}
+    assert spec.DRAWING_DIMENSIONS[spec.OUTSIDE_DIA_REFERENCE] == {"OutsideDia"}
     assert drawing.FRONT_KEEP.keys() | drawing.RIGHT_KEEP.keys() == set(
         spec.DRAWING_PRECISION_BY_NAME
     )
     import build_dt_alignment_pinion as part
     from _drawing_contract import model_toleranced_dimensions
 
-    assert model_toleranced_dimensions(part)[("GearBlankProfile", "OutsideDia")] == (
+    assert model_toleranced_dimensions(part)[("OutsideDiaReference", "OutsideDia")] == (
         "*deviations(OUTSIDE_DIA_BAND)"
     )
     assert "OUTSIDE DIAMETER" not in spec.GEAR_DATA

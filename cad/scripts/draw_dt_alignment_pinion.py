@@ -28,26 +28,38 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
+import _drawing_hidden_sketches as hidden_sketches
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
+from _simplified_names import simplified_name
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_alignment_pinion_spec import (
     ARBOR_BORE_CALLOUT,
     BORE_DIA,
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    FACE_WIDTH,
+    OUTSIDE_DIA,
+    OUTSIDE_DIA_CALLOUT,
     SURFACE_FINISHES,
     TEETH,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["dt_alignment_pinion"]
@@ -66,24 +78,44 @@ SHEET_SCALE = (1.0, 1.0)
 FRONT_SCALE = (2, 1)
 PROFILE_SCALE = (1, 1)
 ISO_SCALE = (1, 2)
-FRONT_CENTER = (0.150, 0.165)
-RIGHT_CENTER = (0.285, 0.165)
+# The side view is the lathe view at the sheet scale; the end view projects
+# to its left (third angle) at 2:1 so the teeth and bore read, and says so
+# under itself (machinist review r1: an unlabelled 2:1 projected view).
+FRONT_CENTER = (0.085, 0.150)
+RIGHT_CENTER = (0.255, 0.150)
 ISO_CENTER = (0.350, 0.215)
 GEAR_DATA_POS = (0.018, 0.262)
 ISOMETRIC_NOTE_POS = (0.330, 0.262)
-MANUFACTURING_NOTES_POS = (0.018, 0.095)
+END_VIEW_NOTE_POS = (0.066, 0.124)
 
+_SIDE_SCALE = PROFILE_SCALE[0] / PROFILE_SCALE[1]
+_SIDE_HALF_OD = OUTSIDE_DIA / 2000.0 * _SIDE_SCALE
+_SIDE_LEFT_X = RIGHT_CENTER[0] - FACE_WIDTH / 2000.0 * _SIDE_SCALE
+_SIDE_RIGHT_X = RIGHT_CENTER[0] + FACE_WIDTH / 2000.0 * _SIDE_SCALE
+# The do-not-cut note is flagged to the teeth it governs (rule 7).  The leader
+# tip lands on the tooth-tip outline past the note's right end, so the leader
+# leaves from the end of the text and crosses none of it (machinist review r4
+# of 7b8a6bebe: a tip under the note's left half struck the second line).
+TOOTH_NOTE_POS = (0.190, 0.200)
+TOOTH_NOTE_ATTACH = (_SIDE_RIGHT_X - 0.005, RIGHT_CENTER[1] + _SIDE_HALF_OD)
 
 FRONT_KEEP = {
-    "ArborBoreDia": (0.085, 0.155),
-    "OutsideDia": (0.150, 0.210),
+    "ArborBoreDia": (0.070, 0.192),
 }
+# Diameters on the side view beside the length (rule 11): the tip diameter's
+# dimension line stands just right of the back face with its text below the
+# part, clear of the 143.2 baseline under the view.  The callout reads
+# left-to-right off its shelf from the dimension line, so the line stands close
+# enough that the mate number ends well inside the border (machinist review
+# r4: at +45 mm it printed cut off as "MHA-DT-0").
 RIGHT_KEEP = {
-    "FaceWidth": (RIGHT_CENTER[0], 0.125),
+    "FaceWidth": (RIGHT_CENTER[0], 0.122),
+    "OutsideDia": (_SIDE_RIGHT_X + 0.015, 0.118),
 }
 DIMENSION_CALLOUTS = {
     "ArborBoreDia": ARBOR_BORE_CALLOUT,
     "FaceWidth": "OVERALL; TEETH FULL LENGTH",
+    "OutsideDia": OUTSIDE_DIA_CALLOUT,
 }
 
 
@@ -152,71 +184,80 @@ def _verify_title_material_specification(
         )
 
 
-def _match_bore_tolerance_places(adapter: Any, annotations: list[Any]) -> None:
-    """Print the bore band with its nominal's two places (+0.10 / 0.00).
+def _assert_tolerance_places(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Read back that a band imported at its nominal's places (+0.10 / 0.00).
 
-    The model's tolerance helper stores the fewest places that spell the band
-    (+0.1 / 0.0), which reads as a one-place tolerance on a two-place size.
-    Only the tolerance places move here; the primary places stay the part's.
+    The part builder authors the places (``set_dimension_bilateral_tolerance``
+    ``places=``); the sheet only verifies, so the .SLDPRT stays the one source
+    (Codex P1 on #1647).
     """
     matches = [
         annotation
         for annotation in annotations
-        if dimension_name(adapter, annotation) == "ArborBoreDia"
+        if dimension_name(adapter, annotation) == name
     ]
     if len(matches) != 1:
-        raise RuntimeError(f"expected one ArborBoreDia annotation, found {len(matches)}")
+        raise RuntimeError(f"expected one {name} annotation, found {len(matches)}")
     annotation = _sw_type_info.early_bound_or_flag(
         matches[0], "IAnnotation", "GetSpecificAnnotation"
     )
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    places = DRAWING_PRECISION_BY_NAME["ArborBoreDia"]
-    # -1 = swDimensionPrecisionSettings_e do-not-change: primary and dual stay.
-    display.SetPrecision3(-1, -1, places, -1)
-    if int(display.GetPrimaryTolPrecision2()) != places:
+    places = DRAWING_PRECISION_BY_NAME[name]
+    applied = int(display.GetPrimaryTolPrecision2())
+    if applied != places:
         raise RuntimeError(
-            f"ArborBoreDia tolerance did not take the nominal's {places} places"
+            f"{name} tolerance imported at {applied} places, not the part's {places}"
         )
 
 
-def _use_single_arrow_od_leader(adapter: Any, annotations: list[Any]) -> None:
+def _prefix_diameter_symbol(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Print the Ø on a doubled centerline-to-witness (diametric linear) size.
+
+    Imported into a side view it prints as a bare "17.63", which reads as a
+    linear height (machinist review r6 of 874c912e6, gating clarity).  The
+    prefix compartment takes SolidWorks' own diameter token, read back.
+    """
     matches = [
         annotation
         for annotation in annotations
-        if dimension_name(adapter, annotation) == "OutsideDia"
+        if dimension_name(adapter, annotation) == name
     ]
     if len(matches) != 1:
-        raise RuntimeError(f"expected one OutsideDia annotation, found {len(matches)}")
+        raise RuntimeError(f"expected one {name} annotation, found {len(matches)}")
     annotation = _sw_type_info.early_bound_or_flag(
         matches[0], "IAnnotation", "GetSpecificAnnotation"
     )
-    display = annotation.GetSpecificAnnotation()
-    if display is None:
-        raise RuntimeError("OutsideDia annotation has no display dimension")
     display = _sw_type_info.early_bound_or_flag(
-        display,
-        "IDisplayDimension",
-        "SetSecondArrow",
-        "GetUseDocSecondArrow",
-        "GetSecondArrow",
-        "SetBrokenLeader2",
-        "GetUseDocBrokenLeader",
-        "GetBrokenLeader2",
+        annotation.GetSpecificAnnotation(), "IDisplayDimension", "SetText", "GetText"
     )
-    display.Diametric = True
-    display.ArrowSide = 1
-    display.SetSecondArrow(False, False)
-    display.SolidLeader = False
-    if display.SetBrokenLeader2(False, 2) != 0:
-        raise RuntimeError("failed to apply broken horizontal OutsideDia leader")
-    if (
-        bool(display.SolidLeader)
-        or bool(display.GetUseDocBrokenLeader())
-        or int(display.GetBrokenLeader2()) != 2
-        or bool(display.GetUseDocSecondArrow())
-        or bool(display.GetSecondArrow())
-    ):
-        raise RuntimeError("OutsideDia single-arrow leader style did not persist")
+    existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+    if "<MOD-DIAM>" in existing:
+        return
+    prefix = "<MOD-DIAM>" + existing
+    display.SetText(1, prefix)
+    applied = str(display.GetText(1) or "")
+    if applied != prefix:
+        raise RuntimeError(f"{name}: diameter prefix did not persist ({applied!r})")
+
+
+def _show_side_view_simplified(adapter: Any, view: Any) -> None:
+    """Draw the side view by the simplified gear convention: the OD outline.
+
+    Every tooth edge along the 143 mm drum printed as a dense block of lines
+    (machinist review r5 of 6d23cf234, minor).  The part's derived
+    ``Default Simplified`` configuration suppresses only the tooth cut and
+    pattern (``_simplified_part``), so the side view shows the blank at the tip
+    diameter; the end view and the isometric keep every tooth.
+    """
+    configuration = simplified_name("Default")
+    bound = _early_bound(view, "IView")
+    bound.ReferencedConfiguration = configuration
+    rebuild_drawing(adapter, label="side view configuration")
+    observed = str(bound.ReferencedConfiguration)
+    if observed != configuration:
+        raise RuntimeError(
+            f"side view references {observed!r} after setting {configuration!r}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -236,6 +277,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Gear Data",
             "Manufacturing Notes",
             "Isometric View Note",
+            "End View Note",
         ),
         required=(
             "Number",
@@ -245,6 +287,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Gear Data",
             "Manufacturing Notes",
             "Isometric View Note",
+            "End View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -274,21 +317,33 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE
     )
+    _show_side_view_simplified(adapter, right)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
     _verify_title_material_specification(drawing_model, material_binding)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="toothed end"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="toothed end",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="full tooth face"
+    # The tip diameter's owner is the blanked OutsideDiaReference sketch,
+    # shown in the side view only.
+    right_annotations = hidden_sketches.curate_view_dimensions(
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="full tooth face",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _use_single_arrow_od_leader(adapter, front_annotations)
     annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _match_bore_tolerance_places(adapter, front_annotations)
+    _assert_tolerance_places(adapter, front_annotations, "ArborBoreDia")
+    _assert_tolerance_places(adapter, right_annotations, "OutsideDia")
+    _prefix_diameter_symbol(adapter, right_annotations, "OutsideDia")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to drum bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
@@ -296,7 +351,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.190, 0.135),
+        symbol_xy=(FRONT_CENTER[0] + 0.045, FRONT_CENTER[1] - 0.030),
         control=surface_finish_by_key(SURFACE_FINISHES, "drum_bore"),
         label="drum bore finish",
         entity=bore_edge,
@@ -316,9 +371,18 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(
         adapter,
-        "Manufacturing Notes",
-        *MANUFACTURING_NOTES_POS,
+        "End View Note",
+        *END_VIEW_NOTE_POS,
         char_height=0.0025,
+    )
+    add_leader_note(
+        adapter,
+        properties["Manufacturing Notes"],
+        text_xy=TOOTH_NOTE_POS,
+        attach_xy=TOOTH_NOTE_ATTACH,
+        label="tooth do-not-cut note",
+        view=right,
+        height=0.0025,
     )
 
     return await finalize_drawing(

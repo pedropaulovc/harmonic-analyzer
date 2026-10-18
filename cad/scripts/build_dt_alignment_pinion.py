@@ -19,6 +19,12 @@ Layout: axis Z, drum z 0..143.2, Ø8 through-bore on the axis.
 The ch30/M6.8 model carries it in the DISENGAGED rest state (p. 68
 "gap"). The native gap's half-pitch rotation keeps +X at a tooth crest.
 
+``OutsideDiaReference`` (blanked, on the Right plane, on the drum axis): a
+construction witness along the tooth tips whose one diametric dimension is the
+printed, banded tip diameter, so the side view prints it beside the length
+(drawing-guidelines.md rule 11 (turned parts read like the lathe)). A
+Right-plane sketch maps local +x -> model -Z.
+
 Dimensions: cad/DIMENSIONS.md "Chapter 25"; tooth count from
 cad/config/machine/alignment_pinion.yaml.
 
@@ -36,11 +42,18 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _drawing_dimension_insert import add_diametric_linear_dimension
 from _feature_tree import feature_name_by_type, name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, ensure_fully_defined
+from _sketch import (
+    SketchDims,
+    blank_reference_sketches,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
@@ -55,11 +68,14 @@ from dt_alignment_pinion_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    END_VIEW_NOTE,
     FACE_WIDTH,
     GEAR_DATA,
     ISOMETRIC_VIEW_NOTE,
     OUTSIDE_DIA,
     OUTSIDE_DIA_BAND,
+    OUTSIDE_DIA_REFERENCE,
+    REFERENCE_SKETCHES,
     STOCK_FORM,
     SURFACE_FINISHES,
 )
@@ -75,6 +91,8 @@ MATERIAL = "Brass"  # p.67: brass drum, same finish as the cylinder train
 # separate MHA-DT-022 steel arbor.
 
 BORE_R = BORE_DIA / 2.0
+# Sketch-only length of the tip-diameter witness stub (OutsideDiaReference).
+_WITNESS_STUB_MM = 1.0
 
 
 async def build(adapter) -> dict[str, str]:
@@ -138,6 +156,8 @@ async def build(adapter) -> dict[str, str]:
     v_bore = math.pi * BORE_R**2 * FACE_WIDTH
     expected = v_gear - v_bore
     await volume_check(adapter, "arbor bore", expected, 0.02 * v_bore)
+
+    await _add_outside_dia_reference(adapter, drive_jobs)
     # The stock-form gear's central reference axis (Axis1@alignment-pinion,
     # Top∩Right) is the pinion spin/lock axis used by the p2 swing group in
     # build_dt_drive_train_assembly -- same convention as the cone gears.
@@ -151,14 +171,23 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven alignment pinion (equations neutral)", expected, 0.02 * v_bore
     )
+    # The printed tip band rides the side-view witness, not the Front-plane
+    # blank circle that only drives the solid.  Both bands print at their
+    # nominal's places (+0.00/-0.10), authored here so the .SLDPRT is the one
+    # source the drawing imports (Codex P1 on #1647).
     set_dimension_bilateral_tolerance(
-        adapter, "GearBlankProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND)
+        adapter,
+        "OutsideDiaReference",
+        "OutsideDia",
+        *deviations(OUTSIDE_DIA_BAND),
+        places=DRAWING_PRECISION[OUTSIDE_DIA_REFERENCE]["OutsideDia"],
     )
     set_dimension_bilateral_tolerance(
         adapter,
         "ArborBoreProfile",
         "ArborBoreDia",
         *deviations(ARBOR_BORE_BAND),
+        places=DRAWING_PRECISION["ArborBoreProfile"]["ArborBoreDia"],
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
@@ -178,9 +207,92 @@ async def build(adapter) -> dict[str, str]:
             "Gear Data": GEAR_DATA,
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "End View Note": END_VIEW_NOTE,
         },
     )
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
+
+
+async def _add_outside_dia_reference(
+    adapter, drive_jobs: list[tuple[str, str]]
+) -> None:
+    """Hidden Right-plane witness of the tip diameter for the side view.
+
+    An axis centerline over the drum length and a short construction stub on
+    the +Y tooth tips at the front face; the doubled centerline-to-stub
+    dimension is the printed tip diameter, driven by the same ``OutsideDia``
+    global as the blank.  The stub stays short because the side view shows
+    this sketch, and a full-length witness printed as a stray centreline over
+    the top outline (machinist review r5 of 6d23cf234, minor).
+    """
+    radius = OUTSIDE_DIA / 2.0
+    ref = SketchDims()
+    check("create_sketch outside-dia reference", await adapter.create_sketch("Right"))
+    # Inference suppressed: the witness lies on the +Y tooth-tip edge.
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "outside-dia reference axis",
+        await adapter.add_centerline(0.0, 0.0, -FACE_WIDTH, 0.0),
+    )
+    witness = check(
+        "outside-dia witness stub",
+        await adapter.add_line(0.0, radius, -_WITNESS_STUB_MM, radius),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("outside-dia witness failed to become construction geometry")
+    for label, line in (("axis", axis), ("witness", witness)):
+        check(
+            f"outside-dia reference {label} horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+    check(
+        "outside-dia reference axis starts at the front face",
+        await adapter.add_sketch_constraint(f"{axis}.start", "origin", "coincident"),
+    )
+    check(
+        "outside-dia witness starts at the front face",
+        await adapter.add_sketch_constraint(
+            f"{witness}.start", "origin", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        f"{axis}.end",
+        "horizontal_distance",
+        FACE_WIDTH,
+        "outside-dia reference span",
+    )
+    ref.record("WitnessSpan", '"FaceWidth"')
+    # The stub's length only defines the sketch: auto-named, unmarked.
+    await dimension_between(
+        adapter,
+        f"{witness}.start",
+        f"{witness}.end",
+        "horizontal_distance",
+        _WITNESS_STUB_MM,
+        "outside-dia witness stub length",
+    )
+    ref.record(None, None)
+    # Centerline to the witness's start POINT, as build_dt_crank_pinion: a
+    # centerline-to-construction-line pick made a plain linear dimension
+    # (farm r3 4e0aa5d74: "OutsideDia: new dimension is not diametric").
+    await add_diametric_linear_dimension(
+        adapter,
+        axis,
+        f"{witness}.start",
+        (-FACE_WIDTH / 2.0, radius + 5.0),
+        "OutsideDia",
+    )
+    ref.record("OutsideDia", '"OutsideDia"')
+    await ensure_fully_defined(adapter, "outside-dia reference sketch")
+    check("exit_sketch outside-dia reference", await adapter.exit_sketch())
+    name_last_feature(adapter, OUTSIDE_DIA_REFERENCE)
+    drive_jobs += ref.apply(adapter, OUTSIDE_DIA_REFERENCE)
 
 
 if __name__ == "__main__":
