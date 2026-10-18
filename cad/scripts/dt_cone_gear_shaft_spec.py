@@ -176,19 +176,22 @@ def _gear(teeth: int) -> str:
     return f"T{teeth:03d}"
 
 
+def _land_1_gears() -> str:
+    teeth = SECTION_CONE_GEAR_TEETH[1]
+    return f"{_gear(min(teeth))}-{_gear(max(teeth))}"
+
+
 # Each tight band names its mate at its own callout (drawing-guidelines.md
 # rule 4; machinist review r1 found the mates only in a general note).  The
 # journal runs in the post bore; every gear land's seat and flat slide in
 # the D-bores of the gears it carries (cone_shaft_land_bands
 # .SECTION_CONE_GEAR_TEETH, the 64T on land 1 too).  Two lines below the
 # journal's and land 1's diameters, where the side view has room; one-line
-# suffixes on the stepped tip, whose texts climb over each other.
+# suffixes on the stepped tip, whose texts climb over each other, and on
+# every across-flat (machinist review r2: A-A's too).
 SEAT_MATE_CALLOUTS = {
     "Sec0Dia": "RUNNING FIT IN\nMHA-DT-005 BORE",
-    "Sec1Dia": (
-        f"SLIDES IN 64T AND\n{_gear(min(SECTION_CONE_GEAR_TEETH[1]))}"
-        f"-{_gear(max(SECTION_CONE_GEAR_TEETH[1]))}"
-    ),
+    "Sec1Dia": f"SLIDES IN 64T AND\n{_land_1_gears()}",
 }
 SEAT_MATE_SUFFIXES = {
     f"Sec{land}Dia": " SLIDES IN "
@@ -196,8 +199,11 @@ SEAT_MATE_SUFFIXES = {
     for land in (2, 3, 4)
 }
 FLAT_MATE_SUFFIXES = {
-    f"Sec{land}AF": " " + ", ".join(_gear(t) for t in SECTION_CONE_GEAR_TEETH[land])
-    for land in (2, 3, 4)
+    "Sec1AF": f" 64T, {_land_1_gears()}",
+    **{
+        f"Sec{land}AF": " " + ", ".join(_gear(t) for t in SECTION_CONE_GEAR_TEETH[land])
+        for land in (2, 3, 4)
+    },
 }
 # The flats' one shared clock (each turns every gear on its land), flagged on
 # the first flat's section rather than left as a general note.

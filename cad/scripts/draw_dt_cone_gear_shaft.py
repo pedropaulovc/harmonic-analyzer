@@ -332,14 +332,16 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # centred over its text and SECTION_CALLOUT_REACH either side of it, so D
 # stands between C-C's outline and the right border and A's stays left of
 # B's cell; C stands left of A's column, its cell clear of D's callout and
-# of the side view's big end.  B, C and D name their gears after their
-# across-flats (FLAT_MATE_SUFFIXES); A's gears are Ø9.525's, on the land its
-# cutting line crosses beside that callout.
+# of the side view's big end.  Every across-flat names its gears after its
+# value (FLAT_MATE_SUFFIXES), the whole line centred on the text position
+# (r2, 20261018T062935602Z: B's "5.842 -0.01 T024" read 376.0..410.5 mm
+# about its 393 mm centre), so A stands 4 mm right of r2's to keep its longer
+# line off the Ø12.231 block and clear of B's.
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
 # land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
     DSection(
-        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.337, 0.165), (2, 1)
+        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.341, 0.165), (2, 1)
     ),
     DSection(
         2,
@@ -386,6 +388,9 @@ SECTION_CALLOUT_REACH = {
     name: (len(text) * ABOVE_CALLOUT_CHAR_WIDTH / 2.0, 0.0087)
     for name, text in SECTION_ABOVE_CALLOUTS.items()
 }
+# One character of an across-flat line, value, band and suffix together: B's
+# 16-character line read 34.5 mm on r2 (20261018T062935602Z).
+AF_CHAR_WIDTH = 0.0345 / 16
 # Section C-C's native outline, (0.2597..0.3503) x (0.0682..0.1318) at
 # 20261010T071427837Z, which the layout audit holds text off.
 SECTION_C_OUTLINE_RIGHT = 0.3503

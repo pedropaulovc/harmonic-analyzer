@@ -159,6 +159,7 @@ def test_the_d_sections_print_the_corner_limit_clock_and_mates(monkeypatch):
         ([terminal], {terminal: drawing.TORQUE_CORNER_CALLOUT}, "above"),
     ]
     assert suffixes == [
+        (["Sec1AF"], {"Sec1AF": " 64T, T030-T120"}),
         (["Sec2AF"], {"Sec2AF": " T024"}),
         (["Sec3AF"], {"Sec3AF": " T018"}),
         (["Sec4AF"], {"Sec4AF": " T006, T012"}),
@@ -775,15 +776,12 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
         assert text_x == x and text_y > y + half, section
         # A's and the terminal land's across-flats carry one-line callouts,
         # centred on their texts (20261010T071427837Z: the torque run reached
-        # 6.9 mm past the right border, and over C-C's outline); B to D
-        # carry their gears after the value, the whole line centred.
+        # 6.9 mm past the right border, and over C-C's outline); every one
+        # carries its gears after the value, the whole line centred.
         name = f"Sec{section.land}AF"
         callout_x, callout_y = drawing.SECTION_CALLOUT_REACH.get(name, (0.0, 0.005))
-        suffix = spec.FLAT_MATE_SUFFIXES.get(name, "")
-        text_half = (
-            len("8.763 -0.01") * drawing.LENGTH_CHAR_WIDTH
-            + len(suffix) * drawing.CALLOUT_CHAR_WIDTH
-        ) / 2.0
+        line = "8.763 -0.01" + spec.FLAT_MATE_SUFFIXES[name]
+        text_half = len(line) * drawing.AF_CHAR_WIDTH / 2.0
         reach_x, reach_y = max(callout_x, text_half), callout_y
         cell = (
             min(x - caption_w / 2.0, text_x - reach_x),
