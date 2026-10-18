@@ -65,6 +65,7 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _fit_deviations import deviations
 from _layout_audit import arc_segments
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -88,6 +89,9 @@ from dt_cone_gear_spec import (
     custom_six_form_points_mm,
     stock_form_profile,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_gear"]
