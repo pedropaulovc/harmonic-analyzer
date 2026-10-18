@@ -209,8 +209,11 @@ END_DIAMETERS = {
 # dimension line just right of the view, text beyond the view's top (+Z hole)
 # and bottom (-Z hole), running right into the gap before the dome's
 # extension lines.  That gap (dimension line to dome tip) is ~30 mm, just the
-# 7.000 value's width, so the lower one's mate callout is set in rows no
-# wider than it; the lower text sits 7 mm under the 2.0 dome height's text.
+# 7.000 value's width, so each one's mate callout is set in rows no wider
+# than it (machinist review of 902433a8d: the upper one named no mate).  The
+# upper block runs down from 6 mm under the (SR6.7) to 5 mm over the upper
+# hole's extension line; the lower text sits 7 mm under the 2.0 dome
+# height's text.
 END_PIN_KEEP = {
     "DrivePinOffset1": (0.058, 0.210),
     "DrivePinOffset2": (0.058, 0.145),
@@ -229,9 +232,11 @@ SIDE_KEEP = {
     "CollarSeatStation": ((COLLAR_SEAT_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[6]),
     "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[7]),
     # The shaft length's native unilateral block sits right of the reference
-    # overall on the next row down, not over it.
+    # overall on the next row down, not over it; its stack suffix widens it
+    # left to x ~0.213, so the overall's text stands left of that (layout
+    # audit of 902433a8d: 1.3 mm text clearance).
     "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0 + 0.035, _ROW_Y[8]),
-    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[9]),
+    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0 - 0.030, _ROW_Y[9]),
     # Above the dome, between the +Z drive-pin location's text and the
     # Ø9.525 dimension: the radial leader runs down, right of the one and
     # left of the other, to the dome's sphere.
@@ -258,7 +263,8 @@ SIDE_KEEP = {
 # of it, right of it the Ø17.50's block tops out 6 mm under it (machinist
 # review of b5c02e5d6: the leader crossed the Ø9.525's landing line).  The
 # Ø20.6 (one place, no band) drops under the Ø17.50's landing line, and the
-# Ø11.388 stands right of the Ø17.50's block, its landing line 2 mm over the
+# Ø11.388 stands 4 mm right of the Ø17.50's block (layout audit of
+# 902433a8d: 2.3 mm read as one callout), its landing line 2 mm over the
 # outboard journal's finish symbol and its fit row 7 mm under the cross-hole
 # callout's landing line; the relief's Ø10.4 stands right of it.
 # The neck's loose Ø9.5 (2X: both bare necks) stands on the inboard neck,
@@ -269,7 +275,7 @@ DIAMETER_POSITIONS = {
     "JournalDiaDim": (RELIEF_START_X - 0.0069, 0.224),
     "ReliefDiaDim": (RELIEF_START_X + 0.045, 0.212),
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2125),
-    "SpigotDiaDim": (COLLAR_SEAT_X + 0.009, 0.2215),
+    "SpigotDiaDim": (COLLAR_SEAT_X + 0.0075, 0.2215),
     "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2065),
     "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
 }
@@ -284,13 +290,14 @@ CALLOUTS_ABOVE = {
     "SpigotDiaDim": SPIGOT_AIR,
     "NeckDiaDim": f"{len(SHAFT_NECKS)}X",
 }
-# The lower drive-pin location names the mate its +/-0.025 serves
+# Each drive-pin location names the mate its +/-0.025 serves
 # (crankshaft_notes), in the clear field under its text; the spigot's length
 # names the chain it keeps clear, between the cross-hole's and the collar
 # seat's extension lines.  Each banded diameter names its mate under its
 # value.
 CALLOUTS_BELOW = {
     "OverallLength": "OVERALL",
+    "DrivePinOffset1": DRIVE_PIN_LOCATION_CALLOUT,
     "DrivePinOffset2": DRIVE_PIN_LOCATION_CALLOUT,
     "SpigotLength": CHAIN_AIR_MATE,
     "ShaftDiaDim": SHANK_MATE,

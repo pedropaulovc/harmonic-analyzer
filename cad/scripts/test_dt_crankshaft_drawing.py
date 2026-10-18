@@ -332,19 +332,21 @@ _PIN_VALUE_TEXT_WIDTH = 0.0275
 _CALLOUT_CHAR_WIDTH = 0.00275
 
 
-def test_lower_pin_location_text_ends_before_the_dome_extension_lines() -> None:
+def test_pin_location_texts_end_before_the_dome_extension_lines() -> None:
     # Machinist review of 19e33c6c2: the text block runs right from the
     # dimension line beside the end view, and the old two-row callout carried
     # the value and its mate note across the dome tip's and dome root's
-    # extension lines.  Every row must end, with air, before the dome tip.
-    x, _y = drawing.END_PIN_KEEP["DrivePinOffset2"]
+    # extension lines.  Every row must end, with air, before the dome tip;
+    # both pin locations name the mate (machinist review of 902433a8d).
     rows = notes.DRIVE_PIN_LOCATION_CALLOUT.splitlines()
     assert "MHA-PD-009" in rows and "SPROCKET" in " ".join(rows)
     block = max(
         _PIN_VALUE_TEXT_WIDTH,
         max(len(row) for row in rows) * _CALLOUT_CHAR_WIDTH,
     )
-    assert x + block + 0.001 < drawing.DOME_TIP_X
+    for name, (x, _y) in drawing.END_PIN_KEEP.items():
+        assert drawing.CALLOUTS_BELOW[name] == notes.DRIVE_PIN_LOCATION_CALLOUT
+        assert x + block + 0.001 < drawing.DOME_TIP_X, name
 
 
 def test_blind_pin_holes_bottom_in_the_collar_body_not_the_spigot_end() -> None:
