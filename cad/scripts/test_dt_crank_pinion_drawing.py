@@ -540,19 +540,20 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert top < bore_y < outside_y - 0.010 < turned_y - 0.030
     assert drawing._side_x(spec.SHOULDER_LENGTH) < turned_x < drawing._side_x(spec.FACE_WIDTH)
     # Lengths below the view, baseline-stacked from the south face, shortest
-    # innermost; the banded two stand outside the faced end with their stack
-    # callouts, and the pin station shares the innermost row in its own span.
+    # innermost. The banded two carry stack callouts outside their spans on
+    # opposite sides (r2 of #1652: stacked on one side, the 8.5 line struck
+    # the 11.6's limits); the pin station sits on the first row in its span.
     for name in ("ShoulderLength", "FaceWidth", "OverallLength", "PinFromBossEnd"):
         assert drawing.RIGHT_KEEP[name][1] < drawing.RIGHT_CENTER[1] - half_od, name
     assert (
-        drawing.RIGHT_KEEP["ShoulderLength"][1]
+        drawing.RIGHT_KEEP["PinFromBossEnd"][1]
+        > drawing.RIGHT_KEEP["ShoulderLength"][1]
         > drawing.RIGHT_KEEP["FaceWidth"][1]
         > drawing.RIGHT_KEEP["OverallLength"][1]
     )
-    for name in ("ShoulderLength", "FaceWidth"):
-        assert drawing.RIGHT_KEEP[name][0] < face_x - 0.020, name
-    pin_x, pin_y = drawing.RIGHT_KEEP["PinFromBossEnd"]
-    assert pin_y == pytest.approx(drawing.RIGHT_KEEP["ShoulderLength"][1])
+    assert drawing.RIGHT_KEEP["ShoulderLength"][0] < face_x - 0.020
+    assert drawing.RIGHT_KEEP["FaceWidth"][0] > drawing._side_x(spec.FACE_WIDTH) + 0.020
+    pin_x, _pin_y = drawing.RIGHT_KEEP["PinFromBossEnd"]
     assert drawing._side_x(spec.PIN_STATION) < pin_x < drawing._side_x(spec.OVERALL_LENGTH)
     # The pin hole's reference diameter leads up and right from the hole's
     # centre and leaves the boss's top before the boss diameter's extension

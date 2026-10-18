@@ -662,7 +662,8 @@ TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.
 # names the check, not its step number: a part never reads the step registry
 # (Main's TbPB ruling 2; test_part_isolation).  The allowance rides the
 # turned diameter's own callout, so it cannot be read against the tip
-# diameter (machinist review r1 of #1652).
+# diameter (machinist review r1 of #1652), and says who turns it, when and
+# on what result (r2: "MAY TURN" named neither).
 T120_SHOULDER_CLEARANCE_TEXT = (
     "NO AXIAL OVERLAP"
     if T120_SHOULDER_AIR_WORST == math.inf
@@ -671,8 +672,10 @@ T120_SHOULDER_CLEARANCE_TEXT = (
 TURNED_DIA_FITUP_CALLOUT = "\n".join(
     (
         f"{CONE_GEAR_NUMBER} T120 CLR",
-        "MHA-DT-000 CHECK MAY",
-        f"TURN TO Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN",
+        "IF MHA-DT-000 T120",
+        "FEELER CHECK FAILS,",
+        "TURN AT ASSY TO CLEAR,",
+        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN",
     )
 )
 # Section A-A cuts through a tooth, so the band reads as a solid ring and the

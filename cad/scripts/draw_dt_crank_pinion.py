@@ -76,6 +76,7 @@ from dt_crank_pinion_spec import (
     CONE_GEAR_NUMBER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    FACE_WIDTH,
     MESH_GEAR_NUMBER,
     OUTSIDE_DIA,
     OVERALL_LENGTH,
@@ -206,9 +207,13 @@ FRONT_KEEP: dict[str, tuple[float, float]] = {}
 # outline's witnesses, baseline-stacked below the view from the toothed
 # south face, shortest innermost (drawing-guidelines.md rule 11 (turned parts
 # read like the lathe): one origin per view, baseline not chained); the
-# banded two carry their stack callouts, so their text stands outside the
-# faced end, where the callout lines clear every extension line. The pin's
-# station reads from the boss's north face on the innermost row. The boss
+# banded two carry their stack callouts, so their text stands outside their
+# spans, where the callout lines clear every extension line: the shoulder's
+# left of the faced end, below the end view's lower A, the face width's right
+# of the shoulder, so neither block's lines run through the other's limits
+# (r2: stacked on one side, the 8.5 line struck the 11.6's "0.0" and the A
+# touched the 8.5's callout). The pin's station reads from the boss's north
+# face on the first row. The boss
 # diameter reads on a vertical dimension line beyond the boss end, its text
 # on the axis between the extension lines: at +0.020 it sat on the upper
 # extension line (machinist review of 4d4e038e3), which
@@ -221,20 +226,28 @@ BOSS_DIA_TEXT_X = _side_x(OVERALL_LENGTH) + 0.049
 # Outside the faced end: centred clear of the end view's A arrow, with the
 # widest stack callout still left of the faced end's extension line.
 _LENGTH_TEXT_X = _side_x(0.0) - 0.0295
+# Its mirror right of the shoulder's extension line.
+_FACE_WIDTH_TEXT_X = _side_x(FACE_WIDTH) + 0.029
+# The turned diameter's and pin hole's callouts share the top row; the
+# turned diameter's block grows left from its leader, so it rises clear of
+# the gear data's long rows.
+_TOP_ROW_Y = _SIDE_TOP + 0.065
 RIGHT_KEEP = {
     "BoreDia": (_side_x(0.0) - 0.0095, _SIDE_TOP + 0.012),
     "OutsideDia": (_side_x(0.0) - 0.003, _SIDE_TOP + 0.027),
-    "TurnedDia": (_side_x(SHOULDER_LENGTH + 0.5), _SIDE_TOP + 0.057),
+    "TurnedDia": (_side_x(SHOULDER_LENGTH + 1.5), _TOP_ROW_Y),
     "BossDia": (BOSS_DIA_TEXT_X, RIGHT_CENTER[1]),
-    "PinHoleDia": (0.275, _SIDE_TOP + 0.057),
-    "ShoulderLength": (_LENGTH_TEXT_X, _SIDE_BOTTOM - 0.006),
+    "PinHoleDia": (0.275, _TOP_ROW_Y),
+    "ShoulderLength": (_LENGTH_TEXT_X, _SIDE_BOTTOM - 0.019),
     "PinFromBossEnd": (
         (_side_x(PIN_STATION) + _side_x(OVERALL_LENGTH)) / 2.0,
         _SIDE_BOTTOM - 0.006,
     ),
-    "FaceWidth": (_LENGTH_TEXT_X, _SIDE_BOTTOM - 0.026),
+    "FaceWidth": (_FACE_WIDTH_TEXT_X, _SIDE_BOTTOM - 0.026),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.043),
 }
+# The section caption sits right of the face width's callout block.
+SECTION_CAPTION_XY = (0.302, 0.085)
 DIMENSION_TEXT_LINE_GAP = 0.0005
 # The boss diameter's text is centred on its dimension line; it read 13.1 mm
 # wide on the f0c105531 render. Its right edge plus a clearance bounds where
@@ -424,7 +437,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="crank pinion longitudinal centre section",
     )
-    _position_section_caption(adapter, right, (0.290, 0.085))
+    _position_section_caption(adapter, right, SECTION_CAPTION_XY)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
