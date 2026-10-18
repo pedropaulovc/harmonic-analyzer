@@ -189,9 +189,13 @@ EXPLODED_ISO_CENTER = (0.100, 0.140)
 # A replay of the ring with the anchor-nut balloon added covers every landing
 # on the visible shaft, nut attachments at least 3.5 mm below the anchor's,
 # and balloon radius 5.0-5.6 mm. At 28 mm it crosses nothing and keeps
-# leader 14 2.1-4.4 mm off the shaft, with the ring 5 mm inside the border at
-# the top and 6 mm at the bottom.
-BALLOON_MARGIN = 0.028
+# leader 14 2.1-4.4 mm off the shaft, but the ring's centres ran 5.5 mm inside
+# the border at the top, so balloon 4's 5.6 mm circle touched it (machinist
+# review, #1660 r1). At 26 mm the top circle clears the border by about 2 mm;
+# _assert_view_on_sheet now grows the outline by the ring plus the largest
+# balloon radius, so a balloon circle can never reach the border.
+BALLOON_MARGIN = 0.026
+BALLOON_MAX_RADIUS = 0.0056
 # Balloon 3 (the rocker pivot bracket) walked to its ear's apex. Lifted 60
 # straight up its foot hole, which lies in front of the ear, the hold-down
 # (item 7) now stands right over that apex in the isometric, so leader 3 ran
@@ -926,9 +930,10 @@ def _fitup_notes() -> tuple[str, str]:
             f"{top_frame} ON THE MILL: SHAFT THROUGH BOTH KEEPERS, FEET "
             "OUTBOARD ON THE RAIL. SET EACH LUG CENTRE OFF THE RAIL WEB CENTRE "
             "BELOW IT AND THE LUG INNER FACES OFF THE LINE OF THE UPPER SOCKET "
-            "CENTRES, TO THE KEEPER PLAN "
-            f"VIEW: THE {fulcrum_shaft} FLATS ARE A FIXED PITCH APART, AND THE "
-            "INNER-FACE BANDS LEAVE ONE STEP "
+            "CENTRES, TO THE KEEPER PLAN VIEW. THE SOUTH FACE'S BAND KEEPS THE "
+            f"SOUTH FOOT CLEAR OF THE {top_frame} FRONT SOCKET BOSS. THE "
+            f"{fulcrum_shaft} FLATS ARE A FIXED PITCH APART, AND THE TWO "
+            "INNER-FACE BANDS TOGETHER LEAVE ONE STEP "
             f"{steps.step_number(steps.SET_SCREWS_STAKED_KEY)} SHAFT POSITION "
             "WITH BOTH FLATS UNDER THEIR CROWN TAPS AND NO LEVER HUB ON A FLAT. "
             f"CLAMP; TRANSFER EACH FOOT HOLE INTO THE RAIL, TAP AS {top_frame}, "
@@ -1291,7 +1296,9 @@ def _place_exploded_sheet(
     _center_view_outline(
         adapter, exploded, EXPLODED_ISO_CENTER, label="channel exploded"
     )
-    _assert_view_on_sheet(exploded, margin=BALLOON_MARGIN, label="channel exploded")
+    _assert_view_on_sheet(
+        exploded, margin=BALLOON_MARGIN + BALLOON_MAX_RADIUS, label="channel exploded"
+    )
     table = insert_bom_table(
         adapter,
         exploded,

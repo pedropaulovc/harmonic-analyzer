@@ -754,15 +754,28 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
         "WEB CENTRE,\nSPLIT OF BOTH WEB FACES" in text
         for text, _, _ in drawing.PLAN_POINTERS
     )
-    # The band's function (Main's ruling, 2026-10-16): the shaft's flat-station
-    # window, 0.14 at 0.02 and gone by 0.09 (ch_fulcrum_shaft_spec). The slide
-    # (r11 review) moves both flats at once; the band is what leaves it a seat.
+    # The bands' functions (Main's ruling, 2026-10-16): together they hold the
+    # shaft's flat-station window (ch_fulcrum_shaft_spec); the slide (r11
+    # review) moves both flats at once, the band is what leaves it a seat. The
+    # south face's band alone is also what keeps its foot off the front socket
+    # boss at the printed worst case (build_fr_top_frame), which the step names
+    # so the absolute setting has a stated reason (#1660 r1, rules 4 and 19).
+    import build_fr_top_frame as top
+
+    south_margin, north_margin = top.KEEPER_FOOT_PRINTED_BOSS_MARGINS
+    # At the title block's band for these places the south foot would reach
+    # the boss; the north foot keeps a wide margin either way.
+    band = keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    title_block_band = top.PRINTED_LINEAR_BAND_MM[places]
+    assert 0.0 < south_margin < title_block_band - band
+    assert north_margin > 10 * band
     staked_number = steps.step_number(steps.SET_SCREWS_STAKED_KEY)
-    assert (
-        f"THE {fulcrum_shaft} FLATS ARE A FIXED PITCH APART, AND THE INNER-FACE "
-        f"BANDS LEAVE ONE STEP {staked_number} SHAFT POSITION WITH BOTH FLATS "
-        "UNDER THEIR CROWN TAPS AND NO LEVER HUB ON A FLAT."
-    ) in fitted
+    for phrase in (
+        f"SOUTH FOOT CLEAR OF THE {top_frame} FRONT SOCKET BOSS",
+        f"THE {fulcrum_shaft} FLATS ARE A FIXED PITCH APART",
+        f"BANDS TOGETHER LEAVE ONE STEP {staked_number} SHAFT POSITION",
+    ):
+        assert phrase in fitted
     assert "EACH FLAT LIES UNDER ITS CROWN TAP" in _step_body(
         steps.SET_SCREWS_STAKED_KEY
     )
