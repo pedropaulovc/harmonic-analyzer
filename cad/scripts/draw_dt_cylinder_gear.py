@@ -124,14 +124,17 @@ NOTCH_DETAIL_DIMENSIONS = {
 # * The cam diameter drops to the gear's lower right; its three mate rows
 #   hang to y ~216, left of the side view (194) and above the isometric (212).
 # * The eccentricity's text leaves its extension lines (y 270/283) for the
-#   free lane below them, so its two function rows sit on no line.
+#   free lane below them, so its two function rows sit on no line.  The
+#   text hangs RIGHT of its dimension line (r2: from x 174 its 35 mm shelf
+#   reached the side view's cam at 205.7), so the line stands just off the
+#   tips (153.4) and the shelf ends ~192, short of the side view (194).
 # * The notch phase's four rows (x ~112..150, y ~320..344) stay inside the
 #   (90°) arc (r 88.6 off the gear centre; r4b: a larger arc reached the side
 #   view and the gear data) with the cam finish symbol moved down out of them.
 FRONT_KEEP = {
     "BoreDia": (0.041, 0.340),
     "CamDia": (0.166, 0.232),
-    "CamCy": (0.174, 0.257),
+    "CamCy": (0.157, 0.257),
     "NotchPhase": (0.131, 0.332),
     "PatternNotchPhase": (0.178, 0.321),
 }
@@ -144,6 +147,9 @@ RIGHT_KEEP = {
 # at (0.225, 0.220) the OD's lower extension line (y 221.7) ran through it and
 # its own dimension line ran 2.2 mm into it (r1 layout audit).
 FACE_WIDTH_TEXT = (0.240, 0.207)
+# The stacking text floats above its dimension line (y 351.7): drawn on it,
+# the line and the extension-line ends struck 7.0565 ±0.025 (machinist r2).
+OVERALL_THICKNESS_TEXT = (0.205, 0.368)
 # The parenthesised cam thickness moves above the side view, left of its
 # rims, so the lower lane is face width's alone (x 172..188, y ~336: under
 # the stacking callout, outside the (90°) arc).
@@ -651,6 +657,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # native export (the former cam-thickness fit callout).
     overall_prefix = f"{STACK_FIT_CALLOUT}\n"
     overall_display.SetText(1, overall_prefix)
+    offset_dimension_text(
+        adapter, right_annotations, {"OverallThickness": OVERALL_THICKNESS_TEXT}
+    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to cam-side front view")
