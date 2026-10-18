@@ -1314,7 +1314,9 @@ def test_both_sections_name_their_faces() -> None:
         assert pick in {"max", "min"}
     # r5's A-A tip (2:1 about the bore axis x 0.372, top face y 0.11365)
     # puts the label in its free field (2.8 mm a character).
-    (offset,) = (o for k, t, *_r, o in drawing.FACE_LABELS if (k, t) == ("A-A", "TOP FACE"))
+    (offset,) = (
+        o for k, t, *_r, o in drawing.FACE_LABELS if (k, t) == ("A-A", "TOP FACE")
+    )
     tip = (0.372 + 2 * 0.0068, 0.11365)
     x, y = tip[0] + offset[0], tip[1] + offset[1]
     top = (x, y - 0.0045, x + len("TOP FACE") * 0.0028, tip[1])
