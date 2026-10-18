@@ -2,7 +2,7 @@ dt-crank-handle:
   number: MHA-DT-008
   material: FAS white oak, grain axial; 6-8% MC
   material_specification: FAS white oak, clear, straight grain along axis; 6-8% MC
-  finish: P220 sand; ebonize (India ink or black aniline dye) to solid black; 3x satin poly; P320 between; cure 7 d
+  finish: P220; ebonize (India ink or aniline dye); 3x satin poly, P320 between; mask bore, tenon, counterbore
   quantity: 1
   tolerance_class: visual_noncritical
   process: "turned (wood)"

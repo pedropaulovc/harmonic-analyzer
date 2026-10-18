@@ -175,20 +175,22 @@ FRONT_KEEP = {
     # Diameters across their own cut.  The shoulder and waist shelves sit
     # under the section; the fitted tenon's and the counterbore's callout
     # blocks stand below them, above the title block, and the reamed bore's
-    # lower still between them, clear of the swell.
+    # lower still between them, clear of the swell.  The counterbore's
+    # five-line block stands near its floor, clear of the end view.
     "ShoulderDia": (_front_x(SHOULDER_X) + _SHELF, _BELOW),
     "WaistDia": (_front_x(WAIST_X) + _SHELF, _BELOW),
     "TenonDia": (_front_x(TENON_X0) + 4.0 * _SHELF, _CALLOUT_ROW),
     "PivotBoreDia": (0.140, 0.068),
     "CounterboreDia": (
-        _front_x(OAK_END_X - COUNTERBORE_DEPTH / 2.0) + _SHELF,
-        _CALLOUT_ROW,
+        _front_x(OAK_END_X - COUNTERBORE_DEPTH) + 0.0055,
+        _CALLOUT_ROW + 0.0015,
     ),
     # The swell's diameter reads above the section, clear of the bore's
     # callout, beside the 40.0 station's extension line.
     "PeakDia": (_front_x(PEAK_X) + 2.0 * _SHELF, 0.225),
-    # Right of the oak end, clear of the end view.
-    "CrestDia": (_front_x(OAK_END_X) + 0.0095, _BELOW),
+    # Right of the oak end, above the crest, under the R1.5 and clear of the
+    # end view and of the counterbore's callout block.
+    "CrestDia": (_front_x(OAK_END_X) + 0.0095, 0.165),
 }
 # Every band renders from its model dimension; the callouts carry the reamed
 # bore's mate and the fitted tenon's and counterbore's mates and clearances

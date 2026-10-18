@@ -92,9 +92,13 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert spec.COUNTERBORE_DIA == pytest.approx(cup.BODY_DIA + 0.1)
     assert drawing.DIMENSION_CALLOUTS["TenonDia"] == spec.TENON_FIT_NOTE
     assert drawing.DIMENSION_CALLOUTS["CounterboreDia"] == spec.COUNTERBORE_FIT_NOTE
+    # Rule 4: a matched pair names its mate by name and number.
     assert "MHA-DT-034" in spec.TENON_FIT_NOTE
+    assert spec.FERRULE_NAME in spec.TENON_FIT_NOTE
     assert "DIAMETRAL CLEARANCE" in spec.TENON_FIT_NOTE
     assert "MHA-DT-035" in spec.COUNTERBORE_FIT_NOTE
+    assert spec.CUP_NAME in spec.COUNTERBORE_FIT_NOTE
+    assert spec.SCREW_NAME in spec.PIVOT_BORE_CALLOUT
     assert "<MOD-DIAM>8.5 MAX" in spec.COUNTERBORE_FIT_NOTE
     assert "FLUSH" in spec.COUNTERBORE_FIT_NOTE
     # The fitted tenon keeps its ferrule seat and 1.5 over the bore, with
@@ -204,5 +208,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert len(str(spec["material"])) <= 36
     assert "straight grain along axis" in spec["material_specification"]
     assert "6-8% MC" in spec["material_specification"]
-    assert spec["finish"]
+    # The poly film stays out of the running bore and the two glued fits
+    # (machinist review, 2026-10-18).
+    assert "mask" in spec["finish"]
     assert int(spec["quantity"]) == 1
