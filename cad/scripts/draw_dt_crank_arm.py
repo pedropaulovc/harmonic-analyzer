@@ -63,10 +63,16 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from dt_crank_arm_notes import HUB_SEAT_CALLOUT, SEAM_CALLOUT
+from dt_crank_arm_notes import (
+    FIDUCIAL_CALLOUT,
+    HUB_SEAT_CALLOUT,
+    PIVOT_TAP_ROWS,
+    SEAM_CALLOUT,
+)
 from dt_crank_arm_spec import (
     ANCHOR_HOLE_SPEC,
     ANCHOR_SCREW_X,
@@ -78,12 +84,18 @@ from dt_crank_arm_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
+    FIDUCIAL_MODEL_DIA,
+    FIDUCIAL_X,
+    FIDUCIAL_Y,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
     REFERENCE_DIMENSIONS,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_crank_arm"]
 PART_STEM = SPEC.artifact_stem
@@ -191,6 +203,23 @@ def _omit_title_block_thread_class(display: Any) -> None:
         raise RuntimeError("anchor tap callout retained its redundant thread class")
 
 
+def _append_callout_rows(display: Any, rows: str) -> None:
+    """Add ``rows`` under a native hole callout's thread row.
+
+    The definition (``GetText(5)``) carries the thread row; appending keeps
+    the tap-drill and thread rows together, with the rows below them (#984
+    review r3: a prefix split the callout between the two).
+    """
+    native = _early_bound(display, "IDisplayDimension")
+    definition = str(native.GetText(5) or "")
+    if not definition.strip():
+        raise RuntimeError("hole callout has no definition to extend")
+    extended = definition.rstrip() + "\n" + rows
+    native.SetText(1, extended)
+    if str(native.GetText(5) or "") != extended:
+        raise RuntimeError(f"hole callout rows did not persist: {native.GetText(5)!r}")
+
+
 # Per-view survivors of the marked-dimension import.
 FRONT_KEEP = {
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
@@ -231,10 +260,23 @@ SEAM_EDGE_PICK = (
     + AXIAL_PIN_DIA / 2.0 * math.sin(math.pi / 4.0) * SHEET_SCALE[0] / 1000.0,
 )
 SEAM_CALLOUT_XY = (0.104, 0.250)
+# The punched fiducial's rim, picked on its upper-left flank toward the
+# callout standing above the boss end, clear of the hub seat's leader.
+FIDUCIAL_EDGE_PICK = (
+    _sheet_x(FIDUCIAL_X - FIDUCIAL_MODEL_DIA / 2.0 * math.cos(math.pi / 4.0)),
+    FRONT_CENTER[1]
+    + (FIDUCIAL_Y + FIDUCIAL_MODEL_DIA / 2.0 * math.sin(math.pi / 4.0))
+    * SHEET_SCALE[0]
+    / 1000.0,
+)
+FIDUCIAL_CALLOUT_XY = (0.016, 0.196)
 # The overall's pick on the handle-end arc: 2 mm below the axis, on the arc.
 _END_PICK_DY_SHEET = 0.004
 _END_PICK_DX = math.sqrt(HALF_WIDTH**2 - (_END_PICK_DY_SHEET * 1000.0 / SHEET_SCALE[0]) ** 2)
 ANCHOR_CALLOUT_XY = (0.195, 0.205)
+# Centre of the four-line pivot callout: its bottom row stays clear above
+# the arm's top edge, its right end left of the isometric view.
+PIVOT_CALLOUT_XY = (0.270, 0.190)
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
 
@@ -417,17 +459,30 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=SEAM_CALLOUT_XY,
         label="MHA-VN-029 seam callout",
     )
+    # The punched fiducial is flagged at the mark itself, from the clear
+    # band above the boss end.
+    add_attached_note(
+        adapter,
+        front,
+        text=FIDUCIAL_CALLOUT,
+        entity_xy=FIDUCIAL_EDGE_PICK,
+        note_xy=FIDUCIAL_CALLOUT_XY,
+        label="punched fiducial callout",
+    )
     # Handle pivot tap (MHA-DT-032): above and just right of the arm, arrow on
     # the hole's top rim, clear of the full principal view.  Thread and tap
-    # drill ride the native callout; the class is the title block's.
+    # drill ride the native callout; the class is the title block's.  The
+    # mate and mouth limit follow the thread row, so the callout names this
+    # tap, not the identical anchor.
     pivot_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=handle_edge,
-        callout_xy=(0.270, 0.180),
+        callout_xy=PIVOT_CALLOUT_XY,
         label="handle pivot tap",
     )
     _omit_title_block_thread_class(pivot_callout)
+    _append_callout_rows(pivot_callout, PIVOT_TAP_ROWS)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
 

@@ -29,7 +29,6 @@ import math
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SurfaceFinishControl
-from dt_crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX as _PIVOT_TAPPED_MOUTH_DIA_MAX
 from dt_crank_handle_pivot_screw_spec import THREAD_SIZE as PIVOT_SCREW_THREAD_SIZE
 from dt_crank_hub_geometry import (
     ARM_FIDUCIAL_RADIUS,
@@ -172,18 +171,11 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 # not a convenience: the U29 cheek around the hub seat reaches 2 mm only at
 # the mill's width tolerance, not at the .X band.  The #4-40 handle pivot
 # (user ruling 2026-09-30) clears the 1.5D engagement rule, so the sheet no
-# longer states the #8-32's named exception.  Its tapped mouth on the handle
-# face is held to an inspectable maximum, so the MHA-DT-032 shoulder keeps a seat
-# around it.
+# longer states the #8-32's named exception.  The fiducial and the pivot
+# tap's mouth limit are flagged at their features (dt_crank_arm_notes).
 STOCK_NOTE = (
     f"{ARM_WIDTH:.1f} x {ARM_THICKNESS:.1f} SECTION: "
     f"{ARM_WIDTH / MM_PER_IN:g} x {ARM_STOCK_THICKNESS_IN} IN CF FLAT BAR AS SUPPLIED."
 )
-DRAWING_NOTES = "\n".join(
-    (
-        "PUNCH FIDUCIAL MARK WHERE SHOWN; LOCATE BY EYE.",
-        STOCK_NOTE,
-        f"HANDLE PIVOT TAP'S MOUTH <MOD-DIAM>{_PIVOT_TAPPED_MOUTH_DIA_MAX:.1f} MAX ON THE HANDLE FACE.",
-    )
-)
+DRAWING_NOTES = STOCK_NOTE
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

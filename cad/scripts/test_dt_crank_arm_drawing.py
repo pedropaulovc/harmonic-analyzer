@@ -32,12 +32,11 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert spec.HALF_WIDTH == pytest.approx(12.7)
     assert "1 x 5/16 IN CF FLAT BAR AS SUPPLIED" in spec.DRAWING_NOTES
     # The arm bore is made first; the hub is turned to suit it (B1, Main
-    # 2026-09-25: the fit is printed functionally, not as "match-fit").
-    assert notes.HUB_SEAT_CALLOUT.splitlines() == [
-        "MHA-DT-031 HUB IS A LIGHT",
-        "PRESS FIT IN THIS BORE;",
-        "FACES FLUSH",
-    ]
+    # 2026-09-25: the fit is printed functionally, not as "match-fit"), to the
+    # one interference the hub sheet states (#984 review r1: an acceptance).
+    low, high = geometry.SEAT_PRESS_INTERFERENCE
+    assert f"{low:.3f}-{high:.3f}" in notes.HUB_SEAT_CALLOUT
+    assert "MHA-DT-031" in notes.HUB_SEAT_CALLOUT
     assert "MATCH" not in notes.HUB_SEAT_CALLOUT
     assert "FACES FLUSH" in notes.HUB_SEAT_CALLOUT
     assert not hasattr(spec, "SHAFT_BORE_DIA")
@@ -266,7 +265,7 @@ def test_hub_seat_keeps_its_printed_band_under_the_fit_note() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "hub seat nominal" not in source
     assert spec.DRAWING_PRECISION["HubSeatProfile"]["HubSeatDia"] == 1
-    assert "LIGHT" in notes.HUB_SEAT_CALLOUT and "PRESS FIT" in notes.HUB_SEAT_CALLOUT
+    assert "DIAMETRAL" in notes.HUB_SEAT_CALLOUT
 
 
 def test_no_front_dimension_text_sits_on_the_arm() -> None:
@@ -318,11 +317,31 @@ def test_arm_states_no_engagement_exception_for_the_4_40_pivot() -> None:
     # the tapped arm no longer states the #8-32's named exception.
     assert not hasattr(spec, "PIVOT_ENGAGEMENT_NOTE")
     assert "THREAD ENGAGEMENT" not in spec.DRAWING_NOTES
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert lines[1] == spec.STOCK_NOTE
-    # The tapped mouth's break is held to 0.1 so the MHA-DT-032 shoulder keeps a
-    # seat round it (local review of fbf82ad96).
-    assert lines[2] == "HANDLE PIVOT TAP'S MOUTH <MOD-DIAM>3.1 MAX ON THE HANDLE FACE."
+    assert spec.STOCK_NOTE in spec.DRAWING_NOTES.splitlines()
+    # The tapped mouth's limit (MHA-DT-032 shoulder seat, local review of
+    # fbf82ad96) rides the pivot's own callout, not a general note (#984 r1).
+    import dt_crank_handle_pivot_screw_spec as screw
+
+    assert "MOUTH" not in spec.DRAWING_NOTES
+    assert f"{screw.TAPPED_MOUTH_DIA_MAX:.1f} MAX" in notes.PIVOT_TAP_ROWS
+    assert "MHA-DT-032" in notes.PIVOT_TAP_ROWS
+
+
+def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
+    # #984 review r2/r3: the fiducial is flagged at the mark, not in a note.
+    assert "FIDUCIAL" not in spec.DRAWING_NOTES
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    cx = drawing._sheet_x(spec.FIDUCIAL_X)
+    cy = drawing.FRONT_CENTER[1] + spec.FIDUCIAL_Y * scale
+    x, y = drawing.FIDUCIAL_EDGE_PICK
+    r = spec.FIDUCIAL_MODEL_DIA / 2.0 * scale
+    assert (x - cx) ** 2 + (y - cy) ** 2 == pytest.approx(r**2)
+    # The note stands above the arm's top edge, left of the hub-seat leader.
+    assert drawing.FIDUCIAL_CALLOUT_XY[1] > drawing.ARM_SILHOUETTE[3]
+    assert drawing.FIDUCIAL_CALLOUT_XY[0] < cx
+
+
+def test_stock_line_comes_from_the_one_stock_constant() -> None:
     # The stock line comes from the one stock constant.
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
     assert spec.STOCK_NOTE == "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED."
