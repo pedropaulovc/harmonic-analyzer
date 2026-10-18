@@ -909,6 +909,59 @@ def test_crank_bore_thru_rides_the_size_line_so_the_mate_line_stays_narrow() -> 
     assert drawing.DIMENSION_CALLOUTS["CrankBoreDia"] == "RUNS ON MHA-DT-011"
 
 
+def test_mounting_hole_callout_says_drill_above_its_through_row() -> None:
+    # r5 machinist review (rule 12): "2X Ø7.14 THRU ALL" left drill or ream unsaid.
+    native = {
+        5: "<HOLE-SPOT><MOD-DIAM><hw-cbdiam> <HOLE-DEPTH><hw-cbdepth>",
+        6: "",
+        7: "<NUM_INST>X <MOD-DIAM><hw-diam> <hw-thru>",
+        8: "",
+    }
+    updated = drawing.mount_hole_callout_definitions(native)
+    assert updated == {**native, 7: "DRILL\n<NUM_INST>X <MOD-DIAM><hw-diam> <hw-thru>"}
+    with pytest.raises(RuntimeError, match="THRU row"):
+        drawing.mount_hole_callout_definitions({**native, 5: native[7]})
+    with pytest.raises(RuntimeError, match="callout parts"):
+        drawing.mount_hole_callout_definitions({5: native[5], 7: native[7]})
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_set_mount_hole_process(mount_callout)" in source
+
+
+def test_thrust_face_station_names_the_collar_it_bears() -> None:
+    """r5 (rule 4): the ±0.25 station must say which part's collar it sets."""
+    callout = drawing.DIMENSION_CALLOUTS["ConeBossNorthZ"]
+    assert "MHA-DT-004" in callout
+    assert "COLLAR" in callout
+    # Above the upper extension line, below the sheet border.
+    assert drawing.SECTION_KEEP["ConeBossNorthZ"][1] > 0.250
+
+
+def test_crank_boss_diameter_runs_onto_its_near_rim() -> None:
+    """r5: Ø21.9's rim-to-rim line crossed Ø11.438's leader at the centre."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'set_near_side_diameter(crank_boss[0], "crank boss diameter")' in source
+
+
+def test_removed_view_letter_is_not_a_datum_letter() -> None:
+    """r5: VIEW B read as datum B."""
+    letters = {datum.letter for datum in spec.PART_DATUMS}
+    assert drawing.JOURNAL_VIEW_LETTER not in letters | {"A"}
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"VIEW B' not in source
+
+
+def test_datum_a_and_journal_finish_stay_off_the_bore_leader() -> None:
+    """r5: datum A sat on Ø12.281's leader and the Ra landed on its triangle."""
+    centre_x = drawing.JOURNAL_CENTER[0]
+    # The tag left of the bore, the size's text right of it.
+    assert (
+        drawing.DATUM_A_TAG_XY[0] < centre_x < drawing.JOURNAL_KEEP["JournalBoreDia"][0]
+    )
+    # The finish up-left of the bore centre, the tag below it.
+    assert drawing.JOURNAL_BORE_FINISH_XY[0] < centre_x
+    assert drawing.JOURNAL_BORE_FINISH_XY[1] > drawing.DATUM_A_TAG_XY[1]
+
+
 def test_section_caption_states_no_scale_at_sheet_scale() -> None:
     assert drawing.SECTION_SCALE == drawing.SHEET_SCALE
     source = Path(drawing.__file__).read_text(encoding="utf-8")

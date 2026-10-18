@@ -74,8 +74,9 @@ from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
     part_sketches_shown,
 )
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, compose_hole_callout_prefix
 from _drawing_leader_notes import add_leader_note
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -180,6 +181,15 @@ DATUM_B_TAG_XY = (
 if not DATUM_B_TAG_XY[1] < _front_y(0.0):
     raise AssertionError("datum B's tag no longer sits below the foot seat it tags")
 
+# View B: datum A tags the journal bore's lower-LEFT rim, so the bore's
+# Ø12.281 leader, which leaves the lower-right rim for its text right of the
+# view, no longer runs through the tag (r5 machinist review: at (0.250,
+# 0.128) the tag printed at the lower-right rim, its frame on that leader).
+# The bore's Ra stands on the post's face up-left of the bore, left of the
+# vertical centreline, its leader on the upper-left rim and off the tag.
+DATUM_A_TAG_XY = (0.226, 0.128)
+JOURNAL_BORE_FINISH_XY = (0.219, 0.162)
+
 FOOT_SEAT = requirement(
     "foot_seat", kind="face", faces=(cone.SURFACE_FINISHES[0].face,),
     requirements=("finish_ra",), fields={
@@ -281,11 +291,13 @@ FRONT_KEEP = {
     # Held one text height (13.6 mm) left of View B's labelled 38.10: with
     # "THRU, RUNS ON ..." below the size the box ran x 117.7..180.7 mm, 1.42 mm
     # from the 38.10 box at x 173.1 (r4 view-crowding).  THRU rides the size line
-    # (DIMENSION_SUFFIXES), so the widest line is the ~49 mm mate; centred
-    # at x=0.134 it ends ~15 mm short of the 38.10, and at y=0.169 the size
-    # line passes ~2 mm under the 13° arc where it meets the plan's lower edge
-    # and the mate's shoulder ~2 mm over the head's top extension line.
-    "CrankBoreDia": (0.134, 0.169),
+    # (DIMENSION_SUFFIXES), so the widest line is the ~47 mm mate; centred
+    # at x=0.1356 it ends ~14 mm short of the 38.10 and its size line starts
+    # 2 mm right of the 13° arrow (at x=0.134 that arrow stood 0.93 mm off it,
+    # r5 layout audit), and at y=0.169 the size line passes under the 13° arc
+    # where it meets the plan's lower edge and the mate's shoulder stays over
+    # the head's top extension line.
+    "CrankBoreDia": (0.1356, 0.169),
 }
 
 BODY = requirement(
@@ -347,7 +359,9 @@ TOP_KEEP = {
     # distant shelf, where a blind reader took it for a note.
     "CrankBossStartZ": (0.062, 0.2338),
     "MountEastX": (0.075, 0.2525),
-    "MountWestX": (0.110, 0.2525),
+    # Outboard of its extension line, mirroring MountEastX: centred between
+    # the lines at x=0.110 that line ran up through the text (r5 review).
+    "MountWestX": (0.121, 0.2525),
     "InclineAngle": (0.142, _top_y(28.0)),
 }
 
@@ -380,14 +394,14 @@ for _side, _x, _dim in (("west", -cone.ATTACHMENT_X, "MountWestX"), ("east", con
             "depth": (_band(cone.ATTACHMENT_CBORE_DEPTH, _P[_dim]), ("ATTACHMENT_CBORE_DEPTH",)), "depth_ref": (cone.ATTACHMENT_CBORE_DEPTH, ("ATTACHMENT_CBORE_DEPTH",)),
         }, precision={"dia": _P[_dim], "depth": _P[_dim]},
     )
-# The collar thrust face's station stands left of the section, mirroring the
-# face-to-face on the right: its text needs the clear band between the plan's
-# callouts and the section, above View B.  It sits high on its dimension
-# line: centred at y=0.230 the post-axis extension line ran through its
-# last label line (r3 sheet).
+# The collar thrust face's station stands above the section's upper (north
+# face) extension line, its four rows clear of the plan's callouts on the
+# left and the north face's finish symbol on the right: between the
+# extension lines (y=0.230, 0.234) one line or the other struck its text
+# (r3 sheet, r5 review).
 SECTION_KEEP = {
     "ConeBossLen": (0.355, 0.235),
-    "ConeBossNorthZ": (0.249, 0.234),
+    "ConeBossNorthZ": (0.2325, 0.2544),
 }
 # The crank bore is located from the cone bore (U31), so its spacing chains
 # off the cone-axis height on the same dimension line, in the one view that
@@ -397,7 +411,9 @@ JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
     "CrankAboveCone": (0.208, 0.170),
     "ConeBossDia": (0.292, 0.172),
-    "JournalBoreDia": (0.292, 0.153),
+    # 0.5 mm under y=0.153, where its band stood 1.52 mm under the boss
+    # OD's text, short of the audit's 1.78 mm of air (r5 layout audit).
+    "JournalBoreDia": (0.292, 0.1525),
 }
 
 CONE_BOSS = requirement(
@@ -452,7 +468,8 @@ JOURNAL_TEXT_OFFSETS = {
 # Each running bore names the shaft that runs in it, the crank-above-cone
 # spacing the mesh it sets, the cone-axis height the tip block whose adjuster
 # cup the shaft's tip must enter, and the cone boss's north-face station the
-# collar that thrusts on that face (r1 machinist review, rule 4).
+# part whose collar thrusts on that face (r1 and r5 machinist reviews, rule 4:
+# its ±0.25 is the stacks' half band, cone_pivot_post_spec).
 DIMENSION_CALLOUTS = {
     "HeadDia": "HEAD",
     "CrankBossDia": "CRANK BOSS",
@@ -462,7 +479,7 @@ DIMENSION_CALLOUTS = {
     "JournalBoreDia": f"CONE BORE THRU\nRUNS ON MHA-DT-004\n{POST_JOURNAL_RIM_BREAK}",
     "ConeBossDia": "CONE JOURNAL BOSS OD",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
-    "ConeBossNorthZ": "THRUST FACE\nFROM POST AXIS",
+    "ConeBossNorthZ": "THRUST FACE FOR\nMHA-DT-004 COLLAR,\nFROM POST AXIS",
     "InclineAngle": "CONE/CRANK BORE AXES",
     "CrankAboveCone": "16T:64T\nMESH",
     "JournalAxisY": "AXIS MATCHES\nMHA-DT-021",
@@ -620,7 +637,10 @@ def _north_boss_finish_anchor(
 # named by a letter arrow (draw_dt_cone_tip_block's recipe) in Section A-A,
 # the one view that shows that axis true length: the leader runs north along
 # the axis onto the face's sheet-left cut edge, mid-wall, and the letter
-# stands square to the face, centred on the tail (sheet metres).
+# stands square to the face, centred on the tail (sheet metres).  The sheet
+# letters it C: datum B is the foot, and a view lettered B read as that
+# datum (r5 machinist review); "View B" stays this script's internal name.
+JOURNAL_VIEW_LETTER = "C"
 VIEW_LETTER_HEIGHT = 0.005
 _VIEW_B_ARROW_LENGTH = 0.008
 _VIEW_LETTER_HALF_WIDTH = 0.0018
@@ -674,7 +694,7 @@ def _add_view_b_arrow(adapter: Any, section: Any) -> None:
     text_xy, tip_xy = _view_b_arrow(adapter, section)
     note = add_leader_note(
         adapter,
-        "B",
+        JOURNAL_VIEW_LETTER,
         text_xy=text_xy,
         attach_xy=tip_xy,
         view=section,
@@ -1177,6 +1197,61 @@ def _set_dimension_suffixes(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
+# The mounting holes' process, on its own row above the native through row
+# (rule 12: "2X Ø7.14 THRU ALL" left drill against ream unsaid, r5 machinist
+# review; draw_ch_fulcrum_keeper's foot-hole recipe).
+MOUNT_HOLE_PROCESS = "DRILL\n"
+# IDisplayDimension text definitions (5..8) and the parts SetText writes them
+# through (1..4).
+_HOLE_CALLOUT_DEFINITION_PARTS = ((5, 1), (6, 2), (7, 3), (8, 4))
+
+
+def mount_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Put MOUNT_HOLE_PROCESS ahead of the one definition holding THRU.
+
+    The counterbored callout's through row and its counterbore row live in
+    different parts, so ``add_native_hole_callout(process=...)`` -- which
+    writes the Prefix part whichever row that is -- could put DRILL ahead of
+    the counterbore; ahead of the THRU part it stands on its own row first.
+    """
+    if set(definitions) != {part for part, _ in _HOLE_CALLOUT_DEFINITION_PARTS}:
+        raise RuntimeError(f"unexpected mounting-hole callout parts: {definitions!r}")
+    thru_parts = [part for part, text in definitions.items() if "THRU" in text.upper()]
+    if len(thru_parts) != 1:
+        raise RuntimeError(
+            f"mounting-hole THRU row is not in one part: {definitions!r}"
+        )
+    part = thru_parts[0]
+    return {
+        **definitions,
+        part: compose_hole_callout_prefix(MOUNT_HOLE_PROCESS, definitions[part]),
+    }
+
+
+def _set_mount_hole_process(display: Any) -> None:
+    """Write the mounting holes' process row and prove it persisted first."""
+    native = _early_bound(display, "IDisplayDimension")
+    parts = [part for part, _ in _HOLE_CALLOUT_DEFINITION_PARTS]
+    definitions = {part: str(native.GetText(part) or "") for part in parts}
+    updated = mount_hole_callout_definitions(definitions)
+    for definition_part, writable_part in _HOLE_CALLOUT_DEFINITION_PARTS:
+        if updated[definition_part] != definitions[definition_part]:
+            native.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(native.GetText(part) or "") for part in parts}
+    resolved = {
+        part: str(native.GetText(part) or "")
+        for _, part in _HOLE_CALLOUT_DEFINITION_PARTS
+    }
+    # The CalloutAbove part (3) prints ahead of the Prefix part (1).
+    first = resolved[3] or resolved[1]
+    if persisted != updated or not first.startswith(MOUNT_HOLE_PROCESS):
+        raise RuntimeError(
+            "mounting-hole process row did not persist first: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
+    _telemetry.info(f"mounting-hole callout: {resolved!r}")
+
+
 def _pin_sheet_scale(adapter: Any) -> None:
     """Re-pin the sheet's scale before the native gate reads (or its failure
     PDF prints) the title block.
@@ -1545,6 +1620,19 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _set_dimension_suffixes(adapter, annotations)
+    # The crank boss's Ø21.9 runs one arrow onto its near rim: native, its
+    # line ran rim to rim through the centre and crossed the crank bore's
+    # Ø11.438 leader there (r5 machinist review).
+    crank_boss = [
+        annotation
+        for annotation in front_annotations
+        if dimension_name(adapter, annotation) == "CrankBossDia"
+    ]
+    if len(crank_boss) != 1:
+        raise RuntimeError(
+            f"expected one CrankBossDia in the front view, found {len(crank_boss)}"
+        )
+    set_near_side_diameter(crank_boss[0], "crank boss diameter")
     crank_height = [
         annotation
         for annotation in front_annotations
@@ -1588,7 +1676,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_cone_section_centerline(adapter, section)
     _add_view_b_arrow(adapter, section)
 
-    add_native_hole_callout(
+    mount_callout = add_native_hole_callout(
         adapter,
         top,
         edge=_circular_edge(
@@ -1600,6 +1688,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.160, 0.250),
         label="mounting counterbores",
     )
+    _set_mount_hole_process(mount_callout)
 
     # The seat is the elevation's bottom line: the O42.011 foot rim seen
     # edge-on.  A coordinate pick on that line failed on the farm (the two
@@ -1646,20 +1735,30 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crank bore finish",
         char_height=0.0025,
     )
+    # The journal bore's Ra lands on its upper-left rim, the symbol on the
+    # post's face left of the vertical centreline: from the bottom rim its
+    # leader ended on datum A's triangle (r5 machinist review).
+    journal_centre = model_point_in_view(
+        adapter,
+        journal,
+        (0.0, BORE_HEIGHT / 1000.0, 0.0),
+        label="cone journal bore centre",
+    )
+    journal_top = model_point_in_view(
+        adapter,
+        journal,
+        (0.0, (BORE_HEIGHT + BORE_DIA / 2.0) / 1000.0, 0.0),
+        label="cone journal bore top rim",
+    )
+    journal_rim = math.dist(journal_centre[:2], journal_top[:2]) / math.sqrt(2.0)
     add_surface_finish(
         adapter,
         journal,
         edge_entity=_bore_rim_edge(journal, diameter_mm=BORE_DIA),
-        symbol_xy=(0.300, 0.120),
-        leader_attach_xy=model_point_in_view(
-            adapter,
-            journal,
-            (
-                0.0,
-                (BORE_HEIGHT - BORE_DIA / 2.0) / 1000.0,
-                0.0,
-            ),
-            label="cone journal bore finish anchor",
+        symbol_xy=JOURNAL_BORE_FINISH_XY,
+        leader_attach_xy=(
+            journal_centre[0] - journal_rim,
+            journal_centre[1] + journal_rim,
         ),
         control=surface_finish_by_key(SURFACE_FINISHES, "journal_bore"),
         label="cone journal bore finish",
@@ -1694,7 +1793,7 @@ async def build(adapter: Any) -> dict[str, str]:
         placements={
             "datum:A": PmiDrawingPlacement(
                 view=journal,
-                position=(0.250, 0.128),
+                position=DATUM_A_TAG_XY,
                 edge_entity=_bore_rim_edge(journal, diameter_mm=BORE_DIA),
             ),
             "datum:B": PmiDrawingPlacement(
@@ -1732,7 +1831,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_note(
         adapter,
-        "VIEW B - CONE JOURNAL\nLOOK ALONG CONE AXIS",
+        f"VIEW {JOURNAL_VIEW_LETTER} - CONE JOURNAL\nLOOK ALONG CONE AXIS",
         0.202,
         0.104,
     )
