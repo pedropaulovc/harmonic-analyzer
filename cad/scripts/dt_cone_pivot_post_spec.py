@@ -124,6 +124,19 @@ if MOUNT_HEAD_WEB_WORST + 1e-9 < WEB_FLOOR_MM:
 if MOUNT_HEAD_WEB_WORST - 0.01 >= WEB_FLOOR_MM:
     raise AssertionError("mounting holes are farther inward than the printable floor requires")
 
+# The cone shaft MHA-DT-004's collar bears on the NORTH cone-boss end face, so
+# the print locates that face from the post axis (rule 10) instead of calling
+# the boss symmetric in a note.  The drive-train stacks book that face half the
+# face-to-face .XX band off the post axis (dt_cone_gear_shaft_spec,
+# crank_boss_rim, build_dt_drive_train_assembly); the station's own band is the
+# largest two-place band inside that half, so no stack moves.
+CONE_BOSS_NORTH_STATION = CONE_BOSS_LENGTH / 2.0
+CONE_BOSS_NORTH_STATION_TOLERANCE_MM = math.floor(_row(2) / 2.0 * 100.0 + 1e-9) / 100.0
+if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _row(2) / 2.0:
+    raise AssertionError(
+        "north cone-boss face station band exceeds the stacks' half band"
+    )
+
 # Final solid volume, the sum of the per-feature analytic terms the build
 # checks natively one feature at a time (build_dt_cone_pivot_post.py asserts
 # the sum at import):
@@ -327,6 +340,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "JournalBoreProfile": {"JournalBoreDia"},
     "JournalPlanReference": {"InclineAngle"},
     "CrankBossStationReference": {"CrankBossStartZ"},
+    "ConeBossStationReference": {"ConeBossNorthZ"},
     "BoreSpacingReference": {"CrankAboveCone"},
 }
 
@@ -362,6 +376,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     # retain the configured nominal without changing the frame's zone.
     "JournalPlanReference": {"InclineAngle": 4},
     "CrankBossStationReference": {"CrankBossStartZ": 2},
+    "ConeBossStationReference": {"ConeBossNorthZ": 2},
     "BoreSpacingReference": {"CrankAboveCone": 2},
 }
 
@@ -379,15 +394,16 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# Notes identify mating parts and geometry relationships that are not
-# recognizable from silhouette alone; every size, band and finish remains on a
-# dimension or native symbol (drawing-guidelines.md rule 2 (the title block is the general specification) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
+# Notes name the locating mate, the shop's inside-corner ceiling and the one
+# known wall shortfall (rule 20); every size, band and finish remains on a
+# dimension or native symbol (drawing-guidelines.md rule 2 (the title block is
+# the general specification) and rule 7 (notes: few, flagged, never a method)).
+# TODO(#1625): drop the corner line when the title block carries the default.
 DRAWING_NOTES = "\n".join(
     (
-        "CRANK BORE CARRIES MHA-DT-011,",
-        "CONE BORE MHA-DT-004; FOOT ON MHA-DT-020.",
-        "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS.",
-        "DRILL MOUNTING HOLES FROM TOP FACE; CHECK CONE BORE AT BREAKOUT.",
+        "FOOT SEATS ON MHA-DT-020.",
+        "INSIDE CORNERS R1.0 MAX.",
+        f"WALL {MOUNT_HEAD_WEB_WORST:.2f} MIN, COUNTERBORE TO HEAD OD.",
     )
 )
 

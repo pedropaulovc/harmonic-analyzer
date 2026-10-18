@@ -65,6 +65,8 @@ from dt_cone_pivot_post_spec import (
     CONE_AXIS_VIEW,
     CONE_BOSS_DIA,
     CONE_BOSS_LENGTH,
+    CONE_BOSS_NORTH_STATION,
+    CONE_BOSS_NORTH_STATION_TOLERANCE_MM,
     CRANK_ABOVE_CONE,
     CRANK_ABOVE_CONE_BAND,
     CRANK_BORE_DIA,
@@ -95,12 +97,17 @@ from dt_cone_pivot_post_spec import (
 PART_NAME = "dt-cone-pivot-post"
 # The dimension-carrying reference sketches, saved hidden (#880): they render
 # in no part or assembly view, and the drawing shows each one only in the view
-# that dimensions it (_drawing_hidden_sketches).
+# that dimensions it (_drawing_hidden_sketches) -- and, for the one Section A-A
+# dimensions, in the elevation that section is cut from.
 REFERENCE_SKETCHES = (
     "JournalPlanReference",
     "CrankBossStationReference",
+    "ConeBossStationReference",
     "BoreSpacingReference",
 )
+# The short north-pointing ray ConeBossStationReference measures its incline
+# from: it stays inside the cone bore's gap in Section A-A.
+CONE_STATION_REFERENCE_LENGTH = 2.0
 MATERIAL = "Gray Cast Iron"
 
 ATTACHMENT_HOLE_SPEC = HoleSpec(
@@ -349,6 +356,9 @@ async def build(adapter: Any) -> dict[str, str]:
         # interface plane the boss grows from and the plan ray the print
         # dimensions it on.
         "CrankBossNearZ": CRANK_BOSS_NEAR_Z,
+        # The cone boss face-to-face: one global drives the boss extrusion
+        # and the north-face station ray (half of it) Section A-A prints.
+        "ConeBossLength": CONE_BOSS_LENGTH,
     }
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
@@ -540,7 +550,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ConeShaftBoss")
-    name_dimensions(adapter, "ConeShaftBoss", ["ConeBossLen"])
+    boss_length = name_dimensions(adapter, "ConeShaftBoss", ["ConeBossLen"])
+    drive_jobs.append((boss_length[0], '"ConeBossLength"'))
     volume += CONE_PADS_OUTSIDE_BODY_MM3
     await volume_check(adapter, "v2 cone pads", volume, 0.001 * volume)
 
@@ -739,6 +750,89 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "CrankBossStationReference")
     drive_jobs += station.apply(adapter, "CrankBossStationReference")
 
+    # 6c. Cone-boss north-face station reference sketch.  The shaft collar
+    # (MHA-DT-004) bears on that face, so the print locates it FROM THE POST
+    # AXIS along the cone axis, in Section A-A.  The sketch lies in A-A's
+    # cutting plane (an offset of Top at the cone-axis height, driven by the
+    # same global), so the section shows it as the cone axis from the post
+    # axis to the face.  A short north ray is the incline's other leg; both are
+    # rooted on the post axis, as the plan rays are (the angle then reads one
+    # wedge).  The part saves it hidden; the drawing shows it per view.
+    check(
+        "create ConeAxisPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=BORE_HEIGHT
+            )
+        ),
+    )
+    name_last_feature(adapter, "ConeAxisPlane")
+    drive_jobs.append(("D1@ConeAxisPlane", '"JournalAxisY"'))
+    cone_station = SketchDims()
+    check(
+        "create sketch ConeBossStationReference",
+        await adapter.create_sketch("ConeAxisPlane"),
+    )
+    incline = math.radians(INCLINE_DEG)
+    set_sketch_direct_db(adapter, True)
+    # Sketch X is model +X and sketch Y model -Z, as on Top: the north face
+    # centre is at model (-sin i, -cos i) * L/2 in (X, Z).
+    cone_station_line = check(
+        "cone boss north face reference ray",
+        await adapter.add_centerline(
+            0.0,
+            0.0,
+            -CONE_BOSS_NORTH_STATION * math.sin(incline),
+            CONE_BOSS_NORTH_STATION * math.cos(incline),
+        ),
+    )
+    north_line = check(
+        "cone station north reference ray",
+        await adapter.add_centerline(0.0, 0.0, 0.0, CONE_STATION_REFERENCE_LENGTH),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "cone station north ray vertical",
+        await adapter.add_sketch_constraint(north_line, None, "vertical"),
+    )
+    for line, label in (
+        (cone_station_line, "cone boss station ray"),
+        (north_line, "cone station north ray"),
+    ):
+        check(
+            f"{label} rooted on the post axis",
+            await adapter.add_sketch_constraint(
+                f"{line}.start", "origin", "coincident"
+            ),
+        )
+    check(
+        "cone station north ray length",
+        await adapter.add_sketch_dimension(
+            north_line, None, "linear", CONE_STATION_REFERENCE_LENGTH
+        ),
+    )
+    cone_station.record("ConeStationRefLen")
+    check(
+        "cone boss north face station",
+        await adapter.add_sketch_dimension(
+            cone_station_line, None, "linear", CONE_BOSS_NORTH_STATION
+        ),
+    )
+    cone_station.record("ConeBossNorthZ", '"ConeBossLength" / 2')
+    _add_driving_plan_incline(
+        adapter,
+        cone_station_line,
+        north_line,
+        "cone station incline",
+        expected_degrees=INCLINE_DEG,
+        toward_north=True,
+    )
+    cone_station.record("ConeStationIncline", '"ConeIncline"')
+    await ensure_fully_defined(adapter, "ConeBossStationReference")
+    check("exit sketch ConeBossStationReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "ConeBossStationReference")
+    drive_jobs += cone_station.apply(adapter, "ConeBossStationReference")
+
     # 7. Bore-spacing reference sketch.  Both bore axes cross the post axis,
     # which is ConeShaftNormal's local X axis (pointing down model -Y), so one
     # construction centreline on it runs from the cone-bore centre to the
@@ -832,6 +926,15 @@ async def build(adapter: Any) -> dict[str, str]:
         "JournalAxisY",
         JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
     )
+    # The collar thrust face's station from the post axis: the half
+    # face-to-face band the drive-train stacks book (derivation in
+    # dt_cone_pivot_post_spec.CONE_BOSS_NORTH_STATION_TOLERANCE_MM).
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "ConeBossStationReference",
+        "ConeBossNorthZ",
+        CONE_BOSS_NORTH_STATION_TOLERANCE_MM,
+    )
 
     # Semantic, name-selected assembly references.  The journal axis is taken
     # from its actual cylindrical wall; the three vertical axes are plane
@@ -885,6 +988,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ("Plane4", "PLANE"),
             ("Plane5", "PLANE"),
             ("BossNorth", "PLANE"),
+            ("ConeAxisPlane", "PLANE"),
             ("swing pivot", "AXIS"),
             ("journal axis", "AXIS"),
             ("mount west", "AXIS"),
@@ -903,6 +1007,7 @@ def _add_driving_plan_incline(
     label: str,
     *,
     expected_degrees: float,
+    toward_north: bool = False,
 ) -> None:
     """Author the acute plan angle between two origin-rooted rays as DRIVING.
 
@@ -910,7 +1015,8 @@ def _add_driving_plan_incline(
     its vertex, the adapter's angular route, never yields an angular control:
     see ``diag_mcmaster_lib``).  The rays are the journal direction
     ``(sin i, -cos i)`` and the downward crank axis ``(0, -1)`` in Top-plane
-    sketch axes, so the text point sits on their bisector, ``TEXT_RADIUS``
+    sketch axes (``toward_north``: their opposites, ``(-sin i, cos i)`` and
+    ``(0, 1)``), so the text point sits on their bisector, ``TEXT_RADIUS``
     from the origin, inside the acute wedge.  It is passed with sketch y in
     BOTH the y and the -z slots so it lands in that wedge whether SOLIDWORKS
     reads the point in sketch or in model space (the off-plane component
@@ -923,8 +1029,9 @@ def _add_driving_plan_incline(
 
     text_radius_m = 0.020
     half = math.radians(expected_degrees / 2.0)
-    text_x = text_radius_m * math.sin(half)
-    text_y = -text_radius_m * math.cos(half)
+    side = -1.0 if toward_north else 1.0
+    text_x = side * text_radius_m * math.sin(half)
+    text_y = -side * text_radius_m * math.cos(half)
     model = adapter.currentModel
     model.ClearSelection2(True)
     _select_sketch_entities(adapter, [journal_line, crank_line], 0)

@@ -430,13 +430,28 @@ def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
 
 
 def test_cone_boss_length_lives_in_the_bore_plane_section() -> None:
-    """The raised boss's axial extent is dimensioned where its profile is visible."""
+    """The raised boss's axial extent is dimensioned where its profile is
+    visible, and the collar's thrust face is located there from the post
+    axis (rule 10), not by a symmetry note."""
     assert drawing.SECTION_SCALE == (1, 1)
-    assert set(drawing.SECTION_KEEP) == {"ConeBossLen"}
+    assert set(drawing.SECTION_KEEP) == {"ConeBossLen", "ConeBossNorthZ"}
     assert "ConeBossLen" not in drawing.TOP_KEEP
+    assert "SYMMETRIC" not in spec.DRAWING_NOTES
     start, end = drawing.CONE_SECTION_LINE
     assert start[1] == end[1] == drawing._front_y(spec.BORE_HEIGHT)
     assert start[0] < drawing.FRONT_CENTER[0] < end[0]
+
+
+def test_cone_boss_north_station_shares_the_face_to_face_global() -> None:
+    """The printed collar-face station and the boss extrusion cannot drift
+    apart, and its band is the half face-to-face band the stacks book."""
+    assert spec.CONE_BOSS_NORTH_STATION == spec.CONE_BOSS_LENGTH / 2.0
+    assert spec.CONE_BOSS_NORTH_STATION_TOLERANCE_MM <= spec._row(2) / 2.0
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"ConeBossLength": CONE_BOSS_LENGTH,' in source
+    assert "drive_jobs.append((boss_length[0], '\"ConeBossLength\"'))" in source
+    assert 'cone_station.record("ConeBossNorthZ", \'"ConeBossLength" / 2\')' in source
+    assert 'drive_jobs.append(("D1@ConeAxisPlane", \'"JournalAxisY"\'))' in source
 
 
 def test_part_owns_every_printed_decimal_place() -> None:
@@ -604,17 +619,23 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
 
 
 def test_manufacturing_notes_do_not_restate_dimensions() -> None:
-    # A note may state the axis relationship, but it may not restate a size, a
-    # band or a finish: those remain dimensions and native symbols under
+    # A note may name the locating mate, but it may not restate a size, a band
+    # or a finish: those remain dimensions and native symbols under
     # drawing-guidelines.md rule 2 (the title block is the general specification) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method).
+    # The only numbers allowed are the inside-corner ceiling (#1625) and the
+    # rule-20 flag of a wall under the 2.0 floor.
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): at most four short lines.
     lines = spec.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4
     assert max(len(line) for line in lines) <= 64
     stripped = re.sub(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "", spec.DRAWING_NOTES)
+    stripped = re.sub(r"INSIDE CORNERS R\d\.\d MAX\.", "", stripped)
+    stripped = re.sub(r"WALL \d\.\d\d MIN,", "", stripped)
     assert not any(character.isdigit() for character in stripped)
-    for banned in ("DIA", "THRU", "DEEP", "C-C", "DATUM", "MACHINE", "Ra"):
+    for banned in ("DIA", "THRU", "DEEP", "C-C", "DATUM", "MACHINE", "Ra", "DRILL"):
         assert banned not in spec.DRAWING_NOTES
+    assert f"WALL {spec.MOUNT_HEAD_WEB_WORST:.2f} MIN" in spec.DRAWING_NOTES
+    assert spec.MOUNT_HEAD_WEB_WORST < 2.0
 
 
 def test_source_records_exact_manual_photo_provenance() -> None:
@@ -785,10 +806,6 @@ def test_head_diameter_lives_on_its_plan_circle() -> None:
     assert drawing.DIMENSION_CALLOUTS["HeadDia"] == "HEAD"
 
 
-def test_cone_boss_end_faces_are_located_by_symmetry() -> None:
-    assert "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS." in spec.DRAWING_NOTES
-
-
 def test_collar_thrust_face_adds_no_setup_note() -> None:
     """#914: the collar face gets a finish symbol, not a method note (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 
@@ -909,6 +926,7 @@ def test_the_post_saves_every_reference_sketch_hidden() -> None:
     assert references == {
         "JournalPlanReference",
         "CrankBossStationReference",
+        "ConeBossStationReference",
         "BoreSpacingReference",
     }
     assert _blanked_reference_sketches() == references
@@ -920,23 +938,29 @@ def test_the_post_saves_every_reference_sketch_hidden() -> None:
 def test_every_view_dimensioning_a_hidden_sketch_shows_it_itself() -> None:
     """A part-hidden sketch's dimensions import only through the hidden-owner
     import, which shows the sketch in that one view.  The plan owns the plan
-    angle and the crank boss station, View B the bore spacing; no other view
-    keeps anything from those sketches, so none of them prints a ray."""
+    angle and the crank boss station, View B the bore spacing and Section A-A
+    the collar face station; no other view keeps anything from those
+    sketches, so none of them prints a ray."""
     hidden = {
         item
         for name in _blanked_reference_sketches()
         for item in spec.DRAWING_DIMENSIONS[name]
     }
-    assert hidden == {"InclineAngle", "CrankAboveCone", "CrankBossStartZ"}
+    assert hidden == {
+        "InclineAngle",
+        "CrankAboveCone",
+        "CrankBossStartZ",
+        "ConeBossNorthZ",
+    }
     assert set(drawing.TOP_KEEP) & hidden == {"InclineAngle", "CrankBossStartZ"}
     assert set(drawing.JOURNAL_KEEP) & hidden == {"CrankAboveCone"}
-    for keep in (drawing.FRONT_KEEP, drawing.SECTION_KEEP):
-        assert not set(keep) & hidden
+    assert set(drawing.SECTION_KEEP) & hidden == {"ConeBossNorthZ"}
+    assert not set(drawing.FRONT_KEEP) & hidden
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for curated in ("top", "journal"):
+    for curated in ("top", "journal", "section"):
         assert f"{curated}_annotations = curate_hidden_owner_dimensions(" in source
-    for curated in ("front", "section"):
-        assert f"{curated}_annotations = curate_view_dimensions(" in source
+    assert "front_annotations = curate_view_dimensions(" in source
+    assert '("ConeBossStationReference",),' in source
 
 
 def test_crank_bore_is_located_from_the_cone_bore_and_never_binds() -> None:
@@ -964,12 +988,6 @@ def test_crank_bore_is_located_from_the_cone_bore_and_never_binds() -> None:
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the spacing band is a dimension, never a setup method.
     assert "ONE SETUP" not in spec.DRAWING_NOTES
     assert "BORE-TO-BORE" not in spec.DRAWING_NOTES
-
-
-def test_deep_mounting_holes_carry_a_drilling_note() -> None:
-    """U37: the 2X mounting holes run the full post height in cast iron."""
-    assert "DRILL MOUNTING HOLES FROM TOP FACE" in spec.DRAWING_NOTES
-    assert "CONE BORE AT BREAKOUT" in spec.DRAWING_NOTES
 
 
 def test_point_relations_use_the_point_relation_types() -> None:

@@ -72,9 +72,10 @@ from _drawing_finish import add_surface_finish
 from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
+    part_sketches_shown,
 )
 from _drawing_hole_callout import add_native_hole_callout
-from _drawing_leader_notes import add_attached_note
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -96,6 +97,7 @@ from dt_cone_pivot_post_spec import (
     BORE_DIA,
     BORE_HEIGHT,
     CONE_AXIS_VIEW,
+    CONE_BOSS_DIA,
     CONE_BOSS_LENGTH,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
@@ -133,7 +135,9 @@ TOP_CENTER = (0.098, 0.209)
 JOURNAL_CENTER = (0.235, 0.160)
 ISO_CENTER = (0.360, 0.150)
 SECTION_CENTER = (0.295, 0.230)
-SECTION_CAPTION = (0.295, 0.201)
+# Top-centre of the native caption: it stands under View B's letter arrow,
+# which runs south off the section's lower boss end (#848).
+SECTION_CAPTION = (0.295, 0.191)
 SECTION_LABEL_SCALE_TEXT = "SCALE"
 SECTION_SCALE = (1, 1)
 
@@ -367,8 +371,12 @@ for _side, _x, _dim in (("west", -cone.ATTACHMENT_X, "MountWestX"), ("east", con
             "depth": (_band(cone.ATTACHMENT_CBORE_DEPTH, _P[_dim]), ("ATTACHMENT_CBORE_DEPTH",)), "depth_ref": (cone.ATTACHMENT_CBORE_DEPTH, ("ATTACHMENT_CBORE_DEPTH",)),
         }, precision={"dia": _P[_dim], "depth": _P[_dim]},
     )
+# The collar thrust face's station stands left of the section, mirroring the
+# face-to-face on the right: its text needs the clear band between the plan's
+# callouts and the section, above View B.
 SECTION_KEEP = {
     "ConeBossLen": (0.355, 0.235),
+    "ConeBossNorthZ": (0.250, 0.230),
 }
 # The crank bore is located from the cone bore (U31), so its spacing chains
 # off the cone-axis height on the same dimension line, in the one view that
@@ -430,16 +438,23 @@ JOURNAL_TEXT_OFFSETS = {
 # the collar's OD edge (cone_gear_shaft_spec: ring - 2 x break >= 1.5), so the
 # bore's callout prints the same break as the collar instead of the title
 # block's 0.25.
+# Each running bore names the shaft that runs in it, the crank-above-cone
+# spacing the mesh it sets, the cone-axis height the tip block whose adjuster
+# cup the shaft's tip must enter, and the cone boss's north-face station the
+# collar that thrusts on that face (r1 machinist review, rule 4).
 DIMENSION_CALLOUTS = {
     "HeadDia": "HEAD",
     "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "CRANK BOSS\nLENGTH",
     "CrankBossStartZ": "CRANK BOSS\nFACE",
-    "CrankBoreDia": "CRANK BORE THRU",
-    "JournalBoreDia": f"CONE BORE THRU\n{POST_JOURNAL_RIM_BREAK}",
+    "CrankBoreDia": "THRU, RUNS ON MHA-DT-011",
+    "JournalBoreDia": f"CONE BORE THRU\nRUNS ON MHA-DT-004\n{POST_JOURNAL_RIM_BREAK}",
     "ConeBossDia": "CONE JOURNAL BOSS OD",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
+    "ConeBossNorthZ": "THRUST FACE\nFROM POST AXIS",
     "InclineAngle": "CONE/CRANK BORE AXES",
+    "CrankAboveCone": "16T:64T\nMESH",
+    "JournalAxisY": "AXIS MATCHES\nMHA-DT-021",
 }
 
 
@@ -509,9 +524,11 @@ def _bore_rim_edge(view: Any, *, diameter_mm: float) -> Any:
     raise RuntimeError(f"view has no rim adjacent to a {diameter_mm:g} mm bore")
 
 
-# The collar's Ra symbol sits up and left of its leader's landing point, clear
-# of the face-to-face dimension on the section's right (sheet metres).
-_NORTH_BOSS_FINISH_OFFSET = (-0.018, 0.006)
+# The collar's Ra symbol sits just above and left of its leader's landing
+# point: clear of the face-to-face dimension on the section's right, and
+# above the thrust-face station's extension line, which runs left along the
+# north face (sheet metres).
+_NORTH_BOSS_FINISH_OFFSET = (-0.006, 0.008)
 
 
 CONE_BOSS_NORTH_FACE = requirement(
@@ -585,9 +602,87 @@ def _north_boss_finish_anchor(
     return (anchor[0], anchor[1])
 
 
+# #848: View B looks down the cone axis at the SOUTH boss end face, so it is
+# named by a letter arrow (draw_dt_cone_tip_block's recipe) in Section A-A,
+# the one view that shows that axis true length: the leader runs north along
+# the axis onto the face's sheet-left cut edge, mid-wall, and the letter
+# stands square to the face, centred on the tail (sheet metres).
+VIEW_LETTER_HEIGHT = 0.005
+_VIEW_B_ARROW_LENGTH = 0.008
+_VIEW_LETTER_HALF_WIDTH = 0.0018
 
 
+def _view_b_arrow(
+    adapter: Any, section: Any
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """(note upper-left, leader tip) of View B's arrow on Section A-A."""
+    normal = surface_finish_by_key(SURFACE_FINISHES, "cone_boss_north_face").face.normal
+    south = (-normal[0], 0.0, -normal[2])
+    across = (south[2], 0.0, -south[0])
+    half = CONE_BOSS_LENGTH / 2000.0
+    wall = (BORE_DIA + CONE_BOSS_DIA) / 4000.0
+    axis_y = BORE_HEIGHT / 1000.0
 
+    def sheet(point: tuple[float, float, float], label: str) -> tuple[float, float]:
+        x, y = model_point_in_view(adapter, section, point, label=label)[:2]
+        return (x, y)
+
+    tip = min(
+        (
+            sheet(
+                (
+                    half * south[0] + side * wall * across[0],
+                    axis_y,
+                    half * south[2] + side * wall * across[2],
+                ),
+                f"view B arrow tip candidate {side:+.0f}",
+            )
+            for side in (-1.0, 1.0)
+        ),
+        key=lambda point: point[0],
+    )
+    centre = sheet((0.0, axis_y, 0.0), "cone section centre")
+    face = sheet((half * south[0], axis_y, half * south[2]), "south boss end centre")
+    run = (face[0] - centre[0], face[1] - centre[1])
+    length = math.hypot(*run)
+    if not run[1] < 0.0:
+        raise RuntimeError(
+            f"south cone boss end {face!r} is not below the section centre {centre!r}"
+        )
+    tail = (
+        tip[0] + run[0] / length * _VIEW_B_ARROW_LENGTH,
+        tip[1] + run[1] / length * _VIEW_B_ARROW_LENGTH,
+    )
+    return (tail[0] - _VIEW_LETTER_HALF_WIDTH, tail[1]), tip
+
+
+def _add_view_b_arrow(adapter: Any, section: Any) -> None:
+    text_xy, tip_xy = _view_b_arrow(adapter, section)
+    note = add_leader_note(
+        adapter,
+        "B",
+        text_xy=text_xy,
+        attach_xy=tip_xy,
+        view=section,
+        label="view B viewing arrow",
+    )
+    # add_note leaves text at the document height; size the letter to the
+    # A-A cutting-plane letters and prove the leader tip did not move with it.
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError("view B arrow note has no text format")
+    text_format.CharHeight = VIEW_LETTER_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError("failed to size the view B arrow letter")
+    rebuild_drawing(adapter, label="view B arrow letter")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+        raise RuntimeError("view B arrow tip moved when its letter was sized")
+    _telemetry.info(
+        f"view B arrow: tip=({tip_xy[0]:.4f}, {tip_xy[1]:.4f}) "
+        f"letter=({text_xy[0]:.4f}, {text_xy[1]:.4f})"
+    )
 
 
 def _model_face_evidence(
@@ -1155,13 +1250,17 @@ def _assert_native_layout(
         raise RuntimeError("cone pivot post view placement failed:\n" + "\n".join(placement))
     # Hiding a sketch in a view hides the dimensions imported from it
     # (rim-aba9 lost the crank boss station that way), so the plan's two
-    # hidden-owner dimensions must each still print, once.
+    # hidden-owner dimensions and Section A-A's must each still print, once.
     labels = [annotation.label for annotation in sheet.annotations]
     missing = [
-        name for name in ("CrankBossStartZ", "InclineAngle") if labels.count(name) != 1
+        name
+        for name in ("CrankBossStartZ", "InclineAngle", "ConeBossNorthZ")
+        if labels.count(name) != 1
     ]
     if missing:
-        raise RuntimeError(f"the plan must print each of {missing} once: {sorted(labels)}")
+        raise RuntimeError(
+            f"the sheet must print each of {missing} once: {sorted(labels)}"
+        )
 
     finish_notes = []
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
@@ -1282,6 +1381,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open cone-pivot-post source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     source_properties = read_required_properties(
         adapter.currentModel,
         (
@@ -1327,21 +1427,41 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _configure_section_caption(drawing_model)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    section = create_section_view(
+    # ConeBossStationReference lies in A-A's cutting plane, saved hidden: a
+    # derived view takes it from the part as it stands when it is cut and
+    # selects it through its base view, so the section is cut and curated
+    # while the part shows it (draw_fr_rocker_arm_support's recipe).  In the
+    # elevation the ray lies on the A-A line itself.
+    with part_sketches_shown(
         adapter,
-        front,
-        line_start=CONE_SECTION_LINE[0],
-        line_end=CONE_SECTION_LINE[1],
-        view_xy=SECTION_CENTER,
-        section_label="A",
-        scale=SECTION_SCALE,
-        label="cone boss bore-plane profile",
-    )
-    _prepare_cone_section(adapter, section)
+        source_model,
+        ("ConeBossStationReference",),
+        label="section A-A cone boss station",
+        base_view=front,
+    ):
+        section = create_section_view(
+            adapter,
+            front,
+            line_start=CONE_SECTION_LINE[0],
+            line_end=CONE_SECTION_LINE[1],
+            view_xy=SECTION_CENTER,
+            section_label="A",
+            scale=SECTION_SCALE,
+            label="cone boss bore-plane profile",
+        )
+        _prepare_cone_section(adapter, section)
+        set_hidden_lines_removed(adapter, section)
+        section_annotations = curate_hidden_owner_dimensions(
+            adapter,
+            section,
+            keep=SECTION_KEEP,
+            view_label="cone boss bore-plane section",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
     # The named journal view looks exactly down the inclined model axis.  Unlike
     # the bore-plane section, it retains the uncut boss end face, so its Ø17.2
     # OD and Ø12.281 bore are two visible concentric circles with clear leaders.
-    for view in (front, top, journal, section):
+    for view in (front, top, journal):
         set_hidden_lines_removed(adapter, view)
     _assert_view_geometry(
         adapter,
@@ -1363,7 +1483,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # plan angle and the crank boss station and View B the bore spacing, so
     # each shows its owning sketch (JournalPlanReference's two rays,
     # CrankBossStationReference's ray, BoreSpacingReference's centreline
-    # joining the bores) in that view only; no other view shows any of them.
+    # joining the bores) in that view only; Section A-A (above) shows
+    # ConeBossStationReference's rays the same way.
     top_annotations = curate_hidden_owner_dimensions(
         adapter,
         top,
@@ -1376,13 +1497,6 @@ async def build(adapter: Any) -> dict[str, str]:
         journal,
         keep=JOURNAL_KEEP,
         view_label="cone journal",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    section_annotations = curate_view_dimensions(
-        adapter,
-        section,
-        keep=SECTION_KEEP,
-        view_label="cone boss bore-plane section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [
@@ -1433,31 +1547,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crank boss axis",
     )
     _add_cone_section_centerline(adapter, section)
-    # The note's arrow lands on the journal rim's upper-right quarter (35
-    # degrees), above the A-A line, so it reaches the rim from the right
-    # without crossing that line (leader-crosses-section-line, af13): the
-    # native entity's default landing sat below it, on the lower-left.  The
-    # rim is the pad end-face circle seen along Z, centred L/2*sin(incline)
-    # right of the axis and foreshortened by cos(incline) across; the audit
-    # read the old landing within 0.1 mm of this ellipse.  The pick only sets
-    # the landing: the note must still attach to the identified bore rim.
-    view_b_t = math.radians(35.0)
-    view_b_incline = math.radians(INCLINE_DEG)
-    add_attached_note(
-        adapter,
-        front,
-        text="VIEW B",
-        entity_xy=(
-            _front_x(
-                CONE_BOSS_LENGTH / 2.0 * math.sin(view_b_incline)
-                + BORE_DIA / 2.0 * math.cos(view_b_t) * math.cos(view_b_incline)
-            ),
-            _front_y(BORE_HEIGHT + BORE_DIA / 2.0 * math.sin(view_b_t)),
-        ),
-        note_xy=(0.1265, 0.1087),
-        label="cone-axis auxiliary-view direction",
-        attached_to=_bore_rim_edge(front, diameter_mm=BORE_DIA),
-    )
+    _add_view_b_arrow(adapter, section)
 
     add_native_hole_callout(
         adapter,
@@ -1490,12 +1580,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The crank-bore Ra stands left of the head, between the crank-height
     # reference and the body's top witness: a symbol above the view crossed
-    # that top witness (leader-crosses-line, ha-perf-parts audit).
+    # that top witness (leader-crosses-line, ha-perf-parts audit).  Its
+    # leader runs level with the rim landing, above the (81.20) reference's
+    # upper extension line at the crank axis: from y=0.1447 it crossed that
+    # line (r1 machinist review).
     add_surface_finish(
         adapter,
         front,
         edge_entity=_bore_rim_edge(front, diameter_mm=CRANK_BORE_DIA),
-        symbol_xy=(0.050, 0.1447),
+        symbol_xy=(0.050, 0.1505),
         leader_attach_xy=model_point_in_view(
             adapter,
             front,
