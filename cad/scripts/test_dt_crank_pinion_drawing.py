@@ -463,8 +463,9 @@ def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() ->
     assert not any(line.startswith("BOSS WALL") for line in lines)
     # The T120 fit-up may turn the band down; the sheet states its floor on
     # the turned diameter's own callout (machinist review r1 of #1652).
-    assert not any("TURNED BAND" in line for line in lines)
-    assert f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN" in spec.TURNED_DIA_FITUP_CALLOUT
+    floor = f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN"
+    assert floor not in spec.DRAWING_NOTES
+    assert floor in spec.TURNED_DIA_FITUP_CALLOUT
     assert "MHA-DT-000" in spec.TURNED_DIA_FITUP_CALLOUT
     assert len(lines) <= 4
     assert not hasattr(spec, "BOSS_WALL_EXCEPTION")
