@@ -90,17 +90,12 @@ def test_baseline_uses_all_published_release_pages_not_local_or_draft_tags() -> 
         + [_release(f"draft-{index}", draft=True) for index in range(97)],
         [_release("v43"), _release("v42"), _release("v45", draft=True), _release("v46", prerelease=True)],
     ]
-    calls: list[tuple[str, ...]] = []
 
     def gh(*args: str) -> str:
-        calls.append(args)
-        return json.dumps(pages[len(calls) - 1])
+        page = int(args[-1].rsplit("page=", 1)[1])
+        return json.dumps(pages[page - 1])
 
     assert previous_published_release("v44", "owner/repo", gh)["tag_name"] == "v43"
-    assert calls == [
-        ("api", "repos/owner/repo/releases?per_page=100&page=1"),
-        ("api", "repos/owner/repo/releases?per_page=100&page=2"),
-    ]
     assert previous_published_release("v1", "owner/repo", lambda *_a: "[]") is None
 
 

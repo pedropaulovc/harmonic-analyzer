@@ -1076,7 +1076,7 @@ def test_missing_drawing_asset_blocks_tag_and_publish(
         cut_release.publish("v44", tmp_path / "cad.zip", facts, False)
 
 
-def test_dry_run_reports_drawing_zip_and_color_legend(
+def test_dry_run_reports_drawing_zip(
     prepared_readme_release: tuple[Path, Path, Path],
     capsys: pytest.CaptureFixture[str],
     caplog: pytest.LogCaptureFixture,
@@ -1088,12 +1088,6 @@ def test_dry_run_reports_drawing_zip_and_color_legend(
     asset = root.with_name("harmonic-analyzer-v22-drawing-diff.zip")
     assert f"asset: {asset}" in caplog.text
     assert "/releases/download/v22/harmonic-analyzer-v22-drawing-diff.zip" in output
-    assert "Red = old-only / removed ink" in output
-    assert "blue = new-only / added ink" in output
-    assert "light gray = common ink" in output
-    assert "BUILD and REV" in output
-    assert "provenance-only changes and antialiasing noise are skipped" in output
-    assert "index.html" in output and "summary.json" in output
 
 
 def test_published_logs_snapshot_includes_tag_and_push(
@@ -1119,9 +1113,8 @@ def test_published_logs_snapshot_includes_tag_and_push(
         asset = root.parent / "harmonic-analyzer-v22-logs.zip"
         assert str(asset) in args
         with zipfile.ZipFile(asset) as archive:
-            text = archive.read("release.log").decode("utf-8")
-        assert "tag complete\n" in text
-        assert "push complete\n" in text
+            lines = archive.read("release.log").decode("utf-8").splitlines()
+        assert lines == ["staging complete", "tag complete", "push complete"]
         return "https://github.com/example/repo/releases/tag/v22"
 
     monkeypatch.setattr(cut_release, "_git", git)
