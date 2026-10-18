@@ -145,6 +145,13 @@ FRONT_KEEP = {
 SECTION_LINE_OVERRUN = 0.005
 # The native caption's top centre, under the section and above the title block.
 SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.085)
+# The cut runs along the face view's horizontal centre line, so A-A projects
+# with the flat to the right; ``_turn_section_axis_across`` turns it 90° CCW
+# so the gear axis reads across the sheet. The native label says so in its
+# one writable compartment, the custom scale text (as draw_fr_harmonic_base
+# labels its turned sections), and the turn proves the direction (machinist
+# review r3 of #1641: a turned section with no rotation label, rule 15).
+SECTION_LABEL_SCALE_TEXT = "ROTATED 90 DEG CCW  SCALE"
 # Face width up and left of the section, its dimension line run out past the
 # south witness line so neither witness line strikes the text (machinist
 # review r1 of #1641); the chamfer's leg dimension runs left off the south
@@ -155,7 +162,9 @@ SECTION_KEEP = {
 }
 # The face width's +/-0.025 is the gear's term in the solid cone-gear stack
 # on the cone gear shaft (dt_cone_gear_stack); rule 4 asks that the stack be
-# named where the band prints.
+# named where the band prints. Below the value: r3 of #1641 set it above, and
+# the above lane neither broke its lines nor printed (layout audit
+# text-unmatched), while the native below lane prints on every sheet.
 FACE_WIDTH_CALLOUT = "SETS CONE GEAR STACK\nON MHA-DT-004"
 
 # Native bands on both bore dimensions set the fitted clearance. The callout
@@ -183,9 +192,13 @@ DIMENSION_CALLOUTS = {
     "FaceWidth": FACE_WIDTH_CALLOUT,
     # The leg is native and prints under the title block's .XX band; the
     # chamfer feature is 45° on the model. The callout says the chamfer is on
-    # one end only and why (the leader shows which end); the short last line
-    # keeps the leg's own dimension line off the text.
-    "BoreSouthChamferSize": " X 45 DEG, THIS END\nCLEARS FLAT RUNOUT\nOF MHA-DT-004",
+    # one end only and why (the leader shows which end). SolidWorks sets the
+    # block's widest line against the leg's own dimension line, whose
+    # extension lines overrun it by 1 mm: two trailing spaces on every line
+    # keep that ink clear (r3 of #1641 printed RUNOUT's T on the line).
+    "BoreSouthChamferSize": (
+        " X 45 DEG, THIS END  \nCLEARS FLAT RUNOUT  \nOF MHA-DT-004  "
+    ),
 }
 
 # The tip diameter lands on its near (upper right) rim and the round
@@ -268,6 +281,15 @@ def _turn_section_axis_across(adapter: Any, view: Any) -> None:
         if bool(section.GetReversedCutDirection()) != reversed_cut:
             raise RuntimeError("64T section cutting direction did not persist")
         axis, flat = _section_axes(adapter, native)
+    # SolidWorks lays the aligned section in projection, the flat along the
+    # cutting line as in the face view: rightward. Turning that flat up is
+    # 90° counter-clockwise, which SECTION_LABEL_SCALE_TEXT prints; any other
+    # start would make the label false, so it fails the build instead.
+    if flat[0] <= 0.0 or abs(flat[1]) > 1e-8:
+        raise RuntimeError(
+            f"64T section does not lay the flat rightward before its turn ({flat=}), "
+            f"so {SECTION_LABEL_SCALE_TEXT!r} would be false"
+        )
     native.Angle = float(native.Angle) - math.atan2(axis[1], axis[0])
     rebuild_drawing(adapter, label="turn 64T section")
     axis, flat = _section_axes(adapter, native)
@@ -277,6 +299,29 @@ def _turn_section_axis_across(adapter: Any, view: Any) -> None:
         f"64T section turned: angle={float(native.Angle):.6f} rad, "
         f"reversed={bool(section.GetReversedCutDirection())}"
     )
+
+
+def _label_section_rotation(drawing_model: Any) -> None:
+    """Write the rotation into the native section label's scale compartment.
+
+    swDetailingSectionViewLabels_{PerStandard,Scale,CustomScale} = 242/247/84
+    and swDetailingViewLabelsScale_SCALEcustom = 3, as draw_fr_harmonic_base
+    reads them off this install's swconst.tlb (R2026x). The label then reads
+    "SECTION A-A" over "ROTATED 90 DEG CCW  SCALE 3 : 2".
+    """
+    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceToggle(242, 0, False):
+        raise RuntimeError("failed to release the standard section-label defaults")
+    if not extension.SetUserPreferenceInteger(247, 0, 3):
+        raise RuntimeError("failed to select custom section-label scale text")
+    if not extension.SetUserPreferenceString(84, 0, SECTION_LABEL_SCALE_TEXT):
+        raise RuntimeError("failed to write the section-label scale text")
+    if (
+        extension.GetUserPreferenceToggle(242, 0)
+        or int(extension.GetUserPreferenceInteger(247, 0)) != 3
+        or str(extension.GetUserPreferenceString(84, 0)) != SECTION_LABEL_SCALE_TEXT
+    ):
+        raise RuntimeError("native section-label scale text did not persist")
 
 
 def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -391,6 +436,7 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    _label_section_rotation(drawing_model)
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     section = create_section_view(
@@ -427,20 +473,14 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The tip, bore and AF callouts read below their values; the face width's
-    # reads above, away from the section it measures.
+    # Every callout reads below its value.
     set_dimension_callouts(
         adapter, front_annotations,
         {name: DIMENSION_CALLOUTS[name] for name in FRONT_KEEP if name in DIMENSION_CALLOUTS},
     )
     set_dimension_callouts(
         adapter, section_annotations,
-        {"BoreSouthChamferSize": DIMENSION_CALLOUTS["BoreSouthChamferSize"]},
-    )
-    set_dimension_callouts(
-        adapter, section_annotations,
-        {"FaceWidth": DIMENSION_CALLOUTS["FaceWidth"]},
-        location="above",
+        {name: DIMENSION_CALLOUTS[name] for name in SECTION_KEEP},
     )
     assert_imported_precision(
         adapter, front_annotations + section_annotations, DRAWING_PRECISION_BY_NAME
