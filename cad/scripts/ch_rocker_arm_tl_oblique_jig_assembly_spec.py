@@ -810,8 +810,8 @@ ITEM_NUMBERS = {stem: str(index) for index, stem in enumerate(BOM_ORDER, 1)}
 # and its pivot pin above it, as it is pressed in; block 1 carries the nut
 # bracket and the nut, their screws backed out along the axes they are
 # driven on, each block screw's wedge-lock pair halfway out to its head;
-# then the carrier, its HUB pin dropped out beneath it and its CL
-# dowel lifted out, and the riser and the feed lever over it with their screws
+# then the carrier, its HUB pin and its CL dowel dropped out beneath it (step
+# 11 presses both up from below once the riser is down), and the riser and the feed lever over it with their screws
 # above them, each lever screw's wedge-lock pair halfway out to its head.
 # Each step's families move by a signed distance along a machine
 # axis; a family's displacement along an axis is the sum of the steps naming
@@ -858,7 +858,8 @@ EXPLODE_STEPS = (
         230.0,
     ),
     ("hub pin presses out down", (HUB_PIN,), "z", -150.0),
-    ("cl dowel presses out up", (CL_DOWEL,), "z", 30.0),
+    # Review bought-tl000-r2: the dowel goes in from beneath like the HUB pin.
+    ("cl dowel presses out down", (CL_DOWEL,), "z", -60.0),
     ("nut screws back out", (NUT_SCREW,), "x", 30.0),
     ("block screws back out", (BLOCK_SCREW,), "y", -40.0),
     ("wedge-lock pairs back out", (BLOCK_LOCK_WASHER,), "y", -20.0),

@@ -309,8 +309,10 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
         spec.BLOCK_LOCK_WASHER: 90.0,
         spec.PIVOT_PIN: 150.0,
         spec.CARRIAGE_SCREW: 150.0,
+        # Review bought-tl000-r2: dropped out beneath the carrier, as step 11
+        # presses it up from below.
+        spec.CL_DOWEL: 170.0,
         spec.CARRIER: 230.0,
-        spec.CL_DOWEL: 260.0,
         spec.RISER: 290.0,
         spec.FEED_LEVER: 290.0,
         spec.LEVER_LOCK_WASHER: 310.0,
