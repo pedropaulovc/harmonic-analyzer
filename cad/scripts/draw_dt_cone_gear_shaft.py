@@ -191,7 +191,9 @@ STATION_TEXT_CLEARANCE = 0.002
 # after it), so each x lies INSIDE the land it measures; the short lands'
 # lines follow their current end stations, one third of a land length back
 # from each small end.  Ø12.231 stands just off the faced end, its text and
-# two mate lines above the journal's extension lines.  A tip-end text spans
+# two mate lines above the journal's extension lines, 4 mm nearer the end
+# than r2's so its widest mate line ends clear of section A-A's across-flat.
+# A tip-end text spans
 # its right-hand neighbours' lines: the tip's text sits highest and each
 # neighbour to the right steps down, so no line rises through a text (codex,
 # 18395f30).  Lands 2 and 3 carry their lines mid-land; the tip's line stays
@@ -201,7 +203,7 @@ STATION_TEXT_CLEARANCE = 0.002
 # r1's (the tip detail with them); Ø9.525 stands right of all three suffixes,
 # its two mate lines centred on it clear above A-A's letter.
 SIDE_DIAMETERS = {
-    "Sec0Dia": (0.2700, 0.1680),
+    "Sec0Dia": (0.2660, 0.1680),
     "Sec1Dia": (0.1600, 0.1800),
     "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1785),
     "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1905),
@@ -335,13 +337,15 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # of the side view's big end.  Every across-flat names its gears after its
 # value (FLAT_MATE_SUFFIXES), the whole line centred on the text position
 # (r2, 20261018T062935602Z: B's "5.842 -0.01 T024" read 376.0..410.5 mm
-# about its 393 mm centre), so A stands 4 mm right of r2's to keep its longer
-# line off the Ø12.231 block and clear of B's.
+# about its 393 mm centre), so A's 56 mm line pushes A-A 3 mm right of r2's
+# and B-B 1 mm right: r3 (20261018T065854075Z) measured A's box ending at
+# 0.3693 with A at 0.341, 2.0 mm short of B's at 0.3713, under the proof's
+# CLEAR_GAP_M plus margin.
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
 # land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
     DSection(
-        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.341, 0.165), (2, 1)
+        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.340, 0.165), (2, 1)
     ),
     DSection(
         2,
@@ -349,7 +353,7 @@ D_SECTIONS = (
         SECTION_ENDS[2] - 0.6,
         CutParent.TIP_DETAIL,
         0.0210,
-        (0.393, 0.165),
+        (0.394, 0.165),
         (3, 1),
     ),
     DSection(
