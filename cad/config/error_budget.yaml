@@ -215,7 +215,7 @@ critical_features:
     nominal: null
     quantity: phase
     class: channel
-    holds: "MHA-DT-004 note ALL FLATS PARALLEL. at the title-block +/-1 deg angle: the Ø6.350, Ø3.175 and Ø1.588 land flats each within 1 deg of the Ø9.525 land's, which carries T030-T120 and the 64T (its own clock is a crank-index shift); one draw per land, shared by its gears (error_budget.draw_groups)"
+    holds: "MHA-DT-004 section A-A callout 4 FLATS IN LINE at the title-block +/-1 deg angle: the Ø6.350, Ø3.175 and Ø0.794 land flats each within 1 deg of the Ø9.525 land's, which carries T030-T120 and the 64T (its own clock is a crank-index shift); one draw per land, shared by its gears (error_budget.draw_groups)"
   station_setting:
     tolerance: 0.25
     nominal: null

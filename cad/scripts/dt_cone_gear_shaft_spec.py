@@ -22,6 +22,7 @@ from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft bui
     LAND_DIA_PLACES,
     LAND_AF_PLACES,
     RUNNING_DIA_BAND,
+    SECTION_CONE_GEAR_TEETH,
     SECTION_DIA_BANDS,
     SECTION_FLAT_AF,
     TERMINAL_DIA_IN,
@@ -138,12 +139,26 @@ if THRUST_RING_MIN - 2.0 * THRUST_EDGE_BREAK_MAX < THRUST_RING_FLOOR - 1e-9:
         f"thrust ring {THRUST_RING_MIN:.3f} less two {THRUST_EDGE_BREAK_MAX} "
         f"breaks is under the {THRUST_RING_FLOOR} floor"
     )
+# The collar's two roots stay sharp in the model (#914): its south face seats
+# on the MHA-DT-005 boss round the journal rim, its north face carries the
+# 64T.  The 64T clears any root under its 1.0 bore chamfer; the post's rim
+# break has no minimum, so the root's limit is the one a sharp rim still
+# seats against: an R0.05 root stands a sharp rim off the face by under
+# 0.01 at the journal's mean clearance.  A hand-ground tool nose holds it.
+COLLAR_ROOT_RADIUS_MAX = 0.05
 # The callout under the collar's reference diameter: the stock statement in
 # the U41 plate's form ("1/4 PLATE AS SUPPLIED"), so the bar size stays out
-# of the MATERIAL cell, and the collar's own edge break, tighter than the
-# title block's.
-COLLAR_STOCK_CALLOUT = (
-    f"5/8 BAR AS SUPPLIED\nEDGE BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
+# of the MATERIAL cell, the collar's own edge break, tighter than the title
+# block's, its root limit, and the reason for both: the faces are seats
+# (machinist review r1, run 20261018T054926125Z: a tight break and a sharp
+# root need their function at the callout).
+COLLAR_STOCK_CALLOUT = "\n".join(
+    (
+        "5/8 BAR AS SUPPLIED",
+        f"EDGE BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX",
+        f"ROOTS R{COLLAR_ROOT_RADIUS_MAX:.2f} MAX",
+        "SEATS MHA-DT-005 AND 64T",
+    )
 )
 # The same break on the post's journal rims, the ring's other bounding edge;
 # the post sheet prints it with the journal size.
@@ -152,8 +167,52 @@ POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
 # break limit is a drawing requirement, printed above the terminal across-flat
 # (draw_dt_cone_gear_shaft).  cone_shaft_land_bands derives the number.  One
 # line: SolidWorks stores an above callout's line break but prints none of it
-# (run 20261010T071427837Z).  Stoning is named because it matches the number.
-TORQUE_CORNER_CALLOUT = f"STONE CORNERS {TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX"
+# (run 20261010T071427837Z).  No process word: the limit is the requirement
+# (machinist review r1).
+TORQUE_CORNER_CALLOUT = f"CORNERS {TERMINAL_FLAT_EDGE_BREAK_MAX:.2f} MAX"
+
+
+def _gear(teeth: int) -> str:
+    return f"T{teeth:03d}"
+
+
+# Each tight band names its mate at its own callout (drawing-guidelines.md
+# rule 4; machinist review r1 found the mates only in a general note).  The
+# journal runs in the post bore; every gear land's seat and flat slide in
+# the D-bores of the gears it carries (cone_shaft_land_bands
+# .SECTION_CONE_GEAR_TEETH, the 64T on land 1 too).  Two lines below the
+# journal's and land 1's diameters, where the side view has room; one-line
+# suffixes on the stepped tip, whose texts climb over each other.
+SEAT_MATE_CALLOUTS = {
+    "Sec0Dia": "RUNNING FIT IN\nMHA-DT-005 BORE",
+    "Sec1Dia": (
+        f"SLIDES IN 64T AND\n{_gear(min(SECTION_CONE_GEAR_TEETH[1]))}"
+        f"-{_gear(max(SECTION_CONE_GEAR_TEETH[1]))}"
+    ),
+}
+SEAT_MATE_SUFFIXES = {
+    f"Sec{land}Dia": " SLIDES IN "
+    + ", ".join(_gear(t) for t in SECTION_CONE_GEAR_TEETH[land])
+    for land in (2, 3, 4)
+}
+FLAT_MATE_SUFFIXES = {
+    f"Sec{land}AF": " " + ", ".join(_gear(t) for t in SECTION_CONE_GEAR_TEETH[land])
+    for land in (2, 3, 4)
+}
+# The flats' one shared clock (each turns every gear on its land), flagged on
+# the first flat's section rather than left as a general note.
+FLATS_IN_LINE_CALLOUT = "4 FLATS IN LINE"
+# Why the three land steps and the collar web print three places: each step
+# stands SEAT_STEP_SETBACK inside the bore of the smallest gear on the larger
+# land (the step proof below), and the web is the 64T's station toward
+# MHA-DT-005.  One-line suffixes: a length tier carries one line.
+LENGTH_FUNCTION_SUFFIXES = {
+    **{
+        f"Sec{land}End": f" INSIDE {_gear(min(SECTION_CONE_GEAR_TEETH[land]))} BORE"
+        for land in (1, 2, 3)
+    },
+    "CollarWidth": " LOCATES 64T GEAR",
+}
 
 # Station layout.  Every cone gear station was laid out on a 6.5 reference
 # face one exact-tracking seat pitch (dt_cone_gear_spec.SEAT_PITCH) from the next;
@@ -356,27 +415,27 @@ SURFACE_FINISHES = (
     ),
 )
 
-# What the native dimensions cannot say (drawing-guidelines.md rule 3 (decimal places carry the tolerance): a
-# fit requirement names its mate).  The gear seats and their flats name the
-# bores they fit (MHA-DT-003's and MHA-DT-007's); why the seat band sits below
-# nominal is cone_shaft_land_bands.GEAR_SEAT_BAND's comment, and the fit-up
-# lives only at the drive-train assembly step -- drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps both off the
-# sheet (Main, 2026-09-26).  No check the shop cannot make (codex, 375a122c),
-# no digits but the mates' numbers, no method words but one.  Lines stay
-# short: the note block starts 58 mm in and the title block begins at 216 mm.
-# The tailstock line is that one process word, by user ruling (U40,
-# 2026-09-23): the slender terminal land cannot be turned unsupported,
-# so the support IS the requirement (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s exception), not a
-# method preference.  The parallel line is the flats' relative clock (codex,
-# fca59e2b): each land's flat turns every gear on it, so the four must share
-# one clock.  No dimension can say it -- the flats stand in four separate
-# sections -- and drawing-guidelines.md rule 5 (avoid excessive GD&T) keeps a parallelism frame off a shaft, so the
-# requirement is the note and its tolerance is the title block's angle,
-# which error_budget.yaml books per land as cone_land_clock.
+# What the native dimensions cannot say.  The seats, flats, steps and web
+# name their gears at their own callouts (SEAT_MATE_CALLOUTS and the suffixes
+# above); the note gives those gears' drawing numbers once.  Why the seat
+# band sits below nominal is cone_shaft_land_bands.GEAR_SEAT_BAND's comment,
+# and the fit-up lives only at the drive-train assembly step --
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps it
+# off the sheet (Main, 2026-09-26).  No check the shop cannot make (codex,
+# 375a122c), no digits but the mates' names and numbers, no method words but
+# one.  Lines stay short: the note block starts 58 mm in and the title block
+# begins at 216 mm.  The tailstock line is that one process word, by user
+# ruling (U40, 2026-09-23): the slender terminal land cannot be turned
+# unsupported, so the support IS the requirement, not a method preference
+# (exception RV-02 in cad/config/parts/dt-cone-gear-shaft.yaml).  The flats'
+# shared clock is FLATS_IN_LINE_CALLOUT on section A-A; its tolerance is the
+# title block's angle, which error_budget.yaml books per land as
+# cone_land_clock.
 DRAWING_NOTES = "\n".join(
     (
-        "GEAR SEATS AND FLATS MATE MHA-DT-003 AND MHA-DT-007 BORES.",
-        "ALL FLATS PARALLEL.",
+        f"{_gear(min(min(g) for g in SECTION_CONE_GEAR_TEETH if g))}"
+        f"-{_gear(max(max(g) for g in SECTION_CONE_GEAR_TEETH if g))}"
+        ": MHA-DT-003 CONE GEARS. 64T: MHA-DT-007.",
         "TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
     )
 )
