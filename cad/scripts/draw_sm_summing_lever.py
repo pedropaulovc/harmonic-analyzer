@@ -203,6 +203,46 @@ RIDGE_DETAIL_LABEL_XY = (0.070, 0.052)
 # ridge-to-side dimension's extension lines and under its dimension line
 # (the vertex height's upper extension line runs left from the vertex).
 RIDGE_DETAIL_LETTER_OFFSET = (0.009, 0.0045)
+# swUserPreferenceIntegerValue_e values read from the installed swconst.tlb.
+_PREF_VISIBLE_EDGES_THICKNESS = 53  # swLineFontVisibleEdgesThickness
+_PREF_DIMENSIONS_THICKNESS = 63  # swLineFontDimensionsThickness
+_NO_PREFERENCE_OPTION = 0  # swUserPreferenceOption_e.swDetailingNoOptionSpecified
+_LINE_WEIGHT_THICK = 2  # swLineWeights_e.swLW_THICK
+_LINE_WEIGHT_THIN = 0  # swLineWeights_e.swLW_THIN
+
+
+@_telemetry.traced("drawing.summing_lever_line_weights")
+def _pin_trial_line_weights(draw: Any) -> None:
+    """Set this document's visible edges thick and dimension leaders thin."""
+    extension = _early_bound(draw.Extension, "IModelDocExtension")
+    # The project templates map Thick to 0.35 mm and Thin to 0.13 mm.
+    # Document defaults reach future views/dimensions without walking entities
+    # or changing the seat's application preferences.
+    for name, preference, weight, width_mm in (
+        ("visible_edges", _PREF_VISIBLE_EDGES_THICKNESS, _LINE_WEIGHT_THICK, 0.35),
+        ("dimensions", _PREF_DIMENSIONS_THICKNESS, _LINE_WEIGHT_THIN, 0.13),
+    ):
+        ok = extension.SetUserPreferenceInteger(
+            preference, _NO_PREFERENCE_OPTION, weight
+        )
+        applied = int(
+            extension.GetUserPreferenceInteger(preference, _NO_PREFERENCE_OPTION)
+        )
+        _telemetry.event(
+            "drawing.line_weight",
+            category=name,
+            preference=preference,
+            option=_NO_PREFERENCE_OPTION,
+            requested=weight,
+            applied=applied,
+            setter_accepted=bool(ok),
+            template_width_mm=width_mm,
+        )
+        if not ok or applied != weight:
+            raise RuntimeError(
+                f"failed to pin {name} line weight to {weight} "
+                f"(set returned {ok!r}, document reads {applied})"
+            )
 
 # Section C-C: the plate's own thickness.  Every end view shows the end ribs
 # over the plate and the spring-anchor pad below its free edge, so no view
@@ -1533,6 +1573,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _pin_trial_line_weights(drawing_model)
     stamp_drawing_summary(
         adapter,
         drawing_model,
