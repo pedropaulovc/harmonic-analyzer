@@ -209,9 +209,12 @@ FREE_PATH = {
     "kink_vertex": FREE_KINK_VERTEX,
     "kink_bisector": FREE_KINK_ANGLE_BISECTOR,
 }
-# The kink angle's text point in the sketch, this far down the wedge's
-# bisector from the vertex (mm): it picks the acute wedge the print shows.
+# The kink angle's text point in the sketch, this far from the vertex (mm)
+# along the lower acute wedge's bisector turned clockwise by each of these in
+# turn (deg): the lower acute wedge, its vertically opposite, then the two
+# obtuse wedges.  The first placement that reads 25 deg is kept.
 KINK_ANGLE_TEXT_MM = 4.0
+KINK_ANGLE_WEDGE_TURNS_DEG = (0.0, 180.0, 90.0, -90.0)
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -225,72 +228,78 @@ def _driving_kink_angle(adapter, blade: str, flat: str, pts, label: str) -> None
     """The kink's sweep as the DRIVING angle between the blade and flat lines.
 
     Both lines are selected as segments
-    (build_dt_cone_pivot_post._add_driving_plan_incline's recipe), the text
-    point on the bisector of the acute wedge below the lines' crossing
-    (dt_pinion_spring_geometry.KINK_VERTEX); on the Front plane the sketch and
-    model frames coincide, so it goes in model metres.  The segments run from
-    the crossing in opposite senses (the blade down, the flat up), so
-    SOLIDWORKS measures their 155 deg (spring r3 leaf).  The new dimension is
-    first made DRIVEN, so turning it to its 25 deg supplement
-    (build_vn_knife_hanger_stud) can only re-read the solved sketch: turned
-    while it drove, it did not read back a driving 25 deg (spring r6 leaf).
-    Only then is it made driving and its value read back.
-    Which of the two acute wedges the arc takes the print checks and, if need
-    be, turns to its vertically opposite
+    (build_dt_cone_pivot_post._add_driving_plan_incline's recipe) and the
+    text point decides which of the four angles at the lines' crossing
+    (dt_pinion_spring_geometry.KINK_VERTEX) is measured
+    (build_dt_cylinder_gear's notch phase); on the Front plane the sketch and
+    model frames coincide, so it goes in model metres.  With the text on the
+    bisector of the acute wedge below the crossing SOLIDWORKS read 155 deg
+    (spring r3 leaf), and its SupplementaryAngle left the reading at 155
+    whether turned driving (r6) or driven (r7).  So the dimension is placed,
+    made DRIVEN and read, in each wedge in turn (the lower acute one first)
+    and deleted unless it reads 25 deg; the first 25 deg reading is made
+    driving and read back.  Every reading is logged and named if none
+    reads 25.  Which of the two acute wedges the arc takes the print checks
+    and, if need be, turns to its vertically opposite
     (draw_dt_pinion_spring._assert_kink_angle_wedge).
     """
     from solidworks_mcp.adapters import sw_type_info as _sw_type_info
     from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
 
     vertex, bisector = pts["kink_vertex"], pts["kink_bisector"]
-    text_x = vertex[0] + KINK_ANGLE_TEXT_MM * bisector[0]
-    text_y = vertex[1] + KINK_ANGLE_TEXT_MM * bisector[1]
     model = adapter.currentModel
-    model.ClearSelection2(True)
-    _select_sketch_entities(adapter, [blade, flat], 0)
     extension = _sw_type_info.early_bound_or_flag(
         model.Extension, "IModelDocExtension", "AddSpecificDimension"
     )
-    display, status = extension.AddSpecificDimension(
-        text_x / 1000.0,
-        text_y / 1000.0,
-        0.0,
-        3,  # swDimensionType_e.swAngularDimension
-        0,
-    )
-    model.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError(f"{label}: AddSpecificDimension(angular) failed ({status})")
-    display = _early_bound(display, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
     expected = math.radians(KINK_DEG)
-
-    def degrees() -> float:
-        return math.degrees(abs(float(_read_member(dimension, "SystemValue"))))
-
-    dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
-    if int(_read_member(dimension, "DrivenState")) != 1:
-        raise RuntimeError(f"{label}: angular dimension did not become driven")
-    measured = degrees()
-    if abs(measured - KINK_DEG) > 1e-6:
-        if abs(180.0 - measured - KINK_DEG) > 1e-6 or not display.SupplementaryAngle():
+    readings: list[str] = []
+    for turn in KINK_ANGLE_WEDGE_TURNS_DEG:
+        c, s = math.cos(math.radians(turn)), math.sin(math.radians(turn))
+        text = (
+            vertex[0] + KINK_ANGLE_TEXT_MM * (bisector[0] * c + bisector[1] * s),
+            vertex[1] + KINK_ANGLE_TEXT_MM * (bisector[1] * c - bisector[0] * s),
+        )
+        model.ClearSelection2(True)
+        _select_sketch_entities(adapter, [blade, flat], 0)
+        display, status = extension.AddSpecificDimension(
+            text[0] / 1000.0,
+            text[1] / 1000.0,
+            0.0,
+            3,  # swDimensionType_e.swAngularDimension
+            0,
+        )
+        model.ClearSelection2(True)
+        if display is None:
             raise RuntimeError(
-                f"{label}: angular dimension measured {measured:.6f} deg, "
-                f"expected {KINK_DEG:g} deg"
+                f"{label}: AddSpecificDimension(angular) failed ({status})"
             )
-        if abs(degrees() - KINK_DEG) > 1e-6:
-            model.EditRebuild3()
-        if abs(degrees() - KINK_DEG) > 1e-6:
-            raise RuntimeError(
-                f"{label}: driven angle reads {degrees():.6f} deg after its "
-                f"supplement (measured {measured:.6f} deg)"
-            )
+        display = _early_bound(display, "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
+        if int(_read_member(dimension, "DrivenState")) != 1:
+            raise RuntimeError(f"{label}: angular dimension did not become driven")
+        measured = abs(float(_read_member(dimension, "SystemValue")))
+        degrees = math.degrees(measured)
+        readings.append(f"{turn:g} deg off the lower bisector: {degrees:.6f}")
+        _telemetry.info(f"{label}: text {readings[-1]} deg")
+        if abs(measured - expected) <= 1e-8:
+            break
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        if not annotation.Select3(False, None):
+            raise RuntimeError(f"{label}: cannot select the {degrees:.6f} deg reading")
+        model.EditDelete()
+        model.ClearSelection2(True)
+    else:
+        raise RuntimeError(
+            f"{label}: no wedge reads {KINK_DEG:g} deg ({'; '.join(readings)} deg)"
+        )
     dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
     state = int(_read_member(dimension, "DrivenState"))
-    if state != 2 or abs(math.radians(degrees()) - expected) > 1e-8:
+    value = abs(float(_read_member(dimension, "SystemValue")))
+    if state != 2 or abs(value - expected) > 1e-8:
         raise RuntimeError(
             f"{label}: angular dimension is not a driving {KINK_DEG:g} deg "
-            f"(DrivenState {state}, {degrees():.6f} deg; measured {measured:.6f})"
+            f"(DrivenState {state}, {math.degrees(value):.6f} deg)"
         )
     _telemetry.success(f"driving {label}: {KINK_DEG:g} deg")
 
