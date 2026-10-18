@@ -54,7 +54,6 @@ from _sketch import (
 from _sketch_rectangle import define_centered_rectangle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from dt_cone_tip_block_spec import (
     ADJUSTER_BORE_SPEC,
     ADJUSTER_BORE_DIA,
@@ -65,7 +64,6 @@ from dt_cone_tip_block_spec import (
     BLOCK_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    EXPLICIT_SYMMETRIC_TOLERANCES_MM,
     FOOT_BORE_DIA,
     FOOT_BORE_SPEC,
     FOOT_TAP_OFFSET_X,
@@ -397,8 +395,7 @@ async def build(adapter) -> dict[str, str]:
     # the foot for the socket head cap screw rising from the swing platform's
     # underside counterbore, FOOT_TAP_OFFSET_X off the adjuster axis like the
     # platform's hole off the cone line.  The hole fixes the block's station,
-    # so its two locations print with an explicit band (the reference
-    # dimensions below).
+    # so its two locations print .XXX (the reference dimensions below).
     if (FOOT_TAP_X, FOOT_TAP_Z) != (BLOCK_X / 2.0 + FOOT_TAP_OFFSET_X, BLOCK_Z / 2.0):
         raise AssertionError("the foot tap is modelled off the -X face and north face")
     foot_cut = wizard_holes(
@@ -526,8 +523,6 @@ async def build(adapter) -> dict[str, str]:
     )
     # Model-owned places are applied only after the reference sketches exist.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    for (feature_name, dimension_name), tol in EXPLICIT_SYMMETRIC_TOLERANCES_MM.items():
-        set_dimension_symmetric_tolerance(adapter, feature_name, dimension_name, tol)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)

@@ -54,20 +54,21 @@ BLOCK_HEIGHT = ADJUSTER_AXIS_HEIGHT + TOP_ABOVE_AXIS
 PINCH_RISE = 8.85
 PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE
 # The printed grade of every dimension a stack reads; DRAWING_PRECISION must
-# carry the same (checked at the end of this module).  Two dimensions carry
-# an explicit band instead of the title block's: the axis height (the tip's
-# vertical capture in the adjuster cup, build_dt_drive_train_assembly) and the
-# hold-down tap's two stations (the pivot-head, embed and lateral stacks).
+# carry the same (checked at the end of this module).  Every dimension prints
+# the title block's general band for its places (machinist review of
+# d84a42ca7: the former explicit +/-0.10 on the axis height and the tap's
+# stations had no fit the reader could see; the stacks close at .XX and .XXX).
 # The width prints .XXX: PassageCenter and FootTapX locate from the -X face,
 # so the width's band lands on the +X face, which stands over the plate's
 # narrow west edge; at .X that face could overhang it at the printed limits
 # (build_dt_drive_train_assembly's print-worst containment), at .XX it keeps
-# only 0.27 of the 0.50 it needs.
+# only 0.19 of the 0.50 it needs.
 BLOCK_WIDTH_PLACES = 3
 BLOCK_DEPTH_PLACES = 3
 BLOCK_HEIGHT_PLACES = 1
-AXIS_HEIGHT_PLACES = 3
-AXIS_HEIGHT_TOL_MM = 0.10
+# .XX: the tip's vertical capture in the adjuster cup
+# (build_dt_drive_train_assembly) closes at the .XX band.
+AXIS_HEIGHT_PLACES = 2
 PINCH_HEIGHT_PLACES = 2
 PASSAGE_CENTER_PLACES = 3
 PINCH_DEPTH_PLACES = 1
@@ -144,6 +145,9 @@ def _printed_limits(nominal: float, places: int) -> tuple[float, float]:
 def printed_band_mm(places: int) -> float:
     """Half-width of the title block's general band at ``places`` decimals."""
     return _BAND_BY_PLACES[places]
+
+
+AXIS_HEIGHT_TOL_MM = printed_band_mm(AXIS_HEIGHT_PLACES)
 
 
 # r3 (Main, 2026-09-25): PassageCenter prints from the -X face, which the
@@ -426,11 +430,12 @@ FOOT_BORE_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": FOOT_THREAD_DEPTH},
 )
 FOOT_BORE_DIA = blind_cut_dia_mm(FOOT_BORE_SPEC)
-# The tap's two stations, each with an explicit +/-FOOT_TAP_STATION_TOL_MM:
-# across the block from the -X face (the PassageCenter datum), and along the
-# axis from the NORTH face, the face the pivot screw's head gap is measured
-# to (build_dt_drive_train_assembly's pivot-head, embed and lateral stacks read
-# this band).  The tap sits FOOT_TAP_OFFSET_X off the adjuster axis, the
+# The tap's two stations, each .XXX on the title block's band: across the
+# block from the -X face (the PassageCenter datum), and along the axis from
+# the NORTH face, the face the pivot screw's head gap is measured to
+# (build_dt_drive_train_assembly's pivot-head, embed and lateral stacks read
+# this band; at .XX the pivot head's air and the post's lateral take-up
+# fail).  The tap sits FOOT_TAP_OFFSET_X off the adjuster axis, the
 # same offset as the platform's hold-down hole off the cone line
 # (dt_cone_swing_platform_spec.HOLDDOWN_LOCAL_X, which says why), so the block
 # body stands centred on the cone line.  Toward -X because the width's band
@@ -438,9 +443,11 @@ FOOT_BORE_DIA = blind_cut_dia_mm(FOOT_BORE_SPEC)
 FOOT_TAP_OFFSET_X = -1.0
 FOOT_TAP_X = BLOCK_X / 2.0 + FOOT_TAP_OFFSET_X
 FOOT_TAP_Z = BLOCK_Z / 2.0
-FOOT_TAP_STATION_TOL_MM = 0.10
-FOOT_TAP_X_PLACES = 2
+FOOT_TAP_X_PLACES = 3
 FOOT_TAP_Z_PLACES = 3
+if FOOT_TAP_X_PLACES != FOOT_TAP_Z_PLACES:
+    raise AssertionError("the stacks read one band for both foot tap stations")
+FOOT_TAP_STATION_TOL_MM = printed_band_mm(FOOT_TAP_X_PLACES)
 _tap_r = _HOLDDOWN_MAJOR_MM / 2.0
 _tap_drill_top_max = (
     FOOT_DEPTH
@@ -491,11 +498,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # U24b: the webs close at the title-block bands.  Still .XX: the pinch-hole
 # height (the top ligament closes at 1.92 at .X if 46.95 prints 47.0) and the
 # slit width (the drill-to-slot point reaches past the far jaw's tap drill at .X).  2026-09-29:
-# with the block fixed by its hold-down, the depth and the passage centre
-# print .XXX (the embed window, the collar-to-block air and the lateral
-# stack; build_dt_drive_train_assembly proves each looser grade fails), and the
-# axis height and the tap's stations carry an explicit +/-0.10 (set on the
-# model, AXIS_HEIGHT_TOL_MM / FOOT_TAP_STATION_TOL_MM).
+# with the block fixed by its hold-down, the depth, the passage centre and
+# the tap's stations print .XXX, and the axis height .XX (the embed window,
+# the collar-to-block air, the pivot head's air, the lateral stack and the
+# cup capture; build_dt_drive_train_assembly proves each looser grade fails).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Width": BLOCK_WIDTH_PLACES, "Depth": BLOCK_DEPTH_PLACES},
     "Block": {"BlockHt": BLOCK_HEIGHT_PLACES},
@@ -522,13 +528,6 @@ _STACK_GRADES = {
     ("FootTapXReference", "FootTapX"): FOOT_TAP_X_PLACES,
     ("FootTapZReference", "FootTapZ"): FOOT_TAP_Z_PLACES,
 }
-# Explicit symmetric bands the model sets on these dimensions; every other
-# marked dimension prints the title block's general band for its places.
-EXPLICIT_SYMMETRIC_TOLERANCES_MM: dict[tuple[str, str], float] = {
-    ("AxisHeightReference", "AxisHeight"): AXIS_HEIGHT_TOL_MM,
-    ("FootTapXReference", "FootTapX"): FOOT_TAP_STATION_TOL_MM,
-    ("FootTapZReference", "FootTapZ"): FOOT_TAP_STATION_TOL_MM,
-}
 for (_feature, _dimension), _places in _STACK_GRADES.items():
     if DRAWING_PRECISION[_feature][_dimension] != _places:
         raise AssertionError(
@@ -550,14 +549,8 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
         raise AssertionError(
             f"DRAWING_PRECISION names unmarked {_feature} dimensions: {_unmarked}"
         )
-_EXPLICIT_BAND_BY_NAME = {
-    dimension: band for (_feature, dimension), band in EXPLICIT_SYMMETRIC_TOLERANCES_MM.items()
-}
 
 
 def printed_value_text(name: str, nominal: float) -> str:
-    """The text a marked dimension prints: the value at its model places,
-    then the explicit symmetric band where the model sets one."""
-    text = f"{nominal:.{DRAWING_PRECISION_BY_NAME[name]}f}"
-    band = _EXPLICIT_BAND_BY_NAME.get(name)
-    return text if band is None else f"{text}\u00b1{band:.2f}"
+    """The text a marked dimension prints: the value at its model places."""
+    return f"{nominal:.{DRAWING_PRECISION_BY_NAME[name]}f}"

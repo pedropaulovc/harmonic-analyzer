@@ -55,7 +55,6 @@ from dt_cone_tip_block_spec import (
     BLOCK_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    EXPLICIT_SYMMETRIC_TOLERANCES_MM,
     FOOT_BORE_DIA,
     FOOT_DEPTH,
     FOOT_DEPTH_PLACES,
@@ -98,9 +97,12 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
 # The 52.66 block (38.100 common cone-axis height) prints 105 mm tall: the
 # front row rises 3 mm and everything above it 7.8 mm over the 47.93 block's
 # layout, so every gap above the row keeps its measured air, and the bottom
-# view drops 1.8 mm.
+# view drops 1.8 mm.  The plan rides 9.7 mm higher again (machinist review
+# of d84a42ca7): PassageCenter's function line stands over its value, with
+# the view-crowding air (the shorter box's height) under section A's north
+# letter.
 FRONT_CENTER = (0.072, 0.132)
-TOP_CENTER = (FRONT_CENTER[0], 0.2298)
+TOP_CENTER = (FRONT_CENTER[0], 0.2395)
 BOTTOM_CENTER = (FRONT_CENTER[0], 0.0382)
 # The right view and the removed views B and C stand on the front view's
 # projection row; their x follows from the adjuster callout between the front
@@ -215,47 +217,97 @@ SLIT_TEXT_RISE = 0.0145
 SLIT_TEXT_OFFSET = (
     SLIT_W * _S / 2.0 + ARROW_LENGTH + TEXT_CLEARANCE + VALUE_TEXT_HALF_WIDTH
 )
+# Machinist review of d84a42ca7 (rules 3/4): a three-place size given a
+# function names its mate and what it holds at its own dimension.  Above a
+# value the text keeps to one line (SolidWorks drops multi-line text placed
+# above a dimension); below it, it may run to two.
+DIMENSION_CALLOUTS = {
+    "SlitDepth": "SLOT DEPTH",
+    # The adjuster thread runs through the block's depth: its length is the
+    # cup screw's engagement window (build_dt_drive_train_assembly's embed
+    # stack).
+    "Depth": "SETS MHA-VN-017\nENGAGEMENT",
+}
+DIMENSION_CALLOUTS_ABOVE = {
+    # The +X face stands over the platform's narrow west edge
+    # (build_dt_drive_train_assembly's print-worst containment).
+    "Width": "STAYS ON MHA-DT-020",
+    # The adjuster axis across the block: the shaft tip's lateral stack.
+    "PassageCenter": "LOCATES MHA-DT-004 TIP",
+}
+# Callout text measured on the d84a42ca7 render: SLOT DEPTH's ten glyphs
+# print 25.3 mm wide, and each row stacks 4.55 mm (the 15.2 over SLOT
+# DEPTH).  A value and its rows centre on the dimension's point; a
+# horizontal dimension with a row over its value prints its line 4.5 mm
+# under that point (the 3.97's stacked deviations, 287c).
+CALLOUT_GLYPH_WIDTH = 0.00253
+TEXT_ROW_HEIGHT = 0.00455
+TWO_ROW_LINE_DROP = 0.0045
+
+
+def _callout_half_width(text: str) -> float:
+    return max(len(line) for line in text.split("\n")) * CALLOUT_GLYPH_WIDTH / 2.0
+
+
 # Left of the adjuster elevation, stepping out from the part: the axis
-# height (the widest value on the sheet, .XXX with its +/-0.10 band) on the
-# inner line, its value at half its span; then the block height, its value
-# at half the block, clear of the axis height's value and the sheet border.
+# height on the inner line, its value at half its span; then the block
+# height, its value at half the block, clear of the axis height's value and
+# the sheet border.
 AXIS_HEIGHT_LINE_DX = 0.031
 BLOCK_HEIGHT_LINE_DX = 0.052
+# The width's value and its function line are wider than its span, so they
+# stand right of the +X extension line on the extended dimension line, 5 mm
+# under the foot: the hold-down tap's callout below keeps the air the
+# view-crowding check asks (the taller box's height) under them.
+WIDTH_LINE_DROP = 0.005
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], _elevation_y(0.0, FRONT_CENTER) - 0.012),
+    "Width": (
+        FRONT_CENTER[0]
+        + BLOCK_X * _S / 2.0
+        + TEXT_CLEARANCE
+        + ROUND_OUT
+        + _callout_half_width(DIMENSION_CALLOUTS_ABOVE["Width"]),
+        _elevation_y(0.0, FRONT_CENTER) - WIDTH_LINE_DROP + TWO_ROW_LINE_DROP,
+    ),
     "BlockHt": (FRONT_CENTER[0] - BLOCK_HEIGHT_LINE_DX, FRONT_CENTER[1]),
     "SlitW": (
         FRONT_CENTER[0] + SLIT_TEXT_OFFSET,
         _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + SLIT_TEXT_RISE,
     ),
 }
-# PassageCenter stands above SlitW on the adjuster elevation; the plan's
-# north edge is the ceiling for both.
-PASSAGE_CENTER_RISE = 0.024
+# PassageCenter stands above SlitW on the adjuster elevation, its line
+# 21.2 mm over the block's top; the plan's north edge is the ceiling for
+# both.
+PASSAGE_CENTER_RISE = 0.0212 + TWO_ROW_LINE_DROP
 # swDimensionArrowsSide_e, set rather than left to the document's smart
-# arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.
-ARROWS_OUTSIDE = ("SlitW",)
+# arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.  The plan depth's
+# three rows and the 4.875's short span leave no room for inside arrows
+# (d84a42ca7: the 4.875's line and arrows struck its "5"); outside, a
+# vertical dimension prints no line between them.
+ARROWS_OUTSIDE = ("SlitW", "Depth", "FootTapZ")
 # Main eye-pass of 287c: the 15.2's smart arrows stood outside, and its lower
 # tail ran down to 0.4 mm over ADJUSTER ENTRY.  Its span holds the two-line
 # value and both arrows inside.  The pinch depth's span holds its two 3.4 mm
 # arrows: with no outside tail right of the hole-centre witness, the pinch
 # clearance callout's leader passes there (leader-crosses-line, af13c8ff8).
-# The plan depth and the foot tap's two stations hold theirs inside too, so
-# no tail runs toward the bottom view's callout or the plan's letters.
+# The width and FootTapX hold theirs inside too, so no tail runs toward the
+# bottom view's callout.
 ARROWS_INSIDE = (
     "SlitDepth",
     "PinchHeight",
     "PinchDepthCenter",
-    "Depth",
+    "Width",
     "FootTapX",
-    "FootTapZ",
 )
 _DIM_ARROWS_OUTSIDE = 1
 _DIM_ARROWS_INSIDE = 0
-# The plan: the block depth left of it, its value mid-span on its line.
+# The plan: the block depth left of it, its value and rows mid-span on its
+# line, a text clearance off the plan.
 _PLAN_LEFT = TOP_CENTER[0] - BLOCK_X * _S / 2.0
 _PLAN_RIGHT = TOP_CENTER[0] + BLOCK_X * _S / 2.0
-PLAN_DEPTH_LINE_X = _PLAN_LEFT - 0.010
+PLAN_DEPTH_LINE_X = (
+    _PLAN_LEFT - TEXT_CLEARANCE - ROUND_OUT - _callout_half_width(DIMENSION_CALLOUTS["Depth"])
+)
 TOP_KEEP = {
     "Depth": (PLAN_DEPTH_LINE_X, _plan_y(0.0)),
 }
@@ -330,10 +382,6 @@ VIEW_C_ARROW = (
     (TOP_CENTER[0] - 0.006 - 0.0018, _plan_y(Z_SOUTH) + 0.0105),
     (TOP_CENTER[0] - 0.006, _plan_y(Z_SOUTH)),
 )
-DIMENSION_CALLOUTS = {
-    "SlitDepth": "SLOT DEPTH",
-}
-
 # The adjuster's hole callout is placed with the view row (ADJUSTER_CALLOUT_*,
 # above).
 # The pinch clearance callout stands above the right view.  At
@@ -354,11 +402,11 @@ PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] + 0.0035 - 0.0264, 0.2013)
 # shortest approach; so did 19 mm once the prism's depth fell to 9.75).
 PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.015, 0.1978)
 # The hold-down tap's callout stands above the bottom view, right of the
-# FootTapX value and under the front view's Width line, so its leader drops
+# FootTapX value and under the front view's Width text, so its leader drops
 # steeply through the view's north edge.  With the tap 1.00 toward -X
 # (2026-09-29) a callout right of the view ran 5.4 mm longer over the part
 # than the tap's shortest approach.  6.6 mm over the north edge clears the
-# outline under the text and the Width's east arrow over it.
+# outline under the text.
 FOOT_TAP_CALLOUT_XY = (FOOT_TAP_CENTER[0] + 0.035, _bottom_y(Z_NORTH) + 0.0066)
 # Under section A-A's native label (SECTION_LABEL_BOX), centred on it with
 # 2.0 mm of air.  At 5.4 under the view (287c, when a 3:2 section printed a
@@ -462,11 +510,20 @@ _VALUE_GLYPH_WIDTH = 2.0 * VALUE_TEXT_HALF_WIDTH / 4.0
 
 
 def _value_extent(name: str, nominal: float) -> tuple[float, float, float, float]:
-    """A value's ink from its point: the text the model prints (its places
-    and any explicit band), centred the way SolidWorks centres the text.  An
-    estimate from the glyph width until a render measures it."""
+    """A value's ink from its point: the text the model prints at its
+    places, centred the way SolidWorks centres the text.  An estimate from
+    the glyph width until a render measures it."""
     half = len(printed_value_text(name, nominal)) * _VALUE_GLYPH_WIDTH / 2.0
     return (half, VALUE_TEXT_HALF_HEIGHT, half, VALUE_TEXT_HALF_HEIGHT)
+
+
+def _value_and_rows_extent(
+    name: str, nominal: float, text: str
+) -> tuple[float, float, float, float]:
+    """A value and its callout rows, centred together on the point."""
+    half_width = max(_value_extent(name, nominal)[0], _callout_half_width(text))
+    half_height = (1 + len(text.split("\n"))) * TEXT_ROW_HEIGHT / 2.0
+    return (half_width, half_height, half_width, half_height)
 
 
 _VALUE_EXTENTS = {
@@ -478,11 +535,17 @@ _VALUE_EXTENTS = {
         name: _value_extent(name, nominal)
         for name, nominal in (
             ("AxisHeight", ADJUSTER_AXIS_HEIGHT),
-            ("Depth", BLOCK_Z),
-            ("PassageCenter", BLOCK_X / 2.0),
             ("PinchHeight", PINCH_HEIGHT),
             ("FootTapX", FOOT_TAP_X),
             ("FootTapZ", FOOT_TAP_Z),
+        )
+    },
+    **{
+        name: _value_and_rows_extent(name, nominal, text)
+        for name, nominal, text in (
+            ("Depth", BLOCK_Z, DIMENSION_CALLOUTS["Depth"]),
+            ("Width", BLOCK_X, DIMENSION_CALLOUTS_ABOVE["Width"]),
+            ("PassageCenter", BLOCK_X / 2.0, DIMENSION_CALLOUTS_ABOVE["PassageCenter"]),
         )
     },
 }
@@ -501,10 +564,18 @@ PINCH_CLEARANCE_CALLOUT_EXTENT = (
     0.0023,
 )
 PINCH_THREAD_CALLOUT_EXTENT = (0.0322, 0.0085, 0.0310, 0.0078)
-# The hold-down tap's two lines (the tap drill and its depth, the thread and
-# its full-thread depth) plus the shoulder: the pinch thread callout's glyph
-# widths over two lines.  An estimate until a render measures it.
-FOOT_TAP_CALLOUT_EXTENT = (0.0280, 0.0060, 0.0280, 0.0055)
+# The hold-down tap's lines (the tap drill and its depth, the thread and its
+# full-thread depth, then the mate its stations locate on) plus the
+# shoulder: the d84a42ca7 render measured the two native lines 44 mm wide,
+# 4.9 mm over the point and the shoulder 5.6 under it; the mate line is one
+# more row, 21 glyphs wide.  The text grows up from its shoulder.
+FOOT_TAP_QUALIFIER = "LOCATES ON MHA-DT-020"
+FOOT_TAP_CALLOUT_EXTENT = (
+    max(0.022, _callout_half_width(FOOT_TAP_QUALIFIER)) + 0.0010,
+    0.0060,
+    max(0.022, _callout_half_width(FOOT_TAP_QUALIFIER)) + 0.0010,
+    0.0055 + TEXT_ROW_HEIGHT,
+)
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
     "ADJUSTER ENTRY": ADJUSTER_ENTRY_EXTENT,
@@ -806,7 +877,8 @@ def sheet_dimension_ink(
     h, v = Axis.HORIZONTAL, Axis.VERTICAL
 
     def drop(name: str) -> float:
-        return keeps[name][1] - HORIZONTAL_LINE_DROP
+        line_drop = TWO_ROW_LINE_DROP if name in DIMENSION_CALLOUTS_ABOVE else HORIZONTAL_LINE_DROP
+        return keeps[name][1] - line_drop
 
     front_x = FRONT_CENTER[0]
     foot = _elevation_y(0.0, FRONT_CENTER)
@@ -1150,47 +1222,6 @@ def _set_arrow_sides(
         raise RuntimeError(f"no dimension to set arrow sides: {sorted(remaining)}")
 
 
-_SW_TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
-
-
-def _assert_explicit_bands(adapter: Any, annotations: list[Any]) -> None:
-    """Prove every explicitly banded dimension imported with its model band.
-
-    The part sets the band (EXPLICIT_SYMMETRIC_TOLERANCES_MM); an imported
-    dimension that lost it would print bare and fall to the title block's
-    general band for its places, which none of these stacks closes at.
-    """
-    expected = {
-        dimension: band_mm
-        for (_feature, dimension), band_mm in EXPLICIT_SYMMETRIC_TOLERANCES_MM.items()
-    }
-    for raw in annotations:
-        annotation = _early_bound(raw, "IAnnotation")
-        name = dimension_name(adapter, annotation)
-        if name not in expected:
-            continue
-        band = expected.pop(name) / 1000.0
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        observed = (
-            int(tolerance.Type),
-            float(tolerance.GetMinValue()),
-            float(tolerance.GetMaxValue()),
-        )
-        if (
-            observed[0] != _SW_TOL_SYMMETRIC
-            or not math.isclose(observed[1], -band, abs_tol=1e-9)
-            or not math.isclose(observed[2], band, abs_tol=1e-9)
-        ):
-            raise RuntimeError(
-                f"{name} imported without its symmetric {band * 1000.0:g} mm band: "
-                f"(type, min m, max m) = {observed!r}"
-            )
-    if expected:
-        raise RuntimeError(f"no imported dimension carries {sorted(expected)}")
-
-
 def _add_adjuster_axis(adapter: Any, section: Any) -> None:
     """Sketch the adjuster bore's axis across section A-A, owned by the view.
 
@@ -1448,7 +1479,7 @@ def _states_depth(text: str, depth_mm: float) -> bool:
 def _foot_tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
     """Whether the hold-down tap's callout reads as a blind UNC-2B tap: the
     thread's line carries its full-thread depth, the tap drill's line its
-    depth, and nothing says THRU."""
+    depth, nothing says THRU, and the thread's part ends on the mate."""
     thread_desc = f"{HOLDDOWN_THREAD.lstrip('#')} UNC"
     lines = [text for text in resolved_parts.values() if text.strip()]
     thread = [text for text in lines if thread_desc in text]
@@ -1458,15 +1489,44 @@ def _foot_tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
         and len(thread) == 1
         and "2B" in thread[0]
         and _states_depth(thread[0], FOOT_THREAD_DEPTH)
+        and thread[0].rstrip().endswith(f"\n{FOOT_TAP_QUALIFIER}")
         and any(_states_depth(text, FOOT_DEPTH) for text in drill)
     )
+
+
+def _foot_tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Append the mate the tap's .XXX stations locate on (rule 4) to the one
+    compartment holding the thread, under its native thread line."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected foot tap callout parts: {definitions!r}")
+    thread_parts = [part for part, text in definitions.items() if "<hw-threadclass>" in text]
+    if len(thread_parts) != 1:
+        raise RuntimeError(f"foot tap thread line is not in one callout part: {definitions!r}")
+    updated = dict(definitions)
+    part = thread_parts[0]
+    updated[part] = f"{updated[part].rstrip()}\n{FOOT_TAP_QUALIFIER}"
+    return updated
+
+
+def _set_foot_tap_callout_text(display: Any) -> None:
+    """Name the mate under the native thread line, keeping every variable."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = _foot_tap_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            display.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    if persisted != updated:
+        raise RuntimeError(
+            f"foot tap mate line did not persist: definitions={persisted!r}"
+        )
 
 
 def _check_foot_tap_callout(display: Any) -> None:
     resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
     if not _foot_tap_callout_resolved(resolved):
         raise RuntimeError(
-            f"hold-down foot tap callout does not state its depths: {resolved!r}"
+            f"hold-down foot tap callout does not state its depths and mate: {resolved!r}"
         )
 
 
@@ -1769,6 +1829,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *bottom_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above")
     _set_arrow_sides(
         adapter,
         annotations,
@@ -1778,7 +1839,6 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _assert_explicit_bands(adapter, annotations)
 
     for view, label in (
         (front, "adjuster entry elevation"),
@@ -1821,6 +1881,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=FOOT_TAP_CALLOUT_XY,
         label="hold-down foot tap",
     )
+    _set_foot_tap_callout_text(foot_tap_callout)
     set_hole_callout_precision(
         foot_tap_callout, FOOT_TAP_DEPTH_PRECISION, label="hold-down foot tap depths"
     )
