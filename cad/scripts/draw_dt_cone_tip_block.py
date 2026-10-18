@@ -222,7 +222,10 @@ SLIT_TEXT_OFFSET = (
 # value the text keeps to one line (SolidWorks drops multi-line text placed
 # above a dimension); below it, it may run to two.
 DIMENSION_CALLOUTS = {
-    "SlitDepth": "SLOT DEPTH",
+    # The slit's depth only has to break into the adjuster bore: its floor
+    # stands inside the bore, so the line ends where no edge is left
+    # (machinist reviews of d84a42ca7 and cd1153854, minor).
+    "SlitDepth": "SLOT INTO BORE",
     # The adjuster thread runs through the block's depth: its length is the
     # cup screw's engagement window (build_dt_drive_train_assembly's embed
     # stack).
@@ -537,8 +540,6 @@ def _value_and_rows_extent(
 _VALUE_EXTENTS = {
     # "5.9": three characters, 5.8 mm wide (I31's "6.0").
     "PinchDepthCenter": (0.0033, 0.0019, 0.0033, 0.0019),
-    # "15.2" over its SLOT DEPTH callout line.
-    "SlitDepth": (0.0129, 0.0046, 0.0124, 0.0045),
     **{
         name: _value_extent(name, nominal)
         for name, nominal in (
@@ -554,6 +555,8 @@ _VALUE_EXTENTS = {
             ("Depth", BLOCK_Z, DIMENSION_CALLOUTS["Depth"]),
             ("Width", BLOCK_X, DIMENSION_CALLOUTS_ABOVE["Width"]),
             ("PassageCenter", BLOCK_X / 2.0, DIMENSION_CALLOUTS_ABOVE["PassageCenter"]),
+            # "15.2" over its callout line.
+            ("SlitDepth", SLIT_DEPTH, DIMENSION_CALLOUTS["SlitDepth"]),
         )
     },
 }
