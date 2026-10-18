@@ -91,6 +91,8 @@ MATERIAL = "Brass"  # p.67: brass drum, same finish as the cylinder train
 # separate MHA-DT-022 steel arbor.
 
 BORE_R = BORE_DIA / 2.0
+# Sketch-only length of the tip-diameter witness stub (OutsideDiaReference).
+_WITNESS_STUB_MM = 1.0
 
 
 async def build(adapter) -> dict[str, str]:
@@ -210,9 +212,12 @@ async def _add_outside_dia_reference(
 ) -> None:
     """Hidden Right-plane witness of the tip diameter for the side view.
 
-    An axis centerline over the drum length and a construction line along the
-    +Y tooth tips; the doubled centerline-to-witness dimension is the printed
-    tip diameter, driven by the same ``OutsideDia`` global as the blank.
+    An axis centerline over the drum length and a short construction stub on
+    the +Y tooth tips at the front face; the doubled centerline-to-stub
+    dimension is the printed tip diameter, driven by the same ``OutsideDia``
+    global as the blank.  The stub stays short because the side view shows
+    this sketch, and a full-length witness printed as a stray centreline over
+    the top outline (machinist review r5 of 6d23cf234, minor).
     """
     radius = OUTSIDE_DIA / 2.0
     ref = SketchDims()
@@ -224,8 +229,8 @@ async def _add_outside_dia_reference(
         await adapter.add_centerline(0.0, 0.0, -FACE_WIDTH, 0.0),
     )
     witness = check(
-        "outside-dia witness line",
-        await adapter.add_line(0.0, radius, -FACE_WIDTH, radius),
+        "outside-dia witness stub",
+        await adapter.add_line(0.0, radius, -_WITNESS_STUB_MM, radius),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
@@ -247,12 +252,6 @@ async def _add_outside_dia_reference(
             f"{witness}.start", "origin", "vertical_points"
         ),
     )
-    check(
-        "outside-dia witness ends at the back face",
-        await adapter.add_sketch_constraint(
-            f"{witness}.end", f"{axis}.end", "vertical_points"
-        ),
-    )
     await dimension_between(
         adapter,
         f"{axis}.start",
@@ -262,6 +261,16 @@ async def _add_outside_dia_reference(
         "outside-dia reference span",
     )
     ref.record("WitnessSpan", '"FaceWidth"')
+    # The stub's length only defines the sketch: auto-named, unmarked.
+    await dimension_between(
+        adapter,
+        f"{witness}.start",
+        f"{witness}.end",
+        "horizontal_distance",
+        _WITNESS_STUB_MM,
+        "outside-dia witness stub length",
+    )
+    ref.record(None, None)
     # Centerline to the witness's start POINT, as build_dt_crank_pinion: a
     # centerline-to-construction-line pick made a plain linear dimension
     # (farm r3 4e0aa5d74: "OutsideDia: new dimension is not diametric").

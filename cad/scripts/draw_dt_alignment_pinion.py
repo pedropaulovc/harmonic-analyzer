@@ -28,6 +28,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 import _drawing_hidden_sketches as hidden_sketches
@@ -42,6 +43,7 @@ from _gear_drawing_entities import visible_circle_edge
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
+from _simplified_names import simplified_name
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_alignment_pinion_spec import (
@@ -209,6 +211,26 @@ def _match_tolerance_places(adapter: Any, annotations: list[Any], name: str) -> 
         )
 
 
+def _show_side_view_simplified(adapter: Any, view: Any) -> None:
+    """Draw the side view by the simplified gear convention: the OD outline.
+
+    Every tooth edge along the 143 mm drum printed as a dense block of lines
+    (machinist review r5 of 6d23cf234, minor).  The part's derived
+    ``Default Simplified`` configuration suppresses only the tooth cut and
+    pattern (``_simplified_part``), so the side view shows the blank at the tip
+    diameter; the end view and the isometric keep every tooth.
+    """
+    configuration = simplified_name("Default")
+    bound = _early_bound(view, "IView")
+    bound.ReferencedConfiguration = configuration
+    rebuild_drawing(adapter, label="side view configuration")
+    observed = str(bound.ReferencedConfiguration)
+    if observed != configuration:
+        raise RuntimeError(
+            f"side view references {observed!r} after setting {configuration!r}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -266,6 +288,7 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE
     )
+    _show_side_view_simplified(adapter, right)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
     _verify_title_material_specification(drawing_model, material_binding)
