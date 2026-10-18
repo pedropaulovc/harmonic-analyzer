@@ -651,14 +651,20 @@ HANDLE_STAKE_TIP_M = (
     (handle_screw.SEAT_STATION + handle_screw.INSTALLED_THREAD_LENGTH) / 1000.0,
 )
 # In the full-detail side view the arm stands outboard of and below that tip,
-# so the note stands below and inboard of it, its right end at least
-# HANDLE_STAKE_NOTE_GAP short of the tip: its leader then leaves that end and
-# reaches the face from the open side, never across the arm (the PD pivot
-# stake's r6 lesson, mirrored). Its width is bounded at the note fields'
-# measured 70 characters a field width.
+# so the note stands below and inboard of it, its leader leaving the text's
+# right end HANDLE_STAKE_NOTE_GAP short of the tip: it reaches the face from
+# the open side, never across the arm (the PD pivot stake's r6 lesson,
+# mirrored). INote.GetExtent spans the leader too (farm runs
+# 20261018T064504517Z and 20261018T072413596Z read its right end 0.2 mm
+# short of the tip), so the leader's own start is the text's right end. The
+# note is seeded HANDLE_STAKE_NOTE_SEED_WIDTHS estimated widths (the note
+# fields' measured 70 characters a field width) left of that, then slid
+# right until its leader starts the gap short of the tip.
 HANDLE_STAKE_NOTE_GAP = 0.004
 HANDLE_STAKE_NOTE_DROP = 0.014
-HANDLE_STAKE_NOTE_WIDTH_MAX = (
+HANDLE_STAKE_NOTE_SEED_WIDTHS = 1.5
+HANDLE_STAKE_NOTE_SETTLE = 0.0005
+HANDLE_STAKE_NOTE_WIDTH = (
     max(len(line) for line in HANDLE_STAKE_NOTE.splitlines())
     * (NOTE_FIELD_LEFT[2] - NOTE_FIELD_LEFT[0])
     / _STEP_LINE_WIDTH
@@ -666,9 +672,11 @@ HANDLE_STAKE_NOTE_WIDTH_MAX = (
 
 
 def handle_stake_note_xy(tip: tuple[float, float]) -> tuple[float, float]:
-    """Top-left sheet point of the stake note for the tip at sheet ``tip``."""
+    """Seed top-left sheet point of the stake note for the tip at sheet ``tip``."""
     return (
-        tip[0] - HANDLE_STAKE_NOTE_GAP - HANDLE_STAKE_NOTE_WIDTH_MAX,
+        tip[0]
+        - HANDLE_STAKE_NOTE_GAP
+        - HANDLE_STAKE_NOTE_SEED_WIDTHS * HANDLE_STAKE_NOTE_WIDTH,
         tip[1] - HANDLE_STAKE_NOTE_DROP,
     )
 
@@ -2985,37 +2993,42 @@ def _note_handle_stake(adapter: Any, view: Any, *, label: str) -> None:
         ),
         "INote",
     )
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    shift = 0.0
+    # The text does not track its insertion point 1:1 (_anchor_note), so the
+    # slide is repeated until the leader start settles.
+    for _pass in range(NOTE_ANCHOR_PASSES):
+        if len(points) < 6:
+            raise RuntimeError(f"{label}: the leader is unreadable: {points!r}")
+        step_x = tip[0] - HANDLE_STAKE_NOTE_GAP - float(points[0])
+        if abs(step_x) <= HANDLE_STAKE_NOTE_SETTLE:
+            break
+        position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        if len(position) != 3:
+            raise RuntimeError(f"{label}: note position is unreadable: {position!r}")
+        if not annotation.SetPosition(position[0] + step_x, position[1], position[2]):
+            raise RuntimeError(f"{label}: note SetPosition failed")
+        rebuild_drawing(adapter, label=f"{label} slid")
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+        shift += step_x
     extent = _note_extent(adapter, note, label=label)
-    # HANDLE_STAKE_NOTE_WIDTH_MAX only seeds the placement: the rendered text
-    # ran wider (farm run 20261018T064504517Z: right end 0.2 mm short of the
-    # tip), so the measured box is steered to stand the gap short of the tip.
-    extent = _anchor_note(
-        adapter,
-        note,
-        (
-            tip[0] - HANDLE_STAKE_NOTE_GAP - (extent[2] - extent[0]),
-            tip[1] - HANDLE_STAKE_NOTE_DROP,
-        ),
-        label=label,
-    )
-    rebuild_drawing(adapter, label=f"{label} anchored")
-    points = list(
-        _early_bound(note.GetAnnotation(), "IAnnotation").GetLeaderPointsAtIndex(0)
-        or ()
-    )
     _telemetry.event(
         "drawing.handle_stake_note",
         tip_mm=tuple(round(value * 1000.0, 2) for value in tip),
+        shift_mm=round(shift * 1000.0, 2),
         extent_mm=tuple(round(value * 1000.0, 2) for value in extent),
         leader_start_mm=tuple(round(float(value) * 1000.0, 2) for value in points[:2]),
     )
-    if extent[2] > tip[0] - HANDLE_STAKE_NOTE_GAP / 2.0:
+    # The extent's left is the text's: the leader runs right, to the tip.
+    if (
+        len(points) < 6
+        or float(points[0]) > tip[0] - HANDLE_STAKE_NOTE_GAP / 2.0
+        or float(points[0]) < extent[0] + HANDLE_STAKE_NOTE_WIDTH / 2.0
+    ):
         raise RuntimeError(
-            f"{label}: the note's right end {extent[2]:.4f} is not short of the tip {tip[0]:.4f}"
-        )
-    if len(points) < 6 or float(points[0]) < extent[2] - 0.001:
-        raise RuntimeError(
-            f"{label}: the leader does not leave the note's right end: {points!r}"
+            f"{label}: the leader does not leave the note's right end short of "
+            f"the tip {tip[0]:.4f}: text left {extent[0]:.4f}, leader {points!r}"
         )
 
 
