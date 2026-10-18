@@ -292,17 +292,17 @@ FRONT_KEEP = {
     # af13), and at y=0.1475 its text sat 0.44 mm under View B's labelled
     # 38.10 (r3 view-crowding).
     "HeadHt": (0.166, 0.1440),
-    # The head's Ø across its silhouette, its one-row text out left in the
-    # band over the head: between the 94.7's top extension line (y 159.2)
-    # and the plan's 72.0 lower one (y 172.5), clear of the plan's outline.
-    "HeadDia": (0.060, 0.1655),
-    # Where the crank boss's Ø21.9 stood before it moved to the plan: right
-    # of the head under the angularity frame, its near-side leader (centred
-    # on its x) rising to the bore's lower-right rim above the A-A cutting
-    # line's corner.  In the band over the head (r5..r8) it left no room for
-    # the head's Ø, and its box had to dodge View C's 38.10 by one text
-    # height (r4, r6 view-crowding) and the 13° arrow (r5 layout audit).
-    "CrankBoreDia": (0.146, 0.1215),
+    # Held one text height (13.6 mm) left of View C's labelled 38.10: with
+    # "THRU, RUNS ON ..." below the size the box ran x 117.7..180.7 mm, 1.42 mm
+    # from the 38.10 box at x 173.1 (r4 view-crowding).  THRU rides the size line
+    # (DIMENSION_SUFFIXES), so the widest line is the 49 mm mate; centred at
+    # x=0.1344 it ends 14.1 mm short of the 38.10 (at 0.1356, 12.94 mm: r6
+    # view-crowding), the 13° arrow's tip ~1 mm off its size line's left end
+    # (r5 layout audit, advisory), and at y=0.169 its near-side leader rises
+    # from the bore's upper-right rim under the 13° arc.  The head's Ø is not
+    # given here: its extension lines run the head's full height and the
+    # crank-bore Ra's leader crossed the left one (r9 leader-crosses-leader).
+    "CrankBoreDia": (0.1344, 0.169),
 }
 
 BODY = requirement(
@@ -418,6 +418,10 @@ JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
     "CrankAboveCone": (0.208, 0.170),
     "ConeBossDia": (0.292, 0.172),
+    # View C sees the head side-on above the crank boss: its Ø stands over
+    # the head, text out left of the head and below the A-A thrust-face
+    # station's lower extension line (y ~217-222 over the head).
+    "HeadDia": (0.200, 0.2135),
     # 0.5 mm under y=0.153, where its band stood 1.52 mm under the boss
     # OD's text, short of the audit's 1.78 mm of air (r5 layout audit).
     "JournalBoreDia": (0.292, 0.1525),
@@ -464,8 +468,8 @@ JOURNAL_TEXT_OFFSETS = {
 # The non-preferred bore limits tell the shop what to inspect without imposing
 # a particular cutting method.  Ø21.9 is the crank boss OD, given across the
 # boss where the plan sees it side-on, and Ø42.8 the head's, given across the
-# head in the elevation (rule 11: turned diameters on the side view, not the
-# end view; r8 machinist review) -- and the plan's
+# head where View C sees it side-on (rule 11: turned diameters on the side
+# view, not the end view; r8 machinist review) -- and the plan's
 # station locates the boss's north face from the post axis; that face stands
 # on the head's tangent plane, so no depth is taken against the curved head.
 # The station is labelled: Main's rim-8339 ruling found the spot-face era's
@@ -1826,7 +1830,7 @@ async def build(adapter: Any) -> dict[str, str]:
             # lines, 3.7 mm below the crank axis, so it rides with the head
             # when the post's height moves (a fixed y=0.138 met HeadHt's lower
             # witness once the inch-train body grew to 94.7). Its leader lands
-            # on the bore rim at -28 degrees, above the bore's own near-side
+            # on the bore rim at -28 degrees, below the bore's own near-side
             # leader and clear of the centre-mark arm:
             # from (0.160, 0.128) to the natural lower-left landing it
             # crossed HeadHt's and CrankBossDia's lines (leader-crosses-line,

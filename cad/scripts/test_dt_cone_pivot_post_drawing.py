@@ -431,7 +431,8 @@ def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
         | spec.DRAWING_DIMENSIONS["JournalBoreProfile"]
         | spec.DRAWING_DIMENSIONS["BoreSpacingReference"]
     )
-    assert set(drawing.JOURNAL_KEEP) == cone_owned
+    # View C also sees the head side-on; its Ø is given there (r8 rule 11).
+    assert set(drawing.JOURNAL_KEEP) == cone_owned | {"HeadDia"}
     assert drawing.CONE_AXIS_VIEW == part.CONE_AXIS_VIEW == "CONE JOURNAL"
 
 
@@ -892,10 +893,12 @@ def test_section_centerline_is_forced_to_print_black_in_center_font() -> None:
 
 def test_turned_diameters_stand_on_their_side_views() -> None:
     """r8 (rule 11): Ø42.8 was leadered on the plan's end view of the head.
-    The head's Ø stands across it in the elevation and the crank boss's in
-    the plan, which sees the boss side-on; each names its feature on its row."""
-    assert "HeadDia" in drawing.FRONT_KEEP
-    assert "HeadDia" not in drawing.TOP_KEEP
+    The head's Ø stands across it in View C and the crank boss's in the plan,
+    both of which see their cylinder side-on; each names its feature on its
+    row.  Not the elevation: the head's extension lines there crossed the
+    crank-bore Ra's leader (r9)."""
+    assert "HeadDia" in drawing.JOURNAL_KEEP
+    assert not {"HeadDia"} & (set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP))
     assert "CrankBossDia" in drawing.TOP_KEEP
     assert "CrankBossDia" not in drawing.FRONT_KEEP
     assert drawing.DIMENSION_SUFFIXES["HeadDia"] == " HEAD"
