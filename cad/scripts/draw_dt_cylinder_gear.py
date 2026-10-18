@@ -22,7 +22,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -103,30 +103,36 @@ MANUFACTURING_NOTES_POS = (0.015, 0.085)
 NOTCH_DETAIL_CENTER = (0.066, 0.155)
 NOTCH_DETAIL_SCALE = (6, 1)
 NOTCH_DETAIL_RADIUS_MM = 4.0
+# The fence's letter, up-left of the 6 mm circle (x 98.4..110.4, y 310.8..
+# 322.8): clear of the notch-phase and (90°) extension lines at x 102.6..105
+# that crossed it above the circle (r1 layout audit, text-on-line), and of
+# the teeth (top y 318.3), whichever corner SolidWorks anchors.
+NOTCH_DETAIL_LETTER_XY = (0.093, 0.326)
 NOTCH_DETAIL_DIMENSIONS = {
-    "NotchWidth": (0.092, 0.188),
+    "NotchWidth": (0.092, 0.199),
     "NotchDepth": (0.025, 0.155),
 }
 
-# The bore-fit note sits LEFT of the notch's vertical, so its leader leaves
-# the bore clear of the notch-phase extension lines.  The cam diameter is
-# dropped outside the gear's lower-right quadrant: its diagonal no longer
-# crosses the bore-fit leader, and the phase text keeps the clear upper lane.
+# Machinist review r1 named the mate at every tight band (rule 4), which
+# grows the callouts; the lanes below are sized for them (sheet mm, gear
+# centre ~(105, 270), tip r 48.3, cam centre (105, 283) r 23.0, bore r 7.2).
 #
-# An angular dimension's arc radius is the distance from the gear centre
-# (sheet ~(105.1, 270.6) mm) to its text.  On the r4b sheet the (90°) text at
-# (145, 360) drew a 98 mm arc: it reached x 203 through the side view's cam
-# silhouette (x 199.7), and the notch radial's extension rose to y 369 into
-# the gear data's last row (bottom y 368.3).  At (178, 321), r 88.6, the arc
-# stops at x 193.7 and y 359.2.  That arc would cut the old one-row 70 mm
-# notch-phase callout at (152, 334), so the callout wraps to three rows
-# (~40 x 16 mm) at (131, 337): inside the arc by >= 5 mm, above the cam
-# finish symbol (top y 325) and right of the detail label A (x <= 106.7).
+# * The bore-fit block (seven rows <= 19 characters, x ~16..66, y ~320..360)
+#   ends its leader shoulder at x ~66: the radial leader to the bore then
+#   meets the cam diameter's diametral line only beyond the shoulder, never
+#   between it and the bore (r1: the 82 mm block's corner at x 98 crossed it).
+# * The cam diameter drops to the gear's lower right; its three mate rows
+#   hang to y ~216, left of the side view (194) and above the isometric (212).
+# * The eccentricity's text leaves its extension lines (y 270/283) for the
+#   free lane below them, so its two function rows sit on no line.
+# * The notch phase's four rows (x ~112..150, y ~320..344) stay inside the
+#   (90°) arc (r 88.6 off the gear centre; r4b: a larger arc reached the side
+#   view and the gear data) with the cam finish symbol moved down out of them.
 FRONT_KEEP = {
-    "BoreDia": (0.056, 0.336),
-    "CamDia": (0.175, 0.235),
-    "CamCy": (0.175, 0.279),
-    "NotchPhase": (0.131, 0.337),
+    "BoreDia": (0.041, 0.340),
+    "CamDia": (0.166, 0.232),
+    "CamCy": (0.174, 0.257),
+    "NotchPhase": (0.131, 0.332),
     "PatternNotchPhase": (0.178, 0.321),
 }
 RIGHT_KEEP = {
@@ -134,11 +140,24 @@ RIGHT_KEEP = {
     "FaceWidth": (0.205, 0.220),
     "OverallThickness": (0.205, 0.360),
 }
+# Face width's text leaves its dimension line for the free lower-right lane:
+# at (0.225, 0.220) the OD's lower extension line (y 221.7) ran through it and
+# its own dimension line ran 2.2 mm into it (r1 layout audit).
+FACE_WIDTH_TEXT = (0.240, 0.207)
+# The parenthesised cam thickness moves above the side view, left of its
+# rims, so the lower lane is face width's alone (x 172..188, y ~336: under
+# the stacking callout, outside the (90°) arc).
+CAM_REFERENCE_TEXT = (0.180, 0.336)
+CAM_FINISH_SYMBOL = (0.152, 0.303)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_FIT_CALLOUT,
-    "NotchWidth": "ALIGNMENT NOTCH",
+    "OutsideDia": "MESHES WITH\nCONE GEARS\nMHA-DT-003",
+    "FaceWidth": "SETS ROD-RING SLOT\nFOR MHA-CH-003",
+    "CamDia": "RUNNING FIT IN\nCONNECTING ROD\nMHA-CH-003 RING",
+    "CamCy": "THROW SETS\nCHANNEL GAIN",
+    "NotchWidth": "ALIGNMENT NOTCH;\nUPPER LIMIT\nPROTECTS FLANKS",
     "NotchDepth": "FROM OD",
-    "NotchPhase": "NOTCH CCW\nFROM CAM LOBE",
+    "NotchPhase": "NOTCH CCW FROM\nCAM LOBE; SETS\nCHANNEL PHASE",
 }
 # Decimal places are the part's (cylinder_gear_spec.DRAWING_PRECISION,
 # applied by build_cylinder_gear); the sheet only reads them back.
@@ -246,6 +265,17 @@ def _notch_detail(adapter: Any, front: Any) -> Any:
         f"initial_position={initial_position!r}, origin={positioned_origin!r}, "
         f"final_outline={final_outline!r}, crop_center={outline_center!r}"
     )
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(
+            f"expected one detail circle on the front view, found {len(circles)}"
+        )
+    circle = _early_bound(circles[0], "IDetailCircle")
+    circle.SetLabelPosition(*NOTCH_DETAIL_LETTER_XY)
+    draw.EditRebuild3()
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, NOTCH_DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"notch detail letter did not persist: {letter!r}")
     return detail
 
 
@@ -423,9 +453,7 @@ def _cam_thickness_reference(adapter: Any, view: Any) -> Any:
     # ``Error`` is an [out] VT_I4: the early-bound call returns (display, error).
     display, status = _early_bound(
         draw.Extension, "IModelDocExtension"
-    ).AddSpecificDimension(
-        RIGHT_CENTER[0] + 0.020, 0.200, 0.0, _HORIZONTAL_LINEAR_DIMENSION, 0
-    )
+    ).AddSpecificDimension(*CAM_REFERENCE_TEXT, 0.0, _HORIZONTAL_LINEAR_DIMENSION, 0)
     draw.ClearSelection2(True)
     if display is None or int(status) != 0:  # swAddSpecificDimension_Success
         raise RuntimeError(
@@ -605,7 +633,7 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter,
         right_annotations,
-        {"FaceWidth": (0.225, 0.220)},
+        {"FaceWidth": FACE_WIDTH_TEXT},
     )
     _leader_outside_arrow(adapter, front_annotations, "CamDia")
     overall_annotations = [
@@ -664,8 +692,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # cam-side front view prints edge-on as the cam circle; it attaches at the
     # circle's 45-degree point.  In the side view the flank sits between
     # OverallThickness's extension lines (x 199.7/210.3 up to y 347), so its
-    # leader crossed one (leader-crosses-line).  This leader runs ~12.6 mm over
-    # the gear teeth, 2.5 mm longer than the flank's shortest way out.
+    # leader crossed one (leader-crosses-line).  This leader runs right over
+    # the gear teeth to the symbol below the notch-phase callout rows.
     cam_flank = _project_mm(
         adapter,
         front,
@@ -680,7 +708,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=cam_flank,
-        symbol_xy=(0.140, 0.318),
+        symbol_xy=CAM_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "cam_follower"),
         label="cam follower finish",
         leader_attach_xy=cam_flank,

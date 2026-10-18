@@ -10,11 +10,15 @@ from stock_form_cutter import TOOTH_FORM_NOTE
 # on the drum.
 TOOTH_RUNOUT_TIR_MM = float(_config.fit("cone_drum_oblique_mesh", "tooth_cutting_runout_tir_mm"))
 
+# Narrow rows (machinist review r1): the leader leaves the block's lower
+# right corner, and only a corner left of x ~0.07 m clears the cam diameter's
+# diametral line on its way down to the bore.
 BORE_FIT_CALLOUT = (
-    "FINISH BORE THRU; ALL 20 GEARS\n"
+    "FINISH BORE THRU;\n"
+    "ALL 20 GEARS\n"
     "MATCH TO FINISHED\n"
-    "CYLINDER-GEAR-SHAFT MHA-DT-013\n"
-    f"{spec.BORE_DIAMETRAL_CLEARANCE_MM[0]:.3f}-{spec.BORE_DIAMETRAL_CLEARANCE_MM[1]:.3f} "
+    "SHAFT MHA-DT-013\n"
+    f"{spec.BORE_DIAMETRAL_CLEARANCE_MM[0]:.3f}-{spec.BORE_DIAMETRAL_CLEARANCE_MM[1]:.3f}\n"
     "DIAMETRAL CLEARANCE"
 )
 # TODO(#744): validate the forked rod and centered channel bank in the native
@@ -31,8 +35,9 @@ GEAR_DATA = "\n".join(
         f"MODULE (mm, REF):  {spec.MODULE_MM:.3f}",
         f"PRESSURE ANGLE:  {spec.PRESSURE_ANGLE_DEG:.1f} DEG",
         f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
-        f"ROOT ENVELOPE DIAMETER (mm, REF):  "
-        f"{spec.ROOT_ENVELOPE_DIA_MM[0]:.3f}-{spec.ROOT_ENVELOPE_DIA_MM[1]:.3f}",
+        # One reference value (machinist review r1): the two-micron
+        # envelope read as limits.
+        f"ROOT DIAMETER (mm, REF):  {sum(spec.ROOT_ENVELOPE_DIA_MM) / 2.0:.2f}",
         f"CUTTER PLUNGE (mm):  {spec.WHOLE_DEPTH:.{spec.WHOLE_DEPTH_PLACES}f} "
         f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}",
         f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
@@ -43,11 +48,8 @@ GEAR_DATA = "\n".join(
         f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE",
     )
 )
-DRAWING_NOTES = "\n".join(
-    (
-        "ALIGNMENT NOTCH IS FIRST TOOTH ROOT CCW FROM CAM LOBE AS VIEWED FROM CAM FACE.",
-        "CAM ECCENTRICITY RANGE ACROSS ALL 20 MHA-DT-012 GEARS",
-        f"IN ONE ANALYZER: {spec.SET_ECCENTRICITY_RANGE_MM:.3f} MAX.",
-        "MATES WITH CONE GEAR FAMILY MHA-DT-003.",
-    )
+# The mesh mate (MHA-DT-003) is named at the OD callout and the eccentricity
+# carries its per-gear band only, so one note remains (rule 7).
+DRAWING_NOTES = (
+    "ALIGNMENT NOTCH IS FIRST TOOTH ROOT CCW FROM CAM LOBE AS VIEWED FROM CAM FACE."
 )
