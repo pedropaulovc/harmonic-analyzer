@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -132,36 +131,51 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
-    notes = dt_pinion_pivot_block_spec.DRAWING_NOTES
-    # Fable review r4: the notes no longer restate the REAM and hold-down
-    # callouts; they name each running bore's mate (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
-    assert "Ø4.978" not in notes
-    assert "REAM" not in notes
-    # Each mate is named exactly as its own title block reads (pc-r7 eye
-    # pass: "TORQUE SHAFT" had drifted from MHA-DT-019's title).
-    assert "MHA-DT-019 PINION PIVOT SHAFT" in notes
-    assert "MHA-DT-017 PINION LIFT ROD" in notes
-    assert "TORQUE SHAFT" not in notes
-    for part in ("dt-pinion-pivot-shaft", "dt-pinion-lift-rod"):
+def test_each_ream_callout_names_its_running_mate() -> None:
+    # Machinist review r1 (#1014): the mate and fit ride each bore's own
+    # callout (drawing-guidelines.md rule 4 (tighten only for function, and
+    # name the mate)), named exactly as the mate's title block reads.
+    callouts = drawing.DIMENSION_CALLOUTS
+    for name, part in (
+        ("PivotBoreDia", "dt-pinion-pivot-shaft"),
+        ("LiftBoreDia", "dt-pinion-lift-rod"),
+    ):
         row = _config.parts(part)
-        assert f"{row['number']} {str(row['title']).upper()}" in notes
-    assert "TURNS FREELY BY HAND" in notes
+        lines = callouts[name].splitlines()
+        assert lines[0] == "THRU - REAM"
+        assert "RUNNING FIT ON" in lines
+        assert str(row["number"]) in lines
+        assert str(row["title"]).upper() in lines
     # R2 (converged-r7): REAM_SLIDE, one fit per shaft with MHA-DT-014; the
     # stock 1/4 in reamer wording went with the line-to-line band.
     assert dt_pinion_pivot_block_spec.BORE_DIA_BAND == REAM_SLIDE
-    assert "1/4 IN" not in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
-    # General tolerances live in the title block ONLY -- a second general
-    # tolerance in the notes would conflict with it.
-    assert "LINEAR +/-" not in notes
-    assert "HOLE CENTRES" not in notes
-    # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
-    # the period British Association series.
-    assert not re.search(r"\bBA\b", notes)
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "_NOTES_" not in source
+    assert "1/4 IN" not in callouts["PivotBoreDia"]
+
+
+def test_sheet_carries_no_general_notes() -> None:
+    # Every bore's fit is at its callout and the hold-downs at their DRILL
+    # callout, so nothing is left for a general note; general tolerances live
+    # in the title block only.
+    assert not hasattr(dt_pinion_pivot_block_spec, "DRAWING_NOTES")
+    for script in (drawing, block):
+        source = Path(script.__file__).read_text(encoding="utf-8")
+        assert "Manufacturing Notes" not in source
+
+
+def test_front_view_locations_start_at_the_pivot_bore() -> None:
+    # Machinist review r1 (#1014, rule 10 (dimension from a real feature)):
+    # the front view's one datum is the pivot bore; every location in it
+    # carries the origin circle there.
+    assert set(drawing.PIVOT_ORIGIN_DIMENSIONS) == {
+        "AnchorX",
+        "LiftBoreX",
+        "AnchorZ",
+        "LiftBoreCz",
+    }
+    assert set(drawing.PIVOT_ORIGIN_DIMENSIONS) <= set(drawing.FRONT_KEEP)
+    # The lift-bore rise stands outside the block's west end (rule 14).
+    rise_x, _ = drawing.FRONT_KEEP["LiftBoreCz"]
+    assert rise_x < drawing._front_x(-dt_pinion_pivot_block_spec.BLOCK_WEST)
 
 
 def test_hole_states_are_annotated() -> None:
@@ -183,7 +197,7 @@ def test_block_carries_no_gdt_only_its_running_bore_finish() -> None:
     assert "add_feature_control_frame(" not in source
     assert "set_basic_dimension(" not in source
     assert not hasattr(dt_pinion_pivot_block_spec, "GEOMETRIC_TOLERANCES_MM")
-    assert "DATUM" not in dt_pinion_pivot_block_spec.DRAWING_NOTES
+    assert "set_dimension_origin" in source
     assert "add_surface_finish(" in source
     # The hold-downs are ordinary coordinates from the west end.
     assert '"west hold-down station"' in source
@@ -216,25 +230,6 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 2  # the book uses two blocks
-
-
-def test_notes_stay_within_policy_and_leave_assembly_to_the_assembly() -> None:
-    notes = dt_pinion_pivot_block_spec.DRAWING_NOTES.splitlines()
-    assert len(notes) <= 4  # drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
-    # Never a method (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): spotting the base seats through the block
-    # is the rig-set step and the base sheet's transfer callout.
-    assert not any("ASSEMBLY" in line or "SPOT" in line for line in notes)
-    import draw_fr_harmonic_base as base_sheet
-    from dt_drive_train_steps import step_ref
-    from pinion_rig_fitup import RIG_SET_STEP
-
-    assert "SPOTTING THE TRANSFER SEATS" in RIG_SET_STEP
-    assert f"AFTER {step_ref('rig-set')};" in base_sheet.TRANSFER_BLOCK_CALLOUT
-    # The feeler setting is an assembly step (drive-train assembly drawing),
-    # and a note carries no dimension (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), Codex #854).
-    assert not any(re.search(r"\d", line) and "MHA-" not in line for line in notes)
-    assert not any("FEELER" in line for line in notes)
-    assert not any("FINISH" in line for line in notes)  # the title block owns it
 
 
 def test_assembly_and_base_depend_on_geometry_not_drawing_notes() -> None:

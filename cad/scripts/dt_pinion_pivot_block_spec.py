@@ -94,36 +94,37 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 
-def _registry_name(row: dict) -> str:
-    """A mating part as its own sheet names it: number and title, uppercase."""
-    return f"{row['number']} {str(row['title']).upper()}"
+def _registry_mate(row: dict) -> tuple[str, str]:
+    """A mating part as its own sheet names it: number, then title in capitals."""
+    return str(row["number"]), str(row["title"]).upper()
 
 
-# Each running bore's mate is named from the registry, so the note cannot
+# Each running bore's mate is named from the registry, so the callout cannot
 # drift from that part's own title block (Main, pc-r7 eye pass: the note said
 # "TORQUE SHAFT" where MHA-DT-019's title reads PINION PIVOT SHAFT).  Each row is
 # read by its literal name so the drawing's config deps carry those two rows
 # (a computed name reads as the part's own row only).
-PIVOT_SHAFT_NAME = _registry_name(_config.parts("dt-pinion-pivot-shaft"))
-LIFT_ROD_NAME = _registry_name(_config.parts("dt-pinion-lift-rod"))
+PIVOT_SHAFT_MATE = _registry_mate(_config.parts("dt-pinion-pivot-shaft"))
+LIFT_ROD_MATE = _registry_mate(_config.parts("dt-pinion-lift-rod"))
 
-# True free-text instructions only. Geometry lives in native dimensions and
-# the two running-bore surface symbols (drawing-guidelines.md rule 5 (avoid excessive GD&T): a block carries no
-# frames or datums). The part
-# build stamps these strings into the SLDPRT; the drawing displays only
-# $PRPSHEET links, so the print cannot silently diverge from its source model.
-DRAWING_NOTES = "\n".join(
-    (
-        # Fable review r4 (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): name each running bore's mate and state the
-        # functional acceptance; the REAM and hold-down callouts are not repeated.
-        f"PIVOT BORE RUNS ON {PIVOT_SHAFT_NAME},",
-        f"  LIFT BORE ON {LIFT_ROD_NAME};",
-        "  EACH SHAFT TURNS FREELY BY HAND.",
-        # Assembly operations are never part notes (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the front
-        # block's feeler setting is on the drive-train assembly step list
-        # (ruling (c), Codex #854), and spotting the base seats through the
-        # block holes is RIG_SET_STEP plus the harmonic base's
-        # "TRANSFER FROM MHA-DT-018" callout (Main, MHA-DT-018 eye pass).
-    )
-)
+
+def _ream_callout(mate: tuple[str, str]) -> str:
+    """The text under a reamed bore's size: process, fit and the mate it runs on
+    (drawing-guidelines.md rule 4 (tighten only for function, and name the
+    mate), at the callout it serves; machinist review r1, #1014).  One phrase
+    per line keeps the block narrow beside the 3:1 front view."""
+    number, title = mate
+    return "\n".join(("THRU - REAM", "RUNNING FIT ON", number, title))
+
+
+# The sheet carries no general notes: each bore's mate and fit ride its REAM
+# callout (rule 7 (notes: few, flagged, never a method): flag it where it
+# applies), the hold-downs are fully defined by their DRILL callout, and
+# assembly operations (the front block's feeler setting, spotting the base seats
+# through the block holes) live on the drive-train assembly's step list and the
+# harmonic base's "TRANSFER FROM MHA-DT-018" callout.
+BORE_CALLOUTS = {
+    "PivotBoreDia": _ream_callout(PIVOT_SHAFT_MATE),
+    "LiftBoreDia": _ream_callout(LIFT_ROD_MATE),
+}
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
