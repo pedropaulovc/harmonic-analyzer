@@ -60,7 +60,6 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
         "ShaftDiaDim": 3,
         "JournalDiaDim": 3,
         "PinionSeatDiaDim": 3,
-        "CollarDiaDim": 2,
         "SpigotDiaDim": 2,
         "SpigotLength": 2,
         "CollarSeatStation": 2,
@@ -177,7 +176,7 @@ def _floor_2(value: float) -> float:
 
 def test_spigot_rim_is_the_shortfall_the_sheet_states() -> None:
     # The drive-pin holes' rim to the Ø17.5 seat spigot is under the 1.5 mm
-    # wall floor (pending ruling #991): the sheet states the worst case of
+    # wall floor (declared shortfall RV-02, owner ruling 2026-10-18): the sheet states the worst case of
     # the printed bands, rounded down so it never claims more rim than exists.
     hole_r = spec.DRIVE_PIN_HOLE_DIA / 2.0
     nominal = spec.SPIGOT_DIA / 2.0 - (spec.DRIVE_PIN_CIRCLE_RADIUS + hole_r)
@@ -292,11 +291,11 @@ def test_shaft_end_fiducial_is_a_simple_punch_not_a_dimensioned_dimple() -> None
     assert spec.FIDUCIAL_MODEL_DIA == geometry.FIDUCIAL_MODEL_DIA == 0.8
     assert spec.FIDUCIAL_MODEL_DEPTH == geometry.FIDUCIAL_MODEL_DEPTH == 0.2
     assert spec.SHAFT_FIDUCIAL_RADIUS == geometry.SHAFT_FIDUCIAL_RADIUS == 2.5
-    assert "PUNCH FIDUCIAL MARK" in spec.DRAWING_NOTES
-    assert "BY EYE" in spec.DRAWING_NOTES
+    assert "PUNCH" in notes.FIDUCIAL_NOTE
+    assert "BY EYE" in notes.FIDUCIAL_NOTE
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert all("Fiducial" not in name for name in marked)
-    assert "DIMPLE" not in spec.DRAWING_NOTES
+    assert "DIMPLE" not in notes.FIDUCIAL_NOTE
 
 
 def test_side_view_sheet_stations_follow_the_model() -> None:
@@ -333,19 +332,21 @@ _PIN_VALUE_TEXT_WIDTH = 0.0275
 _CALLOUT_CHAR_WIDTH = 0.00275
 
 
-def test_lower_pin_location_text_ends_before_the_dome_extension_lines() -> None:
+def test_pin_location_texts_end_before_the_dome_extension_lines() -> None:
     # Machinist review of 19e33c6c2: the text block runs right from the
     # dimension line beside the end view, and the old two-row callout carried
     # the value and its mate note across the dome tip's and dome root's
-    # extension lines.  Every row must end, with air, before the dome tip.
-    x, _y = drawing.END_PIN_KEEP["DrivePinOffset2"]
+    # extension lines.  Every row must end, with air, before the dome tip;
+    # both pin locations name the mate (machinist review of 902433a8d).
     rows = notes.DRIVE_PIN_LOCATION_CALLOUT.splitlines()
     assert "MHA-PD-009" in rows and "SPROCKET" in " ".join(rows)
     block = max(
         _PIN_VALUE_TEXT_WIDTH,
         max(len(row) for row in rows) * _CALLOUT_CHAR_WIDTH,
     )
-    assert x + block + 0.001 < drawing.DOME_TIP_X
+    for name, (x, _y) in drawing.END_PIN_KEEP.items():
+        assert drawing.CALLOUTS_BELOW[name] == notes.DRIVE_PIN_LOCATION_CALLOUT
+        assert x + block + 0.001 < drawing.DOME_TIP_X, name
 
 
 def test_blind_pin_holes_bottom_in_the_collar_body_not_the_spigot_end() -> None:
@@ -425,12 +426,14 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     )
 
 
-def test_shaft_diameter_callout_counts_every_bare_core_land() -> None:
-    # Machinist review of 8b5e1f354: the 2X Ø9.525 sat with three bare core
-    # lands in the side view and did not say which two it meant.  The core
-    # runs dome root to far end; the collar, the journal (its relief stays
-    # proud of the core) and the Ø9 seat cover the rest, as the build lays
-    # them, so the callout counts every land left bare.
+def test_neck_diameter_callout_counts_both_bare_necks() -> None:
+    # Machinist review of 8b5e1f354: the Ø9.525 sat with three bare core
+    # lands in the side view and did not say which it meant; review of
+    # 5a219a81904f: the hub's band on the two necks was over-specified.  The
+    # core runs dome root to far end; the collar, the journal (its relief
+    # stays proud of the core) and the Ø9 seat cover the rest, as the build
+    # lays them.  The shank fits the hub alone; one loose callout counts the
+    # remaining bare necks.
     covers = sorted(
         [
             (spec.SEAT_COLLAR, spec.SEAT_COLLAR + spec.COLLAR_LENGTH),
@@ -449,7 +452,10 @@ def test_shaft_diameter_callout_counts_every_bare_core_land() -> None:
     assert [v for land in spec.SHAFT_CORE_LANDS for v in land] == pytest.approx(
         [v for land in bare for v in land]
     )
-    assert drawing.CALLOUTS_ABOVE["ShaftDiaDim"] == f"{len(bare)}X" == "3X"
+    assert spec.SHAFT_NECKS == spec.SHAFT_CORE_LANDS[1:]
+    assert drawing.CALLOUTS_ABOVE["NeckDiaDim"] == f"{len(bare) - 1}X" == "2X"
+    assert not drawing.CALLOUTS_ABOVE["ShaftDiaDim"][:1].isdigit()
+    assert spec.DRAWING_PRECISION["PinionSeatProfile"]["NeckDiaDim"] == 1
 
 
 def test_integral_lands_run_in_the_restored_post_at_every_size_limit() -> None:

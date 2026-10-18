@@ -31,6 +31,7 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     _SW_LENGTH_MM,
     _SW_PREF_UNITS_LINEAR,
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -60,8 +61,9 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -69,10 +71,25 @@ import _telemetry
 from build_dt_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
 from dt_crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
 from dt_crankshaft_notes import (
+    CENTRES_NOTE,
+    CHAIN_AIR_MATE,
+    COLLAR_REAR_MATE,
+    COLLAR_SEAT_MATE,
     CROSS_HOLE_CALLOUT,
     DRIVE_PIN_CALLOUT,
     DRIVE_PIN_DEPTH_BAND,
     DRIVE_PIN_LOCATION_CALLOUT,
+    FIDUCIAL_NOTE,
+    JOURNAL_FIT,
+    JOURNAL_MATE,
+    KNOCKOUT_CALLOUT_ABOVE,
+    KNOCKOUT_CALLOUT_BELOW,
+    PINION_SEAT_MATE,
+    SHAFT_LENGTH_MATE,
+    SHANK_MATE,
+    SLIDING_FIT,
+    SPIGOT_AIR,
+    SPIGOT_AIR_MATE,
 )
 from dt_crankshaft_spec import (
     COLLAR_DIA,
@@ -81,8 +98,11 @@ from dt_crankshaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRIVE_PIN_CIRCLE_RADIUS,
+    DRIVE_PIN_FLOOR,
     DRIVE_PIN_HOLE_DIA,
     DRIVE_PIN_HOLE_PROCESS,
+    DRIVE_PIN_KNOCKOUT_DIA,
+    FIDUCIAL_MODEL_DIA,
     JOURNAL_DIA,
     JOURNAL_END,
     JOURNAL_START,
@@ -94,7 +114,7 @@ from dt_crankshaft_spec import (
     RELIEF_START,
     SEAT_COLLAR,
     SEAT_STEP,
-    SHAFT_CORE_LANDS,
+    SHAFT_NECKS,
     SHAFT_DIA,
     SHAFT_DOME_HEIGHT,
     SHAFT_LENGTH,
@@ -102,6 +122,9 @@ from dt_crankshaft_spec import (
     SPIGOT_END,
     SURFACE_FINISHES,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["dt_crankshaft"]
@@ -166,11 +189,11 @@ JOURNAL_FLANK_Y = _sheet_y(JOURNAL_DIA / 2.0)
 # sits ~3 mm above its requested point and the dimension line ~5 mm below
 # it; the two seat-collar stations make ten rows between the Ø20.6 collar's
 # underside and the title block, so the pitch closes from 12 to 9.5 mm.  The
-# 2.0 dome height shares the first row at the far left, where no baseline
-# reaches; the last row clears the title block.
+# 2.0 dome height stands over the first row at the far left, where no
+# baseline reaches; the last row clears the title block.
 _ROW_PITCH = 0.0095
 _ROW_Y = tuple(round(0.162 - k * _ROW_PITCH, 4) for k in range(10))
-# The six diameters are authored in end-profile sketches; the end view
+# The seven diameters are authored in end-profile sketches; the end view
 # receives them first and they are then dragged onto the profile (drawing-guidelines.md rule 11 (turned parts read like the lathe):
 # diameters on the side view).  Their temporary end-view spots are clear of
 # everything else on the sheet.
@@ -181,21 +204,27 @@ END_DIAMETERS = {
     "PinionSeatDiaDim": (0.036, 0.254),
     "SpigotDiaDim": (0.024, 0.241),
     "CollarDiaDim": (0.024, 0.254),
+    "NeckDiaDim": (0.024, 0.228),
 }
 # The drive-pin holes' locations stay in the end view, the one view that
 # shows them as true (visible) circles: each hole from the shaft axis, its
 # dimension line just right of the view, text beyond the view's top (+Z hole)
 # and bottom (-Z hole), running right into the gap before the dome's
 # extension lines.  That gap (dimension line to dome tip) is ~30 mm, just the
-# 7.000 value's width, so the lower one's mate callout is set in rows no
-# wider than it; the lower text sits 5 mm under the 2.0 dome height's shelf.
+# 7.000 value's width, so each one's mate callout is set in rows no wider
+# than it (machinist review of 902433a8d: the upper one named no mate).  The
+# upper block runs down from 6 mm under the (SR6.7) to 5 mm over the upper
+# hole's extension line; the lower text sits 7 mm under the 2.0 dome
+# height's text.
 END_PIN_KEEP = {
     "DrivePinOffset1": (0.058, 0.210),
     "DrivePinOffset2": (0.058, 0.145),
 }
 END_KEEP = {**END_DIAMETERS, **END_PIN_KEEP}
 SIDE_KEEP = {
-    "DomeHeight": (DOME_TIP_X - 0.016, _ROW_Y[0]),
+    # Below the dome, 6 mm over the lower 7.000's text (machinist review of
+    # 5a219a81904f: on the first row the 2.0 read as stacked on the 7.000).
+    "DomeHeight": (DOME_TIP_X - 0.016, 0.168),
     "PinionSeatStation": ((SEAT_STEP_X + FAR_END_X) / 2.0, _ROW_Y[0]),
     "JournalInboardStation": ((JOURNAL_END_X + FAR_END_X) / 2.0, _ROW_Y[1]),
     "ReliefInboardStation": ((RELIEF_END_X + FAR_END_X) / 2.0, _ROW_Y[2]),
@@ -205,9 +234,11 @@ SIDE_KEEP = {
     "CollarSeatStation": ((COLLAR_SEAT_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[6]),
     "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[7]),
     # The shaft length's native unilateral block sits right of the reference
-    # overall on the next row down, not over it.
+    # overall on the next row down, not over it; its stack suffix widens it
+    # left to x ~0.213, so the overall's text stands left of that (layout
+    # audit of 902433a8d: 1.3 mm text clearance).
     "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0 + 0.035, _ROW_Y[8]),
-    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[9]),
+    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0 - 0.030, _ROW_Y[9]),
     # Above the dome, between the +Z drive-pin location's text and the
     # Ø9.525 dimension: the radial leader runs down, right of the one and
     # left of the other, to the dome's sphere.
@@ -223,41 +254,65 @@ SIDE_KEEP = {
 # it, so each must sit on the section that sketch starts: the Ø9.525 circle
 # lies at the dome root, and placed on the far-end seat its extension lines
 # drew solid through the journal (run 20260923T031747843Z-94724e44).
-# Ø9.525 on the core LEFT of the cross-hole, between the dome root (where its
-# extension lines start) and the hole: placed right of the hole those lines
-# ran along the silhouette over it, and the hole callout's leader had to cross
-# one (leader-crosses-line, af13c8ff8).  The Ø9.0 seat's on the seat, left of
-# the pinion pin hole. The Ø11.388's 2X/limit stack rises above its dimension:
-# place its arrow on the outboard land 6.9 mm short of the relief shoulder,
-# right of the rear-face finish symbol's text and left of the outboard land's
-# own symbol, and lower its row 5 mm, so the 2X clears both LIGHT DRIVE FIT
-# and the taper note's landing line.
-_DIAMETER_ROW_Y = (0.212, 0.223)
-# The spigot's Ø17.5 on the spigot and the collar body's Ø20.6 on the body
-# (each sketch starts at its section's front face), the spigot's text a row
-# above the body's so each dimension line stays clear of the other's text:
-# right of them under the cross-hole callout's prose and left of the outboard
-# journal's finish symbol.
+# The Ø9.525 sits on the core LEFT of the cross-hole, so its lines stop short
+# of the hole the callout's leader leaves (leader-crosses-line, af13c8ff8);
+# the Ø9.0 seat's sits on the seat, left of the pinion pin hole.
+# Each banded diameter is a four-row block (fit / upper limit / value /
+# mate) whose left edge stands on its dimension line and whose landing line
+# runs under its widest row; each request is the block's centre.  The
+# cross-hole callout's leader climbs from the hole at ~1.45 (dy/dx) to its
+# block (HOLE_CALLOUT_XY): left of it the Ø9.525's block lands 3.5 mm clear
+# of it, right of it the Ø17.50's block tops out 6 mm under it (machinist
+# review of b5c02e5d6: the leader crossed the Ø9.525's landing line).  The
+# Ø20.6 (one place, no band) drops under the Ø17.50's landing line, and the
+# Ø11.388 stands 4 mm right of the Ø17.50's block (layout audit of
+# 902433a8d: 2.3 mm read as one callout), its landing line 2 mm over the
+# outboard journal's finish symbol and its fit row 7 mm under the cross-hole
+# callout's landing line; the relief's Ø10.4 stands right of it.
+# The neck's loose Ø9.5 (2X: both bare necks) stands on the inboard neck,
+# over the Ø9.000's block; the Ø9.000's dimension line stands 2 mm past its
+# step so the retention-pin note's leader passes 4.5 mm right of its block.
 DIAMETER_POSITIONS = {
-    "ShaftDiaDim": (PIN_X - 0.016, _DIAMETER_ROW_Y[0]),
-    "JournalDiaDim": (RELIEF_START_X - 0.0069, _DIAMETER_ROW_Y[1]),
-    "ReliefDiaDim": (RELIEF_START_X + 0.030, _DIAMETER_ROW_Y[0]),
-    "PinionSeatDiaDim": (SEAT_STEP_X + 0.010, _DIAMETER_ROW_Y[0]),
-    "SpigotDiaDim": (COLLAR_SEAT_X + 0.002, _DIAMETER_ROW_Y[1]),
-    "CollarDiaDim": (SPIGOT_END_X + 0.002, _DIAMETER_ROW_Y[0]),
+    "ShaftDiaDim": (PIN_X - 0.016, 0.2195),
+    "JournalDiaDim": (RELIEF_START_X - 0.0069, 0.224),
+    "ReliefDiaDim": (RELIEF_START_X + 0.045, 0.212),
+    "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2125),
+    "SpigotDiaDim": (COLLAR_SEAT_X + 0.0075, 0.2215),
+    "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2065),
+    "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
 }
-# The Ø9.525 callout counts every bare core land (SHAFT_CORE_LANDS: the
-# dome-side shank, the land behind the collar and the land before
-# the Ø9 seat step); machinist review of 8b5e1f354 found the 2X it carried
-# named two of the three.  The 2X Ø11.388 names both bearing lands on either
-# side of the relief; the displayed arrow picks the outboard land, and the
-# equal-size callout also governs the inboard land.
-CALLOUTS_ABOVE = {"ShaftDiaDim": f"{len(SHAFT_CORE_LANDS)}X", "JournalDiaDim": "2X"}
-# The lower drive-pin location names the mate its +/-0.025 serves
-# (crankshaft_notes), in the clear field under its text.
+# The shank's band is the hub's fit; the two bare necks share one loose
+# 2X Ø9.5 (dt_crankshaft_spec SHAFT_NECKS).  The 2X Ø11.388 names both
+# bearing lands on either side of the relief; the displayed arrow picks the
+# outboard land, and the equal-size callout also governs the inboard land.
+CALLOUTS_ABOVE = {
+    "ShaftDiaDim": SLIDING_FIT,
+    "JournalDiaDim": JOURNAL_FIT,
+    "PinionSeatDiaDim": SLIDING_FIT,
+    "SpigotDiaDim": SPIGOT_AIR,
+    "NeckDiaDim": f"{len(SHAFT_NECKS)}X",
+}
+# Each drive-pin location names the mate its +/-0.025 serves
+# (crankshaft_notes), in the clear field under its text; the spigot's length
+# names the chain it keeps clear, between the cross-hole's and the collar
+# seat's extension lines.  Each banded diameter names its mate under its
+# value.
 CALLOUTS_BELOW = {
     "OverallLength": "OVERALL",
+    "DrivePinOffset1": DRIVE_PIN_LOCATION_CALLOUT,
     "DrivePinOffset2": DRIVE_PIN_LOCATION_CALLOUT,
+    "SpigotLength": CHAIN_AIR_MATE,
+    "ShaftDiaDim": SHANK_MATE,
+    "JournalDiaDim": JOURNAL_MATE,
+    "PinionSeatDiaDim": PINION_SEAT_MATE,
+    "SpigotDiaDim": SPIGOT_AIR_MATE,
+}
+# The banded far-end stations name their stack on their own row: a callout
+# below would lift the value into the row above.
+SUFFIXES = {
+    "CollarRearStation": COLLAR_REAR_MATE,
+    "CollarSeatStation": COLLAR_SEAT_MATE,
+    "Depth": SHAFT_LENGTH_MATE,
 }
 # Both running lands carry separate part-owned finish symbols. The outboard
 # symbol sits right of the Ø11.388 dimension line, its leader landing on the
@@ -295,12 +350,23 @@ COLLAR_REAR_FINISH = (
 # asserted (place_callout_clear).
 DRIVE_PIN_CALLOUT_XY = (0.066, 0.250)
 # Text centred up-right of the cross-hole: the callout's leader leaves the
-# text's left end and runs down-left at ~53 deg through the hole centre, a
-# clean crossing of the 118.0 station's extension line rather than a near
-# parallel one (run 20260923T030252135Z-49e46990), 4 mm clear of the Ø9.525
-# shoulder on its left.  18 mm right of its old spot so that leader clears
-# the moved Ø9.525 text (leader-crosses-line, af13c8ff8).
-HOLE_CALLOUT_XY = (PIN_X + 0.072, 0.247)
+# text's left end and runs down-left at ~55 deg to the hole, a clean
+# crossing of the 122.7 station's extension line rather than a near
+# parallel one (run 20260923T030252135Z-49e46990).  Its three prose rows and
+# drill row centre on y 0.251; its left end (~36 mm left of the centre) sets
+# the leader's slope that the diameter blocks under it are laid out around
+# (DIAMETER_POSITIONS).
+HOLE_CALLOUT_XY = (PIN_X + 0.077, 0.251)
+# The knockouts' native callout (drill above, size, purpose below; ~44 mm
+# wide) centres under the end view, below the lower 7.000 row's PINS SLIP
+# block (bottom ~0.131) and left of the dome's extension line (x 0.0897).
+# Its leader leaves the text's left end up-left to the lower hole's floor.
+KNOCKOUT_CALLOUT_XY = (0.064, 0.115)
+# The punch-mark note sits, anchored upper-left, in the narrow field at the
+# end view's lower-left, left of the knockout leader: its leader rises
+# from the text's right end to the mark at about 225 deg on the dome, 2 mm
+# clear of the lower pin hole.
+FIDUCIAL_NOTE_XY = (0.0145, 0.152)
 # The 16T retention-pin hole is match-drilled through the seated pinion's
 # boss at assembly, so the sheet prints the pinion sheet's own matched-fit
 # note with the mates swapped (crank_pinion_spec.CRANKSHAFT_PIN_HOLE_PROCESS,
@@ -318,7 +384,10 @@ HOLE_CALLOUT_XY = (PIN_X + 0.072, 0.247)
 # window instead (run1b-e7fd1a2ec: the leader tip, not the text, read 0.3 mm
 # under the floor).
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
-PINION_PIN_NOTE_XY = (0.270, 0.250)
+# High in its field (top row ~4.5 mm under the border), so the neck's 2X Ø9.5
+# and the Ø9.000's block stand under it, and its leader to the hole passes
+# right of the Ø9.000's block.
+PINION_PIN_NOTE_XY = (0.273, 0.264)
 PINION_PIN_NOTE_FIELD = (
     HOLE_CALLOUT_XY[0] + 0.032,
     SIDE_CENTER[1],
@@ -335,21 +404,46 @@ PINION_PIN_HOLE_WINDOW = (
 )
 NOTE_FIELD_MARGIN = 0.001
 NOTES_XY = (0.016, 0.062)
+# One row under the general note (drawing-guidelines.md rule 11: say CENTRES
+# OK where centre holes do no harm; machinist review of 9d262bff5).
+CENTRES_NOTE_XY = (NOTES_XY[0], NOTES_XY[1] - 0.0055)
 ISO_NOTE_XY = (0.376, 0.108)
 
 
-def _set_callout_below(display: Any, text: str, label: str) -> None:
-    """Put the matched-operation prose UNDER a native hole callout.
+def _set_callout_text(display: Any, which: int, text: str, label: str) -> None:
+    """Put prose ABOVE (``which`` 3) or UNDER (4) a native hole callout.
 
     The drill size reads first, in the order the work is done; the fit and
     mate prose follows in the callout-below compartment (the Ø9.550 bore
     callout's order).  ``SetText`` reports nothing, so it is read back.
     """
     display = _early_bound(display, "IDisplayDimension")
-    display.SetText(4, text)  # swDimensionTextCalloutBelow
-    applied = str(display.GetText(4) or "")
+    display.SetText(which, text)  # swDimensionTextCalloutAbove/Below
+    applied = str(display.GetText(which) or "")
     if applied.replace("\r", "") != text:
-        raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
+        raise RuntimeError(f"{label}: callout text {which} did not persist: {applied!r}")
+
+
+def _set_dimension_suffixes(
+    adapter: Any, annotations: list[Any], suffixes: dict[str, str]
+) -> None:
+    """Append each named dimension's mate to its value on the same line.
+
+    ``SetText`` reports nothing, so each suffix is read back.
+    """
+    remaining = dict(suffixes)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        text = remaining.pop(name, None)
+        if text is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(2, text)  # swDimensionTextSuffix
+        applied = str(display.GetText(2) or "")
+        if applied.replace("\r", "") != text:
+            raise RuntimeError(f"{name}: suffix did not persist: {applied!r}")
+    if remaining:
+        raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
 
 
 # Format-definition parts of a display dimension and the writable part each
@@ -380,6 +474,43 @@ def _depth_banded_definition(definitions: dict[int, str], band: str) -> tuple[in
     if "<HOLE-DEPTH>" in head or len(tail.split()) != 1:
         raise RuntimeError(f"hole callout has no single closing depth: {definitions!r}")
     return part, f"{definition.rstrip()} {band}"
+
+
+def _drop_coaxial_step(display: Any, step_dia: float, label: str) -> None:
+    """Clear the coaxial hole's step SolidWorks folds into a native callout.
+
+    Each pin hole and its knockout meet end to end, so a callout on either
+    reads the pair as one stepped hole: on the farm the drive-pin callout
+    carried ``<MOD-DIAM>1.40<HOLE-DEPTH>12.63`` in its callout-above part (run
+    20261018T110810560Z-720787ec).  Each hole has its own callout naming its
+    process, so the other's step is cleared.  Only a part holding nothing but
+    that step is cleared; the step anywhere else fails loud.  The stepped
+    reading also put a bare counterbore symbol (``<HOLE-SPOT>``) before the
+    size (machinist review of b5c02e5d6), so it goes with the step.  Read
+    back.
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    marker = f"<MOD-DIAM>{step_dia:.2f}"
+    definitions = {
+        part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
+    }
+    holders = [part for part, text in definitions.items() if marker in text]
+    for part in holders:
+        if not definitions[part].startswith(marker):
+            raise RuntimeError(f"{label}: coaxial step mixed into part {part}: {definitions!r}")
+        display.SetText(_DEFINITION_TO_WRITABLE[part], "")
+        if str(display.GetText(part) or ""):
+            raise RuntimeError(f"{label}: coaxial step in part {part} did not clear")
+    if not holders:
+        return
+    prefix = definitions[5]
+    if "<HOLE-SPOT>" in prefix:
+        bare = prefix.replace("<HOLE-SPOT>", "")
+        display.SetText(_DEFINITION_TO_WRITABLE[5], bare)
+        applied = str(display.GetText(5) or "")
+        if applied.replace("\r", "") != bare:
+            raise RuntimeError(f"{label}: counterbore symbol did not clear: {applied!r}")
+    _telemetry.info(f"{label}: cleared coaxial step from parts {holders}: {definitions!r}")
 
 
 def _require_mm_sheet(draw: Any, label: str) -> None:
@@ -578,6 +709,23 @@ def _is_upper_seat_rim(edge: Any) -> bool:
         abs(cx) < 1e-3
         and abs(cy - SEAT_COLLAR) < 1e-3
         and abs(cz - DRIVE_PIN_CIRCLE_RADIUS) < 1e-3
+    )
+
+
+def _is_lower_knockout_floor(edge: Any) -> bool:
+    """Whether an edge is the -Z knockout's circle on its drive-pin hole floor.
+
+    The lower hole is the knockout callout's nearest; the floor circle, not
+    the knockout's exit on the collar's rear face, is what the end view sees.
+    """
+    curve = _early_bound(edge.GetCurve(), "ICurve")
+    if not curve.IsCircle():
+        return False
+    cx, cy, cz = (float(v) * 1000.0 for v in tuple(curve.CircleParams)[:3])
+    return (
+        abs(cx) < 1e-3
+        and abs(cy - DRIVE_PIN_FLOOR) < 1e-3
+        and abs(cz + DRIVE_PIN_CIRCLE_RADIUS) < 1e-3
     )
 
 
@@ -815,6 +963,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*moved, *end_kept, *side_annotations]
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    _set_dimension_suffixes(adapter, annotations, SUFFIXES)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [
@@ -850,7 +999,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=_visible_cross_hole_edge(adapter, side, _PIN_HOLE_DIA),
         process=CROSS_HOLE_PROCESS,
     )
-    _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "tapered-pin cross-hole")
+    _set_callout_text(cross_hole, 4, CROSS_HOLE_CALLOUT, "tapered-pin cross-hole")
     drive_pins = add_native_hole_callout(
         adapter,
         end,
@@ -863,21 +1012,48 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label="end",
             accept=_is_upper_seat_rim,
         ),
-        process=DRIVE_PIN_HOLE_PROCESS,
+        process=f"2X {DRIVE_PIN_HOLE_PROCESS}",
     )
+    _drop_coaxial_step(drive_pins, DRIVE_PIN_KNOCKOUT_DIA, "seat-collar drive-pin holes")
     _band_hole_depth(
         drive_pins,
         DRIVE_PIN_DEPTH_BAND,
         drawing_model,
         "seat-collar drive-pin holes",
     )
-    _set_callout_below(drive_pins, DRIVE_PIN_CALLOUT, "seat-collar drive-pin holes")
+    _set_callout_text(drive_pins, 4, DRIVE_PIN_CALLOUT, "seat-collar drive-pin holes")
     place_callout_clear(
         adapter,
         _early_bound(drive_pins, "IDisplayDimension").GetAnnotation(),
         label="seat-collar drive-pin holes",
         below={},
         beside={},
+    )
+    knockouts = add_native_hole_callout(
+        adapter,
+        end,
+        callout_xy=KNOCKOUT_CALLOUT_XY,
+        label="drive-pin knockout holes",
+        edge=_visible_cross_hole_edge(
+            adapter,
+            end,
+            DRIVE_PIN_KNOCKOUT_DIA,
+            view_label="end",
+            accept=_is_lower_knockout_floor,
+        ),
+    )
+    _drop_coaxial_step(knockouts, DRIVE_PIN_HOLE_DIA, "drive-pin knockout holes")
+    _set_callout_text(knockouts, 3, KNOCKOUT_CALLOUT_ABOVE, "drive-pin knockout holes")
+    _set_callout_text(knockouts, 4, KNOCKOUT_CALLOUT_BELOW, "drive-pin knockout holes")
+    add_attached_note(
+        adapter,
+        end,
+        text=FIDUCIAL_NOTE,
+        entity=_visible_cross_hole_edge(
+            adapter, end, FIDUCIAL_MODEL_DIA, view_label="end"
+        ),
+        note_xy=FIDUCIAL_NOTE_XY,
+        label="dome punch mark",
     )
     pinion_note = add_attached_note(
         adapter,
@@ -925,12 +1101,13 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    centres = add_note(adapter, CENTRES_NOTE, *CENTRES_NOTE_XY)
+    if centres is None or str(centres.GetText() or "").replace("\r", "") != CENTRES_NOTE:
+        raise RuntimeError("failed to add the crankshaft centres note")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    # The end view's hidden lines show the cross-hole running across the
-    # dome end, which clocks the punched fiducial to it (drawing-guidelines.md rule 9 (show internal shape in solid lines): a cross-hole
-    # through a turned part).  Re-asserted last so the export regenerates the
-    # dashed edges after every annotation (layout-tuning refusal e).
-    set_hidden_lines_visible(adapter, end)
+    # The end view prints hidden lines removed with the rest (drawing-guidelines.md
+    # rule 9 (show internal shape in solid lines)): the punch mark is flagged by
+    # its own leader, so no dashed cross-hole is needed to clock it.
 
     return await finalize_drawing(
         adapter,

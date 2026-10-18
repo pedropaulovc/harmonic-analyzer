@@ -49,7 +49,7 @@ from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawin
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
-from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
+from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder, wizard_holes
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from dt_crank_pinion_spec import (
@@ -60,7 +60,6 @@ from dt_crank_pinion_spec import (
 )
 from dt_crankshaft_spec import (
     COLLAR_DIA,
-    COLLAR_DIA_TOL,
     COLLAR_LENGTH,
     COLLAR_REAR,
     COLLAR_STATION_TOL,
@@ -73,6 +72,9 @@ from dt_crankshaft_spec import (
     DRIVE_PIN_FLOOR,
     DRIVE_PIN_HOLE_BAND,
     DRIVE_PIN_HOLE_DIA,
+    DRIVE_PIN_KNOCKOUT_DIA,
+    DRIVE_PIN_KNOCKOUT_LENGTH,
+    DRIVE_PIN_KNOCKOUT_SPEC,
     DRIVE_PIN_OFFSET_TOL,
     DRIVE_PIN_SPIGOT_RIM,
     DRIVE_PIN_SPIGOT_RIM_WORST,
@@ -248,6 +250,7 @@ async def _cut_annulus_inboard(
     length: float,
     length_expr: str,
     drive_jobs: list[tuple[str, str]],
+    witness_dim: str | None = None,
 ) -> float:
     """Turn a ``turned_dia`` section down to ``inner_dia`` inboard of ``start``.
 
@@ -257,6 +260,12 @@ async def _cut_annulus_inboard(
     its base plane, so running AWAY from Top it takes ``reverse_direction``
     (memory/solidworks-modeling-pitfalls.md); the caller's volume gate fails
     loud on the wrong side.  Returns the volume removed.
+
+    ``witness_dim`` adds a construction circle of the uncut core (Ø
+    ``turned_dia``, driven by ``"ShaftDia"``) to the profile, carrying that
+    printed diameter: the cut ignores it, and the drawing drags it onto the
+    bare land that ends at ``start``, where its extension lines stay on that
+    land's silhouette.
     """
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
@@ -283,6 +292,17 @@ async def _cut_annulus_inboard(
         dims=dims,
         names=(f"{name}OuterCx", f"{name}OuterCz", f"{name}OuterDia"),
     )
+    if witness_dim is not None:
+        witness = await define_circle(
+            adapter, 0.0, 0.0, turned_dia / 2.0, f"{name} core witness circle",
+            dims=dims,
+            names=(None, None, witness_dim),
+            drives=(None, None, '"ShaftDia"'),
+        )
+        segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{name} core witness did not take construction flag")
     await ensure_fully_defined(adapter, f"{name} sketch")
     check(f"exit_sketch {name}", await adapter.exit_sketch())
     name_last_feature(adapter, f"{name}Profile")
@@ -614,7 +634,8 @@ async def build(adapter) -> dict[str, str]:
     )
     await volume_check(adapter, "journal relief", v_with_seat, 0.005 * v_with_seat)
     # The Ø9.0 pinion seat (RULING (b)): the same cut from the seat step to
-    # the far end face.
+    # the far end face.  Its profile also carries the loose Ø9.5 the drawing
+    # prints on the inboard neck, the bare land that ends at this step.
     v_with_seat -= await _cut_annulus_inboard(
         adapter,
         "PinionSeat",
@@ -626,6 +647,7 @@ async def build(adapter) -> dict[str, str]:
         length=SHAFT_LENGTH - SEAT_STEP,
         length_expr='"ShaftLength" - "PinionSeatStep"',
         drive_jobs=drive_jobs,
+        witness_dim="NeckDiaDim",
     )
     await volume_check(
         adapter, "pinion seat step", v_with_seat, 0.005 * v_with_seat
@@ -805,6 +827,38 @@ async def build(adapter) -> dict[str, str]:
         f"seat spigot rim (floor 1.5): drive-pin hole to the Ø{SPIGOT_DIA:g}"
         f" spigot {DRIVE_PIN_SPIGOT_RIM:.2f} nominal,"
         f" {DRIVE_PIN_SPIGOT_RIM_WORST:.2f} at the printed worst case"
+    )
+    # The pins' way out (dt_crankshaft_spec DRIVE_PIN_KNOCKOUT_SPEC): ONE
+    # native #54 Hole Wizard feature drilled through-all from the collar's
+    # rear face on each pin's axis.  Past the reamed hole's floor it runs in
+    # that hole's own air, so it removes only the collar between the floor
+    # and the rear face.  On the +Y rear face the placement sketch reads
+    # (x, z) as model (X, +/-Z), the cone pivot post's top-face convention.
+    knockout = wizard_holes(
+        adapter,
+        DRIVE_PIN_KNOCKOUT_SPEC,
+        [
+            [0.0, COLLAR_REAR, DRIVE_PIN_CIRCLE_RADIUS],
+            [0.0, COLLAR_REAR, -DRIVE_PIN_CIRCLE_RADIUS],
+        ],
+        (0.0, 1.0, 0.0),
+        "drive-pin knockout holes (#54 drill)",
+        name="DrivePinKnockouts",
+        expect_dia_mm=DRIVE_PIN_KNOCKOUT_DIA,
+        placement_dims=[
+            ((None, None), ("DrivePinKnockoutOffset1", '"DrivePinCircleRadius"')),
+            # Vertical-distance dimensions are unsigned; the authored point
+            # retains the -Z side.
+            ((None, None), ("DrivePinKnockoutOffset2", '"DrivePinCircleRadius"')),
+        ],
+    )
+    drive_jobs += knockout.placement_drive_jobs
+    v_knockouts = (
+        2.0 * math.pi * (DRIVE_PIN_KNOCKOUT_DIA / 2.0) ** 2 * DRIVE_PIN_KNOCKOUT_LENGTH
+    )
+    v_final -= v_knockouts
+    await volume_check(
+        adapter, "seat collar drive-pin knockouts", v_final, 0.05 * v_knockouts
     )
     for plane, station, expr in (
         ("CollarRear", COLLAR_REAR, '"SeatCollar" + "CollarLength"'),
@@ -994,9 +1048,7 @@ async def build(adapter) -> dict[str, str]:
         set_dimension_symmetric_tolerance(
             adapter, "StationReference", name, COLLAR_STATION_TOL
         )
-    set_dimension_symmetric_tolerance(
-        adapter, "CollarProfile", "CollarDiaDim", COLLAR_DIA_TOL
-    )
+    # The collar body's Ø20.6 takes the title block's .X band (no mate).
     set_dimension_bilateral_tolerance(
         adapter, "SpigotProfile", "SpigotDiaDim", *deviations(SPIGOT_DIA_BAND)
     )
