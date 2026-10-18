@@ -127,8 +127,10 @@ ROD_DIA_TEXT_Y = 20.0  # model height of the rod-diameter text, clear of the hub
 
 
 FRONT_KEEP = {
-    # r2: lower, so the leader passes under the section line's lower "A".
-    "HubOd": (0.030, _front_y(-HUB_OD / 2.0) - 0.022),
+    # r4 (non-gating): from the lower left its leader ran through the section
+    # line's lower arrowhead; up-right of the hub the field is clear between
+    # the rod's Ø6.0 line and section A-A's fence letter.
+    "HubOd": (0.100, _front_y(0.0) + 0.0095),
     "HubBore": (0.105, _front_y(-HUB_OD / 2.0) - 0.014),
     "RodTipY": (0.035, FRONT_CENTER[1] + 0.010),
     "RodDia": (0.105, _front_y(ROD_DIA_TEXT_Y)),
