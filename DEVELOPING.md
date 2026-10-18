@@ -104,6 +104,38 @@ bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
 
+### Recipe gate file parallelism
+
+`check:recipe` alone runs its complete explicit test inventory with
+`pytest -q -p no:cacheprovider -n 4 --dist loadfile`. Other `check:*` gates
+remain serial internally. Four workers bound the additional local processes:
+the farm launcher already permits eight simultaneous doit tasks, so `-n auto`
+inside a gate would compete with sibling checks for every CPU. This is a
+conservative first step, not a claim of a fivefold speedup. File scheduling keeps
+each module's tests and module-scoped fixtures on one worker; the longest module
+still sets a lower bound on wall time, and every worker pays collection costs.
+Doit still owns the same dependency checks and success stamp.
+
+For a serial/parallel comparison of the **production recipe inventory**, run
+these commands sequentially from the isolated worktree's root. They derive the
+argv from `task_check()` rather than substituting a broader `pytest cad/scripts`
+run, and bypass the stamp so both runs execute. Replace the JUnit paths with
+distinct absolute paths outside the worktree; keep the guard and environment
+settings above. These direct pytest runs do not update the gate's success stamp.
+
+```powershell
+# Serial baseline: remove only the recipe gate's four xdist arguments.
+uv run --locked python -c "import dodo, subprocess; t = next(t for t in dodo.task_check() if t['name'] == 'recipe'); c = list(t['actions'][0][1][0]); i = c.index('-n'); del c[i:i+4]; raise SystemExit(subprocess.call(c + ['--durations=50', '--junitxml=C:/outside-worktree/recipe-serial.xml'], cwd=dodo.REPO_ROOT))"
+# Parallel: run the production argv unchanged, plus timing/report options.
+uv run --locked python -c "import dodo, subprocess; t = next(t for t in dodo.task_check() if t['name'] == 'recipe'); c = list(t['actions'][0][1][0]); raise SystemExit(subprocess.call(c + ['--durations=50', '--junitxml=C:/outside-worktree/recipe-parallel.xml'], cwd=dodo.REPO_ROOT))"
+```
+
+Compare full case inventories and outcomes as well as process wall time; JUnit
+case-time sums are not parallel wall time. `loadfile` does not isolate writes to
+shared repository paths across files or workers. Tests must use temporary paths
+for mutable outputs; retain `-p no:cacheprovider` to avoid the shared Windows
+pytest-cache rename race even when multiple doit gates run concurrently.
+
 ## Persisted assembly display data
 
 Assembly publication requires both a fresh native rebuild-state proof and a
