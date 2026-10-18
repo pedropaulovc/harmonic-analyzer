@@ -62,9 +62,14 @@ def test_channel_assembly_keeps_registry_outputs_and_precomputed_placement() -> 
         spec.outputs["slddrw"], spec.outputs["pdf"], spec.outputs["png"]
     )
     assert drawing.SHEET_SCALE == (1.0, 7.0)
-    assert drawing.FRONT_CENTER == (0.060, 0.150)
-    assert drawing.RIGHT_CENTER == (0.130, 0.150)
-    assert drawing.ISO_CENTER == (0.225, 0.150)
+    assert drawing.SHEET_SCALES[drawing.SHEET_NAMES[0]] == (1.0, 5.0)
+    assert drawing.ASSEMBLED_ISO_SCALE == drawing.SHEET_SCALE
+    assert drawing.FRONT_CENTER == (0.075, 0.140)
+    assert drawing.RIGHT_CENTER == (0.185, 0.140)
+    assert drawing.ISO_CENTER == (0.320, 0.150)
+    # Front and Right in projection: one centre line.
+    assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
+    assert drawing.ISO_LABEL == "ISOMETRIC\nSCALE 1 : 7"
 
 
 def test_step_numbers_follow_the_sequence_and_unknown_steps_are_refused() -> None:

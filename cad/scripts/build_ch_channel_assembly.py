@@ -1033,8 +1033,9 @@ async def _author_settings_reference(adapter) -> None:
     the pivot axis (south ear inner face, south washer, hub 0, hub 19) and a
     leg on the fulcrum axis between the keeper lugs' inner faces -- and one
     for the keeper plan view (the MHA-FR-002 socket bore and boss, socket
-    line, web faces and web centre line, the lug centre line and the two
-    inner-face stations), each dimensioned from
+    line, web centre line, the lug centre line and the two inner-face
+    stations, plus the web faces as its only non-construction lines), each
+    dimensioned from
     globals, banded, marked for the drawing and blanked (the mg
     AxleStackReference pattern). On the Right plane, sketch x is machine -z
     and sketch y is machine y; on the Top plane, sketch x is machine x and
@@ -1061,6 +1062,7 @@ async def _author_settings_reference(adapter) -> None:
         ("ChKeeperSocketBoss", spec.SOCKET_BOSS_DIA),
         ("ChKeeperWebHalfT", spec.KEEPER_PLAN_WEB_HALF_T),
         ("ChKeeperWebFaceFromSocket", spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET),
+        ("ChKeeperFootTipFromSocket", spec.KEEPER_PLAN_FOOT_TIP_FROM_SOCKET),
         ("ChKeeperLugX", spec.KEEPER_LUG_X - socket_x),
         ("ChKeeperFrontFaceZ", socket_y - face_ys[0]),
         ("ChKeeperRearFaceZ", socket_y - face_ys[1]),
@@ -1118,13 +1120,15 @@ async def _author_settings_reference(adapter) -> None:
     dims = SketchDims()
     check("create keeper-plan settings sketch", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    # The MHA-FR-002 features, all construction (phantom on the sheet): the
-    # socket line runs east (-x) past the boss toward the upper-left socket;
-    # the socket's bore and boss circles sit on its centre; the web centre
-    # line and both web faces run rearward (+z, sketch -y) to the front lug
-    # inner-face station, the faces from where they leave the boss. The lug
+    # The MHA-FR-002 features (ch_channel_assembly_spec): the socket line
+    # runs east (-x) past the boss toward the upper-left socket; the socket's
+    # bore and boss circles sit on its centre; the web centre line runs
+    # rearward (+z, sketch -y) to the front lug inner-face station; the lug
     # centre line runs from the socket line through both inner-face
-    # stations, front then rear.
+    # stations, front then rear. All construction (phantom on the sheet)
+    # but the web faces, which print as visible lines from where they leave
+    # the boss: the inner face to the station, beside the front keeper, the
+    # outer face to the keeper's foot tip, where it goes under it.
     socket_line = check(
         "keeper-plan socket line",
         await adapter.add_line(
@@ -1146,14 +1150,18 @@ async def _author_settings_reference(adapter) -> None:
         await adapter.add_line(socket_x, socket_y, socket_x, face_ys[0]),
     )
     web_face_y = socket_y - spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET
-    web_faces = [
+    outer_face, inner_face = web_faces = [
         check(
             f"keeper-plan {side} web face",
-            await adapter.add_line(x, web_face_y, x, face_ys[0]),
+            await adapter.add_line(x, web_face_y, x, end_y),
         )
-        for side, x in (
-            ("outer", socket_x + spec.KEEPER_PLAN_WEB_HALF_T),
-            ("inner", socket_x - spec.KEEPER_PLAN_WEB_HALF_T),
+        for side, x, end_y in (
+            (
+                "outer",
+                socket_x + spec.KEEPER_PLAN_WEB_HALF_T,
+                socket_y - spec.KEEPER_PLAN_FOOT_TIP_FROM_SOCKET,
+            ),
+            ("inner", socket_x - spec.KEEPER_PLAN_WEB_HALF_T, face_ys[0]),
         )
     ]
     lug_ys = [socket_y, *face_ys]
@@ -1167,9 +1175,12 @@ async def _author_settings_reference(adapter) -> None:
     set_sketch_direct_db(adapter, False)
     for entity in (socket_line, *socket_circles, web_line, *web_faces, *lug_legs):
         segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
-        segment.ConstructionGeometry = True
-        if not bool(segment.ConstructionGeometry):
-            raise RuntimeError(f"keeper-plan entity {entity} is not construction")
+        construction = entity not in web_faces
+        segment.ConstructionGeometry = construction
+        if bool(segment.ConstructionGeometry) is not construction:
+            raise RuntimeError(
+                f"keeper-plan entity {entity}: construction is not {construction}"
+            )
     for line, relation in (
         (socket_line, "horizontal"),
         (web_line, "vertical"),
@@ -1189,7 +1200,7 @@ async def _author_settings_reference(adapter) -> None:
         (front_station, f"{lug_legs[1]}.start", "coincident"),
         (lug_start, socket, "horizontal_points"),
         (f"{web_line}.end", front_station, "horizontal_points"),
-        *((f"{face}.end", front_station, "horizontal_points") for face in web_faces),
+        (f"{inner_face}.end", front_station, "horizontal_points"),
     ):
         check(
             f"keeper-plan {first} {relation} {second}",
@@ -1242,6 +1253,14 @@ async def _author_settings_reference(adapter) -> None:
                     '"ChKeeperWebFaceFromSocket"',
                 ),
             )
+        ),
+        (
+            socket,
+            f"{outer_face}.end",
+            "vertical_distance",
+            spec.KEEPER_PLAN_FOOT_TIP_FROM_SOCKET,
+            "KeeperOuterWebFaceEnd",
+            '"ChKeeperFootTipFromSocket"',
         ),
         (
             socket,

@@ -1,6 +1,7 @@
 r"""Create the MHA-CH-000 channel assembly fitter package (four sheets).
 
-1. ASSEMBLED VIEWS: Front, Right and the full-detail isometric at 1:7.
+1. ASSEMBLED VIEWS: Front and Right at 1:5 and the full-detail isometric at
+   1:7.
 2. EXPLODED VIEW + BOM: the builder-owned CHANNEL_EXPLODED isometric
    (ch_channel_assembly_spec), the native BOM with the registry's part
    numbers, vendor SKUs and ch_channel_assembly_notes' descriptions, and one
@@ -140,9 +141,13 @@ if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the channel package is landscape throughout")
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 SHEET_SCALE = (1.0, 7.0)
+# r5 review: at 1:7 the Front and Right sat small in the sheet's left 60%.
+# At 1:5 the bank's 0.197 m height fits the 0.254 m between the borders.
+ASSEMBLED_SCALE = (1.0, 5.0)
+ASSEMBLED_ISO_SCALE = SHEET_SCALE
 FITUP_SCALE = (1.0, 1.0)
 SHEET_SCALES = {
-    SHEET_NAMES[0]: SHEET_SCALE,
+    SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: SHEET_SCALE,
     SHEET_NAMES[2]: FITUP_SCALE,
     SHEET_NAMES[3]: FITUP_SCALE,
@@ -150,12 +155,19 @@ SHEET_SCALES = {
 _TEMPLATE = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
 BORDER = 0.0127
 
-# --- sheet 1: assembled views (the v41 single-sheet positions) ---------------
-FRONT_CENTER = (0.060, 0.150)
-RIGHT_CENTER = (0.130, 0.150)
-# r1: at y 0.140 the isometric's outline (0.154 tall) dipped to y 0.063,
-# into the title block's 0.066 top; 0.150 leaves it 7 mm clear.
-ISO_CENTER = (0.225, 0.150)
+# --- sheet 1: assembled views -------------------------------------------------
+# Front and Right in projection on one centre line, mid-way between the
+# borders (outlines 0.042-0.238 at 1:5), the Right's outline ending 13 mm
+# west of the title block it stands beside (0.060 and 0.036 wide at 1:5).
+FRONT_CENTER = (0.075, 0.140)
+RIGHT_CENTER = (0.185, 0.140)
+# The isometric over the title block's middle, at 1:7 so its 0.154-tall
+# outline stays between the title block (top 0.066) and the caption: at
+# y 0.150 it runs 0.073 to 0.227.
+ISO_CENTER = (0.320, 0.150)
+ISO_LABEL = "ISOMETRIC\nSCALE {} : {}".format(*map(int, ASSEMBLED_ISO_SCALE))
+# Under the isometric's drawn bottom (0.096), above the title block.
+ISO_LABEL_XY = (ISO_CENTER[0] - 0.022, 0.089)
 ASSEMBLED_CAPTION_XY = (0.272, 0.250)
 ASSEMBLED_CAPTION = "\n".join(
     (
@@ -490,10 +502,12 @@ LEVER_BANK = BankView(
 # The keepers on MHA-FR-002 in plan at 1:2, machine front up as the frame's
 # own plan prints it (b9ae machinist review: step 10's settings had no view,
 # and its X datum, the web centre, is no face to touch). The frame is not in
-# this assembly, so the hidden KEEPER_PLAN_FEATURE sketch draws, in phantom,
-# the frame features the settings run from (5d5245a review rule 10): the
+# this assembly, so the hidden KEEPER_PLAN_FEATURE sketch draws the frame
+# features the settings run from (5d5245a review rule 10): in phantom, the
 # west front upper socket's bore and boss, the line of the upper socket
-# centres, the web faces and the web centre line splitting them; it carries
+# centres and the web centre line; as visible lines, the web faces the
+# centre line splits, each as far as it shows past the front keeper (r5
+# review: in phantom they read as hidden lines through it). It carries
 # the three settings (owner rulings X1+B1, X-A). Placed under the lever bank:
 # the socket line 0.120 up. The farm-measured outline (c80bb08be) ran 0.1051
 # below the socket line, so its bottom clears the border by 2.2 mm; the boss
@@ -1224,12 +1238,12 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
 
 def _place_assembled_sheet(adapter: Any) -> None:
     _activate_sheet(adapter, SHEET_NAMES[0])
-    for orientation, center in (
-        ("*Front", FRONT_CENTER),
-        ("*Right", RIGHT_CENTER),
-        ("*Isometric", ISO_CENTER),
+    for orientation, center, scale in (
+        ("*Front", FRONT_CENTER, ASSEMBLED_SCALE),
+        ("*Right", RIGHT_CENTER, ASSEMBLED_SCALE),
+        ("*Isometric", ISO_CENTER, ASSEMBLED_ISO_SCALE),
     ):
-        view = place_view(adapter, str(SOURCE), orientation, *center, scale=SHEET_SCALE)
+        view = place_view(adapter, str(SOURCE), orientation, *center, scale=scale)
         # The isometric is the drawing's full-detail view.
         role = ViewRole.FULL_DETAIL if orientation == "*Isometric" else ViewRole.PLAIN
         configuration = apply_view_configuration(
@@ -1250,6 +1264,9 @@ def _place_assembled_sheet(adapter: Any) -> None:
         ASSEMBLED_CAPTION,
         ASSEMBLED_CAPTION_XY,
         label="assembled-views caption",
+    )
+    _add_note_block(
+        adapter, SHEET_NAMES[0], ISO_LABEL, ISO_LABEL_XY, label="isometric label"
     )
 
 
