@@ -413,26 +413,30 @@ HOLDDOWN_CALLOUT_XY = (HOLDDOWN_SECTION_CENTER[0] + 0.015, 0.0625)
 # y in mm, which candidate -- the one furthest "max" right or "min" left on
 # the sheet -- and the note's upper-left corner relative to the tip).  At
 # r2's 2.8 mm a character a label is 22..25 mm long; each tip sits near one
-# end of its label, so the smart-side leader leaves from that end.
-# Positions are measured on r3's render; the tip is projected on the seat.
+# end of its label, so the smart-side leader leaves from that end.  The
+# layout audit boxes a note with its leader, text to tip.
+# Positions are measured on r3/r5's renders; the tip is projected on the
+# face.  A-A names its top face only: everything over its strip lies in
+# the relief note's box (x 0.2998..0.3784, y 0.1144 up, r5 overlapped an
+# UNDERSIDE label there) or under the Ra 1.6 and (0.25) texts, and the
+# relief note, its TOP RELIEF and the label already name that face.
 FACE_LABELS = (
     # Under A-A's right-hand piece, right of the relief, over the A-A label
     # (top ~0.0995) and left of the (0.25) dimension line (x 0.3955).
     ("A-A", "TOP FACE", (-6.8, 6.8), PLATE_THICKNESS, "max", (-0.0196, -0.00515)),
-    # Over A-A's left-hand piece (tip ~0.348), right of the PlateThk text
-    # (x <= 0.330), under the relief note (~0.141) and left of its leader
-    # (x ~0.372 at this height).
-    ("A-A", "UNDERSIDE", (-12.0, 12.0), 0.0, "min", (-0.016, 0.00715)),
-    # Right of C-C's strip, under the hold-down callout (~0.051).
+    # Right of C-C's strip, its text standing from the tip's height down
+    # (~0.048..0.0435), under the hold-down callout (~0.051).
     (
         "C-C",
         "TOP FACE",
         (HOLDDOWN_LOCAL_X - 6.0, HOLDDOWN_LOCAL_X + 6.0),
         PLATE_THICKNESS,
         "max",
-        (0.008, -0.002),
+        (0.008, 0.0),
     ),
-    # Under C-C's left-hand piece, over the C-C label.
+    # Under C-C's left-hand piece, over the C-C label (top 0.0319): r5 boxed
+    # it 0.0339..0.0420, its top the tip's.  It overlapped r5's TOP FACE box
+    # (foot 0.0415, text 2 mm lower than now) by 0.5 mm.
     (
         "C-C",
         "UNDERSIDE",
@@ -460,8 +464,11 @@ HOLDDOWN_PROCESS = "DRILL"
 # The post-mount taps' callout over the hole-location plan.  The block is
 # centred on the requested point: r3's four rows ran from the inner border
 # (top 0.2665, ~0.3 mm air) to their underline at 0.2453, 6.6 mm over the
-# plate's top edge (0.2387).  3 mm lower leaves both ~3 mm.
-POST_MOUNT_CALLOUT_XY = (0.200, 0.2535)
+# plate's top edge (0.2387).  The underline runs 92 mm under the long
+# break row: r5, 3 mm lower, ran it (0.1530..0.2454 at y 0.2424) across
+# the notch view (x 0.2394 up, top 0.2444).  2 mm lower than r3 and 9 mm
+# left, the underline stops 3 mm short of that view.
+POST_MOUNT_CALLOUT_XY = (0.191, 0.2545)
 # The reamed pivot bore's callout, below the A-A cutting line between its
 # arrows: right of the plate the 189.26 dimension line crosses any callout
 # wider than ~40 mm.  Its fit row hangs under it, over the plan caption row

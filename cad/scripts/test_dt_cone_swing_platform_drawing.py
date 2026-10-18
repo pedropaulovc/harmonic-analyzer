@@ -525,7 +525,8 @@ def _holddown_hole_x() -> float:
 
 
 def _cc_face_label_boxes() -> dict[str, tuple[float, float, float, float]]:
-    """C-C's face labels at 2.8 mm a character, from tips on the strip."""
+    """C-C's face labels as the layout audit boxes them: text (2.8 mm a
+    character, 4.5 mm tall) and leader, out to the tip on the strip."""
     cy = drawing.HOLDDOWN_SECTION_CENTER[1]
     faces = {"TOP FACE": cy + 0.0094, "UNDERSIDE": cy + 0.003}
     boxes = {}
@@ -534,8 +535,14 @@ def _cc_face_label_boxes() -> dict[str, tuple[float, float, float, float]]:
             continue
         offsets = [x - spec.HOLDDOWN_LOCAL_X for x in xs]
         tip_x = _holddown_hole_x() + (max if pick == "max" else min)(offsets) / 1000.0
-        x, y = tip_x + offset[0], faces[text] + offset[1]
-        boxes[f"C-C {text}"] = (x, y - 0.0025, x + len(text) * 0.0028, y)
+        tip_y = faces[text]
+        x, y = tip_x + offset[0], tip_y + offset[1]
+        boxes[f"C-C {text}"] = (
+            min(x, tip_x),
+            min(y - 0.0045, tip_y),
+            max(x + len(text) * 0.0028, tip_x),
+            max(y, tip_y),
+        )
     return boxes
 
 
@@ -1291,36 +1298,29 @@ def test_relief_fit_note_stands_over_section_a_a_clear_of_its_neighbours() -> No
     assert x_at(0.135) > 0.3738
 
 
-def test_both_sections_name_the_top_face_and_the_underside() -> None:
+def test_both_sections_name_their_faces() -> None:
     """Machinist review r3 blocker: A-A draws the top face at its foot, C-C
-    at its head, and neither named a face.  Each section labels both."""
+    at its head, and neither named a face.  C-C names both; A-A its top
+    face, the only free field it has (r5: an UNDERSIDE label over its strip
+    overlapped the relief note's box)."""
     labels = {(key, text) for key, text, *_ in drawing.FACE_LABELS}
     assert labels == {
         ("A-A", "TOP FACE"),
-        ("A-A", "UNDERSIDE"),
         ("C-C", "TOP FACE"),
         ("C-C", "UNDERSIDE"),
     }
     for _key, text, _xs, model_y, pick, _offset in drawing.FACE_LABELS:
         assert model_y == (spec.PLATE_THICKNESS if text == "TOP FACE" else 0.0)
         assert pick in {"max", "min"}
-    # r3's tips (A-A at 2:1 about the bore axis x 0.372, faces y 0.11365 and
-    # 0.12635) put each label in its free field (2.8 mm a character).
-    tips = {
-        ("A-A", "TOP FACE"): (0.372 + 2 * 0.0068, 0.11365),
-        ("A-A", "UNDERSIDE"): (0.372 - 2 * 0.012, 0.12635),
-    }
-    boxes = {}
-    for key, text, _xs, _y, _pick, offset in drawing.FACE_LABELS:
-        if (key, text) in tips:
-            tx, ty = tips[(key, text)]
-            x, y = tx + offset[0], ty + offset[1]
-            boxes[text] = (x, y - 0.0025, x + len(text) * 0.0028, y)
-    top, under = boxes["TOP FACE"], boxes["UNDERSIDE"]
+    # r5's A-A tip (2:1 about the bore axis x 0.372, top face y 0.11365)
+    # puts the label in its free field (2.8 mm a character).
+    (offset,) = (o for k, t, *_r, o in drawing.FACE_LABELS if (k, t) == ("A-A", "TOP FACE"))
+    tip = (0.372 + 2 * 0.0068, 0.11365)
+    x, y = tip[0] + offset[0], tip[1] + offset[1]
+    top = (x, y - 0.0045, x + len("TOP FACE") * 0.0028, tip[1])
     assert top[1] > 0.0995 + 0.002  # A-A label
     assert top[2] < 0.3955 - 0.002  # (0.25) dimension line
-    assert top[3] < 0.11365 - 0.002  # under the top face
-    assert under[0] > 0.330 + 0.0015  # PlateThk text
-    assert under[1] > 0.12635 + 0.002  # over the underside
-    assert under[3] < 0.141 - 0.002  # relief note's bottom row
-    assert under[2] < 0.372 - 0.002  # relief leader at this height
+    assert top[3] < 0.1144  # the relief note's box (r5)
+    # C-C's two labels clear each other with their leaders (r5 overlapped).
+    first, second = _cc_face_label_boxes().values()
+    assert not _boxes_overlap(first, second)
