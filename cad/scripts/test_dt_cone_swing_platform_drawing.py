@@ -186,10 +186,12 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     )
     # The fit names its mate and a checkable acceptance (machinist review r1:
     # "MINIMAL AXIAL PLAY" could not be checked).
-    flat = " ".join(spec.PIVOT_RELIEF_FIT_REQUIREMENT.split("\n"))
-    assert flat.startswith("TOP RELIEF: FIT DEPTH TO PLATE")
-    assert "MHA-VN-014 SHOULDER SCREW" in flat
-    assert "NO AXIAL SHAKE" in flat
+    lines = spec.PIVOT_RELIEF_FIT_REQUIREMENT.split("\n")
+    flat = " ".join(lines)
+    assert flat.startswith("TOP RELIEF: FIT DEPTH TO MHA-VN-014 SHOULDER SCREW")
+    assert "UNLOCKED" in flat and "NO AXIAL SHAKE" in flat
+    # The layout audit gates a note over four rows (tall-block, r3).
+    assert len(lines) <= 4
     # Only the NW fillet reaches over the 10.50 strip, and only by a sliver.
     overlaps = {
         label: part._north_fillet_relief_overlap(label, r)

@@ -254,9 +254,10 @@ NOTCH_KEEP = {
     # beside section A-A's PlateThk text (x >= 0.3035), and the pivot relief
     # note stands right of the line (RELIEF_NOTE_XY).
     "CapECz": _planned(0.296, 0.180),
-    # 0.5 mm right of r1: the 33.00 arrow stood 1.81 mm from this text
-    # (layout audit arrow-near-text, clearance 2.0).
-    "CapEDia": _planned(0.2855, 0.259),
+    # 0.5 mm right of r1 and 0.5 mm higher than r3: the 33.00 arrow (y 0.2462
+    # at r3) stood 1.81 then 1.91 mm under this text's foot (layout audit
+    # arrow-near-text, clearance 2.0).
+    "CapEDia": _planned(0.2855, 0.2595),
 }
 SECTION_KEEP = {
     # Outside its witnesses, the text hangs LEFT of the dimension line (away
@@ -588,17 +589,25 @@ def _position_view_label(
     ``INote.GetExtent``, shift the anchor by the corner's error, read back,
     all zoomed onto the requested box (:data:`VIEW_LABEL_ZOOM_MARGIN`).
     The sheet scale is pinned first; finalization re-applying it must not
-    move a dynamic label after this readback.  The script adds no notes to
-    these views, so the native label is the view's one note.
+    move a dynamic label after this readback.  The script's only notes in
+    these views are the face labels (:data:`FACE_LABELS`); the native label
+    is the view's one other note.
     """
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*SHEET_SCALE, False, False):
         raise RuntimeError(f"cannot pin sheet scale before {label} placement")
-    notes = tuple(_read_member(view, "GetNotes") or ())
+    face_labels = {text for _key, text, *_ in FACE_LABELS}
+    notes = tuple(
+        note
+        for note in (
+            _early_bound(item, "INote") for item in _read_member(view, "GetNotes") or ()
+        )
+        if str(note.GetText()) not in face_labels
+    )
     if len(notes) != 1:
         raise RuntimeError(f"expected one native {label}, found {len(notes)} notes")
-    note = _early_bound(notes[0], "INote")
+    note = notes[0]
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
     extent = tuple(float(v) for v in note.GetExtent())
     size = (extent[3] - extent[0], extent[4] - extent[1])
