@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -58,18 +59,26 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     )
 
 
-def test_every_formed_feature_carries_the_one_formed_band() -> None:
-    # Main's r6 ruling (c): the hand-formed profile prints one place with a
-    # +/-0.5 band; the blank's cut features ride the title-block .XX row.
+def test_preload_setting_formed_features_carry_the_formed_band() -> None:
+    # Main's r6 ruling (c): the hand-formed profile prints one place.  The
+    # dimensions that set the crest's preload carry the +/-0.5 band the drive
+    # train's corner walk books; the flick's two ride the .X row (PR #1675).
     assert dt_pinion_spring_spec.FORMED_TOLERANCE_MM == 0.5
     assert model_toleranced_dimensions(spring) == {
         ("feature_name", "name"): "FORMED_TOLERANCE_MM"
     }
-    formed = dt_pinion_spring_spec.FORMED_DIMENSIONS["SpringProfile"]
+    banded = set().union(*dt_pinion_spring_spec.FORMED_BANDED_DIMENSIONS.values())
+    assert banded == set(geometry.FORMED_CONTACT_BANDS)
+    assert not banded & {"FlatLen", "FreeTipH"}
+    for name in banded:
+        assert "MHA-DT-014" in drawing.DIMENSION_CALLOUTS[name]
+    formed = set().union(*dt_pinion_spring_spec.FORMED_DIMENSIONS.values())
     precision = dt_pinion_spring_spec.DRAWING_PRECISION_BY_NAME
     assert {name: precision[name] for name in formed} == dict.fromkeys(formed, 1)
-    for name in ("StripWidth", "PadWidth", "PadLen"):
+    for name in ("PadWidth", "PadLen", "PadReliefR"):
         assert precision[name] == 2
+    source = Path(spring.__file__).read_text(encoding="utf-8")
+    assert "_pad_relief_max_limit(adapter)" in source
 
 
 def test_profile_is_baselined_from_the_foots_free_end() -> None:
@@ -90,12 +99,25 @@ def test_pad_webs_clear_two_millimetres_at_the_printed_worst_case() -> None:
     side_near = across - _XX_BAND - radius
     side_far = width_min - (across + _XX_BAND) - radius
     end_web = geometry.HOLE_FROM_END - _XX_BAND - radius
-    pad_web = (geometry.PAD_LEN - _XX_BAND) - (
-        geometry.HOLE_FROM_END + _XX_BAND
-    ) - radius
     webs = {"near side": side_near, "far side": side_far, "end": end_web}
-    webs["toward the strip"] = pad_web
+    # Toward the strip: the wing's inside corner, at the bend relief's limits
+    # (sharp, or the MAX round), with the wing short, the hole long and
+    # nearest the strip's forward edge: the strip narrow, the pad wide and the
+    # hole short of its lower (forward) edge, all measured from the aft edge.
+    hole_along = geometry.HOLE_FROM_END + _XX_BAND
+    hole_from_aft = (geometry.PAD_WIDTH + _XX_BAND) - (across - _XX_BAND)
+    hole_aft_of_strip_edge = (geometry.WIDTH - _XX_BAND) - hole_from_aft
+    for relief in (0.0, geometry.PAD_RELIEF_R):
+        corner_along = geometry.PAD_WING_LEN - _XX_BAND + relief
+        corner_out = relief  # the round's centre, forward of the strip edge
+        webs[f"toward the strip, R{relief:g}"] = (
+            math.hypot(corner_along - hole_along, corner_out + hole_aft_of_strip_edge)
+            - relief
+            - radius
+        )
     assert min(webs.values()) >= _WEB_TARGET, webs
+    # The round ends tangent to the strip at the bend tangent, never past it.
+    assert geometry.PAD_WING_LEN + geometry.PAD_RELIEF_R == geometry.FOOT_LEN
 
 
 def test_hole_callout_picks_the_hole_rim_where_the_pad_puts_it() -> None:
@@ -106,9 +128,10 @@ def test_hole_callout_picks_the_hole_rim_where_the_pad_puts_it() -> None:
     centre = (geometry.HOLE_X, geometry.FOOT_Y, geometry.PAD_Z)
     assert drawing.HOLE_CENTER == pytest.approx(centre)
     x, y, z = drawing.HOLE_EDGE_PICK
-    assert (x, y) == pytest.approx(centre[:2])
-    assert abs(z - centre[2]) == pytest.approx(geometry.HOLE_DIA / 2.0)
-    assert abs(z - geometry.PAD_Z) < geometry.PAD_WIDTH / 2.0
+    assert y == pytest.approx(centre[1])
+    assert math.hypot(x - centre[0], z - centre[2]) == pytest.approx(
+        geometry.HOLE_DIA / 2.0
+    )
     # Positive control: the pc-r11 pick is nowhere near the rim.
     stale = abs(geometry.HOLE_DIA / 2.0 - centre[2])
     assert geometry.HOLE_DIA / 2.0 - stale > 1.0
@@ -162,12 +185,12 @@ def test_front_qualifier_text_clears_its_rows_extension_lines() -> None:
     # view's vertical extension lines: each qualified text now sits wholly
     # between or wholly outside the lines at its row.
     for name, lines in drawing.FRONT_ROW_EXTENSION_X.items():
-        text = drawing.DIMENSION_CALLOUTS[name]
-        half = drawing.QUALIFIER_HALF_WIDTH[text]
+        half = drawing.callout_half_width(name)
         x = drawing.FRONT_KEEP[name][0]
         crossed = [line for line in lines if x - half < line < x + half]
-        assert not crossed, (name, text, crossed)
-    assert set(drawing.FRONT_ROW_EXTENSION_X) == set(drawing.DIMENSION_CALLOUTS)
+        assert not crossed, (name, crossed)
+    rows = {"FootLen", "FreeKinkH", "FreeKinkV", "FreeTipH"}
+    assert set(drawing.FRONT_ROW_EXTENSION_X) == rows
     # Positive control: pc-r12's centred kink-row text crossed both lines.
     old_x = drawing._front_x(drawing._FOOT_MID_X)
     half = drawing.QUALIFIER_HALF_WIDTH["FREE, TO KINK TANGENT"]
@@ -390,9 +413,8 @@ def test_kink_crop_holds_its_dimensions_and_labels_clear_of_them() -> None:
     # reaches down to the label.
     for name in ("KinkR", "FlatLen"):
         assert drawing.DETAIL_KEEP[name][1] > drawing.DETAIL_LABEL_XY[1]
-    # The fence letter goes west of the front view's fence.
-    assert drawing.PARENT_LETTER_OFFSET[0] < -drawing.DETAIL_RADIUS_MM * drawing._S
-    assert drawing.PARENT_LETTER_OFFSET[1] == 0.0
+    # The fence letter goes east of the front view's fence, off the phantom.
+    assert drawing.PARENT_LETTER_OFFSET[0] > drawing.DETAIL_RADIUS_MM * drawing._S
 
 
 def test_views_are_projected_and_hidden_lines_removed() -> None:
@@ -405,7 +427,7 @@ def test_views_are_projected_and_hidden_lines_removed() -> None:
     assert "process=HOLE_PROCESS" in source
     assert drawing.HOLE_PROCESS == "#30 DRILL"
     assert geometry.HOLE_DIA == pytest.approx(0.1285 * 25.4, abs=1e-3)  # No. 30 drill
-    assert source.count("add_edge_dimension(") == 1  # the two hole locations
+    assert source.count("add_edge_dimension(") == 1  # the blank's driven dimensions
 
 
 def test_bend_coupon_qualifies_the_tightest_accepted_radius() -> None:
@@ -427,7 +449,7 @@ def test_bend_coupon_qualifies_the_tightest_accepted_radius() -> None:
 def test_notes_carry_no_dimension_and_stay_short() -> None:
     notes = dt_pinion_spring_spec.DRAWING_NOTES
     assert len(notes.splitlines()) <= 4
-    assert "TEMPLATE" in notes and "FORM" in notes
+    assert "FORM" in notes
     assert "COIL" not in notes
     # The blank's orientation is the coupon's (Codex #859, PRRT_kwDOPHDy386mTtoA).
     assert "ALONG ROLL LENGTH (BENDS ACROSS ROLLING DIRECTION)" in notes
@@ -468,7 +490,6 @@ def test_registry_names_the_stock_the_section_models() -> None:
     assert printed_deviations(section.WIDTH, section.WIDTH_PLACES) == pytest.approx(
         (-_XX_BAND, _XX_BAND), abs=0.005
     )
-    assert dt_pinion_spring_spec.DRAWING_PRECISION_BY_NAME["StripWidth"] == 2
     assert spring.MATERIAL == "AISI 304"  # the library's stainless stand-in
 
 

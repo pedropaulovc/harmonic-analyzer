@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dt_pinion_spring_geometry import (
     FORMED_BAND_MM,
+    FORMED_CONTACT_BANDS,
     BLADE_STRAIGHT_LEN as BLADE_STRAIGHT_LEN,
     BLADE_LEAN_DEG as BLADE_LEAN_DEG,
     FLAT_LEN as FLAT_LEN,
@@ -27,6 +28,8 @@ from dt_pinion_spring_geometry import (
     KINK_DEG as KINK_DEG,
     PAD_LEN as PAD_LEN,
     PAD_LEN_PLACES as PAD_LEN_PLACES,
+    PAD_RELIEF_PLACES as PAD_RELIEF_PLACES,
+    PAD_RELIEF_R as PAD_RELIEF_R,
     PAD_WIDTH as PAD_WIDTH,
     PAD_WIDTH_PLACES as PAD_WIDTH_PLACES,
     PAD_Z as PAD_Z,
@@ -38,10 +41,13 @@ from dt_pinion_spring_geometry import (
 )
 
 # U27 + Main's r6 ruling (c): the profile is hand-formed, so every formed
-# feature prints one place with a +/-0.5 band -- looser than a formed leaf
-# could ever be held to +/-0.10, tighter than the .X row's +/-0.8.  The foot
-# length is formed too, and its screw seat is transferred to the base at
-# assembly, so it no longer sets preload and takes the same band.
+# feature prints one place.  The five that set the crest's preload on the
+# MHA-DT-014 strap flank (dt_pinion_spring_geometry.FORMED_CONTACT_BANDS) carry
+# a +/-0.5 band -- looser than a formed leaf could ever be held to +/-0.10,
+# tighter than the .X row's +/-0.8, which the drive train's preload and stress
+# corner walk would not pass -- and their callouts name the mate (rule 4).
+# FlatLen and FreeTipH shape the flick past the contact, so they ride the
+# title-block .X row (machinist review, PR #1675).
 FORMED_TOLERANCE_MM = FORMED_BAND_MM
 # O2 (Main, 2026-09-24): the part is modelled INSTALLED; the maker forms the
 # FREE shape.  The hidden construction-only FreeForm sketch carries the free
@@ -53,15 +59,30 @@ FORMED_DIMENSIONS: dict[str, set[str]] = {
     "SpringProfile": {"FootLen", "BendR", "KinkR", "FlatLen"},
     FREE_FORM_SKETCH: {"FreeKinkH", "FreeKinkV", "FreeTipH"},
 }
+FORMED_BANDED_DIMENSIONS: dict[str, set[str]] = {
+    feature: names & set(FORMED_CONTACT_BANDS)
+    for feature, names in FORMED_DIMENSIONS.items()
+}
+if set().union(*FORMED_BANDED_DIMENSIONS.values()) != set(FORMED_CONTACT_BANDS):
+    raise AssertionError("every preload-setting formed dimension must carry the band")
+# The pad's bend relief prints as a single limit, R0.25 MAX (swTolMAX prints the
+# nominal, so the nominal is the limit), down to sharp: either end keeps the
+# hole's webs, and the round never reaches past the bend tangent.
+PAD_RELIEF_FEATURE = "PadRelief"
+PAD_RELIEF_DIMENSION = "PadReliefR"
+PAD_RELIEF_TOL_TYPE = 6  # swTolType_e.swTolMAX
 
 # Everything the print carries.  The profile is baselined from the foot's free
 # end (drawing-guidelines.md rule 10 (dimension from a real feature)): the FREE kink start and tip are located from it, never
 # from the model origin.  The pad, the strip width and the hole location are
-# cut with the flat blank, so they take the title-block .XX row.
+# cut with the flat blank, so they take the title-block .XX row (the relief
+# round is its single MAX limit); the strip width and the hole location are
+# sheet dimensions picked on the blank's edges
+# (draw_dt_pinion_spring._blank_dimensions).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     **FORMED_DIMENSIONS,
-    "Spring": {"StripWidth"},
     "PadProfile": {"PadWidth", "PadLen"},
+    PAD_RELIEF_FEATURE: {PAD_RELIEF_DIMENSION},
 }
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the model owns
@@ -69,8 +90,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SpringProfile": {name: 1 for name in FORMED_DIMENSIONS["SpringProfile"]},
     FREE_FORM_SKETCH: {name: 1 for name in FORMED_DIMENSIONS[FREE_FORM_SKETCH]},
-    "Spring": {"StripWidth": WIDTH_PLACES},
     "PadProfile": {"PadWidth": PAD_WIDTH_PLACES, "PadLen": PAD_LEN_PLACES},
+    PAD_RELIEF_FEATURE: {PAD_RELIEF_DIMENSION: PAD_RELIEF_PLACES},
 }
 
 _PRECISION_NAMES = [
@@ -87,11 +108,11 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # The bend coupon qualifies a blank cut along the roll's length, its bends
 # across the rolling direction (cad/docs/tolerance-policy.md); the blank also
 # fits across the roll, so the print names the direction (Codex #859,
-# PRRT_kwDOPHDy386mTtoA).
+# PRRT_kwDOPHDy386mTtoA).  The notes state requirements, not the sequence of
+# work (machinist review, PR #1675).
 DRAWING_NOTES = "\n".join(
     (
-        "CUT BLANK ALONG ROLL LENGTH (BENDS ACROSS ROLLING DIRECTION)",
-        "  TO TOP-VIEW PAD TEMPLATE, DRILL, LEAVE LONG; FORM, TRIM TIP.",
+        "CUT BLANK ALONG ROLL LENGTH (BENDS ACROSS ROLLING DIRECTION).",
         "RADII AND FORMED-PROFILE DIMENSIONS ARE TO THE INSIDE SURFACE.",
         "PHANTOM PROFILE IS THE FREE FORM; SOLID IS AS INSTALLED.",
     )

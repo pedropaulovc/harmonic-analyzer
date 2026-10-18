@@ -23,8 +23,8 @@ Traced that way the one-sided thin wall lands right of travel -- west of the
 blade, under the foot -- so the blade's west face is the contact face.  The
 pad-merge volume gate proves the foot side and a west-extreme probe the
 blade side.  Thin mid-plane extrude, WIDTH symmetric about z 0, plus a square
-screw pad (PAD_WIDTH x PAD_LEN) at the foot's free end, cut with the flat
-blank.
+screw pad (PAD_WIDTH x PAD_LEN) at the foot's free end, its wing set back
+behind a PAD_RELIEF_R MAX bend relief, cut with the flat blank.
 
 The model is the INSTALLED, parked shape (O2); the maker forms the free shape,
 PRESET_DEG more bend (dt_pinion_spring_geometry).
@@ -62,7 +62,7 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from _holes import blind_cut_dia_mm, wizard_holes
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -76,11 +76,14 @@ from dt_pinion_spring_spec import (
     DRAWING_PRECISION,
     FLAT_LEN,
     FOOT_LEN,
-    FORMED_DIMENSIONS,
+    FORMED_BANDED_DIMENSIONS,
     FORMED_TOLERANCE_MM,
     FREE_FORM_SKETCH,
     ISOMETRIC_VIEW_NOTE,
-    PAD_LEN,
+    PAD_RELIEF_DIMENSION,
+    PAD_RELIEF_FEATURE,
+    PAD_RELIEF_R,
+    PAD_RELIEF_TOL_TYPE,
     PAD_WIDTH,
     PAD_Z,
     R_BEND,
@@ -107,7 +110,9 @@ from dt_pinion_spring_geometry import (
     KINK_C,
     KINK_EXIT,
     KINK_START,
+    PAD_RELIEF_VOLUME,
     PAD_VOLUME,
+    PAD_WING_LEN,
     VOLUME,
 )
 
@@ -133,6 +138,31 @@ _SAVED_DRAWING_PROPERTIES = (
     "Manufacturing Notes",
     "Isometric View Note",
 )
+
+
+def _pad_relief_max_limit(adapter) -> None:
+    """PadReliefR as a single MAX limit, sharp up to the nominal
+    (build_pn_pen_rod._shoulder_fillet_max_limit's recipe): the native type
+    prints the nominal, so the nominal is the limit."""
+    _, dimension = _named_dimension(adapter, PAD_RELIEF_FEATURE, PAD_RELIEF_DIMENSION)
+    label = f"{PAD_RELIEF_DIMENSION}@{PAD_RELIEF_FEATURE}"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, PAD_RELIEF_R / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the limit {PAD_RELIEF_R}"
+        )
+    lower, upper = -PAD_RELIEF_R / 1000.0, 0.0
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = PAD_RELIEF_TOL_TYPE
+    if not tolerance.SetValues(lower, upper):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} m")
+    if (
+        int(tolerance.Type) != PAD_RELIEF_TOL_TYPE
+        or not math.isclose(float(tolerance.GetMinValue()), lower, abs_tol=1e-12)
+        or not math.isclose(float(tolerance.GetMaxValue()), upper, abs_tol=1e-12)
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {PAD_RELIEF_R:g} MAX")
 
 
 def _extreme_mm(adapter, direction: tuple[float, float, float], axis: int) -> float:
@@ -311,7 +341,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "StripThickness", f"{THICK}mm")
     await set_global(adapter, "StripWidth", f"{WIDTH}mm")
     await set_global(adapter, "PadWidth", f"{PAD_WIDTH}mm")
-    await set_global(adapter, "PadLength", f"{PAD_LEN}mm")
+    await set_global(adapter, "PadLength", f"{PAD_WING_LEN}mm")
+    await set_global(adapter, "PadReliefRadius", f"{PAD_RELIEF_R}mm")
 
     # Open inside-surface path, drawn from the free tip DOWN (_formed_path).
     check("create_sketch spring", await adapter.create_sketch("Front"))
@@ -351,28 +382,30 @@ async def build(adapter) -> dict[str, str]:
         )
     _telemetry.success(f"spring wall west of the blade: westmost x {west:.3f}")
 
-    # Screw pad: a PAD_WIDTH x PAD_LEN square in from the foot's free end,
+    # Screw pad: a PAD_WIDTH-wide wing PAD_WING_LEN in from the foot's free end,
     # flush with the strip's aft edge, local -z (machine +z once placed
     # Ry(180)); the Top-plane sketch reads v = -z, so that edge is v = +W/2 and
     # the pad widens toward -v.  Extruded the strip thickness up from the foot's underside
     # (y 0, the gated side of the one-sided thin wall) so it merges with the
     # foot. The volume gate proves the merge: a pad on the wrong side would add
-    # its whole footprint, not just the two wings beside the strip.
+    # its whole footprint, not just the wing beside the strip.  The chain
+    # starts on the wing's forward edge, so PadLen measures the edge the
+    # print can witness (the aft edge runs on into the strip).
     pad = SketchDims()
     check("create_sketch pad", await adapter.create_sketch("Top"))
     x0 = FOOT_END[0]
     pad_pts = [
-        (x0, WIDTH / 2.0),
-        (x0 - PAD_LEN, WIDTH / 2.0),
-        (x0 - PAD_LEN, WIDTH / 2.0 - PAD_WIDTH),
         (x0, WIDTH / 2.0 - PAD_WIDTH),
+        (x0 - PAD_WING_LEN, WIDTH / 2.0 - PAD_WIDTH),
+        (x0 - PAD_WING_LEN, WIDTH / 2.0),
+        (x0, WIDTH / 2.0),
     ]
     pad_lines = await add_line_chain(adapter, pad_pts)
     await define_rectilinear_chain(
         adapter,
         pad_lines,
         pad_pts,
-        anchor=0,
+        anchor=3,
         label="pad",
         dims=pad,
         names=["PadLen", "PadWidth", "PadEndX", "PadEdgeZ"],
@@ -389,7 +422,29 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Pad")
     drive_jobs += [(name_dimensions(adapter, "Pad", ["PadThk"])[0], '"StripThickness"')]
     volume += PAD_VOLUME
-    await volume_check(adapter, "pad", volume, 0.02 * PAD_VOLUME)
+    padded = await volume_check(adapter, "pad", volume, 0.02 * PAD_VOLUME)
+
+    # Bend relief: the wing's inside corner, where its west edge meets the
+    # strip's forward edge PAD_RELIEF_R east of the bend tangent, rounds at
+    # PAD_RELIEF_R, so the round ends tangent to the strip AT the bend tangent.
+    # The volume gate is on the measured step: the concave round ADDS its
+    # spandrel (a round on a convex edge would remove one).
+    check(
+        "fillet pad relief",
+        await adapter.add_fillet(
+            PAD_RELIEF_R,
+            [[x0 - PAD_WING_LEN, THICK / 2.0, WIDTH / 2.0]],
+            propagate=False,
+        ),
+    )
+    name_last_feature(adapter, "PadRelief")
+    drive_jobs += [
+        (name_dimensions(adapter, "PadRelief", ["PadReliefR"])[0], '"PadReliefRadius"')
+    ]
+    volume += PAD_RELIEF_VOLUME
+    await volume_check(
+        adapter, "pad relief", padded + PAD_RELIEF_VOLUME, 0.5 * PAD_RELIEF_VOLUME
+    )
 
     # Foot screw hole (PR7 item 11): ONE native Hole Wizard #4 clearance feature
     # (through-all along Y) through the foot strip near its free end, drilled
@@ -432,10 +487,12 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven spring (equations neutral)", volume, 0.01 * VOLUME
     )
 
-    # Manufacturing drawing support: every hand-formed feature carries the one
-    # formed band; the blank's cut features ride the title-block .XX row. The
-    # part authors the decimal places and the drawing reads them back.
-    for feature_name, dimension_names in FORMED_DIMENSIONS.items():
+    # Manufacturing drawing support: the formed features that set the crest's
+    # preload carry the one formed band, the rest of the profile rides the
+    # title-block .X row, the blank's cut features its .XX row, and the pad's
+    # bend relief a single MAX limit. The part authors the decimal places and
+    # the drawing reads them back.
+    for feature_name, dimension_names in FORMED_BANDED_DIMENSIONS.items():
         for name in sorted(dimension_names):
             set_dimension_symmetric_tolerance(
                 adapter, feature_name, name, FORMED_TOLERANCE_MM
@@ -444,6 +501,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _pad_relief_max_limit(adapter)
 
     # Hidden so no assembly instance renders it; the drawing shows it per view.
     blank_sketch(adapter, FREE_FORM_SKETCH)

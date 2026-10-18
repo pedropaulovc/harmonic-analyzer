@@ -76,6 +76,15 @@ PAD_LEN_PLACES = 2  # PadLen prints .XX (dt_pinion_spring_spec)
 HOLE_FROM_END = 4.5
 FOOT_FLAT = 0.0
 FOOT_LEN = PAD_LEN + FOOT_FLAT  # free end to the bend tangent
+# Bend relief (machinist review, PR #1675): the pad's wing beside the strip
+# stops PAD_RELIEF_R short of the bend tangent, and its inside corner takes an
+# R PAD_RELIEF_R MAX round that ends tangent to the strip's edge AT the bend
+# tangent, so the bend never runs into the wing or a sharp step.  The hole's
+# web to that corner sets the size: any radius from sharp to the MAX keeps it
+# >= 2.0 at the printed worst case (test_dt_pinion_spring_drawing).
+PAD_RELIEF_R = 0.25
+PAD_RELIEF_PLACES = 2
+PAD_WING_LEN = PAD_LEN - PAD_RELIEF_R  # free end to the wing's straight edge
 # #859 option (iv): the pad is flush with the strip's aft edge and widens
 # forward only (pinion_rig_layout).  Placed Ry(180), the part's local +z
 # runs machine -z (forward), so the pad's centre, and the hole's, stand
@@ -166,7 +175,9 @@ PATH_LEN = (
 # Both arcs carry the wall on their convex side: each adds theta * T^2 / 2.
 _ARC_SIDE = (math.radians(KINK_DEG) + _BEND_SWEEP) * (THICK / 2.0) * THICK
 VOLUME = (PATH_LEN * THICK + _ARC_SIDE) * WIDTH
-PAD_VOLUME = (PAD_WIDTH - WIDTH) * PAD_LEN * THICK  # the wings beside the strip
+PAD_VOLUME = (PAD_WIDTH - WIDTH) * PAD_WING_LEN * THICK  # the wing beside the strip
+# The relief round's spandrel in the wing's inside corner.
+PAD_RELIEF_VOLUME = (1.0 - math.pi / 4.0) * PAD_RELIEF_R**2 * THICK
 
 # Free (as-formed) profile: everything past the bend exit turned PRESET_DEG
 # counter-clockwise (toward the strap) about the bend centre.

@@ -6,8 +6,8 @@ foot, an R3.3 bend up to a blade leaning back over the foot's bend, then an
 R3.3 crest turning 25 deg out to a short free flat.  The solid is the installed shape;
 the front view also shows the part's hidden FreeForm reference sketch as the
 phantom free form, and the free crest and tip are baselined from the foot's
-free end on it.  The projected top view carries the blank's pad, strip width
-and hole; a 5:1 detail carries the crest.
+free end on it.  The projected top view carries the blank's pad, its bend
+relief, the strip width and the hole; a 5:1 detail carries the crest.
 
 Run with SolidWorks open::
 
@@ -62,11 +62,13 @@ from dt_pinion_spring_geometry import (
     HOLE_DIA,
     HOLE_FROM_END,
     KINK_C,
-    PAD_LEN,
+    KINK_EXIT,
     PAD_WIDTH,
+    PAD_WING_LEN,
     PAD_Z,
     R_KINK,
     THICK,
+    WIDTH,
 )
 from dt_pinion_spring_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION_BY_NAME
 
@@ -100,7 +102,7 @@ FRONT_CENTER = (0.110, 0.118)
 # Third-angle projection: the top view sits ABOVE the front and shares its X
 # station (both views span the same model x range), so the pad and hole read
 # straight up from the profile's free end.
-TOP_CENTER = (FRONT_CENTER[0], 0.210)
+TOP_CENTER = (FRONT_CENTER[0], 0.228)
 ISO_CENTER = (0.350, 0.150)
 # Detail A is a cropped 5:1 *Front MODEL view, not a native detail view.  The
 # native detail's targeted import of SpringProfile brought FlatLen in pc-r11
@@ -132,11 +134,11 @@ DETAIL_LABEL_XY = (
     DETAIL_CENTER[0],
     DETAIL_CENTER[1] - DETAIL_CROP_RADIUS - DETAIL_LABEL_DROP,
 )
-# The fence's "A" goes WEST of the fence, level with its centre: above it,
-# it sat on the FREE, TO KINK TANGENT row (stacktop-dbe47ae3, spring-r1).
-# West of the fence is open sheet; the free-form phantom runs on the fence's
-# west edge.
-PARENT_LETTER_OFFSET = (-(DETAIL_RADIUS_MM * _S + 0.005), 0.0)
+# The fence's "A" goes EAST of the fence, level with its centre: above it,
+# it sat on the FREE, TO KINK TANGENT row (stacktop-dbe47ae3, spring-r1);
+# west, the free-form phantom ran under it (PR #1675 review r1).  East of the
+# fence is the open bay between the blade and FreeKinkV's dimension line.
+PARENT_LETTER_OFFSET = (DETAIL_RADIUS_MM * _S + 0.005, 0.002)
 # swCropViewErrors_e.swCropViewErrors_NoError
 CROP_NO_ERROR = 1
 # The kink focus must land within 0.1 mm of DETAIL_CENTER after the move.
@@ -156,33 +158,56 @@ def _front_y(model_y_mm: float) -> float:
 _FOOT_MID_X = (FOOT_END[0] + FREE_KINK_START[0]) / 2.0
 _PROFILE_TOP = _front_y(max(FLAT_TIP[1], FREE_FLAT_TIP[1]))
 _PAD_EAST = _front_x(FOOT_END[0])
-# Half the printed width of each qualified dimension's widest text line, as
-# pc-r12's render measured it (sheet metres, 11.8 px/mm).  A text wider than
-# its own dimension goes east of the foot end's extension line, which the
-# FootLen, FreeKinkH and FreeTipH rows share: centred between the extension
-# lines, pc-r12 printed those lines through FREE, BEND and TANGENT.
+# Half the printed width of each qualified dimension's text lines, as pc-r12's
+# render measured them (sheet metres, 11.8 px/mm; the preload line scaled
+# from those).  A text wider than its own dimension goes east of the foot
+# end's extension line, which the FootLen, FreeKinkH and FreeTipH rows share:
+# centred between the extension lines, pc-r12 printed those lines through
+# FREE, BEND and TANGENT.
+PRELOAD_REASON = "SETS PRELOAD ON MHA-DT-014"
 QUALIFIER_HALF_WIDTH = {
     "FREE, TO KINK TANGENT": 0.026,
     "TO BEND TANGENT": 0.021,
     "FREE, TO TIP": 0.013,
+    PRELOAD_REASON: 0.033,
 }
+# The dimensions banded +/-0.5 set the crest's preload on the MHA-DT-014 strap
+# (dt_pinion_spring_spec.FORMED_BANDED_DIMENSIONS), so each names that mate
+# (drawing-guidelines.md rule 4); FreeTipH and FlatLen ride the .X row.
+DIMENSION_CALLOUTS = {
+    "FootLen": f"TO BEND TANGENT\n{PRELOAD_REASON}",
+    "FreeKinkH": f"FREE, TO KINK TANGENT\n{PRELOAD_REASON}",
+    "FreeKinkV": f"FREE, TO KINK TANGENT\n{PRELOAD_REASON}",
+    "FreeTipH": "FREE, TO TIP",
+    "BendR": PRELOAD_REASON,
+    "KinkR": PRELOAD_REASON,
+}
+
+
+def callout_half_width(name: str) -> float:
+    """Half the printed width of ``name``'s widest callout line."""
+    return max(QUALIFIER_HALF_WIDTH[line] for line in DIMENSION_CALLOUTS[name].split("\n"))
+
+
 TEXT_TO_EXTENSION_GAP = 0.003
-_KINK_TEXT_X = _PAD_EAST + TEXT_TO_EXTENSION_GAP + QUALIFIER_HALF_WIDTH["FREE, TO KINK TANGENT"]
+_KINK_TEXT_X = _PAD_EAST + TEXT_TO_EXTENSION_GAP + callout_half_width("FreeKinkH")
 FRONT_KEEP = {
     "FootLen": (
-        _PAD_EAST + TEXT_TO_EXTENSION_GAP + QUALIFIER_HALF_WIDTH["TO BEND TANGENT"],
+        _PAD_EAST + TEXT_TO_EXTENSION_GAP + callout_half_width("FootLen"),
         _front_y(0.0) - 0.010,
     ),
-    "BendR": (_front_x(BEND_CX) - 0.032, _front_y(0.0) - 0.004),
+    # West of the foot's bend tangent extension line, which runs down past
+    # the radius's two-line text.
+    "BendR": (_front_x(BEND_CX) - 0.045, _front_y(0.0) - 0.004),
     # The free locations, on the FreeForm phantom.  FreeKinkV's dimension
     # line runs where its text sits, east of the foot end.
     "FreeKinkV": (_KINK_TEXT_X, _front_y(FREE_KINK_START[1] / 2.0)),
-    # Clear of the kink fence's native "A" label, which SolidWorks sets just
-    # above the fence (spring-r1 put the 15.0 text on it), with a text gap
-    # between the two and the top view lifted to make room.  FREE, TO TIP
-    # fits between its extension lines; the kink row's text does not.
-    "FreeKinkH": (_KINK_TEXT_X, _PROFILE_TOP + 0.020),
-    "FreeTipH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.038),
+    # The smaller span inboard: FREE, TO TIP fits between its extension lines
+    # above the kink fence; the kink row's text does not, so it sits east of
+    # the foot end on the outer row.  The top view stands clear above both
+    # (spring r1: the outer row's text met the pad's edge).
+    "FreeTipH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.015),
+    "FreeKinkH": (_KINK_TEXT_X, _PROFILE_TOP + 0.032),
 }
 # The vertical extension lines each qualified row's text sits among: its own
 # two, and the foot end's, which runs past every row.
@@ -192,16 +217,24 @@ FRONT_ROW_EXTENSION_X = {
     "FreeKinkH": (_front_x(FREE_KINK_START[0]), _PAD_EAST),
     "FreeTipH": (_front_x(FREE_FLAT_TIP[0]), _PAD_EAST),
 }
+# Top view (third-angle: model +z, forward, runs DOWN the sheet).  The view
+# centres on the pad, so the hole centre is level with TOP_CENTER, the strip's
+# aft edge (flush with the pad's) 9.5 mm (sheet) above it, the strip's forward
+# edge 3.2 below and the pad's forward edge 9.5 below.
+_TOP_AFT = TOP_CENTER[1] + (PAD_Z + WIDTH / 2.0) * _S
+_TOP_STRIP_FWD = TOP_CENTER[1] + (PAD_Z - WIDTH / 2.0) * _S
+_TOP_PAD_FWD = TOP_CENTER[1] - PAD_WIDTH / 2.0 * _S
+_WING_WEST = _front_x(FOOT_END[0] - PAD_WING_LEN)
 TOP_KEEP = {
-    "PadLen": (_front_x(FOOT_END[0] - PAD_LEN / 2.0), TOP_CENTER[1] + 0.021),
-    # West, outboard of the hole-edge 4.75 (HOLE_EDGE_TEXT_XY) so the two stack
-    # apart: east, its extension lines (witnessed at the pad's west end) ran the
-    # pad's lower edge under the hole callout's leader (leader-crosses-line).
-    "PadWidth": (_front_x(_PROFILE_MIN_X) - 0.020, TOP_CENTER[1] + 0.0035),
-    # East of the pad: its extension lines are witnessed at the foot end, so
-    # the west placement drew the strip's y=206.8 line through the hole under
-    # the hole callout's leader (leader-crosses-line).
-    "StripWidth": (_PAD_EAST + 0.010, TOP_CENTER[1] + 0.004),
+    # Below the pad, on the wing's forward edge it witnesses: above, its
+    # extension lines crossed the pad and the strip.
+    "PadLen": (_front_x(FOOT_END[0] - PAD_WING_LEN / 2.0), _TOP_PAD_FWD - 0.009),
+    # East, witnessed on the pad's free end, outboard of the hole-edge 4.75
+    # (HOLE_EDGE_TEXT_XY) that shares its lower extension line.
+    "PadWidth": (_PAD_EAST + 0.016, TOP_CENTER[1] + 0.003),
+    # Below-left of the relief round, its leader clear of PadLen's extension
+    # line up the wing's west edge and of the strip width's lines above.
+    "PadReliefR": (_WING_WEST - 0.015, _TOP_PAD_FWD - 0.0055),
 }
 DETAIL_KEEP = {
     # The flick turns right (east) in this view: the radius leader goes
@@ -209,31 +242,42 @@ DETAIL_KEEP = {
     "KinkR": (0.205, 0.232),
     "FlatLen": (0.282, 0.200),
 }
-DIMENSION_CALLOUTS = {
-    "FootLen": "TO BEND TANGENT",
-    "FreeKinkH": "FREE, TO KINK TANGENT",
-    "FreeKinkV": "FREE, TO KINK TANGENT",
-    "FreeTipH": "FREE, TO TIP",
-}
-HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END / 2.0), TOP_CENTER[1] + 0.031)
-# West of the strip, inboard of PadWidth: east, it boxed the hole in with
-# StripWidth once that moved east (their extension and dimension lines cross).
-HOLE_EDGE_TEXT_XY = (_front_x(_PROFILE_MIN_X) - 0.010, TOP_CENTER[1] - 0.00375)
-# Below the pad: above it the leader crossed the 4.50 and 9.50 pad
-# dimensions on its way down to the hole.  The note centres on this point, so
-# it sits east of the pad, clear of the FREE, TO TIP text below the top view.
-HOLE_CALLOUT_XY = (_PAD_EAST + 0.035, TOP_CENTER[1] - 0.019)
+HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END / 2.0), _TOP_AFT + 0.0095)
+# East of the pad, inboard of PadWidth: west, its extension lines ran from the
+# hole through the wing and the strip.
+HOLE_EDGE_TEXT_XY = (_PAD_EAST + 0.007, (_TOP_PAD_FWD + TOP_CENTER[1]) / 2.0 - 0.0016)
+# The strip's width, picked on the free flat's two edges (the flat, topmost
+# in this view, runs straight across the crest's top), printed west of the
+# crest: east of the pad its extension lines were witnessed at nothing
+# (spring r1).
+STRIP_PICK_X = (KINK_EXIT[0] + FLAT_TIP[0]) / 2.0
+STRIP_PICK_Y = (KINK_EXIT[1] + FLAT_TIP[1]) / 2.0
+STRIP_WIDTH_TEXT_XY = (
+    _front_x(_PROFILE_MIN_X) - 0.011,
+    (_TOP_AFT + _TOP_STRIP_FWD) / 2.0,
+)
+# Above-left of the pad: below it the leader crossed the front view's FREE,
+# TO TIP row (spring r1).  The note centres on this point; its leader lands
+# on the hole's upper-left rim, west of the 4.50's extension line at the
+# hole centre.
+HOLE_CALLOUT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END) - 0.040, _TOP_AFT + 0.0165)
 # The #4 normal clearance (3.264 mm = 0.1285 in) is a No. 30 drill; the shop
 # reaches for the number, the native size compartment still prints the diameter.
 HOLE_PROCESS = "#30 DRILL"
 # The pad hole where build_pinion_spring's Hole Wizard puts it (model mm): on
 # the foot's top face, centred across the pad, which stands PAD_Z off the
-# strip's centre plane.  The callout picks its rim at the +z quadrant.  pc-r11
-# (0c5636eab) picked z HOLE_DIA/2, the rim while the pad was centred on the
-# strip; once 6c9d4f476 moved the pad, that point sat 0.06 mm from the hole's
-# centre, and SelectByID2 found no edge there.
+# strip's centre plane.  The callout picks its rim upper-left (-x, -z: aft is
+# up the sheet), off the centre mark's arms.  pc-r11 (0c5636eab) picked z
+# HOLE_DIA/2, the rim while the pad was centred on the strip; once 6c9d4f476
+# moved the pad, that point sat 0.06 mm from the hole's centre, and
+# SelectByID2 found no edge there.
 HOLE_CENTER = (FOOT_END[0] - HOLE_FROM_END, THICK, PAD_Z)
-HOLE_EDGE_PICK = (HOLE_CENTER[0], HOLE_CENTER[1], HOLE_CENTER[2] + HOLE_DIA / 2.0)
+_RIM_DIAGONAL = HOLE_DIA / 2.0 / math.sqrt(2.0)
+HOLE_EDGE_PICK = (
+    HOLE_CENTER[0] - _RIM_DIAGONAL,
+    HOLE_CENTER[1],
+    HOLE_CENTER[2] - _RIM_DIAGONAL,
+)
 
 
 def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
@@ -561,12 +605,16 @@ def _label_kink_detail(
     )
 
 
-def _hole_locations(adapter: Any, top: Any) -> None:
-    """Locate the pad hole from the foot's free end and the pad's lower edge.
+def _blank_dimensions(adapter: Any, top: Any) -> None:
+    """Locate the pad hole from the foot's free end and the pad's lower edge,
+    and size the strip across its free flat.
 
     The Hole Wizard placement sketch cannot carry a datum point (drawing-guidelines.md rule 10 (dimension from a real feature)), so the
     print dimensions the hole from the blank's own edges with driven sheet
-    dimensions picked on both features; they print at the .XX row.
+    dimensions picked on both features; they print at the .XX row.  The
+    strip's width is the extrusion's depth in the model, which has no edge to
+    witness in this view, so it too is a driven dimension on the strip's two
+    edges.
     """
     hole_x = (FOOT_END[0] - HOLE_FROM_END) / 1000.0
     hole_r = HOLE_DIA / 2000.0
@@ -606,7 +654,7 @@ def _hole_locations(adapter: Any, top: Any) -> None:
         ),
         (
             "hole from the pad's lower edge",
-            (edge_picks[lower][0] - 0.004, edge_picks[lower][1]),
+            (edge_picks[lower][0] + 0.004, edge_picks[lower][1]),
             model_point_in_view(
                 adapter,
                 top,
@@ -616,6 +664,25 @@ def _hole_locations(adapter: Any, top: Any) -> None:
             HOLE_EDGE_TEXT_XY,
             "vertical",
             PAD_WIDTH / 2.0,
+        ),
+        (
+            "strip width across the free flat",
+            *(
+                model_point_in_view(
+                    adapter,
+                    top,
+                    (
+                        STRIP_PICK_X / 1000.0,
+                        STRIP_PICK_Y / 1000.0,
+                        sign * WIDTH / 2000.0,
+                    ),
+                    label=f"strip edge z{sign:+g}",
+                )
+                for sign in (-1.0, 1.0)
+            ),
+            STRIP_WIDTH_TEXT_XY,
+            "vertical",
+            WIDTH,
         ),
     )
     for label, p0, p1, text_xy, orientation, expected in locations:
@@ -723,7 +790,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
-    _hole_locations(adapter, top)
+    _blank_dimensions(adapter, top)
     hole_edge = model_point_in_view(
         adapter,
         top,
@@ -743,7 +810,8 @@ async def build(adapter: Any) -> dict[str, str]:
         process=HOLE_PROCESS,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.058)
+    # Under FootLen's three-line callout (its dimension line sits ~0.058).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.048)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.115)
 
     return await finalize_drawing(
