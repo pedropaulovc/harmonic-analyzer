@@ -652,6 +652,7 @@ def feature_release(
     monkeypatch.setattr(cut_release, "stage_comparisons", lambda _stage: {})
     monkeypatch.setattr(cut_release, "stage_readout_procedure", lambda *_args: [])
     monkeypatch.setattr(cut_release, "_git", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(cut_release, "_gh", lambda *_args: "[]")
     monkeypatch.setattr(
         cut_release, "_git_provenance",
         lambda _version: {"commit_short": "offline", "tree_clean": True},
@@ -708,6 +709,16 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
                 assert digest == sums[f"{directory}/{manifest['step']}"]
                 assert manifest["drawing"]["revision"] == "v38"
     assert set(facts["features"]) == set(expected)
+    drawing_asset = Path(facts["drawing_diff"]["asset_path"])
+    assert drawing_asset == zip_path.with_name("harmonic-analyzer-v38-drawing-diff.zip")
+    with zipfile.ZipFile(drawing_asset) as archive:
+        assert {"index.html", "summary.json"} <= set(archive.namelist())
+    with zipfile.ZipFile(zip_path) as archive:
+        assert not any("drawing-diff" in name for name in archive.namelist())
+        assert not any(
+            "drawing-diff" in line
+            for line in archive.read("SHA256SUMS.txt").decode().splitlines()
+        )
     assert facts["travelers"] == []
     assert (out / "reports" / "release-neutral.json").read_bytes() == before_certificate
 
@@ -818,6 +829,19 @@ def prepared_readme_release(
     scene.write_text('{"unit":"mm"}', encoding="utf-8")
     zip_path = release_root.with_suffix(".zip")
     zip_path.write_bytes(b"prepared bundle")
+    drawing_asset = zip_path.with_name("harmonic-analyzer-v22-drawing-diff.zip")
+    drawing_facts = {
+        "asset_path": str(drawing_asset),
+        "prev": "v21",
+        "images": [],
+        "changed_drawings": [],
+        "added_drawings": [],
+        "removed_drawings": [],
+        "unchanged_drawings": [],
+    }
+    with zipfile.ZipFile(drawing_asset, "w") as archive:
+        archive.writestr("index.html", "<html>No drawing changes</html>")
+        archive.writestr("summary.json", json.dumps(drawing_facts))
     facts = {
         "native_documents": 137,
         "sw_revision": "35",
@@ -827,6 +851,7 @@ def prepared_readme_release(
         "pngs": 107,
         "comparisons": {"pairs": 3, "mean_score": None},
         "size_mb": 42.0,
+        "drawing_diff": drawing_facts,
     }
     monkeypatch.setattr(cut_release, "RELEASE_DIR", release_dir)
     monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", revision)
@@ -864,7 +889,8 @@ def test_release_installs_images_and_revision_only_after_successful_publication(
     warnings: list[str] = []
     monkeypatch.setattr(cut_release._telemetry, "warn", warnings.append)
 
-    def gh(*_args: str) -> str:
+    def gh(*gh_args: str) -> str:
+        assert str(release_root.with_name("harmonic-analyzer-v22-drawing-diff.zip")) in gh_args
         assert publication != "dry-run", "dry run reached external publication"
         assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"
         assert all(
@@ -1023,3 +1049,47 @@ def test_postpublish_partial_revision_install_names_all_recovery_paths(
     assert revision.read_bytes() == b"next_revision: v23\n"
     assert tomllib.loads(plans[0].read_text())["drawing"]["revision"] == "v23"
     assert tomllib.loads(plans[1].read_text())["drawing"]["revision"] == "v22"
+
+
+def test_drawing_baseline_failure_blocks_bundle_before_publication(
+    feature_release: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unavailable(*_args: str) -> str:
+        raise RuntimeError("GitHub release API unavailable")
+
+    monkeypatch.setattr(cut_release, "_gh", unavailable)
+    with pytest.raises(RuntimeError, match="GitHub release API unavailable"):
+        cut_release.bundle("v38")
+    assert not (feature_release / "release" / "harmonic-analyzer-v38.zip").exists()
+
+
+def test_missing_drawing_asset_blocks_tag_and_publish(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("missing drawing ZIP reached git/gh publication")
+
+    monkeypatch.setattr(cut_release, "_git", forbidden)
+    monkeypatch.setattr(cut_release, "_gh", forbidden)
+    facts = {"drawing_diff": {"asset_path": str(tmp_path / "missing-drawing-diff.zip")}}
+    with pytest.raises(RuntimeError, match="required drawing-diff asset is missing"):
+        cut_release.publish("v44", tmp_path / "cad.zip", facts, False)
+
+
+def test_dry_run_reports_drawing_zip_and_color_legend(
+    prepared_readme_release: tuple[Path, Path, Path],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root, _images, _revision = prepared_readme_release
+    zip_path, facts = cut_release.bundle("v22")
+    cut_release.report_no_publish("v22", zip_path, facts)
+    output = capsys.readouterr().out
+    asset = root.with_name("harmonic-analyzer-v22-drawing-diff.zip")
+    assert f"asset: {asset}" in output
+    assert "/releases/download/v22/harmonic-analyzer-v22-drawing-diff.zip" in output
+    assert "Red = old-only / removed ink" in output
+    assert "blue = new-only / added ink" in output
+    assert "light gray = common ink" in output
+    assert "BUILD and REV" in output
+    assert "provenance-only changes and antialiasing noise are skipped" in output
+    assert "index.html" in output and "summary.json" in output

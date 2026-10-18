@@ -44,6 +44,10 @@ What it does, in order:
      (Build logs ship as a SEPARATE logs asset, not in this zip.)
   4. diff: render the changed-parts highlight (this staged bundle vs the previous
      release, fetched from GitHub) into ``stage/diff`` so it ships in the zip.
+     Separately compare all drawing PDF pages with the previous published compact
+     release and write ``harmonic-analyzer-<version>-drawing-diff.zip`` beside the
+     CAD bundle, including a browsable index and machine-readable summary even
+     when no drawing changes remain after BUILD/REV stamp normalization.
   5. Before publication, regenerate every README-generated picture from the
      versioned staged bundle into an untracked temporary directory, and validate
      and stage the ``release.yaml`` and enrolled plans' next-revision updates.
@@ -53,11 +57,11 @@ What it does, in order:
   6. git: annotated tag at HEAD, pushed to origin.
   7. gh: create the GitHub release for the tag (auto-generated notes header + our
      provenance block + an inline changed-parts gallery) and upload the bundle,
-     the diff PNGs, and a LOGS asset -- the per-task build logs (``cad/out/logs``,
-     teed by dodo.py) plus this run's ``*-release.log``, zipped into
-     ``<top>-<version>-logs.zip`` when there are several (a lone log goes up
-     as-is). ``--no-publish`` prepares everything but does not tag/push, invoke
-     gh, or change tracked images/revision.
+     the drawing-diff ZIP, the 3D diff PNGs, and a LOGS asset -- the per-task build
+     logs (``cad/out/logs``, teed by dodo.py) plus this run's ``*-release.log``,
+     zipped into ``<top>-<version>-logs.zip`` when there are several (a lone log
+     goes up as-is). ``--no-publish`` reads the previous release and prepares
+     everything but does not tag/push, upload assets, or change tracked images/revision.
   8. Only after successful publication, install the prepared README images and
      next-revision updates. The release agent must put those revisions and images
      into one generated-only follow-up PR before the next release; that narrowly
@@ -101,6 +105,7 @@ import _process_plans
 from _buildgraph import module_deps_of, script_for
 from _drawing_registry import DRAWINGS
 from _release_artwork import ARTWORK_DIR, NOTED_ARTWORK
+from _release_drawing_diff import extract_release_pdfs, previous_published_release
 from export_models import stage_release_neutral
 from features_bound import stage_bound_features
 
@@ -787,6 +792,50 @@ def stage_drawings(stage: Path) -> dict[str, str]:
     return staged
 
 
+def drawing_diff(stage: Path, version: str) -> dict[str, Any]:
+    """Create the required separate drawing asset before any tag or publication.
+
+    Its baseline is published GitHub releases, independently of the local-tag
+    history used by the existing 3D renderer. Nothing is written under ``stage``:
+    the CAD bundle and its provenance/integrity inventory stay unchanged.
+    """
+    from _drawing_diff import create_drawing_diff
+
+    if not stage.is_dir():
+        raise FileNotFoundError(f"release stage does not exist: {stage}")
+
+    baseline = previous_published_release(version, _repo_slug(), _gh)
+    previous = baseline["tag_name"] if baseline is not None else None
+    asset = RELEASE_DIR / f"{PROJECT_SLUG}-{version}-drawing-diff.zip"
+    log(f"drawing diff baseline: {previous or '(none -- first published release)'}")
+    with tempfile.TemporaryDirectory(
+        dir=RELEASE_DIR, prefix=f".{version}-drawing-baseline-"
+    ) as temporary:
+        old = (
+            extract_release_pdfs(baseline, Path(temporary) / "old")
+            if baseline is not None else None
+        )
+        new = stage / "pdf"
+        if not new.exists():
+            # A registry with no current drawings has no staged pdf/ directory.
+            # Keep even this empty directory outside the unchanged CAD bundle.
+            new = Path(temporary) / "new"
+            new.mkdir()
+        result = create_drawing_diff(
+            old, new, asset,
+            old_label=previous or "No previous release", new_label=version,
+        )
+    result["prev"] = previous
+    log(
+        f"drawing diff: {asset.name} -- "
+        f"{len(result['changed_drawings'])} changed, "
+        f"{len(result['added_drawings'])} added, "
+        f"{len(result['removed_drawings'])} removed, "
+        f"{len(result['unchanged_drawings'])} unchanged drawings"
+    )
+    return result
+
+
 def _module_strings(value: Any) -> list[str]:
     """Every string held by one module-level value, through nested containers."""
     found: list[str] = []
@@ -1114,6 +1163,10 @@ def bundle(
     #     assumes -- generated from the same model so it cannot drift.
     facts["readout_procedure"] = stage_readout_procedure(stage, version)
 
+    # The independently downloadable drawing comparison is deliberately outside
+    # the CAD stage, so it cannot change the existing bundle/provenance contract.
+    facts["drawing_diff"] = drawing_diff(stage, version)
+
     # 5. Provenance manifest LAST -- it hashes everything staged above, so it must
     #    run after the diff is written and before the zip is sealed. (Build logs
     #    are NOT staged here: they ship as a separate logs asset, see _logs_asset.)
@@ -1179,6 +1232,31 @@ def _diff_section(version: str, diff: dict[str, Any] | None) -> str:
     )
 
 
+def _drawing_diff_section(version: str, diff: dict[str, Any] | None) -> str:
+    """Link the always-produced drawing ZIP, distinct from the 3D part gallery."""
+    if diff is None:
+        return ""
+    name = Path(diff["asset_path"]).name
+    url = f"https://github.com/{_repo_slug()}/releases/download/{version}/{name}"
+    baseline = f"`{diff['prev']}`" if diff["prev"] else "no previous published release"
+    return (
+        f"\n## Drawing visual diff vs {baseline}\n\n"
+        f"[Download `{name}`]({url}), extract it, and open `index.html`. "
+        f"The separate ZIP includes changed-page PNGs and `summary.json`: "
+        f"**{len(diff['changed_drawings'])} changed, "
+        f"{len(diff['added_drawings'])} added, "
+        f"{len(diff['removed_drawings'])} removed, "
+        f"{len(diff['unchanged_drawings'])} unchanged drawings**.\n\n"
+        "Red = old-only / removed ink; blue = new-only / added ink; "
+        "light gray = common ink. All drawing PDFs and all their pages are "
+        "compared, including added and removed drawings/pages. BUILD and REV "
+        "provenance-only changes and antialiasing noise are skipped, not "
+        "reported as drawing changes. With no drawing changes the ZIP still "
+        "contains the index and summary; on a first release all drawings are added. "
+        "This is separate from the existing 3D changed-parts gallery.\n"
+    )
+
+
 def release_notes(version: str, facts: dict[str, Any]) -> str:
     return (
         f"Scripted SolidWorks reproduction of Michelson's 20-channel harmonic "
@@ -1226,6 +1304,7 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         )
         + f"- Size: {facts['size_mb']:.1f} MB\n"
         + _diff_section(version, facts.get("diff"))
+        + _drawing_diff_section(version, facts.get("drawing_diff"))
         + "\n**Provenance**\n"
         + _provenance_section(facts)
         + (
@@ -1302,12 +1381,14 @@ def _logs_asset(version: str, log_path: Path | None) -> Path | None:
 def _gh_assets(
     version: str, zip_path: Path, facts: dict[str, Any], log_path: Path | None
 ) -> list[str]:
-    """Asset paths for the release: the CAD bundle, the diff PNGs (embedded in the
-    notes by deterministic download URL), and the LOGS asset. Records the logs
-    asset name in ``facts`` so release_notes can reference it. Building the logs
-    asset here (not in bundle()) keeps the *-release.log as fresh as possible --
-    it is finalized right before the upload."""
+    """Asset paths shared by publication and dry runs: CAD bundle, required
+    drawing-diff ZIP, 3D diff PNGs, and logs. Record the logs asset name for notes.
+    Building the logs asset here keeps the release log as fresh as possible."""
     assets = [str(zip_path)]
+    drawing_asset = Path(facts["drawing_diff"]["asset_path"])
+    if not drawing_asset.is_file() or drawing_asset.stat().st_size == 0:
+        raise RuntimeError(f"required drawing-diff asset is missing: {drawing_asset}")
+    assets.append(str(drawing_asset))
     if facts.get("diff"):
         assets += [str(p) for p in facts["diff"]["image_paths"]]
     logs = _logs_asset(version, log_path)
@@ -1325,11 +1406,12 @@ def publish(
     log_path: Path | None = None,
 ) -> str:
     """Annotated tag -> push -> gh release + asset upload. Returns release URL."""
+    # Asset preparation/validation must finish before the first external side effect.
+    assets = _gh_assets(version, zip_path, facts, log_path)
     log(f"tagging {version} at HEAD")
     _git("tag", "-a", version, "-m", f"Release {version}")
     _git("push", "origin", version)
 
-    assets = _gh_assets(version, zip_path, facts, log_path)
     args = [
         "release",
         "create",
@@ -1350,9 +1432,10 @@ def publish(
 def report_no_publish(
     version: str, zip_path: Path, facts: dict[str, Any], log_path: Path | None = None
 ) -> None:
-    """``--no-publish``: build the assets (incl. the logs zip) and REPORT them.
-    No git tag/push, no gh -- nothing leaves the machine. Used to dry-run a real
-    release (e.g. validate the bundle + logs zip) without publishing."""
+    """``--no-publish``: build and report every asset without tag/push/upload.
+
+    Bundle preparation still reads the published drawing baseline from GitHub.
+    """
     assets = _gh_assets(version, zip_path, facts, log_path)
     log("--no-publish: would `gh release create` with these assets (NOT uploaded):")
     for a in assets:
@@ -1424,8 +1507,8 @@ def main() -> int:
     ap.add_argument(
         "--no-publish",
         action="store_true",
-        help="build the bundle + logs zip but do NOT tag/push/gh "
-        "(dry run -- nothing leaves the machine)",
+        help="prepare the CAD bundle, drawing-diff and logs assets without "
+        "tagging, pushing or uploading (reads the published baseline)",
     )
     opts = ap.parse_args()
 
@@ -1532,6 +1615,7 @@ def main() -> int:
                 f"assembly glTF (+{facts['config_meshes']} "
                 f"per-config) + {facts['pngs']} PNGs + boxes/"
             )
+            _telemetry.info(f"drawings: {facts['drawing_diff']['asset_path']}")
             _telemetry.info(f"log:     {log_path}")
             if facts.get("logs_asset"):
                 _telemetry.info(f"logs:    {RELEASE_DIR / facts['logs_asset']}")

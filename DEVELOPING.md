@@ -697,6 +697,31 @@ the owning worktree. Then run `uv run --frozen python -m doit -s gallery`
 followed by `uv run --frozen python -m doit -s release -- vNN` there. This keeps
 the gallery and publish in the owning worktree without local COM redispatch.
 
+Every release also prepares and attaches
+`harmonic-analyzer-vNN-drawing-diff.zip`, separately from the main CAD bundle,
+the existing 3D changed-parts PNGs and the logs asset. Extract it and open
+`index.html` for per-page drawing overlays and `summary.json` for the complete
+changed/added/removed/unchanged inventory. Red is old-only/removed ink, blue is
+new-only/added ink, and light gray is common ink. Only changed pages get PNGs;
+the index and summary still ship when no drawing changes remain.
+
+The drawing baseline is the highest published, non-draft, non-prerelease compact
+`vNN` below the version being cut, not an orphan local tag. The publisher fetches
+only the previous CAD ZIP's directory and PDF members over HTTP ranges; it does
+not download the full CAD asset. Missing assets, authentication/network failures,
+malformed archives, unsafe/ambiguous member names and unreadable PDFs block the
+release before tagging. A genuine historical bundle without PDFs is an empty
+drawing baseline; on the first release every current drawing is added.
+
+All PDF drawings and pages participate, including added and removed drawings or
+pages. Narrow BUILD/REV provenance-stamp changes and antialiasing noise are
+excluded, so a revision bump alone does not generate a drawing-change PNG.
+Other title-block changes remain part of the comparison. The drawing ZIP is
+staged beside `cad/out/release/harmonic-analyzer-vNN.zip`, not inside it, leaving
+the main bundle's provenance/integrity contract unchanged. `--no-publish`
+prepares the same drawing ZIP and reports its path and notes without uploading
+anything.
+
 ### Starting one under the supervisor
 
 Start it with `hub` `op: "start"`, never with Bash. `persist: true` is what lets
