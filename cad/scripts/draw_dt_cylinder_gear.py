@@ -138,21 +138,22 @@ FRONT_KEEP = {
     "NotchPhase": (0.131, 0.332),
     "PatternNotchPhase": (0.178, 0.321),
 }
+# The stacking text stands right of the side view's rims (x ~213..261, y
+# ~352..374), the dimension line running out under it: centred over the
+# 10.6 mm stack, its 29 mm value sat on the line and both extension-line
+# ends struck it (machinist r2, r4; offsetting it only added a shelf).
 RIGHT_KEEP = {
     "OutsideDia": (0.248, RIGHT_CENTER[1]),
     "FaceWidth": (0.205, 0.220),
-    "OverallThickness": (0.205, 0.360),
+    "OverallThickness": (0.237, 0.363),
 }
 # Face width's text leaves its dimension line for the free lower-right lane:
 # at (0.225, 0.220) the OD's lower extension line (y 221.7) ran through it and
 # its own dimension line ran 2.2 mm into it (r1 layout audit).
 FACE_WIDTH_TEXT = (0.240, 0.207)
-# The stacking text floats above its dimension line (y 351.7): drawn on it,
-# the line and the extension-line ends struck 7.0565 ±0.025 (machinist r2).
-OVERALL_THICKNESS_TEXT = (0.205, 0.368)
 # The parenthesised cam thickness moves above the side view, left of its
-# rims, so the lower lane is face width's alone (x 172..188, y ~336: under
-# the stacking callout, outside the (90°) arc).
+# rims, so the lower lane is face width's alone (x 172..188, y ~336: left of
+# the stacking text, outside the (90°) arc).
 CAM_REFERENCE_TEXT = (0.180, 0.336)
 CAM_FINISH_SYMBOL = (0.152, 0.303)
 DIMENSION_CALLOUTS = {
@@ -657,9 +658,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # native export (the former cam-thickness fit callout).
     overall_prefix = f"{STACK_FIT_CALLOUT}\n"
     overall_display.SetText(1, overall_prefix)
-    offset_dimension_text(
-        adapter, right_annotations, {"OverallThickness": OVERALL_THICKNESS_TEXT}
-    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to cam-side front view")

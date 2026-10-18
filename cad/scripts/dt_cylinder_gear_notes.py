@@ -26,7 +26,9 @@ BORE_FIT_CALLOUT = (
 # The bank is a solid stack preloaded onto its datum (#948 ruling R, PR #1292):
 # no gear interface opens, so a connecting-rod ring never overhangs its cam
 # and the callout no longer states an overhang bound.
-STACK_FIT_CALLOUT = "STACKS CAM FACE TO BACK FACE\nON CYLINDER-GEAR-SHAFT MHA-DT-013"
+# Rows <= 18 characters: the stacking text stands right of the side view's
+# rims, clear of its extension lines, inside the border.
+STACK_FIT_CALLOUT = "STACKS CAM FACE TO\nBACK FACE ON SHAFT\nMHA-DT-013"
 GEAR_DATA = "\n".join(
     (
         "GEAR DATA",
