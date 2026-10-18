@@ -84,3 +84,8 @@ machinist_exceptions:
     where: "step 7C (sheet 6): CENTRE 50.000 FROM THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS), the nut bracket's set on pivot block 1 before its taps are spotted"
     finding: "a three-place set given to hold the #8 taps' end walls (rules 4 and 17: walls fixed with geometry, not a tighter band)"
     reason: "TL-29 cannot grow: a longer bracket puts the leadscrew feed gap under 2.5 and its 3/4 stock caps the length, so the set takes the title block's .XXX band (+/-0.13) with its reason, and each #8 tap's end wall is 1.544 min at the worst case of every band, over the 1.5 floor; MHA-CH-006-TL-29 states it on its #8 callout (nut bracket spec END_WALL_MIN, self-checked) (owner ruling 2026-10-17, via coordinator) (owner-accepted)"
+  - id: "RV-03"
+    kind: "accept"
+    where: "step 8 (sheet 6): the handwheel's and the two KP08 pillow blocks' set screws on the leadscrew's flats, EACH LOCKED WITH LOW-STRENGTH (PURPLE) THREADLOCKER"
+    finding: "set screws on a hand-cranked, reversing shaft held only by threadlocker, no mechanical lock (rule 23)"
+    reason: "the lock means is the owner's choice: a bought low-strength (purple) threadlocker on each set screw, named in step 8, with no new hardware; each set screw seats on a flat on the screw, so the flat, not friction, carries the hand-crank torque (owner ruling 2026-10-18, via coordinator) (owner-accepted)"

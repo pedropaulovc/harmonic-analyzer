@@ -448,6 +448,7 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
         "7C",
         "7D",
         "7E",
+        "7F",
     ]
     assert "RAIL 1'S PIVOT BLOCK (STILL ON ITS CARRIAGE)" in steps["7C"]
     spot = "SPOT THE NUT BRACKET THROUGH THE BLOCK'S 2 Ø4.98 SIDE HOLES"
@@ -473,6 +474,14 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
         "UNCLAMP THE NUT BRACKET, DRILL AND TAP ITS 2 SPOTS #8-32 PER "
         "MHA-CH-006-TL-29; THE BLOCK'S HOLES STAY PLAIN."
     ) in steps["7D"]
+    assert steps["7D"].startswith("7D. RUN THE SCREW OUT, UNCLAMP")
+    # Review full-bought: after 7D runs it out, the screw goes back through
+    # the nut to its working stub before step 8 tightens round it.
+    assert steps["7F"] == (
+        "7F. RE-THREAD THE SCREW THROUGH THE NUT, "
+        f"{spec.leadscrew.NEAR_STUB:.0f} PAST THE NEAR BLOCK."
+    )
+    assert "PAST THE NEAR BLOCK" not in steps["7B"]
     assert (
         "TIGHTEN THE NUT SCREWS TO 1.0 N·m, THE BLOCK SCREWS TO 4.4 N·m, THEN THE KP08"
     ) in steps["8"]
@@ -485,7 +494,20 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
         f"THREAD THE LEADSCREW (ITEM {spec.ITEM_NUMBERS[spec.LEADSCREW]}), OILED "
         "WITH ISO VG 32 OIL, IN FROM THE BAR'S FAR END"
     ) in steps["7B"]
-    assert "TIGHTEN ITS AND THE KP08 SET SCREWS ON THE SCREW'S FLATS." in steps["8"]
+    # Owner ruling 2026-10-18 (rule 23): the set screws' lock is named, as a
+    # bought consumable, with no numbers or method; exception RV-03 records it.
+    assert (
+        "TIGHTEN ITS AND THE KP08 SET SCREWS ON THE SCREW'S FLATS, EACH LOCKED "
+        "WITH LOW-STRENGTH (PURPLE) THREADLOCKER."
+    ) in steps["8"]
+    (lock_rule,) = [
+        e
+        for e in machinist_exceptions.load_exceptions(
+            _config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
+        )
+        if e.id == "RV-03"
+    ]
+    assert "THREADLOCKER" in lock_rule.where and "2026-10-18" in lock_rule.reason
     # The limits are the parts' own fits: the HUB pin's p6 seat presses into
     # the H7, the dowel's m6 into the N7.
     assert hub_pin.HUB_HOLE_BAND == (0.018, 0.0)

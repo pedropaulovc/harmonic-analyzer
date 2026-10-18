@@ -112,9 +112,20 @@ def _cluster_extent(sheet: str):
         points += _nut_bracket()
         points += _nut_bracket(dx=spec.explode_shift(spec.NUT_SCREW, "x"))
         points += _nut_bracket(dy=spec.explode_shift(spec.BLOCK_SCREW, "y"))
+        # Rail 1's pivot block, shown for the nut bracket to mate to.
+        block = spec.pivot_block
+        points += feed.rect(
+            spec.CARRIAGE_STATION + block.BLOCK_X0,
+            spec.CARRIAGE_STATION + block.BLOCK_X1,
+            -feed.BLOCK_SIDE_LATERAL,
+            feed.BLOCK_SIDE_LATERAL,
+        )
         z = (
             -feed.BAR_SCREW_LENGTH_MM + lift(spec.BRACKET_SCREW),
-            feed.NUT_BRACKET_TOP_Z + lift(spec.NUT_BRACKET),
+            max(
+                feed.NUT_BRACKET_TOP_Z + lift(spec.NUT_BRACKET),
+                spec.trammel.PIVOT_BLOCK_TOP_Z + lift(spec.PIVOT_BLOCK),
+            ),
         )
     else:
         assert sheet == "CARRIER EXPLODED"
@@ -186,6 +197,13 @@ def test_clusters_partition_the_bom() -> None:
     ]
     for item in ("22", "25", "26"):
         assert spec.BOM_ORDER[int(item) - 1] in feed.stems
+    # Review full-bought: the feed sheet shows the nut bracket on its pivot
+    # block (rail 1's), ballooned only on the rail bars' sheet.
+    assert feed.context == (spec.instance_name(spec.PIVOT_BLOCK, 0),)
+    assert spec.lock_parent(spec.NUT_BRACKET, 0) in feed.context
+    assert all(
+        not cluster.context for cluster in drawing.CLUSTERS if cluster is not feed
+    )
 
 
 def test_exploded_captions_cite_their_sheets() -> None:

@@ -105,6 +105,9 @@ class Cluster:
     title: str
     stems: tuple[str, ...]
     scale: tuple[float, float]  # placed at; the ring fit then picks its scale
+    # Instances shown for what the families mate to, ballooned on their own
+    # family's sheet, not here.
+    context: tuple[str, ...] = ()
 
 
 # All 29 families on one exploded view at 1:10 read as a crowd whose leaders
@@ -150,6 +153,9 @@ CLUSTERS = (
             spec.BLOCK_LOCK_WASHER,
         ),
         (1.0, 3.0),
+        # Review full-bought (owner ruling 2026-10-18): the nut bracket and its
+        # block screws read against rail 1's pivot block, the face they mate to.
+        context=(spec.lock_parent(spec.NUT_BRACKET, 0),),
     ),
     Cluster(
         "CARRIER EXPLODED",
@@ -1623,7 +1629,10 @@ def _place_cluster_view(
         adapter, view, True, configuration=configuration, label=label
     )
     isolate_drawing_view_components(
-        adapter, view, visible_stems=frozenset(cluster.stems), label=label
+        adapter,
+        view,
+        visible_stems=frozenset(cluster.stems + cluster.context),
+        label=label,
     )
     return view, _fit_cluster_view(adapter, view, cluster, configuration, label=label)
 

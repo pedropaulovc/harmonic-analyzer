@@ -1338,7 +1338,9 @@ _CL_HOLE = (
 ASSEMBLY_STEPS = (
     f"1. SCREW AN HGR15R RAIL {_item(RAIL)} ON EACH BASE BAR WITH "
     f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, ENDS FLUSH: "
-    "ONE BAR AS DRAWN FOR RAIL 1 (-X SIDE), THE OTHER TURNED OVER FOR RAIL 2, "
+    # Sheet 1 tags RAIL 1 (-X); the step drops the repeat to hold sheet 6's
+    # left column (7F and step 8's lock, review full-bought).
+    "ONE BAR AS DRAWN FOR RAIL 1, THE OTHER TURNED OVER FOR RAIL 2, "
     "ITS COUNTERBORES UP. SCREW AN END BRACKET "
     f"{_item(END_BRACKET)} ON RAIL 1'S BAR AT EACH KP08 STATION, "
     f"{len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} "
@@ -1378,8 +1380,7 @@ ASSEMBLY_STEPS = (
     f"{_item(LEADSCREW_NUT)} ON THE NUT BRACKET WITH 4 {_NUT_SCREW} "
     f"{_item(NUT_SCREW)}, FLANGE TOWARD THE SPINDLE, SNUG.",
     f"7B. THREAD THE LEADSCREW {_item(LEADSCREW)}, OILED WITH ISO VG 32 OIL, IN "
-    "FROM THE BAR'S FAR END THROUGH BOTH BLOCKS AND THE NUT, "
-    f"{leadscrew.NEAR_STUB:.0f} PAST THE NEAR BLOCK; IT TURNS FREELY.",
+    "FROM THE BAR'S FAR END THROUGH BOTH BLOCKS AND THE NUT.",
     "7C. CLAMP THE NUT BRACKET ON THE COLUMN SIDE OF RAIL 1'S PIVOT BLOCK (STILL "
     f"ON ITS CARRIAGE), CENTRE {nut_bracket.X_SET_MID:.{nut_bracket.X_SET_PLACES}f} "
     "FROM "
@@ -1393,11 +1394,19 @@ ASSEMBLY_STEPS = (
     "7E. REFIT THE NUT BRACKET FROM THE BLOCK'S FAR FACE WITH 2 "
     f"{_BLOCK_SCREW} {_item(BLOCK_SCREW)} ON WEDGE-LOCK PAIRS "
     f"{_item(BLOCK_LOCK_WASHER)}, SNUG.",
+    # Review full-bought (owner ruling 2026-10-18): the screw run out at 7D
+    # goes back through the nut to its working stub before step 8 tightens
+    # round it (7B threads it only to locate the nut for 7C's spotting).
+    "7F. RE-THREAD THE SCREW THROUGH THE NUT, "
+    f"{leadscrew.NEAR_STUB:.0f} PAST THE NEAR BLOCK.",
     f"8. TIGHTEN THE NUT SCREWS TO {_NUT_TORQUE}, THE BLOCK SCREWS TO "
     f"{_BLOCK_TORQUE}, THEN THE KP08 "
     "SCREWS, SO THE SCREW TURNS FREELY OVER THE WHOLE TRAVEL. PUSH THE "
     f"HANDWHEEL {_item(HANDWHEEL)} ON, HUB {leadscrew.HUB_GAP:.0f} OFF THE FAR "
-    "BLOCK; TIGHTEN ITS AND THE KP08 SET SCREWS ON THE SCREW'S FLATS.",
+    # Owner ruling 2026-10-18 (rule 23, exception RV-03): the set screws are
+    # locked with a bought low-strength threadlocker, named, not prescribed.
+    "BLOCK; TIGHTEN ITS AND THE KP08 SET SCREWS ON THE SCREW'S FLATS, EACH "
+    "LOCKED WITH LOW-STRENGTH (PURPLE) THREADLOCKER.",
     "9. LOWER THE CARRIER PLATE ONTO THE PINS, ITS HOLES A1 AND B1 (INNER PASS, "
     "TAGGED ON SHEET 1) ON THE COLLARS.",
     "10. WITH THE CARRIER ON A1/B1, DRILL AND REAM ITS HUB AND CL HOLES OFF "
