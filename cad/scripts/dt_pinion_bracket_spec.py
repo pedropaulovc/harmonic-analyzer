@@ -27,7 +27,6 @@ from dt_pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,
     C2C as C2C,
     CROSS_HOLE_CZ_PLACES,
-    CROSS_HOLE_FROM_BORE_WALL_PLACES,
     END_RADIUS_PLACES,
     HALF_WIDTH as HALF_WIDTH,
     OVERALL_LENGTH as OVERALL_LENGTH,
@@ -64,21 +63,22 @@ PIN_SEAT_DIA_BAND = REAM_H7
 # functional requirement, not habit: the hole is match-drilled on into the
 # MHA-DT-019 shaft, and every bit it runs off the bore axis comes straight off
 # the shaft wall beside it (SHAFT_LIGAMENT_WORST).  Codex #858 P2, user
-# ruling (a): both locations are model dimensions on the print, never prose.
-# Through the thickness the model's own CrossHoleCz (half the thickness from
-# broad face A) prints at .XX; its far-face web is STRAP_FACE_WEB_WORST.
-# Across the bar the hole sits ON the pivot-bore axis, a relation with no
-# dimension to print, so a hidden construction reference sketch
-# (CrossHoleAxisReference) owns its distance from the pivot-bore wall,
-# CrossHoleFromBoreWall = "PivotBore" / 2, printed at .XX: the
-# SHAFT_LIGAMENT_WORST case.  The diameter carries the spring pin's own
-# functional band (vn_pinion_strap_pin_spec).
+# ruling (a): no location lives in prose.  Through the thickness the model's
+# own CrossHoleCz (half the thickness from broad face A) prints at .XX; its
+# far-face web is STRAP_FACE_WEB_WORST.  Across the bar the hole's centre sits
+# ON the pivot-axis line the flank view draws (where the 7.000 starts), so it
+# needs no offset: the former 3.18 from the pivot-bore wall (a hidden
+# reference sketch) ran to a hidden line, which rule 9 forbids (r1 machinist
+# review, #1007).  The diameter carries the spring pin's own functional band
+# (vn_pinion_strap_pin_spec), and the hole is drilled (rule 12).
 CROSS_HOLE_DIA = _strap_pin.HOLE_DIA
 CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
 # The pin is its own BOM line (MHA-VN-033), so the callout names it
 # instead of supplying one loose with each strap; test_dt_pinion_bracket_drawing
-# keeps the number in step with the parts registry.
-CROSS_HOLE_CALLOUT = "THRU\nFOR MHA-VN-033 SPRING PIN"
+# keeps the number in step with the parts registry.  The band is tighter than
+# DRILLED HOLES, so the callout also names the fit (rule 4; r2 review): a
+# slotted spring pin grips its hole by compression.
+CROSS_HOLE_CALLOUT = "DRILL THRU\nFOR MHA-VN-033\nSPRING PIN, PRESS FIT"
 
 # drawing-guidelines.md rule 17 (walls and webs) (#842, U27; audit W23) worst-case web from the blind seat to a broad
 # face.  Codex #858 P2, user ruling (a) (2026-09-25): the seat's station is
@@ -126,10 +126,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
     "PinSeat": {"PinSeatDepth"},
     # Option E-a: the set-pin cross hole.  Its size and its station from
-    # broad face A (Codex #858 P2) ...
+    # broad face A (Codex #858 P2); its centre sits on the pivot-axis line.
     "CrossHoleProfile": {"CrossHoleDia", "CrossHoleCz"},
-    # ... and its height, from the pivot-bore wall (user ruling (a)).
-    "CrossHoleAxisReference": {"CrossHoleFromBoreWall"},
 }
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
@@ -157,12 +155,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     # Two places on PinSeatCz resolve its +/-0.10 band.
     "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3, "PinSeatCz": 2},
     "PinSeat": {"PinSeatDepth": 1},
-    # Two places resolve the spring pin's +0.06/0 hole band; both locations
-    # are routine .XX (their worst cases clear the 1.5 floor at that grade).
+    # Two places resolve the spring pin's +0.06/0 hole band; its station is
+    # routine .XX (its worst cases clear the 1.5 floor at that grade).
     "CrossHoleProfile": {"CrossHoleDia": 2, "CrossHoleCz": CROSS_HOLE_CZ_PLACES},
-    "CrossHoleAxisReference": {
-        "CrossHoleFromBoreWall": CROSS_HOLE_FROM_BORE_WALL_PLACES
-    },
 }
 
 _PRECISION_NAMES = [
@@ -189,12 +184,10 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 DRAWING_REFERENCE_PRECISION = 1
 
 
+# The arbor bore runs on the MHA-DT-022 arbor.  The pivot bore takes no
+# symbol: the strap is pinned to the MHA-DT-019 shaft (option E-a), so nothing
+# runs in it (rule 6; r1 machinist review, #1007).
 SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        key="pivot_bore",
-        roughness_um=MACHINED_UM,
-        face=CylinderFace(diameter_mm=PIVOT_BORE),
-    ),
     SurfaceFinishControl(
         key="arbor_bore",
         roughness_um=MACHINED_UM,

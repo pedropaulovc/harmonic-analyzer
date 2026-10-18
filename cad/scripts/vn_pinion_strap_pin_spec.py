@@ -21,7 +21,6 @@ from _fit_shaft_h import SHAFT_H
 from _printed_tolerance import printed_deviations
 from dt_pinion_bracket_geometry import (
     CROSS_HOLE_CZ_PLACES,
-    CROSS_HOLE_FROM_BORE_WALL_PLACES,
     END_RADIUS_PLACES,
     PIN_BORE,
     PIN_DROP,
@@ -57,16 +56,17 @@ if not (0.062 * INCH <= HOLE_DIA and HOLE_MAX <= 0.065 * INCH):
     raise AssertionError("pin hole band leaves B18.8.2's recommended hole")
 
 # The deviations the hole's surroundings PRINT at (_printed_tolerance): each
-# dimension's title-block row for the places MHA-DT-014 shows it at, plus the
-# rounding of a nominal that does not print exactly (the 3.175 bore-wall
-# offset prints at two places).  Places come from dt_pinion_bracket_geometry,
-# which the sheet's DRAWING_PRECISION also reads (restricted review).
+# dimension's title-block row for the places MHA-DT-014 shows it at.  Places
+# come from dt_pinion_bracket_geometry, which the sheet's DRAWING_PRECISION
+# also reads (restricted review).
 _THICKNESS_LOWER = printed_deviations(THICKNESS, THICKNESS_PLACES)[0]
 _CROSS_HOLE_CZ_UPPER = printed_deviations(THICKNESS / 2.0, CROSS_HOLE_CZ_PLACES)[1]
-_BORE_WALL_OFFSET_MAX = max(
-    abs(d)
-    for d in printed_deviations(PIVOT_BORE / 2.0, CROSS_HOLE_FROM_BORE_WALL_PLACES)
-)
+# The hole's height prints no offset: its centre sits on the pivot-axis line
+# the flank view draws (an implied zero).  A zero carries no decimal places,
+# so no single title-block row owns it (Codex P1 on #1663): it is charged the
+# COARSEST row, .X, so the budget holds whichever row a shop reads it under.
+IMPLIED_ZERO_PLACES = 1
+_AXIS_OFFSET_MAX = max(abs(d) for d in printed_deviations(0.0, IMPLIED_ZERO_PLACES))
 _R_END_LOWER = printed_deviations(R_END, END_RADIUS_PLACES)[0]
 
 # Web from the cross hole to the FAR broad face (Codex #858 P2).  MHA-DT-014
@@ -83,11 +83,11 @@ STRAP_FACE_WEB_WORST = (
 # Ligament from the cross hole to the MHA-DT-025 follower seat 7 above it.
 FOLLOWER_SEAT_LIGAMENT = abs(PIN_DROP) - HOLE_MAX / 2.0 - PIN_BORE / 2.0
 # Shaft wall beside the match-drilled hole.  The hole must cross the shaft
-# axis: an offset e from it thins one side by e.  MHA-DT-014 prints the strap
-# hole's height as its distance from the pivot-bore wall (the model's own
-# "PivotBore" / 2 reference, Codex #858 P2 user ruling (a)) at .XX, so e is
-# the full general .XX grade plus the rounding of its 3.175 nominal, 0.515,
-# and the worst wall is 2.341 - 0.515 = 1.826.  That misses the 2.0 web
+# axis: an offset e from it thins one side by e.  MHA-DT-014 draws the strap
+# hole's centre ON the pivot-axis line of its flank view (r1 machinist
+# review, ENFORCE #1007: the former 3.18 offset from the pivot-bore wall ran
+# to a hidden line, rule 9), so e is that implied zero at the coarsest
+# general grade, 0.8, and the worst wall is 2.341 - 0.8 = 1.541.  That misses the 2.0 web
 # target (Codex #858, PRRT_kwDOPHDy386mTvki), and no geometry can move to
 # meet it: the MHA-DT-019 shaft is the ruled 1/4 in, the pin is the smallest
 # B18.8.2 size (1/16), and the hole band is already B18.8.2's recommended
@@ -100,7 +100,7 @@ SHAFT_LIGAMENT_FLOOR = 1.5
 _SHAFT_MIN = PIVOT_BORE + SHAFT_H[1]
 SHAFT_LIGAMENT_CENTRED = (_SHAFT_MIN - HOLE_MAX) / 2.0
 SHAFT_LIGAMENT_QUARTER = SHAFT_LIGAMENT_CENTRED - 0.25
-SHAFT_LIGAMENT_WORST = SHAFT_LIGAMENT_CENTRED - _BORE_WALL_OFFSET_MAX
+SHAFT_LIGAMENT_WORST = SHAFT_LIGAMENT_CENTRED - _AXIS_OFFSET_MAX
 # The pin must never stand proud of either strap edge: its west end faces the
 # MHA-DT-023 cam collar with only 0.38 of air at the printed worst case.  The
 # longest pin fits inside the narrowest strap foot (twice the smallest .X

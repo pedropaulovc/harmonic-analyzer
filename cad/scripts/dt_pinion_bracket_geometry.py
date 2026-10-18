@@ -58,6 +58,8 @@ OVERALL_LENGTH = C2C + 2.0 * R_END
 # natively from these, so a precision change reaches the web gates by itself
 # (restricted review, ruling 3).
 END_RADIUS_PLACES = 1  # BottomCapRadius / TopCapRadius
-CROSS_HOLE_CZ_PLACES = 2  # CrossHoleCz, from broad face A
-CROSS_HOLE_FROM_BORE_WALL_PLACES = 2  # CrossHoleFromBoreWall
+# CrossHoleCz, from broad face A.  The hole's height prints no offset: its
+# centre sits on the pivot-axis line the flank view draws, an implied zero
+# the webs charge the coarsest grade (vn_pinion_strap_pin_spec).
+CROSS_HOLE_CZ_PLACES = 2
 
