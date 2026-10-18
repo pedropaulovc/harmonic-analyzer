@@ -90,15 +90,16 @@ def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
     # The oak and the skimmed ring finish together at the Ø12.5 contour (user
     # rulings 2026-09-30 and 2026-10-01), so the seat is the whole face over
     # the tenon; the Ø7.7 bore keeps 1.5 of oak over the Ø4.1 pivot bore with
-    # 0.10 of eccentricity.  Off the bore by 0.175, the skimmed ring keeps
-    # 1.825 of brass, and the smallest stock still cleans up.
+    # 0.10 of eccentricity.  The Ø12.5 holds the title block's .X band
+    # (MHA-DT-008 machinist review of 2026-10-18); off the bore by 0.175, the
+    # skimmed ring keeps 1.675 of brass, and the smallest stock still cleans up.
     assert handle.SHOULDER_R == pytest.approx(spec.INSTALLED_OUTER_DIA / 2.0)
     assert handle.FERRULE_OFFSET_MAX == pytest.approx(0.10 + 0.15 / 2.0)
     assert handle.FERRULE_SKIMMED_WALL_MIN == pytest.approx(
-        (12.5 - 0.5) / 2.0 - 0.10 - (7.8 / 2.0 + 0.175)
+        (12.5 - 0.8) / 2.0 - 0.10 - (7.8 / 2.0 + 0.175)
     )
-    assert spec.STOCK_DIA_MIN / 2.0 >= (12.5 + 0.5) / 2.0 + 0.175 + 0.10
-    assert handle.FERRULE_SEAT_RADIAL_MIN == pytest.approx(2.125)
+    assert spec.STOCK_DIA_MIN / 2.0 >= (12.5 + 0.8) / 2.0 + 0.175 + 0.10
+    assert handle.FERRULE_SEAT_RADIAL_MIN == pytest.approx(1.975)
     assert handle.TENON_WALL_MIN == pytest.approx(1.55)
 
 

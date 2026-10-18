@@ -143,7 +143,9 @@ def test_cup_is_one_configuration_the_oak_rounds_clear_of() -> None:
     assert not hasattr(drive_train, "HANDLE_CUP_INSTALLED_CONFIG")
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "create_configuration" not in source
-    # The crest, turned its whole allowance small and off the mandrel by the
-    # bore's eccentricity, stays outside the largest counterbore.
-    assert handle.END_ROUND_CY - 0.25 - 0.10 >= handle.COUNTERBORE_DIA_MAX / 2.0 - 1e-9
+    # The oak round the largest counterbore, the crest turned its .X band
+    # small and the bore's eccentricity both ways, holds the 2.0 wall target
+    # (MHA-DT-008 machinist review of 2026-10-18).
+    assert handle.BUTT_WALL_MIN >= 2.0
+    assert handle.END_ROUND_CY - 0.4 - 0.20 >= handle.COUNTERBORE_DIA_MAX / 2.0 + 2.0
     assert _config.parts("dt-crank-handle-butt-cup")["description"] == "CRANK HANDLE BUTT CUP"
