@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-oblique-feed-lever:
+  title: Rocker Oblique Trammel Feed Lever
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-26
+  material: 6061-T6 ALUMINUM FLAT
+  material_specification: 6061-T6 aluminum flat bar, 1/2 x 1 in; width and thickness as supplied
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "saw and face to length; drill the two 5/16 clearance holes through; file the grip-end corner radii; break edges"

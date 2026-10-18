@@ -102,7 +102,9 @@ def typed_dimensions(source: str) -> list[tuple[int, str]]:
 def test_every_assembly_builder_is_checked() -> None:
     globbed = {path.resolve() for path in SCRIPTS.glob("build_*_assembly.py")}
     assert set(ASSEMBLY_BUILDERS) == globbed
-    assert len(ASSEMBLY_BUILDERS) == 9
+    # Nine machine assemblies plus the oblique-trammel jig (a fixture kit,
+    # outside the top assembly's tree but still an ASSEMBLY_ORDER builder).
+    assert len(ASSEMBLY_BUILDERS) == 10
 
 
 @pytest.mark.parametrize("builder", ASSEMBLY_BUILDERS, ids=lambda path: path.stem)
