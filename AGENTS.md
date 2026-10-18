@@ -1108,8 +1108,11 @@ enforces it, and derives its scope from that one constant:
    `_rebuild.force_rebuild` (`capture_rebuild_failure`),
    `_drawing_common.read_required_properties` (`capture_missing_properties`),
    `_drawing_selection._select_view_entity` (`capture_pick_miss`, a sheet-point
-   pick that selected nothing), `_drawing_common.new_project_drawing`
-   (`record_drawing_display`, read-only) and `package_native._release_seat`.
+   pick that selected nothing), `_drawing_balloons._select_balloon_anchor`
+   (a frozen balloon anchor: `drawing_pick_state`, read-only;
+   `capture_pick_screens` at every miss; `capture_pick_miss` after the last),
+   `_drawing_common.new_project_drawing` (`record_drawing_display`,
+   read-only) and `package_native._release_seat`.
    The pinned failure captures never return, but a caller can catch their
    exceptions and continue: `draw_rocker_arm` retries a missed pivot-bore pick. Therefore
    `capture_pick_miss` preserves the pick's `RuntimeError` and logs WARN, not a
@@ -1124,7 +1127,12 @@ enforces it, and derives its scope from that one constant:
    `capture_com_failure`, and `SetCurrentWorkingDirectory` under
    `teardown_seat`. Nothing reachable from a PRE-save entry point
    (`record_authoring_context`, `record_seat_provenance`,
-   `note_seats_before_connect`, `record_drawing_display`) reaches any of them.
+   `note_seats_before_connect`, `record_drawing_display`,
+   `drawing_pick_state`) reaches any of them. The one PRE-save root that may
+   is `capture_pick_screens` (`PRE_SAVE_EXPORTS`), a pick-miss screenshot
+   taken before a retry: it reaches only `SaveBMP` and `SaveAs3`, and every
+   `SaveAs3` there must pass `swSaveAsOptions_Copy`, so both export a file
+   and write nothing into the model.
 4. **Pinned reads.** The module reads tracked code only as attributes from a
    pinned list (`_com._read_member`, `_com._early_bound`, …,
    `_sketch_closure._sketch_state`). Tracked helpers are accessed through module

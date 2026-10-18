@@ -51,6 +51,7 @@ from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 import _drawing_scan
 import _drawing_view_display
 import _layout_audit
+import _seat_forensics
 import _telemetry
 
 
@@ -3116,11 +3117,6 @@ class _AnchorEdge:
     def GetCurveParams2(self):
         return (*self._ends, 0.0, 1.0, 0.0, 0.0, 0.0)
 
-    def GetClosestPointOn(self, x, y, z):
-        """The closest of 1,001 points along the curve, as (x, y, z, t, unused)."""
-        t = min((i / 1000.0 for i in range(1001)), key=lambda t: _math.dist(self._at(t), (x, y, z)))
-        return (*self._at(t), t, 0.0)
-
     def Select4(self, _append, _data):
         self.sheet.selected = [self]
         self.sheet.selection_point = None
@@ -3144,23 +3140,31 @@ class _AnchorSheet:
     default the selected edge, typed swSelEDGES. Its leader ends at the
     selection point (a hit test's pick, or ``SetSelectionPoint2``'s), else at
     the edge's own ``landing``; ``honours_point=False`` always takes the
-    latter."""
+    latter. ``ink_after_redraw`` maps sheet points to edges the hit test
+    finds only after ``GraphicsRedraw2`` (a seat that picked a window that
+    had not drawn the zoom, #1667)."""
 
     def __init__(
         self, edges_at, attach=lambda edge: ((edge,), (1,)), near=None, window_px=640,
-        honours_point=True,
+        honours_point=True, ink_after_redraw=None,
     ):
         self.edges_at = edges_at
         self.attach = attach
         self.near = near or {}
         self.window_px = window_px
         self.honours_point = honours_point
+        self.ink_after_redraw = ink_after_redraw or {}
+        self.redraws = 0
         self.span = _FIT_SPAN_M
         self.selected = []
         self.selection_point = None
         self.hits = []
         self.balloons = []
-        for edge in (*edges_at.values(), *(edge for _d, edge in self.near.values())):
+        for edge in (
+            *edges_at.values(),
+            *self.ink_after_redraw.values(),
+            *(edge for _d, edge in self.near.values()),
+        ):
             edge.sheet = self
 
         def set_point(index, _mark, x, y, _z):
@@ -3186,6 +3190,10 @@ class _AnchorSheet:
 
     def ViewZoomtofit2(self):
         self.span = _FIT_SPAN_M
+
+    def GraphicsRedraw2(self):
+        self.redraws += 1
+        self.edges_at = {**self.edges_at, **self.ink_after_redraw}
 
     def _select(self, _name, kind, x, y, _z, _append, _mark, _callout, _option):
         assert kind == "EDGE"
@@ -3353,20 +3361,33 @@ def _body(points):
 
 
 def _balloon(monkeypatch, sheet, view, anchors, items=(("dt-cone-gear", "1"),)):
-    """Run the real balloon path with the sheet projection = model (x, y)."""
+    """Run the real balloon path with the sheet projection = model (x, y).
+
+    A pick miss's screenshots are recorded on ``sheet.screens`` as (label,
+    zoom span at the capture) instead of taken, the final miss's capture
+    writes no file, and the span attributes land on ``sheet.span_attrs``."""
     projected = []
 
     def project(_adapter, _view, points, *, label, names=None):
         projected.append((tuple(points), tuple(names or ())))
         return [(round(p[0], 9), round(p[1], 9)) for p in points]
 
+    def screens(adapter, label):
+        sheet.screens.append((label, adapter.currentModel.span))
+        return {"desktop_png": f"failures/{label}/desktop.png", "capture_ms": 0}
+
     events = []
+    sheet.screens = []
+    sheet.span_attrs = {}
     monkeypatch.setattr(_drawing_balloons, "model_points_in_view", project)
     monkeypatch.setattr(_drawing_balloons, "_spread_balloons", lambda *a, **k: None)
     monkeypatch.setattr(_drawing_balloons, "rebuild_drawing", lambda *a, **k: None)
     monkeypatch.setattr(
         _drawing_balloons, "_balloon_item_number", lambda _adapter, note, label: note.item
     )
+    monkeypatch.setattr(_drawing_balloons, "_span_scan_attrs", sheet.span_attrs.update)
+    monkeypatch.setattr(_seat_forensics, "capture_pick_screens", screens)
+    monkeypatch.setattr(_seat_forensics, "_write_artefacts", lambda steps: {})
     monkeypatch.setattr(
         _telemetry, "event", lambda name, **kw: events.append((name, kw))
     )
@@ -3398,61 +3419,48 @@ def test_frozen_anchor_selects_at_its_exploded_projection_and_records_it(monkeyp
             "point_mm": "1.000,2.000,3.000",
             "sheet_mm": "131.000,452.000",
             "tried": 1,
+            "picks": "hit",
         }
     ]
+    assert sheet.redraws == 0 and sheet.screens == []
 
 
-def _frozen_miss(monkeypatch, listed):
-    """A frozen anchor whose zoomed hit test finds no ink at its projection
-    (#1667's tessellation miss); ``listed`` are the edges the view lists for
-    dt-cone-gear-1. The seat's window read is stubbed: it reads the host."""
-    view = _exploded_view(_instances("dt-cone-gear-1"), [], visible={"dt-cone-gear-1": listed})
+def test_frozen_anchor_that_hits_nothing_fails_after_redrawn_picks(monkeypatch):
+    """Every pick misses: two more after a forced redraw, each miss
+    screenshotted while still zoomed on the point, then the sheet fails."""
+    view = _exploded_view(_instances("dt-cone-gear-1"), [])
     sheet = _AnchorSheet({})
-    for edge in listed:
-        edge.sheet = sheet
-    monkeypatch.setattr(_drawing_balloons._seat_forensics, "_display_bags", lambda _a: ({}, {}))
-    return view, sheet
-
-
-def test_frozen_anchor_that_hits_nothing_fails_naming_the_stem(monkeypatch):
-    view, sheet = _frozen_miss(monkeypatch, [])
-    with pytest.raises(RuntimeError, match="cone-gear frozen balloon anchor .* selects no edge"):
+    with pytest.raises(
+        RuntimeError,
+        match="cone-gear frozen balloon anchor .* selects no edge .* in 3 picks, 2 after a forced redraw",
+    ):
         _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
     assert sheet.balloons == []
-
-
-def test_frozen_anchor_ink_miss_attaches_to_the_listed_edge_through_its_point(monkeypatch):
-    """#1667: the same frozen point hit on one leaf and found no ink on the
-    next. The model still says which listed edge passes through it: the
-    balloon attaches to that edge and lands at the projected point."""
-    far = _AnchorEdge("dt-cone-gear-1", ends=(0.0, 0.05, 0.0, 0.01, 0.05, 0.0))
-    # The anchor (1, 2, 3) mm is 40% of the way along this edge.
-    through = _AnchorEdge("dt-cone-gear-1", ends=(-0.001, 0.0, 0.001, 0.004, 0.005, 0.006))
-    view, sheet = _frozen_miss(monkeypatch, [far, through])
-    balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
-    assert sheet.hits == [(0.001, 0.002)]
-    assert [note.end for note in balloons] == [(0.001, 0.002)]
-    assert balloons[0].GetAnnotation().GetAttachedEntities3() == (through,)
-    assert sheet.landings[0].sheet_xy == (0.001, 0.002)
-    assert anchors[0]["method"] == "frozen-edge"
-    assert anchors[0]["visible"] == "dt-cone-gear-1=2"
-    assert anchors[0]["on_edge_matches"] == 1
-    assert float(anchors[0]["on_edge_mm"].split()[0]) <= 0.02
-
-
-def test_frozen_anchor_off_every_listed_edge_fails_with_the_nearest_distance(monkeypatch):
-    """Ink missed AND the point lies on no listed edge: the edge is gone or
-    hidden, so the sheet fails, recording the seat's window and how far the
-    nearest listed edge is."""
-    view, sheet = _frozen_miss(
-        monkeypatch, [_AnchorEdge("dt-cone-gear-1", ends=(0.0, 0.05, 0.0, 0.01, 0.05, 0.0))]
+    assert sheet.hits == [(0.001, 0.002)] * 3 and sheet.redraws == 2
+    zoom = 2 * _drawing_scan._HIT_ZOOM_HALF
+    assert sheet.screens == [
+        (f"dt-cone-gear-frozen-anchor-pick{pick}", pytest.approx(zoom)) for pick in (1, 2, 3)
+    ]
+    assert [sheet.span_attrs[f"pick{pick}"] for pick in (1, 2, 3)] == ["miss"] * 3
+    assert sheet.span_attrs["pick3_desktop_png"] == (
+        "failures/dt-cone-gear-frozen-anchor-pick3/desktop.png"
     )
-    warnings = []
-    monkeypatch.setattr(_telemetry, "warn", lambda message, **_kw: warnings.append(message))
-    with pytest.raises(RuntimeError, match=r"selects no edge .* lies on none of its 1 listed .* nearest 48\.\d+ mm"):
-        _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
-    assert sheet.balloons == []
-    assert [message.split(":", 1)[0] for message in warnings] == ["[forensics] t"]
+
+
+def test_frozen_anchor_miss_healed_by_a_redraw_balloons_its_own_ink(monkeypatch):
+    """A miss the redrawn pick heals is still screenshotted, and the span and
+    event say which pick hit (#1667)."""
+    view = _exploded_view(_instances("dt-cone-gear-1"), [])
+    sheet = _AnchorSheet({}, ink_after_redraw={(0.001, 0.002): _AnchorEdge("dt-cone-gear-1")})
+    balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
+    assert len(balloons) == 1 and sheet.redraws == 1
+    assert [label for label, _span in sheet.screens] == ["dt-cone-gear-frozen-anchor-pick1"]
+    assert anchors[0]["method"] == "frozen" and anchors[0]["picks"] == "miss,hit"
+    assert (sheet.span_attrs["pick1"], sheet.span_attrs["pick2"]) == ("miss", "hit")
+    assert sheet.span_attrs["pick1_desktop_png"] == (
+        "failures/dt-cone-gear-frozen-anchor-pick1/desktop.png"
+    )
+    assert "pick2_desktop_png" not in sheet.span_attrs
 
 
 def test_frozen_anchor_on_another_components_edge_fails(monkeypatch):
