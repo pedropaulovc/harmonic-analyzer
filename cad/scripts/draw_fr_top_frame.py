@@ -721,10 +721,11 @@ HANGER_SLOT_FRAME_SHOULDER = 0.00635
 # clear of that line, at a height where the leader passes 2.4 mm from both the
 # rear-right boss and the front round hole.  Above the plan, it would have
 # fenced the rear round hole's size off from every band wide enough for it.
-# The name says the frame holds the slot's width (its median plane), not its
-# station along the slot, which the plain .XXX 15.264 in F-F bands (codex
-# review of 06d0bbc59); 10 glyphs, inside the 39.1 mm outline's reach.
-HANGER_SLOT_FRAME_QUANTITY = "SLOT WIDTH"
+# The name says the frame holds the slot's width (its median plane) and
+# nothing else: the station along the slot is F-F's 15.264 ±0.13 (codex
+# review of 06d0bbc59; machinist review r7); 15 glyphs, 39.0 mm, inside the
+# 39.1 mm outline's reach.
+HANGER_SLOT_FRAME_QUANTITY = "SLOT WIDTH ONLY"
 HANGER_SLOT_FRAME_QUANTITY_BOX = (
     0.0, -0.0116, 0.0026 * len(HANGER_SLOT_FRAME_QUANTITY), -0.0080
 )
@@ -2150,10 +2151,12 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     # hole beside it, so the title block's +/-0.13 is the station band the
     # spec's wall and travel stacks charge (HANGER_SLOT_ALONG_TOL).  The
     # slot's position frame on the plan holds its width's median plane only,
-    # on an implied basic zero, and says so ("SLOT WIDTH"); boxed BASIC
-    # (machinist review r2) the station had no limit along the slot (codex
-    # review of 06d0bbc59).  F-F cuts the rear station alone, so the native
-    # prefix counts both.
+    # on an implied basic zero, and its name says so ("SLOT WIDTH ONLY":
+    # machinist review r7 read the frames as locating the 15.264); boxed
+    # BASIC (machinist review r2) the station had no limit along the slot
+    # (codex review of 06d0bbc59).  The drawing contract forbids a band
+    # authored on the sheet, and the 15.264 has no model dimension to carry
+    # one.  F-F cuts the rear station alone, so the native prefix counts both.
     slot_station = _checked_dimension(
         adapter, view,
         p0=(SLOT_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z),
