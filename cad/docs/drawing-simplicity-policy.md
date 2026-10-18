@@ -127,8 +127,12 @@ instructions for the package kind (`cad/scripts/prompts/machinist_review_part.md
 or `machinist_review_assembly.md`). A separate isolated judge inspects the sheets,
 vets every finding against the same guidelines, text layer and owner exceptions,
 and clusters duplicate claims. It confirms real findings, rejects misreads, and
-demotes advisory or accepted-exception claims to non-gating `minor`. Repetition is
-not a vote: a confirmed finding from only one run still counts.
+demotes advisory or accepted-exception claims to non-gating `minor`. A confirmed
+finding gates only when at least two runs raised it independently (owner ruling
+2026-10-18; `GATING_MIN_RUNS`, reduced to the number of valid runs when fewer
+than two are valid). A confirmed finding from one run stays in the report as
+non-gating evidence: across repeated rounds, lone confirmations moved from
+round to round while the sheet itself converged.
 
 The gate covers every sheet whose rendered output a PR changes, including a
 sheet that changes only because CAD geometry, config or a helper it reads
@@ -151,8 +155,9 @@ both verdicts and the finding diff.
   (`--judge-reviewer`, `--judge-model`, `--judge-effort` select alternatives).
 - The authoritative result is `<name>.aggregate.json` and its companion
   `<name>.aggregate.md`, not an individual run's verdict. `FIX` means at least one
-  **confirmed** blocker, over-specification or clarity finding. Confirmed minor
-  findings and rejected clusters remain in the report but do not gate. `SHIP`
+  **confirmed** blocker, over-specification or clarity finding raised by two or
+  more runs. Confirmed minor findings, single-run confirmations and rejected
+  clusters remain in the report but do not gate. `SHIP`
   means no confirmed gating findings and no aggregate error. If valid runs return
   zero findings, the judge is skipped. If all runs fail, or the judge fails after
   retries (including incomplete/duplicate finding coverage), the result is

@@ -2,8 +2,11 @@ r"""Blind senior-machinist review of drawing packages via Claude or Codex.
 
 Each package receives three independent blind reviews by default (``--runs``).
 A separate isolated judge inspects the sheets and vets every finding, clustering
-duplicates and rejecting misreads or non-gating claims. Only confirmed findings
-determine the aggregate verdict; raw per-run verdicts are retained as evidence.
+duplicates and rejecting misreads or non-gating claims. A confirmed blocker,
+over-specification or clarity cluster gates the aggregate verdict only when at
+least ``GATING_MIN_RUNS`` valid runs raised it (fewer when fewer runs are
+valid); single-run confirmations stay in the report as non-gating evidence.
+Raw per-run verdicts are retained as evidence.
 Every review and judge session uses an isolated CLI in a neutral attempt directory.
 A private stdio MCP server supplies grayscale whole-sheet views fitting
 1976×1280 pixels (about 118 dpi on 11×17 sheets) and vector-PDF region crops.
@@ -130,6 +133,11 @@ DEFAULT_EFFORTS = {
 REVIEWERS = tuple(DEFAULT_MODELS)
 FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
+# Owner ruling 2026-10-18: a confirmed finding gates only when two blind runs
+# raised it independently. Across many rounds on one sheet the single-run
+# confirmations kept moving while the sheet converged, so one reviewer's lone
+# claim is evidence to read, not a merge block.
+GATING_MIN_RUNS = 2
 # Tool descriptors and isolation settings are static across packages, so neither
 # source paths nor sheet counts disturb the model's cached tool/prompt prefix.
 SHEETS_SERVER = SCRIPTS_DIR / "machinist_review_sheets_mcp.py"
@@ -2067,13 +2075,20 @@ def aggregate_package(
                 judge_span.set_attribute("confirmed_count", len(confirmed))
                 judge_span.set_attribute("rejected_count", len(rejected))
                 judge_span.set_attribute("failed", error is not None)
-        gating_count = sum(item["category"] in GATING_KEYS for item in confirmed)
+        valid_runs = sum(not summary["error"] for summary in summaries)
+        gating_min_runs = max(1, min(GATING_MIN_RUNS, valid_runs))
+        for item in confirmed:
+            item["gating"] = (
+                item["category"] in GATING_KEYS and item["run_count"] >= gating_min_runs
+            )
+        gating_count = sum(item["gating"] for item in confirmed)
         verdict = "ERROR" if error else "FIX" if gating_count else "SHIP"
         aggregate = {
             "name": package.name, "kind": package.kind,
             "sources": [str(source) for source in package.sources],
             "source_sha256": source_sha, "verdict": verdict,
-            "gating_count": gating_count, "confirmed": confirmed, "rejected": rejected,
+            "gating_count": gating_count, "gating_min_runs": gating_min_runs,
+            "confirmed": confirmed, "rejected": rejected,
             "runs": summaries, "judge": judge_info, "reviewer": reviewer,
             "model": model, "effort": effort, "error": error,
             "sheet_count": max(review.sheet_count for review in reviews),
@@ -2098,7 +2113,8 @@ def aggregate_package(
 def render_aggregate(aggregate: dict[str, Any]) -> str:
     lines = [
         f"# {aggregate['name']} — {aggregate['verdict']}", "",
-        f"- confirmed gating findings: {aggregate['gating_count']}",
+        f"- confirmed gating findings: {aggregate['gating_count']} "
+        f"(a finding gates when {aggregate['gating_min_runs']}+ runs raised it)",
         f"- source sha256: {', '.join(aggregate['source_sha256'])}",
         f"- reviewer: {aggregate['reviewer']}/{aggregate['model']} ({aggregate['effort']})",
         f"- judge: {aggregate['judge']['reviewer']}/{aggregate['judge']['model']} "
@@ -2113,6 +2129,8 @@ def render_aggregate(aggregate: dict[str, Any]) -> str:
         lines += ["", f"## {section} ({len(items)})"]
         for item in items:
             decision = item.get("decision", "confirmed")
+            if section == "confirmed" and not item["gating"]:
+                decision += ", non-gating"
             lines.append(
                 f"- **{item['category']} / {decision}**, {item['where']}: "
                 f"{item['issue']} → _{item['fix']}_ "
