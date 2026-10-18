@@ -69,12 +69,14 @@ def test_preload_setting_formed_features_carry_the_formed_band() -> None:
     }
     banded = set().union(*dt_pinion_spring_spec.FORMED_BANDED_DIMENSIONS.values())
     assert banded == set(geometry.FORMED_CONTACT_BANDS)
-    assert not banded & {"FlatLen", "FreeTipH"}
+    assert not banded & {"FlatLen", dt_pinion_spring_spec.FREE_KINK_ANGLE}
     for name in banded:
         assert "MHA-DT-014" in drawing.DIMENSION_CALLOUTS[name]
     formed = set().union(*dt_pinion_spring_spec.FORMED_DIMENSIONS.values())
     precision = dt_pinion_spring_spec.DRAWING_PRECISION_BY_NAME
-    assert {name: precision[name] for name in formed} == dict.fromkeys(formed, 1)
+    linear = formed - {dt_pinion_spring_spec.FREE_KINK_ANGLE}
+    assert {name: precision[name] for name in linear} == dict.fromkeys(linear, 1)
+    assert precision[dt_pinion_spring_spec.FREE_KINK_ANGLE] == 0
     for name in ("PadWidth", "PadLen", "PadReliefR"):
         assert precision[name] == 2
     source = Path(spring.__file__).read_text(encoding="utf-8")
@@ -82,12 +84,12 @@ def test_preload_setting_formed_features_carry_the_formed_band() -> None:
 
 
 def test_profile_is_baselined_from_the_foots_free_end() -> None:
-    # drawing-guidelines.md rule 10 (dimension from a real feature): the kink start and the tip locate from the free end, the one
+    # drawing-guidelines.md rule 10 (dimension from a real feature): the kink start locates from the free end, the one
     # feature the maker can put a rule on, never from the model origin.
     source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "KinkStartX" not in source and "FlatTipX" not in source
     free = dt_pinion_spring_spec.FORMED_DIMENSIONS[dt_pinion_spring_spec.FREE_FORM_SKETCH]
-    assert free == {"FreeKinkH", "FreeKinkV", "FreeTipH"}
+    assert free == {"FreeKinkH", "FreeKinkV", dt_pinion_spring_spec.FREE_KINK_ANGLE}
     assert set(drawing.DETAIL_KEEP) == {"KinkR", "FlatLen"}
     assert drawing.DETAIL_SCALE == (5, 1)
 
@@ -168,7 +170,7 @@ def test_free_form_presets_the_crest_into_the_flank() -> None:
 
 def test_free_form_prints_from_the_hidden_reference_sketch() -> None:
     # O2 (a): the installed solid plus the FreeForm phantom; the free crest and
-    # tip print from the hidden sketch, which the part blanks and the front
+    # kink angle print from the hidden sketch, which the part blanks and the front
     # view shows through the opt-in hidden-sketch curation.
     assert dt_pinion_spring_spec.REFERENCE_SKETCHES == ("FreeForm",)
     build_source = Path(spring.__file__).read_text(encoding="utf-8")
@@ -176,7 +178,8 @@ def test_free_form_prints_from_the_hidden_reference_sketch() -> None:
     assert 'prefix="Free", construction=True' in build_source
     draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "hidden_sketches.curate_view_dimensions(" in draw_source
-    assert {"FreeKinkH", "FreeKinkV", "FreeTipH"} <= set(drawing.FRONT_KEEP)
+    free = {"FreeKinkH", "FreeKinkV", dt_pinion_spring_spec.FREE_KINK_ANGLE}
+    assert free <= set(drawing.FRONT_KEEP)
     assert "FREE FORM" in dt_pinion_spring_spec.DRAWING_NOTES
 
 
@@ -189,7 +192,7 @@ def test_front_qualifier_text_clears_its_rows_extension_lines() -> None:
         x = drawing.FRONT_KEEP[name][0]
         crossed = [line for line in lines if x - half < line < x + half]
         assert not crossed, (name, crossed)
-    rows = {"FootLen", "FreeKinkH", "FreeKinkV", "FreeTipH"}
+    rows = {"FootLen", "FreeKinkH", "FreeKinkV"}
     assert set(drawing.FRONT_ROW_EXTENSION_X) == rows
     # Positive control: pc-r12's centred kink-row text crossed both lines.
     old_x = drawing._front_x(drawing._FOOT_MID_X)
@@ -198,6 +201,89 @@ def test_front_qualifier_text_clears_its_rows_extension_lines() -> None:
         old_x - half < line < old_x + half
         for line in drawing.FRONT_ROW_EXTENSION_X["FreeKinkH"]
     )
+
+
+def _unit(v: tuple[float, float]) -> tuple[float, float]:
+    length = math.hypot(*v)
+    return (v[0] / length, v[1] / length)
+
+
+def test_kink_angle_drives_the_flick_in_the_acute_wedge() -> None:
+    # PR #1675 review r2: the tip's location from the free end less the kink
+    # start's (two .X dimensions) let the flick read flat, reversed or sharply
+    # kinked.  The kink's angle, blade to flat, now drives both profiles and
+    # prints on the free one, in the acute wedge below the lines' crossing.
+    build_source = Path(spring.__file__).read_text(encoding="utf-8")
+    assert "TipH" not in build_source
+    assert build_source.count('dims.record(f"{prefix}KinkAngle", \'"KinkAngle"\')') == 1
+    assert 'set_global(adapter, "KinkAngle", f"{KINK_DEG}deg")' in build_source
+    for start, bend_exit, kink_exit, tip, vertex, bisector in (
+        (
+            geometry.KINK_START,
+            geometry.BEND_EXIT,
+            geometry.KINK_EXIT,
+            geometry.FLAT_TIP,
+            geometry.KINK_VERTEX,
+            geometry.KINK_ANGLE_BISECTOR,
+        ),
+        (
+            geometry.FREE_KINK_START,
+            geometry.FREE_BEND_EXIT,
+            geometry.FREE_KINK_EXIT,
+            geometry.FREE_FLAT_TIP,
+            geometry.FREE_KINK_VERTEX,
+            geometry.FREE_KINK_ANGLE_BISECTOR,
+        ),
+    ):
+        blade_down = _unit((bend_exit[0] - start[0], bend_exit[1] - start[1]))
+        flat_down = _unit((kink_exit[0] - tip[0], kink_exit[1] - tip[1]))
+        for point, direction in ((start, blade_down), (kink_exit, flat_down)):
+            offset = (vertex[0] - point[0], vertex[1] - point[1])
+            assert offset[0] * direction[1] - offset[1] * direction[0] == pytest.approx(
+                0.0, abs=1e-9
+            )
+        dot = blade_down[0] * flat_down[0] + blade_down[1] * flat_down[1]
+        assert math.degrees(math.acos(dot)) == pytest.approx(geometry.KINK_DEG)
+        assert bisector == pytest.approx(
+            _unit((blade_down[0] + flat_down[0], blade_down[1] + flat_down[1]))
+        )
+    # The keep sits on the free wedge's bisector, the wedge wide enough there
+    # for the text.
+    vertex = (
+        drawing._front_x(geometry.FREE_KINK_VERTEX[0]),
+        drawing._front_y(geometry.FREE_KINK_VERTEX[1]),
+    )
+    keep = drawing.FRONT_KEEP[dt_pinion_spring_spec.FREE_KINK_ANGLE]
+    assert math.dist(keep, vertex) == pytest.approx(drawing.KINK_ANGLE_TEXT_RADIUS)
+    half = math.radians(geometry.KINK_DEG / 2)
+    chord = 2.0 * drawing.KINK_ANGLE_TEXT_RADIUS * math.sin(half)
+    assert chord > 0.010
+    assert dt_pinion_spring_spec.FREE_KINK_ANGLE not in drawing.DIMENSION_CALLOUTS
+
+
+def _arc(vertex, about_deg: float, half_deg: float, radius: float = 0.024):
+    bisector_x, bisector_y = geometry.FREE_KINK_ANGLE_BISECTOR
+    bisector = math.degrees(math.atan2(bisector_y, bisector_x))
+    points = []
+    for step in range(11):
+        angle = math.radians(bisector + about_deg - half_deg + step * half_deg / 5.0)
+        x, y = math.cos(angle), math.sin(angle)
+        points.append((vertex[0] + radius * x, vertex[1] + radius * y))
+    return [(vertex, points)]
+
+
+def test_kink_arc_faults_reads_the_wedge_the_arc_sweeps() -> None:
+    vertex = (0.087, 0.152)
+    acute = geometry.KINK_DEG / 2
+    assert drawing.kink_arc_faults(_arc(vertex, 0.0, acute), vertex) == []
+    # Positive controls: the obtuse neighbour, the upper acute wedge, an arc
+    # about another centre, and no arc.
+    obtuse_half = 90.0 - geometry.KINK_DEG / 2
+    assert drawing.kink_arc_faults(_arc(vertex, 90.0, obtuse_half), vertex)
+    assert drawing.kink_arc_faults(_arc(vertex, 180.0, geometry.KINK_DEG / 2), vertex)
+    shifted = (vertex[0] + 0.002, vertex[1])
+    assert drawing.kink_arc_faults(_arc(shifted, 0.0, geometry.KINK_DEG / 2), vertex)
+    assert drawing.kink_arc_faults([], vertex) == ["no arc"]
 
 
 class _KinkView:

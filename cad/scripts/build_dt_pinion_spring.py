@@ -44,7 +44,7 @@ import sys
 import _telemetry
 from _appearance import apply_material
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -101,15 +101,20 @@ from dt_pinion_spring_geometry import (
     FOOT_Y,
     FREE_BEND_EXIT,
     FREE_FLAT_TIP,
+    FREE_KINK_ANGLE_BISECTOR,
     FREE_KINK_C,
     FREE_KINK_EXIT,
     FREE_KINK_START,
+    FREE_KINK_VERTEX,
     HOLE_DIA as HOLE_DIA,
     HOLE_FROM_END,
     HOLE_SPEC,
+    KINK_ANGLE_BISECTOR,
     KINK_C,
+    KINK_DEG,
     KINK_EXIT,
     KINK_START,
+    KINK_VERTEX,
     PAD_RELIEF_VOLUME,
     PAD_VOLUME,
     PAD_WING_LEN,
@@ -191,6 +196,8 @@ INSTALLED_PATH = {
     "bend_c": (BEND_CX, BEND_CY),
     "foot_tan": FOOT_TAN,
     "foot_end": FOOT_END,
+    "kink_vertex": KINK_VERTEX,
+    "kink_bisector": KINK_ANGLE_BISECTOR,
 }
 FREE_PATH = {
     **INSTALLED_PATH,
@@ -199,7 +206,12 @@ FREE_PATH = {
     "kink_c": FREE_KINK_C,
     "kink_start": FREE_KINK_START,
     "bend_exit": FREE_BEND_EXIT,
+    "kink_vertex": FREE_KINK_VERTEX,
+    "kink_bisector": FREE_KINK_ANGLE_BISECTOR,
 }
+# The kink angle's text point in the sketch, this far down the wedge's
+# bisector from the vertex (mm): it picks the acute wedge the print shows.
+KINK_ANGLE_TEXT_MM = 4.0
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -207,6 +219,54 @@ def _as_construction(adapter, entity_id: str) -> None:
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+def _driving_kink_angle(adapter, blade: str, flat: str, pts, label: str) -> None:
+    """The kink's sweep as the DRIVING angle between the blade and flat lines.
+
+    Both lines are selected as segments
+    (build_dt_cone_pivot_post._add_driving_plan_incline's recipe).  The text
+    point sits on the bisector of the acute wedge below the lines' crossing
+    (dt_pinion_spring_geometry.KINK_VERTEX), the wedge the print shows; on the
+    Front plane the sketch and model frames coincide, so it goes in model
+    metres.  The value is verified acute BEFORE the dimension is made driving:
+    a supplement would fold the flat back, not print it wrong.
+    """
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    vertex, bisector = pts["kink_vertex"], pts["kink_bisector"]
+    text_x = vertex[0] + KINK_ANGLE_TEXT_MM * bisector[0]
+    text_y = vertex[1] + KINK_ANGLE_TEXT_MM * bisector[1]
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [blade, flat], 0)
+    extension = _sw_type_info.early_bound_or_flag(
+        model.Extension, "IModelDocExtension", "AddSpecificDimension"
+    )
+    display, status = extension.AddSpecificDimension(
+        text_x / 1000.0,
+        text_y / 1000.0,
+        0.0,
+        3,  # swDimensionType_e.swAngularDimension
+        0,
+    )
+    model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"{label}: AddSpecificDimension(angular) failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    expected = math.radians(KINK_DEG)
+    actual = abs(float(_read_member(dimension, "SystemValue")))
+    if abs(actual - expected) > 1e-8:
+        raise RuntimeError(
+            f"{label}: angular dimension measured {math.degrees(actual):.6f} deg, "
+            f"expected {KINK_DEG:g} deg"
+        )
+    dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
+    if int(_read_member(dimension, "DrivenState")) != 2:
+        raise RuntimeError(f"{label}: angular dimension did not become driving")
+    _telemetry.success(f"driving {label}: {KINK_DEG:g} deg")
 
 
 async def _formed_path(
@@ -252,7 +312,8 @@ async def _formed_path(
     # Shape: the foot is horizontal, each arc is tangent to its neighbouring
     # line at the merged endpoint. Position: foot free end anchored to the
     # origin, foot length, both radii, then the kink start (the two literal
-    # lean-dependent dims) and the flat tip's x, which fixes the kink sweep.
+    # lean-dependent dims) and the kink's angle, blade to flat, which fixes
+    # its sweep.
     # The print baselines the formed profile from the foot's free end (policy
     # drawing-guidelines.md rule 10 (dimension from a real feature)), so those locations dimension from foot.end, not the origin.
     check(
@@ -270,7 +331,7 @@ async def _formed_path(
             await adapter.add_sketch_constraint(first, second, "tangent"),
         )
 
-    foot_end, kink_start, flat_tip = pts["foot_end"], pts["kink_start"], pts["flat_tip"]
+    foot_end, kink_start = pts["foot_end"], pts["kink_start"]
     await anchor_point_to_origin(adapter, f"{foot}.end", *foot_end, "foot end")
     dims.record(f"{prefix}FootEndX")
     dims.record(f"{prefix}FootEndY")
@@ -311,15 +372,8 @@ async def _formed_path(
         await adapter.add_sketch_dimension(flat, None, "linear", FLAT_LEN),
     )
     dims.record(f"{prefix}FlatLen", '"FlatLength"')
-    await dimension_between(
-        adapter,
-        f"{foot}.end",
-        f"{flat}.start",
-        "horizontal_distance",
-        foot_end[0] - flat_tip[0],
-        "flat tip from the free end",
-    )
-    dims.record(f"{prefix}TipH")
+    _driving_kink_angle(adapter, blade, flat, pts, f"{prefix}kink angle")
+    dims.record(f"{prefix}KinkAngle", '"KinkAngle"')
     return dims
 
 
@@ -343,6 +397,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PadWidth", f"{PAD_WIDTH}mm")
     await set_global(adapter, "PadLength", f"{PAD_WING_LEN}mm")
     await set_global(adapter, "PadReliefRadius", f"{PAD_RELIEF_R}mm")
+    await set_global(adapter, "KinkAngle", f"{KINK_DEG}deg")
 
     # Open inside-surface path, drawn from the free tip DOWN (_formed_path).
     check("create_sketch spring", await adapter.create_sketch("Front"))

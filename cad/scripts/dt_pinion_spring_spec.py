@@ -25,6 +25,7 @@ from dt_pinion_spring_geometry import (
     FOOT_LEN as FOOT_LEN,
     HOLE_DIA as HOLE_DIA,
     HOLE_FROM_END as HOLE_FROM_END,
+    KINK_ANGLE_PLACES as KINK_ANGLE_PLACES,
     KINK_DEG as KINK_DEG,
     PAD_LEN as PAD_LEN,
     PAD_LEN_PLACES as PAD_LEN_PLACES,
@@ -46,18 +47,21 @@ from dt_pinion_spring_geometry import (
 # a +/-0.5 band -- looser than a formed leaf could ever be held to +/-0.10,
 # tighter than the .X row's +/-0.8, which the drive train's preload and stress
 # corner walk would not pass -- and their callouts name the mate (rule 4).
-# FlatLen and FreeTipH shape the flick past the contact, so they ride the
-# title-block .X row (machinist review, PR #1675).
+# FlatLen and the kink's angle shape the flick past the contact, so they ride
+# the title-block .X and angular rows (machinist review, PR #1675).
 FORMED_TOLERANCE_MM = FORMED_BAND_MM
 # O2 (Main, 2026-09-24): the part is modelled INSTALLED; the maker forms the
 # FREE shape.  The hidden construction-only FreeForm sketch carries the free
-# profile, and the print locates the crest and the tip from it; the
-# shape-invariant length and radii print from the installed profile.
+# profile, and the print locates the crest and sets the kink angle on it; the
+# shape-invariant length and radii print from the installed profile.  The
+# kink angle prints in place of the tip's location, which it and FlatLen fix
+# (an offset of two .X dimensions bounded nothing: machinist review, PR #1675).
 FREE_FORM_SKETCH = "FreeForm"
 REFERENCE_SKETCHES = (FREE_FORM_SKETCH,)
+FREE_KINK_ANGLE = "FreeKinkAngle"
 FORMED_DIMENSIONS: dict[str, set[str]] = {
     "SpringProfile": {"FootLen", "BendR", "KinkR", "FlatLen"},
-    FREE_FORM_SKETCH: {"FreeKinkH", "FreeKinkV", "FreeTipH"},
+    FREE_FORM_SKETCH: {"FreeKinkH", "FreeKinkV", FREE_KINK_ANGLE},
 }
 FORMED_BANDED_DIMENSIONS: dict[str, set[str]] = {
     feature: names & set(FORMED_CONTACT_BANDS)
@@ -73,7 +77,7 @@ PAD_RELIEF_DIMENSION = "PadReliefR"
 PAD_RELIEF_TOL_TYPE = 6  # swTolType_e.swTolMAX
 
 # Everything the print carries.  The profile is baselined from the foot's free
-# end (drawing-guidelines.md rule 10 (dimension from a real feature)): the FREE kink start and tip are located from it, never
+# end (drawing-guidelines.md rule 10 (dimension from a real feature)): the FREE kink start is located from it, never
 # from the model origin.  The pad, the strip width and the hole location are
 # cut with the flat blank, so they take the title-block .XX row (the relief
 # round is its single MAX limit); the strip width and the hole location are
@@ -89,7 +93,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # them and the drawing reads them back.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SpringProfile": {name: 1 for name in FORMED_DIMENSIONS["SpringProfile"]},
-    FREE_FORM_SKETCH: {name: 1 for name in FORMED_DIMENSIONS[FREE_FORM_SKETCH]},
+    FREE_FORM_SKETCH: {
+        name: KINK_ANGLE_PLACES if name == FREE_KINK_ANGLE else 1
+        for name in FORMED_DIMENSIONS[FREE_FORM_SKETCH]
+    },
     "PadProfile": {"PadWidth": PAD_WIDTH_PLACES, "PadLen": PAD_LEN_PLACES},
     PAD_RELIEF_FEATURE: {PAD_RELIEF_DIMENSION: PAD_RELIEF_PLACES},
 }

@@ -194,6 +194,19 @@ FREE_KINK_START = _free(KINK_START)
 FREE_KINK_C = _free(KINK_C)
 FREE_KINK_EXIT = _free(KINK_EXIT)
 FREE_FLAT_TIP = _free(FLAT_TIP)
+# The kink prints as its angle, blade to flat (machinist review, PR #1675):
+# the two lines cross outside the crest, on its convex side, R_KINK /
+# cos(KINK_DEG / 2) out along the crest's mid-normal, and the acute wedge
+# below that crossing -- the blade running down, the flat's line carried down
+# past the crest -- holds the arc.  Shape-invariant, so the free form's is the
+# installed one turned PRESET_DEG about the bend centre.
+KINK_VERTEX = _add(
+    KINK_C, _cw(_W, KINK_DEG / 2.0), R_KINK / math.cos(math.radians(KINK_DEG / 2.0))
+)
+KINK_ANGLE_BISECTOR = _cw((-_B[0], -_B[1]), KINK_DEG / 2.0)
+FREE_KINK_VERTEX = _free(KINK_VERTEX)
+FREE_KINK_ANGLE_BISECTOR = _cw(KINK_ANGLE_BISECTOR, -PRESET_DEG)
+KINK_ANGLE_PLACES = 0
 # How far the free crest's outer face stands into the parked flank, along the
 # flank normal: the free crest circle's centre shift less the parked air. The
 # parked contact point turned PRESET_DEG is no longer the face's nearest point
@@ -232,7 +245,7 @@ def root_stress(
 # The formed profile as the print holds it (Codex #859, PRRT_kwDOPHDy386mTao2):
 # FootLen, BendR, the free kink start's FreeKinkH / FreeKinkV from the foot's
 # free end, and KinkR each carry FORMED_BAND_MM on their own.  FlatLen and
-# FreeTipH shape the flick past the crest's contact point, so they move
+# the kink angle shape the flick past the crest's contact point, so they move
 # neither the contact nor the arm.  A corner is one sign per band.
 FREE_KINK_H = FOOT_END[0] - FREE_KINK_START[0]
 FREE_KINK_V = FREE_KINK_START[1] - FOOT_END[1]

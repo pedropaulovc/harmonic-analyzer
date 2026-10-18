@@ -5,9 +5,10 @@ strip with a square screw pad at its free end -- formed as a flat screw-down
 foot, an R3.3 bend up to a blade leaning back over the foot's bend, then an
 R3.3 crest turning 25 deg out to a short free flat.  The solid is the installed shape;
 the front view also shows the part's hidden FreeForm reference sketch as the
-phantom free form, and the free crest and tip are baselined from the foot's
-free end on it.  The projected top view carries the blank's pad, its bend
-relief, the strip width and the hole; a 5:1 detail carries the crest.
+phantom free form; the free crest is baselined from the foot's free end on it,
+and the kink's angle printed there.  The projected top view carries the
+blank's pad, its bend relief, the strip width and the hole; a 5:1 detail
+carries the crest.
 
 Run with SolidWorks open::
 
@@ -37,6 +38,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -52,16 +54,20 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _layout_audit import arc_segments
 from dt_pinion_spring_geometry import (
     BEND_CX,
     FLAT_TIP,
     FOOT_END,
     FOOT_TAN,
     FREE_FLAT_TIP,
+    FREE_KINK_ANGLE_BISECTOR,
     FREE_KINK_START,
+    FREE_KINK_VERTEX,
     HOLE_DIA,
     HOLE_FROM_END,
     KINK_C,
+    KINK_DEG,
     KINK_EXIT,
     PAD_WIDTH,
     PAD_WING_LEN,
@@ -70,7 +76,11 @@ from dt_pinion_spring_geometry import (
     THICK,
     WIDTH,
 )
-from dt_pinion_spring_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION_BY_NAME
+from dt_pinion_spring_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    FREE_KINK_ANGLE,
+)
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -161,24 +171,23 @@ _PAD_EAST = _front_x(FOOT_END[0])
 # Half the printed width of each qualified dimension's text lines, as pc-r12's
 # render measured them (sheet metres, 11.8 px/mm; the preload line scaled
 # from those).  A text wider than its own dimension goes east of the foot
-# end's extension line, which the FootLen, FreeKinkH and FreeTipH rows share:
+# end's extension line, which the FootLen and FreeKinkH rows share:
 # centred between the extension lines, pc-r12 printed those lines through
 # FREE, BEND and TANGENT.
 PRELOAD_REASON = "SETS PRELOAD ON MHA-DT-014"
 QUALIFIER_HALF_WIDTH = {
     "FREE, TO KINK TANGENT": 0.026,
     "TO BEND TANGENT": 0.021,
-    "FREE, TO TIP": 0.013,
     PRELOAD_REASON: 0.033,
 }
 # The dimensions banded +/-0.5 set the crest's preload on the MHA-DT-014 strap
 # (dt_pinion_spring_spec.FORMED_BANDED_DIMENSIONS), so each names that mate
-# (drawing-guidelines.md rule 4); FreeTipH and FlatLen ride the .X row.
+# (drawing-guidelines.md rule 4); the kink angle and FlatLen ride the
+# title-block rows, bare.
 DIMENSION_CALLOUTS = {
     "FootLen": f"TO BEND TANGENT\n{PRELOAD_REASON}",
     "FreeKinkH": f"FREE, TO KINK TANGENT\n{PRELOAD_REASON}",
     "FreeKinkV": f"FREE, TO KINK TANGENT\n{PRELOAD_REASON}",
-    "FreeTipH": "FREE, TO TIP",
     "BendR": PRELOAD_REASON,
     "KinkR": PRELOAD_REASON,
 }
@@ -191,6 +200,15 @@ def callout_half_width(name: str) -> float:
 
 TEXT_TO_EXTENSION_GAP = 0.003
 _KINK_TEXT_X = _PAD_EAST + TEXT_TO_EXTENSION_GAP + callout_half_width("FreeKinkH")
+# The kink angle's text (and so its arc) this far from the vertex down the
+# wedge's bisector (sheet metres): there the 25 deg wedge is 10.4 mm wide,
+# room for "25°" with 2 mm to the blade and to the flat's extension line.
+KINK_ANGLE_TEXT_RADIUS = 0.024
+# The arc must centre on the vertex and every drawn point lie within this of
+# the wedge's bisector (half the wedge plus room for outside arrows); the
+# neighbouring wedges' arcs reach 77.5 deg and more off it.
+KINK_ARC_CENTRE_TOL = 0.0005
+KINK_ARC_HALF_SPREAD_DEG = KINK_DEG / 2.0 + 15.0
 FRONT_KEEP = {
     "FootLen": (
         _PAD_EAST + TEXT_TO_EXTENSION_GAP + callout_half_width("FootLen"),
@@ -202,12 +220,20 @@ FRONT_KEEP = {
     # The free locations, on the FreeForm phantom.  FreeKinkV's dimension
     # line runs where its text sits, east of the foot end.
     "FreeKinkV": (_KINK_TEXT_X, _front_y(FREE_KINK_START[1] / 2.0)),
-    # The smaller span inboard: FREE, TO TIP fits between its extension lines
-    # above the kink fence; the kink row's text does not, so it sits east of
-    # the foot end on the outer row.  The top view stands clear above both
-    # (spring r1: the outer row's text met the pad's edge).
-    "FreeTipH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.015),
+    # East of the foot end on the outer row: the kink row's text does not fit
+    # between its extension lines.  The top view stands clear above it
+    # (spring r1: the row's text met the pad's edge).
     "FreeKinkH": (_KINK_TEXT_X, _PROFILE_TOP + 0.032),
+    # The kink angle, blade to flat, on the phantom: in the acute wedge below
+    # the two lines' crossing, west of the blade, where no other extension
+    # line runs (above it, FreeKinkH's rises from the kink start; east of the
+    # crest, FreeKinkV's runs to its dimension line).
+    FREE_KINK_ANGLE: (
+        _front_x(FREE_KINK_VERTEX[0])
+        + KINK_ANGLE_TEXT_RADIUS * FREE_KINK_ANGLE_BISECTOR[0],
+        _front_y(FREE_KINK_VERTEX[1])
+        + KINK_ANGLE_TEXT_RADIUS * FREE_KINK_ANGLE_BISECTOR[1],
+    ),
 }
 # The vertical extension lines each qualified row's text sits among: its own
 # two, and the foot end's, which runs past every row.
@@ -215,7 +241,6 @@ FRONT_ROW_EXTENSION_X = {
     "FootLen": (_front_x(FOOT_TAN[0]), _PAD_EAST),
     "FreeKinkV": (_PAD_EAST,),
     "FreeKinkH": (_front_x(FREE_KINK_START[0]), _PAD_EAST),
-    "FreeTipH": (_front_x(FREE_FLAT_TIP[0]), _PAD_EAST),
 }
 # Top view (third-angle: model +z, forward, runs DOWN the sheet).  The view
 # centres on the pad, so the hole centre is level with TOP_CENTER, the strip's
@@ -605,6 +630,76 @@ def _label_kink_detail(
     )
 
 
+def kink_arc_faults(
+    arcs: list[tuple[tuple[float, float], list[tuple[float, float]]]],
+    vertex: tuple[float, float],
+) -> list[str]:
+    """Why the kink angle's drawn arcs do not read as the acute wedge below
+    the blade/flat crossing (draw_dt_cone_gear.clock_arc_faults' reading):
+    centred on the crossing, every point within KINK_ARC_HALF_SPREAD_DEG of
+    the wedge's bisector and spanning it.  Empty when they do."""
+    if not arcs:
+        return ["no arc"]
+    bisector = math.atan2(FREE_KINK_ANGLE_BISECTOR[1], FREE_KINK_ANGLE_BISECTOR[0])
+    faults = []
+    offsets = []
+    for centre, points in arcs:
+        off = math.dist(centre, vertex)
+        if off > KINK_ARC_CENTRE_TOL:
+            faults.append(f"arc centred {off * 1000:.2f} mm off the vertex")
+        for x, y in points:
+            turn = math.atan2(y - vertex[1], x - vertex[0]) - bisector
+            offsets.append(math.degrees((turn + math.pi) % (2.0 * math.pi) - math.pi))
+    wide = [offset for offset in offsets if abs(offset) > KINK_ARC_HALF_SPREAD_DEG]
+    if wide:
+        faults.append(
+            f"{len(wide)} point(s) outside the wedge, up to {max(map(abs, wide)):.1f} deg "
+            "off its bisector"
+        )
+    if not offsets or min(offsets) > 0.0 or max(offsets) < 0.0:
+        faults.append("the arcs do not span the wedge's bisector")
+    return faults
+
+
+def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -> None:
+    """Fail unless the printed kink angle draws its arc in the acute wedge
+    below the free form's blade/flat crossing.  The angle drives the free
+    form, so its quadrant is never flipped here (that would refold the flat):
+    the sketch authors it in this wedge (build_dt_pinion_spring
+    ._driving_kink_angle) and the keep stays inside it."""
+    matches = [
+        item for item in annotations if dimension_name(adapter, item) == FREE_KINK_ANGLE
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {FREE_KINK_ANGLE}, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    rebuild_drawing(adapter, label="kink angle wedge")
+    vertex = model_point_in_view(
+        adapter,
+        front,
+        (FREE_KINK_VERTEX[0] / 1000.0, FREE_KINK_VERTEX[1] / 1000.0, 0.0),
+        label="free kink vertex",
+    )
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    arcs = []
+    for index in range(int(data.GetArcCount())):
+        raw = tuple(float(value) for value in (data.GetArcAtIndex2(index) or ()))
+        segments = arc_segments(raw)
+        if segments:
+            points = [(segments[0].x0, segments[0].y0)]
+            points += [(s.x1, s.y1) for s in segments]
+            arcs.append(((raw[10], raw[11]), points))
+    faults = kink_arc_faults(arcs, vertex)
+    _telemetry.info(
+        f"kink angle: {len(arcs)} arc(s) about the free kink vertex "
+        f"{tuple(round(v * 1000, 2) for v in vertex)} mm; faults {faults}",
+        kink_arc_count=len(arcs),
+    )
+    if faults:
+        raise RuntimeError(f"{FREE_KINK_ANGLE} arc: {'; '.join(faults)}")
+
+
 def _blank_dimensions(adapter: Any, top: Any) -> None:
     """Locate the pad hole from the foot's free end and the pad's lower edge,
     and size the strip across its free flat.
@@ -783,6 +878,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *top_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _assert_kink_angle_wedge(adapter, front, front_annotations)
     # The fence and the labels go on once every import is done, so nothing
     # of the front view's own sketch is near its import.
     mark = _mark_kink_on_front(adapter, front)
