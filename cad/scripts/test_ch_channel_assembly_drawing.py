@@ -384,6 +384,14 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     assert drawing.exploded_offset(asm.BRACKET, "south") == (0.0, 0.0, -60.0)
     bracket, keeper = drawing.NORTH_BRACKET_DETAIL, drawing.NORTH_KEEPER_DETAIL
     assert drawing.EXPLODED_DETAILS == (bracket, keeper)
+    # #1660 r3 (rule 22): lifted, the cluster read as the lever bank's, so an
+    # explode trail runs from the bracket's seat on the rocker shaft, north
+    # along its axis, then up to DETAIL B's centre (its exploded bore).
+    seat, along, lifted = drawing.north_end_trail_mm()
+    assert seat == (*drawing.ROCKER_PIVOT_XY, bank.PIVOT_BRACKET_Z[1])
+    assert along == (*drawing.ROCKER_PIVOT_XY, seat[2] + 90.0)
+    assert lifted == pytest.approx(bracket.centre_xyz)
+    assert (drawing.TRAIL_LINE_STYLE, drawing.TRAIL_COLOR) == (2, 0)
     # Machinist review (PR #1605): at the upper right the letter B sat over
     # the rocker bank's stack beside the circle; the lower left is open.
     assert bracket.letter_corner == (-1, -1)
@@ -697,10 +705,11 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     # Machinist gate 2026-10-17 (rule 7): the step states the bores' acceptance,
     # never the operation or the made-to-order reamer (sized against the keeper
     # print's band in ch_fulcrum_keeper_spec). 5d5245a48 review (rule 24): the
-    # bore limits are the keeper print's, not this sheet's.
+    # bore limits are the keeper print's, not this sheet's. #1660 r3 (rules 1
+    # and 22): the step says plainly that the bores are made in this setup.
     assert (
-        f"FLAT. BOTH {number} BORES IN LINE: THE "
-        f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED." in reamed
+        f"STILL CLAMPED, MAKE BOTH {number} BORES TO THEIR DRAWING, IN LINE: "
+        f"THE {fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH." in reamed
     )
     assert "6.388" not in reamed and "6.400" not in reamed
     for method in ("REAM", "0.2515", " IN LONG", " PASS"):
@@ -710,7 +719,10 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     # made here, so the keeper is finished in this step, but its sizes and the
     # tap's place are the keeper print's (CrownRadius and the crown tap, which
     # point back at this step); the assembly sheet restates none of them.
-    assert f"TO THE {number} DRAWING." in reamed
+    assert (
+        "THEN, ON EACH BORE'S AXIS, FINISH THAT KEEPER'S CROWN AND CROWN TAP "
+        f"TO THE {number} DRAWING." in reamed
+    )
     for part_data in ("R7.0", "#1-72", " PIN ", "CROWN TOP", "9.8", "10.6"):
         assert part_data not in reamed
     assert keeper_drawing.DIMENSION_CALLOUTS["CrownRadius"].endswith(

@@ -31,7 +31,7 @@ from dataclasses import dataclass
 import sys
 import textwrap
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -654,6 +654,13 @@ NORTH_KEEPER_DETAIL = BankView(
     letter_corner=(1, -1),
 )
 EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
+# The north bracket cluster (DETAIL B) is lifted 570 up out of the hanging
+# rocker arms (ch_channel_assembly_spec), so off its shaft it read as part of
+# the lever bank (#1660 r3, rule 22: show which face mates to which). Its
+# explode trail, a black phantom line along the path its steps moved it,
+# ties it back to the MHA-CH-005 north end (draw_pn_pen_assembly's trails).
+TRAIL_LINE_STYLE = 2  # swLineStyles_e.swLinePHANTOM
+TRAIL_COLOR = 0  # COLORREF black, the views' outline colour
 _STACK_MID = (asm.PIVOT_CHAIN_Z[2] + asm.PIVOT_CHAIN_Z[3]) / 2.0
 _SPRING_MID = (asm.PIVOT_CHAIN_Z[0] + asm.PIVOT_CHAIN_Z[1]) / 2.0
 _LUG_MID = sum(asm.LUG_INNER_FACE_Z) / 2.0
@@ -921,10 +928,10 @@ def _fitup_notes() -> tuple[str, str]:
         steps.KEEPERS_PAIR_REAMED_KEY: (
             f"CLAMP BOTH {keeper}, FEET OUTBOARD ON ONE FLAT, INNER LUG FACES "
             "AT THE LEVER BANK VIEW'S LUG SPAN, BORE AXIS PARALLEL TO THE "
-            f"FLAT. BOTH {keeper} BORES IN LINE: THE "
-            f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED. EACH "
-            "CROWN AND CROWN TAP CENTRES ON THE BORE MADE HERE: FINISH BOTH "
-            f"NOW, TO THE {keeper} DRAWING."
+            f"FLAT. STILL CLAMPED, MAKE BOTH {keeper} BORES TO THEIR DRAWING, "
+            f"IN LINE: THE {fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH. "
+            "THEN, ON EACH BORE'S AXIS, FINISH THAT KEEPER'S CROWN AND CROWN "
+            f"TAP TO THE {keeper} DRAWING."
         ),
         steps.KEEPERS_SET_KEY: (
             f"{top_frame} ON THE MILL: SHAFT THROUGH BOTH KEEPERS, FEET "
@@ -1342,6 +1349,7 @@ def _place_exploded_sheet(
     # After the balloons, so the boundary circles are never picked as a
     # component's edge.
     _mark_exploded_details(adapter, exploded)
+    _add_north_end_trail(adapter, exploded)
     _activate_sheet(adapter, SHEET_NAMES[1])
     for detail in EXPLODED_DETAILS:
         _exploded_detail(adapter, detail)
@@ -1397,6 +1405,42 @@ def _placed_bank_view(adapter: Any, bank: BankView) -> Any:
     return view
 
 
+def _sketch_in_view(
+    adapter: Any,
+    view: Any,
+    sheet_points: tuple[tuple[float, float], tuple[float, float]],
+    kind: Literal["circle", "line"],
+    *,
+    label: str,
+) -> Any:
+    """Sketch a ``kind`` ("circle": centre, rim point; "line": ends) at two
+    sheet points (m) in ``view``'s own sketch, left selected
+    (draw_pn_pen_assembly._sketch_in_view)."""
+    view = _early_bound(view, "IView")
+    _activate_view(adapter, view, label=label)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_points:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    create = {"circle": manager.CreateCircle, "line": manager.CreateLine}[kind]
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = False
+    try:
+        segment = create(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous
+    if segment is None:
+        raise RuntimeError(f"failed to sketch the {label} {kind}")
+    return segment
+
+
 def _sketch_view_circle(
     adapter: Any,
     view: Any,
@@ -1406,27 +1450,54 @@ def _sketch_view_circle(
     label: str,
 ) -> None:
     """Sketch a circle (sheet m) in ``view``'s own sketch, left selected."""
-    view = _early_bound(view, "IView")
-    _activate_view(adapter, view, label=label)
-    sketch = _early_bound(view.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (centre, (centre[0] + radius_m, centre[1])):
-        point = _early_bound(
-            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+    _sketch_in_view(
+        adapter,
+        view,
+        (centre, (centre[0] + radius_m, centre[1])),
+        "circle",
+        label=label,
+    )
+
+
+def north_end_trail_mm() -> tuple[tuple[float, float, float], ...]:
+    """The north bracket's explode path (model mm): its seat on the
+    MHA-CH-005 axis, north along that axis, then up to its exploded bore."""
+    seat = (_PIVOT_X, _PIVOT_Y, PIVOT_BRACKET_Z[1])
+    dx, dy, dz = exploded_offset(asm.BRACKET, "north")
+    if dx != 0.0 or dy <= 0.0 or dz <= 0.0:
+        raise RuntimeError(
+            f"the north bracket no longer explodes north then up: {(dx, dy, dz)}"
         )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
-    previous = bool(manager.AddToDB)
-    manager.AddToDB = False
-    try:
-        circle = manager.CreateCircle(*points[0], *points[1])
-    finally:
-        manager.AddToDB = previous
-    if circle is None:
-        raise RuntimeError(f"failed to sketch the {label} circle")
+    along = (seat[0], seat[1], seat[2] + dz)
+    return seat, along, (along[0], along[1] + dy, along[2])
+
+
+def _add_north_end_trail(adapter: Any, exploded: Any) -> None:
+    """The north bracket cluster's explode trail on the exploded view: black
+    phantom segments along ``north_end_trail_mm``, the path its steps moved
+    it, so the lifted cluster reads as the rocker shaft's north end (#1660
+    r3)."""
+    path = north_end_trail_mm()
+    label = "north bracket explode trail"
+    ends = [
+        model_point_in_view(
+            adapter, exploded, tuple(value / 1000.0 for value in point), label=label
+        )
+        for point in path
+    ]
+    for start, end in zip(ends, ends[1:]):
+        segment = _early_bound(
+            _sketch_in_view(adapter, exploded, (start, end), "line", label=label),
+            "ISketchSegment",
+        )
+        segment.Style = TRAIL_LINE_STYLE
+        segment.Color = TRAIL_COLOR
+        adapter.currentModel.ClearSelection2(True)
+        adapter.currentModel.EditRebuild3()
+        style, color = int(segment.Style), int(segment.Color)
+        if (style, color) != (TRAIL_LINE_STYLE, TRAIL_COLOR):
+            raise RuntimeError(f"{label}: segment reads style {style}, colour {color}")
+        _telemetry.info(f"{label}: {start!r} -> {end!r}")
 
 
 def _crop(adapter: Any, view: Any, bank: BankView) -> None:
