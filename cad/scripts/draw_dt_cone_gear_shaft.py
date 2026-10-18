@@ -1471,7 +1471,9 @@ async def build(adapter: Any) -> dict[str, str]:
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=SIDE_SCALE)
     donor = place_view(adapter, str(SOURCE), "*Front", *DONOR_CENTER, scale=SIDE_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (side, donor):
+    # The isometric too (PR #1436 fleet invariant): finalization's shaded
+    # pass is then a real mode change, so its cosmetic edges print at quality.
+    for view in (side, donor, iso):
         set_hidden_lines_removed(adapter, view)
 
     pivot_face = _cylindrical_face(adapter, side, JOURNAL_DIA)

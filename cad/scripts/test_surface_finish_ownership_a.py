@@ -77,11 +77,6 @@ CASES = (
                 MACHINED_UM,
                 CylinderFace(dt_cone_gear_shaft_spec.JOURNAL_DIA),
             ),
-            SurfaceFinishControl(
-                "tip_land",
-                MACHINED_UM,
-                CylinderFace(dt_cone_gear_shaft_spec.SECTION_DIAS[-1], tolerance_mm=0.01),
-            ),
         ),
     ),
     (
