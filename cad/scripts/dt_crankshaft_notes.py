@@ -6,20 +6,39 @@ Imported ONLY by ``draw_crankshaft`` and its offline test (codex #361; see
 
 from __future__ import annotations
 
-from dt_crankshaft_spec import DRIVE_PIN_DEPTH_TOL, DRIVE_PIN_SPIGOT_RIM_WORST
+from dt_crankshaft_spec import (
+    DRIVE_PIN_DEPTH_TOL,
+    DRIVE_PIN_KNOCKOUT_PROCESS,
+    DRIVE_PIN_SPIGOT_RIM_WORST,
+)
 
 # Matched-fit requirement on the feature callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), naming both mates
 # and the acceptance of the custom 1:48 taper pin (crank_pin_spec).  It reads
 # under the native #9 drill size, in the order the work is done (drill, then
-# taper-ream with the hub); short lines keep it narrow beside the cross-hole.
+# taper-ream with the hub).  Three rows, not four: the shorter block stands
+# higher, so the diameters under it have room for their mates.
 CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "MATCH TAPER-REAM 1:48",
-        "WITH CRANK HUB MHA-DT-031",
-        "TO TAPER PIN MHA-DT-009:",
-        "LIGHT DRIVE FIT",
+        "MATCH TAPER-REAM 1:48 WITH",
+        "HUB MHA-DT-031 FOR PIN",
+        "MHA-DT-009: LIGHT DRIVE FIT",
     )
 )
+
+# Each banded size and length names the mate or stack its band serves, at its
+# own callout (drawing-guidelines.md rule 4; machinist review of
+# 5a219a81904f).  Rows stay short: the profile's diameters share a crowded
+# band under the cross-hole callout, and the station rows are 9.5 mm apart,
+# so their mates ride on the same line as a suffix.
+SHANK_MATE = "IN MHA-DT-031"
+JOURNAL_MATE = "RUN IN MHA-DT-005"
+PINION_SEAT_MATE = "IN MHA-DT-010"
+# The spigot's diameter and its length from the seat face both keep the #25
+# chain wrapping MHA-PD-009 clear of the shaft (dt_crankshaft_spec).
+CHAIN_AIR_MATE = "CHAIN AIR\nMHA-PD-009"
+COLLAR_REAR_MATE = " BEARS ON MHA-DT-005"
+COLLAR_SEAT_MATE = " MHA-PD-009 SEAT"
+SHAFT_LENGTH_MATE = " SETS MHA-DT-031 TO MHA-PD-009 AIR"
 
 # The thinnest wall round the drive-pin holes, to the seat spigot's rim, at
 # the printed worst case (crankshaft_spec rounds it down): stated as the fact
@@ -56,3 +75,14 @@ DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{DRIVE_PIN_DEPTH_TOL:.2f}"
 # dome tip's extension lines (machinist review of 19e33c6c2: the two-row
 # form ran ~44 mm wide, across them).
 DRIVE_PIN_LOCATION_CALLOUT = "PINS SLIP\nINTO\nSPROCKET\nMHA-PD-009"
+
+# The pins' knockouts (dt_crankshaft_spec DRIVE_PIN_KNOCKOUT_SPEC) print as a
+# native Hole Wizard callout on the lower hole's floor: the drill reads above
+# the native size so the three short rows fit the field under the end view.
+KNOCKOUT_CALLOUT_ABOVE = DRIVE_PIN_KNOCKOUT_PROCESS
+KNOCKOUT_CALLOUT_BELOW = "DRIVE-PIN KNOCKOUT"
+
+# The punched witness on the dome, flagged with a leader to the mark itself
+# (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); its
+# exact spot is deliberately free.
+FIDUCIAL_NOTE = "PUNCH\nMARK\nBY EYE"

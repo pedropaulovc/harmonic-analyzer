@@ -15,7 +15,7 @@ import math
 
 import _config
 import cone_line
-from _hole_spec import HoleSpec, drill_process
+from _hole_spec import HoleSpec, blind_cut_dia_mm, drill_process
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -317,8 +317,9 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
 # - The spigot's length prints from the seat face, not the far end, so the
 #   body's front face rides with the wheel and the chain: +/-0.05 at .XX
 #   keeps a bought chain's envelope clear of it.
-# - The collar body OD is not a seat: +/-0.10 at .XX (it sets the collar's
-#   bearing ring against the post boss).
+# - The collar body OD is not a seat and meets no mate (machinist review of
+#   5a219a81904f): it prints at one place under the title block's .X band,
+#   and the bearing ring it gives the post boss holds at either limit.
 # - The MHA-PD-009 holes (PIN_HOLE_DIA) slip over the pins with 0.119 diametral
 #   clearance, which absorbs the pin spacing error of BOTH parts; each pin
 #   located +/-0.025 from the axis spends 0.05 of it here, leaving the
@@ -326,7 +327,6 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
 # - Pressed to the floor, the pin stands PROUD = LENGTH - depth: the depth
 #   band plus the dowel's +/-0.010 in length grade must keep the tip clear
 #   of the crank hub and engaged in the wheel.  +/-0.10 at .XX.
-COLLAR_DIA_TOL = 0.10
 SPIGOT_DIA_BAND = (0.0, -0.10)
 SPIGOT_LENGTH_TOL = 0.05
 DRIVE_PIN_OFFSET_PLACES = pd_transgear_removable_spec.DRIVE_PIN_OFFSET_PLACES
@@ -355,6 +355,32 @@ DRIVE_PIN_PRESS_INTERFERENCE = (
 )
 if min(DRIVE_PIN_PRESS_INTERFERENCE) <= 0.0:
     raise AssertionError("the drive-pin hole band loses the press at its upper limit")
+# A dowel pressed into a blind hole has no way out (drawing-guidelines.md
+# rule 16 (design for the cutter)): each drive-pin hole's floor is pierced by
+# a #54 knockout drilled through from the collar's rear face, so a 3/64 pin
+# punch drives a pin back out of the seat face.  The reamed hole keeps its
+# depth, so the pin still bottoms on the annular floor the knockout leaves,
+# and the knockout leaves the rear face inside the post boss's bearing ring,
+# clear of the bore mouth.
+DRIVE_PIN_KNOCKOUT_SPEC = HoleSpec("drilled_number", "#54")
+DRIVE_PIN_KNOCKOUT_DIA = blind_cut_dia_mm(DRIVE_PIN_KNOCKOUT_SPEC)  # 1.397
+DRIVE_PIN_KNOCKOUT_PROCESS = drill_process(DRIVE_PIN_KNOCKOUT_SPEC)
+DRIVE_PIN_KNOCKOUT_LENGTH = COLLAR_REAR - DRIVE_PIN_FLOOR
+_KNOCKOUT_DIA_MAX = DRIVE_PIN_KNOCKOUT_DIA + float(
+    _config.title_block("drilled_hole")["plus_mm"]
+)
+DRIVE_PIN_FLOOR_LAND_WORST = (
+    DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[1] - _KNOCKOUT_DIA_MAX
+) / 2.0
+if DRIVE_PIN_FLOOR_LAND_WORST < 0.4:
+    raise AssertionError("the knockout leaves the pressed pin no floor to bottom on")
+if (
+    DRIVE_PIN_CIRCLE_RADIUS - DRIVE_PIN_OFFSET_TOL - _KNOCKOUT_DIA_MAX / 2.0
+    <= JOURNAL_BORE_DIA / 2.0 + JOURNAL_BORE_BAND[0] + BORE_MOUTH_BREAK_MAX
+    or DRIVE_PIN_CIRCLE_RADIUS + DRIVE_PIN_OFFSET_TOL + _KNOCKOUT_DIA_MAX / 2.0
+    >= COLLAR_DIA / 2.0 - BORE_MOUTH_BREAK_MAX
+):
+    raise AssertionError("the knockout must leave the rear face on its bearing ring")
 _SPIGOT_R_WORST = (SPIGOT_DIA + SPIGOT_DIA_BAND[1]) / 2.0
 _PIN_HOLE_OUTER_R_WORST = (
     DRIVE_PIN_CIRCLE_RADIUS
@@ -461,8 +487,10 @@ if (
 # The Ø9.525 core is turned bare in three places: the dome-side shank (dome
 # root to the seat face), the land behind the collar (rear face to the
 # outboard journal, inside the bore mouth) and the land past the inboard
-# journal (to the Ø9 seat step).  The one ShaftDiaDim callout sizes every one
-# of them.
+# journal (to the Ø9 seat step).  The shank fits the crank hub and carries
+# the ShaftDiaDim band; the two necks meet nothing, so one loose NeckDiaDim
+# sizes both at the title block's .X (machinist review of 5a219a81904f: the
+# hub's band on the necks was over-specified).
 SHAFT_CORE_LANDS = (
     (0.0, SEAT_COLLAR),
     (COLLAR_REAR, JOURNAL_START),
@@ -470,6 +498,12 @@ SHAFT_CORE_LANDS = (
 )
 if any(start >= end for start, end in SHAFT_CORE_LANDS):
     raise AssertionError("every bare Ø9.525 core land must have a length")
+SHAFT_NECKS = SHAFT_CORE_LANDS[1:]
+NECK_DIA_PLACES = 1
+if SHAFT_DIA + dt_crank_pinion_spec.printed_band_mm(NECK_DIA_PLACES) >= (
+    JOURNAL_DIA + JOURNAL_DIA_BAND[1]
+):
+    raise AssertionError("a loose neck must stay under the journal at print-worst")
 # Both Ø11.388 lands run in MHA-DT-005 and therefore need their own Ra 1.6
 # control on the native cylindrical face and their own drawing leader.  The
 # collar's rear face runs against the post boss's south face, so it
@@ -505,7 +539,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftDomeProfile": {"DomeHeight"},
     "JournalProfile": {"JournalDiaDim"},
     "ReliefProfile": {"ReliefDiaDim"},
-    "PinionSeatProfile": {"PinionSeatDiaDim"},
+    "PinionSeatProfile": {"PinionSeatDiaDim", "NeckDiaDim"},
     "CollarProfile": {"CollarDiaDim"},
     "SpigotProfile": {"SpigotDiaDim"},
     "Spigot": {"SpigotLength"},
@@ -532,8 +566,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftDomeProfile": {"DomeHeight": 1},
     "JournalProfile": {"JournalDiaDim": 3},
     "ReliefProfile": {"ReliefDiaDim": RELIEF_DIA_PLACES},
-    "PinionSeatProfile": {"PinionSeatDiaDim": 3},
-    "CollarProfile": {"CollarDiaDim": 2},
+    "PinionSeatProfile": {"PinionSeatDiaDim": 3, "NeckDiaDim": NECK_DIA_PLACES},
+    "CollarProfile": {"CollarDiaDim": 1},
     "SpigotProfile": {"SpigotDiaDim": 2},
     "Spigot": {"SpigotLength": 2},
     "DrivePinProfile": {
@@ -576,7 +610,9 @@ HOLE_CALLOUT_PRECISION: dict[str, dict[str, int]] = {
     "DrivePinProfile": {"DrivePinHoleDia1": 3, "DrivePinHoleDia2": 3},
     "DrivePinHoles": {"DrivePinDepth": 2},
 }
-# The punch mark is a visual witness: its clocking to the cross-hole shows in
-# the end view's hidden lines, and its exact spot is deliberately free.
-DRAWING_NOTES = "PUNCH FIDUCIAL MARK ON DOME WHERE SHOWN; LOCATE BY EYE."
+# The one general note is the shop's inside-corner ceiling at every shoulder
+# (drawing-guidelines.md rule 11 (turned parts read like the lathe)); the
+# punch mark is flagged at the mark itself (dt_crankshaft_notes FIDUCIAL_NOTE).
+# TODO(#1625): drop the note when the title block carries the default.
+DRAWING_NOTES = f"INSIDE CORNERS R{STEP_CORNER_RADIUS_MAX:.2f} MAX."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:1"
