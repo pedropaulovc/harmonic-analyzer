@@ -101,6 +101,27 @@ CAM_ROOT_WEB_MIN_MM = STOCK_FORM.root_radius_min_mm - (CAM_DIA / 2.0 + ECCENTRIC
 # Per-gear band only: error_budget.yaml cam_eccentricity books each channel's
 # throw independently, so no matched-set range is drawn (machinist review r1).
 ECCENTRICITY_TOLERANCE_MM = 0.025
+# Worst-case crescent wall between the bore and the cam OD, opposite the lobe:
+# smallest cam, largest throw, and the bore at its largest matched size (the
+# largest finished arbor plus the maximum diametral clearance).  Floored to
+# the printed 0.01.  Below the 2.0 mm target, above the 1.5 mm floor (rule
+# 17): printed as a plain fact (rule 20); pending owner ruling (#992).
+CAM_WALL_MIN_MM = (
+    math.floor(
+        (
+            (CAM_DIA + CAM_DIA_BAND[1]) / 2.0
+            - (ECCENTRICITY + ECCENTRICITY_TOLERANCE_MM)
+            - (
+                arbor.SHAFT_DIA
+                + arbor.SHAFT_DIA_BAND[0]
+                + BORE_DIAMETRAL_CLEARANCE_MM[1]
+            )
+            / 2.0
+        )
+        * 100.0
+    )
+    / 100.0
+)
 # Cam-lobe direction vs the alignment-notch centreline (the channel's phase
 # datum); error_budget.yaml cam_phase. Carried on the native NotchPhase
 # angular dimension (build_dt_cylinder_gear), lobe axis to notch radial.

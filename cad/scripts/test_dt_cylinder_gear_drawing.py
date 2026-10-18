@@ -133,6 +133,24 @@ def test_every_tight_band_states_its_mate_or_function_at_the_callout() -> None:
     assert "MHA-DT-013" in notes.BORE_FIT_CALLOUT
 
 
+def test_worst_case_cam_wall_is_printed_and_clears_the_floor() -> None:
+    import dt_cylinder_gear_shaft_spec as arbor
+
+    worst_wall = (
+        (spec.CAM_DIA + spec.CAM_DIA_BAND[1]) / 2.0
+        - (spec.ECCENTRICITY + spec.ECCENTRICITY_TOLERANCE_MM)
+        - (
+            arbor.SHAFT_DIA
+            + arbor.SHAFT_DIA_BAND[0]
+            + spec.BORE_DIAMETRAL_CLEARANCE_MM[1]
+        )
+        / 2.0
+    )
+    assert worst_wall - 0.01 < spec.CAM_WALL_MIN_MM <= worst_wall
+    assert 1.5 < spec.CAM_WALL_MIN_MM < 2.0
+    assert f"{spec.CAM_WALL_MIN_MM:.2f} MIN WALL" in notes.BORE_FIT_CALLOUT
+
+
 def test_cam_and_notch_oracles_use_actual_off_centre_root_material() -> None:
     import math
 

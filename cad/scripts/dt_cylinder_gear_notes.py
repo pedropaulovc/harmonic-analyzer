@@ -12,14 +12,17 @@ TOOTH_RUNOUT_TIR_MM = float(_config.fit("cone_drum_oblique_mesh", "tooth_cutting
 
 # Narrow rows (machinist review r1): the leader leaves the block's lower
 # right corner, and only a corner left of x ~0.07 m clears the cam diameter's
-# diametral line on its way down to the bore.
+# diametral line on its way down to the bore.  The worst-case wall to the cam
+# OD is under the 2.0 target, so it is stated as a plain fact (rule 20).
 BORE_FIT_CALLOUT = (
     "FINISH BORE THRU;\n"
     "ALL 20 GEARS\n"
     "MATCH TO FINISHED\n"
     "SHAFT MHA-DT-013\n"
     f"{spec.BORE_DIAMETRAL_CLEARANCE_MM[0]:.3f}-{spec.BORE_DIAMETRAL_CLEARANCE_MM[1]:.3f}\n"
-    "DIAMETRAL CLEARANCE"
+    "DIAMETRAL CLEARANCE\n"
+    f"{spec.CAM_WALL_MIN_MM:.2f} MIN WALL\n"
+    "TO CAM OD"
 )
 # TODO(#744): validate the forked rod and centered channel bank in the native
 # assembly. The drawing requirement below does not certify that integration.

@@ -117,9 +117,10 @@ NOTCH_DETAIL_DIMENSIONS = {
 # grows the callouts; the lanes below are sized for them (sheet mm, gear
 # centre ~(105, 270), tip r 48.3, cam centre (105, 283) r 23.0, bore r 7.2).
 #
-# * The bore-fit block (seven rows <= 19 characters, x ~18..70, y ~320..360;
-#   r5: at 13.8 its underline nearly met the border) ends its leader shoulder
-#   at x ~70: the radial leader to the bore then
+# * The bore-fit block (nine rows <= 19 characters, x ~18..72, y ~316..364,
+#   under the gear data's last row at ~369; r5: at 13.8 its underline nearly
+#   met the border) ends its leader shoulder at x ~72: the radial leader to
+#   the bore then
 #   meets the cam diameter's diametral line only beyond the shoulder, never
 #   between it and the bore (r1: the 82 mm block's corner at x 98 crossed it).
 # * The cam diameter drops to the gear's lower right; its three mate rows
@@ -133,7 +134,7 @@ NOTCH_DETAIL_DIMENSIONS = {
 #   (90°) arc (r 88.6 off the gear centre; r4b: a larger arc reached the side
 #   view and the gear data) with the cam finish symbol moved down out of them.
 FRONT_KEEP = {
-    "BoreDia": (0.045, 0.340),
+    "BoreDia": (0.045, 0.338),
     "CamDia": (0.166, 0.232),
     "CamCy": (0.157, 0.257),
     "NotchPhase": (0.131, 0.332),
