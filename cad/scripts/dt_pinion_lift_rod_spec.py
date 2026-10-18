@@ -25,6 +25,7 @@ CAP_R = round((ROD_DIA**2 / 4.0 + CAP_SAG**2) / (2.0 * CAP_SAG), 2)  # 4.80
 ROD_DIA_BAND = SHAFT_H
 
 LEVER_NUMBER = "MHA-DT-016"
+PIVOT_BLOCK_NUMBER = "MHA-DT-018"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the rod turns in the pivot blocks' west bores -- the one running
 # surface on the part.
@@ -32,24 +33,28 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(ROD_DIA)),
 )
 
+# One revolved half-profile carries the rod's size, body length, crown and
+# overall, so all four print on the side view, as the part sits in the lathe
+# (drawing-guidelines.md rule 11 (turned parts read like the lathe)).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "RodProfile": {"RodDia"},
-    "Rod": {"Depth"},
-    "BackCapProfile": {"CapR"},
+    "RodProfile": {"RodDia", "RodBody", "CapR", "RodOverall"},
     # U36: the MHA-DT-030 pin hole, located from the flat front end face -- the
     # part origin sits on that face, so the circle's own anchor IS the
     # front-end baseline (drawing-guidelines.md rule 10 (dimension from a real feature)).
     "PinHoleProfile": {"PinHoleDia", "PinHoleZ"},
 }
+# The overall (front face to crown apex) prints in parentheses: the body
+# length to the crown rim is the controlling size, because the rig's worst
+# fitted stack (pinion_rig_layout) reads its .X band (machinist review r1:
+# the body length alone read like an overall that was not one, rule 10).
+DRAWING_REFERENCE_DIMENSIONS = frozenset({"RodOverall"})
 
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the part authors
 # them and the drawing reads them back.  Two on the banded bearing diameter and
 # the drilled pin hole; one on the length, the crown and the pin station,
 # which the lever's mid-engagement sets at assembly.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "RodProfile": {"RodDia": 2},
-    "Rod": {"Depth": 1},
-    "BackCapProfile": {"CapR": 1},
+    "RodProfile": {"RodDia": 2, "RodBody": 1, "CapR": 1, "RodOverall": 1},
     "PinHoleProfile": {"PinHoleDia": 2, "PinHoleZ": 1},
 }
 _PRECISION_NAMES = [
@@ -63,15 +68,26 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
+# drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
+# the h band rides the diameter because the rod turns in the two MHA-DT-018
+# blocks' reamed lift bores (+0.025/+0.010 slide band); ground 1/4 in shafting
+# already holds it, so the stock is good enough as supplied (machinist review
+# r1: the band and Ra named no mate).
+ROD_DIA_CALLOUT = "\n".join(
+    (
+        f"RUNNING FIT IN {PIVOT_BLOCK_NUMBER} LIFT BORES,",
+        "1/4 IN GROUND STOCK OK",
+    )
+)
+
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the pin hole's own callout, as the hole
 # specification only; the drive and peen are
-# dt_pinion_lever_pin_spec.ASSEMBLY_STEP (LEVER PIN SET).
+# dt_pinion_lever_pin_spec.ASSEMBLY_STEP (LEVER PIN SET).  The sheet carries
+# no general notes: the SR view defines the crown (machinist review r1).
 PIN_HOLE_CALLOUT = "\n".join(
     (
         "MATCH-DRILL THRU AT ASSEMBLY",
         f"IN {LEVER_NUMBER} HUB",
     )
 )
-DRAWING_NOTES = "BACK-END CROWN BLENDS INTO THE OD WITH NO STEP."
-END_VIEW_NOTE = "END VIEW SCALE 2:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
