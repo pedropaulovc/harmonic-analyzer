@@ -3897,6 +3897,9 @@ def task_check():
             # command line (WinError 206), failing the gate before pytest runs.
             "cmd": [
                 *pytest_cmd,
+                # Fixed explicit inventory: skip repeated parent-directory
+                # virtualenv-marker probes, not general discovery exclusions.
+                "--collect-in-virtualenv",
                 # Bound nested parallelism: doit already fans out other gates
                 # (eight tasks by default on the farm). Steal individual tests
                 # so the dominant recipe-test file does not serialize the tail.

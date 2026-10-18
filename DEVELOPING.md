@@ -107,8 +107,16 @@ configured draws, seeds, reference cases and numerical acceptance checks.
 ### Recipe gate scheduling
 
 `check:recipe` alone runs its complete explicit test inventory with
-`pytest -q -p no:cacheprovider -n 8 --dist worksteal`. Other `check:*` gates
-remain serial internally. Eight workers bound the additional local processes:
+`pytest -q -p no:cacheprovider --collect-in-virtualenv -n 8 --dist worksteal`.
+`--collect-in-virtualenv` is safe here only because the gate supplies an explicit
+file list: it avoids repeated parent-directory virtualenv-marker probes without
+expanding that inventory. Do not apply it to normal recursive pytest discovery.
+In one ordered, unchanged 291-file, serial (`-n 0`) collect-only pair, baseline
+collection took **75.1735279 s** versus **38.6164179 s** with the flag; the
+**11,513 node-ID multisets were identical**. This is collection-only evidence,
+not a recipe execution or whole-build speedup measurement.
+Other `check:*` gates remain serial internally.
+Eight workers bound the additional local processes:
 the measured development host has 16 logical CPUs, and the farm launcher already
 permits eight simultaneous doit tasks. Using `-n auto` inside the recipe gate
 would occupy every CPU before accounting for sibling checks. This is a
