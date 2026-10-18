@@ -149,7 +149,7 @@ def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> N
         f"SET MHA-DT-010 {pinion.SEAT_FEELER_MM:.2f} OFF",
         shared_check,
         "TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND",
-        "THEN MATCH-DRILL MHA-DT-010 AND MHA-DT-011",
+        "THEN MATCH-DRILL THROUGH THE MHA-DT-010",
         "RE-CHECK NO BINDING",
     )
     positions = [fitup.index(phrase) for phrase in order]
@@ -202,7 +202,7 @@ def test_step_four_holds_the_collar_before_the_feeler_and_the_pin() -> None:
     positions = [
         body.index("HOLD THE MHA-DT-011 COLLAR HARD ON THE BOSS SOUTH FACE"),
         body.index("OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER"),
-        body.index("MATCH-DRILL MHA-DT-010"),
+        body.index("MATCH-DRILL THROUGH THE MHA-DT-010"),
     ]
     assert positions == sorted(positions)
 
