@@ -387,7 +387,7 @@ def test_worst_stack_bands_are_the_printed_places() -> None:
     assert dt_alignment_pinion_spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1
     assert rig.DRUM_LEN_BAND == x_band
     assert dt_pinion_lift_rod_spec.DRAWING_PRECISION["RodProfile"]["RodBody"] == 1
-    assert dt_pinion_pivot_shaft_spec.DRAWING_PRECISION["Shaft"]["Depth"] == 1
+    assert dt_pinion_pivot_shaft_spec.DRAWING_PRECISION["ShaftProfile"]["ShaftLength"] == 1
     assert rig.LENGTH_BAND == x_band
     assert not hasattr(rig, "STACK_BAND")  # the stacks name every term
 
@@ -450,7 +450,7 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
 
     x_band, xx_band = 0.8, 0.51  # title-block .X / .XX
     assert dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 1
-    assert DRAWING_PRECISION["Shaft"]["Depth"] == 1
+    assert DRAWING_PRECISION["ShaftProfile"]["ShaftLength"] == 1
     # MHA-DT-018 is not precision-migrated, so its 10.50 Depth prints at the
     # document's two places.
     assert "draw_dt_pinion_pivot_block.py" not in PRECISION_MIGRATED_DRAWINGS
@@ -468,7 +468,7 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     assert rig.BLOCK_DEPTH_PLACES == 2  # the unmigrated sheet's document places
     assert rig.STRAP_T_PLACES == dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"]
     assert rig.DRUM_LEN_PLACES == DRUM_PRECISION["GearBlank"]["FaceWidth"]
-    assert rig.LENGTH_PLACES == DRAWING_PRECISION["Shaft"]["Depth"]
+    assert rig.LENGTH_PLACES == DRAWING_PRECISION["ShaftProfile"]["ShaftLength"]
     assert rig.LENGTH_PLACES == ROD_PRECISION["RodProfile"]["RodBody"]
     # A nominal that does not print exactly moves its term by the rounding.
     assert printed_deviations(10.254, 2) == pytest.approx((-0.514, 0.506))

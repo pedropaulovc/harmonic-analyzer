@@ -37,74 +37,87 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert shaft.DRAWING_DIMENSIONS is dt_pinion_pivot_shaft_spec.DRAWING_DIMENSIONS
     marked = set().union(*dt_pinion_pivot_shaft_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = set(drawing.PROFILE_KEEP) | set(drawing.DETAIL_KEEP)
     assert kept == marked
-    assert set(drawing.DIMENSION_CALLOUTS) <= kept
+    assert set(drawing.DIMENSION_CALLOUTS) <= set(drawing.PROFILE_KEEP)
+    assert set(dt_pinion_pivot_shaft_spec.DRAWING_PRECISION_BY_NAME) == marked
     assert drawing.SHAFT_DIA == dt_pinion_pivot_shaft_spec.SHAFT_DIA
     assert drawing.SHAFT_LEN == dt_pinion_pivot_shaft_spec.SHAFT_LEN
 
 
-def test_sheet_runs_at_1_to_1_with_2_to_1_end_view_and_1_to_2_iso() -> None:
+def test_one_side_view_carries_the_lathe_dimensions_and_a_detail_the_crown() -> None:
+    # drawing-guidelines.md rule 11: the diameter, the body and the overall
+    # length all read in the side view; no end view.
+    assert set(drawing.PROFILE_KEEP) == {
+        "OverallLength",
+        "ShaftLength",
+        "ShaftDia",
+        "PinHoleDia",
+    }
+    assert set(drawing.DETAIL_KEEP) == {"CapFrontSag", "CapFrontR"}
     assert drawing.SHEET_SCALE == (1.0, 1.0)
+    assert drawing.DETAIL_SCALE == (5, 1)
     assert drawing.ISO_SCALE == (1, 2)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(4, 1)" in source  # the end-view override
+    assert '"*Front"' not in source
+    assert source.count("place_view(") == 2
     assert dt_pinion_pivot_shaft_spec.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert 'add_property_linked_note(adapter, "Iso View Note"' in source
-    assert 'add_property_linked_note(adapter, "End View Note"' in source
+    assert "for view in (profile, iso):" in source
+    assert "set_hidden_lines_removed(adapter, detail)" in source
 
 
-def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
+def test_overall_length_is_a_tip_to_tip_reference_over_the_body() -> None:
+    spec = dt_pinion_pivot_shaft_spec
+    assert spec.OVERALL_LEN == pytest.approx(spec.SHAFT_LEN + 2.0 * spec.CAP_SAG)
+    source = Path(shaft.__file__).read_text(encoding="utf-8")
+    assert 'pin_holes.record("OverallLength", \'"ShaftLen" + 2 * "CapSag"\')' in source
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        'set_reference_dimensions(adapter, profile_annotations, ("OverallLength",))'
+        in (drawing_source)
+    )
+    # Overall outermost, over the body length.
+    assert (
+        drawing.PROFILE_KEEP["OverallLength"][1]
+        > drawing.PROFILE_KEEP["ShaftLength"][1]
+    )
+    assert drawing.DIMENSION_CALLOUTS["ShaftLength"] == "CYLINDRICAL BODY"
+
+
+def test_running_fit_names_its_mate_and_the_sheet_carries_no_gdt() -> None:
+    import _config
+
+    block = _config.parts("dt-pinion-pivot-block")["number"]
+    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == f"RUNNING FIT IN\n{block} BORES"
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "add_feature_control_frame(" not in source
+    assert "add_datum_feature(" not in source
+    assert not hasattr(dt_pinion_pivot_shaft_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert 'entity_type="SILHOUETTE"' in source
+    assert "char_height=FINISH_CHAR_HEIGHT" in source
+    # The diameter stands outside the back end, the pin-hole callout under
+    # the front hole: neither on the part.
+    assert drawing.PROFILE_KEEP["ShaftDia"][0] < drawing.BACK_END_X
+    assert drawing.PROFILE_KEEP["PinHoleDia"][1] < drawing.SHAFT_LOWER_FLANK_Y
+
+
+def test_linked_notes_are_few_and_carry_no_dimension_or_general_tolerance() -> None:
     notes = dt_pinion_pivot_shaft_spec.DRAWING_NOTES
-    assert "SPHERICAL CROWN" in notes
-    assert "DERIVED AXIS" in notes
-    assert "PROFILE 0.05, FORM ONLY (NO DATUM)" in notes
-    assert "EXEMPT FROM TITLE-BLOCK EDGE-BREAK" in notes
-    assert "(1.20) REF AXIAL HEIGHT" in notes
-    assert "1.20+/-0.05" not in notes
-    assert "194.40 OVERALL" not in notes
-    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "FINAL SIZE"
+    assert notes == "CENTRES OK."
     assert model_toleranced_dimensions(shaft) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_BAND)",
     }
-    # U27: the length reads the title-block .X band, not a tight tolerance.
+    # U27: the lengths read the title-block .X band, not a tight tolerance.
     assert dt_pinion_pivot_shaft_spec.DRAWING_PRECISION == {
-        "Shaft": {"Depth": 1},
-        "PinHoleProfile": {"PinHoleDia": 2},
+        "ShaftProfile": {"ShaftDia": 2, "ShaftLength": 1},
+        "CapFrontProfile": {"CapFrontSag": 1, "CapFrontR": 1},
+        "PinHoleProfile": {"PinHoleDia": 2, "OverallLength": 1},
     }
-    # General tolerances live in the title block ONLY.
-    assert "LINEAR +/-" not in notes
-    assert " BA " not in f" {notes} "
-    assert "X.XX" not in notes
+    assert dt_pinion_pivot_shaft_spec.CROWN_CALLOUT == "BOTH ENDS"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-
-
-def test_direct_limits_and_native_cylindricity_control_the_body() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert "edge_xy=end_top" in source
-    assert "symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024)" in source
-    assert source.count("add_feature_control_frame(") == 2
-    assert 'characteristic="profile_surface"' in source
-    assert 'quantity="BOTH CROWNS"' in source
-    assert 'entity_type="FACE"' in source
-    assert 'entity_type="SILHOUETTE"' not in source
-    assert "add_surface_finish(" in source
-    assert "CYLINDRICITY" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
-    assert "Ra 1.6" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
-    assert "CROWN ROOT CIRCLES" in drawing.DIMENSION_CALLOUTS["Depth"]
-    # Main eye pass on pc-ea2: under the end view the diameter's leader ran
-    # back through its own stacked "-0.02".  Clear left of the end view the
-    # leader rises right from the underline and crosses no tolerance text.
-    text_x, text_y = drawing.FRONT_KEEP["ShaftDia"]
-    end_view_left = (
-        drawing.FRONT_CENTER[0]
-        - drawing.END_VIEW_SCALE * dt_pinion_pivot_shaft_spec.SHAFT_DIA / 2.0 / 1000.0
-    )
-    assert text_x < end_view_left
-    assert text_y < drawing.FRONT_CENTER[1]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
@@ -145,17 +158,16 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
         f"{dt_pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT},\n"
         f"PER {dt_drive_train_steps.step_ref(key)}"
     )
-    assert "dt_drive_train_steps" not in Path(dt_pinion_pivot_shaft_spec.__file__).read_text(
-        encoding="utf-8"
-    )
+    assert "dt_drive_train_steps" not in Path(
+        dt_pinion_pivot_shaft_spec.__file__
+    ).read_text(encoding="utf-8")
     assert dt_pinion_pivot_shaft_spec.PIN_HOLE_DIA == 25.4 / 16.0
     assert dt_pinion_pivot_shaft_spec.PIN_HOLE_BAND == (0.06, 0.0)
 
 
-# pc-r7 eye pass: the cylindricity frame and datum A sat on the match-drill
-# callout's text and the Ra bar on its shoulder.  The callout is placed from
-# the symbols' read-back boxes (_drawing_annotation_extent), and these pin the
-# arithmetic and the wiring offline.
+# The shared callout-placement helper (_drawing_annotation_extent), pinned
+# offline with the read-backs of this sheet's earlier layout (pc-r7 eye pass:
+# the cylindricity frame and datum A sat on the match-drill callout's text).
 def test_callout_text_box_is_the_shoulder_span_mirrored_about_the_text_centre() -> None:
     import _drawing_annotation_extent as extent
 
@@ -326,15 +338,3 @@ def test_a_callout_too_long_to_fit_fails_loud_instead_of_re_colliding(
             below={},
             beside={"crown profile frame": (0.2455, 0.214, 0.262, 0.265)},
         )
-
-
-def test_the_match_drill_callout_is_placed_from_every_neighbours_read_back_box() -> (
-    None
-):
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    call = source[source.index("place_callout_clear(") :]
-    call = call[: call.index("add_property_linked_note")]
-    assert '== "PinHoleDia"' in call
-    for handle in ("bearing_finish", "cylindricity", "datum_a", "crown_profile"):
-        assert f"{handle}.GetAnnotation()" in call
-    assert call.index("below=") < call.index("bearing_finish") < call.index("beside=")

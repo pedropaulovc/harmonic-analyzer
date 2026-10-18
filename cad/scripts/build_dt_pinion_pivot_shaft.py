@@ -8,7 +8,9 @@ the SEPARATE lift rod in the west bores -- build_dt_pinion_lift_rod.py).
 Layout: shaft axis Z, z 0..SHAFT_LEN (PR7: ends FLUSH with the pivot blocks'
 outer faces -- pinion_rig_layout -- instead of 2 proud), each end crowned by
 a shallow spherical cap (sagitta 1.2 -- the p.69 close-up's domed end
-visible inside the strap bore).
+visible inside the strap bore).  Every sketch is on the Right plane (sketch
+u = -z), the MHA-CH-005 idiom, so the diameter, the body length, the crown
+and the overall length all import into the drawing's side view.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25".
 
@@ -25,14 +27,22 @@ import sys
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _dimensions import drive_dimension, name_dimensions, set_global
+from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, ensure_fully_defined, set_sketch_direct_db
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_circle import define_circle
+from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
@@ -48,7 +58,6 @@ from dt_pinion_pivot_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    END_VIEW_NOTE,
     ISO_VIEW_NOTE,
     PIN_HOLE_BAND,
     PIN_HOLE_DIA,
@@ -67,7 +76,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Finish",
     "Quantity",
     "Manufacturing Notes",
-    "End View Note",
     "Iso View Note",
 )
 
@@ -95,6 +103,158 @@ def _pin_hole_removed() -> float:
     return total * h / 3.0
 
 
+async def _shaft_profile(adapter) -> list[tuple[str, str]]:
+    """The plain half-profile on the Right plane (sketch u = -z), revolved
+    into the body: the front end face on the origin, the body running to
+    u = -SHAFT_LEN.  The printed diameter and the body length (the overall
+    length less both crowns) are its driving dimensions, so both import into
+    the side view (the build_ch_pivot_shaft idiom, mirrored to +Z)."""
+    from solidworks_mcp.adapters.base import RevolveParameters
+
+    dims = SketchDims()
+    check("create_sketch shaft", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "shaft axis centerline",
+        await adapter.add_centerline(0.0, 0.0, -SHAFT_LEN, 0.0),
+    )
+    points = [
+        (0.0, 0.0),
+        (0.0, SHAFT_R),
+        (-SHAFT_LEN, SHAFT_R),
+        (-SHAFT_LEN, 0.0),
+    ]
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    n = len(lines)
+    for i, line in enumerate(lines):
+        (_, v1), (_, v2) = points[i], points[(i + 1) % n]
+        direction = "horizontal" if v1 == v2 else "vertical"
+        check(
+            f"shaft {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    body = lines[1]
+    await dimension_between(
+        adapter,
+        f"{body}.start",
+        f"{body}.end",
+        "horizontal_distance",
+        SHAFT_LEN,
+        "shaft ShaftLength",
+    )
+    dims.record("ShaftLength", '"ShaftLen"')
+    await add_diametric_linear_dimension(
+        adapter, axis, body, (-SHAFT_LEN / 2.0, SHAFT_R + 5.0), "ShaftDia"
+    )
+    dims.record("ShaftDia", '"ShaftDia"')
+    await anchor_point_to_origin(adapter, f"{lines[0]}.start", 0.0, 0.0, "shaft anchor")
+    await ensure_fully_defined(adapter, "shaft sketch")
+    check("exit_sketch shaft", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShaftProfile")
+    drive_jobs = dims.apply(adapter, "ShaftProfile")
+    check("revolve shaft", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Shaft")
+    return drive_jobs
+
+
+async def _cap(adapter, tag: str, u_end: float, sign: float) -> list[tuple[str, str]]:
+    """One shallow spherical crown CAP_SAG proud of the end face at sketch
+    ``u_end`` (``sign`` +1 at the front end, the crown toward +u = -z; -1 at
+    the back end), on the Right plane: radial base line on the end face, arc
+    from the rim to the on-axis apex, on-axis close line doubling as the
+    revolve axis edge.  Constraint accounting (4 free points after merges):
+    base vertical + close horizontal (directions), rim reach (radius), crown
+    height (apex), one station anchor (origin-coincident at the front end, a
+    driven distance at the back end), arc radius (the outward lobe as drawn;
+    the volume gate arbitrates it)."""
+    from solidworks_mcp.adapters.base import RevolveParameters
+
+    u_apex = u_end + sign * CAP_SAG
+    u_centre = u_end - sign * (CAP_R - CAP_SAG)
+    name = f"Cap{tag}Profile"
+    dims = SketchDims()
+    check(f"create_sketch {name}", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    check(
+        f"{name} centerline",
+        await adapter.add_centerline(u_end, 0.0, u_apex, 0.0),
+    )
+    base = check(f"{name} base", await adapter.add_line(u_end, 0.0, u_end, SHAFT_R))
+    # add_arc sweeps CCW p1 -> p2: the outward lobe runs rim -> apex where the
+    # crown points toward -u (back end) and apex -> rim toward +u (front end).
+    rim, apex = (u_end, SHAFT_R), (u_apex, 0.0)
+    p1, p2 = (rim, apex) if sign < 0 else (apex, rim)
+    arc = check(
+        f"{name} arc",
+        await adapter.add_arc(u_centre, 0.0, p1[0], p1[1], p2[0], p2[1]),
+    )
+    close = check(f"{name} close", await adapter.add_line(u_apex, 0.0, u_end, 0.0))
+    set_sketch_direct_db(adapter, False)
+    check(
+        f"{name} base vertical",
+        await adapter.add_sketch_constraint(base, None, "vertical"),
+    )
+    check(
+        f"{name} close horizontal",
+        await adapter.add_sketch_constraint(close, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter, f"{base}.end", "origin", "vertical_distance", SHAFT_R, f"{name} rim"
+    )
+    dims.record(f"Cap{tag}Rim", '"ShaftDia" / 2')
+    await dimension_between(
+        adapter,
+        f"{close}.start",
+        f"{close}.end",
+        "horizontal_distance",
+        CAP_SAG,
+        f"{name} height",
+    )
+    dims.record(f"Cap{tag}Sag", '"CapSag"')
+    if u_end:
+        check(
+            f"{name} on axis",
+            await adapter.add_sketch_constraint(
+                f"{base}.start", "origin", "horizontal_points"
+            ),
+        )
+        await dimension_between(
+            adapter,
+            f"{base}.start",
+            "origin",
+            "horizontal_distance",
+            abs(u_end),
+            f"{name} station",
+        )
+        dims.record(f"Cap{tag}Z", '"ShaftLen"')
+    else:
+        check(
+            f"{name} station",
+            await adapter.add_sketch_constraint(
+                f"{base}.start", "origin", "coincident"
+            ),
+        )
+    check(
+        f"{name} radius",
+        await adapter.add_sketch_dimension(arc, None, "radial", CAP_R),
+    )
+    dims.record(
+        f"Cap{tag}R",
+        '("ShaftDia" / 2 * "ShaftDia" / 2 + "CapSag" * "CapSag") / (2 * "CapSag")',
+    )
+    await ensure_fully_defined(adapter, f"{name} sketch")
+    check(f"exit_sketch {name}", await adapter.exit_sketch())
+    name_last_feature(adapter, name)
+    drive_jobs = dims.apply(adapter, name)
+    check(
+        f"revolve {tag} cap",
+        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+    )
+    name_last_feature(adapter, f"Cap{tag}")
+    return drive_jobs
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -102,9 +262,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Editable knobs (Tools > Equations): the shaft diameter and length. The mm
     # suffix is load-bearing -- this is an INCH document and the equation manager
-    # reads BARE numbers in document units (an unsuffixed 6.35 = 6.35 in). The
-    # extrude length is a feature parameter (built with the literal below);
-    # ShaftLen is declared so a GUI edit sees the knob.
+    # reads BARE numbers in document units (an unsuffixed 6.35 = 6.35 in).
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLen", f"{SHAFT_LEN}mm")
     await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
@@ -112,139 +270,15 @@ async def build(adapter) -> dict[str, str]:
     for tag, z_hole in zip(("Front", "Back"), PIN_HOLE_Z):
         await set_global(adapter, f"PinHole{tag}Z", f"{z_hole}mm")
 
-    drive_jobs: list[tuple[str, str]] = []
-
-    # On-axis rod (origin centre): define_circle emits only the diameter dim, so
-    # only the "Dia" slot is recorded -- the X/Z names are ignored.
-    shaft = SketchDims()
-    check("create_sketch shaft", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        SHAFT_R,
-        "shaft",
-        dims=shaft,
-        names=("ShaftCx", "ShaftCz", "ShaftDia"),
-        drives=(None, None, '"ShaftDia"'),
-    )
-    await ensure_fully_defined(adapter, "shaft sketch")
-    check("exit_sketch shaft", await adapter.exit_sketch())
-    name_last_feature(adapter, "ShaftProfile")
-    drive_jobs += shaft.apply(adapter, "ShaftProfile")
-    check(
-        "extrude shaft",
-        await adapter.create_extrusion(ExtrusionParameters(depth=SHAFT_LEN)),
-    )
-    name_last_feature(adapter, "Shaft")
-    depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
-    drive_jobs += [(depth_dim[0], '"ShaftLen"')]
+    drive_jobs = await _shaft_profile(adapter)
     volume = await volume_check(adapter, "shaft", V_SHAFT, 0.005 * V_SHAFT)
 
     # Crowned end caps (PR7): a shallow spherical cap proud of each flat end
-    # (sagitta CAP_SAG), revolved about the shaft axis from a Top-plane
-    # profile (u, v) -> (X, -Z): radial base line at the end face, arc from
-    # the rim to the on-axis apex, on-axis close line doubling as the revolve
-    # axis edge (the handle-ball idiom: centerline overlapping the axis edge).
-    # Constraint accounting per cap (4 free points after merges): base
-    # horizontal + close vertical (directions), rim h-dist (radius), sagitta
-    # v-dist (apex), one station anchor (origin-coincident at the front end,
-    # a driven v-dist at the back end), arc radius (centre resolved to the
-    # outward-bulge solution as drawn; the volume gate arbitrates the lobe).
-    from solidworks_mcp.adapters.base import RevolveParameters
-
-    for tag, z_end, sign in (("front", 0.0, -1.0), ("back", SHAFT_LEN, 1.0)):
-        v_base = -z_end
-        v_apex = -(z_end + sign * CAP_SAG)
-        v_centre = -(z_end + sign * (CAP_SAG - CAP_R))
-        cap = SketchDims()
-        check(f"create_sketch cap {tag}", await adapter.create_sketch("Top"))
-        set_sketch_direct_db(adapter, True)
-        check(
-            f"cap {tag} centerline",
-            await adapter.add_centerline(0.0, v_base, 0.0, v_apex),
-        )
-        base = check(
-            f"cap {tag} base",
-            await adapter.add_line(0.0, v_base, SHAFT_R, v_base),
-        )
-        # add_arc sweeps CCW p1 -> p2: the minor (outward-bulge) lobe is
-        # rim -> apex at the front end, apex -> rim at the back end.
-        p1, p2 = (
-            ((0.0, v_apex), (SHAFT_R, v_base))
-            if sign > 0
-            else ((SHAFT_R, v_base), (0.0, v_apex))
-        )
-        arc = check(
-            f"cap {tag} arc",
-            await adapter.add_arc(0.0, v_centre, p1[0], p1[1], p2[0], p2[1]),
-        )
-        close = check(
-            f"cap {tag} close",
-            await adapter.add_line(0.0, v_apex, 0.0, v_base),
-        )
-        set_sketch_direct_db(adapter, False)
-        check(
-            f"cap {tag} base horizontal",
-            await adapter.add_sketch_constraint(base, None, "horizontal"),
-        )
-        check(
-            f"cap {tag} close vertical",
-            await adapter.add_sketch_constraint(close, None, "vertical"),
-        )
-        check(
-            f"cap {tag} rim reach",
-            await adapter.add_sketch_dimension(
-                f"{base}.end", "origin", "horizontal_distance", SHAFT_R
-            ),
-        )
-        cap.record(f"Cap{tag.capitalize()}Rim", '"ShaftDia" / 2')
-        check(
-            f"cap {tag} sagitta",
-            await adapter.add_sketch_dimension(
-                f"{close}.start", f"{close}.end", "vertical_distance", CAP_SAG
-            ),
-        )
-        cap.record(f"Cap{tag.capitalize()}Sag", '"CapSag"')
-        if z_end:
-            check(
-                f"cap {tag} on axis",
-                await adapter.add_sketch_constraint(
-                    f"{base}.start", "origin", "vertical_points"
-                ),
-            )
-            check(
-                f"cap {tag} station",
-                await adapter.add_sketch_dimension(
-                    f"{base}.start", "origin", "vertical_distance", z_end
-                ),
-            )
-            cap.record(f"Cap{tag.capitalize()}Z", '"ShaftLen"')
-        else:
-            check(
-                f"cap {tag} station",
-                await adapter.add_sketch_constraint(
-                    f"{base}.start", "origin", "coincident"
-                ),
-            )
-        check(
-            f"cap {tag} radius",
-            await adapter.add_sketch_dimension(arc, None, "radial", CAP_R),
-        )
-        cap.record(
-            f"Cap{tag.capitalize()}R",
-            '("ShaftDia" / 2 * "ShaftDia" / 2 + "CapSag" * "CapSag") / (2 * "CapSag")',
-        )
-        await ensure_fully_defined(adapter, f"cap {tag} sketch")
-        check(f"exit_sketch cap {tag}", await adapter.exit_sketch())
-        name_last_feature(adapter, f"Cap{tag.capitalize()}Profile")
-        drive_jobs += cap.apply(adapter, f"Cap{tag.capitalize()}Profile")
-        check(
-            f"revolve cap {tag}",
-            await adapter.create_revolve(RevolveParameters(angle=360.0)),
-        )
-        name_last_feature(adapter, f"Cap{tag.capitalize()}")
-        volume = await volume_check(adapter, f"cap {tag}", volume + V_CAP, 0.03 * V_CAP)
+    # (sagitta CAP_SAG).
+    drive_jobs += await _cap(adapter, "Front", 0.0, 1.0)
+    volume = await volume_check(adapter, "cap front", volume + V_CAP, 0.03 * V_CAP)
+    drive_jobs += await _cap(adapter, "Back", -SHAFT_LEN, -1.0)
+    volume = await volume_check(adapter, "cap back", volume + V_CAP, 0.03 * V_CAP)
 
     # Option E-a set-pin holes: one diametral cross hole along X under each
     # strap's mid-plane in the physical back-stop stack, where the match-drill
@@ -255,9 +289,49 @@ async def build(adapter) -> dict[str, str]:
     # end.  A mirror station (z < 0) lies outside the shaft and cuts nothing,
     # and the removed volume is gated at 5% of the two holes, so a missing or
     # misplaced cut fails loud.
+    #
+    # The same sketch carries the overall length, tip to tip, as a construction
+    # axis from the front crown's apex (u = +CAP_SAG) to the back one's: the
+    # drawing prints it as a reference (the build_ch_pivot_shaft idiom).  It is
+    # drawn off the inference engine: both ends lie on the crowns' apex
+    # vertices, which a snapped relation would over-define.
     v_holes = 2.0 * _pin_hole_removed()
     pin_holes = SketchDims()
     check("create_sketch pin holes", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    overall = check(
+        "tip-to-tip axis",
+        await adapter.add_centerline(CAP_SAG, 0.0, -(SHAFT_LEN + CAP_SAG), 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "tip-to-tip axis horizontal",
+        await adapter.add_sketch_constraint(overall, None, "horizontal"),
+    )
+    check(
+        "tip-to-tip axis on the shaft axis",
+        await adapter.add_sketch_constraint(
+            f"{overall}.start", "origin", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{overall}.start",
+        "origin",
+        "horizontal_distance",
+        CAP_SAG,
+        "front crown tip",
+    )
+    pin_holes.record("FrontTip", '"CapSag"')
+    await dimension_between(
+        adapter,
+        f"{overall}.start",
+        f"{overall}.end",
+        "horizontal_distance",
+        SHAFT_LEN + 2.0 * CAP_SAG,
+        "overall length",
+    )
+    pin_holes.record("OverallLength", '"ShaftLen" + 2 * "CapSag"')
     for tag, z_hole in zip(("Front", "Back"), PIN_HOLE_Z):
         await define_circle(
             adapter,
@@ -269,7 +343,9 @@ async def build(adapter) -> dict[str, str]:
             names=(
                 f"PinHole{tag}Z",
                 f"PinHole{tag}Y",
-                "PinHoleDia" if tag == "Back" else f"PinHole{tag}Dia",
+                # The front hole's size prints: its callout stands under the
+                # profile's front end, clear of the diameter at the back.
+                "PinHoleDia" if tag == "Front" else f"PinHole{tag}Dia",
             ),
             drives=(f'"PinHole{tag}Z"', None, '"PinHoleDia"'),
         )
@@ -307,7 +383,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
     )
-    apply_drawing_precision(adapter, DRAWING_PRECISION)  # length at .X (U27)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)  # lengths at .X (U27)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -321,7 +397,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
             "Iso View Note": ISO_VIEW_NOTE,
         },
     )

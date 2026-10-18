@@ -1,8 +1,10 @@
-r"""Create the curated machinist drawing for the pinion strap torque shaft.
+r"""Create the curated machinist drawing for the pinion strap torque shaft
+(MHA-DT-019).
 
-A plain Ø6.35 turned steel shaft with a shallow spherical crown at each end.
-Modelled on the fulcrum-shaft slice: a 2:1 end view carries the diameter, the
-1:1 side view carries the length, and a 1:2 isometric stays clear of the title
+A plain Ø6.35 steel shaft with a shallow spherical crown at each end, drawn
+like the MHA-CH-005 pivot shaft: one 1:1 side view carries the diameter, the
+body length, the overall length (reference) and the match-drilled pin holes,
+a 5:1 detail carries the crown, and a 1:2 isometric stays clear of the title
 block.
 
 Run with SolidWorks open::
@@ -17,14 +19,17 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
+import _config
 from _check import check
-from _drawing_annotation_extent import gdt_box, place_callout_clear
+from _com import _early_bound, _read_member
+from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -33,10 +38,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimensions,
+)
 from _drawing_finish import add_surface_finish
-from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -46,10 +55,13 @@ from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_drive_train_steps import step_ref
 from dt_pinion_pivot_shaft_spec import (
-    CAP_RADIUS,
     CAP_SAG,
-    GEOMETRIC_TOLERANCES_MM,
+    CROWN_CALLOUT,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    OVERALL_LEN,
     PIN_HOLE_CALLOUT,
+    PIN_HOLE_Z,
     SHAFT_DIA as SHAFT_DIA,
     SHAFT_LEN,
     SURFACE_FINISHES,
@@ -72,41 +84,226 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-END_VIEW_SCALE = 4.0
-FRONT_CENTER = (0.055, 0.205)
-RIGHT_CENTER = (
-    FRONT_CENTER[0] + SHAFT_LEN * SHEET_SCALE[0] / 2000.0 + 0.045,
-    FRONT_CENTER[1],
-)
-ISO_CENTER = (0.355, 0.205)
-# 1:2, like fulcrum-shaft's identical long turned shaft: at 1:1 the ~180 mm
-# isometric bar runs over the right zone border, so the pictorial is halved and
-# a scale callout keeps the title block honest.
+# The side view is "*Right": the axis horizontal, as the bar sits in the
+# lathe. Model -Z runs to the sheet's right, so the FRONT end (the part
+# origin) is on the RIGHT and the body runs left. Every printed dimension is
+# authored on a Right-plane sketch, so the view imports them natively
+# (drawing-guidelines.md rule 11 (turned parts read like the lathe)). An end
+# view would carry nothing, so this sheet has none.
+PROFILE_CENTER = (0.170, 0.200)
+_MM = SHEET_SCALE[0] / 1000.0
+# The view centres on the bar's bounding box, crowns included.
+FRONT_END_X = PROFILE_CENTER[0] + (OVERALL_LEN / 2.0 - CAP_SAG) * _MM
+FRONT_TIP_X = FRONT_END_X + CAP_SAG * _MM
+BACK_END_X = FRONT_END_X - SHAFT_LEN * _MM
+FRONT_PIN_X = FRONT_END_X - PIN_HOLE_Z[0] * _MM
+SHAFT_LOWER_FLANK_Y = PROFILE_CENTER[1] - SHAFT_DIA * _MM / 2.0
+# 1:2: at 1:1 the ~190 mm isometric bar runs over the drawable band, so the
+# pictorial is halved and says so. It stands in the open field under the
+# profile, right of the notes and left of the title block (x 0.216).
+ISO_CENTER = (0.150, 0.110)
 ISO_SCALE = (1, 2)
+ISO_NOTE_XY = (0.115, 0.082)
 
-FRONT_KEEP = {
-    # Left of the end view, so the leader rises right from the underline and
-    # never crosses the stacked tolerance (Main eye pass on pc-ea2: under the
-    # view its leader ran back through "-0.02").
-    "ShaftDia": (0.030, 0.167),
-}
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
-    # Option E-a: the set-pin holes read as solid circles in the side view.
-    # Only the size is printed; the match-drill callout carries the location.
-    # pc-ea eye pass: below the view its text ran into the 182.0 body
-    # dimension's callout, so it sits above the view between the datum frame
-    # and the Ra flag, its leader dropping to the left-hand hole.
-    "PinHoleDia": (0.125, 0.241),
-}
+# The O.D.'s band is for the two pivot-block bores it runs in; the callout
+# names them (drawing-guidelines.md rule 4 (tighten only for function, and
+# name the mate)).
+SHAFT_FIT_CALLOUT = (
+    f"RUNNING FIT IN\n{_config.parts('dt-pinion-pivot-block')['number']} BORES"
+)
 # The holes are drilled at MHA-DT-000's SHAFT DRILL SET, so the callout points
 # at that step through the registry (Codex #858, PRRT_kwDOPHDy386mTbPB).
 SHAFT_DRILL_STEP_KEY = "straps-pinned-to-torque-shaft"
 DIMENSION_CALLOUTS = {
-    "ShaftDia": "FINAL SIZE",
-    "Depth": "CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
+    "ShaftDia": SHAFT_FIT_CALLOUT,
+    # The overall (reference) runs tip to tip over it; this is the cylinder.
+    "ShaftLength": "CYLINDRICAL BODY",
     "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(SHAFT_DRILL_STEP_KEY)}",
 }
+
+PROFILE_KEEP = {
+    # Over the bar, stacked: the overall (reference) outermost, tip to tip,
+    # the body length under it, end face to end face.
+    "OverallLength": (PROFILE_CENTER[0], 0.252),
+    "ShaftLength": (PROFILE_CENTER[0], 0.234),
+    # Left of the back end and under the bar's lower flank, outside the
+    # witness pair, so the toleranced text and its fit callout sit clear of
+    # both extension lines.
+    "ShaftDia": (BACK_END_X - 0.030, PROFILE_CENTER[1] - 0.012),
+    # Option E-a: the set-pin holes read as solid circles in the side view.
+    # Only the size prints; the match-drill callout carries the location. Under
+    # the front hole, its leader rising onto it.
+    "PinHoleDia": (FRONT_PIN_X - 0.008, PROFILE_CENTER[1] - 0.028),
+}
+
+# DETAIL A: the crown is a 1.2 mm feature. At 1:1 its height, its sphere and
+# the overall and body witnesses all crowd the same 1.2 mm, so a native 5:1
+# detail of the front end carries the crown, once, for BOTH ENDS. The fence
+# centres on the axis just inside the end face and takes in the apex and the
+# rim; the detail stands right of the profile, clear of the right border.
+DETAIL_SCALE = (5, 1)
+DETAIL_RADIUS_MM = 5.0
+DETAIL_FENCE_Z_MM = 1.0
+DETAIL_CENTER = (0.355, 0.200)
+_DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+_DETAIL_FENCE_R = DETAIL_RADIUS_MM * _DETAIL_MM
+if DETAIL_RADIUS_MM <= abs(
+    -CAP_SAG - DETAIL_FENCE_Z_MM
+) or DETAIL_RADIUS_MM <= math.hypot(DETAIL_FENCE_Z_MM, SHAFT_DIA / 2.0):
+    raise AssertionError("DETAIL A's fence must take in the crown's apex and its rim")
+# The label anchors at its top centre, under the crown's callout.
+DETAIL_LABEL_XY = (DETAIL_CENTER[0], DETAIL_CENTER[1] - _DETAIL_FENCE_R - 0.032)
+# The circle's letter on the profile: up-right of the front tip, right of
+# its overall-length witness line.
+DETAIL_LETTER_XY = (FRONT_TIP_X + 0.008, PROFILE_CENTER[1] + 0.012)
+
+# A short dimension's callout is far wider than the span it measures, so its
+# text stands OUTSIDE the witness pair. Callout text runs ~2.75 mm a character
+# at the template's dimension height (MHA-CH-005 r743-3 render).
+CALLOUT_CHAR_WIDTH = 0.00275
+CALLOUT_WITNESS_GAP = 0.003
+
+
+def _detail_x(z_mm: float) -> float:
+    """Sheet x of part station z in the detail: model -Z runs to the right."""
+    return DETAIL_CENTER[0] + (DETAIL_FENCE_Z_MM - z_mm) * _DETAIL_MM
+
+
+def _right_of_witness(witness_x: float, callout: str) -> float:
+    """Text centre x that starts a callout CALLOUT_WITNESS_GAP right of a witness."""
+    return witness_x + CALLOUT_WITNESS_GAP + len(callout) * CALLOUT_CHAR_WIDTH / 2.0
+
+
+DETAIL_KEEP = {
+    # Under the fence, right of the apex's witness: a short .X height the
+    # "BOTH ENDS" callout makes a 2X statement.
+    "CapFrontSag": (
+        _right_of_witness(_detail_x(-CAP_SAG), CROWN_CALLOUT),
+        DETAIL_CENTER[1] - _DETAIL_FENCE_R - 0.010,
+    ),
+    # Up-right of the fence: the leader drops onto the crown's arc.
+    "CapFrontR": (
+        DETAIL_CENTER[0] + _DETAIL_FENCE_R + 0.012,
+        DETAIL_CENTER[1] + 0.022,
+    ),
+}
+
+# Ra on the running face, the body both pivot-block bores run on. A revolved
+# flank is a drawing SILHOUETTE, not a model edge, so the pick names that
+# entity type; the straight leader keeps off the geometry. Note text height,
+# as on the other part sheets: at the template default the symbol printed
+# about twice the text height (#1015).
+FINISH_CHAR_HEIGHT = 0.0025
+BEARING_FINISH_EDGE = (PROFILE_CENTER[0] - 0.020, SHAFT_LOWER_FLANK_Y)
+BEARING_FINISH_SYMBOL = (BEARING_FINISH_EDGE[0], SHAFT_LOWER_FLANK_Y - 0.013)
+
+
+def _front_end_detail(adapter: Any, profile: Any) -> Any:
+    """A native 5:1 detail of the front end: its crown."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(profile, "IView")
+    if not drawing.ActivateView(view_name(adapter, profile)):
+        raise RuntimeError("failed to activate the front-end detail's parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        profile,
+        (0.0, 0.0, DETAIL_FENCE_Z_MM / 1000.0),
+        label="front-end detail centre",
+    )
+    radius = DETAIL_RADIUS_MM * SHEET_SCALE[0] / 1000.0
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create the front-end detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        "A",
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create the front-end detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("the front-end detail has invalid bounds")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position the front-end detail")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position the front-end detail label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"the front-end detail label did not persist: {actual}")
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(
+            f"expected one detail circle on the profile, found {len(circles)}"
+        )
+    circle = _early_bound(circles[0], "IDetailCircle")
+    circle.SetLabelPosition(*DETAIL_LETTER_XY)
+    draw.EditRebuild3()
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"the detail circle's letter did not persist: {letter}")
+    return detail
+
+
+def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> None:
+    """Print the crown's model radius as the ASME spherical reference ``(SR4.8)``.
+
+    The radius is read-only: a spherical cap of the printed crown height on
+    the toleranced diameter already fixes it. Whatever radius prefix the
+    display carries is kept behind the ``(S``; the readback proves it stuck
+    (the MHA-CH-005 pivot shaft's dome prints the same way).
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+    prefix = "(S" + existing
+    display.SetText(1, prefix)
+    display.SetText(2, ")")  # swDimensionTextSuffix
+    applied = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+    _telemetry.info(
+        f"{label}: spherical reference prefix {existing!r} -> {applied[0]!r}, "
+        f"suffix {applied[1]!r}"
+    )
+    if applied != (prefix, ")"):
+        raise RuntimeError(
+            f"failed to mark {label} as a spherical reference: {applied}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -124,7 +321,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
             "Iso View Note",
         ),
         required=(
@@ -133,7 +329,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
             "Iso View Note",
         ),
     )
@@ -152,119 +347,73 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    profile = place_view(adapter, str(SOURCE), "*Right", *PROFILE_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (front, right, iso):
+    for view in (profile, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+    profile_annotations = curate_view_dimensions(
+        adapter,
+        profile,
+        keep=PROFILE_KEEP,
+        view_label="profile",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    detail = _front_end_detail(adapter, profile)
+    set_hidden_lines_removed(adapter, detail)
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="front-end detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+    # Decimal places (and so the general-tolerance row each dimension claims)
+    # are authored on the part; the sheet only proves the import kept them.
+    assert_imported_precision(
+        adapter,
+        [*profile_annotations, *detail_annotations],
+        DRAWING_PRECISION_BY_NAME,
     )
-    # SolidWorks classifies a solid circular end silhouette under the same
-    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
-    # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to shaft end view")
+    set_dimension_callouts(adapter, profile_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, detail_annotations, {"CapFrontSag": CROWN_CALLOUT})
+    # The overall length is the two crowns on the body: a reference.
+    set_reference_dimensions(adapter, profile_annotations, ("OverallLength",))
+    radius_annotations = [
+        annotation
+        for annotation in detail_annotations
+        if dimension_name(adapter, annotation) == "CapFrontR"
+    ]
+    if len(radius_annotations) != 1:
+        raise RuntimeError("front-end detail does not carry exactly one crown radius")
+    _set_spherical_reference(
+        adapter, radius_annotations[0], label="pinion pivot shaft crown radius"
+    )
 
-    end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
-    end_top = (FRONT_CENTER[0], FRONT_CENTER[1] + end_radius)
-    end_upper = (
-        FRONT_CENTER[0] + end_radius * math.cos(math.radians(50.0)),
-        FRONT_CENTER[1] + end_radius * math.sin(math.radians(50.0)),
-    )
-    cylindricity = add_feature_control_frame(
+    # The axis says which pairs of lines are diameters and is what the shop
+    # indicates the bar on. The face pick sits mid-body, clear of every
+    # placed annotation.
+    add_view_centerline(
         adapter,
-        front,
-        edge_xy=end_upper,
-        frame_xy=(0.065, 0.232),
-        characteristic="cylindricity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["pinion pivot cylindrical body"],
-        label="pinion pivot cylindrical body",
+        profile,
+        face_xy=(PROFILE_CENTER[0] + 0.030, PROFILE_CENTER[1]),
+        label="pinion pivot shaft axis centerline",
     )
-    datum_a = add_datum_feature(
+    add_surface_finish(
         adapter,
-        front,
-        edge_xy=end_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-        datum="A",
-        label="pinion pivot cylindrical-body axis",
-    )
-    crown_axial = CAP_SAG / 2.0
-    crown_radial = math.sqrt(CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2)
-    right_crown_face = (
-        RIGHT_CENTER[0] + (SHAFT_LEN / 2.0 + crown_axial) / 1000.0,
-        RIGHT_CENTER[1] + crown_radial / 2000.0,
-    )
-    body_face = (
-        RIGHT_CENTER[0],
-        RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 4000.0,
-    )
-    crown_profile = add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=right_crown_face,
-        # Right of the crown, not left (was (0.245, 0.228)): the 33 mm "BOTH
-        # CROWNS" row outruns the 20 mm frame, so the leader out of the frame's
-        # right side ran through it (leader-through-own-text). From here the
-        # shoulder leaves the frame's left side and the leader drops near-vertical
-        # to the crown, 6 mm left of the row and 2.4 mm past the 187.0 witness end.
-        frame_xy=(0.295, 0.228),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["pinion pivot crown profile"],
-        datums=(),
-        quantity="BOTH CROWNS",
-        label="pinion pivot crown profile",
-        entity_type="FACE",
-    )
-    bearing_finish = add_surface_finish(
-        adapter,
-        right,
-        edge_xy=body_face,
-        symbol_xy=(0.155, 0.205),
+        profile,
+        edge_xy=BEARING_FINISH_EDGE,
+        entity_type="SILHOUETTE",
+        symbol_xy=BEARING_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="pinion pivot bearing finish",
-        entity_type="FACE",
+        char_height=FINISH_CHAR_HEIGHT,
     )
 
-    # pc-r7 eye pass: the cylindricity frame and datum A sat on the
-    # match-drill callout's text, and the Ra bar on its shoulder.  The callout
-    # is moved from the symbols' read-back boxes, not by a hand-tuned
-    # coordinate, and the placement is asserted, so a longer callout moves
-    # further instead of re-colliding.
-    place_callout_clear(
-        adapter,
-        next(
-            annotation
-            for annotation in right_annotations
-            if dimension_name(adapter, annotation) == "PinHoleDia"
-        ),
-        label="MHA-DT-019 match-drill callout",
-        below={
-            "bearing finish": gdt_box(
-                adapter, bearing_finish.GetAnnotation(), label="bearing Ra"
-            ),
-        },
-        beside={
-            "cylindricity frame": gdt_box(
-                adapter, cylindricity.GetAnnotation(), label="cylindricity frame"
-            ),
-            "datum A": gdt_box(adapter, datum_a.GetAnnotation(), label="datum A"),
-            "crown profile frame": gdt_box(
-                adapter, crown_profile.GetAnnotation(), label="crown profile frame"
-            ),
-        },
-    )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
-    add_property_linked_note(adapter, "End View Note", 0.020, 0.140)
-    add_property_linked_note(adapter, "Iso View Note", 0.325, 0.157)
+    # 0.020: a note is left-aligned on its anchor, so the ink starts here,
+    # clear of the 12.7 mm zone margin.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.085)
+    add_property_linked_note(adapter, "Iso View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,
