@@ -118,15 +118,23 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("drum_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
 
+# The tip diameter prints on the side view beside the length it runs
+# (drawing-guidelines.md rule 11 (turned parts read like the lathe)).  The gear
+# helper's blank circle must stay on Front to cut the teeth, so a hidden
+# Right-plane reference sketch carries the printed, banded OutsideDia
+# (drawing-simplicity-policy.md: a hidden reference sketch whose one driving
+# dimension is the value); GearBlankProfile's own OutsideDia still drives the
+# solid from the same global.
+OUTSIDE_DIA_REFERENCE = "OutsideDiaReference"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
-    "GearBlankProfile": {"OutsideDia"},
+    OUTSIDE_DIA_REFERENCE: {"OutsideDia"},
     "ArborBoreProfile": {"ArborBoreDia"},
 }
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": 1},
-    "GearBlankProfile": {"OutsideDia": 2},
+    OUTSIDE_DIA_REFERENCE: {"OutsideDia": 2},
     "ArborBoreProfile": {"ArborBoreDia": 2},
 }
 DRAWING_PRECISION_BY_NAME = {
@@ -208,6 +216,12 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
+# The tight tip and tooth-thickness bands exist for the mesh with the 20
+# cylinder gears, so the block names that mate and why the span is tight
+# (drawing-guidelines.md rule 4 (tighten only for function, and name the mate);
+# machinist review r1 of 680e8eea5).
+_CYLINDER_GEAR = _config.parts("dt-cylinder-gear")
+MESH_MATE = f"CYLINDER GEAR {_CYLINDER_GEAR['number']}"
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
@@ -215,9 +229,11 @@ GEAR_DATA = gear_data_note(
         ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
+        # The finite form's off-centre root arc spans only microns; one REF
+        # value, not a range that reads like a working band (review r1 minor).
         (
             "ROOT ENVELOPE DIAMETER (mm, REF)",
-            f"{ROOT_ENVELOPE_DIA_MM[0]:.3f}-{ROOT_ENVELOPE_DIA_MM[1]:.3f}",
+            f"{sum(ROOT_ENVELOPE_DIA_MM) / 2.0:.2f}",
         ),
         (
             "CUTTER PLUNGE (mm, REF)",
@@ -236,8 +252,15 @@ GEAR_DATA = gear_data_note(
             f"+{BASE_TANGENT_SPAN_BAND[0]:.3f}"
             f"/{BASE_TANGENT_SPAN_BAND[1]:.3f}",
         ),
+        (
+            "MATES WITH",
+            f"{MESH_MATE} (ALL {int(_CYLINDER_GEAR['quantity'])}), {drum.TEETH}T; "
+            "SPAN SETS MESH BACKLASH",
+        ),
     ]
 )
+# The tip band's mate rides its callout (rule 4).
+OUTSIDE_DIA_CALLOUT = f"MESHES WITH\n{MESH_MATE}"
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): notes never carry a dimension.  MHA-DT-022 owns its bond-zone band
 # natively (BondZoneDia).  The hand slide is this part's matched-fit
@@ -245,10 +268,19 @@ GEAR_DATA = gear_data_note(
 # (Codex P2 on #832).  It names the mating part as well as its number
 # (codex machinist review of f0faedc51), both from the part registry.
 _ARBOR = _config.parts("dt-pinion-arbor")
+# The arbor's title is bracketed so it reads as the mate's name, not this
+# part's (machinist review r1 minor).
 ARBOR_BORE_CALLOUT = (
-    f"REAM THRU\nSLIDES BY HAND ON {_ARBOR['number']}\n{_ARBOR['title'].upper()}"
+    f"REAM THRU\nSLIDES BY HAND ON {_ARBOR['number']}\n({_ARBOR['title'].upper()})"
 )
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the bond to MHA-DT-022 is an assembly step (dt_pinion_arbor_spec
-# ASSEMBLY_STEP owns the drum joint), not a part note.
-DRAWING_NOTES = "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND."
+# ASSEMBLY_STEP owns the drum joint), not a part note.  The one note is a
+# do-not-cut requirement, so it is leadered to the teeth on the side view and
+# says what the tooth ends at both end faces get instead of the title-block
+# edge break (machinist review r1: the free note left them ambiguous).
+DRAWING_NOTES = (
+    "TEETH, INCLUDING TOOTH ENDS AT BOTH FACES:\n"
+    "REMOVE BURRS ONLY; DO NOT CHAMFER OR BLEND."
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
+END_VIEW_NOTE = "END VIEW SCALE 2:1"
