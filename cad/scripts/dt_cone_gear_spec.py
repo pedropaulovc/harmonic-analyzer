@@ -20,8 +20,6 @@ from typing import Any
 
 import _config
 from cone_pitch import SEAT_PITCH
-from _gtol_cylinder import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from cone_shaft_land_bands import (
     FLAT_AF_BAND,
     SECTION_CONE_GEAR_TEETH,
@@ -239,52 +237,64 @@ def tooth_thickness_mm(teeth: int) -> float:
     return stock_form_profile(teeth).pitch_tooth_thickness_mm
 
 
-# T006 acceptance on the bench (machinist review of the stack build: the
-# DT6-FORM1 form cannot be checked without an optical comparator). The cut
-# gear is measured over two Ø1.20 pins (drill blanks) in opposite gaps with
-# an ordinary micrometer. At this size each pin bears on the working involute
-# well above the relief junction (R ~1.64-1.67 vs 1.53) and stands ~0.4 proud
-# of the tips, so the reading follows the tooth thickness alone.
+# Tooth-thickness acceptance on the bench: every gear is measured over two
+# pins in opposite gaps (all twenty tooth counts are even) with an ordinary
+# micrometer. T006 first (machinist review of the stack build: the DT6-FORM1
+# form cannot be checked without an optical comparator); then every sheet
+# (ENFORCE round 1 of #971: T012-T120 printed a circular thickness no shop can
+# measure). Ø1.00 drill blanks bear inside every stock-cut flank and stand
+# ~0.46-0.56 proud of the tips; T006 keeps Ø1.20, which bears on its working
+# involute well above the relief junction (R ~1.64-1.67 vs 1.53) and stands
+# ~0.8 proud. Either way the reading follows the tooth thickness alone.
+OVER_PINS_PIN_DIA_MM = 1.00
 CUSTOM_SIX_PIN_DIA_MM = 1.20
 _OVER_PINS_SAMPLES = 2000
 
 
-def _over_pins_mm(profile: StockFormProfile, pin_dia_mm: float) -> tuple[float, float]:
-    """Measurement over two pins in opposite gaps and the flank contact radius.
+def over_pins_pin_dia_mm(teeth: int) -> float:
+    _require_member(teeth)
+    return CUSTOM_SIX_PIN_DIA_MM if teeth == 6 else OVER_PINS_PIN_DIA_MM
 
-    The pin centre sits on the gap bisector (+X) where its distance to the
-    sampled ACTUAL flanks equals its radius; even tooth counts put the other
-    pin diametrically opposite, so M = 2 (R + r).
+
+def _over_pins_mm(profile: StockFormProfile, pin_dia_mm: float) -> tuple[float, float, bool]:
+    """Measurement over two pins in opposite gaps, the flank contact radius,
+    and whether that contact is inside a flank (not at either end of it).
+
+    A pin lowered along the gap bisector (+X) stops on the first sampled
+    ACTUAL flank point it meets: the one that puts its centre furthest out,
+    x + sqrt(r^2 - y^2). Even tooth counts put the other pin diametrically
+    opposite, so M = 2 (X + r).
     """
-    points = [
-        segment.point(index / _OVER_PINS_SAMPLES)
-        for segment in profile.gap_segments()
-        if segment.kind == "flank"
-        for index in range(_OVER_PINS_SAMPLES + 1)
-    ]
     radius = pin_dia_mm / 2.0
-    low, high = 0.0, profile.blank_radius_mm + radius
-    for _ in range(50):
-        middle = (low + high) / 2.0
-        if min(math.hypot(x - middle, y) for x, y in points) > radius:
-            high = middle
-        else:
-            low = middle
-    x, y = min(points, key=lambda point: math.hypot(point[0] - high, point[1]))
-    return 2.0 * (high + radius), math.hypot(x, y)
+    best: tuple[float, float, bool] | None = None
+    for segment in profile.gap_segments():
+        if segment.kind != "flank":
+            continue
+        for index in range(_OVER_PINS_SAMPLES + 1):
+            x, y = segment.point(index / _OVER_PINS_SAMPLES)
+            if abs(y) > radius:
+                continue
+            centre = x + math.sqrt(radius * radius - y * y)
+            if best is None or centre > best[0]:
+                best = (centre, math.hypot(x, y), 0 < index < _OVER_PINS_SAMPLES)
+    if best is None:
+        raise ValueError(f"T{profile.teeth:03d}: a Ø{pin_dia_mm} pin reaches no flank")
+    centre, contact, interior = best
+    return 2.0 * (centre + radius), contact, interior
 
 
 @lru_cache(maxsize=None)
-def custom_six_over_pins_limits_mm() -> tuple[float, float]:
-    """T006 over-pins acceptance at its two thickness limits, rounded inward."""
-    profiles = manufacturing_corner_profiles(6)
+def over_pins_limits_mm(teeth: int) -> tuple[float, float]:
+    """Over-pins acceptance at the thickness and blank limits, rounded inward."""
+    pin = over_pins_pin_dia_mm(teeth)
     readings = []
-    for profile in profiles:
-        over_pins, contact = _over_pins_mm(profile, CUSTOM_SIX_PIN_DIA_MM)
-        if not profile.template.relief_junction_radius_mm < contact < profile.blank_radius_mm:
-            raise ValueError("T006: over-pins contact leaves the working involute")
-        if over_pins <= outside_dia_mm(6):
-            raise ValueError("T006: pins do not stand clear of the tips")
+    for profile in manufacturing_corner_profiles(teeth):
+        over_pins, contact, interior = _over_pins_mm(profile, pin)
+        floor = profile.template.relief_junction_radius_mm if teeth == 6 else 0.0
+        if not interior or not floor < contact < profile.blank_radius_mm:
+            raise ValueError(f"T{teeth:03d}: over-pins contact leaves the working flank")
+        if over_pins <= outside_dia_mm(teeth):
+            raise ValueError(f"T{teeth:03d}: pins do not stand clear of the tips")
         readings.append(over_pins)
     return math.ceil(min(readings) * 1e3) / 1e3, math.floor(max(readings) * 1e3) / 1e3
 
@@ -471,24 +481,6 @@ for _teeth in CONFIGURATION_TEETH:
             f"flat into its Ø{bore_dia_mm(_teeth)} bore"
         )
 
-
-def bore_surface_finish(teeth: int) -> SurfaceFinishControl:
-    """Return the bore finish control qualified by this configuration's bore."""
-    return SurfaceFinishControl(
-        "cone_gear_bore",
-        MACHINED_UM,
-        CylinderFace(bore_dia_mm(teeth)),
-        native_attachment="model",
-    )
-
-
-# Part PMI is authored while the default T120 configuration is active. Each
-# sheet resolves its own "cone_gear_bore" finish row: using T120's row would
-# reject the actual terminal bore on T006/T012.
-SURFACE_FINISHES = (bore_surface_finish(TEETH),)
-BORE_SURFACE_FINISHES: dict[int, tuple[SurfaceFinishControl, ...]] = {
-    teeth: (bore_surface_finish(teeth),) for teeth in CONFIGURATION_TEETH
-}
 
 # The part's two construction-only authoring sketches.  The part saves both
 # hidden (they would otherwise render in every assembly that places a gear);

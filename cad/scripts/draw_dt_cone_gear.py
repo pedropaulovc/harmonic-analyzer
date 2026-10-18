@@ -5,14 +5,16 @@ Each sheet selects its own part configuration, imports the native model-owned
 blank diameter, D-bore (diameter, across-flat and flat clock), face width,
 driving circular-tooth-thickness requirement and functional root-envelope
 limits, plus the actual finite cutter recipe and bounded carrying-contact data.
-The native imported bands remain model-owned. A separate DT6-FORM1 sheet
-gives the custom tool's grind data beside its installed T006 gap outline; the
-exact grinding equations stay in the model's "Cutter Profile" property.
+The native imported bands remain model-owned. A last sheet defines the T006
+tooth space point by point beside its outline (the custom DT6-FORM1 tool is
+ground to it); the exact equations stay in the model's "Cutter Profile"
+property.
 
-There are no datums or feature-control frames.  Hidden lines communicate no
-additional manufacturing fact on these through-bored spur gears, so every view
-remains hidden-lines-removed.  The one finish symbol belongs to the fitted
-bore.  The side view stays in projection with the front view's bore axis; its
+There are no datums, feature-control frames or finish symbols: the bore is a
+fixed D-fit that does not run (drawing-guidelines.md rule 6).  Hidden lines
+communicate no additional manufacturing fact on these through-bored spur
+gears, so every view remains hidden-lines-removed.  The side view stays in
+projection with the front view's bore axis; its
 face width hangs below it, clear of the Gear Data block. The circular pitch
 thickness uses a construction inspection witness of the actual arc size, not
 an ideal chord oracle; root MIN/MAX use the actual radial-envelope witness.
@@ -54,10 +56,9 @@ from _drawing_common import (
 from _drawing_dimension_import import _INSERT_DIMS_MARKED, delete_unnamed_imports
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import visible_view_entities
-from _drawing_finish import add_surface_finish
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_layout_collect import check_drawing_layout
-from _drawing_leaders import ARROW_TEXT_CLEARANCE
+from _drawing_leaders import ARROW_TEXT_CLEARANCE, set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -65,13 +66,12 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _fit_deviations import deviations
 from _layout_audit import arc_segments
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_cone_gear_notes import CUTTER_DETAIL_SHEET
 from dt_cone_gear_spec import (
-    BORE_SURFACE_FINISHES,
     CUSTOM_SIX_FORM_TOLERANCE_NOTE,
     CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
@@ -86,8 +86,12 @@ from dt_cone_gear_spec import (
     outside_dia_mm,
     tooth_thickness_mm,
     custom_six_form_points_mm,
+    custom_six_gap_half_angle_rad,
     stock_form_profile,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_gear"]
@@ -130,7 +134,7 @@ _SCALE_BY_TEETH = {
 }
 SHEET_SCALES = {
     f"T{teeth:03d}": _SCALE_BY_TEETH[teeth] for teeth in CONFIGURATION_TEETH
-} | {CUTTER_DETAIL_SHEET: (20.0, 1.0)}
+} | {CUTTER_DETAIL_SHEET: (1.0, 1.0)}
 SHEET_SCALE = SHEET_SCALES[SHEET_NAMES[0]]
 
 FRONT_CENTER = (0.105, 0.150)
@@ -159,24 +163,37 @@ BORE_VIEW_BORE_MIN = 0.028
 BORE_VIEW_SCALE_LADDER = (
     (4.0, 1.0), (5.0, 1.0), (10.0, 1.0), (20.0, 1.0), (40.0, 1.0),
 )
-# Gear body kept round the bore inside the crop circle, sheet metres.
-BORE_VIEW_CROP_MARGIN = 0.003
+# Gear body kept round the bore inside the crop circle, sheet metres. The
+# crop prints no outline (``_crop_bore_view``): drawn, its circle stood 3 mm
+# outside the bore and the diameter's outside arrow spanned exactly that
+# ring, so the Ø read as landing on the unlabelled circle (ENFORCE round 1
+# of #971). Unprinted, the ring only spaces the bore from the clock text:
+# 1.5 mm keeps the clock's three-line block's arc (its radius grows with the
+# crop) clear of the front view on T114.
+BORE_VIEW_CROP_MARGIN = 0.0015
 # The view's title stands this far under the crop circle, below the
-# across-flat value and its dimension line, which hang BORE_VIEW_AF_DROP under
-# it.
-BORE_VIEW_AF_DROP = 0.005
+# across-flat callout's dimension line, the block's bottom edge. The block is
+# centred on its SetPosition point (as the clock's is, below), ~5.3 mm a
+# row; the mate's line under BORE ACROSS FLAT adds one, so the point drops
+# half a row less than the 5 mm it stood at and the bottom stays put.
+BORE_VIEW_AF_DROP = 0.0025
 BORE_VIEW_LABEL_DROP = 0.016
+# The diameter's text stands this far above the crop circle (6 mm with the
+# value alone): the block is centred there, and the mate's two lines under
+# THRU would lower the leader shoulder under it ~5.3 mm, onto the bore.
+BORE_VIEW_DIA_LIFT = 0.0115
 # The across-flat text stands OUTSIDE its witnesses, right of the flat's, as
 # MHA-DT-007's does. Centred between them, its lines (~2.65 mm a character in
 # the #1128 full-5 render) ran wider than the 29-35 mm witness span on every
 # sheet, so both witness lines crossed the callout, and its tolerance stack
 # sat on the diameter leader's lower end (machinist review of full-5).
-# BORE_VIEW_AF_HALF_WIDTH is half the widest line, BORE ACROSS FLAT, rounded
-# up; the text's left edge clears the flat's witness by BORE_VIEW_AF_GAP.
+# BORE_VIEW_AF_HALF_WIDTH is half the widest line, the mate's 20-character
+# SLIDES ON MHA-DT-004, rounded up; the text's left edge clears the flat's
+# witness by BORE_VIEW_AF_GAP.
 BORE_VIEW_AF_GAP = 0.004
-BORE_VIEW_AF_HALF_WIDTH = 0.022
-# The flat clock's two-line text ("90° ±0.25°" over TO TOOTH CENTERLINE),
-# measured in the run-20261010T051729717Z T006 PDF: x 69.8-119.9 mm, y
+BORE_VIEW_AF_HALF_WIDTH = 0.027
+# The flat clock's text, measured with two lines ("90° ±0.25°" over TO TOOTH
+# CENTERLINE) in the run-20261010T051729717Z T006 PDF: x 69.8-119.9 mm, y
 # 60.0-72.0 mm round its SetPosition point (94.9, 66.0) mm, so the point is
 # the block's centre. Its arc ends on the bore's +X axis line with an
 # arrowhead at radius |text - vertex|, i.e. under the text: there the axis
@@ -184,10 +201,14 @@ BORE_VIEW_AF_HALF_WIDTH = 0.022
 # arrowhead (3.6 mm long on that PDF; the document's 6.35 mm arrow-length
 # preference is not what this arc end draws) now ends ARROW_TEXT_CLEARANCE
 # under the block, and the block's left edge stands CLEAR_GAP_M right of the
-# crop circle the audit flagged it against (detail-circle crossing at x
-# 70.6 mm).
+# bore view's crop circle. The mate's line over the value makes the block
+# three lines, ~18 mm tall; at 20 characters, one more than CENTERLINE's
+# line, it overhangs the measured width ~1.3 mm a side, inside that gap. A
+# wider half-width would swing the arc into the front view's box on T114
+# (test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours). The native
+# readback still refuses an arc sweep under CLOCK_MIN_SWEEP_DEG.
 BORE_CLOCK_TEXT_HALF_WIDTH = 0.025
-BORE_CLOCK_TEXT_HALF_HEIGHT = 0.006
+BORE_CLOCK_TEXT_HALF_HEIGHT = 0.009
 BORE_CLOCK_TEXT_GAP = 0.002
 BORE_CLOCK_ARROW_LENGTH = 0.0036
 # swDimensionArrowsSide_e.swDimArrowsInside, set rather than left to the
@@ -224,111 +245,287 @@ CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAn
 # rows) measured 49.1 mm tall natively (e91d2581 layout audit), 3.51 mm a
 # line; the 15-line block ends ~52.6 mm down, still above the largest side
 # view (top 0.197) with FaceWidth below it.
-# The dedicated custom-tool sheet keeps the grind data out of these
-# dimension/view lanes.
+# The tooth-space sheet keeps the T006 form table out of these dimension/view
+# lanes.
 GEAR_DATA_POS = (0.215, 0.263)
 # Rendered height budget of the Gear Data block, for the layout test.
 GEAR_DATA_HEIGHT = 0.056
 MANUFACTURING_NOTES_POS = (0.015, 0.263)
 CUTTER_DETAIL_POS = (0.015, 0.263)
-CUTTER_DETAIL_VIEW_CENTER = (0.325, 0.155)
+# Where the tooth-space sheet's hidden title-block source view stands (see
+# build): clear of the table, inside the border.
+CUTTER_SOURCE_VIEW_CENTER = (0.325, 0.155)
+# The tooth-space plot beside the table (ENFORCE round 4 of #971: a table
+# alone left the sheet bunched in one corner, rule 15). The table governs; the
+# plot draws the same rows at FORM_PLOT_SCALE with Y0 on the CL at
+# FORM_PLOT_ORIGIN. At 75:1 the space spans x 0.207-0.353 and y 0.139-0.202,
+# right of the table (x <= ~0.125) and above the title block (y 0.064).
+FORM_PLOT_SCALE = 75.0
+FORM_PLOT_ORIGIN = (0.280, 0.140)
+# The CL runs this far below Y0 and above the blank OD; the X axis this far
+# right of the CL.
+FORM_PLOT_CL_OVERRUN = 0.008
+FORM_PLOT_X_AXIS_LENGTH = 0.085
+# The R stations are drawn left of the CL only, out to these |X| (mm), so
+# their labels stand clear of the X axis.
+FORM_PLOT_STATION_REACH_MM = {"junction": 1.10, "blank": 1.25}
+FORM_PLOT_INVOLUTE_SAMPLES = 16
+FORM_PLOT_TITLE_POS = (0.205, 0.240)
+FORM_PLOT_ORIGIN_NOTE_OFFSET = (0.004, -0.008)
+# A station label's top-left, from its arc's left end: wholly left of the end,
+# where the arc only rises away to the right.
+FORM_PLOT_STATION_LABEL_OFFSET = (-0.019, 0.002)
 
 
-def cutter_detail_window_mm() -> tuple[float, float, float]:
-    """Bound the installed T006 material-facing gap for its native cropped view."""
-    profile = stock_form_profile(6)
-    radial_midpoint = (profile.root_radius_min_mm + profile.blank_radius_mm) / 2.0
-    phase = math.pi / profile.teeth
-    cosine, sine = math.cos(phase), math.sin(phase)
-    center = radial_midpoint, 0.0
-    samples = 32
-    radius = 0.0
-    for segment in profile.gap_segments():
-        if segment.kind == "tip_arc":
-            continue
-        # Core's second-derivative bound pays the unsampled chord sagitta.
-        deviation = segment.second_derivative_bound_mm / (8.0 * samples**2)
-        radius = max(radius, max(
-            math.dist(center, segment.point(index / samples))
-            for index in range(samples + 1)
-        ) + deviation + profile.geometry_error_bound_mm)
-    return cosine * radial_midpoint, sine * radial_midpoint, radius + 0.15
+def form_plot_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
+    """Sheet position (m) of table point (X, Y) mm on the tooth-space plot."""
+    return (
+        FORM_PLOT_ORIGIN[0] + x_mm * FORM_PLOT_SCALE / 1000.0,
+        FORM_PLOT_ORIGIN[1] + y_mm * FORM_PLOT_SCALE / 1000.0,
+    )
+
+
+def form_plot_flank_mm() -> list[tuple[float, float]]:
+    """One flank (+X) of the T006 space as table (X, Y), root arc end up.
+
+    Straight lines row to row from where the relief leaves the root arc to the
+    junction (the table's own rule), then the involute sampled to the blank.
+    """
+    points = custom_six_form_points_mm()
+    template = stock_form_profile(6).template
+    root = template.root_radius_mm
+    junction = template.relief_junction_radius_mm
+    blank = points[-1][0]
+    flank = [(x, y) for radius, x, y in points[1:] if radius <= junction + 1e-9]
+    for index in range(1, FORM_PLOT_INVOLUTE_SAMPLES + 1):
+        radius = junction + (blank - junction) * index / FORM_PLOT_INVOLUTE_SAMPLES
+        half = custom_six_gap_half_angle_rad(radius)
+        flank.append((radius * math.sin(half), radius * math.cos(half) - root))
+    return flank
+
+
+def form_plot_station_mm(radius_mm: float, reach_mm: float) -> tuple[float, float]:
+    """Table (X, Y) where the station arc of ``radius_mm`` stops, left of CL."""
+    root = stock_form_profile(6).template.root_radius_mm
+    return (-reach_mm, math.sqrt(radius_mm**2 - reach_mm**2) - root)
+
+
+def form_plot_labels() -> list[tuple[str, tuple[float, float]]]:
+    """(text, top-left sheet position) of the plot's notes."""
+    template = stock_form_profile(6).template
+    blank = custom_six_form_points_mm()[-1][0]
+    junction = template.relief_junction_radius_mm
+    top = form_plot_xy(0.0, custom_six_form_points_mm()[-1][2])[1]
+    labels = [
+        (
+            f"T006 TOOTH SPACE PLOTTED {FORM_PLOT_SCALE:.0f}:1 FROM THE TABLE "
+            "(TABLE GOVERNS)",
+            FORM_PLOT_TITLE_POS,
+        ),
+        ("CL", (FORM_PLOT_ORIGIN[0] - 0.003, top + FORM_PLOT_CL_OVERRUN + 0.006)),
+        (
+            "+X",
+            (FORM_PLOT_ORIGIN[0] + FORM_PLOT_X_AXIS_LENGTH + 0.002,
+             FORM_PLOT_ORIGIN[1] + 0.002),
+        ),
+        (
+            f"X0 Y0 ON CL AT ROOT R{template.root_radius_mm:.3f}\n"
+            f"GEAR AXIS {template.root_radius_mm:.3f} BELOW Y0 ON CL",
+            (FORM_PLOT_ORIGIN[0] + FORM_PLOT_ORIGIN_NOTE_OFFSET[0],
+             FORM_PLOT_ORIGIN[1] + FORM_PLOT_ORIGIN_NOTE_OFFSET[1]),
+        ),
+    ]
+    for key, radius in (("junction", junction), ("blank", blank)):
+        x, y = form_plot_xy(
+            *form_plot_station_mm(radius, FORM_PLOT_STATION_REACH_MM[key])
+        )
+        labels.append((
+            f"R{radius:.3f}",
+            (x + FORM_PLOT_STATION_LABEL_OFFSET[0], y + FORM_PLOT_STATION_LABEL_OFFSET[1]),
+        ))
+    return labels
+
+
+def _draw_form_plot(adapter: Any) -> None:
+    """Sketch the tooth-space plot on the active sheet and label it.
+
+    Sheet sketch lines carry no dimensions: the sizes stay in the table.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    draw.ClearSelection2(True)
+    ddoc.EditSheet()
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    root = stock_form_profile(6).template.root_radius_mm
+    axis = form_plot_xy(0.0, -root)
+    flank = form_plot_flank_mm()
+    created = []
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        for side in (1.0, -1.0):
+            sheet_points = [form_plot_xy(side * x, y) for x, y in flank]
+            for start, end in zip(sheet_points, sheet_points[1:]):
+                created.append(("flank", manager.CreateLine(*start, 0.0, *end, 0.0)))
+        root_right = form_plot_xy(*flank[0])
+        root_left = form_plot_xy(-flank[0][0], flank[0][1])
+        # +1: counter-clockwise from the right end over the CL to the left.
+        created.append((
+            "root arc",
+            manager.CreateArc(*axis, 0.0, *root_right, 0.0, *root_left, 0.0, 1),
+        ))
+        top = form_plot_xy(0.0, custom_six_form_points_mm()[-1][2])[1]
+        created.append((
+            "CL",
+            manager.CreateCenterLine(
+                FORM_PLOT_ORIGIN[0], FORM_PLOT_ORIGIN[1] - FORM_PLOT_CL_OVERRUN, 0.0,
+                FORM_PLOT_ORIGIN[0], top + FORM_PLOT_CL_OVERRUN, 0.0,
+            ),
+        ))
+        created.append((
+            "X axis",
+            manager.CreateCenterLine(
+                *FORM_PLOT_ORIGIN, 0.0,
+                FORM_PLOT_ORIGIN[0] + FORM_PLOT_X_AXIS_LENGTH, FORM_PLOT_ORIGIN[1], 0.0,
+            ),
+        ))
+        template = stock_form_profile(6).template
+        blank = custom_six_form_points_mm()[-1][0]
+        for key, radius in (
+            ("junction", template.relief_junction_radius_mm), ("blank", blank)
+        ):
+            start = form_plot_xy(0.0, radius - root)
+            end = form_plot_xy(
+                *form_plot_station_mm(radius, FORM_PLOT_STATION_REACH_MM[key])
+            )
+            arc = manager.CreateArc(*axis, 0.0, *start, 0.0, *end, 0.0, 1)
+            created.append((f"R{radius:.3f} station", arc))
+            if arc is not None:
+                _early_bound(arc, "ISketchSegment").ConstructionGeometry = True
+    finally:
+        manager.AddToDB = previous_add_to_db
+    missing = sorted({label for label, segment in created if segment is None})
+    if missing:
+        raise RuntimeError(f"failed to sketch the tooth-space plot's {missing}")
+    draw.ClearSelection2(True)
+    for text, position in form_plot_labels():
+        if add_note(adapter, text, *position) is None:
+            raise RuntimeError(f"failed to add the tooth-space plot note {text!r}")
+    _telemetry.info(
+        f"T006 tooth-space plot: {len(created)} sheet sketch entities at "
+        f"{FORM_PLOT_SCALE:.0f}:1, Y0 at "
+        f"{tuple(round(value * 1000, 1) for value in FORM_PLOT_ORIGIN)} mm"
+    )
+
+
 
 
 def cutter_grind_data() -> str:
-    """What the toolmaker grinds DT6-FORM1 to and how it is accepted.
+    """The T006 tooth space, point by point, and how the cut gear is accepted.
 
     The sheet once printed the part's "Cutter Profile" property: parametric
     equations with 17-digit floats, which no shop grinds to (eye pass of
     run 20261010T051729717Z). Then it printed reference chords, which left
-    the relief undefined (machinist review of the stack build). It now
-    gives the cutting edge point by point at 3 places, read from the same
-    profile the native cut uses (dt_cone_gear_spec.custom_six_form_points_mm),
-    says how the points connect (the round-2 review: points alone let
-    templates differ between them), and gives a one-sided form tolerance.
-    T006 cuts at T=0 on a spur (helix 0) gear, so its installed gap IS the
-    ground form. The shop has no optical comparator: the tool is checked
-    against a template made to the table, and the cut T006 over pins on its
-    own sheet.
+    the relief undefined (machinist review of the stack build). It gives the
+    form point by point at 3 places, read from the same profile the native
+    cut uses (dt_cone_gear_spec.custom_six_form_points_mm), says how the
+    points connect (the round-2 review: points alone let templates differ
+    between them), and gives a one-sided form tolerance.
+
+    It is T006 geometry, not a tool drawing: as "DT6-FORM1 GROUND FORM
+    TOOL" it carried the gear's title block (part, number, brass) and no tool
+    material, and told the shop how to inspect the tool (ENFORCE round 1 of
+    #971; #1427). T006 cuts at T=0 on a spur (helix 0) gear, so its tooth
+    space IS the custom cutter's edge: the shop grinds its own tool to this
+    space, in whatever tool steel it uses, and accepts the cut gear over pins
+    on the T006 sheet. The form tolerance names what it sets (rule 4,
+    ENFORCE round 3).
     """
     profile = stock_form_profile(6)
     template = profile.template
     if template.cutter_number is not None or template.name != CUTTER_DETAIL_SHEET:
         raise ValueError("T006 must use the specified DT6-FORM1 custom cutter")
     if profile.radial_translation_mm != 0.0 or profile.helix_angle_deg != 0.0:
-        raise ValueError("DT6-FORM1's installed gap is its ground form only at T=0, helix 0")
+        raise ValueError("the T006 tooth space is DT6-FORM1's form only at T=0, helix 0")
     root = template.root_radius_mm
     junction = template.relief_junction_radius_mm
     return "\n".join((
-        f"{template.name} GROUND FORM TOOL, mm",
-        "CUTTING EDGE, SYMMETRIC ABOUT TOOL CL:",
-        "X ACROSS CL, Y ALONG CL FROM TIP CENTER,",
+        "T006 TOOTH SPACE FORM, mm",
+        "SYMMETRIC ABOUT THE SPACE CENTERLINE (CL):",
+        "X ACROSS CL, Y ALONG CL FROM THE ROOT,",
         "AT RADIUS R FROM THE GEAR AXIS",
         *(
             f"R{radius:.3f}   X{x:.3f}   Y{y:.3f}"
             for radius, x, y in custom_six_form_points_mm()
         ),
-        f"TIP: CONCAVE ARC R{root:.3f} ABOUT GEAR AXIS",
-        f"TIP ARC TO R{junction:.3f}: STRAIGHT LINES ROW TO ROW",
+        f"ROOT: ARC R{root:.3f} ABOUT GEAR AXIS",
+        f"ROOT ARC TO R{junction:.3f}: STRAIGHT LINES ROW TO ROW",
         f"ABOVE R{junction:.3f}: INVOLUTE, BASE R{template.base_radius_mm:.3f}",
         CUSTOM_SIX_FORM_TOLERANCE_NOTE,
-        f"FORM DEPTH (PLUNGE FROM BLANK OD):  {profile.plunge_mm:.3f}",
-        "INSPECT THE TOOL BY TEMPLATE TO THIS TABLE;",
-        "ACCEPT THE CUT T006 OVER PINS PER SHEET T006",
+        f"WIDE ONLY: SETS BACKLASH WITH {CYLINDER_MATE}",
+        # The space depth is the root and blank rows' difference, and Gear
+        # Data prints it as the plunge; no third copy here.
+        f"ACCEPT OVER PINS PER SHEET {SHEET_NAMES.index('T006') + 1} (T006 GEAR DATA)",
     ))
 
 
+# Each tight band names its mate and fit at its callout (drawing-guidelines
+# rule 4; ENFORCE round 1 of #971 found them only in Gear Data, or nowhere).
+SHAFT_MATE = "MHA-DT-004"
+CYLINDER_MATE = "MHA-DT-012"
 DIMENSION_CALLOUTS = {
     # No process word: a reamer would cut away the flat, and the dimensions
     # define the D-profile (user ruling 2026-09-29, machinist review of the
-    # #1128 full build).
-    "BoreCutDia": "THRU",
+    # #1128 full build). The mate hangs under the value in rows as narrow as
+    # the value: on T006/T012 the flat's witness for the clock rises ~3 mm
+    # right of it, and a wider block's shoulder crosses that witness.
+    "BoreCutDia": f"THRU\nSLIDES ON\n{SHAFT_MATE}",
     # The value is the gear bore's own; naming the bore, not the shaft it
     # slides on, keeps it from reading as MHA-DT-004's across-flat.
-    "BoreAF": "BORE ACROSS FLAT",
+    "BoreAF": f"BORE ACROSS FLAT\nSLIDES ON {SHAFT_MATE}",
     # The flat's normal runs through the bore axis and the +X tooth's centre;
     # the bore view crops the teeth off, so the callout names the reference
     # its centre-mark line stands for.
     "BoreFlatClock": "TO TOOTH CENTERLINE",
-    # Pitch diameter, backlash and mate already live in the Gear Data block.
-    # Repeating them here made the long suffix collide with the bore callout.
+    # The circle the arc is measured on; the mesh it sets goes over the value
+    # (CALLOUTS_ABOVE). Per-sheet: see callouts_below.
     "ToothThickness": "CIRCULAR TOOTH THICKNESS",
     # The origin circle is an inspection witness, not the off-centre root arc.
-    "FloorDia": "ROOT ENVELOPE",
+    "FloorDia": f"ROOT ENVELOPE\nCLEARS {CYLINDER_MATE}",
+    # The cone set is a solid stack on the shaft; each gear's width sets the
+    # stations (user ruling 2026-09-28, spec FACE_WIDTH).
+    "FaceWidth": f"20-GEAR STACK\nON {SHAFT_MATE}",
 }
 
 
-def callouts_above(teeth: int) -> dict[str, str]:
-    """Text over the value: the circle the tooth thickness is measured on.
+def callouts_below(teeth: int) -> dict[str, str]:
+    """Text under the value, with the circle the tooth thickness is measured
+    on.
 
     The thickness is the arc on the pitch circle, but its witnesses are
     straight lines, so without the circle it read as unmeasurable (machinist
-    review of the round-2 build). Below the shelf there is no room on the
-    large-gear sheets: there the callout's end already stands over the title
-    block, 1-2 mm above it.
+    review of the round-2 build).
     """
     pitch_dia = 2.0 * stock_form_profile(teeth).pitch_radius_mm
-    return {"ToothThickness": f"ON PITCH CIRCLE \u00d8{pitch_dia:.3f}"}
+    return {
+        **DIMENSION_CALLOUTS,
+        "ToothThickness": (
+            f"{DIMENSION_CALLOUTS['ToothThickness']}\n"
+            f"ON PITCH CIRCLE \u00d8{pitch_dia:.3f}"
+        ),
+    }
+
+
+# Text over the value: the mates. One line each: SOLIDWORKS drops a
+# multi-line callout above a value from the print (ENFORCE round 2 of #971:
+# every two-line one went unmatched in the PDF; draw_ch_amplitude_bar r1).
+CALLOUTS_ABOVE = {
+    "ToothThickness": f"BACKLASH WITH {CYLINDER_MATE}",
+    "BlankDia": f"MESHES WITH {CYLINDER_MATE}",
+    "BoreFlatClock": f"PHASED TO {SHAFT_MATE}",
+}
+if any("\n" in text for text in CALLOUTS_ABOVE.values()):
+    raise AssertionError("an above-callout with a line break does not print")
 
 
 def rendered_half_od(teeth: int) -> float:
@@ -344,14 +541,24 @@ def rendered_half_face_width(teeth: int) -> float:
 # BlankDia's value stands this far above the tip circle.  At 0.012 the T006
 # value (8:1) sat on the vertical centre-mark line, which reaches 26.3 mm
 # above the bore axis on that sheet (layout audit, 0.82 mm overlap); 0.0145
-# clears it, and no other text on any sheet is within 36 mm above the value.
-BLANK_DIA_LIFT = 0.0145
+# cleared it with the value alone. The block is centred on its point, so the
+# mate's line over the value lowers the shoulder ~2.5 mm: 0.0175 restores it.
+BLANK_DIA_LIFT = 0.0175
+# ...and this far left of the bore axis, so its leader drops from the
+# block's right end nearly straight onto the tip circle. Centred over the
+# axis (ENFORCE round 3, T006) the leader ran diagonally from x 134 mm down
+# through the root envelope's block, whose left edge stands at 121 mm.
+BLANK_DIA_SHIFT_X = 0.020
 # The functional root-envelope stack stands right of the tip circle,
 # above the thickness witness: in the same lane as the thickness
 # dimension line, which runs DOWN from the +X tooth, and clear of the side
-# view (left edge >= 0.219 on every sheet).
-FLOOR_DIA_GAP_X = 0.016
-FLOOR_DIA_RISE = 0.006
+# view (left edge >= 0.219 on every sheet). The mate's row is ~4 chars wider
+# than the label (centred block), so the gap grows ~5.5 mm over the label-only
+# 0.016 to hold the block's left edge where it cleared the teeth.
+FLOOR_DIA_GAP_X = 0.0215
+# The shelf's rise above 0.6 of the tip radius: 6 mm with the three-row stack;
+# the mate's row under the label (centred block) would lower it ~2.8 mm.
+FLOOR_DIA_RISE = 0.009
 # The thickness dimension's arrows stand outside its witnesses, so the upper
 # arrow's tail runs UP the stack's lane: on the 834-fix-6927 T006 sheet (8:1)
 # it crossed the shelf under "GAP FLOOR" by ~1 mm.  The shelf therefore rises
@@ -366,10 +573,11 @@ _PREF_OPT_NONE = 0
 # the thickness arrow 6.35 mm from tip to tail end; build() reads the live
 # preference and refuses a template that differs.
 DIMENSION_ARROW_LENGTH = 0.00635
-# The limit stack hangs 7.2 mm from its anchor down to the shelf line (three
-# rows at a ~4.9 mm pitch, same sheet), rounded outward; it is centred on the
-# anchor, so the same half-height bounds its top.
-FLOOR_STACK_HALF_HEIGHT = 0.0075
+# The limit stack hangs ~11 mm from its anchor down to the shelf line (four
+# rows, the label and the mate under the limits, at the ~5.7 mm pitch of the
+# ENFORCE round-1 T084 render's three-row block), rounded outward; it is
+# centred on the anchor, so the same half-height bounds its top.
+FLOOR_STACK_HALF_HEIGHT = 0.0115
 
 
 def thickness_arrow_reach_y(teeth: int) -> float:
@@ -411,13 +619,20 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     half_od = rendered_half_od(teeth)
     return {
         "FloorDia": (FRONT_CENTER[0] + half_od + FLOOR_DIA_GAP_X, floor_dia_y(teeth)),
-        "BlankDia": (FRONT_CENTER[0], FRONT_CENTER[1] + half_od + BLANK_DIA_LIFT),
+        "BlankDia": (
+            FRONT_CENTER[0] - BLANK_DIA_SHIFT_X,
+            FRONT_CENTER[1] + half_od + BLANK_DIA_LIFT,
+        ),
         # Vertical dimension on the +X tooth: its line stands at the text x,
         # just right of the tip circle, and runs down to the text below the
         # gear's lowest point (the ~65 mm callout stays left of the side view).
+        # The block is centred on its point: 22.5 mm under the tip circle
+        # with one row more than the three-row block (the mate over the
+        # value, the pitch circle under the label) keeps its bottom where
+        # that block's stood at 25 mm, ~5 mm above the title block.
         "ToothThickness": (
             FRONT_CENTER[0] + half_od + 0.014,
-            FRONT_CENTER[1] - half_od - 0.025,
+            FRONT_CENTER[1] - half_od - 0.0225,
         ),
     }
 
@@ -469,7 +684,7 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     crop = bore_view_crop_radius(teeth)
     x, y = BORE_VIEW_CENTER
     return {
-        "BoreCutDia": (x - 0.022, y + crop + 0.006),
+        "BoreCutDia": (x - 0.022, y + crop + BORE_VIEW_DIA_LIFT),
         "BoreAF": (
             x + flat + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
             y - crop - BORE_VIEW_AF_DROP,
@@ -490,36 +705,14 @@ def bore_view_label_top(teeth: int) -> float:
     return BORE_VIEW_CENTER[1] - bore_view_crop_radius(teeth) - BORE_VIEW_LABEL_DROP
 
 
-def bore_finish_xy(teeth: int) -> tuple[tuple[float, float], tuple[float, float]]:
-    """(bore edge pick, symbol anchor) for the upper-left bore finish.
-
-    The +X tooth carries the thickness witness and the flat faces +X, so the
-    finish leader lands on the bore's 135 deg arc point from a symbol
-    above-left of the gear.
-    """
-    numerator, denominator = _SCALE_BY_TEETH[teeth]
-    bore_radius = bore_dia_mm(teeth) * numerator / (denominator * 2000.0)
-    half_od = rendered_half_od(teeth)
-    diagonal = 0.5 ** 0.5
-    edge = (
-        FRONT_CENTER[0] - bore_radius * diagonal,
-        FRONT_CENTER[1] + bore_radius * diagonal,
-    )
-    symbol = (
-        FRONT_CENTER[0] - half_od * diagonal - 0.030,
-        FRONT_CENTER[1] + half_od * diagonal + 0.006,
-    )
-    return edge, symbol
-
-
-# Sheet width of the face-width text with its stacked band.  "6.00" over
-# "+0.1/-0.1" measured ~19.4 mm on the conegear-834b render; "6.8887" over
-# "+0.025/-0.025" has half as many characters again, so ~29 mm (scaled, not
-# yet measured).  Where the face spans less than the text plus a clearance
-# each side, the #834 machinist review found the text crowding its extension
-# lines (sheets 5-20, 3:1 and below): the text then stands outside, right of
-# the view, on the extended dimension line.
-FACE_WIDTH_TEXT_WIDTH = 0.029
+# Sheet width of the face-width text block: the stack's "20-GEAR STACK" row
+# is wider than the banded value, 36.0 mm on every sheet of the ENFORCE
+# round-3 render. Where the face spans less than the text plus a clearance
+# each side, the text crowds its extension lines (#834 machinist review,
+# sheets 5-20; ENFORCE round 3, sheets 3-20, with the 29 mm the value alone
+# had measured): the text then stands outside, right of the view, on the
+# extended dimension line.
+FACE_WIDTH_TEXT_WIDTH = 0.036
 FACE_WIDTH_TEXT_CLEARANCE = 0.002
 
 
@@ -530,8 +723,15 @@ def face_width_text_inside(teeth: int) -> bool:
     )
 
 
+# The face width's block is centred on its point, 12 mm under the side view
+# with the value alone (T084, ENFORCE round-1 render: block y 88-99 mm, view
+# bottom 104.5 mm). The stack's two lines under the value would raise its top
+# ~5 mm, onto the view, so the point drops by as much.
+FACE_WIDTH_DROP = 0.017
+
+
 def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
-    y = RIGHT_CENTER[1] - rendered_half_od(teeth) - 0.012
+    y = RIGHT_CENTER[1] - rendered_half_od(teeth) - FACE_WIDTH_DROP
     if face_width_text_inside(teeth):
         return {"FaceWidth": (RIGHT_CENTER[0], y)}
     x = (
@@ -638,6 +838,19 @@ def _configure_views(
             )
 
 
+def _hide_tangent_edges(view: Any, configuration: str) -> None:
+    """Drop the end view's tangent edges, and prove they went.
+
+    ENFORCE round 4 of #971: a grey circle at the root radius crossed every
+    tooth base, an edge between smooth faces that reads as a hub step or a
+    reference circle (draw_dt_crank_drive_gear does the same).
+    """
+    view.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
+    if int(view.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError(f"failed to hide the {configuration} front view's tangent edges")
+    view.UpdateViewDisplayGeometry()
+
+
 def _assert_tooth_geometry(front: Any, configuration: str, teeth: int) -> None:
     """Prove the view exposes patterned body edges, not a smooth bored blank."""
     edge_count = len(
@@ -682,11 +895,24 @@ def _center_bore_view(adapter: Any, view: Any, configuration: str) -> None:
         )
 
 
+def _hide_title_block_source(adapter: Any, view: Any) -> None:
+    """Hide the tooth-space sheet's T006 view; its title block still reads it.
+
+    ``IView.SetVisible`` returns nothing, so ``GetVisible`` proves the hide
+    (draw_mg_magnifier_assembly's BOM reference view).
+    """
+    bound = _early_bound(view, "IView")
+    bound.SetVisible(False, False)
+    rebuild_drawing(adapter, label="hide T006 tooth-space title-block source")
+    if bool(bound.GetVisible()):
+        raise RuntimeError("the tooth-space sheet's T006 view still reads visible")
+
+
 def _crop_bore_view(
-    adapter: Any, view: Any, configuration: str, teeth: int, kept: set[str],
-    *, center: tuple[float, float] = BORE_VIEW_CENTER, radius: float | None = None,
+    adapter: Any, view: Any, configuration: str, teeth: int, kept: set[str]
 ) -> None:
-    """Crop to a native circle, read back its boundary, outline and dimensions."""
+    """Crop to a native circle round the bore, read back its outline and
+    dimensions; it prints no crop outline (BORE_VIEW_CROP_MARGIN)."""
     draw = adapter.currentModel
     view = _early_bound(view, "IView")
     label = f"{configuration} bore view"
@@ -695,7 +921,8 @@ def _crop_bore_view(
     sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    radius = bore_view_crop_radius(teeth) if radius is None else radius
+    radius = bore_view_crop_radius(teeth)
+    center = BORE_VIEW_CENTER
     points = []
     for x, y in (center, (center[0] + radius, center[1])):
         point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
@@ -710,7 +937,7 @@ def _crop_bore_view(
         manager.AddToDB = previous_add_to_db
     if circle is None:
         raise RuntimeError(f"failed to sketch the {label} crop circle")
-    status = int(view.Crop2(False, False, 1))
+    status = int(view.Crop2(False, True, 1))
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label=f"{label} crop")
     view.UpdateViewDisplayGeometry()
@@ -740,12 +967,10 @@ def _crop_bore_view(
         raise RuntimeError(
             f"{label} crop did not take: outline {outline!r}, before {uncropped!r}"
         )
-    boundary = (bool(view.CropViewJaggedOutline), bool(view.CropViewNoOutline))
-    if boundary != (False, False):
-        raise RuntimeError(
-            f"{label}'s crop boundary is not its plain circle: jagged, "
-            f"no-outline {boundary!r}"
-        )
+    # The jagged-outline accessor is invalid without an outline
+    # (_drawing_detail_crop), so only the no-outline flag is read back.
+    if not bool(view.CropViewNoOutline):
+        raise RuntimeError(f"{label}'s crop prints an outline; expected none")
     lost = sorted(kept - after)
     if lost:
         raise RuntimeError(f"{label} lost {lost} to its crop; it holds {sorted(after)}")
@@ -1128,6 +1353,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _configure_views(adapter, configuration, views)
         for view in views:
             set_hidden_lines_removed(adapter, view)
+        _hide_tangent_edges(front, configuration)
         _assert_tooth_geometry(front, configuration, teeth)
         _center_bore_view(adapter, bore_view, configuration)
 
@@ -1160,6 +1386,19 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
         _assert_sheet_bands(adapter, front_annotations, configuration, teeth)
+        # ENFORCE round 4 of #971: the OD's and the root envelope's
+        # dimension lines crossed at the centre and over the bore; the OD
+        # leader now stops on its near rim.
+        blank_dia = [
+            item for item in front_annotations
+            if dimension_name(adapter, item) == "BlankDia"
+        ]
+        if len(blank_dia) != 1:
+            raise RuntimeError(
+                f"{configuration}: expected one BlankDia dimension, found {len(blank_dia)}"
+            )
+        set_near_side_diameter(blank_dia[0], f"{configuration} blank diameter")
+        rebuild_drawing(adapter, label=f"{configuration} blank diameter near-side leader")
         right_annotations = _curate_repeated_dimensions(
             adapter,
             right,
@@ -1167,8 +1406,8 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} right",
         )
         annotations = [*bore_annotations, *front_annotations, *right_annotations]
-        set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-        set_dimension_callouts(adapter, annotations, callouts_above(teeth), location="above")
+        set_dimension_callouts(adapter, annotations, callouts_below(teeth))
+        set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
         assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
         _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
         _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")
@@ -1176,19 +1415,6 @@ async def build(adapter: Any) -> dict[str, str]:
         if not sheet.SetScale(*view_scale, False, False):
             raise RuntimeError(f"failed to pin the {configuration} sheet scale")
         _label_bore_view(adapter, bore_view, teeth, label=f"{configuration} bore view")
-
-        finish_edge, finish_symbol = bore_finish_xy(teeth)
-        # This sheet's configuration-owned finish rows (part spec).
-        SURFACE_FINISHES = BORE_SURFACE_FINISHES[teeth]  # noqa: N806
-        add_surface_finish(
-            adapter,
-            front,
-            edge_xy=finish_edge,
-            symbol_xy=finish_symbol,
-            control=surface_finish_by_key(SURFACE_FINISHES, "cone_gear_bore"),
-            label=f"{configuration} cone-gear bore finish",
-            char_height=0.0025,
-        )
 
         add_property_linked_note(
             adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025
@@ -1203,48 +1429,20 @@ async def build(adapter: Any) -> dict[str, str]:
         )
 
     if not ddoc.ActivateSheet(CUTTER_DETAIL_SHEET):
-        raise RuntimeError("failed to activate the DT6-FORM1 tool detail sheet")
-    detail = place_view(
-        adapter, str(SOURCE), "*Front", *CUTTER_DETAIL_VIEW_CENTER,
+        raise RuntimeError("failed to activate the T006 tooth-space sheet")
+    # The title block reads the T006 part, number and alloy through this
+    # view, so it stays on the sheet, hidden (_hide_title_block_source).
+    source_view = place_view(
+        adapter, str(SOURCE), "*Front", *CUTTER_SOURCE_VIEW_CENTER,
         scale=SHEET_SCALES[CUTTER_DETAIL_SHEET],
     )
-    _configure_views(adapter, "T006", (detail,))
-    center_x, center_y, radius_mm = cutter_detail_window_mm()
-    projected = model_point_in_view(
-        adapter, detail, (center_x / 1000.0, center_y / 1000.0, 0.0),
-        label="DT6-FORM1 installed gap centre",
-    )
-    detail = _early_bound(detail, "IView")
-    position = tuple(float(value) for value in detail.Position)
-    if not detail.SetViewPosition(double_array([
-        position[i] + CUTTER_DETAIL_VIEW_CENTER[i] - projected[i] for i in range(2)
-    ]), False):
-        raise RuntimeError("failed to position the DT6-FORM1 installed gap crop")
-    rebuild_drawing(adapter, label="DT6-FORM1 crop centre")
-    projected = model_point_in_view(
-        adapter, detail, (center_x / 1000.0, center_y / 1000.0, 0.0),
-        label="DT6-FORM1 installed gap centre readback",
-    )
-    if math.dist(projected, CUTTER_DETAIL_VIEW_CENTER) > BORE_VIEW_POSITION_TOL_M:
-        raise RuntimeError("DT6-FORM1 installed gap crop centre did not persist")
-    numerator, denominator = SHEET_SCALES[CUTTER_DETAIL_SHEET]
-    _crop_bore_view(
-        adapter, detail, "DT6-FORM1", 6, set(),
-        center=CUTTER_DETAIL_VIEW_CENTER,
-        radius=radius_mm * numerator / denominator / 1000.0,
-    )
-    set_hidden_lines_removed(adapter, detail)
-    # The grind data, not the model's "Cutter Profile" equations (see
+    _configure_views(adapter, "T006", (source_view,))
+    _hide_title_block_source(adapter, source_view)
+    # The form table, not the model's "Cutter Profile" equations (see
     # cutter_grind_data).
     if add_note(adapter, cutter_grind_data(), *CUTTER_DETAIL_POS) is None:
-        raise RuntimeError("failed to add the DT6-FORM1 grind data")
-    # The crop is the gap the edge cuts, an illustration only: the table
-    # defines the edge (machinist review of the stack build).
-    if add_note(
-        adapter, "T006 GAP = TOOL EDGE (ILLUSTRATION; USE TABLE)",
-        0.230, 0.092,
-    ) is None:
-        raise RuntimeError("failed to label the installed gap on the cutter detail")
+        raise RuntimeError("failed to add the T006 tooth-space table")
+    _draw_form_plot(adapter)
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*SHEET_SCALES[CUTTER_DETAIL_SHEET], False, False):
         raise RuntimeError("failed to pin the DT6-FORM1 detail sheet scale")

@@ -8,7 +8,6 @@ import dt_alignment_pinion_spec
 import dt_arbor_pedestal_spec
 import build_dt_alignment_pinion
 import build_dt_arbor_pedestal
-import build_dt_cone_gear
 import build_dt_cone_gear_shaft
 import build_dt_cone_swing_platform
 import build_ch_connecting_rod
@@ -17,7 +16,6 @@ import build_dt_crank_pinion
 import build_dt_crankshaft
 import build_dt_cylinder_gear_shaft
 import dt_cone_gear_shaft_spec
-import dt_cone_gear_spec
 import dt_cone_swing_platform_spec
 import ch_connecting_rod_spec
 import ch_channel_lever_spec
@@ -26,7 +24,6 @@ import dt_crankshaft_spec
 import dt_cylinder_gear_shaft_spec
 import draw_dt_alignment_pinion
 import draw_dt_arbor_pedestal
-import draw_dt_cone_gear
 import draw_dt_cone_gear_shaft
 import draw_dt_cone_swing_platform
 import draw_ch_connecting_rod
@@ -67,19 +64,6 @@ CASES = (
                 "foot_seat",
                 SEAT_UM,
                 PlanarFace((0, -1, 0), 0.0),
-            ),
-        ),
-    ),
-    (
-        dt_cone_gear_spec,
-        build_dt_cone_gear,
-        draw_dt_cone_gear,
-        (
-            SurfaceFinishControl(
-                "cone_gear_bore",
-                MACHINED_UM,
-                CylinderFace(dt_cone_gear_spec.BORE_DIA),
-                native_attachment="model",
             ),
         ),
     ),
