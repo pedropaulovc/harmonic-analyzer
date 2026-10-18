@@ -1,6 +1,5 @@
 """Suite-wide test isolation for the whole repository (``cad/scripts`` and ``tests``)."""
 
-import functools
 import importlib
 import importlib.util
 import os
@@ -27,6 +26,11 @@ _CHILD_GUARD_DIR = Path(__file__).resolve().parent / "tests" / "_child_guard"
 
 
 def _load_shared_guard():
+    # A worker already loaded this module through sitecustomize. Keep that same
+    # module so its installed wrappers and audit hooks see the pytest handoff.
+    existing = sys.modules.get("harmonic_solidworks_guard")
+    if existing is not None:
+        return existing
     spec = importlib.util.spec_from_file_location(
         "harmonic_solidworks_guard", _CHILD_GUARD_DIR / "harmonic_solidworks_guard.py"
     )
@@ -37,8 +41,6 @@ def _load_shared_guard():
 
 
 _guard = _load_shared_guard()
-_REAL_POPEN = subprocess.Popen
-_REAL_RUN = subprocess.run
 _refused: list[str] = []
 # The log this session's guarded children record their refusals in, and how
 # much of it has been reported.
@@ -122,13 +124,10 @@ def _install_activation_guard():
         _guard.guard_module(module_name, module, _refuse, class_ids)
 
 
-def _guard_child_processes():
-    """Make every Python child of this session load the shared guard.
-
-    A nested session keeps the outer one's refusal log.
-    """
+def _guard_child_processes(config):
+    """Give a worker its own log; its nested descendants keep that same log."""
     global _child_log, _child_log_read
-    if not os.environ.get(_guard.MARKER):
+    if hasattr(config, "workerinput") or not os.environ.get(_guard.MARKER):
         handle, path = tempfile.mkstemp(prefix="solidworks-refusals-", suffix=".log")
         os.close(handle)
         os.environ[_guard.MARKER] = path
@@ -161,46 +160,17 @@ def _child_refusals():
 # as it finishes executing. Collaborator identity, not the call, decides: a
 # test that fakes ``_run_subprocess`` or dodo's ``subprocess.run``/``Popen`` is
 # already hermetic and keeps exercising the real ``_exec_com``.
-def _runs_real_subprocess(module, log_stem):
-    """Whether dodo's ``_run_subprocess`` would start a real child.
-
-    It logs through ``Popen`` when given a log stem and calls ``run`` (which
-    itself uses ``Popen``) otherwise.
-    """
-    runner = getattr(module, "subprocess", None)
-    return getattr(runner, "Popen", None) is _REAL_POPEN and (
-        log_stem is not None or getattr(runner, "run", None) is _REAL_RUN
-    )
-
-
-def _guard_dodo(module):
-    run_subprocess = getattr(module, "_run_subprocess", None)
-    exec_com = getattr(module, "_exec_com", None)
-    if run_subprocess is None or exec_com is None:
-        return
-
-    @functools.wraps(exec_com)
-    def refuse_com_task(cmd, label, log_stem=None, *, task=None):
-        if module._run_subprocess is run_subprocess and _runs_real_subprocess(
-            module, log_stem
-        ):
-            _refuse("dodo._exec_com", f"{label}: {cmd}")
-        return exec_com(cmd, label, log_stem, task=task)
-
-    module._exec_com = refuse_com_task
-
-
 def _install_dodo_guard():
     original_exec_module = SourceFileLoader.exec_module
 
     def exec_module(self, module):
         original_exec_module(self, module)
         if os.path.basename(self.path).lower() == "dodo.py":
-            _guard_dodo(module)
+            _guard._guard_dodo(module, _refuse)
 
     SourceFileLoader.exec_module = exec_module
     if "dodo" in sys.modules:
-        _guard_dodo(sys.modules["dodo"])
+        _guard._guard_dodo(sys.modules["dodo"], _refuse)
 
 
 def pytest_configure(config):
@@ -235,7 +205,10 @@ def pytest_configure(config):
         )
     # SolidWorks runs only on Windows; elsewhere there is nothing to start.
     if sys.platform == "win32" and not _guard_disabled():
-        _guard_child_processes()
+        # Inherited hooks must raise/record in this pytest host, not terminate
+        # the worker. Fresh Python descendants still use the hard-exit handler.
+        _guard._pytest_refuse = _refuse
+        _guard_child_processes(config)
         _install_launch_guard()
         _install_activation_guard()
         _install_dodo_guard()

@@ -137,6 +137,15 @@ shared repository paths across files or workers. Tests must use temporary paths
 for mutable outputs; retain `-p no:cacheprovider` to avoid the shared Windows
 pytest-cache rename race even when multiple doit gates run concurrently.
 
+Each xdist worker owns a separate child-refusal log; nested sessions and Python
+descendants retain their worker's log, so a refusal fails its owning test rather
+than unrelated siblings. Both the pytest-process guard and inherited child
+guard permit injected fake COM runners while refusing real subprocess runners.
+When pytest configures an inherited worker, existing guard hooks hand refusals to
+pytest's raising/recording handler instead of terminating the worker. This
+process-local handoff is not inherited by fresh Python children: they still log
+and exit 97 on a refusal.
+
 ## Persisted assembly display data
 
 Assembly publication requires both a fresh native rebuild-state proof and a
