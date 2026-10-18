@@ -225,12 +225,17 @@ def _driving_kink_angle(adapter, blade: str, flat: str, pts, label: str) -> None
     """The kink's sweep as the DRIVING angle between the blade and flat lines.
 
     Both lines are selected as segments
-    (build_dt_cone_pivot_post._add_driving_plan_incline's recipe).  The text
-    point sits on the bisector of the acute wedge below the lines' crossing
-    (dt_pinion_spring_geometry.KINK_VERTEX), the wedge the print shows; on the
-    Front plane the sketch and model frames coincide, so it goes in model
-    metres.  The value is verified acute BEFORE the dimension is made driving:
-    a supplement would fold the flat back, not print it wrong.
+    (build_dt_cone_pivot_post._add_driving_plan_incline's recipe), the text
+    point on the bisector of the acute wedge below the lines' crossing
+    (dt_pinion_spring_geometry.KINK_VERTEX); on the Front plane the sketch and
+    model frames coincide, so it goes in model metres.  The segments run from
+    the crossing in opposite senses (the blade down, the flat up), so
+    SOLIDWORKS measures their 155 deg (spring r3 leaf); while still unforced
+    that turns to its 25 deg supplement (build_vn_knife_hanger_stud), and only
+    then is the dimension made driving and its value read back: a driving
+    supplement would fold the flat back.  Which of the two acute wedges the
+    arc takes the print checks and, if need be, turns to its vertically
+    opposite (draw_dt_pinion_spring._assert_kink_angle_wedge).
     """
     from solidworks_mcp.adapters import sw_type_info as _sw_type_info
     from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
@@ -259,13 +264,18 @@ def _driving_kink_angle(adapter, blade: str, flat: str, pts, label: str) -> None
     expected = math.radians(KINK_DEG)
     actual = abs(float(_read_member(dimension, "SystemValue")))
     if abs(actual - expected) > 1e-8:
-        raise RuntimeError(
-            f"{label}: angular dimension measured {math.degrees(actual):.6f} deg, "
-            f"expected {KINK_DEG:g} deg"
-        )
+        if abs(math.pi - actual - expected) > 1e-8 or not display.SupplementaryAngle():
+            raise RuntimeError(
+                f"{label}: angular dimension measured {math.degrees(actual):.6f} deg, "
+                f"expected {KINK_DEG:g} deg"
+            )
     dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
-    if int(_read_member(dimension, "DrivenState")) != 2:
-        raise RuntimeError(f"{label}: angular dimension did not become driving")
+    if int(_read_member(dimension, "DrivenState")) != 2 or (
+        abs(abs(float(_read_member(dimension, "SystemValue"))) - expected) > 1e-8
+    ):
+        raise RuntimeError(
+            f"{label}: angular dimension is not a driving {KINK_DEG:g} deg"
+        )
     _telemetry.success(f"driving {label}: {KINK_DEG:g} deg")
 
 

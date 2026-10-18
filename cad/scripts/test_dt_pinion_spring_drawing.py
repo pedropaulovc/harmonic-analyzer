@@ -284,6 +284,14 @@ def test_kink_arc_faults_reads_the_wedge_the_arc_sweeps() -> None:
     shifted = (vertex[0] + 0.002, vertex[1])
     assert drawing.kink_arc_faults(_arc(shifted, 0.0, geometry.KINK_DEG / 2), vertex)
     assert drawing.kink_arc_faults([], vertex) == ["no arc"]
+    # Only the upper acute wedge (the same 25 deg) reads as one to turn
+    # vertically opposite; the lower one and the obtuse neighbour do not.
+    lower = drawing.kink_arc_mean_offset_deg(_arc(vertex, 0.0, acute), vertex)
+    upper = drawing.kink_arc_mean_offset_deg(_arc(vertex, 180.0, acute), vertex)
+    assert lower == pytest.approx(0.0, abs=1e-6)
+    assert upper == pytest.approx(180.0, abs=1e-4)
+    obtuse = drawing.kink_arc_mean_offset_deg(_arc(vertex, 90.0, obtuse_half), vertex)
+    assert obtuse == pytest.approx(90.0, abs=1e-4)
 
 
 class _KinkView:

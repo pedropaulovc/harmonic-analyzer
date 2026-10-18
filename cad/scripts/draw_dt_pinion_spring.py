@@ -661,26 +661,22 @@ def kink_arc_faults(
     return faults
 
 
-def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -> None:
-    """Fail unless the printed kink angle draws its arc in the acute wedge
-    below the free form's blade/flat crossing.  The angle drives the free
-    form, so its quadrant is never flipped here (that would refold the flat):
-    the sketch authors it in this wedge (build_dt_pinion_spring
-    ._driving_kink_angle) and the keep stays inside it."""
-    matches = [
-        item for item in annotations if dimension_name(adapter, item) == FREE_KINK_ANGLE
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(f"expected one {FREE_KINK_ANGLE}, found {len(matches)}")
-    annotation = _early_bound(matches[0], "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    rebuild_drawing(adapter, label="kink angle wedge")
-    vertex = model_point_in_view(
-        adapter,
-        front,
-        (FREE_KINK_VERTEX[0] / 1000.0, FREE_KINK_VERTEX[1] / 1000.0, 0.0),
-        label="free kink vertex",
-    )
+def kink_arc_mean_offset_deg(
+    arcs: list[tuple[tuple[float, float], list[tuple[float, float]]]],
+    vertex: tuple[float, float],
+) -> float:
+    """How far (deg, 0-180) the arcs' mean direction from the vertex stands
+    off the lower wedge's bisector: near 180 when they took the upper one."""
+    sx = sum(x - vertex[0] for _, points in arcs for x, _ in points)
+    sy = sum(y - vertex[1] for _, points in arcs for _, y in points)
+    bx, by = FREE_KINK_ANGLE_BISECTOR
+    cos = (sx * bx + sy * by) / (math.hypot(sx, sy) or 1.0)
+    return math.degrees(math.acos(max(-1.0, min(1.0, cos))))
+
+
+def _kink_arcs(
+    display: Any,
+) -> list[tuple[tuple[float, float], list[tuple[float, float]]]]:
     data = _early_bound(display.GetDisplayData(), "IDisplayData")
     arcs = []
     for index in range(int(data.GetArcCount())):
@@ -690,11 +686,50 @@ def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -
             points = [(segments[0].x0, segments[0].y0)]
             points += [(s.x1, s.y1) for s in segments]
             arcs.append(((raw[10], raw[11]), points))
+    return arcs
+
+
+def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -> None:
+    """Fail unless the printed kink angle draws its arc in the acute wedge
+    below the free form's blade/flat crossing.  The angle drives the free
+    form, so the only turn allowed is to the vertically opposite wedge, the
+    same 25 deg (a supplement would refold the flat; the value is read back
+    after the turn): the sketch's 155-to-25 supplement may leave the arc in
+    the upper acute wedge (build_dt_pinion_spring._driving_kink_angle)."""
+    matches = [
+        item for item in annotations if dimension_name(adapter, item) == FREE_KINK_ANGLE
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {FREE_KINK_ANGLE}, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    rebuild_drawing(adapter, label="kink angle wedge")
+    vertex = model_point_in_view(
+        adapter,
+        front,
+        (FREE_KINK_VERTEX[0] / 1000.0, FREE_KINK_VERTEX[1] / 1000.0, 0.0),
+        label="free kink vertex",
+    )
+    arcs = _kink_arcs(display)
     faults = kink_arc_faults(arcs, vertex)
+    turned = False
+    if faults and arcs and kink_arc_mean_offset_deg(arcs, vertex) > 90.0:
+        if not display.VerticallyOppositeAngle():
+            raise RuntimeError(f"{FREE_KINK_ANGLE}: VerticallyOppositeAngle failed")
+        turned = True
+        rebuild_drawing(adapter, label="kink angle turned")
+        arcs = _kink_arcs(display)
+        faults = kink_arc_faults(arcs, vertex)
+    value = abs(float(_read_member(dimension, "SystemValue")))
+    if abs(value - math.radians(KINK_DEG)) > 1e-8:
+        faults.append(f"value {math.degrees(value):.6f} deg, not {KINK_DEG:g}")
     _telemetry.info(
         f"kink angle: {len(arcs)} arc(s) about the free kink vertex "
-        f"{tuple(round(v * 1000, 2) for v in vertex)} mm; faults {faults}",
+        f"{tuple(round(v * 1000, 2) for v in vertex)} mm; "
+        f"turned vertically opposite {turned}; faults {faults}",
         kink_arc_count=len(arcs),
+        kink_arc_turned=turned,
     )
     if faults:
         raise RuntimeError(f"{FREE_KINK_ANGLE} arc: {'; '.join(faults)}")
