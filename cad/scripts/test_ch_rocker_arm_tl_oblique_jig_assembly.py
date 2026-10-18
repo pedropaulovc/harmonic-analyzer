@@ -892,6 +892,18 @@ def test_alignment_note_prints_the_calculator_targets() -> None:
     )
 
 
+def test_sweep_note_gives_each_pass_its_pin_stations() -> None:
+    # Review bought-tl000-r1: the checks' sweeps are ranged on sheet 1, each
+    # pass's pin stations over its whole sweep, rounded outward.
+    assert spec.SWEEP_NOTE_LINE == (
+        "SWEEP OF EACH PASS, EACH PIN AT S: INNER 75 TO 378, OUTER 77 TO 390; "
+        "NO STOP LIMITS IT, THE FITTER ENDS EACH PASS THERE."
+    )
+    for lo, hi in trammel.PIN_TRAVEL.values():
+        assert f"{math.floor(lo)} TO {math.ceil(hi)}" in spec.SWEEP_NOTE_LINE
+    assert "EACH PASS'S SWEEP (SHEET 1)" in spec.ASSEMBLY_CHECKS[1]
+
+
 def test_sweep_clears_the_column_cover(report) -> None:
     assert report.cover_clearance == pytest.approx(
         {

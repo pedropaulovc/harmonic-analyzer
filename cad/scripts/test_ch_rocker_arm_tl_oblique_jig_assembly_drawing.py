@@ -163,7 +163,7 @@ def test_sheets_are_landscape_with_their_scales() -> None:
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
     assert drawing.SHEET_SCALES == {
         "ASSEMBLED AT INNER PASS": (1.0, 4.0),
-        "BILL OF MATERIALS": (1.0, 10.0),
+        "BILL OF MATERIALS": (1.0, 6.0),
         "RAIL BARS EXPLODED": (1.0, 5.0),
         "LEADSCREW FEED EXPLODED": (1.0, 3.0),
         "CARRIER EXPLODED": (1.0, 5.0),
@@ -225,7 +225,9 @@ def test_sheet_text_is_the_spec_text_wrapped() -> None:
         return text.split()
 
     assert words(drawing.ASSEMBLED_CAPTION) == words(spec.ASSEMBLED_CAPTION)
-    assert words(drawing.ALIGNMENT_NOTE) == words(" ".join(spec.ALIGNMENT_NOTE_LINES))
+    assert words(drawing.ALIGNMENT_NOTE) == words(
+        " ".join((*spec.ALIGNMENT_NOTE_LINES, spec.SWEEP_NOTE_LINE))
+    )
     # Both columns read as the spec's steps, in order, split between steps
     # (or sub-steps).
     if drawing.ASSEMBLY_STEPS_CONTINUED:

@@ -187,12 +187,14 @@ if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the jig's primary sheet must remain landscape")
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 # The jig is about 970 x 435 in plan: 1:4 for the arrangement, 1:15 for the
-# finished isometric and 1:10 for the BOM's collapsed reference. The finished
+# finished isometric and 1:6 for the BOM's collapsed reference, the largest
+# ladder rung its room left of the BOM holds (review bought-tl000-r1: at 1:10
+# it sat small in that room). The finished
 # view sits under the continued steps and the checks; review bought-r15's
 # step 4, 6 and 7 rewrites send step 11 to the right column, which leaves its
 # room about 63 tall, short of the 94 the view needs at 1:8.
 ASSEMBLED_SCALE = (1.0, 4.0)
-REFERENCE_SCALE = (1.0, 10.0)
+REFERENCE_SCALE = (1.0, 6.0)
 ISOMETRIC_SCALE = (1.0, 15.0)
 # The exploded clusters' scales, largest first. Every one is at most 1:2, so
 # every rung references the simplified configuration (the view policy) and
@@ -521,7 +523,9 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
 
 
 ASSEMBLED_CAPTION = _wrapped((spec.ASSEMBLED_CAPTION,), width=CAPTION_WIDTH)
-ALIGNMENT_NOTE = _wrapped(spec.ALIGNMENT_NOTE_LINES, width=ALIGNMENT_WIDTH)
+ALIGNMENT_NOTE = _wrapped(
+    (*spec.ALIGNMENT_NOTE_LINES, spec.SWEEP_NOTE_LINE), width=ALIGNMENT_WIDTH
+)
 
 
 def _note_height(text: str) -> float:

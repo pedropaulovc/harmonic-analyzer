@@ -1096,11 +1096,25 @@ def _alignment_rows() -> tuple[str, ...]:
     return tuple(rows)
 
 
+def _sweep_line() -> str:
+    # Review bought-tl000-r1: the checks' "sweep of each pass" gets its range,
+    # each pin's station over ±trammel.SWEEP, rounded outward.
+    spans = ", ".join(
+        f"{name.upper()} {math.floor(lo):.0f} TO {math.ceil(hi):.0f}"
+        for name, (lo, hi) in trammel.PIN_TRAVEL.items()
+    )
+    return (
+        f"SWEEP OF EACH PASS, EACH PIN AT S: {spans}; NO STOP LIMITS IT, THE "
+        "FITTER ENDS EACH PASS THERE."
+    )
+
+
 ALIGNMENT_NOTE_LINES = (
     "RAIL ALIGNMENT TARGETS: PIVOT PIN AXIS, MACHINE X/Y FROM THE SPINDLE, "
     f"AT STATION S FROM THE SPINDLE ALONG THE RAIL (±{ALIGNMENT_BAND:.2f})",
     *_alignment_rows(),
 )
+SWEEP_NOTE_LINE = _sweep_line()
 
 # Every screw by its fastener-table callout (fasteners.FASTENERS) and every
 # bought item by its BOM item number.
@@ -1441,7 +1455,7 @@ ASSEMBLY_STEPS = (
 ASSEMBLY_CHECKS = (
     f"CHECK: EVERY ALIGNMENT READING WITHIN ±{ALIGNMENT_BAND:.2f} OF ITS TARGET.",
     "CHECK: WITH THE NUT BRACKET'S 2 BLOCK SCREWS OUT, SWING THE CARRIER BY THE "
-    "LEVER THROUGH THE WHOLE SWEEP OF EACH PASS; IT TURNS FREELY, NOTHING "
+    "LEVER THROUGH EACH PASS'S SWEEP (SHEET 1); IT TURNS FREELY, NOTHING "
     "TOUCHES THE STUDS, NUTS OR COLUMN COVER AND BOTH CARRIAGES STAY ON THEIR "
     "RAILS.",
     "CHECK: WITH THE BLOCK SCREWS IN, THE HANDWHEEL RUNS THE SAME SWEEPS "
