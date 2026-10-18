@@ -443,11 +443,15 @@ SECTION_KEEP = {
 JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
     "CrankAboveCone": (0.208, 0.170),
-    # 3.5 mm over r16's 0.172: the bore's callout below grows UP from its
-    # shoulder, and its FOR COLLAR SEAT line put its band on this shoulder
-    # (r17 layout audit: 0.70 mm overlap); the block's top stays ~5 mm under
-    # SECTION A-A.
-    "ConeBossDia": (0.292, 0.1755),
+    # One row (DIMENSION_SUFFIXES), 3.5 mm tall, centred 1 mm over this y.
+    # The bore's five-line block below is centred on ITS y, so its band tops
+    # out at 167.1 mm (r17 layout audit); a two-row box here (9.1 mm) had no
+    # slot between that and SECTION A-A's caption at 184.5 mm, because the
+    # crowding check wants the smaller box's full height of air between
+    # views (r17: 0.70 mm overlap at 0.172; r18: 5.47 mm under the caption's
+    # 8.10 at 0.1755).  One row needs 3.5 mm: it prints 170.2..173.7, 3.1 mm
+    # over the band and 10.8 mm under the caption.
+    "ConeBossDia": (0.292, 0.173),
     # View C sees the head side-on above the crank boss: its Ø stands over
     # the head, text out left of the head and below the A-A thrust-face
     # station's lower extension line (y ~217-222 over the head).
@@ -509,8 +513,8 @@ JOURNAL_TEXT_OFFSETS = {
 # bore's callout prints the same break as the collar instead of the title
 # block's 0.25, and says why under it (r16 machinist review, rules 4 and 7:
 # a break tighter than the title block's needs its reason at the callout).
-# That line grows the block UP from its shoulder, so the boss OD's callout
-# above it rises (JOURNAL_KEEP).
+# That line grows the block both ways from its centre, so the boss OD's
+# callout above it went to one row (DIMENSION_SUFFIXES, JOURNAL_KEEP).
 # Each running bore names the shaft that runs in it, the crank-above-cone
 # spacing the mesh it sets, the cone-axis height the tip block whose adjuster
 # cup the shaft's tip must enter, and the cone boss's north-face station the
@@ -522,17 +526,19 @@ DIMENSION_CALLOUTS = {
     "CrankBossStartZ": "CRANK BOSS\nFACE",
     "CrankBoreDia": "RUNS ON MHA-DT-011",
     "JournalBoreDia": f"CONE BORE THRU\nRUNS ON MHA-DT-004\n{POST_JOURNAL_RIM_BREAK}\nFOR COLLAR SEAT",
-    "ConeBossDia": "CONE JOURNAL BOSS OD",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
     "ConeBossNorthZ": "THRUST FACE FOR\nMHA-DT-004 COLLAR,\nFROM POST AXIS",
     "CrankAboveCone": "16T:64T\nMESH",
     "JournalAxisY": "AXIS MATCHES\nMHA-DT-021",
 }
 # Text after the size and its band, on the same line: one row keeps the
-# head's Ø in the narrow band between View C's head and the A-A station.
+# head's Ø in the narrow band between View C's head and the A-A station,
+# and the cone boss's Ø between the bore's block and SECTION A-A's caption
+# (named as Section A-A's CONE BOSS FACE-TO-FACE names the same boss).
 DIMENSION_SUFFIXES = {
     "CrankBoreDia": " THRU",
     "HeadDia": " HEAD",
+    "ConeBossDia": " CONE BOSS OD",
 }
 # Diameters given on their circles land one arrow on the near rim, the line
 # kept off the centre: two leaders through one centre crossed there (the
