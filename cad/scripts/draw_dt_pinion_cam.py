@@ -21,7 +21,6 @@ from typing import Any
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    auto_center_marks,
     dimension_name,
     place_view,
     view_name,
@@ -110,7 +109,10 @@ FRONT_KEEP = {
 }
 SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.055),
-    "CollarOd": (SIDE_CENTER[0] + 0.035, SIDE_CENTER[1]),
+    # ENFORCE r2: at +0.035 the follower-pin line ran back over the right
+    # face; +0.051 centres the 53-wide callout between the profile and the
+    # isometric view boxes (~5.5 clear each side).
+    "CollarOd": (SIDE_CENTER[0] + 0.051, SIDE_CENTER[1]),
 }
 # The tap-drill callout sits LEFT of the end view, under the profile view:
 # placed right of it, its diameter line ran out past the view (render r1).
@@ -299,10 +301,10 @@ async def build(adapter: Any) -> dict[str, str]:
         0.008,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to front view")
-    if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to set-screw end view")
+    # No explicit centre marks: the template marks every hole as each view is
+    # placed, and AutoInsertCenterMarks2 printed a second, identical mark on
+    # the bore and the tap (layout audit duplicate-annotation, ENFORCE r2; as
+    # draw_mg_wheel_drum, #913).
 
     # Cam-OD roughness (the follower's running surface): the lower-right OD
     # rim, clear of the bore callout's upper-left diagonal and of the tap
