@@ -357,9 +357,11 @@ def test_the_sheet_carries_no_notes() -> None:
         assert helper not in source, helper
     assert "Manufacturing Notes" not in source
     # The only free text left is digit-free and tied to the dimension it
-    # qualifies (a reaming instruction, a concentricity/tangency statement).
+    # qualifies (a reaming instruction, a concentricity/tangency statement),
+    # bar the part number that names a mate (rule 7).
     assert not re.search(r'SetText\(\d+,\s*"[^"]*\d', source)
     for text in drawing.DIMENSION_CALLOUTS.values():
+        text = text.replace(drawing.ARBOR_NUMBER, "")
         assert not re.search(r"\d", text), text
 
 
