@@ -236,9 +236,9 @@ DIMENSION_CALLOUTS = {
     # text at its bent dimension line, so that leg touched the leading S of
     # SETS (r3 review, rule 14); the leading spaces stand the rows off it.
     "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-023 CAM",
-    # The station's band leaves the far-face wall under rule 17's 2.0 target
-    # (owner ruling (a), RV-01): the sheet states the minimum it holds, at the
-    # worst printed bands, rounded down (the ch-anchor-jam-nut precedent).
+    # The station's band leaves the far-face wall under rule 17's 2.0 target.
+    # Emits the fact declared by RV-01 (owner ruling (a)): the minimum the
+    # wall holds at the worst printed bands, rounded down.
     "PinSeatCz": (
         "CENTRES MHA-DT-025\nFOLLOWER IN BAR\n"
         f"WALL {int(PIN_SEAT_WEB_WORST * 10) / 10:.1f} MIN"
