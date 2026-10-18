@@ -1,16 +1,17 @@
 """Pure fitting contract for pn-pen.SLDASM (MHA-PN-000): inventory, the
 exploded view's octant and the three carriage settings.
 
-The builder (``build_pn_pen_assembly``) authors the settings as blanked
-construction sketches carrying driving, toleranced model dimensions; its
-explode module (``_pn_pen_explode``) authors the ``PN_EXPLODED``
-presentation from ``pn_pen_explode_spec``; the fitter drawing
-(``draw_pn_pen_assembly``) imports those dimensions. The BOM descriptions,
-callouts, detail regions, steps and checks the sheets print live in
-``pn_pen_assembly_notes``, which only the drawing reads, so a wording edit
-does not rebuild the assembly. Every number comes from the part and carriage
-contracts (``pn_pen_carriage_geom``, the part/vendor specs); nothing here
-restates a dimension. No SolidWorks imports.
+Builder data only: the builder (``build_pn_pen_assembly``) authors the
+settings as blanked construction sketches carrying driving, toleranced model
+dimensions; its explode module (``_pn_pen_explode``) authors the
+``PN_EXPLODED`` presentation from ``pn_pen_explode_spec``; the fitter drawing
+(``draw_pn_pen_assembly``) imports those dimensions. The BOM item numbers and
+descriptions, the drawing's dimension display (reference, nominal and
+tolerance maps), callouts, detail regions, steps and checks the sheets print
+live in ``pn_pen_assembly_sheet``, which only the drawing reads, so a wording
+edit does not rebuild the assembly. Every number comes from the part and
+carriage contracts (``pn_pen_carriage_geom``, the part/vendor specs); nothing
+here restates a dimension. No SolidWorks imports.
 
 Settings (drawing-guidelines.md rule 22 (an assembly package is complete),
 setup and adjustment):
@@ -39,7 +40,6 @@ from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
 
 ASM_NAME = "pn-pen"
-DRAWING_NUMBER = "MHA-PN-000"
 
 HANGER = "pn-pen-hanger"
 ROD = "pn-pen-rod"
@@ -59,7 +59,8 @@ HANGER_JAM_NUT = "vn-pen-hanger-jam-nut"
 # moves and the drawing's BOM proves exactly this inventory. BOM_ORDER is
 # the builder's insertion order (hanger, rod, its RIDERS, then the hanger
 # fastening), which is the order a top-level BOM numbers its rows in; the
-# drawing proves each row's item number against ITEM, which the steps cite.
+# drawing proves each row's item number against pn_pen_assembly_sheet.ITEM,
+# which the steps cite.
 BOM_ORDER = (
     HANGER,
     ROD,
@@ -76,7 +77,6 @@ BOM_ORDER = (
     HANGER_JAM_NUT,
 )
 QUANTITIES = {stem: 1 for stem in BOM_ORDER}
-ITEM = {stem: index for index, stem in enumerate(BOM_ORDER, 1)}
 
 
 # --- exploded view -------------------------------------------------------------
@@ -114,7 +114,6 @@ STUD_HEIGHT = carriage.STUD_HEAD_TOP_REST_Y - carriage.ROD_SQUARE_TOP_REST_Y
 # dimension carry.
 STUD_TOLERANCE_MM = 0.4
 STUD_PRECISION = 1
-REFERENCE_DIMENSIONS = frozenset({STUD_DIMENSION})
 _STUD_MAJOR = THREAD_MAJOR_MM[stud.THREAD]
 STUD_LENGTH_EXTREMES = (
     stud.OVERALL_LENGTH - printed_band_mm(1),
@@ -180,7 +179,7 @@ YAW_TEXT_UV = (
     CARRIAGE_END_UV[1] + YAW_TEXT_RADIUS * math.sin(math.radians(_BISECTOR_DEG)),
 )
 
-# The drawing imports exactly these, at these places.
+# The builder marks exactly these for the drawing, at these places.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     STUD_FEATURE: {STUD_DIMENSION},
     CARRIAGE_FEATURE: {YAW_DIMENSION, NIB_DIMENSION},
@@ -189,12 +188,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     STUD_FEATURE: {STUD_DIMENSION: STUD_PRECISION},
     CARRIAGE_FEATURE: {YAW_DIMENSION: YAW_PRECISION, NIB_DIMENSION: NIB_PRECISION},
 }
-# A reference dimension carries no band: the stud's band rides on the
-# measured-length setting the callout and step 1 print.
-DIMENSION_TOLERANCES = {NIB_DIMENSION: NIB_TOLERANCE_MM}
-ANGULAR_TOLERANCES = {YAW_DIMENSION: YAW_TOLERANCE_DEG}
-TOLERANCE_PRECISION = {NIB_DIMENSION: 1, YAW_DIMENSION: 0}
-DIMENSION_NOMINALS = {STUD_DIMENSION: STUD_HEIGHT, NIB_DIMENSION: NIB_PROTRUSION}
 
 # --- contract asserts ---------------------------------------------------------
 assert sorted(QUANTITIES) == sorted(BOM_ORDER)

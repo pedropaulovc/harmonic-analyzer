@@ -1,16 +1,17 @@
-"""Drawing-only text of the pen-carriage fitter package (MHA-PN-000).
+"""Drawing-only data of the pen-carriage fitter package (MHA-PN-000).
 
-The BOM descriptions, setting callouts and their text points, the detail
-regions and titles, the as-shipped note, the assembly steps and checks the
-sheets print. Only draw_pn_pen_assembly (and its tests) import this module;
-the builder reads pn_pen_assembly_spec alone, so a wording edit here does not
-rebuild the pen assembly. No SolidWorks.
+The BOM item numbers and descriptions, the settings' display on the sheet
+(which is a reference, the nominals and bands it reads back, tolerance
+places), setting callouts and their text points, the explode trails, the
+detail regions and titles, the as-shipped note, the assembly steps and checks
+the sheets print. Only draw_pn_pen_assembly (and its tests) import this
+module; no assembly builder may (``test_assembly_sheet_isolation`` pins it),
+so a wording edit here does not rebuild the pen assembly. No SolidWorks.
 """
 
 from __future__ import annotations
 
 import math
-from fractions import Fraction
 
 import pn_pen_adjust_screw_spec as stud
 import pn_pen_carriage_geom as carriage
@@ -22,6 +23,7 @@ import vn_pen_hanger_jam_nut_spec as hanger_jam_nut
 import vn_pen_hanger_nut_spec as hanger_nut
 import vn_pen_rod_set_screw_spec as rod_set_screw
 import _mcmaster_99607a213 as thumb_screw
+from _inch_fraction import inch_fraction
 from mg_wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
 from pn_pen_assembly_spec import (
     BOM_ORDER,
@@ -31,7 +33,6 @@ from pn_pen_assembly_spec import (
     HANGER_JAM_NUT,
     HANGER_NUT,
     HANGER_SCREW,
-    ITEM,
     MARKER,
     NIB_DIMENSION,
     NIB_PRECISION,
@@ -54,17 +55,37 @@ from pn_pen_assembly_spec import (
     YAW_DIMENSION,
     YAW_TOLERANCE_DEG,
 )
-from pn_pen_explode_spec import exploded_point
+from pn_pen_explode_spec import EXPLODE_STEPS
+
+DRAWING_NUMBER = "MHA-PN-000"
+# A top-level BOM numbers its rows in the builder's insertion order
+# (pn_pen_assembly_spec.BOM_ORDER); the drawing proves each row against this
+# and the steps cite it.
+ITEM = {stem: index for index, stem in enumerate(BOM_ORDER, 1)}
+
+# How the sheet shows the builder's setting dimensions. A reference dimension
+# carries no band: the stud's band rides on the measured-length setting the
+# callout and step 1 print.
+REFERENCE_DIMENSIONS = frozenset({STUD_DIMENSION})
+DIMENSION_TOLERANCES = {NIB_DIMENSION: NIB_TOLERANCE_MM}
+ANGULAR_TOLERANCES = {YAW_DIMENSION: YAW_TOLERANCE_DEG}
+TOLERANCE_PRECISION = {NIB_DIMENSION: 1, YAW_DIMENSION: 0}
+DIMENSION_NOMINALS = {STUD_DIMENSION: STUD_HEIGHT, NIB_DIMENSION: NIB_PROTRUSION}
+
+
+def exploded_point(stem: str, point: tuple[float, float, float]) -> tuple[float, ...]:
+    """``point`` (machine mm, assembled) carried by every
+    ``pn_pen_explode_spec.EXPLODE_STEPS`` step that moves ``stem``."""
+    moved = list(point)
+    for _label, stems, key, distance in EXPLODE_STEPS:
+        if stem in stems:
+            moved["xyz".index(key)] += distance
+    return tuple(moved)
 
 
 def _inch(mm: float) -> str:
     """A purchased size in the vendor's fractional inches (5/32, 1/4, 1)."""
-    fraction = Fraction(mm / 25.4).limit_denominator(64)
-    if abs(float(fraction) * 25.4 - mm) > 1e-6:
-        raise AssertionError(f"{mm} mm is not a 1/64 in size")
-    if fraction.denominator == 1:
-        return str(fraction.numerator)
-    return f"{fraction.numerator}/{fraction.denominator}"
+    return inch_fraction(mm, what="pen purchased size")
 
 
 STUD_NUT_WRENCH = _inch(stud_nut.ACROSS_FLATS)

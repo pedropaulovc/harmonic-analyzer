@@ -210,13 +210,14 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_pn_pen_assembly:
             scripts_dir = Path(draw_pn_pen_assembly.__file__).resolve().parent
-            # The fitting spec (inventory, explode, settings), the sheet text
-            # and the carriage geometry its settings derive from.
+            # The fitting spec (inventory, settings), the explode spec, the
+            # sheet module and the carriage geometry its settings derive from.
             assert {
                 str(scripts_dir / name)
                 for name in (
                     "pn_pen_assembly_spec.py",
-                    "pn_pen_assembly_notes.py",
+                    "pn_pen_explode_spec.py",
+                    "pn_pen_assembly_sheet.py",
                     "pn_pen_carriage_geom.py",
                 )
             } <= set(deps)
