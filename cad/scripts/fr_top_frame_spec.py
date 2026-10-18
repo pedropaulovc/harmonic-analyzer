@@ -18,6 +18,7 @@ from __future__ import annotations
 from math import radians, sqrt, tan
 
 import _config
+import ch_fulcrum_keeper_spec as FULCRUM_KEEPER
 import vn_knife_hanger_stud_spec as HANGER_SCREW
 import vn_knife_hanger_washer_spec as HANGER_WASHER
 import vn_knife_mount_dowel_spec as KNIFE_DOWEL
@@ -160,11 +161,25 @@ if HANGER_PIN_SLIP_CLEARANCE_MIN < 0.02 or HANGER_PIN_SLIP_CLEARANCE_MAX > 0.10:
 # Manufacturing GD&T limits consumed by the part's drawing projection: each
 # slot to its round hole (datum B front, C rear), at their BASIC span,
 # oriented by the other round hole with its location released (translation
-# modifier), so the two mounts' dowel lines stay square to the B-C line.
+# modifier), so the two mounts' dowel lines stay square to the B-C line.  The
+# faced top's flatness across both MHA-CH-007 keeper seats is the keeper's own
+# budget (ch_fulcrum_keeper_spec owns it and proves the MHA-CH-004 shaft
+# stack with it), printed as a native frame on the rail (machinist review
+# r3: a tolerance is a control on its feature, not note text).  The values
+# stay literals (the FCF provenance scan reads them); the guard below ties
+# the flatness to the keeper's budget.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-hanger slot position": "0.05",
     "knife-hanger crossbar centring": "0.10",
+    "keeper seat flatness": "0.04",
 }
+if float(GEOMETRIC_TOLERANCES_MM["keeper seat flatness"]) != (
+    FULCRUM_KEEPER.KEEPER_SEAT_FLATNESS_BUDGET_MM
+):
+    raise AssertionError(
+        "keeper seat flatness must print MHA-CH-007's budget "
+        f"{FULCRUM_KEEPER.KEEPER_SEAT_FLATNESS_BUDGET_MM}"
+    )
 HANGER_CROSSBAR_CENTER_ZONE = float(
     GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"]
 )

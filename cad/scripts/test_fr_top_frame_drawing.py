@@ -4144,6 +4144,21 @@ def test_slot_station_is_a_basic_xxx_from_its_round_hole() -> None:
     assert 'suffix="2X ROUND HOLE FROM\\nSCREW AXIS, SAME Z"' in source
 
 
+def test_boss_and_socket_diameters_take_one_near_side_arrow() -> None:
+    # Machinist review r3 (sheet 3): as full diameters through the shared
+    # axis the socket's match-fit leader crossed the Ø45.0 BOSS leader at
+    # the socket centre, and the Ø45.0 grazed the 28.0's upper arrow.  Each
+    # now reads off one arrow on its nearest rim; the boss text stands 4 mm
+    # higher, still under the socket block.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert set(drawing.DETAIL_TOP_KEEP) == {"C0Dia", "B0Dia"}
+    assert 'set_near_side_diameter(annotation, f"holes/sockets top {name}")' in source
+    styled = source.index('set_near_side_diameter(annotation, f"holes/sockets top {name}")')
+    assert source.index("for name in DETAIL_TOP_KEEP:", styled - 400) < styled
+    assert drawing.DETAIL_TOP_KEEP["C0Dia"] == (0.035, 0.236)
+    assert drawing.DETAIL_TOP_KEEP["B0Dia"][1] - drawing.DETAIL_TOP_KEEP["C0Dia"][1] >= 0.019
+
+
 def test_cap_recess_callouts_name_the_cap_and_why_the_ceiling() -> None:
     # Machinist review r2 (sheet 4): the recess's diameter and depth bands
     # are tighter than .XX, so each callout names MHA-VN-028, and the
@@ -4699,6 +4714,15 @@ def test_crossbar_pocket_depth_stands_between_the_side_rail_and_the_t() -> None:
     assert drawing.BAR_POCKET_FROM_SOCKET == pytest.approx(
         abs(part.FRONT_COLUMN_Z) - part.BAR_POCKET_Z
     ) == pytest.approx(43.0)
+    # Machinist review r3: the 43.0 drew 24 mm left of its text point, off the
+    # sheet frame; the build reads its line back onto the 138.0's x and proves
+    # it inside the zone frame.
+    assert (
+        "_pin_vertical_dimension_line(\n"
+        "        adapter, pocket_from_socket, POCKET_FROM_SOCKET_LINE_XY[0],"
+    ) in source
+    assert drawing.POCKET_FROM_SOCKET_LINE_XY[0] == drawing.POCKET_LENGTH_TEXT_XY[0]
+    assert drawing.SHEET_FRAME[0] < drawing.POCKET_FROM_SOCKET_LINE_XY[0]
     assert 'label="crossbar pocket depth"' in source
     assert "pocket_depth.ArrowSide = _DIM_ARROWS_INSIDE" in source
     assert "crossbar pocket depth" in spec.DRAWING_REFERENCE_PRECISION
@@ -4739,25 +4763,24 @@ def test_keeper_facing_note_is_the_part_property_carrying_the_keeper_budget() ->
 
     budget = keeper.KEEPER_SEAT_FLATNESS_BUDGET_MM
     assert budget == 0.04
-    # The frame's sheet imports the keeper's budget; the keeper never imports
+    # The frame's spec prints the keeper's budget; the keeper never imports
     # the frame.
-    assert drawing.KEEPER_SEAT_FLATNESS_BUDGET_MM is budget
+    assert spec.GEOMETRIC_TOLERANCES_MM["keeper seat flatness"] == f"{budget:.2f}" == "0.04"
     assert not hasattr(spec, "KEEPER_SEAT_FLATNESS_BUDGET_MM")
+    assert not hasattr(drawing, "KEEPER_SEAT_FLATNESS_BUDGET_MM")
     assert "fr_top_frame_spec" not in Path(keeper.__file__).read_text(encoding="utf-8")
     # One facing requirement on the whole top except the four corner bosses
     # (user ruling 2026-10-14).  No region size, no edge margin, no setup
-    # method, no new dimension (machinist review r13).  The keeper rail's
-    # flatness moved to its own leadered note on the rail (machinist review
-    # r1 of the ENFORCE pass).
+    # method, no new dimension (machinist review r13).  The keeper seats'
+    # flatness is a native frame on the rail it controls, naming the seats
+    # and the shaft they align (machinist review r3 of the ENFORCE pass: as
+    # note text it read as an unexplained requirement).
     assert spec.DRAWING_NOTES_B.splitlines() == [
         "WHOLE TOP EXCEPT 4 BOSSES:",
         "Ra 3.2 UM.",
     ]
-    assert drawing.KEEPER_FLATNESS_NOTE.splitlines() == [
-        "FLAT WITHIN 0.04",
-        "ACROSS BOTH MHA-CH-007",
-        "KEEPER SEATS",
-    ]
+    assert drawing.KEEPER_FLATNESS_QUALIFIER == "BOTH MHA-CH-007 SEATS, ALIGN MHA-CH-004"
+    assert not hasattr(drawing, "KEEPER_FLATNESS_NOTE")
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     (notes,) = [
         node.value
@@ -4809,11 +4832,19 @@ def test_keeper_facing_note_is_the_part_property_carrying_the_keeper_budget() ->
     assert _keyword(linked[0], "char_height").id == "FACING_NOTE_HEIGHT"
     (flatness,) = [
         call
-        for call in _named_calls(drawing_tree, "add_leader_note")
-        if ast.unparse(call.args[1]) == "KEEPER_FLATNESS_NOTE"
+        for call in _named_calls(drawing_tree, "add_feature_control_frame")
+        if ast.unparse(_keyword(call, "label")) == "'keeper seat flatness'"
     ]
-    assert ast.unparse(_keyword(flatness, "view")) == "detail_top"
-    assert ast.unparse(_keyword(flatness, "text_xy")) == "KEEPER_FLATNESS_NOTE_XY"
+    assert ast.unparse(flatness.args[1]) == "detail_top"
+    assert ast.literal_eval(_keyword(flatness, "characteristic")) == "flatness"
+    assert ast.literal_eval(_keyword(flatness, "entity_type")) == "FACE"
+    assert ast.unparse(_keyword(flatness, "entity")) == "keeper_seat_face"
+    assert ast.unparse(_keyword(flatness, "tolerance")) == (
+        "GEOMETRIC_TOLERANCES_MM['keeper seat flatness']"
+    )
+    assert ast.unparse(_keyword(flatness, "frame_xy")) == "KEEPER_FLATNESS_FRAME_XY"
+    assert ast.unparse(_keyword(flatness, "quantity")) == "KEEPER_FLATNESS_QUALIFIER"
+    assert "datums" not in {keyword.arg for keyword in flatness.keywords}
     assert drawing.KEEPER_FLATNESS_TIP_Z == pytest.approx(
         (part.KEEPER_TAP_Z_FRONT + part.KEEPER_TAP_Z_REAR) / 2.0
     )

@@ -42,7 +42,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
-from _drawing_annotation_extent import require_clear
+from _drawing_annotation_extent import move_annotation, require_clear, sheet_region
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -68,7 +68,7 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_audit import annotation_display
 from _drawing_leader_notes import add_leader_note
-from _drawing_leaders import set_near_side_diameter
+from _drawing_leaders import dimension_segments, set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -83,6 +83,7 @@ from _drawing_sheets import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
+from _gtol_planar import PlanarFace
 from _layout_audit import display_box, estimated_text_runs
 from _mcmaster_90280a837 import (
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,
@@ -93,7 +94,6 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from ch_fulcrum_keeper_spec import KEEPER_SEAT_FLATNESS_BUDGET_MM
 from build_fr_top_frame import (
     BAR_POCKET_Z,
     BAR_WEB_X0,
@@ -390,17 +390,17 @@ KEEPER_CALLOUT_EXTENT = (
 # renders about 2.6 mm per character on a 5.1 mm row (farm 30394c1da: its
 # then 70-character line spanned 30 -> 208 mm).
 FACING_NOTE_HEIGHT = 0.0035
-# The keeper rail's flatness rides on its own leader to the rail top at the
-# rail's centreline midway between the keepers (z -0.5, sheet about
-# (291.5, 160.8) mm on the r1 render), its three rows left-aligned in the
-# open window between the rail (outer edge 296) and the 194.5 REAR KEEPER Z
-# line (x 372): 22 glyphs reach 359, rows 185 -> 170 stay over that
-# dimension's text (top 165).
-KEEPER_FLATNESS_NOTE = (
-    f"FLAT WITHIN {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f}\n"
-    "ACROSS BOTH MHA-CH-007\nKEEPER SEATS"
-)
-KEEPER_FLATNESS_NOTE_XY = (0.302, 0.185)
+# The keeper seats' flatness is a native frame on the faced top, leadered to
+# the rail top at the rail's centreline midway between the keepers (z -0.5,
+# sheet about (291.5, 160.8) mm on the r1 render), its frame's top-left where
+# the r2 note's text stood, in the open window between the rail (outer edge
+# 296) and the 194.5 REAR KEEPER Z line, over that dimension's text (top
+# 165).  The row under the frame names the seats it covers and the part they
+# align: 39 characters at the frame's 2.6 mm reach 404, inside the border
+# (machinist review r3: a 0.04 flatness is a control with its function, not
+# note text).
+KEEPER_FLATNESS_QUALIFIER = "BOTH MHA-CH-007 SEATS, ALIGN MHA-CH-004"
+KEEPER_FLATNESS_FRAME_XY = (0.302, 0.185)
 KEEPER_FLATNESS_TIP_Z = (KEEPER_TAP_Z_FRONT + KEEPER_TAP_Z_REAR) / 2.0
 # Native SolidWorks centres the four-row RD4 block on its callout point and
 # lands the leader on an underline below the bottom row, 11.15 mm under that
@@ -811,7 +811,10 @@ POCKET_LENGTH_OFFSET_XY = (0.0320, 0.2555)
 # and the pocket end's (177.0).  Its value stands on the line, which breaks
 # round it (about 12 x 3.5 mm, x 18.6 -> 30.2, left of the plan's 36.8).
 # An offset-text jog there threw the whole dimension 24 mm left, off the
-# sheet frame (farm run 20261018T061230033Z-344b527a..., sheet 6).
+# sheet frame (farm run 20261018T061230033Z-344b527a..., sheet 6), and the
+# plain text point did too (20261018T065727559Z-54ee64e9..., r3), so the
+# build reads the drawn line back and moves it onto this x
+# (``_pin_vertical_dimension_line``).
 BAR_POCKET_FROM_SOCKET = abs(FRONT_COLUMN_Z) - BAR_POCKET_Z
 POCKET_FROM_SOCKET_LINE_XY = (
     POCKET_LENGTH_TEXT_XY[0],
@@ -1005,7 +1008,10 @@ FLANGE_ON_SOCKET_AXES = "FLANGE CENTRED\nON SOCKET AXES"
 # derive from the socket pattern -- so sheet 3 dimensions every hole from
 # the socket bore axes instead (``HOLE_STATIONS``, drawing-guidelines.md rule 10 (dimension from a real feature)).
 DETAIL_TOP_KEEP = {
-    "C0Dia": (0.035, 0.232),
+    # 4 mm above r3's 0.232, so its near-side leader to the boss rim passes
+    # about 2.5 mm over the 28.0 FRONT HANGER Z's upper arrow (machinist
+    # review r3), the value still 4 mm under the socket block's shoulder.
+    "C0Dia": (0.035, 0.236),
     # One row taller than r1's two (the mating tube and the fit it holds,
     # machinist review r1), so its top stands 3 mm higher.
     "B0Dia": (0.050, 0.255),
@@ -1747,6 +1753,58 @@ def _checked_dimension(
             adapter, [annotation], {dimension_name(adapter, annotation): offset_text}
         )
     return native
+
+
+def _pin_vertical_dimension_line(
+    adapter: Any, display: Any, line_x: float, *, label: str
+) -> None:
+    """Hold a vertical dimension's line at sheet ``line_x``, inside the frame.
+
+    A circle-centre vertical dimension on the underside locator landed its
+    whole line 24 mm left of its requested text point -- off the sheet frame
+    -- with and without an offset jog, and nothing read it back (machinist
+    review r2 and r3, farm runs 20261018T061230033Z and 20261018T065727559Z).
+    Read the drawn line, move the text by the miss, and prove every line of
+    the dimension inside the zone frame.
+    """
+    annotation = _early_bound(
+        _early_bound(display, "IDisplayDimension").GetAnnotation(), "IAnnotation"
+    )
+    region = sheet_region(adapter)
+    for _attempt in range(3):
+        segments = dimension_segments(annotation)
+        vertical = [
+            (a, b)
+            for a, b in segments
+            if abs(a[0] - b[0]) < 1e-6 and abs(a[1] - b[1]) > 1e-4
+        ]
+        if not vertical:
+            raise RuntimeError(f"{label}: no vertical dimension line in {segments}")
+        drawn_x = vertical[0][0][0]
+        miss = line_x - drawn_x
+        _telemetry.info(
+            f"{label}: dimension line at x {drawn_x:.5f}, requested {line_x:.5f}; "
+            f"lines {segments}"
+        )
+        if abs(miss) <= 0.0005:
+            outside = [
+                segment
+                for segment in segments
+                if any(
+                    not (
+                        region.xmin <= x <= region.xmax
+                        and region.ymin <= y <= region.ymax
+                    )
+                    for x, y in segment
+                )
+            ]
+            if outside:
+                raise RuntimeError(f"{label}: lines outside the sheet frame {outside}")
+            return
+        move_annotation(adapter, annotation, miss, 0.0, label=label)
+    raise RuntimeError(
+        f"{label}: dimension line stayed at x {drawn_x:.5f}, not {line_x:.5f}"
+    )
 
 
 def _orient_cut_section(
@@ -3006,6 +3064,15 @@ async def build(adapter: Any) -> dict[str, str]:
     socket_dimension = _early_bound(socket_display.GetDimension2(0), "IDimension")
     if int(socket_dimension.GetToleranceType()) != 0:  # swTolNONE
         raise RuntimeError("socket source still carries a fixed fit tolerance; rebuild the part")
+    # Both diameters of the upper-left boss read off one arrow on the rim
+    # nearest their text: as full diameters through the shared axis their
+    # leaders crossed at the socket centre (machinist review r3, rule 14).
+    for name in DETAIL_TOP_KEEP:
+        (annotation,) = [
+            annotation for annotation in detail_top_dimensions
+            if dimension_name(adapter, annotation) == name
+        ]
+        set_near_side_diameter(annotation, f"holes/sockets top {name}")
     if not auto_center_marks(adapter, detail_top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top-frame hole pattern")
     # No origin centrelines or X/Z axis tags on this sheet: nothing here is
@@ -3189,20 +3256,34 @@ async def build(adapter: Any) -> dict[str, str]:
         *keeper_facing_note_xy(keeper_callout_xy),
         char_height=FACING_NOTE_HEIGHT,
     )
-    # The keeper rail's flatness, on the rail it controls (machinist review
-    # r1: it was appended to the hole callout's note block).
-    add_leader_note(
-        adapter,
-        KEEPER_FLATNESS_NOTE,
-        text_xy=KEEPER_FLATNESS_NOTE_XY,
-        attach_xy=model_point_in_view(
+    # The keeper seats' flatness: a native frame on the faced top it controls,
+    # leadered to the rail between the keepers (machinist review r3: a 0.04
+    # flatness in note text read as an unexplained requirement).  The face is
+    # resolved by its plane and a point on the keeper rail, so the frame
+    # cannot land on another coplanar face.
+    keeper_seat_face = resolve_faces(
+        _early_bound(_early_bound(detail_top, "IView").ReferencedDocument, "IModelDoc2"),
+        {
+            "keeper seats": PlanarFace(
+                (0.0, 1.0, 0.0), HALF_H,
+                contains_x_mm=COLUMN_X, contains_z_mm=KEEPER_FLATNESS_TIP_Z,
+            )
+        },
+    )["keeper seats"]
+    add_feature_control_frame(
+        adapter, detail_top,
+        entity=keeper_seat_face,
+        entity_type="FACE",
+        leader_attach_xy=model_point_in_view(
             adapter, detail_top,
             (COLUMN_X / 1000.0, HALF_H / 1000.0, KEEPER_FLATNESS_TIP_Z / 1000.0),
-            label="keeper rail flatness leader",
+            label="keeper seat flatness leader",
         ),
-        label="keeper rail flatness",
-        view=detail_top,
-        height=FACING_NOTE_HEIGHT,
+        frame_xy=KEEPER_FLATNESS_FRAME_XY,
+        characteristic="flatness",
+        tolerance=GEOMETRIC_TOLERANCES_MM["keeper seat flatness"],
+        quantity=KEEPER_FLATNESS_QUALIFIER,
+        label="keeper seat flatness",
     )
     upper_right_rim = (COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     hanger_x = HANGER_X
@@ -3747,7 +3828,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # pocket wall stack charges both .X bands at the rear end.
     pocket_pick_x = (BAR_X0 + EDGE_CHAMFER + BAR_WEB_X0) / 2.0
     pocket_front_end = (pocket_pick_x, -HALF_H+EDGE_CHAMFER, -BAR_POCKET_Z)
-    _checked_dimension(
+    pocket_from_socket = _checked_dimension(
         adapter, hub_bottom_parent,
         p0=(-COLUMN_X, -HALF_H, FRONT_COLUMN_Z), p1=pocket_front_end,
         text_xy=POCKET_FROM_SOCKET_LINE_XY, label="crossbar pocket from front socket",
@@ -3761,6 +3842,10 @@ async def build(adapter: Any) -> dict[str, str]:
                 pocket_front_end, label="crossbar pocket front end",
             ).edge,
         ),
+    )
+    _pin_vertical_dimension_line(
+        adapter, pocket_from_socket, POCKET_FROM_SOCKET_LINE_XY[0],
+        label="crossbar pocket from front socket",
     )
     _checked_dimension(
         adapter, hub_bottom_parent,
