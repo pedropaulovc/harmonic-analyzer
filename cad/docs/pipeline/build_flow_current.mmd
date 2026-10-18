@@ -50,8 +50,9 @@ flowchart TD
     PNG -.->|ASSETS| APNG[("stage/solidworks/ (flattened P&amp;G)<br/>stage/step/ · stage/stl/ · stage/pdf/<br/>stage/gltf/ · stage/png/ · stage/boxes/")]
 
     PNG --> DIFF["⑩b render_diff.py (uv run)<br/>download prev release →<br/>offscreen render changed parts<br/>(Hausdorff, noise-filtered)"]
-    DIFF -->|no prior / render fails| SKIP["⚠ non-fatal: skip<br/>release continues"]
+    DIFF -->|no prior| SKIP["first release: no geometry baseline"]
     DIFF -->|ok| ADIFF[("stage/diff/*.png<br/>stage/diff/diff_summary.json")]
+    DIFF -->|render fails| FAILR
     SKIP --> BUNDLE
     ADIFF --> BUNDLE
 

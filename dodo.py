@@ -3426,6 +3426,8 @@ def task_check():
         # _assembly.py; each recipe carries its own contract only).
         SCRIPTS_DIR / "test_assembly_contract.py",
         SCRIPTS_DIR / "test_cut_release_version.py",
+        SCRIPTS_DIR / "test_drawing_diff.py",
+        SCRIPTS_DIR / "test_release_drawing_diff.py",
         SCRIPTS_DIR / "test_trim_renders.py",
         SCRIPTS_DIR / "test_export_models.py",
         SCRIPTS_DIR / "test_export_features.py",
