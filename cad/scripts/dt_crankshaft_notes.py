@@ -25,16 +25,22 @@ CROSS_HOLE_CALLOUT = "\n".join(
     )
 )
 
-# Each banded size and length names the mate or stack its band serves, at its
-# own callout (drawing-guidelines.md rule 4; machinist review of
-# 5a219a81904f).  Rows stay short: the profile's diameters share a crowded
-# band under the cross-hole callout, and the station rows are 9.5 mm apart,
-# so their mates ride on the same line as a suffix.
+# Each banded size and length names the mate or stack its band serves, and a
+# fit its kind, at its own callout (drawing-guidelines.md rule 4; machinist
+# reviews of 5a219a81904f and f50937749).  The profile's diameters share a
+# crowded band under the cross-hole callout, so each diameter takes one
+# short row above its value (the fit) and one below (the mate): SolidWorks
+# drops a multi-row callout above a dimension.  The station rows are 9.5 mm
+# apart, so their stacks ride on the same line as a suffix.
+SLIDING_FIT = "SLIDING FIT"
 SHANK_MATE = "IN MHA-DT-031"
-JOURNAL_MATE = "RUN IN MHA-DT-005"
+JOURNAL_FIT = "2X RUNNING FIT"
+JOURNAL_MATE = "IN MHA-DT-005"
 PINION_SEAT_MATE = "IN MHA-DT-010"
-# The spigot's diameter and its length from the seat face both keep the #25
-# chain wrapping MHA-PD-009 clear of the shaft (dt_crankshaft_spec).
+# The spigot's diameter (under it, never over) and its length from the seat
+# face both keep the #25 chain wrapping MHA-PD-009 clear (dt_crankshaft_spec).
+SPIGOT_AIR = "#25 CHAIN AIR"
+SPIGOT_AIR_MATE = "ON MHA-PD-009"
 CHAIN_AIR_MATE = "CHAIN AIR\nMHA-PD-009"
 COLLAR_REAR_MATE = " BEARS ON MHA-DT-005"
 COLLAR_SEAT_MATE = " MHA-PD-009 SEAT"

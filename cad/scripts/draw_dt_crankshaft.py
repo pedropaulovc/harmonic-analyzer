@@ -78,12 +78,16 @@ from dt_crankshaft_notes import (
     DRIVE_PIN_DEPTH_BAND,
     DRIVE_PIN_LOCATION_CALLOUT,
     FIDUCIAL_NOTE,
+    JOURNAL_FIT,
     JOURNAL_MATE,
     KNOCKOUT_CALLOUT_ABOVE,
     KNOCKOUT_CALLOUT_BELOW,
     PINION_SEAT_MATE,
     SHAFT_LENGTH_MATE,
     SHANK_MATE,
+    SLIDING_FIT,
+    SPIGOT_AIR,
+    SPIGOT_AIR_MATE,
 )
 from dt_crankshaft_spec import (
     COLLAR_DIA,
@@ -246,49 +250,53 @@ SIDE_KEEP = {
 # The Ø9.525 sits on the core LEFT of the cross-hole, so its lines stop short
 # of the hole the callout's leader leaves (leader-crosses-line, af13c8ff8);
 # the Ø9.0 seat's sits on the seat, left of the pinion pin hole.
-# Every banded diameter carries its mate's callout (dt_crankshaft_notes): the
-# cross-hole block stands high (HOLE_CALLOUT_XY) to make the room.  The
-# Ø11.388's 2X sits above it and its mate below, so its row rises 2 mm clear
-# of the outboard journal's finish symbol; the relief's Ø10.4 stands right of
-# that mate.
-_DIAMETER_ROW_Y = (0.212, 0.225)
-# The spigot's Ø17.5 on the spigot and the collar body's Ø20.6 on the body
-# (each sketch starts at its section's front face), the spigot's text above
-# the body's so each dimension line stays clear of the other's text.  The
-# spigot's line stands 2.6 mm short of its step, so its two-row mate centres
-# right of the cross-hole leader; the body's loose one-place text drops into
-# the room its band left, left of the rear face's finish symbol.  The neck's
-# loose Ø9.5 (2X: both bare necks) stands on the inboard neck, its text up
-# left of the Ø9.000's mate and under the retention-pin note.
+# Each banded diameter is a four-row block (fit / upper limit / value /
+# mate) whose left edge stands on its dimension line and whose landing line
+# runs under its widest row; each request is the block's centre.  The
+# cross-hole callout's leader climbs from the hole at ~1.45 (dy/dx) to its
+# block (HOLE_CALLOUT_XY): left of it the Ø9.525's block lands 3.5 mm clear
+# of it, right of it the Ø17.50's block tops out 6 mm under it (machinist
+# review of b5c02e5d6: the leader crossed the Ø9.525's landing line).  The
+# Ø20.6 (one place, no band) drops under the Ø17.50's landing line, and the
+# Ø11.388 stands right of the Ø17.50's block, its landing line 2 mm over the
+# outboard journal's finish symbol and its fit row 7 mm under the cross-hole
+# callout's landing line; the relief's Ø10.4 stands right of it.
+# The neck's loose Ø9.5 (2X: both bare necks) stands on the inboard neck,
+# over the Ø9.000's block; the Ø9.000's dimension line stands 2 mm past its
+# step so the retention-pin note's leader passes 4.5 mm right of its block.
 DIAMETER_POSITIONS = {
-    "ShaftDiaDim": (PIN_X - 0.016, _DIAMETER_ROW_Y[0]),
-    "JournalDiaDim": (RELIEF_START_X - 0.0069, _DIAMETER_ROW_Y[1]),
-    "ReliefDiaDim": (RELIEF_START_X + 0.045, _DIAMETER_ROW_Y[0]),
-    "PinionSeatDiaDim": (SEAT_STEP_X + 0.010, _DIAMETER_ROW_Y[0]),
-    "SpigotDiaDim": (COLLAR_SEAT_X + 0.009, 0.224),
-    "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.208),
-    "NeckDiaDim": ((JOURNAL_END_X + SEAT_STEP_X) / 2.0 - 0.0005, 0.2265),
+    "ShaftDiaDim": (PIN_X - 0.016, 0.2195),
+    "JournalDiaDim": (RELIEF_START_X - 0.0069, 0.224),
+    "ReliefDiaDim": (RELIEF_START_X + 0.045, 0.212),
+    "PinionSeatDiaDim": (SEAT_STEP_X + 0.002, 0.2125),
+    "SpigotDiaDim": (COLLAR_SEAT_X + 0.009, 0.2215),
+    "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2065),
+    "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
 }
 # The shank's band is the hub's fit; the two bare necks share one loose
 # 2X Ø9.5 (dt_crankshaft_spec SHAFT_NECKS).  The 2X Ø11.388 names both
 # bearing lands on either side of the relief; the displayed arrow picks the
 # outboard land, and the equal-size callout also governs the inboard land.
 CALLOUTS_ABOVE = {
-    "ShaftDiaDim": SHANK_MATE,
-    "JournalDiaDim": "2X",
-    "PinionSeatDiaDim": PINION_SEAT_MATE,
-    "SpigotDiaDim": CHAIN_AIR_MATE,
+    "ShaftDiaDim": SLIDING_FIT,
+    "JournalDiaDim": JOURNAL_FIT,
+    "PinionSeatDiaDim": SLIDING_FIT,
+    "SpigotDiaDim": SPIGOT_AIR,
     "NeckDiaDim": f"{len(SHAFT_NECKS)}X",
 }
 # The lower drive-pin location names the mate its +/-0.025 serves
 # (crankshaft_notes), in the clear field under its text; the spigot's length
 # names the chain it keeps clear, between the cross-hole's and the collar
-# seat's extension lines.
+# seat's extension lines.  Each banded diameter names its mate under its
+# value.
 CALLOUTS_BELOW = {
     "OverallLength": "OVERALL",
     "DrivePinOffset2": DRIVE_PIN_LOCATION_CALLOUT,
-    "JournalDiaDim": JOURNAL_MATE,
     "SpigotLength": CHAIN_AIR_MATE,
+    "ShaftDiaDim": SHANK_MATE,
+    "JournalDiaDim": JOURNAL_MATE,
+    "PinionSeatDiaDim": PINION_SEAT_MATE,
+    "SpigotDiaDim": SPIGOT_AIR_MATE,
 }
 # The banded far-end stations name their stack on their own row: a callout
 # below would lift the value into the row above.
@@ -333,14 +341,13 @@ COLLAR_REAR_FINISH = (
 # asserted (place_callout_clear).
 DRIVE_PIN_CALLOUT_XY = (0.066, 0.250)
 # Text centred up-right of the cross-hole: the callout's leader leaves the
-# text's left end and runs down-left at ~53 deg through the hole centre, a
-# clean crossing of the 118.0 station's extension line rather than a near
-# parallel one (run 20260923T030252135Z-49e46990), 4 mm clear of the Ø9.525
-# shoulder on its left.  18 mm right of its old spot so that leader clears
-# the moved Ø9.525 text (leader-crosses-line, af13c8ff8).  Its three prose
-# rows and drill row centre on y 0.251, so the block's landing line stands
-# ~6 mm over the diameters' mate callouts.
-HOLE_CALLOUT_XY = (PIN_X + 0.072, 0.251)
+# text's left end and runs down-left at ~55 deg to the hole, a clean
+# crossing of the 122.7 station's extension line rather than a near
+# parallel one (run 20260923T030252135Z-49e46990).  Its three prose rows and
+# drill row centre on y 0.251; its left end (~36 mm left of the centre) sets
+# the leader's slope that the diameter blocks under it are laid out around
+# (DIAMETER_POSITIONS).
+HOLE_CALLOUT_XY = (PIN_X + 0.077, 0.251)
 # The knockouts' native callout (drill above, size, purpose below; ~44 mm
 # wide) centres under the end view, below the lower 7.000 row's PINS SLIP
 # block (bottom ~0.131) and left of the dome's extension line (x 0.0897).
@@ -368,10 +375,10 @@ FIDUCIAL_NOTE_XY = (0.0145, 0.152)
 # window instead (run1b-e7fd1a2ec: the leader tip, not the text, read 0.3 mm
 # under the floor).
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
-# High in its field, so the neck's 2X Ø9.5 and the Ø9.000's mate stand under
-# it, and 3 mm right so its leader to the hole keeps ~3 mm off the Ø9.000's
-# text.
-PINION_PIN_NOTE_XY = (0.273, 0.261)
+# High in its field (top row ~4.5 mm under the border), so the neck's 2X Ø9.5
+# and the Ø9.000's block stand under it, and its leader to the hole passes
+# right of the Ø9.000's block.
+PINION_PIN_NOTE_XY = (0.273, 0.264)
 PINION_PIN_NOTE_FIELD = (
     HOLE_CALLOUT_XY[0] + 0.032,
     SIDE_CENTER[1],
@@ -465,7 +472,10 @@ def _drop_coaxial_step(display: Any, step_dia: float, label: str) -> None:
     carried ``<MOD-DIAM>1.40<HOLE-DEPTH>12.63`` in its callout-above part (run
     20261018T110810560Z-720787ec).  Each hole has its own callout naming its
     process, so the other's step is cleared.  Only a part holding nothing but
-    that step is cleared; the step anywhere else fails loud.  Read back.
+    that step is cleared; the step anywhere else fails loud.  The stepped
+    reading also put a bare counterbore symbol (``<HOLE-SPOT>``) before the
+    size (machinist review of b5c02e5d6), so it goes with the step.  Read
+    back.
     """
     display = _early_bound(display, "IDisplayDimension")
     marker = f"<MOD-DIAM>{step_dia:.2f}"
@@ -479,8 +489,16 @@ def _drop_coaxial_step(display: Any, step_dia: float, label: str) -> None:
         display.SetText(_DEFINITION_TO_WRITABLE[part], "")
         if str(display.GetText(part) or ""):
             raise RuntimeError(f"{label}: coaxial step in part {part} did not clear")
-    if holders:
-        _telemetry.info(f"{label}: cleared coaxial step from parts {holders}: {definitions!r}")
+    if not holders:
+        return
+    prefix = definitions[5]
+    if "<HOLE-SPOT>" in prefix:
+        bare = prefix.replace("<HOLE-SPOT>", "")
+        display.SetText(_DEFINITION_TO_WRITABLE[5], bare)
+        applied = str(display.GetText(5) or "")
+        if applied.replace("\r", "") != bare:
+            raise RuntimeError(f"{label}: counterbore symbol did not clear: {applied!r}")
+    _telemetry.info(f"{label}: cleared coaxial step from parts {holders}: {definitions!r}")
 
 
 def _require_mm_sheet(draw: Any, label: str) -> None:
