@@ -88,10 +88,10 @@ def test_tooth_system_and_reference_cutter_are_spec_owned() -> None:
         f"DIAMETRAL PITCH:  {spec.DIAMETRAL_PITCH:.2f}",
         f"PRESSURE ANGLE:  {spec.PRESSURE_ANGLE_DEG:.1f} DEG",
         f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
-        f"ROOT ENVELOPE DIAMETER (mm, REF):  "
-        f"{spec.ROOT_ENVELOPE_DIA_MM[0]:.3f}-{spec.ROOT_ENVELOPE_DIA_MM[1]:.3f}",
+        f"ROOT DIAMETER (mm, REF):  {sum(spec.ROOT_ENVELOPE_DIA_MM) / 2.0:.2f}",
         f"CUTTER PLUNGE (mm):  {spec.WHOLE_DEPTH:.3f} "
-        f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}",
+        f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}; "
+        "SETS BACKLASH WITH CONE GEARS MHA-DT-003",
         f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
         f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
         f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
@@ -110,6 +110,45 @@ def test_drum_prints_the_tooth_runout_the_cone_mesh_stack_books() -> None:
         f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {cone_set_stack.TOOTH_RUNOUT_TIR_MM:.2f} "
         "TIR MAX TO FINISHED BORE"
     ) in notes.GEAR_DATA
+
+
+def test_title_block_notch_depth_still_cuts_below_the_root_and_clears_the_cam() -> None:
+    from _printed_tolerance import printed_band_mm
+
+    band = printed_band_mm(spec.DRAWING_PRECISION["NotchProfile"]["NotchDepth"])
+    assert spec.NOTCH_DEPTH - band > spec.WHOLE_DEPTH + spec.WHOLE_DEPTH_BAND[0]
+    assert spec.TIP_RADIUS - (spec.NOTCH_DEPTH + band) > (
+        spec.CAM_DIA / 2.0 + spec.ECCENTRICITY + spec.ECCENTRICITY_TOLERANCE_MM
+    )
+
+
+def test_every_tight_band_states_its_mate_or_function_at_the_callout() -> None:
+    callouts = drawing.DIMENSION_CALLOUTS
+    assert "MHA-DT-003" in callouts["OutsideDia"]
+    assert "MHA-CH-003" in callouts["CamDia"]
+    assert "MHA-CH-003" in callouts["FaceWidth"]
+    assert "GAIN" in callouts["CamCy"]
+    assert "PHASE" in callouts["NotchPhase"]
+    assert "FLANKS" in callouts["NotchWidth"]
+    assert "MHA-DT-013" in notes.BORE_FIT_CALLOUT
+
+
+def test_worst_case_cam_wall_is_printed_and_clears_the_floor() -> None:
+    import dt_cylinder_gear_shaft_spec as arbor
+
+    worst_wall = (
+        (spec.CAM_DIA + spec.CAM_DIA_BAND[1]) / 2.0
+        - (spec.ECCENTRICITY + spec.ECCENTRICITY_TOLERANCE_MM)
+        - (
+            arbor.SHAFT_DIA
+            + arbor.SHAFT_DIA_BAND[0]
+            + spec.BORE_DIAMETRAL_CLEARANCE_MM[1]
+        )
+        / 2.0
+    )
+    assert worst_wall - 0.01 < spec.CAM_WALL_MIN_MM <= worst_wall
+    assert 1.5 < spec.CAM_WALL_MIN_MM < 2.0
+    assert f"{spec.CAM_WALL_MIN_MM:.2f} MIN WALL" in notes.BORE_FIT_CALLOUT
 
 
 def test_cam_and_notch_oracles_use_actual_off_centre_root_material() -> None:

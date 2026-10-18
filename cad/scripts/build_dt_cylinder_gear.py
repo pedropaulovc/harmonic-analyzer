@@ -120,7 +120,6 @@ from dt_cylinder_gear_spec import (
     NOTCH_CENTER_X,
     NOTCH_DEPTH,
     NOTCH_FLOOR_RADIUS,
-    NOTCH_DEPTH_TOLERANCE_MM,
     NOTCH_MEAN_RADIUS,
     NOTCH_PHASE_DEG,
     NOTCH_WIDTH,
@@ -673,8 +672,14 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(
                 f"{name}@NotchProfile readback {actual!r}, expected {expected:g} mm"
             )
+    # Bilateral bands print at the nominal's places (rule 3): machinist
+    # review r1 read "0.0/-0.1" under 64.44 and "+0.1/0.0" under 0.40.
     set_dimension_bilateral_tolerance(
-        adapter, "GearBlankProfile", "OutsideDia", *deviations(OUTSIDE_DIA_BAND)
+        adapter,
+        "GearBlankProfile",
+        "OutsideDia",
+        *deviations(OUTSIDE_DIA_BAND),
+        places=DRAWING_PRECISION["GearBlankProfile"]["OutsideDia"],
     )
     set_dimension_symmetric_tolerance(
         adapter,
@@ -683,7 +688,11 @@ async def build(adapter) -> dict[str, str]:
         FACE_WIDTH_TOLERANCE_MM,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "CamProfile", "CamDia", *deviations(CAM_DIA_BAND)
+        adapter,
+        "CamProfile",
+        "CamDia",
+        *deviations(CAM_DIA_BAND),
+        places=DRAWING_PRECISION["CamProfile"]["CamDia"],
     )
     # Centred (cylinder_bank_layout asserts it), so it prints +/-.
     set_dimension_symmetric_tolerance(
@@ -696,14 +705,14 @@ async def build(adapter) -> dict[str, str]:
         ECCENTRICITY_TOLERANCE_MM,
     )
     set_dimension_bilateral_tolerance(
-        adapter, "NotchProfile", "NotchWidth", *deviations(NOTCH_WIDTH_BAND)
-    )
-    set_dimension_symmetric_tolerance(
         adapter,
         "NotchProfile",
-        "NotchDepth",
-        NOTCH_DEPTH_TOLERANCE_MM,
+        "NotchWidth",
+        *deviations(NOTCH_WIDTH_BAND),
+        places=DRAWING_PRECISION["NotchProfile"]["NotchWidth"],
     )
+    # NotchDepth carries no model band: the sighted kerf prints to the
+    # title-block .X row (dt_cylinder_gear_spec.NOTCH_DEPTH).
     set_dimension_symmetric_angular_tolerance(
         adapter,
         "NotchProfile",

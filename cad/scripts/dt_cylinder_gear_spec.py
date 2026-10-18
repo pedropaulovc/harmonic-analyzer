@@ -76,7 +76,9 @@ BORE_DIAMETRAL_CLEARANCE_MM = (0.030, 0.070)  # (minimum, maximum), matched fit
 # Manufacturing still matches every bore to the actual finished arbor.
 BORE_DIA = arbor.SHAFT_DIA + sum(BORE_DIAMETRAL_CLEARANCE_MM) / 2.0
 FACE_WIDTH = 3.0
-# Face width controls mesh engagement across the mating cone-gear family.
+# Face width controls mesh engagement across the mating cone-gear family and,
+# with OVERALL_THICKNESS, the cam length the MHA-CH-003 rod ring rides in
+# (cylinder_bank_layout.SLOT_MIN) and the gear-0 pitch stack.
 FACE_WIDTH_TOLERANCE_MM = 0.05
 CAM_DIA = 30.6  # integral eccentric cam disc
 CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
@@ -96,16 +98,39 @@ ECCENTRICITY = 8.64  # cam axis offset from the bore axis
 # The cam must merge wholly into the actual uncut web, not a fictitious
 # actual-N circular root blank.  The native builder checks this same margin.
 CAM_ROOT_WEB_MIN_MM = STOCK_FORM.root_radius_min_mm - (CAM_DIA / 2.0 + ECCENTRICITY)
+# Per-gear band only: error_budget.yaml cam_eccentricity books each channel's
+# throw independently, so no matched-set range is drawn (machinist review r1).
 ECCENTRICITY_TOLERANCE_MM = 0.025
-SET_ECCENTRICITY_RANGE_MM = 0.025
+# Worst-case crescent wall between the bore and the cam OD, opposite the lobe:
+# smallest cam, largest throw, and the bore at its largest matched size (the
+# largest finished arbor plus the maximum diametral clearance).  Floored to
+# the printed 0.01.  Below the 2.0 mm target, above the 1.5 mm floor (rule
+# 17): printed as a plain fact (rule 20); pending owner ruling (#992).
+CAM_WALL_MIN_MM = (
+    math.floor(
+        (
+            (CAM_DIA + CAM_DIA_BAND[1]) / 2.0
+            - (ECCENTRICITY + ECCENTRICITY_TOLERANCE_MM)
+            - (
+                arbor.SHAFT_DIA
+                + arbor.SHAFT_DIA_BAND[0]
+                + BORE_DIAMETRAL_CLEARANCE_MM[1]
+            )
+            / 2.0
+        )
+        * 100.0
+    )
+    / 100.0
+)
 # Cam-lobe direction vs the alignment-notch centreline (the channel's phase
 # datum); error_budget.yaml cam_phase. Carried on the native NotchPhase
 # angular dimension (build_dt_cylinder_gear), lobe axis to notch radial.
 CAM_PHASE_TOLERANCE_DEG = 0.25
 NOTCH_WIDTH = 0.4  # alignment saw-kerf
 NOTCH_WIDTH_BAND = (0.10, 0.0)  # (upper, lower) deviations
+# The kerf is a sighted phase mark, engaged by nothing: its depth only has to
+# reach below the tooth root, so it prints to the title-block .X band.
 NOTCH_DEPTH = 3.0
-NOTCH_DEPTH_TOLERANCE_MM = 0.2
 TIP_RADIUS = OUTSIDE_DIA / 2.0
 NOTCH_FLOOR_RADIUS = TIP_RADIUS - NOTCH_DEPTH
 NOTCH_MEAN_RADIUS = (NOTCH_FLOOR_RADIUS + TIP_RADIUS) / 2.0
