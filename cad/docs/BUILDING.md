@@ -122,8 +122,10 @@ title-block BUILD/REV-only changes are omitted. At 144 dpi, symmetric ink
 matching tolerates one pixel per axis and 68 grayscale levels without a
 changed-area cutoff. Isolated higher-contrast features beyond that neighborhood
 remain changes. Small edge/thickness movements and low-contrast edits can be
-missed; printed-character inventory changes disable both tolerances, but text
-order is not checked semantically. The index and `summary.json` record the rule.
+missed, including gaps/bridges up to two pixels (0.35 mm) and pattern changes
+inside dense ink. Printed-character inventory changes disable both tolerances,
+but text order is not checked semantically. The index and `summary.json` record
+the rule.
 The first release shows all drawings as additions. A release with no effective
 drawing changes still has an index and summary, but no PNGs. Page additions,
 removals and size changes remain changes even when blank. Baseline download or

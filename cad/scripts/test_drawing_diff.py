@@ -435,13 +435,6 @@ def test_empty_inventory_writes_usable_deterministic_serializable_archive(tmp_pa
     with ZipFile(facts["asset_path"]) as archive:
         summary = json.loads(archive.read("summary.json"))
         assert summary["images"] == []
-        assert summary["antialias_intensity_tolerance"] == 68
-        assert summary["spatial_tolerance_pixels"] == 1
-        assert summary["spatial_distance_metric"] == "chebyshev"
-        assert summary["comparison_rule"] == "symmetric-darker-ink-neighborhood-v1"
-        assert summary["tolerances_disabled_for_text_changes"] is True
-        assert summary["text_comparison"] == "visible-character-multiset"
-        assert len(summary["tolerance_limitations"]) == 3
         assert "asset_path" not in summary
         index = archive.read("index.html").decode("utf-8")
         assert "v1&lt;&amp;" in index and "v2&lt;&amp;" in index

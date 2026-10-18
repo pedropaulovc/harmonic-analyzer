@@ -727,6 +727,8 @@ in `summary.json` and explained in the HTML index.
 The one-pixel bound is 0.176 mm per axis on the printed page. Ink movement or
 thickness changes within that bound and contrast changes of at most 68 levels
 can be missed, including embedded-image shading and regenerated break lines.
+Gaps or bridges up to two pixels (0.35 mm) and pattern changes inside dense ink
+can also be missed when every changed pixel is near existing ink.
 Printed-character inventory changes disable both tolerances; the inventory is
 a visible-character multiset, not a semantic check of text order or placement.
 This is a visual triage aid, not proof of manufacturing/CAD equivalence. The

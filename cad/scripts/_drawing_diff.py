@@ -5,9 +5,9 @@ Only geometrically identified BUILD/REV *values* in the template's lower-right
 The 144 dpi comparison matches ink in both directions within one pixel along
 each axis and 68 grayscale levels. There is no minimum changed area: isolated
 high-contrast additions/removals survive. Printed-character inventory changes
-disable both tolerances. Low-contrast edits and movements/thickness changes
-within these bounds can be omitted, including image-edge/shading differences.
-This is a bounded visual comparison, not a semantic CAD equivalence test.
+disable both tolerances. Low-contrast edits, one-pixel edge movements/thickness
+changes, gaps/bridges up to two pixels and dense-ink pattern changes can be
+omitted. This is a bounded visual comparison, not semantic CAD equivalence.
 
 Run from the repository root, without SolidWorks::
 
@@ -371,7 +371,8 @@ def _index(summary: dict[str, Any]) -> bytes:
         "Printed-character inventory changes disable both tolerances; text order "
         "and placement are not compared semantically. Low-contrast edits and "
         "edge movements/thickness changes within these bounds can be omitted, "
-        "including embedded-image shading and regenerated break lines. "
+        "as can gaps/bridges up to two pixels and changes inside dense ink. "
+        "Embedded-image shading and regenerated break lines can be omitted. "
         "This is not proof of CAD equivalence. Pages align at their top-left "
         "without rescaling. Added/removed pages and page-size changes are always "
         "included, even when blank.</p>"
@@ -415,6 +416,8 @@ def create_drawing_diff(
             "can be omitted.",
             f"Ink movements/thickness changes within {SPATIAL_TOLERANCE_PIXELS} pixel "
             "along each axis can be omitted.",
+            "Gaps/bridges up to two pixels (0.35 mm) and dense-ink pattern changes "
+            "can be omitted.",
             "Text order and placement are not compared semantically.",
         ],
         "images": [],
