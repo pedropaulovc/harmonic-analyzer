@@ -14,9 +14,10 @@ chain on the Front plane carries them (LEVER_FEATURE), from the lever rod's
 west tip along its axis to the clamp centre, then down the vertical-rod line
 to the fixture axis. They print at the title block's general tolerance.
 
-The sheet's text (BOM rows, setting callouts, steps and checks) lives in
-mg_magnifier_assembly_notes, which only the drawing imports, so a wording
-edit there does not rebuild the assembly.
+The sheet's text (BOM rows, setting callouts, steps and checks) and the map of
+dimensions the drawing imports live in mg_magnifier_assembly_sheet, which
+only the drawing imports, so a wording edit there does not rebuild the
+assembly.
 """
 
 from __future__ import annotations
@@ -56,7 +57,6 @@ CHAIN_D = (0.0, STEP_D, HUB_FRONT_D, WASHER_D)
 FEATURE = "AxleStackReference"
 PRESS_GAUGE_DIMENSION = "PressGauge"
 ENDSHAKE_DIMENSION = "Endshake"
-DRAWING_DIMENSIONS = {FEATURE: {PRESS_GAUGE_DIMENSION, ENDSHAKE_DIMENSION}}
 DRAWING_PRECISION = {FEATURE: {PRESS_GAUGE_DIMENSION: 2, ENDSHAKE_DIMENSION: 2}}
 TOLERANCE_PRECISION = 2
 DIMENSION_TOLERANCES = {

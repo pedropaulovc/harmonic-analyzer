@@ -1,9 +1,10 @@
-"""Drawing-only text of the magnifier fitter package (MHA-MG-000).
+"""Drawing-only data of the magnifier fitter package (MHA-MG-000).
 
-The BOM rows (families, quantities, descriptions), the setting callouts, the
-exploded-view caption, the fit-up steps and the checks the sheets print. Only
-draw_mg_magnifier_assembly (and its tests) import this module; the builder
-reads mg_magnifier_assembly_spec alone, so a wording edit here does not
+The BOM rows (families, quantities, descriptions), the axle-stack dimensions
+the sheet imports, the setting callouts, the exploded-view caption, the
+fit-up steps and the checks the sheets print. Only draw_mg_magnifier_assembly
+(and its tests) import this module; no assembly builder may
+(``test_assembly_sheet_isolation`` pins it), so a wording edit here does not
 rebuild the magnifier assembly. No SolidWorks.
 """
 
@@ -18,10 +19,15 @@ from _mcmaster_91882a221 import THREAD as _THUMB_THREAD
 from mg_magnifier_assembly_spec import (
     CLAMP_STATION_DIMENSION,
     ENDSHAKE_DIMENSION,
+    FEATURE,
     FIXTURE_DROP_DIMENSION,
     PRESS_GAUGE_DIMENSION,
 )
 from vn_lever_wire_geom import WIRE_DIA as _WIRE_DIA
+
+# The axle-stack dimensions the AXLE AS PRESSED and WHEEL ENDSHAKE details
+# import (the builder marks the banded ones, DIMENSION_TOLERANCES).
+DRAWING_DIMENSIONS = {FEATURE: {PRESS_GAUGE_DIMENSION, ENDSHAKE_DIMENSION}}
 
 # --- Setting callouts ---------------------------------------------------------
 # Each callout states what its band protects, naming the mate the tight gauge

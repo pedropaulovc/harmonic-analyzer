@@ -14,7 +14,7 @@ import _transforms
 import build_mg_magnifier_assembly as assembly
 import draw_mg_magnifier_assembly as drawing
 import joint_retention
-import mg_magnifier_assembly_notes as notes
+import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
 import mg_magnifier_assembly_steps as steps
 import mg_magnifier_explode_spec as explode
@@ -73,7 +73,7 @@ def test_the_stack_settings_are_the_group_stations_with_their_bands() -> None:
 
 def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     names = {stack.PRESS_GAUGE_DIMENSION, stack.ENDSHAKE_DIMENSION}
-    assert stack.DRAWING_DIMENSIONS == {stack.FEATURE: names}
+    assert notes.DRAWING_DIMENSIONS == {stack.FEATURE: names}
     assert set(stack.DRAWING_PRECISION[stack.FEATURE]) == names
     assert set(stack.DIMENSION_TOLERANCES) == names
     assert set(notes.DIMENSION_CALLOUTS) == names == set(drawing.CALLOUT_LOCATION)
@@ -389,13 +389,13 @@ def test_the_sheet_text_is_on_the_drawing_recipe_only() -> None:
             Path(dep).name for dep in _buildgraph.module_deps_of(Path(module.__file__))
         }
 
-    assert "mg_magnifier_assembly_notes.py" in closure(drawing)
+    assert "mg_magnifier_assembly_sheet.py" in closure(drawing)
     assert "mg_magnifier_assembly_spec.py" in closure(assembly)
-    assert "mg_magnifier_assembly_notes.py" not in closure(assembly)
+    assert "mg_magnifier_assembly_sheet.py" not in closure(assembly)
     for module in (assembly, stack):
         source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "import mg_magnifier_assembly_notes" not in source
-        assert "from mg_magnifier_assembly_notes" not in source
+        assert "import mg_magnifier_assembly_sheet" not in source
+        assert "from mg_magnifier_assembly_sheet" not in source
     # Nothing the sheet prints stays behind in the builder's spec.
     for name in (
         "BOM_ORDER",
@@ -405,6 +405,7 @@ def test_the_sheet_text_is_on_the_drawing_recipe_only() -> None:
         "ASSEMBLY_CHECKS",
         "DIMENSION_CALLOUTS",
         "LEVER_CALLOUTS",
+        "DRAWING_DIMENSIONS",
     ):
         assert not hasattr(stack, name), name
 

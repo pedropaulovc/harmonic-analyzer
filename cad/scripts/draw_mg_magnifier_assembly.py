@@ -48,7 +48,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 import _config
 import _telemetry
-import mg_magnifier_assembly_notes as notes
+import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
 import mg_magnifier_explode_spec as explode
 import vn_lever_wire_geom
@@ -750,7 +750,7 @@ def _dimensioned_detail(
         view,
         keep=keep,
         view_label=detail.title,
-        dimensions_by_feature=stack.DRAWING_DIMENSIONS,
+        dimensions_by_feature=notes.DRAWING_DIMENSIONS,
     )
     _crop(adapter, view, detail)
     kept = {
