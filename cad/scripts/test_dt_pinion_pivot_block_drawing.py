@@ -470,7 +470,7 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     assert rig.STRAP_T_PLACES == dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"]
     assert rig.DRUM_LEN_PLACES == DRUM_PRECISION["GearBlank"]["FaceWidth"]
     assert rig.LENGTH_PLACES == DRAWING_PRECISION["Shaft"]["Depth"]
-    assert rig.LENGTH_PLACES == ROD_PRECISION["Rod"]["Depth"]
+    assert rig.LENGTH_PLACES == ROD_PRECISION["RodProfile"]["RodBody"]
     # A nominal that does not print exactly moves its term by the rounding.
     assert printed_deviations(10.254, 2) == pytest.approx((-0.514, 0.506))
     assert rig.FRONT_BLOCK_FEELER_BAND == 0.10
