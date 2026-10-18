@@ -3424,6 +3424,9 @@ def task_check():
         # The rocker's S7 op 97 profile windows: computed from the printed
         # zones and the template's geometry, pinned into the plan's text.
         SCRIPTS_DIR / "test_ch_rocker_arm_profile_check.py",
+        # The rocker's oblique-trammel jig numbers: derived from the strap's
+        # radii, the cutters and the rail angle, pinned against the plan.
+        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_trammel_spec.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_release_diff.py",
