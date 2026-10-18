@@ -122,6 +122,71 @@ def test_the_build_leaves_the_terminal_torque_corners_sharp(monkeypatch):
     assert all(not start < pick[2] <= tip for pick in picks), picks
 
 
+def _centre_mark_view(marks: list, deletes: bool):
+    """A section view holding ``marks`` and a drawing whose EditDelete drops
+    the selected one (or, ``deletes=False``, silently keeps it)."""
+    from types import SimpleNamespace
+
+    events: list[str] = []
+    selected: list = []
+
+    def select(mark):
+        def _select(append, _data):
+            assert append is False
+            selected.append(mark)
+            events.append("select")
+            return True
+
+        return _select
+
+    for mark in marks:
+        mark.Select2 = select(mark)
+
+    def edit_delete():
+        events.append("delete")
+        if deletes:
+            for mark in selected:
+                marks.remove(mark)
+
+    draw = SimpleNamespace(
+        ClearSelection2=lambda _all: selected.clear() or True,
+        EditDelete=edit_delete,
+    )
+    view = SimpleNamespace(
+        GetAnnotationsByType=lambda kind: (
+            tuple(marks) if kind == drawing._CENTER_MARK_ANNOTATION else ()
+        )
+    )
+    return SimpleNamespace(currentModel=draw), view, events
+
+
+def test_the_full_section_loses_its_centre_mark_so_all_four_read_alike(monkeypatch):
+    """Machinist review r7: only the full A-A got SolidWorks' centre mark, so
+    one section in four carried one.  The mark is deleted and read back gone;
+    a partial section with none is left alone; a delete that does not land
+    fails the build."""
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    a_a = drawing.D_SECTIONS[0]
+    marks = [SimpleNamespace()]
+    adapter, view, events = _centre_mark_view(marks, deletes=True)
+    drawing._delete_centre_mark(adapter, view, a_a)
+    assert marks == [] and events == ["select", "delete"]
+    # a partial section: nothing to delete, nothing selected
+    adapter, view, events = _centre_mark_view([], deletes=True)
+    drawing._delete_centre_mark(adapter, view, drawing.D_SECTIONS[-1])
+    assert events == []
+    # the delete is VT_VOID: only the re-read proves it
+    adapter, view, _events = _centre_mark_view([SimpleNamespace()], deletes=False)
+    with pytest.raises(RuntimeError, match="survived deletion"):
+        drawing._delete_centre_mark(adapter, view, a_a)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_delete_centre_mark(adapter, view, section)" in source
+    assert "carries a centre mark again" in source
+
+
 def test_the_d_sections_print_the_corner_limit_clock_and_mates(monkeypatch):
     """Run the real section loop with its native steps recorded: the corner
     limit rides above the terminal flat's own across-flat and the shared
@@ -138,7 +203,7 @@ def test_the_d_sections_print_the_corner_limit_clock_and_mates(monkeypatch):
         drawing, "curate_view_dimensions", lambda _a, _view, *, keep, **_k: list(keep)
     )
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, dimension: dimension)
-    monkeypatch.setattr(drawing, "_trim_centre_mark", lambda *_a: ())
+    monkeypatch.setattr(drawing, "_delete_centre_mark", lambda *_a: None)
     monkeypatch.setattr(drawing, "_section_face", lambda *_a: (0.0, 0.0, 1.0, 1.0))
     monkeypatch.setattr(drawing, "_place_view_caption", lambda *_a, **_k: None)
     monkeypatch.setattr(

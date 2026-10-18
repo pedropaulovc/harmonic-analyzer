@@ -452,11 +452,10 @@ DETAIL_CAPTION_GAP = 0.004
 # 0.6 mm the caption still stands 2.4 mm or more under its face.
 # The layout proof measures the placed box, so the slack costs no clearance.
 CAPTION_SETTLE_M = 0.0006
-# The section's centre mark keeps only its cross, arms this long on the sheet:
-# the template's mark scales with the view, so at 10:1 its arms and extended
-# lines ran 104 mm, over the AF text, the right border and the title block.
-CENTRE_MARK_ARM = 0.003
-# swAnnotationType_e.swCenterMarkSym
+# The full A-A section is the one SolidWorks gives a centre mark; the partial
+# ones get none, so the mark is deleted and all four sections read alike
+# (machinist review r7, 20261018T084331898Z: "A-A has a centre mark but B-B,
+# C-C and D-D do not").  swAnnotationType_e.swCenterMarkSym:
 _CENTER_MARK_ANNOTATION = 13
 # An arrowhead's half-width across its shaft (the audit's 12.1 x 3.4 mm head).
 SECTION_ARROW_HALF_WIDTH = 0.0017
@@ -802,7 +801,6 @@ class PlacedSection(NamedTuple):
     face: Box
     across_flat: Any
     caption: Box
-    centre_marks: dict[str, Box]
 
 
 def _axis_sign(adapter: Any, side: Any) -> int:
@@ -1042,55 +1040,32 @@ def _place_view_caption(
     return box
 
 
-def _annotation_ink(annotation: Any, label: str) -> Box:
-    """The box of every line an annotation draws, in sheet metres."""
-    data = _early_bound(
-        _early_bound(annotation, "IAnnotation").GetDisplayData(), "IDisplayData"
-    )
-    lines = [
-        tuple(float(value) for value in data.GetLineAtIndex2(index))
-        for index in range(int(data.GetLineCount()))
-    ]
-    if not lines:
-        raise RuntimeError(f"{label} draws no line")
-    xs = [value for line in lines for value in (line[4], line[7])]
-    ys = [value for line in lines for value in (line[5], line[8])]
-    return (min(xs), min(ys), max(xs), max(ys))
-
-
-def _trim_centre_mark(adapter: Any, view: Any, section: DSection) -> dict[str, Box]:
-    """Keep the section's centre mark, if SolidWorks gave it one, as a small
-    cross, and return its ink by name.
+def _delete_centre_mark(adapter: Any, view: Any, section: DSection) -> None:
+    """Delete the section's centre mark, if SolidWorks gave it one, and read
+    none back.
 
     A full section gets a mark; a partial one (cut from the tip detail) gets
-    none (leaf 20260929T212711Z-1-75518df7).  The mark's size is model
-    length (its 2.5 mm arms read 5 mm at 2:1 and 25 mm at 10:1), so the arm
-    is divided by the section's scale."""
+    none (leaf 20260929T212711Z-1-75518df7).  Only A-A is full, so a kept
+    mark marked one section in four."""
     label = f"section {section.label} centre mark"
-    marks = tuple(
-        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
-    )
+    iview = _early_bound(view, "IView")
+    marks = tuple(iview.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
     if not marks:
         _telemetry.info(f"{label}: none drawn")
-        return {}
+        return
     if len(marks) != 1:
         raise RuntimeError(f"expected at most one {label}, found {len(marks)}")
-    annotation = _early_bound(marks[0], "IAnnotation")
-    mark = _early_bound(annotation.GetSpecificAnnotation(), "ICenterMark")
-    mark.UseDocDisplaySettings = False
-    mark.ShowLines = False
-    mark.Size = CENTRE_MARK_ARM * section.scale[1] / section.scale[0]
-    rebuild_drawing(adapter, label=f"trim {label}")
-    if bool(mark.UseDocDisplaySettings) or bool(mark.ShowLines):
-        raise RuntimeError(f"{label} kept its document display or its extended lines")
-    ink = _annotation_ink(annotation, label)
-    arm = max(ink[2] - ink[0], ink[3] - ink[1]) / 2.0
-    if not 0.5 * CENTRE_MARK_ARM <= arm <= 1.5 * CENTRE_MARK_ARM:
-        raise RuntimeError(
-            f"{label} arms read {arm:.4f} m (size {float(mark.Size):.5f}), not "
-            f"{CENTRE_MARK_ARM:.4f}: ink {ink}"
-        )
-    return {label: ink}
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    if not _early_bound(marks[0], "IAnnotation").Select2(False, 0):
+        raise RuntimeError(f"cannot select {label}")
+    draw.EditDelete()  # VT_VOID: the re-read below is the proof
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"delete {label}")
+    left = tuple(iview.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
+    if left:
+        raise RuntimeError(f"{label} survived deletion ({len(left)} left)")
+    _telemetry.info(f"{label}: deleted")
 
 
 def _cut_endpoints(
@@ -1118,7 +1093,7 @@ def _add_d_sections(
     adapter: Any, parents: Mapping[CutParent, Any], sign: int
 ) -> list[PlacedSection]:
     """Cut each flatted land across and print its across-flat in the section,
-    its centre mark a cross and its caption hung under it.
+    its centre mark deleted and its caption hung under it.
 
     ``curate_view_dimensions`` fails the build if a section's across-flat
     does not arrive, so every D on the sheet carries its size."""
@@ -1148,7 +1123,7 @@ def _add_d_sections(
         )
         by_name = {dimension_name(adapter, dimension): dimension for dimension in dimensions}
         across_flat = by_name[name]
-        centre_marks = _trim_centre_mark(adapter, view, section)
+        _delete_centre_mark(adapter, view, section)
         face = _section_face(adapter, view, section, sign)
         caption = _place_view_caption(
             adapter,
@@ -1171,7 +1146,7 @@ def _add_d_sections(
             _set_dimension_suffixes(
                 adapter, [across_flat], {name: FLAT_MATE_SUFFIXES[name]}
             )
-        placed.append(PlacedSection(section, view, face, across_flat, caption, centre_marks))
+        placed.append(PlacedSection(section, view, face, across_flat, caption))
     return placed
 
 
@@ -1305,7 +1280,7 @@ def _prove_section_layout(
     every section, caption, cutting line, the detail and the pictorial inside
     the frame and off the title block; the cutting lines' arrows and letters
     clear of each other, of every dimension text and of the lands; and each
-    section's caption, centre mark and across-flat clear of its neighbours."""
+    section's caption and across-flat clear of its neighbours."""
     region = sheet_region(adapter)
     template = DRAWING_TEMPLATES[SPEC.layout]
     keep_out = {
@@ -1341,25 +1316,24 @@ def _prove_section_layout(
     groups: dict[str, dict[str, Box]] = {}
     for placed in sections:
         label = f"section {placed.section.label}"
+        if _early_bound(placed.view, "IView").GetAnnotationsByType(
+            _CENTER_MARK_ANNOTATION
+        ):
+            raise RuntimeError(
+                f"{label} carries a centre mark again after its deletion"
+            )
         cell = {
             f"{label} face": placed.face,
             f"{label} across-flat": _dimension_text_box(
                 placed.across_flat, f"{label} across-flat"
             ),
             f"{label} caption": placed.caption,
-            **placed.centre_marks,
         }
         require_clear(
             f"{label} caption",
             placed.caption,
             {name: box for name, box in cell.items() if name != f"{label} caption"},
         )
-        for name, box in placed.centre_marks.items():
-            require_clear(
-                name,
-                box,
-                {f"{label} across-flat": cell[f"{label} across-flat"]},
-            )
         groups[label] = {label: _union(cell.values())}
     lands = {
         **_land_boxes(adapter, side, sign, label="side view"),
