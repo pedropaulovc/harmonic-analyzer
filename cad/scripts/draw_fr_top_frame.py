@@ -87,6 +87,7 @@ from _mcmaster_90280a837 import (
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,
     SHANK_LEN as CROSS_SCREW_SHANK_LEN,
 )
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -183,6 +184,9 @@ from fr_top_frame_spec import (
     PRINTED_LINEAR_BAND_MM,
     SURFACE_FINISHES,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["fr_top_frame"]
 PART_STEM = SPEC.artifact_stem
