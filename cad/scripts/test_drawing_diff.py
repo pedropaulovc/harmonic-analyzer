@@ -244,7 +244,7 @@ def test_small_meaningful_edits_have_no_changed_area_cutoff(tmp_path: Path, chan
     assert np.any((pixels[:, :, 2] > pixels[:, :, 0] + 20))
 
 
-def test_minor_raster_antialiasing_is_ignored_without_spatial_erasure(tmp_path: Path) -> None:
+def test_minor_raster_antialiasing_is_ignored(tmp_path: Path) -> None:
     def line(x: float) -> str:
         return f"0 G 0.5 w {x} 20 m 110 101 l S\n"
 
@@ -255,6 +255,118 @@ def test_minor_raster_antialiasing_is_ignored_without_spatial_erasure(tmp_path: 
 
     assert facts["images"] == []
     assert facts["unchanged_drawings"] == ["part.pdf"]
+
+
+@pytest.mark.parametrize(("dx", "dy"), [(0.5, 0), (0, 0.5), (0.5, 0.5)])
+@pytest.mark.parametrize("before_gray", [0, 0.25])
+def test_one_pixel_edge_displacement_is_omitted(
+    tmp_path: Path, dx: float, dy: float, before_gray: float
+) -> None:
+    # At 144 dpi, half a PDF point is one pixel. Diagonal matching uses the
+    # documented Chebyshev bound, not a one-pixel Euclidean circle.
+    before = _square(20, 20).replace("0 g", f"{before_gray} g", 1)
+    _pdf(tmp_path / "old/part.pdf", [before])
+    _pdf(tmp_path / "new/part.pdf", [_square(20 + dx, 20 + dy)])
+
+    facts = _compare(tmp_path)
+
+    assert facts["images"] == []
+    assert facts["unchanged_drawings"] == ["part.pdf"]
+
+
+@pytest.mark.parametrize(("dx", "dy"), [(1, 0), (0, 1), (1, 1)])
+def test_edge_displacement_beyond_one_pixel_is_retained(
+    tmp_path: Path, dx: float, dy: float
+) -> None:
+    _pdf(tmp_path / "old/part.pdf", [_square(20, 20)])
+    _pdf(tmp_path / "new/part.pdf", [_square(20 + dx, 20 + dy)])
+
+    facts = _compare(tmp_path)
+
+    assert facts["changed_drawings"] == ["part.pdf"]
+    pixels = _pixels(facts)
+    assert _has_color(pixels, (220, 32, 32))
+    assert _has_color(pixels, (0, 96, 224))
+
+
+@pytest.mark.parametrize("removed", [False, True])
+def test_isolated_single_pixel_feature_next_to_matched_edge_is_retained(
+    tmp_path: Path, removed: bool
+) -> None:
+    common = _square(20, 20)
+    # The mark is only one pixel, two pixels from the nearest common ink:
+    # neither page area nor a larger matching neighborhood may erase it.
+    with_mark = common + _square(28.5, 20, 0.5)
+    _pdf(tmp_path / "old/part.pdf", [with_mark if removed else common])
+    _pdf(tmp_path / "new/part.pdf", [common if removed else with_mark])
+
+    facts = _compare(tmp_path)
+
+    assert facts["changed_drawings"] == ["part.pdf"]
+    assert _has_color(_pixels(facts), (220, 32, 32) if removed else (0, 96, 224))
+
+
+@pytest.mark.parametrize("contrast", [68, 69, 255])
+@pytest.mark.parametrize("removed", [False, True])
+def test_unmatched_ink_has_an_inclusive_intensity_bound(
+    contrast: int, removed: bool
+) -> None:
+    # Exact grayscale inputs pin the numerical bound independently of a PDF
+    # renderer's grayscale conversion. The PDF tests cover archive behavior.
+    blank = np.full((7, 7), 255, dtype=np.uint8)
+    marked = blank.copy()
+    marked[3, 3] = 255 - contrast
+    before, after = (marked, blank) if removed else (blank, marked)
+
+    png, text_changed = diff._overlay(
+        diff._Raster(before, (3.5, 3.5), [], ()),
+        diff._Raster(after, (3.5, 3.5), [], ()),
+    )
+
+    assert (png is not None) is (contrast > 68)
+    assert text_changed is False
+
+
+def test_neighborhood_does_not_wrap_between_opposite_page_edges() -> None:
+    before = np.full((7, 7), 255, dtype=np.uint8)
+    after = before.copy()
+    before[3, 0] = 0
+    after[3, -1] = 0
+
+    png, _ = diff._overlay(
+        diff._Raster(before, (3.5, 3.5), [], ()),
+        diff._Raster(after, (3.5, 3.5), [], ()),
+    )
+
+    assert png is not None
+
+
+def test_faint_printed_character_edit_bypasses_both_tolerances(tmp_path: Path) -> None:
+    before = _text("10.2", 20, 20, 4).replace("0 g", "0.9 g", 1)
+    after = _text("10.3", 20, 20, 4).replace("0 g", "0.9 g", 1)
+    _pdf(tmp_path / "old/part.pdf", [before])
+    _pdf(tmp_path / "new/part.pdf", [after])
+
+    facts = _compare(tmp_path)
+
+    assert facts["changed_drawings"] == ["part.pdf"]
+    assert facts["pages"][0]["text_changed"] is True
+    pixels = _pixels(facts).astype(np.int16)
+    assert np.any(pixels[:, :, 0] > pixels[:, :, 2])
+    assert np.any(pixels[:, :, 2] > pixels[:, :, 0])
+
+
+def test_reordered_characters_with_the_same_inventory_still_compare_ink(tmp_path: Path) -> None:
+    _pdf(tmp_path / "old/part.pdf", [_text("12", 20, 20)])
+    _pdf(tmp_path / "new/part.pdf", [_text("21", 20, 20)])
+
+    facts = _compare(tmp_path)
+
+    assert facts["changed_drawings"] == ["part.pdf"]
+    assert facts["pages"][0]["text_changed"] is False
+    pixels = _pixels(facts).astype(np.int16)
+    assert np.any(pixels[:, :, 0] > pixels[:, :, 2])
+    assert np.any(pixels[:, :, 2] > pixels[:, :, 0])
 
 
 @pytest.mark.parametrize("with_antialias_noise", [False, True])
@@ -323,11 +435,16 @@ def test_empty_inventory_writes_usable_deterministic_serializable_archive(tmp_pa
     with ZipFile(facts["asset_path"]) as archive:
         summary = json.loads(archive.read("summary.json"))
         assert summary["images"] == []
+        assert summary["antialias_intensity_tolerance"] == 68
+        assert summary["spatial_tolerance_pixels"] == 1
+        assert summary["spatial_distance_metric"] == "chebyshev"
+        assert summary["comparison_rule"] == "symmetric-darker-ink-neighborhood-v1"
+        assert summary["tolerances_disabled_for_text_changes"] is True
+        assert summary["text_comparison"] == "visible-character-multiset"
+        assert len(summary["tolerance_limitations"]) == 3
         assert "asset_path" not in summary
         index = archive.read("index.html").decode("utf-8")
-        assert "No effective drawing changes" in index
         assert "v1&lt;&amp;" in index and "v2&lt;&amp;" in index
-        assert "Blue: added ink" in index and "Red: removed ink" in index
 
 
 @pytest.mark.parametrize("bad_input", [b"not a PDF", b"%PDF-1.7\ncorrupt"])

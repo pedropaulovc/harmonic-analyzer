@@ -118,10 +118,16 @@ from the CAD bundle and geometry-diff PNGs. Extract it and open `index.html`:
 added ink is blue, removed ink red, and common drawing content light gray.
 It compares all drawing PDFs with the highest earlier published release;
 added/removed drawings and pages are included, while unchanged pages and
-title-block BUILD/REV-only changes are omitted. The first release shows all
-drawings as additions. A release with no effective drawing changes still has
-an index and `summary.json`, but no PNGs. Baseline download or PDF-rendering
-errors stop publication before tagging. See the
+title-block BUILD/REV-only changes are omitted. At 144 dpi, symmetric ink
+matching tolerates one pixel per axis and 68 grayscale levels without a
+changed-area cutoff. Isolated higher-contrast features beyond that neighborhood
+remain changes. Small edge/thickness movements and low-contrast edits can be
+missed; printed-character inventory changes disable both tolerances, but text
+order is not checked semantically. The index and `summary.json` record the rule.
+The first release shows all drawings as additions. A release with no effective
+drawing changes still has an index and summary, but no PNGs. Page additions,
+removals and size changes remain changes even when blank. Baseline download or
+PDF-rendering errors stop publication before tagging. See the
 [drawing comparison details](../../DEVELOPING.md#supervised-farm-releases).
 
 Submit that post-release refresh in a follow-up PR whose only changes are the
