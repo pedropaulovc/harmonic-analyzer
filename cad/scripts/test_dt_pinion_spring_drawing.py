@@ -299,14 +299,17 @@ def test_kink_arc_faults_reads_the_wedge_the_arc_sweeps() -> None:
     shifted = (vertex[0] + 0.002, vertex[1])
     assert drawing.kink_arc_faults(_arc(shifted, 0.0, half), vertex)
     assert drawing.kink_arc_faults([], vertex) == ["no arc"]
-    # Only the opposite included wedge (the same 155 deg) reads as one to
-    # turn vertically opposite; the convex one and the acute ones do not.
-    convex = drawing.kink_arc_mean_offset_deg(_arc(vertex, 0.0, half), vertex)
-    opposite = drawing.kink_arc_mean_offset_deg(_arc(vertex, 180.0, half), vertex)
-    assert convex == pytest.approx(0.0, abs=1e-6)
-    assert opposite == pytest.approx(180.0, abs=1e-4)
-    side = drawing.kink_arc_mean_offset_deg(_arc(vertex, 90.0, acute), vertex)
-    assert side == pytest.approx(90.0, abs=1e-4)
+    # The r10 leaf's arcs as imported: the segments' own wedge across the
+    # crest (blade down to flat up) plus an extension arc out to the text.
+    centre = (0.08715684620887239, 0.15211975644463)
+    blade_down = (0.0890486683798352, 0.14028129645639575)
+    flat_up = (0.09044542242555458, 0.16364856351590332)
+    text_side = (0.0753884200079658, 0.1498323407033654)
+    r10 = [
+        (centre, drawing.minor_arc_points(centre, blade_down, flat_up)),
+        (centre, drawing.minor_arc_points(centre, text_side, blade_down)),
+    ]
+    assert drawing.kink_arc_faults(r10, centre)
 
 
 def test_minor_arc_points_sweep_the_short_way_either_sense() -> None:

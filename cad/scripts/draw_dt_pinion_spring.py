@@ -23,6 +23,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -666,20 +667,6 @@ def kink_arc_faults(
     return faults
 
 
-def kink_arc_mean_offset_deg(
-    arcs: list[tuple[tuple[float, float], list[tuple[float, float]]]],
-    vertex: tuple[float, float],
-) -> float:
-    """How far (deg, 0-180) the arcs' mean direction from the vertex stands
-    off the convex included wedge's bisector: near 180 when they took the
-    opposite included wedge, across the crest."""
-    sx = sum(x - vertex[0] for _, points in arcs for x, _ in points)
-    sy = sum(y - vertex[1] for _, points in arcs for _, y in points)
-    bx, by = FREE_KINK_INCLUDED_BISECTOR
-    cos = (sx * bx + sy * by) / (math.hypot(sx, sy) or 1.0)
-    return math.degrees(math.acos(max(-1.0, min(1.0, cos))))
-
-
 def kink_arc_summary(
     arcs: list[tuple[tuple[float, float], list[tuple[float, float]]]],
     vertex: tuple[float, float],
@@ -760,8 +747,13 @@ def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -
     on the crest's convex side of the free form's blade/flat crossing.  The
     angle drives the free form, so the only turn allowed is to the
     vertically opposite wedge, the same 155 deg (the value is read back
-    after the turn): the sketch's dimension may bring its arc in the wedge
-    across the crest (build_dt_pinion_spring._driving_kink_angle)."""
+    after the turn).  The sketch's dimension measures the segments' own
+    wedge, across the crest (spring r10: blade down to flat up, with an
+    extension arc out to the text), so it is turned the way the setting
+    bar's flank angle is (draw_ch_rocker_arm_tl_trammel_setting_bar): the
+    dimension selected alone in its view by name -- unselected, the turn
+    returned True and drew nothing new (r10) -- turned, its text re-seated
+    at its keep, and the drawing rebuilt."""
     matches = [
         item for item in annotations if dimension_name(adapter, item) == FREE_KINK_ANGLE
     ]
@@ -770,6 +762,10 @@ def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -
     annotation = _early_bound(matches[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    selection_name = str(display.GetNameForSelection() or "")
+    if not selection_name:
+        raise RuntimeError(f"{FREE_KINK_ANGLE} has no selection name")
+    model = adapter.currentModel
     rebuild_drawing(adapter, label="kink angle wedge")
     vertex = model_point_in_view(
         adapter,
@@ -781,10 +777,19 @@ def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -
     faults = kink_arc_faults(arcs, vertex)
     placed = f"{kink_arc_summary(arcs, vertex)}; faults {faults}"
     turned = False
-    if faults and arcs and kink_arc_mean_offset_deg(arcs, vertex) > 90.0:
-        if not display.VerticallyOppositeAngle():
-            raise RuntimeError(f"{FREE_KINK_ANGLE}: VerticallyOppositeAngle failed")
+    if faults:
+        _activate_view(adapter, front, label="front view")
+        if not model.Extension.SelectByID2(
+            selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+        ):
+            raise RuntimeError(f"failed to select {FREE_KINK_ANGLE} {selection_name!r}")
+        flipped = display.VerticallyOppositeAngle()
+        model.ClearSelection2(True)
+        if not flipped:
+            raise RuntimeError(f"{FREE_KINK_ANGLE}: VerticallyOppositeAngle refused")
         turned = True
+        if not annotation.SetPosition2(*FRONT_KEEP[FREE_KINK_ANGLE], 0.0):
+            raise RuntimeError(f"failed to re-seat {FREE_KINK_ANGLE}")
         rebuild_drawing(adapter, label="kink angle turned")
         arcs = _kink_arcs(display)
         faults = kink_arc_faults(arcs, vertex)
