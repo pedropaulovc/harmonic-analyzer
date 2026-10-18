@@ -34,7 +34,6 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from dt_crank_pin_spec import (
     RING_HOLE_DIA,
@@ -46,7 +45,6 @@ from dt_crank_pin_spec import (
     END_VIEW_NOTE,
     PIN_LENGTH,
     SMALL_END_DIA,
-    SURFACE_FINISHES,
 )
 
 PART_NAME = "dt-crank-pin"
@@ -177,7 +175,6 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

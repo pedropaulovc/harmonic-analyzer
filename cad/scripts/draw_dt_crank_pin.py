@@ -23,17 +23,26 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
+from _drawing_centerline import add_view_centerline
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_finish import add_surface_finish
-from _drawing_notes import add_property_linked_note
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_leader_notes import add_leader_note
+from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _telemetry
-from dt_crank_pin_spec import BIG_END_DIA, PIN_LENGTH, SMALL_END_DIA, SURFACE_FINISHES
+from dt_crank_pin_spec import (
+    BIG_END_DIA,
+    DIMENSION_CALLOUTS,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    PIN_LENGTH,
+    RING_HOLE_X,
+    SMALL_END_DIA,
+)
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -65,16 +74,41 @@ _HALF_LENGTH = PIN_LENGTH * SHEET_SCALE[0] / 2000.0
 BIG_END_EDGE = (FRONT_CENTER[0] - _HALF_LENGTH, FRONT_CENTER[1])
 SMALL_END_EDGE = (FRONT_CENTER[0] + _HALF_LENGTH, FRONT_CENTER[1])
 # The upper taper outline at model x = TAPER_PICK_X, where the pin's radius
-# is interpolated between its end diameters.
+# is interpolated between its end diameters: the taper note's leader tip.
 TAPER_PICK_X = PIN_LENGTH * 0.45
 _TAPER_PICK_R = (BIG_END_DIA - (BIG_END_DIA - SMALL_END_DIA) * TAPER_PICK_X / PIN_LENGTH) / 2.0
 TAPER_SILHOUETTE_PICK = (
     BIG_END_EDGE[0] + TAPER_PICK_X * SHEET_SCALE[0] / 1000.0,
     FRONT_CENTER[1] + _TAPER_PICK_R * SHEET_SCALE[0] / 1000.0,
 )
+# The taper note's top-left corner: above the pin, right of the big end's Ø
+# callout, left of the small end's and above the hole station.
+TAPER_NOTE_XY = (BIG_END_EDGE[0] - 0.007, FRONT_CENTER[1] + 0.063)
 
+# The ring cross-hole, seen end-on as a circle on the axis.
+RING_HOLE_CENTER = (
+    BIG_END_EDGE[0] + RING_HOLE_X * SHEET_SCALE[0] / 1000.0,
+    FRONT_CENTER[1],
+)
+# A point on the conical face, clear of the cross-hole, for the axis.
+AXIS_FACE_PICK = (FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] + 0.002)
+
+# Above the pin: the hole's station from the big-end face, clear of the
+# finish symbol to its right. Below and right of the hole: its Ø callout,
+# whose leader reaches the hole from the bare side, then the overall length
+# below that callout's lines.
 FRONT_KEEP = {
-    "Length": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.033),
+    "RingHoleX": (
+        (BIG_END_EDGE[0] + RING_HOLE_CENTER[0]) / 2.0,
+        FRONT_CENTER[1] + 0.016,
+    ),
+    "RingHoleDia": (RING_HOLE_CENTER[0] + 0.020, FRONT_CENTER[1] - 0.016),
+    "Length": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.045),
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
 }
 
 
@@ -171,7 +205,21 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
+    # Descriptive text only; the hole's size and station are the model's.
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    # The axis shows the cross-hole goes through the centre; its station runs
+    # from the big-end face.
+    add_view_centerline(
+        adapter, front, face_xy=AXIS_FACE_PICK, label="crank pin axis centerline"
+    )
     _add_end_diameter(
         adapter,
         front,
@@ -194,24 +242,19 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 
-    # The finish belongs to the tapered seat, so its leader lands on the
-    # cone's upper side-view outline (a SILHOUETTE pick), mid-taper and clear
-    # of the ring cross-hole, not on the big-end face.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=TAPER_SILHOUETTE_PICK,
-        entity_type="SILHOUETTE",
-        symbol_xy=(FRONT_CENTER[0] - 0.018, FRONT_CENTER[1] + 0.022),
-        control=surface_finish_by_key(SURFACE_FINISHES, "taper_seat"),
-        label="taper seating finish",
-    )
-
-    # 0.020: the note is left-aligned on its anchor, so the ink starts here. The
-    # left bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame
-    # rule now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
     add_property_linked_note(adapter, "End View Note", RIGHT_CENTER[0] - 0.022, 0.162)
+
+    # The part's one note (taper ratio and matched fit) is flagged on the
+    # taper it governs: its leader tip lands on the cone's upper outline,
+    # mid-taper and clear of the ring cross-hole.
+    add_leader_note(
+        adapter,
+        property_link("Manufacturing Notes"),
+        text_xy=TAPER_NOTE_XY,
+        attach_xy=TAPER_SILHOUETTE_PICK,
+        label="taper fit note",
+        view=front,
+    )
 
     return await finalize_drawing(
         adapter,
