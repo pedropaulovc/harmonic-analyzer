@@ -15,8 +15,9 @@ centre line, is the handle's length view (drawing-guidelines.md rule 11
 counterbore all sketch on the Front plane the section lies in, so every size
 prints there.  The stations stack above it in a baseline from the tenon end
 face, with the tangency-fixed radii as references beneath them; the diameters
-are dimensioned across their own cut, their text below the section; the fitted
-tenon and counterbore carry their mates and clearances as callouts.  The end
+are dimensioned across their own cut, their text on shelves clear of the
+section; the fitted tenon and counterbore carry their mates and clearances as
+callouts.  The end
 view stands on the section's axis and carries the cutting plane.
 
 Run with SolidWorks open::
@@ -65,6 +66,7 @@ import _telemetry
 from dt_crank_handle_spec import (
     COUNTERBORE_DEPTH,
     COUNTERBORE_FIT_NOTE,
+    COUNTERBORE_FLOOR_X,
     DOME_CENTER,
     DOME_R,
     DRAWING_DIMENSIONS,
@@ -111,13 +113,15 @@ _S = SHEET_SCALE[0] / 1000.0
 
 # The section lays the handle axis horizontal, tenon at the left and butt at
 # the right (the part's +X to the right, as MHA-DT-035's section shows), centred
-# on the oak's extent.  The end view stands on the same axis height.
+# on the oak's extent.  The end view stands on the same axis height.  The axis
+# sits low enough that the S-curve's concave centre (26.4 above it) falls
+# under the long station rows, so its radius line crosses none of them.
 FRONT_BBOX_CX = (TENON_X0 + OAK_END_X) / 2.0
-FRONT_CENTER = (0.162, 0.150)
+FRONT_CENTER = (0.162, 0.130)
 RIGHT_CENTER = (0.362, FRONT_CENTER[1])
-ISO_CENTER = (0.380, 0.240)
+ISO_CENTER = (0.380, 0.235)
 ISO_NOTE_POS = (0.285, 0.244)
-CAPTION_XY = (0.146, 0.062)
+CAPTION_XY = (0.085, 0.052)
 
 END_R = HANDLE_MAX_DIA * _S / 2.0
 
@@ -143,11 +147,17 @@ def _on_radius(
     )
 
 
-# Rows above the section: the stations in a baseline from the tenon end face,
-# shortest nearest; the counterbore depth from the oak end on the second row.
-_ROW = (0.215, 0.225, 0.235, 0.245, 0.255)
-# Diameter text below the section; each dimension line stands at its station.
-_BELOW = 0.118
+# Rows above the section, the stations in a baseline from the tenon end face,
+# shortest nearest: the two that end left of the waist below the S-curve's
+# concave centre, the three that run past it above it; the counterbore depth
+# from the oak end on the second row.
+_ROW = (0.195, 0.205, 0.242, 0.250, 0.258)
+# A diameter's text hangs on a shelf off its dimension line, on the side the
+# text stands from the feature it measures: each stands 1.5 right of its
+# feature, so every shelf runs right.
+_SHELF = 0.0015
+_BELOW = 0.098
+_CALLOUT_ROW = 0.080
 FRONT_KEEP = {
     "TenonLength": (_front_x((TENON_X0 + SHOULDER_X) / 2.0), _ROW[0]),
     "WaistStation": (_front_x((TENON_X0 + WAIST_X) / 2.0), _ROW[1]),
@@ -155,26 +165,34 @@ FRONT_KEEP = {
     "PeakStation": (_front_x((TENON_X0 + PEAK_X) / 2.0), _ROW[3]),
     "OverallLength": (_front_x(FRONT_BBOX_CX), _ROW[4]),
     "CounterboreDepth": (_front_x(OAK_END_X - COUNTERBORE_DEPTH / 2.0), _ROW[1]),
-    # The radii stand between the station extension lines, below the rows,
-    # each on a line from its centre through its arc.
+    # The radii stand between the station extension lines, below the rows:
+    # the convex ones outside their arcs (a short leader to the arc), the
+    # concave ones between centre and arc.
     "FlareR": _on_radius(FLARE_CENTER, 5.3, 245.0),
     "SConcaveR": _on_radius(S_CONCAVE_CENTER, 15.5, 285.0),
     "SConvexR": _on_radius(S_CONVEX_CENTER, S_CONVEX_R + 5.0, 100.0),
     "DomeR": _on_radius(DOME_CENTER, DOME_R + 5.0, 78.0),
     "EndRoundR": _on_radius(END_ROUND_CENTER, 8.1, 42.5),
-    # Diameters across their own cut, the text below the section.
-    "ShoulderDia": (_front_x(SHOULDER_X - 0.9), _BELOW),
-    "WaistDia": (_front_x(WAIST_X), _BELOW),
-    # The fitted tenon's two-line to-suit callout runs below the shoulder and
-    # waist text.
-    "TenonDia": (_front_x(TENON_X0 + 2.0), 0.100),
-    "PivotBoreDia": (_front_x(26.0), 0.104),
-    "PeakDia": (_front_x(PEAK_X), 0.098),
+    # Diameters across their own cut.  The shoulder and waist shelves sit
+    # under the section; the fitted tenon's, the reamed bore's and the
+    # counterbore's callout blocks stand side by side below them, above the
+    # title block.
+    "ShoulderDia": (_front_x(SHOULDER_X) + _SHELF, _BELOW),
+    "WaistDia": (_front_x(WAIST_X) + _SHELF, _BELOW),
+    "TenonDia": (_front_x((TENON_X0 + SHOULDER_X) / 2.0) + 2.0 * _SHELF, _CALLOUT_ROW),
+    "PivotBoreDia": (
+        (_front_x(TENON_X0) + _front_x(COUNTERBORE_FLOOR_X)) / 2.0 + _SHELF,
+        _CALLOUT_ROW,
+    ),
+    "CounterboreDia": (
+        _front_x(OAK_END_X - COUNTERBORE_DEPTH / 2.0) + _SHELF,
+        _CALLOUT_ROW,
+    ),
+    # The swell's diameter reads above the section, clear of the bore's
+    # callout, beside the 40.0 station's extension line.
+    "PeakDia": (_front_x(PEAK_X) + 2.0 * _SHELF, 0.225),
     # Right of the oak end, clear of the end view.
-    "CrestDia": (_front_x(OAK_END_X) + 0.008, 0.100),
-    # Across the empty counterbore; its three-line callout stands above the
-    # title block, below the swell's diameter.
-    "CounterboreDia": (_front_x(OAK_END_X - COUNTERBORE_DEPTH / 2.0), 0.086),
+    "CrestDia": (_front_x(OAK_END_X) + 0.0095, _BELOW),
 }
 # Every band renders from its model dimension; the callouts carry the reamed
 # bore's mate and the fitted tenon's and counterbore's mates and clearances
@@ -191,8 +209,9 @@ _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 
 
 def _style_radius(adapter: Any, annotation: Any, *, name: str, reference: bool) -> None:
-    """Leader from the text to the arc, stopping there: the swell and dome
-    centres lie off the sheet (draw_ch_fulcrum_keeper._set_crown_reference).
+    """Arrow outside, no solid leader: the convex arcs' leaders run from the
+    text to the arc and stop there, since the swell and dome centres lie off
+    the sheet (draw_ch_fulcrum_keeper._set_crown_reference).
     A tangency-fixed radius prints as the reference "(R59.5)"; the bare "("
     prefix of set_reference_dimension would replace SolidWorks' own radius
     glyph, so whatever prefix the display carries stays behind it."""

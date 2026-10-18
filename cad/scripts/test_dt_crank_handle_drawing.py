@@ -196,7 +196,9 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     spec = _config.parts("dt-crank-handle")
     assert handle.MATERIAL == "Oak"
     assert "white oak" in spec["material_specification"]
-    assert "straight grain along axis" in spec["material_specification"]
+    # The title block's MATERIAL field prints "material" (MHA-DT-008
+    # machinist review of 2026-10-18: the grain belongs with the stock).
+    assert "straight grain" in spec["material"]
     assert "6-8% MC" in spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1
