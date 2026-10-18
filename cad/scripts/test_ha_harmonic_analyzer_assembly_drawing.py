@@ -101,6 +101,19 @@ def test_settings_are_derived_from_the_pose_sources() -> None:
     }
 
 
+def test_bar_height_chain_lies_on_the_west_front_column_axis() -> None:
+    """Machinist review r2/r3 (b4df34ad9): at the deck's west edge the shown
+    chain floated beside the column. It lies on the column's axis, and the
+    front view's centreline is picked on that axis above the chain's top."""
+    (bar,) = [
+        line for line in spec.SETTING_LINES if line.dimension == spec.BAR_HEIGHT_DIMENSION
+    ]
+    assert bar.x == spec.BAR_HEIGHT_X == fr_top_frame_spec.COLUMN_X
+    x_m, y_m, _z = drawing.BAR_COLUMN_PICK_M
+    assert x_m * 1000.0 == pytest.approx(fr_top_frame_spec.COLUMN_X)
+    assert bar.y_high + 100.0 < y_m * 1000.0 < drawing.TOP_SCREW_Y - 100.0
+
+
 def test_stud_drop_text_stands_east_of_the_east_column() -> None:
     # East is -x; the text's west end (half its ~80 mm of model width at 1:5)
     # must clear the column's outer face.

@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import Literal, Sequence
 
 import fr_harmonic_base_spec as base
+from frame_column_stations import COLUMN_X
 from mg_wheel_bar_geom import BAR_LENGTH, BAR_SIDE, WHEEL_BAR_X0
 from pn_pen_carriage_geom import STUD_HEAD_TOP_REST_Y
 from vn_pen_wire_geom import WHEEL_BAR_Y, WIRE_X
@@ -122,8 +123,12 @@ def plan_explode(
 # --- Integration settings (hidden top-assembly sketch on the Front plane) ---
 # Two construction lines carry the two settings the complete machine owns,
 # each a driving dimension the drawing imports onto the front view:
-# * the wheel bar's top above the deck, measured at the deck's west edge
-#   (the bar runs x -8..226 over it);
+# * the wheel bar's top above the deck, on the axis of the west front column
+#   (+X) the bar clamps round, so the construction line the front view must
+#   show for the dimension to import lies on that column's centreline
+#   (machinist review r2/r3 on b4df34ad9: at the deck's west edge it floated
+#   beside the column, an unlabelled chain line). A vertical dimension does
+#   not depend on its station; the bar runs x -8..226 over the column;
 # * the pen adjuster stud head's top below the bar top, on the pen-rod line
 #   (the wire's rest run), which the pen-wire tie sets.
 SETTING_FEATURE = "IntegrationSettings"
@@ -140,7 +145,7 @@ DRAWING_PRECISION = {
 
 DECK_TOP_Y = base.STACK_HEIGHT
 WHEEL_BAR_TOP_Y = WHEEL_BAR_Y + BAR_SIDE / 2.0
-BAR_HEIGHT_X = base.DECK_HALF_X
+BAR_HEIGHT_X = COLUMN_X
 STUD_X = WIRE_X
 _BAR_X_SPAN = (WHEEL_BAR_X0 - BAR_LENGTH / 2.0, WHEEL_BAR_X0 + BAR_LENGTH / 2.0)
 if not (_BAR_X_SPAN[0] < STUD_X < BAR_HEIGHT_X < _BAR_X_SPAN[1]):

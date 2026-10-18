@@ -37,8 +37,9 @@ from _drawing_balloons import (
     add_component_bom_balloons,
     assert_balloon_landings,
 )
+from _drawing_centerline import add_view_centerline
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_projection import model_points_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_tables import insert_bom_table
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
@@ -53,6 +54,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _simplified_names import simplified_name
+from fr_frame_attachment_spec import TOP_SCREW_Y
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -140,6 +142,19 @@ BAR_DIMENSION_TEXT_DX = -0.016  # left of the front view's outline
 # so its west end clears the column by ~15 mm of model (3 mm of sheet) and its
 # east end stays ~10 mm of sheet short of the crank-side view's crank handle.
 STUD_DIMENSION_TEXT_MODEL_X_MM = -265.0
+# The bar-height setting's construction line lies on the west front column's
+# axis (ha_harmonic_analyzer_assembly_spec.BAR_HEIGHT_X), shown in the front
+# view for its dimension to import (_drawing_hidden_sketches, r21). The
+# column's own centreline makes that chain read as the axis it lies on (the
+# mg-magnifier precedent, 1d6de0958). Picked on the axis halfway between the
+# bar top and the top-frame screw: clear of the bar clamp, the top frame and
+# the chain itself, which stops at the bar top. Metres; the front view
+# projects along z, so z is immaterial.
+BAR_COLUMN_PICK_M = (
+    spec.BAR_HEIGHT_X / 1000.0,
+    (spec.WHEEL_BAR_TOP_Y + TOP_SCREW_Y) / 2000.0,
+    0.0,
+)
 ASSEMBLED_NOTE_XY = (0.020, 0.100)
 ASSEMBLED_NOTE_WIDTH = 84  # characters; default-format note text
 
@@ -560,6 +575,18 @@ def _add_setting_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
     return settled
 
 
+def _add_bar_column_axis(adapter: Any, front: Any) -> None:
+    """The west front column's centreline on the front view: the bar-height
+    chain lies on that axis and reads as it (machinist review r2/r3 on
+    b4df34ad9 read the chain, beside the column, as an unlabelled line)."""
+    xy = model_point_in_view(
+        adapter, front, BAR_COLUMN_PICK_M, label="west front column axis pick"
+    )
+    add_view_centerline(
+        adapter, front, face_xy=(xy[0], xy[1]), label="front view west column axis"
+    )
+
+
 def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
     """Front and crank-side views at 1:5, the settings and the note."""
     name = SHEET_NAMES[0]
@@ -592,6 +619,7 @@ def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
     for view, label in ((front, "assembled front"), (right, "assembled crank side")):
         _assert_view_on_sheet(view, layout=layout, label=label)
     settled = _add_setting_dimensions(adapter, front)
+    _add_bar_column_axis(adapter, front)
     _add_note_block(
         adapter, name, ASSEMBLED_NOTE, ASSEMBLED_NOTE_XY, label="assembled note"
     )
