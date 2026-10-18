@@ -104,18 +104,40 @@ bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
 
-### Recipe gate file parallelism
+### Recipe gate scheduling
 
 `check:recipe` alone runs its complete explicit test inventory with
-`pytest -q -p no:cacheprovider -n 8 --dist loadfile`. Other `check:*` gates
+`pytest -q -p no:cacheprovider -n 8 --dist worksteal`. Other `check:*` gates
 remain serial internally. Eight workers bound the additional local processes:
 the measured development host has 16 logical CPUs, and the farm launcher already
 permits eight simultaneous doit tasks. Using `-n auto` inside the recipe gate
 would occupy every CPU before accounting for sibling checks. This is a
-conservative first step, not a claim of a fivefold speedup. File scheduling keeps
-each module's tests and module-scoped fixtures on one worker; the longest module
-still sets a lower bound on wall time, and every worker pays collection costs.
+conservative first step, not a claim of a fivefold speedup. Work stealing
+rebalances individual tests instead of pinning the dominant recipe-test file to
+one worker. Each worker still pays collection costs, and module/session-scoped
+fixtures may execute in multiple workers; tests must not rely on shared mutable
+fixture state across processes.
 Doit still owns the same dependency checks and success stamp.
+
+The coordinator compared the same frozen source (`4d89b02fb`) and production
+recipe inventory sequentially on that host, changing only xdist scheduling:
+
+| Scheduler | Process wall time |
+|---|---:|
+| serial | 1366.4064949 s |
+| 8 workers, `loadfile` | 1114.6658742 s |
+| 8 workers, `worksteal` | 532.3394605 s |
+
+`worksteal` reduced recipe-gate wall time by **61.04% (2.5668×)** against serial.
+The coordinator's retained process logs and JUnit reports are the evidence:
+serial and worksteal had identical counters of `(classname, name, outcome)` for
+all **11,498 cases** (11,493 passed, 2 skipped, 3 xfailed). The serial/loadfile
+reports are `recipe-fixed-0.xml` and `recipe-fixed-8.xml`; the worksteal report
+is `recipe-worksteal-8.xml`, from the same frozen source.
+See [PR #1622](https://github.com/pedropaulovc/harmonic-analyzer/pull/1622)
+for the benchmark handoff. These measurements precede the additional nested
+guard regressions and measure **only `check:recipe`**, not a full build or the
+end-to-end 5× target in #1621.
 
 For a serial/parallel comparison of the **production recipe inventory**, run
 these commands sequentially from the isolated worktree's root. They derive the
@@ -132,7 +154,7 @@ uv run --locked python -c "import dodo, subprocess; t = next(t for t in dodo.tas
 ```
 
 Compare full case inventories and outcomes as well as process wall time; JUnit
-case-time sums are not parallel wall time. `loadfile` does not isolate writes to
+case-time sums are not parallel wall time. `worksteal` does not isolate writes to
 shared repository paths across files or workers. Tests must use temporary paths
 for mutable outputs; retain `-p no:cacheprovider` to avoid the shared Windows
 pytest-cache rename race even when multiple doit gates run concurrently.

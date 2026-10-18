@@ -3902,12 +3902,12 @@ def task_check():
             "cmd": [
                 *pytest_cmd,
                 # Bound nested parallelism: doit already fans out other gates
-                # (eight tasks by default on the farm). Keep each module on one
-                # worker so its module-scoped fixtures are not duplicated.
+                # (eight tasks by default on the farm). Steal individual tests
+                # so the dominant recipe-test file does not serialize the tail.
                 "-n",
                 "8",
                 "--dist",
-                "loadfile",
+                "worksteal",
                 *(
                     str(path.resolve().relative_to(REPO_ROOT.resolve()))
                     for path in recipe_tests
