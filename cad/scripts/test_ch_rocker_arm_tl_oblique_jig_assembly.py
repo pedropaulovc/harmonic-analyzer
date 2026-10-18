@@ -301,6 +301,9 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
         spec.BEARING: 55.0,
         spec.FLANGE_NUT: 60.0,
         spec.HUB_PIN: 80.0,
+        # Review bought-tl000-r2: dropped out beneath the carrier with the HUB
+        # pin, as step 11 presses both up from below.
+        spec.CL_DOWEL: 80.0,
         spec.PIVOT_BLOCK: 90.0,
         spec.NUT_BRACKET: 90.0,
         spec.LEADSCREW_NUT: 90.0,
@@ -309,9 +312,6 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
         spec.BLOCK_LOCK_WASHER: 90.0,
         spec.PIVOT_PIN: 150.0,
         spec.CARRIAGE_SCREW: 150.0,
-        # Review bought-tl000-r2: dropped out beneath the carrier, as step 11
-        # presses it up from below.
-        spec.CL_DOWEL: 170.0,
         spec.CARRIER: 230.0,
         spec.RISER: 290.0,
         spec.FEED_LEVER: 290.0,
@@ -904,6 +904,13 @@ def test_sweep_note_gives_each_pass_its_pin_stations() -> None:
     for lo, hi in trammel.PIN_TRAVEL.values():
         assert f"{math.floor(lo)} TO {math.ceil(hi)}" in spec.SWEEP_NOTE_LINE
     assert "EACH PASS'S SWEEP (SHEET 1)" in spec.ASSEMBLY_CHECKS[1]
+    # Review bought-tl000-r3: the screws that check took out go back in at
+    # the ship state's torque.
+    assert spec.ASSEMBLY_CHECKS[2] == (
+        f"CHECK: REFIT THE BLOCK SCREWS (ITEM {spec.ITEM_NUMBERS[spec.BLOCK_SCREW]}) "
+        "ON THEIR WEDGE-LOCK PAIRS AT 4.4 N·m; THE HANDWHEEL RUNS THE SAME SWEEPS "
+        "WITHOUT BINDING."
+    )
 
 
 def test_sweep_clears_the_column_cover(report) -> None:

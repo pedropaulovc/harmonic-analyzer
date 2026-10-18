@@ -858,8 +858,10 @@ EXPLODE_STEPS = (
         230.0,
     ),
     ("hub pin presses out down", (HUB_PIN,), "z", -150.0),
-    # Review bought-tl000-r2: the dowel goes in from beneath like the HUB pin.
-    ("cl dowel presses out down", (CL_DOWEL,), "z", -60.0),
+    # Review bought-tl000-r2: the dowel goes in from beneath like the HUB pin,
+    # and drops as far, clear of the carrier's and the lever's outline (farm
+    # r3: at -60 the carrier hid it).
+    ("cl dowel presses out down", (CL_DOWEL,), "z", -150.0),
     ("nut screws back out", (NUT_SCREW,), "x", 30.0),
     ("block screws back out", (BLOCK_SCREW,), "y", -40.0),
     ("wedge-lock pairs back out", (BLOCK_LOCK_WASHER,), "y", -20.0),
@@ -1459,8 +1461,11 @@ ASSEMBLY_CHECKS = (
     "LEVER THROUGH EACH PASS'S SWEEP (SHEET 1); IT TURNS FREELY, NOTHING "
     "TOUCHES THE STUDS, NUTS OR COLUMN COVER AND BOTH CARRIAGES STAY ON THEIR "
     "RAILS.",
-    "CHECK: WITH THE BLOCK SCREWS IN, THE HANDWHEEL RUNS THE SAME SWEEPS "
-    "WITHOUT BINDING.",
+    # Review bought-tl000-r3: the check that takes the block screws out puts
+    # them back to step 13's ship state.
+    f"CHECK: REFIT THE BLOCK SCREWS {_item(BLOCK_SCREW)} ON THEIR WEDGE-LOCK "
+    f"PAIRS AT {_BLOCK_TORQUE}; THE HANDWHEEL RUNS THE SAME SWEEPS WITHOUT "
+    "BINDING.",
     "CHECK: THE CARRIER SITS ON BOTH PIN COLLARS; NEITHER PIVOT PIN "
     f"{_item(PIVOT_PIN)} STANDS ABOVE THE CARRIER TOP.",
 )
