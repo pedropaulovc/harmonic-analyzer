@@ -1198,6 +1198,17 @@ parsed-YAML for configs), so a cache hit and "doit up-to-date" always agree and 
 comment-only YAML edit busts neither. Paths are tagged **repo-relative**, so the
 key is identical across machines and worktrees.
 
+YAML digest checks read fresh file bytes on every call, then reuse the canonical
+MD5 through a process-local, 256-entry `lru_cache` keyed only by those bytes.
+There is no path, stat, or mtime cache; parsed values are not retained. YAML
+canonicalization and exact cache-key identities remain unchanged. The controlled
+comparison for [#1621](https://github.com/pedropaulovc/harmonic-analyzer/issues/1621)
+matched all 225 tracked YAML digests and all 419 available API key/input sets
+across three repetitions. Of those key sets, 235 had missing native prerequisites
+and do not establish full live-artifact parity. The candidate recorded 225 misses
+and 9,744 hits (97.74%); this is digest-reuse evidence, not a whole-build speedup
+claim. See the [measurement details](https://github.com/pedropaulovc/harmonic-analyzer/pull/1626#issuecomment-6244324157).
+
 Assembly and drawing keys also include SHA-256 identity tokens for the exact CAD
 artifacts they reference. SolidWorks persistent-reference IDs and persisted
 rebuild stamps may differ between two same-recipe builds, so a recipe key alone
