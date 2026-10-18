@@ -1433,7 +1433,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="sm_knife_mount",
         thread="#10-24 UNC",
         quantity=2,
-        installed_at="MHA-SM-000 STEP 5",
+        installed_at="MHA-SM-000 STEP 6",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the knife-edge bearing block's top seat to the stationary crossbar underside (MOUNT_GAP 0); "
@@ -1443,14 +1443,14 @@ JOINTS: tuple[Joint, ...] = (
             "cyclic tension and shear, never as torque about its own axis"
         ),
         axial_capture=(
-            "plain hex head (92314A253, cut to 46.70 +/-0.15 under the head) seated on a new "
-            "18-8 SAE washer (96659A104), whose lower bearing face seats on the crossbar's faced top "
-            "36.50 +/-0.05 above the finished underside; the bolt passes the O6.045 clearance "
-            "hole and reaches 8.9173 nominal (8.349..9.4856 worst case) into the 9.65 +/-0.13 "
-            "full thread of the #10-24 bottoming tap, drawing the block up against the casting. "
-            "The independently inspected full-form cut tail covers the longest reach with "
-            "0.0760667 spare; one incomplete tip pitch leaves 7.2906667 full engagement, "
-            "with 0.0344 minimum tip air"
+            "plain hex head (92314A253) seated on a new 18-8 SAE washer (96659A104), whose lower "
+            "bearing face seats on the crossbar's faced top; MHA-SM-000 step 4 cuts each bolt under "
+            "the head to the crossbar-underside-to-washer-top height measured at its own hole plus "
+            "8.92 +/-0.15, so the bolt passes the O6.045 clearance hole and reaches 8.9173 nominal "
+            "(8.77..9.07 worst case) into the 9.65 +/-0.13 full thread of the #10-24 bottoming tap, "
+            "drawing the block up against the casting. The independently inspected full-form cut "
+            "tail covers the longest reach with 0.4916667 spare; one incomplete tip pitch leaves "
+            "7.7116667 full engagement, with 0.45 minimum tip air"
         ),
         lock=Lock.NONE,
         lock_part="",
@@ -1460,13 +1460,14 @@ JOINTS: tuple[Joint, ...] = (
             "coordinator ruling 2026-10-16 (period hardware, #1188 finding): a doweled static clamp needs "
             "no lock, so the bolt goes in plain. "
             "build_sm_summing_assembly.py: module docstring, HANGER_STUD_Y/HANGER_REACH_MIN/HANGER_REACH_MAX, "
-            "_assert_knife_hanger_stack; build_sm_knife_mount.py: MOUNT_GAP; sm_knife_mount_spec.py "
+            "_assert_knife_hanger_stack; sm_summing_assembly_spec.py HANGER_FIT_REACH/"
+            "HANGER_FIT_REACH_TOL; build_sm_knife_mount.py: MOUNT_GAP; sm_knife_mount_spec.py "
             "STUD_TAP_SPEC/STUD_TAP_THREAD_DEPTH_MIN/PIN_HOLE_X; fr_top_frame_spec.py HANGER_GRIP/"
-            "HANGER_GRIP_TOL/HANGER_PIN_X; vn_knife_mount_dowel_spec.py; "
+            "HANGER_PIN_X; vn_knife_mount_dowel_spec.py; "
             "vn_knife_hanger_washer_spec.py; vn_knife_hanger_stud_spec.py THREAD_LENGTH_MIN/"
             "INCOMPLETE_TIP_LEN_MAX; cad/config/parts/vn-knife-hanger-stud.yaml "
             "(92314A253) installation_notes; "
-            "sm_summing_assembly_notes.ASSEMBLY_STEPS 4-5, ASSEMBLY_CHECKS 1"
+            "sm_summing_assembly_notes.ASSEMBLY_STEPS 4-6, ASSEMBLY_CHECKS 1"
         ),
     ),
     Joint(
@@ -1535,7 +1536,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="sm_gooseneck",
         thread=gooseneck_screw.THREAD,
         quantity=1,
-        installed_at="MHA-SM-000 STEP 7",
+        installed_at="MHA-SM-000 STEP 8",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "user ruling 2026-09-21: tighten the head to clamp the supplier upper-eye "
@@ -1561,7 +1562,7 @@ JOINTS: tuple[Joint, ...] = (
             "screw's Manufacturing Notes and property-linked by "
             "draw_sm_gooseneck_spring_screw), repeated in the summing "
             "assembly's Manufacturing Notes property (UPPER_EYE_CLAMP_NOTES) and "
-            "printed as MHA-SM-000 step 7 (sm_summing_assembly_notes.ASSEMBLY_STEPS 7, "
+            "printed as MHA-SM-000 step 8 (sm_summing_assembly_notes.ASSEMBLY_STEPS 8, "
             "ASSEMBLY_CHECKS 3); _assert_counter_spring_top_hang"
         ),
     ),

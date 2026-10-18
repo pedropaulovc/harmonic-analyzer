@@ -738,9 +738,10 @@ def test_close_bore_clears_the_hex_trunnion_only_at_the_ridge() -> None:
 def test_tap_callout_bands_its_full_thread_and_drill_depth_with_a_pitch_of_runout() -> None:
     # Machinist review B2: the bottoming tap needs drill past the full
     # thread.  The #10-24 full thread prints 9.65 with its own native +/-0.13
-    # (R3: no third place; bare, the .XX row's +/-0.51 would give a 9.14
-    # shallowest thread under the bolt's 9.4856 reach) and its shallowest
-    # 9.52 still holds 1.5 D; the drill runs 1.5 pitch past it nominally and
+    # (R3: no third place; bare, the .XX row's +/-0.51 would give a 10.16
+    # deepest thread the 11.19 shallowest drill clears by under a pitch) and
+    # its shallowest 9.52 still holds 1.5 D and the bolt's 9.07 longest
+    # fit-up reach; the drill runs 1.5 pitch past it nominally and
     # carries the explicit +/-0.05 the 2.0 crown web leaves, 11.24, on the
     # native callout (the summing-lever bracket-tap precedent), still one
     # 1.058 pitch past the deepest thread at worst.  Rule 3: the #25 pilot
@@ -764,10 +765,15 @@ def test_tap_callout_bands_its_full_thread_and_drill_depth_with_a_pitch_of_runou
     from build_sm_summing_assembly import HANGER_REACH_MAX
 
     assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_MIN > HANGER_REACH_MAX
-    assert (
-        sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH - sm_knife_mount_spec._XX
-        < HANGER_REACH_MAX
+    bare_deepest_thread = (
+        sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH + sm_knife_mount_spec._XX
     )
+    shallowest_drill = (
+        sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH
+        - sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH_BAND
+    )
+    assert shallowest_drill - bare_deepest_thread == pytest.approx(1.03)
+    assert shallowest_drill - bare_deepest_thread < sm_knife_mount_spec.STUD_PITCH
     assert sm_knife_mount_spec.STUD_THREAD == "#10-24"
     assert sm_knife_mount_spec.STUD_TAP_DIA == pytest.approx(3.797)
     assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_BAND == pytest.approx(0.13)

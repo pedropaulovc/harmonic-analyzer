@@ -10,6 +10,7 @@ import pytest
 import _interference_contracts
 import build_sm_summing_assembly as asm
 import fr_top_frame_spec as top_frame
+import sm_summing_assembly_spec as asm_spec
 import vn_knife_hanger_stud_spec as hanger_screw
 import vn_knife_hanger_washer_spec as hanger_washer
 from build_sm_knife_mount import CASTING_UNDERSIDE_Y
@@ -32,9 +33,9 @@ def _transform(rotation_rows: list[list[float]]) -> list[float]:
 def test_cut_hex_bolt_seats_on_the_new_washer_and_faced_crossbar_top() -> None:
     assert hanger_screw.CATALOG_LENGTH == pytest.approx(50.8)
     assert hanger_screw.LENGTH == hanger_screw.UNDERHEAD_LEN == pytest.approx(46.70)
-    assert hanger_screw.LENGTH_BAND == pytest.approx((0.15, -0.15))
-    assert hanger_screw.LENGTH_MIN == pytest.approx(46.55)
-    assert hanger_screw.LENGTH_MAX == pytest.approx(46.85)
+    # The length is cut at MHA-SM-000, not banded on the purchased part.
+    for retired in ("LENGTH_BAND", "LENGTH_MIN", "LENGTH_MAX"):
+        assert not hasattr(hanger_screw, retired)
     assert hanger_washer.THICKNESS == pytest.approx(
         (hanger_washer.THICKNESS_MIN + hanger_washer.THICKNESS_MAX) / 2.0
     )
@@ -55,23 +56,33 @@ def test_cut_hex_bolt_seats_on_the_new_washer_and_faced_crossbar_top() -> None:
     assert asm.HANGER_STUD_Y == pytest.approx(990.7827)
 
 
-def test_reach_extrema_include_every_cut_length_grip_and_washer_corner() -> None:
-    reaches = [
-        length - grip - thickness
-        for length, grip, thickness in product(
-            (hanger_screw.LENGTH_MIN, hanger_screw.LENGTH_MAX),
+def test_reach_extrema_are_the_fit_up_cut_band_alone() -> None:
+    # Cutting each bolt to the stack measured at its own hole takes the
+    # printed grip band and the washer's catalogue spread out of the reach.
+    assert asm_spec.HANGER_FIT_REACH == pytest.approx(8.92)
+    assert asm_spec.HANGER_FIT_REACH_TOL == pytest.approx(0.15)
+    assert asm.HANGER_REACH_MIN == pytest.approx(8.77)
+    assert asm.HANGER_REACH_MAX == pytest.approx(9.07)
+    assert asm.HANGER_REACH == pytest.approx(8.9173)
+    assert asm.HANGER_REACH_MIN <= asm.HANGER_REACH <= asm.HANGER_REACH_MAX
+    # The cut covers every printed grip and catalogue washer corner, and the
+    # longest still comes out of the 2 in stock past its factory end.
+    cuts = [
+        grip + thickness + reach
+        for grip, thickness, reach in product(
             (
                 top_frame.HANGER_GRIP - top_frame.HANGER_GRIP_TOL,
                 top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL,
             ),
             (hanger_washer.THICKNESS_MIN, hanger_washer.THICKNESS_MAX),
+            (asm.HANGER_REACH_MIN, asm.HANGER_REACH_MAX),
         )
     ]
-    assert min(reaches) == pytest.approx(asm.HANGER_REACH_MIN)
-    assert max(reaches) == pytest.approx(asm.HANGER_REACH_MAX)
-    assert min(reaches) == pytest.approx(8.349)
-    assert max(reaches) == pytest.approx(9.4856)
-    assert asm.HANGER_REACH == pytest.approx(8.9173)
+    assert min(cuts) == pytest.approx(asm.HANGER_CUT_LENGTH_MIN)
+    assert max(cuts) == pytest.approx(asm.HANGER_CUT_LENGTH_MAX)
+    assert asm.HANGER_CUT_LENGTH_MIN == pytest.approx(45.6744)
+    assert asm.HANGER_CUT_LENGTH_MAX == pytest.approx(47.731)
+    assert hanger_screw.CATALOG_LENGTH - max(cuts) > hanger_screw.PITCH
 
 
 @pytest.mark.parametrize(
@@ -80,6 +91,8 @@ def test_reach_extrema_include_every_cut_length_grip_and_washer_corner() -> None
         ("HANGER_WASHER_Y", 1036.3, "washer lower face"),
         ("HANGER_STUD_Y", 990.8, "bolt under-head face"),
         ("HANGER_THREAD_SPARE", -0.01, "useful full-form tail"),
+        ("HANGER_REACH", 9.08, "outside the fit-up cut"),
+        ("HANGER_CUT_LENGTH_MAX", 49.8, "without removing its factory end"),
     ],
 )
 def test_stack_rejects_unseated_bearing_faces_or_insufficient_inspected_tail(

@@ -40,7 +40,6 @@ from vn_knife_hanger_stud_spec import (
     HEAD_AF,
     HEAD_TOP_Y,
     LENGTH,
-    LENGTH_BAND,
     SHANK_DIA,
     THREAD_LENGTH_MIN,
 )
@@ -64,8 +63,8 @@ _ANGLE_TEXT_RADIUS = 0.016
 # The B-size inner border is 12.7 mm in from the sheet edge; the title block
 # spans x >= 0.216 below y = 0.065.
 FRONT_KEEP = {
-    # Text and dimension line left of the head, the four ~72 mm callout lines
-    # centred 6 mm inside the left border and 10 mm clear of the hex.
+    # Text and dimension line left of the head, the three callout lines (under
+    # 72 mm wide) centred 6 mm inside the left border and 10 mm clear of the hex.
     "CutLength": (0.055, FRONT_CENTER[1]),
     # The text stands wholly above the tail's top extension line and right of
     # the shank, so neither extension line crosses "10.62 min." or its lines.
@@ -95,8 +94,12 @@ PURCHASED_NOTE_XY = (0.130, 0.240)
 # Every view and the sheet are 2:1, so the title-block SCALE is the view
 # scale and the isometric carries no scale label.
 ISO_CENTER = (0.340, 0.135)
+# MHA-SM-000 cuts each bolt to its measured stack, so the native CutLength
+# still drives the modelled trim but prints as the bracketed reference
+# nominal; every other control keeps its native band.
+REFERENCE_CONTROL = "CutLength"
+REFERENCE_NOMINAL = LENGTH / 1000
 EXPECTED_CONTROLS = {
-    "CutLength": (LENGTH / 1000, LENGTH_BAND[1] / 1000, LENGTH_BAND[0] / 1000),
     "ChamferWidth": (
         CHAMFER_WIDTH / 1000,
         -CHAMFER_WIDTH_TOLERANCE / 1000,
@@ -109,6 +112,37 @@ EXPECTED_CONTROLS = {
     ),
     "ThreadLengthMin": (THREAD_LENGTH_MIN / 1000, 0.0, 0.0),
 }
+
+
+def verify_cut_length_reference(adapter: Any, annotations: list[Any]) -> list[Any]:
+    """Prove the one reference CutLength; return the banded controls.
+
+    The reference still drives the trim at its nominal, carries no band and
+    prints bracketed at its native precision.
+    """
+    controls, references = [], []
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        (references if name == REFERENCE_CONTROL else controls).append(annotation)
+    if len(references) != 1:
+        raise RuntimeError(
+            f"{REFERENCE_CONTROL}: expected one sheet dimension, found {len(references)}"
+        )
+    display = _early_bound(references[0].GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(dimension.DrivenState) != 2:
+        raise RuntimeError(f"{REFERENCE_CONTROL}: no longer drives the modelled trim")
+    if not math.isclose(float(dimension.SystemValue), REFERENCE_NOMINAL, abs_tol=1e-9):
+        raise RuntimeError(f"{REFERENCE_CONTROL}: native dimension nominal changed")
+    brackets = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+    if int(tolerance.Type) != DIMENSION_TOLERANCE_TYPES[
+        REFERENCE_CONTROL
+    ] or brackets != ("(", ")"):
+        raise RuntimeError(f"{REFERENCE_CONTROL}: reference display did not persist")
+    if int(display.GetPrimaryPrecision2()) != DIMENSION_PRECISION[REFERENCE_CONTROL]:
+        raise RuntimeError(f"{REFERENCE_CONTROL}: native display precision changed")
+    return controls
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -133,10 +167,10 @@ async def build(adapter: Any) -> dict[str, str]:
         draw,
         {
             0: "Knife-Hanger Bolt — Modified Stock Drawing",
-            1: "Cut length, end chamfer and modified-part thread-tail acceptance",
+            1: "Reference cut length, end chamfer and modified-part thread-tail acceptance",
             2: "Harmonic Analyzer Project",
             3: "MHA-VN-024; McMaster-Carr 92314A253",
-            4: "Native cut length, chamfer and thread-tail controls",
+            4: "Native reference cut length, chamfer and thread-tail controls",
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
@@ -153,7 +187,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     verify_machining_controls(
         adapter,
-        annotations,
+        verify_cut_length_reference(adapter, annotations),
         expected=EXPECTED_CONTROLS,
         tolerance_types=DIMENSION_TOLERANCE_TYPES,
         precision=DIMENSION_PRECISION,

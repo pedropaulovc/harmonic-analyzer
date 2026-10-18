@@ -23,7 +23,6 @@ import vn_knife_hanger_washer_spec as HANGER_WASHER
 import vn_knife_mount_dowel_spec as KNIFE_DOWEL
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from dt_cone_pivot_post_installation import (
@@ -31,7 +30,6 @@ from dt_cone_pivot_post_installation import (
     FRAME_REAR_COLUMN_Z,
 )
 from fr_frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
-from ch_fulcrum_keeper_spec import KEEPER_SEAT_FLATNESS_BUDGET_MM
 
 # --- Machined-surface geometry ------------------------------------------------
 #
@@ -108,19 +106,17 @@ HANGER_CLEARANCE_DIA_PLACES = 3
 HANGER_CLEARANCE_DIA_BAND = (0.13, 0.0)  # (upper, lower), not a supplier guarantee
 HANGER_CLEARANCE_DIA_MIN = HANGER_CLEARANCE_DIA + min(HANGER_CLEARANCE_DIA_BAND)
 HANGER_CLEARANCE_DIA_MAX = HANGER_CLEARANCE_DIA + max(HANGER_CLEARANCE_DIA_BAND)
-# The finished top-to-underside grip controls the bolt reach. User ruling
-# 2026-10-14: the whole top except the four corner bosses is faced on the
-# plane the model already carries, so the grip is the crossbar's own
-# full-height extrude, HangerGrip@Crossbar. It is driven by the "RingHeight"
-# global, carries the +/-0.05 band, and the sheet imports it in section F-F.
+# The finished top-to-underside grip. User ruling 2026-10-14: the whole top
+# except the four corner bosses is faced on the plane the model already
+# carries, so the grip is the crossbar's own full-height extrude,
+# HangerGrip@Crossbar, driven by the "RingHeight" global and imported in
+# section F-F. Owner ruling 2026-10-18 (machinist review r1, rule 4/19): the
+# grip prints under the title block's .XX band; the MHA-VN-024 bolt is cut to
+# the measured grip at MHA-SM-000 fit-up (build_sm_summing_assembly), so no
+# tightened band rescues its thread engagement.
 HANGER_GRIP = RING_HEIGHT
 HANGER_GRIP_PLACES = 2
-HANGER_GRIP_TOL = 0.05
-# The band sets the bolt's reach into the knife mount's tap
-# (build_sm_summing_assembly HANGER_REACH_MIN/MAX), so the callout names it.
-HANGER_GRIP_CALLOUT = (
-    "FINISHED TOP AND\nUNDERSIDE SEATS;\nSETS MHA-VN-024\nTHREAD ENGAGEMENT"
-)
+HANGER_GRIP_TOL = printed_band_mm(HANGER_GRIP_PLACES)  # 0.51, title block .XX
 # A plain native Hole Wizard clearance row, drilled through from the faced
 # underside. A plain hole ignores HoleFit, so _holes.wizard_holes writes the
 # pinned #10 loose 6.045 to both diameter knobs whenever the table seeds
@@ -162,9 +158,13 @@ if HANGER_PIN_SLIP_CLEARANCE_MIN < 0.02 or HANGER_PIN_SLIP_CLEARANCE_MAX > 0.10:
         f"{HANGER_PIN_SLIP_CLEARANCE_MAX} is outside 0.02-0.10"
     )
 # Manufacturing GD&T limits consumed by the part's drawing projection: each
-# slot to its round hole (datum B front, C rear), at their BASIC span,
-# oriented by the other round hole with its location released (translation
-# modifier), so the two mounts' dowel lines stay square to the B-C line.
+# slot's width to its round hole (datum B front, C rear), oriented by the
+# other round hole with its location released (translation modifier), so the
+# two mounts' dowel lines stay square to the B-C line.  The values stay
+# literals (the FCF provenance scan reads them).  The keeper seats carry no
+# frame: rule 5 names flatness on a clamp face over-specification and no
+# user ruling accepts one (codex review of 06d0bbc59); the faced top (RV-03)
+# carries them.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-hanger slot position": "0.05",
     "knife-hanger crossbar centring": "0.10",
@@ -174,17 +174,16 @@ HANGER_CROSSBAR_CENTER_ZONE = float(
 )
 HANGER_CROSSBAR_CENTER_TOL = HANGER_CROSSBAR_CENTER_ZONE / 2.0
 HANGER_SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"])
-# The slot's station from its round hole, BASIC (codex review of 080fda97:
-# the frames need a basic location): the frame's zone holds the slot's width
-# (across the dowel line), and the note holds its centre along the slot from
-# the BASIC at the title block's .XXX band (a slot's plain position frame does
-# not reach that direction, codex review of 0bb6ba81; +-0.025 there read as
-# over-specification, 50fe7633).  From the screw axis it sits at the round
-# hole's .XXX band plus its own: 0.26.
-HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 15.264, BASIC
+# The slot's station from its round hole along the slot.  The frame's zone
+# holds the slot's width (across the dowel line), at an implied basic zero
+# from its round hole and an implied basic 90 deg to the B-C line; it does
+# not reach along the slot, so the 15.264 there is an ordinary .XXX
+# dimension, not a basic (codex review of 06d0bbc59: boxed, it left that
+# direction with no limit).  The wall and travel stacks charge that band:
+# from the screw axis the round hole's .XXX band plus its own, 0.26.
+HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 15.264
 HANGER_SLOT_FROM_ROUND_PLACES = 3
-HANGER_SLOT_ALONG_TOL = _XXX  # 0.13
-HANGER_SLOT_ALONG_CALLOUT = f"CENTRE \u00b1{HANGER_SLOT_ALONG_TOL:g} ALONG SLOT"
+HANGER_SLOT_ALONG_TOL = _XXX  # 0.13, the .XXX band charged along the slot
 HANGER_SLOT_STATION_TOL = HANGER_PIN_X_TOL + HANGER_SLOT_ALONG_TOL
 # The -X dowel's blind slot retains the round hole's slip width and depth.
 # Its shortest 3.820 takes the required 3.79508 travel. The functional .XXX
@@ -220,8 +219,11 @@ HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0
 # number and name (codex review of 59f405ab).
 HANGER_PIN_HOLE_CALLOUT = "2X BLIND FLAT-BOTTOM REAM\nSLIP FIT MHA-VN-051 DOWEL"
 HANGER_PIN_DEPTH_CALLOUT = "4X"
-HANGER_SLOT_WIDTH_CALLOUT = "2X BLIND SLOT\nREAMED WIDTH, SLIP FIT\nMHA-VN-051 DOWEL"
-HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH"
+# Milled to width: a reamer cannot make a slot 0.71 longer than it is wide
+# (machinist review r1, 2026-10-18).
+HANGER_SLOT_WIDTH_CALLOUT = "2X BLIND SLOT WIDTH\nSLIP FIT MHA-VN-051 DOWEL"
+# The length's three places are functional (above): name the travel it holds.
+HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH,\nMHA-VN-051 DOWEL TRAVEL"
 
 # Full thread in the hub at the printed worst case (dt_arbor_pedestal_spec's
 # terms): the thread is full only where its major circle lies wholly in metal,
@@ -253,7 +255,7 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 
 # --- Machining-required surfaces ---------------------------------------------
 #
-# These six faces own native finish controls. The top plane between the
+# These four faces own native finish controls. The top plane between the
 # corner bosses, which seats both MHA-CH-007 keepers on the right (west) rail
 # and both MHA-VN-060 washers on the crossbar, and the underside plane between
 # the bosses, which seats both MHA-SM-002 knife mounts, carry SEAT_UM in the
@@ -266,10 +268,10 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 # * The four cap-recess floors carry no finish: each MHA-VN-028 cap seats on
 #   its tube end (build_fr_frame_assembly asserts it), 1.5 mm above the floor,
 #   so the recess only clears the cap skirt.
-# * The gooseneck bore guides the O16 counter-spring post through the hub and
-#   is pinched by the set screw against it.
-# * The set-screw boss's spot face is the machined face the set tap starts
-#   square from, so the cup point bears on the post along the tap axis.
+# * The gooseneck bore (a drilled hole the set screw clamps the post in) and
+#   the set-screw spot face (a clamp face) neither run nor locate, so they
+#   carry no symbol (machinist review r1, 2026-10-18; drawing-guidelines.md
+#   rule 6).
 #
 # SEAT grade throughout: nothing runs on these surfaces continuously, so the
 # commercial machine finish is what the fit needs. Each controlled face has
@@ -284,17 +286,6 @@ SURFACE_FINISHES = tuple(
     )
     for rail, x in (("east", GOOSENECK_X), ("west", COLUMN_X))
     for end, z in (("front", FRONT_COLUMN_Z), ("rear", REAR_COLUMN_Z))
-) + (
-    SurfaceFinishControl(
-        "hub_bore",
-        SEAT_UM,
-        CylinderFace(GOOSENECK_BORE_DIA, contains_x_mm=GOOSENECK_X),
-    ),
-    SurfaceFinishControl(
-        "hub_set_spot_face",
-        SEAT_UM,
-        PlanarFace((-1.0, 0.0, 0.0), HUB_SET_SPOT_FROM_AXIS - GOOSENECK_X),
-    ),
 )
 
 
@@ -364,10 +355,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # fit-up-located keeper feet, not independently located to the general band.
 # More places appear only where a fit lives there -- the cap recess diameter
 # and depth carry the bilateral bands above, the gooseneck bore prints the
-# clearance a purchased post is set into, the finished grip sets the hanger
-# bolt's thread engagement (the rail height, that same thickness, prints its
-# reference at the grip's places), and the dowel slip hole and slot width are
-# reamed to their own +/-0.03 band at three places.
+# clearance a purchased post is set into, the finished grip prints at the
+# owner's .XX (ruling 2026-10-18; the rail height, that same thickness,
+# prints its reference at the grip's places), and the dowel slip hole and
+# slot width hold their own +/-0.03 band at three places.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OuterProfile": {"Width": 1, "Depth": 1, "WinWidth": 1, "WinDepth": 1},
     "WebRing": {"RingHeight": HANGER_GRIP_PLACES},
@@ -480,6 +471,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # length are measured associatively from their visible model features.
     "crossbar junction land": 1,
     "crossbar pocket length": 1,
+    "crossbar pocket from front socket": 1,
     "underside gusset thickness": 1,
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
     "dowel slot from dowel hole": HANGER_SLOT_FROM_ROUND_PLACES,
@@ -503,42 +495,48 @@ KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 # at the depth each wall is judged (``build_fr_top_frame``).
 DRILL_DRIFT_PER_MM = tan(radians(KEEPER_TAP_DRILL_WANDER_DEG))  # 0.00524
 
-# The nominal socket geometry stays fixed; the assigned actual tube governs fit.
-# User ruling 2026-10-14: the base's 1/16 in x 45 general break (printed at the
-# base rim break's one place, 1.6) overrides the title block's 0.25 max break
-# on the convex casting edges the model chamfers; hole, bore, counterbore, tap
-# and slot mouths keep the title-block break (the counterbore and tap walls are
-# proved without a chamfer).  The edges too close to a feature, too short or
-# on too narrow a flange shelf at the print's limits, or under a knife seat,
-# for it (build_fr_top_frame._external_edge_breaks) are the "UNLESS NOTED":
-# E-E's note names the crossbar flange's underside, the hub side view's the
-# hub rib's inner bottom, its outer bottom beside the set-screw boss and the
+# The nominal socket geometry stays fixed; the assigned actual tube governs fit
+# (the socket callout names the mate and the acceptance; the frame assembly
+# MHA-FR-000 carries the corner match marks).
+# User rulings 2026-10-14 and 2026-10-18 (aesthetics; exception RV-04): the
+# base's 1/16 in x 45 general break (printed at the base rim break's one
+# place, 1.6) overrides the title block's 0.25 max break on the convex casting
+# edges the model chamfers; hole, bore, counterbore, tap and slot mouths keep
+# the title-block break (the counterbore and tap walls are proved without a
+# chamfer).  The edges too close to a feature, too short or on too narrow a
+# flange shelf at the print's limits, or under a knife seat, for it
+# (build_fr_top_frame._external_edge_breaks) are the "UNLESS NOTED": E-E's
+# note names the crossbar flange's underside, the hub side view's the hub
+# rib's inner bottom, its outer bottom beside the set-screw boss and the
 # V-gussets, the underside locator's the bar and gusset bottoms at the knife
-# seats; they keep the title block break.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps this block at four lines of at most 70
-# characters.
+# seats; they keep the title block break.  The third row says what "SHARP"
+# on those notes means (machinist review r1: it read as cancelling the
+# title block's burr removal too).
+# Owner ruling 2026-10-18 (exception RV-02, #1625): the cast inside corners
+# the model leaves sharp (window corners, flange junctions) take the casting's
+# own root radius at most; the R3.0 T-roots are dimensioned (the "UNLESS
+# NOTED").  No geometry change.
 IN = 25.4
 EDGE_CHAMFER = 0.0625 * IN  # 1.5875 legs
+INSIDE_CORNER_R_MAX = 3.0
 DRAWING_NOTES = (
-    "MATCH EACH SOCKET TO ITS ASSIGNED ACTUAL MHA-FR-003 TUBE.\n"
-    "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK.\n"
-    "RETAIN CORNER AND ORIENTATION MATCH MARKS.\n"
     f"CONVEX EDGES {EDGE_CHAMFER:.{DRAWING_REFERENCE_PRECISION['top rim chamfer']}f}"
-    " X 45 DEG UNLESS NOTED; HOLE EDGES PER TITLE BLOCK."
+    " X 45 DEG UNLESS NOTED; NOT HOLE OR SLOT MOUTHS.\n"
+    # TODO(#1625): remove when the title block gains its inside-corner default
+    f"INSIDE CORNERS R{INSIDE_CORNER_R_MAX:.1f} MAX UNLESS NOTED.\n"
+    f"EDGES NOTED SHARP: NO {EDGE_CHAMFER:.{DRAWING_REFERENCE_PRECISION['top rim chamfer']}f}"
+    " CHAMFER; TITLE-BLOCK EDGE BREAK."
 )
-# User rulings 2026-10-11 and 2026-10-14: the whole top plane between the four
-# corner bosses is faced, so both keeper feet land on one flat right-rail face
-# wherever fit-up puts them and both washers bear on the crossbar's faced top;
-# no split-line regions and no geometry change: the model's top is the
-# finished plane.  Its own property, placed beside the keeper callout on
-# HOLES-SOCKETS.  The flatness stays on the keeper rail and the last row
-# states why it is held: the two keepers' lug bores carry one fulcrum shaft
-# in a running fit (blind machinist review, farm 0fbfc4d75).
-DRAWING_NOTES_B = (
-    "WHOLE TOP EXCEPT 4 BOSSES:\n"
-    f"Ra {SEAT_UM:.1f} UM; RIGHT RAIL FLAT\n"
-    f"WITHIN {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f} SO BOTH KEEPER\n"
-    "(MHA-CH-007) BORES ALIGN."
-)
+# User rulings 2026-10-11, 2026-10-14 and 2026-10-18 (cohesive appearance;
+# exception RV-03): the whole top plane between the four corner bosses is
+# faced, so both keeper feet land on one flat right-rail face wherever fit-up
+# puts them and both washers bear on the crossbar's faced top; no split-line
+# regions and no geometry change: the model's top is the finished plane.  Its
+# own property, placed beside the keeper callout on HOLES-SOCKETS.  The
+# keeper seats carry no flatness frame (rule 5; codex review of PR #1640,
+# owner ruling pending in #1659): MHA-CH-000 pair-reams the keepers and sets
+# them on this face with the shaft through both.
+DRAWING_NOTES_B = f"WHOLE TOP EXCEPT 4 BOSSES:\nRa {SEAT_UM:.1f} UM."
 # User ruling 2026-10-12 (reading (i)): every face on the 999.7 underside
 # plane between the bosses is faced at the seat finish -- the rail web
 # bottoms, the junction lands and plan gussets, and the crossbar's full-depth

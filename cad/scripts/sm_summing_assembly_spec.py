@@ -54,6 +54,17 @@ QUANTITIES = {
 }
 BOM_ORDER = tuple(QUANTITIES)
 
+# --- Knife-hanger bolt fit-up ---------------------------------------------------
+# Each MHA-VN-024 is cut at this assembly to the stack measured at its own
+# crossbar hole -- crossbar underside to the top of the MHA-VN-060 washer
+# seated on the faced top -- plus this reach into its knife mount's tap. The
+# frame's printed grip band and the washer's catalogue thickness spread are
+# measured out of the reach; only this cut band reaches the tap. Two places,
+# so the notes print it as "8.92 ±0.15".
+HANGER_FIT_REACH = 8.92
+HANGER_FIT_REACH_TOL = 0.15
+HANGER_FIT_REACH_PLACES = 2
+
 # --- Native explode (SM_EXPLODED) ---------------------------------------------
 # The notes' ASSEMBLY_STEPS read back to front: the gooseneck and its screw
 # lift off the spring, the screw backs out of the plug, the spring lifts off

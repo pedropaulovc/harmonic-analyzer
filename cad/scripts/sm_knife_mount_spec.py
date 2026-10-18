@@ -91,12 +91,13 @@ KNIFE_BORE_ORIENTATION_TOL = float(
 # bolt axis the crossbar's #10 clearance hole must float round
 # (``build_sm_summing_assembly``'s knife-hanger stack).  Its 0.075 zone radius
 # is one term of HANGER_SCREW_MISMATCH (hypot(0.316, 0.264) = 0.412) inside
-# the hole's 0.6095 radial float with the drill drift's 0.191, 0.0064 spare.
+# the hole's 0.6095 radial float with the drill drift's 0.194 over the
+# printed grip's thickest 37.01, 0.0039 spare.
 # A screw through a clearance hole needs no tighter zone than that float
 # admits (drawing-guidelines.md rule 5), and Ø0.15 is the largest two-place
-# zone it admits: the float closes at Ø0.1590; Ø0.16 leaves -0.0007 and
-# Ø0.25 -0.064.  Plain face dimensions instead, even at .XXX (+/-0.13 each
-# way, not 0.075), give hypot(0.371, 0.319) = 0.489 and -0.071: the frame is
+# zone it admits: the float closes at Ø0.1556; Ø0.16 leaves -0.0031 and
+# Ø0.25 -0.067.  Plain face dimensions instead, even at .XXX (+/-0.13 each
+# way, not 0.075), give hypot(0.371, 0.319) = 0.489 and -0.074: the frame is
 # functional.
 STUD_TAP_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"])
 
@@ -157,18 +158,20 @@ def free_rock_deg(
 KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
 # The bore crown (its upper inner wall) below the top seat: 14.62.
 BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
-# MHA-VN-024, a #10-24 plain hex bolt cut from stock to its under-head length
-# (``vn_knife_hanger_stud_spec``), drops through a washer on the crossbar's
-# faced top and its #10 clearance hole and threads into a bottoming tap on the
-# bore's vertical centreline at mid-depth.  The full thread's shallowest
-# limit, 9.52, must take the bolt's longest reach, 9.4856
+# MHA-VN-024, a #10-24 plain hex bolt cut from stock at MHA-SM-000 to its
+# hole's measured stack plus the 8.92 +/-0.15 fit-up reach
+# (``sm_summing_assembly_spec.HANGER_FIT_REACH``), drops through a washer on
+# the crossbar's faced top and its #10 clearance hole and threads into a
+# bottoming tap on the bore's vertical centreline at mid-depth.  The full
+# thread's shallowest limit, 9.52, must take the bolt's longest reach, 9.07
 # (``build_sm_summing_assembly.HANGER_TIP_CLEARANCE``), and hold 1.5 D of
 # full thread (below).  It prints 9.65 with an explicit native +/-0.13 on the
 # hole callout: the band the earlier 9.650 took from the title block's .XXX
 # row, held unchanged.  Bare, two places would claim the .XX row's +/-0.51
 # (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), a
-# 9.14 shallowest thread the bolt's tip would bottom in; the band's mate and
-# function are the callout's reason row (rule 4).  The drill runs 1.5 P
+# 10.16 deepest thread the drill's shallowest limit, 11.19, would clear by
+# only 1.03, under one pitch of runout; the band's mate and function are the
+# callout's reason row (rule 4).  The drill runs 1.5 P
 # past that nominal thread (9.65 + 1.5875 = 11.2375, printed 11.24), yet its
 # deepest limit, with the pilot the web charges ground to the sharpest
 # accepted point (below), must still leave the 2.0 crown web: so the drill
