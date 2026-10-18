@@ -1581,7 +1581,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # The named journal view looks exactly down the inclined model axis.  Unlike
     # the bore-plane section, it retains the uncut boss end face, so its Ø17.2
     # OD and Ø12.281 bore are two visible concentric circles with clear leaders.
-    for view in (front, top, journal):
+    # The isometric too (PR #1436): a newly placed view may already read as
+    # shaded, so the final shaded-with-edges call alone can be a no-op that
+    # leaves its edges at draft quality.
+    for view in (front, top, journal, iso):
         set_hidden_lines_removed(adapter, view)
     _assert_view_geometry(
         adapter,
