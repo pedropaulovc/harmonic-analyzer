@@ -319,12 +319,18 @@ def key_inputs(
     invalidate the file_dep. Each file is tagged by its REPO-RELATIVE path (not
     absolute, unlike ``_digest_files``) so the key is identical across machines and
     worktrees. The input list is what ``HARMONIC_CACHE_DEBUG`` / ``cache_status``
-    print so a key shift is a readable per-file diff (issue #73)."""
+    print so a key shift is a readable per-file diff (issue #73).
+
+    Resolve each dependency's tag once per invocation and reuse it for sorting
+    and provenance; equal tags retain input order, including duplicates. Tags
+    are fresh on the next invocation. This is not an atomic filesystem snapshot:
+    a symlink can still change between tagging and digesting its original path."""
     h = hashlib.sha256()
     h.update(f"epoch={_CACHE_EPOCH}\0salt={_salt() if salt is None else salt}\0".encode())
     pairs: list[tuple[str, str]] = []
-    for path in sorted(file_deps, key=lambda p: _rel(Path(p))):
-        rel = _rel(Path(path))
+    tagged = [(_rel(Path(path)), path) for path in file_deps]
+    tagged.sort(key=lambda item: item[0])
+    for rel, path in tagged:
         try:
             content = digest_one(path)
         except OSError:

@@ -1243,6 +1243,75 @@ def test_content_checker_digest_ignores_yaml_noise(tmp_path):
     assert digest(str(nonyaml)) == dodo._canonical_file_md5(str(nonyaml))
 
 
+def test_content_checker_yaml_digest_reads_same_size_same_mtime_edits(tmp_path):
+    dodo = _load_dodo()
+    digest = dodo.ContentChecker._digest
+    cfg = tmp_path / "config.yaml"
+    cfg.write_bytes(b"value: 1\n")
+    original_stat = cfg.stat()
+    original_digest = digest(str(cfg))
+
+    cfg.write_bytes(b"value: 2\n")
+    os.utime(cfg, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+    assert digest(str(cfg)) != original_digest
+
+    cfg.write_bytes(b"value: 1\n")
+    assert digest(str(cfg)) == original_digest
+    cfg.unlink()
+    with pytest.raises(FileNotFoundError):
+        digest(str(cfg))
+    cfg.mkdir()
+    with pytest.raises(OSError):
+        digest(str(cfg))
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"value: [\n",
+        b"value: [\r\n",
+        b"value: \xff\r\n",
+        b"value: \x00\r\n",
+    ],
+)
+def test_content_checker_yaml_load_failure_keeps_raw_fallback(tmp_path, raw):
+    dodo = _load_dodo()
+    cfg = tmp_path / "malformed.yaml"
+    cfg.write_bytes(raw)
+    expected = dodo._canonical_file_md5(str(cfg))
+    assert dodo.ContentChecker._digest(str(cfg)) == expected
+    assert dodo.ContentChecker._digest(str(cfg)) == expected
+    cfg.write_bytes(b"value: 1\n")
+    assert dodo.ContentChecker._digest(str(cfg)) != expected
+
+
+def test_content_checker_yaml_digest_preserves_mapping_order(tmp_path):
+    dodo = _load_dodo()
+    cfg = tmp_path / "config.yaml"
+    cfg.write_bytes(b"first: 1\nsecond: 2\n")
+    original = dodo.ContentChecker._digest(str(cfg))
+    cfg.write_bytes(b"second: 2\nfirst: 1\n")
+    assert dodo.ContentChecker._digest(str(cfg)) != original
+
+
+def test_content_checker_yaml_digest_preserves_binary_reader_encoding(tmp_path):
+    dodo = _load_dodo()
+    cfg = tmp_path / "config.yaml"
+    text = "value: caf\u00e9\n"
+    cfg.write_bytes(text.encode("utf-8"))
+    original = dodo.ContentChecker._digest(str(cfg))
+    cfg.write_bytes(text.encode("utf-16"))
+    assert dodo.ContentChecker._digest(str(cfg)) == original
+
+
+def test_content_checker_yaml_non_yaml_load_error_propagates(tmp_path):
+    dodo = _load_dodo()
+    cfg = tmp_path / "config.yaml"
+    cfg.write_bytes(b"date: 2026-13-01\n")
+    with pytest.raises(ValueError):
+        dodo.ContentChecker._digest(str(cfg))
+
+
 def test_content_checker_digest_is_checkout_eol_independent(tmp_path):
     """Issue #255: Git-equivalent text content must produce one digest whether a
     Windows checkout materialises LF, CRLF, or mixed line endings. Binary inputs

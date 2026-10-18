@@ -112,9 +112,11 @@ def _endcut_integral_bounds(
     point_error = max(ground.geometry_error_bound_mm, 256 * math.ulp(axis))
     measure_error = 256 * math.ulp(axis ** (1 if d1 is None else 3))
 
-    def cell(shape: str, lo: float, hi: float) -> tuple[float, float]:
-        x0, y0 = _ground_point(ground, shape, lo)
-        x1, y1 = _ground_point(ground, shape, hi)
+    def cell(
+        point0: tuple[float, float], point1: tuple[float, float]
+    ) -> tuple[float, float]:
+        x0, y0 = point0
+        x1, y1 = point1
         if y1 < y0:
             raise ValueError("finite ground branch reverses its Y direction")
         y_min, y_max = max(0.0, y0 - point_error), y1 + point_error
@@ -140,30 +142,44 @@ def _endcut_integral_bounds(
             upper * (width + 2 * point_error),
         )
 
-    pending: list[tuple[float, int, str, float, float, float, float]] = []
+    # Endpoint points belong to this invocation and branch, never a shared cache.
+    pending: list[
+        tuple[
+            float, int, str, float, float, float, float,
+            tuple[float, float], tuple[float, float],
+        ]
+    ] = []
     lower_sum = upper_sum = 0.0
     serial = 0
     for shape, lo, hi in _ground_branches(ground):
-        lower, upper = cell(shape, lo, hi)
+        point0 = _ground_point(ground, shape, lo)
+        point1 = _ground_point(ground, shape, hi)
+        lower, upper = cell(point0, point1)
         lower_sum = math.nextafter(lower_sum + lower, -math.inf)
         upper_sum = math.nextafter(upper_sum + upper, math.inf)
-        heapq.heappush(pending, (lower - upper, serial, shape, lo, hi, lower, upper))
+        heapq.heappush(
+            pending, (lower - upper, serial, shape, lo, hi, lower, upper, point0, point1)
+        )
         serial += 1
     while upper_sum - lower_sum > absolute_error:
         if serial >= 262144:
             raise ValueError("finite end-envelope interval did not resolve its declared error")
-        _, _, shape, lo, hi, old_lower, old_upper = heapq.heappop(pending)
+        _, _, shape, lo, hi, old_lower, old_upper, point0, point1 = heapq.heappop(pending)
         mid = (lo + hi) / 2.0
         if mid == lo or mid == hi:
             raise ValueError("finite end-envelope refinement exhausted its parameter interval")
         lower_sum = math.nextafter(lower_sum - old_lower, -math.inf)
         upper_sum = math.nextafter(upper_sum - old_upper, math.inf)
-        for start, end in ((lo, mid), (mid, hi)):
-            lower, upper = cell(shape, start, end)
+        midpoint = _ground_point(ground, shape, mid)
+        for start, end, start_point, end_point in (
+            (lo, mid, point0, midpoint), (mid, hi, midpoint, point1),
+        ):
+            lower, upper = cell(start_point, end_point)
             lower_sum = math.nextafter(lower_sum + lower, -math.inf)
             upper_sum = math.nextafter(upper_sum + upper, math.inf)
             heapq.heappush(
-                pending, (lower - upper, serial, shape, start, end, lower, upper)
+                pending,
+                (lower - upper, serial, shape, start, end, lower, upper, start_point, end_point),
             )
             serial += 1
     return max(0.0, lower_sum), upper_sum

@@ -11,6 +11,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -111,6 +113,105 @@ def test_key_inputs_sorted_with_missing_marker(tmp_path):
     digests = dict(inputs)
     assert digests["gone.txt"] == "<missing>"
     assert key == cache.cache_key([present, missing], _digest_one)
+
+
+@pytest.mark.parametrize("as_iterator", [False, True])
+def test_key_inputs_preserves_equal_tag_order_and_duplicates(
+    tmp_path, monkeypatch, as_iterator
+):
+    monkeypatch.setattr(cache, "REPO_ROOT", tmp_path / "repo")
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+    a = _make_dep(left, "same.txt", "alpha")
+    z = _make_dep(right, "same.txt", "zeta")
+    deps = [z, a, z]
+    key, inputs = cache.key_inputs(
+        iter(deps) if as_iterator else deps, _digest_one, salt="ties"
+    )
+    assert deps == [z, a, z]
+    assert inputs == [("same.txt", "zeta"), ("same.txt", "alpha"), ("same.txt", "zeta")]
+    expected = hashlib.sha256(f"epoch={cache._CACHE_EPOCH}\0salt=ties\0".encode())
+    for tag, digest in inputs:
+        expected.update(f"{tag}\0{digest}\0".encode())
+    assert key == expected.hexdigest()
+    assert cache.key_inputs([a, z, z], _digest_one, salt="ties")[0] != key
+
+
+def test_key_inputs_refreshes_alias_tags_and_keeps_original_digest_paths(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(cache, "REPO_ROOT", tmp_path.resolve())
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    for target in (first, second):
+        target.mkdir()
+        _make_dep(target, "input.yaml", '{ "value": 1 }\n')
+        _make_dep(target, "input.bin", '{ "value": 1 }\n')
+    alias = tmp_path / "alias"
+
+    def point_alias(target):
+        try:
+            alias.symlink_to(target, target_is_directory=True)
+        except OSError:
+            if os.name != "nt":
+                raise
+            # Junctions need no symlink privilege; both endpoints stay in tmp_path.
+            subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(alias), str(target)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+    def remove_alias():
+        if alias.is_symlink():
+            alias.unlink()
+        else:
+            alias.rmdir()
+
+    calls = []
+
+    def digest_one(path):
+        calls.append(path)
+        text = Path(path).read_text(encoding="utf-8")
+        return json.dumps(json.loads(text)) if Path(path).suffix == ".yaml" else text
+
+    deps = [str(alias / "input.yaml"), str(alias / "input.bin")]
+    point_alias(first)
+    try:
+        first_result = cache.key_inputs(deps, digest_one, salt="alias")
+        assert calls == [deps[1], deps[0]]
+        assert first_result[1] == [
+            ("first/input.bin", '{ "value": 1 }\n'),
+            ("first/input.yaml", '{"value": 1}'),
+        ]
+        assert first_result == cache.key_inputs(
+            [str(first / "input.yaml"), str(first / "input.bin")],
+            digest_one,
+            salt="alias",
+        )
+    finally:
+        remove_alias()
+
+    point_alias(second)
+    try:
+        calls.clear()
+        second_result = cache.key_inputs(deps, digest_one, salt="alias")
+        assert calls == [deps[1], deps[0]]
+        assert second_result[1] == [
+            ("second/input.bin", '{ "value": 1 }\n'),
+            ("second/input.yaml", '{"value": 1}'),
+        ]
+        assert second_result == cache.key_inputs(
+            [str(second / "input.yaml"), str(second / "input.bin")],
+            digest_one,
+            salt="alias",
+        )
+        assert second_result[0] != first_result[0]
+    finally:
+        remove_alias()
 
 
 

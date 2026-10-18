@@ -83,7 +83,6 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any
-import yaml as _yaml
 from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
 from doit.tools import config_changed
 from filelock import FileLock, Timeout  # noqa: E402
@@ -144,6 +143,7 @@ import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _farm  # noqa: E402  (farm executor: cache-missing leaves run on the pool)
 import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports sw_recovery)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
+from _yaml_digest import yaml_digest as _yaml_content_digest  # noqa: E402
 from _drawing_registry import (  # noqa: E402
     DRAWING_TEMPLATES,
     DRAWINGS_BY_NAME,
@@ -449,15 +449,11 @@ class ContentChecker(MD5Checker):
             return recipe if recipe is not None else _canonical_file_md5(file_path)
         if not file_path.endswith((".yaml", ".yml")):
             return _canonical_file_md5(file_path)
-        try:
-            with open(file_path, "rb") as fh:
-                data = _yaml.safe_load(fh)
-        except _yaml.YAMLError:
+        with open(file_path, "rb") as fh:
+            digest = _yaml_content_digest(fh.read())
+        if digest is None:
             return _canonical_file_md5(file_path)  # malformed -> build fails loud later
-        canon = _yaml.safe_dump(
-            data, default_flow_style=False, sort_keys=False, allow_unicode=True
-        )
-        return hashlib.md5(canon.encode("utf-8")).hexdigest()
+        return digest
 
     def check_modified(self, file_path, file_stat, state):
         timestamp, size, digest = state
@@ -3438,6 +3434,8 @@ def task_check():
         # Persisted display data must fail closed before assembly publication.
         SCRIPTS_DIR / "test_assembly_save.py",
         REPO_ROOT / "tests" / "test_saved_display_data.py",
+        # Worker/child guard isolation and fake-runner safety under xdist.
+        REPO_ROOT / "tests" / "test_solidworks_launch_guard.py",
         # The copied-mate safeguard must keep failing CLOSED: an unreadable
         # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
         # read as "this copy is clean".
@@ -3879,6 +3877,14 @@ def task_check():
             "file_dep": [
                 str((REPO_ROOT / "dodo.py").resolve()),
                 str((REPO_ROOT / "build.py").resolve()),
+                # Pytest hooks/child startup sit outside the cad/scripts import
+                # map, so the executed closure cannot discover these inputs.
+                str((REPO_ROOT / "conftest.py").resolve()),
+                str((REPO_ROOT / "tests" / "_child_guard" / "sitecustomize.py").resolve()),
+                str(
+                    (REPO_ROOT / "tests" / "_child_guard" / "harmonic_solidworks_guard.py")
+                    .resolve()
+                ),
                 *recipe_test_deps,
                 *_CONFIG_YAMLS,
                 *sorted(
@@ -3891,6 +3897,16 @@ def task_check():
             # command line (WinError 206), failing the gate before pytest runs.
             "cmd": [
                 *pytest_cmd,
+                # Fixed explicit inventory: skip repeated parent-directory
+                # virtualenv-marker probes, not general discovery exclusions.
+                "--collect-in-virtualenv",
+                # Bound nested parallelism: doit already fans out other gates
+                # (eight tasks by default on the farm). Steal individual tests
+                # so the dominant recipe-test file does not serialize the tail.
+                "-n",
+                "8",
+                "--dist",
+                "worksteal",
                 *(
                     str(path.resolve().relative_to(REPO_ROOT.resolve()))
                     for path in recipe_tests
