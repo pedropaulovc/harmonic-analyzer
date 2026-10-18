@@ -677,6 +677,26 @@ oal_mm = { value = 104.72, measured = { status = "measured", by = "placeholder (
 # Basis: tools.drill-index-115.members."G".projection_mm."drill-chuck-r8": no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:402 (tools.drill-index-115.members."G".projection_mm."drill-chuck-r8") authored drill_index geometry baseline 84.2 mm, offset +0 mm = 84.2 mm. No extra reachable/cutting length is credited over the source setup.
 "drill-chuck-r8" = { value = 84.2, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers or steel rule, installed holder exit face to cutting tip" } }
 
+# Rocker route v3 (harmonic-analyzer #1595): the pilot for the strap's Ø6 E7 CL tooling hole,
+# leaving 0.235 on diameter for the 6.026 reamer. #1 = 0.2280 in (Machinery's Handbook 27th
+# ed. Table 4 p.1934 decimal equivalents of number drills) = 5.791 mm.
+[tools.drill-index-115.members."#1"]
+# Basis: tools.drill-index-115.members."#1".dia_mm: nominal 0.2280 in x 25.4 = 5.791 mm, offset -0.003 mm = 5.788 mm; typical HSS cutting-margin undersize under the authorized cutting-diameter manufacturing-tolerance exception; not a bore-fit or clearance pass claim.
+dia_mm = { value = 5.788, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
+# Basis: tools.drill-index-115.members."#1".shank_mm: nominal 5.791 mm, offset -0.003 mm = 5.788 mm; h8-style straight shank estimate (straight shank = drill size).
+shank_mm = { value = 5.788, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "digital calipers and steel rule, physical overall dimension" } }
+flutes = 2
+# Basis: tools.drill-index-115.members."#1".point_angle: conventional 118-degree jobber point; no catalogue angle claim.
+point_angle = { value = 118, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "optical comparator, included drill or centre point angle" } }
+# Basis: tools.drill-index-115.members."#1".flute_len_mm: jobber estimate between the 5.5 mm (57) and G (72.88) members, 60 mm; not a supplier citation.
+flute_len_mm = { value = 60.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "digital calipers, cutting length from point to flute or countersink boundary" } }
+# Basis: tools.drill-index-115.members."#1".oal_mm: jobber estimate, 95 mm; not a supplier citation.
+oal_mm = { value = 95.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "calipers" } }
+
+[tools.drill-index-115.members."#1".projection_mm]
+# Basis: tools.drill-index-115.members."#1".projection_mm."drill-chuck-r8": 95 OAL less about 20 of shank in the chuck = 75 mm; estimate, no extra reach credited.
+"drill-chuck-r8" = { value = 75.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "digital calipers or steel rule, installed holder exit face to cutting tip" } }
+
 [tools.drill-index-115.members."B"]
 # Basis: tools.drill-index-115.members."B".dia_mm: nominal declared 6.045 mm, offset -0.003 mm = 6.042 mm; typical HSS cutting-margin undersize under the authorized cutting-diameter manufacturing-tolerance exception. Source b757b5a76 cad/process/shop/inventory.toml:405 (tools.drill-index-115.members."B".dia_mm); not a bore-fit or clearance pass claim.
 dia_mm = { value = 6.042, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
@@ -2214,12 +2234,13 @@ lms-3066 = "over_under_14pc"
 lms-3067 = "64ths_29pc"
 
 # Example purchase: DIN 212 H7 chucking reamers for the 6.5 H7 pivot bores and the
-# rocker strap's Ø10.20 H7 hub hole (MHA-CH-013, ch_rocker_hub_fit).
+# rocker strap's Ø10.20 H7 hub hole (MHA-CH-013, ch_rocker_hub_fit), and a special-size
+# 6.026 reamer for the strap's Ø6 E7 CL tooling hole (rocker route v3, #1595).
 [tools.reamers-metric]
 kind = "reamers"
 material = "HSS"
-sizes_mm = [6.5, 10.2]
-note = "illustrative example item: 6.5 mm and 10.2 mm H7 HSS machine (chucking) reamers, DIN 212 proportions"
+sizes_mm = [6.026, 6.5, 10.2]
+note = "illustrative example item: 6.5 mm and 10.2 mm H7 HSS machine (chucking) reamers, DIN 212 proportions, and a 6.026 mm special-size reamer for a Ø6 E7 hole"
 
 [tools.reamers-metric.members."6.5mm"]
 # Basis: tools.reamers-metric.members."6.5mm".dia_mm: nominal named 6.5 mm, offset +0.006 mm = 6.506 mm; slight chucking-reamer oversize under the authorized cutting-diameter manufacturing-tolerance exception. Source b757b5a76 cad/process/shop/inventory.toml:616 (tools.reamers-metric.members."6.5mm".dia_mm); not a bore-fit or clearance pass claim.
@@ -2257,6 +2278,25 @@ oal_mm = { value = 133.0, measured = { status = "measured", by = "placeholder (r
 [tools.reamers-metric.members."10.2mm".projection_mm]
 # Basis: tools.reamers-metric.members."10.2mm".projection_mm."drill-chuck-r8": 133 OAL less about 35 of shank in the chuck = 98 mm; estimate, no extra reach credited.
 "drill-chuck-r8" = { value = 98.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "digital calipers or steel rule, installed holder exit face to cutting tip" } }
+
+# Rocker route v3 (harmonic-analyzer #1595): the strap's Ø6 E7 CL tooling hole (6.020-6.032,
+# owner ruling via coordinator 2026-10-17), piloted by the #1 drill (0.235 on diameter).
+[tools.reamers-metric.members."6.026mm"]
+# Basis: tools.reamers-metric.members."6.026mm".dia_mm: special size 6.026 mm, the middle of the ISO 286-2 Ø6 E7 band (+0.020/+0.032), offset +0 mm; ordered to size, not a bore-fit pass claim.
+dia_mm = { value = 6.026, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
+# Basis: tools.reamers-metric.members."6.026mm".shank_mm: DIN 212 straight shank under the cutting diameter, 5.6 mm nominal (as the 6.5 mm member's 6.3), offset -0.02 mm = 5.58 mm; h8-style shank estimate, not a maker tolerance assertion.
+shank_mm = { value = 5.58, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "micrometer on shank" } }
+flutes = 6
+# Basis: tools.reamers-metric.members."6.026mm".lead_mm: same 1 mm bevel lead as the 6.5 mm member; estimate, no shop metrology asserted.
+lead_mm = { value = 1, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "optical comparator, axial bevel length" } }
+# Basis: tools.reamers-metric.members."6.026mm".flute_len_mm: DIN 212 proportions near 6 mm, as the 6.5 mm member, 25.9 mm; estimate, not a supplier citation.
+flute_len_mm = { value = 25.9, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "digital calipers, cutting length from point to flute or countersink boundary" } }
+# Basis: tools.reamers-metric.members."6.026mm".oal_mm: DIN 212 proportions near 6 mm, as the 6.5 mm member, 92.85 mm; estimate, not a supplier citation.
+oal_mm = { value = 92.85, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "calipers" } }
+
+[tools.reamers-metric.members."6.026mm".projection_mm]
+# Basis: tools.reamers-metric.members."6.026mm".projection_mm."drill-chuck-r8": as the 6.5 mm member, 72 mm; estimate, no extra reach credited.
+"drill-chuck-r8" = { value = 72.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "digital calipers or steel rule, installed holder exit face to cutting tip" } }
 
 # --- cone-pivot-post additions ---
 # Example purchase: decimal-size HSS chucking reamers for the cone post's running bores
@@ -3525,7 +3565,7 @@ solids = [
   { name = "table slot 2 undercut", shape = "box", void = true, cuts = ["table"], at_mm = [-420.1, -12.5, -33.625], size_mm = [840.2, 25.0, 10.0], note = "PM-30MV manual p6 slot section", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centres on the table" } },
   { name = "table slot 3 neck", shape = "box", void = true, cuts = ["table"], at_mm = [-420.1, 56.5, -23.625], size_mm = [840.2, 14.0, 15.0], note = "PM-30MV manual p6 slot section", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centres on the table" } },
   { name = "table slot 3 undercut", shape = "box", void = true, cuts = ["table"], at_mm = [-420.1, 51.0, -33.625], size_mm = [840.2, 25.0, 10.0], note = "PM-30MV manual p6 slot section", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centres on the table" } },
-  { name = "plate", supply = "bought", shape = "box", at_mm = [-304.8, -76.2, -9.625], size_mm = [609.6, 152.4, 9.525], note = "MIC-6 3/8 x 6 x 24 in, drawn at catalogue thickness; the in-place skim thins it by the cleanup depth, recorded at commissioning", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "catalogue nominal; measure thickness with micrometers and the skimmed top with a DTI" } },
+  { name = "plate", supply = "bought", shape = "box", at_mm = [-304.8, -76.2, -9.625], size_mm = [609.6, 152.4, 9.525], material = "aluminium", note = "MIC-6 3/8 x 6 x 24 in, drawn at catalogue thickness; the in-place skim thins it by the cleanup depth, recorded at commissioning. Seat of the tape's area hold (hold.area on = \"plate\"); its flatness after the skim is unmeasured", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "catalogue nominal; measure thickness with micrometers and the skimmed top with a DTI" } },
   { name = "tape", supply = "bought", shape = "box", at_mm = [-175.0, -20.0, -0.1], size_mm = [350.0, 40.0, 0.1], locates = "work underside", bears = "face", note = "3M 444 strip cut to the work's outline (drawn: 350 x 40); 0.10 mm TDS nominal", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "TDS nominal; measure the strip with 0-25 mm micrometers on receipt" } },
   { name = "clamp +X strap", supply = "bought", shape = "box", at_mm = [279.4, -12.7, -0.1], size_mm = [76.2, 25.4, 12.7], note = "kit strap; overlaps the plate end by 25.4 mm, toe contact centred 12.7 mm in", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic catalogue-size estimate (kit member strap-pad); replace with caliper readings" } },
   { name = "clamp +X stud slot", shape = "box", void = true, cuts = ["clamp +X strap"], at_mm = [315.2, -6.75, -1.1], size_mm = [30.0, 13.5, 14.7], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic clearance-slot estimate; replace with caliper readings" } },
@@ -3543,9 +3583,23 @@ solids = [
   { name = "clamp -X heel block", supply = "bought", shape = "box", at_mm = [-355.6, -12.7, -9.625], size_mm = [12.7, 25.4, 9.525], note = "kit step block at the plate's 3/8 in height, under the strap's heel", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "generic step-block estimate; pick the step that levels the strap" } },
 ]
 
+# Typed for prechips 0.2.0's area hold (hold.area). 3M TDS 70-0709-3922-1 (9/08, Adhesive 300:
+# 444/444PC), read 2026-10-18 via https://www.mouser.com/datasheet/2/1/70070939221-35156.pdf.
+# The TDS has no shear strength: its ASTM D3654 row is a hold time (1000 g on 0.5 in2 lasted
+# 813 min at 22 C), so shear_n_per_cm2 stays unknown. Its peel is from a stainless panel only,
+# not 1018 on MIC-6, so the peel's pair stays unknown. It gives no release method.
 [consumables.tape-3m-444]
+kind = "adhesive_tape"
 name = "3M 444 double-coated PET film tape, 2 in x 36 yd, 0.10 mm"
 products = ["Uline S-10085, USD 103 per roll, 2-roll minimum (https://www.uline.com/Product/Detail/S-10085/3M-Double-Sided-Tape/3M-444-Double-Sided-Film-Tape-2-x-36-yds, read 2026-10-16); candidate purchase for fixtures.thin-part-tape-subplate, not owned"]
+width_mm = 50.8
+thickness_mm = { value = [0.090, 0.110], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "TDS calculated caliper 0.0039 in (0.10 mm) without liner, no tolerance published; +/-0.01 assumed. Mic a strip of the lot on hand with 0-25 mm micrometers" } }
+shear_n_per_cm2 = "unknown"
+peel_n_per_cm = { value = 3.5, test = "ASTM D3330 90 degree peel from stainless steel, 15 min dwell at room temperature; 3M typical value, not for specification", pairs = "unknown", cite = "3M TDS 70-0709-3922-1 (9/08), Adhesive 300 table: 444 adhesion to stainless steel, 15 minute RT, 32 oz/in (35 N/100 mm)" }
+dwell_min = { value = 15, cite = "3M TDS 70-0709-3922-1 (9/08): the 15 minute RT dwell of the peel value above (66 N/100 mm after 72 h RT)" }
+surface_prep = "Clean both bonding faces with isopropyl alcohol or heptane; they must be clean and dry (3M TDS)"
+apply = "Apply the strip at 21-38 C with firm pressure: roll the work down over its whole length (3M TDS: bond strength depends on the contact developed)"
+release = "unknown"
 
 # Rocker route-v3 purchased jig hardware. Candidate purchases only: no possession,
 # receipt metrology, preload certificate or physical fit acceptance is asserted.
@@ -4879,9 +4933,9 @@ note = 'Illustrative metric leaf radius gauge, including R7.0; compare the upper
 #   Mitutoyo 186-906, McMaster-Carr 2204A65, USD 228.36: 0.010-0.500 in, smallest 0.254 mm.
 #   Mitutoyo 186-110, Global Test Supply USD 48.53, 2-3 weeks: smallest leaf R0.4.
 #   Glarks R0.3-1.5 set, Amazon B0823B97NV, USD 15.95: smallest leaf R0.3, unbranded maker.
-# prechips 0.1.2 reads a radius band [0, 0.2] against range_mm and needs range_mm[0] <= 0.
-# No leaf reaches R0, so the [0.2, 1.0] leaf span below does not span that band even though
-# the R0.2 leaf decides it; the range is not stretched to 0 to make the check pass.
+# prechips 0.2.0 reads the [0, 0.2] band as an R0.2 MAX limit check (#302). The maker's
+# +/-0.01 leaf accuracy is declared below: it means the R0.2 leaf may be R0.21, so the check
+# needs a leaf at or under R0.19, which this set does not have. It is not omitted to pass.
 [gauges.radius-gauge-small]
 name = "small radius gauge: Fuji Tool 272HRMAA, R0.2-R1.0 by 0.1 mm, 9 leaves"
 kind = "radius_gauge"
@@ -4895,6 +4949,8 @@ purchase = "1 x Fuji Tool 272HRMAA (maker code 01-445) Grade A radius gauge, R0.
 range_mm = [0.2, 1.0]
 # Basis: gauges.radius-gauge-small.resolution_mm: catalogue increment 0.1 mm between adjacent leaves, offset +0 mm = 0.1 mm. This is the comparison increment, not a display step; the maker's leaf accuracy is +/-0.01 mm for 0.2R-1.0R, not a calibration certificate.
 resolution_mm = { value = 0.1, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "leaf size markings, smallest increment between adjacent leaves" } }
+# Basis: gauges.radius-gauge-small.leaf_tolerance_mm: maker's leaf accuracy +/-0.01 mm for 0.2R-1.0R (Fuji Tool Grade A, read live 2026-10-17), offset +0 mm = 0.01 mm. A catalogue accuracy, not a calibration certificate.
+leaf_tolerance_mm = { value = 0.01, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-18", instrument = "maker's catalogue leaf accuracy; check the R0.2 leaf on an optical comparator on receipt" } }
 note = "Vendor data. Fuji Tool Grade A radius gauges, read live 2026-10-17 on the maker's English and Japanese pages and the ZenPlus/edenki listing: 272HRMAA is 9 leaves, R0.2 to R1.0 by 0.1 mm, carbon tool steel (SK) hardened to HRC 50 +/-2, leaf accuracy +/-0.01 mm for 0.2R-1.0R. The 272 type is the corner-groove gauge: each leaf carries one R for internal inspection (a fillet in a corner) and one for external inspection (a rounded edge), stored by size at both ends of the case. Selection (agent recommendation 2026-10-17, not an owner ruling): the hardened Grade A set over the SPCC 272MAA, because its R0.2 leaf is held to +/-0.01 mm and its tip resists denting. Use: check that the pressed hub-to-strap corner is at most R0.2, any fillet or burr in it included. Wipe the corner clean, set the R0.2 leaf's internal-inspection R into the corner in a plane through the hub axis and sight it against a backlight. Both straight flanks seat on the hub wall and the strap face with no light: the corner is no larger than the leaf's own radius. The leaf rides on the corner with light along a flank: the corner exceeds the leaf's actual radius; reject only if that radius is known to be 0.200 mm or more, otherwise the result is inconclusive and needs another qualified method. The R0.3 leaf brackets the limit from above. The set has no leaf under R0.2, so a sharp corner reads only as at most the leaf's radius. Decision rule: the maker holds the leaf to R0.2 +/-0.01 mm, so a seat alone proves only R0.21 or less against the R0.2 MAX limit. Before this gauge accepts the limit, establish the R0.2 leaf's actual tip radius (maker inspection data, or a comparator or measuring-microscope reading) and accept on a seat only if it is 0.200 mm or less; with a larger leaf a seat is inconclusive and the corner needs another qualified method. Receipt: checking the leaf markings and that the R0.2 and R0.3 tips are undamaged under a 10x loupe establishes identity and condition only, not leaf size; no calibration certificate is claimed."
 cite = [
   "Fuji Tool Radius Gauges Grade A https://www.fujitool.co.jp/eng/products/measuring_tools/000085.html read live 2026-10-17: 272HRMAA (code 01-445) 9 leaves 0.2-1.0 mm; carbon tool steel HRC50 +/-2; accuracy 0.2R-1.0R +/-0.01 mm, 1.25R-15.0R +/-0.02 mm",
@@ -5393,6 +5449,16 @@ pieces = 2.0
 name = "cigarette rolling paper, 1-1/4 size, for paper touch-offs"
 # Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10"; the consumable schema holds no numbers.
 products = ["Zig-Zag 1-1/4 rolling papers, any shop (https://zigzag.com/blogs/learn/your-complete-guide-to-rolling-paper-sizes-2022)"]
+
+# Rocker strap layout (owner ruling 2026-10-17): a 1:1 print of the strap outline, glued
+# to the faced blank with the adhesive below, its scale checked on a printed 300 mm bar
+# with gauges.calipers-18in; the bandsaw roughs to its line +1 (route v3 T2). The print
+# itself has no record yet: it is part-specific, a plain consumable cannot carry
+# shop_made (test_process_shop's part guard), and prechips has no printed-pattern
+# layout to read one (prechips #344).
+[consumables.spray-adhesive-3m-super-77]
+name = "3M Super 77 multipurpose spray adhesive"
+products = ["3M Super 77 Multipurpose Spray Adhesive aerosol: synthetic elastomer, spray, bonds paper to metal (https://www.3m.com/3M/en_US/p/d/b40071862/ and https://cameo.mfa.org/wiki/3M_Super_77_Multipurpose_Spray_Adhesive, search summaries 2026-10-18; the pages did not load live); owner ruling 2026-10-17: glue the outline print to the blank"]
 
 # Polishes filed edges and lifts burrs and rust; strips cut to length.
 [consumables.abrasive-cloth-norton-k225]

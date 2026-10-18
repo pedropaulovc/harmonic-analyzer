@@ -7,19 +7,22 @@
 # lineage is what the post-press setups cut, so both branches live here as
 # [[stock.components]] joined at J1.
 #
-# Route (user ruling 2026-10-16, local brief rocker-trammel-plan.md):
+# Route (user ruling 2026-10-16, local brief rocker-trammel-plan.md), prechips 0.2.0:
 #   H1  lathe: face, turn the Ø10.2 r6 land, drill the supply bore, part off oversize
-#       (the parted-off end_face has no stock state yet: prechips #292)
-#   S0  mill: face the strap both sides 3 -> 2.5 on the taped sub-plate (S0A, S0B; user
-#       ruling 2026-10-17, shop record PR #1594)          check errors: prechips #294, #295
-#   T1  mill vise: spot, drill, ream the Ø10.2 H7 hub hole
-#       (headroom errors on the 290 mm vise base vs 222.25 mm Y travel: prechips #297)
-#       CL/CR tooling holes in the end waste                        BLOCKED: prechips #293
-#   T2  4x6 bandsaw: rough R800/R816 to the scribed line +1        BLOCKED: prechips >0.1.2 (#249, merged #286)
-#   T3  oblique trammel jig TL-000: R800 then R816                  BLOCKED: prechips #255/#269 (PRs #258/#267/#278)
-#   T4  bandsaw: saw the end waste off                              BLOCKED: follows T3
+#       (the parted-off end_face is a stock face since prechips #292)
+#   S0  mill: face the strap both sides 3 -> 2.5 on the sub-plate, a typed tape area hold
+#       (S0A, S0B; user ruling 2026-10-17, shop record PR #1594)
+#   T1  mill vise: spot, drill, ream the Ø10.2 H7 hub hole; the CL (Ø6 E7, reamed) and CR
+#       (Ø6.6 drilled) tooling holes in the end waste (prechips #293; owner ruling 2026-10-17)
+#       (headroom on the 290 mm vise base vs 222.25 mm Y travel: prechips #297)
+#   T2  bench: glue a 1:1 print of the strap outline (consumables spray-adhesive-3m-super-77;
+#       owner ruling 2026-10-17); 4x6 bandsaw, vertical, 24 TPI: rough R800/R816 to the
+#       printed line +1                                           BLOCKED: prechips #344
+#   T3  oblique trammel jig TL-000: R800 then R816                  BLOCKED: prechips #278
+#       (guided_sweep has no trammel guide; its headroom/travel stay debt: prechips #272)
+#   T4  bandsaw: saw the end waste off (keep = the part)            BLOCKED: follows T3
 #   T5  mill vise: both angled tip lands                            BLOCKED: follows T4
-#   J1  bench vise: press the hub in
+#   J1  bench vise: press the hub in (the press forms the hub root, joint forms)
 #   P1  mill: indicate the hub OD, ream Ø6.5, face hub side A, spot and drill the #47
 #   P2  mill: flip, face hub side B to length
 #   V1/V2 mill vise swivelled 40.89 deg, set on pins in A/C: side-mill each taper   BLOCKED: prechips #300
@@ -159,6 +162,30 @@ axis = [0.0, 0.0, 1.0]
 note = "the hub supply's bottom end, parted off at H1; 0.6718 over the finished hub face"
 cite = ["harmonic-analyzer/cad/scripts/ch_rocker_hub_spec.py:SUPPLY_LENGTH_MIN, FACE_STOCK"]
 
+# The strap's two tooling holes in its end waste, drilled at T1 (route step: the oblique
+# trammel jig's carrier locates the strap on the CL dowel and clamps it with the CR screw)
+# and sawn off with the waste. Centres: ch_rocker_arm_tl_oblique_trammel_spec.CL_FROM_HUB /
+# CR_FROM_HUB (∓160.8945, ∓16.1761 in the jig frame, where the arm hangs below the hub),
+# here about the hub axis at model X0 Y8 with the arm above it: Y = 8 + 16.1761.
+# Sizes: owner ruling via coordinator 2026-10-17.
+[process_features.cl_tooling_hole]
+kind = "tooling_hole"
+at = [-160.8945, 24.1761, 1.25]
+axis = [0.0, 0.0, -1.0]
+dia = [6.020, 6.032]
+thru = true
+note = "CL: Ø6 E7, reamed, in the -X end waste; locates on the trammel carrier's m6 CL dowel (6.004-6.012) with 0.008-0.028 clearance; sawn off with the waste"
+cite = ["owner ruling via coordinator 2026-10-17: Ø6 E7 for 0.008-0.028 clearance on the m6 CL dowel (not F7, which can interfere by 0.002)", "ISO 286-2 E7 over 3 up to 6: +0.020/+0.032", "harmonic-analyzer cad/scripts/ch_rocker_arm_tl_oblique_cl_dowel_spec.py:DIA_BAND (m6, +0.012/+0.004 on 6; rocker trammel-jig PR stack #1578-#1593)", "harmonic-analyzer cad/scripts/ch_rocker_arm_tl_oblique_trammel_spec.py:CL_FROM_HUB"]
+
+[process_features.cr_tooling_hole]
+kind = "tooling_hole"
+at = [160.8945, 24.1761, 1.25]
+axis = [0.0, 0.0, -1.0]
+dia = [6.6, 6.7]
+thru = true
+note = "CR: Ø6.6 drilled clearance for the 1/4-20 clamp screw, in the +X end waste, the same size as the riser's CL/CR holes; sawn off with the waste"
+cite = ["owner ruling via coordinator 2026-10-17: Ø6.6 clearance for the 1/4-20 CR clamp screw, the same as the riser", "harmonic-analyzer cad/scripts/ch_rocker_arm_tl_oblique_riser_spec.py:CLAMP_DIA (6.6; rocker trammel-jig PR stack #1578-#1593)", "harmonic-analyzer cad/scripts/_printed_tolerance.py:drilled_oversize_mm (title block DRILLED HOLES +0.1/-0)", "harmonic-analyzer cad/scripts/ch_rocker_arm_tl_oblique_trammel_spec.py:CR_FROM_HUB"]
+
 # The press joint (ch_rocker_hub_fit): strap hole H7, hub land r6 on the 10.20 nominal
 # (user ruling 2026-10-17: H7/r6, 0.005-0.034 diametral interference). ISO 286-2 over 10
 # up to 18: H7 0/+0.018, r6 +0.023/+0.034.
@@ -173,6 +200,7 @@ depth = 2.5
 thru = true
 requirements = ["dia"]
 precision = { dia = 3 }
+edge_break = { kind = "sharp" }   # T1 leaves both mouths sharp: a break would leave a groove round the hub root
 note = "MHA-CH-013's Ø10.20 H7 hub hole, through the faced 2.5 strap"
 cite = ["harmonic-analyzer/cad/scripts/ch_rocker_hub_fit.py:STRAP_HOLE_BAND", "harmonic-analyzer/cad/scripts/ch_rocker_strap_spec.py:HOLE_DIA"]
 
@@ -322,7 +350,7 @@ bottom_z = 0.0
 [setups.hold]
 fixture = "thin-part-tape-subplate"
 pose = { origin_mm = [0.0, 6.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-method = "tape"
+area = { ref = "tape-3m-444", on = "plate" }
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
@@ -387,7 +415,7 @@ bottom_z = 0.0
 [setups.hold]
 fixture = "thin-part-tape-subplate"
 pose = { origin_mm = [0.0, -6.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-method = "tape"
+area = { ref = "tape-3m-444", on = "plate" }
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
@@ -438,14 +466,15 @@ thickness = "micrometers/0-1in"
 
 # ---------------------------------------------------------------------------------------
 # T1: mill vise, datum B up on parallels, the jaws on the two long edges. Spot, drill and
-# ream the Ø10.2 H7 hub hole.
+# ream the Ø10.2 H7 hub hole; spot, drill and ream the CL tooling hole and spot and drill
+# the CR tooling hole in the end waste, which overhangs the jaws.
 [[setups]]
 id = "T1"
 machine = "PM-30MV"
 frame = "SU"
 coolant = "cutting oil, brushed on"
 deburr_mm = 0.0
-deburr_cite = ["AUTHOR'S CHOICE: the hub hole's two entry edges stay sharp, burrs removed with no break, so the pressed hub root is a corner (R0.2 MAX), not a groove (prechips#301)"]
+deburr_cite = ["AUTHOR'S CHOICE: the hub hole's two entry edges stay sharp, burrs removed with no break, so the pressed hub root is a corner (R0.2 MAX), not a groove; joint_features.strap_hole states the sharp mouths that J1's forms = [\"hub_root\"] reads"]
 stock_in = "S0B"
 
 [setups.stock_state]
@@ -455,9 +484,13 @@ bottom_z = 0.0
 
 [setups.stock_state.entry_z]
 strap_hole = 2.5
+cl_tooling_hole = 2.5
+cr_tooling_hole = 2.5
 
 [setups.stock_state.local_thickness]
 strap_hole = 2.5
+cl_tooling_hole = 2.5
+cr_tooling_hole = 2.5
 
 [setups.hold]
 fixture = "vise-pm-6"
@@ -533,6 +566,51 @@ note = "Leave both edges of the reamed hole sharp: remove the drill and reamer b
 [setups.ops.checks]
 dia = "bore-gauge-small"
 
+[[setups.ops]]
+op = 40
+do = "spot"
+feature = "cl_tooling_hole"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 1.5
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 50
+do = "spot"
+feature = "cr_tooling_hole"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 1.5
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 60
+do = "drill"
+feature = "cl_tooling_hole"
+tool = "drill-index-115/#1"
+holder = "drill-chuck-r8"
+exit_mm = 1.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 70
+do = "ream"
+feature = "cl_tooling_hole"
+tool = "reamers-metric/6.026mm"
+holder = "drill-chuck-r8"
+exit_mm = 1.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 80
+do = "drill"
+feature = "cr_tooling_hole"
+tool = "drill-index-115/G"
+holder = "drill-chuck-r8"
+exit_mm = 1.0
+approach_mm = 3.0
+
 # ---------------------------------------------------------------------------------------
 # J1: fitting bench, bench vise. Press the hub into the strap hole, centred in the strap.
 [[setups]]
@@ -557,6 +635,10 @@ interference_mm = [0.005, 0.034]   # H7/r6, user ruling 2026-10-17
 method = "press"
 process = "AUTHOR'S CHOICE: press in the bench vise between soft jaws, the hub centred in the strap thickness"
 cite = ["harmonic-analyzer/cad/scripts/ch_rocker_hub_fit.py:PRESS_INTERFERENCE (user rulings 2026-10-16: press fit in the vise; 2026-10-17: H7/r6)"]
+# prechips 0.2.0 refuses this join: the S0A/S0B facings keep the root fillet's ring outside
+# the hub-land column as finished material, so the strap arrives carrying the hub_root
+# faces; the same ring is the S0B and T1 bottom_z and tape/plate findings (prechips #334).
+forms = ["hub_root"]   # 2X R0.2 MAX: the press leaves the root a sharp corner, which the band admits
 
 [setups.hold]
 fixture = "bench-vise-4in"
@@ -567,7 +649,11 @@ fixed_jaw = "not_applicable"
 jaws_along = "not_applicable"
 parallels = "not_applicable"
 jaw_above_parallels_mm = "not_applicable"
-pose = { origin_mm = [0.0, 0.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+# The vise's jaws close along its local X: turn it so they close along the hub axis
+# (model Z) on the two hub ends, its top (local Z) toward +Y, the hub centre 6.5 below the
+# jaw tops. The strap stands up between the open jaws, its 14 mm side below the hub
+# (strap edge BM Y-14, clear of the body under the jaws at Y-18.5).
+pose = { origin_mm = [0.0, 6.5, 0.0], x = [0.0, 0.0, 1.0], z = [0.0, 1.0, 0.0] }
 stop = "AUTHOR'S CHOICE: a 2.95 spacer under the strap sets the hub's stand-out equal both sides"
 clamp = "none"
 
