@@ -395,11 +395,12 @@ FACING_NOTE_HEIGHT = 0.0035
 # sheet about (291.5, 160.8) mm on the r1 render), its frame's top-left where
 # the r2 note's text stood, in the open window between the rail (outer edge
 # 296) and the 194.5 REAR KEEPER Z line, over that dimension's text (top
-# 165).  The row under the frame names the seats it covers and the part they
-# align: 39 characters at the frame's 2.6 mm reach 404, inside the border
-# (machinist review r3: a 0.04 flatness is a control with its function, not
-# note text).
-KEEPER_FLATNESS_QUALIFIER = "BOTH MHA-CH-007 SEATS, ALIGN MHA-CH-004"
+# 165).  The row under the frame names the seats it covers and what their
+# flatness buys: 24 characters at the row's measured 2.63 mm (r4: 39 ran
+# 302 -> 404.5) end at 365, 7 mm short of the 194.5's line at x 372, which
+# r4's longer row ran through (machinist review r3: a 0.04 flatness is a
+# control with its function, not note text; r4: no text struck by a line).
+KEEPER_FLATNESS_QUALIFIER = "MHA-CH-007 SEATS IN LINE"
 KEEPER_FLATNESS_FRAME_XY = (0.302, 0.185)
 KEEPER_FLATNESS_TIP_Z = (KEEPER_TAP_Z_FRONT + KEEPER_TAP_Z_REAR) / 2.0
 # Native SolidWorks centres the four-row RD4 block on its callout point and
@@ -636,7 +637,12 @@ HANGER_GRIP_TEXT_XY = _hanger_section_xy(
 )
 HANGER_GRIP_OFFSET_XY = (0.058, 0.076)
 PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H + 8.0)
-PIN_STATION_OFFSET_XY = (0.157, 0.106)
+# Its third row names the mate the three-place station matches, the
+# MHA-SM-002 knife mount's own dowel hole (both read
+# vn_knife_mount_dowel_spec.HANGER_OFFSET; machinist review r4), so the
+# block, centred on its point, stands 5.5 mm (one row) higher than r4's.
+PIN_STATION_OFFSET_XY = (0.157, 0.1115)
+PIN_STATION_CALLOUT = "2X ROUND HOLE FROM\nSCREW AXIS, SAME Z;\nMATCHES MHA-SM-002"
 SLOT_STATION_TEXT_XY = _hanger_section_xy((SLOT_X + PIN_HOLE_X) / 2.0, HALF_H + 14.0)
 SLOT_STATION_OFFSET_XY = (0.104, 0.1115)
 SLOT_LENGTH_TEXT_XY = _hanger_section_xy(SLOT_X, -HALF_H - 12.0)
@@ -1762,10 +1768,13 @@ def _pin_vertical_dimension_line(
 
     A circle-centre vertical dimension on the underside locator landed its
     whole line 24 mm left of its requested text point -- off the sheet frame
-    -- with and without an offset jog, and nothing read it back (machinist
-    review r2 and r3, farm runs 20261018T061230033Z and 20261018T065727559Z).
-    Read the drawn line, move the text by the miss, and prove every line of
-    the dimension inside the zone frame.
+    -- with and without an offset jog (machinist review r2-r4, farm runs
+    20261018T061230033Z, 20261018T065727559Z, 20261018T075108244Z).  Read
+    at placement it still stood where asked (r4: x 0.02467 of 0.02467): the
+    shift lands in a later rebuild, so this runs as a settled check, after
+    ``finalize_drawing``'s settling rebuild.  Read the drawn line, move the
+    text by the miss (each move rebuilds), and prove every line of the
+    dimension inside the zone frame.
     """
     annotation = _early_bound(
         _early_bound(display, "IDisplayDimension").GetAnnotation(), "IAnnotation"
@@ -2137,7 +2146,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         expected_mm=HANGER_PIN_X, orientation="horizontal",
         entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
         entities=(axes[0], axes[1]),
-        suffix="2X ROUND HOLE FROM\nSCREW AXIS, SAME Z",
+        suffix=PIN_STATION_CALLOUT,
         offset_text=PIN_STATION_OFFSET_XY,
     )
     # The slot's location along the slot: a BASIC 15.264 from the round
@@ -3843,10 +3852,15 @@ async def build(adapter: Any) -> dict[str, str]:
             ).edge,
         ),
     )
-    _pin_vertical_dimension_line(
-        adapter, pocket_from_socket, POCKET_FROM_SOCKET_LINE_XY[0],
-        label="crossbar pocket from front socket",
-    )
+
+    def _pocket_from_socket_settled() -> None:
+        if not ddoc.ActivateSheet("UNDERSIDE"):
+            raise RuntimeError("failed to activate the underside sheet to settle 43.0")
+        _pin_vertical_dimension_line(
+            adapter, pocket_from_socket, POCKET_FROM_SOCKET_LINE_XY[0],
+            label="crossbar pocket from front socket",
+        )
+
     _checked_dimension(
         adapter, hub_bottom_parent,
         p0=pocket_front_end,
@@ -3979,6 +3993,9 @@ async def build(adapter: Any) -> dict[str, str]:
         # proved per view by ``_auto_tapped_hole_notes`` above.
         redundant_note_substrings=(),
         expected_redundant_notes=0,
+        # The 43.0 shifts in a rebuild after its placement readback, so it is
+        # held on its line after the settling rebuild (machinist review r4).
+        settled_checks=(_pocket_from_socket_settled,),
     )
 
 

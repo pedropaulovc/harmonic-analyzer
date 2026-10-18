@@ -4139,9 +4139,19 @@ def test_slot_station_is_a_basic_xxx_from_its_round_hole() -> None:
     assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(
         spec.HANGER_PIN_X_TOL + spec.HANGER_SLOT_ALONG_TOL
     )
-    # The 7.100 names the round holes it locates and their transverse
-    # station: the screw axis's own Z.
-    assert 'suffix="2X ROUND HOLE FROM\\nSCREW AXIS, SAME Z"' in source
+    # The 7.632 names the round holes it locates, their transverse station
+    # (the screw axis's own Z) and, as a three-place size, the mate it
+    # matches: MHA-SM-002's dowel hole at the same dowel-spec offset
+    # (machinist review r4).
+    assert "suffix=PIN_STATION_CALLOUT," in source
+    assert drawing.PIN_STATION_CALLOUT.splitlines() == [
+        "2X ROUND HOLE FROM",
+        "SCREW AXIS, SAME Z;",
+        "MATCHES MHA-SM-002",
+    ]
+    import sm_knife_mount_spec as knife_mount
+
+    assert spec.HANGER_PIN_X == knife_mount.PIN_HOLE_X
 
 
 def test_boss_and_socket_diameters_take_one_near_side_arrow() -> None:
@@ -4714,13 +4724,16 @@ def test_crossbar_pocket_depth_stands_between_the_side_rail_and_the_t() -> None:
     assert drawing.BAR_POCKET_FROM_SOCKET == pytest.approx(
         abs(part.FRONT_COLUMN_Z) - part.BAR_POCKET_Z
     ) == pytest.approx(43.0)
-    # Machinist review r3: the 43.0 drew 24 mm left of its text point, off the
-    # sheet frame; the build reads its line back onto the 138.0's x and proves
-    # it inside the zone frame.
+    # Machinist review r3/r4: the 43.0 drew 24 mm left of its text point, off
+    # the sheet frame, after a rebuild later than its placement readback; a
+    # settled check reads its line back onto the 138.0's x after the
+    # finalizer's settling rebuild and proves it inside the zone frame.
     assert (
         "_pin_vertical_dimension_line(\n"
-        "        adapter, pocket_from_socket, POCKET_FROM_SOCKET_LINE_XY[0],"
+        "            adapter, pocket_from_socket, POCKET_FROM_SOCKET_LINE_XY[0],"
     ) in source
+    assert source.count("_pin_vertical_dimension_line(") == 2  # def + the one call
+    assert "settled_checks=(_pocket_from_socket_settled,)," in source
     assert drawing.POCKET_FROM_SOCKET_LINE_XY[0] == drawing.POCKET_LENGTH_TEXT_XY[0]
     assert drawing.SHEET_FRAME[0] < drawing.POCKET_FROM_SOCKET_LINE_XY[0]
     assert 'label="crossbar pocket depth"' in source
@@ -4779,7 +4792,7 @@ def test_keeper_facing_note_is_the_part_property_carrying_the_keeper_budget() ->
         "WHOLE TOP EXCEPT 4 BOSSES:",
         "Ra 3.2 UM.",
     ]
-    assert drawing.KEEPER_FLATNESS_QUALIFIER == "BOTH MHA-CH-007 SEATS, ALIGN MHA-CH-004"
+    assert drawing.KEEPER_FLATNESS_QUALIFIER == "MHA-CH-007 SEATS IN LINE"
     assert not hasattr(drawing, "KEEPER_FLATNESS_NOTE")
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     (notes,) = [
