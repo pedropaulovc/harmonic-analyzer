@@ -185,10 +185,15 @@ if not DATUM_B_TAG_XY[1] < _front_y(0.0):
 # Ø12.281 leader, which leaves the lower-right rim for its text right of the
 # view, no longer runs through the tag (r5 machinist review: at (0.250,
 # 0.128) the tag printed at the lower-right rim, its frame on that leader).
+# The tag's position is its leader's knee; its frame prints ~6.5..13.5 mm
+# left of that, so the knee stands near the bore's vertical centreline to
+# keep the frame on the post's face: from x=0.226 the frame straddled the
+# body's left edge (r6 sheet).
 # The bore's Ra stands on the post's face up-left of the bore, left of the
-# vertical centreline, its leader on the upper-left rim and off the tag.
-DATUM_A_TAG_XY = (0.226, 0.128)
-JOURNAL_BORE_FINISH_XY = (0.219, 0.162)
+# vertical centreline, its leader on the upper-left rim and off the tag; at
+# x=0.219 the symbol's V touched the body's left edge (r6 sheet).
+DATUM_A_TAG_XY = (0.2335, 0.128)
+JOURNAL_BORE_FINISH_XY = (0.221, 0.162)
 
 FOOT_SEAT = requirement(
     "foot_seat", kind="face", faces=(cone.SURFACE_FINISHES[0].face,),
@@ -287,17 +292,19 @@ FRONT_KEEP = {
     # af13), and at y=0.1475 its text sat 0.44 mm under View B's labelled
     # 38.10 (r3 view-crowding).
     "HeadHt": (0.166, 0.1440),
-    "CrankBossDia": (0.132, 0.120),
+    # Near-side leader (r5): its horizontal text centres on the given x; from
+    # x=0.132 the head's right edge ran through CRANK BOSS's C (r6 sheet).
+    "CrankBossDia": (0.1355, 0.120),
     # Held one text height (13.6 mm) left of View B's labelled 38.10: with
     # "THRU, RUNS ON ..." below the size the box ran x 117.7..180.7 mm, 1.42 mm
     # from the 38.10 box at x 173.1 (r4 view-crowding).  THRU rides the size line
-    # (DIMENSION_SUFFIXES), so the widest line is the ~47 mm mate; centred
-    # at x=0.1356 it ends ~14 mm short of the 38.10 and its size line starts
-    # 2 mm right of the 13° arrow (at x=0.134 that arrow stood 0.93 mm off it,
-    # r5 layout audit), and at y=0.169 the size line passes under the 13° arc
-    # where it meets the plan's lower edge and the mate's shoulder stays over
-    # the head's top extension line.
-    "CrankBoreDia": (0.1356, 0.169),
+    # (DIMENSION_SUFFIXES), so the widest line is the 49 mm mate; centred at
+    # x=0.1344 it ends 14.1 mm short of the 38.10 (at 0.1356, 12.94 mm: r6
+    # view-crowding), the 13° arrow's tip ~1 mm off its size line's left end
+    # (r5 layout audit, advisory), and at y=0.169 the size line passes under
+    # the 13° arc where it meets the plan's lower edge and the mate's shoulder
+    # stays over the head's top extension line.
+    "CrankBoreDia": (0.1344, 0.169),
 }
 
 BODY = requirement(
@@ -1685,7 +1692,10 @@ async def build(adapter: Any) -> dict[str, str]:
             center_y_mm=BLOCK_HEIGHT,
             center_x_mm=ATTACHMENT_X,
         ),
-        callout_xy=(0.160, 0.250),
+        # Its three rows (DRILL on its own) run 61 mm wide; at x=0.160 they
+        # stood 10 mm from the section's thrust-face station, under one text
+        # height (r6 view-crowding).
+        callout_xy=(0.155, 0.250),
         label="mounting counterbores",
     )
     _set_mount_hole_process(mount_callout)
