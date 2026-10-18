@@ -146,6 +146,9 @@ if not (
 # draw_pivot_shaft's identical O.D. flank; the Ra text renders above the arm.
 FINISH_EDGE = (SHAFT_LEFT_X + 0.038, SHAFT_FLANK_Y)
 FINISH_SYMBOL = (FINISH_EDGE[0], 0.206)
+# Note text height, as on draw_ch_pivot_shaft's identical O.D. symbol: at the
+# template default the Ra text printed ~8 mm tall over the bar (r2 render).
+FINISH_CHAR_HEIGHT = 0.0025
 
 
 def _rotate_view(adapter: Any, view: Any, angle: float, *, label: str) -> None:
@@ -357,6 +360,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bearing"),
         label="arbor bearing finish",
+        char_height=FINISH_CHAR_HEIGHT,
     )
 
     # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
