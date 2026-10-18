@@ -5,8 +5,9 @@ Only geometrically identified BUILD/REV *values* in the template's lower-right
 The 144 dpi comparison tolerates eight grayscale levels, not missing pixels:
 there is no spatial dilation, minimum changed area, or component filtering.
 Consequently even small dimension/geometry edits survive; regenerated jagged
-SolidWorks break lines can also appear as changes. This is intentionally a
-visual comparison, not a semantic CAD equivalence test.
+SolidWorks break lines can also appear as changes. Embedded image placement,
+resolution, and shading changes are compared without extra smoothing. This is
+intentionally a visual comparison, not a semantic CAD equivalence test.
 
 Run from the repository root, without SolidWorks::
 
@@ -184,14 +185,16 @@ def _stamp_text(
                 left, top, right, bottom = glyph.box
                 boxes.append((left - 1, top - 1, right + 1, bottom + 1))
 
-    # Preserve textual changes even if a very small glyph falls entirely within
-    # the intensity tolerance. Sorting ignores paint/text-object ordering only;
-    # it does not normalize version-looking text elsewhere on the drawing.
+    # A visible-character multiset is invariant to text-object splitting and
+    # paint order. Its only purpose is protecting tiny textual edits from the
+    # intensity tolerance; placement and ordering changes remain raster-detected.
+    # Version-looking text elsewhere is not normalized.
     text = tuple(
         sorted(
-            value
+            glyph.char
             for glyphs in runs.values()
-            if (value := "".join(g.char for g in glyphs if id(g) not in ignored).strip())
+            for glyph in glyphs
+            if id(glyph) not in ignored and not glyph.char.isspace()
         )
     )
     return boxes, text
@@ -344,8 +347,9 @@ def _index(summary: dict[str, Any]) -> bytes:
         f"{counts['removed']} removed, {counts['unchanged']} unchanged (omitted).</p>"
         "<p>Only title-block BUILD/REV values and minor intensity antialiasing "
         "are ignored. Small geometric/text edits are retained. Regenerated jagged "
-        "break lines may appear as changes. Pages align at their top-left, without "
-        "rescaling. Added/removed blank pages still have an image.</p>"
+        "break lines may appear as changes. Embedded image placement, resolution, "
+        "and shading changes are retained without extra smoothing. Pages align at "
+        "their top-left, without rescaling. Added/removed blank pages still have an image.</p>"
         '<p><a href="summary.json">Machine-readable summary</a></p>'
         f"{content}</html>"
     ).encode("utf-8")

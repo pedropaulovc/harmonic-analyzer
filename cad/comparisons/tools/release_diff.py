@@ -211,7 +211,13 @@ def extract(url, entry, dest):
         raise ValueError(f"release ZIP member identity mismatch: {entry['name']!r}")
     off = entry["lho"] + 30 + n + m
     raw = _get(url, off, off + entry["comp"] - 1) if entry["comp"] else b""
-    data = raw if method == 0 else zlib.decompress(raw, -15)
+    if method == 0:
+        data = raw
+    else:
+        inflater = zlib.decompressobj(-15)
+        data = inflater.decompress(raw, entry["uncomp"] + 1)
+        if not inflater.eof or inflater.unconsumed_tail or inflater.unused_data:
+            raise ValueError(f"release ZIP member has invalid/oversized deflate data: {entry['name']!r}")
     if len(data) != entry["uncomp"] or zlib.crc32(data) & 0xFFFFFFFF != entry["crc"]:
         raise ValueError(f"release ZIP member size/CRC mismatch: {entry['name']!r}")
     dest.parent.mkdir(parents=True, exist_ok=True)

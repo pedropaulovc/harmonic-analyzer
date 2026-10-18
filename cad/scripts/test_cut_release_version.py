@@ -1079,13 +1079,14 @@ def test_missing_drawing_asset_blocks_tag_and_publish(
 def test_dry_run_reports_drawing_zip_and_color_legend(
     prepared_readme_release: tuple[Path, Path, Path],
     capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     root, _images, _revision = prepared_readme_release
     zip_path, facts = cut_release.bundle("v22")
     cut_release.report_no_publish("v22", zip_path, facts)
     output = capsys.readouterr().out
     asset = root.with_name("harmonic-analyzer-v22-drawing-diff.zip")
-    assert f"asset: {asset}" in output
+    assert f"asset: {asset}" in caplog.text
     assert "/releases/download/v22/harmonic-analyzer-v22-drawing-diff.zip" in output
     assert "Red = old-only / removed ink" in output
     assert "blue = new-only / added ink" in output
@@ -1093,3 +1094,36 @@ def test_dry_run_reports_drawing_zip_and_color_legend(
     assert "BUILD and REV" in output
     assert "provenance-only changes and antialiasing noise are skipped" in output
     assert "index.html" in output and "summary.json" in output
+
+
+def test_published_logs_snapshot_includes_tag_and_push(
+    prepared_readme_release: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, _images, _revision = prepared_readme_release
+    zip_path, facts = cut_release.bundle("v22")
+    logs = root.parent / "task-logs"
+    logs.mkdir()
+    (logs / "task.log").write_text("task complete\n", encoding="utf-8")
+    release_log = root.parent / "release.log"
+    release_log.write_text("staging complete\n", encoding="utf-8")
+    monkeypatch.setattr(cut_release, "LOGS_DIR", logs)
+
+    def git(*args: str, **_kwargs: object) -> str:
+        if args[0] in ("tag", "push"):
+            with release_log.open("a", encoding="utf-8") as target:
+                target.write(f"{args[0]} complete\n")
+        return ""
+
+    def gh(*args: str) -> str:
+        asset = root.parent / "harmonic-analyzer-v22-logs.zip"
+        assert str(asset) in args
+        with zipfile.ZipFile(asset) as archive:
+            text = archive.read("release.log").decode("utf-8")
+        assert "tag complete\n" in text
+        assert "push complete\n" in text
+        return "https://github.com/example/repo/releases/tag/v22"
+
+    monkeypatch.setattr(cut_release, "_git", git)
+    monkeypatch.setattr(cut_release, "_gh", gh)
+    cut_release.publish("v22", zip_path, facts, False, release_log)

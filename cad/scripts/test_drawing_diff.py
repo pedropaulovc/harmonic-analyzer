@@ -213,8 +213,12 @@ def test_version_notes_and_neighboring_title_block_ink_are_not_normalized(
     assert facts["changed_drawings"] == ["part.pdf"]
     assert len(facts["images"]) == 1
     assert facts["pages"][0]["text_changed"] is True
-    assert _has_color(_pixels(facts), (220, 32, 32))
-    assert _has_color(_pixels(facts), (0, 96, 224))
+    # Small antialiased glyphs need not contain any fully covered pixel. The
+    # consumer-visible contract is red/blue ink, not exact solid-fill RGB.
+    pixels = _pixels(facts).astype(np.int16)
+    red, green, blue = pixels[:, :, 0], pixels[:, :, 1], pixels[:, :, 2]
+    assert np.any((red > green + 20) & (red > blue + 20))
+    assert np.any((blue > red + 20) & (blue > green + 20))
 
 
 @pytest.mark.parametrize("change", ["tiny_geometry", "tiny_dimension_text", "decimal_point"])
@@ -253,9 +257,17 @@ def test_minor_raster_antialiasing_is_ignored_without_spatial_erasure(tmp_path: 
     assert facts["unchanged_drawings"] == ["part.pdf"]
 
 
-def test_identical_ink_with_different_text_object_segmentation_is_omitted(tmp_path: Path) -> None:
-    _pdf(tmp_path / "old/part.pdf", [_text("1234", 20, 20)])
-    _pdf(tmp_path / "new/part.pdf", [_text("12", 20, 20) + _text("34", 32, 20)])
+@pytest.mark.parametrize("with_antialias_noise", [False, True])
+def test_identical_ink_with_different_text_object_segmentation_is_omitted(
+    tmp_path: Path, with_antialias_noise: bool
+) -> None:
+    before = _text("1234", 20, 20)
+    after = _text("12", 20, 20) + _text("34", 32, 20)
+    if with_antialias_noise:
+        before += "0 G 0.5 w 20 20 m 110 101 l S\n"
+        after += "0 G 0.5 w 20.0001 20 m 110 101 l S\n"
+    _pdf(tmp_path / "old/part.pdf", [before])
+    _pdf(tmp_path / "new/part.pdf", [after])
 
     facts = _compare(tmp_path)
 

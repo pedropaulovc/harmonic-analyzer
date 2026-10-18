@@ -1378,6 +1378,14 @@ def _logs_asset(version: str, log_path: Path | None) -> Path | None:
     return zip_path
 
 
+def _drawing_diff_asset(facts: dict[str, Any]) -> Path:
+    """Require the already-prepared drawing asset before publication starts."""
+    asset = Path(facts["drawing_diff"]["asset_path"])
+    if not asset.is_file() or asset.stat().st_size == 0:
+        raise RuntimeError(f"required drawing-diff asset is missing: {asset}")
+    return asset
+
+
 def _gh_assets(
     version: str, zip_path: Path, facts: dict[str, Any], log_path: Path | None
 ) -> list[str]:
@@ -1385,10 +1393,7 @@ def _gh_assets(
     drawing-diff ZIP, 3D diff PNGs, and logs. Record the logs asset name for notes.
     Building the logs asset here keeps the release log as fresh as possible."""
     assets = [str(zip_path)]
-    drawing_asset = Path(facts["drawing_diff"]["asset_path"])
-    if not drawing_asset.is_file() or drawing_asset.stat().st_size == 0:
-        raise RuntimeError(f"required drawing-diff asset is missing: {drawing_asset}")
-    assets.append(str(drawing_asset))
+    assets.append(str(_drawing_diff_asset(facts)))
     if facts.get("diff"):
         assets += [str(p) for p in facts["diff"]["image_paths"]]
     logs = _logs_asset(version, log_path)
@@ -1406,11 +1411,13 @@ def publish(
     log_path: Path | None = None,
 ) -> str:
     """Annotated tag -> push -> gh release + asset upload. Returns release URL."""
-    # Asset preparation/validation must finish before the first external side effect.
-    assets = _gh_assets(version, zip_path, facts, log_path)
+    # Validate the new required asset before side effects, but snapshot the logs
+    # after tag/push, as before, so that publication trace remains in the asset.
+    _drawing_diff_asset(facts)
     log(f"tagging {version} at HEAD")
     _git("tag", "-a", version, "-m", f"Release {version}")
     _git("push", "origin", version)
+    assets = _gh_assets(version, zip_path, facts, log_path)
 
     args = [
         "release",

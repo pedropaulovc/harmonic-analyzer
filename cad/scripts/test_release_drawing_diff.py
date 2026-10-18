@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import struct
+import tracemalloc
 import urllib.error
 import urllib.request
 import warnings
@@ -47,7 +48,11 @@ def _archive(members: list[tuple[str, bytes]], compression: int = zipfile.ZIP_DE
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             for name, data in members:
-                archive.writestr(name, data)
+                # ZipInfo(name) normalizes backslashes on Windows. Assign the
+                # raw archive name afterward so hostile fixtures reach the reader.
+                info = zipfile.ZipInfo()
+                info.filename = name
+                archive.writestr(info, data, compress_type=compression)
     return output.getvalue()
 
 
@@ -150,7 +155,10 @@ def test_valid_historical_bundle_without_pdfs_is_empty(
 def test_unsafe_or_duplicate_pdf_identity_fails_before_any_member_is_written(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, names: list[str],
 ) -> None:
-    _serve(monkeypatch, _archive([(name, _pdf()) for name in names]))
+    data = _archive([(name, _pdf()) for name in names])
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        assert [info.orig_filename for info in archive.infolist()][1:] == names
+    _serve(monkeypatch, data)
     with pytest.raises(ValueError, match="unsafe|duplicate"):
         extract_release_pdfs(_release(), tmp_path / "old")
     assert not (tmp_path / "old").exists()
@@ -232,3 +240,50 @@ def test_release_creates_separate_drawing_zip_from_the_published_pdf_inventory(
     assert {path.relative_to(stage).as_posix() for path in stage.rglob("*") if path.is_file()} == {
         "pdf/part.pdf", "pdf/added.pdf",
     }
+
+
+@pytest.mark.parametrize("size_delta", [-1, 1])
+def test_deflate_member_rejects_truncated_or_trailing_compressed_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, size_delta: int,
+) -> None:
+    data = _archive([("pdf/part.pdf", _pdf())])
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        compressed_size = archive.getinfo("pdf/part.pdf").compress_size
+    mutable = bytearray(data)
+    central = data.rfind(b"pdf/part.pdf") - 46
+    assert data[central:central + 4] == b"PK\x01\x02"
+    struct.pack_into("<I", mutable, central + 20, compressed_size + size_delta)
+    _serve(monkeypatch, bytes(mutable))
+
+    with pytest.raises(ValueError, match="invalid/oversized deflate"):
+        extract_release_pdfs(_release(), tmp_path / "old")
+    assert not (tmp_path / "old" / "part.pdf").exists()
+
+
+def test_compressed_pdf_cannot_allocate_beyond_its_declared_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Measure inflation, not cold imports of the shared comparison tool's deps.
+    __import__("numpy")
+    __import__("trimesh")
+    data = _archive([("pdf/part.pdf", b"x" * (8 * 1024 * 1024))])
+    mutable = bytearray(data)
+    central = data.rfind(b"pdf/part.pdf") - 46
+    assert data[central:central + 4] == b"PK\x01\x02"
+    struct.pack_into("<I", mutable, central + 24, 32)
+    _serve(monkeypatch, bytes(mutable))
+
+    already_tracing = tracemalloc.is_tracing()
+    if not already_tracing:
+        tracemalloc.start()
+    try:
+        before, _ = tracemalloc.get_traced_memory()
+        tracemalloc.reset_peak()
+        with pytest.raises(ValueError, match="invalid/oversized deflate"):
+            extract_release_pdfs(_release(), tmp_path / "old")
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        if not already_tracing:
+            tracemalloc.stop()
+    assert peak - before < 2 * 1024 * 1024
+    assert not (tmp_path / "old" / "part.pdf").exists()
