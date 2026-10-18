@@ -42,6 +42,7 @@ from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _machinist_review_mode import MachinistReviewMode
 from _named_views import octant_view_name
 from _paths import CAD_ROOT
 from _session import run_build
@@ -55,6 +56,9 @@ from dt_pinion_cam_spec import (
     SURFACE_FINISHES,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_pinion_cam"]
 PART_STEM = SPEC.artifact_stem
