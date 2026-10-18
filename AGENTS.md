@@ -409,7 +409,7 @@ scoped recorded face refs, requires two rocker pivot-bore patches and identical
 scoped/full STEP bytes, and reports both digests. Release staging copies the
 verified scoped bundles under `features/`. Each enrolled `prechips:<stem>` task
 depends only on its own `package:features:<stem>` leaf, not `package:features`, and uses
-pinned prechips 0.1.2 and `cad/process/` with a strict **exit 0 only** policy:
+pinned prechips 0.2.0 and `cad/process/` with a strict **exit 0 only** policy:
 bad input, machining blockers and required unknowns all fail without a stamp.
 Build and release include every stem in `_process_plans.TRAVELER_STEMS`.
 Enrollment is currently empty: the tracked legacy plans remain as provenance,

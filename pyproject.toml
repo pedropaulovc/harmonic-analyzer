@@ -61,7 +61,7 @@ dependencies = [
     "temporalio>=1.32",
     # Drawing-bound manufacturing travelers (SolidWorks-free prechips:<stem> tasks).
     # Exact pin: each prechips fix ships as a PyPI release and a deliberate bump.
-    "prechips==0.1.2",
+    "prechips==0.2.0",
 ]
 
 [dependency-groups]

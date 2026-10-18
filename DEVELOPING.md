@@ -38,7 +38,7 @@ enforcement declaration, or recipe-skipped infrastructure such as telemetry.
 
 `prechips:<stem>` tasks run on the submitter, including when SolidWorks leaves
 run on the farm. They need **FreeCAD 1.1** there; the Python dependency
-`prechips==0.1.2` does not install the FreeCAD executable. prechips discovers the
+`prechips==0.2.0` does not install the FreeCAD executable. prechips discovers the
 Windows FreeCAD 1.1 installation or a command on `PATH`; set `FREECAD_CMD` when
 it lives elsewhere:
 
