@@ -262,8 +262,15 @@ async def _add_outside_dia_reference(
         "outside-dia reference span",
     )
     ref.record("WitnessSpan", '"FaceWidth"')
+    # Centerline to the witness's start POINT, as build_dt_crank_pinion: a
+    # centerline-to-construction-line pick made a plain linear dimension
+    # (farm r3 4e0aa5d74: "OutsideDia: new dimension is not diametric").
     await add_diametric_linear_dimension(
-        adapter, axis, witness, (-FACE_WIDTH / 2.0, radius + 5.0), "OutsideDia"
+        adapter,
+        axis,
+        f"{witness}.start",
+        (-FACE_WIDTH / 2.0, radius + 5.0),
+        "OutsideDia",
     )
     ref.record("OutsideDia", '"OutsideDia"')
     await ensure_fully_defined(adapter, "outside-dia reference sketch")
