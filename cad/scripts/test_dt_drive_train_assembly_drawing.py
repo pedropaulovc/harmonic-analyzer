@@ -1228,9 +1228,9 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     assert steps.index("MIC THE MHA-VN-070, W") < steps.index("EAR INNER FACE")
     assert "LIFT IT OFF" not in steps
     assert "SHOULDER" not in steps
-    # The front strap is set one spring-set blade off the front washer, the
-    # MHA-VN-052 beside it; the bank then has no end play to read.
-    assert f"A {bank.BANK_SPRING_SET:.2f} BLADE BETWEEN ITS STRAP" in steps
+    # The front MHA-DT-002 is set one spring-set blade off the front washer,
+    # the MHA-VN-052 beside it; the bank then has no end play to read.
+    assert f"A {bank.BANK_SPRING_SET:.2f} BLADE BETWEEN ITS INNER FACE" in steps
     assert "BESIDE MHA-VN-052" in steps
     assert "REMOVE THE BLADE" in steps
     for gone in ("MHA-125", "0.025", "-6.0", "END PLAY", "LEAF", "0.45"):
