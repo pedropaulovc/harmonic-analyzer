@@ -27,6 +27,7 @@ from dt_pinion_spring_geometry import (
     HOLE_FROM_END as HOLE_FROM_END,
     KINK_ANGLE_PLACES as KINK_ANGLE_PLACES,
     KINK_DEG as KINK_DEG,
+    PAD_HOLE_WEB_MIN,
     PAD_LEN as PAD_LEN,
     PAD_LEN_PLACES as PAD_LEN_PLACES,
     PAD_RELIEF_PLACES as PAD_RELIEF_PLACES,
@@ -76,6 +77,9 @@ if set().union(*FORMED_BANDED_DIMENSIONS.values()) != set(FORMED_CONTACT_BANDS):
 PAD_RELIEF_FEATURE = "PadRelief"
 PAD_RELIEF_DIMENSION = "PadReliefR"
 PAD_RELIEF_TOL_TYPE = 6  # swTolType_e.swTolMAX
+# The wing's .XXX length says why it is tight, and states the web it leaves the
+# hole (rule 20; Codex, PR #1675).
+PAD_LEN_CALLOUT = f"CLEARS BEND\nHOLE WEB {PAD_HOLE_WEB_MIN:.2f} MIN"
 
 # Everything the print carries.  The profile is baselined from the foot's free
 # end (drawing-guidelines.md rule 10 (dimension from a real feature)): the FREE kink start is located from it, never

@@ -69,7 +69,6 @@ from dt_pinion_spring_geometry import (
     KINK_C,
     KINK_EXIT,
     KINK_INCLUDED_DEG,
-    PAD_HOLE_WEB_MIN,
     PAD_WIDTH,
     PAD_WING_LEN,
     PAD_Z,
@@ -81,6 +80,7 @@ from dt_pinion_spring_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FREE_KINK_ANGLE,
+    PAD_LEN_CALLOUT,
 )
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -193,7 +193,7 @@ DIMENSION_CALLOUTS = {
     "FreeKinkV": f"FREE, TO KINK TANGENT\n{PRELOAD_REASON}",
     "BendR": PRELOAD_REASON,
     "KinkR": PRELOAD_REASON,
-    "PadLen": f"CLEARS BEND\nHOLE WEB {PAD_HOLE_WEB_MIN:.2f} MIN",
+    "PadLen": PAD_LEN_CALLOUT,
 }
 
 
@@ -695,8 +695,8 @@ def kink_arc_summary(
         parts.append(
             f"arc centre {math.dist(centre, vertex) * 1000:.2f} mm off, "
             f"r {radius * 1000:.2f} mm, {len(points)} pts, deg first "
-            f"{offsets[0]:.1f} last {offsets[-1]:.1f} min {min(offsets):.1f} "
-            f"max {max(offsets):.1f}"
+            f"{offsets[0]:.1f} last {offsets[-1]:.1f}, spanning {min(offsets):.1f} "
+            f"to {max(offsets):.1f}"
             if offsets
             else "empty arc"
         )
