@@ -111,6 +111,7 @@ from dt_drive_train_assembly_spec import (
 )
 import dt_drive_train_steps as steps
 import dt_mesh_checks as mesh_checks
+import dt_pinion_cam_geometry as cam_geometry
 from dt_pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
 import fr_harmonic_base_spec as base
 import pinion_rig_fitup as FITUP
@@ -683,8 +684,54 @@ def handle_stake_note_xy(tip: tuple[float, float]) -> tuple[float, float]:
     )
 
 
+# Rule 23 (#1176): each MHA-DT-023 cam's set screw is staked at the cam set;
+# the machinist review of 15cf1dcbc and 8e6a0dbd8 asked for the lock in a
+# view, as MHA-DT-032's is. The tap mouth in the cam's own frame (metres):
+# the tap drill enters along -Y from the OD's lowest tangent plane at
+# SET_SCREW_Z (build_dt_pinion_cam).
+CAM_STEM = "dt-pinion-cam"
+CAM_TAP_MOUTH_M = (
+    0.0,
+    -(cam_geometry.ECC + cam_geometry.CAM_OD / 2.0) / 1000.0,
+    cam_geometry.SET_SCREW_Z / 1000.0,
+)
+CAM_STAKE_NOTE = "\n".join(
+    (
+        "STAKE EACH MHA-DT-023",
+        "TAP MOUTH AT 2 POINTS",
+        f"(STEP {steps.step_number('cam-collars-set')})",
+    )
+)
+# Sheet 11's Right view shows the front cam's tap end-on just above the front
+# MHA-DT-018, the base plate and its hold-down screws below it, and the
+# caption under the view (run 20261018T134956953Z: tap near (255, 139) mm,
+# the front screws at x 237-248 mm down to y 106 mm, caption top near y 95
+# mm). The note stands below and left of the tap, under the base plate and
+# left of those screws, so its leader leaves the text's right end and climbs
+# to the tap.
+CAM_STAKE_NOTE_GAP = 0.022
+CAM_STAKE_NOTE_DROP = 0.0225
+CAM_STAKE_NOTE_WIDTH = (
+    max(len(line) for line in CAM_STAKE_NOTE.splitlines())
+    * (NOTE_FIELD_LEFT[2] - NOTE_FIELD_LEFT[0])
+    / _STEP_LINE_WIDTH
+)
+
+
+def cam_stake_note_xy(tip: tuple[float, float]) -> tuple[float, float]:
+    """Top-left sheet point of the cam stake note for the tap at sheet ``tip``."""
+    return (
+        tip[0] - CAM_STAKE_NOTE_GAP - CAM_STAKE_NOTE_WIDTH,
+        tip[1] - CAM_STAKE_NOTE_DROP,
+    )
+
+
 # Step 10 screws the north MHA-CH-008 down with the channel's own hold-down.
 NORTH_BRACKET_SCREW = str(_config.parts("vn-bracket-hold-down-screw")["number"])
+# Step 5's T12 is the paper drive's removable chain sprocket in its T12
+# configuration (pd_transgear_removable_spec: T12 on the crank); the machinist
+# review of 8e6a0dbd8 asked for its own number.
+CRANK_CHAIN_WHEEL = str(_config.parts("pd-transgear-removable")["number"])
 
 
 ASSEMBLED_HEADING = (
@@ -776,7 +823,7 @@ CONE_CRANK_STEPS = _note_text(
         "   BOSS AT ITS MID-LENGTH INTO MHA-DT-011; "
         + _PINION_PIN_FIT
         + "; RE-CHECK NO BINDING.",
-        "5. PAPER-DRIVE T12 ON MHA-DT-011 BEFORE THE ARM, HOLES OVER 2X MHA-VN-044.",
+        f"5. {CRANK_CHAIN_WHEEL} T12 ON MHA-DT-011 BEFORE THE ARM, HOLES OVER 2X MHA-VN-044.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-031 pressed into the arm and
         # seam-pinned by MHA-VN-029 (a 4 m6 dowel, 4.0 long = half the arm); the
         # MHA-DT-009 cross-hole runs behind the arm through the hub barrel. The
@@ -1125,7 +1172,7 @@ INTERFACE_NOTES = _note_text(
         "EXTERNAL INTERFACES (RECEIVING PARTS NOT IN THIS BOM)",
         "BASE MHA-FR-001 (FRAME ASSEMBLY MHA-FR-000) RECEIVES MHA-VN-014, MHA-VN-013,",
         "MHA-VN-015, {slotted}X MHA-VN-019, {foot}X MHA-VN-020 AND {hold_down}X MHA-VN-032.",
-        "PAPER DRIVE MHA-PD-000: T12 CHAIN WHEEL ON MHA-DT-011.",
+        f"PAPER DRIVE MHA-PD-000: {CRANK_CHAIN_WHEEL} T12 CHAIN WHEEL ON MHA-DT-011.",
         "FRAME ASSEMBLY MHA-FR-000: ITS MHA-FR-005 RAIL TAKES THE NORTH MHA-CH-008 "
         f"AT STEP {steps.step_number(NORTH_BRACKET_SET_KEY)}.",
         "CHANNEL ASSEMBLY MHA-CH-000: CONNECTING RODS RUN ON THE MHA-DT-012 CAMS; "
@@ -2994,6 +3041,7 @@ def _place_full_detail_sheet(adapter: Any) -> tuple[float, float]:
         label=f"{label} caption",
     )
     _note_handle_stake(adapter, view, label=f"{label} stake note")
+    _note_cam_stake(adapter, view, label=f"{label} cam stake note")
     return scale
 
 
@@ -3065,6 +3113,48 @@ def _note_handle_stake(adapter: Any, view: Any, *, label: str) -> None:
             f"{label}: the leader does not leave the note's right end short of "
             f"the tip {tip[0]:.4f}: text left {extent[0]:.4f}, leader {points!r}"
         )
+
+
+def _note_cam_stake(adapter: Any, view: Any, *, label: str) -> None:
+    """Point step 21's cam stake note (rule 23, #1176) at the front MHA-DT-023
+    tap mouth (CAM_TAP_MOUTH_M), the note below and left of it
+    (cam_stake_note_xy). The front cam is the one furthest right: the Right
+    view has south at its right."""
+    stem = frozenset({CAM_STEM})
+    tips: list[tuple[float, float]] = []
+    for leaf in _view_component_leaves(adapter, view, label=label):
+        if not (leaf.visible and _stems_matching(leaf.identities, stem)):
+            continue
+        (mouth,) = _anchor_model_points(
+            adapter, leaf, (CAM_TAP_MOUTH_M,), {}, stem=CAM_STEM, label=label
+        )
+        tips.append(model_point_in_view(adapter, view, mouth, label=label))
+    if not tips:
+        raise RuntimeError(f"{label}: the view shows no {CAM_STEM}")
+    tip = max(tips)
+    note = _early_bound(
+        add_leader_note(
+            adapter,
+            CAM_STAKE_NOTE,
+            text_xy=cam_stake_note_xy(tip),
+            attach_xy=tip,
+            label=label,
+            view=view,
+        ),
+        "INote",
+    )
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    _telemetry.event(
+        "drawing.cam_stake_note",
+        tips_mm=tuple(tuple(round(value * 1000.0, 2) for value in t) for t in tips),
+        extent_mm=tuple(
+            round(value * 1000.0, 2) for value in _note_extent(adapter, note, label=label)
+        ),
+        leader_mm=tuple(round(float(value) * 1000.0, 2) for value in points),
+    )
+    if len(points) < 6:
+        raise RuntimeError(f"{label}: the leader is unreadable: {points!r}")
 
 
 def _source_dirty_tracer(source_model: Any) -> Callable[[str], None]:

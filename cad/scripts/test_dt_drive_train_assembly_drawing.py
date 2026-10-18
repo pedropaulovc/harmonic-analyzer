@@ -35,6 +35,8 @@ EXTERNAL_NUMBERS = frozenset(
         "MHA-CH-008",
         "MHA-VN-070",
         drawing.NORTH_BRACKET_SCREW,
+        # Step 5's paper-drive T12, named on sheet 12's interface line.
+        drawing.CRANK_CHAIN_WHEEL,
     }
 )
 # Named installation assemblies are external interfaces, not drive-train BOM rows.
