@@ -184,9 +184,13 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     assert (spec.PIVOT_BEARING_RELIEF_DIAMETER - head_dia) / 2.0 >= (
         spec.PIVOT_HEAD_RADIAL_CLEARANCE - 1e-9
     )
+    # The fit names its mate and a checkable acceptance (machinist review r1:
+    # "MINIMAL AXIAL PLAY" could not be checked).
     assert spec.PIVOT_RELIEF_FIT_REQUIREMENT.startswith(
-        "TOP PIVOT RELIEF: MATCH DEPTH TO FINISHED PLATE"
+        "TOP RELIEF: FIT DEPTH TO PLATE"
     )
+    assert "MHA-VN-014" in spec.PIVOT_RELIEF_FIT_REQUIREMENT
+    assert "NO AXIAL SHAKE" in spec.PIVOT_RELIEF_FIT_REQUIREMENT
     # Only the NW fillet reaches over the 10.50 strip, and only by a sliver.
     overlaps = {
         label: part._north_fillet_relief_overlap(label, r)
@@ -311,7 +315,7 @@ def test_r12_corner_arrow_lands_at_its_arc_middle() -> None:
 
     text = drawing.PROFILE_KEEP["CornerSER"]
     assert arrow_angle(text) == pytest.approx((low + high) / 2.0, abs=1e-6)
-    assert not low <= arrow_angle((0.040, 0.2435)) <= high
+    assert not low <= arrow_angle(drawing._planned(0.040, 0.2435)) <= high
     # R12.0 is 11.7 x 3.9 mm round its position (run 20261009T172850508Z):
     # above the 223.4 south witness, below the 24.0 dimension line (2.6 mm
     # under its text), and left of the 24.0 east extension line.
@@ -447,14 +451,15 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     printed = math.floor(diameters * 100.0) / 100.0
     assert printed <= diameters and printed >= 0.87
     assert f"{printed:.2f}" == "0.90"
-    engagement, override = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
-    assert engagement == (
-        f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN (MHA-VN-031)."
+    assert spec.POST_MOUNT_ENGAGEMENT_NOTE == (
+        f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN."
     )
-    # The break the derivation counts is the break the note allows.
+    # The break the derivation counts is the break the tap callout allows
+    # (rule 7: a local override rides its feature's callout, machinist review
+    # r1), under the thread on the plan.
     assert spec.POST_MOUNT_TAP_EDGE_BREAK == 0.1
-    assert override == "1/4-20 TAPPED HOLES: DEBURR ONLY, 0.1 MAX BREAK EACH END."
-    assert f"{spec.POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK" in override
+    assert spec.POST_MOUNT_TAP_BREAK_CALLOUT == "0.1 MAX BREAK EACH END"
+    assert drawing.POST_MOUNT_CALLOUT_BELOW[0] == spec.POST_MOUNT_TAP_BREAK_CALLOUT
     # Positive control: the title block's 0.25 break at both ends would print
     # under the audit floor, which is why the override exists.
     title_block = (
@@ -689,11 +694,11 @@ def test_holddown_section_arrows_clear_the_profile_plan() -> None:
         radius = {c[0]: c[3] for c in part.PLATE_CORNERS}[label] * 0.0005 / math.sqrt(2.0)
         return (px + cx * 0.0005 + dx * radius, py - cz * 0.0005 + dy * radius)
 
-    r10_leader = ((0.051, 0.139), arc_tip("NE", -1.0, -1.0))
-    r8_leader = ((0.135, 0.118), arc_tip("NW", 1.0, -1.0))
+    r10_leader = (drawing._planned(0.051, 0.139), arc_tip("NE", -1.0, -1.0))
+    r8_leader = (drawing.PROFILE_KEEP["CornerNWR"], arc_tip("NW", 1.0, -1.0))
     north_edge_y = py - part.NORTH_OVERHANG * 0.0005
     nw_x = px + part.WEST_HALF_N * 0.0005
-    nw_extension = ((nw_x, 0.113), (nw_x, north_edge_y))
+    nw_extension = ((nw_x, drawing._planned(0.0, 0.113)[1]), (nw_x, north_edge_y))
     for box in (*arrows, *letters):
         for line in (r10_leader, r8_leader, nw_extension):
             assert not _segment_hits_box(line, box)
@@ -1165,3 +1170,76 @@ def test_a_detail_b_transform_that_never_refreshes_still_fails(monkeypatch) -> N
         "while its outline is centred on (0.08349999999999999, 0.04500000000000001)"
     )
     assert "34 rebuilds and 5.10 s" in message
+
+
+_CBORE_PARTS = {
+    5: "<HOLE-CBORE><MOD-DIAM><hw-cbdia> <HOLE-DEPTH><hw-cbdepth>",
+    6: "",
+    7: "<MOD-DIAM><hw-diam> THRU ALL",
+    8: "",
+}
+
+
+def test_holddown_callout_drills_in_its_thru_row_and_names_face_and_mate() -> None:
+    """Machinist review r1: "DRILL ⌴ Ø5.56" read as drilling the counterbore,
+    and the +-0.1 stations of detail B named no mate (rule 4)."""
+    updated = drawing.holddown_callout_definitions(dict(_CBORE_PARTS))
+    assert updated[5] == _CBORE_PARTS[5]
+    assert updated[7] == "DRILL <MOD-DIAM><hw-diam> THRU ALL"
+    assert updated[8] == "FROM UNDERSIDE\nLOCATES MHA-DT-021 TIP BLOCK"
+    counted = drawing.holddown_callout_definitions(
+        {**_CBORE_PARTS, 7: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"}
+    )
+    assert counted[7] == "<NUM_INST>X DRILL <MOD-DIAM><hw-diam> THRU ALL"
+    # Fail closed on a layout the rewrite was not written for.
+    with pytest.raises(RuntimeError, match="already prints below"):
+        drawing.holddown_callout_definitions({**_CBORE_PARTS, 8: "X"})
+    with pytest.raises(RuntimeError, match="not one upper part"):
+        drawing.holddown_callout_definitions({**_CBORE_PARTS, 5: "THRU", 7: "THRU"})
+    with pytest.raises(RuntimeError, match="unexpected hole callout parts"):
+        drawing.callout_below_definitions({5: "", 6: "", 7: ""}, ("A",))
+
+
+def test_tight_bands_name_their_mates_on_their_callouts() -> None:
+    """Rule 4: the reamed bore and both +-0.1 hole groups name the part that
+    makes the tolerance necessary, each at its own callout (r1 blocker)."""
+    assert drawing.PIVOT_BORE_CALLOUT_BELOW == ("RUNNING FIT ON MHA-VN-014 SHOULDER",)
+    assert "MHA-DT-005" in drawing.POST_MOUNT_CALLOUT_BELOW[1]
+    assert "MHA-DT-021" in drawing.HOLDDOWN_CALLOUT_BELOW[1]
+    pivot = drawing.callout_below_definitions(
+        {5: "REAM <MOD-DIAM><hw-diam>", 6: "", 7: "", 8: ""},
+        drawing.PIVOT_BORE_CALLOUT_BELOW,
+    )
+    assert pivot == {
+        5: "REAM <MOD-DIAM><hw-diam>",
+        6: "",
+        7: "",
+        8: "RUNNING FIT ON MHA-VN-014 SHOULDER",
+    }
+    # SolidWorks drops multi-line text above a dimension; every added row is
+    # below, and the tallest callout's rows stay in their free fields.
+    for rows in (
+        drawing.PIVOT_BORE_CALLOUT_BELOW,
+        drawing.POST_MOUNT_CALLOUT_BELOW,
+        drawing.HOLDDOWN_CALLOUT_BELOW,
+    ):
+        assert all("\n" not in row for row in rows)
+    # ~2.4 mm a character at 3.5 mm: the hold-down's mate row, centred on its
+    # requested x, ends left of the title block.
+    width = len(drawing.HOLDDOWN_CALLOUT_BELOW[1]) * 0.0024
+    assert drawing.HOLDDOWN_CALLOUT_XY[0] + width / 2.0 < 0.216
+
+
+def test_relief_fit_note_stands_over_section_a_a_clear_of_its_neighbours() -> None:
+    """Rule 7: the relief fit is flagged by a leader at the relief on A-A
+    (machinist review r1 read the note under C-C as C-C's)."""
+    x, y = drawing.RELIEF_NOTE_XY
+    lines = spec.PIVOT_RELIEF_FIT_REQUIREMENT.split("\n")
+    right = x + max(map(len, lines)) * 0.00186
+    bottom = y - len(lines) * 0.0035
+    assert x > 0.296 + 0.002  # 213.56 dimension line (CapECz)
+    assert right < 0.4189 - 0.005  # border
+    assert bottom > 0.1366 + 0.002  # A-A's PlateThk text
+    assert y < drawing.ISO_CAPTION_UPPER_LEFT[1] - 0.0048 - 0.002  # iso caption
+    assert drawing.ISO_CAPTION_UPPER_LEFT[1] < 0.189 - 0.002  # isometric's ink
+    assert drawing.RELIEF_TIP_INSET_MM < spec.PIVOT_BEARING_RELIEF_DIAMETER / 2.0
