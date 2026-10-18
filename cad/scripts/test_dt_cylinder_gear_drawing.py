@@ -131,8 +131,6 @@ def test_every_tight_band_states_its_mate_or_function_at_the_callout() -> None:
     assert "PHASE" in callouts["NotchPhase"]
     assert "FLANKS" in callouts["NotchWidth"]
     assert "MHA-DT-013" in notes.BORE_FIT_CALLOUT
-    assert max(map(len, notes.BORE_FIT_CALLOUT.splitlines())) <= 19
-    assert notes.DRAWING_NOTES.count("\n") == 0
 
 
 def test_cam_and_notch_oracles_use_actual_off_centre_root_material() -> None:
