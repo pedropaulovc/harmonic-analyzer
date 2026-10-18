@@ -147,6 +147,12 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
 )
 
+# The one note: the shop's inside-corner ceiling for the upright-to-foot
+# corner (drawing-guidelines.md rule 16), the fleet's owner-ruled precedent
+# (fr-top-frame, 2026-10-18) until the title block carries the default.
+# TODO(#1625): drop the note (and the part config's RV-01) when it does.
+DRAWING_NOTES = "INSIDE CORNERS R1.0 MAX."
+
 # Hidden reference sketches (#810 Codex l4afp, drawing-simplicity-policy.md `How the repository implements the guidelines`): the strap band,
 # the hold-down hole's station off the foot's far face and both lateral
 # locations off the west side face are manufacturing dimensions under the

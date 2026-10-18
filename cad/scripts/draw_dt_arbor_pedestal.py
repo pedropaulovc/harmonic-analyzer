@@ -3,7 +3,9 @@ r"""Create the curated machinist drawing for the cylinder-arbor pedestal."""
 from __future__ import annotations
 
 import argparse
+import re
 import sys
+from math import sqrt
 from typing import Any, Literal
 
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -13,6 +15,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
+import _config
 from _check import check
 from _com import _early_bound
 from _drawing_annotation_extent import place_callout_clear, require_clear
@@ -34,9 +37,11 @@ from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -62,6 +67,9 @@ from dt_arbor_pedestal_spec import (
 )
 
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
+
 SPEC = DRAWINGS_BY_NAME["dt_arbor_pedestal"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
@@ -81,12 +89,13 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # elevation on that midpoint. Third-angle projection keeps the plan aligned
 # above the elevation; the isometric balances the aligned group from the
 # right. The elevation sits low so the 28-deep plan (56 on the sheet) clears
-# the crown band and still leaves a callout lane above itself under the
+# the crown band and still leaves two dimension lanes above itself under the
 # sheet border: lateral-location lane 0.045, elevation 0.055..0.165, crown
-# text ~0.173, foot-width lane 0.183, plan 0.186..0.242, hole lateral lane
-# 0.250, hold-down hole callout 0.254. The 44.45 common cone-axis bore
-# height grew the elevation 9.5 mm on the sheet; it grows downward, so the
-# crown-to-plan band the apex tap callout sits in keeps its height.
+# text ~0.173, plan 0.186..0.242, hole lateral lane 0.250, foot-width lane
+# 0.259, hold-down hole callout left of the plan at 0.238. The 44.45 common
+# cone-axis bore height grew the elevation 9.5 mm on the sheet; it grows
+# downward, so the crown-to-plan band the apex tap callout sits in keeps its
+# height.
 _PART_MID_Y = (
     BORE_HEIGHT + TOP_RADIUS
 ) / 2.0  # foot 0 .. dome top (bore + dome radius)
@@ -114,34 +123,41 @@ def _top_y(model_z: float) -> float:
 
 # Lanes for the two lateral locations: below the seat in the elevation (the
 # bore's centreline extends down through the part, crossing no other
-# dimension's extension line), and between the plan and the foot-width lane.
+# dimension's extension line), and just above the plan, inside the foot-width
+# lane.
 BORE_LATERAL_XY = (FRONT_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _front_y(0.0) - 0.010)
 HOLE_LATERAL_XY = (TOP_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _top_y(FOOT_NEAR_Z) + 0.008)
 
 # The elevation carries the height chain off the foot seat plus the fitted
 # bore; the plan carries the foot rectangle, the strap band and the hold-down
-# hole. Nested left lanes work outward from the shortest span (foot height,
-# journal axis, overall reference) off the one datum a machinist actually
-# clamps to -- the seat.
+# hole. Nested left lanes work outward from the shorter span (journal axis,
+# then overall reference) off the one datum a machinist actually clamps to --
+# the seat; the foot height sits east of the elevation, off the same seat.
 FRONT_KEEP = {
-    "FootHt": (FRONT_CENTER[0] - 0.034, _front_y(FOOT_HEIGHT / 2.0)),
+    # Right of the elevation: the model dimension's upper witness leaves the
+    # foot corner at the east taper kink. From a left lane that witness ran
+    # across the whole upright face and read as a visible edge (ENFORCE r2).
+    "FootHt": (
+        FRONT_CENTER[0] + FOOT_WIDTH * _S / 2.0 + 0.016,
+        _front_y(FOOT_HEIGHT / 2.0),
+    ),
     "BoreHeight": (FRONT_CENTER[0] - 0.046, _front_y(BORE_HEIGHT / 2.0)),
-    "BoreDia": (FRONT_CENTER[0] + 0.043, _front_y(BORE_HEIGHT) - 0.010),
+    # Right of the elevation, far enough out that the three-line callout's
+    # widest row ("ARBOR MHA-DT-013", ~42 mm) clears the tapered flank.
+    "BoreDia": (FRONT_CENTER[0] + 0.050, _front_y(BORE_HEIGHT) - 0.010),
     "BoreLateral": BORE_LATERAL_XY,
     # Crown: the model's radius (_show_crown_radius), up and right of the dome.
     "DomeRadius": (0.178, _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.008),
 }
 TOP_KEEP = {
-    # BELOW the plan, in the band over the crown callout. Above it (0.256)
-    # the witnesses ran the plan's full height, and the hold-down hole's
-    # callout crossed the east one on its way out (leader-crosses-line).
-    # Down here the apex tap callout's leader still crosses this dimension
-    # line: that tap sits 5 mm inside the far face, so its leader can only
-    # leave the plan downward, through this lane. Any other exit runs ~23 mm
-    # over the part (leader-over-part). That one crossing is an ACCEPTED
-    # finding (user ruling on #1105, like amplitude-bar's). Do not "fix" it by
-    # moving this lane back above the plan.
-    "Width": (TOP_CENTER[0], _top_y(STRAP_INNER_Z) - 0.0032),
+    # ABOVE the plan, outside the hole lateral lane. Below it (0.183) the
+    # apex tap callout's leader -- which can only leave the plan downward,
+    # because the 19.0, 5.00, 10.0 and 28.0 lines all span the tap's
+    # station -- crossed this dimension line (2026-10-18 ENFORCE r1, rule 14
+    # (keep text off the part)). Up here its witnesses run the plan's full
+    # height along the side edges; the hold-down callout's leader crosses the
+    # west one, which rule 14 calls conventional.
+    "Width": (TOP_CENTER[0], _top_y(FOOT_NEAR_Z) + 0.017),
     # Outer right lane, outboard of the strap band and set-screw station
     # nested inside it. On the left (0.067) its far-face witness was the
     # line the apex tap callout's leader had to cross.
@@ -168,16 +184,31 @@ TOP_KEEP = {
 # the bore in the elevation and the hold-down hole in the plan are both
 # dimensioned from the foot's west side face, so the two views share one
 # origin the shop can touch off.
+
+# The arbor (MHA-DT-013) is what the reamed bore fits: the back pedestal's
+# apex screw locks it, and the front pedestal slides along it while its strap
+# is set off the bank's spring blade (cylinder_bank_layout), so the bore is a
+# sliding fit and the Ra 1.6 says so (rule 4 (tighten only for function, and
+# name the mate); 2026-10-18 ENFORCE r1 blocker).
+ARBOR_NUMBER = str(_config.parts("dt-cylinder-gear-shaft")["number"])
 DIMENSION_CALLOUTS = {
-    "BoreDia": "REAM THRU",
+    "BoreDia": f"REAM THRU\nSLIDING FIT ON\nARBOR {ARBOR_NUMBER}",
 }
 CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
 # The apex tap runs down to the arbor bore and stops there; the MHA-VN-034 cup
-# point's spot is drilled into the arbor at fit-up through this hole, so the
-# callout says where the thread ends and nothing more (digit-free, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
-# The plan already shows the hole at the apex, so the words do not repeat it:
-# v37's "..., AT CROWN APEX" ran the callout 22.6 mm past the zone frame.
-SET_SCREW_PROCESS = "TAP TO BORE"
+# point's spot is drilled into the arbor at fit-up through this hole. Both
+# native extents (the tap drill's and the thread's ``<hw-thru>``) say TO BORE,
+# so neither can read as a drill carried on past the bore into the strap
+# (2026-10-18 ENFORCE r1: "Ø2.26 THRU / TAP TO BORE ... THRU" gave two
+# extents), and the thread class goes: the title block states it (rule 2 (the
+# title block is the general specification)). Same rewrite as the MHA-CH-005
+# pivot bracket's apex tap. Digit-free words (rule 7 (notes: few, flagged,
+# never a method)); the plan already shows the hole at the apex, so the words
+# do not repeat it: v37's "..., AT CROWN APEX" ran the callout 22.6 mm past
+# the zone frame.
+SET_SCREW_PROCESS = "TAP"
+SET_SCREW_EXTENT = "TO BORE"
+_THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
 # The overall height's lane, left of the elevation.
 OVERALL_HEIGHT_XY = (FRONT_CENTER[0] - 0.058, FRONT_CENTER[1])
 # Sheet Y of the elevation's crown apex and of the plan's far face: the tap
@@ -190,6 +221,18 @@ OVERALL_HEIGHT_XY = (FRONT_CENTER[0] - 0.058, FRONT_CENTER[1])
 _CROWN_APEX_Y = _front_y(BORE_HEIGHT + TOP_RADIUS)
 _PLAN_FAR_Y = _top_y(STRAP_INNER_Z)
 SET_SCREW_CALLOUT_XY = (TOP_CENTER[0] - 0.055, _CROWN_APEX_Y + 0.0114)
+# The hold-down hole's callout: text CENTRE (the row runs ~50 mm) left of
+# the plan and above the 19.0 lane, its leader dropping right to the hole's
+# upper-west rim. The leader crosses only the plan's west edge (and the
+# foot-width witness on it); it stays above the 19.0's hole-station extension
+# line and west of the 12.0's. Above the plan its leader crossed the 24.0
+# dimension line once that lane moved up (TOP_KEEP["Width"]).
+_HOLD_DOWN_RIM = SCREW_HOLE_DIA / 2.0 * _S * sqrt(0.5)
+HOLD_DOWN_EDGE_XY = (TOP_CENTER[0] - _HOLD_DOWN_RIM, _top_y(SCREW_Z) + _HOLD_DOWN_RIM)
+HOLD_DOWN_CALLOUT_XY = (TOP_CENTER[0] - 0.055, _top_y(FOOT_NEAR_Z) - 0.004)
+# The note hangs from its top-left anchor in the empty lower-left corner,
+# clear below the bore lateral lane and left of the title block.
+NOTES_ANCHOR = (0.016, 0.034)
 # Half the ink of a drawn line: the 0.25 mm line weight.
 _LINE_HALF_M = 0.000125
 
@@ -386,6 +429,52 @@ def _prove_set_screw_callout_clear(adapter: Any, display: Any) -> None:
     require_clear(ink.label, ink.text, set_screw_callout_above())
 
 
+def set_screw_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Rewrite the native tap callout's definition parts (5..8).
+
+    Both ``<hw-thru>`` extents become TO BORE and the thread class goes (the
+    title block states it). Every Hole Wizard size variable stays.
+    """
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
+    if "\n".join(definitions.values()).count("<hw-thru>") != 2:
+        raise RuntimeError(f"tap callout lacks its two native extents: {definitions!r}")
+    updated = {
+        part: text.replace("<hw-thru>", SET_SCREW_EXTENT)
+        for part, text in definitions.items()
+    }
+    thread_parts = [
+        part for part, text in updated.items() if "<hw-threadclass>" in text.lower()
+    ]
+    if len(thread_parts) != 1:
+        raise RuntimeError(f"tap thread line is not in one callout part: {updated!r}")
+    part = thread_parts[0]
+    updated[part] = re.sub(
+        r" {2,}", " ", _THREAD_CLASS.sub(" ", updated[part])
+    ).rstrip()
+    return updated
+
+
+@_telemetry.traced("drawing.arbor.tap_callout_text")
+def _set_tap_callout_text(display: Any) -> None:
+    """Write the rewritten definitions and prove they persisted."""
+    native = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = set_screw_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            native.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = {part: str(native.GetText(part) or "") for part in (1, 2, 3, 4)}
+    joined = "\n".join(resolved.values())
+    if persisted != updated or joined.count(SET_SCREW_EXTENT) != 2 or "2B" in joined:
+        raise RuntimeError(
+            "apex tap callout text did not persist: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
+    _telemetry.info(f"apex tap callout: {resolved!r}")
+
+
 @_telemetry.traced("drawing.diameter_second_arrow", label_param="label")
 def _disable_diameter_second_arrow(
     adapter: Any,
@@ -468,6 +557,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
         required=(
             "Number",
@@ -475,6 +565,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -553,14 +644,14 @@ async def build(adapter: Any) -> dict[str, str]:
             _front_y(BORE_HEIGHT),
         ),
     )
-    # Below and right of the seat. The foot's width is dimensioned in the
-    # plan, so nothing here owns a witness line the leader could cross: it
-    # leaves the vee's left side, runs up-left to the seat's right quarter,
-    # and the "Ra 3.2" text hangs right of the symbol into empty sheet.
+    # Under the seat's east half, between the bore lateral's witness at the
+    # centreline and the foot-height lane east of the elevation: the leader
+    # drops from the seat's right quarter and the "Ra 3.2" text hangs right
+    # of the vee, short of the 5.0's lower arrow.
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.035, _front_y(0.0) - 0.010),
+        symbol_xy=(FRONT_CENTER[0] + 0.017, _front_y(0.0) - 0.011),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         label="foot seat finish",
         char_height=0.0025,
@@ -585,18 +676,11 @@ async def build(adapter: Any) -> dict[str, str]:
     _set_reference_precision(overall, "overall height")
     _show_crown_radius(adapter, front_annotations)
     adapter.currentModel.GraphicsRedraw2()
-    _screw_r = SCREW_HOLE_DIA / 2.0 * _S
-    # ``callout_xy`` is the text's CENTRE (the text runs ~50 mm). Over the
-    # plan, right of the hole lateral lane: the leader leaves the hole up and
-    # right through the plan's near edge, west of the depth lane's witness.
-    # Right of the plan (0.235, 0.232) it crossed the east witness of the
-    # foot width and, with depth now on the right, would cross its dimension
-    # line too (leader-crosses-line).
     add_native_hole_callout(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0] + _screw_r, _top_y(SCREW_Z)),
-        callout_xy=(TOP_CENTER[0] + 0.050, _top_y(FOOT_NEAR_Z) + 0.012),
+        edge_xy=HOLD_DOWN_EDGE_XY,
+        callout_xy=HOLD_DOWN_CALLOUT_XY,
         label="flange hold-down hole",
         process="DRILL",
     )
@@ -612,7 +696,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="apex set-screw tap",
         process=SET_SCREW_PROCESS,
     )
+    _set_tap_callout_text(tap_callout)
     _prove_set_screw_callout_clear(adapter, tap_callout)
+    # The one note (DRAWING_NOTES), lower left under the elevation's lanes.
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.
