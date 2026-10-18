@@ -96,17 +96,25 @@ TOP_CENTER = (FRONT_CENTER[0], 0.240)
 SECTION_LINE_MODEL_MM = ((0.0, -HUB_OD / 2.0 - 3.0, 0.0), (0.0, ROD_LEN + 4.0, 0.0))
 SECTION_SCALE = (1, 1)
 SECTION_LABEL_XY = (SECTION_CENTER[0], 0.218)
-# Between section A-A (x <= 0.142) and the detail fence (x >= 0.218), so the
+# Between section A-A (x <= 0.146) and the detail fence (x >= 0.222), so the
 # field right of the detail is free for the pin-hole callout.
 ISO_CENTER = (0.184, 0.142)
-DETAIL_CENTER = (0.245, 0.170)
+# ENFORCE r2 (#1011): a 9 mm fence showed no grip rod above the hub, and the
+# GRIP AXIS witness stood in mid-air; 11 mm takes in the rod root (to y ~10.5
+# at its flanks) and the detail draws the rod's axis.
+DETAIL_CENTER = (0.255, 0.170)
 DETAIL_SCALE = (3, 1)
-DETAIL_RADIUS_MM = 9.0
-# r7 eye-pass: at (0.228, 0.128) the label sat on the 8.0 FLAT BOTTOM text;
-# the label rides right of the detail, clear of the fence (x <= 0.263 at
-# this height).
-DETAIL_LABEL_XY = (0.300, 0.150)
+DETAIL_RADIUS_MM = 11.0
+# The label rides right of the detail, below the pin-hole callout and clear
+# of the fence (x <= 0.281 at y 0.150).
+DETAIL_LABEL_XY = (0.322, 0.140)
 _DS = DETAIL_SCALE[0] / 1000.0
+# Section A-A's hub sits at (SECTION_CENTER[0], _front_y(0)); r2: the fence's
+# letter landed on the hatched rod, so it rides up-right of the 1:1 fence, on
+# clear paper short of the isometric.
+DETAIL_LETTER_XY = (0.153, 0.135)
+# The rod's axis in the detail: from inside the hub to just past the fence.
+ROD_AXIS_MODEL_Y_MM = (4.0, DETAIL_RADIUS_MM + 0.7)
 
 
 def _front_y(model_y_mm: float) -> float:
@@ -117,7 +125,8 @@ ROD_DIA_TEXT_Y = 20.0  # model height of the rod-diameter text, clear of the hub
 
 
 FRONT_KEEP = {
-    "HubOd": (0.030, _front_y(-HUB_OD / 2.0) - 0.010),
+    # r2: lower, so the leader passes under the section line's lower "A".
+    "HubOd": (0.030, _front_y(-HUB_OD / 2.0) - 0.022),
     "HubBore": (0.105, _front_y(-HUB_OD / 2.0) - 0.014),
     "RodTipY": (0.035, FRONT_CENTER[1] + 0.010),
     "RodDia": (0.105, _front_y(ROD_DIA_TEXT_Y)),
@@ -132,14 +141,16 @@ TOP_KEEP = {"CapR": (0.105, TOP_CENTER[1] + 0.012)}
 # at hole height and a short, near-horizontal leader (the isometric moved out
 # of that field).  ENFORCE r1 (#1011): every axial station is a baseline from
 # B, stacked below the hub with the overall length outermost, so no witness
-# line crosses another dimension: the bore depth reads left of B, the pin
-# station and the overall length between their witness lines.
+# line crosses another dimension.  ENFORCE r2: B's witness (z 5) struck the
+# FLAT BOTTOM and GRIP AXIS text and the pin hole's struck "4.0", so the grip,
+# pin and bore-depth texts all read left of B; the overall length reads
+# between its witness lines.
 DETAIL_TEXT_MODEL_MM = {
-    "GripFromB": (6.7, 10.7),
-    "PinHoleFromB": (3.0, -10.3),
-    "BoreDepthFromB": (10.0, -14.8),
-    "OverallFromB": (-1.0, -19.3),
-    "PinHoleDia": (-28.3, 2.7),
+    "GripFromB": (10.0, 13.5),
+    "PinHoleFromB": (9.0, -13.0),
+    "BoreDepthFromB": (13.0, -17.5),
+    "OverallFromB": (-1.0, -22.0),
+    "PinHoleDia": (-31.5, 2.7),
 }
 DETAIL_KEEP = {
     name: (DETAIL_CENTER[0] - z * _DS, DETAIL_CENTER[1] + y * _DS)
@@ -279,6 +290,67 @@ def _lever_section(adapter: Any, front: Any) -> Any:
     return section
 
 
+def _sketch_points(
+    adapter: Any, view: Any, sheet_xy: list[tuple[float, float]]
+) -> list:
+    """Sheet points in ``view``'s own sketch frame."""
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_xy:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    return points
+
+
+def _rod_axis_in_detail(adapter: Any, detail: Any) -> None:
+    """The grip rod's axis through detail B, for GRIP AXIS to dimension to.
+
+    The section hatches rod and hub as one piece, so nothing marks the axis;
+    r2's GRIP AXIS witness stood in mid-air.  The detail is centred on the hub
+    axis (its fence is), so the ends are placed from DETAIL_CENTER at 3:1,
+    direct to the database (an inferred end snaps onto nearby lines) and read
+    back (draw_sm_summing_lever ``_owned_centerline``).
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, detail)):
+        raise RuntimeError("failed to activate hub detail for the rod axis")
+    draw.ClearSelection2(True)
+    points = _sketch_points(
+        adapter,
+        detail,
+        [(DETAIL_CENTER[0], DETAIL_CENTER[1] + y * _DS) for y in ROD_AXIS_MODEL_Y_MM],
+    )
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateCenterLine(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if segment is None:
+        raise RuntimeError("failed to create the grip rod axis in detail B")
+    line = _early_bound(segment, "ISketchLine")
+    for expected, accessor in zip(points, ("GetStartPoint2", "GetEndPoint2")):
+        placed = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+        actual = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XYZ"]
+        if max(abs(a - b) for a, b in zip(actual, expected)) > 1e-9:
+            raise RuntimeError(
+                f"grip rod axis {accessor} moved from where it was placed"
+            )
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError("grip rod axis color did not persist")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="lever detail rod axis")
+
+
 def _hub_detail(adapter: Any, section: Any) -> Any:
     """A native 3:1 detail B of the hub in section A-A."""
     draw = adapter.currentModel
@@ -289,17 +361,29 @@ def _hub_detail(adapter: Any, section: Any) -> Any:
     draw.ClearSelection2(True)
     center = model_point_in_view(adapter, section, (0.0, 0.0, 0.0), label="hub centre")
     radius = DETAIL_RADIUS_MM * _S
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (center, (center[0] + radius, center[1])):
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
+    points = _sketch_points(adapter, section, [center, (center[0] + radius, center[1])])
+    # r2: an inferred circle snapped onto the section's B face and crown apex
+    # (a 6 mm fence centred 1 mm toward the crown), so it goes straight to the
+    # database and is read back before the detail selects it.
     manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if fence is None:
         raise RuntimeError("failed to create hub-detail fence")
+    arc = _early_bound(fence, "ISketchArc")
+    placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    placed_centre = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XY"]
+    if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
+        float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError("hub-detail fence moved from where it was placed")
+    draw.ClearSelection2(True)
+    if not _early_bound(fence, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select the hub-detail fence")
     detail = drawing.CreateDetailViewAt4(
         *DETAIL_CENTER,
         0.0,
@@ -322,6 +406,14 @@ def _hub_detail(adapter: Any, section: Any) -> Any:
     position = tuple(float(value) for value in detail.Position)
     if len(outline) != 4 or len(position) != 2:
         raise RuntimeError("hub detail has invalid bounds")
+    # r2's snapped fence printed a 6 mm detail; a short box is that again.
+    span = 2.0 * DETAIL_RADIUS_MM * _DS
+    _telemetry.info(
+        f"hub detail outline {outline[2] - outline[0]:.5f} x "
+        f"{outline[3] - outline[1]:.5f} m (fence {span:.5f})"
+    )
+    if min(outline[2] - outline[0], outline[3] - outline[1]) < 0.95 * span:
+        raise RuntimeError(f"hub detail is smaller than its fence: {outline}")
     target = [
         position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
         for axis in range(2)
@@ -341,6 +433,18 @@ def _hub_detail(adapter: Any, section: Any) -> Any:
     actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
     if math.dist(actual, label_xyz) > 1e-8:
         raise RuntimeError(f"hub detail label position did not persist: {actual}")
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(
+            f"expected one detail circle on section A-A, found {len(circles)}"
+        )
+    circle = _early_bound(circles[0], "IDetailCircle")
+    circle.SetLabelPosition(*DETAIL_LETTER_XY)
+    draw.EditRebuild3()
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"detail B's letter did not persist: {letter}")
+    _rod_axis_in_detail(adapter, detail)
     return detail
 
 

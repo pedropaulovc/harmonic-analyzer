@@ -313,3 +313,18 @@ def test_every_projected_view_and_the_section_hide_their_hidden_lines() -> None:
     assert "for view in (front, top, iso):" in source
     assert "set_hidden_lines_removed(adapter, section)" in source
     assert '"*Right"' not in source
+
+
+def test_detail_fence_and_rod_axis_go_straight_to_the_database() -> None:
+    # ENFORCE r2 (#1011): an inferred fence snapped to B and the crown apex
+    # (a 6 mm detail), and GRIP AXIS had no rod axis to land on.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for name in ("_hub_detail", "_rod_axis_in_detail"):
+        body = source[source.index(f"def {name}(") :]
+        body = body[: body.index("\ndef ")]
+        assert "manager.AddToDB = True" in body, name
+    assert "_rod_axis_in_detail(adapter, detail)" in source
+    assert "circle.SetLabelPosition(*DETAIL_LETTER_XY)" in source
+    # The rod axis runs from inside the hub to just past the fence.
+    low, high = drawing.ROD_AXIS_MODEL_Y_MM
+    assert low < dt_pinion_lever_spec.HUB_OD / 2.0 < drawing.DETAIL_RADIUS_MM < high
