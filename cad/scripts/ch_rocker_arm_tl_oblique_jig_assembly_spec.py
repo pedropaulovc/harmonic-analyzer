@@ -8,11 +8,12 @@ enters the harmonic-analyzer assembly tree or a machine BOM
 read from the calculator ``ch_rocker_arm_tl_oblique_trammel_spec`` (imported as
 ``trammel``), never retyped.
 
-Material: see the component drawings (TL-20 to TL-26). Overall envelope at the
-modelled pose, machine frame: X ±463.0 (the base bars' far column-side
-corners), Y -347.5 (the feed lever's grip end) to +85.8 (the bars' near
-column-side corners, 12.6 past the table's back edge since the 2026-10-17
-1/2 x 6 widening), Z 0 to 87.7 (the HUB pin's top); see ``MODEL_EXTENT``.
+Material: see the component drawings (TL-20 to TL-26, TL-28, TL-29). Overall
+envelope at the modelled pose, machine frame: X ±463.0 (the base bars' far
+column-side corners), Y -347.5 (the feed lever's grip end) to +85.8 (the
+bars' near column-side corners, 12.6 past the table's back edge since the
+2026-10-17 1/2 x 6 widening; the TL-28 brackets end flush with bar 1's
+column-side edge), Z 0 to 87.7 (the HUB pin's top); see ``MODEL_EXTENT``.
 
 Frame: the MACHINE frame. Origin on the spindle axis at the table top; +X along
 the table, +Y toward the column, +Z up. Rotation rows follow ``_transforms``:
@@ -27,22 +28,33 @@ the table, carriage tops at ``CARRIAGE_TOP_Z`` 40.7, pivot blocks to 64.7, the
 carrier from ``CARRIER_UNDERSIDE_Z`` 67.7 to ``CARRIER_TOP_Z`` 79.7; riser and
 feed lever on the carrier top; the HUB pin's head under the carrier.
 
+Leadscrew feed (``ch_rocker_arm_tl_oblique_leadscrew_spec``, imported as
+``leadscrew``): two TL-28 end brackets screwed up from bar 1's
+underside carry the KP08 blocks; the TL-29 nut bracket bolts to pivot block
+1's column-side face and carries the flanged nut, so it rides with carriage
+1. The Tr8x2 nut does not back-drive: the TL-26 lever feeds (roughing) only
+with the nut bracket's block screws out; the handwheel feeds the finish pass.
+
 Bought hardware is NOT modelled (TrammelJig ruling, option (a)): the two
 HGR15R rails, the two HGH15CA carriages, the four 6200-2RS bearings, the
-CL dowel and the hold-down studs. The pivot blocks therefore stand on the
-carriages' top plane with nothing modelled under them. The drawing's BOM lists
-each bought item by its shop-inventory id only, never a vendor SKU, so a
-source change needs no edit here (``BOUGHT_ITEMS``), and the clearance check
-below carries their catalogue envelopes. No skid (user ruling).
+CL dowel, the hold-down studs, the leadscrew, its nut, the two KP08 blocks
+and the handwheel. The pivot blocks therefore stand on the carriages' top
+plane with nothing modelled under them. The drawing's BOM lists each bought
+item by its shop-inventory id only, never a vendor SKU, so a source change
+needs no edit here (``BOUGHT_ITEMS``), and the clearance check below carries
+their catalogue envelopes (the KP08s with ``leadscrew.KP08_MARGIN`` all
+round). No skid (user ruling).
 
 The clearance check (``clearance_report``) sweeps both passes over
 ``trammel.SWEEP`` ⚙ and reports: the clearance of every moving outline to the
 column's pleated cover (Y = +``THROAT_TO_COVER`` ⚙), the machine X/Y reached,
 each base bar's overhang past its table end, each carriage's margin on its
 rail, every plan gap between a moving and a fixed item whose heights overlap,
-every height gap where their plans overlap, and every outline's margin to the
-four table edges. test_ch_rocker_arm_tl_oblique_jig_assembly.py pins the
-numbers.
+every height gap where their plans overlap (moving: carriages, pivot blocks
+and pins, the nut bracket, carrier, riser, lever and HUB pin head; fixed: the
+bars, rails, studs, nuts and the feed's brackets, KP08s, screw and
+handwheel), and every outline's margin to the four table edges.
+test_ch_rocker_arm_tl_oblique_jig_assembly.py pins the numbers.
 
 The hold-down stud envelope is an ESTIMATE, not a measurement (the
 ShopTrammelInventory reply: kit ``fixtures.clamping-kit-pm-52pcck-14mm``, its
@@ -58,8 +70,11 @@ from dataclasses import dataclass
 
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
+import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import ch_rocker_arm_tl_oblique_hub_pin_spec as hub_pin
+import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_oblique_nut_bracket_spec as nut_bracket
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
 import ch_rocker_arm_tl_oblique_riser_spec as riser
@@ -75,9 +90,11 @@ CARRIER = "ch-rocker-arm-tl-oblique-carrier"
 RISER = "ch-rocker-arm-tl-oblique-riser"
 HUB_PIN = "ch-rocker-arm-tl-oblique-hub-pin"
 FEED_LEVER = "ch-rocker-arm-tl-oblique-feed-lever"
+END_BRACKET = leadscrew.END_BRACKET
+NUT_BRACKET = leadscrew.NUT_BRACKET
 
 # Every component family and its count: the builder places, the explode moves
-# and the drawing's BOM proves exactly this inventory (registry order TL-20..26).
+# and the drawing's BOM proves exactly this inventory (registry order TL-20..29).
 QUANTITIES = {
     BASE_BAR: base_bar.QUANTITY,
     PIVOT_BLOCK: 2,
@@ -86,8 +103,24 @@ QUANTITIES = {
     RISER: 1,
     HUB_PIN: 1,
     FEED_LEVER: 1,
+    END_BRACKET: leadscrew.END_BRACKET_QUANTITY,
+    NUT_BRACKET: leadscrew.NUT_BRACKET_QUANTITY,
 }
-BOM_ORDER = (BASE_BAR, PIVOT_BLOCK, PIVOT_PIN, CARRIER, RISER, HUB_PIN, FEED_LEVER)
+# SolidWorks numbers a top-level BOM in FeatureManager order, so BOM_ORDER is
+# the builder's insertion order and the steps' item numbers (``_item``) read
+# it. c4-r10 (rule 25): the brackets go in before the carrier, so a BOM_ORDER
+# with them last cited the HUB pin as item 6 against the sheet's item 8.
+BOM_ORDER = (
+    BASE_BAR,
+    PIVOT_BLOCK,
+    PIVOT_PIN,
+    END_BRACKET,
+    NUT_BRACKET,
+    CARRIER,
+    RISER,
+    HUB_PIN,
+    FEED_LEVER,
+)
 
 Rows = tuple[tuple[float, float, float], ...]
 Point3 = tuple[float, float, float]
@@ -205,6 +238,33 @@ FEED_LEVER_ROWS = _rz(
     POSE.rotation, ((0.0, -1.0, 0.0), (0.0, 0.0, 1.0), (-1.0, 0.0, 0.0))
 )
 
+# Leadscrew feed (leadscrew_spec), on rail 1's column side. End brackets:
+# Z-up, origin on the bottom face at the inner end, mid-width, +X outward
+# (rail 1's +lateral, the block's -Y), +Y along the rail away from the spindle;
+# each stands on bar 1's top under its KP08.
+END_BRACKET_ROWS: Rows = (
+    tuple(-c for c in rail_rows(leadscrew.RAIL)[1]),
+    rail_rows(leadscrew.RAIL)[0],
+    (0.0, 0.0, 1.0),
+)
+END_BRACKET_PLACEMENTS: tuple[tuple[Point3, Rows], ...] = tuple(
+    (
+        (
+            *leadscrew.point(s, leadscrew.BRACKET_INNER_LATERAL),
+            trammel.BASE_BAR_THICK,
+        ),
+        END_BRACKET_ROWS,
+    )
+    for s in leadscrew.KP08_S
+)
+# Nut bracket: pivot block 1's axes, origin on the block's -Y face (rail 1's
+# +lateral) at the carriage centre, on the bracket's bottom face.
+NUT_BRACKET_ORIGIN: Point3 = (
+    *leadscrew.point(CARRIAGE_STATION, leadscrew.BLOCK_SIDE_LATERAL),
+    leadscrew.NUT_BRACKET_BOTTOM_Z,
+)
+NUT_BRACKET_ROWS = rail_rows(leadscrew.RAIL)
+
 # --- Heights ⚙ ---------------------------------------------------------------------
 RAIL_TOP_Z = trammel.RAIL_SEAT_Z + trammel.RAIL_HEIGHT  # 27.7
 CARRIAGE_UNDERSIDE_Z = trammel.RAIL_SEAT_Z + trammel.CARRIAGE_UNDER  # 17.0
@@ -216,13 +276,12 @@ PART_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + trammel.STRAP_THICK  
 # --- Hold-down studs (ESTIMATES, unmeasured) ---------------------------------------
 # PM-30MV T-slot: 14 throat (⚙ TSLOT_WIDTH) about 14 deep to the undercut; the
 # kit's T-nut foot is 8 high and is pulled up against the undercut's roof, and
-# the stud bottoms flush with the foot. A 3 in stud on the strap-pad members.
+# the stud bottoms flush with the foot. The kit's 3 in stud only (``fasteners``).
 TSLOT_THROAT_DEPTH = 14.0  # estimate
 TNUT_FOOT_HEIGHT = 8.0  # estimate (kit T-nut foot 24 x 24 x 8)
 STUD_BOTTOM_Z = -(TSLOT_THROAT_DEPTH + TNUT_FOOT_HEIGHT)
 STUD_DIA = base_bar.HOLD_DOWN_STUD_DIA  # 1/2-13
-STUD_LENGTH = 3.0 * trammel.INCH  # the ruling: 1/2-13 x 3 in studs only
-STUD_LENGTH_LONG = 4.0 * trammel.INCH  # the strap-pad-mill members' stud
+STUD_LENGTH = fasteners.HOLD_DOWN_STUD_LENGTH_MM  # the kit's 3 in stud only
 STUD_TOP_Z = STUD_BOTTOM_Z + STUD_LENGTH  # 54.2
 # The longest stud the sweep clears: the carrier's underside, the lowest moving
 # face over a stud, less the stud's bottom. The test pins it equal to the
@@ -295,6 +354,26 @@ BOUGHT_ITEMS: tuple[BoughtItem, ...] = (
         "HOLD-DOWN: 1/2-13 X 3 IN STUD, T-NUT, FLANGE NUT",
         2 * len(trammel.HOLD_DOWN_STUDS),
     ),
+    BoughtItem(
+        leadscrew.SCREW_ID,
+        f"TR8X2 LEADSCREW, {leadscrew.SCREW_LENGTH:.0f} LONG",
+        1,
+    ),
+    BoughtItem(
+        leadscrew.NUT_ID,
+        "TR8X2 FLANGED NUT, BRASS",
+        1,
+    ),
+    BoughtItem(
+        leadscrew.KP08_ID,
+        "PILLOW BLOCK, 8 BORE, SET SCREWS",
+        2,
+    ),
+    BoughtItem(
+        leadscrew.HANDWHEEL_ID,
+        f"HANDWHEEL {leadscrew.HANDWHEEL_WHEEL_DIA:.0f} DIA, 8 BORE",
+        1,
+    ),
 )
 
 # BOM DESCRIPTION cells for the modelled parts (the parts carry no
@@ -307,17 +386,20 @@ BOM_DESCRIPTIONS = {
     RISER: "ACETAL RISER",
     HUB_PIN: "HUB LOCATOR PIN",
     FEED_LEVER: "FEED LEVER",
+    END_BRACKET: "END BRACKET",
+    NUT_BRACKET: "NUT BRACKET",
 }
 
 # --- Native explode (JIG_EXPLODED) -------------------------------------------------
 # The disassembly order, ASSEMBLY_STEPS read back to front, along Z so the
 # exploded isometric (ISOMETRIC_VIEW, +Z up the sheet) stands the stack in
-# its fitting order: base bars on the table, the pivot blocks over the
-# carriages' plane (the rails and carriages are bought, not modelled), each
-# pivot pin above its block, bearing end down, as it is pressed in; then the
-# carrier with its HUB pin dropped out beneath it, and the riser and the feed
-# lever over it. Each step's families move by a signed distance; a family's
-# lift is the sum of the steps naming it (``explode_lift``).
+# its fitting order: base bars on the table with the end brackets on bar
+# 1, the pivot blocks (the nut bracket bolted on block 1) over the carriages'
+# plane (the rails, carriages and the feed's bought parts are not modelled),
+# each pivot pin above its block, bearing end down, as it is pressed in; then
+# the carrier with its HUB pin dropped out beneath it, and the riser and the
+# feed lever over it. Each step's families move by a signed distance; a
+# family's lift is the sum of the steps naming it (``explode_lift``).
 # (label, families, axis, signed distance mm).
 EXPLODED_VIEW_NAME = "JIG_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
@@ -326,7 +408,7 @@ EXPLODE_STEPS = (
     ("riser lifts off", (RISER,), "z", 60.0),
     ("carrier lifts off the pins", (CARRIER, HUB_PIN, RISER, FEED_LEVER), "z", 190.0),
     ("hub pin presses out down", (HUB_PIN,), "z", -150.0),
-    ("pivot blocks lift off", (PIVOT_BLOCK, PIVOT_PIN), "z", 60.0),
+    ("pivot blocks lift off", (PIVOT_BLOCK, PIVOT_PIN, NUT_BRACKET), "z", 60.0),
     ("pivot pins press out up", (PIVOT_PIN,), "z", 60.0),
 )
 
@@ -409,9 +491,9 @@ ELEVATION_VIEW_LABEL = "ELEVATION FROM THE OPERATOR SIDE (-Y)"
 # Each tag's text, the machine point its leader touches and the machine XY of
 # the text's top-left corner, laid out for 1:4: a character is about 11.6
 # and a line 18 machine mm there. A1-B2 tag the carrier's pass holes (the
-# pins in A1/B1), clear of its edges and the bars'; each rail tag points at its rail's
-# axis on the bar, below the bar; the origin tag stands under the carrier,
-# right of the feed lever.
+# pins in A1/B1), clear of its edges and the bars'; each rail tag points at
+# its rail's axis on the bar, below the bar (the feed is on rail 1's column
+# side); the origin tag stands under the carrier, right of the feed lever.
 @dataclass(frozen=True)
 class PlanTag:
     text: str
@@ -510,11 +592,15 @@ ALIGNMENT_NOTE_LINES = (
     *_alignment_rows(),
 )
 
-_LEVER_SCREW = f"{carrier.LEVER_THREAD} SHCS"
-# The riser's countersinks take only the B18.6.3 machine-screw head; a B18.3
-# socket flat head stands proud of them (trammel spec; Codex #1583).
-_RISER_SCREW = f"B18.6.3 {trammel.RISER_SCREW} X 1/2 FLAT HEADS"
-_RAIL_SCREW = f"{trammel.RAIL_SCREW} X 3/4 SHCS"
+# Every screw by its fastener-table callout (fasteners.FASTENERS).
+_RAIL_SCREW = fasteners.callout(fasteners.RAIL_TO_BAR)
+_BAR_SCREW = fasteners.callout(fasteners.BRACKET_TO_BAR)
+_BLOCK_SCREW = fasteners.callout(fasteners.NUT_BRACKET_TO_BLOCK)
+_CARRIAGE_SCREW = fasteners.callout(fasteners.BLOCK_TO_CARRIAGE)
+_KP08_SCREW = fasteners.callout(fasteners.KP08_TO_BRACKET)
+_NUT_SCREW = fasteners.callout(fasteners.NUT_TO_NUT_BRACKET)
+_RISER_SCREW = fasteners.callout(fasteners.RISER_TO_CARRIER)
+_LEVER_SCREW = fasteners.callout(fasteners.LEVER_TO_CARRIER)
 
 
 def _limits(nominal: float, band: tuple[float, float], places: int) -> str:
@@ -528,7 +614,7 @@ def _item(stem: str) -> int:
     return BOM_ORDER.index(stem) + 1
 
 
-# Step 8 states the two finished holes itself (TL-21 prints only their
+# Step 10 states the two finished holes itself (TL-21 prints only their
 # centre-drill spots): the HUB hole's H7 is the HUB pin's press fit, the CL
 # hole's N7 the bought m6 dowel's. c3-r7 (rule 4): H7 alone did not read as
 # a press fit, so the HUB hole names the fit, its item and the p6/H7
@@ -547,13 +633,18 @@ _CL_HOLE = (
     f"({_limits(carrier.CL_DOWEL_DIA, carrier.CL_DOWEL_BAND, 3)})"
 )
 ASSEMBLY_STEPS = (
-    f"1. SCREW AN HGR15R RAIL ON EACH BASE BAR WITH {len(base_bar.RAIL_HOLE_X)} "
+    f"1. SCREW AN HGR15R RAIL ON EACH BASE BAR WITH {trammel.RAIL_HOLE_COUNT} "
     f"{_RAIL_SCREW}, ENDS FLUSH: "
     "ONE BAR AS DRAWN FOR RAIL 1 (-X SIDE), THE OTHER TURNED OVER FOR RAIL 2, "
-    "SO EACH BAR'S NEAR SLOT IS ON THE COLUMN SIDE.",
+    "ITS COUNTERBORES UP. SCREW AN END BRACKET "
+    f"ON RAIL 1'S BAR AT EACH KP08 STATION WITH "
+    f"{len(leadscrew.BAR_SCREW_LATERALS)} {_BAR_SCREW} UP FROM THE BAR'S "
+    f"UNDERSIDE, TORQUE {leadscrew.BAR_SCREW_TORQUE_NM:.1f} N-M "
+    f"({leadscrew.BAR_SCREW_TORQUE_IN_LBF} IN-LBF).",
     "2. SET BOTH BARS ON THE TABLE, NEAR ENDS TOWARD THE SPINDLE, EACH HELD BY "
-    "TWO HOLD-DOWNS IN THE OUTER T-SLOTS ON 1/2-13 X "
-    f"{STUD_LENGTH / trammel.INCH:.0f} IN STUDS ONLY; ANY STUD LONGER THAN "
+    "TWO HOLD-DOWNS IN THE OUTER T-SLOTS ON "
+    f"{fasteners.HOLD_DOWN_STUD_THREAD} X {fasteners.HOLD_DOWN_STUD_LENGTH} IN "
+    "STUDS ONLY; ANY STUD LONGER THAN "
     f"{inch_eighths_down(STUD_LENGTH_MAX)} IN REACHES THE SWINGING CARRIER. "
     "NUTS FINGER TIGHT.",
     "3. SLIDE AN HGH15CA CARRIAGE ONTO EACH RAIL.",
@@ -561,36 +652,59 @@ ASSEMBLY_STEPS = (
     "OUTER RACES ON THE SHOULDER. PRESS A PIVOT PIN DOWN FROM THE BLOCK'S TOP "
     "FACE, BEARING END FIRST, THROUGH BOTH INNER RACES UNTIL ITS COLLAR SEATS "
     "ON THE UPPER RACE.",
-    "5. SCREW EACH BLOCK ON ITS CARRIAGE WITH 4 M4 SHCS, BORE TOWARD THE SPINDLE.",
+    f"5. SCREW EACH BLOCK ON ITS CARRIAGE WITH 4 {_CARRIAGE_SCREW}, BORE "
+    "TOWARD THE SPINDLE.",
     "6. INDICATE THE PIVOT PIN AT EACH STATION OF THE ALIGNMENT TABLE (SHEET 1) "
     "AND TAP EACH BAR TO ITS READINGS; TIGHTEN THE HOLD-DOWN NUTS AND READ "
     "AGAIN.",
-    "7. LOWER THE CARRIER PLATE ONTO THE PINS, ITS HOLES A1 AND B1 (INNER PASS, "
+    f"7. SCREW A KP08 BLOCK ON EACH END BRACKET WITH 2 {_KP08_SCREW} AND THE "
+    f"FLANGED NUT ON THE NUT BRACKET WITH 4 {_NUT_SCREW}, FLANGE TOWARD THE "
+    "SPINDLE, SNUG. THREAD THE LEADSCREW IN FROM THE BAR'S FAR END THROUGH "
+    f"BOTH BLOCKS AND THE NUT, {leadscrew.NEAR_STUB:.0f} PAST THE NEAR "
+    "BLOCK; IT TURNS FREELY. CLAMP THE BRACKET ON THE COLUMN SIDE OF RAIL "
+    f"1'S PIVOT BLOCK, ITS CENTRE "
+    f"{nut_bracket.X_SET_MID:.{nut_bracket.X_SET_PLACES}f} "
+    "FROM THE BLOCK'S SPINDLE END; SPOT THROUGH "
+    f"THE BLOCK'S 2 Ø{pivot_block.SIDE_HOLE_DIA:.2f} SIDE HOLES ({nut_bracket.TRANSFER_PUNCH} "
+    "TRANSFER PUNCH). RUN THE SCREW OUT, REMOVE THE BRACKET, DRILL AND TAP THE "
+    f"SPOTS {nut_bracket.BLOCK_THREAD} PER {nut_bracket.NUMBER}; REFIT AND "
+    f"BOLT IT ON WITH 2 {_BLOCK_SCREW} FROM THE FAR FACE, SNUG.",
+    "8. TIGHTEN THE NUT SCREWS, THEN THE BRACKET'S BLOCK SCREWS, THEN THE KP08 "
+    "SCREWS, SO THE SCREW TURNS FREELY OVER THE WHOLE TRAVEL; LOCK THE KP08 SET "
+    f"SCREWS. PUSH THE HANDWHEEL ON, HUB {leadscrew.HUB_GAP:.0f} OFF THE FAR "
+    "BLOCK, AND LOCK ITS SET SCREW.",
+    "9. LOWER THE CARRIER PLATE ONTO THE PINS, ITS HOLES A1 AND B1 (INNER PASS, "
     "TAGGED ON SHEET 1) ON THE COLLARS.",
-    "8. WITH THE CARRIER ON A1/B1, DRILL AND REAM ITS HUB AND CL HOLES OFF "
+    "10. WITH THE CARRIER ON A1/B1, DRILL AND REAM ITS HUB AND CL HOLES OFF "
     "THEIR SPOTS (LOCATED ON MHA-CH-006-TL-21 FROM THE A1-B1 PIN AXES), EACH "
     "IN ONE SETUP SQUARE TO THE CARRIER TOP: "
     f"{_HUB_HOLE}; {_CL_HOLE}; BREAK THE HUB HOLE BELOW "
     f"{hub_pin.HUB_HOLE_UNDERSIDE_BREAK_MIN:.1f} MIN X 45°.",
-    "9. CLAMP THE RISER ON THE CARRIER TOP AND SPOT ITS "
+    "11. CLAMP THE RISER ON THE CARRIER TOP AND SPOT ITS "
     f"{len(riser.SCREW_HOLES) + 3} HOLES ({len(riser.SCREW_HOLES)} "
     f"{riser.SCREW_SIZE} COUNTERSUNK, HUB Ø{riser.HUB_DIA:.0f}, CL DOWEL, CR SCREW "
     f"Ø{riser.CLAMP_DIA:.2f}) FROM BELOW THROUGH THE CARRIER'S FINISHED AND "
     "TAPPED HOLES; DRILL AND COUNTERSINK THEM TO "
     "MHA-CH-006-TL-24, THEN SCREW IT DOWN WITH "
-    f"{len(riser.SCREW_HOLES)} {_RISER_SCREW}. ONLY NOW PRESS "
+    f"{len(riser.SCREW_HOLES)} {_RISER_SCREW}S. ONLY NOW PRESS "
     "THE HUB PIN UP TO ITS HEAD AND THE CL DOWEL FLUSH UNDERNEATH; FACE THE "
     f"HUB PIN'S TOP {hub_pin.LOCATOR_SET_MIN:.2f}-{hub_pin.LOCATOR_SET_MAX:.2f} "
     f"ABOVE THE RISER AND RECHAMFER IT {hub_pin.LEAD_CHAMFER:.1f} X 45° MAX.",
-    f"10. BOLT THE FEED LEVER ON WITH 2 {_LEVER_SCREW}, GRIP END TOWARD THE OPERATOR.",
-    "11. TO CHANGE PASS, LIFT THE CARRIER, SLIDE THE CARRIAGES UNTIL THE PINS "
-    "MEET A2/B2 AND LOWER IT; THE STEP 6 READINGS STAND. SHIP ON A1/B1.",
+    f"12. BOLT THE FEED LEVER ON WITH 2 {_LEVER_SCREW}, GRIP END TOWARD THE OPERATOR.",
+    "13. TO CHANGE PASS, LIFT THE CARRIER, RUN CARRIAGE 1 BY THE HANDWHEEL AND "
+    "SLIDE CARRIAGE 2 UNTIL THE PINS MEET A2/B2, AND LOWER IT; THE STEP 6 "
+    "READINGS STAND. SHIP ON A1/B1.",
 )
+# The Tr8x2 nut does not back-drive: the lever feeds (roughing) only with the
+# nut bracket's block screws out; the handwheel feeds the finish pass.
 ASSEMBLY_CHECKS = (
     f"CHECK: EVERY ALIGNMENT READING WITHIN ±{ALIGNMENT_BAND:.2f} OF ITS TARGET.",
-    "CHECK: SWING THE CARRIER BY THE LEVER THROUGH THE WHOLE SWEEP OF EACH PASS; "
-    "IT TURNS FREELY, NOTHING TOUCHES THE STUDS, NUTS OR COLUMN COVER AND BOTH "
-    "CARRIAGES STAY ON THEIR RAILS.",
+    "CHECK: WITH THE NUT BRACKET'S 2 BLOCK SCREWS OUT, SWING THE CARRIER BY THE "
+    "LEVER THROUGH THE WHOLE SWEEP OF EACH PASS; IT TURNS FREELY, NOTHING "
+    "TOUCHES THE STUDS, NUTS OR COLUMN COVER AND BOTH CARRIAGES STAY ON THEIR "
+    "RAILS.",
+    "CHECK: WITH THE BLOCK SCREWS IN, THE HANDWHEEL RUNS THE SAME SWEEPS "
+    "WITHOUT BINDING.",
     "CHECK: THE CARRIER SITS ON BOTH PIN COLLARS; NO PIN STANDS ABOVE ITS TOP.",
 )
 
@@ -626,22 +740,34 @@ CARRIER_OUTLINES: dict[str, list[tuple[float, float]]] = {
         carrier.LEVER_INNER_END_Y,
     ),
 }
-# The underside of each moving item (machine Z).
-MOVING_BOTTOM_Z = {
-    "carrier": trammel.CARRIER_UNDERSIDE_Z,
-    "riser": trammel.CARRIER_TOP_Z,
-    "feed lever": trammel.CARRIER_TOP_Z,
-    "HUB pin head": HUB_HEAD_BOTTOM_Z,
-    "pivot block": trammel.CARRIAGE_TOP_Z,
-    "carriage": CARRIAGE_UNDERSIDE_Z,
+# Each moving item's height, underside to top (machine Z).
+MOVING_Z = {
+    "carrier": (trammel.CARRIER_UNDERSIDE_Z, trammel.CARRIER_TOP_Z),
+    "riser": (trammel.CARRIER_TOP_Z, trammel.CARRIER_TOP_Z + trammel.RISER_THICK),
+    "feed lever": (
+        trammel.CARRIER_TOP_Z,
+        trammel.CARRIER_TOP_Z + feed_lever.LEVER_THICK,
+    ),
+    "HUB pin head": (HUB_HEAD_BOTTOM_Z, trammel.CARRIER_UNDERSIDE_Z),
+    "pivot block": (trammel.CARRIAGE_TOP_Z, trammel.PIVOT_BLOCK_TOP_Z),
+    "pivot pin": (PIN_BOTTOM_Z, PIN_TOP_Z),
+    "carriage": (CARRIAGE_UNDERSIDE_Z, trammel.CARRIAGE_TOP_Z),
+    "nut bracket": leadscrew.NUT_BRACKET_Z,  # with its nut
 }
-# The top of each fixed item (machine Z).
-FIXED_TOP_Z = {
-    "base bar": trammel.BASE_BAR_THICK,
-    "rail": RAIL_TOP_Z,
-    "flange nut": FLANGE_NUT_TOP_Z,
-    "stud": STUD_TOP_Z,
+# Each fixed item's height, bottom to top (machine Z); the leadscrew feed's
+# bought items are leadscrew_spec's envelopes.
+FIXED_Z = {
+    "base bar": (0.0, trammel.BASE_BAR_THICK),
+    "rail": (trammel.RAIL_SEAT_Z, RAIL_TOP_Z),
+    "flange nut": (trammel.BASE_BAR_THICK, FLANGE_NUT_TOP_Z),
+    "stud": (STUD_BOTTOM_Z, STUD_TOP_Z),
+    "end bracket": leadscrew.BRACKET_Z,
+    "KP08": leadscrew.KP08_Z,
+    "screw": leadscrew.SCREW_Z,
+    "handwheel": leadscrew.HANDWHEEL_Z,
 }
+# Pairs that pass through each other by design: (moving family, fixed family).
+THREADED = {("carriage", "rail"), ("nut bracket", "screw")}
 
 
 def _model_extent() -> tuple[
@@ -651,6 +777,15 @@ def _model_extent() -> tuple[
     points += [
         POSE.to_machine(p) for outline in CARRIER_OUTLINES.values() for p in outline
     ]
+    points += [
+        p for box in leadscrew.BRACKET_BOXES.values() for p in leadscrew.rect(*box)
+    ]
+    points += leadscrew.rect(
+        CARRIAGE_STATION + leadscrew.NUT_BRACKET_X[0],
+        CARRIAGE_STATION + leadscrew.NUT_BRACKET_X[1],
+        leadscrew.BLOCK_SIDE_LATERAL,
+        leadscrew.BLOCK_SIDE_LATERAL + leadscrew.NUT_BRACKET_DEPTH,
+    )
     xs = [p[0] for p in points]
     ys = [p[1] for p in points]
     return (min(xs), max(xs)), (min(ys), max(ys)), (0.0, HUB_PIN_TOP_Z)
@@ -693,7 +828,8 @@ def moving_outlines(
         name: [pose.to_machine(p) for p in outline]
         for name, outline in CARRIER_OUTLINES.items()
     }
-    for rail, station in carriage_stations(pass_name, theta).items():
+    stations = carriage_stations(pass_name, theta)
+    for rail, station in stations.items():
         out[f"pivot block {rail}"] = _rail_rect(
             rail,
             station + pivot_block.BLOCK_X0,
@@ -706,7 +842,23 @@ def moving_outlines(
             station + trammel.CARRIAGE_LENGTH / 2.0,
             trammel.CARRIAGE_WIDTH / 2.0,
         )
+    out["nut bracket"] = leadscrew.rect(
+        *leadscrew.nut_bracket_box(stations[leadscrew.RAIL])
+    )
     return out
+
+
+def pin_circles(
+    pass_name: str, theta: float
+) -> dict[str, tuple[tuple[float, float], float]]:
+    """(machine XY centre, collar radius) of each pivot pin at one cutter angle."""
+    return {
+        f"pivot pin {rail}": (
+            trammel.rail_point(rail, station + trammel.PIN_OFFSET),
+            pivot_pin.COLLAR_DIA / 2.0,
+        )
+        for rail, station in carriage_stations(pass_name, theta).items()
+    }
 
 
 def hub_head(pass_name: str, theta: float) -> tuple[tuple[float, float], float]:
@@ -727,6 +879,17 @@ def fixed_outlines() -> dict[str, list[tuple[float, float]]]:
     return out
 
 
+def feed_outlines() -> dict[str, list[tuple[float, float]]]:
+    """Machine-XY plan boxes of the leadscrew feed's stationary items."""
+    boxes = {
+        **leadscrew.BRACKET_BOXES,
+        **leadscrew.KP08_BOXES,
+        "screw": leadscrew.SCREW_BOX,
+        "handwheel": leadscrew.HANDWHEEL_BOX,
+    }
+    return {name: leadscrew.rect(*box) for name, box in boxes.items()}
+
+
 def stud_centres() -> dict[str, tuple[float, float]]:
     """Machine XY of the four hold-down studs (near and far on each bar)."""
     return {
@@ -737,10 +900,20 @@ def stud_centres() -> dict[str, tuple[float, float]]:
 
 
 def _family(name: str) -> str:
-    for family in (*MOVING_BOTTOM_Z, *FIXED_TOP_Z):
+    for family in (*MOVING_Z, *FIXED_Z):
         if name.startswith(family):
             return family
     raise KeyError(name)
+
+
+def z_span(name: str) -> tuple[float, float]:
+    """Machine-Z (bottom, top) of any item the clearance check names."""
+    if name.endswith("flange nut"):
+        return FIXED_Z["flange nut"]
+    if "stud" in name:
+        return FIXED_Z["stud"]
+    family = _family(name)
+    return MOVING_Z[family] if family in MOVING_Z else FIXED_Z[family]
 
 
 def _segment_distance(
@@ -788,11 +961,22 @@ def _polygons_overlap(
     return True
 
 
+def polygon_gap(a: list[tuple[float, float]], b: list[tuple[float, float]]) -> float:
+    """Plan gap between two convex polygons; negative where they overlap."""
+    edge = min(
+        _segment_distance(p, u, v)
+        for polygon, other in ((a, b), (b, a))
+        for p in polygon
+        for u, v in zip(other, other[1:] + other[:1])
+    )
+    return -edge if _polygons_overlap(a, b) else edge
+
+
 @dataclass(frozen=True)
 class ClearanceReport:
     """Every number the jig's clearance check pins (mm)."""
 
-    cover_clearance: dict[str, float]  # moving item -> min gap to the column cover
+    cover_clearance: dict[str, float]  # item -> min gap to the column cover
     moving_x: tuple[float, float]  # machine X reached by any moving item
     moving_y: tuple[float, float]
     fixed_x: tuple[float, float]  # machine X of the bars
@@ -809,9 +993,15 @@ def _update_min(store: dict, key, value: float) -> None:
     store[key] = min(store.get(key, value), value)
 
 
+def _heights_overlap(a: tuple[float, float], b: tuple[float, float]) -> bool:
+    return a[0] < b[1] and b[0] < a[1]
+
+
 def clearance_report(samples: int = SWEEP_SAMPLES) -> ClearanceReport:
     """Sweep both passes over ±SWEEP ⚙ and measure every clearance."""
-    fixed = fixed_outlines()
+    bars = fixed_outlines()
+    feed = feed_outlines()
+    fixed = {**bars, **feed}
     studs = stud_centres()
     cover: dict[str, float] = {}
     edges: dict[str, dict[str, float]] = {}
@@ -831,19 +1021,30 @@ def clearance_report(samples: int = SWEEP_SAMPLES) -> ClearanceReport:
         ):
             _update_min(store, edge, value)
 
-    def fixed_pairs(name: str, outline=None, circle=None) -> None:
-        bottom = MOVING_BOTTOM_Z[_family(name)]
-        for fixed_name, polygon in fixed.items():
-            if name.startswith("carriage") and fixed_name.startswith("rail"):
-                continue  # the carriage straddles its rail by design
-            key = (name, fixed_name)
-            overlap = (
-                _polygons_overlap(outline, polygon)
-                if outline
-                else (circle_polygon_gap(*circle, polygon) < 0.0)
-            )
-            if overlap:
-                plan_overlap.add(key)
+    def pairs(name: str, others: dict, outline=None, circle=None) -> None:
+        """``name`` (a plan polygon or a (centre, radius) circle) against each
+        of ``others`` (polygons): the plan gap where the heights overlap, the
+        plan overlap otherwise."""
+        z = z_span(name)
+        for other, polygon in others.items():
+            if (_family(name), _family(other)) in THREADED:
+                continue  # passes through it by design
+            key = (name, other)
+            heights = _heights_overlap(z, z_span(other))
+            if outline is not None:
+                if _polygons_overlap(outline, polygon):
+                    plan_overlap.add(key)
+                if heights:
+                    _update_min(plan_gaps, key, polygon_gap(outline, polygon))
+            else:
+                gap = circle_polygon_gap(*circle, polygon)
+                if gap < 0.0:
+                    plan_overlap.add(key)
+                if heights:
+                    _update_min(plan_gaps, key, gap)
+
+    def stud_pairs(name: str, outline=None, circle=None) -> None:
+        z = z_span(name)
         for stud_name, centre in studs.items():
             for part, radius in (
                 ("stud", STUD_DIA / 2.0),
@@ -853,13 +1054,13 @@ def clearance_report(samples: int = SWEEP_SAMPLES) -> ClearanceReport:
                     name,
                     f"{stud_name} {part}" if part == "flange nut" else stud_name,
                 )
-                if outline:
+                if outline is not None:
                     gap = circle_polygon_gap(centre, radius, outline)
                 else:
                     gap = math.dist(centre, circle[0]) - radius - circle[1]
                 if gap < 0.0:
                     plan_overlap.add(key)
-                if bottom < FIXED_TOP_Z[part]:
+                if _heights_overlap(z, FIXED_Z[part]):
                     _update_min(plan_gaps, key, gap)
 
     for pass_name in trammel.PASS_RADIUS:
@@ -868,48 +1069,64 @@ def clearance_report(samples: int = SWEEP_SAMPLES) -> ClearanceReport:
             for station in carriage_stations(pass_name, theta).values():
                 near = min(near, station - trammel.CARRIAGE_S_RANGE[0])
                 far = min(far, trammel.CARRIAGE_S_RANGE[1] - station)
-            for name, outline in moving_outlines(pass_name, theta).items():
+            moving = moving_outlines(pass_name, theta)
+            for name, outline in moving.items():
                 xs = [p[0] for p in outline]
                 ys = [p[1] for p in outline]
                 moving_xs.extend((min(xs), max(xs)))
                 moving_ys.extend((min(ys), max(ys)))
                 _update_min(cover, name, COVER_Y - max(ys))
                 table_margins(name, xs, ys)
-                fixed_pairs(name, outline=outline)
+                pairs(name, fixed, outline=outline)
+                stud_pairs(name, outline=outline)
             centre, radius = hub_head(pass_name, theta)
             xs = [centre[0] - radius, centre[0] + radius]
             ys = [centre[1] - radius, centre[1] + radius]
             _update_min(cover, "HUB pin head", COVER_Y - ys[1])
             table_margins("HUB pin head", xs, ys)
-            fixed_pairs("HUB pin head", circle=(centre, radius))
+            pairs("HUB pin head", fixed, circle=(centre, radius))
+            stud_pairs("HUB pin head", circle=(centre, radius))
+            # The nut bracket rides carriage 1 under the carrier and its parts.
+            nut_bracket = {"nut bracket": moving["nut bracket"]}
+            pairs(
+                "nut bracket",
+                {name: moving[name] for name in CARRIER_OUTLINES},
+                outline=moving["nut bracket"],
+            )
+            pairs("HUB pin head", nut_bracket, circle=(centre, radius))
+            for name, circle in pin_circles(pass_name, theta).items():
+                pairs(name, {**fixed, **nut_bracket}, circle=circle)
+                stud_pairs(name, circle=circle)
         margins[pass_name] = (near, far)
 
-    fixed_points = [p for polygon in fixed.values() for p in polygon]
+    # The feed's stationary items against the hold-downs, the cover and the table.
+    for name, polygon in feed.items():
+        xs = [p[0] for p in polygon]
+        ys = [p[1] for p in polygon]
+        _update_min(cover, name, COVER_Y - max(ys))
+        table_margins(name, xs, ys)
+        stud_pairs(name, outline=polygon)
+
+    fixed_points = [p for polygon in bars.values() for p in polygon]
     fixed_xs = [p[0] for p in fixed_points]
     fixed_ys = [p[1] for p in fixed_points]
     for rail in RAILS:
-        bar = fixed[f"base bar {rail}"]
+        bar = bars[f"base bar {rail}"]
         table_margins(f"base bar {rail}", [p[0] for p in bar], [p[1] for p in bar])
     overhang = {
-        rail: max(abs(p[0]) for p in fixed[f"base bar {rail}"])
+        rail: max(abs(p[0]) for p in bars[f"base bar {rail}"])
         - trammel.TABLE_LENGTH / 2.0
         for rail in RAILS
     }
 
-    def top_of(fixed_name: str) -> float:
-        if fixed_name.endswith("flange nut"):
-            return FIXED_TOP_Z["flange nut"]
-        if "stud" in fixed_name:
-            return FIXED_TOP_Z["stud"]
-        return FIXED_TOP_Z[_family(fixed_name)]
+    def vertical_gap(key: tuple[str, str]) -> float:
+        a, b = z_span(key[0]), z_span(key[1])
+        return max(a[0] - b[1], b[0] - a[1])
 
-    height_gaps = {
-        key: MOVING_BOTTOM_Z[_family(key[0])] - top_of(key[1])
-        for key in sorted(plan_overlap)
-    }
+    height_gaps = {key: vertical_gap(key) for key in sorted(plan_overlap)}
     over_studs = [
-        MOVING_BOTTOM_Z[_family(moving)]
-        for moving, fixed_name in plan_overlap
+        z_span(item)[0]
+        for item, fixed_name in plan_overlap
         if "stud" in fixed_name and not fixed_name.endswith("flange nut")
     ]
     return ClearanceReport(

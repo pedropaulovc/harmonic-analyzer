@@ -3,15 +3,18 @@ r"""Reproduction script: ch-rocker-arm-tl-oblique-jig.SLDASM (MHA-CH-006-TL-000)
 The rocker arm's oblique-trammel mill jig, a shop fixture (never in the
 machine tree, ``_buildgraph.is_shop_fixture``): two of the one base bar (as
 saved under rail 1 on -X, turned over under rail 2 on +X), a pivot block with
-its pressed pivot pin on each rail's carriage, and the carrier riding the two
-pins with its riser, its pressed HUB locator pin and its feed lever.
+its pressed pivot pin on each rail's carriage, the carrier riding the two
+pins with its riser, its pressed HUB locator pin and its feed lever, and the
+leadscrew feed's two end brackets on bar 1 and nut bracket on pivot
+block 1.
 
 Authored in the MACHINE frame of ``ch_rocker_arm_tl_oblique_jig_assembly_spec``
 (origin on the spindle at the table top, +X along the table, +Y toward the
 column, +Z up) at the symmetric inner pass. Every pose is the spec's, derived
 from the calculator ``ch_rocker_arm_tl_oblique_trammel_spec``. The bought
-rails, carriages, bearings and dowel are not modelled; the drawing's BOM lists
-them. The modelled pose is one position of the sweep, so every component is
+rails, carriages, bearings, dowel, leadscrew, nut, KP08 blocks and handwheel
+are not modelled; the drawing's BOM lists them. The modelled pose is one
+position of the sweep, so every component is
 fixed (the fix-all strategy of the other sub-assemblies): 0 DOF, fully defined.
 
 The build names the spec's machine-frame views on the assembly
@@ -454,6 +457,24 @@ async def build(adapter) -> dict[str, str]:
         await _place_fixed(
             adapter, "ch-rocker-arm-tl-oblique-pivot-pin", origin, spec.PIN_ROWS
         )
+    # The leadscrew feed beside rail 1 (leadscrew_spec): an end bracket
+    # on bar 1's top under each KP08 station, and the nut bracket on pivot
+    # block 1's column-side face. The screw, nut, KP08 blocks and handwheel
+    # are bought and not modelled.
+    for which, (origin, rows) in zip(("near", "far"), spec.END_BRACKET_PLACEMENTS):
+        await _place_fixed(
+            adapter,
+            "ch-rocker-arm-tl-oblique-end-bracket",
+            origin,
+            rows,
+            label=f"end bracket {which}",
+        )
+    await _place_fixed(
+        adapter,
+        "ch-rocker-arm-tl-oblique-nut-bracket",
+        spec.NUT_BRACKET_ORIGIN,
+        spec.NUT_BRACKET_ROWS,
+    )
     # The carrier on the two pin collars, A1/B1 on the pins; the riser on its
     # top; the HUB pin pressed up from under it; the lever bolted on top.
     await _place_fixed(

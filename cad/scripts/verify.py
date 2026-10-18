@@ -221,10 +221,11 @@ _COMPONENT_BAND = {
     # the thumbscrew.
     "ms-measuring-stick": (5, 7),  # expected 6
     # The rocker's oblique-trammel jig (shop fixture, TL-000; never under the
-    # top): 2 base bars, 2 pivot blocks, 2 pivot pins, carrier, riser, HUB pin
-    # and feed lever; the bought rails, carriages, bearings and dowel are not
-    # modelled.
-    "ch-rocker-arm-tl-oblique-jig": (9, 11),  # expected 10
+    # top): 2 base bars, 2 pivot blocks, 2 pivot pins, carrier, riser, HUB pin,
+    # feed lever, 2 end brackets and the nut bracket; the bought rails,
+    # carriages, bearings, dowel, leadscrew, nut, KP08 blocks and handwheel are
+    # not modelled.
+    "ch-rocker-arm-tl-oblique-jig": (12, 14),  # expected 13
     "ha-harmonic-analyzer": (
         7,
         9,

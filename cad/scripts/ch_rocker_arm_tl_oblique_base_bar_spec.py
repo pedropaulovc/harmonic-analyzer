@@ -80,12 +80,32 @@ Walls (rule 17, worst case at the printed bands): the near slot to the bar's
 spindle end 14.2 nominal; a slot end to its bar side 16.25 nominal (the far
 slot to the +Y side; the near slot to the -Y side is 41.65), 13.9 worst (the
 far slot's: its rise, run and the stock width's bands all enter it).
+
+End bracket holes (PR C4): 8 x #8 SHCS clearance (``BRACKET_HOLE_DIA``
+4.978, normal fit) THRU, counterbored Ø7.94 x 4.80 from the UNDERSIDE, at
+the leadscrew layout's ``BASE_BAR_HOLES`` (four in a row at each KP08
+station, derived there; y -27.5, -44, -66 and -82.5, so rows 61.4, 44.9,
+22.9 and 6.4 from the -Y edge). Four #8-32 x 5/8 SHCS per TL-28 bracket go
+up through the bar into the bracket's tapped holes before the bar goes on
+the table; the heads sit 0.12 or more below the underside. Since the
+2026-10-17 widening (ruling A′) each bracket stands wholly on the bar, its
+outer end flush with the -Y edge. Both bars carry the holes; on the
+turned-over bar 2 the counterbores face up, unused. Stations and rows print
+at .XXX (±0.13): the row's spacings must hold TL-28's tapped row inside the
+screws' 0.406 float, so the callout names the mate. Worst-case walls
+(``bracket_hole_walls``): counterbore to the -Y edge 2.05 (the rule-17
+target, which bounds the outer screws' half-span), to the far end 6.85, to its
+row neighbour 7.68, to the nearest rail tap and hold-down slot over 20;
+counterbore floor 6.88.
 """
 
 from __future__ import annotations
 
-from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import printed_band_mm
+import math
+
+
+from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 INCH = 25.4
@@ -192,6 +212,118 @@ for _label, _nominal, _worst in (
 if SLOT_LATERAL - SLOT_RUN / 2.0 - _R_MAX <= trammel.RAIL_WIDTH / 2.0:
     raise AssertionError("a hold-down slot runs under the rail")
 
+# --- End bracket holes (PR C4) -------------------------------------------
+# The two TL-28 brackets' #8-32 x 5/8 SHCS, fitted up through the bar before it
+# goes on the table. Positions: ``ch_rocker_arm_tl_oblique_leadscrew_spec``'s
+# BASE_BAR_HOLES, which imports this module; only the build, drawing and test
+# read them, and pass them to ``bracket_hole_walls``.
+BRACKET_SCREW = "#8"
+BRACKET_HOLE_FIT = "normal"
+BRACKET_HOLE_DIA = CLEARANCE_MM[(BRACKET_SCREW, BRACKET_HOLE_FIT)]  # 4.978
+BRACKET_SCREW_HEAD_DIA = 0.270 * INCH  # #8 SHCS head, ASME B18.3 max: 6.858
+BRACKET_SCREW_HEAD_HEIGHT = 0.164 * INCH  # 4.166
+BRACKET_CBORE_DIA = 7.94  # 5/16 in
+BRACKET_CBORE_DEPTH = 4.80  # the shallowest printed depth still sinks the head
+BRACKET_HOLE_SPEC = HoleSpec(
+    "counterbore_socket",
+    BRACKET_SCREW,
+    fit=BRACKET_HOLE_FIT,
+    overrides_mm={
+        "HoleDiameter": BRACKET_HOLE_DIA,
+        "CounterBoreDiameter": BRACKET_CBORE_DIA,
+        "CounterBoreDepth": BRACKET_CBORE_DEPTH,
+    },
+)
+# Stations and rows at .XXX (±0.13 a side): the row's spacings must hold
+# TL-28's four tapped holes inside the screws' 0.406 float.
+BRACKET_HOLE_PLACES = 3
+BRACKET_CBORE_PLACES = 2
+BRACKET_CALLOUT_PRECISION = {
+    "hw-thruholedia": 2,
+    "hw-cbdia": BRACKET_CBORE_PLACES,
+    "hw-cbdepth": BRACKET_CBORE_PLACES,
+}
+BRACKET_MATE = "MHA-CH-006-TL-28"
+# The plan looks at the top face; the counterbores open on the underside.
+BRACKET_CALLOUT_PROCESS = f"MATCHES {BRACKET_MATE}\nDRILL, C'BORE FAR SIDE\n"
+_XXX = printed_band_mm(BRACKET_HOLE_PLACES)
+_CB = printed_band_mm(BRACKET_CBORE_PLACES)
+# Public for the leadscrew layout's rule-17 window (ruling A′): a hole's .XXX
+# band and the counterbore's largest printed radius.
+BRACKET_HOLE_BAND = _XXX
+BRACKET_CBORE_RADIUS_MAX = (BRACKET_CBORE_DIA + _CB) / 2.0
+BRACKET_HEAD_RECESS_MIN = BRACKET_CBORE_DEPTH - _CB - BRACKET_SCREW_HEAD_HEIGHT
+BRACKET_HEAD_CLEARANCE_MIN = BRACKET_CBORE_DIA - _CB - BRACKET_SCREW_HEAD_DIA
+BRACKET_HEAD_BEARING_MIN = (
+    BRACKET_SCREW_HEAD_DIA - (BRACKET_HOLE_DIA + drilled_oversize_mm())
+) / 2.0
+BRACKET_CBORE_FLOOR_MIN = (
+    BAR_THICK - printed_band_mm(THICK_PLACES) - (BRACKET_CBORE_DEPTH + _CB)
+)
+if BRACKET_HEAD_RECESS_MIN < 0.1:
+    raise AssertionError("a bracket screw head can stand proud of the underside")
+if BRACKET_HEAD_CLEARANCE_MIN < 0.25:
+    raise AssertionError("the bracket counterbore does not clear the screw head")
+if BRACKET_HEAD_BEARING_MIN < 0.5:
+    raise AssertionError("the bracket screw head bears on under 0.5 a side")
+if BRACKET_CBORE_FLOOR_MIN < 1.5:
+    raise AssertionError("the bracket counterbore floor is under rule 17's 1.5")
+BRACKET_WALL_MIN = 1.5  # rule 17, worst case
+
+
+def bracket_screw_under_head(screw_length: float) -> tuple[float, float]:
+    """The screw's reach past the bar's top (min, max) at the printed bands:
+    its length less the bar left under the counterbore."""
+    thick = printed_band_mm(THICK_PLACES)
+    return (
+        screw_length - (BAR_THICK + thick - (BRACKET_CBORE_DEPTH - _CB)),
+        screw_length - (BAR_THICK - thick - (BRACKET_CBORE_DEPTH + _CB)),
+    )
+
+
+def bracket_hole_walls(holes: tuple[tuple[float, float], ...]) -> dict[str, float]:
+    """Rule-17 walls round the bracket counterbores (the widest cut of each
+    hole), worst case at the printed bands, for part-frame hole centres."""
+    position = math.hypot(_XXX, _XXX)  # a hole's corner of its .XXX square
+    # A rail tap's station holds ±0.08 but its row only the title block's .XX
+    # (c3-r7): the row moves all seven taps against these holes' .XXX rows.
+    rail_position = math.hypot(RAIL_HOLE_BAND, printed_band_mm(RAIL_ROW_PLACES))
+    radius = BRACKET_CBORE_RADIUS_MAX
+    xs = [x for x, _ in holes]
+    rows = [y - LOW_SIDE_Y for _, y in holes]  # from the faced -Y edge
+    # Both slots: station and rise at .X from the -Y side, as the holes' rows
+    # (c3-r6: the far slot's drop from the +Y side, which added the stock
+    # width's band, became a rise).
+    slots = (
+        (NEAR_SLOT_X, NEAR_SLOT_Y, math.hypot(_X, _X)),
+        (FAR_SLOT_X, FAR_SLOT_Y, math.hypot(_X, _X)),
+    )
+    return {
+        "-Y edge": min(rows) - _XXX - radius,
+        "+Y edge": BAR_WIDTH - _X - (max(rows) + _XXX) - radius,
+        "spindle end": min(xs) - _XXX - radius,
+        "far end": BAR_LENGTH - _X - (max(xs) + _XXX) - radius,
+        "neighbour counterbore": min(
+            math.dist(a, b) for i, a in enumerate(holes) for b in holes[i + 1 :]
+        )
+        - 2.0 * position
+        - 2.0 * radius,
+        "rail tap": min(math.hypot(x - rx, y) for x, y in holes for rx in RAIL_HOLE_X)
+        - position
+        - rail_position
+        - radius
+        - THREAD_MAJOR_MM[RAIL_SCREW] / 2.0,
+        "hold-down slot": min(
+            math.hypot(x - sx, max(0.0, abs(y - sy) - SLOT_RUN / 2.0)) - slot_position
+            for x, y in holes
+            for sx, sy, slot_position in slots
+        )
+        - position
+        - _R_MAX
+        - radius,
+    }
+
+
 # --- Drawing contract ----------------------------------------------------------
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarProfile": {
@@ -207,6 +339,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Bar": {"BarThick"},
     "RailHoles": {f"RailHole{k}X" for k in range(1, len(RAIL_HOLE_X) + 1)},
     "RailRowReference": {"RailRowY"},
+    # The bracket rows' stations (one per KP08 station) from the spindle-end
+    # face, and the four rows from the faced -Y edge (the hidden reference
+    # sketch; ruling A′: four screws a bracket).
+    "BracketHoles": {"BracketHole1X", "BracketHole5X"},
+    "BracketRowReference": {f"BracketRow{k}Y" for k in range(1, 5)},
 }
 # The bar's width and thickness are the flat bar as bought: "STOCK" under them.
 STOCK_DIMENSIONS = frozenset({"BarWidth", "BarThick"})
@@ -223,6 +360,11 @@ _PLACES = {
     "BarThick": THICK_PLACES,
     "RailRowY": RAIL_ROW_PLACES,
     **{name: RAIL_HOLE_PLACES for _feature, name in TOLERANCES},
+    **{
+        name: BRACKET_HOLE_PLACES
+        for feature in ("BracketHoles", "BracketRowReference")
+        for name in DRAWING_DIMENSIONS[feature]
+    },
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: _PLACES.get(name, STATION_PLACES) for name in names}
