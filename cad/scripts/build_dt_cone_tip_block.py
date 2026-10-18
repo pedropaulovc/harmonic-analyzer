@@ -49,7 +49,6 @@ from _sketch import (
     blank_sketch,
     dimension_between,
     ensure_fully_defined,
-    set_sketch_direct_db,
 )
 from _sketch_rectangle import define_centered_rectangle
 from _drawing_precision import apply_drawing_precision
@@ -91,7 +90,7 @@ from _visibility import blank_reference_geometry
 PART_NAME = "dt-cone-tip-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it rides
 
-# The construction-only sketches that carry the drawing's location dimensions
+# The points-only sketches that carry the drawing's location dimensions
 # (_author_reference_dimension); hidden in the part before save.
 REFERENCE_SKETCHES = (
     "PassageCenterReference",
@@ -163,11 +162,20 @@ def _slit_removed() -> float:
     v -= 2.0 * SLIT_W * ADJUSTER_CSK**2 / 2.0
     return v
 
-def _as_construction(adapter, entity_id: str) -> None:
-    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{entity_id} did not take the construction flag")
+def _add_reference_point(adapter, uv: tuple[float, float], label: str) -> str:
+    """One sketch point straight into the sketch DB (no inference snap),
+    registered for the adapter's dimension refs
+    (build_ch_rocker_arm_tl_oblique_nut_bracket's idiom)."""
+    sketch_manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    previous = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        point = sketch_manager.CreatePoint(uv[0] / 1000.0, uv[1] / 1000.0, 0.0)
+    finally:
+        sketch_manager.AddToDB = previous
+    if point is None:
+        raise RuntimeError(f"cannot create the {label} reference point")
+    return adapter._register_sketch_entity("Point", point)
 
 
 async def _author_reference_dimension(
@@ -183,33 +191,33 @@ async def _author_reference_dimension(
     dimension_name: str,
     drive_expression: str,
 ) -> None:
-    """Author one construction-only, model-owned drawing location."""
+    """Author one model-owned drawing location: two sketch points and the
+    one driving dimension between them.  Points, not a construction line:
+    the drawing shows each reference sketch in the view it dimensions, and
+    a line under a face's edge printed grey over the object line (machinist
+    review of cd1153854; #1688; the TL-22 nut bracket's and MHA-DT-016's
+    points-only idiom)."""
     check(
         f"create_sketch {feature_name}",
         await adapter.create_sketch(plane),
     )
-    set_sketch_direct_db(adapter, True)
-    reference = check(
-        f"{feature_name} line",
-        await adapter.add_line(*start, *end),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, reference)
+    first = _add_reference_point(adapter, start, f"{feature_name} start")
+    second = _add_reference_point(adapter, end, f"{feature_name} end")
     check(
         f"{feature_name} {orientation}",
-        await adapter.add_sketch_constraint(reference, None, orientation),
+        await adapter.add_sketch_constraint(first, second, f"{orientation}_points"),
     )
     await dimension_between(
         adapter,
-        f"{reference}.start",
-        f"{reference}.end",
+        first,
+        second,
         dimension_type,
         value_mm,
         feature_name,
     )
     await anchor_point_to_origin(
         adapter,
-        f"{reference}.start",
+        first,
         *start,
         feature_name,
     )
@@ -433,7 +441,7 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven block (equations neutral)", volume, 0.01 * v_cb)
 
-    # Model-owned functional interfaces: construction-only dimensions carry
+    # Model-owned functional interfaces: points-only reference dimensions carry
     # every centre location that a machinist must set from a finished face.
     # r3 (Main, 2026-09-25): the axis locates from the -X face (the far jaw's;
     # PASSAGE_CENTER_DATUM), so the width's band falls on the pinch head's side.
@@ -478,8 +486,8 @@ async def build(adapter) -> dict[str, str]:
     # The pinch-hole centre straight from the foot, on the south face's
     # outline (the Right plane reads south as sketch +x).  The drawing must
     # keep this sketch shown in the right view to keep its dimension
-    # (_drawing_hidden_sketches, r21), so its line lies under the face's edge,
-    # as AxisHeight's does under the -X face.  The r3 diagonal from the south
+    # (_drawing_hidden_sketches, r21), so its points lie on the face's edge,
+    # as AxisHeight's do on the -X face.  The r3 diagonal from the south
     # corner to the hole centre printed as a stray line across the view
     # (machinist review of cc7f631ab, clarity).
     await _author_reference_dimension(
