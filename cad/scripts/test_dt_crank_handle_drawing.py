@@ -197,8 +197,12 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert handle.MATERIAL == "Oak"
     assert "white oak" in spec["material_specification"]
     # The title block's MATERIAL field prints "material" (MHA-DT-008
-    # machinist review of 2026-10-18: the grain belongs with the stock).
-    assert "straight grain" in spec["material"]
+    # machinist review of 2026-10-18: the grain belongs with the stock), in
+    # its one-line 36-character cell (Codex P2 on #1650); the long form
+    # stays in material_specification.
+    assert "grain axial" in spec["material"]
+    assert len(str(spec["material"])) <= 36
+    assert "straight grain along axis" in spec["material_specification"]
     assert "6-8% MC" in spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1
