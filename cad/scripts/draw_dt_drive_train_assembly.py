@@ -2784,21 +2784,27 @@ def _fit_cluster_view(
     preferred_outline = _view_outline(view)
     scale = cluster_ring_scale(preferred_outline, preferred, label=label)
     outline = preferred_outline
-    if scale != preferred:
-        # Every configuration switch comes before every explode and the BOM
-        # (``_place_package``): a step across 1:2 is refused, not switched.
-        # The pictorial view is judged shaded-with-edges, as
-        # apply_view_configuration judges it.
-        if view_configuration(scale, _SW_SHADED_EDGES) != configuration:
-            raise RuntimeError(
-                f"{label}: {_scale_text(scale)} would move the exploded view off "
-                f"{configuration!r}; a configuration switch here dirties the source"
-            )
-        _set_view_scale(adapter, view, scale, label=label)
-        outline = _view_outline(view)
-    # The ladder predicted this fit from the preferred outline; the re-read
-    # outline is the proof, before any balloon exists.
-    shift, overflows, slide = cluster_ring_fit(outline)
+    # The ladder predicts each fit from the preferred outline; the re-read
+    # outline is the proof, before any balloon exists. A shaded pictorial's
+    # outline does not scale exactly (r4, 20261018T074844468Z: the cone set,
+    # predicted to fit at 1:3, read 176.6 mm against 176.0), so a refused
+    # proof steps on down the ladder and proves again.
+    for scale in CLUSTER_SCALE_LADDER[CLUSTER_SCALE_LADDER.index(scale) :]:
+        if scale != preferred:
+            # Every configuration switch comes before every explode and the
+            # BOM (``_place_package``): a step across 1:2 is refused, not
+            # switched. The pictorial view is judged shaded-with-edges, as
+            # apply_view_configuration judges it.
+            if view_configuration(scale, _SW_SHADED_EDGES) != configuration:
+                raise RuntimeError(
+                    f"{label}: {_scale_text(scale)} would move the exploded view off "
+                    f"{configuration!r}; a configuration switch here dirties the source"
+                )
+            _set_view_scale(adapter, view, scale, label=label)
+            outline = _view_outline(view)
+        shift, overflows, slide = cluster_ring_fit(outline)
+        if not overflows:
+            break
     _telemetry.event(
         "drawing.cluster_ring_fit",
         cluster=cluster,

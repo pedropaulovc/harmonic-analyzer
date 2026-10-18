@@ -158,7 +158,11 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # length; the tip hardware leads it far enough to clear the tip's embed in
     # the block (both checked against the live shaft spec offline).
     ExplodeStep("swing plate drops", ("dt-cone-swing-platform",), "y", -30.0),
-    ExplodeStep("post mount screws lift", ("vn-post-mount-screw",), "y", 100.0),
+    # The MHA-VN-031 pair sets the cone-set sheet's top: lifted 100 (their
+    # 94.9 length clear of the post) its 1:3 balloon ring read 176.6 mm tall
+    # against the region's 176.0 (r4, 20261018T074844468Z). 88 leaves the
+    # lower 7 of each below its seated top end, the rest standing clear.
+    ExplodeStep("post mount screws lift", ("vn-post-mount-screw",), "y", 88.0),
     ExplodeStep("pivot screw lifts", ("vn-cone-pivot-screw",), "y", 35.0),
     ExplodeStep("lock knob lifts", ("vn-cone-lock-knob",), "y", 30.0),
     # The withdrawn cone's upper silhouette covers a 25 lift: run
