@@ -97,7 +97,7 @@ from magnifying_bracket_joint_layout import (
     TAP_DRILL_DIA,
     DRILL_DEPTH,
     DRILL_POINT_DEPTH,
-    DRILL_DEPTH_BAND,
+    DRILL_DEPTH_DEVIATIONS,
     THREAD_DEPTH_BAND,
     RIB_DEPTH as RECEIVER_RIB_T,
 )
@@ -1129,8 +1129,8 @@ def _receiver_model_bands(adapter) -> None:
 
     feature = _early_bound(model.FeatureByName("BracketMountingTaps"), "IFeature")
     required = {
-        "FullThreadDepth": (THREAD_DEPTH, THREAD_DEPTH_BAND),
-        "TapDrillDepth": (DRILL_DEPTH, DRILL_DEPTH_BAND),
+        "FullThreadDepth": (THREAD_DEPTH, (-THREAD_DEPTH_BAND, THREAD_DEPTH_BAND)),
+        "TapDrillDepth": (DRILL_DEPTH, DRILL_DEPTH_DEVIATIONS),
     }
     matches = {name: [] for name in required}
     # Hole Wizard thread lengths can belong to its cosmetic-thread subfeature.
@@ -1162,7 +1162,7 @@ def _receiver_model_bands(adapter) -> None:
     # one sketch subfeature, but adds one cosmetic-thread subfeature PER HOLE,
     # each owning its own full-thread depth.
     expected = {"FullThreadDepth": len(LEVER_HOLE_POINTS), "TapDrillDepth": 1}
-    for name, (_nominal, band) in required.items():
+    for name, (_nominal, limits) in required.items():
         owners = {match[0] for match in matches[name]}
         if len(matches[name]) != expected[name] or len(owners) != expected[name]:
             raise RuntimeError(
@@ -1175,40 +1175,47 @@ def _receiver_model_bands(adapter) -> None:
             # rewrite them. Subfeatures (Sketch14, Hole Thread22...) are not
             # reachable by FeatureByName, and the per-hole threads share the
             # name D1, so band the dimensions already held, not by name.
-            _band_held_dimension(display, dimension, band, f"{native_name}@{owner}")
+            _band_held_dimension(
+                display, dimension, limits, f"{native_name}@{owner}"
+            )
 
 
-def _band_held_dimension(display, dimension, band: float, label: str) -> None:
-    """Symmetric tolerance + 2-place display on an already-resolved dimension
-    (the by-name ``set_dimension_symmetric_tolerance`` contract, minus lookup)."""
+def _band_held_dimension(
+    display, dimension, deviations: tuple[float, float], label: str
+) -> None:
+    """(lower, upper) tolerance in mm + 2-place display on an already-resolved
+    dimension: symmetric when the deviations mirror, else bilateral (the
+    by-name ``set_dimension_*_tolerance`` contracts, minus lookup)."""
     from _com import _bind, _early_bound
     from _drawing_tolerances import _set_tolerance_precision
 
+    lower, upper = deviations
+    kind = 4 if math.isclose(lower, -upper) else 2  # swTolSYMMETRIC / swTolBILAT
     display = _bind(display, "IDisplayDimension")
     dimension = _bind(dimension, "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = 4  # swTolType_e.swTolSYMMETRIC
-    band_m = band / 1000.0
-    if not tolerance.SetValues(-band_m, band_m):
-        raise RuntimeError(f"{label}: SetValues rejected +/-{band} mm")
+    tolerance.Type = kind
+    lower_m, upper_m = lower / 1000.0, upper / 1000.0
+    if not tolerance.SetValues(lower_m, upper_m):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
     minimum = float(tolerance.GetMinValue())
     maximum = float(tolerance.GetMaxValue())
     if (
-        int(tolerance.Type) != 4
-        or abs(minimum + band_m) > 1e-9
-        or abs(maximum - band_m) > 1e-9
+        int(tolerance.Type) != kind
+        or abs(minimum - lower_m) > 1e-9
+        or abs(maximum - upper_m) > 1e-9
     ):
         raise RuntimeError(
             f"{label}: tolerance readback type {int(tolerance.Type)} "
-            f"{minimum:g}/{maximum:g} m != symmetric +/-{band_m:g} m"
+            f"{minimum:g}/{maximum:g} m != type {kind} {lower_m:g}/{upper_m:g} m"
         )
-    _set_tolerance_precision(display, (-band, band), label=label)
+    _set_tolerance_precision(display, (lower, upper), label=label)
     display = _early_bound(display, "IDisplayDimension")
     do_not_change = -1  # swDimensionPrecisionSettings_e
     display.SetPrecision3(2, do_not_change, do_not_change, do_not_change)
     if int(display.GetPrimaryPrecision2()) != 2:
         raise RuntimeError(f"{label}: display precision did not persist")
-    _telemetry.success(f"toleranced {label}: +/-{band:g} mm (2 decimals)")
+    _telemetry.success(f"toleranced {label}: {upper:+g}/{lower:+g} mm (2 decimals)")
 
 
 def _as_construction(adapter, entity_id: str) -> None:

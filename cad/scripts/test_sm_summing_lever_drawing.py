@@ -181,7 +181,7 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert part.TAP_SPEC.depth_mm == 6.05
     assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
     assert joint.THREAD_DEPTH_BAND == 0.05
-    assert joint.DRILL_DEPTH_BAND == 0.10
+    assert joint.DRILL_DEPTH_DEVIATIONS == (0.0, 0.10)  # one-sided, +0.10/0
     # The -Z rib's depth rides the title block (no native band of its own).
     assert joint.RIB_DEPTH_BAND == joint.LINEAR_BAND
     assert not hasattr(joint, "RECEIVER_DIMENSION_BANDS")
@@ -873,9 +873,9 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     # Subfeatures are not FeatureByName-reachable and both threads are "D1":
     # band the exact native objects found in the walk, never a by-name lookup.
     assert held == [
-        (True, thread, 0.05, "D1@Hole Thread22"),
-        (True, thread_b, 0.05, "D1@Hole Thread23"),
-        (True, drill, 0.10, "Tap Drill Depth@Sketch14"),
+        (True, thread, (-0.05, 0.05), "D1@Hole Thread22"),
+        (True, thread_b, (-0.05, 0.05), "D1@Hole Thread23"),
+        (True, drill, (0.0, 0.10), "Tap Drill Depth@Sketch14"),
     ]
     assert (drill.Name, thread.Name, thread_b.Name, unrelated.Name) == (
         "Tap Drill Depth", "D1", "D1", "Depth"
@@ -949,7 +949,7 @@ def test_tap_section_cuts_the_outer_tap_through_the_rib_into_solid_plate() -> No
     for z in (end_z, end_z + joint.RIB_DEPTH):
         assert math.hypot(z - centre_z, rib_half) < radius
     far_z = drawing._TAP_SECTION_FAR_Z
-    assert far_z > end_z + joint.DRILL_DEPTH + joint.DRILL_DEPTH_BAND
+    assert far_z > end_z + joint.DRILL_DEPTH_MAX
     assert far_z > end_z + joint.RIB_DEPTH
     assert drawing.TAP_SECTION_BREAK[0][0] == drawing.TAP_SECTION_BREAK[-1][0] == far_z
     face_exit = centre_z + math.sqrt(radius**2 - (lever_build.PLATE_T / 2.0) ** 2)

@@ -164,8 +164,8 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
 REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"EdgeRibFrontEndStep"})
 
 # Leads the 2-56 receiver callout: what its two depth limits hold.  The full
-# thread prints as a minimum; the drill's band keeps the bottoming tap's two
-# pitches of lead inside the shallowest drill
+# thread prints as a minimum; the drill's one-sided +0.10/0 keeps the
+# bottoming tap's two pitches of lead inside the shallowest (nominal) drill
 # (``magnifying_bracket_joint_layout.TAP_LEAD_MARGIN_MIN``).  The drill runs
 # along the plate's mid-plane, so past the rib's inboard face is more plate,
 # not a floor: DRILL_POINT_RIB_MARGIN_MIN only keeps the point out of the

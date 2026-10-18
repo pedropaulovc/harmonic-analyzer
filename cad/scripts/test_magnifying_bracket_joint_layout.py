@@ -131,7 +131,10 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
     assert joint.RIB_DEPTH_BAND == joint.LINEAR_BAND == 0.51
     assert joint.THREAD_RIB_MARGIN_MIN == pytest.approx(1.79)
     assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0075)
-    assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.042857142857)
+    # The drill is one-sided, +0.10/0: its shallowest is the nominal 6.05.
+    assert joint.DRILL_DEPTH_MIN == joint.DRILL_DEPTH
+    assert joint.DRILL_DEPTH_MAX == pytest.approx(6.15)
+    assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.142857142857)
     # The whole tap drill, point included, stays in the deepened end rib at
     # the title block's band, its wander counted as if axial.
     assert joint.DRILL_POINT_RIB_MARGIN == pytest.approx(0.71583546)
@@ -237,7 +240,7 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
     )
     spring_dz_min = (
         min(spring_stations) - joint.LEVER_FRONT_LOCAL_Z - joint.LINEAR_BAND
-        - spring_position - joint.DRILL_DEPTH - joint.DRILL_DEPTH_BAND
+        - spring_position - joint.DRILL_DEPTH_MAX
         - joint.DRILL_POINT_DEPTH_MAX
     )
     assert spring_dz_min < 0.0  # the j=0 station overlaps the drill's depth

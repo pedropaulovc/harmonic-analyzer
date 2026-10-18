@@ -84,7 +84,7 @@ from _surface_finish import MACHINED, MACHINED_UM, surface_finish_by_key
 import _telemetry
 from magnifying_bracket_joint_layout import (
     DRILL_DEPTH,
-    DRILL_DEPTH_BAND,
+    DRILL_DEPTH_DEVIATIONS,
     LEVER_HOLE_POINTS,
     RIB_DEPTH,
     TAP_DRILL_DIA,
@@ -2020,20 +2020,21 @@ async def build(adapter: Any) -> dict[str, str]:
                     "persist as a MIN limit"
                 )
             continue
-        band = DRILL_DEPTH_BAND
-        variable.ToleranceType = 4  # swTolType_e.swTolSYMMETRIC
-        variable.ToleranceMin = -band / 1000.0
-        variable.ToleranceMax = band / 1000.0
+        # The drill depth is one-sided, +0.10/0 (joint DRILL_DEPTH_DEVIATIONS).
+        lower, upper = DRILL_DEPTH_DEVIATIONS
+        variable.ToleranceType = 2  # swTolType_e.swTolBILAT
+        variable.ToleranceMin = lower / 1000.0
+        variable.ToleranceMax = upper / 1000.0
         length.TolerancePrecision = 2
         if (
-            int(variable.ToleranceType) != 4
-            or abs(float(variable.ToleranceMin) * 1000.0 + band) > 1e-5
-            or abs(float(variable.ToleranceMax) * 1000.0 - band) > 1e-5
+            int(variable.ToleranceType) != 2
+            or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
+            or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
             or int(length.TolerancePrecision) != 2
         ):
             raise RuntimeError(
                 f"bracket mounting callout tolerance for {variable_name} did not "
-                f"persist: wanted symmetric band {band} mm at 2 places"
+                f"persist: wanted bilateral {upper:+g}/{lower:+g} mm at 2 places"
             )
     if required_depths:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
