@@ -985,8 +985,11 @@ async def build(adapter: Any) -> dict[str, str]:
             ("ConeShaftNormal", "PLANE"),
             ("HeadBasePlane", "PLANE"),
             ("CrankInterfacePlane", "PLANE"),
-            ("Plane4", "PLANE"),
+            # name_bore_axis's auto-named planes for the mount axes: SOLIDWORKS
+            # numbers them after the four planes above (ConeAxisPlane is the
+            # fourth), and a rename does not return a number to the counter.
             ("Plane5", "PLANE"),
+            ("Plane6", "PLANE"),
             ("BossNorth", "PLANE"),
             ("ConeAxisPlane", "PLANE"),
             ("swing pivot", "AXIS"),
