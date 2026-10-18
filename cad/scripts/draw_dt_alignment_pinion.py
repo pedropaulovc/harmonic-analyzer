@@ -211,6 +211,36 @@ def _match_tolerance_places(adapter: Any, annotations: list[Any], name: str) -> 
         )
 
 
+def _prefix_diameter_symbol(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Print the Ø on a doubled centerline-to-witness (diametric linear) size.
+
+    Imported into a side view it prints as a bare "17.63", which reads as a
+    linear height (machinist review r6 of 874c912e6, gating clarity).  The
+    prefix compartment takes SolidWorks' own diameter token, read back.
+    """
+    matches = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} annotation, found {len(matches)}")
+    annotation = _sw_type_info.early_bound_or_flag(
+        matches[0], "IAnnotation", "GetSpecificAnnotation"
+    )
+    display = _sw_type_info.early_bound_or_flag(
+        annotation.GetSpecificAnnotation(), "IDisplayDimension", "SetText", "GetText"
+    )
+    existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+    if "<MOD-DIAM>" in existing:
+        return
+    prefix = "<MOD-DIAM>" + existing
+    display.SetText(1, prefix)
+    applied = str(display.GetText(1) or "")
+    if applied != prefix:
+        raise RuntimeError(f"{name}: diameter prefix did not persist ({applied!r})")
+
+
 def _show_side_view_simplified(adapter: Any, view: Any) -> None:
     """Draw the side view by the simplified gear convention: the OD outline.
 
@@ -314,6 +344,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _match_tolerance_places(adapter, front_annotations, "ArborBoreDia")
     _match_tolerance_places(adapter, right_annotations, "OutsideDia")
+    _prefix_diameter_symbol(adapter, right_annotations, "OutsideDia")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to drum bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)

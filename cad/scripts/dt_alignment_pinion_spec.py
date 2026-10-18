@@ -246,6 +246,13 @@ GEAR_DATA = gear_data_note(
             f"{CUTTER_REFERENCE_TEETH}T REFERENCE",
         ),
         ("TOOTH FORM", TOOTH_FORM),
+        # The tip sits under the standard (N+2)/DP blank on purpose (the
+        # cutter's support radius sets it); machinist reviews r5 and r6 asked
+        # the block to say so.
+        (
+            "TIP",
+            f"TOPPED, UNDER THE STANDARD {TEETH + 2}/DP BLANK; SIZE ON SIDE VIEW",
+        ),
         ("PITCH TOOTH THICKNESS (mm, REF)", f"{PITCH_TOOTH_THICKNESS_MM:.3f}"),
         (
             f"BASE-TANGENT SPAN, OVER {BASE_TANGENT_SPAN_TEETH} TEETH (mm)",
