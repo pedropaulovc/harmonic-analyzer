@@ -1107,17 +1107,17 @@ def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
 def test_transferred_keeper_receiver_keeps_real_normal_wall_at_printed_bands() -> None:
     assert part.KEEPER_TAP_X == part.COLUMN_X + keeper.KEEPER_FITUP_X_FROM_WEB_MM
     assert part.KEEPER_MAX_TRANSVERSE_OFFSET == pytest.approx(0.53)
-    assert part.KEEPER_MAX_WEB_CENTRE_OFFSET == pytest.approx(3.45)
+    assert part.KEEPER_MAX_WEB_CENTRE_OFFSET == pytest.approx(3.53)
     assert part.KEEPER_MIN_WEB_HALF_WIDTH == pytest.approx(6.1)
     assert part.KEEPER_MIN_ROOT_RADIUS == pytest.approx(2.2)
     assert part.KEEPER_MIN_FLANGE_THICKNESS == pytest.approx(7.2)
     assert part.KEEPER_MAX_FULL_THREAD_DEPTH == pytest.approx(8.4)
     assert part.KEEPER_TAP_THREAD_WALL_MARGIN_NO_WANDER == pytest.approx(
-        1.688580825956946
+        1.6113269132941093
     )
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER == pytest.approx(1.710)
-    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(1.6241775880068343)
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.645596762049888)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN_NO_WANDER == pytest.approx(1.630)
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(1.546923704593722)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.5655967620498874)
     assert (
         min(part.KEEPER_TAP_THREAD_WALL_MARGIN, part.KEEPER_TAP_DRILL_WALL_MARGIN)
         >= 1.5
@@ -1184,7 +1184,7 @@ def _printed_receiver_stack():
     )
     axis_offset = (
         abs(round(keeper.KEEPER_FITUP_X_FROM_WEB_MM, keeper.KEEPER_FITUP_PLACES))
-        + keeper.KEEPER_FITUP_LOCATION_BAND_MM
+        + keeper.KEEPER_FITUP_X_BAND_MM
         + transverse_offset
     )
     thread_places = spec.KEEPER_TAP_CALLOUT_PRECISION["hw-threaddepth"]
@@ -1243,8 +1243,8 @@ def _printed_web_half_width(web_thickness: float) -> float:
 @pytest.mark.parametrize(
     ("web_thickness", "expected_thread_wall", "expected_pilot_wall"),
     (
-        (12.7, 1.4794211222462903, 1.4955967620498885),
-        (13.0, 1.6241775880068343, 1.645596762049888),
+        (12.7, 1.4023900543521644, 1.415596762049887),
+        (13.0, 1.546923704593722, 1.5655967620498874),
     ),
 )
 def test_keeper_receiver_full_depth_displaced_axis_proves_web_change(
@@ -1294,12 +1294,10 @@ def test_keeper_receiver_full_depth_displaced_axis_proves_web_change(
     assert thread_wall == pytest.approx(expected_thread_wall, abs=1e-6)
     assert pilot_wall == pytest.approx(expected_pilot_wall)
     if web_thickness == 12.7:
-        # Both former no-wander guards passed, yet .3 degrees over the
-        # full printed drill depth supplies a counterexample to both.
-        assert thread_wall + displacement >= 1.5
-        assert pilot_wall + displacement >= 1.5
-        assert thread_wall < 1.5
-        assert pilot_wall < 1.5
+        # The former web: under the lug centre's own X band (owner ruling
+        # X-A) it misses 1.5 even before the full-depth wander.
+        assert thread_wall + displacement < 1.5
+        assert pilot_wall + displacement < 1.5
     else:
         assert thread_wall >= 1.5
         assert pilot_wall >= 1.5
@@ -1374,10 +1372,10 @@ def test_printed_typ_top_flange_minimum_keeps_the_receiver_wall(stack) -> None:
     )
     # The pilot reaches the bare web below the root whatever the flange.
     pilot_wall = half_width - (axis_offset + displacement + pilot_radius)
-    assert pilot_wall == pytest.approx(1.645596762049888)
+    assert pilot_wall == pytest.approx(1.5655967620498874)
     assert pilot_wall == pytest.approx(part.KEEPER_TAP_DRILL_WALL_MARGIN)
     if stack == "typ top flange thickness":
-        assert thread_wall == pytest.approx(1.6241775880068343, abs=1e-6)
+        assert thread_wall == pytest.approx(1.546923704593722, abs=1e-6)
         assert thread_wall == pytest.approx(
             part.KEEPER_TAP_THREAD_WALL_MARGIN, abs=1e-6
         )
@@ -1385,7 +1383,7 @@ def test_printed_typ_top_flange_minimum_keeps_the_receiver_wall(stack) -> None:
     else:
         # The faced-down seat lifts the root above the thread corner, which
         # then faces bare web: the counterexample to the old print.
-        assert thread_wall == pytest.approx(1.4933967620498887, abs=1e-6)
+        assert thread_wall == pytest.approx(1.4133967620498877, abs=1e-6)
         assert thread_wall < 1.5
 
 
@@ -4859,8 +4857,8 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert (part.HALF_H, part.FLANGE, part.FLANGE_BOT_Y) == pytest.approx(
         (18.25, 8.0, 10.25)
     )
-    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(1.6241775880068343)
-    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.645596762049888)
+    assert part.KEEPER_TAP_THREAD_WALL_MARGIN == pytest.approx(1.546923704593722)
+    assert part.KEEPER_TAP_DRILL_WALL_MARGIN == pytest.approx(1.5655967620498874)
     assert part.KEEPER_FOOT_BOSS_MARGINS == pytest.approx((1.496, 2.504), abs=0.0005)
     # Along the rail the faced top runs boss to boss, so the fitted foot
     # stays on it exactly when it clears the bosses at the printed bands.
@@ -4877,17 +4875,17 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     half_flange = (round(part.RAIL_W_SIDE, width_places) - band[width_places]) / 2.0
     offset = (
         abs(round(keeper.KEEPER_FITUP_X_FROM_WEB_MM, keeper.KEEPER_FITUP_PLACES))
-        + keeper.KEEPER_FITUP_LOCATION_BAND_MM
+        + keeper.KEEPER_FITUP_X_BAND_MM
     )
     half_foot = (round(keeper.KEEPER_WIDTH, foot_places) + band[foot_places]) / 2.0
     max_chamfer = round(part.EDGE_CHAMFER, chamfer_places) + band[chamfer_places]
     assert (half_flange, offset, half_foot, max_chamfer) == pytest.approx(
-        (16.7, 2.92, 7.4, 2.4)
+        (16.7, 3.0, 7.4, 2.4)
     )
     assert max_chamfer == pytest.approx(part.EDGE_BREAK_PRINTED_MAX)
     margin = half_flange - offset - half_foot - max_chamfer
     assert part.KEEPER_FOOT_PRINTED_FLAT_TOP_SIDE_MARGIN == pytest.approx(margin)
-    assert margin == pytest.approx(3.98)
+    assert margin == pytest.approx(3.90)
     # Faced in place: the rail-top plane stays put.
     assert part.HALF_H - part.FLANGE_BOT_Y == pytest.approx(spec.FLANGE_THICKNESS_MM)
     # Native socket and hub-bore/set-screw spotface finishes. The faced top

@@ -103,6 +103,11 @@ QUALIFYING_EXPLODES = {
         "create_summing_explode",
         ("_sm_summing_explode.py", "_assembly_patterns.py"),
     ),
+    "ch_channel": (
+        "_ch_channel_explode",
+        "create_channel_explode",
+        ("_ch_channel_explode.py", "_assembly_patterns.py"),
+    ),
 }
 
 

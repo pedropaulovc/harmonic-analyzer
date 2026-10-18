@@ -219,6 +219,7 @@ from fr_top_frame_spec import (
     SET_SCREW_THREAD,
     RING_HEIGHT,
     SURFACE_FINISHES,
+    WEB_T,
 )
 from dt_cone_pivot_post_installation import (
     FRAME_COLUMN_Z_CENTER,
@@ -252,6 +253,7 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_SCREW_TRANSVERSE_BAND_MM,
     SCREW_FROM_SIDE,
     KEEPER_FITUP_LOCATION_BAND_MM,
+    KEEPER_FITUP_X_BAND_MM,
     KEEPER_FITUP_PLACES,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
     LUG_HALF_T,
@@ -451,7 +453,6 @@ KEEPER_TAP_Z_REAR = FULCRUM_KEEPER_CENTRE_Z + KEEPER_SCREW_Z_OFF  # +82.496
 # per-face setback differs by rail family (the rails are 34.2/38.0 wide but
 # share one web thickness).
 FLANGE = FLANGE_THICKNESS_MM  # final top flange, also below the faced rail top
-WEB_T = 13.0  # user ruling: retain loose bands plus realistic deep-drill wander
 RECESS_SIDE = (RAIL_W_SIDE - WEB_T) / 2.0  # 10.6 setback per side-rail face
 RECESS_FR = (RAIL_W_FR - WEB_T) / 2.0  # 12.5 setback per front/rear-rail face
 FLANGE_BOT_Y = RING_HEIGHT / 2.0 - FLANGE  # +10.25 (flange underside)
@@ -1206,7 +1207,7 @@ KEEPER_FOOT_PRINTED_FLAT_TOP_SIDE_MARGIN = (
     / 2.0
     - (
         abs(round(KEEPER_FITUP_X_FROM_WEB_MM, KEEPER_FITUP_PLACES))
-        + KEEPER_FITUP_LOCATION_BAND_MM
+        + KEEPER_FITUP_X_BAND_MM
     )
     - KEEPER_MAX_FOOT_WIDTH / 2.0
     - EDGE_BREAK_PRINTED_MAX
@@ -1232,7 +1233,7 @@ KEEPER_MAX_TRANSVERSE_OFFSET = max(
 )
 KEEPER_MAX_WEB_CENTRE_OFFSET = (
     abs(round(KEEPER_FITUP_X_FROM_WEB_MM, KEEPER_FITUP_PLACES))
-    + KEEPER_FITUP_LOCATION_BAND_MM
+    + KEEPER_FITUP_X_BAND_MM
     + KEEPER_MAX_TRANSVERSE_OFFSET
 )
 KEEPER_MIN_WEB_HALF_WIDTH = (
@@ -1340,9 +1341,9 @@ if KEEPER_MIN_THREAD_TIP_RESERVE < 0.25:
 # wander uses the same angular drift over the run from the counterbore floor.
 KEEPER_MIN_WEB_CENTRE_OFFSET = (
     abs(round(KEEPER_FITUP_X_FROM_WEB_MM, KEEPER_FITUP_PLACES))
-    - KEEPER_FITUP_LOCATION_BAND_MM
+    - KEEPER_FITUP_X_BAND_MM
     - KEEPER_MAX_TRANSVERSE_OFFSET
-)  # 2.35
+)  # 2.27
 _KEEPER_DRILL_BOTTOM_Y = HALF_H - KEEPER_MAX_TAP_DRILL_DEPTH
 _KEEPER_DRILL_TIP_Y = (
     _KEEPER_DRILL_BOTTOM_Y - KEEPER_MAX_TAP_DRILL_RADIUS * DRILL_POINT_H
@@ -1385,7 +1386,7 @@ KEEPER_CROSS_TAP_WALL = (
     - SIDE_TAP_THREAD_MAJOR_DIA / 2.0
     - _CROSS_TAP_WANDER_MM
     - KEEPER_TAP_AXIS_WANDER_MM
-)  # 1.74: under the 2.0 target, over the 1.5 floor
+)  # 1.70: under the 2.0 target, over the 1.5 floor
 if KEEPER_CROSS_TAP_WALL < 1.5:
     raise AssertionError("top cross-tap thread leaves under 1.5 mm to a keeper drill")
 

@@ -389,6 +389,8 @@ def test_fitup_exports_for_the_top_frame() -> None:
     assert spec.KEEPER_FITUP_LOCATION_BAND_MM == 0.02
     assert spec.KEEPER_FITUP_PLACES == 2
     assert spec.KEEPER_FITUP_X_FROM_WEB_MM == 2.9
+    # Owner ruling X-A (2026-10-18): the lug centre's own looser band.
+    assert spec.KEEPER_FITUP_X_BAND_MM == 0.10
     front, rear = spec.KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM
     assert (round(front, 2), round(rear, 2)) == (40.5, 182.5)
     assert rear - front == 2.0 * (spec.KEEPER_Z_OFF - spec.LUG_HALF_T)

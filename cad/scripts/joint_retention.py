@@ -225,15 +225,6 @@ RULINGS: dict[str, Ruling] = {
             "flange sweeps r ~23 inside the chain band (plates' inner edge r 21.2)"
         ),
     ),
-    "U-MHA-VN-034-channel-threadlocker": Ruling(
-        joint="ch-channel/pivot-bracket-apex-set-screw",
-        granted=(
-            "user, 2026-10-10, joint-specific drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) ruling relayed on PR #1317's Codex review: "
-            "waived; light spring preload and small hub drag; Loctite 222. Each MHA-VN-034 goes "
-            "in snug on its flat with Loctite 222 (removable threadlocker), as the MHA-VN-041 "
-            "pivot screw keeps its low-strength threadlocker"
-        ),
-    ),
     "U-MHA-VN-023-no-lock": Ruling(
         joint="ha-harmonic-analyzer/gooseneck-set-screw-in-top-frame",
         granted=(
@@ -1295,12 +1286,17 @@ JOINTS: tuple[Joint, ...] = (
             "which reverses each stroke, reaches the screw through the flat it bears on"
         ),
         axial_capture="cup point snugged on a flat milled on MHA-CH-005 under the ear's apex tap; screw rides only its own #4-40 thread in the R8 arch wall",
-        lock=Lock.THREADLOCKER_ONLY,
+        # Staked, not threadlocked: ruling U-MHA-VN-034-channel-threadlocker
+        # (Loctite 222) was retired, superseded by the user's standing
+        # no-threadlocker rule; coordinator ruling after the user's ask timed
+        # out, 2026-10-16. Mirrors the keeper set screws' stake below.
+        lock=Lock.STAKED,
+        lock_part="ch_pivot_bracket:staked tap mouth",
+        lock_binds=("vn_arbor_set_screw", "ch_pivot_bracket"),
         lock_step="set-screws-driven",
-        exception="U-MHA-VN-034-channel-threadlocker",
         evidence=(
             "draw_ch_channel_assembly.py _fitup_steps 'set-screws-driven' ('RUN ONE MHA-VN-034 DOWN EACH APEX TAP "
-            "ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG.'); build_ch_channel_assembly.py apex set screw "
+            "ONTO ITS FLAT, NORTH FIRST; SNUG, AND STAKE EACH TAP MOUTH AT 2 POINTS.'); build_ch_channel_assembly.py apex set screw "
             "placement (SET_SCREW_TIP_Y); ch_pivot_bracket_spec.SET_SCREW_HOLE_SPEC (#4-40 tapped, through_next) "
             "and SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT; ch_pivot_shaft_spec flats (FLAT_DEPTH, FLAT_LENGTH)"
         ),
@@ -1344,7 +1340,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_rocker_arm_support",
         thread="#8-32",
         quantity=1,
-        installed_at=ch_channel_assembly_steps.step_ref("south-bracket-spring-set"),
+        installed_at=ch_channel_assembly_steps.step_ref("south-bracket-screwed"),
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the south pivot_bracket foot to the stationary rocker_arm_support "
@@ -1362,8 +1358,8 @@ JOINTS: tuple[Joint, ...] = (
         lock_step="",
         evidence=(
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header; rocker_bracket_seat_layout.SEAT_SPEC; "
-            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-spring-set' (MHA-CH-000 STEP 5: 'TRANSFER ITS SEAT ... "
-            "TAP AS MHA-FR-005, SCREW DOWN ONE MHA-VN-071, PULL THE BLADE')"
+            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-screwed' (MHA-CH-000 STEP 6: 'TRANSFER THE SOUTH "
+            "MHA-CH-008 FOOT HOLE INTO THE MHA-FR-005 RAIL, TAP AS MHA-FR-005, SCREW DOWN ONE MHA-VN-071')"
         ),
     ),
     Joint(
@@ -1420,7 +1416,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_ch_channel_assembly.py keeper loop (vn-fulcrum-set-screw on each keeper's crown tap axis); "
             "ch_fulcrum_keeper_spec.SET_SCREW_HOLE_SPEC (#1-72 tapped, through_next) + DRAWING_NOTES 2; "
-            "draw_ch_fulcrum_keeper.SET_SCREW_QUALIFIER ('STAKE AT ASSEMBLY PER MHA-CH-000 STEP 11'); "
+            "draw_ch_fulcrum_keeper.SET_SCREW_QUALIFIER ('STAKE AT ASSEMBLY PER MHA-CH-000 STEP 13'); "
             "draw_ch_channel_assembly.py step fulcrum-set-screws-staked ('TIGHTEN ONE MHA-VN-055 SET SCREW ONTO EACH "
             "FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS'); ch_fulcrum_shaft_spec FLAT_DEPTH / FLAT_PITCH / "
             "FLAT_STATION_WINDOW_MM; config parts/vn-fulcrum-set-screw.yaml (91375A942)"
@@ -2362,7 +2358,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "north-ear-datum"
     ),
     "ha-harmonic-analyzer/south-pivot-bracket-hold-down": Occurrence(
-        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "south-bracket-spring-set"
+        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "south-bracket-screwed"
     ),
     "ha-harmonic-analyzer/fulcrum-keeper-screw-in-top-frame": Occurrence(
         "ha_harmonic_analyzer", "build_ch_channel_assembly.py", '"vn-frame-side-screw"'
