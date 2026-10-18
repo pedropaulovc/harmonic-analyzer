@@ -80,29 +80,43 @@ def test_unknown_or_reshaped_inputs_rebuild_full():
     )
 
 
-def test_only_the_paper_drive_qualifies_on_main():
-    plans = {stem: explode_plan(stem) for stem in ASSEMBLY_ORDER}
-    qualified = {stem for stem, plan in plans.items() if plan.closure}
-    assert qualified == {"pd_paper_drive"}
-    scripts = SCRIPTS_DIR
-    pd = plans["pd_paper_drive"]
-    assert (pd.module, pd.function) == (
+# Every assembly whose explode may refresh without the insert/mate loop:
+# (explode module, the function its builder authors with, the closure files).
+QUALIFYING_EXPLODES = {
+    "pd_paper_drive": (
         "_pd_paper_drive_explode",
         "create_paper_drive_explode",
-    )
-    assert {Path(path) for path in pd.closure} == {
-        (scripts / "_pd_paper_drive_explode.py").resolve(),
-        (scripts / "pd_paper_drive_explode_spec.py").resolve(),
-    }
+        ("_pd_paper_drive_explode.py", "pd_paper_drive_explode_spec.py"),
+    ),
+    "mg_magnifier": (
+        "_mg_magnifier_explode",
+        "create_mg_magnifier_explode",
+        ("_mg_magnifier_explode.py", "mg_magnifier_explode_spec.py"),
+    ),
+}
+
+
+def test_qualifying_explode_plans():
+    plans = {stem: explode_plan(stem) for stem in ASSEMBLY_ORDER}
+    qualified = {stem for stem, plan in plans.items() if plan.closure}
+    assert qualified == set(QUALIFYING_EXPLODES)
+    for stem, (module, function, closure) in QUALIFYING_EXPLODES.items():
+        plan = plans[stem]
+        assert (plan.module, plan.function) == (module, function), stem
+        assert {Path(path) for path in plan.closure} == {
+            (SCRIPTS_DIR / name).resolve() for name in closure
+        }, stem
     # The drive train's explode takes build-time collar-pin roles.
     assert "found 0" in plans["dt_drive_train"].decline
-    # The frame and measuring stick author their explodes inline.
+    # The frame, measuring stick and pen author their explodes inline.
     assert "no _fr_frame_explode.py" in plans["fr_frame"].decline
     assert "no _ms_measuring_stick_explode.py" in plans["ms_measuring_stick"].decline
+    assert "no _pn_pen_explode.py" in plans["pn_pen"].decline
 
 
-def test_the_planned_function_is_the_one_the_builder_calls():
-    plan = explode_plan("pd_paper_drive")
+@pytest.mark.parametrize("stem", sorted(QUALIFYING_EXPLODES))
+def test_the_planned_function_is_the_one_the_builder_calls(stem):
+    plan = explode_plan(stem)
     assert callable(getattr(importlib.import_module(plan.module), plan.function))
 
 
