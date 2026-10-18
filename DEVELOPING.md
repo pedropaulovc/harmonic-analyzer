@@ -1198,6 +1198,12 @@ parsed-YAML for configs), so a cache hit and "doit up-to-date" always agree and 
 comment-only YAML edit busts neither. Paths are tagged **repo-relative**, so the
 key is identical across machines and worktrees.
 
+Each `key_inputs` call resolves each dependency's path tag once and reuses it
+for sorting and provenance, while digesting the original path. Equal tags retain
+input order, including duplicates. Resolution is fresh between calls: there is
+no global path cache. This does not promise an atomic filesystem snapshot if an
+alias changes between tag resolution and content digesting.
+
 YAML digest checks read fresh file bytes on every call, then reuse the canonical
 MD5 through a process-local, 256-entry `lru_cache` keyed only by those bytes.
 There is no path, stat, or mtime cache; parsed values are not retained. YAML
