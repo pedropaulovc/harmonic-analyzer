@@ -695,9 +695,12 @@ CAM_TAP_MOUTH_M = (
     -(cam_geometry.ECC + cam_geometry.CAM_OD / 2.0) / 1000.0,
     cam_geometry.SET_SCREW_Z / 1000.0,
 )
+# One leader names both cams by the 2X count: the machinist review of
+# c61144555 read "STAKE EACH" with a single leader as pointing at the front
+# cam only.
 CAM_STAKE_NOTE = "\n".join(
     (
-        "STAKE EACH MHA-DT-023",
+        "2X MHA-DT-023: STAKE",
         "TAP MOUTH AT 2 POINTS",
         f"(STEP {steps.step_number('cam-collars-set')})",
     )
