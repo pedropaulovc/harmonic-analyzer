@@ -1482,10 +1482,10 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
             error(
                 f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}"
             )
-    else:
-        # get_current_span() is typed Span (mutable, has set_status); only
-        # ReadableSpan exposes .status -- the live SDK span is both.
-        status = cast(ReadableSpan, span).status
+    elif isinstance(span, ReadableSpan):
+        # Status inspection is SDK-only. A sampler-dropped NonRecordingSpan
+        # implements the API's no-op setters, but has no readable status.
+        status = span.status
         if status.status_code is StatusCode.UNSET:
             span.set_status(Status(StatusCode.OK))
         elif status.status_code is StatusCode.ERROR:
@@ -1502,6 +1502,8 @@ def span(
     On a clean exit the span status is set OK; on an exception it records the
     exception, marks the span ERROR, emits an ERROR log, then re-raises — so a
     failure is always attributable to a span rather than vanishing.
+    Sampler-dropped spans are no-ops: their cleanup preserves the body's return
+    value or exception without requiring SDK-only readable span attributes.
 
     ``service`` attributes the span to another resource than this process's stage
     (:data:`BUILD_INFRA_SERVICE` for the COM seat queue and the artefact cache); it

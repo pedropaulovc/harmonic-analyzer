@@ -36,6 +36,8 @@ from opentelemetry.sdk._logs.export import (
 from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.sdk.trace.sampling import ALWAYS_OFF
+from opentelemetry.trace import NonRecordingSpan
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -194,6 +196,102 @@ def test_span_records_exception_and_sets_error_status(capture):
     # App Insights with an empty message, so a failed row must explain itself
     assert sp.attributes["error.type"] == "RuntimeError"
     assert sp.attributes["error.message"] == "sketch OVER-defined"
+
+
+@pytest.fixture
+def nonrecording_tracer(monkeypatch):
+    provider = SdkTracerProvider(sampler=ALWAYS_OFF)
+    tracer = provider.get_tracer("test.nonrecording")
+    monkeypatch.setattr(_telemetry, "get_tracer", lambda *args, **kwargs: tracer)
+    yield
+    provider.shutdown()
+
+
+@pytest.mark.parametrize("asynchronous", [False, True])
+@pytest.mark.parametrize(
+    "outcome", [2, SystemExit(2), RuntimeError("original failure")]
+)
+def test_nonrecording_span_preserves_body_outcome(
+    nonrecording_tracer, asynchronous, outcome
+):
+    depth = _telemetry._depth.get()
+    parent = _telemetry.trace.get_current_span()
+
+    def body(sp):
+        assert isinstance(sp, NonRecordingSpan)
+        assert not sp.is_recording()
+        if isinstance(outcome, BaseException):
+            raise outcome
+        # Like prechips_traveler.main(), mark ERROR and return the CLI's code.
+        sp.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, "exit 2"))
+        return outcome
+
+    def synchronous():
+        with _telemetry.span("nonrecording") as sp:
+            return body(sp)
+
+    async def asynchronous_body():
+        async with _telemetry.aspan("nonrecording") as sp:
+            return body(sp)
+
+    def invoke():
+        return asyncio.run(asynchronous_body()) if asynchronous else synchronous()
+
+    if isinstance(outcome, BaseException):
+        with pytest.raises(type(outcome)) as caught:
+            invoke()
+        assert caught.value is outcome
+    else:
+        assert invoke() == outcome
+    assert _telemetry._depth.get() == depth
+    assert _telemetry.trace.get_current_span() is parent
+
+
+@pytest.mark.parametrize("code", [2, 3, 4])
+def test_prechips_check_nonrecording_span_preserves_exit_code(
+    nonrecording_tracer, monkeypatch, tmp_path, code
+):
+    import prechips_traveler as wrapper
+
+    directory = tmp_path / "traveler"
+    monkeypatch.setattr(wrapper._telemetry, "set_service", lambda *args: None)
+    monkeypatch.setattr(
+        wrapper.telemetry,
+        "configure",
+        lambda *args: types.SimpleNamespace(trace_provider=None, log_provider=None),
+    )
+    monkeypatch.setattr(
+        wrapper._telemetry, "capture_external_telemetry", lambda *args: None
+    )
+    monkeypatch.setattr(wrapper._process_plans, "traveler_dir", lambda *args: directory)
+    monkeypatch.setattr(
+        wrapper._process_plans,
+        "bind_shop",
+        lambda *args, **kwargs: tuple(
+            tmp_path / name for name in ("inventory", "policy", "data")
+        ),
+    )
+    monkeypatch.setattr(
+        wrapper._process_plans,
+        "bind_plan",
+        lambda *args, **kwargs: tmp_path / "plan.toml",
+    )
+    monkeypatch.setattr(wrapper.kernel, "discover_kernel", lambda: "stub-kernel")
+    calls = []
+
+    def cli(argv):
+        calls.append(argv)
+        return code
+
+    monkeypatch.setattr(wrapper.cli, "main", cli)
+    # Keep the real wrapper and telemetry context managers: existing wrapper
+    # unit tests replace spans and cannot detect a cleanup masking the CLI exit.
+    with pytest.raises(SystemExit) as caught:
+        raise SystemExit(
+            wrapper.main(["ch_rocker_arm", "--out", str(tmp_path), "--check"])
+        )
+    assert caught.value.code == code
+    assert calls[0][0] == "check"
 
 
 def _log_from_a_named_caller(message: str) -> None:
