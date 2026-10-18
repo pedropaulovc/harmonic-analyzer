@@ -457,6 +457,32 @@ def _depth_banded_definition(definitions: dict[int, str], band: str) -> tuple[in
     return part, f"{definition.rstrip()} {band}"
 
 
+def _drop_coaxial_step(display: Any, step_dia: float, label: str) -> None:
+    """Clear the coaxial hole's step SolidWorks folds into a native callout.
+
+    Each pin hole and its knockout meet end to end, so a callout on either
+    reads the pair as one stepped hole: on the farm the drive-pin callout
+    carried ``<MOD-DIAM>1.40<HOLE-DEPTH>12.63`` in its callout-above part (run
+    20261018T110810560Z-720787ec).  Each hole has its own callout naming its
+    process, so the other's step is cleared.  Only a part holding nothing but
+    that step is cleared; the step anywhere else fails loud.  Read back.
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    marker = f"<MOD-DIAM>{step_dia:.2f}"
+    definitions = {
+        part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
+    }
+    holders = [part for part, text in definitions.items() if marker in text]
+    for part in holders:
+        if not definitions[part].startswith(marker):
+            raise RuntimeError(f"{label}: coaxial step mixed into part {part}: {definitions!r}")
+        display.SetText(_DEFINITION_TO_WRITABLE[part], "")
+        if str(display.GetText(part) or ""):
+            raise RuntimeError(f"{label}: coaxial step in part {part} did not clear")
+    if holders:
+        _telemetry.info(f"{label}: cleared coaxial step from parts {holders}: {definitions!r}")
+
+
 def _require_mm_sheet(draw: Any, label: str) -> None:
     """Refuse unless the drawing's linear unit is the millimetre.
 
@@ -958,6 +984,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         process=f"2X {DRIVE_PIN_HOLE_PROCESS}",
     )
+    _drop_coaxial_step(drive_pins, DRIVE_PIN_KNOCKOUT_DIA, "seat-collar drive-pin holes")
     _band_hole_depth(
         drive_pins,
         DRIVE_PIN_DEPTH_BAND,
@@ -985,6 +1012,7 @@ async def build(adapter: Any) -> dict[str, str]:
             accept=_is_lower_knockout_floor,
         ),
     )
+    _drop_coaxial_step(knockouts, DRIVE_PIN_HOLE_DIA, "drive-pin knockout holes")
     _set_callout_text(knockouts, 3, KNOCKOUT_CALLOUT_ABOVE, "drive-pin knockout holes")
     _set_callout_text(knockouts, 4, KNOCKOUT_CALLOUT_BELOW, "drive-pin knockout holes")
     add_attached_note(
