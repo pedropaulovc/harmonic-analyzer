@@ -501,7 +501,9 @@ BOM_DESCRIPTIONS = {
     "dt-crank-handle-butt-cup": "CRANK HANDLE BUTT CUP",
     "dt-crank-handle-pivot-screw": "CRANK HANDLE PIVOT SCREW",
     "dt-crank-hub": "CRANK HUB",
-    "vn-crank-hub-pin": "4 M6 DOWEL PIN ISO 2338, CUT TO PRINT",
+    # Ø4 m6 (ISO 2338), not "4 M6": the machinist review of 82158b1bb read
+    # four M6 pins against QTY 1.
+    "vn-crank-hub-pin": "4 MM DOWEL PIN ISO 2338 m6, CUT TO PRINT",
     "vn-crank-seat-drive-pin": "3/32 X 1/4 DOWEL PIN, MCMASTER 98381A434",
     "dt-alignment-pinion": "ALIGNMENT PINION",
     "dt-pinion-bracket": "PINION BRACKET STRAP",
@@ -770,8 +772,10 @@ CONE_CRANK_STEPS = _note_text(
         f"   SET MHA-DT-010 {PINION_SEAT_FEELER:.2f} OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER.",
         T120_FITUP_ASSEMBLY_CHECK + " THEN",
         "   TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
-        "   THE PARTS AND BORE SPACING). THEN MATCH-DRILL MHA-DT-010 AND MHA-DT-011",
-        "   AT BOSS MID-LENGTH; " + _PINION_PIN_FIT + "; RE-CHECK NO BINDING.",
+        "   THE PARTS AND BORE SPACING). THEN MATCH-DRILL THROUGH THE MHA-DT-010",
+        "   BOSS AT ITS MID-LENGTH INTO MHA-DT-011; "
+        + _PINION_PIN_FIT
+        + "; RE-CHECK NO BINDING.",
         "5. PAPER-DRIVE T12 ON MHA-DT-011 BEFORE THE ARM, HOLES OVER 2X MHA-VN-044.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-031 pressed into the arm and
         # seam-pinned by MHA-VN-029 (a 4 m6 dowel, 4.0 long = half the arm); the
@@ -986,7 +990,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "THE CLUSTER SWINGS FREELY; MHA-DT-019 TURNS WITH IT IN BOTH MHA-DT-018.",
         ),
         # Main's TbPB ruling (1), 2026-09-27: the set screws stay loose here;
-        # COLLAR SET locks them once the collars are set.
+        # the cam set tightens and stakes them once the cams are set (#1176).
         (
             "cams-and-lever-fitted",
             f"FIT {cams}X MHA-DT-023 AND MHA-DT-016 ON MHA-DT-017 IN THE MHA-DT-018 LIFT "
@@ -1018,8 +1022,8 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "FOOT HOLE; DRILL AND TAP EACH PER ITS MHA-FR-001 TRANSFER CALLOUT. "
             f"FIT {slotted}X MHA-VN-019 AND 1X MHA-VN-020.",
         ),
-        # The cams' phase is set with the lever parked; COLLAR SET then sets
-        # each collar along the rod and locks it.
+        # The cams' phase is set with the lever parked; the cam set then sets
+        # each cam along the rod, tightens its set screw and stakes the tap.
         (
             "cam-collars-set",
             f"MHA-DT-016 AT PARK, EACH CAM ECCENTRIC DOWN;\n{_COLLAR_SET_STEP}",
@@ -1142,13 +1146,16 @@ CONSUMABLES_NOTES = _note_text(
 # review of 53a7c4266: EAST in the rig steps could not be worked out). Model
 # -Z is south, the machine front; -X is east (the builder's block screws, "east
 # screw first (-x)"). Sheet 1's general notes field has no line to spare.
+# One reflowed paragraph (heading=False): as a heading, the 72-character first
+# line wrapped "TIP" onto its own line (machinist review of 82158b1bb).
 DIRECTION_NOTES = _note_text(
     (
-        "DIRECTIONS: FRONT IS SOUTH (THE CRANK END), BACK IS NORTH (THE CONE TIP",
-        "END). SHEET 1: THE TOP VIEW HAS SOUTH UP AND EAST LEFT; THE FRONT VIEW",
-        "LOOKS SOUTH, EAST AT ITS LEFT; THE RIGHT VIEW LOOKS EAST, SOUTH AT ITS",
-        "RIGHT.",
-    )
+        "DIRECTIONS: FRONT IS SOUTH, THE CRANK END; BACK IS NORTH, THE CONE",
+        "TIP END. SHEET 1: THE TOP VIEW HAS SOUTH UP AND EAST LEFT; THE",
+        "FRONT VIEW LOOKS SOUTH, EAST AT ITS LEFT; THE RIGHT VIEW LOOKS",
+        "EAST, SOUTH AT ITS RIGHT.",
+    ),
+    heading=False,
 )
 
 FIT_PLACEHOLDER = _note_text(

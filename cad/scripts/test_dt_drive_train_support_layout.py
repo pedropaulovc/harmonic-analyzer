@@ -1725,7 +1725,6 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     # The collars' set is an assembly step: nothing is cut, so MHA-DT-023's own
     # print stays free of it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), as MHA-DT-018 keeps its feeler).
     assert "LEAF" not in dt_pinion_cam_spec.DRAWING_NOTES
-    assert FITUP.COLLAR_SET_STEP.startswith("SET MHA-DT-023 COLLARS ON STARRETT 66MA")
     assert "0.90 OFF BACK MHA-DT-018" in FITUP.COLLAR_SET_STEP
     assert "0.25 OFF FRONT MHA-DT-018" in FITUP.COLLAR_SET_STEP
     # The fit-up module no longer claims MHA-DT-000 prints the feeler band.

@@ -575,13 +575,15 @@ def test_drum_is_bonded_after_the_arbor_passes_the_front_strap() -> None:
 
 def test_torque_shaft_pins_go_in_before_the_cams() -> None:
     """The cams block the strap pins' west edge, and the cam set screws are
-    locked only by COLLAR SET, before the lever pin (Main's TbPB ruling)."""
+    tightened and staked only at the cam set, before the lever pin (Main's
+    TbPB ruling; #1176)."""
     import dt_drive_train_steps as steps
+    import pinion_rig_fitup as fitup
 
     assert "DRIVE MHA-VN-033 PINS" in _rig_step_body("straps-pinned-to-torque-shaft")
     cams = _rig_step_body("cams-and-lever-fitted")
     assert "FIT 2X MHA-DT-023" in cams and "LOOSE" in cams and "MHA-DT-030" not in cams
-    assert "LOCK SCREWS" in _rig_step_body("cam-collars-set")
+    assert _flat(fitup.COLLAR_SET_STEP) in _rig_step_body("cam-collars-set")
     order = [
         steps.step_number(key)
         for key in (

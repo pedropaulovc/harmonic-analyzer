@@ -35,6 +35,10 @@ clear above that block: none of the 24 points tried on the first,
 slotted-screw-1, found its own ink, and the listed-edge leader SolidWorks
 placed ended on the front MHA-DT-014 strap (machinist review of 53a7c4266,
 balloon 31, two runs).
+
+The cone gear is pinned mid-stack, dt-cone-gear-10: dt-cone-gear-1 sits
+against MHA-DT-007, and its walked leader ended 1.9 mm from the 64T gear's
+(machinist review of 82158b1bb, balloons 35 and 36).
 """
 
 from __future__ import annotations
@@ -65,7 +69,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "vn-swing-stop-screw": BalloonAnchor(),
         "dt-cone-gear-shaft": BalloonAnchor(),
         "dt-crank-drive-gear": BalloonAnchor(),
-        "dt-cone-gear": BalloonAnchor(),
+        "dt-cone-gear": BalloonAnchor(instance="dt-cone-gear-10"),
     },
     "crank": {
         "dt-crankshaft": BalloonAnchor(),

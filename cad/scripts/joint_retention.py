@@ -1184,14 +1184,18 @@ JOINTS: tuple[Joint, ...] = (
             "flat point clamped on the plain round Ø6.35 rod (slip-fit Ø6.40 bore, no flat or spot); the collars "
             "are set on 66MA leaves 0.25/0.90 off the MHA-DT-018 blocks and also carry the rod's axial location"
         ),
-        lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
+        # Rule 23 staked tap mouth (#1176), as the channel's fulcrum set screws
+        # (fulcrum-set-screws-staked); no threadlocker on any thread.
+        lock=Lock.STAKED,
+        lock_part="dt_pinion_cam:staked tap mouth",
+        lock_binds=("dt_pinion_cam", "dt_pinion_lift_rod"),
+        lock_step="cam-collars-set",
         evidence=(
             "draw_dt_drive_train_assembly.py rig_steps 'cams-and-lever-fitted' (set screw loose) and 'cam-collars-set' "
-            "(pinion_rig_fitup COLLAR SET: 'LOCK SCREWS'); dt_pinion_cam_spec.DRAWING_NOTES; pinion_cam_geometry "
-            "SET_SCREW_Z/TAP_DRILL_DIA; build_dt_drive_train_assembly.py pinion cam mates (~L5805-5841, 'set-pin anti-spin')"
+            "(pinion_rig_fitup COLLAR_SET_STEP: 'TIGHTEN THEIR SET SCREWS AND STAKE EACH TAP MOUTH AT 2 POINTS'); "
+            "dt_pinion_cam_spec.DRAWING_NOTES; dt_pinion_cam_geometry SET_SCREW_Z/TAP_DRILL_DIA (tap 45 deg or more "
+            "off the follower contact, test_cam_set_screw_hole_stays_clear_of_the_follower); "
+            "build_dt_drive_train_assembly.py pinion cam mates (~L5805-5841, 'set-pin anti-spin')"
         ),
     ),
     Joint(
