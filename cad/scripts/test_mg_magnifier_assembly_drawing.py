@@ -4,19 +4,24 @@ import ast
 import asyncio
 import math
 import re
+from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+import _transforms
 import build_mg_magnifier_assembly as assembly
 import draw_mg_magnifier_assembly as drawing
+import joint_retention
+import mg_magnifier_assembly_notes as notes
 import mg_magnifier_assembly_spec as stack
+import mg_magnifier_assembly_steps as steps
+import mg_magnifier_explode_spec as explode
 import mg_wheel_axle_spacer_spec
 import mg_wheel_axle_spec
 import mg_wheel_group
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
-from mg_lever_press_fit_geom import PRESS_INSTALLATION_NOTES
 
 # The LANDSCAPE sheet's free field right of the isometric: inside the border
 # (about 13 mm in from the trim) and above the title block (sheet metres).
@@ -38,7 +43,7 @@ def test_magnifier_keeps_registry_outputs_and_precomputed_placement() -> None:
     )
     assert drawing.SHEET_SCALE == (1.0, 4.0)
     assert drawing.FRONT_CENTER == (0.070, 0.150)
-    assert drawing.RIGHT_CENTER == (0.150, 0.150)
+    assert drawing.RIGHT_CENTER == (0.168, 0.150)
     assert drawing.ISO_CENTER == (0.225, 0.140)
 
 
@@ -71,19 +76,20 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     assert stack.DRAWING_DIMENSIONS == {stack.FEATURE: names}
     assert set(stack.DRAWING_PRECISION[stack.FEATURE]) == names
     assert set(stack.DIMENSION_TOLERANCES) == names
-    assert set(stack.DIMENSION_CALLOUTS) == names == set(drawing.CALLOUT_LOCATION)
+    assert set(notes.DIMENSION_CALLOUTS) == names == set(drawing.CALLOUT_LOCATION)
     assert stack.DIMENSION_TOLERANCES[stack.PRESS_GAUGE_DIMENSION] == 0.05
     assert stack.DIMENSION_TOLERANCES[stack.ENDSHAKE_DIMENSION] == pytest.approx(0.05)
     assert (
         "LOCKNUT ON FULL THREAD"
-        in stack.DIMENSION_CALLOUTS[stack.PRESS_GAUGE_DIMENSION]
+        in notes.DIMENSION_CALLOUTS[stack.PRESS_GAUGE_DIMENSION]
     )
     # The endshake is set by one nut and held by the other.
-    endshake = stack.DIMENSION_CALLOUTS[stack.ENDSHAKE_DIMENSION]
+    endshake = notes.DIMENSION_CALLOUTS[stack.ENDSHAKE_DIMENSION]
     assert "SET BY THE FIRST NUT" in endshake
     assert "LOCKED BY THE SECOND" in endshake
-    for text in stack.DIMENSION_CALLOUTS.values():
-        assert not re.search(r"\d", text), text
+    # No dimension rides callout text; a part number naming the mate may.
+    for text in notes.DIMENSION_CALLOUTS.values():
+        assert not re.search(r"\d", re.sub(r"MHA-[A-Z]{2}-\d{3}", "", text)), text
     # One detail imports each setting.
     assert set(drawing.PRESSED_KEEP) == {stack.PRESS_GAUGE_DIMENSION}
     assert set(drawing.ENDSHAKE_KEEP) == {stack.ENDSHAKE_DIMENSION}
@@ -118,7 +124,9 @@ def test_each_detail_sits_in_the_free_field_with_its_label_under_its_ink(
 
 def test_the_gauge_detail_names_what_it_presses_into_what() -> None:
     label = drawing.PRESSED.label_text
-    assert "MG-WHEEL-AXLE" in label and "MG-WHEEL-BAR" in label
+    # Named as the BOM rows name them: part number and description.
+    assert "MHA-MG-007 WHEEL AXLE PRESSED" in label
+    assert "INTO MHA-MG-008 WHEEL BAR" in label
     # The pressed detail's three-line label still clears the endshake crop.
     lines = len(label.splitlines())
     assert (
@@ -152,9 +160,9 @@ def test_the_details_and_labels_do_not_overlap() -> None:
 
 def test_an_above_callout_with_a_line_break_is_refused(monkeypatch) -> None:
     assert drawing.CALLOUT_LOCATION[stack.PRESS_GAUGE_DIMENSION] == "above"
-    assert drawing._printable_callouts() == stack.DIMENSION_CALLOUTS
+    assert drawing._printable_callouts() == notes.DIMENSION_CALLOUTS
     monkeypatch.setitem(
-        stack.DIMENSION_CALLOUTS, stack.PRESS_GAUGE_DIMENSION, "PRESS GAUGE\nLOCKNUT"
+        notes.DIMENSION_CALLOUTS, stack.PRESS_GAUGE_DIMENSION, "PRESS GAUGE\nLOCKNUT"
     )
     with pytest.raises(RuntimeError, match="line break do not print"):
         drawing._printable_callouts()
@@ -169,7 +177,7 @@ class _Display:
 
 
 def test_each_callout_reads_back_from_its_own_compartment() -> None:
-    callouts = stack.DIMENSION_CALLOUTS
+    callouts = notes.DIMENSION_CALLOUTS
     gauge, endshake = stack.PRESS_GAUGE_DIMENSION, stack.ENDSHAKE_DIMENSION
     good = [
         (gauge, _Display({3: callouts[gauge]})),
@@ -341,70 +349,702 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
     ]
     assert blanked == [feature]
 
+def test_the_package_has_four_landscape_sheets_with_the_wire_steps_on_the_last() -> None:
+    assert drawing.SHEET_NAMES[-1] == "ASSEMBLY STEPS"
+    assert len(drawing.SHEET_NAMES) == 4
+    assert set(drawing.SHEET_LAYOUTS.values()) == {DrawingLayout.LANDSCAPE}
+    # MHA-HA-000 prints "LEVER WIRE PER MHA-MG-000 (SHEET 4)" and names these keys.
+    assert steps.WIRE_HOOKED_KEY == "lever-wire-hooked"
+    assert steps.WIRE_TIED_KEY == "lever-wire-tied"
+    assert steps.SEQUENCE[-2:] == (steps.WIRE_HOOKED_KEY, steps.WIRE_TIED_KEY)
+    assert "SHEET 4" in notes.EXPLODED_CAPTION
 
 
-def test_press_note_is_model_owned_and_inserted_before_native_finalization(
-    monkeypatch, tmp_path
-) -> None:
-    # The assembly stamps the same drawing-free instruction as the bracket,
-    # not a copied caption that can drift from the force or safe pressing setup.
+def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
+    # The builder's COM explode (_mg_magnifier_explode -> _assembly_patterns ->
+    # _assembly) reads every parts/* and assemblies/* YAML, so importing it
+    # re-keyed this sheet on any part edit. The drawing reads the pure spec.
+    from pathlib import Path
+
+    import _buildgraph
+
+    script = Path(drawing.__file__)
+    names = {Path(dep).name for dep in _buildgraph.module_deps_of(script)}
+    assert not names & {
+        "_assembly.py",
+        "_assembly_patterns.py",
+        "_mg_magnifier_explode.py",
+    }
+    assert not [token for token in _buildgraph.config_files_of(script) if "*" in token]
+
+
+def test_the_sheet_text_is_on_the_drawing_recipe_only() -> None:
+    # Code review C03: the BOM, callout and step text is drawing-only, so a
+    # wording edit must re-key the MHA-MG-000 sheet and never the native
+    # assembly:mg_magnifier recipe the builder's closure keys.
+    import _buildgraph
+
+    def closure(module) -> set[str]:
+        return {
+            Path(dep).name for dep in _buildgraph.module_deps_of(Path(module.__file__))
+        }
+
+    assert "mg_magnifier_assembly_notes.py" in closure(drawing)
+    assert "mg_magnifier_assembly_spec.py" in closure(assembly)
+    assert "mg_magnifier_assembly_notes.py" not in closure(assembly)
+    for module in (assembly, stack):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "import mg_magnifier_assembly_notes" not in source
+        assert "from mg_magnifier_assembly_notes" not in source
+    # Nothing the sheet prints stays behind in the builder's spec.
+    for name in (
+        "BOM_ORDER",
+        "BOM_DESCRIPTIONS",
+        "STEP_TEXT",
+        "ASSEMBLY_STEPS",
+        "ASSEMBLY_CHECKS",
+        "DIMENSION_CALLOUTS",
+        "LEVER_CALLOUTS",
+    ):
+        assert not hasattr(stack, name), name
+
+
+def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:
+    import math
+
+    import build_vn_lever_wire
+    import vn_lever_wire_geom as wire
+
+    x, station, z = drawing.WIRE_BALLOON_POINT_MM
+    # On the build's split ring, mid-run, on the wire's surface.
+    assert station == pytest.approx(build_vn_lever_wire.BALLOON_RING_STATION)
+    assert station == pytest.approx(wire.WIRE_LEN / 2.0)
+    assert math.hypot(x, z) == pytest.approx(wire.WIRE_DIA / 2.0)
+    assert drawing.BALLOON_ANCHORS["vn-lever-wire"].point_mm == drawing.WIRE_BALLOON_POINT_MM
+    # Turned into the machine frame, the point's outward normal faces +X+Y+Z.
+    delta = [h - d for h, d in zip(wire.WIRE_START, wire.WIRE_END)]
+    axis = [v / math.hypot(*delta) for v in delta]
+    n = math.hypot(axis[0], axis[1])
+    ex = (axis[1] / n, -axis[0] / n, 0.0)
+    ez = (
+        ex[1] * axis[2] - ex[2] * axis[1],
+        ex[2] * axis[0] - ex[0] * axis[2],
+        ex[0] * axis[1] - ex[1] * axis[0],
+    )
+    normal = [x * a + z * b for a, b in zip(ex, ez)]
+    viewer = [1.0 / math.sqrt(3.0)] * 3
+    facing = sum(a * b for a, b in zip(normal, viewer)) / math.hypot(*normal)
+    along = sum(a * b for a, b in zip(axis, viewer))
+    # All of the viewer direction square to the axis points at the ring point.
+    assert facing == pytest.approx(math.sqrt(1.0 - along**2))
+
+
+def test_the_wire_is_tied_in_the_rest_state_with_both_ends_secured() -> None:
+    import mg_wheel_group
+
+    hooked = notes.STEP_TEXT[steps.WIRE_HOOKED_KEY]
+    tied = notes.STEP_TEXT[steps.WIRE_TIED_KEY]
+    # The rest pose the run is derived at, as MHA-HA-000 sets it.
+    assert "EVERY CHANNEL AMPLITUDE AT ZERO" in tied
+    assert "PLATE TOP LEVEL" in tied
+    assert "TIE 1" in tied and "6 O'CLOCK" in tied
+    for text in (hooked, tied):
+        assert "AT LEAST THREE TURNS" in text
+        # Machinist review r5: the spool wire's tails are trimmed once twisted.
+        assert "TRIM THE TAIL" in text
+    # The wrap check stands on the wheel group's proven wrap margin.
+    assert mg_wheel_group.LEVER_WIRE_WRAP_LEFT_DEG >= mg_wheel_group.WRAP_MARGIN_DEG
+    assert any("SHORT OF TIE 1" in check for check in notes.ASSEMBLY_CHECKS)
+
+
+def test_the_assembled_views_name_their_direction_clear_of_their_neighbours() -> None:
+    # r8's printed outlines (sheet metres): Front, Right, Isometric.
+    front = (0.041, 0.091, 0.099, 0.204)
+    right = (0.153, 0.091, 0.183, 0.204)
+    iso_left = 0.194
+    assert drawing.ASSEMBLED_VIEW_CAPTIONS == {
+        "*Front": "VIEW FROM THE BACK",
+        "*Right": "VIEW FROM THE LEFT",
+    }
+    boxes = []
+    for outline, name in ((front, "*Front"), (right, "*Right")):
+        text = drawing.ASSEMBLED_VIEW_CAPTIONS[name]
+        left, top = drawing.caption_under(outline, text)
+        width = len(text) * drawing.CAPTION_CHAR_WIDTH
+        assert left + width / 2.0 == pytest.approx((outline[0] + outline[2]) / 2.0)
+        assert top < outline[1]
+        assert top - drawing.NOTE_LINE_PITCH > drawing.TITLE_BLOCK[3]
+        assert left > drawing.INNER_BORDER[0]
+        boxes.append((left, left + width))
+    assert boxes[0][1] < boxes[1][0]
+    assert boxes[1][1] < iso_left
+
+
+
+def test_every_step_is_numbered_in_sequence_and_names_no_setting_value() -> None:
+    assert tuple(notes.STEP_TEXT) == steps.SEQUENCE
+    assert notes.ASSEMBLY_STEPS == tuple(
+        f"{steps.step_number(key)}. {notes.STEP_TEXT[key]}" for key in steps.SEQUENCE
+    )
+    settings = (
+        stack.PRESS_GAUGE,
+        stack.ENDSHAKE,
+        stack.CLAMP_STATION,
+        stack.FIXTURE_DROP,
+    )
+    for text in (*notes.STEP_TEXT.values(), *notes.ASSEMBLY_CHECKS):
+        for value in settings:
+            for printed in {f"{value:g}", f"{value:.1f}", f"{value:.2f}"}:
+                assert not re.search(rf"(?<![\d.]){re.escape(printed)}(?![\d])", text), (
+                    printed,
+                    text,
+                )
+    joined = " ".join(notes.STEP_TEXT.values())
+    for setting in ("PRESS GAUGE", "WHEEL ENDSHAKE", "CLAMP STATION", "FIXTURE DROP"):
+        assert f"{setting} (SHEET 1" in joined, setting
+    # The detached method note stays out; the rod is screwed home on its
+    # shoulder in the fixture step, with no lock (#1559).
+    assert "HOLD ROD NEAR END" not in joined
+    fixture_set = notes.STEP_TEXT[steps.FIXTURE_SET_KEY]
+    assert "CLAMP'S BOTTOM TAP" in fixture_set
+    assert "SHOULDER SEATS" in fixture_set
+    assert "ROD BORE" not in joined
+    assert not re.search(r"LOCTITE|THREADLOCK|SET SCREW", joined)
+
+
+def test_the_builder_stamps_no_drawing_note_property() -> None:
     tree = ast.parse(Path(assembly.__file__).read_text(encoding="utf-8"))
-    values = [
-        value
+    keys = {
+        node.value
         for node in ast.walk(tree)
-        if isinstance(node, ast.Dict)
-        for key, value in zip(node.keys, node.values, strict=True)
-        if isinstance(key, ast.Constant) and key.value == "Drawing Notes"
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+    assert "Drawing Notes" not in keys
+    assert "PRESS_INSTALLATION_NOTES" not in Path(assembly.__file__).read_text(
+        encoding="utf-8"
+    )
+
+
+def test_the_lever_settings_match_the_placed_lever_group() -> None:
+    assert stack.LEVER_TIP_X == pytest.approx(assembly.LEVER_X0)
+    assert stack.LEVER_AXIS_Y == pytest.approx(assembly.LEVER_ROD_Y)
+    assert stack.CLAMP_CENTRE_X == pytest.approx(assembly.CLAMP_X)
+    assert stack.FIXTURE_AXIS_Y == pytest.approx(assembly.FIXTURE_POSITION[1])
+    assert stack.CLAMP_STATION > 0.0 and stack.FIXTURE_DROP > 0.0
+    assert set(notes.LEVER_CALLOUTS) == set(drawing.LEVER_CALLOUT_LOCATION)
+    assert stack.LEVER_DRAWING_DIMENSIONS == {
+        stack.LEVER_FEATURE: {stack.CLAMP_STATION_DIMENSION, stack.FIXTURE_DROP_DIMENSION}
+    }
+    drawing._printable_lever_callouts()
+
+
+def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
+    monkeypatch,
+) -> None:
+    ok = lambda data=None: SimpleNamespace(is_success=True, data=data, error=None)  # noqa: E731
+    lines: list[tuple[float, ...]] = []
+    relations: list[tuple] = []
+    globals_authored: dict[str, str] = {}
+    equations: dict[str, str] = {}
+    lengths: dict[str, tuple[str, float]] = {}
+    anchors: list[tuple] = []
+    blanked: list[str] = []
+
+    class Adapter:
+        _sketch_entities: dict[str, object] = {}
+        currentModel = object()
+
+        async def create_sketch(self, plane):
+            assert plane == "Front"
+            return ok()
+
+        async def add_line(self, *coords):
+            name = f"leg{len(lines)}"
+            lines.append(coords)
+            self._sketch_entities[name] = SimpleNamespace(ConstructionGeometry=False)
+            return ok(name)
+
+        async def add_sketch_constraint(self, *args):
+            relations.append(args)
+            return ok()
+
+        async def exit_sketch(self):
+            return ok()
+
+    class Dims:
+        def __init__(self):
+            self.rows = []
+
+        def record(self, name, drive=None):
+            self.rows.append((name, drive))
+
+        def apply(self, adapter, feature):
+            return [(f"{name}@{feature}", drive) for name, drive in self.rows if drive]
+
+    def early_bound(entity, iface):
+        if iface == "IAssemblyDoc":
+            return SimpleNamespace(FeatureByName=lambda name: name)
+        if iface == "IFeature":
+            return SimpleNamespace(Visible=1 if entity in blanked else 2)
+        return entity
+
+    async def set_global(adapter, name, expression):
+        globals_authored[name] = expression
+
+    async def drive_dimension(adapter, name, expression):
+        equations[name] = expression
+
+    async def dimension_between(adapter, a, b, kind, value, name):
+        lengths[name] = (kind, value)
+
+    async def anchor(adapter, ref, x, y, label):
+        anchors.append((ref, x, y))
+
+    async def noop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(assembly, "set_global", set_global)
+    monkeypatch.setattr(assembly, "drive_dimension", drive_dimension)
+    monkeypatch.setattr(assembly, "dimension_between", dimension_between)
+    monkeypatch.setattr(assembly, "SketchDims", Dims)
+    monkeypatch.setattr(assembly, "_early_bound", early_bound)
+    monkeypatch.setattr(assembly, "anchor_point_to_origin", anchor)
+    monkeypatch.setattr(assembly, "ensure_fully_defined", noop)
+    for name in (
+        "set_sketch_direct_db",
+        "name_last_feature",
+        "apply_drawing_precision",
+        "mark_dimensions_for_drawing",
+    ):
+        monkeypatch.setattr(assembly, name, lambda *a, **kw: None)
+    monkeypatch.setattr(
+        assembly, "blank_sketch", lambda adapter, feature: blanked.append(feature)
+    )
+
+    asyncio.run(assembly._author_lever_setting_reference(Adapter()))
+
+    tip = (stack.LEVER_TIP_X, stack.LEVER_AXIS_Y)
+    clamp = (stack.CLAMP_CENTRE_X, stack.LEVER_AXIS_Y)
+    fixture = (stack.CLAMP_CENTRE_X, stack.FIXTURE_AXIS_Y)
+    assert lines == [(*tip, *clamp), (*clamp, *fixture)]
+    assert ("leg0", None, "horizontal") in relations
+    assert ("leg1", None, "vertical") in relations
+    assert ("leg0.end", "leg1.start", "coincident") in relations
+    assert anchors == [("leg0.start", *tip)]
+    assert lengths == {
+        stack.CLAMP_STATION_DIMENSION: ("horizontal_distance", stack.CLAMP_STATION),
+        stack.FIXTURE_DROP_DIMENSION: ("vertical_distance", stack.FIXTURE_DROP),
+    }
+    feature = stack.LEVER_FEATURE
+    assert equations == {
+        f"LeverTipX@{feature}": '"LeverTipX"',
+        f"LeverAxisY@{feature}": '"LeverAxisY"',
+        f"{stack.CLAMP_STATION_DIMENSION}@{feature}": '"LeverClampStation"',
+        f"{stack.FIXTURE_DROP_DIMENSION}@{feature}": '"LeverFixtureDrop"',
+    }
+    assert globals_authored == {
+        "LeverTipX": f"{stack.LEVER_TIP_X}mm",
+        "LeverAxisY": f"{stack.LEVER_AXIS_Y}mm",
+        "LeverClampStation": f"{stack.CLAMP_STATION}mm",
+        "LeverFixtureDrop": f"{stack.FIXTURE_DROP}mm",
+    }
+    assert all(entity.ConstructionGeometry for entity in Adapter._sketch_entities.values())
+    assert blanked == [feature]
+
+
+def test_the_explode_moves_every_shown_family_but_the_wire_in_one_group() -> None:
+    moved = {
+        explode.member_stem(member)
+        for step in explode.EXPLODE_STEPS
+        for member in step.members
+    }
+    # The bar with its pressed axle, and the lever with its clamp, stay put
+    # as each group's base; everything else moves.
+    assert moved == explode.SHOWN_STEMS - {
+        explode.WIRE_STEM,
+        "mg-wheel-bar",
+        "mg-wheel-axle",
+        "mg-magnifying-lever",
+        "mg-magnifying-clamp",
+    }
+    assert explode.WHEEL_GROUP_STEMS.isdisjoint(explode.LEVER_GROUP_STEMS)
+    assert explode.SHOWN_STEMS == set(notes.BOM_ORDER)
+
+
+def test_plan_explode_resolves_instances_and_refuses_missing_ones() -> None:
+    instances = [
+        explode.Instance(f"{stem}-{number}", stem)
+        for stem in notes.BOM_ORDER
+        for number in range(1, notes.QUANTITIES[stem] + 1)
     ]
-    assert len(values) == 1
-    assert isinstance(values[0], ast.Name) and values[0].id == "PRESS_INSTALLATION_NOTES"
-    assert "COLLAR ONTO LEVER; HOLD ROD NEAR END" in PRESS_INSTALLATION_NOTES
-    assert "WITH OUTER FACE" in PRESS_INSTALLATION_NOTES
-    # #1570: press only, no bond.
-    assert "LOCTITE" not in PRESS_INSTALLATION_NOTES
-    assert "SOLDER" not in PRESS_INSTALLATION_NOTES
-    note_calls = []
-    events = []
-    source = tmp_path / "magnifier.SLDASM"
-    source.write_bytes(b"source-presence fixture; native opening is faked")
+    plan = explode.plan_explode(instances)
+    assert [step for step, _names in plan] == list(explode.EXPLODE_STEPS)
+    for step, names in plan:
+        assert names, step.label
+        for name in names:
+            assert explode.member_stem(name.rsplit("-", 1)[0]) in {
+                explode.member_stem(member) for member in step.members
+            }
+    first_nut = next(
+        names for step, names in plan if step.members == ("vn-wheel-axle-nut:1",)
+    )
+    assert first_nut == ("vn-wheel-axle-nut-1",)
+    with pytest.raises(ValueError, match="absent"):
+        explode.plan_explode([i for i in instances if i.stem != "mg-output-fixture"])
+    with pytest.raises(ValueError, match="no instance"):
+        explode.plan_explode([i for i in instances if i.name != "vn-wheel-axle-nut-2"])
 
-    async def open_model(path):
-        assert path == str(source)
-        events.append("open")
-        return SimpleNamespace(is_success=True, data=None, error=None)
 
-    adapter = SimpleNamespace(currentModel=object(), open_model=open_model)
+def test_the_bom_rows_are_the_registry_parts_with_their_skus() -> None:
+    assert drawing.BOM_COMPONENTS == notes.BOM_ORDER
+    assert set(notes.BOM_DESCRIPTIONS) == set(notes.BOM_ORDER)
+    for stem, row in drawing.PART_ROWS.items():
+        assert drawing.BOM_PART_NUMBERS[stem] == row["number"]
+        skus = row.get("supplier_skus") or ()
+        assert drawing.BOM_SKUS[stem] == (" / ".join(skus) if skus else "-")
+    assert drawing.BOM_SKUS["vn-thumb-screw"] == "91882A221"
+    assert drawing.BOM_SKUS["mg-magnifying-lever"] == "-"
+    assert notes.QUANTITIES["vn-thumb-screw"] == 2
 
-    def linked_note(actual_adapter, name, x, y, *, char_height):
-        events.append("press-note")
-        note_calls.append((actual_adapter, name, x, y, char_height))
 
-    def stack_dimensions(actual_adapter):
-        assert actual_adapter is adapter
-        events.append("stack")
-        return settled
+def test_the_bom_screw_lengths_are_the_vendor_specs_fractions() -> None:
+    import vn_clamp_screw_spec as clamp_screw
+    import vn_magnifying_bracket_screw_spec as bracket_screw
+    from _mcmaster_91882a221 import SHANK_LEN as thumb_len
 
-    def settled():
-        events.append("settled")
+    for stem, length_mm, printed in (
+        (notes.CLAMP_SCREW, clamp_screw.SHANK_LEN, "1-1/4"),
+        (notes.BRACKET_SCREW, bracket_screw.LENGTH, "5/16"),
+        (notes.THUMB_SCREW, thumb_len, "7/16"),
+    ):
+        assert f" X {printed} " in notes.BOM_DESCRIPTIONS[stem]
+        assert float(sum(Fraction(p) for p in printed.split("-"))) == pytest.approx(
+            length_mm / 25.4
+        )
 
-    async def finalize(actual_adapter, outputs, **kwargs):
-        assert actual_adapter is adapter
-        assert outputs is drawing.OUTPUTS
-        assert kwargs["settled_checks"] == (settled,)
-        events.append("finalize")
-        return {"pdf": "finalized"}
 
-    monkeypatch.setattr(drawing, "SOURCE", source)
-    monkeypatch.setattr(drawing, "read_required_properties", lambda *args, **kwargs: None)
-    monkeypatch.setattr(drawing, "new_project_drawing", lambda *args, **kwargs: None)
-    monkeypatch.setattr(drawing, "place_view", lambda *args, **kwargs: object())
-    monkeypatch.setattr(drawing, "apply_view_configuration", lambda *args, **kwargs: None)
-    monkeypatch.setattr(drawing, "assert_full_detail_view", lambda *args, **kwargs: None)
-    monkeypatch.setattr(drawing, "_stack_dimensions", stack_dimensions)
-    monkeypatch.setattr(drawing, "add_property_linked_note", linked_note)
-    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
-    assert asyncio.run(drawing.build(adapter)) == {"pdf": "finalized"}
-    assert events == ["open", "stack", "press-note", "finalize"]
-    assert note_calls == [
-        (adapter, "Drawing Notes", *drawing.PRESS_NOTE_XY, drawing.PRESS_NOTE_CHAR_HEIGHT)
+@pytest.mark.parametrize(
+    ("length_mm", "printed"), ((1.5 * 25.4, "1-1/2"), (3.0 / 8.0 * 25.4, "3/8"))
+)
+def test_a_stock_screw_length_change_reprints_its_bom_fraction(
+    monkeypatch, length_mm: float, printed: str
+) -> None:
+    # Code review C04: a canonical stock-length change must move the printed
+    # fraction, not fail an import on a duplicated expected length.
+    import importlib
+
+    import vn_clamp_screw_spec as clamp_screw
+
+    monkeypatch.setattr(clamp_screw, "SHANK_LEN", length_mm)
+    try:
+        importlib.reload(notes)
+        assert (
+            notes.BOM_DESCRIPTIONS[notes.CLAMP_SCREW]
+            == f"#8-32 X {printed} FILLISTER SCREW"
+        )
+    finally:
+        monkeypatch.undo()
+        importlib.reload(notes)
+
+
+def test_a_screw_length_off_the_sixty_fourths_refuses_the_bom(monkeypatch) -> None:
+    # A metric 8 mm stock (0.31496 in, 0.0625 mm off 5/16) has no catalogue
+    # fraction: the BOM refuses rather than print a rounded one.
+    import importlib
+
+    import vn_magnifying_bracket_screw_spec as bracket_screw
+
+    monkeypatch.setattr(bracket_screw, "LENGTH", 8.0)
+    try:
+        with pytest.raises(ValueError, match="vn-magnifying-bracket-screw length.*1/64"):
+            importlib.reload(notes)
+    finally:
+        monkeypatch.undo()
+        importlib.reload(notes)
+
+
+def _inside(inner, outer) -> bool:
+    return (
+        inner[0] >= outer[0] - 1e-9
+        and inner[1] >= outer[1] - 1e-9
+        and inner[2] <= outer[2] + 1e-9
+        and inner[3] <= outer[3] + 1e-9
+    )
+
+
+def _overlap(a, b) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def test_the_package_fields_stay_inside_the_border_and_off_the_title_block() -> None:
+    bom = (
+        drawing.BOM_ANCHOR[0],
+        drawing.BOM_BOTTOM,
+        drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values()),
+        drawing.BOM_ANCHOR[1],
+    )
+    for field in (
+        drawing.WHEEL_FIELD,
+        drawing.LEVER_FIELD,
+        drawing.FINISHED_FIELD,
+        drawing.BOM_REFERENCE_FIELD,
+        bom,
+    ):
+        assert _inside(field, drawing.INNER_BORDER), field
+    for field in (drawing.LEVER_FIELD, drawing.FINISHED_FIELD, drawing.BOM_REFERENCE_FIELD):
+        assert not _overlap(field, drawing.TITLE_BLOCK), field
+    assert not _overlap(drawing.WHEEL_FIELD, bom)
+    assert not _overlap(drawing.WHEEL_FIELD, drawing.TITLE_BLOCK)
+    assert not _overlap(drawing.BOM_REFERENCE_FIELD, bom)
+    assert drawing.BOM_REFERENCE_FIELD[3] < drawing.BOM_BOTTOM
+    assert drawing.FINISHED_FIELD[0] > drawing.STEPS_RIGHT
+
+
+def test_the_finished_caption_centres_over_its_view() -> None:
+    outline = (0.257, 0.080, 0.311, 0.214)
+    text = "FINISHED ASSEMBLY (SCALE 1:4)"
+    left, top = drawing.caption_over(outline, text)
+    width = len(text) * drawing.CAPTION_CHAR_WIDTH
+    assert left + width / 2.0 == pytest.approx((outline[0] + outline[2]) / 2.0)
+    # r6 printed this caption 68.8 mm wide.
+    assert width == pytest.approx(0.0688, abs=0.0005)
+    assert left > drawing.STEPS_RIGHT
+    assert top - drawing.NOTE_LINE_PITCH > outline[3]
+    assert top < drawing.INNER_BORDER[3]
+
+
+def test_the_wire_balloon_stands_right_of_the_view_on_its_rising_leader() -> None:
+    import math
+
+    landing = (0.282, 0.120)
+    outline = (0.257, 0.080, 0.311, 0.214)
+    x, y = drawing.wire_balloon_centre(
+        landing,
+        outline,
+        rise_deg=drawing.FINISHED_WIRE_BALLOON_RISE_DEG,
+        reach=drawing.BALLOON_MARGIN,
+    )
+    assert x == pytest.approx(outline[2] + drawing.BALLOON_MARGIN)
+    assert math.degrees(math.atan2(y - landing[1], x - landing[0])) == pytest.approx(
+        drawing.FINISHED_WIRE_BALLOON_RISE_DEG
+    )
+    assert x < drawing.INNER_BORDER[2] - drawing._PAD
+    assert drawing.TITLE_BLOCK[3] < y < drawing.FINISHED_FIELD[3]
+
+
+def test_the_steps_and_checks_fit_their_column() -> None:
+    for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS):
+        assert max(len(line) for line in block.splitlines()) <= drawing.STEPS_LINE_WIDTH
+    checks_bottom = drawing.CHECKS_XY[1] - (
+        drawing.ASSEMBLY_CHECKS.count("\n") + 1
+    ) * drawing.NOTE_LINE_PITCH
+    assert checks_bottom > drawing.INNER_BORDER[1]
+    assert drawing.ASSEMBLY_STEPS.startswith("ASSEMBLY SEQUENCE\n1. ")
+    assert f"\n{len(steps.SEQUENCE)}. " in drawing.ASSEMBLY_STEPS
+
+
+def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
+    from _drawing_common import _SW_SHADED_EDGES
+    from _drawing_view_configuration import (
+        SIMPLIFIED_VIEW_CONFIGURATION,
+        view_configuration,
+    )
+
+    for ladder in (
+        drawing.EXPLODED_SCALE_LADDER,
+        drawing.LEVER_SCALE_LADDER,
+        drawing.FINISHED_SCALE_LADDER,
+        drawing.BOM_REFERENCE_SCALE_LADDER,
+    ):
+        for scale in ladder:
+            assert (
+                view_configuration(scale, _SW_SHADED_EDGES)
+                == SIMPLIFIED_VIEW_CONFIGURATION
+            )
+    assert drawing.exploded_caption("WHEEL GROUP", (1.0, 3.0)).endswith("(SCALE 1:3)")
+
+
+def test_the_lever_group_takes_1_2_5_centred_with_its_caption_under_it() -> None:
+    # Outlines measured 82.6 x 116.1 mm at 1:3 (r11) and 118.3 x 168.6 at 1:2
+    # (r13): size = k / scale + fixed padding.
+    def outline_size(denominator: float) -> tuple[float, float]:
+        sizes = []
+        for at_2, at_3 in ((0.1183, 0.0826), (0.1686, 0.1161)):
+            k = (at_2 - at_3) * 6.0
+            sizes.append(k / denominator + at_2 - k / 2.0)
+        return sizes[0], sizes[1]
+
+    field = drawing.LEVER_FIELD
+    reach = 2.0 * drawing.BALLOON_RING_REACH
+
+    def fits(denominator: float) -> bool:
+        width, height = outline_size(denominator)
+        return width + reach <= field[2] - field[0] and height + reach <= field[3] - field[1]
+
+    assert not fits(2.0)
+    assert fits(2.5)
+    assert drawing.LEVER_SCALE_LADDER[0] == (1.0, 2.5)
+    # Centred in the field, the caption sits under the view, above the title block.
+    width, height = outline_size(2.5)
+    centre = ((field[0] + field[2]) / 2.0, (field[1] + field[3]) / 2.0)
+    outline = (
+        centre[0] - width / 2.0,
+        centre[1] - height / 2.0,
+        centre[0] + width / 2.0,
+        centre[1] + height / 2.0,
+    )
+    text = drawing.exploded_caption(drawing.LEVER_GROUP, (1.0, 2.5))
+    left, top = drawing.lever_caption_xy(outline, text)
+    assert top < outline[1]
+    assert left + len(text) * drawing.CAPTION_CHAR_WIDTH / 2.0 == pytest.approx(centre[0])
+    assert left > drawing.INNER_BORDER[0]
+    assert left + len(text) * 0.00256 < drawing.INNER_BORDER[2]
+    with pytest.raises(ValueError, match="reaches the title block"):
+        drawing.lever_caption_xy((0.1, 0.075, 0.2, 0.2), text)
+
+
+def test_the_setting_axis_picks_land_on_the_bare_cylinders_off_the_chain() -> None:
+    # r14 (run 20261016T171305106Z), back view at 1:4: the picks stay 5 mm
+    # off the clamp block, the 7/16 hex whose bottom face sits LEVER_BORE_Y
+    # under the lever axis and whose corners sit HEX_AC/2 either side of the
+    # rod axis along the lever (#1559), and off the fixture's top, 5.5 mm
+    # over its axis.
+    import mg_magnifying_clamp_geom as clamp
+
+    picks = drawing.setting_axis_picks_m()
+    rod_x, rod_y, rod_z = (value * 1000.0 for value in picks["vertical rod"])
+    lever_x, lever_y, lever_z = (value * 1000.0 for value in picks["lever"])
+    assert rod_z == lever_z == 0.0
+    assert 0.0 < rod_x - stack.CLAMP_CENTRE_X < drawing._VROD_R
+    assert stack.LEVER_AXIS_Y - rod_y > clamp.LEVER_BORE_Y + 5.0
+    assert rod_y - stack.FIXTURE_AXIS_Y > 5.5 + 5.0
+    assert 0.0 < lever_y - stack.LEVER_AXIS_Y < drawing._LEVER_R
+    assert lever_x - stack.CLAMP_CENTRE_X > clamp.HEX_AC / 2.0 + 5.0
+    assert stack.LEVER_TIP_X - lever_x > drawing._LEVER_R + 5.0
+
+
+def test_the_axle_nut_balloons_land_square_to_the_axle_on_distinct_parts() -> None:
+    import math
+
+    import vn_wheel_axle_front_washer_spec as washer
+    import vn_wheel_axle_nut_spec as nut
+
+    def screen(point):
+        # Ry(180) placement, then the *Isometric (+X+Y+Z) projection.
+        x, y, z = -point[0], point[1], -point[2]
+        return ((x - z) / math.sqrt(2.0), (-x + 2.0 * y - z) / math.sqrt(6.0))
+
+    wx, wy, wz = drawing.FRONT_WASHER_BALLOON_POINT_MM
+    assert wz == 0.0 and math.hypot(wx, wy) == pytest.approx(washer.OD / 2.0)
+    nx, ny, nz = drawing.LOCKNUT_BALLOON_POINT_MM
+    # On the flat facing 240 deg (corners on the local +-Y meridian).
+    normal = math.radians(240.0)
+    assert nz == 0.0
+    assert nx * math.cos(normal) + ny * math.sin(normal) == pytest.approx(
+        nut.ACROSS_FLATS / 2.0
+    )
+    axle = screen((0.0, 0.0, 1.0))  # the stack's explode runs along local +z
+    for point, side in (
+        (drawing.FRONT_WASHER_BALLOON_POINT_MM, (-0.5, math.sqrt(3.0) / 2.0)),
+        (drawing.LOCKNUT_BALLOON_POINT_MM, (0.5, -math.sqrt(3.0) / 2.0)),
+    ):
+        sx, sy = screen(point)
+        length = math.hypot(sx, sy)
+        assert (sx / length, sy / length) == pytest.approx(side)
+        assert sx * axle[0] + sy * axle[1] == pytest.approx(0.0, abs=1e-9)
+    anchors = drawing.BALLOON_ANCHORS
+    assert anchors["vn-wheel-axle-nut"].instance == "vn-wheel-axle-nut-2"
+    # Instance 2 is the locknut, exploded farthest out.
+    farthest = min(
+        (step for step in explode.EXPLODE_STEPS if step.axis == "z"),
+        key=lambda step: step.distance_mm,
+    )
+    assert farthest.members == ("vn-wheel-axle-nut:2",)
+
+
+def test_the_press_gauge_names_the_nut_it_serves_and_the_axle_is_oiled() -> None:
+    import _config
+
+    number = _config.parts("vn-wheel-axle-nut")["number"]
+    callout = notes.DIMENSION_CALLOUTS[stack.PRESS_GAUGE_DIMENSION]
+    assert f"{number} LOCKNUT ON FULL THREAD" in callout
+    assert "\n" not in callout
+    assert notes.STEP_TEXT["wheel-stacked"].startswith("LIGHT OIL ON THE AXLE;")
+
+
+def test_step_down_takes_the_largest_scale_whose_ring_fits() -> None:
+    field = (0.0, 0.0, 0.200, 0.150)
+    widths = {(1.0, 2.0): 0.250, (1.0, 3.0): 0.150, (1.0, 4.0): 0.110}
+
+    def outline_at(scale):
+        width = widths[scale]
+        return (0.0, 0.0, width, width * 0.5)
+
+    scale, outline = drawing.step_down_to_fit(
+        outline_at, drawing.EXPLODED_SCALE_LADDER, field, name="t"
+    )
+    assert scale == (1.0, 3.0)
+    with pytest.raises(ValueError, match="no t scale fits"):
+        drawing.step_down_to_fit(
+            outline_at, drawing.EXPLODED_SCALE_LADDER, (0.0, 0.0, 0.05, 0.05), name="t"
+        )
+
+
+def test_every_bom_family_is_ballooned_exactly_once_across_the_package() -> None:
+    items = {stem: str(index) for index, stem in enumerate(notes.BOM_ORDER, start=1)}
+    ballooned = [
+        stem
+        for stems in (
+            explode.WHEEL_GROUP_STEMS,
+            explode.LEVER_GROUP_STEMS,
+            frozenset({explode.WIRE_STEM}),
+        )
+        for stem, _item in drawing.balloon_items(items, stems)
     ]
+    assert sorted(ballooned) == sorted(notes.BOM_ORDER)
+
+
+def test_the_joint_retention_rows_point_at_magnifier_steps() -> None:
+    assert joint_retention.STEP_LISTS["mg_magnifier"] == steps.SEQUENCE
+    assert DRAWINGS_BY_NAME["mg_magnifier_assembly"].part == "mg_magnifier"
+
+
+@pytest.mark.parametrize(
+    ("stem", "station", "radius", "rows"),
+    [
+        (
+            "mg-magnifying-lever",
+            assembly.LEVER_ROD_DIA / 2.0,
+            assembly.LEVER_ROD_DIA / 2.0,
+            _transforms.ROT_Y_180,
+        ),
+        (
+            # The shoulder's Ø5 edge (#1559): the old x = R station now falls
+            # on the turned-down thread, so a point at radius R is off the rod.
+            "mg-magnifying-vertical-rod",
+            assembly.VROD_SHOULDER_X,
+            assembly.VROD_DIA / 2.0,
+            _transforms.compose_rows(
+                _transforms.rot_z_rows(-90.0), _transforms.ROT_Y_180
+            ),
+        ),
+    ],
+)
+def test_rod_balloon_anchors_sit_on_a_drawn_circle_facing_the_isometric(
+    stem: str, station: float, radius: float, rows: list[list[float]]
+) -> None:
+    x, y, z = drawing.BALLOON_ANCHORS[stem].point_mm
+    assert x == pytest.approx(station)
+    assert math.hypot(y, z) == pytest.approx(radius)
+    normal = [
+        sum((0.0, y / radius, z / radius)[i] * rows[i][j] for i in range(3))
+        for j in range(3)
+    ]
+    assert sum(normal) > 0.0  # faces the +X+Y+Z viewer
+    if stem == "mg-magnifying-lever":
+        # Square to the rod axis, and straight at the viewer.
+        assert sum(normal) == pytest.approx(math.sqrt(2.0))
+    else:
+        # Opposite the revolve seam (x, R, 0): a vertex of the drawn circle
+        # for any even segment count (r12 missed mid-chord at 1:2).
+        assert (y, z) == pytest.approx((-radius, 0.0))

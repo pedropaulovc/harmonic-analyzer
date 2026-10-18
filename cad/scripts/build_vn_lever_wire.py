@@ -55,13 +55,21 @@ import sys
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _com_invoke, _early_bound
 from _dimensions import drive_dimension, set_global
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, feature_name_by_type, name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, ensure_fully_defined
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_properties,
@@ -69,7 +77,9 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _visibility import blank_reference_geometry
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from vn_lever_wire_spec import (
+    BALLOON_RING_FRACTION,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FRONT_VIEW_NOTE,
@@ -87,6 +97,134 @@ from vn_lever_wire_geom import (  # noqa: E402
     WIRE_DIA,
     WIRE_LEN,
 )
+
+# The balloon ring (BalloonRingSplit): a projected split line round the wire
+# at BALLOON_RING_FRACTION of the run from the drum end. It changes no shape;
+# it only gives MHA-MG-000's balloon a model edge on the free span, where
+# before the wire's only edges were its two end circles, one inside the wheel
+# and one under the fixture spigot (machinist review r4, balloon 19).
+BALLOON_RING_STATION = BALLOON_RING_FRACTION * WIRE_LEN
+_SPLIT_OVERHANG = 0.5  # the cross line overhangs the wire so it rings it whole
+_CYLINDER_IDENTITY = 4002  # swSurfaceTypes_e.CYLINDER_TYPE
+
+
+def _wire_cylinder_areas(adapter) -> list[tuple[object, float]]:
+    """Every Ø WIRE_DIA cylinder face of the body with its area in mm^2."""
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    faces: list[tuple[object, float]] = []
+    for body in part.GetBodies2(0, False) or ():
+        face = _early_bound(body, "IBody2").GetFirstFace()
+        while face is not None:
+            surface = _com_invoke(face, "IFace2", "GetSurface")
+            if (
+                surface is not None
+                and int(_com_invoke(surface, "ISurface", "Identity")) == _CYLINDER_IDENTITY
+                and math.isclose(
+                    float(tuple(_com_invoke(surface, "ISurface", "CylinderParams"))[6])
+                    * 1000.0,
+                    WIRE_DIA / 2.0,
+                    abs_tol=1e-4,
+                )
+            ):
+                faces.append((face, float(_early_bound(face, "IFace2").GetArea()) * 1e6))
+            face = _early_bound(face, "IFace2").GetNextFace()
+    return faces
+
+
+async def _add_balloon_ring(adapter) -> list[tuple[str, str]]:
+    """Ring the wire at BALLOON_RING_STATION with a projected split line.
+
+    One Front-plane sketch (u -> model X, v -> model Y, the wire axis): a
+    centreline up the axis from the drum end to the station, driven from
+    WireLength, and a cross line centred on its top end that projects both
+    ways into a full ring (the MHA-PN-007 thread-limit pattern).
+    """
+    reach = WIRE_DIA / 2.0 + _SPLIT_OVERHANG
+    dims = SketchDims()
+    check("create_sketch balloon ring", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "balloon ring axis",
+        await adapter.add_centerline(0.0, 0.0, 0.0, BALLOON_RING_STATION),
+    )
+    split = check(
+        "balloon ring split line",
+        await adapter.add_line(-reach, BALLOON_RING_STATION, reach, BALLOON_RING_STATION),
+    )
+    set_sketch_direct_db(adapter, False)
+    for entity, relation in ((axis, "vertical"), (split, "horizontal")):
+        check(
+            f"balloon ring {entity} {relation}",
+            await adapter.add_sketch_constraint(entity, None, relation),
+        )
+    check(
+        "balloon ring split centred on the axis",
+        await adapter.add_sketch_constraint(f"{axis}.end", split, "midpoint"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{axis}.start", 0.0, 0.0, "balloon ring axis on the drum end"
+    )
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        f"{axis}.end",
+        "vertical_distance",
+        BALLOON_RING_STATION,
+        "balloon ring station",
+    )
+    dims.record("BalloonRingStation", f'"WireLength" * {BALLOON_RING_FRACTION}')
+    await dimension_between(
+        adapter,
+        f"{split}.start",
+        f"{split}.end",
+        "horizontal_distance",
+        2.0 * reach,
+        "balloon ring split reach",
+    )
+    dims.record(None, None)
+    await ensure_fully_defined(adapter, "balloon ring sketch")
+    check("exit_sketch balloon ring", await adapter.exit_sketch())
+    name_last_feature(adapter, "BalloonRingReference")
+    drive_jobs = dims.apply(adapter, "BalloonRingReference")
+
+    # Projected split line: the sketch at mark 4, the wire cylinder at mark 1.
+    before = _wire_cylinder_areas(adapter)
+    if len(before) != 1:
+        raise RuntimeError(
+            f"BalloonRingSplit: expected the one wire cylinder, got {len(before)}"
+        )
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "BalloonRingReference", "SKETCH", 0.0, 0.0, 0.0, False, 4, null_callout(), 0
+    ):
+        raise RuntimeError("BalloonRingSplit: failed to select the split sketch")
+    selection_manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
+    selection_data.Mark = 1
+    if not _early_bound(before[0][0], "IEntity").Select4(True, selection_data):
+        raise RuntimeError("BalloonRingSplit: failed to select the wire cylinder")
+    previous = feature_name_by_type(adapter, "PLine")
+    model.InsertSplitLineProject(False, False)  # both directions: a full ring
+    model.ClearSelection2(True)
+    created = feature_name_by_type(adapter, "PLine")
+    if not created or created == previous:
+        raise RuntimeError("BalloonRingSplit: projected split line was not created")
+    _feature_by_name(adapter, created).Name = "BalloonRingSplit"
+    areas = sorted(area for _face, area in _wire_cylinder_areas(adapter))
+    expected = sorted(
+        math.pi * WIRE_DIA * run
+        for run in (BALLOON_RING_STATION, WIRE_LEN - BALLOON_RING_STATION)
+    )
+    if len(areas) != 2 or any(
+        abs(got - want) > 0.01 * want for got, want in zip(areas, expected)
+    ):
+        raise RuntimeError(
+            f"BalloonRingSplit: wire faces {areas} mm^2, expected {expected}"
+        )
+    # The reference sketch stays out of every view.
+    blank_sketch(adapter, "BalloonRingReference")
+    return drive_jobs
 
 
 async def build(adapter) -> dict[str, str]:
@@ -126,6 +264,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append(("D1@Wire", '"WireLength"'))
     v_wire = math.pi * (WIRE_DIA / 2.0) ** 2 * WIRE_LEN
     await volume_check(adapter, "wire", v_wire, 0.005 * v_wire)
+    # Shape-neutral: a split line only adds the MHA-MG-000 balloon's edge.
+    drive_jobs += await _add_balloon_ring(adapter)
+    await volume_check(adapter, "wire with balloon ring", v_wire, 0.005 * v_wire)
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check: every equation evaluates to the value just built,

@@ -32,6 +32,12 @@ from vn_lever_wire_geom import WIRE_DIA  # noqa: F401 (re-export, import-pure)
 # union(marks) == union(keeps) == {}).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 
+# The balloon ring's station, as a fraction of the run from the drum end
+# (build_vn_lever_wire.BalloonRingSplit): mid-run, on the free span between
+# the wheel rim and the fixture, where MHA-MG-000's finished view balloons the
+# wire. Shared so the drawing's balloon anchor and the build agree.
+BALLOON_RING_FRACTION = 0.5
+
 # True free-text instructions only; the build stamps these and APPENDS the
 # computed straight-run line, then the drawing displays only the $PRPSHEET link.
 DRAWING_NOTES = "\n".join(

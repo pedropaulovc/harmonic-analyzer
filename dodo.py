@@ -3489,6 +3489,9 @@ def task_check():
         # and the seat put back to its declared baseline however it ends.
         SCRIPTS_DIR / "test_drawing_pdf_raster.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
+        # The shared catalogue inch-fraction printer behind the BOM and ITEM
+        # screw lengths: exact 1/64 fractions print, anything else refuses.
+        SCRIPTS_DIR / "test_inch_fraction.py",
         # The keeper chain's rest-pose solve: whole pitches, clearances, and a
         # length that lets the taper pin come fully out.
         SCRIPTS_DIR / "test_vn_keeper_chain.py",

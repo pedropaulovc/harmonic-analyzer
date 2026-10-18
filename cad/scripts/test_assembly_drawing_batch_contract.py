@@ -58,8 +58,8 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     # bank's fit-up steps (#743, Codex PRRT_kwDOPHDy386mRSOK); the paper-drive
     # sheet left it when it became three sheets with its own fit-up steps; the
     # measuring-stick sheet is a full fitter package (BOM, explode, steps); the
-    # magnifier sheet left it when it gained the axle-stack details that print
-    # the press gauge and the endshake (Codex PR #1330).
+    # magnifier left it with the axle-stack details (Codex PR #1330) and is
+    # now a four-sheet fitter package (BOM, explode, steps).
     if drawing
     not in (
         draw_fr_frame_assembly,
@@ -168,12 +168,21 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_mg_magnifier_assembly:
             scripts_dir = Path(draw_mg_magnifier_assembly.__file__).resolve().parent
-            # The stack spec whose settings the details print, and the axle
-            # spec that places the endshake detail.
+            # The stack spec whose settings the sheets print, the notes with
+            # its BOM, callout and step text, the step order, the explode plan
+            # (pure: not the builder's COM explode), and the axle spec that
+            # places the endshake detail.
             assert {
                 str(scripts_dir / name)
-                for name in ("mg_magnifier_assembly_spec.py", "mg_wheel_axle_spec.py")
+                for name in (
+                    "mg_magnifier_assembly_spec.py",
+                    "mg_magnifier_assembly_notes.py",
+                    "mg_magnifier_assembly_steps.py",
+                    "mg_magnifier_explode_spec.py",
+                    "mg_wheel_axle_spec.py",
+                )
             } <= set(deps)
+            assert str(scripts_dir / "_mg_magnifier_explode.py") not in deps
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
             assert str(Path(_assembly_drawing.__file__).resolve()) in deps
