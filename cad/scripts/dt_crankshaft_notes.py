@@ -49,7 +49,8 @@ SHAFT_LENGTH_MATE = " SETS MHA-DT-031 TO MHA-PD-009 AIR"
 # The thinnest wall round the drive-pin holes, to the seat spigot's rim, at
 # the printed worst case (crankshaft_spec rounds it down): stated as the fact
 # the shop holds, under the holes' own callout.
-# Pending exception ruling: MHA-DT-011 rim (#991).
+# Emits approved declaration dt-crankshaft RV-02 (owner ruling 2026-10-18,
+# #991; redesign tracked in #1679).
 DRIVE_PIN_RIM_NOTE = f"DRIVE-PIN HOLE TO SPIGOT RIM {DRIVE_PIN_SPIGOT_RIM_WORST:.2f} MIN."
 
 # Under the native REAM callout on the seat spigot's two blind holes: the

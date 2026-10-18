@@ -176,7 +176,7 @@ def _floor_2(value: float) -> float:
 
 def test_spigot_rim_is_the_shortfall_the_sheet_states() -> None:
     # The drive-pin holes' rim to the Ø17.5 seat spigot is under the 1.5 mm
-    # wall floor (pending ruling #991): the sheet states the worst case of
+    # wall floor (declared shortfall RV-02, owner ruling 2026-10-18): the sheet states the worst case of
     # the printed bands, rounded down so it never claims more rim than exists.
     hole_r = spec.DRIVE_PIN_HOLE_DIA / 2.0
     nominal = spec.SPIGOT_DIA / 2.0 - (spec.DRIVE_PIN_CIRCLE_RADIUS + hole_r)
