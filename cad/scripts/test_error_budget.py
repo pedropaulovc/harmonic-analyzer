@@ -1494,7 +1494,7 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
 
 
 def test_shaft_flat_clock_is_printed_and_booked_per_land(budget):
-    """MHA-DT-004's four flats share one clock by note, at the title block's
+    """MHA-DT-004's four flats share one clock by section A-A's callout, at the title block's
     angle, and the budget draws that angle once per land: gears on one land
     turn together, and the Ø9.525 land (the 64T and T030..T120) is the
     reference its own clock cannot move."""
@@ -1503,7 +1503,7 @@ def test_shaft_flat_clock_is_printed_and_booked_per_land(budget):
 
     angle = float(_config.title_block("angular")["value_deg"])
     assert budget["critical_features"]["cone_land_clock"]["tolerance"] == angle
-    assert "ALL FLATS PARALLEL." in dt_cone_gear_shaft_spec.DRAWING_NOTES.splitlines()
+    assert dt_cone_gear_shaft_spec.FLATS_IN_LINE_CALLOUT == "4 FLATS IN LINE"
 
     land = eb.draw_groups()["cone_land_clock"]
     for carried in cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH:

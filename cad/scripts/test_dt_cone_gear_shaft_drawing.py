@@ -122,13 +122,80 @@ def test_the_build_leaves_the_terminal_torque_corners_sharp(monkeypatch):
     assert all(not start < pick[2] <= tip for pick in picks), picks
 
 
-def test_only_the_terminal_d_section_prints_the_torque_corner_limit(monkeypatch):
-    """Run the real section loop with its native steps recorded: the limit
-    rides above the terminal flat's own across-flat, once, through the
-    printable-above guard."""
+def _centre_mark_view(marks: list, deletes: bool):
+    """A section view holding ``marks`` and a drawing whose EditDelete drops
+    the selected one (or, ``deletes=False``, silently keeps it)."""
+    from types import SimpleNamespace
+
+    events: list[str] = []
+    selected: list = []
+
+    def select(mark):
+        def _select(append, _data):
+            assert append is False
+            selected.append(mark)
+            events.append("select")
+            return True
+
+        return _select
+
+    for mark in marks:
+        mark.Select2 = select(mark)
+
+    def edit_delete():
+        events.append("delete")
+        if deletes:
+            for mark in selected:
+                marks.remove(mark)
+
+    draw = SimpleNamespace(
+        ClearSelection2=lambda _all: selected.clear() or True,
+        EditDelete=edit_delete,
+    )
+    view = SimpleNamespace(
+        GetAnnotationsByType=lambda kind: (
+            tuple(marks) if kind == drawing._CENTER_MARK_ANNOTATION else ()
+        )
+    )
+    return SimpleNamespace(currentModel=draw), view, events
+
+
+def test_the_full_section_loses_its_centre_mark_so_all_four_read_alike(monkeypatch):
+    """Machinist review r7: only the full A-A got SolidWorks' centre mark, so
+    one section in four carried one.  The mark is deleted and read back gone;
+    a partial section with none is left alone; a delete that does not land
+    fails the build."""
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    a_a = drawing.D_SECTIONS[0]
+    marks = [SimpleNamespace()]
+    adapter, view, events = _centre_mark_view(marks, deletes=True)
+    drawing._delete_centre_mark(adapter, view, a_a)
+    assert marks == [] and events == ["select", "delete"]
+    # a partial section: nothing to delete, nothing selected
+    adapter, view, events = _centre_mark_view([], deletes=True)
+    drawing._delete_centre_mark(adapter, view, drawing.D_SECTIONS[-1])
+    assert events == []
+    # the delete is VT_VOID: only the re-read proves it
+    adapter, view, _events = _centre_mark_view([SimpleNamespace()], deletes=False)
+    with pytest.raises(RuntimeError, match="survived deletion"):
+        drawing._delete_centre_mark(adapter, view, a_a)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_delete_centre_mark(adapter, view, section)" in source
+    assert "carries a centre mark again" in source
+
+
+def test_the_d_sections_print_the_corner_limit_clock_and_mates(monkeypatch):
+    """Run the real section loop with its native steps recorded: the corner
+    limit rides above the terminal flat's own across-flat and the shared
+    clock above the first flat's, once each, through the printable-above
+    guard; B, C and D name their gears after their across-flats."""
     from collections import defaultdict
 
     callouts = []
+    suffixes = []
     monkeypatch.setattr(drawing, "_cut_endpoints", lambda *_a: ((0.0, 0.0), (1.0, 0.0)))
     monkeypatch.setattr(drawing, "create_section_view", lambda *_a, label, **_k: label)
     monkeypatch.setattr(drawing, "_prepare_d_section", lambda *_a: None)
@@ -136,17 +203,57 @@ def test_only_the_terminal_d_section_prints_the_torque_corner_limit(monkeypatch)
         drawing, "curate_view_dimensions", lambda _a, _view, *, keep, **_k: list(keep)
     )
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, dimension: dimension)
-    monkeypatch.setattr(drawing, "_trim_centre_mark", lambda *_a: ())
+    monkeypatch.setattr(drawing, "_delete_centre_mark", lambda *_a: None)
     monkeypatch.setattr(drawing, "_section_face", lambda *_a: (0.0, 0.0, 1.0, 1.0))
     monkeypatch.setattr(drawing, "_place_view_caption", lambda *_a, **_k: None)
     monkeypatch.setattr(
         drawing, "set_dimension_callouts",
         lambda _a, dimensions, texts, *, location: callouts.append((dimensions, texts, location)),
     )
+    monkeypatch.setattr(
+        drawing,
+        "_set_dimension_suffixes",
+        lambda _a, dimensions, texts: suffixes.append((dimensions, texts)),
+    )
     placed = drawing._add_d_sections(object(), defaultdict(object), 1)
     assert len(placed) == len(drawing.D_SECTIONS)
+    first = f"Sec{min(drawing.FLAT_LANDS)}AF"
     terminal = f"Sec{max(drawing.FLAT_LANDS)}AF"
-    assert callouts == [([terminal], {terminal: drawing.TORQUE_CORNER_CALLOUT}, "above")]
+    assert callouts == [
+        ([first], {first: "4 FLATS IN LINE"}, "above"),
+        ([terminal], {terminal: drawing.TORQUE_CORNER_CALLOUT}, "above"),
+    ]
+    assert suffixes == [
+        (["Sec1AF"], {"Sec1AF": " 64T, T030-T120"}),
+        (["Sec2AF"], {"Sec2AF": " T024"}),
+        (["Sec3AF"], {"Sec3AF": " T018"}),
+        (["Sec4AF"], {"Sec4AF": " T006, T012"}),
+    ]
+
+
+def test_every_tight_band_names_its_mate_at_its_callout():
+    """Machinist review r1 (20261018T054926125Z): each seat, flat, step and
+    the collar web says what it fits or locates at its own dimension."""
+    spec = dt_cone_gear_shaft_spec
+    assert drawing.DIMENSION_CALLOUTS["Sec0Dia"] == "RUNNING FIT IN\nMHA-DT-005 BORE"
+    assert drawing.DIMENSION_CALLOUTS["Sec1Dia"] == "SLIDES IN 64T AND\nT030-T120"
+    assert drawing.DIMENSION_SUFFIXES == {
+        "Sec2Dia": " SLIDES IN T024",
+        "Sec3Dia": " SLIDES IN T018",
+        "Sec4Dia": " SLIDES IN T006, T012, MHA-VN-016",
+        "Sec1End": " INSIDE T030 BORE",
+        "Sec2End": " INSIDE T024 BORE",
+        "Sec3End": " INSIDE T018 BORE",
+        "CollarWidth": " LOCATES 64T GEAR",
+    }
+    # Each step stands inside the bore its suffix names (seat j carries the
+    # 120 - 6j tooth gear).
+    for land, seat in zip((1, 2, 3), spec.SEAT_STEP_GEARS, strict=True):
+        assert f"T{120 - 6 * seat:03d}" in drawing.DIMENSION_SUFFIXES[f"Sec{land}End"]
+    # Every suffix is one line; every below callout fits two.
+    assert not any("\n" in text for text in drawing.DIMENSION_SUFFIXES.values())
+    assert not any("\n" in text for text in spec.FLAT_MATE_SUFFIXES.values())
+    assert all(text.count("\n") <= 1 for text in spec.SEAT_MATE_CALLOUTS.values())
 
 
 def test_display_precision_is_owned_by_the_part() -> None:
@@ -357,7 +464,21 @@ def test_collar_diameter_stands_on_the_collar() -> None:
 # the pivot-journal Ra 1.6 box, and the Ø9.525 text on land 1.  final877 had
 # the same block (0.2094, 0.1683, 0.2565, 0.1834): the Ra sat on "15.88)" and
 # its leader crossed the block.
-_COLLAR_TEXT = (0.2088, 0.1676, 0.2565, 0.1844)
+_MHA014_COLLAR_TEXT = (0.2088, 0.1676, 0.2565, 0.1844)
+
+
+def _scaled_collar_text() -> tuple[float, float, float, float]:
+    """The mha014-1 block grown to today's callout: its per-character width
+    (widest line "5/8 BAR AS SUPPLIED") times today's widest line, and its
+    per-line height times today's line count, from the same corner."""
+    x0, y0, x1, y1 = _MHA014_COLLAR_TEXT
+    lines = drawing.COLLAR_CALLOUT_LINES
+    per_char = (x1 - x0) / len("5/8 BAR AS SUPPLIED")
+    per_line = (y1 - y0) / 3
+    return (x0, y0, x0 + per_char * max(map(len, lines)), y0 + per_line * len(lines))
+
+
+_COLLAR_TEXT = _scaled_collar_text()
 _PIVOT_FINISH_BOX = (0.2320, 0.1800, 0.2790, 0.1980)
 _SEC1_TEXT = (0.1400, 0.1685, 0.1723, 0.1765)
 _SEC1_LINES = [((0.1400, 0.1452), (0.1400, 0.1548))]
@@ -405,14 +526,18 @@ def test_the_collar_callout_lifts_clear_of_the_pivot_finish() -> None:
 
 
 def test_the_collar_callout_read_guard_takes_the_whole_block() -> None:
-    """The measured block must be the three lines, not the value line alone:
-    the render's width passes the guard, a "(Ø15.88)"-only box does not."""
+    """The measured block must be all its lines, not the value line alone:
+    the render's width per character of its widest line (mha014-1, widest
+    "5/8 BAR AS SUPPLIED") at today's widest line passes the guard, a
+    "(Ø15.88)"-only box does not."""
     assert drawing.COLLAR_CALLOUT_LINES == (
         "(Ø15.88)",
         *dt_cone_gear_shaft_spec.COLLAR_STOCK_CALLOUT.split("\n"),
     )
-    measured = _COLLAR_TEXT[2] - _COLLAR_TEXT[0]
-    assert measured >= drawing.COLLAR_CALLOUT_MIN_READ
+    x0, _y0, x1, _y1 = _MHA014_COLLAR_TEXT
+    per_char = (x1 - x0) / len("5/8 BAR AS SUPPLIED")
+    widest = max(len(line) for line in drawing.COLLAR_CALLOUT_LINES)
+    assert per_char * widest >= drawing.COLLAR_CALLOUT_MIN_READ
     value_line_only = len("(Ø15.88)") * drawing.LENGTH_CHAR_WIDTH
     assert value_line_only < drawing.COLLAR_CALLOUT_MIN_READ
 
@@ -601,7 +726,8 @@ def _length_texts_crossed(side_keep, overall_xy):
 
     Each length hangs its two extension lines from the shaft down to its own
     tier, so a line crosses every tier ABOVE its own.  A text is centred on
-    its x; its box is the character count times LENGTH_CHAR_WIDTH.
+    its x; its box is the value's character count times LENGTH_CHAR_WIDTH
+    plus its function suffix's times CALLOUT_CHAR_WIDTH.
     """
     spec = dt_cone_gear_shaft_spec
     big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
@@ -630,7 +756,12 @@ def _length_texts_crossed(side_keep, overall_xy):
     lines += [(big_end, overall_xy[1]), (tip_x, overall_xy[1])]
     crossed = []
     for name, (text, (x, y)) in texts.items():
-        half = len(text) * drawing.LENGTH_CHAR_WIDTH / 2.0
+        suffix = drawing.DIMENSION_SUFFIXES.get(name, "")
+        width = (
+            len(text) * drawing.LENGTH_CHAR_WIDTH
+            + len(suffix) * drawing.CALLOUT_CHAR_WIDTH
+        )
+        half = width / 2.0
         for line_x, line_bottom in lines:
             if line_bottom >= y:
                 continue
@@ -708,11 +839,15 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
         x, y = section.centre
         text_x, text_y = drawing.D_SECTION_KEEP[f"Sec{section.land}AF"]
         assert text_x == x and text_y > y + half, section
-        # The terminal land's across-flat carries the torque-corner callout,
-        # centred on its text (20261010T071427837Z: the run reached 6.9 mm
-        # past the right border, and over C-C's outline).
-        terminal = section.land == max(spec.FLAT_LANDS)
-        reach_x, reach_y = drawing.TORQUE_CALLOUT_REACH if terminal else (0.0, 0.005)
+        # A's and the terminal land's across-flats carry one-line callouts,
+        # centred on their texts (20261010T071427837Z: the torque run reached
+        # 6.9 mm past the right border, and over C-C's outline); every one
+        # carries its gears after the value, the whole line centred.
+        name = f"Sec{section.land}AF"
+        callout_x, callout_y = drawing.SECTION_CALLOUT_REACH.get(name, (0.0, 0.005))
+        line = "8.763 -0.01" + spec.FLAT_MATE_SUFFIXES[name]
+        text_half = len(line) * drawing.AF_CHAR_WIDTH / 2.0
+        reach_x, reach_y = max(callout_x, text_half), callout_y
         cell = (
             min(x - caption_w / 2.0, text_x - reach_x),
             y - half - drawing.SECTION_CAPTION_GAP - caption_h,
@@ -723,7 +858,7 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
         assert margin <= cell[0] and cell[2] <= template.width_m - margin - CLEAR_GAP_M, section
         assert margin <= cell[1] and cell[3] <= template.height_m - margin, section
         assert cell[1] > template.title_block_top_m, section
-        if terminal:
+        if section.land == max(spec.FLAT_LANDS):
             assert text_x - reach_x > drawing.SECTION_C_OUTLINE_RIGHT + CLEAR_GAP_M
         cells.append(cell)
     for index, a in enumerate(cells):
@@ -947,7 +1082,7 @@ def test_a_tip_detail_transform_that_never_catches_up_still_fails(monkeypatch) -
     projected = re.search(r"projects its centre to \(([^,]+), ([^)]+)\)", message)
     assert projected is not None, message
     assert float(projected[1]) == pytest.approx(-0.04755932565095955, abs=1e-15)
-    assert float(projected[2]) == pytest.approx(0.236, abs=1e-12)
+    assert float(projected[2]) == pytest.approx(drawing.TIP_DETAIL_CENTER[1], abs=1e-12)
     assert "outline (0.0728120098" in message and "Position (0.2475593000" in message
     assert "rebuilds and 5.10 s" in message
 
@@ -956,19 +1091,21 @@ def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:
     """Three lands 6.9 mm apart carry three texts; each line clears the others.
 
     A dragged diameter's text hangs to the RIGHT of its dimension line, so the
-    text at (x, y) spans x..x+width; any other line inside that span rises
-    from the shaft and must stop below the text.  The first render stepped
-    the texts the other way and three leaders crossed (codex, 18395f30).
+    text at (x, y) spans x..x+width, its mate suffix included; any other line
+    inside that span rises from the shaft and must stop below the text.  The
+    first render stepped the texts the other way and three leaders crossed
+    (codex, 18395f30).
     """
-    width = drawing.DIAMETER_TEXT_WIDTH
     text_height = 0.009  # nominal over a stacked two-line band
-    items = list(drawing.SIDE_DIAMETERS.values())
-    for x_a, y_a in items:
-        for x_b, y_b in items:
-            if (x_a, y_a) == (x_b, y_b):
+    items = list(drawing.SIDE_DIAMETERS.items())
+    for name_a, (x_a, y_a) in items:
+        suffix = drawing.DIMENSION_SUFFIXES.get(name_a, "")
+        width = drawing.DIAMETER_TEXT_WIDTH + len(suffix) * drawing.CALLOUT_CHAR_WIDTH
+        for name_b, (x_b, y_b) in items:
+            if name_a == name_b:
                 continue
             if x_a < x_b < x_a + width:
-                assert y_b < y_a - text_height, ((x_a, y_a), (x_b, y_b))
+                assert y_b < y_a - text_height, (name_a, name_b)
 
 
 def test_sections_are_a_monotonic_stepped_shaft() -> None:
@@ -1153,17 +1290,19 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # One feature, one dimension, one quantity prefix -- not three dimensions
     # (the gear-seat steps; the collar's roots stay sharp, #914).
     assert drawing.DIMENSION_CALLOUTS["ShoulderR"] == "3X"
-    # The old "SHOULDER ROOTS R0.10 MAX" note is gone.  What remains names
-    # the gear seats' and flats' mates (drawing-guidelines.md rule 4 (tighten only for function, and name the mate); codex 375a122c) without any
-    # joint method (drawing-guidelines.md rule 7 (notes: few, flagged, never a method); user ruling 2026-09-28: the gears are a solid
-    # touching stack keyed by the flats, nothing holds them but the D)
-    # or a check of its own (no MUST), and carries
-    # no number but the mates' part numbers, no tolerance, datum or method
-    # word -- except the tailstock line, a user-ruled process requirement
-    # (U40, 2026-09-23: the 25.24 mm Ø1.588 tip land at L/D 15.9 is only
-    # turnable supported), so "TURN" is allowed in that one line only.  The
-    # three-place-stations lines went in the U27 round: the places already
-    # say it.
+    # The old "SHOULDER ROOTS R0.10 MAX" note is gone.  The mates are named
+    # at their callouts; the note maps the gear names those callouts use to
+    # their drawing numbers (drawing-guidelines.md rule 4 (tighten only for
+    # function, and name the mate); machinist review r1) without any joint
+    # method (drawing-guidelines.md rule 7 (notes: few, flagged, never a
+    # method); user ruling 2026-09-28: the gears are a solid touching stack
+    # keyed by the flats, nothing holds them but the D) or a check of its own
+    # (no MUST), and carries no number but the gear names and the mates'
+    # part numbers, no tolerance, datum or method word -- except the
+    # tailstock line, a user-ruled process requirement (U40, 2026-09-23: the
+    # slender tip land is only turnable supported), so "TURN" is allowed in
+    # that one line only.  The three-place-stations lines went in the U27
+    # round: the places already say it.
     notes = dt_cone_gear_shaft_spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
     # The sheet's note text runs ~2.7 mm per character; a line from the
@@ -1174,7 +1313,7 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     )
     cone = _config.parts("dt-cone-gear")["number"]
     crank = _config.parts("dt-crank-drive-gear")["number"]
-    bare = notes.replace(cone, "").replace(crank, "")
+    bare = re.sub(r"\bT\d{3}\b|\b64T\b", "", notes.replace(cone, "").replace(crank, ""))
     assert not any(character.isdigit() for character in bare)
     tailstock = [line for line in notes.splitlines() if "TAILSTOCK" in line.upper()]
     assert len(tailstock) == 1
@@ -1196,7 +1335,15 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         assert forbidden not in notes.upper()
     # U40: "TURN" appears only in the ruled tailstock line.
     assert "TURN" not in notes.upper().replace(tailstock[0].upper(), "")
-    assert notes.splitlines()[0] == f"GEAR SEATS AND FLATS MATE {cone} AND {crank} BORES."
+    assert notes.splitlines()[0] == f"T006-T120: {cone} CONE GEARS. 64T: {crank}."
+    # rule 4: the across-flats' tight bands name their gears at the callout;
+    # the fit those names need is stated once, under the gear key (r4b).
+    assert notes.splitlines()[1] == dt_cone_gear_shaft_spec.FLAT_FIT_NOTE
+    assert "SLIDING FIT" in dt_cone_gear_shaft_spec.FLAT_FIT_NOTE
+    # The extension lines stop short of every across-flat's text foot.
+    assert 0.0 < drawing.WITNESS_LINE_EXTENSION <= 0.0005
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_pin_witness_line_extension(drawing_model)" in drawing_source
     assert "THREE-PLACE" not in notes
     assert (
         'apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})'
@@ -1218,12 +1365,11 @@ def test_the_sheet_carries_no_datums_or_feature_control_frames() -> None:
         "add_datum_feature(",
     ):
         assert banned not in source
-    # The journal that runs and the tip land T012, T006 and the MHA-VN-016
-    # collar ride keep their roughness symbol; nothing else does.
-    assert source.count("add_surface_finish(") == 2
+    # Only the journal that runs keeps its roughness symbol: the tip land's
+    # parts are locked to it and the tip bears with its end (rule 6, r5).
+    assert source.count("add_surface_finish(") == 1
     assert tuple(control.key for control in dt_cone_gear_shaft_spec.SURFACE_FINISHES) == (
         "pivot_journal",
-        "tip_land",
     )
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in part_source
@@ -1525,6 +1671,10 @@ def test_the_sheet_states_the_collar_as_stock_with_its_break() -> None:
     callout = spec.COLLAR_STOCK_CALLOUT.upper()
     assert "5/8" in callout and "AS SUPPLIED" in callout
     assert f"{spec.THRUST_EDGE_BREAK_MAX:.1f} MAX" in callout
+    # Machinist review r1: the sharp roots get a limit and both their reason.
+    assert f"ROOTS R{spec.COLLAR_ROOT_RADIUS_MAX:.2f} MAX" in callout
+    assert "SEATS MHA-DT-005 AND 64T" in callout
+    assert spec.COLLAR_ROOT_RADIUS_MAX < spec.THRUST_EDGE_BREAK_MAX
     assert spec.DRAWING_PRECISION["CollarProfile"]["CollarDia"] == 2
     assert f"{spec.COLLAR_DIA:.2f}" == "15.88"
 

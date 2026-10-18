@@ -9,9 +9,12 @@ in steps: the tip's line rises highest and each text hangs to the RIGHT of
 its line above every line it spans.  Each gear land's D-flat is shown in its
 own enlarged cut-only section, A-A to D-D, carrying its across-flat; B-B to
 D-D are cut on DETAIL E, the stepped tip at 4:1, where their arrows and
-letters have room.  A standard isometric supplies pictorial clarity, and the
-note names the bores the seats and flats mate and the tailstock support the
-tip land needs (U40).  Source geometry and native model fits stay
+letters have room.  A standard isometric supplies pictorial clarity.  Every
+tight band names its mate at its own callout (a seat's gears below or after
+its diameter, a flat's after its across-flat), the steps and the collar web
+say what their three places locate, and the note gives the gears' drawing
+numbers and the tailstock support the tip land needs (U40).  Source geometry
+and native model fits stay
 authoritative: the sheet types no tolerance and no precision.
 
 Run with SolidWorks open::
@@ -81,6 +84,7 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import estimate_text_box
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -93,13 +97,21 @@ from dt_cone_gear_shaft_spec import (
     DRAWING_REFERENCE_PRECISION,
     FILLET_CALLOUT,
     FLAT_LANDS,
+    FLAT_MATE_SUFFIXES,
+    FLATS_IN_LINE_CALLOUT,
     JOURNAL_DIA,
+    LENGTH_FUNCTION_SUFFIXES,
+    SEAT_MATE_CALLOUTS,
+    SEAT_MATE_SUFFIXES,
     SECTION_DIAS,
     SECTION_ENDS,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
     TORQUE_CORNER_CALLOUT,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_gear_shaft"]
@@ -151,11 +163,12 @@ DONOR_CENTER = (0.360, 0.090)
 # A station's text is centred in its span when it fits there with
 # STATION_TEXT_CLEARANCE to spare; the web's 3.18 span is narrower than its
 # text, so the text stands LEFT of the collar's north witness line (the 916a
-# render had the web text touch that line).  The one radius rides above the
-# 3/8-to-1/4 in step it attaches to (the fillet's first edge), right of the
-# Ø6.350 line.
+# render had the web text touch that line), far enough left for its function
+# suffix (LENGTH_FUNCTION_SUFFIXES) to end clear of it.  The one radius rides
+# above the 3/8-to-1/4 in step it attaches to (the fillet's first edge),
+# right of the Ø6.350 line.
 SIDE_KEEP = {
-    "CollarWidth": (0.1985, 0.1355),
+    "CollarWidth": (0.1740, 0.1355),
     "Sec0End": (0.2311, 0.1355),
     "Sec1End": (0.1498, 0.1275),
     "Sec2End": (0.1464, 0.1195),
@@ -168,24 +181,37 @@ OVERALL_REFERENCE_TEXT_XY = (0.1515, 0.0795)
 # render measured "10.781" at 13.4 mm, 2.2 mm a character), and the ink every
 # length text keeps from any extension line crossing its tier.
 LENGTH_CHAR_WIDTH = 0.0023
+# One capital letter of callout or suffix text: "EDGE BREAK 0.1 MAX" read
+# 47.3 mm on the r1 render (20261018T054926125Z), 2.6 mm a character.
+CALLOUT_CHAR_WIDTH = 0.0026
 STATION_TEXT_CLEARANCE = 0.002
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
 # linear dimension's line sits at its text x and the text hangs to the RIGHT
-# of that line (~32 mm wide with its stacked band), so each x lies INSIDE the
-# land it measures; the short lands' lines follow their current end stations,
-# one third of a land length back from each small end.  Ø12.231 stands just
-# off the faced end.  A tip-end text spans its right-hand neighbours'
-# lines: the tip's text sits highest and each neighbour to the right steps
-# down, so no line rises through a text (codex, 18395f30).  Lands 2 and 3
-# carry their lines mid-land; the tip's line stays 1.7 mm in from the tip
-# face, right of the tip finish glyph, and follows the tip face when its
-# station moves.
+# of that line (~32 mm wide with its stacked band, and its mate suffix
+# after it), so each x lies INSIDE the land it measures; the short lands'
+# lines follow their current end stations, one third of a land length back
+# from each small end.  Ø12.231 stands just off the faced end, its text and
+# two mate lines above the journal's extension lines, 4 mm nearer the end
+# than r2's so its widest mate line ends clear of section A-A's across-flat.
+# Its text's lower-left corner is where the dimension line turns, so the
+# block stands 3.5 mm higher than r4b's: there the shelf sat on the
+# extension line and the 3 mm arrow rose into "MHA-DT-005" (machinist
+# review r4b, 20261018T072511131Z).  A tip-end text spans
+# its right-hand neighbours' lines: the tip's text sits highest and each
+# neighbour to the right steps down, so no line rises through a text (codex,
+# 18395f30).  Lands 2 and 3 carry their lines mid-land; the tip's line stays
+# 3.0 mm in from the tip face (r5's, clear of where the old tip finish leader
+# landed) and follows the
+# tip face when its station moves.  With its suffix the Ø6.350 text runs over
+# A-A's upper letter, so the three tip-end texts stand 2.5 mm higher than
+# r1's (the tip detail with them); Ø9.525 stands right of all three suffixes,
+# its two mate lines centred on it clear above A-A's letter.
 SIDE_DIAMETERS = {
-    "Sec0Dia": (0.2700, 0.1620),
-    "Sec1Dia": (0.1400, 0.1730),
-    "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1760),
-    "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1880),
-    "Sec4Dia": (TIP_END_X + 0.0017, 0.2000),
+    "Sec0Dia": (0.2660, 0.1715),
+    "Sec1Dia": (0.1600, 0.1800),
+    "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1785),
+    "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1905),
+    "Sec4Dia": (TIP_END_X + 0.0030, 0.2025),
     # #914: the collar ring is 3.181 wide, too narrow for a dimension line
     # and two arrows inside it, so the collar alone takes the near-side
     # diametric style: one arrow on the top rim from outside, leader up to
@@ -199,8 +225,12 @@ NEAR_SIDE_DIAMETERS = ("CollarDia",)
 REFERENCE_DIAMETERS = ("CollarDia",)
 # Sheet width of one diameter text with its stacked band, for the layout test.
 DIAMETER_TEXT_WIDTH = 0.032
-# The collar prints its reference diameter over the stock statement, three
-# lines whose widest is "5/8 BAR AS SUPPLIED".  At LENGTH_CHAR_WIDTH a line
+# One-line suffixes after a dimension's value: the tip-end seats' gears and
+# what the three-place steps and web locate (machinist review r1).
+DIMENSION_SUFFIXES = {**SEAT_MATE_SUFFIXES, **LENGTH_FUNCTION_SUFFIXES}
+# The collar prints its reference diameter over the stock statement, its
+# break, root limit and their reason, lines as wide as "5/8 BAR AS SUPPLIED"
+# or wider.  At LENGTH_CHAR_WIDTH a line
 # that long is wider than the whole journal land, so hanging right from its
 # rim arrow the block ran under the pivot-journal finish and that finish's
 # leader crossed it (final877 eye pass).  The build lifts the block above the
@@ -216,10 +246,12 @@ DONOR_KEEP = {
     for index, name in enumerate(SIDE_DIAMETERS)
 }
 # Three identical step roots, one modelled fillet, one radius dimension (the
-# collar's roots stay sharp, #914).
+# collar's roots stay sharp, #914, their limit in the collar callout).  The
+# journal and land 1 name their mates below their diameters.
 DIMENSION_CALLOUTS = {
     "ShoulderR": FILLET_CALLOUT,
     "CollarDia": COLLAR_STOCK_CALLOUT,
+    **SEAT_MATE_CALLOUTS,
 }
 # The pivot-journal finish symbol, above whose ink the collar's text must stand.
 PIVOT_FINISH_XY = (0.2400, 0.1800)
@@ -257,12 +289,13 @@ class DSection(NamedTuple):
 # so every diameter and station stays on the side view.  The circle on the
 # side view spans lands 2..4 only, clear of
 # the R0.10 leader at the Ø6.350 to Ø9.525 step; the detail draws no boundary
-# round its clipped geometry.
+# round its clipped geometry.  It stands 2.5 mm above r1's 0.236, with the
+# tip-end diameter texts under it.
 TIP_DETAIL_LABEL = "E"
 TIP_DETAIL_SCALE = (4, 1)
 TIP_DETAIL_STATION_MM = SECTION_ENDS[3] - 1.8
 TIP_DETAIL_RADIUS = 0.009
-TIP_DETAIL_CENTER = (0.100, 0.236)
+TIP_DETAIL_CENTER = (0.100, 0.2385)
 # The circle's letter on the side view: up-left of the circle (x 0.069..0.087,
 # y 0.141..0.159), between the terminal and Ø3.175 dimension lines,
 # under their texts, 2 mm off the circle whichever corner of the
@@ -301,15 +334,22 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # on the thinnest land, is shorter.  The four stand in two rows right of the
 # side view, under the pictorial, each over its caption, the bottom row's
 # captions above the title block (x > 0.216, y < 0.066).  D's across-flat
-# carries the torque-corner callout, centred over D's text and
-# TORQUE_CALLOUT_REACH either side of it, so D stands between C-C's outline
-# and the right border; C stands left of A's column, its cell clear of that
-# callout and of the side view's big end.
+# carries the torque-corner callout and A's the flats' shared clock, each
+# centred over its text and SECTION_CALLOUT_REACH either side of it, so D
+# stands between C-C's outline and the right border and A's stays left of
+# B's cell; C stands left of A's column, its cell clear of D's callout and
+# of the side view's big end.  Every across-flat names its gears after its
+# value (FLAT_MATE_SUFFIXES), the whole line centred on the text position
+# (r2, 20261018T062935602Z: B's "5.842 -0.01 T024" read 376.0..410.5 mm
+# about its 393 mm centre), so A's 56 mm line pushes A-A 3 mm right of r2's
+# and B-B 1 mm right: r3 (20261018T065854075Z) measured A's box ending at
+# 0.3693 with A at 0.341, 2.0 mm short of B's at 0.3713, under the proof's
+# CLEAR_GAP_M plus margin.
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
 # land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
     DSection(
-        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.337, 0.165), (2, 1)
+        1, "A", SECTION_ENDS[1] - 25.0, CutParent.SIDE, 0.0150, (0.340, 0.165), (2, 1)
     ),
     DSection(
         2,
@@ -317,7 +357,7 @@ D_SECTIONS = (
         SECTION_ENDS[2] - 0.6,
         CutParent.TIP_DETAIL,
         0.0210,
-        (0.393, 0.165),
+        (0.394, 0.165),
         (3, 1),
     ),
     DSection(
@@ -344,11 +384,21 @@ D_SECTION_KEEP = {
     f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
-# An above callout is centred on its dimension's text, set as one run: that
+SECTION_ABOVE_CALLOUTS = {
+    f"Sec{min(FLAT_LANDS)}AF": FLATS_IN_LINE_CALLOUT,
+    f"Sec{max(FLAT_LANDS)}AF": TORQUE_CORNER_CALLOUT,
+}
+# An above callout is centred on its dimension's text, set as one run: a
 # 40-character run read 110.6 mm wide in COM (Sec4AF's 0.3377..0.4483 at
 # 20261010T071427837Z) and 8.7 mm above the text position (f68549253).
-TORQUE_CALLOUT_CHAR_WIDTH = 0.1106243 / 40
-TORQUE_CALLOUT_REACH = (len(TORQUE_CORNER_CALLOUT) * TORQUE_CALLOUT_CHAR_WIDTH / 2.0, 0.0087)
+ABOVE_CALLOUT_CHAR_WIDTH = 0.1106243 / 40
+SECTION_CALLOUT_REACH = {
+    name: (len(text) * ABOVE_CALLOUT_CHAR_WIDTH / 2.0, 0.0087)
+    for name, text in SECTION_ABOVE_CALLOUTS.items()
+}
+# One character of an across-flat line, value, band and suffix together: B's
+# 16-character line read 34.5 mm on r2 (20261018T062935602Z).
+AF_CHAR_WIDTH = 0.0345 / 16
 # Section C-C's native outline, (0.2597..0.3503) x (0.0682..0.1318) at
 # 20261010T071427837Z, which the layout audit holds text off.
 SECTION_C_OUTLINE_RIGHT = 0.3503
@@ -368,6 +418,26 @@ def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
     return callouts
 
 
+def _set_dimension_suffixes(
+    adapter: Any, annotations: Iterable[Any], suffixes: Mapping[str, str]
+) -> None:
+    """Write each named dimension's native suffix (after its value and band,
+    on its one line) and read it back; the value stays the model's."""
+    remaining = dict(suffixes)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        text = remaining.pop(dimension_name(adapter, annotation), None)
+        if text is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(2, text)  # swDimensionTextSuffix
+        got = str(display.GetText(2) or "")
+        if got != text:
+            raise RuntimeError(f"dimension suffix {text!r} did not persist: {got!r}")
+    if remaining:
+        raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
+
+
 # A native "SECTION A-A / SCALE 2 : 1" caption measured 45.4 x 17.0 mm (leaf
 # for c8b0aad); each is hung SECTION_CAPTION_GAP under its section's ink.
 SECTION_CAPTION_SIZE = (0.046, 0.017)
@@ -382,11 +452,10 @@ DETAIL_CAPTION_GAP = 0.004
 # 0.6 mm the caption still stands 2.4 mm or more under its face.
 # The layout proof measures the placed box, so the slack costs no clearance.
 CAPTION_SETTLE_M = 0.0006
-# The section's centre mark keeps only its cross, arms this long on the sheet:
-# the template's mark scales with the view, so at 10:1 its arms and extended
-# lines ran 104 mm, over the AF text, the right border and the title block.
-CENTRE_MARK_ARM = 0.003
-# swAnnotationType_e.swCenterMarkSym
+# The full A-A section is the one SolidWorks gives a centre mark; the partial
+# ones get none, so the mark is deleted and all four sections read alike
+# (machinist review r7, 20261018T084331898Z: "A-A has a centre mark but B-B,
+# C-C and D-D do not").  swAnnotationType_e.swCenterMarkSym:
 _CENTER_MARK_ANNOTATION = 13
 # An arrowhead's half-width across its shaft (the audit's 12.1 x 3.4 mm head).
 SECTION_ARROW_HALF_WIDTH = 0.0017
@@ -732,7 +801,6 @@ class PlacedSection(NamedTuple):
     face: Box
     across_flat: Any
     caption: Box
-    centre_marks: dict[str, Box]
 
 
 def _axis_sign(adapter: Any, side: Any) -> int:
@@ -972,55 +1040,32 @@ def _place_view_caption(
     return box
 
 
-def _annotation_ink(annotation: Any, label: str) -> Box:
-    """The box of every line an annotation draws, in sheet metres."""
-    data = _early_bound(
-        _early_bound(annotation, "IAnnotation").GetDisplayData(), "IDisplayData"
-    )
-    lines = [
-        tuple(float(value) for value in data.GetLineAtIndex2(index))
-        for index in range(int(data.GetLineCount()))
-    ]
-    if not lines:
-        raise RuntimeError(f"{label} draws no line")
-    xs = [value for line in lines for value in (line[4], line[7])]
-    ys = [value for line in lines for value in (line[5], line[8])]
-    return (min(xs), min(ys), max(xs), max(ys))
-
-
-def _trim_centre_mark(adapter: Any, view: Any, section: DSection) -> dict[str, Box]:
-    """Keep the section's centre mark, if SolidWorks gave it one, as a small
-    cross, and return its ink by name.
+def _delete_centre_mark(adapter: Any, view: Any, section: DSection) -> None:
+    """Delete the section's centre mark, if SolidWorks gave it one, and read
+    none back.
 
     A full section gets a mark; a partial one (cut from the tip detail) gets
-    none (leaf 20260929T212711Z-1-75518df7).  The mark's size is model
-    length (its 2.5 mm arms read 5 mm at 2:1 and 25 mm at 10:1), so the arm
-    is divided by the section's scale."""
+    none (leaf 20260929T212711Z-1-75518df7).  Only A-A is full, so a kept
+    mark marked one section in four."""
     label = f"section {section.label} centre mark"
-    marks = tuple(
-        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
-    )
+    iview = _early_bound(view, "IView")
+    marks = tuple(iview.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
     if not marks:
         _telemetry.info(f"{label}: none drawn")
-        return {}
+        return
     if len(marks) != 1:
         raise RuntimeError(f"expected at most one {label}, found {len(marks)}")
-    annotation = _early_bound(marks[0], "IAnnotation")
-    mark = _early_bound(annotation.GetSpecificAnnotation(), "ICenterMark")
-    mark.UseDocDisplaySettings = False
-    mark.ShowLines = False
-    mark.Size = CENTRE_MARK_ARM * section.scale[1] / section.scale[0]
-    rebuild_drawing(adapter, label=f"trim {label}")
-    if bool(mark.UseDocDisplaySettings) or bool(mark.ShowLines):
-        raise RuntimeError(f"{label} kept its document display or its extended lines")
-    ink = _annotation_ink(annotation, label)
-    arm = max(ink[2] - ink[0], ink[3] - ink[1]) / 2.0
-    if not 0.5 * CENTRE_MARK_ARM <= arm <= 1.5 * CENTRE_MARK_ARM:
-        raise RuntimeError(
-            f"{label} arms read {arm:.4f} m (size {float(mark.Size):.5f}), not "
-            f"{CENTRE_MARK_ARM:.4f}: ink {ink}"
-        )
-    return {label: ink}
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    if not _early_bound(marks[0], "IAnnotation").Select2(False, 0):
+        raise RuntimeError(f"cannot select {label}")
+    draw.EditDelete()  # VT_VOID: the re-read below is the proof
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"delete {label}")
+    left = tuple(iview.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
+    if left:
+        raise RuntimeError(f"{label} survived deletion ({len(left)} left)")
+    _telemetry.info(f"{label}: deleted")
 
 
 def _cut_endpoints(
@@ -1048,7 +1093,7 @@ def _add_d_sections(
     adapter: Any, parents: Mapping[CutParent, Any], sign: int
 ) -> list[PlacedSection]:
     """Cut each flatted land across and print its across-flat in the section,
-    its centre mark a cross and its caption hung under it.
+    its centre mark deleted and its caption hung under it.
 
     ``curate_view_dimensions`` fails the build if a section's across-flat
     does not arrive, so every D on the sheet carries its size."""
@@ -1078,7 +1123,7 @@ def _add_d_sections(
         )
         by_name = {dimension_name(adapter, dimension): dimension for dimension in dimensions}
         across_flat = by_name[name]
-        centre_marks = _trim_centre_mark(adapter, view, section)
+        _delete_centre_mark(adapter, view, section)
         face = _section_face(adapter, view, section, sign)
         caption = _place_view_caption(
             adapter,
@@ -1087,16 +1132,21 @@ def _add_d_sections(
             CaptionAnchor.TOP_CENTRE,
             label=f"section {section.label} caption",
         )
-        if section.land == max(FLAT_LANDS):
-            # The terminal flat's torque corners stay sharp in the model; the
-            # break limit rides above that flat's own across-flat value.
+        if name in SECTION_ABOVE_CALLOUTS:
+            # The terminal flat's torque corners stay sharp in the model, so
+            # their break limit rides above that flat's own across-flat; the
+            # flats' shared clock rides above the first flat's.
             set_dimension_callouts(
                 adapter,
                 [across_flat],
-                _printable_above_callouts({name: TORQUE_CORNER_CALLOUT}),
+                _printable_above_callouts({name: SECTION_ABOVE_CALLOUTS[name]}),
                 location="above",
             )
-        placed.append(PlacedSection(section, view, face, across_flat, caption, centre_marks))
+        if name in FLAT_MATE_SUFFIXES:
+            _set_dimension_suffixes(
+                adapter, [across_flat], {name: FLAT_MATE_SUFFIXES[name]}
+            )
+        placed.append(PlacedSection(section, view, face, across_flat, caption))
     return placed
 
 
@@ -1230,7 +1280,7 @@ def _prove_section_layout(
     every section, caption, cutting line, the detail and the pictorial inside
     the frame and off the title block; the cutting lines' arrows and letters
     clear of each other, of every dimension text and of the lands; and each
-    section's caption, centre mark and across-flat clear of its neighbours."""
+    section's caption and across-flat clear of its neighbours."""
     region = sheet_region(adapter)
     template = DRAWING_TEMPLATES[SPEC.layout]
     keep_out = {
@@ -1266,25 +1316,24 @@ def _prove_section_layout(
     groups: dict[str, dict[str, Box]] = {}
     for placed in sections:
         label = f"section {placed.section.label}"
+        if _early_bound(placed.view, "IView").GetAnnotationsByType(
+            _CENTER_MARK_ANNOTATION
+        ):
+            raise RuntimeError(
+                f"{label} carries a centre mark again after its deletion"
+            )
         cell = {
             f"{label} face": placed.face,
             f"{label} across-flat": _dimension_text_box(
                 placed.across_flat, f"{label} across-flat"
             ),
             f"{label} caption": placed.caption,
-            **placed.centre_marks,
         }
         require_clear(
             f"{label} caption",
             placed.caption,
             {name: box for name, box in cell.items() if name != f"{label} caption"},
         )
-        for name, box in placed.centre_marks.items():
-            require_clear(
-                name,
-                box,
-                {f"{label} across-flat": cell[f"{label} across-flat"]},
-            )
         groups[label] = {label: _union(cell.values())}
     lands = {
         **_land_boxes(adapter, side, sign, label="side view"),
@@ -1325,6 +1374,34 @@ def _prove_section_layout(
     )
 
 
+# swUserPreferenceDoubleValue_e.swDetailingWitnessLineExtension, the extension
+# lines' run past the dimension line (read from swconst.tlb), document scope
+# (swDetailingNoOptionSpecified).  The project standard runs them 0.9 mm past
+# (r4b, 20261018T072511131Z: A-A's dimension line at y 174.7 mm, its
+# extension lines to 175.6, the text's foot at 175.7), and every across-flat's
+# text is wider than its flat, so the lines' ends struck the band and the gear
+# names in all four sections (machinist review r2 and r4b).  0.4 mm past keeps
+# a visible overrun and leaves the text's foot 0.6 mm clear.
+_PREF_WITNESS_LINE_EXTENSION = 14
+_PREF_OPTION_NONE = 0
+WITNESS_LINE_EXTENSION = 0.0004
+
+
+def _pin_witness_line_extension(drawing_model: Any) -> None:
+    """Set this sheet's extension-line overrun, read back, raise on mismatch."""
+    extension = drawing_model.Extension
+    key, scope = _PREF_WITNESS_LINE_EXTENSION, _PREF_OPTION_NONE
+    before = float(extension.GetUserPreferenceDouble(key, scope))
+    ok = extension.SetUserPreferenceDouble(key, scope, WITNESS_LINE_EXTENSION)
+    applied = float(extension.GetUserPreferenceDouble(key, scope))
+    if not ok or abs(applied - WITNESS_LINE_EXTENSION) > 1e-7:
+        raise RuntimeError(
+            f"failed to set the extension-line overrun to {WITNESS_LINE_EXTENSION} m "
+            f"(set returned {ok!r}, document reads {applied}, was {before})"
+        )
+    _telemetry.info(f"extension-line overrun {before * 1000:.2f} -> {applied * 1000:.2f} mm")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1352,6 +1429,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _pin_witness_line_extension(drawing_model)
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -1367,11 +1445,12 @@ async def build(adapter: Any) -> dict[str, str]:
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=SIDE_SCALE)
     donor = place_view(adapter, str(SOURCE), "*Front", *DONOR_CENTER, scale=SIDE_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (side, donor):
+    # The isometric too (PR #1436 fleet invariant): finalization's shaded
+    # pass is then a real mode change, so its cosmetic edges print at quality.
+    for view in (side, donor, iso):
         set_hidden_lines_removed(adapter, view)
 
     pivot_face = _cylindrical_face(adapter, side, JOURNAL_DIA)
-    tip_face = _cylindrical_face(adapter, side, SECTION_DIAS[-1])
     _add_shaft_axis(adapter, side)
 
     # The donor is curated FIRST so the diameters cannot be claimed (and then
@@ -1415,12 +1494,19 @@ async def build(adapter: Any) -> dict[str, str]:
     if collar is None:
         raise RuntimeError("the donor view gave no CollarDia dimension")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _set_dimension_suffixes(adapter, annotations, DIMENSION_SUFFIXES)
     sign = _axis_sign(adapter, side)
     detail = _create_tip_detail(adapter, side, sign)
     _place_detail_letter(adapter, side)
     sections = _add_d_sections(
         adapter, {CutParent.SIDE: side, CutParent.TIP_DETAIL: detail}, sign
     )
+    # Precision hidden-lines-removed on every section, after its across-flat
+    # is attached: left on their parents' display, C-C (5:1) and D-D (20:1)
+    # printed their round as visible straight segments (machinist review r1,
+    # r2, r4b).
+    for placed in sections:
+        set_hidden_lines_removed(adapter, placed.view)
     # The caption stands right of the detail's ink: B's letters and the
     # detail's own outline, whichever reaches further.
     detail_ink_right = max(
@@ -1453,19 +1539,10 @@ async def build(adapter: Any) -> dict[str, str]:
             f"the {len(annotations) - 1} beside the collar uniquely"
         )
 
-    # Leader anchors for the two lands that RUN (sheet metres).  The tip
-    # symbol stands above the tip with its glyph LEFT of the terminal diameter
-    # line and its text ABOVE that native diameter text, inside the left border
-    # (x 0.012; a glyph at 0.016 poked through it, codex c4720c62); the
-    # leader drops onto the tip's top flank inside the first 2 mm of the land.
-    # No length extension line runs up there (they all hang from the bottom
-    # flank) and no diameter line stands left of the terminal diameter's.
+    # Leader anchor for the land that RUNS (sheet metres): the journal's top
+    # flank, 20 mm in from the faced end.
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
-    tip_top = (
-        big_end_x - SHAFT_LENGTH / 1000.0 + 0.002,
-        SIDE_CENTER[1] + SECTION_DIAS[-1] / 2000.0,
-    )
     pivot_finish = add_surface_finish(
         adapter,
         side,
@@ -1476,17 +1553,6 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="FACE",
         entity=pivot_face,
         leader_attach_xy=pivot_top,
-    )
-    add_surface_finish(
-        adapter,
-        side,
-        symbol_xy=(0.0240, 0.1960),
-        control=surface_finish_by_key(SURFACE_FINISHES, "tip_land"),
-        label="tip land finish",
-        char_height=0.0025,
-        entity_type="FACE",
-        entity=tip_face,
-        leader_attach_xy=tip_top,
     )
     _clear_collar_callout(adapter, collar, pivot_finish, collar_neighbours)
     _prove_section_layout(
