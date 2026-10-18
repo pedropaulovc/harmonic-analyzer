@@ -18,6 +18,7 @@ import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
 import sm_summing_lever_spec as lever
 import vn_boss_hook_jam_nut_spec as jam_nut
+import vn_boss_hook_spec as boss_hook
 import vn_counter_spring_stock_geom as counter_stock
 import vn_knife_hanger_stud_spec as hanger_bolt
 from _assembly_contract import assembly_contract
@@ -26,6 +27,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _sm_summing_explode import station_of, summing_exploded_view_name
 from _transforms import IDENTITY
 from dt_cone_pivot_post_installation import SUMMING_Z
+from stock_anchor_geom import ANCHOR_9490T1
 from vn_counter_spring_spec import INSTALLED_LENGTH_MM
 
 
@@ -209,6 +211,41 @@ def test_station_slide_clears_the_hex_trunnion() -> None:
     mount_inner_face = builder.HEX_Z_MID - builder.knife_mount.SUPPORT_Z_THICK / 2.0
     for distance in slide.values():
         assert abs(distance) > builder.HEX_Z_OUTER - mount_inner_face
+
+
+def _rise(stem: str) -> float:
+    return sum(
+        d for _, stems, _, axis, d in explode.EXPLODE_STEPS if axis == "y" and stem in stems
+    )
+
+
+def test_exploded_jam_nut_draws_clear_of_the_boss_and_the_hook_cut_end() -> None:
+    # Machinist review 20261018T153536833Z r2/r3: raised 6, the nut drew on
+    # the boss top face. Step 2 spins it on from the hook's cut end, so it
+    # stands on the hook's axis between the boss and the raised cut end. In
+    # the *Isometric (+X+Y+Z) a point draws (2Y - X - Z)/sqrt(6) up the sheet;
+    # boss, nut and cut end share one vertical axis, and a level circle of
+    # radius r draws r/sqrt(3) above and below its centre (the nut's hex
+    # inside its corner circle).
+    def drawn(y: float, r: float) -> tuple[float, float]:
+        centre = 2.0 * y / math.sqrt(6.0)
+        return centre - r / math.sqrt(3.0), centre + r / math.sqrt(3.0)
+
+    gap = explode.PAPER_GAP_MM * drawing.EXPLODED_SCALE[1]
+    corner = jam_nut.ACROSS_CORNERS / 2.0
+    assert builder.JAM_NUT_POS[1] == builder.spring_mounts.COUNTER_BOSS_TOP_Y
+    boss_top = drawn(builder.JAM_NUT_POS[1], lever.ANCHOR_R)[1]
+    nut_y = builder.JAM_NUT_POS[1] + _rise(spec.BOSS_JAM_NUT)
+    nut = drawn(nut_y, corner)[0], drawn(nut_y + jam_nut.THICKNESS, corner)[1]
+    cut_end_y = (
+        builder.BOSS_HOOK_POS[1] + boss_hook.TRIM.shank_end_y_mm + _rise(spec.BOSS_HOOK)
+    )
+    cut_end = drawn(cut_end_y, ANCHOR_9490T1.wire_dia_mm / 2.0)[0]
+    assert nut[0] - boss_top >= gap
+    assert cut_end - nut[1] >= gap
+    # The spring and the gooseneck keep their gaps above the raised hook.
+    assert _rise(spec.COUNTER_SPRING) - _rise(spec.BOSS_HOOK) == 20.0
+    assert _rise(spec.GOOSENECK) - _rise(spec.COUNTER_SPRING) == 25.0
 
 
 def test_settings_are_derived_from_the_placed_geometry() -> None:

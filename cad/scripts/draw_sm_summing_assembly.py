@@ -101,7 +101,7 @@ if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the summing package is landscape throughout")
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 ASSEMBLED_SCALE = (1.0, 5.0)
-EXPLODED_SCALE = (1.0, 4.0)
+EXPLODED_SCALE = (1.0, explode.EXPLODED_SHEET_SCALE)
 SHEET_SCALES = dict(
     zip(SHEET_NAMES, (ASSEMBLED_SCALE, EXPLODED_SCALE, ASSEMBLED_SCALE))
 )
@@ -241,7 +241,10 @@ BOM_NORMALIZED_ALIASES = {
 #   7 nut (ROT_X_NEG90: local x = X, y = -Z, z = +Y, corners on the local +-Y
 #     meridian): the middle of the top edge of the flat at local polar angle
 #     300 deg. Its normal is machine (0.5, 0, 0.866), the flat that faces the
-#     viewer most squarely;
+#     viewer most squarely. The nut now stands clear between the boss top face
+#     and the hook's cut end (explode.JAM_NUT_RISE); a part-frame pin rides that
+#     rise, being projected through the collapsed transform plus the summed
+#     explode steps (_drawing_balloons._anchor_model_points);
 #   8 spring (local x = +Y, y = -Z, z = -X): the +X coil-end junction circle,
 #     a wire radius off (-coil_start_x_mm, 0, -COIL_MEAN_RADIUS_MM). Its
 #     outward normal is machine (0.976, -0.216, 0.006). The point is the
