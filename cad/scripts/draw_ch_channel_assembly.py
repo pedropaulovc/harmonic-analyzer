@@ -493,10 +493,11 @@ LEVER_BANK = BankView(
 # and its X datum, the web centre, is no face to touch). The frame is not in
 # this assembly, so the hidden KEEPER_PLAN_FEATURE sketch draws its datums
 # as construction lines and carries the three settings (owner ruling
-# X1+B1). Placed under the lever bank: the socket line 0.116 up, the rear
-# foot tip (z 87.0) 3.5 mm over the border.
-KEEPER_PLAN_SOCKET_Y = 0.116
-_PLAN_CENTRE_Y = 0.066
+# X1+B1). Placed under the lever bank: the socket line 0.120 up. The
+# farm-measured outline (c80bb08be) runs 0.0064 above the socket line to
+# 0.1051 below it, so its bottom clears the border by 2.2 mm.
+KEEPER_PLAN_SOCKET_Y = 0.120
+_PLAN_CENTRE_Y = 0.070
 _TOP_FRAME_NUMBER = str(_config.parts("fr-top-frame")["number"])
 KEEPER_PLAN = BankView(
     "KEEPER PLAN VIEW",
