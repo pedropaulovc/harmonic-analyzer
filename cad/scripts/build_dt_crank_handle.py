@@ -10,15 +10,16 @@ tenon (the ferrule's seat) and a counterbore (the cup's seat).
 User rulings 2026-09-30 (ch30 eight-views-4 side view, approved CadQuery
 concept v4): five tangent arcs span the wood -- a concave flare from the
 ferrule's OD down to a slim waist, an S-curve (concave then convex) up to the
-Ø21 swell, a dome, and an end round that runs out on the counterbore mouth,
-turned across the bonded cup at assembly.  Circumferentially smooth after the
-revolve.
+Ø21 swell, a dome, and an end round cresting on the flat oak end round the
+cup.  Circumferentially smooth after the revolve.
 
 Layout: handle axis along +X; x=0 is the ferrule's arm face (the handle's
 seat on the arm), so the oak starts at the tenon end, short of it.  One
-revolve carries the tenon, the grip and the counterbore.  Every arc centre is
-anchored, each tangency fixes the next radius, and the oak's overall from the
-tenon end fixes where the end round meets the counterbore.
+revolve carries the tenon, the reamed bore, the grip and the counterbore.  The
+profile is defined by what the sheet prints -- stations from the tenon end
+face, the shoulder, waist, swell and crest diameters and the end round -- with
+the waist and swell centres on their stations; the tangencies fix the other
+four radii, which are driven references.
 
 Run (SolidWorks already open)::
 
@@ -33,6 +34,7 @@ import sys
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -42,13 +44,10 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     add_line_chain,
-    anchor_point_to_origin,
-    anchor_point_to_point,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
@@ -66,14 +65,17 @@ from dt_crank_handle_spec import (  # noqa: E402
     COUNTERBORE_DIA,
     COUNTERBORE_FLOOR_X,
     COUNTERBORE_R,
+    CREST_DIA,
     DOME_CENTER,
     DOME_END,
+    DOME_R,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     END_ROUND_CENTER,
+    END_ROUND_R,
     FERRULE_LENGTH,
     FLARE_CENTER,
+    FLARE_R,
     INFLECTION,
     ISOMETRIC_VIEW_NOTE,
     OAK_END_X,
@@ -82,7 +84,9 @@ from dt_crank_handle_spec import (  # noqa: E402
     PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
     S_CONCAVE_CENTER,
+    S_CONCAVE_R,
     S_CONVEX_CENTER,
+    S_CONVEX_R,
     SHOULDER_R,
     SHOULDER_X,
     TENON_DIA,
@@ -94,10 +98,6 @@ from dt_crank_handle_spec import (  # noqa: E402
     WOOD_LENGTH,
     profile_radius,
 )
-
-# The peak-station witness stands inside the swell, clear of the profile.
-_WITNESS_Y0, _WITNESS_Y1 = 2.5, 3.5
-
 
 def _nominal_volume() -> float:
     """Revolved volume of the nominal profile, less the bore: the check that
@@ -125,26 +125,40 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
     "Isometric View Note",
 )
 
 
+def _make_driven(adapter, dimension_id: str, label: str) -> None:
+    """Turn a just-made sketch dimension into a DRIVEN (reference) one
+    (build_mg_magnifying_vertical_rod._make_driven)."""
+    display = _early_bound(adapter._sketch_entities[dimension_id], "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
+    if int(dimension.DrivenState) != 1:
+        raise RuntimeError(f"{label}: dimension did not become driven")
+
+
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+    from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
-    # document units.  The arc centres are closed forms of several knobs, so
-    # their coordinates stay static.
+    # document units.
     for name, value in (
         ("FerruleLength", FERRULE_LENGTH),
         ("TenonLength", TENON_LENGTH),
         ("TenonDia", TENON_DIA),
         ("ShoulderR", SHOULDER_R),
+        ("WaistX", WAIST_X),
+        ("WaistDia", 2.0 * WAIST_R),
+        ("InflectionX", INFLECTION[0]),
         ("PeakX", PEAK_X),
+        ("PeakDia", 2.0 * PEAK_R),
+        ("CrestDia", CREST_DIA),
+        ("EndRoundR", END_ROUND_R),
         ("WoodLength", WOOD_LENGTH),
         ("CounterboreDia", COUNTERBORE_DIA),
         ("CounterboreDepth", COUNTERBORE_DEPTH),
@@ -154,6 +168,8 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
+    bore_r = PIVOT_BORE_DIA / 2.0
+    tenon_corner = (TENON_X0, TENON_R)
     shoulder_pt = (SHOULDER_X, SHOULDER_R)
     waist_pt = (WAIST_X, WAIST_R)
     peak_pt = (PEAK_X, PEAK_R)
@@ -166,12 +182,13 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, True)
     centerline = check(
         "add_centerline axis",
-        await adapter.add_centerline(TENON_X0, 0.0, COUNTERBORE_FLOOR_X, 0.0),
+        await adapter.add_centerline(0.0, 0.0, COUNTERBORE_FLOOR_X, 0.0),
     )
-    # Tenon: end face -> OD -> shoulder step up to the ferrule's OD.
+    # Tenon: end face (from the reamed bore) -> OD -> shoulder step up to the
+    # ferrule's OD.
     tenon_end, tenon_top, shoulder = await add_line_chain(
         adapter,
-        [(TENON_X0, 0.0), (TENON_X0, TENON_R), (SHOULDER_X, TENON_R), shoulder_pt],
+        [(TENON_X0, bore_r), tenon_corner, (SHOULDER_X, TENON_R), shoulder_pt],
         close=False,
     )
     # add_arc sweeps CCW from start to end; each is ordered so the sweep is the
@@ -193,29 +210,34 @@ async def build(adapter) -> dict[str, str]:
         "end round arc", await adapter.add_arc(*END_ROUND_CENTER, *crest_pt, *DOME_END)
     )
     # Crest -> flat oak end face -> counterbore wall -> counterbore floor ->
-    # axis closure.
-    oak_end_face, counterbore_wall, counterbore_floor, _closure = await add_line_chain(
+    # the reamed bore back to the tenon end face: the bore is part of the
+    # revolve, so its diameter prints on the section with the rest.
+    oak_end_face, counterbore_wall, counterbore_floor, bore_wall = await add_line_chain(
         adapter,
         [
             crest_pt,
             oak_end_pt,
             (COUNTERBORE_FLOOR_X, COUNTERBORE_R),
-            (COUNTERBORE_FLOOR_X, 0.0),
-            (TENON_X0, 0.0),
+            (COUNTERBORE_FLOOR_X, bore_r),
+            (TENON_X0, bore_r),
         ],
         close=False,
-    )
-    # Construction-only witness line inside the swell, clear of the profile
-    # and the axis so it inherits no relations.
-    peak_station = check(
-        "peak station construction line",
-        await adapter.add_centerline(PEAK_X, _WITNESS_Y0, PEAK_X, _WITNESS_Y1),
     )
     set_sketch_direct_db(adapter, False)
 
     check(
+        "axis on the origin",
+        await adapter.add_sketch_constraint(f"{centerline}.start", "origin", "coincident"),
+    )
+    check(
         "axis horizontal",
         await adapter.add_sketch_constraint(centerline, None, "horizontal"),
+    )
+    check(
+        "axis ends at the counterbore floor",
+        await adapter.add_sketch_constraint(
+            f"{centerline}.end", f"{counterbore_floor}.end", "vertical_points"
+        ),
     )
     for label, entity, relation in (
         ("tenon end", tenon_end, "vertical"),
@@ -224,17 +246,55 @@ async def build(adapter) -> dict[str, str]:
         ("oak end face", oak_end_face, "vertical"),
         ("counterbore wall", counterbore_wall, "horizontal"),
         ("counterbore floor", counterbore_floor, "vertical"),
-        ("peak station", peak_station, "vertical"),
+        ("reamed bore", bore_wall, "horizontal"),
     ):
         check(
             f"{label} {relation}",
             await adapter.add_sketch_constraint(entity, None, relation),
         )
+    # Horizontal tangents at the waist and the swell: each centre stands on
+    # its station.
+    for arc, point, label in (
+        (flare, f"{flare}.end", "waist"),
+        (s_convex, f"{s_convex}.start", "swell"),
+    ):
+        check(
+            f"{label} centre on its station",
+            await adapter.add_sketch_constraint(f"{arc}.center", point, "vertical_points"),
+        )
     # Dimensions in creation order; SketchDims renames them by that order.
-    await anchor_point_to_origin(
-        adapter, f"{tenon_end}.start", TENON_X0, 0.0, "tenon end on the axis"
+    # The tangencies fix these four radii: each is made while the sketch is
+    # still free (so it never over-defines) and turned driven at once, a
+    # reference the drawing parenthesizes.
+    for arc, radius, name in (
+        (flare, FLARE_R, "FlareR"),
+        (s_concave, S_CONCAVE_R, "SConcaveR"),
+        (s_convex, S_CONVEX_R, "SConvexR"),
+        (dome, DOME_R, "DomeR"),
+    ):
+        reference = check(
+            f"{name} reference radius",
+            await adapter.add_sketch_dimension(arc, None, "radial", radius),
+        )
+        _make_driven(adapter, reference, name)
+        profile.record(name)
+    await dimension_between(
+        adapter,
+        f"{tenon_end}.start",
+        "origin",
+        "horizontal_distance",
+        TENON_X0,
+        "tenon end from the arm face",
     )
     profile.record("TenonStart", '"FerruleLength" - "TenonLength"')
+    await add_diametric_linear_dimension(
+        adapter,
+        centerline,
+        bore_wall,
+        ((TENON_X0 + COUNTERBORE_FLOOR_X) / 2.0, bore_r + 3.0),
+        "PivotBoreDia",
+    )
+    profile.record("PivotBoreDia", '"PivotBoreDia"')
     check(
         "tenon length",
         await adapter.add_sketch_dimension(tenon_top, None, "linear", TENON_LENGTH),
@@ -248,13 +308,46 @@ async def build(adapter) -> dict[str, str]:
         "TenonDia",
     )
     profile.record("TenonDia", '"TenonDia"')
-    check(
-        "shoulder step",
-        await adapter.add_sketch_dimension(shoulder, None, "linear", SHOULDER_R - TENON_R),
+    await add_diametric_linear_dimension(
+        adapter,
+        centerline,
+        f"{shoulder}.end",
+        (SHOULDER_X - 1.0, SHOULDER_R + 4.0),
+        "ShoulderDia",
     )
-    profile.record("ShoulderStep", '"ShoulderR" - "TenonDia" / 2')
+    profile.record("ShoulderDia", '"ShoulderR" * 2')
+    # The stations print from the tenon end face, the one faced end.
+    station = '"FerruleLength" + "TenonLength"'
+    for point, x, name, knob in (
+        (f"{flare}.end", WAIST_X, "WaistStation", '"WaistX"'),
+        (f"{s_concave}.end", INFLECTION[0], "InflectionStation", '"InflectionX"'),
+        (f"{s_convex}.start", PEAK_X, "PeakStation", '"PeakX"'),
+    ):
+        await dimension_between(
+            adapter,
+            f"{tenon_end}.end",
+            point,
+            "horizontal_distance",
+            x - TENON_X0,
+            f"{name} from the tenon end",
+        )
+        profile.record(name, f"{knob} - {station}")
+    for point, x, radius, name in (
+        (f"{flare}.end", WAIST_X, WAIST_R, "WaistDia"),
+        (f"{s_convex}.start", PEAK_X, PEAK_R, "PeakDia"),
+        (f"{end_round}.start", OAK_END_X + 3.0, END_ROUND_CENTER[1], "CrestDia"),
+    ):
+        await add_diametric_linear_dimension(
+            adapter, centerline, point, (x, radius + 4.0), name
+        )
+        profile.record(name, f'"{name}"')
+    check(
+        "end round radius",
+        await adapter.add_sketch_dimension(end_round, None, "radial", END_ROUND_R),
+    )
+    profile.record("EndRoundR", '"EndRoundR"')
     # The oak overall, tenon end face to the oak's end at the counterbore
-    # mouth: every axial station reads from the tenon end, the one faced end.
+    # mouth.
     await dimension_between(
         adapter,
         f"{tenon_end}.end",
@@ -279,47 +372,6 @@ async def build(adapter) -> dict[str, str]:
         "CounterboreDia",
     )
     profile.record("CounterboreDia", '"CounterboreDia"')
-    # The peak station prints from the tenon end face too.
-    await anchor_point_to_point(
-        adapter,
-        f"{tenon_end}.end",
-        f"{peak_station}.start",
-        PEAK_X - TENON_X0,
-        _WITNESS_Y0 - TENON_R,
-        "peak station from the tenon end",
-    )
-    profile.record("PeakStation", '"PeakX" - "FerruleLength" + "TenonLength"')
-    profile.record(None, None)
-    check(
-        "peak witness construction length",
-        await adapter.add_sketch_dimension(
-            peak_station, None, "linear", _WITNESS_Y1 - _WITNESS_Y0
-        ),
-    )
-    profile.record(None, None)
-    # Arc centres: each anchored by a horizontal and a vertical distance from
-    # the origin.  The two swell centres sit on the peak station ("PeakX"); the
-    # rest are closed forms of several knobs and stay static.  The end round's
-    # centre is anchored in height only: its tangency to the dome and the oak's
-    # end point fix the rest.
-    for arc, center, label, x_drive in (
-        (flare, FLARE_CENTER, "flare centre", None),
-        (s_concave, S_CONCAVE_CENTER, "S concave centre", None),
-        (s_convex, S_CONVEX_CENTER, "S convex centre", '"PeakX"'),
-        (dome, DOME_CENTER, "dome centre", '"PeakX"'),
-    ):
-        await anchor_point_to_origin(adapter, f"{arc}.center", *center, label)
-        profile.record(None if x_drive is None else f"{label.title().replace(' ', '')}X", x_drive)
-        profile.record(None, None)
-    await dimension_between(
-        adapter,
-        f"{tenon_end}.start",
-        f"{end_round}.center",
-        "vertical_distance",
-        END_ROUND_CENTER[1],
-        "end round centre height",
-    )
-    profile.record(None, None)
     for first, second, label in (
         (flare, s_concave, "waist"),
         (s_concave, s_convex, "inflection"),
@@ -342,32 +394,6 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Handle")
 
-    # Axial running bore through the grip. The Right plane is normal to the
-    # handle's +X turning axis, so this cut is coaxial with the revolve and its
-    # true-circle end view gives the drawing an inspectable bore callout.
-    bore = SketchDims()
-    check("create_sketch pivot bore", await adapter.create_sketch("Right"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        PIVOT_BORE_DIA / 2.0,
-        "pivot bore",
-        dims=bore,
-        names=("PivotBoreCy", "PivotBoreCz", "PivotBoreDia"),
-        drives=(None, None, '"PivotBoreDia"'),
-    )
-    await ensure_fully_defined(adapter, "pivot bore sketch")
-    check("exit_sketch pivot bore", await adapter.exit_sketch())
-    name_last_feature(adapter, "PivotBoreProfile")
-    drive_jobs += bore.apply(adapter, "PivotBoreProfile")
-    check(
-        "cut pivot bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.5 * OAK_END_X, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "PivotBore")
     await volume_check(adapter, "crank handle", V_HANDLE, 0.002 * V_HANDLE)
 
     # Deferred drive equations after the model + a rebuild exist, so every
@@ -390,7 +416,7 @@ async def build(adapter) -> dict[str, str]:
     # The tenon and the counterbore are fitted to the parts they take.
     set_dimension_bilateral_tolerance(
         adapter,
-        "PivotBoreProfile",
+        "HandleProfile",
         "PivotBoreDia",
         *deviations(PIVOT_BORE_BAND),
     )
@@ -407,10 +433,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
