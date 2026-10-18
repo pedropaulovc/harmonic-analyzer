@@ -7,9 +7,3 @@ dt-crank-pin:
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: "machined (steel)"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "minor"
-      where: "side view, under the Ø2.10 DRILL THRU keeper-ring cross-hole callout: WEB 1.56 MIN"
-      finding: "cross-hole web to the pin surface below the 2.0 mm target (rule 17)"
-      reason: "owner ruling 2026-09-30 (#1140, listed pending on #989 after the 2026-10-11 reset): the Ø1.0 wire of the round brass keeper ring MHA-DT-027 needs the Ø2.10 hole through the pin's proud big end; a 2.0 web at the worst case needs a hole under Ø1.25, which no Ø1.0-wire ring threads, and a thicker pin would re-bore the crank hub MHA-DT-031 and crankshaft MHA-DT-011 taper-reamed cross-hole. 1.56 MIN is the web at the worst printed limits of the .XX big-end diameter and hole station and the DRILLED HOLES oversize, above the 1.5 floor; the hole sits in the big end standing proud of the hub and carries only the keeper ring"

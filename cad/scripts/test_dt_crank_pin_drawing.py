@@ -66,18 +66,10 @@ def test_matched_taper_fit_names_both_mates() -> None:
     assert len(dt_crank_pin_spec.DRAWING_NOTES.splitlines()) <= 4
 
 
-def test_printed_web_shortfall_is_an_owner_declared_minor() -> None:
-    """A stated shortfall with no declaration gates the machinist review."""
-    import _config
-    from machinist_exceptions import load_exceptions
-
-    (web,) = load_exceptions(_config.CONFIG_DIR, "dt_crank_pin", "part")
-    assert web.kind == "minor"
-    assert dt_crank_pin_spec.CROSS_HOLE_WEB_CALLOUT in web.where
+def test_web_shortfall_is_stated_on_the_hole_callout() -> None:
+    """Rule 20: the pending web shortfall prints where it applies."""
     callout = dt_crank_pin_spec.DIMENSION_CALLOUTS["RingHoleDia"]
-    assert dt_crank_pin_spec.CROSS_HOLE_WEB_CALLOUT in callout
-    assert "rule 17" in web.finding
-    assert web.reason.startswith("owner ruling 2026-09-30")
+    assert callout.splitlines()[-1] == dt_crank_pin_spec.CROSS_HOLE_WEB_CALLOUT
 
 
 def test_the_one_note_is_flagged_on_the_taper() -> None:

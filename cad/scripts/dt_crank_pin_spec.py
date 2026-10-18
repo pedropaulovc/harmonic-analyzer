@@ -56,8 +56,9 @@ CROSS_HOLE_WEB_MIN = (
     / 100.0
 )
 # The shortfall is stated under the hole's own Ø callout (rule 20), flagged
-# where it applies (rule 7). Owner-declared minor: dt-crank-pin.yaml
-# machinist_exceptions RV-01 (#989, #1140).
+# where it applies (rule 7); the review files it as a non-gating shortfall.
+# Pending exception ruling: MHA-DT-009 cross-hole web (#989; the 2026-09-30
+# acceptance from #1140 was reset to pending on 2026-10-11).
 CROSS_HOLE_WEB_CALLOUT = f"WEB {CROSS_HOLE_WEB_MIN:.2f} MIN"
 DIMENSION_CALLOUTS: dict[str, str] = {
     "RingHoleDia": f"DRILL THRU\n{CROSS_HOLE_WEB_CALLOUT}",
