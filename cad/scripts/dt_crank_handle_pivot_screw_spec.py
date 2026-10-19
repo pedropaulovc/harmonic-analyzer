@@ -48,6 +48,7 @@ from dt_crank_hub_geometry import (
     GENERAL_1PL_TOL_MM,
     MM_PER_IN,
 )
+from dt_drive_train_steps import step_ref
 
 
 STOCK_DIA = 0.25 * MM_PER_IN
@@ -76,6 +77,9 @@ SLOT_DEPTH_TOL = 0.20
 # (user ruling 2026-09-30): the tenon keeps 1.5 of oak over its bore.
 SHOULDER_DIA = 4.00
 SHOULDER_DIA_BAND = (-0.03, -0.08)
+# Rule 4: the running fit names its mate at the callout, as the handle's
+# PIVOT_BORE_CALLOUT names this shoulder.
+SHOULDER_CALLOUT = "RUNS IN HANDLE\nMHA-DT-008 BORE"
 # The shoulder's thread-end face is the seat on the arm face.  Under the
 # title block's 0.25 edge break on it and on the tapped mouth, a #6-32 left no
 # seat (local review of 1f3067ef2); a Ø6 collar cannot pass the oak bore
@@ -323,8 +327,9 @@ FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS = (
     FULL_THREAD_WORST_PRINTED_ARM / THREAD_MODEL_DIA
 )
 # User ruling 2026-09-29 (ch11 p.14 re-check): the photographs show no screw
-# end on the arm's inboard face, so the screw is cut long, seated with its
-# threadlocker, then filed flush with that face and its edge broken.  The
+# end on the arm's inboard face, so the screw is cut long, seated shoulder
+# tight with no threadlocker, filed flush with that face and the tap mouth
+# staked onto it (MHA-DT-000 step crank-handle-fitted; rule 23, #1174).  The
 # drive train places that fitted state as the INSTALLED configuration (the
 # MHA-DT-30 precedent); the default stays the as-turned screw the sheet prints.
 # Filing removes at most FILE_ALLOWANCE_MAX, and even the shortest screw in
@@ -339,14 +344,18 @@ FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
 # The fitted shoulder and both head bands' reasons, stated once (user ruling
 # 2026-09-29, after the MHA-DT-32 machinist review; the length band's reason
-# after the 1d2be3aaf re-review called it over-specification unstated).
+# after the 1d2be3aaf re-review called it over-specification unstated).  The
+# last line tells the shop why the thread runs past the 7.9 arm: the tip is
+# finished at assembly (rule 7: a blank finished at assembly says so).
+FITTED_STEP = step_ref("crank-handle-fitted")
 DRAWING_NOTES = "\n".join(
     (
-        "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-DT-08: UNDER-HEAD TO SEAT",
-        f"  FACE (SHOULDER END, EDGE BROKEN {SEAT_EDGE_BREAK_MAX:.1f} MAX, ON MHA-DT-06) = FERRULE",
-        f"  FACE TO CUP FLOOR PLUS {END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}. "
-        f"HEAD BEARS ON MHA-DT-35 FLOOR;",
-        f"  DIA BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f} BEARING, LENGTH BAND KEEPS IT BELOW CUP FACE.",
+        f"UNDER-HEAD TO SEAT FACE (ON MHA-DT-06, EDGE BREAK {SEAT_EDGE_BREAK_MAX:.1f} MAX), TO SUIT",
+        f"  BONDED MHA-DT-08: FERRULE FACE TO MHA-DT-35 FLOOR PLUS "
+        f"{END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}.",
+        f"HEAD BEARS ON MHA-DT-35 FLOOR BELOW ITS FACE; BANDS KEEP "
+        f"{HEAD_BEARING_RADIAL_MIN:.1f} BEARING.",
+        f"TIP FILED FLUSH WITH MHA-DT-06 AND STAKED AT {FITTED_STEP}.",
     )
 )
 

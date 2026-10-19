@@ -8,10 +8,11 @@ dimension at its part-authored places.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the thread tip on
-the left and the slotted head on the right.  Lengths baseline from the
-under-head face (see ``dt_crank_handle_pivot_screw_spec``).  The head-end view is
-the ``*Back`` orientation, which is exactly the third-angle RIGHT view of that
-profile, so it sits on the profile's axis to its right and shows the slot.
+the left and the slotted head on the right.  Axial locations baseline from the
+tip, the one faced end (see ``dt_crank_handle_pivot_screw_spec``).  The
+head-end view is the ``*Back`` orientation, which is exactly the third-angle
+RIGHT view of that profile, so it sits on the profile's axis to its right and
+shows the slot.
 
 Run with SolidWorks open::
 
@@ -51,6 +52,7 @@ from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -68,6 +70,7 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_END_STATION,
     RELIEF_LEAD,
     SEAT_STATION,
+    SHOULDER_CALLOUT,
     SHOULDER_DIA,
     SURFACE_FINISHES,
     THREAD_CALLOUT,
@@ -76,6 +79,9 @@ from dt_crank_handle_pivot_screw_spec import (
     TIP_CHAMFER,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_crank_handle_pivot_screw"]
 PART_STEM = SPEC.artifact_stem
@@ -130,16 +136,19 @@ RELIEF_MID_X = (SEAT_X + RELIEF_END_X) / 2.0
 RELIEF_FLOOR_MID_X = (_sheet_x(SEAT_STATION + RELIEF_LEAD) + RELIEF_END_X) / 2.0
 
 # Rows below the profile, 15 mm apart (text sits ~3 mm above its requested
-# point and the dimension line ~5 mm below it).  Row 0 carries the thread size
-# from the seat face on the left and the head length from the under-head face
-# on the right; row 1 the shoulder length from the under-head face; row 2 the
-# reference overall.  Row 0 stands 34 mm below the axis so the relief Ø can
-# print between it and the profile.  No extension line crosses a dimension
-# line.
+# point and the dimension line ~5 mm below it).  Row 0 carries the thread
+# length (the seat face from the tip) on the left and the head length on the
+# right; row 1 the under-head face from the tip; row 2 the reference overall.
+# Row 0 stands 34 mm below the axis so the relief Ø can print between it and
+# the profile.  No extension line crosses a dimension line.
 _ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.064)
+# The 4-mm head prints 12 mm long, narrower than its ~21-mm value, so the head
+# length and the slot depth stand outside the head face rather than between
+# extension lines that would strike their text (v43 render).
+HEAD_TEXT_OUTSIDE = 0.016
 SIDE_KEEP = {
     "ThreadLength": ((TIP_X + SEAT_X) / 2.0, _ROW_Y[0]),
-    "HeadLength": ((UNDERHEAD_X + HEAD_FACE_X) / 2.0, _ROW_Y[0]),
+    "HeadLength": (HEAD_FACE_X + HEAD_TEXT_OUTSIDE, _ROW_Y[0]),
     # The under-head face located from the tip, like every axial location.
     "UnderHeadLocation": ((TIP_X + UNDERHEAD_X) / 2.0, _ROW_Y[1]),
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
@@ -157,8 +166,9 @@ SIDE_KEEP = {
     # The tip chamfer's axial leg reads below-left of the tip, clear of the
     # thread size's extension line at the tip and of the callout above.
     "TipChamfer": (TIP_X - 0.020, SIDE_CENTER[1] - 0.016),
-    # The slot shows as a notch in the head face; its depth reads above it.
-    "SlotDepth": (HEAD_FACE_X - 0.0015, SIDE_CENTER[1] + 0.026),
+    # The slot shows as a notch in the head face; its depth reads above it,
+    # outside the head face.
+    "SlotDepth": (HEAD_FACE_X + HEAD_TEXT_OUTSIDE, SIDE_CENTER[1] + 0.026),
 }
 # The relief Ø's dimension line stands on the floor (SIDE_KEEP); its text
 # goes on an OffsetText leader so the seat-face extension line (the thread
@@ -267,6 +277,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(
         adapter, annotations, {"TipChamfer": CHAMFER_CALLOUT}, location="below"
+    )
+    # Rule 4: the running-fit band names its mate at the callout.  Above the
+    # value, so the lines stay off the dimension line that drops to the
+    # shoulder.
+    set_dimension_callouts(
+        adapter, annotations, {"ShoulderDia": SHOULDER_CALLOUT}, location="above"
     )
     offset_dimension_text(adapter, side_annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
