@@ -54,7 +54,6 @@ from __future__ import annotations
 import math
 import sys
 
-
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -175,8 +174,6 @@ def _mid_y(x: float) -> float:
     by = _bottom_point(x)[1]
     ty = CENTER_Y - math.sqrt(R_TOP**2 - x * x)
     return (by + ty) / 2.0
-
-
 
 
 def _as_construction(adapter, entity_id: str) -> None:

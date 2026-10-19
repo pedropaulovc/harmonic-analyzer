@@ -95,7 +95,8 @@ from _cwm import (  # noqa: E402
 from solidworks_mcp.adapters.solidworks.assembly import (  # noqa: E402
     _create_math_transform,
 )
-from build_ch_rocker_arm import ROD_HOLE_X, ROD_HOLE_Y, _mid_y  # noqa: E402
+from _rocker_interface import ROD_HOLE_X, ROD_HOLE_Y  # noqa: E402
+from build_ch_rocker_arm import _mid_y  # noqa: E402
 from build_ch_connecting_rod import CENTER_DISTANCE as ROD_C2C  # noqa: E402
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]

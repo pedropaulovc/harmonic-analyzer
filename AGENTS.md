@@ -1025,6 +1025,11 @@ owns the arm/plate dowel-hole limits, proud set, blind depth and mouth breaks;
 `pd_vn_transgear_arm_plate_locating_pin_spec` retains purchased-pin data and the
 stock-to-interface fit, insertion and bottom-air calculations. Mating geometry
 imports the narrow providers directly, not either full hardware spec.
+`_rocker_interface` owns the shared rocker profile dimensions and rod-pin
+coordinates. Rod specs, rocker builders and geometry consumers import it
+directly; manufacturing limits and fit checks stay in the rocker and rod specs.
+Feature citations for these shared dimensions name `_rocker_interface`, not the
+full rocker-arm spec or a builder.
 Assembly data splits by consumer: `<stem>_assembly_spec.py` (reaches the .SLDASM),
 `<stem>_explode_spec.py` (pure explode the builder authors), and drawing-only
 `<stem>_assembly_sheet.py` / `*_steps.py` (BOM, captions, sequence text).

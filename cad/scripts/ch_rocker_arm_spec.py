@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import math
 from _hole_spec import HoleSpec
-
-
 import _rocker_interface
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -52,15 +50,12 @@ BOT_END_X = _rocker_interface.R_BOTTOM * math.sin(_ALPHA_BOT)
 _RAD_X = TOP_END_X / R_TOP
 ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X  # widest half-span (~146.25)
 
-
-
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. build_ch_rocker_arm marks exactly these; draw_ch_rocker_arm keeps
 # exactly their union across its per-view ``keep`` maps. ---
 # The marked-dimension contract moved to ``ch_rocker_arm_notes`` with the rest of
 # the drawing-only data (codex #354): it changes for drawing-only mark/keep
 # updates, and assemblies import this module.
-
 
 # The amplitude bar's foot rides the top edge, and at d = 0 its cheeks pass
 # over this arm's hub, so the print controls the edge's height over the pivot
