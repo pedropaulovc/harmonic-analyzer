@@ -159,7 +159,9 @@ def _reauthor_drawing_configurations(
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     rest = "Default"
     if active_configuration_name(adapter, model) != rest:
-        raise RuntimeError(f"{asm_name}: drawing configurations are authored from {rest!r}")
+        raise RuntimeError(
+            f"{asm_name}: drawing configurations are authored from {rest!r}"
+        )
     try:
         sync_simplified_configuration(adapter, asm_name)
         with _telemetry.span("simplified.author", asm=asm_name, configuration=rest):
