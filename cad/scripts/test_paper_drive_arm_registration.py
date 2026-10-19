@@ -17,7 +17,7 @@ import pd_transgear_arm_geometry as arm
 import pd_transgear_arm_plate_geometry as plate
 import pd_transgear_arm_spec as arm_spec
 import pd_transgear_arm_plate_spec as plate_spec
-import pd_vn_transgear_arm_plate_locating_pin_spec as pin
+import _transgear_arm_plate_locating_interface as pin
 from _test_stubbed_build import keyed_artefacts, offline_adapter, seat_calls, stub_seat
 
 

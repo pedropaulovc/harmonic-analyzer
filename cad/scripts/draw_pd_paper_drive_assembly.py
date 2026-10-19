@@ -118,6 +118,7 @@ import _gear_quality as quality
 import pd_rack_pinion_spec as disc
 import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
+import _transgear_arm_plate_locating_interface as plate_locating_interface
 from paper_drive_rack_travel import OPERATING_DIRECTION_TEXT, RackOperatingDomain
 
 
@@ -1260,8 +1261,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "MATCH-DRILL AND REAM THE LOCATING HOLES. "
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
-            f"{plate_locating_pin.PROUD_LIMITS_MM[0]:.2f} TO "
-            f"{plate_locating_pin.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE "
+            f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
+            f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE "
             "BLIND FLOOR; MATCH-MARK ARM AND PLATE."
         ),
         "arm-plate-fitted": (

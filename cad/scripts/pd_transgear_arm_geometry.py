@@ -29,12 +29,12 @@ from fractions import Fraction
 
 import pd_rack_pinion_spec as DISC
 import pd_support_bar_spec as BAR
-import pd_vn_transgear_pivot_screw_spec as PIVOT
+import _mcmaster_90325a174 as PIVOT
 from _fit_close_running import measured_close_running_clearance_mm
 from _gear_quality import reducer_position_diameter_mm
 from _printed_tolerance import angular_band_deg
 import pd_transgear_pivot_spacer_spec as SPACER
-import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATING_PIN
+import _transgear_arm_plate_locating_interface as LOCATING_PIN
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 

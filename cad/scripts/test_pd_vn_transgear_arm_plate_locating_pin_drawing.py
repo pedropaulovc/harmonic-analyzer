@@ -10,6 +10,7 @@ import _config
 import build_pd_vn_transgear_arm_plate_locating_pin as part
 import draw_pd_vn_transgear_arm_plate_locating_pin as drawing
 import pd_vn_transgear_arm_plate_locating_pin_spec as spec
+import _transgear_arm_plate_locating_interface as interface
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _test_stock_recipes import discovered_recipes
@@ -55,7 +56,7 @@ def test_standard_press_slip_and_length_family_do_not_bottom_in_custom_arm() -> 
     assert spec.SLIP_DIAMETRAL_CLEARANCE_MM == pytest.approx((0.002, 0.018))
     assert spec.INSERTION_LIMITS_MM == pytest.approx((4.02, 4.58))
     assert spec.ARM_BOTTOM_AIR_MIN_MM == pytest.approx(0.17)
-    assert spec.HOLE_MOUTH_BREAK_AXIAL_MAX_MM == spec.HOLE_MOUTH_BREAK_RADIAL_MAX_MM == 0.05
+    assert interface.HOLE_MOUTH_BREAK_AXIAL_MAX_MM == interface.HOLE_MOUTH_BREAK_RADIAL_MAX_MM == 0.05
 
 
 

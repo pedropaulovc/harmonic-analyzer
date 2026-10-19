@@ -1018,6 +1018,13 @@ topology checks without importing cone-part derivation.
 depths; bar and latch consumers import it directly, not the clamp's bore/ear
 geometry. The support-bar builder still reads `sh_column_clamp_fit` for its
 physically mating clamp-screw clearance budget.
+The transgear arm and pivot spacer read the pivot screw's catalogue shoulder
+dimensions directly from `_mcmaster_90325a174`; fitted-thread and chamfer checks
+remain in `vn_transgear_pivot_screw_spec`. `_transgear_arm_plate_locating_interface`
+owns the arm/plate dowel-hole limits, proud set, blind depth and mouth breaks;
+`vn_transgear_arm_plate_locating_pin_spec` retains purchased-pin data and the
+stock-to-interface fit, insertion and bottom-air calculations. Mating geometry
+imports the narrow providers directly, not either full hardware spec.
 Assembly data splits by consumer: `<stem>_assembly_spec.py` (reaches the .SLDASM),
 `<stem>_explode_spec.py` (pure explode the builder authors), and drawing-only
 `<stem>_assembly_sheet.py` / `*_steps.py` (BOM, captions, sequence text).

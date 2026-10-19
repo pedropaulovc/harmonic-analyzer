@@ -32,6 +32,7 @@ import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_transgear_knob_cup_spec as cup
 import pd_transgear_knob_shaft_spec as knob_shaft
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
+import _transgear_arm_plate_locating_interface as plate_locating_interface
 import pd_vn_transgear_arm_plate_screw_spec as plate_screw
 import pd_vn_transgear_knob_drive_pin_spec as drive_pin
 import pd_transgear_rear_bushing_spec as rear_bushing
@@ -309,8 +310,8 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     ) in located
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
-        f"{plate_locating_pin.PROUD_LIMITS_MM[0]:.2f} TO "
-        f"{plate_locating_pin.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE BLIND FLOOR"
+        f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
+        f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE BLIND FLOOR"
     ) in located
     assert "MATCH-MARK ARM AND PLATE" in located
     fitted = _step_body("arm-plate-fitted")

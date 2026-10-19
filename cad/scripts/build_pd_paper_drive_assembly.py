@@ -346,6 +346,7 @@ import pd_rack_pinion_spec as DISC_SPEC  # noqa: E402
 import pd_transgear_arm_plate_geometry as ARM_PLATE  # noqa: E402
 import pd_transgear_arm_plate_spec as ARM_PLATE_SPEC  # noqa: E402
 import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATING_PIN  # noqa: E402
+import _transgear_arm_plate_locating_interface as LOCATING_INTERFACE  # noqa: E402
 import pd_vn_transgear_arm_plate_screw_spec as PLATE_SCREW  # noqa: E402
 import transgear_cluster_fit as CLUSTER  # noqa: E402
 import pd_transgear_disc_hub_geometry as DISC_HUB_GEOM  # noqa: E402
@@ -434,7 +435,7 @@ LOCATING_PIN_XY = tuple(_on_arm(x, y) for x, y in ARM.LOCATOR_SITES_MM)
 # end is the PROUD end, 1.70 into the plate, so the 6.0 body runs 4.30 into
 # the arm's 4.80 blind ream. Run 9 put the origin at the buried end: the body
 # then ran out of the arm's front face (9.86 mm^3 of solid arm per dowel).
-LOCATING_PIN_Z0 = PLATE_Z0 + LOCATING_PIN.PROUD_MM
+LOCATING_PIN_Z0 = PLATE_Z0 + LOCATING_INTERFACE.PROUD_MM
 if not (
     PLATE_Z0 - ARM.LOCATOR_BLIND_DEPTH_MM
     < LOCATING_PIN_Z0 - LOCATING_PIN.LENGTH
@@ -2904,7 +2905,7 @@ async def build(adapter) -> dict[str, str]:
         await distance_driver(
             adapter, named_ref(f"Top Plane@{locating_pin}", "PLANE"),
             named_ref(f"RearFace@{arm}", "PLANE"),
-            LOCATING_PIN.PROUD_MM,
+            LOCATING_INTERFACE.PROUD_MM,
             label=f"locating dowel {index} proud stop", verify=(locating_pin, pin_origin),
         )
         assert_component_placed(adapter, locating_pin, pin_origin, ROT_X_NEG90)

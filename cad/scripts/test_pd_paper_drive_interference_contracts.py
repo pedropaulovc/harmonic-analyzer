@@ -224,9 +224,10 @@ def test_locating_dowels_press_into_the_arm_and_slip_in_the_plate() -> None:
     """MHA-PD-VN-64 presses into the arm's blind reams over its insertion
     (length less proud), short of the floor, and slips in the plate."""
     import pd_vn_transgear_arm_plate_locating_pin_spec as dowel
+    import _transgear_arm_plate_locating_interface as interface
 
     allowed = _allowed()
-    insertion = dowel.LENGTH - dowel.PROUD_MM
+    insertion = dowel.LENGTH - interface.PROUD_MM
     assert dowel.DIA > arm.LOCATOR_HOLE_DIA_MM
     assert insertion < arm.LOCATOR_BLIND_DEPTH_MM
     assert dowel.DIA <= plate.LOCATOR_HOLE_DIA_MM

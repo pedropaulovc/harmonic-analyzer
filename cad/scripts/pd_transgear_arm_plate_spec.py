@@ -27,6 +27,7 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import pd_transgear_arm_plate_geometry as PLATE
+import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import paper_drive_arm_registration as REGISTRATION
 from pd_transgear_arm_plate_geometry import (
     BAND_X,
@@ -159,7 +160,7 @@ GEOMETRIC_CONTROLS += (
 # the sheet border (run 20261010T001620278Z).
 LOCATOR_CALLOUT = (
     "2X REAM THRU\nBREAK EDGE\n"
-    f"{PLATE.ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
+    f"{LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
 )
 
 # The bore is the knob shaft's running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MACHINED, on
