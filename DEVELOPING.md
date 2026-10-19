@@ -134,17 +134,51 @@ In one ordered, unchanged 291-file, serial (`-n 0`) collect-only pair, baseline
 collection took **75.1735279 s** versus **38.6164179 s** with the flag; the
 **11,513 node-ID multisets were identical**. This is collection-only evidence,
 not a recipe execution or whole-build speedup measurement.
-Other `check:*` gates remain serial internally.
-Eight workers bound the additional local processes:
-the measured development host has 16 logical CPUs, and the farm launcher already
-permits eight simultaneous doit tasks. Using `-n auto` inside the recipe gate
-would occupy every CPU before accounting for sibling checks. This is a
-conservative first step, not a claim of a fivefold speedup. Work stealing
-rebalances individual tests instead of pinning the dominant recipe-test file to
-one worker. Each worker still pays collection costs, and module/session-scoped
-fixtures may execute in multiple workers; tests must not rely on shared mutable
-fixture state across processes.
-Doit still owns the same dependency checks and success stamp.
+Local offline `check:*` gates share a host-wide CPU-worker budget across doit
+processes, worktrees, and farm snapshots: `round(logical CPUs × 0.8)`, minimum
+one. On amet's 16 logical CPUs that allows 13 workers, not one gate at a time.
+Single-process checks cost one slot. A recipe requests up to eight; another
+recipe can use the remaining five concurrently. Admission rewrites pytest's
+`-n`/`--numprocesses` argument to the number actually granted, including
+`auto`/`logical` requests, which use the configured host budget. A parallel suite
+waits for at least half its requested
+workers (rounded up, after capping the request to host capacity); an insufficient
+provisional allocation is released immediately. This avoids launching a long
+recipe at one worker just because short checks temporarily occupy the host.
+Worker counts stay fixed for that suite's lifetime.
+Pytest checks without an explicit parallel-worker request receive command-line
+`-n 0`; inherited `PYTEST_ADDOPTS` or configuration `addopts` cannot silently
+turn a one-slot check into an unbudgeted worker pool.
+This is a concurrency target, not a hard CPU-utilization cap: I/O waits,
+subprocesses inside tests, and unrelated applications affect measured usage.
+
+`_local_check.py` uses `%PROGRAMDATA%/harmonic-analyzer/local-check.lock` for
+brief allocation and adjacent numbered slot locks for execution. A check
+holds its own slots before importing its entry point. A dead submitter cannot
+release a still-running check's capacity; the OS releases slots when the check
+exits, including a crash. No partial allocation waits for more slots, so
+competing suites cannot deadlock. Never delete lock files to unblock a queue.
+
+Remote farm leaves and cached machinist reviews use separate budgets. Doit
+still owns dependency checks and success stamps. The `local.check.wait` span
+measures admission latency; logs record requested/granted workers, host
+capacity, and execution `held_s`. Top-level telemetry context is unchanged.
+Waits log every 30 seconds, with no queue deadline or failed-check retry.
+
+`HARMONIC_LOCAL_CHECK_LOCK` selects the lock namespace and
+`HARMONIC_LOCAL_CHECK_CPU_SLOTS` overrides capacity (a positive integer).
+Tests use isolated namespaces and small capacities. Production submitters
+must agree on both settings and use this admission version. Older snapshots
+do not participate correctly; resume paused launches from updated commits.
+Direct pytest bypasses admission; use
+`uv run python cad/scripts/_local_check.py check:manual -m pytest ...` for
+manual suites alongside builds. Nested pytest/xdist children belong to the
+enclosing check and must not acquire admission again.
+
+Work stealing rebalances individual tests instead of pinning the dominant
+recipe-test file to one worker. Each worker still pays collection costs, and
+module/session-scoped fixtures may execute in multiple workers; tests must not
+rely on shared mutable fixture state across processes.
 
 The coordinator compared the same frozen source (`4d89b02fb`) and production
 recipe inventory sequentially on that host, changing only xdist scheduling:
@@ -171,13 +205,13 @@ these commands sequentially from the isolated worktree's root. They derive the
 argv from `task_check()` rather than substituting a broader `pytest cad/scripts`
 run, and bypass the stamp so both runs execute. Replace the JUnit paths with
 distinct absolute paths outside the worktree; keep the guard and environment
-settings above. These direct pytest runs do not update the gate's success stamp.
+settings above. These admitted runs do not update the gate's success stamp.
 
 ```powershell
 # Serial baseline: remove only the recipe gate's four xdist arguments.
-uv run --locked python -c "import dodo, subprocess; t = next(t for t in dodo.task_check() if t['name'] == 'recipe'); c = list(t['actions'][0][1][0]); i = c.index('-n'); del c[i:i+4]; raise SystemExit(subprocess.call(c + ['--durations=50', '--junitxml=C:/outside-worktree/recipe-serial.xml'], cwd=dodo.REPO_ROOT))"
+uv run --locked python -c "import dodo, subprocess; t = next(t for t in dodo.task_check() if t['name'] == 'recipe'); c = list(t['actions'][0][1][0]); i = c.index('-n'); del c[i:i+4]; raise SystemExit(subprocess.call(dodo._local_check.command(c + ['--durations=50', '--junitxml=C:/outside-worktree/recipe-serial.xml'], 'check:recipe'), cwd=dodo.REPO_ROOT))"
 # Parallel: run the production argv unchanged, plus timing/report options.
-uv run --locked python -c "import dodo, subprocess; t = next(t for t in dodo.task_check() if t['name'] == 'recipe'); c = list(t['actions'][0][1][0]); raise SystemExit(subprocess.call(c + ['--durations=50', '--junitxml=C:/outside-worktree/recipe-parallel.xml'], cwd=dodo.REPO_ROOT))"
+uv run --locked python -c "import dodo, subprocess; t = next(t for t in dodo.task_check() if t['name'] == 'recipe'); c = list(t['actions'][0][1][0]); raise SystemExit(subprocess.call(dodo._local_check.command(c + ['--durations=50', '--junitxml=C:/outside-worktree/recipe-parallel.xml'], 'check:recipe'), cwd=dodo.REPO_ROOT))"
 ```
 
 Compare full case inventories and outcomes as well as process wall time; JUnit

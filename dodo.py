@@ -32,8 +32,8 @@ COM serialization (the single SolidWorks STA seat) is enforced at RUNTIME by a
 cross-process file lock (``_com_seat`` / ``filelock``), NOT by fake ``task_dep``
 edges: every COM subprocess acquires the machine-global seat lock before it drives
 SolidWorks and releases it after, so at most one COM task touches the seat at a
-time even under ``doit -n N`` -- while the SolidWorks-free ``check:*`` tasks (which
-never take the lock) fan out in parallel. The task graph therefore carries only
+time even under ``doit -n N``. Local ``check:*`` subprocesses share a separate
+host-wide CPU-worker budget; remote leaves remain concurrent. The graph carries only
 REAL dependency edges (an assembly's file_dep on its parts, verify/export on the
 built ``.SLDASM``, release on export+verify+preflight), so the DAG reads true and a
 COM failure no longer skips unrelated downstream COM tasks as a spine side effect.
@@ -46,7 +46,7 @@ Install (this repo is a uv project -- pyproject.toml + uv.lock at the root)::
 Run through uv (SolidWorks already open for the COM tasks)::
 
     uv run python -m doit                       # = `build`: every part + assembly + every gate
-    uv run python -m doit -n 4                  # local seat only: fan out the SolidWorks-free checks
+    uv run python -m doit -n 4                  # local seat only: cache restores/checks parallel within the host CPU budget
     uv run python build.py --verbosity warning  # concise console output; farm: no -n (build.py keeps 8 leaves in flight)
 
     uv run python -m doit build_bare            # quick: parts + assemblies only, no gates
@@ -143,6 +143,7 @@ import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _farm  # noqa: E402  (farm executor: cache-missing leaves run on the pool)
 import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports sw_recovery)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
+import _local_check  # noqa: E402  (host-wide local check admission)
 from _yaml_digest import yaml_digest as _yaml_content_digest  # noqa: E402
 from _drawing_registry import (  # noqa: E402
     DRAWING_TEMPLATES,
@@ -1018,8 +1019,8 @@ def _run(
     CONTINUES this span (via the injected TRACEPARENT) instead of adding a
     duplicate root layer under it.
 
-    SolidWorks-FREE tasks ONLY -- it never takes the COM seat, so these fan out
-    under ``-n N``. Every COM-touching task goes through
+    SolidWorks-FREE tasks ONLY -- it never takes the COM seat. Local checks
+    additionally use their host-wide admission runner. Every COM task uses
     :func:`_cached_com_action`, which owns the seat lock, the remote-cache
     probe/store and the farm dispatch; there is therefore no code path that can
     reach SolidWorks while bypassing the cache or the farm."""
@@ -1422,6 +1423,8 @@ def _run_stamped(cmd: list[str], label: str, stamp: str, task: str) -> None:
     _run raises on non-zero, so a failed gate never writes a stamp (stays stale ->
     re-runs). The COM gates (``verify:*``/``preflight``) do NOT come here: they are
     cache-keyed leaves whose stamp is written by :func:`_cached_com_action`."""
+    if task.startswith("check:"):
+        cmd = _local_check.command(cmd, task)
     _run(cmd, label, log_stem=Path(stamp).stem, task=task)
     Path(stamp).parent.mkdir(parents=True, exist_ok=True)
     Path(stamp).write_text(f"{label}\n", encoding="utf-8")
@@ -3397,12 +3400,12 @@ def _executed_closure(cmd: list[str]) -> set[str]:
 
 
 def task_check():
-    """SolidWorks-FREE checks -- no COM, so they run in parallel under ``-n N``.
+    """SolidWorks-FREE checks -- host-budgeted independently of remote leaves.
 
     ``check:math`` / ``check:config`` wrap ``verify.py --suite ...`` (verify.py
     runs those two without connecting to SolidWorks); ``check:graph`` /
     ``check:nameplate`` / ``check:recipe`` wrap the pure-python unit tests via
-    pytest. None takes the COM seat lock, so they fan out under ``-n``.
+    pytest. None takes the COM seat lock; each reserves local CPU-worker slots.
     """
     import _process_plans
 
@@ -3417,6 +3420,7 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        SCRIPTS_DIR / "test_local_check.py",
         SCRIPTS_DIR / "test_farm_admission.py",
         SCRIPTS_DIR / "test_machinist_review_leaf.py",
         # Which recorded-input changes may skip the insert/mate loop (the
@@ -3932,9 +3936,9 @@ def task_check():
                 # Fixed explicit inventory: skip repeated parent-directory
                 # virtualenv-marker probes, not general discovery exclusions.
                 "--collect-in-virtualenv",
-                # Bound nested parallelism: doit already fans out other gates
-                # (eight tasks by default on the farm). Steal individual tests
-                # so the dominant recipe-test file does not serialize the tail.
+                # Request up to eight workers; local admission reduces this
+                # to available host CPU slots. Remote leaves have their own budget.
+                # Steal individual tests to avoid a dominant-file tail.
                 "-n",
                 "8",
                 "--dist",
@@ -4191,7 +4195,9 @@ def task_check():
         executed = _executed_closure(spec["cmd"])
         yield {
             "name": name,
-            "file_dep": sorted({*spec["file_dep"], *executed}),
+            "file_dep": sorted({
+                *spec["file_dep"], *executed, str(Path(_local_check.__file__).resolve()),
+            }),
             "task_dep": spec.get("task_dep", []),
             "uptodate": spec.get("uptodate", []),
             "targets": [stamp, *spec.get("targets", [])],
