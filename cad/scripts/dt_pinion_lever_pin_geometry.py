@@ -1,9 +1,9 @@
 r"""Geometry-only contract for the pinion lever retention pin (MHA-DT-030).
 
-U8 + U36: a 1/16 in solid steel pin driven through the MHA-DT-016 lever hub and
-the MHA-DT-017 lift rod at mid-engagement, 3 o'clock to the grip, trimmed and
-peened flush at both ends.  The holes are match-drilled at assembly through
-both parts.
+U8 + U36: a 1/16 in solid steel pin inserted through the MHA-DT-016 lever hub
+and the MHA-DT-017 lift rod at mid-engagement, 3 o'clock to the grip, trimmed
+and peened flush at both ends.  The holes are match-drilled at assembly through
+both parts; the pin slips into them and its peened heads retain it (#1064).
 """
 
 from __future__ import annotations

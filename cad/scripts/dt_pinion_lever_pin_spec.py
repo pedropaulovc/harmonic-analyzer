@@ -2,14 +2,17 @@ r"""Pure-data dimensional contract shared by the pinion lever retention pin and
 its manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  A plain 1/16 in drill-rod pin cut
-overlength, driven through the hole match-drilled at assembly through the
+overlength, inserted through the hole match-drilled at assembly through the
 MHA-DT-016 lever hub and the MHA-DT-017 lift rod, then trimmed and peened flush at
-both ends (U8 + U36; Codex P1 on #844).  The nominals drive the part's named equation globals AND the
+both ends (U8 + U36; Codex P1 on #844).  The pin is a slip fit in the drilled
+hole and the peened heads retain it (#1064), so the step says INSERT, not
+DRIVE.  The nominals drive the part's named equation globals AND the
 drawing's coordinate math (``test_dt_pinion_lever_pin_drawing.py``).
 """
 
 from __future__ import annotations
 
+from dt_drive_train_steps import step_ref
 from dt_pinion_lever_pin_geometry import PIN_DIA as PIN_DIA, PIN_LEN as PIN_LEN
 
 LEVER_NUMBER = "MHA-DT-016"
@@ -17,7 +20,9 @@ LIFT_ROD_NUMBER = "MHA-DT-017"
 
 # Stock 1/16 in drill rod (h9 in the drill-rod catalogues).  The pin rides a
 # drilled hole (title-block DRILLED HOLES +0.10/0), so it is retained by the
-# peened heads, not by an interference: the band only says "use the stock".
+# peened heads, not by an interference: the band only says "use the stock",
+# and its zero upper deviation keeps the pin no larger than the smallest hole
+# the 1/16 drill leaves.
 PIN_DIA_BAND = (0.0, -0.03)
 
 # drawing-guidelines.md rule 11 (turned parts read like the lathe) (turned parts): both dimensions live on the revolved half-profile, so
@@ -43,17 +48,35 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the pin sheet carries no notes, and the MHA-DT-016 and MHA-DT-017 hole
 # callouts carry only the hole specification (Main, 2026-09-26, as MHA-DT-019's).
-# The grip-parked drilling pose and the drive, trim and peen sequence are
+# The grip-parked drilling pose and the insert, trim and peen sequence are
 # performed at assembly, so they print once, on this pinion fit-up step,
 # named by its first words as RIG SET and SHAFT DRILL SET are.  The part
 # callouts' pointers to it land at integration, from the step registry.
 LEVER_PIN_SET_NAME = "LEVER PIN SET"
+LEVER_PIN_SET_STEP_KEY = "lever-pin-set"
 PIN_NUMBER = "MHA-DT-030"
 ASSEMBLY_STEP = "\n".join(
     (
         f"{LEVER_PIN_SET_NAME}: MATCH-DRILL {LEVER_NUMBER} HUB AND {LIFT_ROD_NUMBER} ROD",
-        f"TOGETHER, GRIP PARKED; DRIVE {PIN_NUMBER},",
+        f"TOGETHER, GRIP PARKED; INSERT {PIN_NUMBER},",
         "TRIM BOTH ENDS AND PEEN FLUSH WITH HUB.",
     )
 )
+# drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
+# the stock band names the hole the pin slips into and says the stock holds
+# it; the overlength cut points at the step that trims it (rule 19).
+DIMENSION_CALLOUTS: dict[str, str] = {
+    "PinDia": "\n".join(
+        (
+            "1/16 DRILL ROD, STOCK OK",
+            f"SLIP FIT IN {LEVER_NUMBER} AND {LIFT_ROD_NUMBER} PIN HOLE",
+        )
+    ),
+    "PinLen": "\n".join(
+        (
+            "CUT LENGTH",
+            f"TRIMMED AT ASSEMBLY PER {step_ref(LEVER_PIN_SET_STEP_KEY)}",
+        )
+    ),
+}
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

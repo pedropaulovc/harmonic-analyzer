@@ -34,14 +34,20 @@ from _drawing_dimensions import assert_imported_precision, set_dimension_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from dt_pinion_lever_pin_spec import (
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA,
 )
+
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["dt_pinion_lever_pin"]
@@ -70,13 +76,11 @@ HALF_DIA = PIN_DIA * SHEET_SCALE[0] / 2000.0
 # above it -- its dimension line left of centre so the axis-centerline pick at
 # the view's middle lands on bare face -- and the cut length below.  The end
 # view is a bare circle with its center mark (machinist review of 7f7fc1717).
+# Each dimension's two-line callout hangs below its value, so the diameter
+# sits high enough for both lines to clear the pin outline.
 FRONT_KEEP = {
-    "PinDia": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] + HALF_DIA + 0.016),
+    "PinDia": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] + HALF_DIA + 0.028),
     "PinLen": (FRONT_CENTER[0], 0.140),
-}
-DIMENSION_CALLOUTS = {
-    "PinLen": "CUT LENGTH",
-    "PinDia": "1/16 DRILL ROD",
 }
 
 
