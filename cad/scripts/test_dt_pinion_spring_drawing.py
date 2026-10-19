@@ -16,8 +16,9 @@ import dt_pinion_spring_spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _printed_tolerance import printed_band_mm, printed_deviations
+from machinist_exceptions import load_exceptions
 
-_XX_BAND = float(_config.title_block("linear_2pl")["value_in"]) * 25.4
+_XX_BAND = printed_band_mm(2)
 _HOLE_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 _WEB_TARGET = 2.0  # U27: machined webs >= 2.0 at the printed worst case
 
@@ -230,6 +231,17 @@ def test_pad_webs_clear_two_millimetres_at_the_printed_worst_case() -> None:
     assert drawing.DIMENSION_CALLOUTS["PadLen"] == (
         f"HOLE WEB {geometry.PAD_HOLE_WEB_MIN:.2f} MIN"
     )
+
+
+def test_owner_exception_matches_only_the_stated_hole_web() -> None:
+    (exception,) = load_exceptions(
+        Path(geometry.__file__).parents[1] / "config", "dt_pinion_spring", "part"
+    )
+    assert (exception.id, exception.kind) == ("RV-01", "minor")
+    assert dt_pinion_spring_spec.PAD_LEN_CALLOUT in exception.where
+    assert f"{geometry.PAD_HOLE_WEB_MIN:.2f} mm minimum" in exception.finding
+    assert "PAD_HOLE_WEB_MIN" in exception.reason
+    assert 1.5 <= geometry.PAD_HOLE_WEB_MIN < _WEB_TARGET
 
 
 def test_pad_wing_and_its_round_clear_the_bend_at_the_printed_worst_case() -> None:

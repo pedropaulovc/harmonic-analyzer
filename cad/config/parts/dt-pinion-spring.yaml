@@ -7,3 +7,9 @@ dt-pinion-spring:
   quantity: 1
   tolerance_class: machined_block
   process: "formed strip blank (17-7 PH stainless, Condition C)"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "sheet 1, top view, PadLen 3.74 from the pad hole axis: HOLE WEB 1.54 MIN"
+      finding: "hole-to-pad-relief web 1.54 mm minimum, below the 2.0 mm target but above the 1.5 mm floor (rule 17)"
+      reason: "owner approval via coordinator Main, 2026-10-19, PR #1675 option (1): retain dt_pinion_spring_geometry.PAD_WING_LEN 8.24 and the hole-axis baselines FootLen/FreeKinkH/PadLen, computed at the printed +/-0.51 band. PAD_HOLE_WEB_MIN floors the physical worst case 1.5488 mm to 1.54, never up to 1.55. The wing and R0.25 MAX relief clear the bend at the loose band limits, no mating interface moves, and the MHA-VN-020 screw head retains 0.906 mm contact margin against the approved 0.5 mm minimum. The sheet states the shortfall through dt_pinion_spring_spec.PAD_LEN_CALLOUT; no tighter band is allowed."

@@ -79,6 +79,9 @@ PAD_RELIEF_DIMENSION = "PadReliefR"
 PAD_RELIEF_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # The wing's length states the web it leaves the hole, under rule 17's 2.0
 # target (rule 20; Codex, PR #1675).
+# RV-01: the owner-approved hole-to-relief web stays above the 1.5 floor at
+# the printed bands; the package declares the under-2.0 target in its YAML
+# (coordinator Main, 2026-10-19, PR #1675 option 1).
 PAD_LEN_CALLOUT = f"HOLE WEB {PAD_HOLE_WEB_MIN:.2f} MIN"
 
 # Everything the print carries.  The profile is baselined from the pad hole's
