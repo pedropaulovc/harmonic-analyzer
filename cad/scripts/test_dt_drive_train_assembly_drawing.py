@@ -304,6 +304,17 @@ def test_bom_descriptions_keep_one_line() -> None:
         assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
 
 
+def test_same_catalogue_screws_keep_distinct_assembly_roles() -> None:
+    stop = drawing.BOM_DESCRIPTIONS["vn-swing-stop-screw"]
+    foot = drawing.BOM_DESCRIPTIONS["vn-foot-screw"]
+    assert "90280A108" in stop and "90280A108" in foot
+    assert "SWING STOP" in stop and "SPRING FOOT" in foot
+    assert (
+        drawing.BOM_PART_NUMBERS["vn-swing-stop-screw"]
+        != drawing.BOM_PART_NUMBERS["vn-foot-screw"]
+    )
+
+
 def test_changed_gear_bom_counts_come_from_their_specs() -> None:
     import dt_crank_drive_gear_spec as gear64
     import dt_crank_pinion_spec as pinion
@@ -317,12 +328,11 @@ def test_changed_gear_bom_counts_come_from_their_specs() -> None:
         assert f"{teeth}T" in drawing.BOM_DESCRIPTIONS[stem]
 
 
-def test_t120_printed_facts_match_the_actual_print_worst_envelope() -> None:
+def test_t120_fitup_envelope_matches_the_actual_model() -> None:
     import build_dt_drive_train_assembly as assembly
     import dt_crank_pinion_spec as pinion
 
     actual_shoulder = assembly.T120_SHOULDER_AIR
-    check = _flat(pinion.T120_FITUP_ASSEMBLY_CHECK)
     assert not math.isnan(actual_shoulder)
     if math.isinf(actual_shoulder):
         assert actual_shoulder == math.inf
@@ -340,7 +350,6 @@ def test_t120_printed_facts_match_the_actual_print_worst_envelope() -> None:
             + assembly.T120_POSE_RADIAL,
         )
         assert all(float(value) == math.inf for value in section.flat)
-        assert "NO AXIAL OVERLAP" in check
     else:
         assert (
             pinion.T120_SHOULDER_AIR_WORST
@@ -351,8 +360,6 @@ def test_t120_printed_facts_match_the_actual_print_worst_envelope() -> None:
     assert (
         pinion.T120_TURNED_BAND_RADIAL_WORST == math.floor(actual_band * 100.0) / 100.0
     )
-    assert not re.search(r"\b(?:INF|NAN)\b|∞", check, re.IGNORECASE)
-    assert check in _flat(drawing.CONE_CRANK_STEPS)
 
 
 def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:

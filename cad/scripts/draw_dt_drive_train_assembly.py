@@ -1,4 +1,4 @@
-r"""Create the native eleven-sheet drive-train assembly drawing package (MHA-DT-000).
+r"""Create the native twelve-sheet drive-train assembly drawing package (MHA-DT-000).
 
 The released ``dt-drive-train.SLDASM`` stays authoritative and byte-for-byte
 unchanged. This recipe consumes the builder-owned ``DRIVE_TRAIN_EXPLODED``
@@ -6,9 +6,10 @@ presentation (``_drive_train_explode``) and reads every count, identity and
 position it prints from the opened model; nothing pending on a sibling branch
 (crank hub, lever pin, pinion tooth count, bracket placement) is typed here.
 
-Sheet numbers are fixed: cross-references on the sheets cite them, so a sheet
-whose content is still pending keeps its slot with a placeholder. Every cited
-number is generated from the ``*_SHEET`` constants, never typed.
+Sheet numbers are fixed; cross-references come from the ``*_SHEET`` constants.
+Separate BOM identities retain the swing-stop and spring-foot roles even when
+they use the same catalogue screw. Fit-up steps give the measured acceptance
+and the cut that answers it, not the design's worst-case clearance narration.
 """
 
 from __future__ import annotations
@@ -93,10 +94,7 @@ import dt_crank_drive_gear_spec as gear64
 import dt_crank_handle_pivot_screw_spec as handle_screw
 from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
 import dt_crank_pinion_spec as pinion
-from dt_crank_pinion_spec import (
-    SEAT_FEELER_MM as PINION_SEAT_FEELER,
-    T120_FITUP_ASSEMBLY_CHECK,
-)
+from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
@@ -472,7 +470,7 @@ BOM_DESCRIPTIONS = {
     "dt-cylinder-gear": f"CYLINDER GEAR WITH CAM, {drum.TEETH}T",
     "vn-pedestal-hold-down-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A197",
     "vn-arbor-set-screw": "#4-40 X 1/4 SET SCREW, MCMASTER 91375A106",
-    "vn-foot-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
+    "vn-foot-screw": "#4-40 SPRING FOOT, MCMASTER 90280A108",
     "dt-cone-gear-shaft": "CONE GEAR SHAFT",
     "dt-cone-gear": "CONE GEAR, T006-T120 BY 6; 1 EACH",
     "dt-crank-drive-gear": f"CRANK DRIVE GEAR, {gear64.TEETH}T",
@@ -486,7 +484,7 @@ BOM_DESCRIPTIONS = {
     "vn-post-mount-screw": f"{post_screw.THREAD} FILLISTER SCREW, MSC {post_screw.SKU}",
     "vn-cone-lock-knob": f"{lock_knob.THREAD} THUMB SCREW, MCMASTER 93585A190",
     "vn-cone-pivot-screw": f"{pivot_screw.THREAD} SHOULDER SCREW, MCMASTER 91829A560",
-    "vn-swing-stop-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
+    "vn-swing-stop-screw": "#4-40 SWING STOP, MCMASTER 90280A108",
     "dt-crankshaft": "CRANKSHAFT",
     "dt-crank-pinion": f"CRANK PINION, {pinion.TEETH}T",
     "dt-crank-pinion-pin": "CRANK PINION RETENTION PIN",
@@ -820,7 +818,14 @@ CONE_CRANK_STEPS = _note_text(
         "   THE MHA-DT-005 CRANK BORE; SLIDE MHA-DT-010 ON UNPINNED, TOOTH IN GAP",
         "   WITH MHA-DT-007. HOLD THE MHA-DT-011 COLLAR HARD ON THE BOSS SOUTH FACE;",
         f"   SET MHA-DT-010 {PINION_SEAT_FEELER:.2f} OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER.",
-        T120_FITUP_ASSEMBLY_CHECK + " THEN",
+        f"   PUSH {pinion.T120_FITUP_PUSHED[0]} AND {pinion.T120_FITUP_PUSHED[1]} TOWARD EACH OTHER;",
+        "   TURN MHA-DT-007 SLOWLY BY HAND, READING A",
+        f"   {pinion.T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND. MHA-DT-010 BAND TO T120 TIPS:",
+        "   IF THE FEELER STOPS, TURN THE MHA-DT-010 BAND DOWN,",
+        f"   Ø{pinion.TURNED_DIA_FITUP_MIN:.{pinion.TURNED_DIA_PLACES}f} MIN.",
+        "   MHA-DT-010 SHOULDER TO T120 SOUTH FACE: IF THE FEELER STOPS,",
+        "   FACE THE MHA-DT-010 SHOULDER BACK,",
+        f"   {pinion.SHOULDER_LENGTH_FITUP_MIN:.{pinion.SHOULDER_LENGTH_PLACES}f} MIN. RESET, RECHECK. THEN",
         "   TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
         "   THE PARTS AND BORE SPACING). THEN MATCH-DRILL THROUGH THE MHA-DT-010",
         "   BOSS AT ITS MID-LENGTH INTO MHA-DT-011; "
@@ -2722,6 +2727,7 @@ def _reference_iso(
 ) -> Any:
     """A small collapsed isometric: every sheet needs a view for its title block."""
     view = place_view(adapter, str(SOURCE), "*Isometric", *center, scale=REFERENCE_ISO_SCALE)
+    set_hidden_lines_removed(adapter, view)
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     _configure_view(adapter, view, exploded=False, label=label)
     _caption_under(adapter, view, caption, label=f"{label} caption")
@@ -2736,7 +2742,7 @@ def _place_assembled_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ASSEMBLED_ISO_CENTER, scale=ASSEMBLED_ISO_SCALE
     )
-    for view in (front, top, right):
+    for view in (front, top, right, iso):
         set_hidden_lines_removed(adapter, view)
     set_high_quality_shaded_with_edges(adapter, iso, label="drive-train assembled isometric")
     # Every 1:3 view prints the teeth/thread-free configuration; the last
@@ -2814,6 +2820,7 @@ def _place_bom_view(adapter: Any) -> Any:
     view = place_view(
         adapter, str(SOURCE), "*Isometric", *BOM_REFERENCE_ISO_CENTER, scale=REFERENCE_ISO_SCALE
     )
+    set_hidden_lines_removed(adapter, view)
     set_high_quality_shaded_with_edges(adapter, view, label="BOM reference isometric")
     _configure_view(adapter, view, exploded=False, label="BOM reference isometric")
     violations = bom_reference_iso_violations(_view_outline(view))
@@ -2857,6 +2864,7 @@ def _place_cluster_view(adapter: Any, cluster: Cluster) -> Any:
     view = place_view(
         adapter, str(SOURCE), "*Isometric", *CLUSTER_VIEW_CENTER, scale=CLUSTER_SCALES[cluster]
     )
+    set_hidden_lines_removed(adapter, view)
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     _configure_view(adapter, view, exploded=False, label=label)
     return view
