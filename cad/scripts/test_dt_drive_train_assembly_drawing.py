@@ -395,6 +395,44 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     assert "RETURN IT TO THE MHA-VN-015" not in check
 
 
+def test_cone_swing_shims_hold_the_step_9_bands_and_check_7_resets_the_rig() -> None:
+    """#1691 review r4: the shims move the pedestals after step 9 set them
+    and after the north bracket and the rig were set from them.  Check 4
+    bounds that move to the step 9 bands, read against the X recorded at 9A
+    and 9C, names the steps that stand, and check 7 re-sets the rig."""
+    import dt_drive_train_steps as steps
+
+    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    order = [
+        check.index("ZERO AN INDICATOR ON EACH MHA-DT-002 IN X"),
+        check.index("(MHA-VN-032) TO SNUG-LOOSE"),
+        check.index("TIGHTEN MHA-VN-032"),
+        check.index(
+            f"RECORDED X (STEP 9A, 9C) PLUS ITS X READING IS {drawing.BANK_X_LIMITS}"
+        ),
+        check.index("BRING IT BACK WITHIN THOSE LIMITS ON ITS INDICATORS AND TIGHTEN"),
+        check.index("SWING OUT AND REMOVE THE SHIMS"),
+    ]
+    assert order == sorted(order), check
+    assert (
+        f"STEPS {steps.step_number(drawing.NORTH_BRACKET_SET_KEY)} AND "
+        f"{steps.step_number('rig-located')}-{steps.step_number('rig-seats-transferred')}"
+        " STAND; CHECK 7 RE-PROVES THE RIG"
+    ) in check
+    assert "BACK THE SWING OFF" not in check
+    bank = _flat(drawing.BANK_STEPS)
+    assert bank.count("RECHECK AND RECORD X") == 2
+    assert "MHA-DT-013 BAR" not in bank
+    located = steps.step_number("rig-located")
+    check7 = _flat(drawing.CHECKS.split("\n7. ")[1])
+    assert (
+        "IF A STATION IS OUT, EASE THE MHA-VN-019 SCREWS, RE-SET THE RIG ON THE "
+        f"FEELER AT BOTH STATIONS AS STEP {located}, TIGHTEN THEM AND RECHECK."
+    ) in check7
+    check5 = _flat(drawing.CHECKS.split("\n5. ")[1].split("\n6. ")[0])
+    assert check5.endswith("TIGHTEN MHA-VN-013: THE CHECK 4 SETTING.")
+
+
 def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> None:
     """The supplied thread class does not prove the assembled stop's engagement."""
     import vn_swing_stop_screw_spec as stop_screw
