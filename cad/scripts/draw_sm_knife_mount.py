@@ -1279,6 +1279,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=pin_frame_rim,
         frame_xy=PIN_FRAME_XY,
         characteristic="position",
+        # machinist-exception: RV-01
         tolerance=GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"],
         datums=("A",),
         diameter=True,
@@ -1314,6 +1315,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_CENTER[0], _front_y(BORE_CY) + R_BORE * SHEET_SCALE[0] / 1000.0),
         frame_xy=BORE_FRAME_XY,
         characteristic="position",
+        # machinist-exception: RV-01
         tolerance=GEOMETRIC_TOLERANCES_MM["knife-bore position"],
         datums=("A", "B"),
         diameter=True,
@@ -1351,6 +1353,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=_tap_lower_rim(adapter, top, TAP_FRAME_RIM_SIDE),
         frame_xy=TAP_FRAME_XY,
         characteristic="position",
+        # machinist-exception: RV-01
         tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"],
         datums=("A", "B"),
         diameter=True,

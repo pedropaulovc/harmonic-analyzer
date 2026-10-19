@@ -77,11 +77,11 @@ counterbore at its +0.10 and the clearance at the drilled +0.1.
 ``WALLS_MM`` holds the nominal values, ``WORST_WALLS`` the worst. The binding
 wall is the M3 taps' to the spigot counterbore: the nut's bolt circle fixes
 it under the floor, only within the counterbore's depth, where the flange
-clamps. The owner accepted it (``RULE_17_FLOOR_EXCEPTIONS``; the part YAML's
-machinist exception RV-01, 2026-10-17), and the seat callout states it (rule
-20). Below the counterbore, the M3 taps' wall to the clearance is also
-stated (rule 20), and so is each #8 tap's wall to its end face (1.54, in the
-#8 callout; RV-02).
+clamps. The owner accepted it (``RULE_17_FLOOR_EXCEPTIONS``; machinist
+exception RV-01 in ``draw_ch_rocker_arm_tl_oblique_nut_bracket.exceptions.yaml``,
+2026-10-17), and the seat callout states it (rule 20). Below the counterbore,
+the M3 taps' wall to the clearance is also stated (rule 20), and so is each
+#8 tap's wall to its end face (1.54, in the #8 callout; RV-02).
 
 UNVERIFIED: the nut's own tolerances (spigot Ø and length, hole positions),
 the M3x0.5 tap drill 2.5 (ASME B1.13M, not re-proved by a live Hole Wizard
@@ -393,8 +393,8 @@ WORST_WALLS: dict[str, float] = {
 }
 # The nut's own circle leaves the M3 taps under the floor to their spigot's
 # counterbore, only within its depth: inherent in the bought nut, accepted by
-# the owner (part YAML machinist exception RV-01, 2026-10-17). Every other
-# wall holds the floor.
+# the owner (draw_ch_rocker_arm_tl_oblique_nut_bracket.exceptions.yaml RV-01,
+# 2026-10-17). Every other wall holds the floor.
 RULE_17_FLOOR_EXCEPTIONS = frozenset({"M3 tap to nut-seat counterbore"})
 for _wall, _mm in WORST_WALLS.items():
     if _mm < WALL_FLOOR and _wall not in RULE_17_FLOOR_EXCEPTIONS:

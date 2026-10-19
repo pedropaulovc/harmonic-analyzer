@@ -1012,6 +1012,20 @@ SPRING_EAST_WEST = (
     "MHA-DT-019 AXIS, CREST BEARING ON THE PARKED BACK MHA-DT-014 FLANK"
 )
 
+# The cone set goes on last, into the pivot seat drilled at 9C; the stop and
+# lock seats are MHA-FR-001 print holes.  Check 4 then sets the swing and
+# clamps it with MHA-VN-013.
+# machinist-exception: DT-01 (MHA-VN-014 run into its blind base seat)
+CONE_SET_ON_BASE_STEP = (
+    "CONE SET ON THE BASE: OIL THE MHA-VN-014 SHOULDER. STAND MHA-DT-020 ON "
+    "MHA-FR-001 OVER THE STEP 9C PIVOT SEAT; RUN MHA-VN-014 DOWN THROUGH ITS "
+    "PIVOT BORE, SHOULDER SEATED HARD ON THE BASE; MHA-DT-020 SWINGS FREELY "
+    "UNDER THE HEAD. RUN MHA-VN-015 INTO ITS TAPPED MHA-FR-001 SEAT (HOLE TABLE), "
+    "HEAD SEATED. SWING THE CONE SET IN; RUN MHA-VN-013 THROUGH THE MHA-DT-020 "
+    "NOTCH INTO ITS TAPPED MHA-FR-001 SEAT (HOLE TABLE), FINGER-LOOSE. CHECK 4 "
+    f"(SHEET {CHECKS_SHEET}) SETS THE SWING."
+)
+
 
 def _numbered_step(key: str, text: str) -> str:
     """Print a complete step with its registry head and retained sublist depth."""
@@ -1082,24 +1096,41 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             f"MHA-DT-016 AT PARK, EACH CAM ECCENTRIC DOWN;\n{_COLLAR_SET_STEP}",
         ),
         ("lever-pin-set", _LEVER_PIN_STEP),
-        # The cone set goes on last, into the pivot seat drilled at 9C; the
-        # stop and lock seats are MHA-FR-001 print holes.  Check 4 then sets
-        # the swing and clamps it with MHA-VN-013.
-        (
-            "other-base-mounting",
-            "CONE SET ON THE BASE: OIL THE MHA-VN-014 SHOULDER. STAND MHA-DT-020 ON "
-            "MHA-FR-001 OVER THE STEP 9C PIVOT SEAT; RUN MHA-VN-014 DOWN THROUGH ITS "
-            "PIVOT BORE, SHOULDER SEATED HARD ON THE BASE; MHA-DT-020 SWINGS FREELY "
-            "UNDER THE HEAD. RUN MHA-VN-015 INTO ITS TAPPED MHA-FR-001 SEAT (HOLE TABLE), "
-            "HEAD SEATED. SWING THE CONE SET IN; RUN MHA-VN-013 THROUGH THE MHA-DT-020 "
-            "NOTCH INTO ITS TAPPED MHA-FR-001 SEAT (HOLE TABLE), FINGER-LOOSE. CHECK 4 "
-            f"(SHEET {CHECKS_SHEET}) SETS THE SWING.",
-        ),
+        ("other-base-mounting", CONE_SET_ON_BASE_STEP),
     )
     return "\n".join(
         (RIG_SEQUENCE_HEADING, *(_numbered_step(key, text) for key, text in numbered))
     )
 
+
+# MHA-VN-015 is the DISENGAGED stop (build_cone_swing_platform
+# swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
+# it. The engaged mesh is SET here with MHA-VN-013, not by the stop:
+# cone_set_stack (user ruling 2026-10-10). The shims line MHA-DT-013
+# up with the cone line before the pedestals tighten (Main ruling:
+# pedestal term booked at zero), then T120 is set on its feeler.
+# machinist-exception: DT-01 (MHA-VN-014 engagement and seat verified)
+CONE_SWING_SET_CHECK = (
+    "4. CONE SWING SET (P1): LOOSEN MHA-VN-013; SWING THE CONE SET ON MHA-VN-014",
+    "   TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. EASE THE MHA-DT-002",
+    "   SCREWS (MHA-VN-032) TO SNUG-LOOSE. SWING IN ON RADIAL SHIMS, TIP TO",
+    f"   MHA-DT-012 ROOT: {set_stack.feeler_gap_mm(12):.2f} AT T012, "
+    f"{set_stack.feeler_gap_mm(120):.2f} AT T120; TIGHTEN MHA-VN-032. SWING OUT AND",
+    "   REMOVE THE SHIMS. SWING IN UNTIL A "
+    f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT; HOLD",
+    "   IT THERE AND TIGHTEN MHA-VN-013. DO NOT LOOSEN MHA-DT-002 AFTER",
+    "   THIS SET; IF YOU DO, REDO BOTH STEPS.",
+    # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
+    # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).
+    "   IF T012 BINDS AFTER THE SET (WORST-CORNER OVERLAP "
+    f"{-mesh_checks.cone_check(12).interference_margin_worst_mm:.2f} REF), BACK",
+    "   THE SWING OFF OR STONE THE T012 TIP.",
+    "   VERIFY MHA-VN-014 FULL-FORM THREAD ENGAGEMENT "
+    f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}; SHOULDER FULLY SEATED.",
+    "   VERIFY MHA-VN-015 FULL-FORM THREAD ENGAGEMENT "
+    f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT};",
+    "   HEAD FULLY SEATED; MHA-DT-020 REMAINS SEATED THROUGH P1.",
+)
 
 CHECKS = _note_text(
     (
@@ -1117,31 +1148,7 @@ CHECKS = _note_text(
         # ring overhangs its cam; the fitter proves the spring holds.
         "   PUSH GEAR 0 TOWARD THE FRONT BY HAND AND RELEASE; THE BANK SPRINGS",
         "   BACK ONTO THE BACK MHA-DT-026.",
-        # MHA-VN-015 is the DISENGAGED stop (build_cone_swing_platform
-        # swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
-        # it. The engaged mesh is SET here with MHA-VN-013, not by the stop:
-        # cone_set_stack (user ruling 2026-10-10). The shims line MHA-DT-013
-        # up with the cone line before the pedestals tighten (Main ruling:
-        # pedestal term booked at zero), then T120 is set on its feeler.
-        "4. CONE SWING SET (P1): LOOSEN MHA-VN-013; SWING THE CONE SET ON MHA-VN-014",
-        "   TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. EASE THE MHA-DT-002",
-        "   SCREWS (MHA-VN-032) TO SNUG-LOOSE. SWING IN ON RADIAL SHIMS, TIP TO",
-        f"   MHA-DT-012 ROOT: {set_stack.feeler_gap_mm(12):.2f} AT T012, "
-        f"{set_stack.feeler_gap_mm(120):.2f} AT T120; TIGHTEN MHA-VN-032. SWING OUT AND",
-        "   REMOVE THE SHIMS. SWING IN UNTIL A "
-        f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT; HOLD",
-        "   IT THERE AND TIGHTEN MHA-VN-013. DO NOT LOOSEN MHA-DT-002 AFTER",
-        "   THIS SET; IF YOU DO, REDO BOTH STEPS.",
-        # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
-        # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).
-        "   IF T012 BINDS AFTER THE SET (WORST-CORNER OVERLAP "
-        f"{-mesh_checks.cone_check(12).interference_margin_worst_mm:.2f} REF), BACK",
-        "   THE SWING OFF OR STONE THE T012 TIP.",
-        "   VERIFY MHA-VN-014 FULL-FORM THREAD ENGAGEMENT "
-        f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}; SHOULDER FULLY SEATED.",
-        "   VERIFY MHA-VN-015 FULL-FORM THREAD ENGAGEMENT "
-        f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT};",
-        "   HEAD FULLY SEATED; MHA-DT-020 REMAINS SEATED THROUGH P1.",
+        *CONE_SWING_SET_CHECK,
         "5. ZEROING (P2), CONE SET SWUNG CLEAR: TURN EACH MHA-DT-012 BY HAND",
         "   UNTIL ITS NOTCH LINES UP. TURN MHA-DT-016 TO ENGAGE MHA-DT-001; TURN",
         "   MHA-DT-001 BY MHA-DT-015 UNTIL ALL NOTCHES POINT UP (COSINES) OR 90 DEG",

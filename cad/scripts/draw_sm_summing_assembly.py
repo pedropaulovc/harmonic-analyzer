@@ -249,6 +249,7 @@ def _wrapped(lines: tuple[str, ...], *, width: int) -> str:
 
 ASSEMBLED_NOTES = _wrapped(notes.ASSEMBLED_NOTES, width=NOTES_WIDTH)
 # Steps and checks share one note so the checks can never overlap the steps.
+# machinist-exception: SM-01 (notes.UPPER_EYE_CLAMP_STEP, notes.UPPER_EYE_CLAMP_CHECK)
 STEPS_AND_CHECKS = "\n".join(
     (
         "ASSEMBLY SEQUENCE",

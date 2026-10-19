@@ -544,6 +544,7 @@ def _apply_callouts(adapter: Any, annotations: list[Any], *, label: str) -> None
     present = {dimension_name(adapter, annotation) for annotation in annotations}
     for location, callouts in (
         ("above", DIMENSION_CALLOUTS_ABOVE),
+        # machinist-exception: RV-03, RV-04 (AnchorOuterDia, EdgeRibFrontEndStep)
         ("below", DIMENSION_CALLOUTS_BELOW),
     ):
         wanted = {name: text for name, text in callouts.items() if name in present}
@@ -1509,6 +1510,7 @@ VIEW_G_ARROW = (
 FRONT_VIEW_NOTE_XY = (0.258, 0.2120)
 
 
+# machinist-exception: RV-02 (inside corners: no code anchor until #1625)
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1959,6 +1961,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=_top_xy(HOLE_X - rim_step, -HOLE_Z_FIRST + rim_step),
         frame_xy=(0.2133, 0.199),
         characteristic="position",
+        # machinist-exception: RV-01
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
         datums=("A", "B"),
         diameter=True,

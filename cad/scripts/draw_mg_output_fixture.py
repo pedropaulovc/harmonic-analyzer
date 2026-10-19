@@ -346,10 +346,19 @@ SPIGOT_LENGTH_LOWER_ARC_GAP = 0.003
 SHOULDER_CORNER_TOL = 0.003
 # The rebuilt arrow on the arc, against the projected arc centre.
 SHOULDER_ARC_SLOP = 0.0001
+# The row under the side view the owner ruled on (2026-10-17, review r4):
+# the bore's two stations, free end to bore and bore to spigot face, and the
+# overall REF outermost under them.  The review exception anchors on these
+# names (draw_mg_output_fixture.exceptions.yaml); each must be a printed
+# turned-profile dimension.
+UNDER_VIEW_DIMENSIONS = {"TurnedProfile": ("RodStation", "BoreStation", "OverallLength")}
+if not set(UNDER_VIEW_DIMENSIONS["TurnedProfile"]) <= DRAWING_DIMENSIONS["TurnedProfile"]:
+    raise AssertionError("MHA-MG-006 under-view row names an unprinted dimension")
 SIDE_KEEP = {
     "RodBoreDia": (_HEX_MID_X, _SIDE_TOP + 0.011),
     "GrooveStation": (_side_x((GROOVE_X + SPIGOT_FACE_X) / 2.0), _GROOVE_STATION_TEXT_Y),
     "SpigotLength": (_side_x((SHOULDER_X + SPIGOT_FACE_X) / 2.0), _SPIGOT_ROW),
+    # machinist-exception: RV-01 (RodStation, BoreStation, OverallLength)
     "RodStation": (_side_x(FREE_END_X / 2.0), _UNDER_ROW),
     "BoreStation": (_side_x(SPIGOT_FACE_X / 2.0), _UNDER_ROW),
     "OverallLength": (_side_x(_AXIAL_MID), _UNDER_ROW - 0.012),

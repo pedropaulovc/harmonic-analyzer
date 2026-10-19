@@ -80,6 +80,7 @@ FRONT_KEEP = {
 # #6-32 tap drill so the cut thread starts in the lever's tap, and its
 # maximum, at the steepest angle, is charged to the full threads the shank
 # keeps past the jam nut.  The callout names both mates.
+# machinist-exception: RV-01 (ChamferWidth, CHAMFER_CALLOUT)
 CHAMFER_CALLOUT = {
     "ChamferWidth": (
         "MIN: CUT END STARTS IN MHA-SM-003 TAP\nMAX: KEEPS FULL THREAD PAST MHA-CH-014"

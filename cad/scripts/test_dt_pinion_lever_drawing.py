@@ -141,11 +141,14 @@ def test_notes_are_one_inside_corner_ceiling() -> None:
     assert dt_pinion_lever_spec.DRAWING_NOTES == "INSIDE CORNERS R1.0 MAX."
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    import _config
+    from machinist_exceptions import load_exceptions
 
-    (exception,) = _config.parts("dt-pinion-lever")["machinist_exceptions"]
-    assert exception["id"] == "RV-01"
-    assert "#1625" in exception["reason"]
+    (exception,) = load_exceptions("dt_pinion_lever")
+    assert exception.id == "RV-01"
+    assert "#1625" in exception.reason
+    assert [str(anchor) for anchor in exception.anchors] == [
+        "note:dt_pinion_lever_spec.DRAWING_NOTES"
+    ]
 
 
 def test_sheet_runs_at_1_to_1_with_a_3_to_1_detail_of_section_a_a() -> None:

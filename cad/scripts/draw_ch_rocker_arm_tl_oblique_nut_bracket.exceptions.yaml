@@ -1,0 +1,17 @@
+# Owner-accepted machinist-review exceptions for draw_ch_rocker_arm_tl_oblique_nut_bracket.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_ch_rocker_arm_tl_oblique_nut_bracket.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "minor"
+  anchor: "note:ch_rocker_arm_tl_oblique_nut_bracket_spec.NUT_SEAT_MATE_CALLOUT"
+  finding: "wall from the M3 taps to the spigot counterbore 0.92 min, under the 1.5 floor (rule 17)"
+  reason: "the bought nut's Ø16.0 bolt circle fixes it; the thin zone lies only within the 2.10 counterbore depth, clamped by the nut flange; below it the wall to the screw clearance is 1.77 min (owner ruling 2026-10-17)"
+- id: "RV-02"
+  kind: "minor"
+  anchor:
+    - "note:ch_rocker_arm_tl_oblique_nut_bracket_spec.BLOCK_TAP_PROCESS"
+    - "note:ch_rocker_arm_tl_oblique_nut_bracket_spec.BLOCK_TAP_WALL_CALLOUT"
+  finding: "wall from each #8-32 tap to its end face 1.54 min, under the 2.0 target (rule 17)"
+  reason: "the bracket is set centred on MHA-CH-006-TL-22's side screws (its centre 50.000 from TL-22's -X end, at three places: the title block's ±0.13), so each spotted tap stands mid-length; the 18.50 length cannot grow without moving the leadscrew line; the wall is stated on the #8 callout (owner ruling 2026-10-17, via coordinator, RockerV3 session)"

@@ -44,6 +44,43 @@ def test_every_config_yaml_is_a_declared_pipeline_input() -> None:
     assert set(CONFIG_YAMLS) <= declared
 
 
+def _key_paths(node: object, key: str, path: str = "") -> list[str]:
+    if isinstance(node, dict):
+        return [
+            found
+            for name, value in node.items()
+            for found in (
+                [f"{path}/{name}"]
+                if name == key
+                else _key_paths(value, key, f"{path}/{name}")
+            )
+        ]
+    if isinstance(node, list):
+        return [
+            found
+            for index, value in enumerate(node)
+            for found in _key_paths(value, key, f"{path}[{index}]")
+        ]
+    return []
+
+
+def test_no_config_yaml_declares_machinist_exceptions() -> None:
+    """Machinist-review exceptions live beside the drawing code
+    (``cad/scripts/draw_<name>.exceptions.yaml``); in a config YAML they would
+    re-key every part or assembly that reads the file for a review-only edit."""
+    offenders = [
+        f"{path.relative_to(CONFIG_DIR).as_posix()}:{found}"
+        for path in CONFIG_YAMLS
+        for found in _key_paths(
+            yaml.safe_load(path.read_text(encoding="utf-8")), "machinist_exceptions"
+        )
+    ]
+    assert not offenders, (
+        f"machinist_exceptions in cad/config (move them to draw_<name>.exceptions.yaml): "
+        f"{offenders}"
+    )
+
+
 def test_dimension_table_cells_remain_renderable_prose() -> None:
     doc = load_doc()
     table_rows = 0

@@ -1,0 +1,10 @@
+# Owner-accepted machinist-review exceptions for draw_fr_harmonic_base.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_fr_harmonic_base.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor: "note:draw_fr_harmonic_base.TRANSFER_NAMEPLATE_CALLOUT"
+  finding: "fit-up at assembly (rule 19)"
+  reason: "the #4 close holes in MHA-FR-004 float only 0.203 diametral over the #4-40 major, against about 3.7 demanded by the plate's .X hole stations and a .XX tap station here (2 x sqrt 2 x (0.8 + 0.51)); the four taps are spotted and tapped through the actual plate's holes at assembly, so that stack never forms (owner-accepted)"

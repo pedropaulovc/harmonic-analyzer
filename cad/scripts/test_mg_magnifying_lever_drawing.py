@@ -744,19 +744,27 @@ def test_machinist_exceptions_accept_the_owner_ruled_finishes() -> None:
     land's Ra 0.8 is the retention proof's smoothing input, declared as the
     MHA-MG-001 bore's is, with the proof's own numbers."""
     import mg_lever_press_fit_geom as press
-    from machinist_exceptions import load_exceptions
+    from machinist_exceptions import load_exceptions, render_anchor
     from _surface_finish import SEAT_UM
 
-    config_root = Path(part.__file__).resolve().parents[1] / "config"
-    entry, land = load_exceptions(config_root, "mg_magnifying_lever", "part")
-    assert (entry.id, entry.kind) == ("RV-01", "accept")
-    assert "Ra 3.2" in entry.where and "Ø6 body" in entry.where
+    spec = mg_magnifying_lever_spec
+    entry, land = load_exceptions("mg_magnifying_lever")
+    assert (entry.id, entry.kind.value) == ("RV-01", "accept")
+    # Each is anchored on the reason note printed at its symbol.
+    (seat_anchor,) = entry.anchors
+    assert render_anchor(seat_anchor, "mg_magnifying_lever") == (
+        f'note "{spec.SCREW_SEAT_CALLOUT}"'
+    )
+    assert surface_finish_by_key(spec.SURFACE_FINISHES, "clamp_screw_seat").roughness_um == 3.2
     assert "rule 6" in entry.finding and "rule 6" in entry.reason
     assert "owner ruling 2026-10-17" in entry.reason
     assert "MHA-MG-002" in entry.reason
-    assert (land.id, land.kind) == ("RV-02", "accept")
-    assert "Ra 0.8" in land.where and "press land" in land.where
-    assert " ".join(mg_magnifying_lever_spec.PRESS_LAND_CALLOUT.split()) in land.where
+    assert (land.id, land.kind.value) == ("RV-02", "accept")
+    (land_anchor,) = land.anchors
+    assert render_anchor(land_anchor, "mg_magnifying_lever") == (
+        f'note "{" / ".join(spec.PRESS_LAND_CALLOUT.splitlines())}"'
+    )
+    assert surface_finish_by_key(spec.SURFACE_FINISHES, "press_land").roughness_um == 0.8
     assert "rule 6" in land.finding
     assert land.reason.startswith("owner ruling #1570")
     assert land.reason.endswith("(owner-accepted)")

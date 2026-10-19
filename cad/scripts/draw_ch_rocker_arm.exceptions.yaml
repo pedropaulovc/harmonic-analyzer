@@ -1,0 +1,22 @@
+# Owner-accepted machinist-review exceptions for draw_ch_rocker_arm.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_ch_rocker_arm.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor: "frame:ch_rocker_arm_spec.GEOMETRIC_TOLERANCES_MM[rod-pin hole position]"
+  finding: "position frame over-specified on a channel part (rule 5)"
+  reason: "rod-pin coordinates set the connecting-rod lever length and angle; changing them changes the cam-to-rocker closure and neutral pose (owner-accepted channel-consistency control); datum C clocks the arm from the rod pin, which sets the arm's angle"
+- id: "RV-02"
+  kind: "accept"
+  anchor:
+    - "frame:draw_ch_rocker_arm.ARC_PROFILE_OUTSIDE_MM[TopRadius]"
+    - "frame:draw_ch_rocker_arm.ARC_PROFILE_OUTSIDE_MM[BottomRadius]"
+  finding: "surface-profile frames over-specified (rule 5)"
+  reason: "the R800 form sets the amplitude-bar foot sliding-contact locus closing the rocker-bar-lever chain, and the R816 arc, tapers and tip lands between J and K complete the concentric strap envelope filed to one scribed line; a radius size band cannot state the accepted form (owner-accepted)"
+- id: "RV-03"
+  kind: "minor"
+  anchor: "note:ch_rocker_arm_notes.HUB_WALL_NOTE"
+  finding: "bore-to-hub wall below the 2.0 mm target (rules 17, 20)"
+  reason: "1.53 MIN at the worst printed limits, above the unchanged 1.5 floor; the OD ceiling is set by the amplitude-bar foot cheeks at rest so the shared hub nominal stays unchanged (owner-ruled shortfall)"

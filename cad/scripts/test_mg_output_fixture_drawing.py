@@ -473,14 +473,16 @@ def test_the_overall_reference_is_an_accepted_exception_with_its_real_stack() ->
     # Owner ruling 2026-10-17 (review r4): the two-station bore location and
     # the (18.00) REF stay; a real overall would chain the free end's 5.30
     # from two .XX bands and thin the free-end wall under the floor.
-    import machinist_exceptions
+    from machinist_exceptions import load_exceptions, render_anchor
 
-    (exception,) = machinist_exceptions.load_exceptions(
-        SCRIPTS.parent / "config", "mg_output_fixture", "part"
-    )
-    assert exception.id == "RV-01" and exception.kind == "accept"
-    for text in ("5.30", "12.70", "(18.00)"):
-        assert text in exception.where, text
+    (exception,) = load_exceptions("mg_output_fixture")
+    assert exception.id == "RV-01" and exception.kind.value == "accept"
+    # Anchored on the three model dimensions on the row under the side view:
+    # the stations 5.30 and 12.70 from the bore and the overall (18.00) REF.
+    assert [render_anchor(anchor, "mg_output_fixture") for anchor in exception.anchors] == [
+        f"model dimension {name} (TurnedProfile)"
+        for name in ("RodStation", "BoreStation", "OverallLength")
+    ]
     assert "rule 10" in exception.finding and "rule 11" in exception.finding
     stacked = 5.30 - 2 * 0.51 - spec.ROD_BORE_R_MAX - spec.BORE_WANDER
     assert stacked == pytest.approx(1.496, abs=5e-4) and stacked < 1.5

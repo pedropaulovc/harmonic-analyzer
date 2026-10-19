@@ -308,6 +308,7 @@ PARENT_LETTER_XY = (F_X - 0.0057, SIDE_CENTER[1] - HALF_OD - 0.0025)
 # attaches to the model FACE its spec control names, resolved on the
 # referenced part, at this landing, in the view CONTROL_VIEWS names.
 CONTROL_ATTACHMENTS = {
+    # machinist-exception: RV-02
     "core_total_runout": (CORE_RUNOUT_LANDING, CORE_RUNOUT_FRAME),
     "front_neck_total_runout": (NECK_RUNOUT_LANDING, NECK_RUNOUT_FRAME),
 }
@@ -688,6 +689,7 @@ async def build(adapter: Any) -> dict[str, str]:
             entity_type="FACE",
             label=control.key,
         )
+    # machinist-exception: RV-01
     add_toothspace_callout(
         adapter, front, profile=STOCK_PROFILE,
         actual_pin_diameter_mm=TOOTH_SPACE_GAUGE_PIN_DIA_MM,

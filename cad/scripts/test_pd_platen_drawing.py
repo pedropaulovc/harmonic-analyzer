@@ -16,7 +16,7 @@ from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _hole_spec import blind_cut_dia_mm
 from _holes import SharedCoordinate
 from _printed_tolerance import printed_band_mm
-from machinist_exceptions import load_exceptions
+from machinist_exceptions import load_exceptions, render_anchor
 from vn_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
 # ASME B landscape field and title block (sheet metres).
@@ -200,24 +200,26 @@ def test_counterbore_floor_holds_the_user_accepted_worst_case():
 def test_owner_rulings_are_declared_against_the_printed_text():
     # The sockets' .XXX stations match the clip's (owner ruling 2026-10-15,
     # option A) and the thin counterbore floor is the user's 2026-10-14
-    # shortfall; each declaration quotes what the sheet prints.
-    entries = {
-        entry.id: entry
-        for entry in load_exceptions(CAD_SCRIPTS.parent / "config", "pd_platen", "part")
-    }
-    assert {name: entry.kind for name, entry in entries.items()} == {
+    # shortfall; each declaration anchors what the sheet prints.
+    entries = {entry.id: entry for entry in load_exceptions("pd_platen")}
+    assert {name: entry.kind.value for name, entry in entries.items()} == {
         "RV-01": "accept",
         "RV-02": "minor",
     }
+
+    def rendered(id_: str) -> str:
+        return "; ".join(render_anchor(a, "pd_platen") for a in entries[id_].anchors)
+
     sockets = entries["RV-01"]
     assert sockets.reason.endswith("(owner-accepted)")
-    assert draw.SOCKET_CALLOUT_PROCESS.splitlines()[0] in sockets.where
-    for value in sorted({c for xy in spec.SOCKET_XY for c in xy}):
-        assert f"2X {value:.{spec.POSITION_PLACES}f}" in sockets.where, value
+    assert draw.SOCKET_CALLOUT_PROCESS.replace("\n", " / ") in rendered("RV-01")
+    assert {f"dim:{name}@Sockets" for name in spec.DRAWING_DIMENSIONS["Sockets"]} <= {
+        str(anchor) for anchor in sockets.anchors
+    }
     floor = entries["RV-02"]
     assert floor.reason.endswith("(owner-ruled shortfall)")
-    assert spec.CBORE_FLOOR_CALLOUT.replace("\n", " ") in floor.where
-    assert f"({spec.CBORE_FLOOR:.2f})" in floor.where
+    assert spec.CBORE_FLOOR_CALLOUT.replace("\n", " / ") in rendered("RV-02")
+    assert "dim:CboreFloor@CboreFloorReference" in {str(a) for a in floor.anchors}
 
 
 def test_one_centre_mark_per_hole_per_plan_view():

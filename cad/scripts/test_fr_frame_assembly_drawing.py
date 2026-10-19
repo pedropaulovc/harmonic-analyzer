@@ -604,22 +604,26 @@ def test_step_9_sets_the_nameplate_then_spots_its_base_seats_through_it() -> Non
 
 def test_step_9_spot_through_is_declared_on_the_assembly() -> None:
     """Owner ruling 2026-10-15 (#1468 option A): step 9's spot-through
-    fit-up is a kind-accept declaration in the frame contract, which the
-    review reads for this drawing. Its `where` quotes the printed step, and
-    its reason states the float and the loose-band demand the step absorbs."""
+    fit-up is a kind-accept declaration beside this drawing's script, which
+    the review reads. Its anchor is the printed step's own constant, and its
+    reason states the float and the loose-band demand the step absorbs."""
     import fr_nameplate_drawing_spec as plate
     from _assembly_contract import assembly_contract
     from _drawing_registry import DRAWINGS_BY_NAME
-    from _paths import CAD_ROOT
     from _printed_tolerance import printed_band_mm
-    from machinist_exceptions import load_exceptions
+    from machinist_exceptions import load_exceptions, render_anchor
 
     name = "fr_frame_assembly"
     assert DRAWINGS_BY_NAME[name].source_kind == "assembly"
-    (entry,) = load_exceptions(CAD_ROOT / "config", name, "assembly")
-    assert (entry.id, entry.kind) == ("RV-01", "accept")
+    (entry,) = load_exceptions(name)
+    assert (entry.id, entry.kind.value) == ("RV-01", "accept")
     assert entry.finding == "fit-up at assembly (rule 19)"
-    assert entry.where.endswith(_step(9))
+    (anchor,) = entry.anchors
+    assert str(anchor) == "note:draw_fr_frame_assembly.NAMEPLATE_TRANSFER_STEP"
+    assert _step_lines(9) == list(drawing.NAMEPLATE_TRANSFER_STEP)
+    assert render_anchor(anchor, name) == (
+        f'note "{" / ".join(line.strip() for line in _step_lines(9))}"'
+    )
     assert entry.reason.endswith("(owner-accepted)")
     # Without the spot-through, the plate's .X station and a .XX base tap,
     # each on both axes, demand far more diametral float than the screw has.
@@ -628,7 +632,7 @@ def test_step_9_spot_through_is_declared_on_the_assembly() -> None:
     assert float_mm < demand_mm
     assert f"{float_mm:.3f} diametral float" in entry.reason
     assert f"= {demand_mm:.3f})" in entry.reason
-    # The build reads the same file and ignores the declaration.
+    # The contract carries no review declarations.
     assert assembly_contract("fr-frame").number == "MHA-FR-000"
 
 

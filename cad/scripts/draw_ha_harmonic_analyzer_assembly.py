@@ -235,6 +235,7 @@ ASSEMBLED_NOTE = _wrapped(
     ),
     width=ASSEMBLED_NOTE_WIDTH,
 )
+# machinist-exception: RV-01 (notes._STEP_TEXT["summing-levelled"])
 STEPS_LEFT = _wrapped(
     notes.ASSEMBLY_STEPS[:STEPS_SPLIT],
     width=STEPS_LINE_WIDTH,

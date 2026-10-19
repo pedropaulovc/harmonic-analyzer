@@ -486,6 +486,7 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
     return "\n".join(out)
 
 
+# machinist-exception: RV-01 (notes.STEP_TEXT["fixture-set"])
 ASSEMBLY_STEPS = _wrapped(
     notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )

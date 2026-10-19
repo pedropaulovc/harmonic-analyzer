@@ -238,12 +238,19 @@ def test_nut_thread_interference_literal_matches_the_specs():
 
 def test_chamfer_band_is_owner_accepted_with_both_functional_limits():
     """Machinist gate 2026-10-17 read the 0.46 ±0.05 deburr as over-spec."""
-    from machinist_exceptions import load_exceptions
+    from machinist_exceptions import load_exceptions, render_anchor
 
-    (entry,) = load_exceptions(_config.CONFIG_DIR, "vn_spring_hook", "part")
-    assert entry.kind == "accept"
-    band = f"{spec.CHAMFER_WIDTH_MM:.2f} ±{spec.CHAMFER_WIDTH_TOLERANCE_MM:.2f}"
-    assert band in entry.where
+    (entry,) = load_exceptions("vn_spring_hook")
+    assert entry.kind.value == "accept"
+    # Anchored on the banded model dimension and its MIN/MAX callout.
+    rendered = [render_anchor(item, "vn_spring_hook") for item in entry.anchors]
+    assert rendered == [
+        "model dimension ChamferWidth (StockDeburrProfile)",
+        'note "MIN: CUT END STARTS IN MHA-SM-003 TAP'
+        ' / MAX: KEEPS FULL THREAD PAST MHA-CH-014"',
+    ]
+    assert "ChamferWidth" in spec.DRAWING_DIMENSIONS["StockDeburrProfile"]
+    assert spec.DIMENSION_TOLERANCE_TYPES["ChamferWidth"] == 4  # symmetric band
     assert entry.reason.startswith("owner ruling 2026-10-17")
     # The reason's numbers are the spec's: the tap-drill minimum and the
     # two-pitch past-nut floor.

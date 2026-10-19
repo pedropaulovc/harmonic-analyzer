@@ -1021,6 +1021,7 @@ async def build(adapter: Any) -> dict[str, str]:
         drawing_model,
         "seat-collar drive-pin holes",
     )
+    # machinist-exception: RV-02 (DRIVE_PIN_RIM_NOTE row)
     _set_callout_text(drive_pins, 4, DRIVE_PIN_CALLOUT, "seat-collar drive-pin holes")
     place_callout_clear(
         adapter,
@@ -1100,6 +1101,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crankshaft collar rear (post boss) face finish",
         char_height=0.0025,
     )
+    # machinist-exception: RV-01 (DRAWING_NOTES inside-corner ceiling)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     centres = add_note(adapter, CENTRES_NOTE, *CENTRES_NOTE_XY)
     if centres is None or str(centres.GetText() or "").replace("\r", "") != CENTRES_NOTE:

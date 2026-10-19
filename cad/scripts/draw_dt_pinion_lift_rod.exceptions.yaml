@@ -1,0 +1,12 @@
+# Owner-accepted machinist-review exceptions for draw_dt_pinion_lift_rod.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_dt_pinion_lift_rod.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "dim:RodBody@RodProfile"
+    - "dim:RodOverall@RodProfile"
+  finding: "the toleranced length stops at the edge-broken crown rim and reads like an overall that is not one, while the true overall is only a reference (rules 10 and 11)"
+  reason: "owner ruling, 2026-10-19: the rod's rim is set flush with the MHA-DT-018 back block's outer face, so the rig's worst fitted stacks (pinion_rig_layout lift_rod_seat_stack and lever_north_travel_stack) read the rim-to-flat-end length's .X band. Tolerancing the overall instead stacks the crown sagitta on it (-0.22/+0.37 under SR4.8 at .X on the Ø6.35 h band), and the lever throw plane's air to the torque shaft front end would fail by 0.33 (0.04 slack today). The body length stays the controlling size, and (199.5) stays the reference overall"

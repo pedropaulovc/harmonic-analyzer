@@ -17,8 +17,7 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_pivot_block as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
-from _paths import CAD_ROOT
-from machinist_exceptions import load_exceptions
+from machinist_exceptions import load_exceptions, render_anchor
 
 STEM = "ch_rocker_arm_tl_oblique_pivot_block"
 
@@ -341,15 +340,15 @@ def test_side_screw_walls_at_worst_case() -> None:
     assert side_hole["height_from"] == "bottom_face"
     # RV-05: the owner accepted the three-place counterbores that hold the
     # side walls under the target.
-    exceptions = {
-        e.id: e
-        for e in load_exceptions(
-            CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_pivot_block", "part"
-        )
-    }
+    exceptions = {e.id: e for e in load_exceptions(STEM)}
     accepted = exceptions["RV-05"]
-    assert accepted.kind == "accept"
-    assert "7.940" in accepted.where and "4.400" in accepted.where
+    assert accepted.kind.value == "accept"
+    # Anchored on the side callout's rows, which state the wall.
+    (anchor,) = accepted.anchors
+    assert render_anchor(anchor, STEM) == (
+        f'note "{" / ".join(spec.SIDE_CALLOUT_BELOW.splitlines())}"'
+    )
+    assert "7.940" in accepted.finding and "4.400" in accepted.finding
     for name in (
         "side counterbore to side counterbore",
         "side counterbore to carriage hole",

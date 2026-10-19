@@ -99,7 +99,7 @@ if not _stock_low <= _zone_low <= _zone_high <= _stock_high:
 # Owner ruling 2026-10-17: the clamp's thumb screw (MHA-VN-011) pinches the
 # lever wherever the operator sets the clamp, so the OD it bears on is a
 # static locating seat, Ra 3.2 (drawing-guidelines.md rule 6, SEAT_UM;
-# mg-magnifying-lever.yaml machinist_exceptions RV-01).  The screw stands on
+# draw_mg_magnifying_lever.exceptions.yaml RV-01).  The screw stands on
 # the clamp's hex axis, the block's centre along the rod, and the block slides
 # from flush with the west tip to against the collar face
 # (mg_magnifying_lever_geom.clamp_radius_band), so the screw's tip can bear

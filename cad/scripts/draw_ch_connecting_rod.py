@@ -608,12 +608,14 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=pin_fcf_rim,
         frame_xy=(0.222, 0.222),
         characteristic="position",
+        # machinist-exception: RV-01
         tolerance=GEOMETRIC_TOLERANCES_MM["rocker pin hole position"],
         datums=("A", "B"),
         diameter=True,
         label="rocker pin hole position",
     )
 
+    # machinist-exception: RV-02
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

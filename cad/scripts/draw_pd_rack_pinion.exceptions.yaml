@@ -1,0 +1,15 @@
+# Owner-accepted machinist-review exceptions for draw_pd_rack_pinion.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_pd_rack_pinion.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor: "frame:pd_rack_pinion_spec.GEOMETRIC_TOLERANCES_MM[disc rear face parallelism to front]"
+  finding: "parallelism frame over-specified (rule 5)"
+  reason: "the clamped disc rim wobble must stay inside the disc-to-platen air (owner-ruled disc-cluster control)"
+- id: "RV-02"
+  kind: "accept"
+  anchor: "note:pd_rack_pinion_spec.TOOTH_SPACE_CALLOUT"
+  finding: "runout callout over-specified (rule 5)"
+  reason: "tooth-space radial runout to the actual running bore, measured with a calibrated pin in each space, is the owner gear-tooth critical class; the assembled running datum is the feed pinion bore (owner-accepted)"

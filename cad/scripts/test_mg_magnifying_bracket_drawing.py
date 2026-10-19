@@ -378,15 +378,16 @@ def test_pressed_bore_ra_is_a_declared_owner_exception() -> None:
     0.8, so the package declares the symbol an accepted exception whose
     numbers are the press budget's own."""
     import mg_lever_press_fit_geom as press
-    from _paths import CAD_ROOT
-    from machinist_exceptions import load_exceptions
+    from machinist_exceptions import load_exceptions, render_anchor
 
-    (entry,) = load_exceptions(CAD_ROOT / "config", "mg_magnifying_bracket", "part")
-    assert (entry.id, entry.kind) == ("RV-01", "accept")
+    (entry,) = load_exceptions("mg_magnifying_bracket")
+    assert (entry.id, entry.kind.value) == ("RV-01", "accept")
     assert "rule 6" in entry.finding and "pressed bore" in entry.finding
-    first_row = mg_magnifying_bracket_spec.COLLAR_BORE_CALLOUT.splitlines()[0]
-    assert "Ra 0.8" in entry.where and first_row in entry.where
-    assert f"(Ø{press.COLLAR_BORE_DIA})" in entry.where
+    # Anchored on the bore's printed matched-fit callout beside the symbol.
+    (anchor,) = entry.anchors
+    rows = mg_magnifying_bracket_spec.COLLAR_BORE_CALLOUT.splitlines()
+    assert render_anchor(anchor, "mg_magnifying_bracket") == f'note "{" / ".join(rows)}"'
+    assert rows[0].startswith("REAM OR HONE THRU")
     assert entry.reason.startswith("owner ruling #1570 option A")
     assert entry.reason.endswith("(owner-accepted)")
     assert press.COLLAR_BORE_RA_UM == press.ROD_LAND_RA_UM == 0.8

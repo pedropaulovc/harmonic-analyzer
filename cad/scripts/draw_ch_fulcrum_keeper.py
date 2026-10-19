@@ -169,6 +169,7 @@ _PAIR_REAM_STEP = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
 DIMENSION_CALLOUTS = {
     "BoreDia": f"{BORE_PAIR_CALLOUT},\nPER {_PAIR_REAM_STEP}",
     "CrownRadius": f"{CROWN_ROUND_CALLOUT},\nPER {_PAIR_REAM_STEP}",
+    # machinist-exception: RV-01
     "BoreFromSide": BORE_CENTRE_CALLOUT,
 }
 # The three-place size states the function that holds it there (rule 4,
@@ -182,6 +183,7 @@ FRONT_CALLOUTS = {
     "SupplyHeight": SUPPLY_HEIGHT_CALLOUT,
 }
 TOP_CALLOUTS = {
+    # machinist-exception: RV-02
     "ScrewFromSide": FOOT_SCREW_SIDE_CALLOUT,
 }
 

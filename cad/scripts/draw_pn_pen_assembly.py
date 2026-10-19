@@ -441,9 +441,11 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
 
 
 SETTINGS_NOTE = _wrapped((notes.SETTINGS_NOTE,), width=SETTINGS_NOTE_WIDTH)
+# machinist-exception: RV-01 (notes.PEN_YAW_STEP)
 ASSEMBLY_STEPS = _wrapped(
     notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
+# machinist-exception: RV-01 (notes.YAW_HOLD_CHECK)
 ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
 
 Box = tuple[float, float, float, float]

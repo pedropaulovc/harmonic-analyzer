@@ -825,6 +825,7 @@ def _seat_gdt(adapter: Any, section_a: Any, on_a: Any) -> None:
         datum=part_spec.SEAT_DATUM,
         label="pivot block bottom seat datum A",
     )
+    # machinist-exception: RV-01
     add_feature_control_frame(
         adapter,
         section_a,
@@ -1056,7 +1057,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # The floor height lives on CboreFloorReference, a sketch the part saves
     # hidden: _drawing_hidden_sketches shows it while B-B is cut and curated.
     annotations += _cbore_floor_section(adapter, source_model, plan)
+    # machinist-exception: RV-03, RV-04 (CALLOUTS_ABOVE["CboreFloor"])
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    # machinist-exception: RV-02 (CALLOUTS_BELOW["TopBoreDepth"], ["BottomBoreDepth"])
     set_dimension_callouts(adapter, annotations, _hung_clear(CALLOUTS_BELOW))
     # Natively the bore's leader runs rim to rim through the centre and across
     # line A (jig-r2); one arrow on the near (left) rim keeps it short and
@@ -1087,6 +1090,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=SIDE_CALLOUT_XY,
         label="nut-bracket screw counterbores",
     )
+    # machinist-exception: RV-05
     _set_screw_hole_callout(
         side_callout, SIDE_CALLOUT_BELOW, reference=None, label="side screw holes"
     )

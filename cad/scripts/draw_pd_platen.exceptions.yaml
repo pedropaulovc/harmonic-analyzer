@@ -1,0 +1,22 @@
+# Owner-accepted machinist-review exceptions for draw_pd_platen.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_pd_platen.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "dim:Socket1X@Sockets"
+    - "dim:Socket3X@Sockets"
+    - "dim:Socket1Y@Sockets"
+    - "dim:Socket2Y@Sockets"
+    - "note:draw_pd_platen.SOCKET_CALLOUT_PROCESS"
+  finding: "three-place tap stations read as a tight band or over-specification (rules 3, 4)"
+  reason: "the clip screws are fixed in these taps and float only in the clip's #2 loose holes (0.76 min over the shank); that float holds the clip's and these taps' position zones (0.37 each, 0.74 together) only with both patterns at .XXX; transfer-drilling the clips from the platen was rejected so any clip fits any platen (owner-accepted)"
+- id: "RV-02"
+  kind: "minor"
+  anchor:
+    - "dim:CboreFloor@CboreFloorReference"
+    - "note:pd_platen_spec.CBORE_FLOOR_CALLOUT"
+  finding: "counterbore floor below the 1.5 mm wall floor (rule 17)"
+  reason: "0.67 MIN at the worst printed limits (0.93 nominal) under each #4 guide-screw head; the plate is brass and the screws are hand-tight, so the floor's shear ring under the head (about 7.7 mm^2) carries only that clamp, with the plate thickness and the sub-flush head recess unchanged (owner-ruled shortfall)"

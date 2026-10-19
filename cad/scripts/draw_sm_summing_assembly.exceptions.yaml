@@ -1,0 +1,12 @@
+# Owner-accepted machinist-review exceptions for draw_sm_summing_assembly.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_sm_summing_assembly.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "SM-01"
+  kind: "accept"
+  anchor:
+    - "note:sm_summing_assembly_sheet.UPPER_EYE_CLAMP_STEP"
+    - "note:sm_summing_assembly_sheet.UPPER_EYE_CLAMP_CHECK"
+  finding: "threaded joint under operating load without a lock (rule 23)"
+  reason: "owner ruling 2026-09-21: the upper eye is a static clamp, not a swivel. The head's preload clamps the loop to the plug face so it cannot rotate, the spring flexes in its coils below the clamp, and no operating torque reaches the screw axis, so the joint is a static clamp that needs no lock (joint_retention.py sm-summing/gooseneck-spring-screw, STATIC_CLAMP). Check 3 is the acceptance (owner-accepted)"

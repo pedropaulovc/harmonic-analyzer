@@ -156,6 +156,7 @@ HOLE_MATES = {
 TOP_CALLOUTS = {
     "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
     "PlateOffset": f"LOCATES {BAR_NUMBER} NOTCH;\nSETS GAP TO NEXT BAR",
+    # machinist-exception: RV-02
     "HubLength": f"{STATIONS} HUBS STACK;\nSETS STATION PITCH",
 }
 

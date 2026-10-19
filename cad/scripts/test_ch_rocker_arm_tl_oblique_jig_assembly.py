@@ -467,11 +467,17 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
     (set_rule,) = [
         e
         for e in machinist_exceptions.load_exceptions(
-            _config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
+            "ch_rocker_arm_tl_oblique_jig_assembly"
         )
         if e.id == "RV-02"
     ]
-    assert "CENTRE 50.000" in set_rule.where and "1.544" in set_rule.reason
+    # Anchored on the printed step's own constant.
+    (set_anchor,) = set_rule.anchors
+    assert steps["7C"] == spec.NUT_BRACKET_SET_STEP
+    assert "CENTRE 50.000" in machinist_exceptions.render_anchor(
+        set_anchor, "ch_rocker_arm_tl_oblique_jig_assembly"
+    )
+    assert "1.544" in set_rule.reason
     assert (
         "UNCLAMP THE NUT BRACKET, DRILL AND TAP ITS 2 SPOTS #8-32 PER "
         "MHA-CH-006-TL-29; THE BLOCK'S HOLES STAY PLAIN."
@@ -505,11 +511,16 @@ def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
     (lock_rule,) = [
         e
         for e in machinist_exceptions.load_exceptions(
-            _config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
+            "ch_rocker_arm_tl_oblique_jig_assembly"
         )
         if e.id == "RV-03"
     ]
-    assert "THREADLOCKER" in lock_rule.where and "2026-10-18" in lock_rule.reason
+    (lock_anchor,) = lock_rule.anchors
+    assert steps["8"] == spec.FEED_TIGHTEN_STEP
+    assert "THREADLOCKER" in machinist_exceptions.render_anchor(
+        lock_anchor, "ch_rocker_arm_tl_oblique_jig_assembly"
+    )
+    assert "2026-10-18" in lock_rule.reason
     # The limits are the parts' own fits: the HUB pin's p6 seat presses into
     # the H7, the dowel's m6 into the N7.
     assert hub_pin.HUB_HOLE_BAND == (0.018, 0.0)
@@ -1449,12 +1460,19 @@ def test_nut_flange_is_a_static_clamp() -> None:
     steps = " ".join(spec.ASSEMBLY_STEPS)
     assert "8. TIGHTEN THE NUT SCREWS TO 1.0 N·m, THE BLOCK SCREWS" in steps
     exceptions = machinist_exceptions.load_exceptions(
-        _config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
+        "ch_rocker_arm_tl_oblique_jig_assembly"
     )
     (static,) = [e for e in exceptions if "nut-flange" in e.finding]
-    assert static.kind == "accept"
+    assert static.kind.value == "accept"
+    # Anchored on the steps that fit the nut (7A) and torque its screws (8).
+    assert [str(anchor) for anchor in static.anchors] == [
+        "note:ch_rocker_arm_tl_oblique_jig_assembly_spec.NUT_FIT_STEP",
+        "note:ch_rocker_arm_tl_oblique_jig_assembly_spec.FEED_TIGHTEN_STEP",
+    ]
+    assert spec.NUT_FIT_STEP in spec.ASSEMBLY_STEPS
+    assert spec.FEED_TIGHTEN_STEP in spec.ASSEMBLY_STEPS
     for text in ("1.0 N·m", "0.87 N·m", "8.0 to 10.7 N·m", "1.67 kN", "7.0", "0.6"):
-        assert text in static.reason or text in static.where, text
+        assert text in static.reason, text
 
 
 def test_handwheel_set_screw_meets_the_leadscrew_flat() -> None:

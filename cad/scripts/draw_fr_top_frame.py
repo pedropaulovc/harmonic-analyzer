@@ -3175,6 +3175,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=hanger_center_landing_xy,
         frame_xy=HANGER_CENTER_FRAME_XY,
         characteristic="position",
+        # machinist-exception: RV-01
         tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"],
         datums=("D",), quantity=HANGER_CENTER_QUALIFIER,
         label="hanger axes on crossbar median plane",
@@ -3259,6 +3260,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The faced whole top (user rulings 2026-10-11/18): the part's own
     # linked note B, hung under the transfer callout it belongs with.
+    # machinist-exception: RV-03 (DRAWING_NOTES_B)
     add_property_linked_note(
         adapter,
         "Manufacturing Notes B",
@@ -3297,6 +3299,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # 70-character edge-break line ran 2.4 mm into the title block (farm
     # 30394c1da keep-out); its 67 characters now end near 200 mm, about 16
     # short of the block's left edge at 216.
+    # machinist-exception: RV-02, RV-04 (DRAWING_NOTES corner and edge rows)
     add_property_linked_note(
         adapter, "Manufacturing Notes", HOLE_STATION_NOTE_XY[0], 0.045, char_height=0.0035,
     )
@@ -3783,6 +3786,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to label underside locator")
     # The faced underside plane (user ruling 2026-10-12): the part's own
     # linked note C, beside the enlarged hub boss and gussets it excludes.
+    # machinist-exception: RV-03 (DRAWING_NOTES_C)
     add_property_linked_note(
         adapter,
         "Manufacturing Notes C",
@@ -3898,6 +3902,7 @@ async def build(adapter: Any) -> dict[str, str]:
             leader_attach_xy=hanger_slot_landing(end_centre, knee),
             frame_xy=HANGER_SLOT_FRAME_XY[station],
             characteristic="position",
+            # machinist-exception: RV-01
             tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"],
             datums=datums,
             translated=datums[1:],

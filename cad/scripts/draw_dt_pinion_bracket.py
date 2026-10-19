@@ -239,6 +239,7 @@ DIMENSION_CALLOUTS = {
     "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-023 CAM",
     # The station's band leaves the far-face wall under rule 17's 2.0 target.
     # Emits the fact declared by RV-01 (owner ruling (a)), from the spec.
+    # machinist-exception: RV-01 (PinSeatCz and PIN_SEAT_WALL_CALLOUT)
     "PinSeatCz": "CENTRES MHA-DT-025\nFOLLOWER IN BAR\n" + PIN_SEAT_WALL_CALLOUT,
 }
 

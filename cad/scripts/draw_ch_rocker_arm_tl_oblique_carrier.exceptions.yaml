@@ -1,0 +1,10 @@
+# Owner-accepted machinist-review exceptions for draw_ch_rocker_arm_tl_oblique_carrier.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_ch_rocker_arm_tl_oblique_carrier.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "minor"
+  anchor: "note:ch_rocker_arm_tl_oblique_carrier_spec.LEVER_TAP_CALLOUT"
+  finding: "engagement 9.53 min (1.20D) in the 12 plate, under 1.5D (rule 18)"
+  reason: "12 plate cannot hold 1.5D of 5/16-18 and the feed lever only takes hand load; the shortfall is stated in the tap callout (owner ruling 2026-10-17, via coordinator, RockerV3 session)"

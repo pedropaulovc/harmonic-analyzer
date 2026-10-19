@@ -556,6 +556,7 @@ _PLAN_FACES = tuple(
 # the front text clears the rear line by 3 mm).
 PLAN_KEEP = {
     asm.KEEPER_X_DIMENSION: (_PLAN_LUG[0] + 0.016, KEEPER_PLAN_SOCKET_Y + 0.017),
+    # machinist-exception: RV-01 (inner-face bands, rear and front)
     asm.KEEPER_REAR_Z_DIMENSION: (
         _PLAN_LUG[0] + 0.035,
         (KEEPER_PLAN_SOCKET_Y + _PLAN_FACES[1][1]) / 2.0,
@@ -943,6 +944,7 @@ def _fitup_notes() -> tuple[str, str]:
             "THEN, ON EACH BORE'S AXIS, FINISH THAT KEEPER'S CROWN AND CROWN "
             f"TAP TO THE {keeper} DRAWING."
         ),
+        # machinist-exception: RV-01 (what the inner-face bands hold)
         steps.KEEPERS_SET_KEY: (
             f"{top_frame} ON THE MILL: SHAFT THROUGH BOTH KEEPERS, FEET "
             "OUTBOARD ON THE RAIL. SET EACH LUG CENTRE OFF THE RAIL WEB CENTRE "

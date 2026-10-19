@@ -1882,6 +1882,7 @@ async def build(adapter: Any) -> dict[str, str]:
             # crossed HeadHt's and CrankBossDia's lines (leader-crosses-line,
             # af13).  A sheet-point pick sets the landing; explicit leader
             # placement detached a GTol from its edge (fulcrum 1149f227f).
+            # machinist-exception: RV-01
             "crank_bore_angularity": PmiDrawingPlacement(
                 view=front,
                 position=(0.124, _front_y(CRANK_BORE_HEIGHT) - 0.0037),
@@ -1906,6 +1907,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps the block at four lines (about 18 mm); the anchor keeps the
     # r7 clearance to the bottom inner border.
+    # machinist-exception: RV-02 (DRAWING_NOTES inside-corner row)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
     # Last of the notes: a view-owned note leaves its view active, and a
     # sheet note inserted after it joins that view (the notes block did, and

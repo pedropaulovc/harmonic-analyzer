@@ -6,9 +6,3 @@ sm-knife-mount:
   quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the 2X dowel-hole position frame, the bore squareness controls and the #10-24 hanger-tap position frame"
-      finding: "position and perpendicularity frames over-specified (rule 5)"
-      reason: "keeps the knife-edge dowel pattern and bore square consistent, and lets the crossbar clearance hole float round the bolt (owner-accepted knife-edge-system control)"

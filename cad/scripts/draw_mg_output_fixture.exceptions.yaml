@@ -1,0 +1,13 @@
+# Owner-accepted machinist-review exceptions for draw_mg_output_fixture.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_mg_output_fixture.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "dim:RodStation@TurnedProfile"
+    - "dim:BoreStation@TurnedProfile"
+    - "dim:OverallLength@TurnedProfile"
+  finding: "overall length is a reference only; the free end is located by a length chained from the cross-hole, not by a real overall (rule 10, dimension from a real feature; rule 11, turned parts read like the lathe)"
+  reason: "owner ruling 2026-10-17 (review r4): the rule 17 2.0 wall forbids a real overall at the title block's bands. With 18.00 and 12.70 both at .XX ±0.51, the free end's 5.30 stacks to ±1.02, and the free-end wall to the Ø5.2 bore (drilled +0.10/0, radius up to 2.65; drill run-off 0.134 at the exit corner) falls to 5.30 - 1.02 - 2.65 - 0.134 = 1.496, under the 2.0 target and the 1.5 floor. Chained, the 5.30 at ±0.51 holds 2.006. The bore is the part's datum (the rod and the thumb screw's reach both work off it), so both stations run from it."

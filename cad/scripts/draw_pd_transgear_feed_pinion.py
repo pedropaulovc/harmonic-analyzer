@@ -510,6 +510,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=STEP_FACE_EDGE,
         frame_xy=STEP_FRAME,
         characteristic="perpendicularity",
+        # machinist-exception: RV-01
         tolerance=GEOMETRIC_TOLERANCES_MM["step face perpendicularity to bore"],
         datums=(BORE_DATUM,),
         label="step face perpendicularity",
@@ -521,6 +522,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.0025
     )
+    # machinist-exception: RV-02
     toothspace_callout = add_toothspace_callout(
         adapter, rear, profile=STOCK_PROFILE,
         actual_pin_diameter_mm=TOOTHSPACE_GAUGE_DIA_MM,

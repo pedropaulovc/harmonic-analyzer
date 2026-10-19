@@ -350,7 +350,7 @@ def test_the_sheet_carries_only_the_inside_corner_note() -> None:
     upright root the old sheet spelled out in a note are now the crown
     radius, the tangency statement and the foot width the views already
     carry. The one note is the inside-corner ceiling (#1625 precedent)."""
-    import _config
+    from machinist_exceptions import load_exceptions
 
     assert dt_arbor_pedestal_spec.DRAWING_NOTES == "INSIDE CORNERS R1.0 MAX."
     builder = Path(part.__file__).read_text(encoding="utf-8")
@@ -359,9 +359,12 @@ def test_the_sheet_carries_only_the_inside_corner_note() -> None:
     for helper in ("add_note(", "add_attached_note("):
         assert helper not in source, helper
     assert source.count("add_property_linked_note(adapter,") == 1
-    exceptions = _config.parts("dt-arbor-pedestal")["machinist_exceptions"]
-    assert [entry["id"] for entry in exceptions] == ["RV-01"]
-    assert "#1625" in exceptions[0]["reason"]
+    (exception,) = load_exceptions("dt_arbor_pedestal")
+    assert exception.id == "RV-01"
+    assert [str(anchor) for anchor in exception.anchors] == [
+        "note:dt_arbor_pedestal_spec.DRAWING_NOTES"
+    ]
+    assert "#1625" in exception.reason
     # The only free text left is digit-free and tied to the dimension it
     # qualifies (a reaming instruction, a concentricity/tangency statement),
     # bar the part number that names a mate (rule 7).

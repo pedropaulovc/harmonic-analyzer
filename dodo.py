@@ -3192,13 +3192,9 @@ _MACHINIST_REVIEW_MODULES = (
 
 def _machinist_review_file_deps(stem: str) -> list[str]:
     spec = DRAWINGS_BY_NAME[stem]
-    dashed = stem.replace("_", "-")
-    if spec.source_kind == "part":
-        exceptions = CONFIG_DIR / "parts" / f"{dashed}.yaml"
-    else:
-        exceptions = (
-            CONFIG_DIR / "assemblies" / f"{dashed.removesuffix('-assembly')}.yaml"
-        )
+    # The owner-declared exceptions beside the draw script
+    # (machinist_exceptions.exceptions_path); most drawings declare none.
+    exceptions = SCRIPTS_DIR / f"draw_{stem}.exceptions.yaml"
     # Selecting only this kind's prompt also keys --kind without hashing the
     # registry. All shared reviewer/judge prompts and schemas are included.
     other_kind = "assembly" if spec.source_kind == "part" else "part"
@@ -3676,6 +3672,9 @@ def task_check():
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
         SCRIPTS_DIR / "test_machinist_review.py",
+        # Owner-declared review exceptions (draw_<name>.exceptions.yaml): schema,
+        # anchors resolve against the draw closure, ids pair with draw-script tags.
+        SCRIPTS_DIR / "test_machinist_exceptions.py",
         # Release-package prompt benchmarks: deterministic grading and workspace
         # contracts run offline, without reviewer/model or SolidWorks activity.
         SCRIPTS_DIR / "test_machinist_review_bench.py",
@@ -3717,6 +3716,9 @@ def task_check():
         # test_dt_cone_pivot_post_drawing reads the policy's GD&T allowlist;
         # allowlist edits must rerun its frame-ownership contract.
         SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
+        # The review's declared exceptions, read beside each draw script by
+        # test_machinist_exceptions and the per-drawing contracts.
+        *sorted(SCRIPTS_DIR.glob("draw_*.exceptions.yaml")),
     ]
     # test_adapter_feature_resolution exercises the vendored adapter, which
     # module_deps_of never walks (an installed package, see SUBMODULE_SRC). Its
@@ -3957,7 +3959,12 @@ def task_check():
                     {
                         "submodule_sources": [
                             _rel_tag(path) for path in adapter_contract_deps
-                        ]
+                        ],
+                        # A deleted declarations file must re-run its pairing check.
+                        "machinist_exceptions": [
+                            _rel_tag(str(path))
+                            for path in sorted(SCRIPTS_DIR.glob("draw_*.exceptions.yaml"))
+                        ],
                     }
                 )
             ],

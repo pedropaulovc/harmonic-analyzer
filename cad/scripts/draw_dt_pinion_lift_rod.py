@@ -107,6 +107,7 @@ ROD_FLANK_Y = RIGHT_CENTER[1] + ROD_DIA * SHEET_SCALE[0] / 2000.0
 # and the (overall) stack below it, the overall outermost (rule 10).
 RIGHT_KEEP = {
     "RodDia": (RIGHT_CENTER[0] - 0.005, ROD_FLANK_Y + 0.026),
+    # machinist-exception: RV-01 (body length controls, overall a reference)
     "RodBody": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.020),
     "RodOverall": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.032),
     "CapR": (RIGHT_CENTER[0] - HALF_SPAN - 0.012, RIGHT_CENTER[1] + 0.024),

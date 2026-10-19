@@ -154,8 +154,8 @@ def inputs(dodo, tmp_path, monkeypatch):
     config = root / "cad" / "config"
     (config / "parts").mkdir(parents=True)
     (config / "assemblies").mkdir()
-    exception = config / "parts" / "probe.yaml"
-    exception.write_text("probe: {}\n", encoding="utf-8")
+    exception = scripts / "draw_probe.exceptions.yaml"
+    exception.write_text("[]\n", encoding="utf-8")
     pdf = root / "cad" / "out" / "pdf" / "probe.pdf"
     pdf.parent.mkdir(parents=True)
     pdf.write_bytes(b"PDF fixture")
@@ -236,13 +236,19 @@ def test_review_keys_exclude_the_shared_recipe_skip_set(inputs, monkeypatch):
         assert dodo._cache_key(dodo._machinist_review_file_deps("probe")) == initial
 
 
-def test_assembly_exception_uses_bare_dashed_config_stem(inputs):
+def test_assembly_exception_is_the_file_beside_its_draw_script(inputs):
     dodo = inputs.module
     inputs.spec.source_kind = "assembly"
     dodo.DRAWINGS_BY_NAME["probe_assembly"] = inputs.spec
-    path = dodo.CONFIG_DIR / "assemblies" / "probe.yaml"
-    path.write_text("machinist_exceptions: []\n")
+    path = inputs.scripts / "draw_probe_assembly.exceptions.yaml"
+    path.write_text("[]\n")
     assert str(path.resolve()) in dodo._machinist_review_file_deps("probe_assembly")
+    # The config contract is no longer a review input.
+    config = dodo.CONFIG_DIR / "assemblies" / "probe.yaml"
+    config.write_text("probe: {}\n")
+    assert str(config.resolve()) not in dodo._machinist_review_file_deps(
+        "probe_assembly"
+    )
 
 
 def test_mode_and_input_set_changes_invalidate_doit_but_not_the_verdict_key(

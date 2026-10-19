@@ -1,0 +1,15 @@
+# Owner-accepted machinist-review exceptions for draw_sh_column_clamp_front.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_sh_column_clamp_front.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "minor"
+  anchor: "note:sh_column_clamp_front_spec.EAR_WALL_NOTE"
+  finding: "ear-to-bore wall below the 2.0 mm target (rules 17, 20)"
+  reason: "1.85 MIN (1.850) from the drilled ear holes to the bore, on the largest A513 DOM column (25.527) at the loosest 0.30 bore clearance with 0.3 deg drill wander, above the unchanged 1.5 floor; 2.0 needs a column under its own 25.4 nominal, and the ear stations are shared with MHA-SH-002's taps (owner-ruled shortfall)"
+- id: "RV-02"
+  kind: "minor"
+  anchor: "note:sh_column_clamp_front_spec.SCREW_LINE_NOTE"
+  finding: "ear-hole-to-tap screw-line stack not held by the loose bands at the worst case, no fit-up adjustment (rules 19, 20)"
+  reason: "the printed ear stations and heights alone spend 0.283 of the #8 screw's 0.407 radial clearance in the 4.98 MIN hole; 0.3 deg drill wander through both arcs (0.096 + 0.081) brings the worst offset to 0.460, 0.053 over (stated rounded up as 0.06); no slot, oversize or match-drill is added (owner-ruled shortfall)"

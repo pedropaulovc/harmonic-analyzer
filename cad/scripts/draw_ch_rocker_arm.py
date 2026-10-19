@@ -3912,6 +3912,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # geometry of the profile zone, not independent radius/height bands.
     front_annotations, taper_dimension, taper_entities, land_dimension, land_entities = _add_rocker_outline_dimensions(adapter, front)
     try:
+        # machinist-exception: RV-03
         notes = add_property_linked_note(
             adapter, "Manufacturing Notes", NOTES_LEFT, NOTES_CEILING
         )
@@ -4109,6 +4110,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=rod_position_landing,
         frame_xy=FCF_XY,
         characteristic="position",
+        # machinist-exception: RV-01
         tolerance=GEOMETRIC_TOLERANCES_MM["rod-pin hole position"],
         datums=tuple(ROD_HOLE.fields["position_datums"][0]),
         diameter=True,
@@ -4130,6 +4132,7 @@ async def build(adapter: Any) -> dict[str, str]:
     except Exception as exc:  # noqa: BLE001 - capture the frame/tag readback
         _capture_layout_failure(adapter, "R24 datum C on the rod-pin frame", exc)
         raise
+    # machinist-exception: RV-02
     arc_profiles = _add_arc_profiles(adapter, front)
     _add_view_arrow(adapter, front)
 
