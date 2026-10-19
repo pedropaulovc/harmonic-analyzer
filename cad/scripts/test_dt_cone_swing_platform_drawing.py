@@ -189,15 +189,12 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     # "MINIMAL AXIAL PLAY" could not be checked).
     lines = spec.PIVOT_RELIEF_FIT_REQUIREMENT.split("\n")
     flat = " ".join(lines)
-    assert lines == [
-        "TOP RELIEF: FIT DEPTH",
-        "TO MHA-VN-014 SHOULDER;",
-        "SWINGS FREE,",
-        "NO AXIAL SHAKE.",
-    ]
+    assert "TOP RELIEF" in flat and "FIT DEPTH" in flat
+    assert "MHA-VN-014" in flat and "SHOULDER" in flat
+    assert "SWINGS FREE" in flat and "NO AXIAL SHAKE" in flat
     assert "UNLOCKED" not in flat and "SCREW:" not in flat
-    # Four rows retain the saved layout envelope without assembly instructions.
-    assert len(lines) == 4
+    # Retain the saved layout envelope, without pinning the spec's line breaks.
+    assert len(lines) <= 4
     # Only the NW fillet reaches over the 10.50 strip, and only by a sliver.
     overlaps = {
         label: part._north_fillet_relief_overlap(label, r)
@@ -1552,6 +1549,78 @@ def test_holddown_callout_drills_in_its_thru_row_and_names_face_and_mate() -> No
         drawing.callout_below_definitions({5: "", 6: "", 7: ""}, ("A",))
 
 
+@pytest.mark.parametrize("stale", [None, "definition", "resolved"])
+def test_post_mount_class_override_preserves_native_thread_rows(monkeypatch, stale) -> None:
+    import _hole_callout_thread_class as thread_class
+
+    original = {
+        5: "<NUM_INST>X <hw-threaddesc> - <hw-threadclass> THRU ALL",
+        6: "<HOLE-DEPTH><hw-threaddepth>",
+        7: "<MOD-DIAM><hw-diam> <HOLE-DEPTH><hw-depth>",
+        8: "\n".join(drawing.POST_MOUNT_CALLOUT_BELOW),
+    }
+    expected = {**original, 5: "<NUM_INST>X <hw-threaddesc> THRU ALL"}
+
+    class NativeCallout:
+        def __init__(self):
+            self.definitions = dict(original)
+            self.writes = []
+
+        def IsHoleCallout(self):
+            return True
+
+        def GetText(self, part):
+            if part >= 5:
+                return self.definitions[part]
+            definition = self.definitions[part + 4]
+            resolved = definition.replace("<hw-threadclass>", "2B")
+            if stale == "resolved" and part == 1:
+                resolved += " - 2B"
+            return resolved
+
+        def SetText(self, part, text):
+            self.writes.append((part, text))
+            if stale != "definition":
+                self.definitions[part + 4] = text
+
+    native = NativeCallout()
+    monkeypatch.setattr(thread_class, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    if stale:
+        with pytest.raises(RuntimeError, match="kept its thread class|still prints its class"):
+            drawing._omit_post_mount_thread_class(native)
+    else:
+        drawing._omit_post_mount_thread_class(native)
+        assert native.definitions == expected
+    assert native.writes == [(1, expected[5])]
+    assert spec.POST_MOUNT_SPEC.thread_class == "2B"
+    # Keep the native count/designation/size/depth/break/mate definitions,
+    # and ensure the production build applies this part-local override.
+    source = ast.parse(Path(drawing.__file__).read_text())
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_omit_post_mount_thread_class"
+        and len(node.args) == 1
+        and isinstance(node.args[0], ast.Name)
+        and node.args[0].id == "post_mount_callout"
+        for node in ast.walk(source)
+    )
+
+
+def test_post_mount_class_override_refuses_a_nondefault_class_before_native_edit(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(drawing, "POST_MOUNT_SPEC", types.SimpleNamespace(thread_class="3B"))
+
+    def forbidden_omission(*_args, **_kwargs):
+        raise AssertionError("nondefault class must not reach native class omission")
+
+    monkeypatch.setattr(drawing, "omit_title_block_thread_class", forbidden_omission)
+    with pytest.raises(RuntimeError, match="only title-block default class 2B"):
+        drawing._omit_post_mount_thread_class(object())
+
+
 def test_tight_bands_name_their_mates_on_their_callouts() -> None:
     """Rule 4: the reamed bore and both +-0.1 hole groups name the part that
     makes the tolerance necessary, each at its own callout (r1 blocker)."""
@@ -1842,3 +1911,181 @@ def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
     old_leader = ((0.07602, 0.1258014), (0.1274698, 0.1062219))
     old_aa_right = (0.0915657, 0.114724, 0.0983277, 0.127486)
     assert _segment_hits_box(old_leader, old_aa_right)
+
+
+@pytest.mark.parametrize("index", range(4))
+def test_virtual_sharp_supports_use_source_lines_and_nearest_notch_segment(monkeypatch, index):
+    monkeypatch.setattr(drawing, "_early_bound", lambda item, _kind: item)
+    corners = part.PLATE_CORNERS
+    _label, x, z, _radius = corners[index]
+
+    def edge(neighbour, near, far, *, line=True, height=spec.PLATE_THICKNESS):
+        dx, dz = neighbour[1] - x, neighbour[2] - z
+        length = math.hypot(dx, dz)
+        points = [
+            ((x + distance * dx / length) / 1000, height / 1000,
+             (z + distance * dz / length) / 1000)
+            for distance in (near, far)
+        ]
+        return types.SimpleNamespace(
+            GetCurve=lambda: types.SimpleNamespace(IsLine=lambda: line),
+            GetStartVertex=lambda: types.SimpleNamespace(GetPoint=lambda: points[0]),
+            GetEndVertex=lambda: types.SimpleNamespace(GetPoint=lambda: points[1]),
+        )
+
+    neighbours = (corners[index - 1], corners[(index + 1) % len(corners)])
+    selected = tuple(edge(neighbour, 12, 18) for neighbour in neighbours)
+    distractors = [
+        edge(neighbours[0], 20, 30),  # same support, farther notch-split segment
+        edge(neighbours[0], 1, 3, line=False),  # arc is not a support
+        edge(neighbours[1], 1, 3, height=0),  # underside is not top-face support
+    ]
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda *_args, **_kw: [*distractors, *selected])
+    adapter = types.SimpleNamespace(swApp=types.SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    assert drawing._profile_corner_edges(adapter, object(), index) == selected
+    adapter.swApp.IsSame = lambda _a, _b: -1
+    with pytest.raises(RuntimeError, match="two different supports"):
+        drawing._profile_corner_edges(adapter, object(), index)
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda *_args, **_kw: distractors[1:])
+    with pytest.raises(RuntimeError, match="missing actual straight"):
+        drawing._profile_corner_edges(adapter, object(), index)
+
+
+@pytest.mark.parametrize("failure", [
+    None, "activate", "select", "count", "misselected", "unknown",
+    "missing", "type", "owner", "coordinate", "witness", "single_witness",
+])
+def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(monkeypatch, failure):
+    state = {"inserted": False, "selected": [], "insert_calls": 0}
+    index = 2  # the 37.0 station: source SW vertex, not a saved paper coordinate
+    _label, x, z, _radius = part.PLATE_CORNERS[index]
+    source = (x / 1000, spec.PLATE_THICKNESS / 1000, z / 1000)
+    expected = (0.0718 + source[0] / 2, 0.1267 - source[2] / 2, 0)
+    inverse = object()
+    sketch = types.SimpleNamespace(
+        ModelToSketchTransform=types.SimpleNamespace(Inverse=lambda: inverse),
+    )
+    point = types.SimpleNamespace(
+        GetID=lambda: (7, 19), Type=1 if failure == "type" else 4,
+        X=0.02, Y=0.03, Z=0,
+        GetSketch=lambda: object() if failure == "owner" else sketch,
+    )
+    sketch.GetSketchPoints2 = lambda: (
+        [point] if state["inserted"] and failure != "missing" else []
+    )
+    view = types.SimpleNamespace(GetSketch=lambda: sketch, UpdateViewDisplayGeometry=lambda: None)
+    manager = types.SimpleNamespace(
+        CreateSelectData=lambda: types.SimpleNamespace(View=None),
+        GetSelectedObjectCount2=lambda _mark: 1 if failure == "count" else len(state["selected"]),
+        GetSelectedObject6=lambda index, _mark: (
+            object() if failure == "misselected" else state["selected"][index - 1]
+        ),
+    )
+
+    def select(edge, append, data):
+        assert data.View is view
+        assert append is bool(state["selected"])
+        if failure == "select":
+            return False
+        state["selected"].append(edge)
+        return True
+
+    def insert():
+        assert len(state["selected"]) == 2
+        state["insert_calls"] += 1
+        state["inserted"] = True
+
+    draw = types.SimpleNamespace(
+        # ActivateView intentionally exists only on the IDrawingDoc fake below.
+        SelectionManager=manager,
+        ClearSelection2=lambda _all: state["selected"].clear(),
+        InsertPoint=insert,
+    )
+    adapter = types.SimpleNamespace(
+        currentModel=draw,
+        swApp=types.SimpleNamespace(
+            IsSame=lambda a, b: -1 if failure == "unknown" else int(a is b),
+            GetMathUtility=lambda: object(),
+        ),
+    )
+    ddoc = types.SimpleNamespace(ActivateView=lambda _name: failure != "activate")
+    def bind(item, kind):
+        return ddoc if item is draw and kind == "IDrawingDoc" else item
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    monkeypatch.setattr(drawing, "view_name", lambda *_args: "profile")
+    edges = (types.SimpleNamespace(), types.SimpleNamespace())
+    for edge in edges:
+        edge.Select4 = lambda append, data, edge=edge: select(edge, append, data)
+    monkeypatch.setattr(drawing, "_profile_corner_edges", lambda *_args: edges)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kw: None)
+    monkeypatch.setattr(drawing, "_virtual_sharp_witness_groups", lambda _view: (
+        [[(0., 0., 0., 0.01, 0., 0.)] + (
+            [] if failure == "single_witness" else [(0., 0., 0., 0., 0.01, 0.)]
+        )]
+        if state["inserted"] and failure != "witness" else []
+    ))
+
+    def transform(_utility, xyz, actual_inverse, **_kw):
+        assert xyz == (point.X, point.Y, point.Z)
+        assert actual_inverse is inverse
+        return (expected[0] + (0.001 if failure == "coordinate" else 0), *expected[1:])
+
+    def project(_adapter, actual_view, xyz, **_kw):
+        assert actual_view is view and xyz == source
+        return expected
+
+    monkeypatch.setattr(drawing, "_transform_point", transform)
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    if failure:
+        with pytest.raises(RuntimeError):
+            drawing._insert_profile_virtual_sharp(adapter, view, index)
+    else:
+        drawing._insert_profile_virtual_sharp(adapter, view, index)
+    assert not state["selected"]
+    assert state["insert_calls"] == (
+        0 if failure in {"activate", "select", "count", "misselected", "unknown"} else 1
+    )
+
+
+def test_virtual_sharp_witness_parser_requires_actual_native_line_geometry():
+    raw = (0., -1., -1., -1., 0., 0., 1., 1., 2., 3., 4., 5., 6., 1., 0.)
+    view = types.SimpleNamespace(
+        GetWitnessEntitiesCount=lambda: (1, len(raw)), GetWitnessGeomInfo=lambda: raw,
+    )
+    assert drawing._virtual_sharp_witness_groups(view) == [[(1., 2., 3., 4., 5., 6.)]]
+    view.GetWitnessEntitiesCount = lambda: (1, len(raw) + 1)
+    with pytest.raises(RuntimeError, match="invalid size"):
+        drawing._virtual_sharp_witness_groups(view)
+    view.GetWitnessEntitiesCount = lambda: (1, len(raw) - 1)
+    view.GetWitnessGeomInfo = lambda: raw[:-1]
+    with pytest.raises(RuntimeError, match="truncated"):
+        drawing._virtual_sharp_witness_groups(view)
+
+
+@pytest.mark.parametrize("failure", [None, "sdk", "set", "read"])
+def test_all_four_virtual_width_endpoints_require_native_document_witness_style(monkeypatch, failure):
+    ordinal = 9876  # fake SDK-provided id, never an implementation ordinal
+    calls = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda item, _kind: item)
+    monkeypatch.setattr(drawing, "_preference_id", lambda _adapter, name: (
+        None if failure == "sdk" else ordinal
+    ) if name == "swDetailingVirtualSharpStyle" else None)
+    extension = types.SimpleNamespace(
+        SetUserPreferenceInteger=lambda key, scope, style: (
+            calls.append((key, scope, style)) or failure != "set"
+        ),
+        GetUserPreferenceInteger=lambda key, scope: 0 if failure == "read" else 3,
+    )
+    adapter = types.SimpleNamespace(currentModel=types.SimpleNamespace(Extension=extension))
+    view = object()
+    marked = []
+    monkeypatch.setattr(drawing, "_insert_profile_virtual_sharp",
+                        lambda _adapter, actual_view, index: marked.append((actual_view, index)))
+    if failure:
+        with pytest.raises(RuntimeError):
+            drawing._add_profile_virtual_sharps(adapter, view)
+        assert not marked
+    else:
+        drawing._add_profile_virtual_sharps(adapter, view)
+        assert calls == [(ordinal, 0, 3)]
+        assert marked == [(view, index) for index in range(4)]

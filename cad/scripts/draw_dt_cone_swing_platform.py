@@ -51,6 +51,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_crop import _transform_point
 from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
@@ -70,9 +71,11 @@ from _drawing_scan import _zoomed_on
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _preferences import _preference_id
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
@@ -1047,6 +1050,29 @@ def holddown_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
     return updated
 
 
+def _omit_post_mount_thread_class(display: Any) -> None:
+    """Rule 2: the title block owns class 2B; keep the native tap variables.
+
+    The existing helper proves the prefix definition lost only its class
+    token/dash.  Resolved-row readback also refuses a still-printed class.
+    This changes no Hole Wizard thread metadata or model association.
+    """
+    # #912: remove this local wrapper/callsite once add_native_hole_callout
+    # applies the existing omission helper and readback by default.
+    if POST_MOUNT_SPEC.thread_class != "2B":
+        raise RuntimeError(
+            "v2 post-mount tapped holes: only title-block default class 2B "
+            f"may be omitted, got {POST_MOUNT_SPEC.thread_class!r}"
+        )
+    omit_title_block_thread_class(display, label="v2 post-mount tapped holes")
+    native = _early_bound(display, "IDisplayDimension")
+    resolved = [str(native.GetText(part) or "") for part in (1, 2, 3, 4)]
+    if any(POST_MOUNT_SPEC.thread_class in text for text in resolved):
+        raise RuntimeError(
+            f"v2 post-mount tapped holes: callout still prints its class: {resolved!r}"
+        )
+
+
 def _rewrite_hole_callout(
     display: Any,
     rewrite: Callable[[dict[int, str]], dict[int, str]],
@@ -1451,6 +1477,174 @@ def _assert_corner_radius_attachment(
     )
 
 
+def _profile_corner_edges(adapter: Any, view: Any, index: int) -> tuple[Any, Any]:
+    """Actual straight top-face supports; nearest segment if a notch splits one."""
+    corners = _part.PLATE_CORNERS
+    label, x, z, _radius = corners[index]
+    result = []
+    visible = visible_view_entities(view, 1, label=f"{label} virtual sharp supports")
+    for neighbour in (corners[index - 1], corners[(index + 1) % len(corners)]):
+        direction = (neighbour[1] - x, neighbour[2] - z)
+        length = math.hypot(*direction)
+        direction = (direction[0] / length, direction[1] / length)
+        candidates = []
+        for raw in visible:
+            edge = _early_bound(raw, "IEdge")
+            if not _early_bound(edge.GetCurve(), "ICurve").IsLine():
+                continue
+            vertices = (edge.GetStartVertex(), edge.GetEndVertex())
+            if any(item is None for item in vertices):
+                continue
+            xyz = [
+                tuple(float(v) * 1000.0 for v in _early_bound(item, "IVertex").GetPoint())
+                for item in vertices
+            ]
+            if any(abs(point[1] - PLATE_THICKNESS) > 0.001 for point in xyz):
+                continue
+            plan = [(point[0], point[2]) for point in xyz]
+            if math.dist(*plan) < 0.001:
+                continue
+            if any(
+                abs((p[0] - x) * direction[1] - (p[1] - z) * direction[0]) > 0.001
+                for p in plan
+            ):
+                continue
+            candidates.append((min(math.dist(p, (x, z)) for p in plan), edge))
+        if not candidates:
+            raise RuntimeError(f"{label}: missing actual straight top-face support")
+        result.append(min(candidates, key=lambda item: item[0])[1])
+    if int(adapter.swApp.IsSame(*result)) != 0:
+        raise RuntimeError(f"{label}: virtual sharp requires two different supports")
+    return result[0], result[1]
+
+
+def _virtual_sharp_witness_groups(view: Any) -> list[list[tuple[float, ...]]]:
+    """Parse native groups; do not guess their undocumented coordinate space.
+
+    Source placement is proved by the Type4 point's sketch-to-sheet transform.
+    This separately requires real, nonempty native witness-line geometry.
+    """
+    count, size = view.GetWitnessEntitiesCount()
+    raw = tuple(float(v) for v in (view.GetWitnessGeomInfo() or ()))
+    if int(size) != len(raw) or not all(math.isfinite(v) for v in raw):
+        raise RuntimeError("profile virtual sharp witness data has invalid size/values")
+    if bool(count) != bool(raw):
+        raise RuntimeError("profile virtual sharp witness count disagrees with geometry")
+    groups = []
+    offset = 0
+    while offset < len(raw):
+        offset += 5  # colour, line style/weight, layer, override
+        if offset + 2 > len(raw) or raw[offset] != 0:
+            raise RuntimeError("profile virtual sharp witness line header is missing")
+        lines = int(raw[offset + 1])
+        if lines < 0 or raw[offset + 1] != lines:
+            raise RuntimeError("profile virtual sharp witness line count is invalid")
+        offset += 2
+        end = offset + lines * 6
+        if end + 2 > len(raw):
+            raise RuntimeError("profile virtual sharp witness lines are truncated")
+        segments = [raw[i:i + 6] for i in range(offset, end, 6)]
+        offset = end
+        if raw[offset] != 1:
+            raise RuntimeError("profile virtual sharp witness arc header is missing")
+        arcs = int(raw[offset + 1])
+        if arcs < 0 or raw[offset + 1] != arcs:
+            raise RuntimeError("profile virtual sharp witness arc count is invalid")
+        offset += 2 + arcs * 12
+        if offset > len(raw):
+            raise RuntimeError("profile virtual sharp witness arcs are truncated")
+        groups.append(segments)
+    return groups
+
+
+def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
+    """InsertPoint with two native edges; never manufacture a point or its Type."""
+    draw = _early_bound(adapter.currentModel, "IModelDoc2")
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    label, x, z, _radius = _part.PLATE_CORNERS[index]
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"{label}: cannot activate profile for virtual sharp")
+    native = _early_bound(view, "IView")
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+
+    def points():
+        result = {}
+        for raw in sketch.GetSketchPoints2() or ():
+            point = _early_bound(raw, "ISketchPoint")
+            key = tuple(int(v) for v in point.GetID())
+            if key in result:
+                raise RuntimeError(f"{label}: duplicate native sketch point ID")
+            result[key] = point
+        return result
+
+    before = points()
+    groups_before = _virtual_sharp_witness_groups(native)
+    edges = _profile_corner_edges(adapter, native, index)
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    draw.ClearSelection2(True)
+    try:
+        for i, edge in enumerate(edges):
+            data = manager.CreateSelectData()
+            data.View = native
+            if not _early_bound(edge, "IEntity").Select4(i > 0, data):
+                raise RuntimeError(f"{label}: cannot select native virtual sharp support {i}")
+        if int(manager.GetSelectedObjectCount2(-1)) != 2:
+            raise RuntimeError(f"{label}: virtual sharp requires exactly two selected edges")
+        for i, edge in enumerate(edges):
+            selected = manager.GetSelectedObject6(i + 1, -1)
+            if selected is None or int(adapter.swApp.IsSame(selected, edge)) != 1:
+                raise RuntimeError(f"{label}: selected support {i} failed native identity readback")
+        draw.InsertPoint()  # VT_VOID; two selected edges invoke the native tool.
+    finally:
+        draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"{label} native virtual sharp")
+    native.UpdateViewDisplayGeometry()
+    after = points()
+    new = set(after) - set(before)
+    if len(new) != 1 or not set(before) <= set(after):
+        raise RuntimeError(f"{label}: expected exactly one new native virtual sharp point")
+    point = after[new.pop()]
+    if int(point.Type) != 4:  # swSketchPointType_VirtualSharp; never assigned.
+        raise RuntimeError(f"{label}: inserted point is not naturally a native virtual sharp")
+    if int(adapter.swApp.IsSame(point.GetSketch(), sketch)) != 1:
+        raise RuntimeError(f"{label}: native virtual sharp is not owned by the profile sketch")
+    inverse = _early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse()
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    sheet = _transform_point(
+        utility, (float(point.X), float(point.Y), float(point.Z)), inverse,
+        label=f"{label} virtual sharp sketch to sheet",
+    )
+    expected = model_point_in_view(
+        adapter, native, (x / 1000.0, PLATE_THICKNESS / 1000.0, z / 1000.0),
+        label=f"{label} original PlateProfile sharp",
+    )
+    if math.dist(sheet[:2], expected[:2]) > 0.00002 or abs(sheet[2]) > 0.00002:
+        raise RuntimeError(f"{label}: native virtual sharp {sheet} misses source corner {expected}")
+    groups = _virtual_sharp_witness_groups(native)
+    if len(groups) != len(groups_before) + 1 or not all(
+        sum(math.dist(segment[:3], segment[3:]) > 1e-8 for segment in group) >= 2
+        for group in groups
+    ):
+        raise RuntimeError(f"{label}: native virtual sharp has no genuine witness lines")
+    print(f"{label} native virtual sharp: type=4 source_model_mm={(x, PLATE_THICKNESS, z)} "
+          f"sheet_m={sheet} witness_groups={len(groups)} raw_witness_lines={groups}")
+
+
+def _add_profile_virtual_sharps(adapter: Any, view: Any) -> None:
+    """Mark all four rounded-away 16/8/37/24 width endpoints, not just 37."""
+    preference = _preference_id(adapter, "swDetailingVirtualSharpStyle")
+    if preference is None:
+        raise RuntimeError("installed swconst lacks swDetailingVirtualSharpStyle")
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceInteger(preference, 0, 3):
+        raise RuntimeError("cannot set document virtual sharp witness style")
+    if int(extension.GetUserPreferenceInteger(preference, 0)) != 3:
+        raise RuntimeError("document virtual sharp witness style did not persist")
+    print(f"swDetailingVirtualSharpStyle SDK ordinal={preference}, witness style=3")
+    for index in range(len(_part.PLATE_CORNERS)):
+        _insert_profile_virtual_sharp(adapter, view, index)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1612,6 +1806,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="profile plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _add_profile_virtual_sharps(adapter, profile)
     _hide_profile_cosmetic_threads(adapter, profile)
     feature_annotations = curate_view_dimensions(
         adapter,
@@ -1728,6 +1923,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         label="v2 post-mount tapped holes",
     )
+    _omit_post_mount_thread_class(post_mount_callout)
     rebuild_drawing(adapter, label="plan hole callout rows")
     # The section shows the top seat at the bottom.  Arrows land mid-face so
     # neither symbol reads as controlling a corner, hole wall or outer edge.
