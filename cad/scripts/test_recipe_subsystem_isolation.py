@@ -162,6 +162,43 @@ def test_transgear_pivot_isolation(part_closures, contract: Contract) -> None:
     "contract",
     [
         Contract(
+            selectors=(
+                "build_mg_*",
+                "build_pn_*",
+                "build_vn_*",
+                "build_pd_platen_rack",
+            ),
+            anchors=(
+                "build_mg_magnifying_wheel",
+                "build_pn_pen_hanger",
+                "build_vn_chain_inner_link",
+                "build_pd_platen_rack",
+            ),
+            forbidden=("paper_drive_geom", "mg_magnifying_wheel_geom"),
+            mates=(
+                # The wheel's own builder owns this geometry.
+                ("build_mg_magnifying_wheel", "mg_magnifying_wheel_geom"),
+                # The axle journal mates the wheel bore.
+                ("build_mg_wheel_axle", "mg_magnifying_wheel_geom"),
+                # The spacer contacts the wheel hub's back face.
+                ("build_mg_wheel_axle_spacer", "mg_magnifying_wheel_geom"),
+                # The drum press-fits the wheel spigot.
+                ("build_mg_wheel_drum", "mg_magnifying_wheel_geom"),
+                # The wire wraps/ties the wheel and clears its hub, spokes and rim.
+                ("build_vn_lever_wire", "mg_magnifying_wheel_geom"),
+            ),
+        )
+    ],
+    ids=["platen-rack"],
+)
+def test_platen_rack_isolation(part_closures, contract: Contract) -> None:
+    assert_isolated(part_closures, contract)
+
+
+@pytest.mark.parametrize(
+    "contract",
+    [
+        Contract(
             selectors=("build_dt_*",),
             anchors=("build_dt_pinion_arbor",),
             forbidden=("ch_rocker_arm_spec",),
