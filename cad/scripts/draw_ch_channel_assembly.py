@@ -28,12 +28,12 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
-import math
 import sys
 import textwrap
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -86,17 +86,17 @@ import _telemetry
 import ch_channel_assembly_notes as notes
 import ch_channel_assembly_spec as asm
 import ch_channel_assembly_steps as steps
+from ch_channel_lever_spec import (
+    HUB_LENGTH as LEVER_HUB_LENGTH,
+    HUB_LENGTH_BAND as LEVER_HUB_LENGTH_BAND,
+)
 from ch_fulcrum_keeper_spec import (
-    BORE_DIA as KEEPER_BORE_DIA,
-    CROWN_LEAST_R,
-    CROWN_MOST_R,
-    CROWN_R,
     FULCRUM_KEEPER_CENTRE_Z,
+    KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
     KEEPER_INNER_FACE_SPAN_MM,
     KEEPER_Z_OFF,
-    SET_SCREW_THREAD as KEEPER_SET_SCREW_THREAD,
 )
 from ch_pivot_bracket_sides import FOOT_Z1 as BRACKET_FOOT_Z1
 from ch_pivot_bracket_spec import (
@@ -189,9 +189,13 @@ EXPLODED_ISO_CENTER = (0.100, 0.140)
 # A replay of the ring with the anchor-nut balloon added covers every landing
 # on the visible shaft, nut attachments at least 3.5 mm below the anchor's,
 # and balloon radius 5.0-5.6 mm. At 28 mm it crosses nothing and keeps
-# leader 14 2.1-4.4 mm off the shaft, with the ring 5 mm inside the border at
-# the top and 6 mm at the bottom.
-BALLOON_MARGIN = 0.028
+# leader 14 2.1-4.4 mm off the shaft, but the ring's centres ran 5.5 mm inside
+# the border at the top, so balloon 4's 5.6 mm circle touched it (machinist
+# review, #1660 r1). At 26 mm the top circle clears the border by about 2 mm;
+# _assert_view_on_sheet now grows the outline by the ring plus the largest
+# balloon radius, so a balloon circle can never reach the border.
+BALLOON_MARGIN = 0.026
+BALLOON_MAX_RADIUS = 0.0056
 # Balloon 3 (the rocker pivot bracket) walked to its ear's apex. Lifted 60
 # straight up its foot hole, which lies in front of the ear, the hold-down
 # (item 7) now stands right over that apex in the isometric, so leader 3 ran
@@ -651,6 +655,13 @@ NORTH_KEEPER_DETAIL = BankView(
     letter_corner=(1, -1),
 )
 EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
+# The north bracket cluster (DETAIL B) is lifted 570 up out of the hanging
+# rocker arms (ch_channel_assembly_spec), so off its shaft it read as part of
+# the lever bank (#1660 r3, rule 22: show which face mates to which). Its
+# explode trail, a black phantom line along the path its steps moved it,
+# ties it back to the MHA-CH-005 north end (draw_pn_pen_assembly's trails).
+TRAIL_LINE_STYLE = 2  # swLineStyles_e.swLinePHANTOM
+TRAIL_COLOR = 0  # COLORREF black, the views' outline colour
 _STACK_MID = (asm.PIVOT_CHAIN_Z[2] + asm.PIVOT_CHAIN_Z[3]) / 2.0
 _SPRING_MID = (asm.PIVOT_CHAIN_Z[0] + asm.PIVOT_CHAIN_Z[1]) / 2.0
 _LUG_MID = sum(asm.LUG_INNER_FACE_Z) / 2.0
@@ -711,6 +722,7 @@ LUG_KEEP = {asm.LUG_SPAN_DIMENSION: LEVER_BANK.sheet_xy(_LUG_MID, _FULCRUM_Y + 3
 CALLOUT_TEXT_PART = 3  # swDimensionTextCalloutAbove
 REFERENCE_PREFIX_PART = 1  # swDimensionTextPrefix
 REFERENCE_SUFFIX_PART = 2  # swDimensionTextSuffix
+BROKEN_LINE_ALIGNED_TEXT = 3  # swDisplayDimensionLeaderText_e.swBrokenLeaderAlignedText
 if any("\n" in text for text in notes.DIMENSION_CALLOUTS.values()):
     raise AssertionError("an above-callout with a line break does not print")
 
@@ -840,19 +852,23 @@ def _fitup_notes() -> tuple[str, str]:
     # ruling): the lever-bank view's reference lug span.
     if abs(rear_face - front_face - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
         raise AssertionError("the pair-ream span is not the fit-up span")
-    # Each crown is finished at the bench to the MHA-CH-007 crown radius
-    # (CrownRadius, printed .X: "FULL ROUND TANGENT TO BOTH SIDES, CENTER AT
-    # BORE HEIGHT, PER" this step), turned or filed about a gauge pin in its
-    # own reamed bore, and only then tapped through to the bore ("ON BORE AXIS
-    # AFTER REAM"). The fitter gauges it as crown top over the pin's underside,
-    # the crown radius plus the pin's, across the spec's CROWN_LEAST_R ..
-    # CROWN_MOST_R band, with the low limit rounded up (Main's ruling,
-    # 2026-10-16).
-    pin_r = KEEPER_BORE_DIA / 2.0
-    crown_over_pin = (
-        math.ceil((CROWN_LEAST_R + pin_r) * 10.0 - 1e-9) / 10.0,
-        round(CROWN_MOST_R + pin_r, 1),
-    )
+    # The crown and its tap centre on the bore this step makes, so each
+    # keeper is finished here, but to its own print: MHA-CH-007 sizes the
+    # crown (CrownRadius, "FULL ROUND TANGENT TO BOTH SIDES, CENTER AT BORE
+    # HEIGHT, PER" this step) and sizes and places the crown tap ("ON BORE
+    # AXIS AFTER REAM", its station in the plan). The step carries none of
+    # that part data (rule 24; #1660 r2 confirmed it on the assembly sheet).
+    # The lever bank is never fitted like the rocker stack: the bars on the
+    # straps locate it, and twenty hubs at the top of their band still leave
+    # end play between the lugs at the extremes of both inner-face bands
+    # (#1660 r2: the step says so and gauges it as the bank sliding).
+    lever_stack_max = COUNT * (LEVER_HUB_LENGTH + LEVER_HUB_LENGTH_BAND[0])
+    lug_span_min = KEEPER_INNER_FACE_SPAN_MM - 2.0 * KEEPER_FITUP_LOCATION_BAND_MM
+    if lug_span_min - lever_stack_max <= 0.0:
+        raise AssertionError(
+            "step 12 says the lever bank has end play, but the longest hubs "
+            "fill the shortest lug span"
+        )
     text = {
         # The rings are captured in the closed cam slots as the cylinder stack
         # goes together, and the pressed pin needs its far tine backed on the
@@ -914,21 +930,21 @@ def _fitup_notes() -> tuple[str, str]:
         steps.KEEPERS_PAIR_REAMED_KEY: (
             f"CLAMP BOTH {keeper}, FEET OUTBOARD ON ONE FLAT, INNER LUG FACES "
             "AT THE LEVER BANK VIEW'S LUG SPAN, BORE AXIS PARALLEL TO THE "
-            f"FLAT. BOTH {keeper} BORES IN LINE: THE "
-            f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED. THEN, ON "
-            f"A {KEEPER_BORE_DIA:.2f} PIN IN EACH BORE, ROUND ITS CROWN TO THE "
-            f"{keeper} CROWN R{CROWN_R:.1f} ABOUT THE PIN AND TAP IT "
-            f"{KEEPER_SET_SCREW_THREAD} TO THE BORE. ACCEPT: CROWN TOP "
-            f"{crown_over_pin[0]:.1f} TO {crown_over_pin[1]:.1f} OVER THE PIN'S "
-            "UNDERSIDE."
+            f"FLAT. STILL CLAMPED, MAKE BOTH {keeper} BORES TO THEIR DRAWING, "
+            f"IN LINE: THE {fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH. "
+            "THEN, ON EACH BORE'S AXIS, FINISH THAT KEEPER'S CROWN AND CROWN "
+            f"TAP TO THE {keeper} DRAWING."
         ),
         steps.KEEPERS_SET_KEY: (
             f"{top_frame} ON THE MILL: SHAFT THROUGH BOTH KEEPERS, FEET "
             "OUTBOARD ON THE RAIL. SET EACH LUG CENTRE OFF THE RAIL WEB CENTRE "
             "BELOW IT AND THE LUG INNER FACES OFF THE LINE OF THE UPPER SOCKET "
-            "CENTRES, TO THE KEEPER PLAN "
-            f"VIEW: THE {fulcrum_shaft} FLATS ARE A FIXED PITCH APART, AND THE "
-            "INNER-FACE BANDS LEAVE ONE STEP "
+            "CENTRES, TO THE KEEPER PLAN VIEW. THE LUG CENTRE'S BAND KEEPS EACH "
+            "FOOT HOLE, TRANSFERRED BELOW, OVER THE RAIL WEB WITH A FULL WALL "
+            "ROUND ITS TAP; THE SOUTH FACE'S BAND KEEPS THE "
+            f"SOUTH FOOT CLEAR OF THE {top_frame} FRONT SOCKET BOSS. THE "
+            f"{fulcrum_shaft} FLATS ARE A FIXED PITCH APART, AND THE TWO "
+            "INNER-FACE BANDS TOGETHER LEAVE ONE STEP "
             f"{steps.step_number(steps.SET_SCREWS_STAKED_KEY)} SHAFT POSITION "
             "WITH BOTH FLATS UNDER THEIR CROWN TAPS AND NO LEVER HUB ON A FLAT. "
             f"CLAMP; TRANSFER EACH FOOT HOLE INTO THE RAIL, TAP AS {top_frame}, "
@@ -944,7 +960,10 @@ def _fitup_notes() -> tuple[str, str]:
             f"DRAW THE {fulcrum_shaft} SHAFT OUT NORTH. PUSH IT BACK SOUTH "
             f"THROUGH THE NORTH {keeper}, LEVERS {last} TO 0 IN CHANNEL ORDER "
             f"AND THE SOUTH {keeper}, EACH BAR'S FOOT NOTCH ASTRIDE ITS {arm} "
-            "STRAP. ACCEPT IF EVERY LEVER SWINGS FREE."
+            "STRAP. THE BARS ON THE STRAPS LOCATE THE LEVER BANK; EVEN AT "
+            f"THEIR LONGEST THE {COUNT} LEVER HUBS ARE SHORTER THAN THE LUG "
+            "SPAN. ACCEPT IF EVERY LEVER SWINGS FREE AND THE BANK SLIDES ALONG "
+            "THE SHAFT BETWEEN THE LUGS."
         ),
         steps.SET_SCREWS_STAKED_KEY: (
             f"WITH THE LEVER BANK ON IT, SLIDE THE {fulcrum_shaft} SHAFT UNTIL "
@@ -1291,7 +1310,9 @@ def _place_exploded_sheet(
     _center_view_outline(
         adapter, exploded, EXPLODED_ISO_CENTER, label="channel exploded"
     )
-    _assert_view_on_sheet(exploded, margin=BALLOON_MARGIN, label="channel exploded")
+    _assert_view_on_sheet(
+        exploded, margin=BALLOON_MARGIN + BALLOON_MAX_RADIUS, label="channel exploded"
+    )
     table = insert_bom_table(
         adapter,
         exploded,
@@ -1332,6 +1353,7 @@ def _place_exploded_sheet(
     # After the balloons, so the boundary circles are never picked as a
     # component's edge.
     _mark_exploded_details(adapter, exploded)
+    _add_north_end_trail(adapter, exploded)
     _activate_sheet(adapter, SHEET_NAMES[1])
     for detail in EXPLODED_DETAILS:
         _exploded_detail(adapter, detail)
@@ -1387,6 +1409,42 @@ def _placed_bank_view(adapter: Any, bank: BankView) -> Any:
     return view
 
 
+def _sketch_in_view(
+    adapter: Any,
+    view: Any,
+    sheet_points: tuple[tuple[float, float], tuple[float, float]],
+    kind: Literal["circle", "line"],
+    *,
+    label: str,
+) -> Any:
+    """Sketch a ``kind`` ("circle": centre, rim point; "line": ends) at two
+    sheet points (m) in ``view``'s own sketch, left selected
+    (draw_pn_pen_assembly._sketch_in_view)."""
+    view = _early_bound(view, "IView")
+    _activate_view(adapter, view, label=label)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_points:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    create = {"circle": manager.CreateCircle, "line": manager.CreateLine}[kind]
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = False
+    try:
+        segment = create(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous
+    if segment is None:
+        raise RuntimeError(f"failed to sketch the {label} {kind}")
+    return segment
+
+
 def _sketch_view_circle(
     adapter: Any,
     view: Any,
@@ -1396,27 +1454,54 @@ def _sketch_view_circle(
     label: str,
 ) -> None:
     """Sketch a circle (sheet m) in ``view``'s own sketch, left selected."""
-    view = _early_bound(view, "IView")
-    _activate_view(adapter, view, label=label)
-    sketch = _early_bound(view.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (centre, (centre[0] + radius_m, centre[1])):
-        point = _early_bound(
-            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+    _sketch_in_view(
+        adapter,
+        view,
+        (centre, (centre[0] + radius_m, centre[1])),
+        "circle",
+        label=label,
+    )
+
+
+def north_end_trail_mm() -> tuple[tuple[float, float, float], ...]:
+    """The north bracket's explode path (model mm): its seat on the
+    MHA-CH-005 axis, north along that axis, then up to its exploded bore."""
+    seat = (_PIVOT_X, _PIVOT_Y, PIVOT_BRACKET_Z[1])
+    dx, dy, dz = exploded_offset(asm.BRACKET, "north")
+    if dx != 0.0 or dy <= 0.0 or dz <= 0.0:
+        raise RuntimeError(
+            f"the north bracket no longer explodes north then up: {(dx, dy, dz)}"
         )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
-    previous = bool(manager.AddToDB)
-    manager.AddToDB = False
-    try:
-        circle = manager.CreateCircle(*points[0], *points[1])
-    finally:
-        manager.AddToDB = previous
-    if circle is None:
-        raise RuntimeError(f"failed to sketch the {label} circle")
+    along = (seat[0], seat[1], seat[2] + dz)
+    return seat, along, (along[0], along[1] + dy, along[2])
+
+
+def _add_north_end_trail(adapter: Any, exploded: Any) -> None:
+    """The north bracket cluster's explode trail on the exploded view: black
+    phantom segments along ``north_end_trail_mm``, the path its steps moved
+    it, so the lifted cluster reads as the rocker shaft's north end (#1660
+    r3)."""
+    path = north_end_trail_mm()
+    label = "north bracket explode trail"
+    ends = [
+        model_point_in_view(
+            adapter, exploded, tuple(value / 1000.0 for value in point), label=label
+        )
+        for point in path
+    ]
+    for start, end in zip(ends, ends[1:]):
+        segment = _early_bound(
+            _sketch_in_view(adapter, exploded, (start, end), "line", label=label),
+            "ISketchSegment",
+        )
+        segment.Style = TRAIL_LINE_STYLE
+        segment.Color = TRAIL_COLOR
+        adapter.currentModel.ClearSelection2(True)
+        adapter.currentModel.EditRebuild3()
+        style, color = int(segment.Style), int(segment.Color)
+        if (style, color) != (TRAIL_LINE_STYLE, TRAIL_COLOR):
+            raise RuntimeError(f"{label}: segment reads style {style}, colour {color}")
+        _telemetry.info(f"{label}: {start!r} -> {end!r}")
 
 
 def _crop(adapter: Any, view: Any, bank: BankView) -> None:
@@ -1644,7 +1729,20 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
         },
     )
     _assert_settings(displays)
+    _break_line_at_text(displays[asm.LUG_SPAN_DIMENSION], label=asm.LUG_SPAN_DIMENSION)
     return lambda: _assert_settings(displays)
+
+
+def _break_line_at_text(display: Any, *, label: str) -> None:
+    """Put the value in a break of its dimension line (#1660 r8): on the
+    unbroken line the reference parentheses' tails touched the line."""
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "SetBrokenLeader2", "GetBrokenLeader2"
+    )
+    if display.SetBrokenLeader2(False, BROKEN_LINE_ALIGNED_TEXT) != 0:
+        raise RuntimeError(f"{label}: failed to break the dimension line")
+    if int(display.GetBrokenLeader2()) != BROKEN_LINE_ALIGNED_TEXT:
+        raise RuntimeError(f"{label}: broken dimension line did not persist")
 
 
 def _create_sheets(adapter: Any) -> None:

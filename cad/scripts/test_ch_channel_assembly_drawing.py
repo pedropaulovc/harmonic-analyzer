@@ -384,6 +384,14 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     assert drawing.exploded_offset(asm.BRACKET, "south") == (0.0, 0.0, -60.0)
     bracket, keeper = drawing.NORTH_BRACKET_DETAIL, drawing.NORTH_KEEPER_DETAIL
     assert drawing.EXPLODED_DETAILS == (bracket, keeper)
+    # #1660 r3 (rule 22): lifted, the cluster read as the lever bank's, so an
+    # explode trail runs from the bracket's seat on the rocker shaft, north
+    # along its axis, then up to DETAIL B's centre (its exploded bore).
+    seat, along, lifted = drawing.north_end_trail_mm()
+    assert seat == (*drawing.ROCKER_PIVOT_XY, bank.PIVOT_BRACKET_Z[1])
+    assert along == (*drawing.ROCKER_PIVOT_XY, seat[2] + 90.0)
+    assert lifted == pytest.approx(bracket.centre_xyz)
+    assert (drawing.TRAIL_LINE_STYLE, drawing.TRAIL_COLOR) == (2, 0)
     # Machinist review (PR #1605): at the upper right the letter B sat over
     # the rocker bank's stack beside the circle; the lower left is open.
     assert bracket.letter_corner == (-1, -1)
@@ -697,26 +705,42 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     # Machinist gate 2026-10-17 (rule 7): the step states the bores' acceptance,
     # never the operation or the made-to-order reamer (sized against the keeper
     # print's band in ch_fulcrum_keeper_spec). 5d5245a48 review (rule 24): the
-    # bore limits are the keeper print's, not this sheet's.
+    # bore limits are the keeper print's, not this sheet's. #1660 r3 (rules 1
+    # and 22): the step says plainly that the bores are made in this setup.
     assert (
-        f"FLAT. BOTH {number} BORES IN LINE: THE "
-        f"{fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH, CLAMPED." in reamed
+        f"STILL CLAMPED, MAKE BOTH {number} BORES TO THEIR DRAWING, IN LINE: "
+        f"THE {fulcrum_shaft} SHAFT SLIDES FREELY THROUGH BOTH." in reamed
     )
     assert "6.388" not in reamed and "6.400" not in reamed
     for method in ("REAM", "0.2515", " IN LONG", " PASS"):
         assert method not in reamed
     assert keeper.PAIR_REAMER_REACH_MARGIN_MM > 0.0
-    # r10 machinist blocker (Main's ruling A): the crown is finished to the
-    # keeper print's crown radius about a pin in its own bore, then tapped,
-    # and gauged over the pin. The gauge's low limit never admits a crown
-    # under the least full round the crown thread's 1.5D is proved at.
+    # #1660 r2 (rules 22 and 24): the crown and its tap centre on the bore
+    # made here, so the keeper is finished in this step, but its sizes and the
+    # tap's place are the keeper print's (CrownRadius and the crown tap, which
+    # point back at this step); the assembly sheet restates none of them.
     assert (
-        f"ON A 6.35 PIN IN EACH BORE, ROUND ITS CROWN TO THE {number} CROWN R7.0 "
-        "ABOUT THE PIN AND TAP IT #1-72 TO THE BORE." in reamed
+        "THEN, ON EACH BORE'S AXIS, FINISH THAT KEEPER'S CROWN AND CROWN TAP "
+        f"TO THE {number} DRAWING." in reamed
     )
-    assert reamed.endswith("ACCEPT: CROWN TOP 9.8 TO 10.6 OVER THE PIN'S UNDERSIDE.")
-    assert 9.8 - keeper.BORE_DIA / 2.0 >= keeper.CROWN_LEAST_R
-    assert 10.6 - keeper.BORE_DIA / 2.0 <= keeper.CROWN_MOST_R + 0.05
+    for part_data in ("R7.0", "#1-72", " PIN ", "CROWN TOP", "9.8", "10.6"):
+        assert part_data not in reamed
+    assert keeper_drawing.DIMENSION_CALLOUTS["CrownRadius"].endswith(
+        f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
+    )
+    # #1660 r2 (rule 19): the lever bank has no stack fit-up because it needs
+    # none. Twenty hubs at the top of their band leave end play at the
+    # shortest lug span the two inner-face bands allow, and the bars on the
+    # rocker straps locate the bank. The step says so and gauges it.
+    from ch_channel_lever_spec import HUB_LENGTH as LEVER_HUB, HUB_LENGTH_BAND
+
+    span_min = (
+        keeper.KEEPER_INNER_FACE_SPAN_MM - 2 * keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    )
+    assert span_min - drawing.COUNT * (LEVER_HUB + HUB_LENGTH_BAND[0]) > 0.2
+    threaded = _step_body(steps.LEVER_BANK_THREADED_KEY)
+    assert "THE BARS ON THE STRAPS LOCATE THE LEVER BANK" in threaded
+    assert "SLIDES ALONG THE SHAFT BETWEEN THE LUGS" in threaded
     assert keeper.SET_SCREW_ENGAGEMENT_D >= keeper.SET_SCREW_MIN_ENGAGEMENT_D
     fitted = _step_body(steps.KEEPERS_SET_KEY)
     assert f"{top_frame} ON THE MILL:" in fitted
@@ -754,15 +778,37 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
         "WEB CENTRE,\nSPLIT OF BOTH WEB FACES" in text
         for text, _, _ in drawing.PLAN_POINTERS
     )
-    # The band's function (Main's ruling, 2026-10-16): the shaft's flat-station
-    # window, 0.14 at 0.02 and gone by 0.09 (ch_fulcrum_shaft_spec). The slide
-    # (r11 review) moves both flats at once; the band is what leaves it a seat.
+    # The bands' functions (Main's ruling, 2026-10-16): together they hold the
+    # shaft's flat-station window (ch_fulcrum_shaft_spec); the slide (r11
+    # review) moves both flats at once, the band is what leaves it a seat. The
+    # south face's band alone is also what keeps its foot off the front socket
+    # boss at the printed worst case (build_fr_top_frame), which the step names
+    # so the absolute setting has a stated reason (#1660 r1, rules 4 and 19).
+    import build_fr_top_frame as top
+
+    south_margin, north_margin = top.KEEPER_FOOT_PRINTED_BOSS_MARGINS
+    # At the title block's band for these places the south foot would reach
+    # the boss; the north foot keeps a wide margin either way.
+    band = keeper.KEEPER_FITUP_LOCATION_BAND_MM
+    title_block_band = top.PRINTED_LINEAR_BAND_MM[places]
+    assert 0.0 < south_margin < title_block_band - band
+    assert north_margin > 10 * band
+    # #1660 r6 (rule 4): the lug centre's ±0.10 (owner ruling X-A) is what
+    # keeps the transferred foot tap walled in the rail web (rule 17's 1.5):
+    # at the title block's band the drill wall falls under it.
+    x_band = keeper.KEEPER_FITUP_X_BAND_MM
+    widened = title_block_band - x_band
+    assert top.KEEPER_TAP_DRILL_WALL_MARGIN >= 1.5
+    assert top.KEEPER_TAP_DRILL_WALL_MARGIN - widened < 1.5
     staked_number = steps.step_number(steps.SET_SCREWS_STAKED_KEY)
-    assert (
-        f"THE {fulcrum_shaft} FLATS ARE A FIXED PITCH APART, AND THE INNER-FACE "
-        f"BANDS LEAVE ONE STEP {staked_number} SHAFT POSITION WITH BOTH FLATS "
-        "UNDER THEIR CROWN TAPS AND NO LEVER HUB ON A FLAT."
-    ) in fitted
+    for phrase in (
+        "THE LUG CENTRE'S BAND KEEPS EACH FOOT HOLE, TRANSFERRED BELOW, OVER "
+        "THE RAIL WEB WITH A FULL WALL ROUND ITS TAP",
+        f"SOUTH FOOT CLEAR OF THE {top_frame} FRONT SOCKET BOSS",
+        f"THE {fulcrum_shaft} FLATS ARE A FIXED PITCH APART",
+        f"BANDS TOGETHER LEAVE ONE STEP {staked_number} SHAFT POSITION",
+    ):
+        assert phrase in fitted
     assert "EACH FLAT LIES UNDER ITS CROWN TAP" in _step_body(
         steps.SET_SCREWS_STAKED_KEY
     )
@@ -876,14 +922,18 @@ def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fa
 def test_the_set_screw_step_states_a_fact_that_needs_no_declaration() -> None:
     """The owner's 2026-10-15 shortfall ruling (#1371) covered the R8 arch's
     1.08D; the lifted arch holds 1.5D, so the step's engagement fact is no
-    shortfall and the channel contract declares no exception for it."""
+    shortfall and the channel contract declares no exception for it. Its one
+    declaration (RV-01) is the keeper inner-face bands of owner ruling X-A."""
     import ch_pivot_bracket_spec as bracket_spec
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
     name = "ch_channel_assembly"
     assert DRAWINGS_BY_NAME[name].source_kind == "assembly"
-    assert load_exceptions(CAD_ROOT / "config", name, "assembly") == ()
+    (keeper_bands,) = load_exceptions(CAD_ROOT / "config", name, "assembly")
+    assert (keeper_bands.id, keeper_bands.kind) == ("RV-01", "accept")
+    assert "KeeperFrontFaceZ, KeeperRearFaceZ" in keeper_bands.where
+    assert "ENGAGEMENT" not in keeper_bands.where.upper()
     fact = (
         f"{bracket_spec.SET_SCREW_THREAD} ENGAGEMENT "
         f"{bracket_spec.SET_SCREW_FULL_THREAD_MIN:.2f} MIN "
