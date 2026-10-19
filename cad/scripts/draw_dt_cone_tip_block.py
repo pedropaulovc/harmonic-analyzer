@@ -10,13 +10,11 @@ import re
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
     dimension_name,
     place_view,
-    view_name,
 )
 
 from _check import check
@@ -37,9 +35,7 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_leader_note
 import _drawing_leaders
-from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -99,14 +95,17 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
 # layout, so every gap above the row keeps its measured air, and the bottom
 # view drops 1.8 mm.  The plan rides 9.7 mm higher again (machinist review
 # of d84a42ca7): PassageCenter's function line stands over its value, with
-# the view-crowding air (the shorter box's height) under section A's north
-# letter.
+# the view-crowding air (the shorter box's height) under the cutting-plane
+# letter the plan then carried.  Section A-A is gone (machinist review of
+# f86ff6bf8: its cut clipped the hold-down tap drill into an unexplained
+# sliver, and every hole it showed is fully defined by its callout, rule 1),
+# and the plan keeps its place so every other gap keeps its measured air.
 FRONT_CENTER = (0.072, 0.132)
 TOP_CENTER = (FRONT_CENTER[0], 0.2395)
 BOTTOM_CENTER = (FRONT_CENTER[0], 0.0382)
 # The right view and the removed views B and C stand on the front view's
 # projection row; their x follows from the adjuster callout between the front
-# and right views (RIGHT_CENTER, below), and section A-A rides above them.
+# and right views (RIGHT_CENTER, below).
 # The 2:1 isometric (38 x 108 mm) stands right of VIEW C, past its top.
 ISO_CENTER = (0.365, 0.209)
 # Every view centres on the prism, whose centre is the model origin.
@@ -203,11 +202,6 @@ VIEW_ROW_PITCH = 0.072
 RIGHT_CENTER = (_RIGHT_NORTH_FACE_X + Z_NORTH * _S, FRONT_CENTER[1])
 LEFT_CENTER = (RIGHT_CENTER[0] + VIEW_ROW_PITCH, FRONT_CENTER[1])
 BACK_CENTER = (RIGHT_CENTER[0] + 2.0 * VIEW_ROW_PITCH, FRONT_CENTER[1])
-# Section A-A stands right of the right view, above it.  SolidWorks prints
-# its "SECTION A-A / SCALE 2:1" label under the view (SECTION_LABEL_BOX), so
-# the section rides high enough that the label keeps its air over the pinch
-# clearance callout above the right view.
-SECTION_CENTER = (RIGHT_CENTER[0] + 0.019, 0.2478)
 # The 1.2 slot prints 2.4 mm wide, narrower than its value, so the arrows
 # stand outside the slot walls and the text sits right of the right arrow's
 # tail on the extended dimension line.  Right, because on the adjuster
@@ -317,9 +311,6 @@ PLAN_DEPTH_LINE_X = (
 TOP_KEEP = {
     "Depth": (PLAN_DEPTH_LINE_X, _plan_y(0.0)),
 }
-# r3: section A-A carries no dimension; the pinch-hole height is in the
-# right view, where the hole is drilled and seen end-on.
-SECTION_KEEP: dict[str, tuple[float, float]] = {}
 # The half-block station below runs from the north face to the pinch-hole
 # centre, so its value sits midway along its span.  Centred on the hole (run
 # 5637ac42), the witness and centreline ended in the decimal point; at +0.003
@@ -362,8 +353,6 @@ BOTTOM_KEEP = {
 # The bottom-row captions sit just under the views' feet.
 CAPTION_Y = _elevation_y(0.0, FRONT_CENTER) - 0.004
 BOTTOM_CAPTION_XY = (BOTTOM_CENTER[0] - 0.0168, _bottom_y(Z_SOUTH) - 0.004)
-# A centreline runs a short way past the part it marks.
-AXIS_OVERRUN = 0.002
 # Review C1: the left and rear views sit right of the right view, out of
 # third-angle order, so each is a removed view named by a letter arrow on the
 # view that shows the face it looks at.  VIEW B looks at the -X (pinch-thread)
@@ -400,7 +389,7 @@ VIEW_C_ARROW = (
 # that a leader from the text's right end still crossed it, so the text now
 # reaches 3.5 mm past the hole centre: its leader drops from the shoulder's
 # right end to the hole, right of the hole-centre witness and the line's
-# arrow, and SECTION A-A stands high enough for its label to clear the text.
+# arrow.
 PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] + 0.0035 - 0.0264, 0.2013)
 # The pinch thread callout stands above VIEW B, its shoulder's left end far
 # enough right of the hole that the leader drops steeply through the 2:1
@@ -417,14 +406,6 @@ PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.015, 0.1978)
 # the edge the shoulder clears it by 1.65, as the two-line block's did, and
 # the block's left end stands 8.5 mm right of the tap.
 FOOT_TAP_CALLOUT_XY = (FOOT_TAP_CENTER[0] + 0.0373, _bottom_y(Z_NORTH) + 0.0100)
-# Under section A-A's native label (SECTION_LABEL_BOX), centred on it with
-# 2.0 mm of air.  At 5.4 under the view (287c, when a 3:2 section printed a
-# SCALE line under its label) it overprinted the label on the 2:1 sheet
-# (machinist review of cc7f631ab).
-ROTATED_NOTE_XY = (
-    SECTION_CENTER[0] - 0.0257 / 2.0,
-    SECTION_CENTER[1] - BLOCK_Z * _S / 2.0 - 0.0116 - 0.002,
-)
 # The locating foot's finish symbol, on the elevation named here.  On the
 # front view (287c) its "Ra 3.2" stood 0.2 mm off an arrow, and no leader can
 # reach that foot without crossing the width's extension or dimension line.
@@ -481,7 +462,6 @@ def _sheet_notes(
             adjuster_center[0] + ADJUSTER_ENTRY_DX,
             ADJUSTER_ENTRY_Y,
         ),
-        ("ROTATED 90°", *ROTATED_NOTE_XY),
     )
 
 
@@ -585,50 +565,12 @@ FOOT_TAP_CALLOUT_EXTENT = (0.0293, 0.0086, 0.0293, 0.0080)
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
     "ADJUSTER ENTRY": ADJUSTER_ENTRY_EXTENT,
-    "ROTATED 90°": (0.0, 0.0036, 0.0257, 0.0),
     "RIGHT VIEW\nPINCH CLEARANCE ENTRY": (0.0, 0.0081, 0.0581, 0.0),
     "VIEW B\nPINCH THREAD ENTRY": (0.0, 0.0081, 0.0476, 0.0),
     "VIEW C\nSHAFT ENTRY": (0.0, 0.0081, 0.0278, 0.0),
     # Thirteen glyphs of "HOLD-DOWN TAP" at SHAFT ENTRY's width per glyph.
     "BOTTOM VIEW\nHOLD-DOWN TAP": (0.0, 0.0081, 0.0335, 0.0),
 }
-# SolidWorks places section A-A's "SECTION A-A" label under the view; its ink
-# relative to SECTION_CENTER.  At the sheet's own 2:1 it prints no SCALE line.
-# Measured on the cc7f631ab render (run 20260929T224514758Z): 45.2 wide,
-# centred, its top 5.25 under the view's lower edge, 6.3 tall.  (The I31
-# box, 14.6 under and 14.5 tall, was a 3:2 section's two-line label.)
-_SECTION_HALF_DEPTH = BLOCK_Z * _S / 2.0
-SECTION_LABEL_BOX = (
-    -0.0227,
-    -_SECTION_HALF_DEPTH - 0.0116,
-    0.0227,
-    -_SECTION_HALF_DEPTH - 0.0052,
-)
-# Section A-A's cutting-plane arrows.  SolidWorks draws one from each end of
-# the chain line (SECTION_LINE_OVERSHOOT past the plan's ends) toward the
-# section view on the right: a 12 mm shaft (run 1's leaf dump, d09c2b9eb,
-# GetSectionLineInfo2) and a head 1/4 in long and 1/8 in across (6.0-6.2 by
-# 3.0-3.1 measured on the run-1 and 72ab renders), with its letter printed
-# just past the tip (SECTION_LETTER_BOX, from the tip: the 72ab render's "A"
-# ink, 2.44..8.12 right and -1.12..4.89 up, padded 0.2).
-# Until r3 this audit never saw them: layoutcheck's replay of run 1 found
-# its north arrow 1.45 mm over PassageCenter's 7.50.
-SECTION_LINE_OVERSHOOT = 0.004
-SECTION_ARROW_LENGTH = 0.012
-SECTION_ARROW_HEAD = (0.00635, 0.003175)  # along the shaft, across it
-SECTION_LETTER_BOX = (0.0022, -0.0013, 0.0083, 0.0051)
-# #955: the north letter stood 1.45 mm right of the plan's edge while its
-# top reached 1.1 mm up beside it, under the TEXT_CLEARANCE every letter on
-# the release sheets keeps.  Its x is fixed (the cut is the plan's centre
-# plane), so the north end drops it below the plan's north edge until its
-# corner clears the plan's corner by TEXT_CLEARANCE -- or, at 2:1 where the
-# letter stands under the plan itself, its top clears the plan's edge by it.
-_NORTH_LETTER_GAP_X = max(
-    0.0, SECTION_ARROW_LENGTH + SECTION_LETTER_BOX[0] - BLOCK_X * _S / 2.0
-)
-SECTION_NORTH_OVERSHOOT = SECTION_LETTER_BOX[3] + math.sqrt(
-    max(0.0, (TEXT_CLEARANCE + ROUND_OUT) ** 2 - _NORTH_LETTER_GAP_X**2)
-)
 # The locating-foot finish symbol: its leader lands midway along the right
 # half of the foot edge; measured on the 287c render, its ink (shoulder,
 # triangle, arm and "Ra 3.2") spans this far round the commanded point and
@@ -733,7 +675,6 @@ def sheet_text_boxes(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dic
         **FRONT_KEEP,
         **_adjuster_axis_keep(adjuster_center),
         **TOP_KEEP,
-        **SECTION_KEEP,
         **RIGHT_KEEP,
         **LEFT_KEEP,
         **BOTTOM_KEEP,
@@ -757,16 +698,6 @@ def sheet_text_boxes(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dic
         boxes[label] = _extent_box(text_xy, VIEW_LETTER_EXTENT)
     for text, x, y in _sheet_notes(adjuster_center):
         boxes[text.split("\n")[0]] = _extent_box((x, y), _NOTE_EXTENTS[text])
-    for name, (_tail, tip) in sheet_section_arrows().items():
-        left, down, right, up = SECTION_LETTER_BOX
-        boxes[name] = (tip[0] + left, tip[1] + down, tip[0] + right, tip[1] + up)
-    x0, y0, x1, y1 = SECTION_LABEL_BOX
-    boxes["SECTION A-A label"] = (
-        SECTION_CENTER[0] + x0,
-        SECTION_CENTER[1] + y0,
-        SECTION_CENTER[0] + x1,
-        SECTION_CENTER[1] + y1,
-    )
     return boxes
 
 
@@ -788,13 +719,6 @@ def sheet_view_silhouettes() -> dict[str, Box]:
             _plan_y(Z_SOUTH),
         ),
         "bottom": (_BOTTOM_LEFT, _bottom_y(Z_SOUTH), _BOTTOM_RIGHT, _bottom_y(Z_NORTH)),
-        # Rotated 90 degrees: the block height runs across the sheet.
-        "section A-A": (
-            SECTION_CENTER[0] - BLOCK_HEIGHT * _S / 2.0,
-            SECTION_CENTER[1] - half_z,
-            SECTION_CENTER[0] + BLOCK_HEIGHT * _S / 2.0,
-            SECTION_CENTER[1] + half_z,
-        ),
     }
 
 
@@ -861,14 +785,12 @@ def _dimension_ink(
 def sheet_dimension_ink(
     adjuster_center: tuple[float, float] = FRONT_CENTER,
 ) -> dict[str, DimensionInk]:
-    """Every kept dimension's printed lines and arrows, and section A-A's
-    cutting-plane arrows (shaft and head, keyed like their letters)."""
+    """Every kept dimension's printed lines and arrows."""
     texts = sheet_text_boxes(adjuster_center)
     keeps = {
         **FRONT_KEEP,
         **_adjuster_axis_keep(adjuster_center),
         **TOP_KEEP,
-        **SECTION_KEEP,
         **RIGHT_KEEP,
         **BOTTOM_KEEP,
     }
@@ -965,29 +887,7 @@ def sheet_dimension_ink(
         set_sides["FootTapZ"],
         texts["FootTapZ"],
     )
-    for name, (tail, tip) in sheet_section_arrows().items():
-        ink[name] = section_arrow_ink(tail, tip)
     return ink
-
-
-def sheet_section_arrows() -> dict[str, tuple[Point, Point]]:
-    """Section A-A's two cutting-plane arrows, (tail on the chain line, tip)."""
-    tail_x = TOP_CENTER[0]
-    ends = (
-        ("north", _plan_y(Z_NORTH) - SECTION_NORTH_OVERSHOOT),
-        ("south", _plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT),
-    )
-    return {
-        f"section A {end}": ((tail_x, y), (tail_x + SECTION_ARROW_LENGTH, y))
-        for end, y in ends
-    }
-
-
-def section_arrow_ink(tail: Point, tip: Point) -> DimensionInk:
-    """One cutting-plane arrow: its shaft and its head's outline."""
-    along, across = SECTION_ARROW_HEAD
-    head = _drawing_leaders.arrowhead_outline((tail, tip), along, across)[:3]
-    return DimensionInk(arrows=((tail, tip), *head))
 
 
 def _leader_to_circle(start: Point, center: Point, radius: float) -> Leader:
@@ -1226,66 +1126,6 @@ def _set_arrow_sides(
             raise RuntimeError(f"{name} did not keep its arrows on side {side}")
     if remaining:
         raise RuntimeError(f"no dimension to set arrow sides: {sorted(remaining)}")
-
-
-def _add_adjuster_axis(adapter: Any, section: Any) -> None:
-    """Sketch the adjuster bore's axis across section A-A, owned by the view.
-
-    The through thread and its countersinks read as one bore only with their
-    centreline (review 2026-09-23, when the 8.85 pinch rise still rose from
-    it).  The cutting plane is X = 0, so the adjuster axis
-    (along Z) lies in it and projects as a line, while the pinch axis (along
-    X) projects to a point -- run 71f5acc5 sketched that zero-length line and
-    CreateCenterLine returned None.  Run 6cab17f6 then sketched it with sheet
-    coordinates while the section was the active view, so it landed in the
-    view's own sketch frame, off the sheet.  This is draw_top_frame's proven
-    owned-centreline recipe: activate the view, map each sheet point through
-    the view sketch's ModelToSketchTransform, and colour the segment black
-    (a sketch line otherwise prints in the under-defined blue).
-    """
-    half = BLOCK_Z / 2000.0 + AXIS_OVERRUN * SHEET_SCALE[1] / SHEET_SCALE[0]
-    ends = [
-        model_point_in_view(
-            adapter,
-            section,
-            (0.0, ADJUSTER_AXIS_HEIGHT / 1000.0, z),
-            label=f"adjuster axis end {index}",
-        )
-        for index, z in enumerate((-half, half))
-    ]
-    length = math.dist(ends[0][:2], ends[1][:2])
-    expected = 2.0 * half * SHEET_SCALE[0] / SHEET_SCALE[1]
-    if abs(length - expected) > 0.0005:
-        raise RuntimeError(
-            f"adjuster axis projects {length:.4f} m long in section A-A, "
-            f"expected {expected:.4f}"
-        )
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, section)):
-        raise RuntimeError("failed to activate section A-A for the adjuster axis")
-    draw.ClearSelection2(True)
-    sketch = _early_bound(section.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in ends:
-        point = _early_bound(
-            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
-        )
-        points.append(
-            tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData)
-        )
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    centerline = manager.CreateCenterLine(*points[0], *points[1])
-    if centerline is None:
-        raise RuntimeError("failed to sketch the adjuster axis in section A-A")
-    segment = _early_bound(centerline, "ISketchSegment")
-    segment.Color = 0
-    if int(segment.Color) != 0:
-        raise RuntimeError("adjuster axis colour did not persist")
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="section A-A adjuster axis")
 
 
 def _circle_entity(
@@ -1628,11 +1468,11 @@ def _audit_isometric_annotation_provenance(adapter: Any, view: Any) -> int:
     return len(annotation_types)
 
 
-_COSMETIC_THREAD_LAYER = "CONE-TIP-SECTION-THREADS-HIDDEN"
+_COSMETIC_THREAD_LAYER = "CONE-TIP-THREADS-HIDDEN"
 
 
 def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
-    """Keep cosmetic-thread annotation ink out of a view (section, pictorial)."""
+    """Keep cosmetic-thread annotation ink out of a view (the pictorial)."""
     draw = adapter.currentModel
     manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
     layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
@@ -1640,18 +1480,18 @@ def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
         if int(
             manager.AddLayer(
                 _COSMETIC_THREAD_LAYER,
-                "cosmetic thread ink hidden in cone-tip section",
+                "cosmetic thread ink hidden in the cone-tip pictorial",
                 0,
                 0,
                 0,
             )
         ) != 1:
-            raise RuntimeError("failed to add cone-tip section thread layer")
+            raise RuntimeError("failed to add cone-tip thread layer")
         layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
     layer = _early_bound(layer, "ILayer")
     layer.Visible = False
     if bool(layer.Visible) or bool(layer.Printable):
-        raise RuntimeError("cone-tip section thread layer is not hidden")
+        raise RuntimeError("cone-tip thread layer is not hidden")
     hidden = 0
     for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw_annotation, "IAnnotation")
@@ -1716,33 +1556,6 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=SHEET_SCALE)
     for view in (front, top, right, left, back, bottom, iso):
         set_hidden_lines_removed(adapter, view)
-
-    # The top-view cutting plane passes through both orthogonal bore axes.  The
-    # resulting solid-line section shows the through adjuster thread, its
-    # countersinks, split jaws and pinch bore relationship without dashed
-    # inference.
-    #
-    # r3: the section carries no dimension (the pinch height moved to the
-    # right view), so no part-hidden sketch needs showing while it is cut.
-    section = create_section_view(
-        adapter,
-        top,
-        line_start=(TOP_CENTER[0], _plan_y(Z_NORTH) - SECTION_NORTH_OVERSHOOT),
-        line_end=(TOP_CENTER[0], _plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT),
-        view_xy=SECTION_CENTER,
-        section_label="A",
-        scale=SHEET_SCALE,
-        label="adjuster and pinch-bore centre section",
-    )
-    set_hidden_lines_removed(adapter, section)
-    section_annotations = curate_view_dimensions(
-        adapter,
-        section,
-        keep=SECTION_KEEP,
-        view_label="bore centre section",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    _add_adjuster_axis(adapter, section)
 
     adjuster_view, adjuster_center, adjuster_edge = _preferred_entry_circle(
         adapter,
@@ -1835,7 +1648,6 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [
         *front_annotations,
         *top_annotations,
-        *section_annotations,
         *right_annotations,
         *left_annotations,
         *back_annotations,
@@ -1903,7 +1715,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Main eye-pass af561fa7: the shaded pictorial carries no thread ink.
     _hide_cosmetic_threads(adapter, iso, label="isometric")
 
-    _hide_cosmetic_threads(adapter, section, label="section")
     for text, x, y in _sheet_notes(adjuster_center):
         if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add the {text.lower()!r} note")
@@ -1979,7 +1790,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Annotation insertion can regenerate a view with inherited display state;
     # every manufacturing view is explicitly HLR at export.
-    for view in (front, top, right, left, back, bottom, section):
+    for view in (front, top, right, left, back, bottom):
         set_hidden_lines_removed(adapter, view)
 
     return await finalize_drawing(

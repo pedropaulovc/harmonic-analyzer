@@ -210,19 +210,17 @@ def test_part_hides_every_model_reference_sketch() -> None:
     )
 
 
-def test_section_a_carries_no_dimension_so_shows_no_hidden_sketch() -> None:
-    """A derived view keeps the part's sketch visibility from its creation.
-
-    995a7c94 hides every reference sketch in the part.  Section A used to
-    dimension PinchRise and was cut while the part showed that sketch; r3
-    moved the pinch height to the right view, so the section keeps nothing
-    and is cut with the part as saved.
-    """
-    assert drawing.SECTION_KEEP == {}
-    assert not hasattr(drawing, "SECTION_SKETCHES")
+def test_sheet_cuts_no_section() -> None:
+    """Machinist review of f86ff6bf8 (gating, two of three runs): section
+    A-A, cut down the slot at 8.500, clipped the Ø2.26 hold-down tap drill
+    at 7.500 into an unexplained 1 mm sliver, and every hole it showed is
+    fully defined by its callout (rule 1).  The sheet cuts no section, so no
+    cutting-plane line, label or ROTATED note prints."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert "part_sketches_shown(" not in body
+    assert "create_section_view" not in source
+    assert "ROTATED" not in source
+    assert "section A-A" not in drawing.sheet_view_silhouettes()
+    assert not any(name.startswith("section") for name in drawing.sheet_text_boxes())
 
 
 def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
@@ -275,7 +273,6 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
         *drawing.TOP_KEEP,
         *drawing.RIGHT_KEEP,
         *drawing.LEFT_KEEP,
-        *drawing.SECTION_KEEP,
         *drawing.BOTTOM_KEEP,
         *adjuster_axis,
     ]
@@ -339,21 +336,11 @@ def test_half_block_station_value_clears_both_witnesses() -> None:
     assert text_x + half_width <= hole - 0.001
 
 
-def test_pinch_depth_dimension_line_stands_between_the_block_and_section_a() -> None:
+def test_pinch_depth_dimension_line_stands_clear_of_the_block() -> None:
     """At +0.003 the 6.0's dimension line printed on the block's top edge."""
     top = drawing._elevation_y(part.BLOCK_HEIGHT, drawing.RIGHT_CENTER)
     line_y = drawing.RIGHT_KEEP["PinchDepthCenter"][1]
-    # Section A-A is turned 90 degrees: its lowest ink is its native label and
-    # the ROTATED note under the view, not an elevation foot.
-    texts = drawing.sheet_text_boxes()
-    section_foot = min(
-        drawing.sheet_view_silhouettes()["section A-A"][1],
-        texts["SECTION A-A label"][1],
-        texts["ROTATED 90°"][1],
-    )
     assert line_y - top >= 0.005
-    assert line_y + drawing.VALUE_TEXT_HALF_HEIGHT <= section_foot - 0.005
-
 
 
 def _matches(finding: str, expected: str) -> bool:
@@ -874,92 +861,6 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     assert fastener("vn-cone-tip-pinch-screw").material == "AISI 304"
     assert FILLISTER_SIZE[1] == dt_cone_tip_block_spec.PINCH_SCREW_LENGTH
     assert dt_cone_tip_block_spec.PINCH_SCREW_SKU == "91794A112"
-
-
-# Run 1 (d09c2b9eb leaf dump, c2-dumps/cone-tip-block-d09c2b9eb.json.gz):
-# section A's north arrow ran 0.072 -> 0.084 at y 0.209, and PassageCenter's
-# 7.50 was centred at (0.0795, 0.205828).  layoutcheck's replay read the
-# arrow 1.45 mm over the value (c5-near-crops/cone-tip-block-01).
-_RUN1_SECTION_ARROW = ((0.072, 0.209), (0.084, 0.209))
-_RUN1_PASSAGE_CENTER = (0.0795, 0.205828)
-
-
-def test_sheet_audit_sees_section_arrows_run1_hid() -> None:
-    """The sheet's own audit fed only dimension and leader arrows, so a
-    cutting-plane arrow over a value passed it.  Planted from run 1, the
-    same value is clear without the section arrow and flagged with it."""
-    x, y = _RUN1_PASSAGE_CENTER
-    half_w, half_h = drawing.VALUE_TEXT_HALF_WIDTH, drawing.VALUE_TEXT_HALF_HEIGHT
-    texts = {"PassageCenter": (x - half_w, y - half_h, x + half_w, y + half_h)}
-    assert drawing.sheet_ink_collisions(texts, {}, {}, {}) == []
-    arrow = {"section A north": drawing.section_arrow_ink(*_RUN1_SECTION_ARROW)}
-    # Its head, 3.2 across, reached into the value's box, as on the render.
-    findings = drawing.sheet_ink_collisions(texts, {}, arrow, {})
-    assert _findings_match(
-        findings,
-        [
-            "text-on-line: section A north's dimension line crosses 'PassageCenter'",
-            "arrow-near-text: section A north's arrow ... 'PassageCenter'",
-        ],
-    ), findings
-
-
-def test_section_arrows_stand_clear_of_every_value() -> None:
-    """Today both cutting-plane arrows keep ARROW_TEXT_CLEARANCE (2 mm) from
-    every text: PassageCenter's value and function line stand on the slit's
-    left with its datum, 6.25 mm from the north arrow since the plan rose
-    9.7 mm for that line (machinist review of d84a42ca7; 3.57 before it);
-    VIEW C's letter is 2.65 mm from the south one.  The build cuts the
-    section where the model draws it."""
-    from _drawing_leaders import distance_to_box
-
-    texts = drawing.sheet_text_boxes()
-    ink = drawing.sheet_dimension_ink()
-    gaps = {}
-    for arrow in drawing.sheet_section_arrows():
-        for name, box in texts.items():
-            if name == arrow:
-                continue
-            nearest = min(distance_to_box(s, box) for s in ink[arrow].arrows)
-            gaps[(arrow, name)] = nearest - drawing.ARROW_HALF_WIDTH
-    assert min(gaps.values()) >= drawing.ARROW_TEXT_CLEARANCE
-    assert gaps[("section A north", "PassageCenter")] == pytest.approx(0.00625, abs=5e-5)
-    assert gaps[("section A south", "view C letter")] == pytest.approx(0.00265, abs=5e-5)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert "_plan_y(Z_NORTH) - SECTION_NORTH_OVERSHOOT)" in body
-    assert "_plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT)" in body
-
-
-def _north_letter_ink_gap(overshoot: float) -> float:
-    """Nearest ink between section A's north letter and the plan's outline,
-    with the north end ``overshoot`` past the plan (the two boxes stand
-    corner to corner, so this is their corners' distance)."""
-    left, down, right, up = drawing.SECTION_LETTER_BOX
-    tip_x = drawing.TOP_CENTER[0] + drawing.SECTION_ARROW_LENGTH
-    tip_y = drawing._plan_y(drawing.Z_NORTH) - overshoot
-    letter = (tip_x + left, tip_y + down, tip_x + right, tip_y + up)
-    plan = drawing.sheet_view_silhouettes()["plan"]
-    dx = max(plan[0] - letter[2], letter[0] - plan[2], 0.0)
-    dy = max(plan[1] - letter[3], letter[1] - plan[3], 0.0)
-    return math.hypot(dx, dy)
-
-
-def test_section_a_north_letter_clears_the_plan() -> None:
-    """#955: the north letter keeps TEXT_CLEARANCE from the plan's outline,
-    the clearance every cutting-plane letter on the release sheets holds.
-    The model's letter is the one the build prints."""
-    assert drawing.sheet_text_boxes()["section A north"][3] == pytest.approx(
-        drawing._plan_y(drawing.Z_NORTH) - drawing.SECTION_NORTH_OVERSHOOT
-        + drawing.SECTION_LETTER_BOX[3]
-    )
-    assert _north_letter_ink_gap(drawing.SECTION_NORTH_OVERSHOOT) >= drawing.TEXT_CLEARANCE
-
-
-def test_the_4mm_north_end_left_its_letter_on_the_plan() -> None:
-    """Fail-first: at the 4 mm overshoot both ends had until #955, the letter
-    stood 1.45 mm off the 3:2 plan's edge; at 2:1 it meets the plan."""
-    assert _north_letter_ink_gap(0.004) < drawing.TEXT_CLEARANCE
 
 
 # --- the hold-down tap (user ruling 2026-09-29) -------------------------------
