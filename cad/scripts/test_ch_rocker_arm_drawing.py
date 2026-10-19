@@ -4959,7 +4959,36 @@ def test_end_caption_seats_actual_ink_between_crop_and_actual_title_rule(bound, 
     box = drawing._note_extent(adapter, note)
     assert box[3] <= 0.084 - 0.003
     assert box[1] >= top + 0.003
-    assert (box[0] + box[2]) / 2 == pytest.approx(0.330)
+    assert (box[0] + box[2]) / 2 == pytest.approx(0.322)
+    assert note.PropertyLinkedText == "$PRPVIEW:DETAIL E SCALE"
+
+
+@pytest.mark.parametrize("width", [0.0234, 0.0324])
+def test_end_caption_clears_land_angle_witness_without_moving_native_view(bound, monkeypatch, width):
+    note = _FakeNote((0.318, 0.078), 0.007)
+    note.PropertyLinkedText = "$PRPVIEW:DETAIL E SCALE"
+    note.annotation.SetPosition2 = note.annotation.SetPosition
+    original_extent = note.GetExtent
+    def measured_extent():
+        values = list(original_extent())
+        values[3] = values[0] + width
+        return tuple(values)
+    note.GetExtent = measured_extent
+    adapter, view = _native_crop_fixture(monkeypatch, "E")
+    view.Position = view.physical = (0.330, 0.084 + view.radius)
+    view.notes = [note]
+    position = view.Position
+    crop = drawing._detail_crop(adapter, view, label="E")
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    drawing._seat_detail_caption(adapter, view, _native_sheet(), label="E")
+    box = drawing._note_extent(adapter, note)
+    # Native proof put the angle's vertical witness at X=341.5 mm; the
+    # centred caption missed it by only 0.05 mm. Keep ordinary 3 mm air.
+    assert 0.3415 - box[2] >= 0.003
+    assert box[3] <= crop[1] - 0.003
+    assert box[1] >= 0.066 + 0.003
+    assert view.Position == position
+    assert drawing._detail_crop(adapter, view, label="E") == crop
     assert note.PropertyLinkedText == "$PRPVIEW:DETAIL E SCALE"
 
 
@@ -4995,7 +5024,8 @@ def test_native_caption_target_has_margin_for_r12_one_pixel_extents(bound, monke
     assert crop[1] - box[3] >= 0.003
     floor = 0.0127 if label == "D" else 0.066
     assert box[1] - floor >= 0.003
-    assert abs((box[0] + box[2] - crop[0] - crop[2]) / 2.0) <= pixel
+    offset = -0.008 if label == "E" else 0.0
+    assert abs((box[0] + box[2] - crop[0] - crop[2]) / 2.0 - offset) <= pixel
     assert note.PropertyLinkedText == f"$PRPVIEW:DETAIL {label} SCALE"
     if label == "D":
         # The same causal native pixel grid rejects the old near-boundary

@@ -483,6 +483,8 @@ def _outline(view: Any, *, label: str) -> tuple[float, float, float, float]:
 # Half the extra 1 mm permits one-pixel ink settling, not less required air.
 _DETAIL_CAPTION_TARGET_AIR_M = 0.004
 _DETAIL_CAPTION_SETTLE_M = (_DETAIL_CAPTION_TARGET_AIR_M - 0.003) / 2.0
+# Leave the native land-angle witness clear of Detail E's linked caption.
+_END_CAPTION_OFFSET_X_M = -0.008
 
 
 def _detail_fence(label: str) -> tuple[tuple[float, float, float], float]:
@@ -1283,6 +1285,9 @@ def _seat_detail_caption(adapter: Any, view: Any, sheet: Any, *, label: str) -> 
         _telemetry.info(slot)
         if not math.isfinite(floor) or floor >= ceiling:
             raise RuntimeError(f"{slot}: invalid native caption slot")
+        target_x = (crop[0] + crop[2]) / 2.0
+        if label == "E":
+            target_x += _END_CAPTION_OFFSET_X_M
         for attempt in range(4):
             _record_detail_caption(adapter, view, sheet, label=label, stage=f"placement {attempt}")
             box = _note_extent(adapter, note, label=f"detail {label} caption")
@@ -1292,7 +1297,7 @@ def _seat_detail_caption(adapter: Any, view: Any, sheet: Any, *, label: str) -> 
             _telemetry.info(context)
             if box[3] - box[1] > ceiling - floor:
                 raise RuntimeError(f"{context}: actual caption cannot fit between crop and lower boundary")
-            error = ((crop[0] + crop[2] - box[0] - box[2]) / 2.0,
+            error = (target_x - (box[0] + box[2]) / 2.0,
                      crop[1] - _DETAIL_CAPTION_TARGET_AIR_M - box[3])
             if max(abs(v) for v in error) <= _DETAIL_CAPTION_SETTLE_M:
                 break

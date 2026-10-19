@@ -503,6 +503,9 @@ radian tolerance before adding the BASIC box and `2X` count. The
 construction ray changes neither the solid nor the profile zone. Keep the
 common arc-centre location in the notes, but do not substitute a typed angle
 or ambiguous radial-land prose for this model-owned dimension.
+Seat E's native linked caption 8 mm left of the crop centre so the angle's
+vertical witness does not graze `DETAIL E`; retain the independent 3 mm
+crop/title-rule clearance guards and leave D's caption centred.
 
 **b. `IView::SetDisplayMode4` refusing HLR on a native detail view.**
 Don't: read `False` as "detail views can't do HLR". Two causes, both documented
