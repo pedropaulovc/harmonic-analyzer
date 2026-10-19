@@ -1964,6 +1964,7 @@ def test_virtual_sharp_supports_use_source_lines_and_nearest_notch_segment(
         drawing._profile_corner_edges(adapter, object(), index)
 
 
+@pytest.mark.parametrize("creation_toggle", [False, True])
 @pytest.mark.parametrize(
     "failure",
     [
@@ -1974,17 +1975,35 @@ def test_virtual_sharp_supports_use_source_lines_and_nearest_notch_segment(
         "misselected",
         "unknown",
         "missing",
+        "multiple",
+        "removed",
+        "renumbered",
+        "clear_lifecycle",
+        "rebuild_lifecycle",
         "type",
         "owner",
         "coordinate",
         "witness",
+        "witness_size",
         "single_witness",
     ],
 )
 def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
-    monkeypatch, failure
+    monkeypatch, capsys, failure, creation_toggle
 ):
-    state = {"inserted": False, "selected": [], "insert_calls": 0}
+    state = {"inserted": False, "selected": [], "insert_calls": 0, "phase": "before"}
+    creation_reads = []
+
+    def creation_preference(name):
+        assert name == "swDisplayVirtualSharps"
+        return 8765  # fake SDK metadata, not an implementation ordinal
+
+    def get_creation_toggle(key):
+        assert key == 8765
+        creation_reads.append(key)
+        return creation_toggle
+
+    monkeypatch.setattr(drawing._sw_type_info, "constant", creation_preference)
     index = 2  # the 37.0 station: source SW vertex, not a saved paper coordinate
     _label, x, z, _radius = part.PLATE_CORNERS[index]
     source = (x / 1000, spec.PLATE_THICKNESS / 1000, z / 1000)
@@ -2001,11 +2020,68 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
         Z=0,
         GetSketch=lambda: object() if failure == "owner" else sketch,
     )
-    sketch.GetSketchPoints2 = lambda: (
-        [point] if state["inserted"] and failure != "missing" else []
+    existing = types.SimpleNamespace(
+        Type=1,
+        GetID=lambda: (
+            (2, 4) if state["inserted"] and failure == "renumbered" else (2, 3)
+        ),
     )
+    extra = types.SimpleNamespace(GetID=lambda: (7, 20), Type=1)
+
+    def enumerated_points():
+        if not state["inserted"]:
+            return [existing]
+        retained = [] if failure == "removed" else [existing]
+        lost = (failure == "clear_lifecycle" and state["phase"] != "immediate") or (
+            failure == "rebuild_lifecycle" and state["phase"] == "rebuilt"
+        )
+        created = [] if failure == "missing" or lost else [point]
+        return retained + created + ([extra] if failure == "multiple" else [])
+
+    sketch.GetSketchPoints2 = enumerated_points
+
+    def witness_lines():
+        if not state["inserted"] or failure == "witness":
+            return []
+        if failure == "clear_lifecycle" and state["phase"] != "immediate":
+            return []
+        if failure == "rebuild_lifecycle" and state["phase"] == "rebuilt":
+            return []
+        lines = [(0.0, 0.0, 0.0, 0.01, 0.0, 0.0)]
+        if failure != "single_witness":
+            lines.append((0.0, 0.0, 0.0, 0.0, 0.01, 0.0))
+        return lines
+
+    def raw_witness():
+        if state["phase"] == "immediate":
+            assert state["selected"] == list(edges)
+        lines = witness_lines()
+        if not lines:
+            return ()
+        return (
+            0.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            0.0,
+            0.0,
+            float(len(lines)),
+            *(coordinate for line in lines for coordinate in line),
+            1.0,
+            0.0,
+        )
+
+    def witness_count():
+        size = len(raw_witness())
+        if failure == "witness_size" and state["phase"] == "rebuilt":
+            size += 1
+        return len(witness_lines()), size
+
     view = types.SimpleNamespace(
-        GetSketch=lambda: sketch, UpdateViewDisplayGeometry=lambda: None
+        GetSketch=lambda: sketch,
+        UpdateViewDisplayGeometry=lambda: None,
+        GetWitnessEntitiesCount=witness_count,
+        GetWitnessGeomInfo=raw_witness,
     )
     manager = types.SimpleNamespace(
         CreateSelectData=lambda: types.SimpleNamespace(View=None),
@@ -2026,14 +2102,26 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
         return True
 
     def insert():
+        # Model commanded side effects, not an SDK guarantee that InsertPoint
+        # creates a virtual sharp. It returns void; every result is read back.
         assert len(state["selected"]) == 2
         state["insert_calls"] += 1
         state["inserted"] = True
+        state["phase"] = "immediate"
+
+    def clear(_all):
+        state["selected"].clear()
+        if state["inserted"]:
+            state["phase"] = "cleared"
+
+    def rebuild(*_args, **_kw):
+        assert state["phase"] == "cleared"
+        state["phase"] = "rebuilt"
 
     draw = types.SimpleNamespace(
         # ActivateView intentionally exists only on the IDrawingDoc fake below.
         SelectionManager=manager,
-        ClearSelection2=lambda _all: state["selected"].clear(),
+        ClearSelection2=clear,
         InsertPoint=insert,
     )
     adapter = types.SimpleNamespace(
@@ -2041,6 +2129,7 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
         swApp=types.SimpleNamespace(
             IsSame=lambda a, b: -1 if failure == "unknown" else int(a is b),
             GetMathUtility=lambda: object(),
+            GetUserPreferenceToggle=get_creation_toggle,
         ),
     )
     ddoc = types.SimpleNamespace(ActivateView=lambda _name: failure != "activate")
@@ -2054,23 +2143,7 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
     for edge in edges:
         edge.Select4 = lambda append, data, edge=edge: select(edge, append, data)
     monkeypatch.setattr(drawing, "_profile_corner_edges", lambda *_args: edges)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kw: None)
-    monkeypatch.setattr(
-        drawing,
-        "_virtual_sharp_witness_groups",
-        lambda _view: (
-            [
-                [(0.0, 0.0, 0.0, 0.01, 0.0, 0.0)]
-                + (
-                    []
-                    if failure == "single_witness"
-                    else [(0.0, 0.0, 0.0, 0.0, 0.01, 0.0)]
-                )
-            ]
-            if state["inserted"] and failure != "witness"
-            else []
-        ),
-    )
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
 
     def transform(_utility, xyz, actual_inverse, **_kw):
         assert xyz == (point.X, point.Y, point.Z)
@@ -2084,13 +2157,79 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
     monkeypatch.setattr(drawing, "_transform_point", transform)
     monkeypatch.setattr(drawing, "model_point_in_view", project)
     if failure:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError) as caught:
             drawing._insert_profile_virtual_sharp(adapter, view, index)
+        if failure in {
+            "type",
+            "owner",
+            "coordinate",
+            "witness",
+            "single_witness",
+            "witness_size",
+        }:
+            message = str(caught.value)
+            assert (
+                "before={'point_count': 1, 'point_ids_types': [((2, 3), 1)]" in message
+            )
+            assert "immediately_after_InsertPoint=" in message
+            assert "after_rebuild=" in message
+            assert "'raw_witness':" in message
+        if failure == "witness_size":
+            assert "invalid size/values" in str(caught.value)
+            assert "'witness_count': 2, 'witness_size': 22" in str(caught.value)
+            assert f"'display_virtual_sharps': {creation_toggle}" in message
+        if failure in {
+            "missing",
+            "multiple",
+            "removed",
+            "renumbered",
+            "clear_lifecycle",
+            "rebuild_lifecycle",
+        }:
+            message = str(caught.value)
+            assert "expected exactly one new native virtual sharp point" in message
+            assert (
+                "before={'point_count': 1, 'point_ids_types': [((2, 3), 1)]" in message
+            )
+            after_points = {
+                "missing": [((2, 3), 1)],
+                "multiple": [((2, 3), 1), ((7, 19), 4), ((7, 20), 1)],
+                "removed": [((7, 19), 4)],
+                "renumbered": [((2, 4), 1), ((7, 19), 4)],
+                "clear_lifecycle": [((2, 3), 1)],
+                "rebuild_lifecycle": [((2, 3), 1)],
+            }[failure]
+            assert (
+                f"after_rebuild={{'point_count': {len(after_points)}, "
+                f"'point_ids_types': {after_points}"
+            ) in message
+            assert "immediately_after_InsertPoint=" in message
+            assert "'witness_count': 0, 'witness_size': 0, 'raw_witness': ()" in message
+            if failure in {"clear_lifecycle", "rebuild_lifecycle"}:
+                assert (
+                    "immediately_after_InsertPoint={'point_count': 2, "
+                    "'point_ids_types': [((2, 3), 1), ((7, 19), 4)], "
+                    "'witness_count': 2, 'witness_size': 21, 'raw_witness': "
+                    "(0.0, -1.0, -1.0, -1.0, 0.0, 0.0, 2.0, "
+                    "0.0, 0.0, 0.0, 0.01, 0.0, 0.0, "
+                    "0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 1.0, 0.0)"
+                ) in message
+            assert f"'display_virtual_sharps': {creation_toggle}" in message
     else:
         drawing._insert_profile_virtual_sharp(adapter, view, index)
+        output = capsys.readouterr().out
+        assert "immediately_after_InsertPoint" not in output
+        assert "raw_witness" not in output
     assert not state["selected"]
     assert state["insert_calls"] == (
         0 if failure in {"activate", "select", "count", "misselected", "unknown"} else 1
+    )
+    assert len(creation_reads) == (
+        0
+        if failure == "activate"
+        else 1
+        if failure in {"select", "count", "misselected", "unknown"}
+        else 3
     )
 
 
@@ -2164,15 +2303,18 @@ def test_virtual_sharp_preference_reads_sdk_metadata_with_real_adapter_constant_
     import _preferences
 
     name = "swDetailingVirtualSharpStyle"
+    toggle_name = "swDisplayVirtualSharps"
     sdk_ordinal = 9876  # fake TYPELIB metadata value, not a production fallback
+    toggle_ordinal = 8765
+    metadata = [(name, sdk_ordinal), (toggle_name, toggle_ordinal)]
     path = Path("installed-sdk") / "swconst.tlb"
     loads = []
     writes = []
     marks = []
     info = types.SimpleNamespace(
-        GetTypeAttr=lambda: types.SimpleNamespace(cVars=1),
-        GetVarDesc=lambda index: (index, sdk_ordinal),
-        GetNames=lambda _memid: (name,),
+        GetTypeAttr=lambda: types.SimpleNamespace(cVars=len(metadata)),
+        GetVarDesc=lambda index: (index, metadata[index][1]),
+        GetNames=lambda memid: (metadata[memid][0],),
     )
     typelib = types.SimpleNamespace(
         GetTypeInfoCount=lambda: 1,
@@ -2202,12 +2344,14 @@ def test_virtual_sharp_preference_reads_sdk_metadata_with_real_adapter_constant_
         ),
         GetUserPreferenceInteger=lambda _key, _scope: 3,
     )
+
     adapter = types.SimpleNamespace(
         # Same legacy-table shape as PyWin32Adapter: no general SDK enum map.
         constants={"swDocDRAWING": 3, "swSketchAcceptNumericInput": 372},
         currentModel=types.SimpleNamespace(Extension=extension),
     )
     assert _preferences._preference_id(adapter, name) is None  # r20 positive control
+    assert _preferences._preference_id(adapter, toggle_name) is None
     monkeypatch.setattr(drawing, "_early_bound", lambda item, _kind: item)
     monkeypatch.setattr(
         drawing,
@@ -2215,6 +2359,7 @@ def test_virtual_sharp_preference_reads_sdk_metadata_with_real_adapter_constant_
         lambda _adapter, _view, index: marks.append(index),
     )
     drawing._add_profile_virtual_sharps(adapter, object())
+    assert sdk.constant(toggle_name) == toggle_ordinal
     assert loads == [str(path)]
     assert writes == [(sdk_ordinal, 0, 3)]
     assert marks == list(range(4))

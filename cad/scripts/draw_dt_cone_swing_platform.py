@@ -1561,7 +1561,7 @@ def _virtual_sharp_witness_groups(view: Any) -> list[list[tuple[float, ...]]]:
 
 
 def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
-    """InsertPoint with two native edges; never manufacture a point or its Type."""
+    """Require native Type4, profile ownership, source position and witness lines."""
     draw = _early_bound(adapter.currentModel, "IModelDoc2")
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     label, x, z, _radius = _part.PLATE_CORNERS[index]
@@ -1569,6 +1569,8 @@ def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
         raise RuntimeError(f"{label}: cannot activate profile for virtual sharp")
     native = _early_bound(view, "IView")
     sketch = _early_bound(native.GetSketch(), "ISketch")
+    creation_preference = _sw_type_info.constant("swDisplayVirtualSharps")
+    application = _early_bound(adapter.swApp, "ISldWorks")
 
     def points():
         result = {}
@@ -1580,7 +1582,26 @@ def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
             result[key] = point
         return result
 
+    def snapshot(native_points):
+        count, size = native.GetWitnessEntitiesCount()
+        return {
+            "point_count": len(native_points),
+            "point_ids_types": [
+                (key, int(point.Type)) for key, point in sorted(native_points.items())
+            ],
+            "witness_count": int(count),
+            "witness_size": int(size),
+            "raw_witness": tuple(float(v) for v in (native.GetWitnessGeomInfo() or ())),
+            # SDK SO_Miscellaneous describes creation at virtual intersections.
+            # Observe only: this recipe must not establish a global seat baseline.
+            "display_virtual_sharps_sdk_id": creation_preference,
+            "display_virtual_sharps": bool(
+                application.GetUserPreferenceToggle(creation_preference)
+            ),
+        }
+
     before = points()
+    before_snapshot = snapshot(before)
     groups_before = _virtual_sharp_witness_groups(native)
     edges = _profile_corner_edges(adapter, native, index)
     manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
@@ -1603,25 +1624,31 @@ def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
                 raise RuntimeError(
                     f"{label}: selected support {i} failed native identity readback"
                 )
-        draw.InsertPoint()  # VT_VOID; two selected edges invoke the native tool.
+        draw.InsertPoint()  # SDK return is void; creation must be proved below.
+        immediate_snapshot = snapshot(points())  # Before clearing the two supports.
     finally:
         draw.ClearSelection2(True)
     rebuild_drawing(adapter, label=f"{label} native virtual sharp")
     native.UpdateViewDisplayGeometry()
     after = points()
+    rebuilt_snapshot = snapshot(after)
+    evidence = (
+        f"before={before_snapshot} immediately_after_InsertPoint={immediate_snapshot} "
+        f"after_rebuild={rebuilt_snapshot}"
+    )
     new = set(after) - set(before)
     if len(new) != 1 or not set(before) <= set(after):
         raise RuntimeError(
-            f"{label}: expected exactly one new native virtual sharp point"
+            f"{label}: expected exactly one new native virtual sharp point; {evidence}"
         )
     point = after[new.pop()]
     if int(point.Type) != 4:  # swSketchPointType_VirtualSharp; never assigned.
         raise RuntimeError(
-            f"{label}: inserted point is not naturally a native virtual sharp"
+            f"{label}: inserted point is not naturally a native virtual sharp; {evidence}"
         )
     if int(adapter.swApp.IsSame(point.GetSketch(), sketch)) != 1:
         raise RuntimeError(
-            f"{label}: native virtual sharp is not owned by the profile sketch"
+            f"{label}: native virtual sharp is not owned by the profile sketch; {evidence}"
         )
     inverse = _early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse()
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
@@ -1639,19 +1666,22 @@ def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
     )
     if math.dist(sheet[:2], expected[:2]) > 0.00002 or abs(sheet[2]) > 0.00002:
         raise RuntimeError(
-            f"{label}: native virtual sharp {sheet} misses source corner {expected}"
+            f"{label}: native virtual sharp {sheet} misses source corner {expected}; {evidence}"
         )
-    groups = _virtual_sharp_witness_groups(native)
+    try:
+        groups = _virtual_sharp_witness_groups(native)
+    except RuntimeError as exc:
+        raise RuntimeError(f"{label}: {exc}; {evidence}") from exc
     if len(groups) != len(groups_before) + 1 or not all(
         sum(math.dist(segment[:3], segment[3:]) > 1e-8 for segment in group) >= 2
         for group in groups
     ):
         raise RuntimeError(
-            f"{label}: native virtual sharp has no genuine witness lines"
+            f"{label}: native virtual sharp has no genuine witness lines; {evidence}"
         )
     print(
         f"{label} native virtual sharp: type=4 source_model_mm={(x, PLATE_THICKNESS, z)} "
-        f"sheet_m={sheet} witness_groups={len(groups)} raw_witness_lines={groups}"
+        f"sheet_m={sheet} witness_groups={len(groups)}"
     )
 
 
