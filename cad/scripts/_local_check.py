@@ -87,6 +87,7 @@ def main() -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     capacity = cpu_slots()
     requested, worker_option = _worker_request(args)
+    minimum = (min(requested, capacity) + 1) // 2
     started = time.monotonic()
     next_log = started + 30
     service = _telemetry.BUILD_INFRA_SERVICE
@@ -94,7 +95,8 @@ def main() -> None:
         granted = 0
         with _telemetry.span(
             "local.check.wait", label=task, lock_path=str(path),
-            cpu_slots=capacity, requested_workers=requested, service=service,
+            cpu_slots=capacity, requested_workers=requested,
+            minimum_workers=minimum, service=service,
         ):
             _telemetry.info(
                 f"[local.check] {task} requesting up to {requested}/{capacity} CPU slots"
@@ -113,6 +115,11 @@ def main() -> None:
                             granted += 1
                             if granted == requested:
                                 break
+                        # Do not strand a long suite at one worker because
+                        # short checks temporarily occupy the remaining slots.
+                        if granted < minimum:
+                            slots.close()
+                            granted = 0
                 except Timeout:
                     pass
                 if granted:

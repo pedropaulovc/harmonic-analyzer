@@ -198,8 +198,11 @@ def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, chec
     small, small_lines = _start(cmd, tmp_path, check_env)
     parallel = None
     waiting = None
+    blocker = None
     try:
         int(small_lines.get(timeout=30))
+        blocker, blocker_lines = _start(cmd, tmp_path, check_env)
+        int(blocker_lines.get(timeout=30))
         parallel, _ = _start(
             _local_check.command(
                 [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
@@ -208,6 +211,13 @@ def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, chec
             ),
             tmp_path, check_env,
         )
+        # One free slot must not strand a long suite at one worker after
+        # these short checks finish. Wait for a useful worker batch instead.
+        time.sleep(2)
+        assert not list(tmp_path.glob("gw*"))
+        blocker.stdin.write("x")
+        blocker.stdin.flush()
+        assert blocker.wait(timeout=30) == 0, blocker.stderr.read()
         deadline = time.monotonic() + 30
         while len(list(tmp_path.glob("gw*"))) < 2:
             assert parallel.poll() is None, parallel.stderr.read()
@@ -227,6 +237,6 @@ def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, chec
         assert parallel.wait(timeout=30) == 0, parallel.stderr.read()
     finally:
         (tmp_path / "release").touch()
-        for proc in (small, parallel, waiting):
+        for proc in (small, parallel, waiting, blocker):
             if proc is not None:
                 _stop(proc)

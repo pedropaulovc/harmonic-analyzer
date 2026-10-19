@@ -140,7 +140,11 @@ one. On amet's 16 logical CPUs that allows 13 workers, not one gate at a time.
 Single-process checks cost one slot. A recipe requests up to eight; another
 recipe can use the remaining five concurrently. Admission rewrites pytest's
 `-n`/`--numprocesses` argument to the number actually granted, including
-`auto`/`logical` requests. Worker counts stay fixed for that suite's lifetime.
+`auto`/`logical` requests. A parallel suite waits for at least half its requested
+workers (rounded up, after capping the request to host capacity); an insufficient
+provisional allocation is released immediately. This avoids launching a long
+recipe at one worker just because short checks temporarily occupy the host.
+Worker counts stay fixed for that suite's lifetime.
 This is a concurrency target, not a hard CPU-utilization cap: I/O waits,
 subprocesses inside tests, and unrelated applications affect measured usage.
 
