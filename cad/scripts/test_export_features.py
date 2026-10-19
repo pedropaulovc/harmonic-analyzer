@@ -25,6 +25,7 @@ import _config
 import ch_pivot_shaft_spec as shaft
 import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
+import _rocker_interface as rocker_interface
 import dt_cone_pivot_post_spec as cone
 import rocker_bank_layout as bank
 from _export_feature_faces import FeatureFaceError, face_name
@@ -407,7 +408,7 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
     assert "arc_len" not in features["top_edge"]["requirements"]
     assert features["top_edge"]["radius"] == rocker.R_TOP
     assert features["top_edge"]["height_above_pivot"] == rocker.TOP_EDGE_ABOVE_PIVOT
-    assert features["profile_outer"]["bottom_radius"] == rocker.R_BOTTOM
+    assert features["profile_outer"]["bottom_radius"] == rocker_interface.R_BOTTOM
     assert features["top_edge"]["arc_len"] == rocker.TOP_ARC_LEN
     assert features["profile_outer"]["bottom_arc_len"] == rocker.BOT_ARC_LEN
     for name, outside, suffix in (
@@ -485,11 +486,11 @@ def test_rocker_datum_domains_are_only_the_drawing_bore_broad_face_and_rod_pin_h
     # The authored land is radial from the top arc's endpoint. Its surface
     # normal is perpendicular to that radius, independently of selector code.
     radial_x = rocker.TOP_END_X / rocker.R_TOP
-    radial_y = (rocker.TOP_END_Y - rocker.CENTER_Y) / rocker.R_TOP
+    radial_y = (rocker.TOP_END_Y - rocker_interface.CENTER_Y) / rocker.R_TOP
     tip = (rocker.ROD_TIP_X, rocker.TOP_END_Y + rocker.TIP_FACE * radial_y, 0.0)
     assert _owners("ch_rocker_arm", _plane((-radial_y, radial_x, 0), tip)) == ["tip_land_pos_x"]
     assert _owners("ch_rocker_arm", _plane((radial_y, radial_x, 0), (-tip[0], tip[1], 0))) == ["tip_land_neg_x"]
-    bottom = (rocker.BOT_END_X, rocker.CENTER_Y - math.sqrt(rocker.R_BOTTOM**2 - rocker.BOT_END_X**2))
+    bottom = (rocker.BOT_END_X, rocker_interface.CENTER_Y - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker.BOT_END_X**2))
     dx, dy = bottom[0] - tip[0], bottom[1] - tip[1]
     length = math.hypot(dx, dy)
     assert _owners("ch_rocker_arm", _plane((-dy / length, dx / length, 0), tip)) == ["profile_outer"]
@@ -519,10 +520,10 @@ def test_rocker_hub_root_names_both_root_fillets_with_the_printed_max_limit() ->
     # Each fillet's tube centre stands one radius off the hub wall and the strap face.
     major = rocker.HUB_DIA / 2 + radius
     for sign in (-1, 1):
-        centre = (0.0, rocker.PIVOT_MID_Y, sign * (rocker.ARM_THICKNESS / 2 + radius))
+        centre = (0.0, rocker_interface.PIVOT_MID_Y, sign * (rocker.ARM_THICKNESS / 2 + radius))
         assert _owners("ch_rocker_arm", _torus(centre, major, radius)) == ["hub_root"]
-        assert _owners("ch_rocker_arm", _torus((0.0, rocker.PIVOT_MID_Y, sign * rocker.ARM_THICKNESS / 2), major, radius)) == []
-    assert _owners("ch_rocker_arm", _torus((0.0, rocker.PIVOT_MID_Y, rocker.ARM_THICKNESS / 2 + radius), major, 2 * radius)) == []
+        assert _owners("ch_rocker_arm", _torus((0.0, rocker_interface.PIVOT_MID_Y, sign * rocker.ARM_THICKNESS / 2), major, radius)) == []
+    assert _owners("ch_rocker_arm", _torus((0.0, rocker_interface.PIVOT_MID_Y, rocker.ARM_THICKNESS / 2 + radius), major, 2 * radius)) == []
 
 
 def test_cone_native_tolerances_angularity_and_exact_datums() -> None:

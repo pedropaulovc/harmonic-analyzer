@@ -21,6 +21,7 @@ from __future__ import annotations
 import math
 
 import ch_rocker_arm_spec as rocker
+import _rocker_interface as rocker_interface
 from _printed_tolerance import printed_band_mm
 
 INCH = 25.4
@@ -58,9 +59,9 @@ _HALF_L_MAX = (STACK_LENGTH + printed_band_mm(1)) / 2.0
 
 def _strap_band(x: float) -> tuple[float, float]:
     """(bottom, top) of the arm at ``x`` in the pivot frame (pivot at Y0)."""
-    bottom = rocker.CENTER_Y - math.sqrt(rocker.R_BOTTOM**2 - x**2)
-    top = rocker.CENTER_Y - math.sqrt(rocker.R_TOP**2 - x**2)
-    return bottom - rocker.PIVOT_MID_Y, top - rocker.PIVOT_MID_Y
+    bottom = rocker_interface.CENTER_Y - math.sqrt(rocker_interface.R_BOTTOM**2 - x**2)
+    top = rocker_interface.CENTER_Y - math.sqrt(rocker.R_TOP**2 - x**2)
+    return bottom - rocker_interface.PIVOT_MID_Y, top - rocker_interface.PIVOT_MID_Y
 
 
 for _x, _y in S4_STATIONS:

@@ -145,7 +145,7 @@ critical_features:
     holds: "offset-turn the cam in a 4-jaw, indicate the throw to 0.01"
   rocker_rod_pin_radius:
     tolerance: 0.10
-    nominal: ch_rocker_arm_spec.ROD_HOLE_X
+    nominal: _rocker_interface.ROD_HOLE_X
     quantity: gain
     class: channel
     holds: "rod-pin hole position from the pivot bore, DRO/CNC"

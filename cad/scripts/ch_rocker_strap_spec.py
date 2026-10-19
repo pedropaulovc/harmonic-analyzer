@@ -17,16 +17,12 @@ from __future__ import annotations
 
 import math
 
+from _rocker_interface import ARM_DEPTH, CENTER_Y, CURVE_RADIUS, PIVOT_MID_Y, R_BOTTOM
 from ch_rocker_arm_spec import (
-    ARM_DEPTH,
     ARM_THICKNESS,
     ARM_THICKNESS_BAND,
     BOT_END_X,
-    CENTER_Y,
-    CURVE_RADIUS,
     HUB_DIA,
-    PIVOT_MID_Y,
-    R_BOTTOM,
     R_TOP,
     ROD_TIP_X,
     TIP_FACE,

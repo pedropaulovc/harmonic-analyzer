@@ -29,6 +29,7 @@ import math
 
 import ch_connecting_rod_spec as _rod
 import ch_rocker_arm_spec as _arm
+import _rocker_interface as rocker_interface
 from _hole_spec import NUMBER_DRILL_MM
 
 MM_PER_IN = 25.4
@@ -101,8 +102,8 @@ def _arm_bottom_low(
     lowest point.
     """
     t = math.radians(theta_deg)
-    x0 = -_arm.ROD_HOLE_X
-    y0 = _arm.PIVOT_MID_Y + top_above_pivot + r_top - _arm.ROD_HOLE_Y
+    x0 = -rocker_interface.ROD_HOLE_X
+    y0 = rocker_interface.PIVOT_MID_Y + top_above_pivot + r_top - rocker_interface.ROD_HOLE_Y
     cx = x0 * math.cos(t) - y0 * math.sin(t)
     cy = x0 * math.sin(t) + y0 * math.cos(t)
     if cx >= -half_width:
@@ -157,7 +158,7 @@ def joint_budget() -> dict[str, float]:
         _arm_bottom_low(
             lo + (hi - lo) * k / _SWING_STEPS,
             _arm.R_TOP - two_place,
-            _arm.R_BOTTOM + two_place,
+            rocker_interface.R_BOTTOM + two_place,
             _arm.TOP_EDGE_ABOVE_PIVOT + _arm.TOP_EDGE_BAND[1],
             half_width,
         )

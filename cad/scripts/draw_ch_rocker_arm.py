@@ -39,6 +39,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _surface_finish
 import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
+import _rocker_interface as rocker_interface
 from _feature_requirements import part_metadata, requirement
 from _printed_limits import drilled_limits as _drilled_band
 from _printed_limits import limits as _band
@@ -120,20 +121,16 @@ from ch_rocker_arm_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
 )
+from _rocker_interface import CENTER_Y, PIVOT_MID_Y, R_BOTTOM, ROD_HOLE_X, ROD_HOLE_Y
 from ch_rocker_arm_spec import (
     ARM_THICKNESS,
     BOT_END_X,
-    CENTER_Y,
     GEOMETRIC_TOLERANCES_MM,
     HUB_DIA,
     PIVOT_HOLE_DIA,
     PIVOT_HOLE_BAND,
-    PIVOT_MID_Y,
     R_TOP,
-    R_BOTTOM,
     ROD_HOLE_SPEC,
-    ROD_HOLE_X,
-    ROD_HOLE_Y,
     ROD_TIP_X,
     SURFACE_FINISHES,
     TIP_FACE,
@@ -165,7 +162,7 @@ _ROD_HOLE_DIA = blind_cut_dia_mm(ROD_HOLE_SPEC)
 
 _P = rocker_notes.DEFAULT_DRAWING_PRECISION
 _AXIS = ((0.0, 0.0, 1.0), ("__frame__",))
-_CENTRE = ([0.0, rocker.PIVOT_MID_Y, 0.0], ("PIVOT_MID_Y",))
+_CENTRE = ([0.0, rocker_interface.PIVOT_MID_Y, 0.0], (("_rocker_interface", "PIVOT_MID_Y"),))
 
 part_metadata(
     fields={
@@ -185,7 +182,7 @@ ISO_CENTER = (0.345, 0.205)
 ROD_HOLE = requirement(
     "rod_hole", kind="hole", faces=(CylinderFace(blind_cut_dia_mm(rocker.ROD_HOLE_SPEC)),),
     requirements=("at", "dia", "thru", "position_dia"), fields={
-        "at": ([rocker.ROD_HOLE_X, rocker.ROD_HOLE_Y, 0.0], ("ROD_HOLE_X", "ROD_HOLE_Y")),
+        "at": ([rocker_interface.ROD_HOLE_X, rocker_interface.ROD_HOLE_Y, 0.0], (("_rocker_interface", "ROD_HOLE_X"), ("_rocker_interface", "ROD_HOLE_Y"))),
         "axis": _AXIS, "drill": (rocker.ROD_HOLE_SPEC.size, ("ROD_HOLE_SPEC",)),
         "dia": (_drilled_band(blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), _P), ("ROD_HOLE_SPEC", ("_hole_spec", "NUMBER_DRILL_MM"), ("_drawing_hole_callout", "add_native_hole_callout"))),
         "nominal_dia": (blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), ("ROD_HOLE_SPEC", ("_hole_spec", "NUMBER_DRILL_MM"))),
@@ -352,8 +349,8 @@ def _plane_between(
 
 def _rocker_points() -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
     top = (rocker.TOP_END_X, rocker.TOP_END_Y)
-    bottom = (rocker.BOT_END_X, rocker.CENTER_Y - math.sqrt(rocker.R_BOTTOM**2 - rocker.BOT_END_X**2))
-    tip = (rocker.ROD_TIP_X, rocker.TOP_END_Y + rocker.TIP_FACE * (rocker.TOP_END_Y - rocker.CENTER_Y) / rocker.R_TOP)
+    bottom = (rocker.BOT_END_X, rocker_interface.CENTER_Y - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker.BOT_END_X**2))
+    tip = (rocker.ROD_TIP_X, rocker.TOP_END_Y + rocker.TIP_FACE * (rocker.TOP_END_Y - rocker_interface.CENTER_Y) / rocker.R_TOP)
     return top, tip, bottom
 
 
@@ -377,7 +374,7 @@ def _least_tip_land_mm() -> float:
     prechips 0.1.2's ``tilt_across`` takes this as the land_angle extent (C2).
     """
     zone, lower_outside = TOP_EDGE_BAND
-    cx, cy = 0.0, rocker.CENTER_Y
+    cx, cy = 0.0, rocker_interface.CENTER_Y
     mx, my = (_TOP[0] + _BOTTOM[0]) / 2.0, (_TOP[1] + _BOTTOM[1]) / 2.0
 
     def inward(start: _XY, end: _XY) -> _XY:
@@ -439,7 +436,7 @@ for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x",
             "land_angle_deg": (round(_LAND_ANGLE, _P), ("_ALPHA_TOP", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
             "land_angle_nominal_deg": (_LAND_ANGLE, ("_ALPHA_TOP",)),
             "dimension_type": ("basic", (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)),
-            "radial_tip_end": ([_sign * _TIP[0], _TIP[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
+            "radial_tip_end": ([_sign * _TIP[0], _TIP[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", ("_rocker_interface", "CENTER_Y"))),
             "top_edge_feature": ("top_edge", (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)),
             # Each land's own BASIC LAND row from A (the J row, main-r1 Opus).
             "station": (rocker.ROD_TIP_X, ("ROD_TIP_X", ("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"))),
@@ -1745,7 +1742,7 @@ PIVOT_BORE = requirement(
 
 part_metadata(
     frames={
-        name: ({"origin": [0.0, rocker.PIVOT_MID_Y, sign * rocker.HUB_LENGTH / 2], "x": [1.0, 0.0, 0.0], "y": [0.0, float(sign), 0.0], "z": [0.0, 0.0, float(sign)], "binding": "unknown"}, ("PIVOT_MID_Y", "HUB_LENGTH"))
+        name: ({"origin": [0.0, rocker_interface.PIVOT_MID_Y, sign * rocker.HUB_LENGTH / 2], "x": [1.0, 0.0, 0.0], "y": [0.0, float(sign), 0.0], "z": [0.0, 0.0, float(sign)], "binding": "unknown"}, (("_rocker_interface", "PIVOT_MID_Y"), "HUB_LENGTH"))
         for name, sign in (("A", 1), ("B", -1))
     },
     datums={"A": ({"feature": "pivot_bore", "surface": "pivot bore cylinder"}, (("draw_ch_rocker_arm", "build"),))},
@@ -1915,28 +1912,28 @@ TOP_EDGE = requirement(
         # Material added on the top edge moves it toward the arc centre.
         **_profile_zone("TopRadius", {"radius": "decreases", "height_above_pivot": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         "arc_len": (rocker.TOP_ARC_LEN, ("TOP_ARC_LEN",)),
-        "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)),
-        "centre_from_pivot_ref": (rocker.CENTER_Y - rocker.PIVOT_MID_Y, ("CENTER_Y", "PIVOT_MID_Y")),
+        "arc_centre": ([0.0, rocker_interface.CENTER_Y, 0.0], (("_rocker_interface", "CENTER_Y"),)),
+        "centre_from_pivot_ref": (rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y, (("_rocker_interface", "CENTER_Y"), ("_rocker_interface", "PIVOT_MID_Y"))),
         "end": (list(_TOP), ("TOP_END_X", "TOP_END_Y")),
     }, precision={"height_above_pivot": _TOP_P, "radius": _P},
 )
 # One Ⓤ0 zone over the lower outline between J and K: the R816 arc, both
 # tapers and both tip lands, all filed to the one scribed line (option 4).
 PROFILE_OUTER = requirement(
-    "profile_outer", kind="profile", faces=(CylinderFace(2 * rocker.R_BOTTOM), _RIGHT[1], _TIPS[1]),
+    "profile_outer", kind="profile", faces=(CylinderFace(2 * rocker_interface.R_BOTTOM), _RIGHT[1], _TIPS[1]),
     requirements=("bottom_radius", "mirror_symmetric", "surface_profile"), fields={
-        "bottom_radius": (rocker.R_BOTTOM, ("R_BOTTOM", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
-        "bottom_radius_nominal": (rocker.R_BOTTOM, ("R_BOTTOM",)),
+        "bottom_radius": (rocker_interface.R_BOTTOM, (("_rocker_interface", "R_BOTTOM"), ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
+        "bottom_radius_nominal": (rocker_interface.R_BOTTOM, (("_rocker_interface", "R_BOTTOM"),)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
         "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['BottomRadius']} TO {'|'.join(ARC_PROFILE_DATUMS)}, BETWEEN {PROFILE_BETWEEN[0]} AND {PROFILE_BETWEEN[1]}", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
         # Material added on the lower outline moves it away from the arc centre.
         # The tip lands declare this same zone themselves (see the tip-land loop).
         **_profile_zone("BottomRadius", {"bottom_radius": "increases"}, (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
-        "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)), "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "BOTTOM_RADIUS_CALLOUT"),)),
+        "arc_centre": ([0.0, rocker_interface.CENTER_Y, 0.0], (("_rocker_interface", "CENTER_Y"),)), "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "BOTTOM_RADIUS_CALLOUT"),)),
         "bottom_arc_len": (rocker.BOT_ARC_LEN, ("BOT_ARC_LEN",)),
-        "mirror_symmetric": (True, (("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"), ("draw_ch_rocker_arm", "_dress_detail_dimensions"))), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH",)),
-        "bottom_end": (list(_BOTTOM), ("BOT_END_X", "R_BOTTOM", "CENTER_Y")),
-        "radial_tip_end": (list(_TIP), ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
+        "mirror_symmetric": (True, (("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"), ("draw_ch_rocker_arm", "_dress_detail_dimensions"))), "depth_ref": (rocker_interface.ARM_DEPTH, (("_rocker_interface", "ARM_DEPTH"),)),
+        "bottom_end": (list(_BOTTOM), ("BOT_END_X", ("_rocker_interface", "R_BOTTOM"), ("_rocker_interface", "CENTER_Y"))),
+        "radial_tip_end": (list(_TIP), ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", ("_rocker_interface", "CENTER_Y"))),
     }, precision={"bottom_radius": _P},
 )
 HUB_OD = requirement(
@@ -2000,7 +1997,7 @@ HUB_ROOT_TEXT_XY = (0.047, 0.199)
 # (FRONT_LEFT_WITNESS_X): G's triangle on the face's lower half, its box
 # straight out right; the BASIC's line above the hub (top ~0.190), its boxed
 # text out right of the face.
-HUB_FACE_DATUM_LANDING_Y_MM = rocker.PIVOT_MID_Y - rocker.HUB_DIA / 4.0
+HUB_FACE_DATUM_LANDING_Y_MM = rocker_interface.PIVOT_MID_Y - rocker.HUB_DIA / 4.0
 HUB_FACE_DATUM_STANDOFF_M = 0.0075
 HUB_FACE_BASIC_TEXT_XY = (0.0945, 0.199)
 FRONT_LEFT_WITNESS_X = 0.105
@@ -2059,7 +2056,7 @@ HUB_ROOT = requirement(
     faces=tuple(
         TorusFace(
             rocker.HUB_DIA / 2 + rocker.HUB_ROOT_RADIUS_MAX, rocker.HUB_ROOT_RADIUS_MAX,
-            center_mm=(0.0, rocker.PIVOT_MID_Y, sign * (rocker.ARM_THICKNESS / 2 + rocker.HUB_ROOT_RADIUS_MAX)),
+            center_mm=(0.0, rocker_interface.PIVOT_MID_Y, sign * (rocker.ARM_THICKNESS / 2 + rocker.HUB_ROOT_RADIUS_MAX)),
         )
         for sign in (-1, 1)
     ),
@@ -2788,7 +2785,7 @@ def _hub_face_datum_g(
     face = (
         scan_view_edges(view, label="view F hub -Z end face")
         .circle_at(
-            (0.0, rocker.PIVOT_MID_Y, face_z),
+            (0.0, rocker_interface.PIVOT_MID_Y, face_z),
             rocker.HUB_DIA / 2.0,
             axis=(0.0, 0.0, 1.0),
             label=label,

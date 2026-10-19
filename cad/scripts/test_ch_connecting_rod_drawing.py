@@ -57,12 +57,12 @@ def test_rod_length_closes_the_raised_cam_to_the_level_rocker() -> None:
     import math
 
     import channel_frame_geom as frame
-    import ch_rocker_arm_spec as rocker
+    import _rocker_interface as rocker_interface
     import dt_cylinder_gear_spec as cylinder
 
     pin = (
-        frame.ROCKER_PIVOT_XY[0] - rocker.ROD_HOLE_X,
-        frame.ROCKER_PIVOT_XY[1] + rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y,
+        frame.ROCKER_PIVOT_XY[0] - rocker_interface.ROD_HOLE_X,
+        frame.ROCKER_PIVOT_XY[1] + rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y,
     )
     phase = math.radians(frame.CYLINDER_LOCK_PHASE_DEG)
     cam = (

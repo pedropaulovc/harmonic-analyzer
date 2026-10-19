@@ -13,7 +13,7 @@ from __future__ import annotations
 import math
 
 import channel_frame_geom
-import ch_rocker_arm_spec
+import _rocker_interface as rocker_interface
 import dt_cylinder_gear_spec
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -22,9 +22,9 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 # Close the actual phased cam centre to the level rocker's pin. The rocker
 # bank is fixed; raising the drive axis changes this physical rod length.
 _HOME_PIN_XY = (
-    channel_frame_geom.ROCKER_PIVOT_XY[0] - ch_rocker_arm_spec.ROD_HOLE_X,
+    channel_frame_geom.ROCKER_PIVOT_XY[0] - rocker_interface.ROD_HOLE_X,
     channel_frame_geom.ROCKER_PIVOT_XY[1]
-    + ch_rocker_arm_spec.ROD_HOLE_Y - ch_rocker_arm_spec.PIVOT_MID_Y,
+    + rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y,
 )
 _CAM_PHASE = math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG)
 _HOME_CAM_XY = (

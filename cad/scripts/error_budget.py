@@ -60,7 +60,7 @@ import mg_output_fixture_geom
 import ms_stick_geom
 import paper_drive_geom
 import mg_magnifying_wheel_geom
-import ch_rocker_arm_spec
+import _rocker_interface as rocker_interface
 import sm_summing_lever_spec
 import spring_mount_geom
 import spring_force_model
@@ -140,13 +140,13 @@ def nominal() -> Nominal:
     return Nominal(
         ecc=dt_cylinder_gear_spec.ECCENTRICITY,
         rod=ch_connecting_rod_spec.CENTER_DISTANCE,
-        pin_x=ch_rocker_arm_spec.ROD_HOLE_X,
-        pin_y=ch_rocker_arm_spec.ROD_HOLE_Y - ch_rocker_arm_spec.PIVOT_MID_Y,
+        pin_x=rocker_interface.ROD_HOLE_X,
+        pin_y=rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y,
         axis_dx=CAM_SHAFT_XY[0] - ROCKER_PIVOT_XY[0],
         axis_dy=CAM_SHAFT_XY[1] - ROCKER_PIVOT_XY[1],
         cam_home_deg=CYLINDER_LOCK_PHASE_DEG,
-        arc_r=ch_rocker_arm_spec.CURVE_RADIUS,
-        arc_cy=ch_rocker_arm_spec.CENTER_Y - ch_rocker_arm_spec.PIVOT_MID_Y,
+        arc_r=rocker_interface.CURVE_RADIUS,
+        arc_cy=rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y,
         fulcrum_dx=LEVER_FULCRUM_XY[0] - ROCKER_PIVOT_XY[0],
         fulcrum_dy=LEVER_FULCRUM_XY[1] - ROCKER_PIVOT_XY[1],
         bar_pin_arm=ch_channel_lever_spec.BAR_PIN_X,

@@ -16,15 +16,13 @@ import math
 from _hole_spec import HoleSpec
 
 
-from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
+import _rocker_interface
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 14"). These MUST match the
 # constants in build_ch_rocker_arm.py (the test cross-checks the load-bearing
 # ones), so the drawing's view math reads the same solid the part builds. ---
-CURVE_RADIUS = 800.0  # top-edge arc radius = amplitude-bar length (stated)
-ARM_DEPTH = 16.0  # perpendicular top-to-bottom depth (p.29 callout)
 ARM_THICKNESS = 2.5  # plate thickness, Z (p.27 callout)
 # Milled strap faces either side of the integral hub, micrometer-checked
 # (process plan op 20), printed 3-place natively on the strap's thickness
@@ -35,8 +33,6 @@ TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view)
 BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, perpendicular to the top edge
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft
-ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
-ROD_HOLE_ABOVE_BOTTOM = 5.53312035905  # preserves the level-pose pin Y after X shift
 ROD_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 
 SURFACE_FINISHES = (
@@ -44,24 +40,18 @@ SURFACE_FINISHES = (
 )
 
 # --- Derived spans (equations of the primitives; mirror build_ch_rocker_arm). ---
-R_TOP = CURVE_RADIUS
-R_BOTTOM = CURVE_RADIUS + ARM_DEPTH
-CENTER_Y = CURVE_RADIUS + ARM_DEPTH
+R_TOP = _rocker_interface.CURVE_RADIUS
 
 _ALPHA_TOP = (TOP_ARC_LEN / 2.0) / R_TOP
-_ALPHA_BOT = (BOT_ARC_LEN / 2.0) / R_BOTTOM
+_ALPHA_BOT = (BOT_ARC_LEN / 2.0) / _rocker_interface.R_BOTTOM
 TOP_END_X = R_TOP * math.sin(_ALPHA_TOP)
-TOP_END_Y = CENTER_Y - R_TOP * math.cos(_ALPHA_TOP)
-BOT_END_X = R_BOTTOM * math.sin(_ALPHA_BOT)
+TOP_END_Y = _rocker_interface.CENTER_Y - R_TOP * math.cos(_ALPHA_TOP)
+BOT_END_X = _rocker_interface.R_BOTTOM * math.sin(_ALPHA_BOT)
 
 # Rod tip: the top-arc endpoint pushed out along the radius by the tip face.
 _RAD_X = TOP_END_X / R_TOP
 ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X  # widest half-span (~146.25)
 
-# Rod-pin hole Y (low in the strap, ch14 fan photo).
-ROD_HOLE_Y = (
-    CENTER_Y - math.sqrt(R_BOTTOM**2 - ROD_HOLE_X * ROD_HOLE_X)
-) + ROD_HOLE_ABOVE_BOTTOM
 
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -71,10 +61,6 @@ ROD_HOLE_Y = (
 # the drawing-only data (codex #354): it changes for drawing-only mark/keep
 # updates, and assemblies import this module.
 
-# The pivot bore rides at the strap mid-depth; assemblies place the arm off
-# this (imported from here, never from build_ch_rocker_arm, so drawing-only edits
-# stay out of assembly rebuild closures -- codex #354).
-PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 
 # The amplitude bar's foot rides the top edge, and at d = 0 its cheeks pass
 # over this arm's hub, so the print controls the edge's height over the pivot
@@ -89,7 +75,7 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 # drawing-simplicity-policy.md `How the repository implements the guidelines` (Codex #936 PRRT_kwDOPHDy386mV3AO): the band is the part's,
 # on a model dimension -- build_ch_rocker_arm's hidden TopEdgeReference sketch,
 # whose one printed dimension IS this height and drives the arcs' centre.
-TOP_EDGE_ABOVE_PIVOT = CENTER_Y - PIVOT_MID_Y - R_TOP  # 8.0
+TOP_EDGE_ABOVE_PIVOT = _rocker_interface.CENTER_Y - _rocker_interface.PIVOT_MID_Y - R_TOP  # 8.0
 TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
 
 # Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in

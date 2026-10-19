@@ -254,11 +254,11 @@ from ch_connecting_rod_spec import CENTER_DISTANCE as ROD_C2C  # ring centre ->
 # notes edit full-rebuild this assembly (codex #354).
 from ch_connecting_rod_spec import FORK_THICKNESS as ROD_FORK_THICKNESS
 from ch_rod_pivot_pin_spec import PIN_INSTALLED_LENGTH
-from ch_rocker_arm_spec import ROD_HOLE_X as ARM_ROD_HOLE_X  # rod pin x in the arm
-from ch_rocker_arm_spec import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
+from _rocker_interface import ROD_HOLE_X as ARM_ROD_HOLE_X  # rod pin x in the arm
+from _rocker_interface import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
 
 # in the strap (bottom-arc y + 5.3, ch14 fan photo), NOT mid-depth like the pivot
-from ch_rocker_arm_spec import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mid-depth
+from _rocker_interface import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mid-depth
 
 # at the pivot. Same imported-not-copied rule as CAM_ECC, and for the same
 # reason: the rocker's rod-pin bore is NOT level with the pivot bore
@@ -266,7 +266,7 @@ from ch_rocker_arm_spec import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mi
 # the intrinsic 3.28 deg lever angle or the placed pin lands 7 mm off and the J2
 # revolute drags the ring off the cam (the 0.9 deg/0.4 mm version of this slip
 # already cost 20 x 20.27 mm^3 of cylinder-gear interference at the top level).
-from ch_rocker_arm_spec import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y  # 816: arm-local arc
+from _rocker_interface import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y  # 816: arm-local arc
 
 # centre above the bottom edge (= CURVE_RADIUS + ARM_DEPTH), shared with the
 # offline error budget so the slide-arc height is never copied.
