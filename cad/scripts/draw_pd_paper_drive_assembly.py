@@ -91,6 +91,7 @@ from _pd_paper_drive_explode import exploded_view_name
 from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
+from _column_clamp_interface import BAR_DEPTH
 import pd_latch_hook_geometry as hook_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
@@ -280,7 +281,7 @@ PIVOT_VIEW_INSTANCES = frozenset(
         "pd-transgear-arm-1",
     }
 )
-PIVOT_FRONT_FACE_Y = -(pivot_screw.SHOULDER_LEN + support_bar.BAR_DEPTH)
+PIVOT_FRONT_FACE_Y = -(pivot_screw.SHOULDER_LEN + BAR_DEPTH)
 PIVOT_VIEW_CENTRE_MM = (0.0, (pivot_screw.HEAD_H + PIVOT_FRONT_FACE_Y) / 2.0, 0.0)
 if (pivot_screw.HEAD_H - PIVOT_FRONT_FACE_Y) / 2.0 + 1.0 > PIVOT_FRAME_RADIUS_MM:
     raise AssertionError("the pivot circles must frame head to front face")
@@ -333,7 +334,7 @@ PIVOT_BALLOON_TIPS = (
     (
         "pd-support-bar",
         "left",
-        -pivot_screw.SHOULDER_LEN - support_bar.BAR_DEPTH / 2.0,
+        -pivot_screw.SHOULDER_LEN - BAR_DEPTH / 2.0,
         support_bar.PIVOT_TAP_CSK_DIA / 2.0 + 2.0,
     ),
 )

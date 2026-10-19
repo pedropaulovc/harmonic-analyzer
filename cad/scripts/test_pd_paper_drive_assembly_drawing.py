@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from _column_clamp_interface import BAR_DEPTH
 import _assembly
 from _assembly_contract import assembly_contract
 import _chain as chain
@@ -926,7 +927,7 @@ def test_the_pivot_section_and_its_locator_keep_to_sheet_two_left_field() -> Non
     assert caption_y - 2 * NOTE_LINE_PITCH > drawing.SHEET_INNER_BORDER_BOTTOM
     # Both circles frame the screw from its head to the bar's front face.
     assert drawing.PIVOT_FRONT_FACE_Y == pytest.approx(
-        -(pivot_screw.SHOULDER_LEN + assembly.BAR.BAR_DEPTH)
+        -(pivot_screw.SHOULDER_LEN + BAR_DEPTH)
     )
     assert drawing.PIVOT_SECTION_RADIUS == pytest.approx(
         drawing.PIVOT_FRAME_RADIUS_MM
@@ -995,7 +996,7 @@ def test_the_pivot_stake_note_points_at_the_front_mouth_clear_of_the_balloons() 
     """Rule 23: SECTION A-A shows where the lock is, its pointer in the bar's
     metal at the front tap mouth and its text off the section and balloons."""
     y, r = drawing.PIVOT_STAKE_TIP
-    front = -(pivot_screw.SHOULDER_LEN + assembly.BAR.BAR_DEPTH)
+    front = -(pivot_screw.SHOULDER_LEN + BAR_DEPTH)
     csk_rim = assembly.BAR.PIVOT_TAP_CSK_DIA / 2.0
     # In the bar, under 1 mm from the front face and the countersink's rim.
     assert front < y < front + 1.0

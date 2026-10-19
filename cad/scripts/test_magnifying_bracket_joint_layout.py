@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from _column_clamp_interface import BAR_DEPTH
 import _interference_contracts as interference
 import build_mg_magnifier_assembly as magnifier
 import build_mg_magnifying_bracket as bracket
@@ -292,7 +293,7 @@ def test_wheel_pin_press_pair_pins_the_pin_and_bar_bore() -> None:
     limit = pairs[frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1"))]
     # The pin stands in the bore over its nominal 8.9 (back end 0.60 inside
     # the 9.5 bar), inside the contract's 9.0.
-    assert -pin.BACK_Y <= 9.0 < bar.BAR_DEPTH
+    assert -pin.BACK_Y <= 9.0 < BAR_DEPTH
     assert limit == pytest.approx(
         interference._smooth_annulus_limit_mm3(pin.PIN_DIA, bar.AXLE_BORE_DIA, 9.0)
     )

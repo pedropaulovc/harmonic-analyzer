@@ -152,9 +152,11 @@ COLUMN_Z = FRAME_FRONT_COLUMN_Z
 # bar's back face; the bar's front face lands on the shared -138.9 plane, so
 # the wheel/axle/wire/pen line is untouched by the clamp swap.
 from _clamp_arc import EAR_HOLE_Z as CLAMP_EAR_DX  # noqa: E402
-from sh_column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
-from mg_wheel_bar_geom import (  # noqa: E402
+from _column_clamp_interface import (  # noqa: E402
+    ARC_DEPTH as ARC_FRONT_DEPTH,
     BAR_DEPTH as WHEEL_BAR_DEPTH,
+)
+from mg_wheel_bar_geom import (  # noqa: E402
     BAR_FRONT_Z as WHEEL_BAR_FRONT_Z,
     CLAMP_HOLE_X as BAR_CLAMP_HOLE_LOCAL_X,
     WHEEL_BAR_X0,

@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from _column_clamp_interface import BAR_DEPTH
 import _config
 import _telemetry
 import build_pd_vn_transgear_pivot_screw as part
@@ -75,7 +76,7 @@ def test_fitted_length_is_a_reference_set_by_the_bar() -> None:
     middle, as a reference."""
     assert screw.TIP_RECESS == (0.20, 0.50)
     assert screw.FITTED_THREAD_LEN == pytest.approx(
-        bar.BAR_DEPTH - sum(screw.TIP_RECESS) / 2.0
+        BAR_DEPTH - sum(screw.TIP_RECESS) / 2.0
     )
     assert screw.SHOULDER_END_Y == -screw.SHOULDER_LEN
     assert screw.TIP_Y == pytest.approx(screw.SHOULDER_END_Y - screw.FITTED_THREAD_LEN)
@@ -87,11 +88,11 @@ def test_fitted_length_is_a_reference_set_by_the_bar() -> None:
     # Facing only shortens: the nominal fit is inside the catalogue length,
     # and every stock length reaches the thinnest bar's deepest recess.
     assert screw.FITTED_THREAD_LEN < screw.THREAD_LEN
-    thin = bar.BAR_DEPTH - bar.BAR_DEPTH_BAND
+    thin = BAR_DEPTH - bar.BAR_DEPTH_BAND
     assert screw.STOCK_THREAD_LEN_MIN >= thin - screw.TIP_RECESS[1]
     # The corner the fit-up sets aside: ASME-short stock (9.017) in the
     # thickest bar (9.63) stops 0.113 deeper than the 0.50 max recess.
-    thick = bar.BAR_DEPTH + bar.BAR_DEPTH_BAND
+    thick = BAR_DEPTH + bar.BAR_DEPTH_BAND
     assert joints.PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR == pytest.approx(
         thick - screw.TIP_RECESS[1] - screw.STOCK_THREAD_LEN_MIN
     )
@@ -103,7 +104,7 @@ def test_fitted_length_is_a_reference_set_by_the_bar() -> None:
 def test_engagement_charges_one_pitch_and_the_neck() -> None:
     """Worst case: the thinnest bar, the deepest recess, one incomplete pitch
     at the faced tip and the neck before the full thread starts."""
-    thin = bar.BAR_DEPTH - bar.BAR_DEPTH_BAND
+    thin = BAR_DEPTH - bar.BAR_DEPTH_BAND
     assert joints.PIVOT_FITTED_LEN_MIN == pytest.approx(thin - screw.TIP_RECESS[1])
     worst = joints.PIVOT_FITTED_LEN_MIN - screw.PITCH - screw.FULL_THREAD_START
     assert joints.PIVOT_ENGAGEMENT_WORST == pytest.approx(worst)

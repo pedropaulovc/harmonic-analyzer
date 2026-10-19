@@ -46,9 +46,9 @@ from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_vis
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _column_clamp_interface import BAR_DEPTH
 from mg_wheel_bar_spec import (
     AXLE_BORE_X,
-    BAR_DEPTH,
     BAR_LENGTH,
     BAR_SIDE,
     BORE_MIN_WALL,

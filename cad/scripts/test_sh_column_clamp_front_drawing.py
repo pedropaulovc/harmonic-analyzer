@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+from _column_clamp_interface import ARC_DEPTH
 import sh_column_clamp_front_spec as spec
 import sh_column_clamp_fit as fit
 import draw_sh_column_clamp_front as drawing
@@ -94,7 +95,7 @@ def test_split_face_helpers_are_shared_with_the_back_arc() -> None:
 
 
 def test_geometry_and_hole_contracts_are_part_owned() -> None:
-    assert spec.ARC_DEPTH == part.DEPTH
+    assert ARC_DEPTH == part.DEPTH
     assert spec.ARC_WIDTH == _clamp_arc.ARC_WIDTH
     assert spec.ARC_HEIGHT == 2.0 * _clamp_arc.ARC_HALF_H
     assert spec.COLUMN_BORE == _clamp_arc.COLUMN_BORE

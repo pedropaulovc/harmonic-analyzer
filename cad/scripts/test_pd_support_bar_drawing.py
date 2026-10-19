@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from _column_clamp_interface import BAR_DEPTH
 import build_pd_support_bar as part
 import draw_pd_support_bar as drawing
 import pd_support_bar_drawing_spec as sheet_spec
@@ -412,7 +413,7 @@ def test_slide_faces_carry_the_slide_grade() -> None:
     assert {control.roughness_um for control in controls.values()} == {MACHINED_UM}
     top, front = controls["top_slide"].face, controls["front_slide"].face
     assert (top.normal, top.offset_mm) == ((0, 1, 0), spec.BAR_HEIGHT / 2.0)
-    assert (front.normal, front.offset_mm) == ((0, 0, -1), spec.BAR_DEPTH / 2.0)
+    assert (front.normal, front.offset_mm) == ((0, 0, -1), BAR_DEPTH / 2.0)
     # The front-face leader lands on the face, clear of every hole.
     x, y = drawing.FRONT_FINISH_MODEL_XY
     assert abs(y) < spec.BAR_HEIGHT / 2.0
@@ -476,7 +477,7 @@ def test_hole_callouts_pick_the_tap_and_counterbore_edges(monkeypatch) -> None:
             (0.0, 0.0, 1.0),
         ),
         (
-            (max(part.CLAMP_ROUND_X), 0.0, -spec.BAR_DEPTH / 2.0),
+            (max(part.CLAMP_ROUND_X), 0.0, -BAR_DEPTH / 2.0),
             part.CLAMP_CBORE_DIA / 2.0,
             (0.0, 0.0, 1.0),
         ),
@@ -506,7 +507,7 @@ def test_clamp_heads_stay_under_the_front_face_at_the_printed_worst_case() -> No
     # even at the depth's printed minimum.
     assert part.CLAMP_HEAD_H < shallowest
     # Rule 17: the floor under the deepest counterbore in the thinnest bar.
-    assert (spec.BAR_DEPTH - spec.BAR_DEPTH_BAND) - deepest >= 2.0
+    assert (BAR_DEPTH - spec.BAR_DEPTH_BAND) - deepest >= 2.0
 
 
 def test_clamp_screws_engage_the_back_arc_and_stop_inside_it() -> None:
@@ -517,12 +518,12 @@ def test_clamp_screws_engage_the_back_arc_and_stop_inside_it() -> None:
     # their nominals.
     from sh_column_clamp_back_geom import BLOCK_DEPTH as back_block
     from sh_column_clamp_back_geom import GRIP_OFFSET as grip_gap
-    from sh_column_clamp_front_geom import ARC_DEPTH as front_arc
+    from _column_clamp_interface import ARC_DEPTH as front_arc
     from _mcmaster_90280a201 import SHANK_DIA, SHANK_LEN
 
     shallowest, deepest = _printed_cbore_depth_limits()
-    thick = spec.BAR_DEPTH + spec.BAR_DEPTH_BAND
-    thin = spec.BAR_DEPTH - spec.BAR_DEPTH_BAND
+    thick = BAR_DEPTH + spec.BAR_DEPTH_BAND
+    thin = BAR_DEPTH - spec.BAR_DEPTH_BAND
     least = SHANK_LEN - (thick - shallowest + front_arc + grip_gap)
     most = SHANK_LEN - (thin - deepest + front_arc + grip_gap)
     # Rule 18: 1.5D of thread at the least engagement.
@@ -690,7 +691,7 @@ def test_slot_views_frame_the_slots() -> None:
         drawing.DETAIL_CENTER[1] + part.CLAMP_SLOT_CBORE_WIDTH * drawing.DETAIL_MM / 2.0
     )
     assert cbore_y > cbore_edge
-    back_face = drawing.SLOT_SECTION_CENTER[0] + spec.BAR_DEPTH * scale / 2000.0
+    back_face = drawing.SLOT_SECTION_CENTER[0] + BAR_DEPTH * scale / 2000.0
     assert cbore_x - 0.0285 - back_face >= 0.0025
 
 
@@ -728,7 +729,7 @@ def test_slot_section_depth_line_runs_through_the_open_slot(monkeypatch) -> None
 
         monkeypatch.setattr(drawing, "_sheet", sheet)
         text_x, text_y = drawing._slot_section_keep(None, None)["ClampSlotCboreDepth"]
-        front = origin[0] - flip * spec.BAR_DEPTH / 2000.0
+        front = origin[0] - flip * BAR_DEPTH / 2000.0
         line_y = text_y - drawing.SLOT_DEPTH_SHELF_DROP
         assert abs(line_y - origin[1]) < part.CLAMP_SLOT_WIDTH / 2000.0
         assert (text_x - front) * flip < 0.0
@@ -774,7 +775,7 @@ def test_slot_detail_is_a_model_view_centred_on_the_outer_slot(monkeypatch) -> N
         return _DetailView((x, y), tuple(float(v) for v in scale), (-0.31, 0.0))
 
     def sheet(_adapter, view, xyz, _label):
-        assert xyz == (max(part.CLAMP_SLOT_X), 0.0, -spec.BAR_DEPTH / 2.0)
+        assert xyz == (max(part.CLAMP_SLOT_X), 0.0, -BAR_DEPTH / 2.0)
         return (
             view.Position[0] + view.offset[0],
             view.Position[1] + view.offset[1],
@@ -847,7 +848,7 @@ def test_round_counterbore_callout_stands_over_the_east_pair() -> None:
     assert x - half < hole < x + half
 
 
-_FRONT_Z = -spec.BAR_DEPTH / 2.0
+_FRONT_Z = -BAR_DEPTH / 2.0
 # Sketch frames SOLIDWORKS may hand the front-face plane's sketch: model mm
 # to (u, v, w), sketch (u, v) back to model (x, y), and whether the normal
 # points out of the front face.

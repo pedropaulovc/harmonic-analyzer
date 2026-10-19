@@ -166,7 +166,6 @@ import pd_support_bar_spec as BAR  # noqa: E402
 import pd_transgear_arm_geometry as ARM  # noqa: E402
 import pd_transgear_arm_spec as ARM_SPEC  # noqa: E402
 from build_pd_support_bar import (  # noqa: E402
-    BAR_DEPTH,
     BAR_HEIGHT,
     BAR_LENGTH,
     CLAMP_CBORE_DEPTH,
@@ -175,7 +174,7 @@ from build_pd_support_bar import (  # noqa: E402
     CLAMP_HOLE_DIA,
     CLAMP_HOLE_X,
 )
-from sh_column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
+from _column_clamp_interface import ARC_DEPTH as ARC_FRONT_DEPTH, BAR_DEPTH  # noqa: E402
 from sh_column_clamp_back_geom import (  # noqa: E402
     BLOCK_DEPTH as ARC_BACK_BLOCK_DEPTH,
     GRIP_OFFSET as ARC_BACK_GRIP_OFFSET,

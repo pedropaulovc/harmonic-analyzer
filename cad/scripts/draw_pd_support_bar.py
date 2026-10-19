@@ -84,9 +84,9 @@ from build_pd_support_bar import (
     CLAMP_ROUND_X,
     CLAMP_SLOT_X,
 )
+from _column_clamp_interface import BAR_DEPTH
 from pd_support_bar_spec import (
     BACK_FACE_Z,
-    BAR_DEPTH,
     BAR_HEIGHT,
     BRACKET_TAP_CSK_DIA,
     BRACKET_TAP_SPEC,

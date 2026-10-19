@@ -31,9 +31,9 @@ from __future__ import annotations
 
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _column_clamp_interface import BAR_DEPTH
 from pd_support_bar_spec import (
     BAR_BAND_PLACES,
-    BAR_DEPTH,
     BAR_HEIGHT,
     BRACKET_TAP_SPEC,
     PIVOT_TAP_THREAD,

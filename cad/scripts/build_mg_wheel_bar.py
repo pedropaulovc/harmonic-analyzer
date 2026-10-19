@@ -73,11 +73,11 @@ from _drawing_tolerances import (
     set_dimension_symmetric_tolerance,
 )
 from _fit_deviations import deviations
+from _column_clamp_interface import BAR_DEPTH
 from mg_wheel_bar_geom import (
     AXLE_BORE_BAND,
     AXLE_BORE_DIA,
     AXLE_BORE_X,
-    BAR_DEPTH,
     BAR_DEPTH_BAND,
     BAR_LENGTH,
     BAR_SIDE,

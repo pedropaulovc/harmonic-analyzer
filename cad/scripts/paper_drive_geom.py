@@ -17,6 +17,7 @@ import pd_rack_pinion_spec
 import pd_transgear_feed_pinion_spec
 import pd_transgear_knob_shaft_spec
 import pd_transgear_removable_spec
+from _column_clamp_interface import BAR_DEPTH
 import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as arm
 from pd_latch_hook_geometry import BAR_CENTRE_Y
@@ -101,7 +102,7 @@ RECORDING_PAPER_RIGHT_INSET_MM = (
     platen.PLATE_WIDTH - RECORDING_PAPER_WIDTH_MM - RECORDING_PAPER_LEFT_INSET_MM
 )
 PAPER_FRONT_Z = (
-    hook.BAR_BACK_FACE_Z - bar.BAR_DEPTH - platen.PLATE_THICKNESS - 0.5
+    hook.BAR_BACK_FACE_Z - BAR_DEPTH - platen.PLATE_THICKNESS - 0.5
 )
 # The pen rod line. x: plumb under the magnifying wheel's rim-tangent wire (the
 # wire hangs from the rim groove's 3 o'clock point straight onto the adjuster

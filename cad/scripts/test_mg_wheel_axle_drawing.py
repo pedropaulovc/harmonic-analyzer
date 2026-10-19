@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from _column_clamp_interface import BAR_DEPTH
 import build_mg_wheel_axle as part
 import draw_mg_wheel_axle as drawing
 import mg_magnifying_wheel_geom
@@ -49,7 +50,7 @@ def test_spec_values_are_the_drill_rod_pin() -> None:
     # end then sits 0.60 inside the 9.5 bar's back face (ruling B grew the
     # bar 0.5 rearward; the pin keeps its 8.9 in the bore).
     assert spec.PRESS_GAUGE == spec.STEP_Y == pytest.approx(19.5 + spacer)
-    assert spec.BACK_Y == pytest.approx(-mg_wheel_bar_geom.BAR_DEPTH + 0.60)
+    assert spec.BACK_Y == pytest.approx(-BAR_DEPTH + 0.60)
     assert (spec.THREAD_END_Y, spec.TIP_Y) == pytest.approx(
         (spec.STEP_Y + 8.20, spec.STEP_Y + 9.00)
     )

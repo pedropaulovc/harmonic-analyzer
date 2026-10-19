@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from _column_clamp_interface import BAR_DEPTH
 import build_mg_wheel_bar as part
 import draw_mg_wheel_bar as drawing
 import mg_wheel_bar_spec
@@ -37,7 +38,7 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     # FREE geom module, so a print-note edit cannot enter the assembly recipe.
     import mg_wheel_bar_geom as geom
 
-    assert (geom.BAR_SIDE, geom.BAR_DEPTH, geom.BAR_LENGTH) == (10.0, 9.5, 234.0)
+    assert (geom.BAR_SIDE, BAR_DEPTH, geom.BAR_LENGTH) == (10.0, 9.5, 234.0)
     assert geom.CLAMP_HOLE_X == (70.5, 105.5)
     assembly = (
         Path(part.__file__)
@@ -213,7 +214,7 @@ def test_hole_callouts_pick_both_screw_hole_features(monkeypatch) -> None:
     edges = _Edges()
     monkeypatch.setattr(drawing, "scan_view_edges", lambda view, *, label: edges)
     rims = drawing._hole_rims(object())
-    face = geom.BAR_DEPTH / 2.0
+    face = BAR_DEPTH / 2.0
     assert edges.picks == [
         (
             (geom.SCREW_HOLE_X, 0.0, face),
