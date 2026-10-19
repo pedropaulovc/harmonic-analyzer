@@ -33,6 +33,7 @@ import textwrap
 from pathlib import Path
 from typing import Any, Callable, Literal
 
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -721,6 +722,7 @@ LUG_KEEP = {asm.LUG_SPAN_DIMENSION: LEVER_BANK.sheet_xy(_LUG_MID, _FULCRUM_Y + 3
 CALLOUT_TEXT_PART = 3  # swDimensionTextCalloutAbove
 REFERENCE_PREFIX_PART = 1  # swDimensionTextPrefix
 REFERENCE_SUFFIX_PART = 2  # swDimensionTextSuffix
+BROKEN_LINE_ALIGNED_TEXT = 3  # swDisplayDimensionLeaderText_e.swBrokenLeaderAlignedText
 if any("\n" in text for text in notes.DIMENSION_CALLOUTS.values()):
     raise AssertionError("an above-callout with a line break does not print")
 
@@ -1727,7 +1729,20 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
         },
     )
     _assert_settings(displays)
+    _break_line_at_text(displays[asm.LUG_SPAN_DIMENSION], label=asm.LUG_SPAN_DIMENSION)
     return lambda: _assert_settings(displays)
+
+
+def _break_line_at_text(display: Any, *, label: str) -> None:
+    """Put the value in a break of its dimension line (#1660 r8): on the
+    unbroken line the reference parentheses' tails touched the line."""
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "SetBrokenLeader2", "GetBrokenLeader2"
+    )
+    if display.SetBrokenLeader2(False, BROKEN_LINE_ALIGNED_TEXT) != 0:
+        raise RuntimeError(f"{label}: failed to break the dimension line")
+    if int(display.GetBrokenLeader2()) != BROKEN_LINE_ALIGNED_TEXT:
+        raise RuntimeError(f"{label}: broken dimension line did not persist")
 
 
 def _create_sheets(adapter: Any) -> None:
