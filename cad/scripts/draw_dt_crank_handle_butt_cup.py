@@ -5,9 +5,10 @@ ch30 eight-views-4).  The end view
 carries only its centre mark and the cutting plane; the longitudinal section
 A-A is the cup's length view (drawing-guidelines.md rule 9 (show internal shape in solid lines)) and takes every dimension, so
 the pocket and the floor hole read on cut edges rather than hidden lines (the
-MHA-DT-035 machinist review).  The body diameter is the one band; the pocket is
-bored to suit the MHA-DT-032 head (a reference size, the note says how), and
-the floor hole carries its drill callout.
+MHA-DT-035 machinist review).  The body diameter and the pocket depth are the
+bands; the pocket is bored to suit the MHA-DT-032 head (a reference size whose
+callout states the fit), and the floor hole carries its drill callout.  Every
+band names its mate at the callout (MHA-DT-035 machinist ENFORCE, r1).
 
 Run with SolidWorks open::
 
@@ -51,13 +52,17 @@ from _paths import CAD_ROOT
 from _section_axis import create_section_axis_centerline, position_section_caption
 from _session import run_build
 import _telemetry
+from dt_crank_handle_butt_cup_notes import (
+    BODY_FIT_CALLOUT,
+    FLOOR_HOLE_CALLOUT,
+    POCKET_DEPTH_CALLOUT,
+    POCKET_FIT_CALLOUT,
+)
 from dt_crank_handle_butt_cup_spec import (
     BODY_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    FLOOR_HOLE_CALLOUT,
     OVERALL_LENGTH,
-    POCKET_DEPTH,
     REFERENCE_DIMENSIONS,
 )
 
@@ -82,11 +87,12 @@ SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 ISO_SCALE = (4, 1)
 END_CENTER = (0.074, 0.165)
-SECTION_CENTER = (0.215, 0.165)
+# 10 mm right of the r1 sheet: the body-fit callout needs the room between the
+# floor-hole dimension and the section.
+SECTION_CENTER = (0.225, 0.165)
 ISO_CENTER = (0.368, 0.215)
-# Left of the pocket-depth text and above the notes (farm run
-# 20260930T011912336Z: at (0.195, 0.100) it overlapped the note block).
-CAPTION_XY = (0.150, 0.114)
+# Below the floor end, clear of the floor-hole callout and the notes.
+CAPTION_XY = (0.160, 0.114)
 MANUFACTURING_NOTES_POS = (0.022, 0.085)
 ISO_NOTE_POS = (0.335, 0.170)
 
@@ -100,22 +106,35 @@ FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 # The pocket, which opens at the face, stands right of the section; the body
 # and the floor hole left of it; the axial sizes stack above (the overall) and
 # below (the pocket depth), both from the face.
+#
+# Offline layout math (r1 layout audit: 3.5 mm text, a 5.55 mm line pitch,
+# ~2.75 mm a character; a multi-line block centres on its keep point, and a
+# horizontal dimension's line runs under its LAST line):
+# - PocketDia, five lines ~69 mm wide, centres between its extension lines
+#   (31.5 mm apart) with ~2.9 mm each side, 4 mm right of the face.
+# - BodyDia, two lines ~63 mm wide, sits between the floor-hole extension
+#   lines (21 mm apart) with ~6 mm each side, ~6.7 mm left of the floor end.
+# - PocketDepth, four lines ~58 mm wide, cannot fit between its extension
+#   lines (27.5 mm), so it stands outside them right of the face, its top
+#   ~3.6 mm under the pocket-diameter extension line.
 SECTION_KEEP = {
-    "PocketDia": (FACE_X + 0.022, SECTION_CENTER[1]),
-    # The DRILL THRU block stands well left of the body band and below the
+    "PocketDia": (FACE_X + 0.039, SECTION_CENTER[1] + 0.001),
+    "BodyDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.038, SECTION_CENTER[1] + 0.001),
+    # The DRILL THRU block stands left of the body callout and below the
     # hole's lower extension line, clear of its arrows (MHA-DT-035 re-reviews).
-    "BodyDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.018, SECTION_CENTER[1]),
     "FloorHoleDia": (
-        SECTION_CENTER[0] - HALF_LENGTH - 0.058,
+        SECTION_CENTER[0] - HALF_LENGTH - 0.076,
         SECTION_CENTER[1] - 0.024,
     ),
     "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] + BODY_R + 0.012),
-    "PocketDepth": (
-        FACE_X - POCKET_DEPTH * _S / 2.0,
-        SECTION_CENTER[1] - BODY_R - 0.010,
-    ),
+    "PocketDepth": (FACE_X + 0.033, SECTION_CENTER[1] - BODY_R - 0.008),
 }
-DIMENSION_CALLOUTS = {"FloorHoleDia": FLOOR_HOLE_CALLOUT}
+DIMENSION_CALLOUTS = {
+    "BodyDia": BODY_FIT_CALLOUT,
+    "FloorHoleDia": FLOOR_HOLE_CALLOUT,
+    "PocketDepth": POCKET_DEPTH_CALLOUT,
+    "PocketDia": POCKET_FIT_CALLOUT,
+}
 CUT_START = (END_CENTER[0], END_CENTER[1] - BODY_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + BODY_R + 0.006)
 

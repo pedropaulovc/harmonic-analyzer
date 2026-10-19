@@ -8,6 +8,7 @@ import pytest
 
 import _config
 import build_dt_crank_handle_butt_cup as part
+import dt_crank_handle_butt_cup_notes as notes
 import dt_crank_handle_butt_cup_spec as spec
 import dt_crank_handle_pivot_screw_spec as screw
 import draw_dt_crank_handle_butt_cup as drawing
@@ -31,7 +32,12 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert set(drawing.SECTION_KEEP) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert spec.REFERENCE_DIMENSIONS == {"PocketDia"}
-    assert drawing.DIMENSION_CALLOUTS == {"FloorHoleDia": "DRILL THRU"}
+    assert drawing.DIMENSION_CALLOUTS == {
+        "BodyDia": notes.BODY_FIT_CALLOUT,
+        "FloorHoleDia": "DRILL THRU",
+        "PocketDepth": notes.POCKET_DEPTH_CALLOUT,
+        "PocketDia": notes.POCKET_FIT_CALLOUT,
+    }
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
     # Two bands: the body diameter that holds the pocket wall, and the pocket
@@ -85,28 +91,38 @@ def test_pocket_and_floor_hole_read_on_a_section() -> None:
     assert "create_section_axis_centerline(" in source
 
 
-def test_notes_name_the_mates_and_the_band_reason() -> None:
-    assert spec.HANDLE_NUMBER == _config.parts("dt-crank-handle")["number"]
-    assert spec.SCREW_NUMBER == _config.parts("dt-crank-handle-pivot-screw")["number"]
-    notes = spec.DRAWING_NOTES
-    assert f"{spec.HANDLE_NUMBER} {spec.HANDLE_NAME}" in notes
-    assert f"{spec.SCREW_NUMBER} {spec.SCREW_NAME}" in notes
-    assert "TO SUIT" in notes
-    assert "MIN POCKET WALL 0.8; MIN FLOOR 1.5; CORNERS EXCEPTED." in notes
-    # Codex P1 on #1139 (c81d97280): the depth band's reason stays in the
-    # spec, not on the sheet. A short functional reason would be allowed by
-    # drawing-guidelines.md rule 7; this sheet does not carry one.
-    assert "DEPTH BAND" not in notes
-    # crank-v4-17: a 78-character line pushed the block 4.8 mm into the title
-    # block (2.55 mm a character from x=21.9, title block at x=216).
-    assert max(len(line.replace("<MOD-DIAM>", "@")) for line in notes.splitlines()) <= 74
+def test_callouts_name_the_mates_and_the_note_states_the_shortfall() -> None:
+    assert notes.HANDLE_NUMBER == _config.parts("dt-crank-handle")["number"]
+    assert notes.SCREW_NUMBER == _config.parts("dt-crank-handle-pivot-screw")["number"]
+    assert notes.SCREW_NAME in _config.parts("dt-crank-handle-pivot-screw")["title"].upper()
+    # MHA-DT-035 machinist ENFORCE r1: each band names its mate at the callout
+    # (rule 4), the matched pocket fit states name, number, diametral
+    # clearance and its hard limit, and the floor corner states its largest
+    # radius (rule 16).
+    assert notes.BODY_FIT_CALLOUT == "EPOXY FIT IN MHA-DT-008"
+    assert notes.POCKET_FIT_CALLOUT.splitlines() == [
+        "BORE TO SUIT MHA-DT-032",
+        "PIVOT SCREW HEAD, 0.2-0.4",
+        "DIAMETRAL CLEARANCE,",
+        "<MOD-DIAM>6.5 MAX",
+    ]
+    assert notes.POCKET_DEPTH_CALLOUT.splitlines() == [
+        "KEEPS MHA-DT-032 HEAD",
+        "BELOW FACE;",
+        "FLOOR CORNER R0.1 MAX",
+    ]
+    assert spec.POCKET_FLOOR_CORNER_R_MAX == pytest.approx(spec.POCKET_CLEARANCE[0] / 2)
+    # Rule 20: the one note states the pocket-wall shortfall as a plain fact,
+    # never argues it, and the assembly method lives in MHA-DT-000 (r1
+    # finding 1).
+    assert notes.DRAWING_NOTES == "POCKET WALL 0.8 MIN"
+    for word in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "EPOXY", "CORNERS"):
+        assert word not in notes.DRAWING_NOTES
     assert "turned clear of it" in _config.parts("dt-crank-handle-butt-cup")["process"]
-    assert "6.5 MAX" in notes
-    assert "FACE FLUSH, CENTRED ON THE" in notes
-    # The oak's end round is turned clear of the cup (local review of
-    # fbf82ad96): its face stays flat.
-    assert "WAXED MHA-DT-032 SCREW.  THE FACE STAYS FLAT; THE OAK ROUNDS OVER IT." in notes
-    assert all(len(line) <= 90 for line in notes.splitlines())
+    # The DT-008 and DT-032 specs import the cup spec; its prose lives in the
+    # notes module so a wording edit never re-keys those parts.
+    for name in ("DRAWING_NOTES", "ISOMETRIC_VIEW_NOTE", "FLOOR_HOLE_CALLOUT"):
+        assert not hasattr(spec, name)
 
 
 def test_registry_row_is_the_title_block_source() -> None:
