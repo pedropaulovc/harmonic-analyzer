@@ -47,7 +47,7 @@ from dt_vn_crank_hub_pin_spec import (
     PULL_THREAD_HOLE,
     PULL_THREAD_NATIVE_THROUGH_TAP_TYPES,
     PULL_THREAD_TAP_DRILL,
-    PULL_THREAD_TAP_DRILL_DESIGNATION,
+    PULL_THREAD_TAP_DRILL_PREFIX,
     PULL_THREAD_WALL_CALLOUT,
     REFERENCE_DIMENSIONS,
 )
@@ -104,8 +104,9 @@ def _require_pull_thread_definition(definition: Any) -> None:
         definition, label="MHA-VN-029 saved pull thread"
     )
     _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-VN-029 saved pull thread")
-    # FastenerType2 reports -1 on this native #56 tap. Use the documented
-    # saved-feature Type contract instead; do not accept an unknown type.
+    # Control build 20261019T195835.864950Z-3cf3a31cc7644bbf8d4f0ebbdd501a43:
+    # restored #6-32 has Type=48 but FastenerType2=-1. The latter is logged
+    # telemetry, not identity; enforce the documented saved-Type contract.
     native_type = definition.Type
     if native_type not in PULL_THREAD_NATIVE_THROUGH_TAP_TYPES:
         raise RuntimeError(
@@ -171,7 +172,7 @@ def _name_pull_thread_drill(display: Any) -> None:
         raise RuntimeError(
             "MHA-VN-029 native tap-drill row has no unique diameter token"
         )
-    prefix = f"{PULL_THREAD_TAP_DRILL_DESIGNATION} DRILL "
+    prefix = PULL_THREAD_TAP_DRILL_PREFIX
     definitions[definition_part] = prefix + original
     resolved[definition_part - 4] = prefix + resolved[definition_part - 4]
     display.SetText(definition_part - 4, definitions[definition_part])
