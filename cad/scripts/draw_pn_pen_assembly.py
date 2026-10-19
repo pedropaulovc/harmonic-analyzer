@@ -776,6 +776,7 @@ def _add_explode_trail(
         )
         for point in trail
     )
+    segments = []
     for index, pair in enumerate(zip(ends, ends[1:]), 1):
         segment = _early_bound(
             _sketch_in_view(adapter, view, pair, "line", label=f"{label} {index}"),
@@ -784,7 +785,9 @@ def _add_explode_trail(
         segment.Style = TRAIL_LINE_STYLE
         segment.Color = BOUNDARY_COLOR
         adapter.currentModel.ClearSelection2(True)
-        adapter.currentModel.EditRebuild3()
+        segments.append((segment, pair))
+    adapter.currentModel.EditRebuild3()
+    for segment, pair in segments:
         style, color = int(segment.Style), int(segment.Color)
         if (style, color) != (TRAIL_LINE_STYLE, BOUNDARY_COLOR):
             raise RuntimeError(f"{label}: trail reads style {style}, colour {color}")
