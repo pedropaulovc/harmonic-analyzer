@@ -104,6 +104,26 @@ def test_magnifying_bracket_joint_is_a_two_screw_static_clamp() -> None:
     assert row.member in jr.build_inventory().parts["mg_magnifier"]
 
 
+def test_pinion_cam_inch_set_screws_remain_staked_at_fitup() -> None:
+    import dt_pinion_cam_geometry as geometry
+    import dt_pinion_cam_spec as spec
+
+    row = next(
+        joint
+        for joint in jr.JOINTS
+        if joint.id == "dt-drive-train/pinion-cam-set-screw"
+    )
+    assert row.thread.startswith(f"{geometry.SET_SCREW_HOLE_SPEC.size} UNC ")
+    assert row.member == "dt_pinion_cam"
+    assert row.receiver == "dt_pinion_lift_rod"
+    assert row.quantity == 2
+    assert row.exposure is Exposure.OSCILLATING
+    assert row.lock is Lock.STAKED
+    assert row.lock_step == spec.SET_SCREW_STAKE_STEP_KEY
+    assert row.lock_binds == (row.member, row.receiver)
+    assert jr.REQUIRED_JOINTS[row.id].anchor == row.lock_step
+
+
 def _audit(joints, inventory=INVENTORY, **kwargs):
     kwargs.setdefault("threaded", THREADED)
     kwargs.setdefault("unthreaded", UNTHREADED)

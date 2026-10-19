@@ -8,13 +8,13 @@ one) raises the surface under the pin and swings the drum into mesh.
 U28 (user, 2026-09-23): Ø14.6 OD, eccentricity 2.0 (4.0 full lift), so the
 thin side keeps 2.10 of wall over the Ø6.40 bore (U27 target 2.0, 2.01 at
 the printed worst case).  The former raised set-pin dome is gone -- a pad
-proud of a turned OD cannot be turned -- and an M2.5 set screw now sits
+proud of a turned OD cannot be turned -- and a #2-56 set screw sits
 sub-flush in the 6.1-thick heavy side, which never meets the follower.
 
 Layout: bore axis Z through the ORIGIN (rides the rod), authored in the
 PARK pose -- collar centre at (0, -ECC), heavy side and the set-screw
 hole straight DOWN, so the OD top is at its lowest (disengaged rest).
-Collar z 0..9; tapped hole along -Y at z SET_SCREW_Z = 4.5.
+Collar z 0..9; native radial tap enters at -Y, z SET_SCREW_Z = 4.1.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -31,13 +31,15 @@ import sys
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
+from _holes import wizard_hole_on_cylinder
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, ensure_fully_defined
+from _sketch import SketchDims, blank_reference_sketches, ensure_fully_defined
 from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
@@ -54,6 +56,7 @@ from dt_pinion_cam_geometry import (
     CAM_LEN,
     CAM_OD,
     ECC,
+    SET_SCREW_HOLE_SPEC,
     SET_SCREW_Z,
     TAP_DRILL_DIA,
 )
@@ -180,10 +183,9 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Bore")
     volume = await volume_check(adapter, "bore", V_COLLAR, 0.005 * V_COLLAR)
 
-    # M2.5 x 0.45 tap drill, cut from the OD's lowest tangent plane into the
-    # existing rod bore through the heavy side.  The drawing releases the
-    # final 6H thread; this pilot geometry makes the machining operation part
-    # of the model too.  Top sketch (u, v) -> (X, -Z).
+    # Retain the drawing-owned tap-drill diameter and axial station in a
+    # hidden, construction-only reference sketch. Top (u, v) -> (X, -Z).
+    # The native radial Hole Wizard below, not this circle, cuts the tap.
     check(
         "create_plane tap drill at OD tangent",
         await adapter.create_plane(
@@ -200,7 +202,7 @@ async def build(adapter) -> dict[str, str]:
         "create_sketch tap drill",
         await adapter.create_sketch(tap_plane_name),
     )
-    await define_circle(
+    tap_circle = await define_circle(
         adapter,
         0.0,
         -SET_SCREW_Z,
@@ -210,21 +212,42 @@ async def build(adapter) -> dict[str, str]:
         names=("TapCx", "TapCz", "TapDrillDia"),
         drives=(None, '"SetScrewZ"', '"TapDrillDia"'),
     )
+    segment = _early_bound(adapter._sketch_entities[tap_circle], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(
+            "tap-drill reference circle did not take the construction flag"
+        )
     await ensure_fully_defined(adapter, "tap-drill sketch")
     check("exit_sketch tap drill", await adapter.exit_sketch())
     name_last_feature(adapter, "TapDrillProfile")
     drive_jobs += tap.apply(adapter, "TapDrillProfile")
+    blank_reference_sketches(adapter, ("TapDrillProfile",))
+
+    # One native #2-56 UNC-2B tap, radially inward from the heavy-side OD
+    # through to the next surface (the rod bore), never through the far wall.
+    # Front-offset station plane fixes Z; Right Plane clocks the mouth to -Y.
     check(
-        "cut M2.5 tap drill to bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(
-                depth=-_TAP_PLANE_Y,
+        "create_plane SetScrewStationPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=SET_SCREW_Z
             )
         ),
     )
-    name_last_feature(adapter, "M2.5TapDrill")
+    name_last_feature(adapter, "SetScrewStationPlane")
+    station_dim = name_dimensions(adapter, "SetScrewStationPlane", ["SetScrewZ"])
+    drive_jobs += [(station_dim[0], '"SetScrewZ"')]
+    wizard_hole_on_cylinder(
+        adapter,
+        SET_SCREW_HOLE_SPEC,
+        [0.0, _TAP_PLANE_Y, SET_SCREW_Z],
+        "heavy-side set-screw tap (#2-56)",
+        name="SetScrewTap",
+        point_planes=("SetScrewStationPlane", "Right Plane"),
+    )
     volume -= V_TAP_DRILL
-    await volume_check(adapter, "M2.5 tap drill", volume, 0.05 * V_TAP_DRILL)
+    await volume_check(adapter, "#2-56 radial tap", volume, 0.05 * V_TAP_DRILL)
 
     # Named bore axis for the rod mate (Axis1).
     cam_bore_axis = await name_bore_axis(
@@ -274,7 +297,11 @@ async def build(adapter) -> dict[str, str]:
     )
     blank_reference_geometry(
         adapter,
-        (("TapDrillPlane", "PLANE"), (cam_bore_axis, "AXIS")),
+        (
+            ("TapDrillPlane", "PLANE"),
+            ("SetScrewStationPlane", "PLANE"),
+            (cam_bore_axis, "AXIS"),
+        ),
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)

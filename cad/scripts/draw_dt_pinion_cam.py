@@ -4,7 +4,7 @@ An eccentric steel collar: the Ø6.40 bore is offset 2.0 mm from the Ø14.6 OD
 axis (so the collar and bore are NOT concentric -- the drawing dimensions that
 offset explicitly, per the cam-note precedent).  The collar/bore sketches live
 on the Front plane (front view carries bore/eccentricity); the side profile
-carries collar length/OD, while the set-screw end view owns the M2.5 tapped
+carries collar length/OD, while the set-screw end view owns the #2-56 tapped
 hole and its station (U28: the raised boss is gone).
 
 Run with SolidWorks open::
@@ -33,7 +33,7 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
@@ -49,6 +49,7 @@ from dt_pinion_cam_spec import (
     BORE_CALLOUT,
     CAM_OD,
     COLLAR_OD_CALLOUT,
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     ECC,
     ECCENTRICITY_CALLOUT,
@@ -219,14 +220,28 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (side, bottom, iso):
         set_hidden_lines_removed(adapter, view)
 
+    # The construction-only tap reference is now unabsorbed and saved hidden;
+    # opt into the established per-view import without changing its ownership.
     bottom_annotations = curate_view_dimensions(
-        adapter, bottom, keep=BOTTOM_KEEP, view_label="set-screw end"
+        adapter,
+        bottom,
+        keep=BOTTOM_KEEP,
+        view_label="set-screw end",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     side_annotations = curate_view_dimensions(
-        adapter, side, keep=SIDE_KEEP, view_label="profile"
+        adapter,
+        side,
+        keep=SIDE_KEEP,
+        view_label="profile",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*bottom_annotations, *front_annotations, *side_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
@@ -273,6 +288,10 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pinion Lift Cam Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # One native tap adds one redundant automatic thread note; the
+        # dimension's curated callout already releases the same thread.
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

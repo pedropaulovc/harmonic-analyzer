@@ -1141,11 +1141,11 @@ def test_short_lift_rod_keeps_its_back_collar_and_bearing() -> None:
     assert rod_end - drive.BLOCK_BACK_Z0 >= 2.0 / 3.0 * drive.BLOCK_DEPTH
 
 
-# The cam's M2.5 set screw is tapped radially on its heavy side, at the
-# collar's mid-length, and the follower pins sweep over that station
-# (front T/2 = 4.5).  The hole stays clear of the follower because it sits
-# round the far side of the cam, not because of the axial offset.  Sweep the
-# whole engage throw with the strap swing, plus over-travel.
+# The cam's #2-56 set screw is tapped radially on its heavy side. Its station
+# comes from the cam geometry; the follower pins' axial bands overlap it.
+# The hole stays clear of the follower because it sits round the far side
+# of the cam, not because of the axial offset. Sweep the whole engage throw
+# with the strap swing, plus over-travel.
 _CAM_OVERTRAVEL_DEG = 10.0
 _HOLE_CONTACT_MARGIN_DEG = 45.0
 
@@ -1177,8 +1177,8 @@ def test_cam_set_screw_hole_stays_clear_of_the_follower() -> None:
 
     # The axial bands DO overlap, so the angular gap is what keeps them apart.
     hole_band = (
-        cam.SET_SCREW_Z - cam.TAP_DRILL_DIA / 2.0,
-        cam.SET_SCREW_Z + cam.TAP_DRILL_DIA / 2.0,
+        cam.SET_SCREW_Z - cam.SET_SCREW_MAJOR_DIA / 2.0,
+        cam.SET_SCREW_Z + cam.SET_SCREW_MAJOR_DIA / 2.0,
     )
     for stations in _follower_stations():
         pin_band = (
@@ -1186,9 +1186,8 @@ def test_cam_set_screw_hole_stays_clear_of_the_follower() -> None:
             max(stations) + drive.FPIN_DIA / 2.0,
         )
         assert pin_band[0] < hole_band[1] and pin_band[1] > hole_band[0]
-    # Tap-drill half-angle seen from the cam centre at the OD.
-    half = math.degrees(math.asin(cam.TAP_DRILL_DIA / cam.CAM_OD))
-    assert math.isclose(half, 8.07, abs_tol=0.01)
+    # Use the whole thread mouth, not the smaller pilot drill, for contact air.
+    half = math.degrees(math.asin(cam.SET_SCREW_MAJOR_DIA / cam.CAM_OD))
     end = drive.CAM_ENGAGE_ROTATION_DEG - _CAM_OVERTRAVEL_DEG
     gaps = [
         _hole_to_contact_deg(end * i / 120, drive._PHI_ENG * j / 20)
