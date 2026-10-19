@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import math
 import sys
@@ -922,7 +923,8 @@ def test_holddown_section_arrows_clear_the_profile_plan() -> None:
         radius = {c[0]: c[3] for c in part.PLATE_CORNERS}[label] * 0.0005 / math.sqrt(2.0)
         return (px + cx * 0.0005 + dx * radius, py - cz * 0.0005 + dy * radius)
 
-    r10_leader = (drawing._planned(0.051, 0.139), arc_tip("NE", -1.0, -1.0))
+    r10_x, r10_y = drawing.PROFILE_KEEP["CornerNER"]
+    r10_leader = ((r10_x + 0.0088233, r10_y - 0.0027781), arc_tip("NE", -1.0, -1.0))
     r8_leader = (drawing.PROFILE_KEEP["CornerNWR"], arc_tip("NW", 1.0, -1.0))
     north_edge_y = py - part.NORTH_OVERHANG * 0.0005
     nw_x = px + part.WEST_HALF_N * 0.0005
@@ -941,7 +943,8 @@ def test_holddown_section_arrows_clear_the_profile_plan() -> None:
     # and the 8.0 extension line.
     down = (px + half - head, line_y - length, px + half + head, line_y)
     assert _segment_hits_box(nw_extension, down)
-    assert _segment_hits_box(r8_leader, down)
+    old_r8_leader = (drawing._planned(0.135, 0.118), arc_tip("NW", 1.0, -1.0))
+    assert _segment_hits_box(old_r8_leader, down)
 
 
 def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> None:
@@ -1600,3 +1603,101 @@ def test_pivot_callout_has_a_full_text_height_between_the_identifier_and_caption
     shift = drawing.PIVOT_BORE_CALLOUT_XY[1] - 0.099
     assert 0.1084 - (0.1063 + shift) > 0.00357
     assert (0.0926 + shift) - 0.085 > 0.00357
+
+
+def test_pivot_section_uses_profile_station_outline_and_native_end_only_style():
+    """Pin the actual A-A dataflow, not merely the presence of 'profile'."""
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    assignments = {
+        node.targets[0].id: node
+        for node in build.body
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+    }
+    aa = assignments["section"]
+    cc = assignments["holddown_section"]
+    style = next(
+        node for node in build.body
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "_set_end_only_section_lines"
+    )
+    assert style.lineno < aa.lineno < cc.lineno
+    assert ast.unparse(cc.value.args[1]) == "profile"
+    assert ast.unparse(assignments["detail"].value.args[1]) == "feature"
+    assert "PostMount" not in " ".join(drawing.PROFILE_KEEP)
+    assert {"PostMountWestZ", "PostMountEastZ"} <= drawing.FEATURE_KEEP.keys()
+
+    profile = types.SimpleNamespace(GetOutline=lambda: (0.0544343, 0.117636, 0.0955657, 0.244364))
+    projections = []
+
+    def project(_adapter, view, point, **_kwargs):
+        projections.append((view, point))
+        return (0.071811, 0.126724)
+
+    namespace = {
+        "adapter": object(), "profile": profile,
+        "model_point_in_view": project, "SECTION_CENTER": drawing.SECTION_CENTER,
+        "create_section_view": lambda *args, **kwargs: (args, kwargs),
+    }
+    selected = [
+        assignments[name] for name in (
+            "profile_section_pivot", "profile_outline", "section"
+        )
+    ]
+    exec(compile(ast.Module(body=selected, type_ignores=[]), str(drawing.__file__), "exec"), namespace)
+    args, kwargs = namespace["section"]
+    assert projections == [(profile, (0.0, 0.0, 0.0))]
+    assert args[1] is profile
+    assert kwargs.pop("line_start") == pytest.approx((0.0524343, 0.126724))
+    assert kwargs.pop("line_end") == pytest.approx((0.0975657, 0.126724))
+    assert kwargs == {
+        "view_xy": drawing.SECTION_CENTER, "section_label": "A",
+        "scale": (2, 1), "label": "pivot bearing section",
+    }
+
+
+def test_profile_a_a_saved_envelope_clears_post_mount_witnesses():
+    """r13/90da07a1: translate the saved end-only stubs to the profile.
+
+    Offline envelope arithmetic only; the new saved native drawing must
+    still prove the actual section line, arrows, and attachment geometry.
+    """
+    shift = drawing.PROFILE_CENTER[0] - drawing.FEATURE_CENTER[0]
+    old_stubs = ((0.1574343, 0.1634343), (0.1965657, 0.2025657))
+    witnesses = ((0.129, 0.1806485), (0.1806485, 0.226))
+    for stub, witness in zip(old_stubs, witnesses):
+        assert min(stub[1], witness[1]) - max(stub[0], witness[0]) == pytest.approx(0.006)
+        translated = (stub[0] + shift, stub[1] + shift)
+        for start, end in witnesses:
+            assert translated[1] < start or translated[0] > end
+
+
+def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
+    """r13 text offsets/leader tip with the requested placement translated.
+
+    Fixed saved envelopes predict clearance, not native arc-attachment proof.
+    """
+    r10 = drawing.PROFILE_KEEP["CornerNER"]
+    r8 = drawing.PROFILE_KEEP["CornerNWR"]
+    assert r10 == pytest.approx((0.045, 0.136))
+    assert r8 == pytest.approx((0.115, 0.142))
+    # Saved text offset: baseline 2.7781 mm below the annotation position.
+    r10_box = (r10[0] - 0.0072358, r10[1] - 0.0027781,
+               r10[0] + 0.0072357, r10[1] + 0.0007219)
+    assert r10_box[1] == pytest.approx(0.1332219)
+    assert r10_box[1] - 0.126724 > 0.0035
+    old_r10_box = tuple(value - (0.006 if index % 2 else 0.0) for index, value in enumerate(r10_box))
+    assert old_r10_box[1] - 0.126724 < 0.0035
+    assert r8[1] - 0.0027781 == pytest.approx(0.1392219)
+    tip = (0.07602, 0.1258014)
+    knee = (r8[0] - 0.0075302, r8[1] - 0.0027781)
+    leader = (tip, knee)
+    # A's right end-only stub plus its downward arrow; C's right arrow,
+    # each widened by the saved 0.762 mm arrow-head envelope.
+    aa_right = (0.0915657, 0.114724, 0.0983277, 0.127486)
+    cc_right = (0.083049, 0.131949, 0.084573, 0.143949)
+    for box in (aa_right, cc_right):
+        assert not _segment_hits_box(leader, box)
+    old_leader = (tip, (0.1274698, 0.1062219))
+    assert _segment_hits_box(old_leader, aa_right)

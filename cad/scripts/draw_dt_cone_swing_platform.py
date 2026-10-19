@@ -226,11 +226,11 @@ PROFILE_KEEP = {
     "SouthWestX": _planned(0.104, 0.258),
     "SouthEastX": _planned(0.045, 0.259),
     # Radial rays must meet actual trimmed corners, not circle extensions.
-    # CornerNE/R10 is left and CornerNW/R8 is right in this view.  The R10
-    # shelf sits just above horizontal enough to land inside its arc while
-    # clearing the 223.4 witness lines.
-    "CornerNER": _planned(0.045, 0.139),
-    "CornerNWR": _planned(0.135, 0.118),
+    # CornerNE/R10 is left and CornerNW/R8 is right in this view.  Their
+    # native positions (45,136)/(115,142) mm clear both profile section
+    # indicators; _planned accounts for the common plan drop.
+    "CornerNER": _planned(0.045, 0.145),
+    "CornerNWR": _planned(0.115, 0.151),
     "CornerSWR": _planned(0.110, 0.249),
     # R12's arrow lands at its arc's middle (corner_radius_text_xy); its
     # text stands between the 223.4 south witness and the 24.0 line.
@@ -1513,15 +1513,17 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (profile, feature, notch, iso):
         set_hidden_lines_removed(adapter, view)
 
-    pivot_xy = model_point_in_view(
-        adapter, feature, (0.0, 0.0, 0.0), label="pivot section station"
+    # Keep the transverse pivot plane, but put its native end-only indicator
+    # on the profile: the feature plan's PostMount Z witnesses are collinear.
+    profile_section_pivot = model_point_in_view(
+        adapter, profile, (0.0, 0.0, 0.0), label="pivot section station"
     )
-    feature_outline = tuple(float(value) for value in feature.GetOutline())
+    profile_outline = tuple(float(value) for value in profile.GetOutline())
     section = create_section_view(
         adapter,
-        feature,
-        line_start=(feature_outline[0] - 0.002, pivot_xy[1]),
-        line_end=(feature_outline[2] + 0.002, pivot_xy[1]),
+        profile,
+        line_start=(profile_outline[0] - 0.002, profile_section_pivot[1]),
+        line_end=(profile_outline[2] + 0.002, profile_section_pivot[1]),
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=(2, 1),
