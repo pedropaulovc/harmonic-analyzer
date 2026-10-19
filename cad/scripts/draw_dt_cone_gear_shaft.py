@@ -16,8 +16,8 @@ say what their three places locate, and the note gives the gears' drawing
 numbers and the tailstock support the tip land needs (U40).  Source geometry
 and native model fits stay authoritative.  A separate setup sheet supplements
 these controls with parenthesized, unbanded native measurements from the
-collar's north / 64T-seat face; it creates no acceptance limits.  Only those
-pure references take their display precision from the spec.
+collar's north / 64T-seat face; it creates no acceptance limits.  These pure
+references and the front-to-tip overall take their display precision from the spec.
 
 Run with SolidWorks open::
 
@@ -606,27 +606,29 @@ def _assert_setup_references(adapter: Any, references: Sequence[SetupReference])
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     if not drawing.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate setup reference sheet")
-    for reference in references:
-        label = f"64T-seat to land {reference.land} end reference"
-        display = _early_bound(reference.display, "IDisplayDimension")
-        assert_dimension_measures(
-            adapter,
-            display,
-            expected_mm=SECTION_ENDS[reference.land] - COLLAR_END_STATION,
-            entities=reference.entities,
-            label=label,
-        )
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        if (
-            int(tolerance.Type) != 0  # swTolNONE: a pure reference takes no band
-            or not bool(display.ShowDimensionValue)
-            or (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")")
-            or int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION
-        ):
-            raise RuntimeError(f"{label} is not an unbanded native reference")
+    with _telemetry.span("drawing.assert_setup_references"):
+        for reference in references:
+            label = f"64T-seat to land {reference.land} end reference"
+            display = _early_bound(reference.display, "IDisplayDimension")
+            assert_dimension_measures(
+                adapter,
+                display,
+                expected_mm=SECTION_ENDS[reference.land] - COLLAR_END_STATION,
+                entities=reference.entities,
+                label=label,
+            )
+            dimension = _early_bound(display.GetDimension2(0), "IDimension")
+            tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+            if (
+                int(tolerance.Type) != 0  # swTolNONE: a pure reference takes no band
+                or not bool(display.ShowDimensionValue)
+                or (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")")
+                or int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION
+            ):
+                raise RuntimeError(f"{label} is not an unbanded native reference")
 
 
+@_telemetry.traced("drawing.setup_reference_sheet")
 def _add_setup_sheet(adapter: Any) -> list[SetupReference]:
     """Add a separate native side view; sheet 1 keeps every existing control."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
@@ -634,10 +636,6 @@ def _add_setup_sheet(adapter: Any) -> list[SetupReference]:
         raise RuntimeError("failed to activate setup reference sheet")
     side = place_view(adapter, str(SOURCE), "*Right", *SETUP_CENTER, scale=SETUP_SCALE)
     set_hidden_lines_removed(adapter, side)
-    curate_view_dimensions(
-        adapter, side, keep={}, view_label="setup references",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
     seat = _end_circle(
         side, station_mm=COLLAR_END_STATION, diameter_mm=COLLAR_DIA,
         label="collar north / 64T-seat face",
@@ -658,7 +656,6 @@ def _add_setup_sheet(adapter: Any) -> list[SetupReference]:
             text_xy=(seat_x - ratio * expected / 2000.0, tier),
             label=label, orientation="horizontal", entities=(seat, end),
         )
-        # Read the exact native measurement BEFORE rounding its display.
         assert_dimension_measures(
             adapter, display, expected_mm=expected, entities=(seat, end), label=label,
         )
@@ -1689,6 +1686,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
+        sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: SETUP_SCALE},
         settled_checks=(lambda: _assert_setup_references(adapter, setup_references),),
     )
 

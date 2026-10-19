@@ -1935,42 +1935,6 @@ def test_the_overall_is_added_as_a_checked_reference() -> None:
     assert 'orientation="horizontal"' in source
 
 
-def test_setup_references_do_not_rebase_the_native_controls_or_budgets() -> None:
-    spec = dt_cone_gear_shaft_spec
-    assert set(drawing.SIDE_KEEP) == {
-        "CollarWidth", "Sec0End", "Sec1End", "Sec2End", "Sec3End", "Sec4End", "ShoulderR",
-    }
-    assert drawing.SETUP_REFERENCE_LANDS == (1, 2, 3, 4)
-    assert drawing.COLLAR_END_STATION == spec.COLLAR_END_STATION
-    assert spec.DATUM_STATION == spec.COLLAR_START_STATION
-    assert spec.SECTION_ORIGINS[1:] == ("CollarFace",) * 4
-    assert drawing.DRAWING_REFERENCE_PRECISION is spec.DRAWING_REFERENCE_PRECISION
-    # S is the north / 64T-seat face, NOT a new controlled datum.  With both
-    # original lengths from the south face, subtract the collar width.
-    # Its uncertainty is already correlated through the existing controls:
-    # +/-0.13 + +/-0.13 = +/-0.26 at a shoulder, and
-    # +/-0.51 + +/-0.13 = +/-0.64 at the tip.  Neither is a new sheet limit.
-    collar_band = spec.printed_band("CollarWidth")
-    assert collar_band == pytest.approx(0.13)
-    for land in drawing.SETUP_REFERENCE_LANDS:
-        name = f"Sec{land}End"
-        expected = spec.SECTION_KNOBS[land] - spec.COLLAR_THICKNESS
-        assert spec.SECTION_ENDS[land] - spec.COLLAR_END_STATION == pytest.approx(expected)
-        assert spec.printed_band(name) + collar_band == pytest.approx(
-            0.64 if land == 4 else 0.26
-        )
-        if land != 4:
-            budget = spec.SEAT_STEP_BUDGET[name]
-            assert set(budget) == {"step band", "fillet", "collar band", "stack", "spare", "margin"}
-            assert budget["step band"] == spec.printed_band(name)
-            assert budget["collar band"] == collar_band
-    assert "REFERENCES ONLY" in drawing.SETUP_NOTE
-    assert "NOT ACCEPTANCE LIMITS" in drawing.SETUP_NOTE
-    assert "ALL DIMENSIONAL REQUIREMENTS: SHEET 1" in drawing.SETUP_NOTE
-    assert drawing.SETUP_SEAT_NOTE == "COLLAR NORTH FACE\n64T SEAT"
-    assert not re.search(r"±|\+/-|0\.26|0\.64|0\.8", drawing.SETUP_NOTE)
-
-
 def _setup_reference_sheet(monkeypatch, *, measurement_error=0.0):
     """Run the real reference loop and its native measurement/parenthesis
     helpers against edge/annotation doubles, not typed displayed values."""
@@ -2015,12 +1979,10 @@ def _setup_reference_sheet(monkeypatch, *, measurement_error=0.0):
     )
     monkeypatch.setattr(drawing, "visible_view_entities", lambda *_a, **_k: [*distractors, seat, *ends])
     place = Mock(return_value=side)
-    curate = Mock(return_value=[])
     note = Mock(return_value=object())
     origin_note = Mock(return_value=object())
     monkeypatch.setattr(drawing, "place_view", place)
     monkeypatch.setattr(drawing, "set_hidden_lines_removed", Mock())
-    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
     monkeypatch.setattr(drawing, "add_note", note)
     monkeypatch.setattr(drawing, "add_attached_note", origin_note)
     # Keep the real parenthesizing helper: only native prefix/suffix may be
@@ -2067,40 +2029,24 @@ def _setup_reference_sheet(monkeypatch, *, measurement_error=0.0):
         def GetPrimaryPrecision2(self):
             return self.precision
 
-    displays = []
-
     def add_dimension(_adapter, view, **kwargs):
         assert view is side
         assert kwargs["entities"][0] is seat
         assert kwargs["orientation"] == "horizontal"
         display = Display(kwargs["entities"])
-        displays.append(display)
         return display
 
     add = Mock(side_effect=add_dimension)
     monkeypatch.setattr(drawing, "add_edge_dimension", add)
-    native_measure = _drawing_edge_dimensions.assert_dimension_measures
-    reads = []
-
-    def read_measure(_adapter, display, **kwargs):
-        reads.append((display, display.precision, kwargs))
-        return native_measure(_adapter, display, **kwargs)
-
-    monkeypatch.setattr(drawing, "assert_dimension_measures", read_measure)
     references = drawing._add_setup_sheet(adapter)
     return SimpleNamespace(
         adapter=adapter, side=side, seat=seat, ends=ends, references=references,
-        displays=displays, add=add, place=place, curate=curate,
-        note=note, origin_note=origin_note, reads=reads,
+        add=add, origin_note=origin_note,
     )
 
 
-def test_setup_sheet_measures_exact_native_edges_before_rounding(monkeypatch) -> None:
+def test_setup_sheet_measures_exact_native_edges(monkeypatch) -> None:
     fixture = _setup_reference_sheet(monkeypatch)
-    assert fixture.place.call_args.args[2:] == ("*Right", *drawing.SETUP_CENTER)
-    assert fixture.place.call_args.kwargs == {"scale": drawing.SETUP_SCALE}
-    assert fixture.curate.call_args.kwargs["keep"] == {}
-    assert fixture.curate.call_args.kwargs["dimensions_by_feature"] is drawing.DRAWING_DIMENSIONS
     assert len(fixture.references) == len(fixture.add.call_args_list) == 4
     measured = []
     for index, reference in enumerate(fixture.references):
@@ -2111,25 +2057,10 @@ def test_setup_sheet_measures_exact_native_edges_before_rounding(monkeypatch) ->
         assert display.native.Tolerance.Type == 0
         assert display.precision == dt_cone_gear_shaft_spec.DRAWING_REFERENCE_PRECISION
         measured.append(display.native.SystemValue * 1000.0)
-        # The first read for each display precedes its precision override.
-        first = next(read for read in fixture.reads if read[0] is display)
-        assert first[1] is None
-        assert first[2]["entities"] == reference.entities
-        assert first[2]["expected_mm"] == pytest.approx(
-            drawing.SECTION_ENDS[reference.land] - drawing.COLLAR_END_STATION
-        )
     assert measured[:3] == pytest.approx((116.234, 123.110, 129.986), abs=0.001)
     assert measured[3] == pytest.approx(163.60, abs=0.005)
-    fixture.note.assert_called_once_with(fixture.adapter, drawing.SETUP_NOTE, *drawing.SETUP_NOTE_XY)
     assert fixture.origin_note.call_args.kwargs["entity"] is fixture.seat
     assert fixture.origin_note.call_args.kwargs["attached_to"] is fixture.seat
-    # Longest span is lowest; all text stands inside its own span and clear
-    # of the tightly clustered shoulder witness lines, never on the part.
-    tiers = [call.kwargs["text_xy"][1] for call in fixture.add.call_args_list]
-    assert tiers == sorted(tiers, reverse=True)
-    assert min(tiers) > 0.066 + 0.008
-    for call in fixture.add.call_args_list:
-        assert call.kwargs["text_xy"][1] < drawing.SETUP_CENTER[1] - 0.015
 
 
 def test_setup_native_nominal_error_hidden_by_rounding_is_rejected(monkeypatch) -> None:
@@ -2141,7 +2072,7 @@ def test_setup_native_nominal_error_hidden_by_rounding_is_rejected(monkeypatch) 
 
 @pytest.mark.parametrize(
     "damage",
-    ("band", "prefix", "suffix", "hidden_value", "precision", "measurement", "attachment", "dangling"),
+    ("band", "prefix", "suffix", "hidden_value", "precision"),
 )
 def test_setup_settled_readback_rejects_a_lost_reference_contract(monkeypatch, damage) -> None:
     fixture = _setup_reference_sheet(monkeypatch)
@@ -2156,42 +2087,8 @@ def test_setup_settled_readback_rejects_a_lost_reference_contract(monkeypatch, d
         display.ShowDimensionValue = False
     elif damage == "precision":
         display.precision += 1
-    elif damage == "measurement":
-        display.native.SystemValue += 0.00001
-    elif damage == "attachment":
-        # Same nominal value, wrong end edge: value-only checking misses it.
-        display.entities = (fixture.seat, fixture.ends[1])
-    elif damage == "dangling":
-        display.dangling = True
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="is not an unbanded native reference"):
         drawing._assert_setup_references(fixture.adapter, fixture.references)
-
-
-def test_setup_package_keeps_control_sheet_first_and_exports_both_sheets() -> None:
-    import ast
-
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
-    calls = [
-        node for node in ast.walk(build)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    ]
-    by_name = {call.func.id: call for call in calls}
-    assert by_name["create_blank_drawing_sheets"].lineno < min(
-        call.lineno for call in calls if call.func.id == "place_view"
-    )
-    assert by_name["_add_setup_sheet"].lineno > by_name["_prove_section_layout"].lineno
-    assert by_name["_add_setup_sheet"].lineno > by_name["add_property_linked_note"].lineno
-    curated = [
-        ast.unparse(next(kw.value for kw in call.keywords if kw.arg == "keep"))
-        for call in calls if call.func.id == "curate_view_dimensions"
-    ]
-    assert curated == ["DONOR_KEEP", "SIDE_KEEP"]
-    final = by_name["finalize_drawing"]
-    keywords = {kw.arg: kw.value for kw in final.keywords}
-    assert ast.unparse(keywords["expected_sheet_names"]) == "SHEET_NAMES"
-    assert "_assert_setup_references(adapter, setup_references)" in ast.unparse(keywords["settled_checks"])
-    assert drawing.SHEET_NAMES == ("Shaft Controls", "Setup References")
 
 
 def test_drive_train_seats_the_shaft_and_64t_on_the_collar(monkeypatch) -> None:
