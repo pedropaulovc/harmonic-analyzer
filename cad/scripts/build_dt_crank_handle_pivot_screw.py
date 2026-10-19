@@ -26,6 +26,7 @@ import math
 import sys
 
 import _config
+import _telemetry
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -51,7 +52,7 @@ from _sketch import (
 )
 from _sketch_rectangle import define_centered_rectangle
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _configuration_material import require_material_in_every_configuration
@@ -73,7 +74,6 @@ from dt_crank_handle_pivot_screw_spec import (
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
     RELIEF_DIA,
-    RELIEF_DIA_TOL,
     RELIEF_END_STATION,
     RELIEF_LEAD,
     RELIEF_LEAD_TOL,
@@ -82,15 +82,13 @@ from dt_crank_handle_pivot_screw_spec import (
     SHOULDER_DIA,
     SHOULDER_DIA_BAND,
     SHOULDER_LENGTH,
+    SINGLE_LIMITS,
     SLOT_DEPTH,
-    SLOT_DEPTH_TOL,
     SLOT_WIDTH,
     SURFACE_FINISHES,
     THREAD_LENGTH,
-    THREAD_LENGTH_BAND,
     THREAD_MODEL_DIA,
     TIP_CHAMFER,
-    TIP_CHAMFER_BAND,
 )
 
 
@@ -140,6 +138,25 @@ def slot_strip_area(radius: float, width: float) -> float:
 V_SLOT = slot_strip_area(HEAD_R, SLOT_WIDTH) * SLOT_DEPTH
 V_FINAL = V_BODY - V_SLOT
 V_INSTALLED = turned_volume(INSTALLED_THREAD_LENGTH, INSTALLED_TIP_CHAMFER) - V_SLOT
+
+
+def _single_limits(adapter) -> None:
+    """Each SINGLE_LIMITS dimension printed as a single MIN or MAX limit
+    (build_mg_magnifying_vertical_rod._single_limits): SOLIDWORKS prints the
+    nominal then the limit word, so the model value is the limit itself."""
+    for (feature, name), (limit, tol_type) in SINGLE_LIMITS.items():
+        label = f"{name}@{feature}"
+        _, dimension = _named_dimension(adapter, feature, name)
+        value = float(dimension.SystemValue)
+        if not math.isclose(value, limit / 1000.0, abs_tol=1e-9):
+            raise RuntimeError(
+                f"{label}: nominal {value * 1000.0:.7f} is not the limit {limit:.7f}"
+            )
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = tol_type
+        if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != tol_type:
+            raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
+        _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -359,44 +376,52 @@ async def build(adapter) -> dict[str, str]:
     # The under-head face located from the TIP, the one faced end every axial
     # location reads from (MHA-DT-32 re-reviews): the seat is the thread length
     # from the tip, the under-head face this reference -- the shoulder is
-    # turned to suit the bonded handle -- and the head face the overall.  It
-    # runs at mid-height of the under-head annulus so its head end sits on
-    # that face.
-    under_head_v = -(SHOULDER_R + HEAD_R) / 2.0
+    # turned to suit the bonded handle -- and the head face the overall.  The
+    # dimension ends on a short vertical witness lying ON the under-head
+    # annulus's edge (the MHA-DT-032 machinist review of 04b95f481 read the
+    # earlier full-length line under the shank as a stray feature line); the
+    # drawing blackens it into that edge.
     set_sketch_direct_db(adapter, True)
-    under_head_line = check(
-        "under-head location reference line",
-        await adapter.add_line(-OVERALL_LENGTH, under_head_v, -HEAD_LENGTH, under_head_v),
+    witness = check(
+        "under-head witness line",
+        await adapter.add_line(-HEAD_LENGTH, -HEAD_R, -HEAD_LENGTH, -SHOULDER_R),
     )
     set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[under_head_line], "ISketchSegment")
+    segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
-        raise RuntimeError("under-head location reference line did not take construction flag")
+        raise RuntimeError("under-head witness line did not take construction flag")
     check(
-        "under-head location reference horizontal",
-        await adapter.add_sketch_constraint(under_head_line, None, "horizontal"),
+        "under-head witness vertical",
+        await adapter.add_sketch_constraint(witness, None, "vertical"),
     )
-    await anchor_point_to_origin(
-        adapter,
-        f"{under_head_line}.start",
-        -OVERALL_LENGTH,
-        under_head_v,
-        "under-head location from the tip",
-    )
-    stations.record(
-        "UnderHeadTipX", '"HeadLength" + "ShoulderLength" + "ThreadLength"'
-    )
-    stations.record("UnderHeadY", '( "ShoulderDia" + "HeadDia" ) / 4')
     await dimension_between(
         adapter,
-        f"{under_head_line}.start",
-        f"{under_head_line}.end",
+        f"{overall_line}.end",
+        f"{witness}.start",
         "horizontal_distance",
         OVERALL_LENGTH - HEAD_LENGTH,
         "under-head location reference",
     )
     stations.record("UnderHeadLocation", '"ShoulderLength" + "ThreadLength"')
+    await dimension_between(
+        adapter,
+        f"{overall_line}.end",
+        f"{witness}.start",
+        "vertical_distance",
+        HEAD_R,
+        "under-head witness at the head's edge",
+    )
+    stations.record("UnderHeadY", '"HeadDia" / 2')
+    await dimension_between(
+        adapter,
+        f"{witness}.start",
+        f"{witness}.end",
+        "vertical_distance",
+        HEAD_R - SHOULDER_R,
+        "under-head witness across the annulus",
+    )
+    stations.record("UnderHeadWitness", '( "HeadDia" - "ShoulderDia" ) / 2')
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
@@ -429,8 +454,8 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven slotted screw (equations neutral)", V_FINAL, 0.02 * V_SLOT
     )
 
-    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the running-fit shoulder and its
-    # length, and the thread length that must stay inside the 8.0 arm.
+    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the running-fit shoulder and the
+    # two head sizes the MHA-DT-035 cup sets.
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND)
     )
@@ -440,23 +465,14 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "HeadLength", HEAD_LENGTH_TOL
     )
-    # The two small features the MHA-DT-32 re-review found could print as
-    # nothing at .X: the tip chamfer and the slot depth.
-    set_dimension_bilateral_tolerance(
-        adapter, "ScrewProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND)
-    )
-    set_dimension_symmetric_tolerance(adapter, "DriverSlot", "SlotDepth", SLOT_DEPTH_TOL)
-    # The relief diameter keeps the die's run-out under the thread root and a
-    # flat seat (Codex P1 on #1139); the relief lead prints as limits in the
-    # relief callout, the model owning its band all the same (Codex P2).
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewProfile", "ReliefDia", RELIEF_DIA_TOL
-    )
+    # The tip chamfer and the relief diameter print as single MAX limits: the
+    # chamfer never past the thread depth, the relief under the die-cut root
+    # (Codex P1 on #1139); the slot depth and thread length are routine .X.
+    _single_limits(adapter)
+    # The relief lead prints as limits in the relief callout, the model owning
+    # its band all the same (Codex P2 on #1139).
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "ReliefLead", RELIEF_LEAD_TOL
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "ScrewProfile", "ThreadLength", *deviations(THREAD_LENGTH_BAND)
     )
 
     # Every model edit -- the material, the appearance, the drawing marks, the

@@ -61,16 +61,23 @@ STOCK_DIA = 0.25 * MM_PER_IN
 # shrink to the photographed size.
 HEAD_DIA = 6.0
 HEAD_DIA_TOL = 0.10
-# A 4.0 head (user ruling 2026-09-29, MHA-DT-32 machinist review): with the
-# slot's own band below, the worst case leaves 2.0 of head under the slot,
+# Rule 4: each head band names its reason at its callout (the MHA-DT-32
+# machinist review of 04b95f481: the reasons only in a general note), one
+# line under the value so it stays clear of the head's extension lines.
+HEAD_DIA_CALLOUT = "ON MHA-DT-35 FLOOR"
+# A 4.0 head (user ruling 2026-09-29, MHA-DT-32 machinist review): under the
+# deepest .X slot below, the worst case leaves 2.1 of head under the slot,
 # not 0.4.  Banded (Codex P2 on #1139, user ruling 2026-09-30): at .X the
 # longest head, at the widest fitted end play, stood 1.6 proud of the cup.
 HEAD_LENGTH = 4.0
 HEAD_LENGTH_TOL = 0.10
+HEAD_LENGTH_CALLOUT = "BELOW MHA-DT-035 FACE"
 SLOT_WIDTH = 1.0
-# Banded (MHA-DT-32 re-review): at .X the slot could print as nothing.
+# Routine (.X; the MHA-DT-32 machinist review of 04b95f481 called its
+# +/-0.20 band over-specification): the shortest head under the deepest .X
+# slot still keeps the 1.5 web asserted below.
 SLOT_DEPTH = 1.0
-SLOT_DEPTH_TOL = 0.20
+SLOT_DEPTH_TOL = GENERAL_1PL_TOL_MM
 
 # The running surface under the oak bore.  (upper, lower) deviations from the
 # Ø4.00 nominal; the model carries the band natively (drawing-simplicity-policy.md `How the repository implements the guidelines`).  Ø4.00
@@ -78,8 +85,10 @@ SLOT_DEPTH_TOL = 0.20
 SHOULDER_DIA = 4.00
 SHOULDER_DIA_BAND = (-0.03, -0.08)
 # Rule 4: the running fit names its mate at the callout, as the handle's
-# PIVOT_BORE_CALLOUT names this shoulder.
-SHOULDER_CALLOUT = "RUNS IN HANDLE\nMHA-DT-008 BORE"
+# PIVOT_BORE_CALLOUT names this shoulder.  One line: SOLIDWORKS stores but
+# never prints a multi-line above-callout (draw_dt_cone_gear_shaft
+# _printable_above_callouts; the 04b95f481 sheet printed none).
+SHOULDER_CALLOUT = "RUNS IN MHA-DT-008 BORE"
 # The shoulder's thread-end face is the seat on the arm face.  Under the
 # title block's 0.25 edge break on it and on the tapped mouth, a #6-32 left no
 # seat (local review of 1f3067ef2); a Ø6 collar cannot pass the oak bore
@@ -108,21 +117,24 @@ THREAD_SIZE = "#4-40"
 # The threaded section is modelled as a plain cylinder at the basic #6 major
 # diameter, the fleet convention for a stock screw in a tap-drill-modelled hole.
 THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
-# 10.0 +0/-0.5: the shortest thread section, 9.5, less the relief and 1.5
-# pitches of die run-in still carries full thread across the arm's 7.94
-# (5/16-in) stock thickness, so the ARM governs the worst-case engagement,
-# not the screw (the 9.0 of U33b left the MHA-DT-32 machinist review short).
-# The tip is cut proud of the arm's inboard face and filed flush at assembly
-# (below).
+# 10.0 at the title block's .X (the MHA-DT-32 machinist review of 04b95f481
+# called the +0/-0.5 band's reason missing at the dimension): the shortest
+# thread section, 9.2, less the longest tip chamfer still carries full thread
+# past the thickest stock arm before filing (FILE_ALLOWANCE_MIN, asserted
+# below), so the ARM governs the worst-case engagement, not the screw (the
+# 9.0 of U33b left the MHA-DT-32 machinist review short).  The tip is cut
+# proud of the arm's inboard face and filed flush at assembly (below).
 THREAD_LENGTH = 10.0
-THREAD_LENGTH_BAND = (0.0, -0.5)
 # 45-degree thread-start chamfer on the tip, inside the 0.39 thread depth.
 # Like the relief lead, the model holds the 45 degrees by equation and the
-# print gives the axial leg with an "X 45 DEG" callout.  Banded (MHA-DT-32
-# re-review): at .X the 0.4 could print as nothing; +0.05/-0.10 keeps a real
-# chamfer that never cuts past the thread depth.
+# print gives the axial leg with an "X 45 DEG" callout.  A single MAX limit
+# (the MHA-DT-32 machinist review of 04b95f481 called +0.05/-0.10 at two
+# places over-specification; the R0.8 MAX fleet pattern): the tip is filed
+# away at assembly, so only the depth matters -- never past the thread.
+# SOLIDWORKS swTolMAX prints the nominal then "MAX", so the model value is
+# the limit.
 TIP_CHAMFER = 0.3
-TIP_CHAMFER_BAND = (0.05, -0.10)
+TIP_CHAMFER_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # The title block states the UN thread class, so the callout names no class.
 THREAD_CALLOUT = f"{THREAD_SIZE} UNC"
 THREADS_PER_IN = 40
@@ -163,13 +175,16 @@ THREAD_FIT_OFFSET_MAX = round(
 # the seat face, so the die's incomplete lead threads run out into air and the shoulder
 # pulls down tight on the arm face.  Routine (.X) sizes under the title-block
 # band.
-# Banded (Codex P1 on #1139): at .X the relief could stand above the thread
-# root (no die run-out) and, with the lead, reach past the shoulder's seat.
-# Ø1.85 +/-0.05 keeps the largest relief under the deepest die-cut root
-# estimated above, Ø1.937 (local reviews of 747487c71 and 21bb244c5).
-RELIEF_DIA = 1.85
-RELIEF_DIA_TOL = 0.05
-RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
+# A single MAX limit (Codex P1 on #1139: at .X the relief could stand above
+# the thread root, so no die run-out; the MHA-DT-32 machinist review of
+# 04b95f481 called +/-0.05 at two places over-specification and asked for a
+# one-sided limit, the MHA-MG-04 relief's pattern): Ø1.9 MAX keeps the
+# largest relief under the deepest die-cut root estimated above, Ø1.937
+# (local reviews of 747487c71 and 21bb244c5).  As above, the model value is
+# the printed limit.
+RELIEF_DIA = 1.9
+RELIEF_DIA_MAX = RELIEF_DIA
+RELIEF_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # Routine at 2.2 (the MHA-DT-32 machinist review of crank-v4-16 called a
 # +/-0.10 band over-specification): at .X the straight floor past the
 # longest lead, 1.4 - 0.4 = 1.0, keeps 1.5 #4-40 pitches of die run-out
@@ -224,7 +239,8 @@ def _limits(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
 
 
 SHOULDER_DIA_MIN, SHOULDER_DIA_MAX = _limits(SHOULDER_DIA, SHOULDER_DIA_BAND)
-THREAD_LENGTH_MIN, THREAD_LENGTH_MAX = _limits(THREAD_LENGTH, THREAD_LENGTH_BAND)
+THREAD_LENGTH_MIN = round(THREAD_LENGTH - GENERAL_1PL_TOL_MM, 6)
+THREAD_LENGTH_MAX = round(THREAD_LENGTH + GENERAL_1PL_TOL_MM, 6)
 HANDLE_BORE_MIN, HANDLE_BORE_MAX = _limits(PIVOT_BORE_DIA, PIVOT_BORE_BAND)
 
 # Head top below the cup's face at nominal: the head reads recessed in
@@ -248,10 +264,7 @@ CUP_POCKET_WALL_MIN = round(((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2
 SLOT_WEB_MIN = round(
     HEAD_LENGTH - HEAD_LENGTH_TOL - (SLOT_DEPTH + SLOT_DEPTH_TOL), 6
 )
-TIP_CHAMFER_MIN, TIP_CHAMFER_MAX = (
-    round(TIP_CHAMFER + TIP_CHAMFER_BAND[1], 6),
-    round(TIP_CHAMFER + TIP_CHAMFER_BAND[0], 6),
-)
+TIP_CHAMFER_MAX = TIP_CHAMFER
 # Under-head bearing annulus on the cup floor at the worst case: the smallest
 # head over the largest drilled floor hole, less a title-block edge break on
 # each, on the narrow side with the head pushed off-centre as far as its
@@ -342,19 +355,25 @@ INSTALLED_TIP_CHAMFER = EDGE_BREAK_MAX_MM
 ARM_STOCK_THICKNESS_MAX = 2.0 * ARM_STOCK_THICKNESS - ARM_STOCK_THICKNESS_MIN
 FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
-# The fitted shoulder and both head bands' reasons, stated once (user ruling
-# 2026-09-29, after the MHA-DT-32 machinist review; the length band's reason
-# after the 1d2be3aaf re-review called it over-specification unstated).  The
-# last line tells the shop why the thread runs past the 7.9 arm: the tip is
-# finished at assembly (rule 7: a blank finished at assembly says so).
+# The fitted shoulder's to-suit rule rides the under-head reference as its
+# callout (user ruling 2026-09-29, after the MHA-DT-32 machinist review; the
+# 04b95f481 review asked for it at the dimension, not only in a note).  The
+# notes name the seat face its 0.1 break belongs to (that review read the
+# earlier parenthetical as ambiguous) and tell the shop why the thread runs
+# past the 7.9 arm: the tip is finished at assembly (rule 7: a blank finished
+# at assembly says so).
 FITTED_STEP = step_ref("crank-handle-fitted")
+UNDER_HEAD_CALLOUT = "\n".join(
+    (
+        "UNDER-HEAD FACED TO SUIT: SEAT",
+        "TO UNDER-HEAD = MHA-DT-008 FERRULE",
+        f"FACE TO MHA-DT-035 FLOOR PLUS {END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}",
+    )
+)
 DRAWING_NOTES = "\n".join(
     (
-        f"UNDER-HEAD TO SEAT FACE (ON MHA-DT-06, EDGE BREAK {SEAT_EDGE_BREAK_MAX:.1f} MAX), TO SUIT",
-        f"  BONDED MHA-DT-08: FERRULE FACE TO MHA-DT-35 FLOOR PLUS "
-        f"{END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}.",
-        f"HEAD BEARS ON MHA-DT-35 FLOOR BELOW ITS FACE; BANDS KEEP "
-        f"{HEAD_BEARING_RADIAL_MIN:.1f} BEARING.",
+        f"SEAT FACE (SHOULDER THREAD END, ON MHA-DT-06): EDGE BREAK "
+        f"{SEAT_EDGE_BREAK_MAX:.1f} MAX.",
         f"TIP FILED FLUSH WITH MHA-DT-06 AND STAKED AT {FITTED_STEP}.",
     )
 )
@@ -372,10 +391,12 @@ SEAT_FLAT_ANNULUS_AREA = math.pi / 4.0 * (SHOULDER_DIA**2 - TAPPED_MOUTH_DIA_MAX
 SEAT_FLAT_ANNULUS_AREA_MIN = (
     math.pi / 4.0 * (SEAT_CONTACT_OUTER_DIA_MIN**2 - SEAT_CONTACT_INNER_DIA**2)
 )
-# The relief neck is the screw's weakest section: pi/4 x 1.85^2 = 2.69 mm^2
+# The relief neck is the screw's weakest section: pi/4 x 1.9^2 = 2.84 mm^2
 # against the #4-40 UNC tensile stress area of 0.00604 in^2 = 3.90 mm^2, about
-# 69 percent.  Seating torque is therefore limited by the neck, not the thread;
-# the handle's working load is a hand grip and never loads it axially.
+# 73 percent at the printed maximum (the single limit leaves the shop to turn
+# it just under the root).  Seating torque is therefore limited by the neck,
+# not the thread; the handle's working load is a hand grip and never loads it
+# axially.
 NECK_AREA = math.pi / 4.0 * RELIEF_DIA**2
 TENSILE_STRESS_AREA = 0.00604 * MM_PER_IN**2
 NECK_TO_STRESS_AREA = NECK_AREA / TENSILE_STRESS_AREA
@@ -464,8 +485,8 @@ for _ok, _what in (
         raise AssertionError(f"MHA-DT-32: {_what}")
 
 # Every axial LOCATION reads from the TIP, the one faced end (MHA-DT-32
-# re-reviews, 2026-09-29): the seat face (the thread length, with its own band
-# for the engagement check), the under-head face (UnderHeadLocation, a
+# re-reviews, 2026-09-29): the seat face (the thread length), the under-head
+# face (UnderHeadLocation, a
 # reference: the shoulder is turned to suit the bonded handle) and the head
 # face (the reference overall, for stock cut-off).  The head length, the slot
 # depth, the relief width and the two 45-degree legs are local sizes of their
@@ -486,24 +507,27 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StationReference": {"OverallLength", "UnderHeadLocation"},
 }
 # Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the shoulder diameter is
-# the running fit and prints its band at two places, the head diameter its
-# cup-floor bearing band, and the relief width prints at two places for the
-# 1.5D engagement rule; every other size is routine (.X), the fitted
-# shoulder length a reference.  The thread length carries its own +0/-0.5
-# band at one place.
+# the running fit and prints its band at two places, and the head diameter and
+# length their cup bands; every other size is routine (.X) or a single MAX
+# limit at one place, the fitted shoulder length a reference.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": 2,
         "HeadLength": 2,
         "ShoulderDia": 2,
         "ThreadLength": 1,
-        "ReliefDia": 2,
+        "ReliefDia": 1,
         "ReliefWidth": 1,
-        "TipChamfer": 2,
+        "TipChamfer": 1,
     },
     "SlotProfile": {"SlotWidth": 1},
-    "DriverSlot": {"SlotDepth": 2},
+    "DriverSlot": {"SlotDepth": 1},
     "StationReference": {"OverallLength": 1, "UnderHeadLocation": 1},
+}
+# The single-limit dimensions: (feature, dimension) -> (limit mm, swTolType).
+SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
+    ("ScrewProfile", "TipChamfer"): (TIP_CHAMFER_MAX, TIP_CHAMFER_TOL_TYPE),
+    ("ScrewProfile", "ReliefDia"): (RELIEF_DIA_MAX, RELIEF_DIA_TOL_TYPE),
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

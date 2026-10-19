@@ -2,9 +2,10 @@ r"""Create the MHA-DT-32 crank handle pivot screw manufacturing drawing.
 
 The SLDPRT remains authoritative.  A screw carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the running-fit shoulder keeps its
-native size band and one bearing-surface finish, the shoulder and thread
-lengths keep their native bands, and every other size is an ordinary model
-dimension at its part-authored places.
+native size band and one bearing-surface finish, the head keeps the two bands
+the MHA-DT-035 cup sets, the tip chamfer and relief Ø print as single MAX
+limits, and every other size is an ordinary model dimension at its
+part-authored places.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the thread tip on
@@ -29,9 +30,11 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -62,7 +65,9 @@ from dt_crank_handle_pivot_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HEAD_DIA,
+    HEAD_DIA_CALLOUT,
     HEAD_LENGTH,
+    HEAD_LENGTH_CALLOUT,
     OVERALL_LENGTH,
     REFERENCE_DIMENSIONS,
     RELIEF_CALLOUT,
@@ -77,6 +82,7 @@ from dt_crank_handle_pivot_screw_spec import (
     THREAD_MODEL_DIA,
     THREAD_SIZE,
     TIP_CHAMFER,
+    UNDER_HEAD_CALLOUT,
 )
 
 
@@ -101,8 +107,9 @@ SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 SIDE_CENTER = (0.160, 0.165)
-# Third-angle right view of the slotted head end, on the profile's axis.
-END_CENTER = (0.322, SIDE_CENTER[1])
+# Third-angle right view of the slotted head end, on the profile's axis,
+# clear of the head Ø's callout.
+END_CENTER = (0.330, SIDE_CENTER[1])
 ISO_CENTER = (0.380, 0.225)
 ISO_SCALE = (1, 1)
 
@@ -143,12 +150,17 @@ RELIEF_FLOOR_MID_X = (_sheet_x(SEAT_STATION + RELIEF_LEAD) + RELIEF_END_X) / 2.0
 # the profile.  No extension line crosses a dimension line.
 _ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.064)
 # The 4-mm head prints 12 mm long, narrower than its ~21-mm value, so the head
-# length and the slot depth stand outside the head face rather than between
-# extension lines that would strike their text (v43 render).
-HEAD_TEXT_OUTSIDE = 0.016
+# length, the head Ø and the slot depth stand outside the head face rather
+# than between extension lines that would strike their text (v43 render).
+# Each head band's one-line reason callout is centred under its value, so the
+# text centre stands half that line's width (~2.3 mm a character) plus 4 mm
+# right of the head face's extension line.
+HEAD_LENGTH_TEXT_X = HEAD_FACE_X + 0.029  # "BELOW MHA-DT-035 FACE", ~49 mm
+HEAD_DIA_TEXT_X = HEAD_FACE_X + 0.026  # "ON MHA-DT-035 FLOOR", ~44 mm
+SLOT_DEPTH_TEXT_X = HEAD_FACE_X + 0.012
 SIDE_KEEP = {
     "ThreadLength": ((TIP_X + SEAT_X) / 2.0, _ROW_Y[0]),
-    "HeadLength": (HEAD_FACE_X + HEAD_TEXT_OUTSIDE, _ROW_Y[0]),
+    "HeadLength": (HEAD_LENGTH_TEXT_X, _ROW_Y[0]),
     # The under-head face located from the tip, like every axial location.
     "UnderHeadLocation": ((TIP_X + UNDERHEAD_X) / 2.0, _ROW_Y[1]),
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
@@ -156,7 +168,9 @@ SIDE_KEEP = {
     # crosses the shoulder near its thread end; the head's stands clear of the
     # head face, left of the end view.
     "ShoulderDia": (SEAT_X + 0.056, SIDE_CENTER[1] + 0.030),
-    "HeadDia": (HEAD_FACE_X + 0.014, SIDE_CENTER[1]),
+    # The head Ø's value stands a little above the axis so its callout below
+    # stays between the head's extension lines.
+    "HeadDia": (HEAD_DIA_TEXT_X, SIDE_CENTER[1] + 0.0025),
     # The thread-relief groove against the seat face.  Its width from the seat
     # face reads above it alone; its Ø reads below it with the 45-degree lead
     # as its callout, the dimension line standing on the floor so nothing
@@ -168,7 +182,7 @@ SIDE_KEEP = {
     "TipChamfer": (TIP_X - 0.020, SIDE_CENTER[1] - 0.016),
     # The slot shows as a notch in the head face; its depth reads above it,
     # outside the head face.
-    "SlotDepth": (HEAD_FACE_X + HEAD_TEXT_OUTSIDE, SIDE_CENTER[1] + 0.026),
+    "SlotDepth": (SLOT_DEPTH_TEXT_X, SIDE_CENTER[1] + 0.026),
 }
 # The relief Ø's dimension line stands on the floor (SIDE_KEEP); its text
 # goes on an OffsetText leader so the seat-face extension line (the thread
@@ -205,11 +219,88 @@ THREAD_NOTE_XY = (THREAD_START_X + 0.013, SIDE_CENTER[1] + 0.042)
 # would run through (r1 layout audit).
 FINISH_PICK = (UNDERHEAD_X - 0.050, 2.0 * SIDE_CENTER[1] - SHOULDER_TOP_Y)
 FINISH_SYMBOL = (UNDERHEAD_X - 0.038, SIDE_CENTER[1] - 0.022)
+# The under-head reference ends on a short construction witness lying ON the
+# under-head annulus's edge (build_dt_crank_handle_pivot_screw); the curate
+# leaves the sketch shown so its dimension prints, so the witness would draw
+# its grey dash-dot over the black edge.  Drawn in the outline's black it IS
+# the edge (draw_ch_fulcrum_keeper._blacken_reference_lines' recipe).
+REFERENCE_SKETCH = "StationReference"
+UNDER_HEAD_WITNESS_LEN = (HEAD_DIA - SHOULDER_DIA) / 2.0
+REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
+SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
+REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the line is a fully defined sketch length
 # A point on the shoulder face, clear of the Ø6.00 dimension line.
 CENTERLINE_PICK = (UNDERHEAD_X - 0.080, SIDE_CENTER[1] + 0.003)
 ISO_NOTE_XY = (0.352, 0.200)
 # Bottom-left, above the title-block line, like the other crank sheets.
 NOTES_XY = (0.016, 0.070)
+
+
+def _reference_line_in_view(view: Any, sketch_name: str, length_mm: float) -> Any:
+    """The drawing-view instance of one reference sketch's construction line,
+    chosen on the model (the sketch's one construction segment of that
+    length) and mapped into ``view`` -- a point pick on the outline would
+    resolve to the edge under it (draw_ch_fulcrum_keeper)."""
+    native = _early_bound(view, "IView")
+    model = native.ReferencedDocument
+    if model is None:
+        raise RuntimeError(f"{sketch_name}: the side view references no model")
+    feature = _early_bound(model, "IPartDoc").FeatureByName(sketch_name)
+    if feature is None:
+        raise RuntimeError(f"{sketch_name}: no such feature in the screw model")
+    sketch = _early_bound(
+        _early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch"
+    )
+    matches = []
+    for raw in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw, "ISketchSegment")
+        length = float(segment.GetLength()) * 1000.0
+        if (
+            bool(segment.ConstructionGeometry)
+            and abs(length - length_mm) <= REFERENCE_WITNESS_LEN_TOL
+        ):
+            matches.append(segment)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{sketch_name}: {len(matches)} construction segments are "
+            f"{length_mm:.3f} mm long; the witness must be exactly one"
+        )
+    in_view = native.GetCorresponding(matches[0])
+    if in_view is None:
+        raise RuntimeError(f"{sketch_name}: its witness has no instance in the side view")
+    return _early_bound(in_view, "ISketchSegment")
+
+
+@_telemetry.traced("drawing.crank_handle_pivot_screw.blacken_under_head_witness")
+def _blacken_under_head_witness(adapter: Any, view: Any) -> None:
+    """Draw the under-head witness in the outline's black."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the MHA-DT-032 side view for its witness")
+    expected = UNDER_HEAD_WITNESS_LEN
+    line = _reference_line_in_view(view, REFERENCE_SKETCH, expected)
+    draw.ClearSelection2(True)
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = selection.CreateSelectData()
+    selection_data.View = view
+    if not line.Select4(False, selection_data):
+        raise RuntimeError("failed to select the under-head witness")
+    kind = int(selection.GetSelectedObjectType3(1, -1))
+    if kind != SW_SEL_EXT_SKETCH_SEGS:
+        raise RuntimeError(f"under-head witness pick resolved to type {kind}")
+    segment = _early_bound(selection.GetSelectedObject6(1, -1), "ISketchSegment")
+    length = float(segment.GetLength()) * 1000.0
+    construction = bool(segment.ConstructionGeometry)
+    if abs(length - expected) > REFERENCE_WITNESS_LEN_TOL or not construction:
+        raise RuntimeError(
+            f"under-head witness pick resolved to {segment.GetName()} "
+            f"({length:.3f} mm, want {expected:.3f}; construction={construction})"
+        )
+    drawing.SetLineColor(REFERENCE_WITNESS_COLOR)
+    draw.ClearSelection2(True)
+    _telemetry.info("crank-handle-pivot-screw: under-head witness drawn black")
+    draw.EditRebuild3()
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -274,14 +365,22 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*side_annotations, *end_annotations]
+    # Callouts below each value: the relief lead, the chamfer's angle, each
+    # head band's reason and the fitted shoulder's to-suit rule (rule 4).
     set_dimension_callouts(
-        adapter, annotations, {"ReliefDia": RELIEF_CALLOUT}, location="below"
-    )
-    set_dimension_callouts(
-        adapter, annotations, {"TipChamfer": CHAMFER_CALLOUT}, location="below"
+        adapter,
+        annotations,
+        {
+            "ReliefDia": RELIEF_CALLOUT,
+            "TipChamfer": CHAMFER_CALLOUT,
+            "HeadDia": HEAD_DIA_CALLOUT,
+            "HeadLength": HEAD_LENGTH_CALLOUT,
+            "UnderHeadLocation": UNDER_HEAD_CALLOUT,
+        },
+        location="below",
     )
     # Rule 4: the running-fit band names its mate at the callout.  Above the
-    # value, so the lines stay off the dimension line that drops to the
+    # value, so the line stays off the dimension line that drops to the
     # shoulder.
     set_dimension_callouts(
         adapter, annotations, {"ShoulderDia": SHOULDER_CALLOUT}, location="above"
@@ -297,6 +396,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one MHA-DT-32 {name} reference dimension")
         set_reference_dimension(adapter, matches[0], label=f"MHA-DT-32 {name}")
+    _blacken_under_head_witness(adapter, side)
 
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to MHA-DT-32 head-end view")
