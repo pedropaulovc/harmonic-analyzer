@@ -119,6 +119,20 @@ DIMENSION_CALLOUTS = {
     "CapR": CAP_RADIUS_CALLOUT,
 }
 
+# swAnnotationType_e.swCenterMarkSym.  The template centre-marks the end
+# view's circle as it is placed; an unconditional auto_center_marks printed a
+# second identical mark over it (layout audit duplicate-annotation,
+# DetailItem347/348 on r1-r2 of #1009), so the sheet adds one only if the
+# template did not, and proves exactly one.
+_CENTER_MARK_ANNOTATION = 13
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+
 
 def _overall_reference(adapter: Any, right: Any) -> None:
     """The (20.80) overall, seated end to crown apex (drawing-guidelines.md rule 10 (dimension from a real feature), Harvey #25)."""
@@ -211,8 +225,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if _center_mark_count(front) == 0 and not auto_center_marks(
+        adapter, front, holes=True, size=0.0025
+    ):
         raise RuntimeError("failed to add ASME center mark to pin end view")
+    found = _center_mark_count(front)
+    if found != 1:
+        raise RuntimeError(f"expected 1 centre mark in the pin end view, found {found}")
 
     # Before the centreline, so the apex pick cannot land on the axis line.
     _overall_reference(adapter, right)

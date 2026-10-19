@@ -87,6 +87,28 @@ def test_sheet_has_no_general_notes() -> None:
         )
 
 
+def test_end_view_keeps_the_templates_one_center_mark(monkeypatch) -> None:
+    """Layout audit r1-r2 of #1009: the template's centre mark and an
+    unconditional auto_center_marks printed two identical marks on the end
+    view.  The sheet adds one only when the template did not."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "if _center_mark_count(front) == 0 and not auto_center_marks(" in source
+    assert "if found != 1:" in source
+    assert drawing._CENTER_MARK_ANNOTATION == 13
+
+    class _View:
+        def __init__(self, marks):
+            self.marks = marks
+
+        def GetAnnotationsByType(self, kind):  # noqa: N802 - the COM member name
+            assert kind == 13
+            return self.marks
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda view, _iface: view)
+    assert drawing._center_mark_count(_View(None)) == 0
+    assert drawing._center_mark_count(_View(("mark",))) == 1
+
+
 def test_bonded_slip_fit_replaces_the_press() -> None:
     """U27 (Main, 2026-09-23): stock drill rod slipped into the strap's H7 seat
     and bonded with LOCTITE 638 (the U6 drum-to-arbor precedent)."""
