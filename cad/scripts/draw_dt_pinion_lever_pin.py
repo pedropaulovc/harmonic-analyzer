@@ -36,11 +36,14 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from dt_drive_train_steps import step_ref
 from dt_pinion_lever_pin_spec import (
-    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    LEVER_PIN_SET_STEP_KEY,
     PIN_DIA,
+    PIN_DIA_CALLOUT,
+    PIN_LEN_CALLOUT,
 )
 
 
@@ -59,6 +62,13 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+
+# The overlength cut is trimmed at MHA-DT-000's LEVER PIN SET; the pointer
+# comes from the registry.
+DIMENSION_CALLOUTS = {
+    "PinDia": PIN_DIA_CALLOUT,
+    "PinLen": f"{PIN_LEN_CALLOUT}\nTRIMMED AT ASSEMBLY PER {step_ref(LEVER_PIN_SET_STEP_KEY)}",
+}
 
 # The 13 x 1.6 pin reads at arm's length at 8:1: a 104 mm side view.
 SHEET_SCALE = (8.0, 1.0)
