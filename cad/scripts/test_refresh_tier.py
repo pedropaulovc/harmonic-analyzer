@@ -179,7 +179,9 @@ def build(adapter):
             "found 0",
         ),
         (
-            CANONICAL.replace("create(adapter, c))", "create(adapter, c), solved_gates=create)"),
+            CANONICAL.replace(
+                "create(adapter, c))", "create(adapter, c), solved_gates=create)"
+            ),
             "outside the explode",
         ),
     ],
