@@ -278,137 +278,167 @@ async def _configuration_topology(
     """
     from solidworks_mcp.adapters.com_variant import null_variant
 
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    active = _activate_configuration(model, configuration)
-    part = _early_bound(model, "IPartDoc")
-    pattern_name = tooth_features(teeth)[2]
-    raw_pattern = part.FeatureByName(pattern_name)
-    if raw_pattern is None:
-        raise RuntimeError(f"{configuration}: {pattern_name} is missing")
-    pattern = _early_bound(raw_pattern, "IFeature")
-    # Active-configuration reads only: IsSuppressed2(3, [name]) answers None
-    # for every feature (7e88be269 farm log), so it cannot fail a check.
-    states = pattern.IsSuppressed2(1, null_variant())
-    if not isinstance(states, (list, tuple)):
-        states = (states,)
-    suppressed = len(states) != 1 or bool(states[0])
-    definition = _early_bound(
-        pattern.GetDefinition(), "ICircularPatternFeatureData"
-    )
-    instances = int(definition.TotalInstances)
-    error_result = pattern.GetErrorCode2()
-    if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
-        raise RuntimeError(
-            f"{configuration}: unreadable pattern error state {error_result!r}"
+    measurements: dict[str, int | float] = {"definition_state_count": 0}
+    feature_audit_count = 0
+    subphase: str | None = None
+    started = 0.0
+    try:
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        active = _activate_configuration(model, configuration)
+        part = _early_bound(model, "IPartDoc")
+        pattern_name = tooth_features(teeth)[2]
+        raw_pattern = part.FeatureByName(pattern_name)
+        if raw_pattern is None:
+            raise RuntimeError(f"{configuration}: {pattern_name} is missing")
+        pattern = _early_bound(raw_pattern, "IFeature")
+        # Active-configuration reads only: IsSuppressed2(3, [name]) answers None
+        # for every feature (7e88be269 farm log), so it cannot fail a check.
+        states = pattern.IsSuppressed2(1, null_variant())
+        if not isinstance(states, (list, tuple)):
+            states = (states,)
+        suppressed = len(states) != 1 or bool(states[0])
+        definition = _early_bound(
+            pattern.GetDefinition(), "ICircularPatternFeatureData"
         )
-    error_code = int(error_result[0] or 0)
-    is_warning = bool(error_result[1])
-    bodies = tuple(part.GetBodies2(0, False) or ())
-    face_count = (
-        int(_early_bound(bodies[0], "IBody2").GetFaceCount())
-        if len(bodies) == 1
-        else 0
-    )
-    feature_issues: list[str] = []
-    # Every row is read in the ACTIVE configuration (IsSuppressed2(1, null)),
-    # the way the suppression sweep set and verified it.
-    if str(_active_configuration(model).Name) != configuration:
-        raise RuntimeError(f"{configuration}: not active for the suppression audit")
-    for row_teeth in CONFIGURATION_TEETH:
-        for feature_name in tooth_features(row_teeth):
-            raw_feature = part.FeatureByName(feature_name)
-            if raw_feature is None:
-                feature_issues.append(f"missing native feature {feature_name}")
-                continue
-            feature = _early_bound(raw_feature, "IFeature")
-            answer = feature.IsSuppressed2(1, null_variant())
-            answer = answer if isinstance(answer, (list, tuple)) else (answer,)
-            if len(answer) != 1 or bool(answer[0]) != (row_teeth != teeth):
-                feature_issues.append(f"{feature_name}: wrong suppression in {configuration}")
-            if row_teeth == teeth:
-                error = feature.GetErrorCode2()
-                if not isinstance(error, (list, tuple)) or len(error) < 2:
-                    feature_issues.append(f"{feature_name}: unreadable native error state")
-                elif int(error[0] or 0):
-                    feature_issues.append(
-                        f"{feature_name}: native error {error[0]}, warning={bool(error[1])}"
-                    )
-    raw_sketch = part.FeatureByName(tooth_features(teeth)[0])
-    if raw_sketch is not None:
-        raw_specific = _early_bound(raw_sketch, "IFeature").GetSpecificFeature2()
-        if raw_specific is None:
-            raise RuntimeError(f"{configuration}: native gap sketch has no ISketch")
-        sketch = _early_bound(raw_specific, "ISketch")
-        entities = tuple(sketch.GetSketchSegments() or ())
-        expected_entities = len(stock_form_profile(teeth).native_segments(
-            unit_scale=1.0 / MM_PER_IN, clearance_radius_mm=R_CLEAR_MM
-        ))
-        if len(entities) != expected_entities:
-            feature_issues.append(
-                f"native gap entities {len(entities)} != real finite topology {expected_entities}"
+        instances = int(definition.TotalInstances)
+        error_result = pattern.GetErrorCode2()
+        if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
+            raise RuntimeError(
+                f"{configuration}: unreadable pattern error state {error_result!r}"
             )
-    root_observation = ""
-    root_issues: list[str] = []
-    if measure_roots and len(bodies) == 1:
-        native_min, native_max, root_edges = _native_root_envelope_mm(bodies[0], teeth=teeth)
-        expected_min, expected_max = floor_radius_min_mm(teeth), floor_radius_max_mm(teeth)
-        maximum_bore_radius = (bore_dia_mm(teeth) + BORE_DIA_BAND[0]) / 2.0
-        minimum_web = native_min - maximum_bore_radius
-        root_observation = (
-            f", native_root_min={native_min:.6f}, native_root_max={native_max:.6f}, "
-            f"expected_root_min={expected_min:.6f}, expected_root_max={expected_max:.6f}, "
-            f"minimum_bore_web={minimum_web:.6f}, root_edges={root_edges}"
+        error_code = int(error_result[0] or 0)
+        is_warning = bool(error_result[1])
+        bodies = tuple(part.GetBodies2(0, False) or ())
+        face_count = (
+            int(_early_bound(bodies[0], "IBody2").GetFaceCount())
+            if len(bodies) == 1
+            else 0
         )
-        if max(abs(native_min - expected_min), abs(native_max - expected_max)) > 0.002:
-            root_issues.append("native radial root envelope differs from the finite cutter arc")
-        required_web = WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
-        if minimum_web < required_web - 1e-9:
-            root_issues.append(
-                f"native bore web {minimum_web:.6f} < retained {required_web:.6f} mm"
+        feature_issues: list[str] = []
+        subphase = "feature_audit_s"
+        started = time.perf_counter()
+        # Every row is read in the ACTIVE configuration (IsSuppressed2(1, null)),
+        # the way the suppression sweep set and verified it.
+        if str(_active_configuration(model).Name) != configuration:
+            raise RuntimeError(f"{configuration}: not active for the suppression audit")
+        for row_teeth in CONFIGURATION_TEETH:
+            for feature_name in tooth_features(row_teeth):
+                raw_feature = part.FeatureByName(feature_name)
+                if raw_feature is None:
+                    feature_issues.append(f"missing native feature {feature_name}")
+                    feature_audit_count += 1
+                    continue
+                feature = _early_bound(raw_feature, "IFeature")
+                answer = feature.IsSuppressed2(1, null_variant())
+                answer = answer if isinstance(answer, (list, tuple)) else (answer,)
+                if len(answer) != 1 or bool(answer[0]) != (row_teeth != teeth):
+                    feature_issues.append(f"{feature_name}: wrong suppression in {configuration}")
+                if row_teeth == teeth:
+                    error = feature.GetErrorCode2()
+                    if not isinstance(error, (list, tuple)) or len(error) < 2:
+                        feature_issues.append(f"{feature_name}: unreadable native error state")
+                    elif int(error[0] or 0):
+                        feature_issues.append(
+                            f"{feature_name}: native error {error[0]}, warning={bool(error[1])}"
+                        )
+                feature_audit_count += 1
+        measurements[subphase] = time.perf_counter() - started
+        subphase = "sketch_read_s"
+        started = time.perf_counter()
+        raw_sketch = part.FeatureByName(tooth_features(teeth)[0])
+        measurements["sketch_entity_count"] = 0
+        if raw_sketch is not None:
+            raw_specific = _early_bound(raw_sketch, "IFeature").GetSpecificFeature2()
+            if raw_specific is None:
+                raise RuntimeError(f"{configuration}: native gap sketch has no ISketch")
+            sketch = _early_bound(raw_specific, "ISketch")
+            entities = tuple(sketch.GetSketchSegments() or ())
+            measurements["sketch_entity_count"] = len(entities)
+            expected_entities = len(stock_form_profile(teeth).native_segments(
+                unit_scale=1.0 / MM_PER_IN, clearance_radius_mm=R_CLEAR_MM
+            ))
+            if len(entities) != expected_entities:
+                feature_issues.append(
+                    f"native gap entities {len(entities)} != real finite topology {expected_entities}"
+                )
+        measurements[subphase] = time.perf_counter() - started
+        subphase = None
+        root_observation = ""
+        root_issues: list[str] = []
+        if measure_roots and len(bodies) == 1:
+            subphase = "root_envelope_s"
+            started = time.perf_counter()
+            native_min, native_max, root_edges = _native_root_envelope_mm(bodies[0], teeth=teeth)
+            measurements["root_edge_count"] = root_edges
+            expected_min, expected_max = floor_radius_min_mm(teeth), floor_radius_max_mm(teeth)
+            maximum_bore_radius = (bore_dia_mm(teeth) + BORE_DIA_BAND[0]) / 2.0
+            minimum_web = native_min - maximum_bore_radius
+            root_observation = (
+                f", native_root_min={native_min:.6f}, native_root_max={native_max:.6f}, "
+                f"expected_root_min={expected_min:.6f}, expected_root_max={expected_max:.6f}, "
+                f"minimum_bore_web={minimum_web:.6f}, root_edges={root_edges}"
             )
-    mass = await adapter.get_mass_properties()
-    if not mass.is_success:
-        raise RuntimeError(f"{configuration}: get_mass_properties failed: {mass.error}")
-    volume = float(mass.data.volume)
-    expected = _expected_configuration_volume(teeth)
-    needs_rebuild = bool(active.NeedsRebuild)
-    save_mark = bool(active.AddRebuildSaveMark)
-    observation = (
-        f"{configuration}: active={str(active.Name)}, "
-        f"needs_rebuild={needs_rebuild}, save_mark={save_mark}, "
-        f"{pattern_name} instances={instances}, "
-        f"suppressed={suppressed}, error={error_code}, warning={is_warning}, "
-        f"bodies={len(bodies)}, faces={face_count}, volume={volume:.1f}, "
-        f"expected={expected:.1f}{root_observation}"
-    )
-    _telemetry.info(f"{phase} cone-gear topology: {observation}")
-    issues: list[str] = []
-    issues.extend(root_issues)
-    issues.extend(feature_issues)
-    if needs_rebuild:
-        issues.append("configuration needs rebuild")
-    if instances != teeth:
-        issues.append(f"pattern instances {instances} != {teeth}")
-    if suppressed:
-        issues.append("pattern is suppressed")
-    if error_code:
-        issues.append(f"pattern error {error_code} warning={is_warning}")
-    if len(bodies) != 1:
-        issues.append(f"solid body count {len(bodies)} != 1")
-    if face_count < 2 * teeth + 4:
-        issues.append(
-            f"solid face count {face_count} < toothed minimum {2 * teeth + 4}"
+            if max(abs(native_min - expected_min), abs(native_max - expected_max)) > 0.002:
+                root_issues.append("native radial root envelope differs from the finite cutter arc")
+            required_web = WEB_EXCEPTIONS_MM.get(teeth, MACHINED_WEB_TARGET_MM)
+            if minimum_web < required_web - 1e-9:
+                root_issues.append(
+                    f"native bore web {minimum_web:.6f} < retained {required_web:.6f} mm"
+                )
+            measurements[subphase] = time.perf_counter() - started
+            subphase = None
+        mass = await adapter.get_mass_properties()
+        if not mass.is_success:
+            raise RuntimeError(f"{configuration}: get_mass_properties failed: {mass.error}")
+        volume = float(mass.data.volume)
+        expected = _expected_configuration_volume(teeth)
+        needs_rebuild = bool(active.NeedsRebuild)
+        save_mark = bool(active.AddRebuildSaveMark)
+        observation = (
+            f"{configuration}: active={str(active.Name)}, "
+            f"needs_rebuild={needs_rebuild}, save_mark={save_mark}, "
+            f"{pattern_name} instances={instances}, "
+            f"suppressed={suppressed}, error={error_code}, warning={is_warning}, "
+            f"bodies={len(bodies)}, faces={face_count}, volume={volume:.1f}, "
+            f"expected={expected:.1f}{root_observation}"
         )
-    area_error = stock_form_profile(teeth).gap_area_error_bound_mm2 * teeth * FACE_WIDTH
-    if abs(volume - expected) + area_error > 0.01 * expected:
-        issues.append(
-            f"volume {volume:.1f} outside bounded 1% of Green expectation {expected:.1f}"
-        )
-    if configuration in {CONFIGS[0][0], CONFIGS[-1][0]}:
-        _configuration_definition_state(
-            adapter, configuration, phase=phase
-        )
-    return volume, observation, tuple(issues)
+        _telemetry.info(f"{phase} cone-gear topology: {observation}")
+        issues: list[str] = []
+        issues.extend(root_issues)
+        issues.extend(feature_issues)
+        if needs_rebuild:
+            issues.append("configuration needs rebuild")
+        if instances != teeth:
+            issues.append(f"pattern instances {instances} != {teeth}")
+        if suppressed:
+            issues.append("pattern is suppressed")
+        if error_code:
+            issues.append(f"pattern error {error_code} warning={is_warning}")
+        if len(bodies) != 1:
+            issues.append(f"solid body count {len(bodies)} != 1")
+        if face_count < 2 * teeth + 4:
+            issues.append(
+                f"solid face count {face_count} < toothed minimum {2 * teeth + 4}"
+            )
+        area_error = stock_form_profile(teeth).gap_area_error_bound_mm2 * teeth * FACE_WIDTH
+        if abs(volume - expected) + area_error > 0.01 * expected:
+            issues.append(
+                f"volume {volume:.1f} outside bounded 1% of Green expectation {expected:.1f}"
+            )
+        if configuration in {CONFIGS[0][0], CONFIGS[-1][0]}:
+            subphase = "definition_state_s"
+            started = time.perf_counter()
+            _configuration_definition_state(
+                adapter, configuration, phase=phase
+            )
+            measurements["definition_state_count"] = 1
+            measurements[subphase] = time.perf_counter() - started
+            subphase = None
+        return volume, observation, tuple(issues)
+    finally:
+        if subphase is not None:
+            measurements[subphase] = time.perf_counter() - started
+        _telemetry.annotate(feature_audit_count=feature_audit_count, **measurements)
 
 
 def _failure_site(exc: BaseException) -> str:
@@ -428,6 +458,7 @@ def _failure_site(exc: BaseException) -> str:
     return f"{type(exc).__name__} at line {frame.lineno} in {frame.name}: {frame.line}"
 
 
+@_telemetry.traced("cone.saved_topology")
 async def assert_saved_configuration_topology(
     adapter: Any, *, phase: str = "saved"
 ) -> dict[str, float]:
@@ -458,72 +489,98 @@ async def assert_saved_configuration_topology(
     """
     failures: list[str] = []
     volumes: dict[str, float] = {}
+    configurations_attempted = 0
+    _telemetry.annotate(phase=phase, configuration_count=len(CONFIGS))
     ordered = (CONFIGS[-1], *CONFIGS[:-1])
     _telemetry.info(
         f"{phase}: validating all configurations after the established "
         "set_active_configuration rebuild (the part's reopen proves the saved "
         "caches first, assert_saved_configurations_regenerate)"
     )
-    for configuration, teeth in ordered:
-        try:
-            activation_started = time.perf_counter()
-            activation = await adapter.set_active_configuration(configuration)
-            activation_elapsed = time.perf_counter() - activation_started
-            check(f"{phase} activate {configuration}", activation)
-            rebuilt = bool(activation.data.get("rebuilt"))
-            _telemetry.info(
-                f"{phase} {configuration}: "
-                f"set_active_configuration rebuilt={rebuilt}, "
-                f"elapsed={activation_elapsed:.6f}s"
-            )
-            if not rebuilt:
-                failures.append(
-                    f"{configuration}: set_active_configuration returned "
-                    f"rebuilt=False after {activation_elapsed:.6f}s"
-                )
-                continue
-            volume, observation, issues = await _configuration_topology(
-                adapter,
-                configuration,
-                teeth,
-                phase=f"{phase} post-activation-rebuild",
-                measure_roots=True,
-            )
-            # Each configuration's own tolerance bands, read with it active.
-            _assert_configuration_bands(adapter, configuration, teeth)
-        except Exception as exc:
-            failures.append(f"{configuration}: {_failure_site(exc)}: {exc}")
-            continue
-        volumes[configuration] = volume
-        if issues:
-            failures.append(f"{observation}; issues={issues!r}")
-
     try:
-        restore_started = time.perf_counter()
-        restore = await adapter.set_active_configuration(CONFIGS[-1][0])
-        restore_elapsed = time.perf_counter() - restore_started
-        check(f"{phase} restore {CONFIGS[-1][0]}", restore)
-        restore_rebuilt = bool(restore.data.get("rebuilt"))
-        _telemetry.info(
-            f"{phase} restore {CONFIGS[-1][0]}: "
-            f"set_active_configuration rebuilt={restore_rebuilt}, "
-            f"elapsed={restore_elapsed:.6f}s"
-        )
-        if not restore_rebuilt:
-            failures.append(
-                f"restore {CONFIGS[-1][0]}: set_active_configuration "
-                "returned rebuilt=False"
-            )
-    except Exception as exc:
-        failures.append(f"restore {CONFIGS[-1][0]}: {exc}")
+        for configuration, teeth in ordered:
+            configurations_attempted += 1
+            try:
+                activation_started = time.perf_counter()
+                activation = await adapter.set_active_configuration(configuration)
+                activation_elapsed = time.perf_counter() - activation_started
+                check(f"{phase} activate {configuration}", activation)
+                rebuilt = bool(activation.data.get("rebuilt"))
+                _telemetry.info(
+                    f"{phase} {configuration}: "
+                    f"set_active_configuration rebuilt={rebuilt}, "
+                    f"elapsed={activation_elapsed:.6f}s"
+                )
+                if not rebuilt:
+                    failures.append(
+                        f"{configuration}: set_active_configuration returned "
+                        f"rebuilt=False after {activation_elapsed:.6f}s"
+                    )
+                    continue
+                with _telemetry.span(
+                    "cone.configuration_topology",
+                    configuration=configuration,
+                    teeth=teeth,
+                    phase=phase,
+                    measure_roots=True,
+                ) as topology_span:
+                    volume, observation, issues = await _configuration_topology(
+                        adapter,
+                        configuration,
+                        teeth,
+                        phase=f"{phase} post-activation-rebuild",
+                        measure_roots=True,
+                    )
+                    _telemetry.annotate(issue_count=len(issues))
+                    if issues:
+                        topology_span.set_status(
+                            _telemetry.Status(
+                                _telemetry.StatusCode.ERROR,
+                                f"{observation}; issues={issues!r}",
+                            )
+                        )
+                    # Each configuration's own tolerance bands, read with it active.
+                    _assert_configuration_bands(adapter, configuration, teeth)
+                    _telemetry.annotate(band_check_count=1 + len(_BANDED_DIMENSIONS))
+            except Exception as exc:
+                failures.append(f"{configuration}: {_failure_site(exc)}: {exc}")
+                continue
+            volumes[configuration] = volume
+            if issues:
+                failures.append(f"{observation}; issues={issues!r}")
 
-    if len(volumes) == len(CONFIGS):
-        family = [volumes[name] for name, _teeth in CONFIGS]
-        if not all(a < b for a, b in zip(family, family[1:], strict=False)):
-            failures.append(f"reopened volumes not monotonic: {volumes!r}")
-    if failures:
-        raise RuntimeError(
-            f"{phase} cone-gear configuration topology is invalid: "
-            + "; ".join(failures)
+        try:
+            restore_started = time.perf_counter()
+            restore = await adapter.set_active_configuration(CONFIGS[-1][0])
+            restore_elapsed = time.perf_counter() - restore_started
+            check(f"{phase} restore {CONFIGS[-1][0]}", restore)
+            restore_rebuilt = bool(restore.data.get("rebuilt"))
+            _telemetry.info(
+                f"{phase} restore {CONFIGS[-1][0]}: "
+                f"set_active_configuration rebuilt={restore_rebuilt}, "
+                f"elapsed={restore_elapsed:.6f}s"
+            )
+            if not restore_rebuilt:
+                failures.append(
+                    f"restore {CONFIGS[-1][0]}: set_active_configuration "
+                    "returned rebuilt=False"
+                )
+        except Exception as exc:
+            failures.append(f"restore {CONFIGS[-1][0]}: {exc}")
+
+        if len(volumes) == len(CONFIGS):
+            family = [volumes[name] for name, _teeth in CONFIGS]
+            if not all(a < b for a, b in zip(family, family[1:], strict=False)):
+                failures.append(f"reopened volumes not monotonic: {volumes!r}")
+        if failures:
+            raise RuntimeError(
+                f"{phase} cone-gear configuration topology is invalid: "
+                + "; ".join(failures)
+            )
+        return volumes
+    finally:
+        _telemetry.annotate(
+            configurations_attempted=configurations_attempted,
+            configurations_completed=len(volumes),
+            failure_count=len(failures),
         )
-    return volumes
