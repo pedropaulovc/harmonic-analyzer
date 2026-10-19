@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 
 import _explode_refresh
-from _buildgraph import ASSEMBLY_ORDER, SCRIPTS_DIR
+from _buildgraph import ASSEMBLY_ORDER, SCRIPTS_DIR, module_deps_of, script_for
 from _refresh_tier import (
     RefreshTier,
     _author_function,
@@ -81,45 +81,16 @@ def test_unknown_or_reshaped_inputs_rebuild_full():
 
 
 # Every assembly whose explode may refresh without the insert/mate loop:
-# (explode module, the function its builder authors with, the closure files).
+# (explode module, the function its builder authors with).
 QUALIFYING_EXPLODES = {
-    "pd_paper_drive": (
-        "_pd_paper_drive_explode",
-        "create_paper_drive_explode",
-        ("_pd_paper_drive_explode.py", "pd_paper_drive_explode_spec.py"),
-    ),
-    "mg_magnifier": (
-        "_mg_magnifier_explode",
-        "create_mg_magnifier_explode",
-        ("_mg_magnifier_explode.py", "mg_magnifier_explode_spec.py"),
-    ),
-    "pn_pen": (
-        "_pn_pen_explode",
-        "create_pn_explode",
-        ("_pn_pen_explode.py", "pn_pen_explode_spec.py", "_assembly_patterns.py"),
-    ),
-    "sm_summing": (
-        "_sm_summing_explode",
-        "create_summing_explode",
-        (
-            "_sm_summing_explode.py",
-            "sm_summing_explode_spec.py",
-            "_assembly_patterns.py",
-        ),
-    ),
-    "ch_channel": (
-        "_ch_channel_explode",
-        "create_channel_explode",
-        (
-            "_ch_channel_explode.py",
-            "ch_channel_explode_spec.py",
-            "_assembly_patterns.py",
-        ),
-    ),
+    "pd_paper_drive": ("_pd_paper_drive_explode", "create_paper_drive_explode"),
+    "mg_magnifier": ("_mg_magnifier_explode", "create_mg_magnifier_explode"),
+    "pn_pen": ("_pn_pen_explode", "create_pn_explode"),
+    "sm_summing": ("_sm_summing_explode", "create_summing_explode"),
+    "ch_channel": ("_ch_channel_explode", "create_channel_explode"),
     "ha_harmonic_analyzer": (
         "_ha_harmonic_analyzer_explode",
         "create_harmonic_analyzer_explode",
-        ("_ha_harmonic_analyzer_explode.py", "_assembly_patterns.py"),
     ),
 }
 
@@ -128,17 +99,42 @@ def test_qualifying_explode_plans():
     plans = {stem: explode_plan(stem) for stem in ASSEMBLY_ORDER}
     qualified = {stem for stem, plan in plans.items() if plan.closure}
     assert qualified == set(QUALIFYING_EXPLODES)
-    for stem, (module, function, closure) in QUALIFYING_EXPLODES.items():
+    for stem, (module, function) in QUALIFYING_EXPLODES.items():
         plan = plans[stem]
-        assert (plan.module, plan.function) == (module, function), stem
-        assert {Path(path) for path in plan.closure} == {
-            (SCRIPTS_DIR / name).resolve() for name in closure
-        }, stem
+        assert (plan.decline, plan.module, plan.function) == ("", module, function), stem
+        assert str((SCRIPTS_DIR / f"{module}.py").resolve()) in plan.closure, stem
+        assert str(script_for(stem).resolve()) not in plan.closure, stem
     # The drive train's explode takes build-time collar-pin roles.
     assert "found 0" in plans["dt_drive_train"].decline
     # The frame and measuring stick author their explodes inline.
     assert "no _fr_frame_explode.py" in plans["fr_frame"].decline
     assert "no _ms_measuring_stick_explode.py" in plans["ms_measuring_stick"].decline
+
+
+def test_pen_rigid_math_change_refreshes_explode_but_geometry_change_rebuilds_full():
+    plan = explode_plan("pn_pen")
+    builder = script_for("pn_pen").resolve()
+    recipe = frozenset({str(builder), *module_deps_of(builder)})
+    recorded = {path: "before" for path in recipe}
+    rigid_math = str(
+        Path(importlib.import_module("_explode_transforms").__file__).resolve()
+    )
+    geometry = str(
+        Path(importlib.import_module("pn_pen_assembly_spec").__file__).resolve()
+    )
+    assert rigid_math in recipe and geometry in recipe
+
+    # Exercise the real builder's dependency boundary, not a pinned inventory
+    # of its current helper files. Rigid presentation math must invalidate the
+    # saved explode without sending the assembly through its insert/mate loop.
+    changed = {**recorded, rigid_math: "changed-rigid-presentation"}
+    assert classify_refresh(recorded, changed, recipe, plan.closure)[0] is (
+        RefreshTier.EXPLODE
+    )
+
+    # Changing operational geometry too must still require the full builder.
+    changed[geometry] = "changed-operational-geometry"
+    assert classify_refresh(recorded, changed, recipe, plan.closure)[0] is RefreshTier.FULL
 
 
 @pytest.mark.parametrize("stem", sorted(QUALIFYING_EXPLODES))

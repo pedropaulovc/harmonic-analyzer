@@ -483,13 +483,6 @@ def test_explode_module_qualifies_for_the_explode_tier() -> None:
         "_pn_pen_explode",
         "create_pn_explode",
     )
-    # The global explode axes' helper is the explode's alone, as in pd.
-    assert {Path(path).name for path in plan.closure} == {
-        "_pn_pen_explode.py",
-        "pn_pen_explode_spec.py",
-        "_assembly_patterns.py",
-        "_explode_transforms.py",
-    }
 
 
 def test_hanger_balloon_lands_mid_strap_clear_of_the_hanger_screw() -> None:
