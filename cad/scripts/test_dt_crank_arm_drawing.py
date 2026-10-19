@@ -487,7 +487,6 @@ def test_bore_rear_chamfer_callout_names_the_mate_from_the_contract() -> None:
 
 
 def test_section_a_a_stands_in_open_sheet_and_its_line_clears_the_front_view() -> None:
-    char_w = 0.0026  # measured on the U29 render
     row_pitch = 0.0056  # the hub seat callout's row pitch on the same render
     sx, sy = drawing.SECTION_CENTER
     k = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1] / 1000.0
@@ -501,11 +500,12 @@ def test_section_a_a_stands_in_open_sheet_and_its_line_clears_the_front_view() -
     assert sx - half_w > side_view_right + 0.02
     assert sy + half_h < iso_note_bottom - 0.01
     tx, ty = drawing.SECTION_KEEP["BoreRearChamferSize"]
-    widest = (
-        max(len(row) for row in notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()) * char_w
-    )
-    assert tx - widest / 2.0 > side_view_right + 0.012  # clear of (8.0)'s arrows
-    assert tx + widest / 2.0 < border_right
+    # Actual sol5 native layout: the 72.9993 mm block grows leftward from tx.
+    # Its previous centred-text assumption let it strike the side-view (8.0).
+    width = drawing.CHAMFER_CALLOUT_WIDTH
+    assert tx - width > side_view_right + 0.012
+    assert tx < border_right - row_pitch
+    assert tx - width / 2.0 == pytest.approx(sx)
     assert sy - half_h - (ty + row_pitch) > row_pitch
     block_bottom = ty - 3.0 * row_pitch  # stacked limits + two callout rows
     _cx, cy = drawing.SECTION_CAPTION_XY

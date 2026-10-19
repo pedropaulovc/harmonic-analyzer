@@ -313,9 +313,17 @@ SECTION_CROP_MODEL_MM = (
     (-HALF_WIDTH - 1.0, 0.0, -1.0),
     (-HUB_SEAT_DIA / 2.0 + 1.0, 0.0, ARM_THICKNESS + 1.0),
 )
-# The stacked limits and two callout rows stand below the axial cheek, then
-# the native A-A caption. Clearance uses the previous audit's occupied boxes.
-SECTION_KEEP = {"BoreRearChamferSize": (SECTION_CENTER[0], 0.118)}
+# Sol5 audit: this native vertical dimension's callout grows LEFT from its
+# placement point, not about it: [295.0007, 368.0] mm at x=368.0. Centre that
+# measured 72.9993 mm block under the cheek, leaving 17.9 mm to the right
+# view's 313.6 mm boundary; its dimension line then also stands off the cheek.
+CHAMFER_CALLOUT_WIDTH = 0.0729993
+SECTION_KEEP = {
+    "BoreRearChamferSize": (
+        SECTION_CENTER[0] + CHAMFER_CALLOUT_WIDTH / 2.0,
+        0.118,
+    )
+}
 SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.098)
 DIMENSION_CALLOUTS = {
     "HubSeatDia": HUB_SEAT_CALLOUT,
