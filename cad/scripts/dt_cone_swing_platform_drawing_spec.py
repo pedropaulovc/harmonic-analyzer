@@ -110,3 +110,17 @@ PROFILE_VIEW_NOTE = "PLATE PROFILE — SCALE 1:2"
 FEATURE_VIEW_NOTE = "HOLE LOCATIONS — SCALE 1:2"
 NOTCH_VIEW_NOTE = "LOCK NOTCH — SCALE 1:2"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
+
+# Feature-callout wording is specification data; the drawing owns placement.
+# Name features, not compass directions: the plan maps model north downward.
+RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nCTR ON PIVOT\nOPEN THRU\nPIVOT END"
+PIVOT_BORE_CALLOUT_BELOW = ("RUNNING FIT ON MHA-VN-014 SHOULDER",)
+POST_MOUNT_LOCATING_CALLOUT = "LOCATES MHA-DT-005 CONE PIVOT POST"
+# A drawing number identifies the hold-down's mate without lengthening its
+# leader shelf into the title block.
+HOLDDOWN_CALLOUT_BELOW = ("FROM UNDERSIDE", "LOCATES MHA-DT-021")
+# The process belongs to the THRU row, not the counterbore-diameter row.
+HOLDDOWN_PROCESS = "DRILL"
+PIVOT_PROCESS = "REAM"
+TOP_FACE_LABEL = "TOP FACE"
+UNDERSIDE_LABEL = "UNDERSIDE"

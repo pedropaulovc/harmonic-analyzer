@@ -81,6 +81,14 @@ from diagnostics.drawing_layout_audit import collect_document, describe_sheet
 from dt_cone_swing_platform_drawing_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    HOLDDOWN_CALLOUT_BELOW,
+    HOLDDOWN_PROCESS,
+    PIVOT_BORE_CALLOUT_BELOW,
+    PIVOT_PROCESS,
+    POST_MOUNT_LOCATING_CALLOUT,
+    RELIEF_WIDTH_CALLOUT,
+    TOP_FACE_LABEL,
+    UNDERSIDE_LABEL,
 )
 from dt_cone_swing_platform_spec import (
     HOLDDOWN_CBORE_DIA,
@@ -240,11 +248,6 @@ FEATURE_KEEP = {
     "PostMountEastX": _planned(0.205, 0.185),
     "PostMountEastZ": _planned(0.130, 0.175),
 }
-# Named by features on the sheet, not a compass: to a blind reader of
-# 68565ace "OPEN TO NORTH EDGE" contradicted a relief opening toward the
-# sheet's lower edge, since sheet-down is model north (codex blocker B2; B3's
-# phantom 0.695 lip followed from it).
-RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nCTR ON PIVOT\nOPEN THRU\nPIVOT END"
 NOTCH_KEEP = {
     # Pivot-to-north-edge lives here, sharing the 205.81 pivot witness: in the
     # profile the R8 corner ray has no path that clears this dimension.
@@ -288,6 +291,10 @@ SECTION_KEEP = {
 DETAIL_MODEL_Z = -6.0  # detail circle centre, between the pivot and the hole
 DETAIL_RADIUS_MM = 12.0
 DETAIL_SCALE = (2, 1)
+# The former B letter stood 0.28 mm off the relief-width arrow and 0.62 mm
+# over the pivot station witness. Its native anchor now puts the printed
+# box at about [189.2,138.4]..[192.8,144.6] mm, clear of both and the circle.
+DETAIL_PARENT_LETTER_XY = (0.188, 0.145)
 _DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 # The layout audit boxes a detail view by its native outline, which run
 # eaafbc73 measured at the circle plus 10.4 mm a side ([53.6, 9.6]..
@@ -356,7 +363,9 @@ DETAIL_LABEL_LOWER_LEFT = (0.016, 0.0145)
 # r3 put the top row on the 213.56 text (bottom ~0.169, right end ~0.3025):
 # the note's top stands under it, its bottom row (~0.141) over the PlateThk
 # text and A-A's UNDERSIDE label.
-RELIEF_NOTE_XY = (0.300, 0.1665)
+# r11 left 2.68 mm to the 213.56 text; 1.2 mm lower clears the 3.57 mm
+# text-separation threshold while preserving the relief-floor leader route.
+RELIEF_NOTE_XY = (0.300, 0.1653)
 # The leader's tip, this far (model mm) into the relief floor from the bore
 # wall: the leader runs down the bore's gap and must not cross the hatch.
 RELIEF_TIP_INSET_MM = 0.05
@@ -444,14 +453,14 @@ HOLDDOWN_CALLOUT_XY = (0.1830, 0.0657)
 FACE_LABELS = (
     # Under A-A's strip, ending 2 mm left of its tip on the right-hand
     # piece, over the A-A label (top ~0.0995).
-    ("A-A", "TOP FACE", (-6.8, 6.8), PLATE_THICKNESS, "max", (-0.024, -0.00515)),
+    ("A-A", TOP_FACE_LABEL, (-6.8, 6.8), PLATE_THICKNESS, "max", (-0.024, -0.00515)),
     # Under C-C's strip, left of its native label: the tip on the left
     # piece's underside (0.1463, 0.0352), the text 0.1198..0.1445 x
     # 0.0288..0.0324, 2.0 mm right of detail B's outline (0.1179) and 4.0 mm
     # left of the native label; the leader rises from the text's right end.
     (
         "C-C",
-        "UNDERSIDE",
+        UNDERSIDE_LABEL,
         (HOLDDOWN_LOCAL_X - 11.1, HOLDDOWN_LOCAL_X + 11.1),
         0.0,
         "min",
@@ -462,20 +471,10 @@ FACE_LABELS = (
 # Each tight band names its mate at its own callout (rule 4; machinist
 # review r1 blocker: the +-0.1 stations named none), and a local override
 # rides the callout of the feature it overrides (rule 7).
-PIVOT_BORE_CALLOUT_BELOW = ("RUNNING FIT ON MHA-VN-014 SHOULDER",)
 POST_MOUNT_CALLOUT_BELOW = (
     POST_MOUNT_TAP_BREAK_CALLOUT,
-    "LOCATES MHA-DT-005 CONE PIVOT POST",
+    POST_MOUNT_LOCATING_CALLOUT,
 )
-# The hold-down's mate row names the part number only: with the noun
-# (LOCATES MHA-DT-021 TIP BLOCK, 72.6 mm, r8) the block's left end, where
-# its leader leaves, could not stand over the hole short of the title block.
-HOLDDOWN_CALLOUT_BELOW = ("FROM UNDERSIDE", "LOCATES MHA-DT-021")
-# A counterbored callout prints its THRU row from the CalloutAbove part (7)
-# and its counterbore row from the Prefix part (5): add_native_hole_callout's
-# Prefix process read "DRILL ⌴ Ø5.56" at r1, so the word goes into the THRU
-# row instead (draw_ch_rocker_arm_tl_oblique_pivot_block's precedent).
-HOLDDOWN_PROCESS = "DRILL"
 # The post-mount taps' callout over the hole-location plan.  The block is
 # centred on the requested point: r3's four rows ran from the inner border
 # (top 0.2665, ~0.3 mm air) to their underline at 0.2453, 6.6 mm over the
@@ -488,7 +487,9 @@ POST_MOUNT_CALLOUT_XY = (0.191, 0.2545)
 # arrows: right of the plate the 189.26 dimension line crosses any callout
 # wider than ~40 mm.  Its fit row hangs under it, over the plan caption row
 # (top 0.085).
-PIVOT_BORE_CALLOUT_XY = (0.215, 0.099)
+# r11 left 2.16 mm to the A identifier; 2 mm lower gives more than one
+# text-height of separation without crowding the plan caption.
+PIVOT_BORE_CALLOUT_XY = (0.215, 0.097)
 # The lock-notch caption sits directly under its own view, not on the plan
 # caption row (aa9766da printed it there, where it read as a section's
 # caption).  Its 59.7 x 4.8 mm box, anchored upper-left and centred under
@@ -538,6 +539,35 @@ def holddown_section_line_model_points() -> tuple[tuple[float, float, float], ..
     )
 
 
+
+
+def _set_end_only_section_lines(drawing_model: Any) -> None:
+    """Keep the pivot cut distinct from the coincident station witnesses (#1029)."""
+    # swDetailingSectionViewLineStyleDisplay = StandardWithoutConnector.
+    # Retain the actual full cutting plane; only its connector ink is omitted.
+    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceInteger(542, 0, 1):
+        raise RuntimeError("failed to set end-only section cutting lines")
+    if extension.GetUserPreferenceInteger(542, 0) != 1:
+        raise RuntimeError("section cutting-line style did not persist")
+
+
+def _place_detail_parent_letter(adapter: Any, parent: Any) -> None:
+    circles = tuple(_read_member(_early_bound(parent, "IView"), "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"expected one detail circle, found {len(circles)}")
+    circle = _early_bound(circles[0], "IDetailCircle")
+    if circle.GetLabel() != "B":
+        raise RuntimeError("expected detail B on the hole-location plan")
+    circle.SetLabelPosition(*DETAIL_PARENT_LETTER_XY)  # VT_VOID; prove by readback.
+    rebuild_drawing(adapter, label="place detail B parent letter")
+    actual = tuple(float(value) for value in circle.GetLabelPosition())
+    if (
+        len(actual) != 2
+        or not all(math.isfinite(value) for value in actual)
+        or math.dist(actual, DETAIL_PARENT_LETTER_XY) > 1e-8
+    ):
+        raise RuntimeError(f"detail B parent letter did not persist: {actual}")
 
 
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
@@ -1457,6 +1487,7 @@ async def build(adapter: Any) -> dict[str, str]:
     create_blank_drawing_sheets(
         adapter, SHEET_NAMES, label="cone swing platform package"
     )
+    _set_end_only_section_lines(drawing_model)
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
     if not ddoc.ActivateSheet(SHEET_NAMES[0]):
         raise RuntimeError("failed to activate the platform sheet")
@@ -1521,6 +1552,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=DETAIL_SCALE,
         label="hold-down station detail",
     )
+    _place_detail_parent_letter(adapter, feature)
     # Hidden lines removed: HoldDownZ and HoldDownX run between the pivot bore
     # and the hold-down hole's visible top-face rims, never to the underside
     # counterbore.
@@ -1666,7 +1698,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=PIVOT_BORE_CALLOUT_XY,
         label="pivot reamed bore",
         edge=pivot_edge,
-        process="REAM",
+        process=PIVOT_PROCESS,
     )
     _rewrite_hole_callout(
         pivot_callout,

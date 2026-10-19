@@ -1472,6 +1472,7 @@ def test_relief_fit_note_stands_over_section_a_a_clear_of_its_neighbours() -> No
     right = x + max(map(len, lines)) * 0.0028
     bottom = y - len(lines) * 0.0042
     assert x > 0.296 + 0.002  # 213.56 dimension line (CapECz)
+    assert 0.1692 - y > 0.00357  # r11 CapECz text bottom vs note top
     assert bottom > 0.1366 + 0.002  # A-A's PlateThk text
     assert y < drawing.ISO_CAPTION_UPPER_LEFT[1] - 0.0048 - 0.002  # iso caption
     assert drawing.ISO_CAPTION_UPPER_LEFT[1] < 0.189 - 0.002  # isometric's ink
@@ -1526,3 +1527,76 @@ def test_both_sections_name_their_faces() -> None:
     assert tip[1] == pytest.approx(strip[1])
     assert _holddown_label()[0] - under[2] > 0.0036
     assert under[3] < strip[1] - 0.002
+
+
+@pytest.mark.parametrize(
+    ("accepted", "persisted", "error"),
+    (
+        (True, 1, None),
+        (False, 1, "failed to set"),
+        (True, 0, "did not persist"),
+    ),
+)
+def test_section_line_style_refuses_a_failed_native_setting(
+    monkeypatch, accepted, persisted, error
+) -> None:
+    extension = types.SimpleNamespace(
+        SetUserPreferenceInteger=lambda *_: accepted,
+        GetUserPreferenceInteger=lambda *_: persisted,
+    )
+    document = types.SimpleNamespace(Extension=extension)
+    monkeypatch.setattr(drawing, "_early_bound", lambda item, _interface: item)
+    if error is None:
+        drawing._set_end_only_section_lines(document)
+    else:
+        with pytest.raises(RuntimeError, match=error):
+            drawing._set_end_only_section_lines(document)
+
+
+@pytest.mark.parametrize(
+    "readback",
+    (
+        drawing.DETAIL_PARENT_LETTER_XY,
+        (0.184923, 0.1339812),
+        (float("nan"), 0.145),
+        (0.188,),
+    ),
+)
+def test_detail_parent_letter_requires_a_finite_persisted_position(monkeypatch, readback):
+    circle = types.SimpleNamespace(
+        GetLabel=lambda: "B",
+        SetLabelPosition=lambda *_: None,
+        GetLabelPosition=lambda: readback,
+    )
+    parent = types.SimpleNamespace(GetDetailCircles=lambda: (circle,))
+    monkeypatch.setattr(drawing, "_early_bound", lambda item, _interface: item)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    if readback == drawing.DETAIL_PARENT_LETTER_XY:
+        drawing._place_detail_parent_letter(object(), parent)
+    else:
+        with pytest.raises(RuntimeError, match="did not persist"):
+            drawing._place_detail_parent_letter(object(), parent)
+
+
+def test_detail_parent_letter_clears_the_relief_arrow_and_station_witness():
+    # r11 native letter anchor and printed box; translating this fixture is
+    # an offline placement calculation, not evidence of the new native print.
+    old_anchor = (0.184923, 0.1339812)
+    old_box = (0.1861, 0.1273, 0.1897, 0.1335)
+    dx, dy = (
+        drawing.DETAIL_PARENT_LETTER_XY[i] - old_anchor[i] for i in range(2)
+    )
+    x0, y0, x1, y1 = (
+        old_box[0] + dx, old_box[1] + dy, old_box[2] + dx, old_box[3] + dy
+    )
+    assert x0 > 0.1858 + 0.002  # relief-width arrow's former near-text finding
+    assert y0 > 0.1267 + 0.002  # pivot baseline witness
+    assert x0 > 0.182811 + 0.002  # detail circle's right edge
+    assert x1 < 0.225 - 0.002 and y1 < 0.1732 - 0.002  # other stations
+
+
+def test_pivot_callout_has_a_full_text_height_between_the_identifier_and_caption():
+    # r11 printed box at y92.6..106.3 mm for the 99 mm anchor.
+    shift = drawing.PIVOT_BORE_CALLOUT_XY[1] - 0.099
+    assert 0.1084 - (0.1063 + shift) > 0.00357
+    assert (0.0926 + shift) - 0.085 > 0.00357
