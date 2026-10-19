@@ -84,7 +84,7 @@ def test_the_diameter_prints_on_the_side_view_beside_the_length() -> None:
 
 
 def test_the_pin_sheet_has_no_notes_and_the_mates_carry_the_match_drill() -> None:
-    """drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's eye-pass sweep): the drive, trim and peen sequence is
+    """drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's eye-pass sweep): the insert, trim and peen sequence is
     the pinion fit-up step; the match-drill rides both mates' hole callouts
     as the hole specification only (Main, 2026-09-26), so the pin sheet
     carries no general notes at all."""
@@ -93,12 +93,10 @@ def test_the_pin_sheet_has_no_notes_and_the_mates_carry_the_match_drill() -> Non
 
     assert not hasattr(spec, "DRAWING_NOTES")
     step = spec.ASSEMBLY_STEP
-    assert step.split("\n") == [
-        "LEVER PIN SET: MATCH-DRILL MHA-DT-016 HUB AND MHA-DT-017 ROD",
-        "TOGETHER, GRIP PARKED; DRIVE MHA-DT-030,",
-        "TRIM BOTH ENDS AND PEEN FLUSH WITH HUB.",
-    ]
     assert step.startswith(f"{spec.LEVER_PIN_SET_NAME}: ")
+    # #1064: a slip pin in a drilled hole, retained by its peened heads, is
+    # inserted, not driven.
+    assert f"INSERT {spec.PIN_NUMBER}" in step and "DRIVE" not in step
     assert spec.PIN_NUMBER == _config.parts("dt-pinion-lever-pin")["number"]
     for callout in (
         dt_pinion_lever_spec.PIN_HOLE_CALLOUT,

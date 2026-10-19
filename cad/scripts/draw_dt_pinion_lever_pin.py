@@ -15,12 +15,10 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -34,14 +32,20 @@ from _drawing_dimensions import assert_imported_precision, set_dimension_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from dt_pinion_lever_pin_spec import (
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA,
 )
+
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["dt_pinion_lever_pin"]
@@ -67,17 +71,29 @@ ISO_CENTER = (0.345, 0.195)
 # Printed half-diameter in sheet metres, which the diameter is placed clear of.
 HALF_DIA = PIN_DIA * SHEET_SCALE[0] / 2000.0
 # drawing-guidelines.md rule 11 (turned parts read like the lathe) (turned parts): both dimensions sit on the side view, the diameter
-# above it -- its dimension line left of centre so the axis-centerline pick at
+# above it -- its dimension line off centre so the axis-centerline pick at
 # the view's middle lands on bare face -- and the cut length below.  The end
 # view is a bare circle with its center mark (machinist review of 7f7fc1717).
+# Each dimension's callout hangs below its value.  The diameter's dimension
+# line sits just right of centre: its shelf runs left from the line, so the
+# three short callout lines stay inside the border (r1 layout audit
+# outside-border, 43.9 mm past the left border at FRONT_CENTER - 0.030).
 FRONT_KEEP = {
-    "PinDia": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] + HALF_DIA + 0.016),
+    "PinDia": (FRONT_CENTER[0] + 0.012, FRONT_CENTER[1] + HALF_DIA + 0.032),
     "PinLen": (FRONT_CENTER[0], 0.140),
 }
-DIMENSION_CALLOUTS = {
-    "PinLen": "CUT LENGTH",
-    "PinDia": "1/16 DRILL ROD",
-}
+# The template centre-marks the end circle as the view is placed; an explicit
+# auto_center_marks printed a second, identical mark over it (r1 layout audit
+# duplicate-annotation DetailItem347/348; draw_ch_rocker_arm_tl_filing_button).
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+
+
+def _prove_one_end_mark(view: Any) -> None:
+    marks = (
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+    if len(marks) != 1:
+        raise RuntimeError(f"expected one pin end-view centre mark, found {len(marks)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -134,8 +150,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    if not auto_center_marks(adapter, right, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to pin end view")
+    _prove_one_end_mark(right)
     add_view_centerline(
         adapter,
         front,

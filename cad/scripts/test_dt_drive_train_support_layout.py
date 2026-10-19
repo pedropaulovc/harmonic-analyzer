@@ -1799,7 +1799,7 @@ def test_assembly_poses_print_once_on_their_rig_steps() -> None:
         ),
         "dt_pinion_lever_pin_spec.ASSEMBLY_STEP": (
             dt_pinion_lever_pin_spec.ASSEMBLY_STEP,
-            ("GRIP PARKED", "DRIVE MHA-DT-030", "PEEN FLUSH"),
+            ("GRIP PARKED", "INSERT MHA-DT-030", "PEEN FLUSH"),
         ),
     }
     scripts = Path(FITUP.__file__).resolve().parent
