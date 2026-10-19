@@ -335,7 +335,8 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     def fake_run(command: list[str], **kwargs: Any):
         cwd = Path(kwargs["cwd"])
-        reviewer = "codex" if "exec" in command else "claude"
+        reviewer = kwargs["reviewer"]
+        assert reviewer == ("codex" if "exec" in command else "claude")
         if reviewer == "codex":
             server_args = json.loads(next(
                 argument.split("=", 1)[1] for argument in command
@@ -379,6 +380,17 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         if reviewer == "codex":
             events.append({"type": "thread.started", "thread_id": session_id})
         else:
+            events.append({
+                "type": "control_response",
+                "response": {
+                    "subtype": "success",
+                    "request_id": "sheets-status",
+                    "response": {"mcpServers": [{
+                        "name": "sheets", "status": "connected",
+                        "tools": [{"name": "view_sheet"}, {"name": "crop"}],
+                    }]},
+                },
+            })
             events.append({
                 "type": "system", "subtype": "init",
                 "session_id": command[command.index("--session-id") + 1],
@@ -445,7 +457,7 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         )
 
     monkeypatch.setattr(mr.shutil, "which", lambda executable: executable)
-    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     monkeypatch.setattr(mr, "prepare_codex_environment", prepare_codex_environment)
     monkeypatch.setattr(mr, "relink_codex_auth", lambda home: None)
     monkeypatch.setattr(mr, "load_codex_rollout", load_codex_rollout)
@@ -1004,7 +1016,7 @@ def test_complete_retry_evidence_resumes_after_provider_failure(
     identity = _identity(case, reviewer=reviewer)
     identity["retries"] = 1
     directory = tmp_path / "run"
-    provider_run = mr.subprocess.run
+    provider_run = mr._run_reviewer
     calls = 0
 
     def retrying_run(command, **kwargs):
@@ -1027,7 +1039,7 @@ def test_complete_retry_evidence_resumes_after_provider_failure(
             return process
         return provider_run(command, **kwargs)
 
-    monkeypatch.setattr(mr.subprocess, "run", retrying_run)
+    monkeypatch.setattr(mr, "_run_reviewer", retrying_run)
     result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
     assert result["error"] is None
     review = evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
@@ -1733,7 +1745,7 @@ def test_crop_history_counts_reused_call_ids_once_per_attempt(
     identity = _identity(case, reviewer=reviewer)
     identity["retries"] = 1
     directory = tmp_path / "run"
-    provider_run = mr.subprocess.run
+    provider_run = mr._run_reviewer
     calls = 0
 
     def retrying_run(command, **kwargs):
@@ -1745,7 +1757,7 @@ def test_crop_history_counts_reused_call_ids_once_per_attempt(
             process.returncode = 17
         return process
 
-    monkeypatch.setattr(mr.subprocess, "run", retrying_run)
+    monkeypatch.setattr(mr, "_run_reviewer", retrying_run)
     result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
     assert result["error"] is None
     review = evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
@@ -1771,7 +1783,7 @@ def test_final_attempt_cannot_launder_failed_attempt_tools_or_earlier_views(
     identity = _identity(case, reviewer=reviewer)
     identity["retries"] = 1
     directory = tmp_path / "run"
-    provider_run = mr.subprocess.run
+    provider_run = mr._run_reviewer
     calls = 0
 
     def retrying_run(command, **kwargs):
@@ -1788,7 +1800,7 @@ def test_final_attempt_cannot_launder_failed_attempt_tools_or_earlier_views(
             process.returncode = 17
         return process
 
-    monkeypatch.setattr(mr.subprocess, "run", retrying_run)
+    monkeypatch.setattr(mr, "_run_reviewer", retrying_run)
     result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
     assert result["error"] is not None
     report = deepcopy(result["review"])
@@ -1926,7 +1938,7 @@ def test_retry_invocations_cannot_reuse_or_relabel_provenance(
 ) -> None:
     identity = _identity(case, reviewer=reviewer)
     identity["retries"] = 1
-    provider_run = mr.subprocess.run
+    provider_run = mr._run_reviewer
     calls = 0
 
     def retrying_run(command, **kwargs):
@@ -1937,7 +1949,7 @@ def test_retry_invocations_cannot_reuse_or_relabel_provenance(
             process.returncode = 17
         return process
 
-    monkeypatch.setattr(mr.subprocess, "run", retrying_run)
+    monkeypatch.setattr(mr, "_run_reviewer", retrying_run)
     directory = tmp_path / "run"
     result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
     assert result["error"] is None
