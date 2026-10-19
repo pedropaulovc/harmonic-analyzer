@@ -46,6 +46,7 @@ def part_properties(part_name: str) -> dict[str, str]:
     # notes are $PRPSHEET links, so the numbers live here, not in the DRWDOT.
     props["TOL_EDGE_BREAK_R"] = str(_config.title_block("edge_break")["display_r"])
     props["TOL_CHAMFER_MAX"] = str(_config.title_block("edge_break")["display_chamfer"])
+    props["TOL_INSIDE_CORNER"] = str(_config.title_block("inside_corner")["display"])
     props["THREAD_TYPE"] = str(_config.title_block("thread")["type"])
     props["THREAD_CLASS"] = str(_config.title_block("thread")["class"])
     # DRILLED HOLES general tolerance (unilateral); the title block's DRILLED

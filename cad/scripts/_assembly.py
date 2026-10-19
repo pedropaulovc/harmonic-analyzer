@@ -61,6 +61,7 @@ def assembly_title_properties(assembly_name: str) -> dict[str, str]:
         "TOL_HOLE_PLUS": str(_config.title_block("drilled_hole")["display_plus"]),
         "TOL_EDGE_BREAK_R": str(_config.title_block("edge_break")["display_r"]),
         "TOL_CHAMFER_MAX": str(_config.title_block("edge_break")["display_chamfer"]),
+        "TOL_INSIDE_CORNER": str(_config.title_block("inside_corner")["display"]),
         "THREAD_TYPE": str(_config.title_block("thread")["type"]),
         "THREAD_CLASS": str(_config.title_block("thread")["class"]),
     }

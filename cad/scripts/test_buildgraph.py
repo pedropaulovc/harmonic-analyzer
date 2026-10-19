@@ -2256,6 +2256,31 @@ def test_part_properties_use_release_revision():
     assert part_properties("pd-platen-guide")["Revision"] == _config.release_revision()
 
 
+@pytest.mark.parametrize(
+    ("properties", "name"),
+    [
+        (part_properties, "pd-platen-guide"),
+        (part_properties, "unregistered-title-block-test-part"),
+        (assembly_title_properties, "fr-frame"),
+    ],
+)
+def test_title_properties_carry_inside_corner_default(properties, name, monkeypatch):
+    import _config
+
+    expected = "R1.0 MAX UNLESS OTHERWISE SPECIFIED"
+    assert properties(name)["TOL_INSIDE_CORNER"] == expected
+    title_block = _config.title_block
+
+    def changed_title_block(section):
+        if section == "inside_corner":
+            return {"display": "R0.8 MAX UNLESS OTHERWISE SPECIFIED"}
+        return title_block(section)
+
+    monkeypatch.setattr(_config, "title_block", changed_title_block)
+    expected = "R0.8 MAX UNLESS OTHERWISE SPECIFIED"
+    assert properties(name)["TOL_INSIDE_CORNER"] == expected
+
+
 # The title block's PART cell prints the part's slug, never a registry title
 # (user ruling 2026-09-26, via Main): one convention on every part sheet.  The
 # cell resolves the linked model's summary Title, which save_part_and_images

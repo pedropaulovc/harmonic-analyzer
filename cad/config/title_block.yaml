@@ -1,8 +1,9 @@
 # Drawing title-block general tolerances (ASME-style, inch — matches the
 # US-customary fastener policy). The dashed-decimal rows mean "a dimension
 # displayed with N decimal places carries this ± unless otherwise specified".
-# ``display`` is pasted verbatim into part custom properties (TOL_LIN_XX /
-# TOL_LIN_XXX / TOL_ANG / TOL_SURFACE) that the drawing template's title block
+# ``display`` is pasted verbatim into part/assembly custom properties (TOL_LIN_XX /
+# TOL_LIN_XXX / TOL_ANG / TOL_SURFACE / TOL_INSIDE_CORNER) that the drawing
+# template's title block
 # reads via $PRPSHEET; ``value_in``/``value_deg`` feed the same numbers into
 # each part's DimXpert block-tolerance document properties — keep the pairs in
 # agreement.
@@ -43,6 +44,11 @@ surface:    { display: "CAST/MACHINED" }
 # Edge-break row: "REMOVE BURRS AND BREAK SHARP EDGES <R> OR CHAMFER <C> MAX",
 # read via $PRPSHEET:{TOL_EDGE_BREAK_R} / {TOL_CHAMFER_MAX} (2026-09 template).
 edge_break: { radius_mm: 0.25, chamfer_max_mm: 0.25, display_r: "R0.25", display_chamfer: "0.25" }
+
+# Inside-corner ceiling: the title block's INSIDE CORNERS row reads the full
+# qualification via $PRPSHEET:{TOL_INSIDE_CORNER}. Feature-specific smaller
+# limits remain native model dimensions; this is the general default (#1625).
+inside_corner: { display: "R1.0 MAX UNLESS OTHERWISE SPECIFIED" }
 
 # Thread row: "THREADS <TYPE> CLASS <CLASS>" via $PRPSHEET:{THREAD_TYPE} /
 # {THREAD_CLASS} -- the US-customary fastener policy's default fit class, so
