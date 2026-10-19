@@ -209,11 +209,11 @@ DETAIL_LETTER_XY = {"D": (0.188, 0.161), "E": (0.264, 0.155)}
 # D's crop is a view boundary, not a third concentric manufactured diameter.
 # Keep its persisted circular fence; omit only the printed detail-view outline.
 DETAIL_NO_OUTLINE = {"D": True, "E": False}
-# swDetViewStyle_e. D's fence prints 0.8 mm outside the hub OD on the 1:2
-# front; with a free letter it read as a third concentric circle (regate-r1
-# #3). The leader style draws a leader from the fence to its letter. E's
-# fence stands apart from every feature, so it keeps the standard style.
-DETAIL_STYLE = {"D": 2, "E": 0}  # swDetViewLEADER, swDetViewSTANDARD
+# swDetViewStyle_e. D's fence is close to the hub OD on the 1:2 front;
+# a free letter made it read as a third concentric circle. Both letters sit
+# away from their source circles to clear the profile controls (#1590/#1442).
+# Native leaders keep those displaced labels unambiguous.
+DETAIL_STYLE = {"D": 2, "E": 2}  # swDetViewLEADER
 # DOT on the printed south centre-mark arm, at the actual hole's south rim.
 # Keep the circular model edge attached; never move an FCF attachment by setter.
 FCF_XY = (0.262, 0.1001)
@@ -321,7 +321,8 @@ _BOT_END_Y = CENTER_Y - math.sqrt(R_BOTTOM**2 - BOT_END_X**2)
 # overall row and both A-to-land rows sit above the top-edge profile frame (top
 # 0.211); the left taper vertex gets its own row from A, under the left half,
 # below the R800/R816 texts.
-OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.221)
+# The longest dimension is outermost (#1440), above both BASIC land locators.
+OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.254)
 # Right taper: its BASIC box at 0.132 printed 1.6 mm into Detail D's view box
 # (r3 layout audit; D's top ~0.1309); at 0.137 it clears it.
 # Left taper: a full row clear of the R800/R816 texts, and left of R816's
@@ -434,9 +435,9 @@ for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x",
         _name, kind="face", faces=(_face,), requirements=("land_angle_deg", "station", "surface_profile"), fields={
             # BASIC with no acceptance of its own: the J↔K zone bounds the land.
             "tip_land": (rocker.TIP_FACE, ("TIP_FACE", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
-            "land_angle_deg": (round(_LAND_ANGLE, _P), ("_ALPHA_TOP", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
+            "land_angle_deg": (round(_LAND_ANGLE, _P), ("_ALPHA_TOP", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
             "land_angle_nominal_deg": (_LAND_ANGLE, ("_ALPHA_TOP",)),
-            "dimension_type": ("basic", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
+            "dimension_type": ("basic", (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)),
             "radial_tip_end": ([_sign * _TIP[0], _TIP[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
             "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
             # Each land's own BASIC LAND row from A (the J row, main-r1 Opus).
@@ -1953,7 +1954,10 @@ HUB_KEEP = {
 # The 2X 5.59 box sits between its own witnesses: the upper one passes its
 # top-left corner (0.05 mm at the plain 5.59, main-r1 PDF), so the widened
 # text is requested 2 mm lower, centred in the 124.0-133.4 mm clear band.
-END_KEEP = {"RodTipLen": (0.377, 0.128)}
+END_KEEP = {
+    "RodTipLen": (0.377, 0.128),
+    "TipLandAngle": (0.372, 0.082),
+}
 # View F at 3:1 (RIGHT_CENTER; strap faces x 0.0713/0.0788, hub ends
 # 0.0644/0.0856, part y 0.151-0.239, hub y 0.160-0.190). Native centres each
 # value-plus-three-row block on its request and runs the dimension line under
@@ -2133,13 +2137,33 @@ def _dress_detail_dimensions(
     adapter: Any, annotations: list[Any], *, keep: dict[str, tuple[float, float]],
 ) -> None:
     """Read D/E imported sizes; preserve the native pivot size and ream band."""
-    expected = {"RodTipLen": TIP_FACE, "HubDia": HUB_DIA, "PivotDia": PIVOT_HOLE_DIA}
+    expected = {
+        "RodTipLen": TIP_FACE,
+        "TipLandAngle": _ALPHA_TOP,
+        "HubDia": HUB_DIA,
+        "PivotDia": PIVOT_HOLE_DIA,
+    }
     remaining = {name: expected[name] for name in keep}
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
         if name not in remaining:
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        if name == "TipLandAngle":
+            model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
+            actual = None if model_dimension is None else model_dimension.SystemValue
+            if (
+                int(display.Type2) != 3
+                or type(actual) not in (int, float)
+                or not math.isfinite(actual)
+                or not math.isclose(actual, remaining.pop(name), abs_tol=1e-9)
+            ):
+                raise RuntimeError("tip-land angle lost its native radial-land measurement")
+            set_basic_dimension(adapter, display, label="tip land angle")
+            display.SetText(1, rocker_notes.TIP_LAND_ANGLE_PREFIX)
+            if str(display.GetText(1) or "") != rocker_notes.TIP_LAND_ANGLE_PREFIX:
+                raise RuntimeError("tip land angle lost its 2X count")
+            continue
         assert_dimension_measures(
             adapter, display, expected_mm=remaining.pop(name), label=f"imported {name}"
         )
@@ -3979,6 +4003,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "HubLength": HUB_FACES.precision["length"],
             "StrapThickness": STRAP_DATUM_B.precision["thickness"],
             "HubRootRadius": rocker_notes.DRAWING_PRECISION["HubRoot"]["HubRootRadius"],
+            "TipLandAngle": rocker_notes.DRAWING_PRECISION["StrapProfile"]["TipLandAngle"],
         },
     )
     # Each band names what it serves (Opus #1020): hub length spaces the

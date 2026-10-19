@@ -281,14 +281,14 @@ def _printed_profile_limits() -> tuple[tuple[float, float], tuple[float, float]]
 
 def test_printed_profile_controls_are_their_sources() -> None:
     assert arm_notes.DRAWING_DIMENSIONS["StrapProfile"] == {
-        "TopRadius", "BottomRadius", "RodTipLen"
+        "TopRadius", "BottomRadius", "RodTipLen", "TipLandAngle"
     }
     assert arm_notes.DRAWING_DIMENSIONS["TopEdgeReference"] == {"TopAbovePivot"}
     assert arm_drawing.BASIC_PROFILE_DIMENSIONS == {
         "TopRadius", "BottomRadius", "TopAbovePivot"
     }
     assert arm_drawing.BASIC_PROFILE_DIMENSIONS == arm_drawing.FRONT_KEEP.keys()
-    assert set(arm_drawing.END_KEEP) == {"RodTipLen"}
+    assert set(arm_drawing.END_KEEP) == {"RodTipLen", "TipLandAngle"}
     assert "RodTipLen" not in arm_drawing.HUB_KEEP
     assert "RodTipLen" not in arm_drawing.RIGHT_KEEP
     assert arm_drawing._ALPHA_TOP == arm._ALPHA_TOP

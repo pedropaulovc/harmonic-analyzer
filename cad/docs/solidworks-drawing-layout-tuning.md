@@ -494,6 +494,15 @@ guards instead of adding another layout mechanism. The source-derived
 10.46° BASIC remains in Manufacturing Note 1; no datum, geometry or tolerance
 changes accompany that presentation-only removal.
 
+The later #1020 follow-up restores the land's BASIC angle on **Detail E** as
+the imported `TipLandAngle@StrapProfile`, not the abandoned front-view offset
+dimension. Its native driven angle measures the actual radial land against a
+vertical construction ray in the part sketch; the drawing checks the angular
+type and radian value before adding the BASIC box and `2X` count. The
+construction ray changes neither the solid nor the profile zone. Keep the
+common arc-centre location in the notes, but do not substitute a typed angle
+or ambiguous radial-land prose for this model-owned dimension.
+
 **b. `IView::SetDisplayMode4` refusing HLR on a native detail view.**
 Don't: read `False` as "detail views can't do HLR". Two causes, both documented
 in `types/IView/SetDisplayMode4.md`: (1) `UseParent = True` — "If UseParent is

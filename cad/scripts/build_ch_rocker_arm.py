@@ -78,6 +78,7 @@ from _sketch_circle import define_circle
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_dimension_insert import add_angular_reference_dimension
 from _drawing_prefix import set_dimension_prefix
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
@@ -189,6 +190,59 @@ def _as_construction(adapter, entity_id: str) -> None:
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _tip_land_angle_reference(adapter, rod_tip_line: str, dims: SketchDims) -> None:
+    """Measure the real +X radial land from vertical in StrapProfile.
+
+    The land is already constrained through the common arc centre. Only a
+    construction ray is added: its root follows the land's top endpoint,
+    while vertical plus a length dimension fully define its free endpoint.
+    The angular dimension is driven, so neither the solid outline nor the
+    existing profile dimensions acquire another driving constraint.
+    """
+    set_sketch_direct_db(adapter, True)
+    vertical = check(
+        "tip land vertical reference",
+        await adapter.add_line(
+            TOP_END_X, TOP_END_Y, TOP_END_X, TOP_END_Y - TIP_FACE
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, vertical)
+    check(
+        "tip land vertical reference root",
+        await adapter.add_sketch_constraint(
+            f"{vertical}.start", f"{rod_tip_line}.start", "coincident"
+        ),
+    )
+    check(
+        "tip land vertical reference direction",
+        await adapter.add_sketch_constraint(vertical, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{vertical}.start",
+        f"{vertical}.end",
+        "vertical_distance",
+        TIP_FACE,
+        "tip land vertical reference length",
+    )
+    dims.record("TipLandVerticalLength", '"TipFaceLen"')
+    # Place text in the acute downward wedge; AddSpecificDimension measures
+    # the selected real land and reference ray, never a numeric text override.
+    await add_angular_reference_dimension(
+        adapter,
+        vertical,
+        rod_tip_line,
+        (
+            TOP_END_X + 2.0 * TIP_FACE * math.sin(_ALPHA_TOP / 2.0),
+            TOP_END_Y - 2.0 * TIP_FACE * math.cos(_ALPHA_TOP / 2.0),
+        ),
+        "tip land from vertical",
+        expected_degrees=math.degrees(_ALPHA_TOP),
+    )
+    dims.record("TipLandAngle")
 
 
 # The hub-to-strap root fillet (Opus #1020 r2 C2): one full circle on each
@@ -346,8 +400,9 @@ async def build(adapter) -> dict[str, str]:
     # Dim EMISSION ORDER (record each as its display dim is created): the centre's
     # vertical_distance (x on-axis, so anchor_point_to_origin emits ONE dim =
     # CenterY), bottom radius, top radius, bottom-tail x, bottom-rod x, top-tail x,
-    # top-rod x, rod-tip length, tail-tip length -- NINE display dims. The
-    # ``coincident`` concentric + the two radial relations are RELATIONS, not dims.
+    # top-rod x, rod-tip length, tail-tip length -- NINE outline display dims.
+    # The vertical construction ray and its driven angle follow those dims.
+    # The ``coincident`` concentric + the two radial relations are not dims.
     await anchor_point_to_origin(
         adapter, f"{bottom_arc}.center", 0.0, CENTER_Y, "arc centre"
     )
@@ -424,6 +479,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(tail_tip_line, None, "linear", TIP_FACE),
     )
     strap.record("TailTipLen", '"TipFaceLen"')
+    await _tip_land_angle_reference(adapter, rod_tip_line, strap)
     await ensure_fully_defined(adapter, "strap sketch")
     check("exit_sketch strap", await adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")

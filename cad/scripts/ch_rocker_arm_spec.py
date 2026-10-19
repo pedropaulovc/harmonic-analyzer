@@ -104,13 +104,13 @@ TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
 #
 # The OD's floor includes both the largest reamed bore and the bore-to-OD
 # eccentricity (PR #1354, R9 machinist review: the old Ø0.50 coaxiality left
-# only 1.33 wall at the printed OD minimum). Main's 2026-10-12 option-A ruling
-# tightens coaxiality to Ø0.10 without changing the nominal hub. A radial
-# eccentricity of coaxiality / 2 consumes wall on one side, so the required
-# diameter must add twice that eccentricity to twice rule 17's 1.5 floor.
-# The hub and MHA-CH-009 thrust washer retain their shared O10.20 above both
-# floors. The OD ceiling is the amplitude bar's foot cheeks at d = 0
-# (channel_kinematics ``bar_bottom``); test_rocker_bank_layout pins the slack.
+# only 1.33 wall at the printed OD minimum). The retained Ø0.10 position
+# control is owner-approved (2026-10-19, relayed by coordinator; RV-04).
+# Its radial eccentricity of zone / 2 consumes wall on one side, so the
+# required diameter adds it twice to twice rule 17's 1.5 floor.
+# The hub retains O10.20 above that floor. Its OD ceiling is the amplitude
+# bar's foot cheeks at d = 0 (channel_kinematics ``bar_bottom``);
+# test_rocker_bank_layout pins the slack.
 PIVOT_HOLE_BAND = (0.03, 0.0)  # (upper, lower): reamed; native on PivotDia
 RULE12_WALL_FLOOR = 1.5  # drawing-guidelines.md rule 17 (walls and webs)
 HUB_COAXIALITY_DIA = 0.10  # authoritative diametral zone; the hub OD's position frame prints it
@@ -137,6 +137,7 @@ HUB_LENGTH_BAND = (0.05, 0.0)
 # rod's float on the arm is measured from the hub's mid-plane. The sheet
 # prints it as a position zone on the strap width to datum G, the hub's -Z
 # end face (the 20X stack registration), at a BASIC to the strap mid-plane.
+# Owner ruling 2026-10-19 retains this frame and datum scheme (RV-05).
 STRAP_HUB_SYMMETRY = 0.10
 # The hub-to-strap root fillet (drawing-guidelines rule 16), printed as the
 # single limit "R0.2 MAX" (Opus #1020 r2 C2). The MHA-CH-001 foot cheeks pass
