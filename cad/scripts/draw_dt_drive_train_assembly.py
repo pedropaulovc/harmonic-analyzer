@@ -920,9 +920,9 @@ BANK_STEPS = _note_text(
         "   SPOT MHA-FR-001 THROUGH THE FOOT HOLE (11/64 TRANSFER PUNCH);",
         "   LIFT OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
         "   BOTTOMING); BLOW OUT CHIPS. REFIT, RE-SET Y AND X, TIGHTEN",
-        # Check 4 re-reads X against this record after the cone swing's shims
-        # (#1691 review: the shims move the pedestals after step 9 sets them).
-        "   MHA-VN-032, RECHECK AND RECORD X.",
+        # Check 4 re-reads both coordinates against the step 9 setting bands
+        # after the cone swing's radial shims move the pedestals.
+        "   MHA-VN-032, RECHECK AND RECORD X AND BACK INNER-FACE Y.",
         # dtrefactor's #937 review: the loaded mandrel hangs from the back
         # strap alone until the front one goes on (F2), and its front end sits
         # over the front foot hole, where no chuck or tap wrench reaches (F1).
@@ -1135,16 +1135,18 @@ CHECKS = _note_text(
         "   MHA-DT-002 SCREWS (MHA-VN-032) TO SNUG-LOOSE. SWING IN ON RADIAL SHIMS,",
         f"   TIP TO MHA-DT-012 ROOT: {set_stack.feeler_gap_mm(12):.2f} AT T012, "
         f"{set_stack.feeler_gap_mm(120):.2f} AT T120; TIGHTEN MHA-VN-032.",
-        "   EACH MHA-DT-002'S RECORDED X (STEP 9A, 9C) PLUS ITS X READING IS",
-        f"   {BANK_X_LIMITS} AND THE Y READING IS ZERO; IF NOT, EASE IT, BRING IT",
-        "   BACK WITHIN THOSE LIMITS ON ITS INDICATORS AND TIGHTEN. STEPS "
+        "   EACH RECORDED X (9A, 9C) PLUS ITS X READING IS "
+        f"{BANK_X_LIMITS};",
+        "   BACK INNER-FACE Y RECORDED IN 9A PLUS ITS Y READING IS WITHIN",
+        "   THE 9A Y LIMITS, USING THE SAME W. IF OUT, EASE THAT PEDESTAL,",
+        "   RESET WITHIN THOSE LIMITS ON ITS INDICATORS AND TIGHTEN. STEPS "
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}",
         f"   AND {steps.step_number('rig-located')}-"
         f"{steps.step_number('rig-seats-transferred')} STAND; CHECK 7 RE-PROVES THE RIG.",
         "   SWING OUT AND REMOVE THE SHIMS. SWING IN UNTIL A "
         f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT; HOLD",
         "   IT THERE AND TIGHTEN MHA-VN-013. DO NOT LOOSEN MHA-DT-002 AFTER",
-        "   THIS SET; IF YOU DO, REDO BOTH STEPS.",
+        "   THIS SET; IF YOU DO, REPEAT CHECKS 4, 5 AND 7.",
         # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
         # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).
         "   IF T012 BINDS AFTER THE SET (WORST-CORNER OVERLAP "
