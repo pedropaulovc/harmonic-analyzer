@@ -258,10 +258,14 @@ NOTCH_KEEP = {
     # beside section A-A's PlateThk text (x >= 0.3035), and the pivot relief
     # note stands right of the line (RELIEF_NOTE_XY).
     "CapECz": _planned(0.296, 0.180),
-    # 0.5 mm right of r1 and 0.5 mm higher than r3: the 33.00 arrow (y 0.2462
-    # at r3) stood 1.81 then 1.91 mm under this text's foot (layout audit
-    # arrow-near-text, clearance 2.0).
-    "CapEDia": _planned(0.2855, 0.2595),
+    # r15 native envelope: the shelf is 2.8049 mm below the position;
+    # on the left it ends 10.0455 mm to the right.  Aim down-left at the
+    # physical concave cap, below the 33.00 line (y 246.2219 mm).
+    # The measured 16.916 mm text block needs this lower station: at y224
+    # the plan's left outline is x245.4, not x248.  Here both it and the
+    # neighbouring x225 station line clear the text by at least 2 mm.
+    # Saved-envelope prediction only; require a new native sheet eye proof.
+    "CapEDia": _planned(0.2355, 0.209),
 }
 SECTION_KEEP = {
     # Outside its witnesses, the text hangs LEFT of the dimension line (away

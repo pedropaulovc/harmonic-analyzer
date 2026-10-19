@@ -63,11 +63,12 @@ PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
 # dimension line and the bore gap it leads into, and its leader (from the
 # note's right end) must pass left of A-A's Ra 1.6 leader.  The plate is
 # the part being fitted, so the mate is the one thing the depth fits to.
+# r16: screw locking belongs to assembly installation, not plate acceptance.
 PIVOT_RELIEF_FIT_REQUIREMENT = (
     "TOP RELIEF: FIT DEPTH\n"
-    "TO MHA-VN-014 SHOULDER\n"
-    "SCREW: UNLOCKED, SWINGS\n"
-    "FREE, NO AXIAL SHAKE."
+    "TO MHA-VN-014 SHOULDER;\n"
+    "SWINGS FREE,\n"
+    "NO AXIAL SHAKE."
 )
 
 

@@ -189,10 +189,15 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     # "MINIMAL AXIAL PLAY" could not be checked).
     lines = spec.PIVOT_RELIEF_FIT_REQUIREMENT.split("\n")
     flat = " ".join(lines)
-    assert flat.startswith("TOP RELIEF: FIT DEPTH TO MHA-VN-014 SHOULDER SCREW")
-    assert "UNLOCKED" in flat and "NO AXIAL SHAKE" in flat
-    # The layout audit gates a note over four rows (tall-block, r3).
-    assert len(lines) <= 4
+    assert lines == [
+        "TOP RELIEF: FIT DEPTH",
+        "TO MHA-VN-014 SHOULDER;",
+        "SWINGS FREE,",
+        "NO AXIAL SHAKE.",
+    ]
+    assert "UNLOCKED" not in flat and "SCREW:" not in flat
+    # Four rows retain the saved layout envelope without assembly instructions.
+    assert len(lines) == 4
     # Only the NW fillet reaches over the 10.50 strip, and only by a sliver.
     overlaps = {
         label: part._north_fillet_relief_overlap(label, r)
@@ -325,6 +330,117 @@ def test_r12_corner_arrow_lands_at_its_arc_middle() -> None:
     assert text[1] - 0.00195 > south_witness_y + 0.0015
     assert text[1] + 0.00195 < drawing.PROFILE_KEEP["SouthEastX"][1] - 0.0026 - 0.0015
     assert text[0] + 0.00585 < px + vx * 0.0005 - 0.002
+
+
+def _notch_cap_native_prediction(text_xy):
+    """r15 saved envelope, not a new native readback or a fixed arrow tip.
+
+    Provenance: 20261019T141948095Z-30f07cb95264469d8375a13d452e6414.out/
+    reports/layout-audit/dt-cone-swing-platform.json, CapEDia/CapECx/CapECz.
+    Original position (285.5,250.5), shelf (275.4545,247.6951), measured
+    text x277.042..293.958 mm.  Reflect the shelf offset for left-standing
+    text; recompute the radial landing from the moved shelf and source cap.
+    The next native drawing/eye proof must confirm the reflected envelope.
+    """
+    per_mm = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
+    pivot = (0.256811, 0.126724)  # r15 notch-view pivot witnesses
+    centre = (
+        pivot[0] + geometry.SLOT_E_X * per_mm,
+        pivot[1] - geometry.SLOT_E_Z * per_mm,
+    )
+    radius = geometry.SLOT_W / 2.0 * per_mm
+    knee = (text_xy[0] + 0.0100455, text_xy[1] - 0.0028049)
+    ray = (knee[0] - centre[0], knee[1] - centre[1])
+    length = math.hypot(*ray)
+    unit = (ray[0] / length, ray[1] / length)
+    tip = tuple(centre[i] + radius * unit[i] for i in (0, 1))
+    return pivot, centre, radius, knee, unit, tip
+
+
+def test_notch_diameter_shelf_ray_lands_inside_the_physical_concave_arc() -> None:
+    """Prove the retained cap half is not trimmed by the rounded outline.
+
+    Intersections with a full R5 circle are not necessarily on its actual
+    fillet arc.  No saved/fixed tip is used for the new landing.
+    """
+    text = drawing.NOTCH_KEEP["CapEDia"]
+    assert text == pytest.approx((0.2355, 0.200))
+    pivot, centre, radius, knee, unit, tip = _notch_cap_native_prediction(text)
+    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
+    mouth = (geometry.SLOT_TX, -geometry.SLOT_TZ)
+    # The rectangle removes dot(radial,mouth)>0; its two tangent endpoints
+    # bound the physical cap at ~81.216..261.216 degrees on the saved sheet.
+    assert sum(unit[i] * mouth[i] for i in (0, 1)) < -math.sin(math.radians(20))
+    assert tip[0] < centre[0] and tip[1] < centre[1]
+    assert math.dist(tip, centre) == pytest.approx(radius)
+    ends = ((-mouth[1], mouth[0]), (mouth[1], -mouth[0]))
+    corners = geometry.PLATE_CORNERS
+    for index, (label, x, z, fillet_radius) in enumerate(corners):
+        next_corner = corners[(index + 1) % len(corners)]
+        edge = (next_corner[1] - x, -(next_corner[2] - z))
+        norm = math.hypot(*edge)
+        inward = (-edge[1] / norm, edge[0] / norm)
+        vertex = (pivot[0] + x * scale, pivot[1] - z * scale)
+        candidates = list(ends)
+        worst = (-inward[0], -inward[1])
+        if sum(worst[i] * mouth[i] for i in (0, 1)) <= 0:
+            candidates.append(worst)
+        clearance = sum((centre[i] - vertex[i]) * inward[i] for i in (0, 1))
+        assert clearance + radius * min(
+            sum(radial[i] * inward[i] for i in (0, 1)) for radial in candidates
+        ) > 0
+        # A convex fillet removes material only within its vertex/tangents
+        # triangle.  Even the full cap circle's box misses these triangles.
+        tangent = fillet_radius / math.tan(part._corner_theta(label) / 2.0)
+        triangle = [(x, z)]
+        for neighbour in (corners[index - 1], next_corner):
+            delta = (neighbour[1] - x, neighbour[2] - z)
+            length = math.hypot(*delta)
+            triangle.append(
+                (
+                    x + tangent * delta[0] / length,
+                    z + tangent * delta[1] / length,
+                )
+            )
+        cap_centre = (geometry.SLOT_E_X, geometry.SLOT_E_Z)
+        cap_radius = geometry.SLOT_W / 2.0
+        assert any(
+            cap_centre[i] + cap_radius < min(point[i] for point in triangle)
+            or cap_centre[i] - cap_radius > max(point[i] for point in triangle)
+            for i in (0, 1)
+        )
+    # The old right-standing shelf crossed 33.00 beside its right arrow.
+    old_knee = (0.2754545, 0.2476951)
+    old_tip = (0.2736097, 0.2354802)
+    line_y = 0.2462219
+    crossing_x = old_tip[0] + (old_knee[0] - old_tip[0]) * (
+        (line_y - old_tip[1]) / (old_knee[1] - old_tip[1])
+    )
+    assert 0.273311 < crossing_x < 0.279661
+    assert max(knee[1], centre[1] + radius) < line_y - 0.002
+
+
+def test_notch_diameter_saved_text_envelope_clears_the_actual_left_outline() -> None:
+    """Use the native width/height and actual tapered edge, not x248 fiction."""
+    text = drawing.NOTCH_KEEP["CapEDia"]
+    pivot, _centre, _radius, _knee, _unit, _tip = _notch_cap_native_prediction(text)
+    left, right = text[0] - 0.008458, text[0] + 0.008458
+    bottom, top = text[1] - 0.0028049, text[1] + 0.0007486
+    assert left - drawing.FEATURE_KEEP["PostMountWestZ"][0] >= 0.002
+    # NE -> SE is the left edge in this native plan; y grows toward SE.
+    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
+    corners = {corner[0]: corner[1:] for corner in geometry.PLATE_CORNERS}
+    nx, nz, _nr = corners["NE"]
+    sx, sz, _sr = corners["SE"]
+
+    def left_outline(sheet_y):
+        model_z = (pivot[1] - sheet_y) / scale
+        model_x = nx + (sx - nx) * (model_z - nz) / (sz - nz)
+        return pivot[0] + model_x * scale
+
+    assert min(left_outline(bottom), left_outline(top)) - right >= 0.002
+    # Positive control: the originally proposed high station touches the edge.
+    assert left_outline(0.224 + 0.0007486) - (0.237 + 0.008458) < 0.002
 
 
 def test_disengaged_collar_margin_survives_general_bands() -> None:
