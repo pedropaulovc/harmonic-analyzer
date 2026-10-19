@@ -108,6 +108,7 @@ from _layout_geometry import (
 from _gtol_frame import gtol_frame_signature, gtol_frame_xml
 from _gtol_symbols import GTOL_SYMBOLS
 from _hole_spec import blind_cut_dia_mm, drill_process
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -143,6 +144,8 @@ from ch_rocker_arm_spec import (
     _ALPHA_TOP,
 )
 
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm"]
 PART_STEM = SPEC.artifact_stem
