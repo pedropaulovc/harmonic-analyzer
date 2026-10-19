@@ -200,9 +200,11 @@ END_KEEP = {
 THREAD_PICK = (THREAD_START_X, SIDE_CENTER[1] + 0.004)
 # Up and right of the thread start, so the leader leans back onto the thread.
 THREAD_NOTE_XY = (THREAD_START_X + 0.013, SIDE_CENTER[1] + 0.042)
-# The running shoulder's upper flank, right of the Ø dimension line.
-FINISH_PICK = (UNDERHEAD_X - 0.060, SHOULDER_TOP_Y)
-FINISH_SYMBOL = (UNDERHEAD_X - 0.050, SIDE_CENTER[1] + 0.030)
+# The running shoulder's lower flank, right of the Ø dimension line: above the
+# shoulder the Ø value carries its mate callout, which the symbol's leader
+# would run through (r1 layout audit).
+FINISH_PICK = (UNDERHEAD_X - 0.050, 2.0 * SIDE_CENTER[1] - SHOULDER_TOP_Y)
+FINISH_SYMBOL = (UNDERHEAD_X - 0.038, SIDE_CENTER[1] - 0.022)
 # A point on the shoulder face, clear of the Ø6.00 dimension line.
 CENTERLINE_PICK = (UNDERHEAD_X - 0.080, SIDE_CENTER[1] + 0.003)
 ISO_NOTE_XY = (0.352, 0.200)
