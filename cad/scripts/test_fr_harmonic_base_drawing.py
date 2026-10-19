@@ -784,6 +784,49 @@ def test_callout_box_rule_fails_e0e287c83_sheet_on_its_real_display_data() -> No
     ]
 
 
+def test_full_id_transfer_lane_budget_replays_1231_and_preserves_table_gap() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    # #1231 / 5e14485511: actual qualified-ID ink, including the complete
+    # mate identity and native thread/depth rows. Each lane needs 66.503 mm,
+    # not the former legacy-ID anchor separation of 62 mm.
+    recorded = {
+        "pedestal": (
+            0.16754236146807672,
+            0.24083402720093727,
+            0.23404513853192324,
+            0.26110972263338045,
+        ),
+        "block": (
+            0.22954236146807666,
+            0.24083402720093727,
+            0.2960451385319233,
+            0.26110972263338045,
+        ),
+    }
+    table = {"hole table": E0E287C83_OBSTACLES["table DetailItem460"]}
+    assert sheet.find_callout_clashes(recorded, table) == [
+        "callout block vs callout pedestal: clearance -4.5 mm"
+    ]
+    current = {}
+    for name, old_anchor, new_anchor in (
+        ("pedestal", (0.200, 0.252), sheet.PEDESTAL_CALLOUT_XY),
+        ("block", (0.262, 0.252), sheet.BLOCK_CALLOUT_XY),
+    ):
+        dx, dy = (new_anchor[i] - old_anchor[i] for i in (0, 1))
+        x0, y0, x1, y1 = recorded[name]
+        current[name] = (x0 + dx, y0 + dy, x1 + dx, y1 + dy)
+    assert sheet.find_callout_clashes(current, table) == []
+    assert sheet.box_gap(current["pedestal"], current["block"]) >= 0.005
+    assert sheet.box_gap(current["pedestal"], table["hole table"]) >= 0.004
+    # Moving the pedestal left to make room is not a valid repair: the
+    # neighboring hole table occupies this same row.
+    x0, y0, x1, y1 = current["pedestal"]
+    assert sheet.find_callout_clashes(
+        {"pedestal": (x0 - 0.010, y0, x1 - 0.010, y1)}, table
+    )
+
+
 def test_callout_check_treats_the_sheet_frame_and_title_block_as_obstacles() -> None:
     import inspect
     from types import SimpleNamespace
