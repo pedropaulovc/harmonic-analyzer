@@ -120,8 +120,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CrossHoleProfile": {"CrossHoleDia"},
     # Machinist review r1/r3 of #1685 (clarity): the hole was located only by
     # "CENTRED ON Ø15 CYLINDER LENGTH", with no datum face and no band.  It
-    # prints as an ordinary .XXX station from the head rear face, the face
-    # every other station runs from; with HeadLen at .XX both webs hold the
+    # prints as an ordinary .XX station from the head rear face, the face
+    # every other station runs from; at title-block bands both webs hold the
     # 2.0 target (CROSS_HOLE_WEB_WORST).
     "CrossHoleStationReference": {"CrossHoleFromHeadRear"},
     # R1a: the collar's spring-pin hole, from the same head rear face.
@@ -189,8 +189,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked integral-arbor dimension needs authored places")
 
-# The cross hole's mid-length station from the head rear face, printed at
-# .XXX (see DRAWING_DIMENSIONS); the model hole sits on it.
+# The cross hole's station from the head rear face, printed at .XX (see
+# DRAWING_DIMENSIONS); the model hole sits on it.
 CROSS_HOLE_FROM_HEAD_REAR = HEAD_REAR_Z - HEAD_CENTER_Z
 if abs(CROSS_HOLE_FROM_HEAD_REAR - CROSS_HOLE_STATION) > 1e-9:
     raise AssertionError("the model crossrod hole left its printed station")
@@ -209,11 +209,6 @@ DRUM_NUMBER = "MHA-DT-001"
 # hole's station is a toleranced dimension (CrossHoleFromHeadRear), so the
 # callout no longer says CENTRED.
 CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT\nON {CROSSROD_NUMBER} CROSSROD"
-# Machinist review r4 of #1685 (over-specification): the .XXX station gave no
-# function.  Its band is what holds the wall to each head face at the
-# novice-machinist target (CROSS_HOLE_WEB_WORST), so the line under its value
-# says so (drawing-guidelines.md rule 4: a tight band names its reason).
-CROSS_HOLE_STATION_CALLOUT = "FOR WALL EACH SIDE"
 # Machinist review r1 of #1685 (clarity): each land's callout names the bore
 # it runs in, where the general note used to.
 JOURNAL_CALLOUT = f"JOURNAL,\nRUNS IN {STRAP_NUMBER}"

@@ -54,12 +54,15 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
 def test_integral_arbor_keeps_the_released_stations_around_a_longer_head() -> None:
     # drawing-guidelines.md rule 17 (walls and webs) (audit W6) grew the head 9.0 -> 10.5, and the machinist review of
     # 7f7fc1717 (Main's option 2) to 11.5, each time about the released
-    # crossrod station; the shaft and back crown stay put.  The neck shoulder
-    # moves 0.25 forward so every length but the drum station prints at .X.
+    # crossrod station; machinist review r5 of #1685 grew it forward only, to
+    # 12.2, so the rear face stays 5.75 aft of the crossrod.  The shaft and
+    # back crown stay put.  The neck shoulder moves 0.25 forward so every
+    # turned length prints at .X.
     assert spec.HEAD_CENTER_Z == pytest.approx(-6.5)
-    assert spec.HEAD_LEN == pytest.approx(11.5)
-    assert spec.HEAD_FRONT_Z == pytest.approx(spec.HEAD_CENTER_Z - spec.HEAD_LEN / 2.0)
-    assert spec.HEAD_REAR_Z == pytest.approx(spec.HEAD_CENTER_Z + spec.HEAD_LEN / 2.0)
+    assert spec.HEAD_LEN == pytest.approx(12.2)
+    assert spec.HEAD_REAR_Z == pytest.approx(-0.75)
+    assert spec.HEAD_REAR_Z == pytest.approx(spec.HEAD_CENTER_Z + spec.CROSS_HOLE_STATION)
+    assert spec.HEAD_FRONT_Z == pytest.approx(spec.HEAD_REAR_Z - spec.HEAD_LEN)
     assert spec.NECK_END_Z == pytest.approx(9.75)
     assert spec.SHAFT_LEN == pytest.approx(226.25)
     assert spec.SHAFT_LEN + spec.BACK_CAP_SAG == pytest.approx(227.45)
@@ -74,9 +77,9 @@ def test_only_the_drum_station_prints_two_places() -> None:
     """Machinist review of 7f7fc1717: NeckLen printed 11.25 at .XX.  Every
     station runs from the head rear face, so the head and neck shoulder are
     chosen so every turned length lands on .X; the drum station, an assembly
-    station, is the one .XX length (as at 61.55).  The head length prints
-    11.50 for its band, not its value (r3 of #1685: the crossrod hole's
-    toleranced station keeps both webs at the target only under .XX)."""
+    station, is the one .XX length (as at 61.55).  The crossrod station (5.75)
+    is not a turned length.  r5 of #1685: no length prints extra places to
+    hold a wall."""
     lengths = {
         "HeadLen": spec.HEAD_LEN,
         "NeckLen": spec.NECK_LEN,
@@ -91,26 +94,32 @@ def test_only_the_drum_station_prints_two_places() -> None:
     two_places = {
         name for name in lengths if spec.DRAWING_PRECISION_BY_NAME[name] == 2
     }
-    assert two_places == {"DrumStationFromHeadRear", "HeadLen"}
-    assert spec.HEAD_LEN_PLACES == 2
+    assert two_places == {"DrumStationFromHeadRear"}
+    assert spec.HEAD_LEN_PLACES == 1
     for name, value in lengths.items():
         if name == "DrumStationFromHeadRear":
             assert value != pytest.approx(round(value, 1), abs=1e-9), name
+        else:
+            assert value == pytest.approx(round(value, 1), abs=1e-9), name
 
 
 def test_crossrod_hole_station_is_toleranced_with_a_rule_12_web() -> None:
     # Machinist review r3 of #1685 (clarity, 3 of 3 runs): CENTRED gave no
-    # datum face and no band, so the hole prints an ordinary .XXX station
-    # from the head rear face.  Both webs hold the novice-machinist 2.0
-    # target held since the review of 7f7fc1717, with HeadLen at .XX.
+    # datum face and no band, so the hole prints an ordinary station from the
+    # head rear face.  r5 (over-specification): a .XXX station and .XX
+    # HeadLen were bands tightened to hold the wall (rules 4 and 17), so the
+    # head grew forward and every band is the title-block row for the places
+    # its value needs.  Both webs hold the novice-machinist 2.0 target held
+    # since the review of 7f7fc1717.
     assert spec.DRAWING_DIMENSIONS["CrossHoleStationReference"] == {
         "CrossHoleFromHeadRear"
     }
     assert spec.CROSS_HOLE_FROM_HEAD_REAR == pytest.approx(spec.CROSS_HOLE_STATION)
-    assert spec.CROSS_HOLE_STATION == pytest.approx(spec.HEAD_LEN / 2.0)
-    assert spec.DRAWING_PRECISION_BY_NAME["CrossHoleFromHeadRear"] == 3
-    assert spec.CROSS_HOLE_STATION_BAND == printed_band_mm(3)
-    assert spec.HEAD_LEN_BAND == printed_band_mm(2)
+    assert spec.CROSS_HOLE_STATION == pytest.approx(5.75)
+    assert spec.DRAWING_PRECISION_BY_NAME["CrossHoleFromHeadRear"] == 2
+    assert spec.CROSS_HOLE_STATION_BAND == printed_band_mm(2)
+    assert spec.HEAD_LEN_BAND == printed_band_mm(1)
+    assert "CrossHoleFromHeadRear" not in drawing.DIMENSION_CALLOUTS
     assert "CrossHoleFromHeadRear" in drawing.DETAIL_KEEP
     # Printed toleranced, never as a reference.
     build = inspect.getsource(drawing.build)
@@ -118,7 +127,7 @@ def test_crossrod_hole_station_is_toleranced_with_a_rule_12_web() -> None:
     source = inspect.getsource(part.build)
     call = source[source.index('feature_name="CrossHoleStationReference"') :]
     call = call[: call.index("\n    )")]
-    assert "drive_expression='\"HeadLen\" / 2'" in call
+    assert "drive_expression='\"CrossHoleStation\"'" in call
     assert "end_v=-HEAD_CENTER_Z" in call
     assert "CENTRED" not in spec.CROSS_HOLE_CALLOUT
     hole_upper = (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]) / 2.0
@@ -544,7 +553,7 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
 
 def test_head_diameter_line_stands_between_crown_apex_and_fence() -> None:
     x = drawing.DIAMETER_POSITIONS["HeadDia"][0]
-    to_x = lambda z: drawing.PRINCIPAL_CENTER[0] - (z - 106.725) / 1000.0  # noqa: E731
+    to_x = drawing._sheet_x
     apex = to_x(spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG)
     center = to_x(spec.HEAD_CENTER_Z)
     half = spec.HEAD_DIA / 2000.0
@@ -606,7 +615,7 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         rig.DRUM_END_SHIM_SET_ERROR,
     )
     assert spec.LINEAR_X_BAND == printed_band_mm(1)
-    assert spec.HEAD_LEN_BAND == printed_band_mm(2)
+    assert spec.HEAD_LEN_BAND == printed_band_mm(1)
     assert geometry.DRUM_LEN == rig.DRUM_LEN
     assert geometry.STRAP_T_BAND == strap.THICKNESS_BAND
     spec_source = inspect.getsource(spec)
@@ -2132,11 +2141,5 @@ def test_cross_hole_station_text_clears_the_shared_rear_face_witness() -> None:
     face, where the 11.5's witness drops (text-on-line, blocking)."""
     rear_face = drawing._detail_x(spec.HEAD_REAR_Z)
     assert drawing.DETAIL_REAR_FACE_X == pytest.approx(rear_face)
-    x, y = drawing.DETAIL_KEEP["CrossHoleFromHeadRear"]
-    # r4: the reason line centres on the position, one pitch under the value.
-    callout = drawing.DIMENSION_CALLOUTS["CrossHoleFromHeadRear"]
-    assert callout is spec.CROSS_HOLE_STATION_CALLOUT
-    width = drawing._callout_width(callout)
-    assert rear_face - (x + width / 2.0) >= 0.002
-    # The value stays 3 mm under the Ø10.5's lower witness (y 0.2245).
-    assert 0.2245 - (y + 0.0035) >= 0.003
+    x, _y = drawing.DETAIL_KEEP["CrossHoleFromHeadRear"]
+    assert rear_face - (x + drawing.CROSS_HOLE_STATION_TEXT_RIGHT) >= 0.002

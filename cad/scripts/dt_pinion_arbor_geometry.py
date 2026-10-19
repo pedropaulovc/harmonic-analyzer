@@ -53,22 +53,29 @@ JOURNAL_DIA_BAND = (-0.010, -0.030)
 # web, (10.5 - 0.8) / 2 - 6.10 / 2 = 1.80, under the novice-machinist 2.0
 # target; Main's ruling (option 2) grows the head to 11.5, again about the
 # crossrod station: 2.30 worst case.  Machinist review r3 of #1685 then
-# asked for a toleranced station in place of CENTRED, which the .XX HeadLen
-# holds at the target (CROSS_HOLE_WEB_WORST below).
+# asked for a toleranced station in place of CENTRED.  At the 11.5 head only
+# a .XXX station and a .XX HeadLen held the target, and r5 ruled that a
+# band tightened to rescue a wall (drawing-guidelines.md rules 4 and 17).
+# So the head grows forward only, 11.5 -> 12.2: the crossrod station and the
+# rear face stay put, and with the station at 5.75 (.XX) and HeadLen at .X
+# both webs hold the target (CROSS_HOLE_WEB_WORST below).  HEAD_CENTER_Z
+# keeps its name for its consumers but is the crossrod station, 0.35 aft of
+# the head's mid-length.
 #
 # Every station on the print runs from the head rear face, so its position
 # decides which lengths print exactly at .X.  With SHAFT_LEN released, the
-# 11.5 head puts the rear face at -0.75, where the back-rim length (227.0) and
-# the overall (242.7) are .X; the neck shoulder moves 0.25 forward, 10.0 ->
-# 9.75, so the neck (10.5, flagged at 11.25) is .X too.  The drum station
-# (61.05) is the one .XX length, as it was at 61.55.
+# rear face sits at -0.75, where the back-rim length (227.0) and the overall
+# (243.4) are .X; the neck shoulder moves 0.25 forward, 10.0 -> 9.75, so the
+# neck (10.5, flagged at 11.25) is .X too.  The drum station (61.05) and the
+# crossrod station (5.75) are the .XX lengths.
 HEAD_DIA = 15.0
-HEAD_LEN = 11.5
+HEAD_LEN = 12.2
 HEAD_CAP_SAG = 3.0
 HEAD_CAP_R = ((HEAD_DIA / 2.0) ** 2 + HEAD_CAP_SAG**2) / (2.0 * HEAD_CAP_SAG)
 HEAD_CENTER_Z = -6.5  # the released crossrod station
-HEAD_REAR_Z = HEAD_CENTER_Z + HEAD_LEN / 2.0
-HEAD_FRONT_Z = HEAD_CENTER_Z - HEAD_LEN / 2.0
+CROSS_HOLE_STATION = 5.75  # from the head rear face
+HEAD_REAR_Z = HEAD_CENTER_Z + CROSS_HOLE_STATION
+HEAD_FRONT_Z = HEAD_REAR_Z - HEAD_LEN
 
 # --- Drum station and journal-land length (Main ruling A, 2026-09-24) --------
 # MHA-DT-022 owns where the MHA-DT-001 drum is bonded: its front end sits
@@ -238,16 +245,15 @@ BACK_JOURNAL_Z = HEAD_REAR_Z + BACK_JOURNAL_FROM_HEAD_REAR
 # drawing-guidelines.md rule 17 (walls and webs) worst-case web from the crossrod hole to either head
 # face.  Machinist review r3 of #1685 (clarity, 3 of 3 runs): "CENTRED ON Ø15
 # CYLINDER LENGTH" told the shop neither where to measure from nor how
-# closely, so the hole is now an ordinary toleranced station from the head
-# rear face, mid-length at .XXX.  At the .X HeadLen the front web would fall
-# to (11.5 - 0.8) - (5.75 + 0.13) - 6.10 / 2 = 1.77, under the 2.0 target, so
-# HeadLen prints at .XX: the front web is then 2.06 and the rear 2.57.
-HEAD_LEN_PLACES = 2  # HeadLen
+# closely, so the hole is an ordinary toleranced station from the head rear
+# face.  Every band is the title-block row for the places the value needs
+# (r5: no band tightened for the wall): rear web 5.75 - 0.51 - 6.10 / 2 =
+# 2.19, front web (12.2 - 0.8) - (5.75 + 0.51) - 6.10 / 2 = 2.09.
+HEAD_LEN_PLACES = 1  # HeadLen
 HEAD_CAP_SAG_PLACES = 1  # HeadCapSagDim
 NECK_LEN_PLACES = 1  # NeckLen
-HEAD_LEN_BAND = printed_band_mm(HEAD_LEN_PLACES)  # .XX title-block row
-CROSS_HOLE_STATION = HEAD_LEN / 2.0  # from the head rear face
-CROSS_HOLE_STATION_PLACES = 3  # CrossHoleFromHeadRear
+HEAD_LEN_BAND = printed_band_mm(HEAD_LEN_PLACES)  # .X title-block row
+CROSS_HOLE_STATION_PLACES = 2  # CrossHoleFromHeadRear
 CROSS_HOLE_STATION_BAND = printed_band_mm(CROSS_HOLE_STATION_PLACES)
 CROSS_HOLE_REAR_WEB_WORST = (
     CROSS_HOLE_STATION

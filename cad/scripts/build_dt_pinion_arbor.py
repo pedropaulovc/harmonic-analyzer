@@ -54,6 +54,7 @@ from dt_pinion_arbor_spec import (
     BOND_ZONE_DIA_Z,
     CROSS_HOLE_DIA,
     CROSS_HOLE_DIA_BAND,
+    CROSS_HOLE_STATION,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -524,7 +525,6 @@ async def build(adapter) -> dict[str, str]:
         "HeadLen": HEAD_LEN,
         "HeadCapSag": HEAD_CAP_SAG,
         "HeadFrontZ": HEAD_FRONT_Z,
-        "HeadCenterZ": HEAD_CENTER_Z,
         "NeckDia": NECK_DIA,
         "NeckLen": NECK_LEN,
         "NeckEndZ": NECK_END_Z,
@@ -533,6 +533,7 @@ async def build(adapter) -> dict[str, str]:
         "ShaftLen": SHAFT_LEN,
         "BackCapSag": BACK_CAP_SAG,
         "CrossHoleDia": CROSS_HOLE_DIA,
+        "CrossHoleStation": CROSS_HOLE_STATION,
         "BackRimFromHeadRear": BACK_RIM_FROM_HEAD_REAR,
         "OverallLen": OVERALL_LEN,
         "JournalLen": JOURNAL_LEN,
@@ -699,7 +700,11 @@ async def build(adapter) -> dict[str, str]:
         "grip cross-hole",
         dims=cross_hole,
         names=("CrossHoleCx", "HeadCenterZ", "CrossHoleDia"),
-        drives=(None, '-("HeadFrontZ" + "HeadLen" / 2)', '"CrossHoleDia"'),
+        drives=(
+            None,
+            '-("HeadFrontZ" + "HeadLen" - "CrossHoleStation")',
+            '"CrossHoleDia"',
+        ),
     )
     await ensure_fully_defined(adapter, "grip-cross-hole sketch")
     check("exit_sketch cross hole", await adapter.exit_sketch())
@@ -801,7 +806,7 @@ async def build(adapter) -> dict[str, str]:
         names=("PinHoleCx", "PinHoleZ", "PinHoleDia"),
         drives=(
             None,
-            '"HeadCenterZ" + "HeadLen" / 2 + "PinStationFromHeadRear"',
+            '"HeadFrontZ" + "HeadLen" + "PinStationFromHeadRear"',
             '"PinHoleDia"',
         ),
     )
@@ -848,16 +853,15 @@ async def build(adapter) -> dict[str, str]:
         end_v=-PIN_Z,
         drive_expression='"PinStationFromHeadRear"',
     )
-    # Machinist review r1/r3 of #1685: the cross hole's mid-length station
-    # from the same face, printed at .XXX; it follows the head length, so
-    # the hole stays mid-length at nominal.
+    # Machinist review r1/r3/r5 of #1685: the cross hole's station from the
+    # same face, printed at .XX.
     drive_jobs += await _add_axial_reference(
         adapter,
         feature_name="CrossHoleStationReference",
         dimension_name="CrossHoleFromHeadRear",
         start_v=-HEAD_REAR_Z,
         end_v=-HEAD_CENTER_Z,
-        drive_expression='"HeadLen" / 2',
+        drive_expression='"CrossHoleStation"',
     )
     drive_jobs += await _add_axial_reference(
         adapter,

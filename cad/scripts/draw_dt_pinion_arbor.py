@@ -57,7 +57,6 @@ from dt_pinion_arbor_spec import (
     BOND_ZONE_CALLOUT,
     BOND_ZONE_DIA_Z,
     CROSS_HOLE_CALLOUT,
-    CROSS_HOLE_STATION_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRUM_STATION,
@@ -154,7 +153,10 @@ DONOR_KEEP = {
 # shaft and its diameter hangs below; the back land's are swapped (see
 # BACK_JOURNAL_TEXT_X).  The stations from the Ø15 head rear face stack
 # below the shaft.
-MODEL_Z_AT_SHEET_ORIGIN_X = 106.725
+# SolidWorks centres the view on the part's extent: the anchor sits 0.625
+# aft of the crown-to-crown mid-length (106.725 measured at the 11.5 head),
+# so it follows the head's growth forward at r5 of #1685.
+MODEL_Z_AT_SHEET_ORIGIN_X = HEAD_FRONT_Z - HEAD_CAP_SAG + OVERALL_LEN / 2.0 + 0.625
 
 
 def _sheet_x(model_z: float) -> float:
@@ -382,23 +384,20 @@ PRINCIPAL_KEEP = {
 # of the crop circle, clear of it like every other detail-A callout; the line
 # crosses the circle once, square, to reach it.
 NECK_DIA_XY = (0.140, 0.2575)
-# The cross hole's 5.750 station in detail A (a (5.75) reference at r2,
+# The cross hole's 5.75 station in detail A (a (5.75) reference at r2,
 # toleranced since r3 of #1685).  Its witnesses drop from the axis at the
-# head rear face (shared with the 11.50's) and the hole centre; the text sits
-# left of the rear-face witness.  At r2 the head length's witness crossed
-# the text (text-on-line), so the block's right end follows from that
-# witness with 2.5 mm of air.  r4 measured the layout: both lines centre on
-# the position, the value on its y and the callout line (r4's reason) one
-# pitch under it, where the dimension line runs.  That puts the line 2 mm
-# under the r4 line (y 0.2135) and the value 3.9 mm under the neck's lower
-# witness (y 0.2245).
-CROSS_HOLE_STATION_WIDTH = _callout_width(CROSS_HOLE_STATION_CALLOUT)
+# head rear face (shared with the head length's) and the hole centre; the
+# text sits left of the rear-face witness.  r2 boxed " (5.75) " at 7.5 mm
+# left to 12.8 mm right of its position, and at x 0.1425 the head length's
+# witness crossed it (text-on-line), so the position now follows from that
+# witness with 2.5 mm of air; the bare "5.75" only adds to it.
+CROSS_HOLE_STATION_TEXT_RIGHT = 0.0128
 DETAIL_REAR_FACE_X = (
     DETAIL_CENTER[0] + DETAIL_RATIO * (HEAD_CENTER_Z - HEAD_REAR_Z) / 1000.0
 )
 CROSS_HOLE_STATION_TEXT_XY = (
-    DETAIL_REAR_FACE_X - 0.0025 - CROSS_HOLE_STATION_WIDTH / 2.0,
-    0.2171,
+    DETAIL_REAR_FACE_X - 0.0025 - CROSS_HOLE_STATION_TEXT_RIGHT,
+    0.2163,
 )
 # Every dimension detail A carries, imported by feature straight into the
 # cropped view (DRAWING_DIMENSIONS names the owners: Head, FrontCapProfile,
@@ -417,19 +416,20 @@ DETAIL_KEEP = {
     # inside the border and its shoulder well over the pin hole's.
     "CrossHoleDia": (0.245, 0.2525),
     # The hole's station rides under the head, its text left of the
-    # rear-face witness and clear of the neck above and the 11.50 below.
+    # rear-face witness and clear of the neck above and the head length below.
     "CrossHoleFromHeadRear": CROSS_HOLE_STATION_TEXT_XY,
     "NeckDia": NECK_DIA_XY,
 }
 # The head sits inside detail A's fence at the right end of the profile (the
 # fence spans x 0.298-0.328 on the axis, y 0.170): the Ø15's dimension line
 # stands inside the fence and runs up to its text above it.  The line sits
-# between the crown apex (x 0.3215) and the fence (x 0.3262 at the head's
-# top and bottom edges), so its witnesses stay inside the circle: they used
+# between the crown apex (x 0.3223 since the 12.2 head) and the fence
+# (x 0.3259 at the head's top and bottom edges), so its witnesses stay
+# inside the circle: they used
 # to run out through it to x 0.340, reading as part of the detail callout
 # with the "A" label between them (Fable r-delta).
 DIAMETER_POSITIONS = {
-    "HeadDia": (0.3238, 0.192),
+    "HeadDia": (0.32385, 0.192),
 }
 # The neck's Ø10.5 has no place on the 1:1 profile.  The layout audit boxes
 # its text from 15.6 mm left of the dimension line to 11.5 mm right of it,
@@ -471,7 +471,6 @@ DIMENSION_CALLOUTS = {
     "BackJournalDia": JOURNAL_CALLOUT,
     "BondZoneDia": BOND_ZONE_CALLOUT,
     "PinStationFromHeadRear": "COLLAR PIN",
-    "CrossHoleFromHeadRear": CROSS_HOLE_STATION_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 # The turning axis runs the full part and this far past each crown.
