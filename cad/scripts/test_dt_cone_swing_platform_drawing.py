@@ -1914,7 +1914,9 @@ def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
 
 
 @pytest.mark.parametrize("index", range(4))
-def test_virtual_sharp_supports_use_source_lines_and_nearest_notch_segment(monkeypatch, index):
+def test_virtual_sharp_supports_use_source_lines_and_nearest_notch_segment(
+    monkeypatch, index
+):
     monkeypatch.setattr(drawing, "_early_bound", lambda item, _kind: item)
     corners = part.PLATE_CORNERS
     _label, x, z, _radius = corners[index]
@@ -1923,8 +1925,11 @@ def test_virtual_sharp_supports_use_source_lines_and_nearest_notch_segment(monke
         dx, dz = neighbour[1] - x, neighbour[2] - z
         length = math.hypot(dx, dz)
         points = [
-            ((x + distance * dx / length) / 1000, height / 1000,
-             (z + distance * dz / length) / 1000)
+            (
+                (x + distance * dx / length) / 1000,
+                height / 1000,
+                (z + distance * dz / length) / 1000,
+            )
             for distance in (near, far)
         ]
         return types.SimpleNamespace(
@@ -1940,22 +1945,45 @@ def test_virtual_sharp_supports_use_source_lines_and_nearest_notch_segment(monke
         edge(neighbours[0], 1, 3, line=False),  # arc is not a support
         edge(neighbours[1], 1, 3, height=0),  # underside is not top-face support
     ]
-    monkeypatch.setattr(drawing, "visible_view_entities", lambda *_args, **_kw: [*distractors, *selected])
-    adapter = types.SimpleNamespace(swApp=types.SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    monkeypatch.setattr(
+        drawing,
+        "visible_view_entities",
+        lambda *_args, **_kw: [*distractors, *selected],
+    )
+    adapter = types.SimpleNamespace(
+        swApp=types.SimpleNamespace(IsSame=lambda a, b: int(a is b))
+    )
     assert drawing._profile_corner_edges(adapter, object(), index) == selected
     adapter.swApp.IsSame = lambda _a, _b: -1
     with pytest.raises(RuntimeError, match="two different supports"):
         drawing._profile_corner_edges(adapter, object(), index)
-    monkeypatch.setattr(drawing, "visible_view_entities", lambda *_args, **_kw: distractors[1:])
+    monkeypatch.setattr(
+        drawing, "visible_view_entities", lambda *_args, **_kw: distractors[1:]
+    )
     with pytest.raises(RuntimeError, match="missing actual straight"):
         drawing._profile_corner_edges(adapter, object(), index)
 
 
-@pytest.mark.parametrize("failure", [
-    None, "activate", "select", "count", "misselected", "unknown",
-    "missing", "type", "owner", "coordinate", "witness", "single_witness",
-])
-def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(monkeypatch, failure):
+@pytest.mark.parametrize(
+    "failure",
+    [
+        None,
+        "activate",
+        "select",
+        "count",
+        "misselected",
+        "unknown",
+        "missing",
+        "type",
+        "owner",
+        "coordinate",
+        "witness",
+        "single_witness",
+    ],
+)
+def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
+    monkeypatch, failure
+):
     state = {"inserted": False, "selected": [], "insert_calls": 0}
     index = 2  # the 37.0 station: source SW vertex, not a saved paper coordinate
     _label, x, z, _radius = part.PLATE_CORNERS[index]
@@ -1966,17 +1994,24 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(mon
         ModelToSketchTransform=types.SimpleNamespace(Inverse=lambda: inverse),
     )
     point = types.SimpleNamespace(
-        GetID=lambda: (7, 19), Type=1 if failure == "type" else 4,
-        X=0.02, Y=0.03, Z=0,
+        GetID=lambda: (7, 19),
+        Type=1 if failure == "type" else 4,
+        X=0.02,
+        Y=0.03,
+        Z=0,
         GetSketch=lambda: object() if failure == "owner" else sketch,
     )
     sketch.GetSketchPoints2 = lambda: (
         [point] if state["inserted"] and failure != "missing" else []
     )
-    view = types.SimpleNamespace(GetSketch=lambda: sketch, UpdateViewDisplayGeometry=lambda: None)
+    view = types.SimpleNamespace(
+        GetSketch=lambda: sketch, UpdateViewDisplayGeometry=lambda: None
+    )
     manager = types.SimpleNamespace(
         CreateSelectData=lambda: types.SimpleNamespace(View=None),
-        GetSelectedObjectCount2=lambda _mark: 1 if failure == "count" else len(state["selected"]),
+        GetSelectedObjectCount2=lambda _mark: (
+            1 if failure == "count" else len(state["selected"])
+        ),
         GetSelectedObject6=lambda index, _mark: (
             object() if failure == "misselected" else state["selected"][index - 1]
         ),
@@ -2009,8 +2044,10 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(mon
         ),
     )
     ddoc = types.SimpleNamespace(ActivateView=lambda _name: failure != "activate")
+
     def bind(item, kind):
         return ddoc if item is draw and kind == "IDrawingDoc" else item
+
     monkeypatch.setattr(drawing, "_early_bound", bind)
     monkeypatch.setattr(drawing, "view_name", lambda *_args: "profile")
     edges = (types.SimpleNamespace(), types.SimpleNamespace())
@@ -2018,12 +2055,22 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(mon
         edge.Select4 = lambda append, data, edge=edge: select(edge, append, data)
     monkeypatch.setattr(drawing, "_profile_corner_edges", lambda *_args: edges)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kw: None)
-    monkeypatch.setattr(drawing, "_virtual_sharp_witness_groups", lambda _view: (
-        [[(0., 0., 0., 0.01, 0., 0.)] + (
-            [] if failure == "single_witness" else [(0., 0., 0., 0., 0.01, 0.)]
-        )]
-        if state["inserted"] and failure != "witness" else []
-    ))
+    monkeypatch.setattr(
+        drawing,
+        "_virtual_sharp_witness_groups",
+        lambda _view: (
+            [
+                [(0.0, 0.0, 0.0, 0.01, 0.0, 0.0)]
+                + (
+                    []
+                    if failure == "single_witness"
+                    else [(0.0, 0.0, 0.0, 0.0, 0.01, 0.0)]
+                )
+            ]
+            if state["inserted"] and failure != "witness"
+            else []
+        ),
+    )
 
     def transform(_utility, xyz, actual_inverse, **_kw):
         assert xyz == (point.X, point.Y, point.Z)
@@ -2048,11 +2095,14 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(mon
 
 
 def test_virtual_sharp_witness_parser_requires_actual_native_line_geometry():
-    raw = (0., -1., -1., -1., 0., 0., 1., 1., 2., 3., 4., 5., 6., 1., 0.)
+    raw = (0.0, -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 1.0, 0.0)
     view = types.SimpleNamespace(
-        GetWitnessEntitiesCount=lambda: (1, len(raw)), GetWitnessGeomInfo=lambda: raw,
+        GetWitnessEntitiesCount=lambda: (1, len(raw)),
+        GetWitnessGeomInfo=lambda: raw,
     )
-    assert drawing._virtual_sharp_witness_groups(view) == [[(1., 2., 3., 4., 5., 6.)]]
+    assert drawing._virtual_sharp_witness_groups(view) == [
+        [(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)]
+    ]
     view.GetWitnessEntitiesCount = lambda: (1, len(raw) + 1)
     with pytest.raises(RuntimeError, match="invalid size"):
         drawing._virtual_sharp_witness_groups(view)
@@ -2063,24 +2113,37 @@ def test_virtual_sharp_witness_parser_requires_actual_native_line_geometry():
 
 
 @pytest.mark.parametrize("failure", [None, "sdk", "set", "read"])
-def test_all_four_virtual_width_endpoints_require_native_document_witness_style(monkeypatch, failure):
+def test_all_four_virtual_width_endpoints_require_native_document_witness_style(
+    monkeypatch, failure
+):
     ordinal = 9876  # fake SDK-provided id, never an implementation ordinal
     calls = []
     monkeypatch.setattr(drawing, "_early_bound", lambda item, _kind: item)
-    monkeypatch.setattr(drawing, "_preference_id", lambda _adapter, name: (
-        None if failure == "sdk" else ordinal
-    ) if name == "swDetailingVirtualSharpStyle" else None)
+    monkeypatch.setattr(
+        drawing,
+        "_preference_id",
+        lambda _adapter, name: (
+            (None if failure == "sdk" else ordinal)
+            if name == "swDetailingVirtualSharpStyle"
+            else None
+        ),
+    )
     extension = types.SimpleNamespace(
         SetUserPreferenceInteger=lambda key, scope, style: (
             calls.append((key, scope, style)) or failure != "set"
         ),
         GetUserPreferenceInteger=lambda key, scope: 0 if failure == "read" else 3,
     )
-    adapter = types.SimpleNamespace(currentModel=types.SimpleNamespace(Extension=extension))
+    adapter = types.SimpleNamespace(
+        currentModel=types.SimpleNamespace(Extension=extension)
+    )
     view = object()
     marked = []
-    monkeypatch.setattr(drawing, "_insert_profile_virtual_sharp",
-                        lambda _adapter, actual_view, index: marked.append((actual_view, index)))
+    monkeypatch.setattr(
+        drawing,
+        "_insert_profile_virtual_sharp",
+        lambda _adapter, actual_view, index: marked.append((actual_view, index)),
+    )
     if failure:
         with pytest.raises(RuntimeError):
             drawing._add_profile_virtual_sharps(adapter, view)
