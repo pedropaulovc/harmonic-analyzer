@@ -39,7 +39,6 @@ def test_pull_thread_is_unified_through_with_distinct_nominal_walls() -> None:
     assert pin_spec.PULL_THREAD_TAP_DRILL == pytest.approx(1.1811)
     assert pin_spec.PULL_THREAD_LEN == pin_spec.PIN_LEN == 4.0
     assert pin_spec.PULL_THREAD_NOMINAL_LENGTH_DIAMETERS == pytest.approx(4.0 / 1.524)
-    assert pin_spec.PULL_THREAD_NOMINAL_LENGTH_DIAMETERS >= 2.0
     assert pin_spec.PULL_THREAD_TAP_DRILL_WALL == pytest.approx(1.40945)
     assert pin_spec.PULL_THREAD_MAJOR_WALL == pytest.approx(1.238)
     assert pin_spec.PULL_THREAD_TAP_DRILL_WALL > pin_spec.PULL_THREAD_MAJOR_WALL
@@ -54,6 +53,32 @@ def test_pull_thread_is_unified_through_with_distinct_nominal_walls() -> None:
     assert "#0-80" not in pin_spec.DRAWING_NOTES
     assert "O'CLOCK" not in pin_spec.DRAWING_NOTES
     assert "DRILL" not in pin_spec.DRAWING_NOTES
+
+
+def test_pull_thread_rule18_full_engagement_uses_printed_worst_case() -> None:
+    import _config
+    from _printed_tolerance import printed_band_mm
+
+    places = pin_spec.DRAWING_PRECISION["PinProfile"]["PinLen"]
+    assert places == 1
+    band = printed_band_mm(places)
+    mouth_break = float(_config.title_block("edge_break")["chamfer_max_mm"])
+    length_min = pin_spec.PIN_LEN - band
+    pitch = 25.4 / pin_spec.PULL_THREAD_TPI
+    full_thread = length_min - 2.0 * mouth_break - pitch
+    required = 1.5 * pin_spec.PULL_THREAD_MAJOR
+    assert band == pytest.approx(0.8)
+    assert length_min == pytest.approx(3.2)
+    assert mouth_break == pytest.approx(0.25)
+    assert pitch == pytest.approx(0.3175)
+    assert full_thread == pytest.approx(2.3825)
+    assert required == pytest.approx(2.286)
+    assert pin_spec.PULL_THREAD_MIN_FULL_DIAMETERS == 1.5
+    assert pin_spec.PIN_LEN_MIN_MM == pytest.approx(length_min)
+    assert pin_spec.PULL_THREAD_FULL_PROFILE_WORST_MM == pytest.approx(full_thread)
+    assert pin_spec.PULL_THREAD_FULL_PROFILE_REQUIRED_MM == pytest.approx(required)
+    assert full_thread >= required
+    assert pin_spec.PULL_THREAD_FULL_PROFILE_MARGIN_MM == pytest.approx(0.0965)
 
 
 def test_pull_thread_uses_supported_native_inch_factory_contract() -> None:
@@ -450,6 +475,7 @@ def test_saved_pull_thread_rejects_missing_feature(
         (("#0-80 UNF - 2B", "THRU ALL"), True),
         (("#0 - 80 UNF - 2B", "THRU"), True),
         (("0-80 UNF - 2B", "THRU ALL"), True),
+        (("<MOD-DIAM>  1.18 THRU ALL 0-80 UNF - 2B THRU ALL",), True),
         (("10-80 UNF - 2B", "THRU ALL"), False),
         (("#1-72 UNF - 2B", "THRU ALL"), False),
         (("#0-800 UNF - 2B", "THRU ALL"), False),

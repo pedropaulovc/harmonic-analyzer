@@ -152,9 +152,11 @@ def _require_pull_thread_callout(display: Any) -> None:
         str(data.GetTextAtIndex(index)) for index in range(int(data.GetTextCount()))
     )
     normalized = "".join(text.upper().split()).replace("×", "X")
+    # Preserve row boundaries: ALL 0-80 must not collapse into ALL0-80.
+    thread_text = re.sub(r"\s*-\s*", "-", text)
     thread_token = re.escape(PULL_THREAD_HOLE.size.upper().lstrip("#"))
     if (
-        re.search(r"(?<![\w#])#?" + thread_token + r"(?![\d.])", normalized) is None
+        re.search(r"(?<![\w#])#?" + thread_token + r"(?![\d.])", thread_text) is None
         or re.search(r"\bUNF\b", text, re.IGNORECASE) is None
         or re.search(r"\b" + PULL_THREAD_HOLE.thread_class + r"\b", text) is None
         or re.search(r"\bTHRU(?:\s+ALL)?\b", text, re.IGNORECASE) is None
