@@ -1640,6 +1640,8 @@ ADAPTER_TRACED_METHODS = frozenset(
         "create_axis",
         "create_reference_point",
         "create_coordinate_system",
+        # assembly document/component operations (not per-entity sketch calls)
+        "insert_component",
         # motion
         "calculate_motion",
         "export_motion_video",
