@@ -1473,6 +1473,26 @@ def test_stamped_id_leader_clears_the_socket_bores() -> None:
         assert crossing_x <= witness_x - 0.0015, (half_x, crossing_x, witness_x)
 
 
+def test_deck_finish_leader_takes_the_nearest_face_edge() -> None:
+    import inspect
+
+    import draw_fr_harmonic_base as sheet
+
+    # Keep a real native-face attachment, just inside the nearest west edge.
+    source = inspect.getsource(sheet)
+    assert "deck_box[0] + DECK_FINISH_FACE_INSET_M" in source
+    assert "(deck_box[2] + deck_box[5]) / 2.0" in source
+    assert "deck_face.GetClosestPointOn(" in source
+    attach = sheet._plan_xy(
+        -part.DECK_HALF_X + sheet.DECK_FINISH_FACE_INSET_M * 1000.0, 0.0
+    )
+    nearest = sheet._plan_xy(-part.DECK_HALF_X, 0.0)
+    # The attachment is one paper millimetre onto the deck, rather than the
+    # old quarter-face point's 33 mm diagonal run across the plate (#1054).
+    assert 0.0005 <= attach[0] - nearest[0] <= 0.0015
+    assert abs(attach[1] - sheet.DECK_FINISH_XY[1]) <= 0.001
+
+
 # The depths each seat printed before the 2026-09-25 machinist review sized
 # them at the .XX band's worst case: (label, seat, engagement, thread, drill).
 _PRE_BAND_SEATS = (
@@ -2430,35 +2450,26 @@ def _pivot_seat_note_box(xy: tuple[float, float]) -> tuple[float, float, float, 
     return (xy[0], xy[1] - height, xy[0] + width, xy[1])
 
 
-def test_pivot_seat_note_locates_it_from_the_near_pedestal_seat() -> None:
-    """The pivot seat is held +-0.05 to the MHA-DT-02 seats, in one setup with
-    them (cone_set_stack); the note's offsets are the model's, measured from
-    the nearer seat in table axes (X right, Y = -z). plate-r1 review: the note
-    names its table tag, D1 (r4), and says its table location is reference,
-    so the two cannot read as competing. Its box heads the notes column clear
-    of the table, views and
-    callouts; fail-first, the same box collides once moved onto the table. The
-    build measures the note's read-back ink against every callout and
-    obstacle the same way."""
+def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets() -> None:
+    """Setup identification stays on the note; dimensions own the location
+    and band. The table's D1 identity still resolves to the actual pivot."""
     import inspect
-    import math
+    import re
 
     import cone_set_stack
     import draw_fr_harmonic_base as sheet
     import fr_harmonic_base_spec as base_spec
 
-    near = min(sheet.PEDESTAL_SCREW_XZ, key=lambda xz: math.dist(xz, sheet.PIVOT_SCREW_XZ))
-    dx = sheet.PIVOT_SCREW_XZ[0] - near[0]
-    dy = near[1] - sheet.PIVOT_SCREW_XZ[1]
-    band = base_spec.PIVOT_SEAT_POSITION_BAND_MM
-    assert band == cone_set_stack.PIVOT_SEAT_POSITION_MM
-    assert f"X {dx:.2f}, Y {dy:.2f} <MOD-PM>{band:.2f}" in sheet.PIVOT_SEAT_STEP
-    assert "ONE SETUP" in sheet.PIVOT_SEAT_STEP
-    assert "MHA-DT-02" in sheet.PIVOT_SEAT_STEP
-    lines = sheet.PIVOT_SEAT_STEP.split("\n")
-    assert sheet.PIVOT_SEAT_TAG == "D1"
-    assert lines[0].startswith("D1 PIVOT SEAT:")
-    assert lines[-1] == "THIS GOVERNS D1; ITS TABLE X/Y ARE REFERENCE."
+    assert sheet.PIVOT_SEAT_STEP is base_spec.PIVOT_SEAT_STEP
+    assert base_spec.PIVOT_SEAT_TAG == "D1"
+    assert base_spec.PIVOT_SEAT_POSITION_BAND_MM == cone_set_stack.PIVOT_SEAT_POSITION_MM
+    # Part/table identities are allowed; no other digits or tolerance tokens
+    # can replace the native offset dimensions with another numeric note.
+    identification = sheet.PIVOT_SEAT_STEP
+    for identity in (base_spec.PIVOT_SEAT_TAG, "MHA-DT-02"):
+        assert identity in identification
+        identification = identification.replace(identity, "")
+    assert not re.search(r"\d|<MOD-PM>|±", identification)
     # r4 review: the plate-r1 note named C1, the lock seat's 1/4-20 row. D1 is
     # the table's one 10-24 row, the only tabled hole of the pivot's size, and
     # one of the two tabled holes the shallow-boss callout names.
@@ -2482,6 +2493,255 @@ def test_pivot_seat_note_locates_it_from_the_near_pedestal_seat() -> None:
     assert "boxes[PIVOT_SEAT_NOTE_LABEL] = element.box" in source
 
 
+def test_pivot_offsets_share_native_marks_precision_and_authoritative_band() -> None:
+    import ast
+    import inspect
+
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    near = min(part.PEDESTAL_SCREW_XZ, key=lambda xz: math.dist(xz, part.PIVOT_SCREW_XZ))
+    assert part.PIVOT_NEAR_PEDESTAL_XZ == near
+    assert part.PIVOT_SEAT_OFFSETS_MM == pytest.approx(
+        (part.PIVOT_SCREW_XZ[0] - near[0], near[1] - part.PIVOT_SCREW_XZ[1])
+    )
+    names = set(spec.PIVOT_SEAT_DIMENSIONS)
+    assert names == spec.DRAWING_DIMENSIONS["PivotSeatReference"]
+    assert names == set(sheet.HOLE_TOP_KEEP)
+    assert spec.DRAWING_PRECISION["PivotSeatReference"] == dict.fromkeys(names, 2)
+    # Both offsets, not their unprinted origin anchors, receive the unchanged
+    # functional band. This checks bindings rather than a setter's formatting.
+    tree = ast.parse(inspect.getsource(part.build))
+    loops = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.For) and isinstance(node.iter, ast.Name)
+        and node.iter.id == "PIVOT_SEAT_DIMENSIONS"
+    ]
+    assert len(loops) == 1
+    setters = [
+        node for node in ast.walk(loops[0])
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", None) == "set_dimension_symmetric_tolerance"
+    ]
+    assert len(setters) == 1
+    assert ast.literal_eval(setters[0].args[1]) == "PivotSeatReference"
+    assert isinstance(setters[0].args[2], ast.Name)
+    assert setters[0].args[2].id == loops[0].target.id
+    assert isinstance(setters[0].args[3], ast.Name)
+    assert getattr(part, setters[0].args[3].id) == spec.PIVOT_SEAT_POSITION_BAND_MM
+    # A blanked owner needs the opt-in importer in this specific top view,
+    # and its result participates in the existing final precision readback.
+    drawing = ast.parse(inspect.getsource(sheet.build))
+    imports = [
+        node for node in ast.walk(drawing)
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
+        and any(
+            keyword.arg == "keep" and isinstance(keyword.value, ast.Name)
+            and keyword.value.id == "HOLE_TOP_KEEP"
+            for keyword in node.value.keywords
+        )
+    ]
+    assert len(imports) == 1
+    assert imports[0].value.func.id == "curate_hidden_owner_dimensions"
+    imported_name = imports[0].targets[0].id
+    precision = [
+        node for node in ast.walk(drawing)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", None) == "assert_imported_precision"
+    ]
+    assert len(precision) == 1
+    assert any(
+        isinstance(node, ast.Starred) and isinstance(node.value, ast.Name)
+        and node.value.id == imported_name
+        for node in ast.walk(precision[0])
+    )
+
+
+def test_height_baselines_preserve_the_spotface_top_land_at_loose_limits() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    assert part.HEIGHT_REFERENCE_ORIGIN == (-spec.BOTTOM_LENGTH / 2.0, 0.0)
+    stations = {name: (x, height) for name, x, height, _dx, _dy in part.HEIGHT_REFERENCE_STATIONS}
+    assert stations == {
+        "GreenTopHeight": (-spec.TOP_LENGTH / 2.0, spec.GREEN_TOP),
+        "CrossScrewAxisHeight": (-part.COLUMN_X, part.BASE_SCREW_Y),
+    }
+    assert spec.DRAWING_DIMENSIONS["HeightReference"] == set(stations)
+    assert spec.DRAWING_PRECISION["HeightReference"] == dict.fromkeys(stations, 1)
+    assert "GreenTopHeight" in sheet.SIDE_KEEP
+    assert "CrossScrewAxisHeight" in sheet.HOLE_SIDE_KEEP
+    assert {"BottomThickness", "DeckRise"} <= set(sheet.SIDE_KEEP)
+    kept = set(spec.DRAWING_PRECISION_BY_NAME)
+    assert not {"FlangeToDeck", "Spot0Y"} & kept
+    assert spec.GREEN_TOP + spec.DECK_RISE == pytest.approx(spec.STACK_HEIGHT)
+    band = part._general_band_mm()
+    assert band == pytest.approx(0.8)
+    land = spec.cross_screw_top_land_worst_case_mm(
+        part.BASE_SCREW_Y, part.SCREW_SPOTFACE_DIAMETER, band
+    )
+    assert land == pytest.approx(
+        (47.8 - 0.8) - (38.1 + 0.8) - (9.0 + 0.8) / 2.0
+    )
+    assert land == pytest.approx(3.2)
+    assert land >= spec.CROSS_SCREW_TOP_LAND_MIN_MM == 2.0
+    # The former chain had another independent .X term and left only 1.6:
+    # the unchanged solid was not protected by the old printed dimensions.
+    chained_green_min = (
+        spec.BOTTOM_THICKNESS - band + spec.TOP_THICKNESS - band
+        - (spec.DECK_RISE + band)
+    )
+    chained_land = (
+        chained_green_min - (part.BASE_SCREW_Y + band)
+        - (part.SCREW_SPOTFACE_DIAMETER + band) / 2.0
+    )
+    assert chained_land < spec.CROSS_SCREW_TOP_LAND_MIN_MM
+
+
+@pytest.mark.parametrize("reference", ("pivot", "height"))
+def test_reference_dimensions_measure_actual_points_without_solid_features(
+    monkeypatch, reference,
+) -> None:
+    import ast
+    import asyncio
+    import operator
+    from types import SimpleNamespace
+
+    from _sketch import SketchDims
+
+    expected_plane = "Top" if reference == "pivot" else "Front"
+
+    def result(data=None):
+        return SimpleNamespace(is_success=True, data=data, error=None)
+
+    class Manager:
+        AddToDB = False
+
+        def CreatePoint(self, x, y, z):
+            assert self.AddToDB
+            return (x, y, z)
+
+    class Adapter:
+        # Deliberately no extrusion, cut, line or circle operation: the
+        # reference must not touch the physical solid or add a printed wire.
+        currentSketchManager = Manager()
+
+        def __init__(self):
+            self.points = {}
+            self.dimensions = []
+            self.named = {}
+            self.globals = {
+                "BottomLength": part.BOTTOM_LENGTH,
+                "TopLength": part.TOP_LENGTH,
+                "BottomThickness": part.BOTTOM_THICKNESS,
+                "TopThickness": part.TOP_THICKNESS,
+                "DeckRise": part.DECK_RISE,
+                "ColumnX": part.COLUMN_X,
+                "BaseScrewY": part.BASE_SCREW_Y,
+            }
+            self.currentModel = SimpleNamespace(Parameter=self.named.get)
+
+        async def set_global_variable(self, request):
+            assert request.expression.endswith("mm")
+            self.globals[request.name] = float(request.expression[:-2])
+            return result({"value": self.globals[request.name]})
+
+        async def create_sketch(self, plane):
+            assert plane == expected_plane
+            return result()
+
+        def _register_sketch_entity(self, kind, raw):
+            assert kind == "Point"
+            identity = f"Point{len(self.points)}"
+            self.points[identity] = raw
+            return identity
+
+        async def add_sketch_dimension(self, first, second, kind, value):
+            axis = {"horizontal_distance": 0, "vertical_distance": 1}[kind]
+            start = self.points[first]
+            end = (0.0, 0.0, 0.0) if second == "origin" else self.points[second]
+            assert value == pytest.approx(abs(end[axis] - start[axis]) * 1000.0)
+            dimension = SimpleNamespace(SystemValue=value / 1000.0, pair=(first, second))
+            self.dimensions.append(dimension)
+            return result(str(len(self.dimensions)))
+
+        async def add_sketch_constraint(self, first, second, kind):
+            assert kind == "horizontal_points"
+            assert self.points[first][1] == 0.0
+            assert second == "origin"
+            return result()
+
+        async def exit_sketch(self):
+            return result()
+
+        async def create_equation(self, request):
+            full_name, expression = request.equation.split(" = ")
+            operations = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Div: operator.truediv}
+
+            def evaluate(node):
+                if isinstance(node, ast.Constant):
+                    return self.globals[node.value] if isinstance(node.value, str) else node.value
+                if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+                    return -evaluate(node.operand)
+                if isinstance(node, ast.BinOp):
+                    return operations[type(node.op)](evaluate(node.left), evaluate(node.right))
+                raise AssertionError(f"unsupported dimension expression: {ast.dump(node)}")
+
+            value = evaluate(ast.parse(expression, mode="eval").body)
+            assert self.named[full_name.strip('"')].SystemValue * 1000.0 == pytest.approx(value)
+            return result()
+
+    class RecordedDimensions(SketchDims):
+        def apply(self, adapter, feature):
+            assert len(self._rows) == len(adapter.dimensions)
+            for (name, _drive), dimension in zip(self._rows, adapter.dimensions, strict=True):
+                adapter.named[f"{name}@{feature}"] = dimension
+            return [(f"{name}@{feature}", drive) for name, drive in self._rows]
+
+    async def native_state_check(_adapter, *_args):
+        return None
+
+    monkeypatch.setattr(part, "SketchDims", RecordedDimensions)
+    monkeypatch.setattr(part, "name_last_feature", lambda _adapter, _name: None)
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "ensure_fully_defined", native_state_check)
+    monkeypatch.setattr(part, "force_rebuild", native_state_check)
+    adapter = Adapter()
+    if reference == "pivot":
+        asyncio.run(part._build_pivot_seat_reference(adapter))
+        expected_points = [
+            (x / 1000.0, -z / 1000.0, 0.0)
+            for x, z in (part.PIVOT_NEAR_PEDESTAL_XZ, part.PIVOT_SCREW_XZ)
+        ]
+        expected = {
+            name: (abs(value), ("Point0", "Point1"))
+            for name, value in zip(
+                fr_harmonic_base_spec.PIVOT_SEAT_DIMENSIONS,
+                part.PIVOT_SEAT_OFFSETS_MM, strict=True,
+            )
+        }
+        feature = "PivotSeatReference"
+    else:
+        asyncio.run(part._build_height_reference(adapter))
+        expected_points = [
+            (part.HEIGHT_REFERENCE_ORIGIN[0] / 1000.0, 0.0, 0.0),
+            *((x / 1000.0, height / 1000.0, 0.0)
+              for _name, x, height, _dx, _dy in part.HEIGHT_REFERENCE_STATIONS),
+        ]
+        expected = {
+            name: (height, ("Point0", f"Point{index}"))
+            for index, (name, _x, height, _dx, _dy)
+            in enumerate(part.HEIGHT_REFERENCE_STATIONS, 1)
+        }
+        feature = "HeightReference"
+    assert list(adapter.points.values()) == expected_points
+    assert not adapter.currentSketchManager.AddToDB
+    for name, (value, pair) in expected.items():
+        dimension = adapter.named[f"{name}@{feature}"]
+        assert dimension.SystemValue * 1000.0 == pytest.approx(value)
+        assert dimension.pair == pair
+
+
 def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
     # Main (restricted review of #858): one blanking helper in _sketch, traced
     # like every other per-operation helper, and no local copy in the base.
@@ -2493,7 +2753,9 @@ def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
     blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
     assert "def _hide_reference_sketches" not in source
     assert source.count(blank) == 1
-    assert part.REFERENCE_SKETCHES == ("HeightReference", "CrossTapReference", "PlanReference")
+    assert set(part.REFERENCE_SKETCHES) == {
+        "HeightReference", "CrossTapReference", "PlanReference", "PivotSeatReference"
+    }
     assert hasattr(_sketch.blank_reference_sketches, "__wrapped__")
 
 
