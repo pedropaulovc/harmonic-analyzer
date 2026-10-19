@@ -22,7 +22,7 @@ from _bore_axis import _MATE_TOL_MM
 from _check import check, log
 from _com import FULLY_CONSTRAINED, UNDER_CONSTRAINED, _early_bound, _read_member
 from _custom_properties import apply_custom_properties
-from _part_properties import _SUMMARY_TITLE, apply_summary_info
+from _part_properties import _SUMMARY_TITLE, apply_summary_info, title_block_properties
 from _part_save import set_isometric_view
 from _source_identity import _git_commit_year, _git_sha
 from _paths import DEFAULT_VIEWS, OUT_PNG, OUT_SLDASM, OUT_SLDPRT, _CHAIN_LINK_PREFIXES
@@ -52,18 +52,7 @@ def assembly_title_properties(assembly_name: str) -> dict[str, str]:
         "Revision": _config.release_revision(),
         "Generator": f"harmonic-analyzer @ {_git_sha()}",
         "COPYRIGHT_YEAR": _git_commit_year(),
-        "TOL_LIN_X": str(_config.title_block("linear_1pl")["display"]),
-        "TOL_LIN_XX": str(_config.title_block("linear_2pl")["display"]),
-        "TOL_LIN_XXX": str(_config.title_block("linear_3pl")["display"]),
-        "TOL_ANG": str(_config.title_block("angular")["display"]),
-        "TOL_SURFACE": str(_config.title_block("surface")["display"]),
-        "TOL_HOLE_MINUS": str(_config.title_block("drilled_hole")["display_minus"]),
-        "TOL_HOLE_PLUS": str(_config.title_block("drilled_hole")["display_plus"]),
-        "TOL_EDGE_BREAK_R": str(_config.title_block("edge_break")["display_r"]),
-        "TOL_CHAMFER_MAX": str(_config.title_block("edge_break")["display_chamfer"]),
-        "TOL_INSIDE_CORNER": str(_config.title_block("inside_corner")["display"]),
-        "THREAD_TYPE": str(_config.title_block("thread")["type"]),
-        "THREAD_CLASS": str(_config.title_block("thread")["class"]),
+        **title_block_properties(),
     }
 
 

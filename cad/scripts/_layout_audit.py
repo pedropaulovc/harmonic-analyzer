@@ -152,12 +152,18 @@ SHOULDER_Y_TOL_M = 0.0003
 # same run when their strings agree and their lower-left corners lie within
 # this window (COM positions sit ~0.9 mm below the glyphs).
 INK_MATCH_WINDOW_M = 0.003
-# Model edges print as 0.25 mm solid black strokes (annotation ink 0.18 mm,
-# section lines 0.35 mm, the frame and title block grey).
-MODEL_EDGE_WIDTH_M = (0.00022, 0.00030)
-# A dashed stroke whose ends both lie within this of an annotation's segment
-# is that annotation's ink, not a hidden model edge.
-HIDDEN_EDGE_ON_ANNOTATION_M = 0.0001
+# The selected templates print visible edges at 0.35 mm and annotations at
+# 0.13 mm. Retained calibration dumps print 0.25 mm edges / 0.18 mm annotations.
+# Keep separate edge bands: widening one band would accept intermediate inks,
+# and lowering its floor would turn legacy annotation strokes into model edges.
+MODEL_EDGE_WIDTH_BANDS_M = ((0.00022, 0.00030), (0.00033, 0.00037))
+ANNOTATION_STROKE_MAX_M = 0.00022
+HIDDEN_EDGE_MAX_WIDTH_M = 0.00030
+# Geometric tolerances do not grow when the template's printed edges get heavier.
+LEADER_CROSSING_MERGE_M = 0.00030
+# A stroke whose ends both lie within this of a native annotation segment
+# is that annotation's ink, including 0.35 mm section cutting lines.
+EDGE_ON_ANNOTATION_M = 0.0001
 
 # Symbol tokens IDisplayData returns unresolved; each renders as ONE glyph.
 _TOKEN = re.compile(r"<[^<>]+>")
@@ -354,7 +360,7 @@ HOLE_RADIUS_TOL_M = 0.00002
 # width of it: RD2's arrow tip sits 0.009 mm off hole A's inner ring and
 # DetailItem357's leader end 0.004 mm off hole B's outer one, while a
 # countersink's two rings print 0.36 mm apart.
-HOLE_LANDING_TOL_M = MODEL_EDGE_WIDTH_M[1]
+HOLE_LANDING_TOL_M = 0.00030
 
 
 def is_hidden(annotation: Mapping[str, Any]) -> bool:
@@ -622,12 +628,11 @@ def ink_spans(dump: Mapping[str, Any]) -> list[InkSpan]:
 
 
 def ink_annotation_strokes(dump: Mapping[str, Any]) -> list[Segment]:
-    """The page's solid strokes thinner than a model edge: annotation ink."""
-    low, _high = MODEL_EDGE_WIDTH_M
+    """Solid annotation ink, including current 0.13 and legacy 0.18 mm strokes."""
     return [
         Segment(*_floats(raw)[:4], "line")
         for raw in (dump.get("ink") or {}).get("strokes", ())
-        if float(raw[4]) < low and not raw[5]
+        if float(raw[4]) < ANNOTATION_STROKE_MAX_M and not raw[5]
     ]
 
 
@@ -861,33 +866,35 @@ def _printed_leader_starts(
 
 
 def ink_edges(dump: Mapping[str, Any]) -> list[Segment]:
-    """The page's model-edge strokes (``MODEL_EDGE_WIDTH_M``, solid black)."""
-    low, high = MODEL_EDGE_WIDTH_M
+    """Solid black model edges at current or retained calibration weights."""
     return [
         Segment(*_floats(raw)[:4], "geometry")
         for raw in (dump.get("ink") or {}).get("strokes", ())
-        if low <= float(raw[4]) <= high and not raw[5]
+        if not raw[5] and any(low <= float(raw[4]) <= high for low, high in MODEL_EDGE_WIDTH_BANDS_M)
     ]
 
 
 def ink_dashed_strokes(dump: Mapping[str, Any]) -> list[Segment]:
-    """The page's dashed strokes no wider than a model edge: hidden edges
+    """The page's dashed strokes at the retained hidden-edge weights
     (Hidden Lines Visible prints them at 0.18 mm) among centre marks,
     cosmetic threads and other annotations' dashes, which
-    ``_hidden_model_edges`` separates."""
+    ``_unclaimed_model_edges`` separates."""
     return [
         Segment(*_floats(raw)[:4], "hidden")
         for raw in (dump.get("ink") or {}).get("strokes", ())
-        if float(raw[4]) <= MODEL_EDGE_WIDTH_M[1] and raw[5]
+        if float(raw[4]) <= HIDDEN_EDGE_MAX_WIDTH_M and raw[5]
     ]
 
 
-def _hidden_model_edges(
-    dashed: Sequence[Segment], annotations: Sequence[AnnotationGeometry], tol: float = HIDDEN_EDGE_ON_ANNOTATION_M
+def _unclaimed_model_edges(
+    strokes: Sequence[Segment], annotations: Sequence[AnnotationGeometry], tol: float = EDGE_ON_ANNOTATION_M
 ) -> list[Segment]:
-    """The dashed strokes that are NOT an annotation's own ink: the pieces
-    whose both ends lie on some annotation segment (a centre mark, a thread,
-    a dimension's dashed extension) belong to that annotation."""
+    """Candidate strokes not claimed by native annotation segments.
+
+    Both ends must lie on the same annotation segment; an intersecting model
+    edge is not annotation ink. This also distinguishes selected 0.35 mm model
+    edges from existing section cutting lines at exactly the same weight.
+    """
     own = [
         segment
         for annotation in annotations
@@ -896,17 +903,20 @@ def _hidden_model_edges(
     ]
     grid = SegmentGrid(list(enumerate(own)))
 
-    def on_annotation(dash: Segment) -> bool:
+    def on_annotation(stroke: Segment) -> bool:
         reach = Box(
-            min(dash.x0, dash.x1) - tol, min(dash.y0, dash.y1) - tol, max(dash.x0, dash.x1) + tol, max(dash.y0, dash.y1) + tol
+            min(stroke.x0, stroke.x1) - tol,
+            min(stroke.y0, stroke.y1) - tol,
+            max(stroke.x0, stroke.x1) + tol,
+            max(stroke.y0, stroke.y1) + tol,
         )
         return any(
-            point_segment_distance((dash.x0, dash.y0), segment) <= tol
-            and point_segment_distance((dash.x1, dash.y1), segment) <= tol
+            point_segment_distance((stroke.x0, stroke.y0), segment) <= tol
+            and point_segment_distance((stroke.x1, stroke.y1), segment) <= tol
             for _index, segment in grid.near(reach)
         )
 
-    return [dash for dash in dashed if not on_annotation(dash)]
+    return [stroke for stroke in strokes if not on_annotation(stroke)]
 
 
 def _anchor(box: Box, reference: int) -> tuple[float, float]:
@@ -2245,7 +2255,6 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
         for view in views
         if len(_floats(view.get("outline"))) >= 4
     ]
-    edges = view_edges(ink_edges(dump), outlines)
     annotation_strokes = ink_annotation_strokes(dump)
 
     view_geometry = []
@@ -2289,15 +2298,6 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
                 strokes=annotation_strokes,
             )
         )
-        if edges.get(name):
-            annotations.append(
-                AnnotationGeometry(
-                    label=f"view {name} geometry",
-                    kind="geometry",
-                    owner=name,
-                    segments=tuple(edges[name]),
-                )
-            )
     for annotation in dump.get("sheet_annotations", ()):
         if not sheet_owned(annotation):
             continue
@@ -2318,10 +2318,17 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
                     exact=True,
                 )
             )
+    # Section cutting lines can share the visible-edge weight. Build every
+    # native annotation first, then attribute only its unclaimed PDF ink to views.
+    edges = view_edges(_unclaimed_model_edges(ink_edges(dump), annotations), outlines)
+    for name, solid in edges.items():
+        annotations.append(
+            AnnotationGeometry(label=f"view {name} geometry", kind="geometry", owner=name, segments=tuple(solid))
+        )
     # Hidden Lines Visible edges print dashed: they are view geometry too, so
     # text over one is text on a line. Attributed like the solid edges, once
     # every annotation's own dashes are known.
-    hidden = view_edges(_hidden_model_edges(ink_dashed_strokes(dump), annotations), outlines)
+    hidden = view_edges(_unclaimed_model_edges(ink_dashed_strokes(dump), annotations), outlines)
     for name, dashes in hidden.items():
         index = next(
             (i for i, a in enumerate(annotations) if a.kind == "geometry" and a.owner == name), None
@@ -3055,7 +3062,7 @@ def find_leaders_over_part(
                         crossings.append((to_tip, point))
                 remaining -= piece.length
             crossings.sort(reverse=True)
-            merged = [c for i, c in enumerate(crossings) if i == 0 or crossings[i - 1][0] - c[0] > MODEL_EDGE_WIDTH_M[1]]
+            merged = [c for i, c in enumerate(crossings) if i == 0 or crossings[i - 1][0] - c[0] > LEADER_CROSSING_MERGE_M]
             if not merged:
                 continue
             over = merged[0][0]
@@ -3695,7 +3702,7 @@ def find_edgeless_views(model: SheetModel) -> list[Finding]:
             sheet=model.geometry.name,
             a=f"view {name}",
             b="",
-            detail=f"view {name!r} has an outline but no printed 0.25 mm model edge",
+            detail=f"view {name!r} has an outline but no unclaimed printed model edge at a supported weight",
         )
         for name, pictorial in model.edgeless
     ]

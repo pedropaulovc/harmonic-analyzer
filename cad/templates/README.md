@@ -1,10 +1,11 @@
 # Harmonic-analyzer SolidWorks templates
 
-The project-owned SolidWorks templates, all **created manually in SolidWorks**
-(not generated — the old `create_drawing_standards.py` generator and the
-`asme-b-book.*` assets it produced are gone). Edit them only in SolidWorks,
-then rebuild/re-render and visually inspect before committing the changed
-binary.
+The project-owned SolidWorks templates were **created manually in SolidWorks**
+(the old `create_drawing_standards.py` generator and its `asme-b-book.*` assets
+are gone). Maintain their native documents in SolidWorks, either interactively
+or with `cad/scripts/maintain_drawing_templates.py`; do not reconstruct their
+sheet geometry from code. Rebuild/re-render and visually inspect changed
+binaries before committing them.
 
 ## harmonic-analyzer.PRTDOT — part template
 
@@ -31,9 +32,9 @@ Both templates contain their border and zone geometry, title block, tolerance
 block, and third-angle projection symbol. The sheet formats are embedded, so
 there is no separate `.slddrt`. `_drawing_registry.DRAWING_TEMPLATES` owns each
 template's path, physical dimensions, raster dimensions, and title-block
-keep-out. Every `DrawingSpec` selects a `DrawingLayout` explicitly. The current
-production fleet uses landscape; changing a row to portrait switches that
-drawing's template and cache dependency together.
+keep-out. Every `DrawingSpec` selects a `DrawingLayout` explicitly; production
+drawings use both orientations. Changing a row's layout switches its template
+and cache dependency together.
 
 Per-drawing setup sets the sheet scale
 (`_drawing_common.new_project_drawing`). `_drawing_common.finalize_drawing`
@@ -43,18 +44,21 @@ the standard isometric projection as high-quality Shaded With Edges.
 ### Line weights
 
 Both drawing templates set Document Properties > Line Thickness to
-**Thin 0.13 mm** and **Normal 0.18 mm**. Thick through Thick(6) keep the
-SolidWorks defaults (0.35 to 2.0 mm). Line Font maps visible edges to Normal
-and hidden edges, tangent edges, cosmetic threads, and hatch to Thin. The border
-uses Thick(2), 0.5 mm.
+**Thin 0.13 mm** and **Normal 0.35 mm**. Line Font maps visible edges to Normal,
+and hidden edges, tangent edges, cosmetic threads, hatch, dimensions and
+annotation leaders/frames to Thin. Thick through Thick(6), section cutting
+lines and the border retain their existing settings; the border uses
+Thick(2), 0.5 mm.
 
-The SolidWorks defaults of 0.18 mm and 0.25 mm filled dense assembly views at
-1:3 with ink. Examples include the cone gear teeth and screw threads on
-`drive-train-assembly` sheet 1. The lighter pair keeps the 1.4:1 contrast
-between visible and thin lines. ISO 128 lists 0.13 mm as its thinnest line
-width. To check weights in an exported PDF, read the stroke widths from its
-drawing operators with PyMuPDF `page.get_drawings()`, and multiply by
-25.4/72 to get millimetres.
+These are document properties persisted in each DRWDOT, not printer or
+seat-global preferences and not runtime drawing overrides. The native API
+`IModelDocExtension.SetUserPreferenceDouble` uses **metres** for the
+`swPageSetupPrinter{Thin,Normal}LineWeight` preferences. The corresponding
+line-font integer preferences select `swLineWeights_e` slots. To check the
+exported PDF, read its stroke widths with PyMuPDF `page.get_drawings()` and
+multiply by 25.4/72 to obtain millimetres. Inspect a representative part and
+dense assembly at print size; section cutting lines may legitimately have
+the same width as visible edges.
 
 `third-angle-projection.SLDBLK` is the projection-symbol block embedded in both
 templates and remains the editable source for future template work.
@@ -66,12 +70,15 @@ entry if either block moves or grows.
 
 ### Title block
 
-Left side, top to bottom: the general-tolerance block (**UNLESS OTHERWISE
-SPECIFIED**; `.XX` / `.XXX` / angular / surface finish, linked to the source
-part's `TOL_LIN_XX` / `TOL_LIN_XXX` / `TOL_ANG` / `TOL_SURFACE` custom
-properties from `cad/config/title_block.yaml`); the edge-break note; FINISH;
-MATERIAL; the ASME Y14.5-2018 interpretation note; DO NOT SCALE DRAWING; and
-the third-angle projection symbol. Right side: project title; PART name; DWG.
+Left side: the general-tolerance block (**UNLESS OTHERWISE SPECIFIED**;
+linear / angular / drilled-hole / surface rows, linked to the source model's
+`TOL_*` properties from `cad/config/title_block.yaml`); the shared edge-break,
+thread-class and inside-corner rows; FINISH; MATERIAL; the ASME Y14.5-2018
+interpretation note; DO NOT SCALE DRAWING; and the third-angle projection
+symbol. The inside-corner row is `INSIDE CORNERS` followed by
+`$PRPSHEET:"TOL_INSIDE_CORNER"`; its full value (including `MAX UNLESS
+OTHERWISE SPECIFIED`) comes from `inside_corner.display` in the config.
+Right side: project title; PART name; DWG.
 NO. (`Number`, the MHA-<subsystem>-## registry id (assembly 00; fabricated parts 01 onward; vendor parts MHA-<parent>-VN-50 onward)); REV (the release tag); scale; UNIT;
 copyright + CC BY-SA mark. The source part supplies the linked `$PRPSHEET`
 fields. `_part_properties.part_properties` stamps `Number`, `Revision`, `Title`, and
@@ -121,6 +128,47 @@ property. SolidWorks updates it when the document unit system changes through
 the status-bar unit picker: MMGS displays `mm`, and IPS displays `in`. The
 pipeline configures dimensions in millimeters today. No custom UNIT property
 is stamped.
+
+### Native template maintenance
+
+`cad/scripts/maintain_drawing_templates.py` edits copies of both embedded-format
+templates through an **already-held farm COM seat**. Its
+`maintain_templates(adapter)` entry point is suitable for an existing cached
+COM leaf's `run_build` callback; never call `run_build` again inside that leaf.
+The CLI is a seat-held entry point, not a newly admitted farm task. Do not
+launch it locally, drain w15, or change the deployed worker to run it.
+
+The `website`, `inside-corner` and `line-weights` operations are independent.
+For example, `maintain_templates(adapter, operations=("website",))` changes
+only the website from `harmonic-analyzer.vza.net` to `harmonicanalyzer.com`;
+the CLI's repeatable `--operation` selects the same operations. This keeps
+the website change separately reviewable from the line-weight change.
+
+The script writes these files under `cad/out/templates` for the caller to
+declare as cache outputs:
+
+- `harmonic-analyzer-landscape.DRWDOT`
+- `harmonic-analyzer-portrait.DRWDOT`
+- `harmonic-analyzer-landscape.census.json`
+- `harmonic-analyzer-portrait.census.json`
+
+Each census records the original, edited and closed/reopened native document:
+sheet properties, sheet-format segments and block transforms, every note's
+linked/resolved text, position, extent, font settings/runs, and document
+line-weight slots/mappings. Existing note anchors, formatting and sheet
+geometry must remain unchanged. The inside-corner operation measures configured
+property values temporarily and adds its linked row only in a native free gap
+in the existing ruled tolerance cell; it refuses to move or shrink existing
+content to make space. No temporary literal values are saved. Source-template
+SHA-256 checks ensure the checked-in files were not mutated on the worker.
+
+After successful persisted readback, deliberately install the returned binaries
+into this directory, remove any temporary dispatch hook, and render portrait
+and landscape samples from the installed templates on the farm. The bootstrap
+leaf itself still renders from the checked-in templates, not from a runtime
+override. Census success is not visual approval: obtain explicit owner
+approval of both sample orientations before merging, and run the applicable
+drawing/machinist gates.
 
 ### The "For Personal Use Only" watermark
 
