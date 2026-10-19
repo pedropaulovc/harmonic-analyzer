@@ -55,8 +55,16 @@ All in [`references/`](../references/), which is a git submodule:
 - `machining-for-hobbyists-getting-started/`, the beginner spine, a chapter per topic
 - `machinerys-handbook/`, the lookup, with a local search index
 - `gears-and-gear-cutting/`, whose ch. 12 forms cutters with a button tool (the Eureka device there only relieves them)
-- `jet-bd-920n-operators-manual.pdf`, the lathe
+- `jet-bd-920n-operators-manual.pdf`, historical reference for the former JET lathe only
 - `magxact-mx100m-mill-dro-manual/` and `el400-operation-manual/`, the DROs
+
+The installed lathe is the Precision Matthews PM-1127VF-LB. Its manual is
+unresolved: verify the machine's build year and nameplate, then obtain the
+matching manufacturer manual. The [archived 2015 PM manual](https://archive.org/download/pm-1440-gs-v-3-2020-10/Precision%20Matthews/PM-1127VF-LB-Manual-2015.pdf)
+covers an earlier DC-motor version, not the VFD configuration recorded from
+catalogue data in the inventory. Do not use it as the installed lathe's manual
+unless nameplate/build identification and Precision Matthews confirmation
+establish that it applies.
 
 ## Machines
 
