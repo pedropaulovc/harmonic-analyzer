@@ -125,3 +125,18 @@ def test_support_bar_isolation(part_closures, contract: Contract) -> None:
 )
 def test_transgear_pivot_isolation(part_closures, contract: Contract) -> None:
     assert_isolated(part_closures, contract)
+
+
+@pytest.mark.parametrize(
+    "contract",
+    [
+        Contract(
+            selectors=("build_dt_*",),
+            anchors=("build_dt_pinion_arbor",),
+            forbidden=("ch_rocker_arm_spec",),
+        )
+    ],
+    ids=["rocker-rod"],
+)
+def test_rocker_rod_isolation(part_closures, contract: Contract) -> None:
+    assert_isolated(part_closures, contract)
