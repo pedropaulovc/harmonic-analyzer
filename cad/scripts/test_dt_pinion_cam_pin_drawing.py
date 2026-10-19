@@ -150,21 +150,29 @@ def test_the_bond_step_counts_one_pin_per_strap() -> None:
     assert step.startswith(f"BOND {pins}X MHA-DT-025, ONE INTO EACH MHA-DT-014 ")
 
 
-def test_no_gdt_no_roughness_symbol_and_only_the_fit_is_banded() -> None:
+def test_no_gdt_the_shank_carries_the_finish_and_only_the_fit_is_banded() -> None:
     """drawing-simplicity-policy.md `GD&T allowlist (rule 5)`: a pin is not on
     the GD&T allowlist.  drawing-guidelines.md rule 6 (roughness symbols only
-    where a surface runs, slides or locates): the cam rides the as-received
-    drill-rod OD and the crown touches nothing, so no face is cut to a
-    roughness.  Machinist review r1 of #1009: the length and crown radius
-    bands named no mate; they take the title block's .XX."""
+    where a surface runs, slides or locates): the cam rides the Ø4 shank, a
+    cam-follower contact (Codex P2 on #1687); the crown touches nothing.
+    Machinist review r1 of #1009: the length and crown radius bands named no
+    mate; they take the title block's .XX."""
+    from _gtol_cylinder import CylinderFace
+
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     build_source = Path(pin.__file__).read_text(encoding="utf-8")
     assert not hasattr(dt_pinion_cam_pin_spec, "GEOMETRIC_TOLERANCES_MM")
-    assert not hasattr(dt_pinion_cam_pin_spec, "SURFACE_FINISHES")
     assert "add_datum_feature(" not in source
     assert "add_feature_control_frame(" not in source
-    assert "add_surface_finish(" not in source
-    assert "author_part_pmi(" not in build_source
+    (control,) = dt_pinion_cam_pin_spec.SURFACE_FINISHES
+    assert control.key == "shank"
+    assert control.roughness_um == 1.6
+    assert control.face == CylinderFace(diameter_mm=dt_pinion_cam_pin_spec.PIN_DIA)
+    assert source.count("add_surface_finish(") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "shank")' in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in (
+        build_source
+    )
     assert "add_view_centerline(" in source
     assert model_toleranced_dimensions(pin) == {
         ("PinProfile", "PinDia"): "*deviations(PIN_DIA_BAND)",
@@ -181,6 +189,54 @@ def test_no_gdt_no_roughness_symbol_and_only_the_fit_is_banded() -> None:
     assert "SetPrecision3(DRAWING_REFERENCE_PRECISION" in source
     assert "REF AXIAL HEIGHT" not in source
     assert round(drawing.OVERALL, 6) == 20.8
+
+
+def test_the_cam_rides_the_shank_short_of_the_crown() -> None:
+    """The finish leader's station is the assembly's cam contact: the foot of
+    the pin line on the cam axis, parked and engaged, lies on the shank clear
+    of the seat and well short of the crown root."""
+    import build_dt_drive_train_assembly as asm
+
+    stations = []
+    for centre, normal, ecc in (
+        (asm._FPIN_C, asm._SPR_N, -asm.CAM_ECC),
+        (asm._FPIN_C_ENG, asm._N_ENG, asm.CAM_ECC),
+    ):
+        axis = (asm.LIFT_X, asm.LIFT_Y + ecc)
+        foot = -((axis[0] - centre[0]) * normal[0] + (axis[1] - centre[1]) * normal[1])
+        stations.append(foot - asm._FPIN_S0)
+    contact = drawing.CAM_CONTACT_FROM_SEATED_END_MM
+    assert min(stations) - 0.5 < contact < max(stations) + 0.5
+    assert dt_pinion_cam_pin_spec.SEAT_LEN < min(stations)
+    assert max(stations) < dt_pinion_cam_pin_spec.PIN_LEN - 3.0
+
+
+# The finish symbol's ink relative to its V root at 2.5 mm character height,
+# measured on the pc-r4-860 render of the old crown symbol: the leader leaves
+# the shelf's right end; the "Ra 1.6" text sits above the shelf, right of it.
+_SHELF_LEFT_DX = -0.0030
+_SHELF_END_DX = 0.0064
+_TEXT_RIGHT_DX = 0.0148
+_SYMBOL_TOP_DY = 0.0074
+
+
+def test_shank_finish_sits_clear_above_the_shank() -> None:
+    x, y = drawing.SHANK_FINISH_SYMBOL_XY
+    model_x, model_y, model_z = drawing._shank_point()
+    target = (
+        drawing.side_view_x(model_z * 1000.0),
+        drawing.RIGHT_CENTER[1] + model_y * drawing.SHEET_SCALE[0],
+    )
+    assert model_x == 0.0
+    assert target[1] == pytest.approx(drawing.RIGHT_CENTER[1] + drawing.HALF_DIA)
+    # The leader falls from the shelf end to the shank's upper edge, so it
+    # passes below the text that sits above the shelf.
+    assert y > target[1] + 0.004
+    assert target[0] > x + _TEXT_RIGHT_DX
+    # Clear of the crown-root extension line and under the Depth block.
+    assert x + _SHELF_LEFT_DX > drawing.side_view_x(drawing.PIN_LEN) + 0.005
+    depth_line = drawing.RIGHT_KEEP["Depth"][1] - 0.008
+    assert depth_line - (y + _SYMBOL_TOP_DY) > _SYMBOL_TOP_DY
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

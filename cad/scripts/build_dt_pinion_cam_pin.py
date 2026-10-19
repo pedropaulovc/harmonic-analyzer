@@ -52,6 +52,7 @@ from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from dt_pinion_cam_pin_spec import (
     CAP_SAG,
@@ -61,6 +62,7 @@ from dt_pinion_cam_pin_spec import (
     PIN_DIA,
     PIN_DIA_BAND,
     PIN_LEN,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "dt-pinion-cam-pin"
@@ -227,6 +229,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

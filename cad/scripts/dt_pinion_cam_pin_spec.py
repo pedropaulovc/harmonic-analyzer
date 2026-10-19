@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import _config
 from _fit_ream_h7 import REAM_H7
+from _gtol_cylinder import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_pinion_cam_pin_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -44,7 +46,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CapProfile": {"CapR"},
 }
 # Decimal places ARE the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the h9 stock
-# band and the two +/-0.05 bands are all hundredths.
+# band is hundredths, and the length and crown radius take the .XX band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {"PinDia": 2, "Depth": 2},
     "CapProfile": {"CapR": 2},
@@ -69,9 +71,17 @@ DEPTH_CALLOUT = "SEATED FLAT END\nTO CROWN ROOT"
 CAP_RADIUS_CALLOUT = "OUTER CROWN"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs,
-# slides or locates): the cam rides the drill rod's own ground OD, which the
-# title block's Finish row leaves as received, and the crown touches nothing.
-# No face is cut to a roughness, so the sheet carries no symbol.
+# slides or locates): the cam rides the Ø4 shank, a cam-follower contact, so
+# the shank carries Ra 1.6 (ground drill rod meets it as received; Codex P2 on
+# #1687).  The crown touches nothing and carries no symbol (machinist review
+# r1 of #1009).  The 360-degree revolve leaves one Ø4 cylindrical face.
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        key="shank",
+        roughness_um=MACHINED_UM,
+        face=CylinderFace(diameter_mm=PIN_DIA),
+    ),
+)
 
 SEAT_BAND = REAM_H7
 BOND_CLEARANCE_MIN = round(SEAT_BAND[1] - PIN_DIA_BAND[0], 6)
