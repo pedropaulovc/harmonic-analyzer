@@ -1839,6 +1839,7 @@ def _anchor_note(
     return extent
 
 
+@_telemetry.traced("drawing.note_field.stack", label_param="label")
 def _stack_note_field(
     adapter: Any,
     blocks: tuple[tuple[str, str], ...],
@@ -1847,6 +1848,7 @@ def _stack_note_field(
     label: str,
 ) -> list[str]:
     """Stack note blocks top-down in one field; return every field violation."""
+    _telemetry.annotate(block_count=len(blocks))
     left, top, _right, _bottom = field
     y = top
     findings = []
@@ -1869,6 +1871,7 @@ def _stack_note_field(
     return findings
 
 
+@_telemetry.traced("drawing.note_fields.stack_sheet", label_param="sheet")
 def _stack_sheet_note_fields(adapter: Any, facts: SourceFacts, sheet: int) -> list[str]:
     """Stack every ``package_note_fields`` field of one fixed-field sheet."""
     findings = []
@@ -1887,18 +1890,21 @@ def _view_outline(view: Any) -> tuple[float, float, float, float]:
     return outline
 
 
+@_telemetry.traced("drawing.view.set_scale", label_param="label")
 def _set_view_scale(
     adapter: Any, view: Any, scale: tuple[float, float], *, label: str
 ) -> None:
     """Re-scale a placed drawing view and read the scale back."""
     view = _early_bound(view, "IView")
     view.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
-    adapter.currentModel.EditRebuild3()
+    with _telemetry.span("drawing.rebuild", phase="view_scale", label=label):
+        adapter.currentModel.EditRebuild3()
     ratio = tuple(float(value) for value in view.ScaleRatio)
     if len(ratio) != 2 or abs(ratio[0] / ratio[1] - scale[0] / scale[1]) > 1e-9:
         raise RuntimeError(f"{label}: view scale reads {ratio!r}, expected {scale!r}")
 
 
+@_telemetry.traced("drawing.view.shift", label_param="label")
 def _shift_view(adapter: Any, view: Any, delta: tuple[float, float], *, label: str) -> None:
     """Move a drawing view by a sheet-space delta and read the move back."""
     view = _early_bound(view, "IView")
@@ -1906,7 +1912,8 @@ def _shift_view(adapter: Any, view: Any, delta: tuple[float, float], *, label: s
     target = (before[0] + delta[0], before[1] + delta[1])
     if not view.SetViewPosition(double_array(list(target)), False):
         raise RuntimeError(f"{label}: SetViewPosition refused {target!r}")
-    adapter.currentModel.EditRebuild3()
+    with _telemetry.span("drawing.rebuild", phase="view_shift", label=label):
+        adapter.currentModel.EditRebuild3()
     after = tuple(float(value) for value in view.Position)
     if math.dist(after, target) > 1e-6:
         raise RuntimeError(f"{label}: view moved to {after!r}, expected {target!r}")
@@ -2341,8 +2348,12 @@ def _isolate_instances(adapter: Any, view: Any, names: frozenset[str], *, label:
             shown.add(name)
         else:
             hidden += 1
-    if not adapter.currentModel.EditRebuild3():
-        raise RuntimeError(f"{label}: rebuild after isolation failed")
+    with _telemetry.span(
+        "drawing.rebuild", phase="isolate_instances", label=label,
+        shown_count=len(shown), hidden_count=hidden,
+    ):
+        if not adapter.currentModel.EditRebuild3():
+            raise RuntimeError(f"{label}: rebuild after isolation failed")
     missing = sorted(names - shown)
     _telemetry.event(
         "drawing.isolate_instances",
@@ -2495,6 +2506,7 @@ def _validate_source(source_model: Any) -> SourceFacts:
 # ============================ BOM ==============================================
 
 
+@_telemetry.traced("drawing.bom.validate")
 def _validate_bom(
     adapter: Any, table: Any, facts: SourceFacts
 ) -> tuple[tuple[tuple[str, str], ...], int]:
@@ -2503,6 +2515,7 @@ def _validate_bom(
     rows = int(table.RowCount)
     columns = int(table.ColumnCount)
     components = facts.components
+    _telemetry.annotate(rows=rows, columns=columns, component_count=len(components))
     if rows != len(components) + 1 or columns < 4:
         raise RuntimeError(
             f"drive-train BOM is {rows}x{columns}; expected {len(components) + 1} rows"
@@ -2566,9 +2579,11 @@ def _validate_bom(
                 f"model has {facts.count(stem)}"
             )
     header_count = int(table.GetHeaderCount())
-    setter_heights = tuple(float(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)) for row in range(rows))
-    if not adapter.currentModel.EditRebuild3():
-        raise RuntimeError("drive-train BOM rebuild failed")
+    with _telemetry.span("drawing.bom.size_rows", row_count=rows):
+        setter_heights = tuple(float(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)) for row in range(rows))
+        with _telemetry.span("drawing.rebuild", phase="bom_row_height", row_count=rows):
+            if not adapter.currentModel.EditRebuild3():
+                raise RuntimeError("drive-train BOM rebuild failed")
     for row, setter_height in enumerate(setter_heights):
         height = float(table.GetRowHeight(row))
         fit = bom_row_fit(BOM_ROW_HEIGHT, height)
@@ -2600,8 +2615,10 @@ def _bom_feature_name(table: Any) -> str:
     return name
 
 
+@_telemetry.traced("drawing.bom.split_layout")
 def _split_bom(adapter: Any, table: Any, *, data_rows: int, header_count: int) -> None:
     """Split the BOM into two side-by-side columns and hold both to the sheet."""
+    _telemetry.annotate(data_rows=data_rows, header_count=header_count, piece_count=2)
     table = _early_bound(table, "ITableAnnotation")
     first_rows = bom_split_row(data_rows)
     split_after = header_count + first_rows - 1  # 0-based row index
@@ -2612,8 +2629,9 @@ def _split_bom(adapter: Any, table: Any, *, data_rows: int, header_count: int) -
     annotation = _early_bound(second.GetAnnotation(), "IAnnotation")
     if not annotation.SetPosition(BOM_SECOND_COLUMN_X, BOM_ANCHOR[1], 0.0):
         raise RuntimeError("drive-train BOM second column refused its position")
-    if not adapter.currentModel.EditRebuild3():
-        raise RuntimeError("drive-train BOM split rebuild failed")
+    with _telemetry.span("drawing.rebuild", phase="bom_split", data_rows=data_rows):
+        if not adapter.currentModel.EditRebuild3():
+            raise RuntimeError("drive-train BOM split rebuild failed")
     findings = []
     for label, piece in (("first", table), ("second", second)):
         piece_annotation = _early_bound(piece.GetAnnotation(), "IAnnotation")
