@@ -84,7 +84,6 @@ from _assembly import (
     assembly_title_properties,
     assert_component_placed,
     assert_components_fully_defined,
-    author_in_drawing_configurations,
     check_no_interference,
     remap_front_to_machine_front,
     save_assembly_and_images,
@@ -307,12 +306,11 @@ async def build(adapter) -> dict[str, str]:
     remap_front_to_machine_front(adapter)
     # Both drawing configurations own the explode: the exploded sheet's 1:10
     # view references Default Simplified.
-    author_in_drawing_configurations(
+    artefacts = await save_assembly_and_images(
         adapter,
         ASM_NAME,
-        lambda configuration: create_harmonic_analyzer_explode(adapter, configuration),
+        author=lambda configuration: create_harmonic_analyzer_explode(adapter, configuration),
     )
-    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
     # save_assembly_and_images deliberately discards the dirty anonymous source
     # after its SaveAsCopy.  Reopen the clean copy for the top-only gallery/BOM;
     # those exports dirty the reopened document, so discard it again without
