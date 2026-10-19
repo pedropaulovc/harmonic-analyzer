@@ -385,10 +385,10 @@ def test_head_end_view_is_the_third_angle_right_view() -> None:
 
 def test_head_bands_name_their_reason_at_the_callout() -> None:
     # Machinist review of 04b95f481: each head band's reason at its callout,
-    # one line under the value, centred on it.  At ~2.3 mm a character the
-    # line clears the head face's extension line by >= 3 mm and the head
-    # Ø's clears the end view by >= 5 mm.
-    char = 0.0023
+    # one line under the value, centred on it.  At 2.75 mm a character
+    # (measured on the r3 audit) the line clears the head face's extension
+    # line by >= 5 mm and the head Ø's clears the end view by >= 5 mm.
+    char = 0.00275
     head_radius = spec.HEAD_DIA * drawing.SHEET_SCALE[0] / 2000.0
     callouts = {
         "HeadDia": spec.HEAD_DIA_CALLOUT,
@@ -398,7 +398,7 @@ def test_head_bands_name_their_reason_at_the_callout() -> None:
         assert "\n" not in text and "MHA-DT-035" in text, name
         half = len(text) * char / 2.0
         x = drawing.SIDE_KEEP[name][0]
-        assert x - half - drawing.HEAD_FACE_X >= 0.003, name
+        assert x - half - drawing.HEAD_FACE_X >= 0.005, name
     head_dia_right = drawing.HEAD_DIA_TEXT_X + len(spec.HEAD_DIA_CALLOUT) * char / 2.0
     assert drawing.END_CENTER[0] - head_radius - head_dia_right >= 0.005
     # The head Ø's value and callout stay between the head's extension lines.
@@ -421,9 +421,10 @@ def test_fitted_shoulder_rule_rides_the_under_head_reference() -> None:
     assert lines[0].startswith("UNDER-HEAD FACED TO SUIT")
     assert "MHA-DT-008" in spec.UNDER_HEAD_CALLOUT
     assert spec.UNDER_HEAD_CALLOUT.endswith("PLUS 0.25-1.00")
-    # ~2.3 mm a character: the widest line stays between the seat-face and
-    # under-head extension lines, centred on the reference's text.
-    half = max(len(line) for line in lines) * 0.0023 / 2.0
+    # 2.5 mm a character (the r3 audit boxed the block 96.5 mm wide): the
+    # widest line stays between the seat-face and under-head extension lines,
+    # centred on the reference's text.
+    half = max(len(line) for line in lines) * 0.0025 / 2.0
     centre = drawing.SIDE_KEEP["UnderHeadLocation"][0]
     assert centre - half > drawing.SEAT_X + 0.010
     assert centre + half < drawing.FINISH_SYMBOL[0] - 0.003

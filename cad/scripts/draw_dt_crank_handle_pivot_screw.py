@@ -109,7 +109,7 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 SIDE_CENTER = (0.160, 0.165)
 # Third-angle right view of the slotted head end, on the profile's axis,
 # clear of the head Ø's callout.
-END_CENTER = (0.330, SIDE_CENTER[1])
+END_CENTER = (0.345, SIDE_CENTER[1])
 ISO_CENTER = (0.380, 0.225)
 ISO_SCALE = (1, 1)
 
@@ -147,16 +147,19 @@ RELIEF_FLOOR_MID_X = (_sheet_x(SEAT_STATION + RELIEF_LEAD) + RELIEF_END_X) / 2.0
 # length (the seat face from the tip) on the left and the head length on the
 # right; row 1 the under-head face from the tip; row 2 the reference overall.
 # Row 0 stands 34 mm below the axis so the relief Ø can print between it and
-# the profile.  No extension line crosses a dimension line.
-_ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.064)
+# the profile; row 2 stands 19 mm under row 1 so the overall's text clears the
+# under-head callout's last line by >= 3.6 mm (r3 audit: 3.0 at 15 mm).  No
+# extension line crosses a dimension line.
+_ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.068)
 # The 4-mm head prints 12 mm long, narrower than its ~21-mm value, so the head
 # length, the head Ø and the slot depth stand outside the head face rather
 # than between extension lines that would strike their text (v43 render).
 # Each head band's one-line reason callout is centred under its value, so the
-# text centre stands half that line's width (~2.3 mm a character) plus 4 mm
-# right of the head face's extension line.
-HEAD_LENGTH_TEXT_X = HEAD_FACE_X + 0.029  # "BELOW MHA-DT-035 FACE", ~49 mm
-HEAD_DIA_TEXT_X = HEAD_FACE_X + 0.026  # "ON MHA-DT-035 FLOOR", ~44 mm
+# text centre stands half that line's width (2.75 mm a character, measured on
+# the r3 audit: 52.2 mm for 19, 57.1 mm for 21) plus 5-6 mm right of the head
+# face's extension line and the centreline's overshoot.
+HEAD_LENGTH_TEXT_X = HEAD_FACE_X + 0.034  # "BELOW MHA-DT-035 FACE"
+HEAD_DIA_TEXT_X = HEAD_FACE_X + 0.032  # "ON MHA-DT-035 FLOOR"
 SLOT_DEPTH_TEXT_X = HEAD_FACE_X + 0.012
 SIDE_KEEP = {
     "ThreadLength": ((TIP_X + SEAT_X) / 2.0, _ROW_Y[0]),
