@@ -141,6 +141,9 @@ GATING_MIN_RUNS = 2
 # Tool descriptors and isolation settings are static across packages, so neither
 # source paths nor sheet counts disturb the model's cached tool/prompt prefix.
 SHEETS_SERVER = SCRIPTS_DIR / "machinist_review_sheets_mcp.py"
+# Startup is part of, not an extension to, the per-attempt timeout.
+CLAUDE_MCP_STARTUP_TIMEOUT_S = 120.0
+_CLAUDE_MCP_POLL_INTERVAL_S = 0.25
 CLAUDE_ISOLATION_SETTINGS = {
     "disableAllHooks": True,
     "autoMemoryEnabled": False,
@@ -383,7 +386,7 @@ def build_claude_command(
         "--thinking-display",
         "summarized",
         "--input-format",
-        "text",
+        "stream-json",
         "--output-format",
         "stream-json",
         "--verbose",
@@ -410,6 +413,184 @@ def build_claude_command(
         "--strict-mcp-config",
         "--no-chrome",
     ]
+
+
+class _ClaudeTransportError(RuntimeError):
+    """Retain partial CLI evidence when startup fails before any review."""
+
+    def __init__(
+        self, message: str, *, stdout: str, stderr: str, returncode: int | None
+    ) -> None:
+        super().__init__(message)
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = returncode
+
+
+async def _run_claude(
+    command: list[str], *, input: str, timeout: float, cwd: str,
+    env: dict[str, str] | None,
+) -> subprocess.CompletedProcess[str]:
+    """Wait for this CLI's actual sheets connection before submitting a prompt.
+
+    Claude 2.1.303 starts MCP before input, but its system/init event waits for a
+    user turn. Use the SDK's initialize/mcp_status control protocol instead:
+    neither request invokes the model, and connected status includes tools/list.
+    Keep the same CLI and MCP process alive for the subsequent review or judge.
+    """
+    stdout: list[bytes] = []
+    stderr: list[bytes] = []
+    messages: asyncio.Queue[bytes | None] = asyncio.Queue()
+    startup_complete = False
+    proc: asyncio.subprocess.Process | None = None
+    readers: list[asyncio.Task[None]] = []
+    failure: Exception | None = None
+    timed_out = False
+    startup_timeout = min(timeout, CLAUDE_MCP_STARTUP_TIMEOUT_S)
+
+    async def read_stdout() -> None:
+        assert proc is not None and proc.stdout is not None
+        pending = b""
+        try:
+            while chunk := await proc.stdout.read(65536):
+                stdout.append(chunk)
+                # Review events can contain multi-megabyte images. Only frame
+                # startup controls; afterward retain bytes without a line limit.
+                if not startup_complete:
+                    pending += chunk
+                    while b"\n" in pending:
+                        line, pending = pending.split(b"\n", 1)
+                        messages.put_nowait(line)
+        finally:
+            messages.put_nowait(None)
+
+    async def read_stderr() -> None:
+        assert proc is not None and proc.stderr is not None
+        while chunk := await proc.stderr.read(65536):
+            stderr.append(chunk)
+
+    async def send(message: dict[str, Any]) -> None:
+        assert proc is not None and proc.stdin is not None
+        proc.stdin.write((json.dumps(message, ensure_ascii=False) + "\n").encode("utf-8"))
+        await proc.stdin.drain()
+
+    async def control(subtype: str) -> dict[str, Any]:
+        request_id = str(uuid.uuid4())
+        await send({
+            "type": "control_request", "request_id": request_id,
+            "request": {"subtype": subtype},
+        })
+        while True:
+            line = await messages.get()
+            if line is None:
+                raise RuntimeError("Claude exited before sheets MCP was ready")
+            try:
+                event = json.loads(line)
+            except (ValueError, UnicodeDecodeError):
+                continue  # Non-JSON diagnostics are still retained in stdout.
+            if not isinstance(event, dict) or event.get("type") != "control_response":
+                continue
+            response = event.get("response", {})
+            if not isinstance(response, dict) or response.get("request_id") != request_id:
+                continue
+            if response.get("subtype") != "success":
+                raise RuntimeError(f"Claude {subtype} failed: {response.get('error', response)}")
+            value = response.get("response")
+            if not isinstance(value, dict):
+                raise RuntimeError(f"Claude {subtype} returned no control response")
+            return value
+
+    try:
+        async with asyncio.timeout(timeout):
+            async with asyncio.timeout(startup_timeout):
+                proc = await asyncio.create_subprocess_exec(
+                    *command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, cwd=cwd, env=env,
+                )
+                readers = [
+                    asyncio.create_task(read_stdout()),
+                    asyncio.create_task(read_stderr()),
+                ]
+                await control("initialize")
+                while True:
+                    status = await control("mcp_status")
+                    servers = status.get("mcpServers")
+                    if (
+                        not isinstance(servers, list) or len(servers) != 1
+                        or not isinstance(servers[0], dict)
+                        or servers[0].get("name") != "sheets"
+                    ):
+                        raise RuntimeError("Claude MCP status lacks the sole private sheets server")
+                    server = servers[0]
+                    state = server.get("status")
+                    if state == "connected":
+                        tools = server.get("tools")
+                        if not isinstance(tools, list) or {
+                            tool.get("name") for tool in tools if isinstance(tool, dict)
+                        } != {"view_sheet", "crop"}:
+                            raise RuntimeError("Claude sheets MCP connected without its sheet tools")
+                        break
+                    if state not in ("pending", "connecting"):
+                        raise RuntimeError(
+                            f"Claude sheets MCP startup {state!r}: {server.get('error', '')}"
+                        )
+                    await asyncio.sleep(_CLAUDE_MCP_POLL_INTERVAL_S)
+            startup_complete = True
+            await send({
+                "type": "user", "session_id": "",
+                "message": {"role": "user", "content": input},
+                "parent_tool_use_id": None,
+            })
+            assert proc.stdin is not None
+            proc.stdin.close()
+            await proc.wait()
+            await asyncio.gather(*readers)
+    except TimeoutError:
+        timed_out = True
+    except Exception as exc:
+        failure = exc
+    finally:
+        if proc is not None:
+            if proc.returncode is None:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+            if proc.stdin is not None:
+                proc.stdin.close()
+            await proc.wait()
+            # Reap before retaining/moving the Windows attempt directory, and
+            # drain both pipes even on timeout to preserve partial evidence.
+            await asyncio.gather(*readers, return_exceptions=True)
+    output = b"".join(stdout).decode("utf-8", errors="replace")
+    diagnostics = b"".join(stderr).decode("utf-8", errors="replace")
+    if timed_out:
+        exc = subprocess.TimeoutExpired(
+            command, timeout if startup_complete else startup_timeout,
+            output=output, stderr=diagnostics,
+        )
+        if not startup_complete:
+            exc.add_note("Timed out waiting for Claude's sheets MCP connection")
+        raise exc
+    if failure is not None:
+        raise _ClaudeTransportError(
+            f"{type(failure).__name__}: {failure}", stdout=output, stderr=diagnostics,
+            returncode=proc.returncode if proc is not None else None,
+        ) from failure
+    assert proc is not None and proc.returncode is not None
+    return subprocess.CompletedProcess(command, proc.returncode, output, diagnostics)
+
+
+def _run_reviewer(
+    command: list[str], *, reviewer: str, input: str, timeout: float,
+    cwd: str, env: dict[str, str] | None,
+) -> subprocess.CompletedProcess[str]:
+    if reviewer == "claude":
+        return asyncio.run(_run_claude(command, input=input, timeout=timeout, cwd=cwd, env=env))
+    return subprocess.run(
+        command, input=input, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=timeout, cwd=cwd, env=env,
+    )
 
 
 def build_codex_command(
@@ -1427,9 +1608,14 @@ def _parse_events(stdout: str) -> list[dict[str, Any]]:
         if not line.startswith("{"):
             continue
         try:
-            events.append(json.loads(line))
+            event = json.loads(line)
         except json.JSONDecodeError:
             continue
+        # Transport status includes server commands, not reviewer tool calls.
+        # Keep it in raw stdout diagnostics, but never use it as sheet evidence.
+        if event.get("type") == "control_response":
+            continue
+        events.append(event)
     return events
 
 
@@ -1729,9 +1915,8 @@ def _review_session(
                     codex=executable,
                 )
             attempt_record["command"] = cmd
-            proc = subprocess.run(
-                cmd, input=prompt, capture_output=True, text=True,
-                encoding="utf-8", errors="replace", timeout=timeout_s,
+            proc = _run_reviewer(
+                cmd, reviewer=reviewer, input=prompt, timeout=timeout_s,
                 cwd=str(cwd), env=env,
             )
             attempt_record["exit_code"] = proc.returncode
@@ -1772,6 +1957,13 @@ def _review_session(
             error = None
             attempt_record["outcome"] = "succeeded"
             break
+        except _ClaudeTransportError as exc:
+            stdout, stderr = exc.stdout, exc.stderr
+            attempt_events = _parse_events(stdout)
+            attempt_record["exit_code"] = exc.returncode
+            error = f"{type(exc).__name__}: {exc}"
+            attempt_record["error"] = error
+            verdict = None
         except subprocess.TimeoutExpired as exc:
             stdout, stderr = exc.stdout, exc.stderr
             partial_stdout = stdout or ""

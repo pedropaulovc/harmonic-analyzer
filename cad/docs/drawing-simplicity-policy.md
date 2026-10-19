@@ -153,6 +153,15 @@ both verdicts and the finding diff.
   full-resolution crops resolve fine detail. A contact sheet alone is not proof.
   The judge defaults independently to Claude Opus 5.5 at medium effort
   (`--judge-reviewer`, `--judge-model`, `--judge-effort` select alternatives).
+- Before either Claude session receives its review/judge prompt, the runner uses
+  that same CLI process's SDK control channel to await the private `sheets`
+  connection and its `view_sheet`/`crop` tool catalogue. A separately probed
+  server or a generic initialization event is not readiness evidence. Startup
+  is bounded to 120 seconds within the existing per-attempt timeout; failed or
+  incomplete connections retry as infrastructure errors in fresh isolated
+  sessions, without submitting a drawing review. Startup diagnostics remain in
+  retained raw stdout; SDK control responses are excluded from reviewer tool
+  evidence. Valid drawing findings are not retried.
 - The authoritative result is `<name>.aggregate.json` and its companion
   `<name>.aggregate.md`, not an individual run's verdict. `FIX` means at least one
   **confirmed** blocker, over-specification or clarity finding raised by two or

@@ -640,6 +640,7 @@ def test_claude_command_owns_only_attempt_dir_configuration(tmp_path: Path) -> N
 
     command = build()
     # The schema travels inline; the only file the CLI reads is the retained config.
+    assert _flag(command, "--input-format") == "stream-json"
     assert json.loads(_flag(command, "--json-schema")) == mr.load_schema()
     assert (attempt_dir / _flag(command, "--mcp-config")).resolve() == mcp_config.resolve()
     assert _flag(command, "--session-id") == session_id
@@ -659,6 +660,258 @@ def test_claude_command_owns_only_attempt_dir_configuration(tmp_path: Path) -> N
     for misplaced in ({"mcp_config": stray}, {"schema": stray}):
         with pytest.raises(ValueError):
             build(**misplaced)
+
+
+@pytest.fixture
+def claude_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
+    """A real subprocess speaking the CLI control protocol, never a model API."""
+    script = tmp_path / "claude_protocol.py"
+    script.write_text(
+        r'''
+import json
+import sys
+import time
+from pathlib import Path
+
+mode, reply_path, delay = sys.argv[1:]
+started = time.monotonic()
+last_status = None
+status_started = None
+
+def record(event):
+    event = {**event, "at": time.monotonic() - started}
+    with Path("protocol.jsonl").open("a", encoding="utf-8") as log:
+        log.write(json.dumps(event) + "\n")
+
+def respond(request, value, subtype="success"):
+    print(json.dumps({
+        "type": "control_response",
+        "response": {
+            "subtype": subtype, "request_id": request["request_id"],
+            "response": value, "error": "synthetic control failure",
+        },
+    }), flush=True)
+
+print("synthetic CLI startup diagnostic", flush=True)
+print("startup stderr " + "x" * 131072, file=sys.stderr, flush=True)
+if mode == "eof":
+    sys.exit(9)
+if mode == "silent":
+    time.sleep(60)
+for line in sys.stdin:
+    event = json.loads(line)
+    record(event)
+    if event["type"] == "control_request":
+        request = event["request"]["subtype"]
+        if request == "initialize":
+            respond(event, {}, "error" if mode == "control_error" else "success")
+        elif request == "mcp_status":
+            if status_started is None:
+                status_started = time.monotonic()
+            if mode == "pending" or time.monotonic() - status_started < float(delay):
+                state = "pending"
+            else:
+                state = "failed" if mode == "failed" else "connected"
+            tools = [{"name": "view_sheet"}, {"name": "crop"}]
+            if mode == "missing_tools":
+                tools.pop()
+            server = {
+                "name": "sheets", "status": state, "tools": tools,
+                "config": {
+                    "type": "stdio", "command": sys.executable,
+                    "args": ["sheets_mcp.py", "sheet.png"],
+                },
+                "error": "synthetic sheets startup failure",
+            }
+            record({"type": "status", "value": state, "tools": tools})
+            respond(event, {"mcpServers": [] if mode == "missing_server" else [server]})
+            last_status = state
+    elif event["type"] == "user":
+        if last_status != "connected":
+            sys.exit("review submitted before connection")
+        if mode == "review_timeout":
+            time.sleep(60)
+        # Include a line larger than asyncio's default readline limit.
+        print(json.dumps({"type": "diagnostic", "payload": "x" * 131072}), flush=True)
+        print(Path(reply_path).read_text(encoding="utf-8"), flush=True)
+        break
+''',
+        encoding="utf-8",
+    )
+    state = SimpleNamespace(processes=[], commands=[])
+    real_spawn = mr.asyncio.create_subprocess_exec
+
+    async def spawn(*args: Any, **kwargs: Any):
+        process = await real_spawn(*args, **kwargs)
+        state.processes.append(process)
+        return process
+
+    def command(mode: str, reply: str, delay_s: float = 0.0) -> list[str]:
+        reply_path = tmp_path / f"reply-{len(state.commands)}.jsonl"
+        reply_path.write_text(reply, encoding="utf-8")
+        argv = [sys.executable, str(script), mode, str(reply_path), str(delay_s)]
+        state.commands.append(argv)
+        return argv
+
+    state.command = command
+    monkeypatch.setattr(mr.asyncio, "create_subprocess_exec", spawn)
+    monkeypatch.setattr(mr, "_CLAUDE_MCP_POLL_INTERVAL_S", 0.02)
+    return state
+
+
+@pytest.mark.parametrize("judge", [False, True])
+def test_claude_slow_start_waits_for_actual_connection_before_review_or_judge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    claude_transport: SimpleNamespace, judge: bool,
+) -> None:
+    value = {"clusters": []} if judge else _clean_verdict()
+    command = claude_transport.command("slow", _claude_stdout(1, value), delay_s=0.15)
+    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
+    report_dir = tmp_path / "reports"
+    review = mr._review_session(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", claude="fake", report_dir=report_dir, retries=0,
+        timeout_s=10, judge_findings=[] if judge else None,
+    )
+    assert review.passed and review.blind and review.attempts == 1
+    assert review.verdict == value
+    assert review.tool_events == 0
+    assert review.extra["inspection_proven"] is True
+    assert review.extra["sheets_viewed"] == [1]
+    (attempt,) = review.extra["evidence"]["attempts"]
+    records = [
+        json.loads(line) for line in
+        (Path(attempt["retained_dir"]) / "protocol.jsonl").read_text().splitlines()
+    ]
+    statuses = [row for row in records if row["type"] == "status"]
+    assert statuses[0]["value"] == "pending" and statuses[-1]["value"] == "connected"
+    (prompt,) = [row for row in records if row["type"] == "user"]
+    assert prompt["at"] >= statuses[-1]["at"] >= 0.15
+    assert prompt["message"]["content"] == review.extra["evidence"]["effective_prompt"]
+    assert ("FINDINGS TO ADJUDICATE" in prompt["message"]["content"]) is judge
+    assert len(claude_transport.processes) == 1
+    assert claude_transport.processes[0].returncode == 0
+    assert "startup stderr " in Path(attempt["stderr_file"]).read_text()
+    stdout = Path(attempt["stdout_file"]).read_text()
+    assert "synthetic CLI startup diagnostic" in stdout
+    statuses = [
+        row["response"]["response"]["mcpServers"][0]
+        for row in (json.loads(line) for line in stdout.splitlines() if line.startswith("{"))
+        if row.get("type") == "control_response"
+        and row["response"]["response"].get("mcpServers")
+    ]
+    assert statuses[-1]["config"] == {
+        "type": "stdio", "command": sys.executable,
+        "args": ["sheets_mcp.py", "sheet.png"],
+    }
+    assert all(event.get("type") != "control_response" for event in mr._parse_events(stdout))
+
+
+@pytest.mark.parametrize(
+    ("mode", "error"),
+    [
+        ("failed", "synthetic sheets startup failure"),
+        ("missing_tools", "without its sheet tools"),
+        ("missing_server", "sole private sheets server"),
+        ("control_error", "initialize failed"),
+        ("eof", "exited before sheets MCP was ready"),
+        ("pending", "TimeoutExpired"),
+        ("silent", "TimeoutExpired"),
+    ],
+)
+def test_claude_failed_start_never_receives_prompt_and_retains_cleanup_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    claude_transport: SimpleNamespace, mode: str, error: str,
+) -> None:
+    command = claude_transport.command(mode, _claude_stdout(1, _clean_verdict()))
+    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
+    monkeypatch.setattr(mr, "CLAUDE_MCP_STARTUP_TIMEOUT_S", 0.75)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", claude="fake", report_dir=tmp_path / "reports",
+        retries=0, timeout_s=10,
+    )
+    assert not review.passed and review.verdict is None and error in review.error
+    (attempt,) = review.extra["evidence"]["attempts"]
+    assert attempt["outcome"] == ("timed_out" if mode in ("pending", "silent") else "failed")
+    log = Path(attempt["retained_dir"]) / "protocol.jsonl"
+    records = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+    assert not any(row["type"] == "user" for row in records)
+    assert "synthetic CLI startup diagnostic" in Path(attempt["stdout_file"]).read_text()
+    assert "startup stderr " in Path(attempt["stderr_file"]).read_text()
+    assert claude_transport.processes[0].returncode is not None
+    assert not Path(attempt["attempt_dir"]).exists()
+
+
+@pytest.mark.parametrize("judge", [False, True])
+@pytest.mark.parametrize("failure", ["failed", "pending", "missing_tools"])
+def test_claude_startup_infrastructure_failure_retries_without_reviewing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    claude_transport: SimpleNamespace, judge: bool, failure: str,
+) -> None:
+    value = {"clusters": []} if judge else _clean_verdict()
+    reply = _claude_stdout(1, value)
+    commands = [
+        claude_transport.command(failure, reply),
+        claude_transport.command("slow", reply, delay_s=0.1),
+    ]
+    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: commands.pop(0))
+    monkeypatch.setattr(mr, "CLAUDE_MCP_STARTUP_TIMEOUT_S", 0.75)
+    review = mr._review_session(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", claude="fake", report_dir=tmp_path / "reports", retries=1,
+        timeout_s=10, judge_findings=[] if judge else None,
+    )
+    assert review.passed and review.attempts == 2 and review.error is None
+    first, second = review.extra["evidence"]["attempts"]
+    assert first["outcome"] != "succeeded" and second["outcome"] == "succeeded"
+    assert first["cwd"] != second["cwd"]
+    for index, attempt in enumerate((first, second)):
+        records = [
+            json.loads(line) for line in
+            (Path(attempt["retained_dir"]) / "protocol.jsonl").read_text().splitlines()
+        ]
+        assert sum(row["type"] == "user" for row in records) == index
+    assert all(process.returncode is not None for process in claude_transport.processes)
+    assert "synthetic CLI startup diagnostic" in Path(first["stdout_file"]).read_text()
+
+
+def test_claude_startup_and_review_share_one_overall_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
+) -> None:
+    command = claude_transport.command("review_timeout", "", delay_s=1.0)
+    monkeypatch.setattr(mr, "CLAUDE_MCP_STARTUP_TIMEOUT_S", 10.0)
+    started = mr.time.monotonic()
+    with pytest.raises(mr.subprocess.TimeoutExpired) as caught:
+        mr._run_reviewer(
+            command, reviewer="claude", input="synthetic prompt", timeout=2.0,
+            cwd=str(tmp_path), env=None,
+        )
+    elapsed = mr.time.monotonic() - started
+    assert caught.value.timeout == 2.0
+    assert elapsed < 2.75  # Not startup time plus another full review timeout.
+    records = [json.loads(line) for line in (tmp_path / "protocol.jsonl").read_text().splitlines()]
+    assert sum(row["type"] == "user" for row in records) == 1
+    assert any(row["type"] == "status" and row["value"] == "connected" for row in records)
+    assert "startup stderr " in caught.value.stderr
+    assert claude_transport.processes[0].returncode is not None
+
+
+def test_claude_connected_review_findings_are_not_retried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
+) -> None:
+    verdict = _clean_verdict("FIX")
+    verdict["clarity"] = [{"where": "sheet 1", "issue": "synthetic finding", "fix": "clarify"}]
+    command = claude_transport.command("slow", _claude_stdout(1, verdict), delay_s=0.1)
+    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", claude="fake", report_dir=tmp_path / "reports",
+        retries=2, timeout_s=10,
+    )
+    assert not review.passed and review.verdict == verdict and review.error is None
+    assert review.blind and review.attempts == 1
+    assert len(claude_transport.processes) == 1
 
 
 def test_codex_command_keeps_cwd_and_attempt_files_independent(
@@ -1971,7 +2224,7 @@ def test_attempt_dir_is_the_cwd_then_retained_without_sheet_images(
         ).read_text(encoding="utf-8")
         return reply
 
-    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "assembly", sources)
     review = mr.review_package(
         package, reviewer=reviewer, report_dir=report_dir, retries=0,
@@ -2085,7 +2338,7 @@ def test_attempt_records_carry_session_id_and_resume_command(
         stdout = _claude_stdout(1, verdict)
         return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
-    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "part", (source,))
     mr.review_package(
         package,
@@ -2192,7 +2445,7 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
             command, 0, stdout=_claude_stdout(1, verdict), stderr=""
         )
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     report_dir = tmp_path / "reports"
     review = mr.review_package(
         mr.ReviewPackage("part", "part", (png,)),
@@ -2270,7 +2523,7 @@ def test_retry_retains_failure_outputs_and_artifacts_after_success(
             stderr=failed_stderr,
         )
 
-    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     review = mr.review_package(
         mr.ReviewPackage("part", "part", (png,)),
         reviewer="codex",
@@ -2364,7 +2617,7 @@ def test_retry_requires_sheet_views_from_the_successful_attempt(
             command, 0, stdout=json.dumps(result), stderr=""
         )
 
-    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     review = mr.review_package(
         mr.ReviewPackage("part", "part", (png,)),
         reviewer="claude",
@@ -2396,7 +2649,6 @@ def test_both_structured_verdict_parsers(tmp_path: Path) -> None:
 def test_arbitrary_png_reports_with_same_basename_do_not_collide(
     tmp_path: Path, monkeypatch
 ) -> None:
-    import subprocess
     from concurrent.futures import ThreadPoolExecutor
 
     verdict = _clean_verdict()
@@ -2404,7 +2656,7 @@ def test_arbitrary_png_reports_with_same_basename_do_not_collide(
     def fake_run(command, **kwargs):
         return _codex_reply(command, kwargs, sheet_count=1, verdict=verdict)
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     inputs = [tmp_path / "left" / "part.png", tmp_path / "right" / "part.png"]
     for index, image in enumerate(inputs):
         image.parent.mkdir()
@@ -2441,8 +2693,6 @@ def test_arbitrary_png_reports_with_same_basename_do_not_collide(
 def test_multi_sheet_assembly_is_one_cross_sheet_review(
     tmp_path: Path, monkeypatch
 ) -> None:
-    import subprocess
-
     from pypdf import PdfWriter
 
     source = tmp_path / "assembly.pdf"
@@ -2472,7 +2722,7 @@ def test_multi_sheet_assembly_is_one_cross_sheet_review(
         captured.append((command, kwargs["input"]))
         return _codex_reply(command, kwargs, sheet_count=2, verdict=verdict)
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("gearbox", "assembly", (source,))
     review = mr.review_package(
         package,
@@ -2500,7 +2750,6 @@ def test_multi_sheet_assembly_is_one_cross_sheet_review(
 
 def test_registry_part_pdf_reviews_every_page(tmp_path: Path, monkeypatch) -> None:
     import hashlib
-    import subprocess
     from types import SimpleNamespace
 
     from pypdf import PdfWriter
@@ -2531,7 +2780,7 @@ def test_registry_part_pdf_reviews_every_page(tmp_path: Path, monkeypatch) -> No
         prompts.append(kwargs["input"])
         return _codex_reply(command, kwargs, sheet_count=2, verdict=verdict)
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     report_dir = tmp_path / "reports"
     review = mr.review_package(
         mr.package_for("two-sheet-part"),
@@ -2706,7 +2955,7 @@ def test_both_reviewers_receive_one_complete_package_invocation(
         stdout = _claude_stdout(2, verdict)
         return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
-    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "assembly", sources)
     claude_review = mr.review_package(
         package,
@@ -2750,7 +2999,7 @@ def _codex_review(
     def fake_run(command: list[str], **kwargs: Any):
         return pending.pop(0)(command, kwargs)
 
-    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     review = mr.review_package(
         mr.ReviewPackage("package", "assembly", sources),
         reviewer="codex",
@@ -2948,7 +3197,7 @@ def test_provider_failures_stay_blind_but_never_pass(
         # The provider refused before any session existed: nothing to audit.
         return mr.subprocess.CompletedProcess(command, 1, stdout="", stderr="quota exhausted")
 
-    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     review = mr.review_package(
         mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
         reviewer=reviewer,
@@ -2997,7 +3246,7 @@ def test_retention_falls_back_to_copy_when_windows_holds_the_attempt_dir(
 
     monkeypatch.setattr(mr.shutil, "move", held_move)
     monkeypatch.setattr(mr.shutil, "rmtree", held_rmtree)
-    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     report_dir = tmp_path / "reports"
     try:
         review = mr.review_package(
@@ -3540,7 +3789,7 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
         assert mr._sha256(snapshot) == source_hash
         return _session_reply(command, kwargs, _finding_verdict())
 
-    monkeypatch.setattr(mr.subprocess, "run", reply)
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
@@ -3611,7 +3860,7 @@ def test_judge_coverage_errors_retry_in_fresh_isolated_sessions(
         value = {"clusters": [_judge_cluster(ids)] if ids else []}
         return _session_reply(command, kwargs, value)
 
-    monkeypatch.setattr(mr.subprocess, "run", reply)
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
         judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
@@ -3641,7 +3890,7 @@ def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
         ]}
         return _session_reply(command, kwargs, value)
 
-    monkeypatch.setattr(mr.subprocess, "run", reply)
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=2,
         report_dir=tmp_path / "reports", retries=0, claude="claude-test",
@@ -3671,7 +3920,7 @@ def test_aggregate_gates_only_findings_raised_by_two_runs(
         ]}
         return _session_reply(command, kwargs, value)
 
-    monkeypatch.setattr(mr.subprocess, "run", reply)
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=3,
         report_dir=tmp_path / "reports", retries=0, claude="claude-test",
@@ -3700,7 +3949,7 @@ def test_aggregate_ship_uses_judged_category_not_raw_verdict(
             )]}
         return _session_reply(command, kwargs, value)
 
-    monkeypatch.setattr(mr.subprocess, "run", reply)
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
         report_dir=tmp_path / "reports", retries=0, claude="claude-test",
@@ -3727,7 +3976,7 @@ def test_aggregate_zero_findings_skips_judge_and_records_partial_run_errors(
             return mr.subprocess.CompletedProcess(command, 1, stdout="", stderr="provider down")
         return _session_reply(command, kwargs, _clean_verdict())
 
-    monkeypatch.setattr(mr.subprocess, "run", reply)
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
         retries=0, claude="claude-test",
@@ -3755,7 +4004,7 @@ def test_aggregate_error_is_retained_and_never_passes(
             value["clusters"].append(value["clusters"][0])
         return _session_reply(command, kwargs, value, sheets=0 if failure == "inspection" else 1)
 
-    monkeypatch.setattr(mr.subprocess, "run", reply)
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
@@ -3789,7 +4038,7 @@ def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
         )]}
         return _session_reply(command, kwargs, value)
 
-    monkeypatch.setattr(mr.subprocess, "run", reply)
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
         report_dir=tmp_path / "reports", retries=0, claude="claude-test",
@@ -3823,7 +4072,7 @@ def test_main_uses_aggregate_contract_for_each_input_mode(
     def reply(command: list[str], **kwargs: Any):
         return _session_reply(command, kwargs, _clean_verdict())
 
-    monkeypatch.setattr(mr.subprocess, "run", reply)
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
     monkeypatch.setattr(mr.shutil, "which", lambda reviewer: f"{reviewer}-test")
     directory = tmp_path / "reports"
     assert mr.main([*args, "--report-dir", str(directory)]) == 0
@@ -3849,7 +4098,7 @@ def test_missing_source_still_writes_an_error_aggregate(
     def forbidden(*args: Any, **kwargs: Any):
         pytest.fail("a missing source must never invoke a reviewer")
 
-    monkeypatch.setattr(mr.subprocess, "run", forbidden)
+    monkeypatch.setattr(mr, "_run_reviewer", forbidden)
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("missing", "part", (tmp_path / "missing.pdf",)),
