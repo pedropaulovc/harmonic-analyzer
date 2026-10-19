@@ -9,8 +9,8 @@ import signal
 import subprocess
 import sys
 import threading
+import time
 
-from filelock import FileLock, Timeout
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -22,6 +22,7 @@ def check_env(tmp_path, monkeypatch):
     # Never contend with the enclosing recipe gate or another developer's run.
     monkeypatch.delenv("HARMONIC_LOCAL_CHECK_LOCK", raising=False)
     monkeypatch.setenv("PROGRAMDATA", str(tmp_path / "host"))
+    monkeypatch.setenv("HARMONIC_LOCAL_CHECK_CPU_SLOTS", "1")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "")
     monkeypatch.setenv("HARMONIC_VERBOSITY", "error")
@@ -77,8 +78,6 @@ def test_separate_checkouts_share_admission_until_running_check_exits(tmp_path, 
     try:
         # Windows venv executables may redirect to a different interpreter PID.
         first_pid = int(first_lines.get(timeout=30))
-        with pytest.raises(Timeout):
-            FileLock(_local_check.lock_path()).acquire(timeout=0)
         second, second_lines = _start(*commands[1], check_env)
         with pytest.raises(queue.Empty):
             second_lines.get(timeout=0.5)
@@ -104,8 +103,6 @@ def test_killed_check_releases_admission(tmp_path, check_env):
         owner_pid = int(lines.get(timeout=30))
         os.kill(owner_pid, signal.SIGTERM)
         proc.wait(timeout=30)
-        with FileLock(_local_check.lock_path()).acquire(timeout=1):
-            pass
         result = subprocess.run(cmd, cwd=tmp_path, env=check_env, input="x", capture_output=True, text=True, timeout=30)
         assert result.returncode == 0, result.stderr
         assert int(result.stdout.strip()) != owner_pid
@@ -137,8 +134,6 @@ def test_failure_preserves_exit_status_and_does_not_stamp_success(tmp_path, chec
         cwd=tmp_path, env=check_env, capture_output=True, text=True, timeout=30,
     )
     assert result.returncode == 7, result.stderr
-    with FileLock(_local_check.lock_path()).acquire(timeout=1):
-        pass
 
 
 def test_successful_check_keeps_top_level_span_depth(tmp_path, check_env, monkeypatch):
@@ -171,3 +166,67 @@ def test_successful_check_keeps_top_level_span_depth(tmp_path, check_env, monkey
     dodo._run_stamped([sys.executable, str(script)], "check fixture", str(stamp), "check:fixture")
     assert stamp.is_file()
     assert json.loads((tmp_path / "trace.json").read_text()) == {"depth": 0, "parent": None}
+
+
+@pytest.mark.parametrize("worker_args", [["-n", "8"], ["--numprocesses=auto"]])
+def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, check_env, worker_args):
+    """Real xdist workers consume only free slots; small checks run alongside."""
+    check_env["HARMONIC_LOCAL_CHECK_CPU_SLOTS"] = "3"
+    hold = tmp_path / "hold.py"
+    hold.write_text(
+        "import os, sys\nprint(os.getpid(), flush=True)\nsys.stdin.read(1)\n",
+        encoding="utf-8",
+    )
+    worker_test = tmp_path / "test_workers.py"
+    worker_test.write_text(
+        "import os, pathlib, time, pytest\n"
+        "@pytest.fixture(scope='session')\n"
+        "def hold_worker(worker_id):\n"
+        "    ready = pathlib.Path('.' + worker_id)\n"
+        "    ready.write_text(os.environ['PYTEST_XDIST_WORKER_COUNT'])\n"
+        "    ready.replace(worker_id)\n"
+        "    deadline = time.monotonic() + 60\n"
+        "    while not pathlib.Path('release').exists():\n"
+        "        assert time.monotonic() < deadline, 'worker release timed out'\n"
+        "        time.sleep(0.05)\n"
+        "@pytest.mark.parametrize('number', range(4))\n"
+        "def test_work(hold_worker, number):\n"
+        "    assert pathlib.Path('release').exists()\n",
+        encoding="utf-8",
+    )
+    cmd = _local_check.command([sys.executable, str(hold)], "check:small")
+    small, small_lines = _start(cmd, tmp_path, check_env)
+    parallel = None
+    waiting = None
+    try:
+        int(small_lines.get(timeout=30))
+        parallel, _ = _start(
+            _local_check.command(
+                [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+                 *worker_args, str(worker_test)],
+                "check:parallel",
+            ),
+            tmp_path, check_env,
+        )
+        deadline = time.monotonic() + 30
+        while len(list(tmp_path.glob("gw*"))) < 2:
+            assert parallel.poll() is None, parallel.stderr.read()
+            assert time.monotonic() < deadline, "two admitted workers did not start"
+            time.sleep(0.05)
+        assert {p.name: p.read_text() for p in tmp_path.glob("gw*")} == {"gw0": "2", "gw1": "2"}
+        waiting, waiting_lines = _start(cmd, tmp_path, check_env)
+        with pytest.raises(queue.Empty):
+            waiting_lines.get(timeout=0.5)
+        small.stdin.write("x")
+        small.stdin.flush()
+        assert small.wait(timeout=30) == 0, small.stderr.read()
+        int(waiting_lines.get(timeout=30))
+        # The small successor starts while the two xdist workers remain alive.
+        assert parallel.poll() is None
+        (tmp_path / "release").touch()
+        assert parallel.wait(timeout=30) == 0, parallel.stderr.read()
+    finally:
+        (tmp_path / "release").touch()
+        for proc in (small, parallel, waiting):
+            if proc is not None:
+                _stop(proc)

@@ -32,8 +32,8 @@ COM serialization (the single SolidWorks STA seat) is enforced at RUNTIME by a
 cross-process file lock (``_com_seat`` / ``filelock``), NOT by fake ``task_dep``
 edges: every COM subprocess acquires the machine-global seat lock before it drives
 SolidWorks and releases it after, so at most one COM task touches the seat at a
-time even under ``doit -n N``. Local ``check:*`` subprocesses take a separate
-host-wide admission lock; remote leaves remain concurrent. The graph carries only
+time even under ``doit -n N``. Local ``check:*`` subprocesses share a separate
+host-wide CPU-worker budget; remote leaves remain concurrent. The graph carries only
 REAL dependency edges (an assembly's file_dep on its parts, verify/export on the
 built ``.SLDASM``, release on export+verify+preflight), so the DAG reads true and a
 COM failure no longer skips unrelated downstream COM tasks as a spine side effect.
@@ -46,7 +46,7 @@ Install (this repo is a uv project -- pyproject.toml + uv.lock at the root)::
 Run through uv (SolidWorks already open for the COM tasks)::
 
     uv run python -m doit                       # = `build`: every part + assembly + every gate
-    uv run python -m doit -n 4                  # local seat only: parallel cache restores; checks share one host slot
+    uv run python -m doit -n 4                  # local seat only: cache restores/checks parallel within the host CPU budget
     uv run python build.py --verbosity warning  # concise console output; farm: no -n (build.py keeps 8 leaves in flight)
 
     uv run python -m doit build_bare            # quick: parts + assemblies only, no gates
@@ -3400,12 +3400,12 @@ def _executed_closure(cmd: list[str]) -> set[str]:
 
 
 def task_check():
-    """SolidWorks-FREE checks -- host-serialized independently of remote leaves.
+    """SolidWorks-FREE checks -- host-budgeted independently of remote leaves.
 
     ``check:math`` / ``check:config`` wrap ``verify.py --suite ...`` (verify.py
     runs those two without connecting to SolidWorks); ``check:graph`` /
     ``check:nameplate`` / ``check:recipe`` wrap the pure-python unit tests via
-    pytest. None takes the COM seat lock; each takes the local-check lock.
+    pytest. None takes the COM seat lock; each reserves local CPU-worker slots.
     """
     import _process_plans
 
@@ -3936,8 +3936,8 @@ def task_check():
                 # Fixed explicit inventory: skip repeated parent-directory
                 # virtualenv-marker probes, not general discovery exclusions.
                 "--collect-in-virtualenv",
-                # Only one local gate executes per host. Keep the recipe's
-                # internal worker limit; remote leaves use a separate budget.
+                # Request up to eight workers; local admission reduces this
+                # to available host CPU slots. Remote leaves have their own budget.
                 # Steal individual tests to avoid a dominant-file tail.
                 "-n",
                 "8",

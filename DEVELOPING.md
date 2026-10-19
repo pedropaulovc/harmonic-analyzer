@@ -134,29 +134,38 @@ In one ordered, unchanged 291-file, serial (`-n 0`) collect-only pair, baseline
 collection took **75.1735279 s** versus **38.6164179 s** with the flag; the
 **11,513 node-ID multisets were identical**. This is collection-only evidence,
 not a recipe execution or whole-build speedup measurement.
-Local offline `check:*` gates share one host-wide execution slot across doit
-processes, worktrees, and farm snapshots. `_local_check.py` acquires
-`%PROGRAMDATA%/harmonic-analyzer/local-check.lock` before importing the check's
-entry point and holds it in the process executing the check. A dead submitter
-therefore cannot release a still-running check's slot. The OS releases the
-lock when its owner exits, including a crash. Never delete the lock file to
-unblock a queue.
+Local offline `check:*` gates share a host-wide CPU-worker budget across doit
+processes, worktrees, and farm snapshots: `round(logical CPUs × 0.8)`, minimum
+one. On amet's 16 logical CPUs that allows 13 workers, not one gate at a time.
+Single-process checks cost one slot. A recipe requests up to eight; another
+recipe can use the remaining five concurrently. Admission rewrites pytest's
+`-n`/`--numprocesses` argument to the number actually granted, including
+`auto`/`logical` requests. Worker counts stay fixed for that suite's lifetime.
+This is a concurrency target, not a hard CPU-utilization cap: I/O waits,
+subprocesses inside tests, and unrelated applications affect measured usage.
 
-`check:recipe` retains eight internal pytest workers; other offline checks
-remain serial internally. Remote farm leaves and cached machinist reviews do
-not take this lock. Doit still owns dependency checks and success stamps.
-The `local.check.wait` span measures admission latency; the release log's
-`held_s` measures execution. The runner leaves the check's top-level telemetry
-context unchanged. Info-level logs report admission, release, and a wait every
-30 seconds. There is no queue deadline and no retry of a failed check.
+`_local_check.py` uses `%PROGRAMDATA%/harmonic-analyzer/local-check.lock` for
+brief allocation and adjacent numbered slot locks for execution. A check
+holds its own slots before importing its entry point. A dead submitter cannot
+release a still-running check's capacity; the OS releases slots when the check
+exits, including a crash. No partial allocation waits for more slots, so
+competing suites cannot deadlock. Never delete lock files to unblock a queue.
 
-`HARMONIC_LOCAL_CHECK_LOCK` overrides the path for isolated tests. All production
-submitters on a host must use the same path. Direct `pytest` invocations bypass
-admission; use the wrapper when running a full suite alongside builds:
-`uv run python cad/scripts/_local_check.py check:manual -m pytest ...`.
-Nested pytest/xdist children belong to their enclosing admitted check and must
-not acquire admission again. Older snapshots lack this guard: resume paused
-launches only from commits containing it.
+Remote farm leaves and cached machinist reviews use separate budgets. Doit
+still owns dependency checks and success stamps. The `local.check.wait` span
+measures admission latency; logs record requested/granted workers, host
+capacity, and execution `held_s`. Top-level telemetry context is unchanged.
+Waits log every 30 seconds, with no queue deadline or failed-check retry.
+
+`HARMONIC_LOCAL_CHECK_LOCK` selects the lock namespace and
+`HARMONIC_LOCAL_CHECK_CPU_SLOTS` overrides capacity (a positive integer).
+Tests use isolated namespaces and small capacities. Production submitters
+must agree on both settings and use this admission version. Older snapshots
+do not participate correctly; resume paused launches from updated commits.
+Direct pytest bypasses admission; use
+`uv run python cad/scripts/_local_check.py check:manual -m pytest ...` for
+manual suites alongside builds. Nested pytest/xdist children belong to the
+enclosing check and must not acquire admission again.
 
 Work stealing rebalances individual tests instead of pinning the dominant
 recipe-test file to one worker. Each worker still pays collection costs, and
