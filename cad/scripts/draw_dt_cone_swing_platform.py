@@ -75,7 +75,6 @@ from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
-from _preferences import _preference_id
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
@@ -1658,9 +1657,10 @@ def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
 
 def _add_profile_virtual_sharps(adapter: Any, view: Any) -> None:
     """Mark all four rounded-away 16/8/37/24 width endpoints, not just 37."""
-    preference = _preference_id(adapter, "swDetailingVirtualSharpStyle")
-    if preference is None:
-        raise RuntimeError("installed swconst lacks swDetailingVirtualSharpStyle")
+    # r20: vendored sldworks.tlb wrappers do not populate win32com's swconst
+    # globals, and adapter.constants is a small legacy map. Read the installed
+    # swconst.tlb enum metadata through the established SDK resolver instead.
+    preference = _sw_type_info.constant("swDetailingVirtualSharpStyle")
     extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
     if not extension.SetUserPreferenceInteger(preference, 0, 3):
         raise RuntimeError("cannot set document virtual sharp witness style")

@@ -2119,15 +2119,14 @@ def test_all_four_virtual_width_endpoints_require_native_document_witness_style(
     ordinal = 9876  # fake SDK-provided id, never an implementation ordinal
     calls = []
     monkeypatch.setattr(drawing, "_early_bound", lambda item, _kind: item)
-    monkeypatch.setattr(
-        drawing,
-        "_preference_id",
-        lambda _adapter, name: (
-            (None if failure == "sdk" else ordinal)
-            if name == "swDetailingVirtualSharpStyle"
-            else None
-        ),
-    )
+
+    def constant(name):
+        assert name == "swDetailingVirtualSharpStyle"
+        if failure == "sdk":
+            raise RuntimeError("SolidWorks named constant unavailable")
+        return ordinal
+
+    monkeypatch.setattr(drawing._sw_type_info, "constant", constant)
     extension = types.SimpleNamespace(
         SetUserPreferenceInteger=lambda key, scope, style: (
             calls.append((key, scope, style)) or failure != "set"
@@ -2152,3 +2151,70 @@ def test_all_four_virtual_width_endpoints_require_native_document_witness_style(
         drawing._add_profile_virtual_sharps(adapter, view)
         assert calls == [(ordinal, 0, 3)]
         assert marked == [(view, index) for index in range(4)]
+
+
+def test_virtual_sharp_preference_reads_sdk_metadata_with_real_adapter_constant_shape(
+    monkeypatch,
+):
+    """r20: sldworks wrapper loading does not populate swconst globals.
+
+    Exercise the real SDK resolver's typelib enumeration, not a prefilled
+    win32com constant or a fabricated adapter preference entry.
+    """
+    import _preferences
+
+    name = "swDetailingVirtualSharpStyle"
+    sdk_ordinal = 9876  # fake TYPELIB metadata value, not a production fallback
+    path = Path("installed-sdk") / "swconst.tlb"
+    loads = []
+    writes = []
+    marks = []
+    info = types.SimpleNamespace(
+        GetTypeAttr=lambda: types.SimpleNamespace(cVars=1),
+        GetVarDesc=lambda index: (index, sdk_ordinal),
+        GetNames=lambda _memid: (name,),
+    )
+    typelib = types.SimpleNamespace(
+        GetTypeInfoCount=lambda: 1,
+        GetTypeInfoType=lambda _index: 0,
+        GetTypeInfo=lambda _index: info,
+    )
+    pythoncom = types.SimpleNamespace(
+        TKIND_ENUM=0,
+        LoadTypeLib=lambda actual_path: loads.append(actual_path) or typelib,
+    )
+    client = types.SimpleNamespace(constants=types.SimpleNamespace())
+    monkeypatch.setitem(sys.modules, "pythoncom", pythoncom)
+    monkeypatch.setitem(sys.modules, "win32com", types.SimpleNamespace(client=client))
+    monkeypatch.setitem(sys.modules, "win32com.client", client)
+    sdk = drawing._sw_type_info
+    monkeypatch.setattr(sdk, "PYWIN32_AVAILABLE", True)
+    monkeypatch.setattr(sdk, "_constants", None)
+
+    def find_library(filename):
+        assert filename == "swconst.tlb"
+        return path
+
+    monkeypatch.setattr(sdk, "_find_aux_tlb", find_library)
+    extension = types.SimpleNamespace(
+        SetUserPreferenceInteger=lambda key, scope, value: (
+            writes.append((key, scope, value)) or True
+        ),
+        GetUserPreferenceInteger=lambda _key, _scope: 3,
+    )
+    adapter = types.SimpleNamespace(
+        # Same legacy-table shape as PyWin32Adapter: no general SDK enum map.
+        constants={"swDocDRAWING": 3, "swSketchAcceptNumericInput": 372},
+        currentModel=types.SimpleNamespace(Extension=extension),
+    )
+    assert _preferences._preference_id(adapter, name) is None  # r20 positive control
+    monkeypatch.setattr(drawing, "_early_bound", lambda item, _kind: item)
+    monkeypatch.setattr(
+        drawing,
+        "_insert_profile_virtual_sharp",
+        lambda _adapter, _view, index: marks.append(index),
+    )
+    drawing._add_profile_virtual_sharps(adapter, object())
+    assert loads == [str(path)]
+    assert writes == [(sdk_ordinal, 0, 3)]
+    assert marks == list(range(4))
