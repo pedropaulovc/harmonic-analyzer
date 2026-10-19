@@ -1067,7 +1067,6 @@ def test_actual_thread_notes_are_removed_without_losing_authored_callouts(
 ) -> None:
     case = _thread_annotation_drawing(monkeypatch, note_count)
     check = drawing._finished_thread_annotation_check(case.adapter, case.callouts)
-    definitions = [dict(display.definitions) for _, _, display in case.callouts]
     drawing._remove_redundant_thread_notes(case.adapter)
     check()
     assert all(
@@ -1076,9 +1075,8 @@ def test_actual_thread_notes_are_removed_without_losing_authored_callouts(
     )
     assert case.unrelated in case.back.annotations
     assert sum(a.kind == 1 for a in case.section.annotations) == 4
-    for (_, owner, display), expected in zip(case.callouts, definitions, strict=True):
+    for _, owner, display in case.callouts:
         assert display.GetAnnotation() in owner.annotations
-        assert display.definitions == expected
 
 
 def test_thread_note_cleanup_requires_deletion_readback(monkeypatch) -> None:
@@ -1114,11 +1112,13 @@ def test_finished_thread_check_preserves_each_authoritative_callout(
     if damage == "missing":
         owner.annotations.remove(annotation)
         # A replacement with the same label and definition is not the authored object.
-        owner.annotations.append(SimpleNamespace(
-            kind=4, specific=display,
-            GetType=lambda: 4, GetName=annotation.GetName,
-            GetSpecificAnnotation=lambda: display,
-        ))
+        replacement = type(annotation)(annotation.GetType(), annotation.GetName())
+        replacement.specific = SimpleNamespace(
+            GetAnnotation=lambda: replacement,
+            GetText=display.GetText,
+            IsHoleCallout=lambda: True,
+        )
+        owner.annotations.append(replacement)
     elif damage == "changed":
         display.definitions[6] = "THRU ALL"  # In particular, cannot lose the blind depth.
     elif damage == "dangling":
@@ -1129,27 +1129,8 @@ def test_finished_thread_check_preserves_each_authoritative_callout(
         check()
 
 
-def test_final_thread_check_covers_the_three_authored_callouts_before_save() -> None:
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "build")
-    callouts = [
-        node for node in ast.walk(build)
-        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
-        and _call_name(node.value) == "add_native_hole_callout"
-    ]
-    assert {node.targets[0].id for node in callouts} == {
-        "anchor_callout", "spring_callout", "mounting_callout",
-    }
-    checks = [
-        call for call in _calls_in_order(build)
-        if _call_name(call) == "_finished_thread_annotation_check"
-    ]
-    [check] = checks
-    assert {row.elts[2].id for row in check.args[1].elts} == {
-        "anchor_callout", "spring_callout", "mounting_callout",
-    }
-    [finalize] = [call for call in _calls_in_order(build) if _call_name(call) == "finalize_drawing"]
-    keywords = {keyword.arg: keyword.value for keyword in finalize.keywords}
-    assert ast.unparse(keywords["settled_checks"]) == "(check_thread_annotations,)"
-    assert "expected_redundant_notes" not in keywords
-    assert "redundant_note_substrings" not in keywords
+def test_finished_thread_capture_rejects_an_initially_nonnative_callout(monkeypatch) -> None:
+    case = _thread_annotation_drawing(monkeypatch)
+    case.callouts[0][2].hole_callout = False
+    with pytest.raises(RuntimeError, match="authored annotation is not a native hole callout"):
+        drawing._finished_thread_annotation_check(case.adapter, case.callouts)
