@@ -32,6 +32,7 @@ def part_closures() -> dict[str, frozenset[str]]:
     builders = part_scripts()
     assert builders, "canonical production part inventory is empty"
     assert len(builders) == len(set(builders)), "duplicate canonical part builders"
+    closures: dict[str, frozenset[str]] = {}
     for builder in builders:
         assert builder.is_file(), f"missing part builder: {builder}"
         assert builder.resolve().parent == SCRIPTS_DIR, builder
@@ -40,10 +41,10 @@ def part_closures() -> dict[str, frozenset[str]]:
         assert not builder.name.endswith("_assembly.py"), builder
         assert not builder.stem.startswith("build_motion_"), builder
         assert not builder.stem.endswith("_probe"), builder
-    return {
-        builder.stem: frozenset(Path(dep).stem for dep in module_deps_of(builder))
-        for builder in builders
-    }
+        deps = frozenset(Path(dep).stem for dep in module_deps_of(builder))
+        assert deps, f"empty production part dependency closure: {builder.stem}"
+        closures[builder.stem] = deps
+    return closures
 
 
 def assert_isolated(closures: dict[str, frozenset[str]], contract: Contract) -> None:
@@ -102,6 +103,34 @@ def assert_isolated(closures: dict[str, frozenset[str]], contract: Contract) -> 
     ids=["support-bar"],
 )
 def test_support_bar_isolation(part_closures, contract: Contract) -> None:
+    assert_isolated(part_closures, contract)
+
+
+@pytest.mark.parametrize(
+    "contract",
+    [
+        Contract(
+            selectors=("build_dt_crank*",),
+            anchors=(
+                "build_dt_crank_hub",
+                "build_dt_crank_pinion",
+                "build_dt_crankshaft",
+            ),
+            forbidden=("pd_transgear_*_spec", "paper_drive_*"),
+        ),
+        Contract(
+            selectors=("build_pd_*",),
+            anchors=("build_pd_transgear_removable",),
+            forbidden=(
+                "dt_crank_hub_geometry",
+                "dt_crank_pinion_spec",
+                "dt_crankshaft_spec",
+            ),
+        ),
+    ],
+    ids=["crank-to-paper-drive", "paper-drive-to-crank"],
+)
+def test_crank_transgear_isolation(part_closures, contract: Contract) -> None:
     assert_isolated(part_closures, contract)
 
 
