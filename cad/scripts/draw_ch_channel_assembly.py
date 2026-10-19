@@ -1,3 +1,4 @@
+# Isolated native timing baseline 2026-10-19; unchanged behavior, distinct recipe key.
 r"""Create the MHA-CH-000 channel assembly fitter package (four sheets).
 
 1. ASSEMBLED VIEWS: Front and Right at 1:5 and the full-detail isometric at

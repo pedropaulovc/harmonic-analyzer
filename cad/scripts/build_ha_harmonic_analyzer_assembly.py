@@ -1,3 +1,4 @@
+# Isolated native timing baseline 2026-10-19; unchanged behavior, distinct recipe key.
 r"""Reproduction script: ha-harmonic-analyzer.SLDASM (top level, M6.5).
 
 The complete machine: the seven machine subassemblies plus the parked

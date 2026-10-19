@@ -1,3 +1,4 @@
+# Isolated native timing baseline 2026-10-19; unchanged behavior, distinct recipe key.
 r"""Reproduction script: channel subassembly (book ch. 13-17; 20 channels).
 
 The complete 20-channel motion chain between the drive train and the

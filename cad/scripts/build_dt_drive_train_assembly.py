@@ -1,3 +1,4 @@
+# Isolated native timing baseline 2026-10-19; unchanged behavior, distinct recipe key.
 r"""Reproduction script: drive-train subassembly (book ch. 11-13, 30).
 
 The complete drive train in machine coordinates (assembly origin = base
