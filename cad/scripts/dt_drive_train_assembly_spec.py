@@ -187,6 +187,17 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         "cone",
         85.0,
     ),
+    # The cone gears then slide on toward the tip, leaving MHA-DT-007 alone on
+    # the MHA-DT-004 collar: unexploded, its balloon and the cone gear's met on
+    # the stack's first disc (r15, 20261018T215310765Z, balloons 35 and 36).
+    # 6.9 of stub still stands past the tip gear; MHA-VN-016 goes with the
+    # gears, ending 6.7 short of the tip block.
+    ExplodeStep(
+        "cone gears slide toward the tip",
+        ("dt-cone-gear", "vn-cone-tip-collar"),
+        "cone",
+        12.0,
+    ),
     ExplodeStep("tip pinch screw lifts", ("vn-cone-tip-pinch-screw",), "y", 25.0),
     # MHA-VN-030 comes down out of the dropped plate's counterbore: 50 carries
     # its tip ~7 below the plate's underside after the plate's 30.
@@ -279,6 +290,11 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         -22.0,
     ),
     ExplodeStep("block screws lift", ("vn-slotted-screw",), "y", 30.0),
+    # In the iso, MHA-VN-020 stood 0.4 behind the back block's east MHA-VN-019
+    # shank (DtPinionLeverPin r2, 20261019T012255621Z, balloon 32): MHA-DT-024
+    # and its screw step east off the strap, the blade ~7 clear of the block's
+    # north-east corner in the view, then the screw lifts out of the foot.
+    ExplodeStep("spring steps east", ("dt-pinion-spring", "vn-foot-screw"), "x", -30.0),
     ExplodeStep("spring foot screw lifts", ("vn-foot-screw",), "y", 25.0),
     ExplodeStep("pinion lever", ("dt-pinion-lever", "dt-pinion-lever-pin"), "z", -40.0),
     # The MHA-DT-033 collar is pinned to the arbor, so it comes out with it.

@@ -622,6 +622,7 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     bank_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["cylinder-bank"]
     assert bank_anchors["dt-cylinder-end-disc"].instance == "dt-cylinder-end-disc-2"
     assert moved["spring foot screw lifts"] == ("vn-foot-screw-1",)
+    assert moved["spring steps east"] == ("dt-pinion-spring-1", "vn-foot-screw-1")
     assert moved["block screws lift"] == tuple(f"vn-slotted-screw-{i}" for i in range(1, 5))
     # The rig sheet's MHA-VN-019 balloon is pinned to the front block's west screw.
     rig_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["pinion-rig"]
@@ -1173,6 +1174,30 @@ def test_the_cone_rotor_withdraws_clear_of_the_post_and_the_tip_block() -> None:
     assert tip.distance_mm - rotor.distance_mm > tip_in_block
     # The adjuster and pinch screw are threaded into the block: they go with it.
     assert {"vn-cone-tip-adjuster", "vn-cone-tip-pinch-screw"} <= set(tip.stems)
+
+
+def test_the_cone_gears_slide_off_the_64t_gear_and_stay_on_the_stub() -> None:
+    """Unexploded, MHA-DT-007 read as the stack's first disc and balloons 35
+    and 36 met there (r15).  The gears and MHA-VN-016 slide on toward the tip
+    without it; the tip gear stays on the stub, the collar short of the block."""
+    import dt_cone_gear_shaft_spec as shaft
+
+    steps = {step.label: step for step in spec.EXPLODE_STEPS}
+    gears = steps["cone gears slide toward the tip"]
+    assert (gears.stems, gears.axis) == (("dt-cone-gear", "vn-cone-tip-collar"), "cone")
+    stub = shaft.T006_TIP_STATION - shaft.T006_NORTH_FACE_STATION
+    assert 0.0 < gears.distance_mm < stub
+    collar_end = (
+        shaft.TIP_COLLAR_END_STATION
+        + steps["tip collar slips off"].distance_mm
+        + gears.distance_mm
+    )
+    block_face = (
+        shaft.TIP_BLOCK_SOUTH_FACE_STATION
+        + steps["tip block slides off"].distance_mm
+        - steps["cone rotor withdraws"].distance_mm
+    )
+    assert collar_end < block_face
 
 
 def test_bank_fitup_limits_are_the_layout_bands() -> None:
