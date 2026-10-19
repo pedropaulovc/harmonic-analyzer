@@ -39,6 +39,7 @@ from _holes import _standard, _verify_tap_metadata
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from dt_vn_crank_hub_pin_native import read_hole_wizard_metadata
 from dt_vn_crank_hub_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -98,6 +99,9 @@ def _pull_thread_entry_edge(view: Any) -> Any:
 
 def _require_pull_thread_definition(definition: Any) -> None:
     """Validate actual feature data, including drill and thread termination."""
+    definition = read_hole_wizard_metadata(
+        definition, label="MHA-VN-029 saved pull thread"
+    )
     _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-VN-029 saved pull thread")
     # FastenerType2 reports -1 on this native #56 tap. Use the documented
     # saved-feature Type contract instead; do not accept an unknown type.

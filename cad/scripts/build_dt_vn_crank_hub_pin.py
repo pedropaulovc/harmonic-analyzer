@@ -35,6 +35,7 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from dt_vn_crank_hub_pin_native import read_hole_wizard_metadata
 from dt_vn_crank_hub_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -61,6 +62,9 @@ PULL_THREAD_ENTRY_NORMAL = (0.0, 0.0, -1.0)
 
 def _require_pull_thread_definition(definition: Any) -> None:
     """Prove the committed feature is the specified inch tap and #56 cut."""
+    definition = read_hole_wizard_metadata(
+        definition, label="MHA-VN-029 built pull thread"
+    )
     _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-VN-029 built pull thread")
     # FastenerType2 reports -1 on this native #56 tap. Use the documented
     # saved-feature Type contract instead; do not accept an unknown type.

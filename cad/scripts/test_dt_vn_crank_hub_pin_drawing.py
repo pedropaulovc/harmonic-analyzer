@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 import dt_crank_hub_geometry as geometry
+import dt_vn_crank_hub_pin_native as pin_native
 import dt_vn_crank_hub_pin_spec as pin_spec
 import draw_dt_vn_crank_hub_pin as drawing
 from _drawing_edges import ViewEdge, ViewEdges
@@ -254,6 +255,7 @@ def saved_pull_thread(
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     definition = SimpleNamespace(
         FastenerSize="#0-80",
+        FastenerType2=-1,  # Observed on worker 5; Type there was not recorded.
         Standard2=0,
         Type=33,  # swTapThru, not the generic initialization type swWzdTap=4
         EndCondition=1,
@@ -269,6 +271,119 @@ def saved_pull_thread(
         FeatureByName=lambda name: feature if name == "PullThread" else None
     )
     return model, definition
+
+
+def test_native_metadata_reader_logs_all_fields_and_reads_each_once(
+    saved_pull_thread: tuple[SimpleNamespace, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _model, definition = saved_pull_thread
+    seen = []
+    messages = []
+    warnings = []
+    events = []
+
+    def capture_warning(message, **attributes):
+        messages.append(message)
+        warnings.append(attributes)
+
+    monkeypatch.setattr(pin_native._telemetry, "warn", capture_warning)
+    monkeypatch.setattr(
+        pin_native._telemetry,
+        "event",
+        lambda name, **attributes: events.append((name, attributes)),
+    )
+
+    class ReadOnce:
+        def __getattr__(self, name: str) -> object:
+            seen.append(name)
+            return getattr(definition, name)
+
+    data = pin_native.read_hole_wizard_metadata(ReadOnce(), label="inch tap control")
+    assert vars(data) == vars(definition)
+    assert len(seen) == len(set(seen)) == len(vars(definition))
+    assert set(seen) == set(vars(definition))
+    assert len(messages) == 1
+    assert "inch tap control" in messages[0]
+    assert "drill in metres" in messages[0]
+    for member, value in vars(data).items():
+        assert f"{member!r}: {value!r}" in messages[0]
+    expected = {"label": "inch tap control", "drill_units": "m", **vars(data)}
+    assert warnings == [expected]
+    assert events == [("hole_wizard.native_metadata", expected)]
+
+
+def test_native_reader_logs_other_fields_before_reraising_property_failure(
+    saved_pull_thread: tuple[SimpleNamespace, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _model, definition = saved_pull_thread
+    read_error = RuntimeError("unavailable FastenerType2")
+    seen = []
+    messages = []
+    monkeypatch.setattr(
+        pin_native._telemetry,
+        "warn",
+        lambda message, **_fields: messages.append(message),
+    )
+
+    class PartialRead:
+        def __getattr__(self, name: str) -> object:
+            seen.append(name)
+            if name == "FastenerType2":
+                raise read_error
+            return getattr(definition, name)
+
+    with pytest.raises(RuntimeError) as caught:
+        pin_native.read_hole_wizard_metadata(PartialRead(), label="inch tap control")
+    assert caught.value is read_error
+    assert len(seen) == len(set(seen)) == len(vars(definition))
+    assert set(seen) == set(vars(definition))
+    assert len(messages) == 1
+    assert "RuntimeError: unavailable FastenerType2" in messages[0]
+    for member, value in vars(definition).items():
+        if member != "FastenerType2":
+            assert f"{member!r}: {value!r}" in messages[0]
+
+
+@pytest.mark.parametrize(
+    ("member", "value"),
+    [
+        ("Type", 4),
+        ("Standard2", 1),
+        ("FastenerSize", "#1-72"),
+        ("ThreadClass", "3B"),
+        ("ThruTapDrillDiameter", 0.001191),
+        ("EndCondition", 2),
+        ("ThreadEndCondition", 2),
+    ],
+)
+def test_native_tuple_is_logged_before_any_release_assertion(
+    saved_pull_thread: tuple[SimpleNamespace, SimpleNamespace],
+    monkeypatch: pytest.MonkeyPatch,
+    member: str,
+    value: object,
+) -> None:
+    import build_vn_crank_hub_pin as builder
+
+    _model, definition = saved_pull_thread
+    setattr(definition, member, value)
+    messages = []
+    monkeypatch.setattr(
+        pin_native._telemetry,
+        "warn",
+        lambda message, **_fields: messages.append(message),
+    )
+    for validator in (
+        builder._require_pull_thread_definition,
+        drawing._require_pull_thread_definition,
+    ):
+        messages.clear()
+        with pytest.raises(RuntimeError):
+            validator(definition)
+        assert len(messages) == 1
+        for field, actual in vars(definition).items():
+            assert f"{field!r}: {actual!r}" in messages[0]
 
 
 @pytest.mark.parametrize("native_type", [33, 34, 35, 36, 48, 49, 50, 51, 52, 53, 54, 55])
