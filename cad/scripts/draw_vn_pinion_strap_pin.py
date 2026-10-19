@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import argparse
 import sys
 from typing import Any
@@ -10,6 +11,8 @@ import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _supplier_pin_drawing import add_supplier_spring_pin_dimensions
+from vn_pinion_strap_pin_spec import SUPPLIER_REFERENCE
 
 
 SPEC = DRAWINGS_BY_NAME["vn_pinion_strap_pin"]
@@ -18,8 +21,19 @@ ITEM = "Ø1/16 x 1/2 SLOTTED SPRING PIN (Ø1.59 x 12.70); SLOT NOT SHOWN"
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    proofs: list[Callable[[], None]] = []
+
+    def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> None:
+        proofs.append(add_supplier_spring_pin_dimensions(adapter, views_by_orientation, SUPPLIER_REFERENCE))
+
+    def assert_supplier_dimensions() -> None:
+        if len(proofs) != 1:
+            raise RuntimeError("pinion strap pin supplier callback must run exactly once")
+        proofs[0]()
+
     return await build_purchased_fastener_drawing(
-        adapter, SPEC, item=ITEM
+        adapter, SPEC, item=ITEM, supplier_dimensions=supplier_dimensions,
+        settled_checks=(assert_supplier_dimensions,),
     )
 
 

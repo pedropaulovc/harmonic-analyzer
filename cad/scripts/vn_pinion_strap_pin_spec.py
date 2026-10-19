@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import math
 
+from _supplier_pin_data import SupplierPinReference
+
 from _fit_ream_slide import REAM_SLIDE
 from _fit_shaft_h import SHAFT_H
 from _printed_tolerance import printed_deviations
@@ -152,3 +154,20 @@ if PIN_WALL_ENGAGEMENT_WORST < PIN_WALL_ENGAGEMENT_FLOOR:
     raise AssertionError("a pin at the sub-flush limit barely grips the far strap wall")
 if PIN_DRIVE_SHARE_MAX > 2.0 * PIN_SUB_FLUSH_MAX:
     raise AssertionError("the widest foot cannot hold the shortest pin in the window")
+
+# Inspected McMaster engineering drawing, 2026-10-19. The .063 print is
+# three-place presentation of the exact installed 1/16 cylinder; the
+# supplier's hole range belongs to a separate MATING HOLE reference.
+SUPPLIER_REFERENCE = SupplierPinReference(
+    sku="98296A027",
+    units="in",
+    diameter_mm=PIN_DIA,
+    length_mm=PIN_LEN,
+    diameter_nominal=0.063,
+    diameter_precision=3,
+    length_precision=3,
+    wall_mm=WALL_T,
+    wall_precision=3,
+    application_hole_limits=(0.062, 0.065),
+    application_hole_precision=3,
+)

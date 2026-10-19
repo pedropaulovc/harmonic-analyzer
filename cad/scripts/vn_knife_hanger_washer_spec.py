@@ -34,6 +34,23 @@ OD_ID_RUNOUT_MAX = DIMS.od_id_runout_max
 BOTTOM_Y = 0.0
 TOP_Y = THICKNESS
 
+# Supplier engineering drawing inspected 2026-10-19. Display precision is
+# independent of the unchanged representative thickness and exact diameters.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260630/7FA79105/"
+    "96659A104_18-8%20Stainless%20Steel%20SAE%20WasherX.GIF"
+)
+SUPPLIER_UNITS = "in"
+DRAWING_REFERENCE_PRECISION = {
+    "supplier outer diameter": 3,
+    "supplier bore diameter": 3,
+    "supplier thickness": 3,
+}
+SUPPLIER_TOLERANCES = {
+    "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "limits"),
+}
+SUPPLIER_BORE_CALLOUT = "FOR No. 10 SCREW SIZE"
+
 
 def washer_volume() -> float:
     """Nominal annulus volume, mm^3."""

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import math
 
+from _supplier_pin_data import SupplierPinReference
+
 SKU = "93600A189"
 PART_NUMBER = "MHA-VN-056"
 PART_STEM = "vn-transgear-arm-plate-locating-pin"
@@ -71,3 +73,16 @@ def nominal_material_properties() -> dict[str, object]:
         "centre_of_mass_local_mm": (0.0, LENGTH / 2.0, 0.0),
         "model_scope": "nominal reference cylinder; catalogue chamfers remove material",
     }
+
+# Inspected McMaster engineering drawing, 2026-10-19. This is supplier
+# nominal-and-band reference information, not a measured specimen size.
+SUPPLIER_REFERENCE = SupplierPinReference(
+    sku=SKU,
+    units="mm",
+    diameter_mm=DIA,
+    length_mm=LENGTH,
+    diameter_nominal=2.000,
+    diameter_precision=3,
+    length_precision=0,
+    diameter_band=(0.002, 0.008),
+)

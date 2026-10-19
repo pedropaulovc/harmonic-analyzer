@@ -28,6 +28,23 @@ MODEL_THICKNESS = 0.64  # the catalogue range's nominal, 0.025 in, to 0.01
 if not THICKNESS_MIN < MODEL_THICKNESS < THICKNESS_MAX:
     raise AssertionError("92916A250 modelled thickness is outside the catalogue range")
 
+# Engineering drawing inspected 2026-10-19. Its thickness is a limit stack;
+# deviations around MODEL_THICKNESS print those limits without changing the solid.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260702/F5440C8D/"
+    "92916A250_Brass%20WasherX.GIF"
+)
+SUPPLIER_UNITS = "in"
+DRAWING_REFERENCE_PRECISION = {
+    "supplier outer diameter": 3,
+    "supplier bore diameter": 3,
+    "supplier thickness": 3,
+}
+SUPPLIER_TOLERANCES = {
+    "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "limits"),
+}
+SUPPLIER_BORE_CALLOUT = "FOR No. 4 SCREW SIZE"
+
 
 def washer_volume() -> float:
     """The modelled solid, mm^3."""

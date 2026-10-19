@@ -4,8 +4,9 @@ A 1/8 x 7/8 alloy-steel dowel (``vn_transgear_latch_pin_spec``), pressed chamfer
 end first into the transgear arm's end face and standing PROUD out of it,
 where the latch hook's Ø5.4 hole drops over it.  The stock recipe
 ``diagnostics/diag_build_98381A474.py`` models the 1/8 series' chamfered and
-rounded ends (read off the 98381A473 vendor model); the SKU is not yet read
-live, so its standalone run is catalog-only.
+rounded ends (read off the 98381A473 vendor model). The supplier engineering
+drawing inspected 2026-10-19 confirms this SKU's size and diameter band,
+but leaves those end forms undimensioned; its standalone run is catalog-only.
 
 Frame: pin axis +Y, pressed end face at y = 0 (the Top Plane), lead end at
 y = LENGTH.  The axis is published as ``ScrewAxis`` (Front ∩ Right), the

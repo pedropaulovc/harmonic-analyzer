@@ -15,11 +15,12 @@ deeper hole, passes it (``transgear_hanger_joints``).
 
 Catalogue: 1/8 x 7/8 alloy-steel dowel, Round x Chamfer ends; the size row
 and the family's diameter band are ``_mcmaster_98381a474``'s.
-[INFERENCE] The SKU is the 7/8 length of the 1/8 series, not yet read live,
-and its end forms are the 98381A473 vendor model's (harvested 2026-09-30):
+The supplier engineering drawing inspected 2026-10-19 confirms diameter
+0.1250 in +0.0003/+0.0001 and length 0.875 in. End-form geometry remains
+the 98381A473 vendor model's series reference (harvested 2026-09-30):
 the chamfered end a flat Ø2.921 face and a cone 16 deg to the axis, 0.443
 long; the round end an R0.406 tangent to the diameter down to a flat Ø2.362
-face.  Vendor check pending.
+face. The newly inspected drawing does not dimension those end forms.
 
 Part frame: axis local +Y through the origin; the pressed (chamfered) end
 face at y = 0, the rounded lead end at y = LENGTH.  The Front and Right
@@ -29,6 +30,8 @@ at PRESS_DEPTH inside the arm's end face.
 """
 
 from __future__ import annotations
+
+from _supplier_pin_data import SupplierPinReference
 
 from _mcmaster_98381a474 import (
     DIA_BAND_IN,
@@ -87,3 +90,16 @@ if PRESS_ENGAGEMENT_D < PRESS_ENGAGEMENT_MIN_D:
         f"latch pin grips {PRESS_ENGAGEMENT_D:.2f} D in the arm, under"
         f" {PRESS_ENGAGEMENT_MIN_D} D"
     )
+
+# Source sizes/band confirmed from the actual McMaster engineering drawing
+# on 2026-10-19. The solid and its existing installation controls stay exact.
+SUPPLIER_REFERENCE = SupplierPinReference(
+    sku=SKU,
+    units="in",
+    diameter_mm=DIA,
+    length_mm=LENGTH,
+    diameter_nominal=0.1250,
+    diameter_precision=4,
+    length_precision=3,
+    diameter_band=(0.0001, 0.0003),
+)

@@ -33,6 +33,11 @@ THICKNESS_MAX = 0.098 * MM_PER_IN  # 2.4892
 BORE_DIA = THREAD_MAJOR_MM[THREAD]  # 2.845
 ACROSS_CORNERS = ACROSS_FLATS / math.cos(math.radians(30.0))  # 7.332
 
+# The inspected supplier drawing spells the exact 3/32 in model height as
+# 0.094 in. Presentation must never round THICKNESS or the solid geometry.
+DRAWING_REFERENCE_PRECISION = {"AcrossFlats": 0, "Height": 3}
+SUPPLIER_FRACTION_DENOMINATOR = 4
+
 
 def nut_volume() -> float:
     """The modelled solid, mm^3: hexagonal prism less the bore."""

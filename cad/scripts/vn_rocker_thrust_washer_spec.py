@@ -40,6 +40,25 @@ THICKNESS_MAX = DIMS.thickness_max
 BOTTOM_Z = 0.0
 TOP_Z = THICKNESS
 
+# The engineering drawing uses .250 +.011/-.000 for the bore. The solid
+# deliberately represents its midpoint; native equivalent limits retain the
+# exact supplier acceptance without rounding or changing that geometry.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260108/095CF7B5/"
+    "3088A429_Carbon%20Steel%20ShimX.GIF"
+)
+SUPPLIER_UNITS = "in"
+DRAWING_REFERENCE_PRECISION = {
+    "supplier outer diameter": 3,
+    "supplier bore diameter": 3,
+    "supplier thickness": 3,
+}
+SUPPLIER_TOLERANCES = {
+    "supplier outer diameter": (OD_MIN, OD_MAX, "symmetric"),
+    "supplier bore diameter": (ID_MIN, ID_MAX, "limits"),
+    "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "symmetric"),
+}
+
 
 def washer_volume() -> float:
     """The modelled annulus, mm^3."""
