@@ -6,6 +6,7 @@ without re-keying ordinary part annotations.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, replace
 from itertools import product
 import math
@@ -13,7 +14,7 @@ from pathlib import Path
 import re
 import sys
 import time
-from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
+from typing import Any, Callable, Iterable, Iterator, Literal, Mapping, Sequence
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -607,6 +608,55 @@ def _view_component_leaves(
     return tuple(leaves)
 
 
+@dataclass(frozen=True)
+class _DrawingComponentVisibility:
+    """One call's view-only visibility plan; the synthetic root is not a parent."""
+
+    drawing_component: Any
+    name: str
+    parent: int | None
+    before: Literal["shown", "hidden"]
+    expected: Literal["shown", "hidden"]
+    kind: Literal["leaf", "ancestor"]
+    stems: frozenset[str]
+
+
+@contextlib.contextmanager
+def _suspend_drawing_view_updates(view: Any, *, label: str) -> Iterator[None]:
+    """Suspend only a visibility-write batch and restore even a failed setter."""
+    previous = bool(view.DisableAutoUpdate)
+    _telemetry.trace.get_current_span().set_attribute(
+        "auto_update_before", "disabled" if previous else "enabled"
+    )
+    primary: BaseException | None = None
+    try:
+        if not previous:
+            view.DisableAutoUpdate = True
+            if not bool(view.DisableAutoUpdate):
+                raise RuntimeError(
+                    f"{label}: disabling drawing view updates did not persist"
+                )
+        yield
+    except BaseException as exc:
+        primary = exc
+        raise
+    finally:
+        try:
+            if not previous or bool(view.DisableAutoUpdate) != previous:
+                view.DisableAutoUpdate = previous
+            if bool(view.DisableAutoUpdate) != previous:
+                raise RuntimeError(
+                    f"{label}: restoring drawing view DisableAutoUpdate={previous} "
+                    "did not persist"
+                )
+        except BaseException as restore:
+            if primary is None:
+                raise
+            primary.add_note(
+                f"restoring drawing view automatic updates also failed: {restore!r}"
+            )
+
+
 @_telemetry.traced("drawing.isolate_components", label_param="label")
 def isolate_drawing_view_components(
     adapter: Any,
@@ -615,35 +665,129 @@ def isolate_drawing_view_components(
     visible_stems: frozenset[str],
     label: str,
 ) -> None:
-    """Show only requested top-level component families in one drawing view."""
+    """Isolate leaf families in this view without changing hidden ancestors.
+
+    ``Visible`` is a per-view component flag, not proof that a leaf beneath a
+    hidden sub-assembly is drawn. Preserve every ancestor flag and verify both
+    the leaf flags and their effective visibility after the required rebuild.
+    """
     if not visible_stems:
         raise ValueError(f"{label}: visible component set must not be empty")
-    root = adapter._attempt(lambda: view.RootDrawingComponent2(False), default=None)
-    if root is None:
-        raise RuntimeError(f"{label}: drawing view has no root component")
-
-    pending = list(_drawing_component_children(root))
+    view = _early_bound(view, "IView")
+    nodes: list[_DrawingComponentVisibility] = []
+    changes: list[_DrawingComponentVisibility] = []
     found: set[str] = set()
-    enumerated: list[str] = []
-    while pending:
-        drawing_component = pending.pop()
-        children = _drawing_component_children(drawing_component)
-        pending.extend(children)
-        enumerated.append(str(drawing_component.Name or ""))
-        if children:
-            continue
-        matched = _drawing_component_stems(adapter, drawing_component, visible_stems)
-        drawing_component.Visible = bool(matched)
-        found.update(matched)
-
-    missing = sorted(visible_stems - found)
-    if missing:
-        raise RuntimeError(
-            f"{label}: component families not found: {missing}; "
-            f"enumerated={sorted(enumerated)}"
+    drawable: set[str] = set()
+    leaves = shown = 0
+    with _telemetry.span("drawing.isolate_components.enumerate", label=label):
+        root = view.RootDrawingComponent2(False)
+        if root is None:
+            raise RuntimeError(f"{label}: drawing view has no root component")
+        # The API's synthetic root has no effective visibility flag. Only real
+        # sub-assembly ancestors participate in whether a leaf can be drawn.
+        pending: list[tuple[Any, int | None, bool]] = [
+            (child, None, True) for child in _drawing_component_children(root)
+        ]
+        while pending:
+            drawing_component, parent, ancestors_shown = pending.pop()
+            children = _drawing_component_children(drawing_component)
+            before = bool(drawing_component.Visible)
+            if children:
+                name = str(drawing_component.Name or "")
+                matched = frozenset()
+            else:
+                leaf = _component_leaf(adapter, drawing_component)
+                name = leaf.name
+                matched = frozenset(_stems_matching(leaf.identities, visible_stems))
+                leaves += 1
+                shown += bool(matched)
+                found.update(matched)
+                if ancestors_shown:
+                    drawable.update(matched)
+            expected = before if children else bool(matched)
+            node = _DrawingComponentVisibility(
+                drawing_component=drawing_component,
+                name=name,
+                parent=parent,
+                before="shown" if before else "hidden",
+                expected="shown" if expected else "hidden",
+                kind="ancestor" if children else "leaf",
+                stems=matched,
+            )
+            index = len(nodes)
+            nodes.append(node)
+            pending.extend(
+                (child, index, ancestors_shown and before) for child in children
+            )
+            if node.kind == "leaf" and node.before != node.expected:
+                changes.append(node)
+        counts = dict(
+            nodes=len(nodes),
+            leaves=leaves,
+            changed=len(changes),
+            unchanged=leaves - len(changes),
+            shown=shown,
+            hidden=leaves - shown,
         )
+        _span_scan_attrs(**counts)
+        missing = sorted(visible_stems - found)
+        if missing:
+            raise RuntimeError(
+                f"{label}: component families not found: {missing}; "
+                f"enumerated={sorted(node.name for node in nodes)}"
+            )
+        blocked = sorted(visible_stems - drawable)
+        if blocked:
+            raise RuntimeError(
+                f"{label}: component families have only hidden ancestors: {blocked}"
+            )
+    _span_scan_attrs(**counts)
+
+    with _telemetry.span("drawing.isolate_components.visibility", label=label, **counts):
+        if changes:
+            with _suspend_drawing_view_updates(view, label=label):
+                for node in changes:
+                    node.drawing_component.Visible = node.expected == "shown"
+
     rebuild_drawing(adapter, label="isolate_drawing_view_components")
-    _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
+    with _telemetry.span("drawing.isolate_components.readback", label=label):
+        effective: list[bool] = []
+        actually_shown: set[str] = set()
+        mismatches: list[str] = []
+        actual_shown = effective_shown = 0
+        for node in nodes:
+            actual = bool(node.drawing_component.Visible)
+            expected = node.expected == "shown"
+            effective.append(
+                actual and (node.parent is None or effective[node.parent])
+            )
+            if actual != expected:
+                mismatches.append(
+                    f"{node.kind} {node.name!r}: Visible={actual}, expected={expected}"
+                )
+            if node.kind == "leaf":
+                actual_shown += actual
+                effective_shown += effective[-1]
+                if effective[-1]:
+                    actually_shown.update(node.stems)
+        _span_scan_attrs(
+            leaves=leaves,
+            shown=actual_shown,
+            hidden=leaves - actual_shown,
+            effectively_shown=effective_shown,
+            families_shown=len(actually_shown),
+            mismatches=len(mismatches),
+        )
+        not_shown = sorted(visible_stems - actually_shown)
+        if mismatches or not_shown:
+            raise RuntimeError(
+                f"{label}: component visibility readback failed: {mismatches}; "
+                f"component families not shown: {not_shown}"
+            )
+    _span_scan_attrs(
+        effectively_shown=effective_shown, families_shown=len(actually_shown)
+    )
+    _telemetry.success(f"{label}: isolated {', '.join(sorted(actually_shown))}")
 
 
 def _natural_sort_key(name: str) -> tuple[tuple[int, int | str], ...]:
