@@ -18,7 +18,6 @@ from __future__ import annotations
 from dt_crank_handle_butt_cup_spec import (
     POCKET_CLEARANCE,
     POCKET_DIA_MAX,
-    POCKET_FLOOR_CORNER_R_MAX,
     POCKET_WALL_MIN,
 )
 
@@ -42,15 +41,9 @@ POCKET_FIT_CALLOUT = "\n".join(
         f"<MOD-DIAM>{POCKET_DIA_MAX:.1f} MAX",
     )
 )
-# The depth band's reason, and the floor corner the head bears against
-# (rule 16: say the largest radius acceptable; r1 findings 4 and 5).
-POCKET_DEPTH_CALLOUT = "\n".join(
-    (
-        f"KEEPS {SCREW_NUMBER} HEAD",
-        "BELOW FACE;",
-        f"FLOOR CORNER R{POCKET_FLOOR_CORNER_R_MAX:.1f} MAX",
-    )
-)
+# The depth band's mate and reason (r1 finding 4).  The floor corner's
+# separate model-owned radial MAX dimension controls head seating (finding 5).
+POCKET_DEPTH_CALLOUT = "\n".join((f"KEEPS {SCREW_NUMBER} HEAD", "BELOW FACE"))
 # The bottom chamfer's band reason: it clears the rounded corner of the
 # MHA-DT-008 counterbore floor, so the cup seats with its face flush.
 BODY_CHAMFER_CALLOUT = "\n".join(

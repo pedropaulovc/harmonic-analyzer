@@ -50,6 +50,8 @@ from dt_crank_handle_ferrule_spec import (
     SEAT_MOUTH_CHAMFER_MAX as FERRULE_SEAT_MOUTH_CHAMFER_MAX,
     SEAT_MOUTH_CHAMFER_MIN as FERRULE_SEAT_MOUTH_CHAMFER_MIN,
     TENON_GLUE_LINE as FERRULE_TENON_GLUE_LINE,
+    TENON_GLUE_LENGTH_FLOOR,
+    TENON_LENGTH,
 )
 
 # 2026-09-02 user re-read: overall 58 from the arm face; the ferrule and the
@@ -75,7 +77,6 @@ TENON_GLUE_LINE = FERRULE_TENON_GLUE_LINE
 TENON_DIA = FERRULE_BORE_DIA - sum(TENON_GLUE_LINE) / 2.0
 # Short enough that the longest tenon stops short of the shortest ferrule's
 # arm face, so the oak never bears on the arm.
-TENON_LENGTH = 5.0
 TENON_X0 = SHOULDER_X - TENON_LENGTH
 TENON_R = TENON_DIA / 2.0
 # Owner ruling A on #1661, drawing-guidelines.md rule 16 (design for the
@@ -249,8 +250,8 @@ for _ok, _what in (
         "the longest tenon reaches the shortest ferrule's arm face",
     ),
     (
-        TENON_GLUE_LENGTH_MIN >= 3.5,
-        "the shortest tenon leaves under 3.5 of unbroken glue length",
+        TENON_GLUE_LENGTH_MIN >= TENON_GLUE_LENGTH_FLOOR,
+        f"the shortest tenon leaves under {TENON_GLUE_LENGTH_FLOOR:g} of unbroken glue length",
     ),
     (
         FERRULE_SEAT_RADIAL_MIN >= 0.5,

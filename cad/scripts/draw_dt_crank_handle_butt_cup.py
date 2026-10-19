@@ -18,6 +18,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -28,6 +29,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -64,8 +66,13 @@ from dt_crank_handle_butt_cup_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     OVERALL_LENGTH,
+    POCKET_DEPTH,
+    POCKET_FLOOR_CORNER_R_BAND,
+    POCKET_FLOOR_CORNER_R_MAX,
+    POCKET_FLOOR_CORNER_R_TOL_TYPE,
     REFERENCE_DIMENSIONS,
 )
+from _fit_deviations import deviations
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -115,15 +122,22 @@ FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 #   (31.5 mm apart) with ~2.9 mm each side, 4 mm right of the face.
 # - BodyDia, two lines ~63 mm wide, sits between the floor-hole extension
 #   lines (21 mm apart) with ~6 mm each side, ~6.7 mm left of the floor end.
-# - PocketDepth, four lines ~58 mm wide, cannot fit between its extension
+# - PocketDepth, three lines ~58 mm wide, cannot fit between its extension
 #   lines (27.5 mm), so it stands outside them right of the face, its top
-#   ~3.6 mm under the pocket-diameter extension line.
+#   clear of the pocket-diameter extension line.
 # - BodyChamfer (the profile sketch is the section's upper half, so the
 #   chamfer is the floor end's top corner, 2 mm on paper), four lines ~50 mm
 #   wide, stands outside its extension lines left of the floor end: line at
 #   y ~0.1905 (part top 0.1855, overall's line 0.1947 right of x 0.2047),
 #   block x ~0.150-0.200 and y ~0.190-0.211, 15 mm over the floor-hole
 #   extension line (0.1755) and 4 mm left of the floor end.
+# - PocketFloorRadius is ONLY the native R0.1 MAX, no prose or parentheses.
+#   The 20261019T031202 baseline gives the overall line y194.7219 and its
+#   witnesses x194.75/235.25; translate x +10 for this section.  A conservative
+#   22 x 3.6 mm text box at (217.75,190.75) is x206.75..228.75,
+#   y187.95..191.55: 2 mm from the left witness, 2.45 above the silhouette,
+#   and 3.17 below the overall line.  Its ray is within the actual quarter
+#   arc (90..180 degrees), so no fictitious arc-extension attachment is needed.
 SECTION_KEEP = {
     "PocketDia": (FACE_X + 0.039, SECTION_CENTER[1] + 0.001),
     "BodyDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.038, SECTION_CENTER[1] + 0.001),
@@ -139,6 +153,10 @@ SECTION_KEEP = {
         SECTION_CENTER[0] - HALF_LENGTH - 0.0295,
         SECTION_CENTER[1] + BODY_R + 0.0161,
     ),
+    "PocketFloorRadius": (
+        FACE_X - POCKET_DEPTH * _S,
+        SECTION_CENTER[1] + BODY_R + 0.00525,
+    ),
 }
 DIMENSION_CALLOUTS = {
     "BodyChamfer": BODY_CHAMFER_CALLOUT,
@@ -149,6 +167,52 @@ DIMENSION_CALLOUTS = {
 }
 CUT_START = (END_CENTER[0], END_CENTER[1] - BODY_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + BODY_R + 0.006)
+
+
+def _dress_pocket_floor_radius(annotation: Any) -> None:
+    """Keep the imported model radius controlling, MAX, and on its real arc."""
+    label = "MHA-DT-035 PocketFloorRadius"
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric) or int(display.Type2) != 5:  # swRadialDimension
+        raise RuntimeError(f"{label}: imported as a non-radial dimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    lower, upper = deviations(POCKET_FLOOR_CORNER_R_BAND)
+    if (
+        not math.isclose(
+            float(dimension.SystemValue),
+            POCKET_FLOOR_CORNER_R_MAX / 1000.0,
+            abs_tol=1e-9,
+        )
+        or int(tolerance.Type) != POCKET_FLOOR_CORNER_R_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: imported radius lost its model MAX limit")
+    if (
+        bool(dimension.IsReference())
+        or bool(display.ShowParenthesis)
+        or any(
+            "(" in str(display.GetText(index) or "")
+            or ")" in str(display.GetText(index) or "")
+            for index in (1, 2)
+        )
+    ):
+        raise RuntimeError(f"{label}: imported as a reference")
+    display.ArcExtensionLineOrOppositeSide = False
+    display.ArrowSide = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+    display.SolidLeader = False
+    if (
+        bool(display.ArcExtensionLineOrOppositeSide)
+        or int(display.ArrowSide) != 1
+        or bool(display.SolidLeader)
+    ):
+        raise RuntimeError(f"{label}: radial leader style did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -221,6 +285,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_reference_dimension(
             adapter, by_name[name], label=f"MHA-DT-035 {name}", diameter=True
         )
+    _dress_pocket_floor_radius(by_name["PocketFloorRadius"])
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the cup end view")
     create_section_axis_centerline(

@@ -23,6 +23,10 @@ PURE DATA, no SolidWorks/COM imports.
 
 from __future__ import annotations
 
+import math
+
+from dt_crank_hub_geometry import EDGE_BREAK_MAX_MM, GENERAL_1PL_TOL_MM
+
 # The ring leaves the bench at the 9/16-in rod's own OD and is skimmed to the
 # Ø12.5 grip contour with the MHA-DT-008 shoulder after the epoxy cures (user
 # ruling 2026-10-01, local review of 47cb8a46b: glued on, the ring can sit
@@ -43,16 +47,37 @@ INSTALLED_CONFIG = "INSTALLED"
 BORE_DIA = 7.7
 BORE_DIA_TOL = 0.10
 LENGTH = 7.0
-# The bore's mouth at the seat face, broken 45 degrees (owner ruling A on
-# #1661): the MHA-DT-008 tenon root is rounded up to R0.3, so the leg's lower
-# limit clears it and the ring seats on the shoulder.  The upper limit is
-# MHA-DT-008's: the chamfer eats into the tenon's bonded length, and 0.4 keeps
-# it at 3.5, half this ring's length (asserted in dt_crank_handle_spec).
-# Modelled at the middle; printed as SEAT_MOUTH_CHAMFER +/- its tolerance.
-SEAT_MOUTH_CHAMFER = 0.35
-SEAT_MOUTH_CHAMFER_TOL = 0.05
-SEAT_MOUTH_CHAMFER_MIN = round(SEAT_MOUTH_CHAMFER - SEAT_MOUTH_CHAMFER_TOL, 6)
-SEAT_MOUTH_CHAMFER_MAX = round(SEAT_MOUTH_CHAMFER + SEAT_MOUTH_CHAMFER_TOL, 6)
+# Joint dimensions shared with MHA-DT-008, whose spec imports this one.
+# The shortest tenon must retain this much uninterrupted bonded length.
+TENON_LENGTH = 5.0
+TENON_GLUE_LENGTH_FLOOR = 3.5
+# Owner ruling A on #1661: the seat-mouth chamfer clears the R0.3 tenon root.
+# Its maximum is the glue-length budget rounded DOWN to a one-place limit:
+# 5.0 - 0.8 - 0.25 - 3.5 = 0.45, hence 0.4.  Derive it here rather than
+# tightening it independently of the handle's joint-length requirement.
+SEAT_MOUTH_CHAMFER_MIN = 0.3
+SEAT_MOUTH_CHAMFER_MAX = (
+    math.floor(
+        round(
+            (
+                TENON_LENGTH
+                - GENERAL_1PL_TOL_MM
+                - EDGE_BREAK_MAX_MM
+                - TENON_GLUE_LENGTH_FLOOR
+            )
+            * 10.0,
+            6,
+        )
+    )
+    / 10.0
+)
+if SEAT_MOUTH_CHAMFER_MAX < SEAT_MOUTH_CHAMFER_MIN:
+    raise AssertionError("MHA-DT-034 glue-length budget cannot clear the tenon root")
+# Modelled at the midpoint; the native band prints both functional limits.
+SEAT_MOUTH_CHAMFER = round((SEAT_MOUTH_CHAMFER_MIN + SEAT_MOUTH_CHAMFER_MAX) / 2.0, 6)
+SEAT_MOUTH_CHAMFER_TOL = round(
+    (SEAT_MOUTH_CHAMFER_MAX - SEAT_MOUTH_CHAMFER_MIN) / 2.0, 6
+)
 
 # Brass wall, on radius, as made: the smallest stock over the largest bore.
 # The skimmed wall, with the ring off-centre, is MHA-DT-008's check.

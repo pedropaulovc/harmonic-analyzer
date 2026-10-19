@@ -56,6 +56,8 @@ POCKET_DIA_MAX = 6.5
 # the tightest radial clearance, so a sharp-edged, centred head still seats on
 # the flat (rule 16: the largest radius acceptable; MHA-DT-035 r1 finding 5).
 POCKET_FLOOR_CORNER_R_MAX = POCKET_CLEARANCE[0] / 2.0
+POCKET_FLOOR_CORNER_R_BAND = (0.0, -POCKET_FLOOR_CORNER_R_MAX)  # (upper, lower)
+POCKET_FLOOR_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: nominal is the limit
 # The floor hole passes the MHA-DT-032 shoulder: a drilled hole under the title
 # block's DRILLED HOLES band (+0.10/0).
 FLOOR_HOLE_DIA = 4.2
@@ -100,6 +102,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PocketDia",
         "FloorHoleDia",
         "BodyChamfer",
+        "PocketFloorRadius",
     },
 }
 # Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the body diameter and the
@@ -113,6 +116,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BodyChamfer": 1,
         "PocketDia": 1,
         "FloorHoleDia": 1,
+        "PocketFloorRadius": 1,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {

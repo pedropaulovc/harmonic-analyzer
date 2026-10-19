@@ -184,6 +184,24 @@ def test_seat_mouth_chamfer_clears_the_tenon_root() -> None:
     assert 'location="below"' in drawing_source
 
 
+def test_seat_mouth_maximum_comes_from_the_glue_length_budget() -> None:
+    import dt_crank_handle_spec as handle
+    from dt_crank_hub_geometry import EDGE_BREAK_MAX_MM, GENERAL_1PL_TOL_MM
+
+    budget = (
+        handle.TENON_LENGTH
+        - GENERAL_1PL_TOL_MM
+        - EDGE_BREAK_MAX_MM
+        - spec.TENON_GLUE_LENGTH_FLOOR
+    )
+    assert budget == pytest.approx(0.45)
+    assert spec.SEAT_MOUTH_CHAMFER_MAX == pytest.approx(0.4)
+    assert spec.SEAT_MOUTH_CHAMFER_MAX <= budget
+    assert spec.SEAT_MOUTH_CHAMFER_MAX + 0.1 > budget
+    assert handle.TENON_GLUE_LENGTH_MIN == pytest.approx(3.55)
+    assert handle.TENON_GLUE_LENGTH_MIN >= spec.TENON_GLUE_LENGTH_FLOOR
+
+
 def test_registry_row_is_the_title_block_source() -> None:
     row = _config.parts("dt-crank-handle-ferrule")
     assert row["number"] == "MHA-DT-034"

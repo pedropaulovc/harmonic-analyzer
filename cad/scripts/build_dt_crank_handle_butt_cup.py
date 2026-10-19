@@ -25,6 +25,7 @@ import sys
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -39,9 +40,10 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _fit_deviations import deviations
 from dt_crank_handle_butt_cup_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
 from dt_crank_handle_butt_cup_spec import (
     BODY_CHAMFER,
@@ -55,6 +57,9 @@ from dt_crank_handle_butt_cup_spec import (
     POCKET_DEPTH,
     POCKET_DEPTH_TOL,
     POCKET_DIA,
+    POCKET_FLOOR_CORNER_R_BAND,
+    POCKET_FLOOR_CORNER_R_MAX,
+    POCKET_FLOOR_CORNER_R_TOL_TYPE,
 )
 
 PART_NAME = "dt-crank-handle-butt-cup"
@@ -63,11 +68,50 @@ MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 BODY_R = BODY_DIA / 2.0
 POCKET_R = POCKET_DIA / 2.0
 FLOOR_HOLE_R = FLOOR_HOLE_DIA / 2.0
+# The concave pocket corner fills the square outside a quarter disk.  Pappus:
+# its area is r²(1-pi/4), and its first radial moment about R-r is r³/6.
+V_POCKET_FLOOR_CORNER = 2.0 * math.pi * (
+    (POCKET_R - POCKET_FLOOR_CORNER_R_MAX)
+    * POCKET_FLOOR_CORNER_R_MAX**2
+    * (1.0 - math.pi / 4.0)
+    + POCKET_FLOOR_CORNER_R_MAX**3 / 6.0
+)
 V_CUP = math.pi * (
     BODY_R**2 * OVERALL_LENGTH
     - POCKET_R**2 * POCKET_DEPTH
     - FLOOR_HOLE_R**2 * (OVERALL_LENGTH - POCKET_DEPTH)
-) - math.pi * BODY_CHAMFER**2 * (BODY_R - BODY_CHAMFER / 3.0)
+) - math.pi * BODY_CHAMFER**2 * (BODY_R - BODY_CHAMFER / 3.0) + V_POCKET_FLOOR_CORNER
+
+
+def _pocket_floor_max_limit(adapter) -> None:
+    """Model the corner at its upper limit and print a native radial MAX."""
+    lower, upper = deviations(POCKET_FLOOR_CORNER_R_BAND)
+    _, dimension = _named_dimension(adapter, "CupProfile", "PocketFloorRadius")
+    label = "PocketFloorRadius@CupProfile"
+    if not math.isclose(
+        float(dimension.SystemValue),
+        POCKET_FLOOR_CORNER_R_MAX / 1000.0,
+        abs_tol=1e-9,
+    ):
+        raise RuntimeError(f"{label}: nominal is not the pocket corner's maximum")
+    # Equation-owned dimensions can read DrivenState 1; IsReference is the
+    # native controlling/reference distinction (draw_pd_platen_rack).
+    if bool(dimension.IsReference()):
+        raise RuntimeError(f"{label}: radius is a reference model dimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = POCKET_FLOOR_CORNER_R_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: MAX-limit tolerance values rejected")
+    if (
+        int(tolerance.Type) != POCKET_FLOOR_CORNER_R_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -83,6 +127,7 @@ async def build(adapter) -> dict[str, str]:
         ("PocketDepth", POCKET_DEPTH),
         ("FloorHoleDia", FLOOR_HOLE_DIA),
         ("BodyChamfer", BODY_CHAMFER),
+        ("PocketFloorRadius", POCKET_FLOOR_CORNER_R_MAX),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -90,8 +135,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Stepped section on the Front plane, revolved about the X axis: pocket
     # mouth -> face -> body OD -> bottom chamfer -> bottom -> floor hole ->
-    # floor top -> pocket wall.  Nothing touches the axis: the floor hole
-    # passes the screw shoulder.
+    # flat floor -> tangent quarter arc -> pocket wall.  The round adds
+    # material inside the pocket, within the head's minimum radial clearance.
     profile = SketchDims()
     check("create_sketch cup profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -99,6 +144,10 @@ async def build(adapter) -> dict[str, str]:
         "cup axis centerline",
         await adapter.add_centerline(0.0, 0.0, -OVERALL_LENGTH, 0.0),
     )
+    corner_r = POCKET_FLOOR_CORNER_R_MAX
+    floor_round_center = (-POCKET_DEPTH + corner_r, POCKET_R - corner_r)
+    floor_round_start = (-POCKET_DEPTH + corner_r, POCKET_R)
+    floor_round_end = (-POCKET_DEPTH, POCKET_R - corner_r)
     points = [
         (0.0, POCKET_R),
         (0.0, BODY_R),
@@ -106,14 +155,27 @@ async def build(adapter) -> dict[str, str]:
         (-OVERALL_LENGTH, BODY_R - BODY_CHAMFER),
         (-OVERALL_LENGTH, FLOOR_HOLE_R),
         (-POCKET_DEPTH, FLOOR_HOLE_R),
-        (-POCKET_DEPTH, POCKET_R),
+        floor_round_end,
     ]
-    lines = await add_line_chain(adapter, points)
+    lines = await add_line_chain(adapter, points, close=False)
+    # add_arc is CCW: wall -> floor is the 90-degree arc, not the 270-degree
+    # complement.  Its traversal is opposite the surrounding line chain.
+    floor_round = check(
+        "pocket floor round",
+        await adapter.add_arc(
+            *floor_round_center, *floor_round_start, *floor_round_end
+        ),
+    )
+    (pocket_wall,) = await add_line_chain(
+        adapter, [floor_round_start, points[0]], close=False
+    )
     set_sketch_direct_db(adapter, False)
-    face, body_od, chamfer, bottom, floor_hole, floor_top, pocket_wall = lines
+    face, body_od, chamfer, bottom, floor_hole, floor_top = lines
     check("axis horizontal", await adapter.add_sketch_constraint(axis, None, "horizontal"))
-    for index, line in enumerate(lines):
-        (u0, v0), (u1, v1) = points[index], points[(index + 1) % len(points)]
+    for line, (u0, v0), (u1, v1) in (
+        *zip(lines, points, points[1:], strict=False),
+        (pocket_wall, floor_round_start, points[0]),
+    ):
         if u0 != u1 and v0 != v1:
             continue  # the 45-degree bottom chamfer; its two legs define it
         relation = "horizontal" if v0 == v1 else "vertical"
@@ -144,11 +206,15 @@ async def build(adapter) -> dict[str, str]:
         "cup overall length",
     )
     profile.record("OverallLength", '"OverallLength"')
-    # Every axial size reads from the face (MHA-DT-035 re-review); the
-    # floor is what the overall leaves.
-    check(
-        "pocket depth",
-        await adapter.add_sketch_dimension(pocket_wall, None, "linear", POCKET_DEPTH),
+    # Face to FLAT floor, not the wall segment: the tangent round shortens
+    # that line by its radius without changing the head's recess.
+    await dimension_between(
+        adapter,
+        f"{face}.start",
+        f"{floor_top}.start",
+        "horizontal_distance",
+        POCKET_DEPTH,
+        "cup pocket depth to the floor",
     )
     profile.record("PocketDepth", '"PocketDepth"')
     # The bottom chamfer's axial leg, and its radial leg equal to it by
@@ -180,6 +246,21 @@ async def build(adapter) -> dict[str, str]:
             adapter, axis, line, (u_mid, radius + 3.0), name
         )
         profile.record(name, f'"{name}"')
+    check(
+        "pocket floor radius",
+        await adapter.add_sketch_dimension(
+            floor_round, None, "radial", POCKET_FLOOR_CORNER_R_MAX
+        ),
+    )
+    profile.record("PocketFloorRadius", '"PocketFloorRadius"')
+    for first, second, label in (
+        (floor_top, floor_round, "pocket floor"),
+        (floor_round, pocket_wall, "pocket wall"),
+    ):
+        check(
+            f"floor round tangent to {label}",
+            await adapter.add_sketch_constraint(first, second, "tangent"),
+        )
     await ensure_fully_defined(adapter, "cup profile sketch")
     check("exit_sketch cup profile", await adapter.exit_sketch())
     name_last_feature(adapter, "CupProfile")
@@ -217,6 +298,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _pocket_floor_max_limit(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,
