@@ -908,6 +908,19 @@ Wizard holes: the bracket's collar end view arrived with one mark on the bore
 read 1 → 2 the same way in #913). Add none; prove the one on the axis
 (`draw_mg_magnifying_bracket._prove_collar_centre_mark`).
 
+The census is not a manufacturing count when the same recipe emits different
+automatic labels. Summing lever already recorded view-dependent labels in
+#1591. The PR1709 native leaf (`5c5d3e3b3672`, 2026-10-19) imported four
+cosmetic threads into H-H and put all four on `TAP-THREAD-SECTION`, but H-H
+emitted no `Tapped Hole` note: the package had seven notes, not the eight
+another build had emitted. That is not evidence of a missing tapped hole.
+Following top frame's per-view cleanup, summing lever deletes every actual
+automatic label and reads back each view to reject survivors. Its final
+settled check rejects any late label and requires the three original native
+callouts (counter-anchor, spring-hole pattern, blind bracket taps) to remain
+in their authored views, non-dangling, with unchanged native definitions.
+The shared finalizer's exact-count contract is unchanged for other recipes.
+
 **q. A standard view placed as-is is not necessarily in projection.**
 Don't: assume `*Right` beside `*Top` makes a third-angle set, or add a mirrored
 `*Back` view to carry a face's hole dimensions. `mg-magnifying-bracket` retry09

@@ -961,3 +961,195 @@ def test_tap_section_cuts_the_outer_tap_through_the_rib_into_solid_plate() -> No
     body = body[: body.index("\ndef ")]
     assert body.index("_thin_visible_layer(adapter)") < body.index("CreateLine")
     assert "segment.Layer = TAP_THREAD_LAYER" in body
+
+
+def _thread_annotation_drawing(monkeypatch, note_count: int = 7):
+    """PR1709's two sheets: four H-H threads even when its auto-label is absent."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.name)
+    state = SimpleNamespace(selected=None, deletes=True, selectable=True)
+
+    class Annotation:
+        def __init__(self, kind, name, specific=None):
+            self.kind, self.name, self.specific = kind, name, specific
+            self.dangling = False
+
+        def GetType(self):
+            return self.kind
+
+        def GetName(self):
+            return self.name
+
+        def GetSpecificAnnotation(self):
+            return self.specific
+
+        def Select2(self, _append, _mark):
+            state.selected = self
+            return state.selectable
+
+        def IsDangling(self):
+            return self.dangling
+
+    def note(text, name):
+        return Annotation(6, name, SimpleNamespace(GetText=lambda: text))
+
+    def view(name):
+        annotations = []
+        return SimpleNamespace(
+            name=name, annotations=annotations,
+            GetAnnotations=lambda: tuple(annotations),
+            GetNotes=lambda: tuple(a.specific for a in annotations if a.kind == 6),
+        )
+
+    top, iso, section, back = [view(name) for name in ("plan", "iso", "H-H", "back")]
+    section.annotations.extend(Annotation(1, f"thread{index}") for index in range(4))
+    for index in range(note_count):
+        owner = (top, top, top, back, iso, iso, iso, section)[index % 8]
+        owner.annotations.append(note(
+            "#2-56 tapped hole" if owner is section else "#6-32 Tapped Hole",
+            f"label{index}",
+        ))
+    unrelated = note("VIEW F", "view label")
+    back.annotations.append(unrelated)
+    callouts = []
+    for label, owner, prefix in (
+        ("anchor tap", top, "#10-24"),
+        ("spring-hole pattern", top, "20X #6-32"),
+        ("two blind bracket mounting taps", back, "#2-56"),
+    ):
+        # Native definitions retain associative fields, including the blind depths.
+        definitions = {
+            5: f"{prefix} <hw-threadsize>",
+            6: "<hw-threaddepth> MIN" if owner is back else "THRU",
+            7: "<hw-tapdrldepth>" if owner is back else "",
+            8: "",
+        }
+        annotation = Annotation(4, label)
+        display = SimpleNamespace(
+            definitions=definitions, hole_callout=True,
+            GetAnnotation=lambda annotation=annotation: annotation,
+            GetText=lambda part, definitions=definitions: definitions[part],
+        )
+        display.IsHoleCallout = lambda display=display: display.hole_callout
+        annotation.specific = display
+        owner.annotations.append(annotation)
+        callouts.append((label, owner, display))
+    views = {
+        drawing.SHEET_NAMES[0]: (top, iso, section),
+        drawing.SHEET_NAMES[1]: (back,),
+    }
+    all_views = (top, iso, section, back)
+
+    def delete():
+        if state.deletes:
+            for owner in all_views:
+                if state.selected in owner.annotations:
+                    owner.annotations.remove(state.selected)
+
+    document = SimpleNamespace(
+        Sheet=lambda name: SimpleNamespace(GetViews=lambda: views[name]),
+        ClearSelection2=lambda _all: None,
+        EditDelete=delete,
+    )
+    adapter = SimpleNamespace(
+        currentModel=document,
+        swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
+    )
+    return SimpleNamespace(
+        adapter=adapter, state=state, callouts=tuple(callouts), views=all_views,
+        section=section, back=back, unrelated=unrelated, note=note,
+    )
+
+
+@pytest.mark.parametrize("note_count", [0, 7, 8, 9])
+def test_actual_thread_notes_are_removed_without_losing_authored_callouts(
+    monkeypatch, note_count,
+) -> None:
+    case = _thread_annotation_drawing(monkeypatch, note_count)
+    check = drawing._finished_thread_annotation_check(case.adapter, case.callouts)
+    definitions = [dict(display.definitions) for _, _, display in case.callouts]
+    drawing._remove_redundant_thread_notes(case.adapter)
+    check()
+    assert all(
+        annotation.kind != 6 or annotation is case.unrelated
+        for view in case.views for annotation in view.annotations
+    )
+    assert case.unrelated in case.back.annotations
+    assert sum(a.kind == 1 for a in case.section.annotations) == 4
+    for (_, owner, display), expected in zip(case.callouts, definitions, strict=True):
+        assert display.GetAnnotation() in owner.annotations
+        assert display.definitions == expected
+
+
+def test_thread_note_cleanup_requires_deletion_readback(monkeypatch) -> None:
+    case = _thread_annotation_drawing(monkeypatch)
+    case.state.deletes = False  # EditDelete returns void even when nothing disappeared.
+    with pytest.raises(RuntimeError, match="notes survived deletion"):
+        drawing._remove_redundant_thread_notes(case.adapter)
+    case.state.selectable = False
+    with pytest.raises(RuntimeError, match="failed to select"):
+        drawing._remove_redundant_thread_notes(case.adapter)
+
+
+def test_finished_thread_check_rejects_a_late_automatic_note(monkeypatch) -> None:
+    case = _thread_annotation_drawing(monkeypatch)
+    check = drawing._finished_thread_annotation_check(case.adapter, case.callouts)
+    drawing._remove_redundant_thread_notes(case.adapter)
+    check()
+    case.section.annotations.append(case.note("#2-56 TAPPED HOLE", "late H-H label"))
+    with pytest.raises(RuntimeError, match="redundant tapped-hole note remains"):
+        check()
+
+
+@pytest.mark.parametrize("index", [0, 1, 2])
+@pytest.mark.parametrize("damage", ["missing", "changed", "dangling", "not_native"])
+def test_finished_thread_check_preserves_each_authoritative_callout(
+    monkeypatch, index, damage,
+) -> None:
+    case = _thread_annotation_drawing(monkeypatch)
+    check = drawing._finished_thread_annotation_check(case.adapter, case.callouts)
+    drawing._remove_redundant_thread_notes(case.adapter)
+    _, owner, display = case.callouts[index]
+    annotation = display.GetAnnotation()
+    if damage == "missing":
+        owner.annotations.remove(annotation)
+        # A replacement with the same label and definition is not the authored object.
+        owner.annotations.append(SimpleNamespace(
+            kind=4, specific=display,
+            GetType=lambda: 4, GetName=annotation.GetName,
+            GetSpecificAnnotation=lambda: display,
+        ))
+    elif damage == "changed":
+        display.definitions[6] = "THRU ALL"  # In particular, cannot lose the blind depth.
+    elif damage == "dangling":
+        annotation.dangling = True
+    else:
+        display.hole_callout = False
+    with pytest.raises(RuntimeError, match="authored native hole callout"):
+        check()
+
+
+def test_final_thread_check_covers_the_three_authored_callouts_before_save() -> None:
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "build")
+    callouts = [
+        node for node in ast.walk(build)
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
+        and _call_name(node.value) == "add_native_hole_callout"
+    ]
+    assert {node.targets[0].id for node in callouts} == {
+        "anchor_callout", "spring_callout", "mounting_callout",
+    }
+    checks = [
+        call for call in _calls_in_order(build)
+        if _call_name(call) == "_finished_thread_annotation_check"
+    ]
+    [check] = checks
+    assert {row.elts[2].id for row in check.args[1].elts} == {
+        "anchor_callout", "spring_callout", "mounting_callout",
+    }
+    [finalize] = [call for call in _calls_in_order(build) if _call_name(call) == "finalize_drawing"]
+    keywords = {keyword.arg: keyword.value for keyword in finalize.keywords}
+    assert ast.unparse(keywords["settled_checks"]) == "(check_thread_annotations,)"
+    assert "expected_redundant_notes" not in keywords
+    assert "redundant_note_substrings" not in keywords
