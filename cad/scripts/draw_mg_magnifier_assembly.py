@@ -1339,48 +1339,55 @@ def _assert_bom_clears_reference_field(table: Any) -> None:
         bom_bottom_mm=round(bottom * 1000.0, 2),
     )
     if bottom < BOM_REFERENCE_FIELD[3] + 0.0025:
-        # Keep native width/height and full grown-row contents in the task log:
-        # failed farm leaves do not necessarily retain a drawing for inspection.
-        contents = _bom_cells(bound)
-        column_widths_mm = tuple(
-            round(float(bound.GetColumnWidth(column)) * 1000.0, 3)
-            for column in range(int(bound.ColumnCount))
-        )
-        row_heights_mm = tuple(round(height * 1000.0, 3) for height in row_heights)
-        _telemetry.info(
-            f"magnifier BOM columns mm {column_widths_mm!r}; "
-            f"rows mm {row_heights_mm!r}",
-            bom_column_widths_mm=column_widths_mm,
-            bom_row_heights_mm=row_heights_mm,
-        )
-        for row, height in enumerate(row_heights):
-            if height <= BOM_ROW_HEIGHT + 1e-6:
-                continue
-            text_heights_mm = tuple(
-                round(
-                    float(
-                        _early_bound(
-                            bound.GetCellTextFormat(row, column), "ITextFormat"
-                        ).CharHeight
-                    )
-                    * 1000.0,
-                    3,
-                )
-                for column in range(int(bound.ColumnCount))
-            )
-            _telemetry.info(
-                f"magnifier BOM row {row}: {height * 1000.0:.3f} mm, "
-                f"text heights mm {text_heights_mm!r}, cells {contents[row]!r}",
-                bom_row=row,
-                bom_row_height_mm=height * 1000.0,
-                bom_cell_text_heights_mm=text_heights_mm,
-                bom_cells=contents[row],
-            )
-        raise RuntimeError(
+        failure = RuntimeError(
             f"magnifier BOM bottom {bottom * 1000.0:.1f} mm runs into the reference "
             f"field at {BOM_REFERENCE_FIELD[3] * 1000.0:.1f} mm "
             f"(planned {BOM_BOTTOM * 1000.0:.1f} mm)"
         )
+        # Keep native width/height and full grown-row contents in the task log:
+        # failed farm leaves do not necessarily retain a drawing for inspection.
+        try:
+            contents = _bom_cells(bound)
+            column_widths_mm = tuple(
+                round(float(bound.GetColumnWidth(column)) * 1000.0, 3)
+                for column in range(int(bound.ColumnCount))
+            )
+            row_heights_mm = tuple(round(height * 1000.0, 3) for height in row_heights)
+            _telemetry.info(
+                f"magnifier BOM columns mm {column_widths_mm!r}; "
+                f"rows mm {row_heights_mm!r}",
+                bom_column_widths_mm=column_widths_mm,
+                bom_row_heights_mm=row_heights_mm,
+            )
+            for row, height in enumerate(row_heights):
+                if height <= BOM_ROW_HEIGHT + 1e-6:
+                    continue
+                text_heights_mm = tuple(
+                    round(
+                        float(
+                            _early_bound(
+                                bound.GetCellTextFormat(row, column), "ITextFormat"
+                            ).CharHeight
+                        )
+                        * 1000.0,
+                        3,
+                    )
+                    for column in range(int(bound.ColumnCount))
+                )
+                _telemetry.info(
+                    f"magnifier BOM row {row}: {height * 1000.0:.3f} mm, "
+                    f"text heights mm {text_heights_mm!r}, cells {contents[row]!r}",
+                    bom_row=row,
+                    bom_row_height_mm=height * 1000.0,
+                    bom_cell_text_heights_mm=text_heights_mm,
+                    bom_cells=contents[row],
+                )
+        except Exception as exc:
+            try:
+                _telemetry.warn(f"magnifier BOM failure diagnostics unavailable: {exc}")
+            except Exception:
+                pass  # Diagnostic logging must not replace the measured overrun.
+        raise failure
 
 
 def _hide_bom_reference(adapter: Any, view: Any, table: Any, items: dict[str, str]) -> None:

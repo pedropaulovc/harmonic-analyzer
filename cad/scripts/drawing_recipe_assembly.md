@@ -97,13 +97,17 @@ twelve characters but left the Number column at 32 mm. The native failure at
 132 mm plan. That aggregate measurement does not identify the wrapped rows.
 The wider Number column addresses the newly longer input without taking room
 from descriptions or SKUs. It makes the table 186 mm wide at X229.1..415.1,
-still 17.1 mm right of the wheel-view field; no view field or scale changes.
+still 17.1 mm right of the unchanged wheel-view field. The BOM-reference field
+follows the table's left edge and widens by 16 mm; its scale-fitting ladder is
+unchanged, but may select a larger reference-view scale. Native readback and
+sheet inspection must establish the resulting scale and fit.
 
 Native acceptance still requires the BOM bottom at or above Y123.2 mm:
-the unchanged reference field ends at Y120.7 and requires 2.5 mm of air.
-The planned bottom remains Y130.7. A clearance failure logs persisted native
-column widths and row heights, plus complete cells and font heights for grown
-rows, before refusing. Inspect the regenerated four-page package for all 19
+the reference field's unchanged top is Y120.7 and requires 2.5 mm of air.
+The planned bottom remains Y130.7. A clearance failure attempts to log persisted
+native column widths and row heights, plus complete cells and font heights for
+grown rows; a diagnostic failure never replaces the measured-overrun error.
+Inspect the regenerated four-page package for all 19
 rows, full unbroken Numbers, readable descriptions/SKUs/quantities, unchanged
 reference-view handling and unobstructed balloons; the offline field-budget
 checks alone do not prove native text fit.
