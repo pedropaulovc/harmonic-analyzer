@@ -2,18 +2,23 @@ r"""Create the curated manufacturing drawing for MHA-DT-VN-59.
 
 The pin is a plain straight dowel with an extraction thread tapped through its
 axis from the flush outer end. Its two native dimensions define the part;
-the end view's associative Hole Wizard callout owns the thread identity.
+the end view's associative Hole Wizard callout owns the thread identity. The
+opened source's saved tap metadata and the rendered callout are read back
+before the drawing can be published.
 """
 
 from __future__ import annotations
 
 import argparse
+import math
+import re
 import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -28,6 +33,7 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _holes import _verify_tap_metadata
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -35,6 +41,7 @@ from dt_vn_crank_hub_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA,
+    PULL_THREAD_HOLE,
     PULL_THREAD_TAP_DRILL,
     REFERENCE_DIMENSIONS,
 )
@@ -70,11 +77,61 @@ THREAD_PICK = (FRONT_CENTER[0] + _TAP_RIM, FRONT_CENTER[1] + _TAP_RIM)
 THREAD_NOTE_XY = (FRONT_CENTER[0] + 0.027, FRONT_CENTER[1] + HALF_DIA + 0.016)
 
 
+def _require_pull_thread_definition(definition: Any) -> None:
+    """Validate actual feature data, including drill and thread termination."""
+    _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-VN-029 saved pull thread")
+    if str(definition.FastenerSize).strip() != PULL_THREAD_HOLE.size:
+        raise RuntimeError("MHA-VN-029 saved extraction thread is not M2x0.4")
+    if not math.isclose(
+        float(definition.ThruTapDrillDiameter) * 1000.0,
+        PULL_THREAD_TAP_DRILL,
+        rel_tol=0.0,
+        abs_tol=0.005,
+    ):
+        raise RuntimeError("MHA-VN-029 saved tap drill is not 1.6 mm")
+
+
+def _require_saved_pull_thread(model: Any) -> None:
+    """Read the feature from the SLDPRT opened by this drawing, not its recipe."""
+    feature = _early_bound(model, "IPartDoc").FeatureByName("PullThread")
+    if feature is None:
+        raise RuntimeError("MHA-VN-029 saved PullThread feature is missing")
+    feature = _early_bound(feature, "IFeature")
+    if str(feature.GetTypeName2()) != "HoleWzd":
+        raise RuntimeError("MHA-VN-029 saved PullThread is not a Hole Wizard feature")
+    definition = feature.GetDefinition()
+    if definition is None:
+        raise RuntimeError("MHA-VN-029 saved pull-thread definition is missing")
+    _require_pull_thread_definition(
+        _early_bound(definition, "IWizardHoleFeatureData2")
+    )
+
+
+def _require_pull_thread_callout(display: Any) -> None:
+    """Check rendered native text without replacing its associative variables."""
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    text = " ".join(
+        str(data.GetTextAtIndex(index)) for index in range(int(data.GetTextCount()))
+    )
+    normalized = "".join(text.upper().split()).replace("×", "X")
+    if (
+        re.search(re.escape(PULL_THREAD_HOLE.size.upper()) + r"(?![\d.])", normalized)
+        is None
+        or re.search(r"\bTHRU(?:\s+ALL)?\b", text, re.IGNORECASE) is None
+        or "<HOLE-DEPTH>" in normalized
+    ):
+        raise RuntimeError(
+            f"MHA-VN-029 native callout lost M2x0.4 through semantics: {text!r}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open crank-hub-pin source", await adapter.open_model(str(SOURCE)))
+    _require_saved_pull_thread(adapter.currentModel)
     read_required_properties(
         adapter.currentModel,
         (
@@ -132,13 +189,14 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.004),
         label="MHA-DT-VN-59 axis centerline",
     )
-    add_native_hole_callout(
+    thread_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=THREAD_PICK,
         callout_xy=THREAD_NOTE_XY,
         label="MHA-VN-029 pull thread callout",
     )
+    _require_pull_thread_callout(thread_callout)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.082)
     return await finalize_drawing(
         adapter,

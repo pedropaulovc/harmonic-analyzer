@@ -89,6 +89,9 @@ from dt_crank_arm_spec import (
     ARM_THICKNESS,
     AXIAL_PIN_DIA,
     AXIAL_PIN_X,
+    BORE_REAR_CHAMFER,
+    BORE_REAR_CHAMFER_DEVIATIONS,
+    BORE_REAR_CHAMFER_TOL_TYPE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
@@ -327,6 +330,25 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
     return matches[0]
 
 
+def _assert_chamfer_limits(annotation: Any) -> None:
+    """Verify the saved part's native limits after importing into the section."""
+    native = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if not math.isclose(
+        float(dimension.SystemValue) * 1000.0, BORE_REAR_CHAMFER, abs_tol=1e-7
+    ):
+        raise RuntimeError("imported bore-mouth chamfer changed its model leg")
+    lower, upper = BORE_REAR_CHAMFER_DEVIATIONS
+    if (
+        int(tolerance.Type) != BORE_REAR_CHAMFER_TOL_TYPE
+        or not math.isclose(float(tolerance.GetMinValue()) * 1000.0, lower, abs_tol=1e-9)
+        or not math.isclose(float(tolerance.GetMaxValue()) * 1000.0, upper, abs_tol=1e-9)
+    ):
+        raise RuntimeError("imported bore-mouth chamfer lost its native LIMIT band")
+
+
 def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
     return tuple(value / 1000.0 for value in point_mm)
 
@@ -521,6 +543,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="section A-A",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _assert_chamfer_limits(_named(adapter, section_annotations, "BoreRearChamferSize"))
     imported_annotations = [
         *front_annotations,
         *right_annotations,

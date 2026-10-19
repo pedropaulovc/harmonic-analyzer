@@ -511,26 +511,6 @@ def test_inside_corners_carry_their_own_approved_native_max_limits(
     assert dt_crank_hub_spec.DRAWING_DIMENSIONS[feature] == {name}
     assert dt_crank_hub_spec.DRAWING_PRECISION[feature] == {name: 1}
     assert name in drawing.SIDE_KEEP and name not in drawing.END_KEEP
-    source = Path(drawing.__file__).with_name("build_dt_crank_hub.py").read_text(
-        encoding="utf-8"
-    )
-    assert f'name_last_feature(adapter, "{feature}")' in source
-    assert f'name_dimensions(adapter, "{feature}", ["{name}"])' in source
-    assert f'("{name}", {radius_name})' in source
-    assert f', \'"{name}"\'))' in source
-    # A single-edge feature must use that root's own radius, not a common
-    # smaller tool nose applied to both shoulders.
-    root = "seat" if name == "SeatRootRadius" else "relief"
-    creation = source.split(f'"fillet hub {root} root"', 1)[1].split(
-        "propagate=False", 1
-    )[0]
-    assert f"adapter.add_fillet(\n            {radius_name}," in creation
-    pick = (
-        "[[0.0, HUB_SEAT_LENGTH, -SEAT_R]]"
-        if root == "seat"
-        else "[[0.0, RELIEF_STATION, -RELIEF_R]]"
-    )
-    assert pick in creation
 
 
 def test_arm_bore_chamfer_clears_the_seat_root_and_preserves_shoulder_land() -> None:

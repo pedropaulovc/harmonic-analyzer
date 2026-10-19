@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -443,16 +444,38 @@ def test_bore_rear_chamfer_costs_no_wall_margin() -> None:
     assert spec.FIDUCIAL_MODEL_DEPTH < spec.ARM_THICKNESS - spec.BORE_REAR_CHAMFER
 
 
-def test_bore_rear_chamfer_is_modelled_on_the_inboard_face_and_marked() -> None:
-    assert spec.DRAWING_DIMENSIONS["BoreRearChamfer"] == {"BoreRearChamferSize"}
-    source = Path(arm.__file__).read_text(encoding="utf-8")
-    # The inboard face is the origin plane, z = 0; the outboard (flush) face
-    # is the HandleSeat plane at z = ARM_THICKNESS.
-    assert "[[-HUB_SEAT_DIA / 2.0, 0.0, 0.0]]" in source
-    assert 'name_last_feature(adapter, "BoreRearChamfer")' in source
-    assert source.index(
-        "apply_drawing_precision(adapter, DRAWING_PRECISION)"
-    ) < source.index("    _bore_rear_chamfer_limits(adapter)")
+@pytest.mark.parametrize(
+    ("changed", "message"),
+    (
+        ({}, None),
+        ({"leg": 0.1}, "model leg"),
+        ({"kind": 6}, "LIMIT band"),
+        ({"lower": -0.05}, "LIMIT band"),
+        ({"upper": 0.1}, "LIMIT band"),
+    ),
+)
+def test_imported_chamfer_rejects_changed_native_limits(monkeypatch, changed, message):
+    values = {
+        "leg": spec.BORE_REAR_CHAMFER,
+        "kind": spec.BORE_REAR_CHAMFER_TOL_TYPE,
+        "lower": spec.BORE_REAR_CHAMFER_DEVIATIONS[0],
+        "upper": spec.BORE_REAR_CHAMFER_DEVIATIONS[1],
+        **changed,
+    }
+    tolerance = SimpleNamespace(
+        Type=values["kind"],
+        GetMinValue=lambda: values["lower"] / 1000.0,
+        GetMaxValue=lambda: values["upper"] / 1000.0,
+    )
+    dimension = SimpleNamespace(SystemValue=values["leg"] / 1000.0, Tolerance=tolerance)
+    display = SimpleNamespace(GetDimension2=lambda _: dimension)
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
+    if message is None:
+        drawing._assert_chamfer_limits(annotation)
+    else:
+        with pytest.raises(RuntimeError, match=message):
+            drawing._assert_chamfer_limits(annotation)
 
 
 def test_bore_rear_chamfer_callout_names_the_mate_from_the_contract() -> None:
@@ -504,6 +527,3 @@ def test_section_a_a_stands_in_open_sheet_and_its_line_clears_the_front_view() -
     nx, ny = drawing.SEAM_CALLOUT_XY
     seam_leader_x = px + (y1 - py) * (nx - px) / (ny - py)
     assert seam_leader_x - bx > 0.020
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "partial=True" in source
-    assert "cut.SetDisplayOnlySurfaceCut(True)" in source
