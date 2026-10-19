@@ -743,7 +743,9 @@ def isolate_drawing_view_components(
             )
     _span_scan_attrs(**counts)
 
-    with _telemetry.span("drawing.isolate_components.visibility", label=label, **counts):
+    with _telemetry.span(
+        "drawing.isolate_components.visibility", label=label, **counts
+    ):
         if changes:
             with _suspend_drawing_view_updates(view, label=label):
                 for node in changes:
@@ -758,9 +760,7 @@ def isolate_drawing_view_components(
         for node in nodes:
             actual = bool(node.drawing_component.Visible)
             expected = node.expected == "shown"
-            effective.append(
-                actual and (node.parent is None or effective[node.parent])
-            )
+            effective.append(actual and (node.parent is None or effective[node.parent]))
             if actual != expected:
                 mismatches.append(
                     f"{node.kind} {node.name!r}: Visible={actual}, expected={expected}"
