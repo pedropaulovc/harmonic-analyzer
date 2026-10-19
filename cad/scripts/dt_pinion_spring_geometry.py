@@ -73,7 +73,7 @@ PARKED_AIR = 0.15
 HOLE_SPEC = HoleSpec("clearance", "#4")
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 PAD_LEN = 9.5
-PAD_LEN_PLACES = 3  # PadLen prints .XXX (dt_pinion_spring_spec): it clears the bend
+PAD_LEN_PLACES = 2  # PadLen prints .XX (dt_pinion_spring_spec), from the hole axis
 HOLE_FROM_END = 4.5
 FOOT_FLAT = 0.0
 FOOT_LEN = PAD_LEN + FOOT_FLAT  # free end to the bend tangent
@@ -82,9 +82,10 @@ FOOT_LEN = PAD_LEN + FOOT_FLAT  # free end to the bend tangent
 # MAX round, so even with the wing at its longest and the bend tangent at its
 # nearest (FootLen's low limit) neither the wing nor the round's tangent end
 # reaches the bend.  That clearance, against the hole's web to the wing's
-# corner, sets the wing: at .XX it would leave a 1.0 web, so PadLen prints
-# .XXX and the wing is the longest that clears; the web it leaves is printed
-# (PAD_HOLE_WEB_MIN, rule 20).
+# corner, sets the wing.  Both are measured from the hole's axis (the screw,
+# which fixes the foot), so the hole's own location band never enters the
+# chain: at .XX the web clears rule 17's 1.5 floor without a tight band, and
+# being under the 2.0 target it is printed (PAD_HOLE_WEB_MIN, rule 20).
 PAD_RELIEF_R = 0.25
 PAD_RELIEF_PLACES = 2
 # #859 option (iv): the pad is flush with the strip's aft edge and widens
@@ -108,20 +109,25 @@ MODULUS_MPA = 200_000.0
 FORMED_BAND_MM = 0.5
 # The pad's hole location prints .XX (sheet dimensions on the blank's edges).
 HOLE_PLACES = 2
+# The print baselines the bend, the free kink and the wing from the hole's
+# axis -- the screw, which fixes the foot -- so the .XX location of the hole
+# itself (from the free end) moves none of them.
+FOOT_FROM_HOLE = FOOT_LEN - HOLE_FROM_END  # the hole axis to the bend tangent
 _WING_CLEAR_OF_BEND = (
-    FOOT_LEN - FORMED_BAND_MM - printed_band_mm(PAD_LEN_PLACES) - PAD_RELIEF_R
+    FOOT_FROM_HOLE - FORMED_BAND_MM - printed_band_mm(PAD_LEN_PLACES) - PAD_RELIEF_R
 )
-# Free end to the wing's straight edge: the longest at PadLen's places whose
-# round still ends at or before the nearest bend tangent.
-PAD_WING_LEN = math.floor(_WING_CLEAR_OF_BEND * 100.0 + 1e-9) / 100.0
+# Hole axis to the wing's straight edge (PadLen): the longest at PadLen's
+# places whose round still ends at or before the nearest bend tangent.
+PAD_WING_FROM_HOLE = math.floor(_WING_CLEAR_OF_BEND * 100.0 + 1e-9) / 100.0
+PAD_WING_LEN = HOLE_FROM_END + PAD_WING_FROM_HOLE  # the free end to that edge
 
 
 def pad_hole_webs() -> dict[str, float]:
     """The hole's webs at the printed worst case: to the pad's sides and free
     end, and to the wing's inside corner at the relief's limits (sharp, or the
-    MAX round) with the wing short, the hole long and nearest the strip's
-    forward edge -- the strip narrow, the pad wide and the hole short of its
-    lower (forward) edge, all measured from the aft edge."""
+    MAX round) with the wing short of the hole's axis and the hole nearest the
+    strip's forward edge -- the strip narrow, the pad wide and the hole short
+    of its lower (forward) edge, all measured from the aft edge."""
     xx = printed_band_mm(HOLE_PLACES)
     radius = (HOLE_DIA + drilled_oversize_mm()) / 2.0
     across = PAD_WIDTH / 2.0  # hole from the pad's lower edge
@@ -133,11 +139,11 @@ def pad_hole_webs() -> dict[str, float]:
         - radius,
         "end": HOLE_FROM_END - xx - radius,
     }
-    hole_along = HOLE_FROM_END + xx
+    hole_along = 0.0  # PadLen runs from the hole's axis
     hole_from_aft = (PAD_WIDTH + printed_band_mm(PAD_WIDTH_PLACES)) - (across - xx)
     hole_aft_of_strip_edge = (WIDTH - printed_band_mm(WIDTH_PLACES)) - hole_from_aft
     for relief in (0.0, PAD_RELIEF_R):
-        corner_along = PAD_WING_LEN - printed_band_mm(PAD_LEN_PLACES) + relief
+        corner_along = PAD_WING_FROM_HOLE - printed_band_mm(PAD_LEN_PLACES) + relief
         corner_out = relief  # the round's centre, forward of the strip edge
         webs[f"toward the strip, R{relief:g}"] = (
             math.hypot(corner_along - hole_along, corner_out + hole_aft_of_strip_edge)
@@ -303,11 +309,12 @@ def root_stress(
 
 
 # The formed profile as the print holds it (Codex #859, PRRT_kwDOPHDy386mTao2):
-# FootLen, BendR, the free kink start's FreeKinkH / FreeKinkV from the foot's
-# free end, and KinkR each carry FORMED_BAND_MM on their own.  FlatLen and
-# the kink angle shape the flick past the crest's contact point, so they move
-# neither the contact nor the arm.  A corner is one sign per band.
-FREE_KINK_H = FOOT_END[0] - FREE_KINK_START[0]
+# FootLen and the free kink start's FreeKinkH from the hole's axis (the screw),
+# FreeKinkV from the foot's surface, BendR and KinkR each carry FORMED_BAND_MM
+# on their own.  FlatLen and the kink angle shape the flick past the crest's
+# contact point, so they move neither the contact nor the arm.  A corner is
+# one sign per band.
+FREE_KINK_H = HOLE_X - FREE_KINK_START[0]
 FREE_KINK_V = FREE_KINK_START[1] - FOOT_END[1]
 FORMED_CONTACT_BANDS = ("FootLen", "BendR", "FreeKinkH", "FreeKinkV", "KinkR")
 
@@ -318,7 +325,7 @@ def formed_contact(
     """(penetration, arm, station) of a formed FREE profile, mm.
 
     ``deviations`` moves each named FORMED_CONTACT_BANDS dimension off its
-    nominal.  The foot's free end is fixed (the pad screw); the bend starts
+    nominal.  The hole's axis is fixed (the pad screw); the bend starts
     FootLen west of it; the blade is the tangent from the free kink start to
     the bend circle; the crest's outer face is KinkR + ``thick`` round its
     centre.  Penetration is how far that face stands into the parked flank,
@@ -329,9 +336,9 @@ def formed_contact(
     dev.update(deviations or {})
     r_bend = R_BEND + dev["BendR"]
     r_kink = R_KINK + dev["KinkR"]
-    bend_c = (FOOT_END[0] - (FOOT_LEN + dev["FootLen"]), FOOT_Y + r_bend)
+    bend_c = (HOLE_X - (FOOT_FROM_HOLE + dev["FootLen"]), FOOT_Y + r_bend)
     kink_start = (
-        FOOT_END[0] - (FREE_KINK_H + dev["FreeKinkH"]),
+        HOLE_X - (FREE_KINK_H + dev["FreeKinkH"]),
         FOOT_END[1] + FREE_KINK_V + dev["FreeKinkV"],
     )
     dx, dy = bend_c[0] - kink_start[0], bend_c[1] - kink_start[1]

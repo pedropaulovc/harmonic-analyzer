@@ -60,7 +60,6 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _sketch_chains import define_rectilinear_chain
 from _holes import blind_cut_dia_mm, wizard_holes
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
@@ -75,7 +74,7 @@ from dt_pinion_spring_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FLAT_LEN,
-    FOOT_LEN,
+    FOOT_LEN as FOOT_LEN,
     FORMED_BANDED_DIMENSIONS,
     FORMED_TOLERANCE_MM,
     FREE_FORM_SKETCH,
@@ -97,6 +96,7 @@ from dt_pinion_spring_geometry import (
     BEND_EXIT,
     FLAT_TIP,
     FOOT_END,
+    FOOT_FROM_HOLE,
     FOOT_TAN,
     FOOT_Y,
     FREE_BEND_EXIT,
@@ -117,6 +117,7 @@ from dt_pinion_spring_geometry import (
     KINK_VERTEX,
     PAD_RELIEF_VOLUME,
     PAD_VOLUME,
+    PAD_WING_FROM_HOLE,
     PAD_WING_LEN,
     VOLUME,
 )
@@ -132,7 +133,8 @@ MATERIAL = "AISI 304"
 # Primitive nominals come from the drawing spec (single source of truth shared
 # with the manufacturing print). Design rationale:
 #   FOOT_LEN -- the pad plus a short straight to the bend: the foot heads EAST,
-#               outboard, away from the strap and the lift rod.
+#               outboard, away from the strap and the lift rod.  The print
+#               locates the bend from the hole's axis (FOOT_FROM_HOLE).
 #   FLAT_LEN -- short on purpose: the flick turns back east, clear of the strap.
 
 _SAVED_DRAWING_PROPERTIES = (
@@ -213,6 +215,10 @@ FREE_PATH = {
 # wedge's bisector from the vertex (mm): placed there, the r3/r7/r8 leaves
 # read the 155 deg included angle.
 KINK_ANGLE_TEXT_MM = 4.0
+# The construction stub that carries the hole's axis in the profile and pad
+# sketches (mm): collinear with the foot, or the pad's forward edge, east of
+# the axis, so it lies under an edge the sheet already draws.
+HOLE_AXIS_STUB = 0.5
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -315,18 +321,32 @@ async def _formed_path(
         f"{prefix}foot line",
         await adapter.add_line(*pts["foot_tan"], *pts["foot_end"]),
     )
+    # The hole's axis on the foot's surface: a construction stub collinear
+    # with the foot, east from the axis, under the foot's own edge on the
+    # sheet.  The bend and the kink start are located from it (the screw).
+    foot_end, kink_start = pts["foot_end"], pts["kink_start"]
+    hole_x = foot_end[0] - HOLE_FROM_END
+    hole_axis = check(
+        f"{prefix}hole axis stub",
+        await adapter.add_line(
+            hole_x, foot_end[1], hole_x + HOLE_AXIS_STUB, foot_end[1]
+        ),
+    )
     set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, hole_axis)
     if construction:
         for entity in (flat, kink, blade, bend, foot):
             _as_construction(adapter, entity)
 
     # Shape: the foot is horizontal, each arc is tangent to its neighbouring
     # line at the merged endpoint. Position: foot free end anchored to the
-    # origin, foot length, both radii, then the kink start (the two literal
-    # lean-dependent dims) and the kink's angle, blade to flat, which fixes
-    # its sweep.
-    # The print baselines the formed profile from the foot's free end (policy
-    # drawing-guidelines.md rule 10 (dimension from a real feature)), so those locations dimension from foot.end, not the origin.
+    # origin, the hole's axis from it, foot length, both radii, then the kink
+    # start (the two literal lean-dependent dims) and the kink's angle, blade
+    # to flat, which fixes its sweep.
+    # The print baselines the formed profile from the hole's axis (policy
+    # drawing-guidelines.md rule 10 (dimension from a real feature); the screw
+    # fixes the foot there), so the bend and the kink start dimension from
+    # the stub, not the origin; the kink's height is from the foot's surface.
     check(
         f"{prefix}foot horizontal",
         await adapter.add_sketch_constraint(foot, None, "horizontal"),
@@ -342,14 +362,36 @@ async def _formed_path(
             await adapter.add_sketch_constraint(first, second, "tangent"),
         )
 
-    foot_end, kink_start = pts["foot_end"], pts["kink_start"]
     await anchor_point_to_origin(adapter, f"{foot}.end", *foot_end, "foot end")
     dims.record(f"{prefix}FootEndX")
     dims.record(f"{prefix}FootEndY")
-    await dimension_between(
-        adapter, f"{foot}.end", f"{foot}.start", "horizontal_distance", FOOT_LEN, "foot"
+    check(
+        f"{prefix}hole axis on the foot",
+        await adapter.add_sketch_constraint(hole_axis, foot, "collinear"),
     )
-    dims.record(f"{prefix}FootLen", '"FootLength"')
+    await dimension_between(
+        adapter,
+        f"{foot}.end",
+        f"{hole_axis}.start",
+        "horizontal_distance",
+        HOLE_FROM_END,
+        "hole axis from the free end",
+    )
+    dims.record(f"{prefix}HoleAxisX", '"HoleFromEnd"')
+    check(
+        f"{prefix}hole axis stub length",
+        await adapter.add_sketch_dimension(hole_axis, None, "linear", HOLE_AXIS_STUB),
+    )
+    dims.record(f"{prefix}HoleAxisStub")
+    await dimension_between(
+        adapter,
+        f"{hole_axis}.start",
+        f"{foot}.start",
+        "horizontal_distance",
+        FOOT_FROM_HOLE,
+        "bend tangent from the hole axis",
+    )
+    dims.record(f"{prefix}FootLen", '"BendFromHole"')
     check(
         f"{prefix}bend radius",
         await adapter.add_sketch_dimension(bend, None, "radial", R_BEND),
@@ -357,11 +399,11 @@ async def _formed_path(
     dims.record(f"{prefix}BendR", '"BendRadius"')
     await dimension_between(
         adapter,
-        f"{foot}.end",
+        f"{hole_axis}.start",
         f"{blade}.start",
         "horizontal_distance",
-        foot_end[0] - kink_start[0],
-        "kink start from the free end",
+        hole_x - kink_start[0],
+        "kink start from the hole axis",
     )
     dims.record(f"{prefix}KinkH")
     await dimension_between(
@@ -399,14 +441,15 @@ async def build(adapter) -> dict[str, str]:
     # (built with the literals); declared so a GUI edit sees the knobs.
     # Blade-tilt-dependent endpoint dims stay literal (no trig equations --
     # the equation manager rejects several dim bindings, probed 2026-07-02).
-    await set_global(adapter, "FootLength", f"{FOOT_LEN}mm")
+    await set_global(adapter, "HoleFromEnd", f"{HOLE_FROM_END}mm")
+    await set_global(adapter, "BendFromHole", f"{FOOT_FROM_HOLE}mm")
     await set_global(adapter, "BendRadius", f"{R_BEND}mm")
     await set_global(adapter, "KinkRadius", f"{R_KINK}mm")
     await set_global(adapter, "FlatLength", f"{FLAT_LEN}mm")
     await set_global(adapter, "StripThickness", f"{THICK}mm")
     await set_global(adapter, "StripWidth", f"{WIDTH}mm")
     await set_global(adapter, "PadWidth", f"{PAD_WIDTH}mm")
-    await set_global(adapter, "PadLength", f"{PAD_WING_LEN}mm")
+    await set_global(adapter, "WingFromHole", f"{PAD_WING_FROM_HOLE}mm")
     await set_global(adapter, "PadReliefRadius", f"{PAD_RELIEF_R}mm")
     await set_global(adapter, "KinkIncludedAngle", f"{KINK_INCLUDED_DEG}deg")
 
@@ -454,9 +497,11 @@ async def build(adapter) -> dict[str, str]:
     # the pad widens toward -v.  Extruded the strip thickness up from the foot's underside
     # (y 0, the gated side of the one-sided thin wall) so it merges with the
     # foot. The volume gate proves the merge: a pad on the wrong side would add
-    # its whole footprint, not just the wing beside the strip.  The chain
-    # starts on the wing's forward edge, so PadLen measures the edge the
-    # print can witness (the aft edge runs on into the strip).
+    # its whole footprint, not just the wing beside the strip.  PadLen runs
+    # along the wing's forward edge, the edge the print can witness (the aft
+    # edge runs on into the strip), from a construction stub on that edge at
+    # the hole's axis -- the wing is located from the screw, as the bend is,
+    # so the hole's own location band does not narrow the web between them.
     pad = SketchDims()
     check("create_sketch pad", await adapter.create_sketch("Top"))
     x0 = FOOT_END[0]
@@ -467,16 +512,61 @@ async def build(adapter) -> dict[str, str]:
         (x0, WIDTH / 2.0),
     ]
     pad_lines = await add_line_chain(adapter, pad_pts)
-    await define_rectilinear_chain(
-        adapter,
-        pad_lines,
-        pad_pts,
-        anchor=3,
-        label="pad",
-        dims=pad,
-        names=["PadLen", "PadWidth", "PadEndX", "PadEdgeZ"],
-        drives=['"PadLength"', '"PadWidth"', None, '"StripWidth" / 2'],
+    hole_x = x0 - HOLE_FROM_END
+    fwd = pad_pts[0][1]
+    set_sketch_direct_db(adapter, True)
+    pad_axis = check(
+        "pad hole axis stub",
+        await adapter.add_line(hole_x, fwd, hole_x + HOLE_AXIS_STUB, fwd),
     )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, pad_axis)
+    for line, direction in zip(
+        pad_lines, ("horizontal", "vertical", "horizontal", "vertical"), strict=True
+    ):
+        check(
+            f"pad {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    check(
+        "pad hole axis on the forward edge",
+        await adapter.add_sketch_constraint(pad_axis, pad_lines[0], "collinear"),
+    )
+    await dimension_between(
+        adapter,
+        f"{pad_lines[1]}.start",
+        f"{pad_lines[1]}.end",
+        "vertical_distance",
+        PAD_WIDTH,
+        "pad width",
+    )
+    pad.record("PadWidth", '"PadWidth"')
+    await dimension_between(
+        adapter,
+        f"{pad_lines[0]}.start",
+        f"{pad_axis}.start",
+        "horizontal_distance",
+        HOLE_FROM_END,
+        "pad hole axis from the free end",
+    )
+    pad.record("PadHoleAxisX", '"HoleFromEnd"')
+    check(
+        "pad hole axis stub length",
+        await adapter.add_sketch_dimension(pad_axis, None, "linear", HOLE_AXIS_STUB),
+    )
+    pad.record("PadHoleAxisStub")
+    await dimension_between(
+        adapter,
+        f"{pad_axis}.start",
+        f"{pad_lines[0]}.end",
+        "horizontal_distance",
+        PAD_WING_FROM_HOLE,
+        "wing edge from the hole axis",
+    )
+    pad.record("PadLen", '"WingFromHole"')
+    await anchor_point_to_origin(adapter, f"{pad_lines[3]}.start", *pad_pts[3], "pad")
+    pad.record("PadEndX")
+    pad.record("PadEdgeZ", '"StripWidth" / 2')
     await ensure_fully_defined(adapter, "pad sketch")
     check("exit_sketch pad", await adapter.exit_sketch())
     name_last_feature(adapter, "PadProfile")

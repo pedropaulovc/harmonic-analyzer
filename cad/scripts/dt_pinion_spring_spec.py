@@ -71,23 +71,24 @@ FORMED_BANDED_DIMENSIONS: dict[str, set[str]] = {
 if set().union(*FORMED_BANDED_DIMENSIONS.values()) != set(FORMED_CONTACT_BANDS):
     raise AssertionError("every preload-setting formed dimension must carry the band")
 # The pad's bend relief prints as a single limit, R0.25 MAX (swTolMAX prints the
-# nominal, so the nominal is the limit), down to sharp: the wing's .XXX length
-# keeps either end clear of the bend at FootLen's low limit
-# (dt_pinion_spring_geometry.PAD_WING_LEN).
+# nominal, so the nominal is the limit), down to sharp: the wing, located from
+# the hole's axis, keeps either end clear of the bend at FootLen's low limit
+# (dt_pinion_spring_geometry.PAD_WING_FROM_HOLE).
 PAD_RELIEF_FEATURE = "PadRelief"
 PAD_RELIEF_DIMENSION = "PadReliefR"
 PAD_RELIEF_TOL_TYPE = 6  # swTolType_e.swTolMAX
-# The wing's .XXX length says why it is tight, and states the web it leaves the
-# hole (rule 20; Codex, PR #1675).
-PAD_LEN_CALLOUT = f"CLEARS BEND\nHOLE WEB {PAD_HOLE_WEB_MIN:.2f} MIN"
+# The wing's length states the web it leaves the hole, under rule 17's 2.0
+# target (rule 20; Codex, PR #1675).
+PAD_LEN_CALLOUT = f"HOLE WEB {PAD_HOLE_WEB_MIN:.2f} MIN"
 
-# Everything the print carries.  The profile is baselined from the foot's free
-# end (drawing-guidelines.md rule 10 (dimension from a real feature)): the FREE kink start is located from it, never
-# from the model origin.  The pad, the strip width and the hole location are
-# cut with the flat blank, so they take the title-block .XX row (the wing's
-# length .XXX, to clear the bend; the relief round is its single MAX limit);
-# the strip width and the hole location are
-# sheet dimensions picked on the blank's edges
+# Everything the print carries.  The profile is baselined from the pad hole's
+# axis (drawing-guidelines.md rule 10 (dimension from a real feature)): the
+# screw fixes the foot there, so the bend tangent and the FREE kink start are
+# located from it, never from the model origin; the kink's height is from the
+# foot's surface.  The pad, the strip width and the hole location are cut
+# with the flat blank, so they take the title-block .XX row (the wing from the
+# hole's axis too; the relief round is its single MAX limit); the strip width
+# and the hole location are sheet dimensions picked on the blank's edges
 # (draw_dt_pinion_spring._blank_dimensions).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     **FORMED_DIMENSIONS,

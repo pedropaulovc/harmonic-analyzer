@@ -77,22 +77,44 @@ def test_preload_setting_formed_features_carry_the_formed_band() -> None:
     linear = formed - {dt_pinion_spring_spec.FREE_KINK_ANGLE}
     assert {name: precision[name] for name in linear} == dict.fromkeys(linear, 1)
     assert precision[dt_pinion_spring_spec.FREE_KINK_ANGLE] == 0
-    for name in ("PadWidth", "PadReliefR"):
+    for name in ("PadWidth", "PadReliefR", "PadLen"):
         assert precision[name] == 2
-    assert precision["PadLen"] == 3
     source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "_pad_relief_max_limit(adapter)" in source
 
 
-def test_profile_is_baselined_from_the_foots_free_end() -> None:
-    # drawing-guidelines.md rule 10 (dimension from a real feature): the kink start locates from the free end, the one
-    # feature the maker can put a rule on, never from the model origin.
+def test_profile_and_wing_are_baselined_from_the_hole_axis() -> None:
+    # drawing-guidelines.md rule 10 (dimension from a real feature): the bend
+    # tangent, the kink start and the wing locate from the pad hole's axis --
+    # the screw that fixes the foot -- never from the model origin, so the
+    # hole's own .XX location from the free end moves none of them (Codex P1
+    # and machinist review r13, PR #1675).
     source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "KinkStartX" not in source and "FlatTipX" not in source
+    for needle in (
+        'dims.record(f"{prefix}HoleAxisX", \'"HoleFromEnd"\')',
+        'dims.record(f"{prefix}FootLen", \'"BendFromHole"\')',
+        'pad.record("PadHoleAxisX", \'"HoleFromEnd"\')',
+        'pad.record("PadLen", \'"WingFromHole"\')',
+        '"kink start from the hole axis"',
+    ):
+        assert source.count(needle) == 1, needle
+    assert geometry.FOOT_FROM_HOLE == geometry.FOOT_LEN - geometry.HOLE_FROM_END
+    assert geometry.FREE_KINK_H == pytest.approx(
+        geometry.HOLE_X - geometry.FREE_KINK_START[0]
+    )
+    # Re-baselining moves no formed edge: the nominal contact is the one the
+    # free-end baseline gave.
+    assert geometry.HOLE_X - geometry.FOOT_FROM_HOLE == pytest.approx(
+        geometry.FOOT_TAN[0]
+    )
     free = dt_pinion_spring_spec.FORMED_DIMENSIONS[dt_pinion_spring_spec.FREE_FORM_SKETCH]
     assert free == {"FreeKinkH", "FreeKinkV", dt_pinion_spring_spec.FREE_KINK_ANGLE}
     assert set(drawing.DETAIL_KEEP) == {"KinkR", "FlatLen"}
     assert drawing.DETAIL_SCALE == (5, 1)
+    # Both views print the datum as a centreline on the hole's axis.
+    for ends in (drawing.FRONT_HOLE_AXIS_ENDS, drawing.TOP_HOLE_AXIS_ENDS):
+        assert {end[0] for end in ends} == {geometry.HOLE_X}
 
 
 def test_pad_webs_clear_two_millimetres_at_the_printed_worst_case() -> None:
@@ -105,26 +127,53 @@ def test_pad_webs_clear_two_millimetres_at_the_printed_worst_case() -> None:
     )
     toward = {name: web for name, web in webs.items() if name.startswith("toward")}
     assert min(set(webs.values()) - set(toward.values())) >= _WEB_TARGET, webs
-    # The bend's clearance leaves the web to the wing's corner under target:
-    # printed on PadLen (rule 20), rounded down.
+    # The bend's clearance leaves the web to the wing's corner under target
+    # but over rule 17's 1.5 floor at .XX: printed on PadLen (rule 20),
+    # rounded down.
     assert geometry.PAD_HOLE_WEB_MIN == math.floor(min(toward.values()) * 100) / 100
-    assert geometry.PAD_HOLE_WEB_MIN == pytest.approx(1.79)
-    assert (
+    assert geometry.PAD_HOLE_WEB_MIN == pytest.approx(1.54)
+    assert 1.5 <= geometry.PAD_HOLE_WEB_MIN < _WEB_TARGET
+    assert drawing.DIMENSION_CALLOUTS["PadLen"] == (
         f"HOLE WEB {geometry.PAD_HOLE_WEB_MIN:.2f} MIN"
-        in drawing.DIMENSION_CALLOUTS["PadLen"].split("\n")
     )
 
 
 def test_pad_wing_and_its_round_clear_the_bend_at_the_printed_worst_case() -> None:
     # Codex P1 (PR #1675): the wing at its longest, the round at its MAX and the
     # bend tangent at FootLen's low limit still leave the round's end short of
-    # the bend.
-    longest = geometry.PAD_WING_LEN + printed_band_mm(geometry.PAD_LEN_PLACES)
-    nearest_bend = geometry.FOOT_LEN - geometry.FORMED_BAND_MM
+    # the bend -- both from the hole's axis, at the title-block .XX row (r13:
+    # a tight .XXX band rescuing the web is not allowed, rules 4 and 17).
+    assert geometry.PAD_LEN_PLACES == 2
+    longest = geometry.PAD_WING_FROM_HOLE + printed_band_mm(geometry.PAD_LEN_PLACES)
+    nearest_bend = geometry.FOOT_FROM_HOLE - geometry.FORMED_BAND_MM
     assert longest + geometry.PAD_RELIEF_R <= nearest_bend + 1e-9
-    assert geometry.PAD_WING_LEN == pytest.approx(8.62)
-    # At .XX the same clearance would leave about a 1.0 web.
-    assert nearest_bend - printed_band_mm(2) - geometry.PAD_RELIEF_R < 8.5
+    assert geometry.PAD_WING_FROM_HOLE == pytest.approx(3.74)
+    assert geometry.PAD_WING_LEN == pytest.approx(8.24)
+    # Positive control: from the free end, the hole's band would join the chain
+    # and leave the web under the floor.
+    from_end = (
+        geometry.FOOT_LEN
+        - geometry.FORMED_BAND_MM
+        - 2 * printed_band_mm(2)
+        - geometry.PAD_RELIEF_R
+        - (geometry.HOLE_FROM_END + printed_band_mm(2))
+        - (geometry.HOLE_DIA + _HOLE_OVERSIZE) / 2.0
+    )
+    assert from_end < 1.5
+
+
+def test_screw_head_still_bears_on_the_shortened_wing() -> None:
+    from vn_foot_screw_spec import HEAD_DIA
+
+    # The pad's working contact is the MHA-VN foot screw's head clamping it;
+    # past the strip's forward edge the head lands on the wing.  At the worst
+    # case (wing short, the hole nearest the strip edge) the head's rim stays
+    # well inside the wing's edge.
+    head_r = HEAD_DIA / 2.0
+    wing_short = geometry.PAD_WING_FROM_HOLE - printed_band_mm(geometry.PAD_LEN_PLACES)
+    margin = wing_short - head_r
+    assert margin == pytest.approx(0.906, abs=0.01)
+    assert margin >= 0.5
 
 
 def test_hole_callout_picks_the_hole_rim_where_the_pad_puts_it() -> None:
@@ -550,6 +599,10 @@ def test_kink_crop_holds_its_dimensions_and_labels_clear_of_them() -> None:
         assert drawing.DETAIL_KEEP[name][1] > drawing.DETAIL_LABEL_XY[1]
     # The fence letter goes east of the front view's fence, off the phantom.
     assert drawing.PARENT_LETTER_OFFSET[0] > drawing.DETAIL_RADIUS_MM * drawing._S
+    # ...and 2 mm west of the hole axis's extension line up to FreeKinkH's row.
+    focus = drawing._front_x(drawing.DETAIL_FOCUS[0])
+    letter_east = focus + drawing.PARENT_LETTER_OFFSET[0] + 0.0015  # half an "A"
+    assert drawing._HOLE_AXIS_X - letter_east >= 0.002
 
 
 def test_views_are_projected_and_hidden_lines_removed() -> None:

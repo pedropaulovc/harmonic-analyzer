@@ -5,9 +5,10 @@ strip with a square screw pad at its free end -- formed as a flat screw-down
 foot, an R3.3 bend up to a blade leaning back over the foot's bend, then an
 R3.3 crest turning 25 deg out to a short free flat.  The solid is the installed shape;
 the front view also shows the part's hidden FreeForm reference sketch as the
-phantom free form; the free crest is baselined from the foot's free end on it,
-and the kink's angle printed there.  The projected top view carries the
-blank's pad, its bend relief, the strip width and the hole; a 5:1 detail
+phantom free form; the bend and the free crest are baselined from the pad
+hole's axis (the screw) on it, and the kink's angle printed there.  The
+projected top view carries the blank's pad (its wing also from the hole's
+axis), its bend relief, the strip width and the hole; a 5:1 detail
 carries the crest.
 
 Run with SolidWorks open::
@@ -148,8 +149,9 @@ DETAIL_LABEL_XY = (
 # The fence's "A" goes EAST of the fence, level with its centre: above it,
 # it sat on the FREE, TO KINK TANGENT row (stacktop-dbe47ae3, spring-r1);
 # west, the free-form phantom ran under it (PR #1675 review r1).  East of the
-# fence is the open bay between the blade and FreeKinkV's dimension line.
-PARENT_LETTER_OFFSET = (DETAIL_RADIUS_MM * _S + 0.005, 0.002)
+# fence is the open bay between the blade and the hole axis's extension line
+# up to FreeKinkH's row, which the letter stays 2 mm west of.
+PARENT_LETTER_OFFSET = (DETAIL_RADIUS_MM * _S + 0.0025, 0.002)
 # swCropViewErrors_e.swCropViewErrors_NoError
 CROP_NO_ERROR = 1
 # The kink focus must land within 0.1 mm of DETAIL_CENTER after the move.
@@ -169,10 +171,12 @@ def _front_y(model_y_mm: float) -> float:
 _FOOT_MID_X = (FOOT_END[0] + FREE_KINK_START[0]) / 2.0
 _PROFILE_TOP = _front_y(max(FLAT_TIP[1], FREE_FLAT_TIP[1]))
 _PAD_EAST = _front_x(FOOT_END[0])
+# The pad hole's axis, the profile's and the wing's datum (the screw).
+_HOLE_AXIS_X = _front_x(FOOT_END[0] - HOLE_FROM_END)
 # Half the printed width of each qualified dimension's text lines, as pc-r12's
 # render measured them (sheet metres, 11.8 px/mm; the preload line scaled
-# from those).  A text wider than its own dimension goes east of the foot
-# end's extension line, which the FootLen and FreeKinkH rows share:
+# from those).  A text wider than its own dimension goes east of the hole
+# axis's extension line, which the FootLen and FreeKinkH rows share:
 # centred between the extension lines, pc-r12 printed those lines through
 # FREE, BEND and TANGENT.
 PRELOAD_REASON = "SETS PRELOAD ON MHA-DT-014"
@@ -180,12 +184,13 @@ QUALIFIER_HALF_WIDTH = {
     "FREE, TO KINK TANGENT": 0.026,
     "TO BEND TANGENT": 0.021,
     PRELOAD_REASON: 0.033,
+    PAD_LEN_CALLOUT: 0.024,
 }
 # The dimensions banded +/-0.5 set the crest's preload on the MHA-DT-014 strap
 # (dt_pinion_spring_spec.FORMED_BANDED_DIMENSIONS), so each names that mate
 # (drawing-guidelines.md rule 4); the kink angle and FlatLen ride the
-# title-block rows, bare.  The wing's .XXX length keeps it and its relief round
-# clear of the bend at FootLen's low limit, and the web it leaves the hole is
+# title-block rows, bare.  The wing, located from the hole's axis at .XX,
+# clears the bend at FootLen's low limit, and the web it leaves the hole is
 # stated (rule 20; Codex, PR #1675).
 DIMENSION_CALLOUTS = {
     "FootLen": f"TO BEND TANGENT\n{PRELOAD_REASON}",
@@ -203,7 +208,7 @@ def callout_half_width(name: str) -> float:
 
 
 TEXT_TO_EXTENSION_GAP = 0.003
-_KINK_TEXT_X = _PAD_EAST + TEXT_TO_EXTENSION_GAP + callout_half_width("FreeKinkH")
+_KINK_TEXT_X = _HOLE_AXIS_X + TEXT_TO_EXTENSION_GAP + callout_half_width("FreeKinkH")
 # The kink angle's text (and so its arc) this far from the vertex along the
 # included wedge's bisector, the crest's convex mid-normal (sheet metres):
 # "155°" stands west of the phantom crest, and the arc's ends on the blade's
@@ -217,7 +222,7 @@ KINK_ARC_CENTRE_TOL = 0.0005
 KINK_ARC_HALF_SPREAD_DEG = KINK_INCLUDED_DEG / 2.0 + 15.0
 FRONT_KEEP = {
     "FootLen": (
-        _PAD_EAST + TEXT_TO_EXTENSION_GAP + callout_half_width("FootLen"),
+        _HOLE_AXIS_X + TEXT_TO_EXTENSION_GAP + callout_half_width("FootLen"),
         _front_y(0.0) - 0.010,
     ),
     # West of the foot's bend tangent extension line, which runs down past
@@ -226,8 +231,8 @@ FRONT_KEEP = {
     # The free locations, on the FreeForm phantom.  FreeKinkV's dimension
     # line runs where its text sits, east of the foot end.
     "FreeKinkV": (_KINK_TEXT_X, _front_y(FREE_KINK_START[1] / 2.0)),
-    # East of the foot end on the outer row: the kink row's text does not fit
-    # between its extension lines.  The top view stands clear above it
+    # East of the hole axis on the outer row: the kink row's text does not
+    # fit between its extension lines.  The top view stands clear above it
     # (spring r1: the row's text met the pad's edge).
     "FreeKinkH": (_KINK_TEXT_X, _PROFILE_TOP + 0.032),
     # The kink's included angle, blade to flat, on the phantom: in the wedge
@@ -243,11 +248,11 @@ FRONT_KEEP = {
     ),
 }
 # The vertical extension lines each qualified row's text sits among: its own
-# two, and the foot end's, which runs past every row.
+# two, the hole axis's being the east one of both horizontal rows.
 FRONT_ROW_EXTENSION_X = {
-    "FootLen": (_front_x(FOOT_TAN[0]), _PAD_EAST),
-    "FreeKinkV": (_PAD_EAST,),
-    "FreeKinkH": (_front_x(FREE_KINK_START[0]), _PAD_EAST),
+    "FootLen": (_front_x(FOOT_TAN[0]), _HOLE_AXIS_X),
+    "FreeKinkV": (_HOLE_AXIS_X,),
+    "FreeKinkH": (_front_x(FREE_KINK_START[0]), _HOLE_AXIS_X),
 }
 # Top view (third-angle: model +z, forward, runs DOWN the sheet).  The view
 # centres on the pad, so the hole centre is level with TOP_CENTER, the strip's
@@ -258,9 +263,13 @@ _TOP_STRIP_FWD = TOP_CENTER[1] + (PAD_Z - WIDTH / 2.0) * _S
 _TOP_PAD_FWD = TOP_CENTER[1] - PAD_WIDTH / 2.0 * _S
 _WING_WEST = _front_x(FOOT_END[0] - PAD_WING_LEN)
 TOP_KEEP = {
-    # Below the pad, on the wing's forward edge it witnesses: above, its
-    # extension lines crossed the pad and the strip.
-    "PadLen": (_front_x(FOOT_END[0] - PAD_WING_LEN / 2.0), _TOP_PAD_FWD - 0.009),
+    # Below the pad, east of the hole axis's extension line: its text centred
+    # between its extension lines was struck by them, and the relief's leader
+    # ran into it (spring r13).
+    "PadLen": (
+        _HOLE_AXIS_X + TEXT_TO_EXTENSION_GAP + callout_half_width("PadLen"),
+        _TOP_PAD_FWD - 0.009,
+    ),
     # East, witnessed on the pad's free end, outboard of the hole-edge 4.75
     # (HOLE_EDGE_TEXT_XY) that shares its lower extension line.
     "PadWidth": (_PAD_EAST + 0.016, TOP_CENTER[1] + 0.003),
@@ -309,6 +318,20 @@ HOLE_EDGE_PICK = (
     HOLE_CENTER[0] - _RIM_DIAGONAL,
     HOLE_CENTER[1],
     HOLE_CENTER[2] - _RIM_DIAGONAL,
+)
+# The hole's axis is the datum the bend, the free kink start and the wing are
+# located from, so it prints as a centreline in both views, this far past the
+# part (model mm): across the foot's edge in the profile, and from the hole's
+# centre mark down past the pad's forward edge, where PadLen's extension line
+# leaves it, in the plan.
+HOLE_AXIS_OVERSHOOT = 1.0
+FRONT_HOLE_AXIS_ENDS = (
+    (HOLE_CENTER[0], -HOLE_AXIS_OVERSHOOT, 0.0),
+    (HOLE_CENTER[0], THICK + HOLE_AXIS_OVERSHOOT, 0.0),
+)
+TOP_HOLE_AXIS_ENDS = (
+    HOLE_CENTER,
+    (HOLE_CENTER[0], THICK, PAD_Z + PAD_WIDTH / 2.0 + HOLE_AXIS_OVERSHOOT),
 )
 
 
@@ -386,6 +409,62 @@ def _mark_kink_on_front(adapter: Any, front: Any) -> tuple[float, float]:
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
     return center
+
+
+def _hole_axis_centerline(
+    adapter: Any,
+    view: Any,
+    ends_mm: tuple[tuple[float, float, float], tuple[float, float, float]],
+    *,
+    label: str,
+) -> None:
+    """A black centreline on the pad hole's axis in ``view``'s own sketch.
+
+    draw_sm_summing_lever._owned_centerline's recipe: the part-mm ends are
+    projected to the sheet, taken into the view sketch's frame, placed direct
+    to the database (an inferred end snaps onto nearby edges) and read back.
+    """
+    _activate_view(adapter, view, label=label)
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for end in ends_mm:
+        x, y = model_point_in_view(
+            adapter, view, tuple(value / 1000.0 for value in end), label=f"{label} end"
+        )
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateCenterLine(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if segment is None:
+        raise RuntimeError(f"failed to create the {label}")
+    line = _early_bound(segment, "ISketchLine")
+    for expected, accessor in zip(
+        points, ("GetStartPoint2", "GetEndPoint2"), strict=True
+    ):
+        placed = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+        actual = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XYZ"]
+        drift = max(abs(a - b) for a, b in zip(actual, expected, strict=True))
+        if drift > 1e-9:
+            raise RuntimeError(
+                f"{label} {accessor[3:-6].lower()} point sits "
+                f"{drift * 1000.0:.4g} mm from where it was authored"
+            )
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError(f"{label} colour did not persist")
+    adapter.currentModel.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
 
 
 def _placed_kink_view(adapter: Any) -> Any:
@@ -995,6 +1074,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # of the front view's own sketch is near its import.
     mark = _mark_kink_on_front(adapter, front)
     _label_kink_detail(adapter, detail, front, mark)
+    _hole_axis_centerline(
+        adapter, front, FRONT_HOLE_AXIS_ENDS, label="profile hole-axis centreline"
+    )
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
@@ -1017,8 +1099,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring pad clearance hole",
         process=HOLE_PROCESS,
     )
+    # After every pick on the hole: its forward rim lies on this line.
+    _hole_axis_centerline(
+        adapter, top, TOP_HOLE_AXIS_ENDS, label="pad hole-axis centreline"
+    )
 
-    # Under FootLen's three-line callout (its dimension line sits ~0.058).
+    # Under FootLen's two-line callout (its dimension line sits ~0.058).
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.048)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.115)
 
