@@ -151,14 +151,16 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     # Machinist review r1: the across-flat value and callout sat between its
     # own extension lines, which struck them. They now hang below the shaft,
     # right of the dome tip. The block is left-aligned on the dimension line
-    # (r2 render: 15 characters ran 35 mm), and stays inside the border.
+    # and stays inside the border. The PR1709 PDF's parent-vendor identity
+    # and shelf span ~45 mm: the older per-character estimate missed the
+    # final "55" and shelf touching the border.
     across_x, across_y = keep["AcrossFlat"]
     widest = max(
         len(line) for line in ch_fulcrum_shaft_spec.ACROSS_FLAT_CALLOUT.splitlines()
     )
     assert across_y + 0.004 <= drawing._SHAFT_BOTTOM_Y - 0.010
     assert across_x > right_tip + 0.005
-    assert across_x + widest * 0.00235 <= 0.4318 - 0.0127 - 0.003
+    assert across_x + max(widest * 0.00235, 0.045) <= 0.4318 - 0.0127 - 0.003
     # Machinist review r1: the Ø callout block (hanging left of its line,
     # ~36 characters) printed over the dome radius, and its upper limit
     # (~7 mm over the anchor) inside the outline.
