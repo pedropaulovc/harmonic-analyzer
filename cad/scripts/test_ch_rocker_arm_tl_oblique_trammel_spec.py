@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+import _config
 import _process_plans as plans
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
@@ -81,6 +82,36 @@ def test_both_cutters_are_on_hand_as_four_flute_end_mills() -> None:
     assert {trammel.PART_CUTTER_IN, trammel.RISER_CUTTER_IN} <= set(sizes)
     assert trammel.PART_CUTTER_DIA == pytest.approx(0.375 * 25.4)
     assert trammel.RISER_CUTTER_DIA == pytest.approx(0.5625 * 25.4)
+
+
+def test_jig_stock_requirements_preserve_finished_geometry_without_claiming_ownership() -> None:
+    inventory = tomllib.loads(
+        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_bytes().decode()
+    )
+    (carrier,) = [
+        row for row in inventory["stock"] if "MHA-CH-006-TL-21" in row.get("note", "")
+    ]
+    (riser,) = [
+        row for row in inventory["stock"] if "MHA-CH-006-TL-24" in row.get("note", "")
+    ]
+    assert carrier["on_hand"] is riser["on_hand"] is False
+    assert carrier["section_mm"] == pytest.approx(
+        [5.5 * trammel.INCH, 0.5 * trammel.INCH]
+    )
+    assert carrier["length_mm"] == pytest.approx(21.0 * trammel.INCH)
+    assert carrier["section_mm"][1] - trammel.CARRIER_THICK == pytest.approx(0.7)
+    assert 0.25 * trammel.INCH - trammel.RISER_THICK == pytest.approx(0.35)
+    # There is no selected riser blank envelope: its 40 x 340 are finished
+    # dimensions, not a fabricated supplier cut or a purchased-stock claim.
+    assert not {"section_mm", "length_mm", "dia_mm"} & set(riser)
+    assert (trammel.CARRIER_THICK, trammel.RISER_THICK) == (12.0, 6.0)
+    assert (trammel.RISER_BLANK_WIDTH, trammel.RISER_BLANK_LENGTH) == (40.0, 340.0)
+    carrier_row = _config.parts("ch-rocker-arm-tl-oblique-carrier")
+    riser_row = _config.parts("ch-rocker-arm-tl-oblique-riser")
+    assert "1/2 in" in carrier_row["material_specification"]
+    assert "6061-T651" in carrier_row["material_specification"]
+    assert "1250" in carrier_row["material_specification"]
+    assert "1/4 in" in riser_row["material_specification"]
 
 
 def test_both_cutter_circles_share_the_arc_centre() -> None:

@@ -9,8 +9,10 @@ import pytest
 import _config
 import _mcmaster_91771a110 as dims
 import build_ch_rocker_arm_tl_vn_oblique_riser_screw as part
+import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as spec
+import ch_rocker_arm_tl_oblique_riser_spec as riser
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_recipe import recipe_declaration
@@ -56,6 +58,25 @@ def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
     assert dims.DIMS.length == pytest.approx(row.length_mm)
     assert dims.DIMS.major_dia == pytest.approx(row.major_mm, abs=1e-3)
     assert spec.CALLOUT == fasteners.callout(row) == "#4-40 X 1/2 B18.6.3 FLAT HEAD"
+
+
+def test_faced_plate_bands_keep_the_riser_screw_engaged_and_inside_the_carrier() -> None:
+    # Recheck #1619's changed stock declaration at the existing catalogue
+    # screw length and the model's flush head seat, not invented vendor
+    # length tolerances. Both finished plate thicknesses take their .X band.
+    length = spec.ROW.length_mm
+    projection_min = length - (riser.THICKNESS + riser.THICKNESS_BAND)
+    projection_max = length - (riser.THICKNESS - riser.THICKNESS_BAND)
+    full_thread_min = min(
+        projection_min - carrier.TAP_MOUTH_BREAK - dims.DIMS.pitch,
+        carrier.ENGAGEMENT_MM[carrier.RISER_THREAD],
+    )
+    assert projection_min == pytest.approx(5.9)
+    assert full_thread_min == pytest.approx(5.015)
+    assert full_thread_min >= 1.5 * spec.ROW.major_mm
+    stand_out_max = projection_max - (carrier.THICKNESS - carrier.THICKNESS_BAND)
+    assert stand_out_max == pytest.approx(-3.7)
+    assert stand_out_max < 0.0
 
 
 def test_standalone_recipe_run_is_catalog_only() -> None:

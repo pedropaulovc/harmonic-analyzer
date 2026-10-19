@@ -6342,3 +6342,22 @@ dia_mm = 11.1125
 length_mm = 304.8
 on_hand = false
 cite = ["OnlineMetals part 20743 https://www.onlinemetals.com/en/buy/carbon-steel/0-4375-carbon-steel-round-bar-1018-cold-finish/pid/20743 read live 2026-10-16"]
+
+# Oblique-trammel stock requirements (#1619): nominal starting material only.
+# on_hand=false records neither a purchase nor possession; no receipt measurements.
+[[stock]]
+form = "rectangular_blank"
+material = "6061-T651 aluminium"
+note = "MHA-CH-006-TL-21 carrier: selected 1/2 in plate, OnlineMetals 1250 custom cut 5.5 x 21 in. Face to the drawing's 12.0 thickness and mill to 520 x 130. Purchase and receipt are not recorded."
+# Basis: issue #1619 owner-selected nominal 5.5 x 0.5 x 21 in, times 25.4 mm/in; no supplier tolerance or metrology is assumed.
+section_mm = [139.7, 12.7]
+length_mm = 533.4
+on_hand = false
+cite = ["Owner stock selection, harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619; OnlineMetals part 1250 https://www.onlinemetals.com/en/buy/aluminum/0-5-aluminum-plate-6061-t651/pid/1250"]
+
+[[stock]]
+form = "rectangular_blank"
+material = "Acetal (Delrin)"
+note = "MHA-CH-006-TL-24 riser requirement: 1/4 in (6.35 mm nominal) acetal stock, faced to 6.0 and milled to finished 40 x 340. Supplier, SKU and starting width/length remain unselected; no stock is claimed purchased or owned. Blank envelope dimensions are intentionally omitted until sourcing is selected."
+on_hand = false
+cite = ["Unsourced stock requirement, harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]

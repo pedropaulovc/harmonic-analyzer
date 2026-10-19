@@ -218,7 +218,7 @@ RISER_SCREW_WALLS = (
     - _RISER_CSK_MOUTH_MAX
     - _RISER_RADIAL_SHIFT,
 )
-# The supplied riser blank, 340 x 40, lies square on the carrier with its
+# The milled riser blank, 340 x 40, lies square on the carrier with its
 # corner at RISER_BLANK_ORIGIN (carrier frame). The self-cut band runs from
 # y 21.45 (inner edge at the blank's ends) to 50.90 (outer edge at the
 # apex), at least 5 inside both long edges.
@@ -387,8 +387,16 @@ PIVOT_BLOCK_HEIGHT = (
 # and stands PIN_COLLAR_PROUD above the block; the carrier rests on it.
 PIN_COLLAR_PROUD = 3.0
 PIN_COLLAR_HEIGHT = BEARING_RECESS + PIN_COLLAR_PROUD
+# Finished dimensions, not purchased stock: face 1/2 in 6061-T651 plate to
+# CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing
+# dimensions print at .X and take that title-block band; every height stack
+# reads the same declared places, not a supplier-stock tolerance.
 CARRIER_THICK = 12.0
+CARRIER_THICK_PLACES = 1
+CARRIER_THICK_BAND = printed_band_mm(CARRIER_THICK_PLACES)
 RISER_THICK = 6.0
+RISER_THICK_PLACES = 1
+RISER_THICK_BAND = printed_band_mm(RISER_THICK_PLACES)
 # The strap is faced to its finished 2.5 (S0) before it goes on the jig (T3).
 STRAP_THICK = rocker.ARM_THICKNESS
 RAIL_SEAT_Z = BASE_BAR_THICK

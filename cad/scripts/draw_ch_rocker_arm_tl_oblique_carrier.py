@@ -8,7 +8,7 @@ axes), 45.00 above the -Y edge. Every location dimension stands outside the
 outline in its own lane: X stations above and below, Y stations left and
 right, so no extension line crosses a text.
 Section A-A at 3:1 cuts along the pin line, which crosses the whole plate,
-is cropped to A1, and carries the stock thickness and the underside chamfer
+is cropped to A1, and carries the finished thickness and the underside chamfer
 that clears the pivot pin's collar fillet. It is a FULL section (carrier-diag:
 the partial one imported nothing), its cut direction SolidWorks' own. It
 stands lower left, under the bottom lanes, its caption, thickness, slab and
@@ -173,8 +173,8 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
 # cut). So the line runs past both plate ends: its right end (sheet x 415)
 # beyond the right lanes, its left (x 51) between the two outer left lanes.
 # A full section at 3:1 is 1.6 m wide, so a Crop2 fence keeps the cut's own
-# span (fr_nameplate's _crop_section). The stock thickness is
-# SectionReference's StockThick (driven from Plate's depth). Its dimensions
+# span (fr_nameplate's _crop_section). The finished thickness is the native
+# SectionReference StockThick dimension (driven from Plate's depth). Its dimensions
 # are imported BEFORE the crop: cropped (jig-r9, c4-r4), the same import
 # delivered PinChamferSize but not StockThick, whose stock line stands 0.5 mm
 # inside the fence's +X end and whose sketch text stands 5 mm past it.
@@ -797,14 +797,14 @@ def _reposition_section_dimensions(
     rebuild_drawing(adapter, label="carrier stock witness cap")
     if abs(float(display.MaxWitnessLineLength) - STOCK_WITNESS_MAX_M) > 1e-9:
         raise RuntimeError(
-            "carrier section A-A: 12.0 STOCK witness cap did not persist"
+            "carrier section A-A: finished thickness witness cap did not persist"
         )
     return placed
 
 
 def _pin_section(adapter: Any, source_model: Any, top: Any) -> list[Any]:
     """Full section A-A along the pin line, cropped to A1's slab, carrying the
-    stock thickness and the chamfer leg, both from SectionReference.
+    finished thickness and the chamfer leg, both from SectionReference.
 
     The hidden owner sketch lies in the cutting plane; a derived view takes it
     from the part as it stands when cut and selects it through its base view,
@@ -882,7 +882,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel Carrier Plate Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel carrier plate; 6061-T6; MHA-CH-06-TL-21",
+            3: "rocker oblique trammel carrier plate; 6061-T651; MHA-CH-06-TL-21",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

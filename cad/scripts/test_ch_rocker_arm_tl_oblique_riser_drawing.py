@@ -12,6 +12,7 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_riser as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
+from _printed_tolerance import printed_band_mm
 
 STEM = "ch_rocker_arm_tl_oblique_riser"
 
@@ -86,11 +87,23 @@ def test_blank_and_holes_are_the_part_sheet() -> None:
     assert spec.HUB_DIA > 10.20
 
 
+def test_blank_sizes_are_finished_native_dimensions_not_stock() -> None:
+    dimensions = {"BlankLength", "BlankWidth", "BlankThick"}
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert dimensions <= marked
+    assert not dimensions & spec.REFERENCE_DIMENSIONS
+    assert not dimensions & set(spec.CALLOUTS_BELOW)
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 1 for name in dimensions)
+    assert spec.THICKNESS_PLACES == spec.DRAWING_PRECISION_BY_NAME["BlankThick"]
+    assert spec.THICKNESS_BAND == printed_band_mm(spec.THICKNESS_PLACES)
+    assert model_toleranced_dimensions(part) == {}
+
+
 def test_flat_head_sinks_and_countersink_stays_in_the_blank() -> None:
     csk = _features()["screw_hole_1_countersink"]
     assert csk["angle_deg"] == 82.0
     assert csk["dia"][0] >= spec.SCREW_HEAD_DIA_MAX
-    assert spec.CSK_DEPTH_MAX < spec.THICKNESS
+    assert spec.CSK_DEPTH_MAX < spec.THICKNESS - spec.THICKNESS_BAND
     assert _features()["screw_hole_1"]["dia"][0] > spec.SCREW_BODY_DIA
 
 
@@ -182,7 +195,8 @@ def test_row_heights_stand_a_text_width_apart() -> None:
     assert xs[0] - half - spec.BLANK_LENGTH * _PLAN_SCALE >= _AIR_MM
     assert all(b - a >= 2.0 * half + _AIR_MM for a, b in zip(xs, xs[1:]))
     width_x = drawing.PLAN_KEEP["BlankWidth"][0] * _PLAN_SCALE
-    assert width_x - xs[-1] >= half + len("STOCK") * _CHAR_MM / 2.0 + _AIR_MM
+    width_text = f"{spec.BLANK_WIDTH:.{spec.DRAWING_PRECISION_BY_NAME['BlankWidth']}f}"
+    assert width_x - xs[-1] >= half + len(width_text) * _CHAR_MM / 2.0 + _AIR_MM
     # Each count's text fits between its own extension lines.
     for name in names:
         assert spec.GLOBALS[name] * _PLAN_SCALE > _TEXT_MM + 1.0, name

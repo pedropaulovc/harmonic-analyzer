@@ -5,9 +5,9 @@ is screwed flat on the carrier top (MHA-CH-06-TL-21) under the strap blank,
 so the cutter that profiles the strap runs out into acetal rather than the
 aluminium carrier.
 
-Material and stock: acetal (Delrin) sheet, a supplied blank 6 x 40 x 340
-(``RISER_THICK`` x ``RISER_BLANK_WIDTH`` x ``RISER_BLANK_LENGTH``) ⚙. The
-blank's faces and edges stay as supplied; only the holes are made.
+Material and stock: 1/4 in acetal (Delrin), supplier and stock width/length
+unselected. Face to 6.0 (``RISER_THICK``) and mill the blank to 40.0 x 340.0
+(``RISER_BLANK_WIDTH`` x ``RISER_BLANK_LENGTH``) at the .X title-block band.
 
 Frame (the SolidWorks model): origin at the blank corner, which sits at
 ``RISER_BLANK_ORIGIN`` = (-170, 16) ⚙ in the carrier frame (origin at the
@@ -77,10 +77,12 @@ INCLUDED_ANGLE_TOL_DEG = angular_band_deg()
 # Reference stations (located from TL-21 at assembly) print at 2 places.
 STATION_PLACES = 2
 
-# --- Blank (supplied, as bought) ---------------------------------------------
+# --- Blank (faced and milled from 1/4 in stock) -------------------------------
 BLANK_LENGTH = trammel.RISER_BLANK_LENGTH  # 340 ⚙
 BLANK_WIDTH = trammel.RISER_BLANK_WIDTH  # 40 ⚙
 THICKNESS = trammel.RISER_THICK  # 6 ⚙
+THICKNESS_PLACES = trammel.RISER_THICK_PLACES
+THICKNESS_BAND = trammel.RISER_THICK_BAND
 BLANK_ORIGIN = trammel.RISER_BLANK_ORIGIN  # (-170, 16) ⚙, carrier frame
 
 
@@ -125,7 +127,7 @@ if SCREW_DIA <= SCREW_BODY_DIA:
 if (CSK_DIA - _XX) / 2.0 < SCREW_HEAD_DIA_MAX / 2.0:
     raise AssertionError("#4 head stands proud of the riser top")
 CSK_DEPTH_MAX = (CSK_DIA + _XX) / 2.0 / math.tan(math.radians(CSK_ANGLE / 2.0))
-if CSK_DEPTH_MAX >= THICKNESS:
+if CSK_DEPTH_MAX >= THICKNESS - THICKNESS_BAND:
     raise AssertionError("riser countersink breaks through the blank")
 
 HOLES: dict[str, tuple[tuple[float, float], float]] = {
@@ -241,6 +243,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         if name in _STATIONS
         else SCREW_DIA_PLACES
         if name == "ScrewDia"
+        else THICKNESS_PLACES
+        if name == "BlankThick"
         else (2 if "Dia" in name else 1)
         for name in names
     }
@@ -280,9 +284,6 @@ CALLOUTS_BELOW = {
     "ScrewDia": f"DRILL THRU\n{CSK_CALLOUT}\n{LOCATE_CALLOUT}",
     "HubDia": f"DRILL THRU\nHUB HOLE\n{LOCATE_CALLOUT}",
     "ClampDia": f"DRILL THRU\nCL AND CR HOLES\n{LOCATE_CALLOUT}",
-    "BlankLength": "STOCK",
-    "BlankWidth": "STOCK",
-    "BlankThick": "STOCK",
 }
 
 SURFACE_FINISHES = ()
