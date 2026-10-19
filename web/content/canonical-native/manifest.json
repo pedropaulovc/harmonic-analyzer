@@ -788,7 +788,7 @@
     },
     {
       "path": "web/scripts/current-native-identity.test.mjs",
-      "sha256": "52931943ea07caee2b771379d0bc5d42ce73a24fb2421b0c54852cfd7f5e51b7",
+      "sha256": "e260d82a31534e22dbbd292d67725a8a1ef8ecffc8228200296da5b6125a4941",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {

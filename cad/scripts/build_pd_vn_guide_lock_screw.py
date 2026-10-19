@@ -3,7 +3,7 @@ r"""Purchased guide-lock screw: McMaster 91792A108, 18-8 stainless slotted pan h
 Ruling R9-31 (2026-09-30): the eight screws that hold the four guide locks
 (MHA-PD-12 lock plates) to the platen guides ride the platen, and a brass
 fillister head there sweeps into the transgear hanger arm.  They take a low
-#4-40 head instead; every other MHA-DT-VN-50 station keeps the fillister.
+#4-40 head instead; every other MHA-PD-VN-52 station keeps the fillister.
 2026-10-11: the low head is slotted, as the book's guide-lock plates show
 (ch22 img05: slotted domed heads, dark ferrous, unlike the brass platen-front
 screws), not a hex socket.  The 18-8 slotted pan head is the lowest stocked
@@ -20,7 +20,7 @@ pan head Ø0.219 in x 0.068 in high, 18-8 stainless, ASME B18.6.3.
 recipe (``diag_mcmaster_fillister``); it has no replica gate, and no McMaster
 .SLDPRT is committed or used.
 
-Frame: the MHA-DT-VN-50 fillister's, so the paper drive places either the same
+Frame: the MHA-PD-VN-52 fillister's, so the paper drive places either the same
 way: the recipe's head-up body (axis +Y, bearing face at y = 0) turned -90 deg
 about X, putting the bearing face on the origin, the head toward -Z and the
 shank along +Z.

@@ -18,7 +18,7 @@ strap.
   is held back against it: g19's back face bears on the back washer, which
   bears on the back strap.
 * The arbor fills both strap bores and domes proud of each strap; a set
-  screw in each pedestal's crown apex bears on it (MHA-CH-VN-53): the back one
+  screw in each pedestal's crown apex bears on it (MHA-DT-VN-64): the back one
   fixes the arbor, the front one is tightened once the front strap is set.
 * The FRONT (south) strap is set off the front washer by one BANK_SPRING_SET
   blade, and the MHA-DT-VN-68 wave spring (``dt_vn_cylinder_bank_spring_spec``)
@@ -190,7 +190,7 @@ STRAP_INNER_SPAN = BACK_STRAP_INNER_Z - FRONT_STRAP_INNER_Z
 FRONT_PEDESTAL_ORIGIN_Z = FRONT_STRAP_INNER_Z - _pedestal.STRAP_INNER_Z
 BACK_PEDESTAL_ORIGIN_Z = BACK_STRAP_INNER_Z + _pedestal.STRAP_INNER_Z
 STRAP_OUTER_SPAN = STRAP_INNER_SPAN + 2.0 * _pedestal.STRAP_T
-# The arbor fills both strap bores end to end, so the MHA-CH-VN-53 apex set screws
+# The arbor fills both strap bores end to end, so the MHA-DT-VN-64 apex set screws
 # (each at its strap's mid-depth) bear on it, and each end is domed
 # ARBOR_DOME_HEIGHT proud of its strap's outer face. Its cylinder IS the span
 # over both straps, the length the fitter measures and cuts to (#743,

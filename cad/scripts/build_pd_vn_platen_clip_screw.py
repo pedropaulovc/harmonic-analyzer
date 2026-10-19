@@ -1,6 +1,6 @@
 r"""Purchased MHA-PD-VN-65 platen-clip screw: McMaster 92446A077 in the assembly frame.
 
-The brass #2-56 x 1/4 slotted pan head lands in the MHA-DT-VN-50 fillister
+The brass #2-56 x 1/4 slotted pan head lands in the MHA-PD-VN-52 fillister
 screw's frame: head toward -Z, under-head plane at z=0, shank along +Z.
 """
 

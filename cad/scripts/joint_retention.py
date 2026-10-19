@@ -1240,7 +1240,7 @@ JOINTS: tuple[Joint, ...] = (
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "Clamps each cast MHA-DT-02 pedestal's ledge to base MHA-FR-01; neither moves in operation (the arbor is "
-            "fixed by MHA-CH-VN-53). The gears' journal drag acts about the horizontal arbor axis, perpendicular to "
+            "fixed by MHA-DT-VN-64). The gears' journal drag acts about the horizontal arbor axis, perpendicular to "
             "this vertical screw, so it reaches the screw only as tension/shear through the foot; no member "
             "rotates on or about the screw axis"
         ),

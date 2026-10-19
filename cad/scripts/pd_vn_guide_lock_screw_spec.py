@@ -4,7 +4,7 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: the thread, shank and head dims the paper-drive assembly and the
 platen guide read to prove MHA-PD-VN-60 is the screw the lock stack was sized for.
 Ruling R9-31: the eight platen-riding lock screws take a low #4-40 head so
-the heads clear the hanger arm; every other MHA-DT-VN-50 station keeps the
+the heads clear the hanger arm; every other MHA-PD-VN-52 station keeps the
 brass fillister.  2026-10-11: that head is slotted, as on the book's
 guide-lock plates (ch22 img05), not a hex socket: an 18-8 slotted pan head,
 the lowest stocked slotted #4 rounded head.  The vendor dims are
