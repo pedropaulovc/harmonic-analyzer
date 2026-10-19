@@ -61,17 +61,16 @@ STOCK_DIA = 0.25 * MM_PER_IN
 # shrink to the photographed size.
 HEAD_DIA = 6.0
 HEAD_DIA_TOL = 0.10
-# Rule 4: each head band names its reason at its callout (the MHA-DT-32
-# machinist review of 04b95f481: the reasons only in a general note), one
-# line under the value so it stays clear of the head's extension lines.
-HEAD_DIA_CALLOUT = "ON MHA-DT-35 FLOOR"
+# Rule 4: the diameter names its pocket clearance, not the axial floor face.
+# The maximum also preserves the wall around the pocket bored to suit it.
+HEAD_DIA_CALLOUT = "CLEARANCE IN MHA-DT-35 POCKET"
 # A 4.0 head (user ruling 2026-09-29, MHA-DT-32 machinist review) keeps
 # 1.5 of head under the deepest .X slot below.  Banded (Codex P2 on #1139,
 # user ruling 2026-09-30): at .X the longest head, at the widest fitted end
 # play, stood 1.6 proud of the cup.
 HEAD_LENGTH = 4.0
 HEAD_LENGTH_TOL = 0.10
-HEAD_LENGTH_CALLOUT = "BELOW MHA-DT-035 FACE"
+HEAD_LENGTH_CALLOUT = "HEAD; KEEPS TOP BELOW MHA-DT-035 FACE"
 SLOT_WIDTH = 1.0
 # Routine (.X; the MHA-DT-32 machinist review of 04b95f481 called its
 # +/-0.20 band over-specification).  Codex P2 on #1694: a 1.0 depth at .X
@@ -100,6 +99,7 @@ SHOULDER_CALLOUT = "RUNS IN MHA-DT-008 BORE"
 # 2026-09-30) and the sheet breaks the seat edge 0.1 max, as MHA-DT-06 does its
 # tapped mouth: a 0.34 radial seat at the worst case.
 SEAT_EDGE_BREAK_MAX = 0.1
+SEAT_EDGE_BREAK_TOL_TYPE = 6  # swTolType_e.swTolMAX
 # Arm face to the head's underside, which bears on the MHA-DT-35 cup floor.
 # User ruling 2026-09-29 (after the machinist reviews): the shoulder is
 # turned to suit the bonded handle -- its measured length from the ferrule's
@@ -187,7 +187,6 @@ RELIEF_DIA = 1.9
 RELIEF_DIA_BAND = (0.0, -0.1)  # (upper, lower) deviations
 RELIEF_DIA_MIN = round(RELIEF_DIA + RELIEF_DIA_BAND[1], 6)
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_BAND[0], 6)
-RELIEF_STRENGTH_CALLOUT = "SEATING TORQUE"
 # Routine at 2.2 (the MHA-DT-32 machinist review of crank-v4-16 called a
 # +/-0.10 band over-specification): at .X the straight floor past the
 # longest lead, 1.4 - 0.4 = 1.0, keeps 1.5 #4-40 pitches of die run-out
@@ -210,11 +209,13 @@ RELIEF_LEAD_LIMITS = (
     round(RELIEF_LEAD + RELIEF_LEAD_TOL, 6),
 )
 CHAMFER_CALLOUT = "X 45 DEG"
-# The 45-degree lead rides the relief's Ø callout rather than a third
-# dimension crowded into the 1.5-mm groove at 3:1 (machinist review).
-RELIEF_CALLOUT = (
-    f"{RELIEF_LEAD_LIMITS[0]:.1f}-{RELIEF_LEAD_LIMITS[1]:.1f} {CHAMFER_CALLOUT} LEAD"
+# Each chamfer leg is imported from its own native model dimension.  The
+# relief diameter no longer carries a numeric lead-size surrogate (r8).
+RELIEF_LEAD_CALLOUT = f"{CHAMFER_CALLOUT} LEAD"
+RELIEF_DIA_CALLOUT = (
+    f"RELIEF BELOW {THREAD_SIZE} ROOT;\nNECK FOR SEATING ON MHA-DT-006"
 )
+SEAT_EDGE_BREAK_CALLOUT = f"{CHAMFER_CALLOUT}\nPRESERVES SEAT ON MHA-DT-006"
 SEAT_FLAT_INNER_DIA = RELIEF_DIA + 2.0 * RELIEF_LEAD
 # ... and at its printed worst: the largest relief under the longest lead.
 SEAT_FLAT_INNER_DIA_MAX = round(RELIEF_DIA_MAX + 2.0 * RELIEF_LEAD_LIMITS[1], 6)
@@ -357,12 +358,9 @@ ARM_STOCK_THICKNESS_MAX = 2.0 * ARM_STOCK_THICKNESS - ARM_STOCK_THICKNESS_MIN
 FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
 # The fitted shoulder's to-suit rule rides the under-head reference as its
-# callout (user ruling 2026-09-29, after the MHA-DT-32 machinist review; the
-# 04b95f481 review asked for it at the dimension, not only in a note).  The
-# notes name the seat face its 0.1 break belongs to (that review read the
-# earlier parenthetical as ambiguous) and tell the shop why the thread runs
-# past the 7.9 arm: the tip is finished at assembly (rule 7: a blank finished
-# at assembly says so).
+# callout (user ruling 2026-09-29, after the MHA-DT-32 machinist review).
+# The seat break is now a native, feature-attached chamfer dimension; only
+# the tip's final assembly operation remains in the free note (r8).
 FITTED_STEP = step_ref("crank-handle-fitted")
 UNDER_HEAD_CALLOUT = "\n".join(
     (
@@ -371,13 +369,7 @@ UNDER_HEAD_CALLOUT = "\n".join(
         f"FACE TO MHA-DT-035 FLOOR PLUS {END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}",
     )
 )
-DRAWING_NOTES = "\n".join(
-    (
-        f"SEAT FACE (SHOULDER THREAD END, ON MHA-DT-06): EDGE BREAK "
-        f"{SEAT_EDGE_BREAK_MAX:.1f} MAX.",
-        f"TIP FILED FLUSH WITH MHA-DT-06 AND STAKED AT {FITTED_STEP}.",
-    )
-)
+DRAWING_NOTES = f"TIP FILED FLUSH WITH MHA-DT-06 AND STAKED AT {FITTED_STEP}."
 
 # The shoulder's seat on the arm face: from the arm's printed maximum mouth
 # (the larger of it and the relief lead's envelope) out to the smallest
@@ -495,7 +487,7 @@ for _ok, _what in (
 # face (UnderHeadLocation, a
 # reference: the shoulder is turned to suit the bonded handle) and the head
 # face (the reference overall, for stock cut-off).  The head length, the slot
-# depth, the relief width and the two 45-degree legs are local sizes of their
+# depth, the relief width and the 45-degree chamfer legs are local sizes of their
 # features.  A head-face origin cannot work: the seat is fitted, so the thread
 # length would ride on the handle stack.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -506,6 +498,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ThreadLength",
         "ReliefDia",
         "ReliefWidth",
+        "ReliefLead",
+        "SeatEdgeBreak",
         "TipChamfer",
     },
     "SlotProfile": {"SlotWidth"},
@@ -525,6 +519,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ThreadLength": 1,
         "ReliefDia": 1,
         "ReliefWidth": 1,
+        "ReliefLead": 1,
+        "SeatEdgeBreak": 1,
         "TipChamfer": 1,
     },
     "SlotProfile": {"SlotWidth": 1},
@@ -534,6 +530,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # The single-limit dimensions: (feature, dimension) -> (limit mm, swTolType).
 SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
     ("ScrewProfile", "TipChamfer"): (TIP_CHAMFER_MAX, TIP_CHAMFER_TOL_TYPE),
+    ("ScrewProfile", "SeatEdgeBreak"): (
+        SEAT_EDGE_BREAK_MAX,
+        SEAT_EDGE_BREAK_TOL_TYPE,
+    ),
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

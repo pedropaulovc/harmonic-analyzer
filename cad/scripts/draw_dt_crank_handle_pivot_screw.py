@@ -3,9 +3,9 @@ r"""Create the MHA-DT-32 crank handle pivot screw manufacturing drawing.
 The SLDPRT remains authoritative.  A screw carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the running-fit shoulder keeps its
 native size band and one bearing-surface finish, the head keeps the two bands
-the MHA-DT-035 cup sets, the tip chamfer and relief Ø print as single MAX
-limits, and every other size is an ordinary model dimension at its
-part-authored places.
+the MHA-DT-035 cup sets, and the tip chamfer and seat edge break print as
+single MAX limits.  The relief Ø retains its native size band and the relief
+lead its native limits; every size keeps its part-authored places.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the thread tip on
@@ -14,6 +14,10 @@ tip, the one faced end (see ``dt_crank_handle_pivot_screw_spec``).  The
 head-end view is the ``*Back`` orientation, which is exactly the third-angle
 RIGHT view of that profile, so it sits on the profile's axis to its right and
 shows the slot.
+The relief width, lead and modelled seat edge break read in a standalone
+cropped 10:1 ``*Right`` model view, labelled DETAIL A and circled on the side
+view.  The main profile keeps the relief Ø on its native near-side broken
+leader; no typed dimension note or offset-text surrogate replaces it.
 
 Run with SolidWorks open::
 
@@ -23,10 +27,13 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
-from typing import Any
+from typing import Any, Sequence
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -45,14 +52,15 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
-    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leader_notes import add_attached_note
+import _drawing_leaders
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -70,11 +78,13 @@ from dt_crank_handle_pivot_screw_spec import (
     HEAD_LENGTH_CALLOUT,
     OVERALL_LENGTH,
     REFERENCE_DIMENSIONS,
-    RELIEF_CALLOUT,
     RELIEF_DIA,
+    RELIEF_DIA_CALLOUT,
     RELIEF_END_STATION,
     RELIEF_LEAD,
-    RELIEF_STRENGTH_CALLOUT,
+    RELIEF_LEAD_CALLOUT,
+    RELIEF_WIDTH,
+    SEAT_EDGE_BREAK_CALLOUT,
     SEAT_STATION,
     SHOULDER_CALLOUT,
     SHOULDER_DIA,
@@ -102,16 +112,17 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Both orthographic views print at the sheet scale, so neither needs a caption.
-# 3:1 lays the 67.0 profile 201 mm long and the 1.0 slot 3 mm wide.
+# The main orthographic views print at the sheet scale without captions;
+# DETAIL A labels its enlarged scale.  3:1 lays the 67.0 profile 201 mm long
+# and the 1.0 slot 3 mm wide.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-SIDE_CENTER = (0.160, 0.165)
+SIDE_CENTER = (0.160, 0.190)
 # Third-angle right view of the slotted head end, on the profile's axis,
 # clear of the head Ø's callout.
-END_CENTER = (0.345, SIDE_CENTER[1])
-ISO_CENTER = (0.380, 0.225)
+END_CENTER = (0.383, SIDE_CENTER[1])
+ISO_CENTER = (0.380, 0.245)
 ISO_SCALE = (1, 1)
 
 
@@ -138,10 +149,6 @@ THREAD_START_X = _sheet_x(OVERALL_LENGTH - TIP_CHAMFER)
 HEAD_TOP_Y = _sheet_y(HEAD_DIA / 2.0)
 SHOULDER_TOP_Y = _sheet_y(SHOULDER_DIA / 2.0)
 THREAD_TOP_Y = _sheet_y(THREAD_MODEL_DIA / 2.0)
-RELIEF_TOP_Y = _sheet_y(RELIEF_DIA / 2.0)
-RELIEF_MID_X = (SEAT_X + RELIEF_END_X) / 2.0
-# The relief floor runs from the foot of the 45-degree lead to the flank.
-RELIEF_FLOOR_MID_X = (_sheet_x(SEAT_STATION + RELIEF_LEAD) + RELIEF_END_X) / 2.0
 
 # Rows below the profile, 15 mm apart (text sits ~3 mm above its requested
 # point and the dimension line ~5 mm below it).  Row 0 carries the thread
@@ -155,12 +162,11 @@ _ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.068
 # The 4-mm head prints 12 mm long, narrower than its ~21-mm value, so the head
 # length, the head Ø and the slot depth stand outside the head face rather
 # than between extension lines that would strike their text (v43 render).
-# Each head band's one-line reason callout is centred under its value, so the
-# text centre stands half that line's width (2.75 mm a character, measured on
-# the r3 audit: 52.2 mm for 19, 57.1 mm for 21) plus 5-6 mm right of the head
-# face's extension line and the centreline's overshoot.
-HEAD_LENGTH_TEXT_X = HEAD_FACE_X + 0.034  # "BELOW MHA-DT-035 FACE"
-HEAD_DIA_TEXT_X = HEAD_FACE_X + 0.032  # "ON MHA-DT-035 FLOOR"
+# Each head band's one-line reason callout is centred under its value.
+# Its half-width at 2.8 mm a character leaves 6 mm clear of the head-face
+# extension line and the centreline's overshoot, even with the longer reasons.
+HEAD_LENGTH_TEXT_X = HEAD_FACE_X + 0.006 + len(HEAD_LENGTH_CALLOUT) * 0.0028 / 2.0
+HEAD_DIA_TEXT_X = HEAD_FACE_X + 0.006 + len(HEAD_DIA_CALLOUT) * 0.0028 / 2.0
 SLOT_DEPTH_TEXT_X = HEAD_FACE_X + 0.012
 SIDE_KEEP = {
     "ThreadLength": ((TIP_X + SEAT_X) / 2.0, _ROW_Y[0]),
@@ -175,12 +181,16 @@ SIDE_KEEP = {
     # The head Ø's value stands a little above the axis so its callout below
     # stays between the head's extension lines.
     "HeadDia": (HEAD_DIA_TEXT_X, SIDE_CENTER[1] + 0.0025),
-    # The thread-relief groove against the seat face.  Its width from the seat
-    # face reads above it alone; its Ø reads below it with the 45-degree lead
-    # as its callout, the dimension line standing on the floor so nothing
-    # crosses.
-    "ReliefWidth": (RELIEF_MID_X, SIDE_CENTER[1] + 0.022),
-    "ReliefDia": (RELIEF_FLOOR_MID_X, SIDE_CENTER[1] - 0.016),
+    # The relief Ø stays associated with the groove floor in this view;
+    # width and both small 45-degree legs read separately in DETAIL A.
+    # The native broken leader joins the text beyond the seat witness,
+    # keeping its widest callout line 6 mm clear without offset calibration.
+    "ReliefDia": (
+        SEAT_X
+        + 0.006
+        + max(len(line) for line in RELIEF_DIA_CALLOUT.splitlines()) * 0.0028 / 2.0,
+        SIDE_CENTER[1] - 0.0185,
+    ),
     # The tip chamfer's axial leg reads below-left of the tip, clear of the
     # thread size's extension line at the tip and of the callout above.
     "TipChamfer": (TIP_X - 0.020, SIDE_CENTER[1] - 0.016),
@@ -188,29 +198,40 @@ SIDE_KEEP = {
     # outside the head face.
     "SlotDepth": (SLOT_DEPTH_TEXT_X, SIDE_CENTER[1] + 0.026),
 }
-# The relief Ø's dimension line stands on the floor (SIDE_KEEP); its text
-# goes on an OffsetText leader so the seat-face extension line (the thread
-# length's right side) cannot run through "0.5 X 45 DEG LEAD".  With
-# OffsetText the anchor is the CENTRE of the Ø line's bottom edge and the
-# callout is centred under it (a dimension exposes no GetExtent).  The lead
-# line measured 49.2917 mm in r4 and r6.  Keep the seating reason shorter:
-# r6's "SEATING TORQUE NECK" measured 52.4319 mm and left only 1.99 mm
-# beside the seat-face witness.  The bilateral relief's underline is
-# 10.0819 mm below the anchor.  The full-width block stands 3.5 mm right of
-# the seat face and 3 mm clear of the shoulder Ø line; its leader passes
-# below the seat-face corner.
-RELIEF_DIA_TEXT_WIDTH = 0.0493
-RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0101
-RELIEF_DIA_TEXT_CLEARANCE = 0.0035
-RELIEF_DIA_TEXT_XY = (
-    SEAT_X + RELIEF_DIA_TEXT_CLEARANCE + RELIEF_DIA_TEXT_WIDTH / 2.0,
-    SIDE_CENTER[1] - 0.0185,
-)
 # The 3-mm slot is narrower than the text, so the value stands above its
 # extension lines rather than between them.
 END_KEEP = {
     "SlotWidth": (END_CENTER[0] + 0.022, END_CENTER[1] + 0.010),
 }
+# A standalone cropped model view offers the tiny model-owned dimensions
+# that a true detail child did not offer in the VN post-mount-screw recipe.
+# The broad width sits above the separate lead and seat-break text rows.
+DETAIL_SCALE = (10.0, 1.0)
+DETAIL_CENTER = (0.115, 0.058)
+DETAIL_RADIUS_MM = 3.0
+DETAIL_RADIUS = DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+DETAIL_STATION = SEAT_STATION + RELIEF_WIDTH / 2.0
+DETAIL_REFERENCE_MM = (0.0, 0.0, DETAIL_STATION)
+DETAIL_KEEP = {
+    "ReliefWidth": (DETAIL_CENTER[0], 0.1045),
+    "ReliefLead": (0.075, 0.0955),
+    "SeatEdgeBreak": (0.180, 0.0955),
+}
+DETAIL_LETTER = "A"
+DETAIL_VIEW_LABEL = (
+    f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]:g}:{DETAIL_SCALE[1]:g}"
+)
+DETAIL_LABEL_XY = (0.165, 0.055)
+DETAIL_PARENT_LETTER_XY = (
+    _sheet_x(DETAIL_STATION) + 0.014,
+    SIDE_CENTER[1] + 0.019,
+)
+DETAIL_PARENT_RADIUS = DETAIL_RADIUS_MM * _S / 1000.0
+# Sheet-space readbacks reject inference-snapped circles and an ignored move.
+CIRCLE_TOL_M = 0.00005
+DETAIL_VIEW_POSITION_TOLERANCE_M = 0.0001
+ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+_CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 # The thread callout's leader lands on the edge where the full thread meets
 # the tip chamfer, the full-thread portion's own end edge in the side view (the
 # relief-flank edge at the other end would read as pointing at the groove).
@@ -236,9 +257,9 @@ SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the line is a fully defined sketch length
 # A point on the shoulder face, clear of the Ø6.00 dimension line.
 CENTERLINE_PICK = (UNDERHEAD_X - 0.080, SIDE_CENTER[1] + 0.003)
-ISO_NOTE_XY = (0.352, 0.200)
-# Bottom-left, above the title-block line, like the other crank sheets.
-NOTES_XY = (0.016, 0.070)
+ISO_NOTE_XY = (0.352, 0.218)
+# The single assembly-only note sits above the profile, clear of DETAIL A.
+NOTES_XY = (0.016, 0.250)
 
 
 def _reference_line_in_view(view: Any, sketch_name: str, length_mm: float) -> Any:
@@ -308,6 +329,222 @@ def _blacken_under_head_witness(adapter: Any, view: Any) -> None:
     draw.EditRebuild3()
 
 
+def _sketch_circle(
+    adapter: Any,
+    view: Any,
+    center: tuple[float, float],
+    radius: float,
+    *,
+    label: str,
+) -> Any:
+    """Sketch a view-owned circle from sheet coordinates, leaving it selected.
+
+    As in the VN post-mount-screw crop, transform through the view sketch and
+    use AddToDB so screen-space inference cannot snap the crop or parent mark.
+    """
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    prior = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = prior
+    if circle is None:
+        raise RuntimeError(f"cannot sketch the {label} circle")
+    # Convert the sheet tolerance to sketch units using the asked radius.
+    asked = math.dist(points[0][:2], points[1][:2])
+    tol = CIRCLE_TOL_M * asked / radius
+    arc = _early_bound(circle, "ISketchArc")
+    made = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    off = math.dist((float(made.X), float(made.Y)), points[0][:2])
+    made_radius = float(arc.GetRadius())
+    if off > tol or abs(made_radius - asked) > tol:
+        raise RuntimeError(
+            f"{label} circle landed off its ask: centre {off / asked * radius * 1000.0:.3f} mm "
+            f"away, radius {made_radius / asked * radius * 1000.0:.3f} mm for "
+            f"{radius * 1000.0:.3f} mm (tolerance {CIRCLE_TOL_M * 1000.0:.2f} mm)"
+        )
+    return circle
+
+
+def _activate(adapter: Any, view: Any, *, label: str) -> str:
+    name = view_name(adapter, view)
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateView(name):
+        raise RuntimeError(f"failed to activate the {label} {name!r}")
+    adapter.currentModel.ClearSelection2(True)
+    return name
+
+
+def _note_texts(view: Any) -> list[str]:
+    return [
+        str(_early_bound(note, "INote").GetText())
+        for note in (_early_bound(view, "IView").GetNotes() or ())
+    ]
+
+
+def cropped_relief_view(adapter: Any) -> Any:
+    """Centre and crop a standalone 10:1 *Right model view at the relief.
+
+    The VN crop pattern keeps the model dimensions available for native
+    import, unlike a true detail child.  Crop2 consumes the selected circle
+    in the activated view's sketch; both placement and crop are read back.
+    """
+    draw = adapter.currentModel
+    view = _early_bound(
+        place_view(adapter, str(SOURCE), "*Right", *DETAIL_CENTER, scale=DETAIL_SCALE),
+        "IView",
+    )
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if ratio != DETAIL_SCALE:
+        raise RuntimeError(f"relief view scale {ratio!r}, expected {DETAIL_SCALE!r}")
+    reference = tuple(value / 1000.0 for value in DETAIL_REFERENCE_MM)
+    relief = model_point_in_view(adapter, view, reference, label="relief view reference")
+    position = tuple(float(value) for value in view.Position)
+    target = [position[i] + DETAIL_CENTER[i] - relief[i] for i in range(2)]
+    if not view.SetViewPosition(double_array(target), False):
+        raise RuntimeError("cannot move the relief view onto its sheet position")
+    draw.EditRebuild3()
+    center = model_point_in_view(adapter, view, reference, label="relief view reference")
+    if math.dist(center, DETAIL_CENTER) > DETAIL_VIEW_POSITION_TOLERANCE_M:
+        raise RuntimeError(
+            f"relief view reference sits at {center!r}, not {DETAIL_CENTER!r}"
+        )
+    _activate(adapter, view, label="relief view")
+    _sketch_circle(adapter, view, center, DETAIL_RADIUS, label="relief view crop")
+    status = int(view.Crop2(False, False, 5))
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    cropped = bool(view.IsCropped())
+    _telemetry.info(
+        f"relief view {view_name(adapter, view)!r}: {ratio[0]:g}:{ratio[1]:g}, "
+        f"Crop2 status {status}, IsCropped {cropped}"
+    )
+    if status != _CROP_NO_ERROR or not cropped:
+        raise RuntimeError(
+            f"relief view is not cropped: Crop2 status {status}, IsCropped {cropped}"
+        )
+    return view
+
+
+def _assert_relief_diameter_leader(
+    segments: Sequence[_drawing_leaders.Segment],
+) -> None:
+    """Require native ink on the lower groove floor and below the seat corner."""
+    if not segments:
+        raise RuntimeError("MHA-DT-032 relief diameter has no native leader ink")
+    floor_left, floor_right = sorted(
+        (RELIEF_END_X, _sheet_x(SEAT_STATION + RELIEF_LEAD))
+    )
+    floor_y = SIDE_CENTER[1] - RELIEF_DIA * _S / 2000.0
+    if not any(
+        math.hypot(
+            x - min(max(x, floor_left), floor_right),
+            y - floor_y,
+        )
+        <= 0.00015
+        for segment in segments
+        for x, y in segment
+    ):
+        raise RuntimeError(
+            "MHA-DT-032 relief diameter leader does not land on the lower groove floor"
+        )
+    shoulder_bottom = SIDE_CENTER[1] - SHOULDER_DIA * _S / 2000.0
+    for (x0, y0), (x1, y1) in segments:
+        if min(x0, x1) <= SEAT_X <= max(x0, x1):
+            if x0 == x1:
+                crossing_y = max(y0, y1)
+            else:
+                crossing_y = y0 + (SEAT_X - x0) * (y1 - y0) / (x1 - x0)
+            if crossing_y > shoulder_bottom - 0.002:
+                raise RuntimeError(
+                    "MHA-DT-032 relief diameter leader crosses the seat face/witness "
+                    "instead of passing below its corner"
+                )
+
+
+def style_relief_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Keep the native Ø leader and small-leg text outside its witnesses."""
+    remaining = {
+        "ReliefDia": SIDE_KEEP["ReliefDia"],
+        "ReliefLead": DETAIL_KEEP["ReliefLead"],
+        "SeatEdgeBreak": DETAIL_KEEP["SeatEdgeBreak"],
+    }
+    relief_diameter = None
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        xy = remaining.pop(name, None)
+        if xy is None:
+            continue
+        if name == "ReliefDia":
+            _drawing_leaders.set_near_side_diameter(
+                annotation, "MHA-DT-032 relief diameter"
+            )
+            relief_diameter = annotation
+        else:
+            display = _early_bound(
+                annotation.GetSpecificAnnotation(), "IDisplayDimension"
+            )
+            display.CenterText = False
+            display.ArrowSide = ARROWS_OUTSIDE
+        if not annotation.SetPosition2(*xy, 0.0):
+            raise RuntimeError(f"cannot position the MHA-DT-032 {name} text")
+        if name != "ReliefDia" and (
+            int(display.ArrowSide) != ARROWS_OUTSIDE or bool(display.CenterText)
+        ):
+            raise RuntimeError(
+                f"{name} arrows/centring did not take: ArrowSide {display.ArrowSide}, "
+                f"CenterText {display.CenterText}"
+            )
+    if remaining:
+        raise RuntimeError(f"relief dimension styles not applied: {sorted(remaining)}")
+    adapter.currentModel.EditRebuild3()
+    _assert_relief_diameter_leader(
+        _drawing_leaders.dimension_segments(relief_diameter)
+    )
+
+
+def label_relief_view(adapter: Any, view: Any) -> None:
+    """Give the cropped model view its own two-line DETAIL A scale label."""
+    _activate(adapter, view, label="relief view")
+    if add_note(adapter, DETAIL_VIEW_LABEL, *DETAIL_LABEL_XY) is None:
+        raise RuntimeError("failed to add the relief view label")
+    texts = _note_texts(view)
+    if texts.count(DETAIL_VIEW_LABEL) != 1:
+        raise RuntimeError(
+            f"relief view label did not land in the relief view: its notes are {texts!r}"
+        )
+
+
+def mark_relief_on_side(adapter: Any, side: Any) -> None:
+    """Circle the same model reference on SIDE and add its view-owned A."""
+    _activate(adapter, side, label="side view")
+    reference = tuple(value / 1000.0 for value in DETAIL_REFERENCE_MM)
+    center = model_point_in_view(adapter, side, reference, label="side relief mark")
+    _sketch_circle(
+        adapter, side, center, DETAIL_PARENT_RADIUS, label="side relief mark"
+    )
+    adapter.currentModel.ClearSelection2(True)
+    if add_note(adapter, DETAIL_LETTER, *DETAIL_PARENT_LETTER_XY) is None:
+        raise RuntimeError("failed to letter the side view's relief mark")
+    texts = _note_texts(side)
+    if texts.count(DETAIL_LETTER) != 1:
+        raise RuntimeError(
+            f"side relief letter did not land in the side view: its notes are {texts!r}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -351,8 +588,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=VIEW_SCALE)
     end = place_view(adapter, str(SOURCE), "*Back", *END_CENTER, scale=VIEW_SCALE)
+    detail = cropped_relief_view(adapter)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (side, end, iso):
+    for view in (side, end, detail, iso):
         set_hidden_lines_removed(adapter, view)
 
     side_annotations = curate_view_dimensions(
@@ -369,14 +607,23 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="head-end",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*side_annotations, *end_annotations]
-    # Callouts below each value: the relief lead, the chamfer's angle, each
-    # head band's reason and the fitted shoulder's to-suit rule (rule 4).
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="relief detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [*side_annotations, *end_annotations, *detail_annotations]
+    # Each native dimension carries its own angle or functional reason below
+    # the value; the two tiny legs remain separate in the enlarged view.
     set_dimension_callouts(
         adapter,
         annotations,
         {
-            "ReliefDia": RELIEF_CALLOUT,
+            "ReliefDia": RELIEF_DIA_CALLOUT,
+            "ReliefLead": RELIEF_LEAD_CALLOUT,
+            "SeatEdgeBreak": SEAT_EDGE_BREAK_CALLOUT,
             "TipChamfer": CHAMFER_CALLOUT,
             "HeadDia": HEAD_DIA_CALLOUT,
             "HeadLength": HEAD_LENGTH_CALLOUT,
@@ -384,19 +631,17 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         location="below",
     )
-    # Rule 4: name the running mate and the relief neck's functional reason.
-    # The reasons sit above each value, clear of the lead below the relief
-    # and the dimension line that drops to the shoulder.
+    # Rule 4: the running mate's to-suit rule sits above the shoulder value,
+    # clear of the dimension line that drops to the shoulder.
     set_dimension_callouts(
         adapter,
         annotations,
         {
             "ShoulderDia": SHOULDER_CALLOUT,
-            "ReliefDia": RELIEF_STRENGTH_CALLOUT,
         },
         location="above",
     )
-    offset_dimension_text(adapter, side_annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
+    style_relief_dimensions(adapter, annotations)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [
@@ -435,6 +680,9 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
         char_height=0.0025,
     )
+    label_relief_view(adapter, detail)
+    mark_relief_on_side(adapter, side)
+    _activate(adapter, side, label="side view notes")
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

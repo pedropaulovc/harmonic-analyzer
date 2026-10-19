@@ -10,7 +10,9 @@ Layout: one revolve about local +Z.  The slotted head face is at z=0; the head,
 shoulder and threaded section follow in +Z, the threaded section opening
 with a thread-relief groove against the seat face (a 45-degree lead from its
 floor into the seat face) so a die runs out into air and the shoulder seats
-tight, and closing with a 45-degree thread-start chamfer on the tip.  The driver slot is sketched on the Front
+tight.  A 45-degree outer seat-edge break clears the arm-face corner; the
+threaded section closes with a 45-degree thread-start chamfer on the tip.
+The driver slot is sketched on the Front
 Plane (the head face) and cut 1.6 deep across the full head, running along
 local X.  ``ArmSeat`` is a named plane on the shoulder's seat face and
 ``Axis1`` the screw axis, for the assembly mates.
@@ -79,6 +81,7 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_LEAD,
     RELIEF_LEAD_TOL,
     RELIEF_WIDTH,
+    SEAT_EDGE_BREAK_MAX,
     SEAT_STATION,
     SHOULDER_DIA,
     SHOULDER_DIA_BAND,
@@ -113,8 +116,8 @@ V_RELIEF = math.pi * (THREAD_R**2 - RELIEF_R**2) * RELIEF_WIDTH - V_LEAD
 def turned_volume(thread_length: float, tip_chamfer: float) -> float:
     """Revolved body volume for a threaded section and tip chamfer.
 
-    The 45-degree tip chamfer removes the corner triangle (legs
-    ``tip_chamfer``, centroid ``THREAD_R - tip_chamfer/3`` from the axis).
+    The 45-degree tip chamfer and outer seat-edge break remove corner triangles
+    whose centroids lie one third of their leg length inward from the outer radius.
     """
     turned = math.pi * (
         HEAD_R**2 * HEAD_LENGTH
@@ -122,7 +125,10 @@ def turned_volume(thread_length: float, tip_chamfer: float) -> float:
         + THREAD_R**2 * thread_length
     )
     chamfer = math.pi * tip_chamfer**2 * (THREAD_R - tip_chamfer / 3.0)
-    return turned - V_RELIEF - chamfer
+    seat_edge_break = math.pi * SEAT_EDGE_BREAK_MAX**2 * (
+        SHOULDER_R - SEAT_EDGE_BREAK_MAX / 3.0
+    )
+    return turned - V_RELIEF - chamfer - seat_edge_break
 
 
 V_BODY = turned_volume(THREAD_LENGTH, TIP_CHAMFER)
@@ -160,6 +166,38 @@ def _single_limits(adapter) -> None:
         _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
 
 
+def _relief_lead_limits(adapter) -> None:
+    """Print the existing relief lead as native LIMIT bounds at its own precision."""
+    label = "ReliefLead@ScrewProfile"
+    display, dimension = _named_dimension(adapter, "ScrewProfile", "ReliefLead")
+    lower, upper = -RELIEF_LEAD_TOL, RELIEF_LEAD_TOL
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 3  # swTolType_e.swTolLIMIT
+    # SetValues2 is rejected on some SW2026 dimensions; use the native LIMIT
+    # writer from build_mg_output_fixture._limit_band (lower, upper in metres).
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+    if (
+        int(tolerance.Type) != 3
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, rel_tol=0.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, rel_tol=0.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    places = DRAWING_PRECISION["ScrewProfile"]["ReliefLead"]
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetPrecision3(-1, -1, places, -1)
+    if int(display.GetPrimaryTolPrecision2()) != places:
+        raise RuntimeError(f"{label}: LIMIT precision did not persist")
+    value = float(dimension.SystemValue) * 1000.0
+    _telemetry.success(
+        f"{label}: LIMIT {value + upper:.{places}f}/{value + lower:.{places}f}"
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreateConfigurationParameters,
@@ -177,6 +215,7 @@ async def build(adapter) -> dict[str, str]:
         ("HeadLength", HEAD_LENGTH),
         ("ShoulderDia", SHOULDER_DIA),
         ("ShoulderLength", SHOULDER_LENGTH),
+        ("SeatEdgeBreak", SEAT_EDGE_BREAK_MAX),
         ("ThreadDia", THREAD_MODEL_DIA),
         ("ThreadLength", THREAD_LENGTH),
         ("ReliefDia", RELIEF_DIA),
@@ -200,15 +239,17 @@ async def build(adapter) -> dict[str, str]:
         "screw axis centerline",
         await adapter.add_centerline(0.0, 0.0, -OVERALL_LENGTH, 0.0),
     )
-    # The thread-relief groove is part of the profile: the seat face steps down
-    # to a 45-degree lead onto the relief floor, which runs to RELIEF_WIDTH
-    # from the seat face before the flank rises to the thread major.
+    # The shoulder's outer corner has a 45-degree seat-edge break.  The seat
+    # face remains at SEAT_STATION and steps down to a 45-degree lead onto the
+    # relief floor, which runs to RELIEF_WIDTH from the seat face before the
+    # flank rises to the thread major.
     points = [
         (0.0, 0.0),
         (0.0, HEAD_R),
         (-HEAD_LENGTH, HEAD_R),
         (-HEAD_LENGTH, SHOULDER_R),
-        (-SEAT_STATION, SHOULDER_R),
+        (-(SEAT_STATION - SEAT_EDGE_BREAK_MAX), SHOULDER_R),
+        (-SEAT_STATION, SHOULDER_R - SEAT_EDGE_BREAK_MAX),
         (-SEAT_STATION, RELIEF_R + RELIEF_LEAD),
         (-(SEAT_STATION + RELIEF_LEAD), RELIEF_R),
         (-RELIEF_END_STATION, RELIEF_R),
@@ -229,18 +270,26 @@ async def build(adapter) -> dict[str, str]:
             await adapter.add_sketch_constraint(line, None, relation),
         )
     head_outline, shoulder_outline = lines[1], lines[3]
-    relief_lead, relief_floor, thread_outline = lines[5], lines[6], lines[8]
-    tip_chamfer = lines[9]
-    # The threaded section is sized from the seat face to the tip, across the
-    # relief; the relief width and the lead's axial leg from the seat face; the
-    # tip chamfer's axial leg from the tip.
+    seat_edge_break = lines[4]
+    relief_lead, relief_floor, thread_outline = lines[6], lines[7], lines[9]
+    tip_chamfer = lines[10]
+    # ShoulderLength spans from under the head to the actual seat face, not
+    # the shortened cylindrical outline.  The threaded section is sized from
+    # the seat face to the tip, across the relief; the relief width and lead's
+    # axial leg start at that same seat face.  Each chamfer has an axial leg.
     for name, start, end, value in (
         ("HeadLength", f"{head_outline}.start", f"{head_outline}.end", HEAD_LENGTH),
         (
             "ShoulderLength",
             f"{shoulder_outline}.start",
-            f"{shoulder_outline}.end",
+            f"{seat_edge_break}.end",
             SHOULDER_LENGTH,
+        ),
+        (
+            "SeatEdgeBreak",
+            f"{seat_edge_break}.start",
+            f"{seat_edge_break}.end",
+            SEAT_EDGE_BREAK_MAX,
         ),
         ("ThreadLength", f"{relief_lead}.start", f"{tip_chamfer}.end", THREAD_LENGTH),
         ("ReliefWidth", f"{relief_lead}.start", f"{relief_floor}.end", RELIEF_WIDTH),
@@ -251,6 +300,15 @@ async def build(adapter) -> dict[str, str]:
             adapter, start, end, "horizontal_distance", value, f"screw {name}"
         )
         profile.record(name, f'"{name}"')
+    await dimension_between(
+        adapter,
+        f"{seat_edge_break}.start",
+        f"{seat_edge_break}.end",
+        "vertical_distance",
+        SEAT_EDGE_BREAK_MAX,
+        "screw seat edge break rise",
+    )
+    profile.record("SeatEdgeBreakRise", '"SeatEdgeBreak"')
     # The lead's radial leg equals its axial leg by equation: 45 degrees.
     await dimension_between(
         adapter,
@@ -305,7 +363,7 @@ async def build(adapter) -> dict[str, str]:
     check("revolve screw", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Screw")
     await volume_check(
-        adapter, "turned shoulder screw with thread relief and tip chamfer", V_BODY, 0.005 * V_BODY
+        adapter, "turned shoulder screw with seat edge break, thread relief and tip chamfer", V_BODY, 0.005 * V_BODY
     )
 
     # Straight driver slot across the full head, sketched on the head face
@@ -474,11 +532,8 @@ async def build(adapter) -> dict[str, str]:
     # The disposable tip chamfer prints a single MAX within the thread depth;
     # the slot depth and thread length are routine .X.
     _single_limits(adapter)
-    # The relief lead prints as limits in the relief callout, the model owning
-    # its band all the same (Codex P2 on #1139).
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewProfile", "ReliefLead", RELIEF_LEAD_TOL
-    )
+    # The relief lead's own native dimension prints both limits of its band.
+    _relief_lead_limits(adapter)
 
     # Every model edit -- the material, the appearance, the drawing marks, the
     # PMI and the hidden reference sketch -- precedes the INSTALLED split, so
