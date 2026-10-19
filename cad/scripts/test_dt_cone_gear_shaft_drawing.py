@@ -261,10 +261,10 @@ def test_display_precision_is_owned_by_the_part() -> None:
     assert "draw_dt_cone_gear_shaft.py" in PRECISION_MIGRATED_DRAWINGS
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_precision" not in source
-    # The contract's one exception: the front-to-tip REFERENCE (#917 R5 (a))
-    # takes its places from the spec constant, never a literal.
-    assert source.count("SetPrecision3") == 1
-    assert "SetPrecision3(DRAWING_REFERENCE_PRECISION, " in source
+    # Pure references (overall and supplementary setup sheet) take their
+    # places from the existing spec constant, never a literal or a new band.
+    assert source.count("SetPrecision3") == 2
+    assert source.count("SetPrecision3(DRAWING_REFERENCE_PRECISION, ") == 2
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in (
         Path(part.__file__).read_text(encoding="utf-8")
     )
@@ -1863,8 +1863,8 @@ def test_one_length_origin_is_the_collar_face() -> None:
             spec.SECTION_ENDS[i] - spec.COLLAR_START_STATION
         )
     assert spec.DRAWING_PRECISION_BY_NAME["Sec4End"] == 2
-    # The front-to-tip overall is the one sheet-derived dimension: a read-only
-    # sum with its places handed over by the spec (drawing contract).
+    # The front-to-tip overall and supplementary setup measurements are
+    # read-only references; their places are handed over by the spec.
     assert spec.DRAWING_REFERENCE_PRECISION == 1
 
 
@@ -1933,6 +1933,162 @@ def test_the_overall_is_added_as_a_checked_reference() -> None:
     assert "set_reference_dimension(" in source
     assert "SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)" in source
     assert 'orientation="horizontal"' in source
+
+
+def _setup_reference_sheet(monkeypatch, *, measurement_error=0.0):
+    """Run the real reference loop and its native measurement/parenthesis
+    helpers against edge/annotation doubles, not typed displayed values."""
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    import _drawing_dimensions
+    import _drawing_edge_dimensions
+
+    spec = dt_cone_gear_shaft_spec
+    seat = _Edge(_Curve(-spec.COLLAR_END_STATION / 1000.0, spec.COLLAR_DIA / 2000.0))
+    ends = [
+        _Edge(_Curve(-spec.SECTION_ENDS[land] / 1000.0, spec.SECTION_DIAS[land] / 2000.0))
+        for land in drawing.SETUP_REFERENCE_LANDS
+    ]
+    # The journal-side collar circle and small-land starts must NOT win:
+    # the picker needs both the station and the diameter of the end edge.
+    distractors = [
+        _Edge(None),
+        _Edge(_Curve(-spec.COLLAR_START_STATION / 1000.0, spec.COLLAR_DIA / 2000.0)),
+        _Edge(_Curve(-spec.COLLAR_END_STATION / 1000.0, spec.SECTION_DIAS[1] / 2000.0)),
+        *(
+            _Edge(_Curve(-spec.COLLAR_END_STATION / 1000.0, spec.SECTION_DIAS[land] / 2000.0))
+            for land in (2, 3, 4)
+        ),
+    ]
+    model = SimpleNamespace(
+        ActivateSheet=Mock(return_value=True),
+        EditSheet=Mock(),
+        EditRebuild3=Mock(),
+    )
+    adapter = SimpleNamespace(
+        currentModel=model,
+        _attempt=lambda fn: fn(),
+        swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
+    )
+    side = object()
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(
+        drawing._sw_type_info, "early_bound_or_flag", lambda obj, *_interfaces: obj
+    )
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda *_a, **_k: [*distractors, seat, *ends])
+    place = Mock(return_value=side)
+    note = Mock(return_value=object())
+    origin_note = Mock(return_value=object())
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", Mock())
+    monkeypatch.setattr(drawing, "add_note", note)
+    monkeypatch.setattr(drawing, "add_attached_note", origin_note)
+    # Keep the real parenthesizing helper: only native prefix/suffix may be
+    # written, leaving ShowDimensionValue and the unrounded measurement live.
+    monkeypatch.setattr(drawing, "set_reference_dimension", _drawing_dimensions.set_reference_dimension)
+
+    class Display:
+        def __init__(self, entities):
+            self.entities = entities
+            self.dangling = False
+            self.precision = None
+            self.text = {}
+            self.ShowDimensionValue = True
+            start, end = (abs(edge.GetCurve().CircleParams[2]) for edge in entities)
+            self.native = SimpleNamespace(
+                SystemValue=end - start + measurement_error / 1000.0,
+                Tolerance=SimpleNamespace(Type=0),
+            )
+            self.annotation = SimpleNamespace(
+                GetSpecificAnnotation=lambda: self,
+                GetAttachedEntities3=lambda: self.entities,
+                GetAttachedEntityTypes=lambda: (1, 1),
+                IsDangling=lambda: self.dangling,
+            )
+
+        def GetAnnotation(self):
+            return self.annotation
+
+        def GetDimension2(self, _index):
+            return self.native
+
+        def SetText(self, part, value):
+            assert part in (1, 2), "a setup reference must not override its native value"
+            self.text[part] = value
+
+        def GetText(self, part):
+            return self.text.get(part, "")
+
+        def SetPrecision3(self, primary, dual, primary_tol, dual_tol):
+            assert (dual, primary_tol, dual_tol) == (-1, -1, -1)
+            self.precision = primary
+            return 0
+
+        def GetPrimaryPrecision2(self):
+            return self.precision
+
+    def add_dimension(_adapter, view, **kwargs):
+        assert view is side
+        assert kwargs["entities"][0] is seat
+        assert kwargs["orientation"] == "horizontal"
+        display = Display(kwargs["entities"])
+        return display
+
+    add = Mock(side_effect=add_dimension)
+    monkeypatch.setattr(drawing, "add_edge_dimension", add)
+    references = drawing._add_setup_sheet(adapter)
+    return SimpleNamespace(
+        adapter=adapter, side=side, seat=seat, ends=ends, references=references,
+        add=add, origin_note=origin_note,
+    )
+
+
+def test_setup_sheet_measures_exact_native_edges(monkeypatch) -> None:
+    fixture = _setup_reference_sheet(monkeypatch)
+    assert len(fixture.references) == len(fixture.add.call_args_list) == 4
+    measured = []
+    for index, reference in enumerate(fixture.references):
+        display = reference.display
+        assert reference.entities == (fixture.seat, fixture.ends[index])
+        assert display.text == {1: "(", 2: ")"}
+        assert display.ShowDimensionValue is True
+        assert display.native.Tolerance.Type == 0
+        assert display.precision == dt_cone_gear_shaft_spec.DRAWING_REFERENCE_PRECISION
+        measured.append(display.native.SystemValue * 1000.0)
+    assert measured[:3] == pytest.approx((116.234, 123.110, 129.986), abs=0.001)
+    assert measured[3] == pytest.approx(163.60, abs=0.005)
+    assert fixture.origin_note.call_args.kwargs["entity"] is fixture.seat
+    assert fixture.origin_note.call_args.kwargs["attached_to"] is fixture.seat
+
+
+def test_setup_native_nominal_error_hidden_by_rounding_is_rejected(monkeypatch) -> None:
+    # A 0.01 mm miss can print the same one-place reference; readback must
+    # compare the exact native measurement, not rounded visible text.
+    with pytest.raises(RuntimeError, match="measures .* expected"):
+        _setup_reference_sheet(monkeypatch, measurement_error=0.01)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    ("band", "prefix", "suffix", "hidden_value", "precision"),
+)
+def test_setup_settled_readback_rejects_a_lost_reference_contract(monkeypatch, damage) -> None:
+    fixture = _setup_reference_sheet(monkeypatch)
+    display = fixture.references[0].display
+    if damage == "band":
+        display.native.Tolerance.Type = 4
+    elif damage == "prefix":
+        display.text[1] = ""
+    elif damage == "suffix":
+        display.text[2] = ""
+    elif damage == "hidden_value":
+        display.ShowDimensionValue = False
+    elif damage == "precision":
+        display.precision += 1
+    with pytest.raises(RuntimeError, match="is not an unbanded native reference"):
+        drawing._assert_setup_references(fixture.adapter, fixture.references)
 
 
 def test_drive_train_seats_the_shaft_and_64t_on_the_collar(monkeypatch) -> None:

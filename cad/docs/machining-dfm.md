@@ -61,6 +61,14 @@ geometry is casting-shaped, not milling-shaped.
      released shaft swing is bounded by the post journal, not by assumed cup capture.
      The current calculated least nose air is 0.4681 mm (`dt_tip_collar_air.require_air()`),
      not a measured clearance.
+     The shaft drawing's supplementary **Setup References** sheet measures from
+     the collar's north / 64T-seat face to the three shoulders and the tip.
+     These are native, parenthesized reference measurements only, with no
+     independent acceptance band; **Shaft Controls** (sheet 1) retains every
+     controlling dimension, including the tip-side stations measured from the
+     journal-side thrust face, and the existing tolerance correlations.
+     The presentation does not establish chuck access
+     to either collar face or prescribe a workholding arrangement.
 
 - **The CNC repeat families (make N identical on the PM-30MV — this is where CNC earns its keep):**
   | family | qty | why CNC |

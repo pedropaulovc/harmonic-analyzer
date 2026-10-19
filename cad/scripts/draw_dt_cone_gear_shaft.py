@@ -14,8 +14,10 @@ tight band names its mate at its own callout (a seat's gears below or after
 its diameter, a flat's after its across-flat), the steps and the collar web
 say what their three places locate, and the note gives the gears' drawing
 numbers and the tailstock support the tip land needs (U40).  Source geometry
-and native model fits stay
-authoritative: the sheet types no tolerance and no precision.
+and native model fits stay authoritative.  A separate setup sheet supplements
+these controls with parenthesized, unbanded native measurements from the
+collar's north / 64T-seat face; it creates no acceptance limits.  These pure
+references and the front-to-tip overall take their display precision from the spec.
 
 Run with SolidWorks open::
 
@@ -35,6 +37,7 @@ from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     delete_view,
     dimension_name,
     iter_views,
@@ -67,9 +70,10 @@ from _drawing_common import (
 from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
-from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
+from _drawing_leader_notes import add_attached_note
 from _drawing_leaders import (
     Segment,
     dimension_segments,
@@ -82,6 +86,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import estimate_text_box
 from _machinist_review_mode import MachinistReviewMode
@@ -129,6 +134,19 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 SIDE_SCALE = (1, 1)
 ISO_SCALE = (1, 2)
+SHEET_NAMES = ("Shaft Controls", "Setup References")
+SETUP_SCALE = (3, 2)
+SETUP_CENTER = (0.210, 0.183)
+SETUP_REFERENCE_LANDS = (1, 2, 3, 4)
+SETUP_REFERENCE_TIERS = (0.157, 0.139, 0.121, 0.103)
+SETUP_NOTE_XY = (0.065, 0.245)
+SETUP_NOTE = (
+    "SUPPLEMENTARY SETUP REFERENCES ONLY\n"
+    "PARENTHESIZED VALUES ARE NOT ACCEPTANCE LIMITS\n"
+    "ALL DIMENSIONAL REQUIREMENTS: SHEET 1"
+)
+SETUP_SEAT_NOTE_XY = (0.310, 0.215)
+SETUP_SEAT_NOTE = "COLLAR NORTH FACE\n64T SEAT"
 
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
@@ -565,6 +583,95 @@ def _add_overall_reference(adapter: Any, side: Any) -> Any:
     if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError("front-to-tip overall reference precision did not persist")
     return display
+
+
+class SetupReference(NamedTuple):
+    """One native setup measurement, retaining both exact entity attachments."""
+
+    land: int
+    display: Any
+    entities: tuple[Any, Any]
+
+
+def _assert_setup_references(adapter: Any, references: Sequence[SetupReference]) -> None:
+    """Prove the supplementary sheet still measures the unrounded geometry.
+
+    These are NOT independent controls.  Both original stations use the
+    journal-side collar face: S-to-shoulder = SecNEnd - CollarWidth, and
+    S-to-tip = Sec4End - CollarWidth.  Their worst-case derived uncertainty
+    is therefore +/-0.26 and +/-0.64 mm respectively, not the title block's
+    one-place band.  SEAT_STEP_BUDGET already books the collar's +/-0.13;
+    no budget, correlation or model dimension changes for this presentation.
+    """
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate setup reference sheet")
+    with _telemetry.span("drawing.assert_setup_references"):
+        for reference in references:
+            label = f"64T-seat to land {reference.land} end reference"
+            display = _early_bound(reference.display, "IDisplayDimension")
+            assert_dimension_measures(
+                adapter,
+                display,
+                expected_mm=SECTION_ENDS[reference.land] - COLLAR_END_STATION,
+                entities=reference.entities,
+                label=label,
+            )
+            dimension = _early_bound(display.GetDimension2(0), "IDimension")
+            tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+            if (
+                int(tolerance.Type) != 0  # swTolNONE: a pure reference takes no band
+                or not bool(display.ShowDimensionValue)
+                or (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")")
+                or int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION
+            ):
+                raise RuntimeError(f"{label} is not an unbanded native reference")
+
+
+@_telemetry.traced("drawing.setup_reference_sheet")
+def _add_setup_sheet(adapter: Any) -> list[SetupReference]:
+    """Add a separate native side view; sheet 1 keeps every existing control."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate setup reference sheet")
+    side = place_view(adapter, str(SOURCE), "*Right", *SETUP_CENTER, scale=SETUP_SCALE)
+    set_hidden_lines_removed(adapter, side)
+    seat = _end_circle(
+        side, station_mm=COLLAR_END_STATION, diameter_mm=COLLAR_DIA,
+        label="collar north / 64T-seat face",
+    )
+    ratio = SETUP_SCALE[0] / SETUP_SCALE[1]
+    front_x = SETUP_CENTER[0] + ratio * SHAFT_LENGTH / 2000.0
+    seat_x = front_x - ratio * COLLAR_END_STATION / 1000.0
+    references = []
+    for land, tier in zip(SETUP_REFERENCE_LANDS, SETUP_REFERENCE_TIERS, strict=True):
+        label = f"64T-seat to land {land} end reference"
+        end = _end_circle(
+            side, station_mm=SECTION_ENDS[land], diameter_mm=SECTION_DIAS[land],
+            label=label,
+        )
+        expected = SECTION_ENDS[land] - COLLAR_END_STATION
+        display = add_edge_dimension(
+            adapter, side, p0=(0.0, 0.0), p1=(0.0, 0.0),
+            text_xy=(seat_x - ratio * expected / 2000.0, tier),
+            label=label, orientation="horizontal", entities=(seat, end),
+        )
+        assert_dimension_measures(
+            adapter, display, expected_mm=expected, entities=(seat, end), label=label,
+        )
+        display = _early_bound(display, "IDisplayDimension")
+        set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+        display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+        references.append(SetupReference(land, display, (seat, end)))
+    add_attached_note(
+        adapter, side, text=SETUP_SEAT_NOTE, note_xy=SETUP_SEAT_NOTE_XY,
+        entity=seat, attached_to=seat, label="setup reference origin",
+    )
+    drawing.EditSheet()
+    if add_note(adapter, SETUP_NOTE, *SETUP_NOTE_XY) is None:
+        raise RuntimeError("failed to add setup reference-only note")
+    _assert_setup_references(adapter, references)
+    return references
 
 
 # A centreline runs a short way past the part it marks.
@@ -1429,6 +1536,10 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="cone gear shaft package")
+    drawing = _early_bound(drawing_model, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate shaft controls sheet")
     _pin_witness_line_extension(drawing_model)
     stamp_drawing_summary(
         adapter,
@@ -1566,6 +1677,7 @@ async def build(adapter: Any) -> dict[str, str]:
         sign=sign,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    setup_references = _add_setup_sheet(adapter)
 
     return await finalize_drawing(
         adapter,
@@ -1573,6 +1685,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Cone Gear Shaft Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: SETUP_SCALE},
+        settled_checks=(lambda: _assert_setup_references(adapter, setup_references),),
     )
 
 
