@@ -1,7 +1,9 @@
 dt-crank-hub:
   number: MHA-DT-31
-  material: SAE 1018 CF bar, ASTM A108-24
-  material_specification: SAE 1018 CF bar, ASTM A108-24
+  # Explicit alternatives (drawing-guidelines.md rule 2): a pressed, pinned
+  # hub needs no single grade (machinist review r1 of 114fa71c1).
+  material: AISI 1018 or 12L14 cold-finished steel bar
+  material_specification: AISI 1018 or 12L14 cold-finished steel bar
   finish: bright machined, oiled
   quantity: 1
   tolerance_class: machined_block

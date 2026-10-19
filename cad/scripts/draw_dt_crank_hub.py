@@ -38,6 +38,7 @@ import _telemetry
 from dt_crank_hub_notes import (
     BORE_CALLOUT,
     CROSS_HOLE_CALLOUT,
+    FRONT_FACE_NOTE,
     HUB_LENGTH_CALLOUT,
     RELIEF_LENGTH_CALLOUT,
     SEAM_CALLOUT,
@@ -49,7 +50,9 @@ from dt_crank_hub_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HUB_BARREL_DIA,
+    HUB_BORE_DIA,
     HUB_LENGTH,
+    HUB_SEAT_DIA,
     HUB_SEAT_LENGTH,
     REFERENCE_DIMENSIONS,
     RELIEF_STATION,
@@ -118,10 +121,15 @@ BARREL_BOTTOM = _sheet_y(HUB_BARREL_DIA / 2.0)
 BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0.015)
 # Every size and callout sits outside the silhouettes.
 # - Lengths: the seat from the faced outboard end, the MHA-DT-09 station from
-#   the arm shoulder (drawing-guidelines.md rule 17 (walls and webs)) and the relief from the rear face on
-#   one row below the profile; the toleranced overall, front face to rear
-#   face, on the row below it.  The barrel is the remainder, not printed.
-#   The two banded lengths carry the mate they serve under their text.
+#   the arm shoulder (drawing-guidelines.md rule 17 (walls and webs)) and the relief from the rear face; the toleranced
+#   overall, front face to rear face, on the lowest row.  The barrel is the
+#   remainder, not printed.  The seat and station each print their arrows
+#   outside a span narrower than text plus arrows, so they stand on two rows,
+#   the seat's above (machinist and layout review r1 of 114fa71c1: on one row
+#   each arrow struck the other's value).  The relief prints left of the rear
+#   face, its row high enough that its arrows clear the overall's text.  The
+#   overall's text and stack rows centre inside its span, narrower than it,
+#   so its extension lines strike no text.
 # - Relief and barrel diameters: left of the inboard end, the relief nearer.
 #   Seat diameter: between the profile and the end view, its value and
 #   light-press callout above.
@@ -129,7 +137,13 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   from the hole's top rim, clear of the barrel diameter's extension lines.
 # - Bore callout: right of the end view, its leader entering the bore from the
 #   right, clear of the six-o'clock seam; the seam callout below the end view.
-_ROW_Y = (0.120, 0.108)
+# - Front-face note: under the seat diameter's lower extension line, between
+#   the overall's front extension line and the end view; its leader lands on
+#   the front face in the end view, which looks at it.
+_SEAT_ROW_Y = 0.130
+_STATION_ROW_Y = 0.120
+_RELIEF_ROW_Y = 0.128
+_OVERALL_ROW_Y = 0.104
 END_KEEP = {"BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020)}
 # The hub's half of the seam is the arc bulging from the seat edge toward the
 # bore; the callout attaches 45 degrees up its right flank.
@@ -142,19 +156,32 @@ SEAM_EDGE_PICK = (
 # drops almost straight to it; a block centred under the view attached at its
 # far end and crossed both its own text and the bore leader (run a2e1cd67).
 SEAM_CALLOUT_XY = (0.303, 0.105)
+# The front face seen end-on: the annulus between the bore and the seat, at
+# half its width and half past seven o'clock, clear of the six-o'clock seam.
+FRONT_FACE_PICK_RADIUS = (HUB_BORE_DIA + HUB_SEAT_DIA) / 4.0 * _S
+FRONT_FACE_PICK = (
+    END_CENTER[0] - FRONT_FACE_PICK_RADIUS * math.cos(math.pi / 4.0),
+    END_CENTER[1] - FRONT_FACE_PICK_RADIUS * math.sin(math.pi / 4.0),
+)
+FRONT_FACE_NOTE_XY = (0.231, 0.1225)
 SIDE_KEEP = {
-    "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _ROW_Y[0]),
-    "ServicePinFromShoulder": ((SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0, _ROW_Y[0]),
-    "HubLength": ((OUTBOARD_X + INBOARD_X) / 2.0, _ROW_Y[1]),
+    "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _SEAT_ROW_Y),
+    "ServicePinFromShoulder": (
+        (SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0,
+        _STATION_ROW_Y,
+    ),
+    "HubLength": ((OUTBOARD_X + INBOARD_X) / 2.0, _OVERALL_ROW_Y),
     # Its toleranced text and callout are wider than the relief: they print
     # outside the span, left of the rear face, the dimension line running out
-    # to them, the callout ending short of the overall's dimension line.
-    "ReliefLength": (INBOARD_X - 0.030, _ROW_Y[0]),
+    # to them.
+    "ReliefLength": (INBOARD_X - 0.030, _RELIEF_ROW_Y),
     "ReliefDia": (INBOARD_X - 0.012, SIDE_CENTER[1]),
     "BarrelDia": (INBOARD_X - 0.034, SIDE_CENTER[1]),
     "SeatDia": (OUTBOARD_X + 0.020, 0.225),
 }
-HOLE_CALLOUT_XY = (0.150, 0.222)
+# Centred so the block's right end, where the leader leaves for the hole's
+# top rim, stays left of the rim with the three prose rows' width.
+HOLE_CALLOUT_XY = (0.140, 0.222)
 ISO_NOTE_XY = (0.345, 0.180)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
@@ -277,6 +304,15 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=SEAM_EDGE_PICK,
         note_xy=SEAM_CALLOUT_XY,
         label="MHA-DT-VN-59 seam callout",
+    )
+    add_attached_note(
+        adapter,
+        front,
+        text=FRONT_FACE_NOTE,
+        entity_xy=FRONT_FACE_PICK,
+        entity_type="FACE",
+        note_xy=FRONT_FACE_NOTE_XY,
+        label="hub front face note",
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

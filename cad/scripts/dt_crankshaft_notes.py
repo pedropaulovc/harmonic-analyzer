@@ -23,9 +23,9 @@ from dt_crankshaft_spec import (
 # room for their mates.
 CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "AT ASSY THRU MHA-DT-31 PILOT,",
-        f"TAPER-REAM {CROSS_HOLE_TAPER} WITH HUB FOR",
-        "MHA-DT-09: LIGHT DRIVE FIT",
+        "AT ASSY THRU HUB MHA-DT-31",
+        f"PILOT; TAPER-REAM {CROSS_HOLE_TAPER} BOTH FOR",
+        "CRANK PIN MHA-DT-09: LIGHT DRIVE FIT",
     )
 )
 # The hub sets where the cross-hole lands (its pilot's station from the arm
