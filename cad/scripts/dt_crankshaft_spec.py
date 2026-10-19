@@ -266,7 +266,7 @@ PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 
 # --- ch. 23 crank seat (CONTRACT-crank): the integral collar replaces the
 # plain 5-mm T12 band.  Its front is a Ø17.5 seat spigot whose face is
-# MHA-PD-09's seat, at the removable's SEAT_FACE_Z, stepping up to the Ø20.6
+# MHA-PD-09's seat, at the shared provider's SEAT_FACE_Z, stepping up to the Ø20.6
 # collar body, whose rear face bears on the post boss's south face.  The #25
 # plates wrapping the T12 pass over the spigot and in front of the body's
 # front face: long enough that a bought chain's
