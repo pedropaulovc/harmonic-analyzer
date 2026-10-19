@@ -111,51 +111,54 @@ HALF_LENGTH = OVERALL_LENGTH * _S / 2.0  # 0.02025
 # convention), so the face is the right edge and the floor the left.
 FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 
-# The pocket, which opens at the face, stands right of the section; the body
-# and the floor hole left of it; the axial sizes stack above (the overall) and
-# below (the pocket depth), both from the face.
+# The pocket opens right; the smaller floor-hole dimension nests closest to
+# the floor end, with the body diameter outboard.  Axial sizes remain above
+# (overall) and below (pocket depth), both measured from the face.
 #
-# Offline layout math (r1 layout audit: 3.5 mm text, a 5.55 mm line pitch,
-# ~2.75 mm a character; a multi-line block centres on its keep point, and a
-# horizontal dimension's line runs under its LAST line):
-# - PocketDia, five lines ~69 mm wide, centres between its extension lines
-#   (31.5 mm apart) with ~2.9 mm each side, 4 mm right of the face.
-# - BodyDia, two lines ~63 mm wide, sits between the floor-hole extension
-#   lines (21 mm apart) with ~6 mm each side, ~6.7 mm left of the floor end.
-# - PocketDepth, three lines ~58 mm wide, cannot fit between its extension
-#   lines (27.5 mm), so it stands outside them right of the face, its top
-#   clear of the pocket-diameter extension line.
-# - BodyChamfer (the profile sketch is the section's upper half, so the
-#   chamfer is the floor end's top corner, 2 mm on paper), four lines ~50 mm
-#   wide, stands outside its extension lines left of the floor end: line at
-#   y ~0.1905 (part top 0.1855, overall's line 0.1947 right of x 0.2047),
-#   block x ~0.150-0.200 and y ~0.190-0.211, 15 mm over the floor-hole
-#   extension line (0.1755) and 4 mm left of the floor end.
-# - PocketFloorRadius is ONLY the native R0.1 MAX, no prose or parentheses.
-#   The 20261019T031202 baseline gives the overall line y194.7219 and its
-#   witnesses x194.75/235.25; translate x +10 for this section.  A conservative
-#   22 x 3.6 mm text box at (217.75,190.75) is x206.75..228.75,
-#   y187.95..191.55: 2 mm from the left witness, 2.45 above the silhouette,
-#   and 3.17 below the overall line.  Its ray is within the actual quarter
-#   arc (90..180 degrees), so no fictitious arc-extension attachment is needed.
+# Sheet-mm solve from the 22821a1d2 native r2 findings (2026-10-19), not a
+# symmetric text-box estimate.  All view centres and scales stay unchanged:
+# - R0.1 MAX at keep (217.75,190.75) printed glyphs [207.3,188.9]..[228.3,192.5]
+#   and a 25.9 mm shoulder (231.5,188.0)->(205.6,188.0).  The chamfer's
+#   witness reaches y191.5 and its outside-arrow tail runs x206.8..213.1 at
+#   y190.5.  Raise ONLY the radius row 6.75: shoulder y194.75 is 3.25 above
+#   that witness, and glyph bottom y195.65 is 5.15 above the arrow tail.
+#   Keep X217.75, so the text still faces the real 90..180-degree quarter arc.
+# - Overall's arrow barb bottom y194.3 was 1.87 mm from the radius glyphs;
+#   its glyphs [221.9,195.7]..[227.2,199.2] had only 3.18 mm block separation.
+#   Raise overall 8: the arrow-to-radius gap becomes 3.05 and the text gap
+#   4.45 mm (>3.57).  Both full witnesses remain outside the radius shoulder.
+# - PocketDepth's upper row [268.8,140.2]..[286.9,143.8] met PocketDia's
+#   outside-arrow tail x284.2, y142.9..149.2.  Lower the whole depth block
+#   3.5: its top is y140.3, 2.6 below the tail, including its far endpoint.
+# - The 031202 native floor-hole keep (136.75,141) put DRILL THRU on a
+#   shoulder at keep_y-5.583, with its main glyph top at keep_y+3.5267.
+#   Keep the same below-witness/hung-text regime (keep_y <154.5), but nest
+#   its column at x201.75, 3 left of the floor, instead of crossing BodyDia's
+#   x166.75 column.  For 2 mm air above BodyDia's y144.5 lower witness and
+#   3.57 mm below its r2 y160.4 text-break boundary, the keep-Y range is
+#   152.083..153.3033; choose 152.5.  The shoulder is then y146.917 and the
+#   main glyph top y156.0267, 4.3733 below BodyDia's lower row.  DRILL THRU's
+#   full 24.0285 mm row hangs LEFT of keep X, so all text ends at x201.75,
+#   3 mm from the actual floor silhouette x204.75, not on the section.
+# Rounded r2 coordinates have 0.05 mm uncertainty; offline contracts retain it.
 SECTION_KEEP = {
     "PocketDia": (FACE_X + 0.039, SECTION_CENTER[1] + 0.001),
     "BodyDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.038, SECTION_CENTER[1] + 0.001),
-    # The DRILL THRU block stands left of the body callout and below the
-    # hole's lower extension line, clear of its arrows (MHA-DT-035 re-reviews).
+    # Smaller diameter closest to the floor; the complete two-row hung block
+    # fits above the body witness without moving into the hole's witness span.
     "FloorHoleDia": (
-        SECTION_CENTER[0] - HALF_LENGTH - 0.076,
-        SECTION_CENTER[1] - 0.024,
+        SECTION_CENTER[0] - HALF_LENGTH - 0.003,
+        SECTION_CENTER[1] - 0.0125,
     ),
-    "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] + BODY_R + 0.012),
-    "PocketDepth": (FACE_X + 0.033, SECTION_CENTER[1] - BODY_R - 0.008),
+    "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] + BODY_R + 0.020),
+    "PocketDepth": (FACE_X + 0.033, SECTION_CENTER[1] - BODY_R - 0.0115),
     "BodyChamfer": (
         SECTION_CENTER[0] - HALF_LENGTH - 0.0295,
         SECTION_CENTER[1] + BODY_R + 0.0161,
     ),
     "PocketFloorRadius": (
         FACE_X - POCKET_DEPTH * _S,
-        SECTION_CENTER[1] + BODY_R + 0.00525,
+        SECTION_CENTER[1] + BODY_R + 0.012,
     ),
 }
 DIMENSION_CALLOUTS = {

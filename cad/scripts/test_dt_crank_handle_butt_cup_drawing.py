@@ -18,6 +18,13 @@ import dt_crank_handle_pivot_screw_spec as screw
 import draw_dt_crank_handle_butt_cup as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_geometry import (
+    Box,
+    Segment,
+    point_segment_distance,
+    segment_box_distance,
+    segment_box_overlap_length,
+)
 
 
 def test_required_drawing_paths_and_registry_entry() -> None:
@@ -450,24 +457,141 @@ def test_imported_floor_radius_refuses_changed_native_semantics(monkeypatch, fau
         )
 
 
-def test_floor_radius_shelf_clears_baseline_ink_and_faces_the_real_quarter_arc() -> None:
-    # Native baseline: section centre X215, overall witnesses X194.75/235.25,
-    # line Y194.7219, body top Y185.5.  Translate X with the current section.
-    shift = drawing.SECTION_CENTER[0] - 0.215
-    x, y = drawing.SECTION_KEEP["PocketFloorRadius"]
-    left, right = x - 0.011, x + 0.011  # conservative 22 mm native value width
-    bottom, top = y - 0.0028, y + 0.0008  # 3.5 mm font plus baseline allowance
-    assert left - (0.19475 + shift) == pytest.approx(0.002, abs=1e-12)
-    assert (0.23525 + shift) - right > 0.002
-    assert bottom - 0.1855 > 0.002
-    assert 0.1947219 - top > 0.003
-    # The new text/leader stays right of the entire chamfer callout, not only
-    # its keep point, and never reaches the overall dimension's line.
-    chamfer_right = drawing.SECTION_KEEP["BodyChamfer"][0] + 0.025
-    assert left - chamfer_right > 0.005
+# Native r2 at 22821a1d2, leaf 20261019T131953.462543Z-db20eea3ec6447c0b3aa1b2fa338062b.
+# These are the actual finding footprints recovered from layout-finding DEBUG
+# records, not the previous idealized 22 mm centred box.  The records round
+# sheet mm to one decimal; expand glyph boxes by 0.05 mm and reserve another
+# 0.05 mm when measuring them against a rounded line.  Translations below are
+# placement contracts, NOT evidence that the next native solver preserved them.
+_R2_KEEP = {
+    "PocketFloorRadius": (0.21775, 0.19075),
+    "OverallLength": (0.225, 0.1975),
+    "PocketDepth": (0.27825, 0.1365),
+    "BodyChamfer": (0.17525, 0.2016),
+    "PocketDia": (0.28425, 0.166),
+}
+_R2_RADIUS_GLYPHS = Box(0.20725, 0.18885, 0.22835, 0.19255)
+_R2_OVERALL_GLYPHS = Box(0.22185, 0.19565, 0.22725, 0.19925)
+_R2_DEPTH_GLYPHS = Box(0.26875, 0.14015, 0.28695, 0.14385)
+_R2_RADIUS_SHOULDER = Segment(0.2315, 0.188, 0.2056, 0.188)
+_R2_CHAMFER_WITNESS = Segment(0.2068, 0.1865, 0.2068, 0.1915)
+_R2_CHAMFER_TAIL = Segment(0.2068, 0.1905, 0.2131, 0.1905)
+_R2_OVERALL_BARB = Segment(0.2083, 0.1951, 0.2083, 0.1943)
+_R2_POCKET_DIA_TAIL = Segment(0.2842, 0.1492, 0.2842, 0.1429)
+
+
+def _r2_delta(name: str) -> tuple[float, float]:
+    x, y = drawing.SECTION_KEEP[name]
+    old_x, old_y = _R2_KEEP[name]
+    return x - old_x, y - old_y
+
+
+def _moved_r2_box(name: str, box: Box) -> Box:
+    dx, dy = _r2_delta(name)
+    return Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy)
+
+
+def _moved_r2_segment(name: str, segment: Segment) -> Segment:
+    dx, dy = _r2_delta(name)
+    return Segment(
+        segment.x0 + dx, segment.y0 + dy, segment.x1 + dx, segment.y1 + dy
+    )
+
+
+def test_measured_r2_footprints_reproduce_every_new_collision() -> None:
+    # The old test overlooked both the shoulder's full width and the actual
+    # glyph top.  Retain failing controls for both text strikes, the shoulder
+    # crossing, the foreign arrow, and the insufficient block separation.
+    assert _R2_RADIUS_SHOULDER.length == pytest.approx(0.0259)
+    assert segment_box_overlap_length(_R2_CHAMFER_TAIL, _R2_RADIUS_GLYPHS) > 0.005
+    crossing = (0.2068, 0.188)
+    assert point_segment_distance(crossing, _R2_RADIUS_SHOULDER) == pytest.approx(0)
+    assert point_segment_distance(crossing, _R2_CHAMFER_WITNESS) == pytest.approx(0)
+    assert segment_box_distance(_R2_OVERALL_BARB, _R2_RADIUS_GLYPHS) < 0.002
+    assert _R2_OVERALL_GLYPHS.gap(_R2_RADIUS_GLYPHS) < 0.00357
+    assert segment_box_overlap_length(_R2_POCKET_DIA_TAIL, _R2_DEPTH_GLYPHS) > 0.0008
+
+
+def test_radius_full_native_shoulder_and_glyphs_clear_chamfer_and_overall() -> None:
+    radius = _moved_r2_box("PocketFloorRadius", _R2_RADIUS_GLYPHS)
+    shoulder = _moved_r2_segment("PocketFloorRadius", _R2_RADIUS_SHOULDER)
+    chamfer_witness = _moved_r2_segment("BodyChamfer", _R2_CHAMFER_WITNESS)
+    chamfer_tail = _moved_r2_segment("BodyChamfer", _R2_CHAMFER_TAIL)
+    overall_barb = _moved_r2_segment("OverallLength", _R2_OVERALL_BARB)
+    overall = _moved_r2_box("OverallLength", _R2_OVERALL_GLYPHS)
+    # Two rounded line coordinates cost 0.10 mm; the expanded glyph box has
+    # already paid its 0.05 mm.  These are actual required gaps, not slack.
+    assert shoulder.box().gap(chamfer_witness.box()) >= 0.0021
+    assert segment_box_distance(chamfer_tail, radius) >= 0.00205
+    assert segment_box_distance(overall_barb, radius) >= 0.00205
+    assert overall.gap(radius) >= 0.00357
+    # Overall's full left/right witnesses rise with its line, so the complete
+    # shoulder must stay between them, not merely put its elbow on one side.
+    floor_x = drawing.SECTION_CENTER[0] - drawing.HALF_LENGTH
+    assert shoulder.box().xmin - floor_x > 0.0001
+    assert drawing.FACE_X - shoulder.box().xmax > 0.0001
+    overall_line_y = drawing.SECTION_KEEP["OverallLength"][1] - 0.0027781
+    assert overall_line_y - radius.ymax >= 0.00205
     corner_r = spec.POCKET_FLOOR_CORNER_R_MAX
     center_x = drawing.FACE_X - (spec.POCKET_DEPTH - corner_r) * drawing._S
     center_y = drawing.SECTION_CENTER[1] + (spec.POCKET_DIA / 2 - corner_r) * drawing._S
+    x, y = drawing.SECTION_KEEP["PocketFloorRadius"]
     bearing = math.degrees(math.atan2(y - center_y, x - center_x))
     assert 90 < bearing < 180
-    assert y < 0.1947219
+
+
+def test_depth_upper_native_row_clears_the_entire_pocket_diameter_arrow_tail() -> None:
+    # The nominal/band is the highest of the three native rows.  Clearing
+    # only the PocketDia witness at y149.25 misses its 6.35 mm outside tail.
+    depth = _moved_r2_box("PocketDepth", _R2_DEPTH_GLYPHS)
+    tail = _moved_r2_segment("PocketDia", _R2_POCKET_DIA_TAIL)
+    assert depth.ymax < min(tail.y0, tail.y1)
+    assert segment_box_distance(tail, depth) >= 0.00205
+
+
+def test_floor_hole_native_hung_rows_nest_without_either_dimension_crossing() -> None:
+    # 031202 native GetPosition (136.75,141): the full DRILL THRU width is
+    # 24.0285 mm LEFT of the keep.  Its value's two glyph runs span
+    # keep_x-17.8861..keep_x-6.1424, not a symmetric box around the column.
+    # The r2 position changed only X; retain this exact below-witness flow.
+    x, y = drawing.SECTION_KEEP["FloorHoleDia"]
+    drill = Box(x - 0.0240285, y - 0.005583, x, y - 0.002083)
+    value = Box(x - 0.0178861, y - 0.0000267, x - 0.0061424, y + 0.0035267)
+    axis_y = drawing.SECTION_CENTER[1]
+    hole_r = spec.FLOOR_HOLE_DIA * drawing._S / 2
+    lower_y, upper_y = axis_y - hole_r, axis_y + hole_r
+    assert y < lower_y  # no unproved switch to native inline/centred text
+    floor_x = drawing.SECTION_CENTER[0] - drawing.HALF_LENGTH
+    assert floor_x - max(drill.xmax, value.xmax) >= 0.002
+    # r2 BodyDia's lower text-break boundary is y160.4 (rounded); the new
+    # value top y156.0267 has >4.3 mm air even after its 0.05 mm uncertainty.
+    assert 0.16035 - value.ymax >= 0.00357
+    body_x = drawing.SECTION_KEEP["BodyDia"][0]
+    hole_line = Segment(x, drill.ymin, x, upper_y)
+    for body_y in (axis_y - drawing.BODY_R, axis_y + drawing.BODY_R):
+        body_witness = Segment(floor_x - 0.001, body_y, body_x - 0.001, body_y)
+        assert segment_box_distance(hole_line, body_witness.box()) >= 0.002
+        assert all(
+            segment_box_distance(body_witness, box) >= 0.002
+            for box in (drill, value)
+        )
+    # Conversely, both hole witnesses end right of the outboard body column.
+    # The old r2 span x216.8..127.8 crossed that column at y154.5.
+    for hole_y in (lower_y, upper_y):
+        hole_witness = Segment(
+            drawing.FACE_X - spec.POCKET_DEPTH * drawing._S - 0.001,
+            hole_y,
+            x - 0.001,
+            hole_y,
+        )
+        assert hole_witness.box().xmin - body_x >= 0.002
+
+
+def test_measured_layout_preserves_generous_views_and_asme_alignment() -> None:
+    assert drawing.SHEET_SCALE == (5.0, 1.0)
+    assert drawing.VIEW_SCALE == (5, 1)
+    assert drawing.ISO_SCALE == (4, 1)
+    assert drawing.END_CENTER == (0.074, 0.165)
+    assert drawing.SECTION_CENTER == (0.225, 0.165)
+    assert drawing.ISO_CENTER == (0.368, 0.215)
+    assert drawing.END_CENTER[1] == drawing.SECTION_CENTER[1]
