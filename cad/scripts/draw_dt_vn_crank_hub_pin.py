@@ -2,8 +2,9 @@ r"""Create the curated manufacturing drawing for MHA-DT-VN-59.
 
 The pin is a plain straight dowel with an extraction thread tapped through its
 axis from the flush outer end. Its two native dimensions define the part;
-the end view's associative Hole Wizard callout owns the thread identity. The
-opened source's saved tap metadata and the rendered callout are read back
+the extraction-entry end view's associative Hole Wizard callout owns the thread
+identity. That view looks from -Z at the Z=0 entry, not at the far drill exit.
+The opened source's saved tap metadata and the rendered callout are read back
 before the drawing can be published.
 """
 
@@ -29,6 +30,7 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_reference_dimensions
+from _drawing_edges import scan_view_edges
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -40,10 +42,13 @@ import _telemetry
 from dt_vn_crank_hub_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_SUMMARY,
+    DRAWING_TITLE,
     PIN_DIA,
     PULL_THREAD_HOLE,
     PULL_THREAD_TAP_DRILL,
     REFERENCE_DIMENSIONS,
+    REDUNDANT_NOTE_SUBSTRINGS,
 )
 
 
@@ -61,7 +66,7 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (10.0, 1.0)
 VIEW_SCALE = (10, 1)
-FRONT_CENTER = (0.095, 0.180)
+END_CENTER = (0.095, 0.180)
 RIGHT_CENTER = (0.225, 0.180)
 ISO_CENTER = (0.355, 0.180)
 HALF_DIA = PIN_DIA * VIEW_SCALE[0] / 2000.0
@@ -69,12 +74,25 @@ RIGHT_KEEP = {
     "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.016),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
 }
-# Outer-end view (*Front, centre FRONT_CENTER): the native callout lands on
-# the tap-drill rim at 45 deg, off the centre-mark arms. Its text sits above
-# the Ø40-sheet pin outline (top at y 0.200), left of the right-view diameter.
-_TAP_RIM = PULL_THREAD_TAP_DRILL * VIEW_SCALE[0] / 2000.0 / 2.0**0.5
-THREAD_PICK = (FRONT_CENTER[0] + _TAP_RIM, FRONT_CENTER[1] + _TAP_RIM)
-THREAD_NOTE_XY = (FRONT_CENTER[0] + 0.027, FRONT_CENTER[1] + HALF_DIA + 0.016)
+# The extraction entry is the -Z-facing end at local Z=0; *Front looks from
+# +Z onto the opposite drill exit, whose native callout can omit the thread.
+# Select the actual entry rim by its model geometry, not a screen-space hit.
+# Text stays above the Ø40-sheet pin outline (top at y 0.200), left of PinDia.
+THREAD_NOTE_XY = (END_CENTER[0] + 0.027, END_CENTER[1] + HALF_DIA + 0.016)
+
+
+def _pull_thread_entry_edge(view: Any) -> Any:
+    """The visible Ø1.6 rim at the Hole Wizard's Z=0 extraction entry."""
+    return (
+        scan_view_edges(view, label="MHA-VN-029 extraction entry")
+        .circle_at(
+            (0.0, 0.0, 0.0),
+            PULL_THREAD_TAP_DRILL / 2.0,
+            axis=(0.0, 0.0, 1.0),
+            label="MHA-VN-029 pull thread entry",
+        )
+        .edge
+    )
 
 
 def _require_pull_thread_definition(definition: Any) -> None:
@@ -102,9 +120,7 @@ def _require_saved_pull_thread(model: Any) -> None:
     definition = feature.GetDefinition()
     if definition is None:
         raise RuntimeError("MHA-VN-029 saved pull-thread definition is missing")
-    _require_pull_thread_definition(
-        _early_bound(definition, "IWizardHoleFeatureData2")
-    )
+    _require_pull_thread_definition(_early_bound(definition, "IWizardHoleFeatureData2"))
 
 
 def _require_pull_thread_callout(display: Any) -> None:
@@ -154,22 +170,12 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
-    stamp_drawing_summary(
-        adapter,
-        drawing_model,
-        {
-            0: "Crank Hub Axial Pin Manufacturing Drawing",
-            1: "Harmonic Analyzer hobby-machinist book drawing",
-            2: "Harmonic Analyzer Project",
-            3: "crank hub seam pin; axial key; straight gauge; steel",
-            4: "Generated from the project-owned ASME B drawing standard",
-        },
-    )
+    stamp_drawing_summary(adapter, drawing_model, DRAWING_SUMMARY)
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
+    end = place_view(adapter, str(SOURCE), "*Back", *END_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (front, right, iso):
+    for view in (end, right, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = curate_view_dimensions(
@@ -181,7 +187,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to MHA-DT-VN-59 end view")
     add_view_centerline(
         adapter,
@@ -191,8 +197,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     thread_callout = add_native_hole_callout(
         adapter,
-        front,
-        edge_xy=THREAD_PICK,
+        end,
+        edge=_pull_thread_entry_edge(end),
         callout_xy=THREAD_NOTE_XY,
         label="MHA-VN-029 pull thread callout",
     )
@@ -201,9 +207,13 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Crank Hub Axial Pin Manufacturing Drawing",
+        pdf_title=DRAWING_TITLE,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # run956fee printed one native "Tapped Hole" label beside the callout;
+        # its leader crossed the callout's. The real callout now owns the thread.
+        redundant_note_substrings=REDUNDANT_NOTE_SUBSTRINGS,
+        expected_redundant_notes=1,
     )
 
 

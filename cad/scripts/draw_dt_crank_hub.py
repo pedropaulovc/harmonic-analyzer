@@ -241,7 +241,12 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
 
 
 def _dress_root_radii(adapter: Any, annotations: list[Any]) -> None:
-    """Prove both associative imports retain their own native R MAX limits."""
+    """Keep each imported radius's native R prefix, MAX limit and arc leader.
+
+    ``GetText(swDimensionTextPrefix)`` includes SolidWorks' own ``R``; it is
+    not a quantity-only field. Preserve that prefix without rewriting the
+    dimension text: the model value and swTolMAX supply the size and MAX.
+    """
     for name, radius_mm, band in (
         ("SeatRootRadius", SEAT_ROOT_FILLET_R, SEAT_ROOT_FILLET_BAND),
         ("ReliefRootRadius", RELIEF_ROOT_FILLET_R, RELIEF_ROOT_FILLET_BAND),
@@ -272,8 +277,11 @@ def _dress_root_radii(adapter: Any, annotations: list[Any]) -> None:
             float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
         ):
             raise RuntimeError(f"{name}: MAX-limit tolerance readback changed")
-        if str(display.GetText(1) or ""):
-            raise RuntimeError(f"{name} has an unexpected quantity prefix")
+        prefix = str(display.GetText(1) or "")  # swDimensionTextPrefix
+        if prefix != "R":
+            raise RuntimeError(
+                f"{name} must retain a single R prefix without a quantity, got {prefix!r}"
+            )
         display.ArcExtensionLineOrOppositeSide = False
         if bool(display.ArcExtensionLineOrOppositeSide):
             raise RuntimeError(f"{name} leader still runs to the opposite side")

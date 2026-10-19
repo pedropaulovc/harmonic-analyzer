@@ -663,12 +663,14 @@ def native_root_annotations(monkeypatch):
         dimension = SimpleNamespace(
             interface="IDimension", SystemValue=radius / 1000.0, Tolerance=tolerance
         )
+        text_parts = {1: "R", 2: ""}
         display = SimpleNamespace(
             interface="IDisplayDimension",
             Diametric=False,
             ArcExtensionLineOrOppositeSide=True,
             GetDimension2=lambda _index, dimension=dimension: dimension,
-            GetText=lambda _part: "",
+            GetText=text_parts.__getitem__,
+            text_parts=text_parts,
         )
         annotations.append(
             SimpleNamespace(
@@ -682,14 +684,29 @@ def native_root_annotations(monkeypatch):
     return annotations
 
 
-def test_both_native_root_imports_keep_max_limits_and_stop_their_leaders(
+def test_both_native_root_imports_keep_radius_prefix_max_values_and_arc_leaders(
     native_root_annotations,
 ) -> None:
+    dimensions = [
+        ann.GetSpecificAnnotation().GetDimension2(0) for ann in native_root_annotations
+    ]
+    # Repeated dressing must not accumulate an R or combine the unequal roots
+    # under one quantity prefix. Both remain the imported model dimensions.
     drawing._dress_root_radii(None, native_root_annotations)
-    assert all(
-        not ann.GetSpecificAnnotation().ArcExtensionLineOrOppositeSide
-        for ann in native_root_annotations
-    )
+    drawing._dress_root_radii(None, native_root_annotations)
+    for annotation, dimension, radius in zip(
+        native_root_annotations, dimensions, (0.1, 0.3), strict=True
+    ):
+        display = annotation.GetSpecificAnnotation()
+        assert display.GetDimension2(0) is dimension
+        assert display.GetText(1) == "R"
+        assert display.GetText(2) == ""
+        assert dimension.SystemValue == pytest.approx(radius / 1000.0)
+        assert dimension.Tolerance.Type == 6
+        assert dimension.Tolerance.GetMinValue() == pytest.approx(-radius / 1000.0)
+        assert dimension.Tolerance.GetMaxValue() == 0.0
+        assert not display.Diametric
+        assert not display.ArcExtensionLineOrOppositeSide
 
 
 @pytest.mark.parametrize("name", ["SeatRootRadius", "ReliefRootRadius"])
@@ -701,7 +718,8 @@ def test_both_native_root_imports_keep_max_limits_and_stop_their_leaders(
         ("nominal", "does not measure its root fillet"),
         ("type", "lost its native MAX type"),
         ("limit", "MAX-limit tolerance readback changed"),
-        ("prefix", "unexpected quantity prefix"),
+        ("upper", "MAX-limit tolerance readback changed"),
+        ("diametric", "is not radial"),
     ],
 )
 def test_neither_native_root_import_can_be_missing_or_misrepresented(
@@ -720,9 +738,24 @@ def test_neither_native_root_import_can_be_missing_or_misrepresented(
         dimension.Tolerance.Type = 4
     elif fault == "limit":
         dimension.Tolerance.lower -= 0.0001
+    elif fault == "upper":
+        dimension.Tolerance.upper += 0.0001
     else:
-        display.GetText = lambda _part: "QTY "
+        display.Diametric = True
     with pytest.raises(RuntimeError, match=message):
+        drawing._dress_root_radii(None, native_root_annotations)
+
+
+@pytest.mark.parametrize("name", ["SeatRootRadius", "ReliefRootRadius"])
+@pytest.mark.parametrize(
+    "prefix", ["", "QTY ", "2X ", "2X R", "RR", "<MOD-DIAM>", "R0.1 MAX"]
+)
+def test_each_native_root_rejects_counts_missing_r_or_replacement_text(
+    native_root_annotations, name: str, prefix: str
+) -> None:
+    annotation = next(ann for ann in native_root_annotations if ann.name == name)
+    annotation.GetSpecificAnnotation().text_parts[1] = prefix
+    with pytest.raises(RuntimeError, match=f"{name} must retain a single R prefix"):
         drawing._dress_root_radii(None, native_root_annotations)
 
 

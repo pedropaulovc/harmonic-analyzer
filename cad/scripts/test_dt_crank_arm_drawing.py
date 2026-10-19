@@ -491,8 +491,8 @@ def test_section_a_a_stands_in_open_sheet_and_its_line_clears_the_front_view() -
     row_pitch = 0.0056  # the hub seat callout's row pitch on the same render
     sx, sy = drawing.SECTION_CENTER
     k = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1] / 1000.0
-    half_w = spec.ARM_THICKNESS / 2.0 * k  # thickness across
-    half_h = (spec.HALF_WIDTH - spec.HUB_SEAT_DIA / 2.0) / 2.0 * k  # cheek up
+    half_w = (spec.HALF_WIDTH - spec.HUB_SEAT_DIA / 2.0) / 2.0 * k  # cheek across
+    half_h = spec.ARM_THICKNESS / 2.0 * k  # axial thickness vertical
     # Boxes from the last layout audit (asm-drawings 20261019T024444355Z).
     side_view_right = 0.3136
     iso_note_bottom = 0.1806
@@ -506,24 +506,20 @@ def test_section_a_a_stands_in_open_sheet_and_its_line_clears_the_front_view() -
     )
     assert tx - widest / 2.0 > side_view_right + 0.012  # clear of (8.0)'s arrows
     assert tx + widest / 2.0 < border_right
-    assert ty + row_pitch < sy - half_h  # the leg text stands under the cheek
+    assert sy - half_h - (ty + row_pitch) > row_pitch
     block_bottom = ty - 3.0 * row_pitch  # stacked limits + two callout rows
     _cx, cy = drawing.SECTION_CAPTION_XY
     assert cy < block_bottom - 0.002
     assert cy - 2.0 * row_pitch > title_block_top  # caption and scale rows
-    # Cutting line: up the bore axis from inside the seat, above the centre
-    # (off the station extension lines), to past the top edge.
+    # The full cut closes across both ends of the arm, in the model XZ plane
+    # holding the chamfer's defining -X rim. A partial YZ cut imported no native
+    # dimension on sol4; cropping only follows the full native import.
     (x0, y0), (x1, y1) = drawing.SECTION_LINE
-    bx, by = drawing.BORE_CENTER
-    r = spec.HUB_SEAT_DIA * drawing.SHEET_SCALE[0] / 2000.0
-    assert x0 == x1 == bx
-    assert by < y0 < by + r
-    assert y1 > drawing.ARM_SILHOUETTE[3]
-    # The +X arrows run in the lane between the fiducial callout's box
-    # (right edge 0.0697 on the last audit) and the seam leader.
-    fiducial_right = 0.0697
-    assert fiducial_right <= bx
-    px, py = drawing.SEAM_EDGE_PICK
-    nx, ny = drawing.SEAM_CALLOUT_XY
-    seam_leader_x = px + (y1 - py) * (nx - px) / (ny - py)
-    assert seam_leader_x - bx > 0.020
+    assert y0 == y1 == drawing.BORE_CENTER[1]
+    assert x0 < drawing.ARM_SILHOUETTE[0]
+    assert x1 > drawing.ARM_SILHOUETTE[2]
+    (left, y0, bottom), (right, y1, top) = drawing.SECTION_CROP_MODEL_MM
+    ax, ay, az = drawing.SECTION_ANCHOR_MM
+    assert y0 == y1 == ay == 0.0
+    assert left < -spec.HALF_WIDTH < ax < -spec.HUB_SEAT_DIA / 2.0 < right < 0.0
+    assert bottom < 0.0 < az < spec.ARM_THICKNESS < top

@@ -4,9 +4,9 @@ Separate through hub MHA-DT-31 is a light press in the arm's seat bore, turned
 to suit it.  Its outboard face
 shows the simple punched alignment witness and the axial seam for MHA-DT-VN-59,
 match-drilled with the hub; the seam's callout gives its nominal size and
-depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.  Removed section
-A-A through the seat's upper cheek shows the inboard-mouth chamfer that clears
-the hub's seat-root radius.
+depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.  Cropped
+full section A-A through the seat's left cheek shows the inboard-mouth chamfer
+that clears the hub's seat-root radius.
 The MHA-DT-09 taper-pin cross-hole belongs to the hub and shaft drawings.
 
 The sheet remains deliberately plain: no datums, feature-control frames or
@@ -30,6 +30,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    curate_dimensions,
     dimension_name,
     place_view,
     view_name,
@@ -64,7 +65,7 @@ from _drawing_leaders import (
 )
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
@@ -290,32 +291,31 @@ ANCHOR_CALLOUT_XY = (0.195, 0.205)
 PIVOT_CALLOUT_XY = (0.270, 0.190)
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 
-# Removed section A-A: the cut runs up the bore axis (the vertical centre-mark
-# line) from inside the seat, 1.5 mm under its rim, to just past the top long
-# edge, so only the upper cheek is sectioned.  Stopping above the bore centre
-# keeps the cutting line off the 20.0/75.0 extension lines, which leave the
-# centre downward.  The sight runs +X, so both arrows point right into the
-# lane between the fiducial callout's box and the seam leader, and the
-# section prints the inboard face (z = 0) on the left, +Y up.  Cut face only:
-# beyond the plane the whole arm would print end-on behind the cheek.
+# A full longitudinal cut through the bore's -X rim imports the chamfer's
+# actual model dimension. The former partial YZ cut imported nothing on
+# sol4; carrier r11 and the crank-drive gear establish the same full-section,
+# annotation-plane constraint. Import before cropping, then retain only the
+# left cheek in the open field over the title block. Keep the native
+# projection: radial X across, axial Z vertical, with no unlabelled rotation.
 SECTION_SCALE = (4, 1)
-SECTION_LINE_OVERRUN = 0.003
-SECTION_LINE_INSET = 1.5  # model mm under the seat rim, in the bore
+SECTION_LINE_OVERRUN = 0.005
 SECTION_LINE = (
-    (
-        BORE_CENTER[0],
-        FRONT_CENTER[1]
-        + (HUB_SEAT_DIA / 2.0 - SECTION_LINE_INSET) * SHEET_SCALE[0] / 1000.0,
-    ),
-    (BORE_CENTER[0], ARM_SILHOUETTE[3] + SECTION_LINE_OVERRUN),
+    (ARM_SILHOUETTE[0] - SECTION_LINE_OVERRUN, BORE_CENTER[1]),
+    (ARM_SILHOUETTE[2] + SECTION_LINE_OVERRUN, BORE_CENTER[1]),
 )
-# The cheek's mid-point lands here: right of the side view, under the
-# isometric's note, in the open field over the title block.
 SECTION_CENTER = (0.368, 0.150)
-SECTION_ANCHOR_MM = (0.0, (HUB_SEAT_DIA / 2.0 + HALF_WIDTH) / 2.0, ARM_THICKNESS / 2.0)
-# The chamfer's leg reads under the section, its two callout rows below the
-# stacked limits, and the native A-A caption under those.
-SECTION_KEEP = {"BoreRearChamferSize": (SECTION_CENTER[0], SECTION_CENTER[1] - 0.022)}
+SECTION_ANCHOR_MM = (
+    -(HUB_SEAT_DIA / 2.0 + HALF_WIDTH) / 2.0,
+    0.0,
+    ARM_THICKNESS / 2.0,
+)
+SECTION_CROP_MODEL_MM = (
+    (-HALF_WIDTH - 1.0, 0.0, -1.0),
+    (-HUB_SEAT_DIA / 2.0 + 1.0, 0.0, ARM_THICKNESS + 1.0),
+)
+# The stacked limits and two callout rows stand below the axial cheek, then
+# the native A-A caption. Clearance uses the previous audit's occupied boxes.
+SECTION_KEEP = {"BoreRearChamferSize": (SECTION_CENTER[0], 0.118)}
 SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.098)
 DIMENSION_CALLOUTS = {
     "HubSeatDia": HUB_SEAT_CALLOUT,
@@ -354,9 +354,7 @@ def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
 
 
 def _cheek_section(adapter: Any, front: Any) -> Any:
-    """Section A-A through the upper cheek (SECTION_* above), cut face only,
-    turned +Y up with the inboard face left, landed on SECTION_CENTER
-    (draw_sm_summing_lever's ``_plate_section``)."""
+    """Create the full XZ cut before importing its native chamfer dimension."""
     section = create_section_view(
         adapter,
         front,
@@ -365,53 +363,82 @@ def _cheek_section(adapter: Any, front: Any) -> Any:
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=SECTION_SCALE,
-        partial=True,
+        partial=False,
         label="hub seat cheek section",
     )
     native = _early_bound(section, "IView")
     cut = _early_bound(native.GetSection(), "IDrSection")
-    # R2026x declares SetDisplayOnlySurfaceCut void; only its getter is tested.
     cut.SetDisplayOnlySurfaceCut(True)
     rebuild_drawing(adapter, label="section A-A cut face only")
     if not cut.GetDisplayOnlySurfaceCut():
         raise RuntimeError("section A-A retained geometry beyond the cutting plane")
     set_hidden_lines_removed(adapter, native)
-    anchor = _metres(SECTION_ANCHOR_MM)
-    above = _metres(
-        (SECTION_ANCHOR_MM[0], SECTION_ANCHOR_MM[1] + 1.0, SECTION_ANCHOR_MM[2])
+    return native
+
+
+def _crop_cheek_section(adapter: Any, section: Any) -> None:
+    """Use the proven carrier crop sequence after the full cut's import."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(section, "IView")
+    corners = model_points_in_view(
+        adapter,
+        native,
+        [_metres(point) for point in SECTION_CROP_MODEL_MM],
+        label="cheek section crop corners",
     )
-    outboard = _metres((SECTION_ANCHOR_MM[0], SECTION_ANCHOR_MM[1], ARM_THICKNESS))
-
-    def turn_up(stage: str) -> None:
-        for attempt in range(3):
-            origin = model_point_in_view(adapter, native, anchor, label="A-A anchor")
-            up = model_point_in_view(adapter, native, above, label="A-A +Y")
-            dx, dy = up[0] - origin[0], up[1] - origin[1]
-            if dy > 0.0 and abs(dx) <= 1e-7:
-                return
-            native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(dy, dx)
-            rebuild_drawing(
-                adapter, label=f"section A-A turned ({stage}), pass {attempt}"
-            )
-        raise RuntimeError(f"section A-A does not run +Y up: ({dx:g}, {dy:g})")
-
-    def outboard_dx() -> float:
-        origin = model_point_in_view(adapter, native, anchor, label="A-A anchor")
-        face = model_point_in_view(adapter, native, outboard, label="A-A outboard face")
-        return face[0] - origin[0]
-
-    turn_up("as cut")
-    # +Y up with the outboard face right is the sight along +X: the arrows
-    # point right, away from the fiducial callout.
-    if outboard_dx() < 0.0:
-        reversed_cut = not bool(cut.GetReversedCutDirection())
-        cut.SetReversedCutDirection(reversed_cut)
-        rebuild_drawing(adapter, label="section A-A looks along +X")
-        if bool(cut.GetReversedCutDirection()) != reversed_cut:
-            raise RuntimeError("section A-A cut direction did not persist")
-        turn_up("reversed")
-    if not outboard_dx() > 0.0:
-        raise RuntimeError("section A-A still prints the inboard face on the right")
+    if not ddoc.ActivateView(view_name(adapter, native)):
+        raise RuntimeError("failed to activate cheek section for cropping")
+    draw.ClearSelection2(True)
+    before = tuple(float(value) for value in native.GetOutline())
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    sketch_corners = []
+    for x, y in corners:
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        sketch_corners.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    segments = tuple(
+        manager.CreateCornerRectangle(*sketch_corners[0], *sketch_corners[1]) or ()
+    )
+    if len(segments) != 4:
+        raise RuntimeError(f"cheek crop fence has {len(segments)} segments")
+    for segment in segments:
+        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
+            raise RuntimeError("failed to select cheek crop fence")
+    status = int(native.Crop2(False, True, 0))
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="section A-A cropped to left cheek")
+    native.UpdateViewDisplayGeometry()
+    after = tuple(float(value) for value in native.GetOutline())
+    if (
+        status != 1
+        or not native.IsCropped()
+        or after[2] - after[0] >= (before[2] - before[0]) / 4.0
+    ):
+        raise RuntimeError(f"cheek crop failed: {status=}, {before=}, {after=}")
+    _telemetry.info(f"cheek section cropped: {before=} -> {after=}")
+    anchor = _metres(SECTION_ANCHOR_MM)
+    origin = model_point_in_view(adapter, native, anchor, label="A-A anchor")
+    radial = model_point_in_view(
+        adapter,
+        native,
+        _metres((SECTION_ANCHOR_MM[0] + 1.0, 0.0, SECTION_ANCHOR_MM[2])),
+        label="A-A radial X",
+    )
+    axial = model_point_in_view(
+        adapter,
+        native,
+        _metres((SECTION_ANCHOR_MM[0], 0.0, SECTION_ANCHOR_MM[2] + 1.0)),
+        label="A-A axial Z",
+    )
+    if abs(radial[1] - origin[1]) > 1e-7 or abs(axial[0] - origin[0]) > 1e-7:
+        raise RuntimeError("cheek section is not radial-across, axial-vertical")
     for attempt in range(4):
         native.UpdateViewDisplayGeometry()
         projected = model_point_in_view(
@@ -433,7 +460,6 @@ def _cheek_section(adapter: Any, front: Any) -> Any:
     position_section_caption(
         adapter, native, SECTION_CAPTION_XY, label="cheek section A-A"
     )
-    return native
 
 
 def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
@@ -543,6 +569,15 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="section A-A",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _crop_cheek_section(adapter, section)
+    section_annotations = curate_dimensions(
+        adapter, section_annotations, reposition=SECTION_KEEP
+    )
+    if any(
+        int(_early_bound(item, "IAnnotation").Visible) != 1
+        for item in section_annotations
+    ):
+        raise RuntimeError("cheek section crop hid its native chamfer dimension")
     _assert_chamfer_limits(_named(adapter, section_annotations, "BoreRearChamferSize"))
     imported_annotations = [
         *front_annotations,
