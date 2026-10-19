@@ -137,7 +137,7 @@ from fr_harmonic_base_fasteners import (
     NAMEPLATE_SCREW_XZ,
 )
 from _interference_contracts import allowed_interference_pairs
-from dt_cone_pivot_post_installation import (
+from _cone_axis_constants import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
 )

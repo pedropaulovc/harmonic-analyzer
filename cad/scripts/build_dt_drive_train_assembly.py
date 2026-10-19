@@ -150,11 +150,16 @@ from channel_frame_geom import (
     CAM_SHAFT_XY,
     CYLINDER_LOCK_PHASE_DEG,
 )
-from dt_cone_pivot_post_installation import (
+from _cone_axis_constants import (
     CHANNEL_Z0,
     DRUM_X,
     GEAR_AXIS_SHIFT,
-    POST_ROTATION_Y_DEG,
+)
+from dt_cone_pivot_post_installation import POST_ROTATION_Y_DEG
+from dt_cone_tip_block_spec import (
+    TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET,
+    TIP_BLOCK_PIVOT_OFFSET,
+    TIP_BLOCK_STATION,
 )
 # The cone journal line and its named stations live in the pure cone_line
 # module, so the base's pivot seat and the paper-drive crank sprocket read the
@@ -170,9 +175,6 @@ from cone_line import (
     SHAFT_T120_STATION,
     SIN_I,
     T006_NORTH_FACE,
-    TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET,
-    TIP_BLOCK_PIVOT_OFFSET,
-    TIP_BLOCK_STATION,
     X_CRANK,
     X_DRUM,
     Y_BASE_TOP,
@@ -984,8 +986,8 @@ _SHAFT_NORTH_END = CRANKSHAFT_Z0 + CS_SHAFT_LENGTH
 # north face is TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot, growing
 # south from it (user ruling 2026-09-29: its station is fixed by its
 # hold-down hole, not slid at fit-up).  T006_CENTER_STATION, T006_NORTH_FACE,
-# TIP_BLOCK_STATION and PIVOT_STATION come from cone_line; the checks below
-# hold them to the parts.
+# TIP_BLOCK_STATION comes from the tip-block spec and PIVOT_STATION from
+# cone_line; the checks below hold them to the parts.
 
 # --- platform <-> riders fit (SolidWorks-free, import-time) ------------------
 # The platform/post/block parts hardcode their envelopes in THEIR part frames;
@@ -1013,8 +1015,8 @@ from dt_cone_swing_platform_geometry import (  # noqa: E402
     SLOT_E_Z as PLAT_SLOT_E_Z,
     SLOT_W as PLAT_SLOT_W,
     WEST_HALF_S as PLAT_WEST_S,
-    manufactured_p1_stop_enclosure,
 )
+from dt_cone_swing_platform_checks import manufactured_p1_stop_enclosure  # noqa: E402
 from dt_cone_swing_platform_spec import (  # noqa: E402
     HOLDDOWN_CBORE_DEPTH as PLAT_HOLDDOWN_CBORE_DEPTH,
     HOLDDOWN_CLEARANCE_DIA as PLAT_HOLDDOWN_CLEARANCE_DIA,

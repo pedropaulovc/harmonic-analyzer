@@ -15,7 +15,7 @@ import pinion_rig_fitup as FITUP
 import pinion_rig_layout as RIG
 import pinion_rig_park_geometry
 from _printed_tolerance import printed_band_mm
-from dt_cone_pivot_post_installation import MECHANISM_Z_SHIFT
+from _cone_axis_constants import MECHANISM_Z_SHIFT
 from dt_pinion_pivot_block_geometry import BLOCK_EAST
 from fr_rocker_arm_support_spec import SUPPORT_WORLD_X
 

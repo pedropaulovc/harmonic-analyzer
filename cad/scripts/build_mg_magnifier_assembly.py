@@ -129,7 +129,7 @@ from _transforms import (
     rot_z_rows,
     rows_from_euler,
 )
-from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, SUMMING_Z
+from _cone_axis_constants import FRAME_FRONT_COLUMN_Z, SUMMING_Z
 from sm_summing_lever_spec import PLATE_L
 from mg_wheel_bar_geom import WHEEL_BAR_Y
 from magnifying_bracket_joint_layout import (

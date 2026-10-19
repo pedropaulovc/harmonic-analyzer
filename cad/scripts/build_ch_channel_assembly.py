@@ -176,6 +176,7 @@ from _sketch import (
 )
 from _ch_channel_explode import create_channel_explode
 import ch_channel_assembly_spec as settings_spec
+from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
 from _assembly import (
     activate_assembly_contract,
     author_in_drawing_configurations,
@@ -219,7 +220,7 @@ from _transforms import (
     euler_from_rows,
     rows_from_euler,
 )
-from dt_cone_pivot_post_installation import (
+from _cone_axis_constants import (
     CHANNEL_Z0,
     MECHANISM_Z_SHIFT,
 )
@@ -1058,7 +1059,7 @@ async def _author_settings_reference(adapter) -> None:
         ("ChKeeperSocketX", socket_x),
         ("ChKeeperSocketZ", socket_y),
         ("ChKeeperSocketLine", spec.KEEPER_PLAN_SOCKET_LINE),
-        ("ChKeeperSocketBore", spec.SOCKET_BORE_DIA),
+        ("ChKeeperSocketBore", SOCKET_BORE_DIA),
         ("ChKeeperSocketBoss", spec.SOCKET_BOSS_DIA),
         ("ChKeeperWebHalfT", spec.KEEPER_PLAN_WEB_HALF_T),
         ("ChKeeperWebFaceFromSocket", spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET),
@@ -1141,7 +1142,7 @@ async def _author_settings_reference(adapter) -> None:
             await adapter.add_circle(socket_x, socket_y, diameter / 2.0),
         )
         for label, diameter in (
-            ("bore", spec.SOCKET_BORE_DIA),
+            ("bore", SOCKET_BORE_DIA),
             ("boss", spec.SOCKET_BOSS_DIA),
         )
     ]
@@ -1213,7 +1214,7 @@ async def _author_settings_reference(adapter) -> None:
     dims.record("KeeperSocketZ", '"ChKeeperSocketZ"')
     for circle, value, name, drive in zip(
         socket_circles,
-        (spec.SOCKET_BORE_DIA, spec.SOCKET_BOSS_DIA),
+        (SOCKET_BORE_DIA, spec.SOCKET_BOSS_DIA),
         ("KeeperSocketBore", "KeeperSocketBoss"),
         ('"ChKeeperSocketBore"', '"ChKeeperSocketBoss"'),
         strict=True,

@@ -15,6 +15,7 @@ import pytest
 
 import dt_cone_gear_shaft_spec as shaft
 import dt_cone_pivot_post_spec as post
+from _cone_axis_constants import BLOCK_DIA
 import crank_boss_rim as rim
 import dt_crank_drive_gear_spec as gear64
 import gear64_post_measure
@@ -105,7 +106,7 @@ def test_the_body_is_a_normal_distance_flush_with_the_cone_boss_end() -> None:
     boss end (BLOCK_DIA == CONE_BOSS_LENGTH)."""
     nominal = rim.clearances(gear_offset=SEATED, worst=False)
     south = SEATED - gear64.FACE_WIDTH / 2.0
-    assert nominal["body"] == pytest.approx(south - post.BLOCK_DIA / 2.0, abs=1e-3)
+    assert nominal["body"] == pytest.approx(south - BLOCK_DIA / 2.0, abs=1e-3)
     assert nominal["body"] == pytest.approx(nominal["cone boss end"], abs=1e-3)
 
 

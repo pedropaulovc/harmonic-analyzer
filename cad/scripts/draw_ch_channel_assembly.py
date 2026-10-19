@@ -86,6 +86,7 @@ from _simplified_names import simplified_name
 import _telemetry
 import ch_channel_assembly_sheet as notes
 import ch_channel_assembly_spec as asm
+from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
 import ch_channel_explode_spec as explode
 import ch_channel_assembly_steps as steps
 from ch_channel_lever_spec import (
@@ -588,7 +589,7 @@ PLAN_POINTERS = (
         KEEPER_PLAN.plan_xy(
             asm.KEEPER_SOCKET_XZ[0],
             asm.KEEPER_SOCKET_XZ[1]
-            + (asm.SOCKET_BORE_DIA / 2.0 + asm.KEEPER_PLAN_WEB_FACE_FROM_SOCKET) / 2.0,
+            + (SOCKET_BORE_DIA / 2.0 + asm.KEEPER_PLAN_WEB_FACE_FROM_SOCKET) / 2.0,
         ),
     ),
 )

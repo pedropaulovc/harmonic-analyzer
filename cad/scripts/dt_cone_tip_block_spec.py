@@ -10,7 +10,8 @@ from _fit_deviations import deviations
 from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
-from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM
+from _cone_axis_constants import CONE_AXIS_HEIGHT_MM
+from cone_stations import PIVOT_STATION
 
 
 # Small black-steel clamp block on the swing platform that carries the axial
@@ -32,13 +33,26 @@ from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM
 # PINCH_SCREW_RECESS_MM short of the -X face (asserted with the screw below).
 BLOCK_X = 17.0  # plan width across the shaft
 # Plan depth along the shaft, printed .XXX.  The north face stands the pivot
-# screw's head gap off the pivot (cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET)
+# screw's head gap off the pivot (TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET)
 # and the block grows SOUTH (user ruling 2026-09-29): the depth must hold the
 # adjuster's embed window (below) open over the tip's axial stack, and stay
 # short enough that the MHA-DT-VN-54 stack collar never reaches the south face
 # (build_dt_drive_train_assembly's collar-to-block air).  9.75 sits between the
 # two at print-worst.
 BLOCK_Z = 9.75
+
+# User ruling 2026-09-29 (eight-views-4.png): the tip block is a straight
+# prism held by one screw in a fixed platform hole under its centre.  Its
+# north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot,
+# 0.8125 off the pivot screw's head at nominal -- the gap
+# build_dt_drive_train_assembly proves at print-worst -- and the block grows
+# SOUTH from there (its depth closes the adjuster's embed window), so the
+# centre, and the platform hole under it, follow the depth.
+TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = 5.575
+TIP_BLOCK_NORTH_FACE = PIVOT_STATION - TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
+TIP_BLOCK_STATION = TIP_BLOCK_NORTH_FACE - BLOCK_Z / 2.0
+TIP_BLOCK_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_STATION
+
 # The adjuster and cone journal share one height above the platform top.
 # Free material above the slit floor and the pinch screw's rise stay fixed.
 ADJUSTER_AXIS_HEIGHT = CONE_AXIS_HEIGHT_MM

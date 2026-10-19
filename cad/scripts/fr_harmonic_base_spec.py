@@ -13,7 +13,7 @@ from __future__ import annotations
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, SurfaceFinishControl
-from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
+from _cone_axis_constants import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
 from frame_column_stations import COLUMN_SOCKET_DIAMETER, COLUMN_X
 
 MM_PER_IN = 25.4

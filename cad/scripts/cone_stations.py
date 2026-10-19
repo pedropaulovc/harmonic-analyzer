@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from cone_pitch import SEAT_PITCH
 from cone_shaft_land_bands import TIP_COLLAR_BODY_NORTH_SHIFT_MM
-from dt_cone_pivot_post_installation import GEAR_AXIS_SHIFT
+from _cone_axis_constants import GEAR_AXIS_SHIFT
 
 # Every station stays on the historical 6.5 cone reference face: the gears
 # grew SOUTH to the full seat pitch with their north faces fixed, so they

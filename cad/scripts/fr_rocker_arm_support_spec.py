@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
-from dt_cone_pivot_post_installation import ROCKER_SUPPORT_Z
+from _cone_axis_constants import ROCKER_SUPPORT_Z
 
 
 # The casting's section lives in fr_rocker_arm_support_section_spec. The foot

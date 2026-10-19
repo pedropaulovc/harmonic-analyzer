@@ -14,7 +14,7 @@ import cam_plane
 import ch_fulcrum_shaft_spec
 import rocker_bank_layout
 from _assembly import _seed_flip, activate_assembly_contract
-from dt_cone_pivot_post_installation import CHANNEL_Z0, DRUM_X, MECHANISM_Z_SHIFT
+from _cone_axis_constants import CHANNEL_Z0, DRUM_X, MECHANISM_Z_SHIFT
 
 
 def test_machine_config_and_channel_interface_share_one_installation_contract() -> None:

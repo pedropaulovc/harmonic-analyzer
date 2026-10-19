@@ -13,7 +13,7 @@ import build_mg_magnifier_assembly as magnifier
 import build_mg_magnifying_bracket as bracket
 import build_sm_summing_assembly as summing
 import build_sm_summing_lever as lever_build
-import dt_cone_pivot_post_installation as installation
+import _cone_axis_constants as installation
 import magnifying_bracket_joint_layout as joint
 import sm_knife_mount_spec as knife_mount
 import sm_summing_lever_spec as lever

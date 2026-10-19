@@ -1040,6 +1040,16 @@ shaft-seat/drive-pin interface used by the crank hub, both shafts and their
 dowels. Keep sprocket tooth geometry and manufacturing checks in
 `pd_transgear_removable_spec`, and crank wall/stack checks in the crank specs;
 neither subsystem should import the other's spec merely to read seat dimensions.
+
+`_cone_axis_constants` owns shared cone/channel/frame installation datums and
+nominal raised-axis inputs. `cone_stations` owns shaft-local stations;
+`cone_line` maps them into the machine frame without importing post, mounting
+or tip-block specs. Tip-block placement belongs to `dt_cone_tip_block_spec`.
+`dt_cone_swing_platform_geometry` owns the pure outline and base-fixed hardware
+placement; `dt_cone_swing_platform_checks` owns spec-dependent mounting/web
+checks and the manufactured P1 stop enclosure. Consumers of placement must
+not acquire those part checks through a geometry-provider import.
+
 Assembly data splits by consumer: `<stem>_assembly_spec.py` (reaches the .SLDASM),
 `<stem>_explode_spec.py` (pure explode the builder authors), and drawing-only
 `<stem>_assembly_sheet.py` / `*_steps.py` (BOM, captions, sequence text).

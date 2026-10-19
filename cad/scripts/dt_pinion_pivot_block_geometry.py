@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
-from dt_post_mount_stack import AXIS_RAISE_MM
+from _cone_axis_constants import AXIS_RAISE_MM
 
 # --- Nominal geometry (cad/DIMENSIONS.md "Chapter 25").
 # These drive the part's named equation globals AND the drawing's coordinate

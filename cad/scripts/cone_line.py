@@ -35,9 +35,7 @@ from cone_pitch import (
     TAN_I,
     Z_PITCH,
 )
-from dt_cone_pivot_post_installation import DRUM_X, GEAR_AXIS_SHIFT
-from dt_cone_tip_block_spec import BLOCK_Z as TIP_BLOCK_Z
-from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
+from _cone_axis_constants import CONE_AXIS_HEIGHT_MM, DRUM_X, GEAR_AXIS_SHIFT, PLATFORM_THICKNESS_MM
 
 Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + PLATFORM_THICKNESS_MM + CONE_AXIS_HEIGHT_MM
@@ -113,16 +111,5 @@ POST_STATION = -39.90136099792956
 X_CRANK = cone_station(POST_STATION)[0]  # fixed post station in the machine frame
 Y_CRANK = Y_BASE_TOP + PLATFORM_THICKNESS_MM + _config.machine("gear_train", "crank_axis_height_mm")
 
-# User ruling 2026-09-29 (eight-views-4.png): the tip block is a straight
-# prism held by one screw in a fixed platform hole under its centre.  Its
-# north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot,
-# 0.8125 off the pivot screw's head at nominal -- the gap
-# build_dt_drive_train_assembly proves at print-worst -- and the block grows
-# SOUTH from there (its depth closes the adjuster's embed window), so the
-# centre, and the platform hole under it, follow the depth.
-TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = 5.575
-TIP_BLOCK_NORTH_FACE = PIVOT_STATION - TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
-TIP_BLOCK_STATION = TIP_BLOCK_NORTH_FACE - TIP_BLOCK_Z / 2.0
-TIP_BLOCK_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_STATION
 _PIVOT = cone_station(PIVOT_STATION)
 PIVOT_XZ = (_PIVOT[0], _PIVOT[2])

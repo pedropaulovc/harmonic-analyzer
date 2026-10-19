@@ -14,6 +14,7 @@ import pytest
 import _config
 import build_dt_cone_pivot_post as part
 import dt_cone_pivot_post_spec as spec
+from _cone_axis_constants import BLOCK_DIA
 import _layout_geometry as layout
 import draw_dt_cone_pivot_post as drawing
 from _assembly import _seed_flip, activate_assembly_contract
@@ -34,7 +35,7 @@ def test_required_drawing_paths() -> None:
 
 
 def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> None:
-    assert spec.BLOCK_DIA == 42.011
+    assert BLOCK_DIA == 42.011
     assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (42.7506, 26.6)
     assert spec.HEAD_BASE_Y == pytest.approx(spec.BLOCK_HEIGHT - spec.HEAD_HEIGHT)
     assert (spec.CRANK_BOSS_DIA, spec.CRANK_BORE_DIA, spec.CRANK_BORE_OFFSET) == (
@@ -63,7 +64,8 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
     assert spec.CRANK_BOSS_START_Z == -21.3753
     assert round(spec.CRANK_BOSS_END_Z, 4) == 50.6591
     assert spec.CRANK_BOSS_LENGTH == pytest.approx(2.8360 * 25.4)
-    from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, POST_BODY_HEIGHT_MM
+    from _cone_axis_constants import CONE_AXIS_HEIGHT_MM
+    from dt_post_mount_stack import POST_BODY_HEIGHT_MM
 
     assert (spec.CONE_BOSS_DIA, spec.BORE_DIA) == (17.2, 12.2808)
     assert spec.BORE_HEIGHT == CONE_AXIS_HEIGHT_MM
@@ -95,11 +97,11 @@ def test_post_preserves_harvested_sizes_and_follows_the_configured_axes() -> Non
         )
     )
     assert part.MAIN_BODY_MM3 == pytest.approx(
-        math.pi * (spec.BLOCK_DIA / 2.0) ** 2 * spec.BLOCK_HEIGHT
+        math.pi * (BLOCK_DIA / 2.0) ** 2 * spec.BLOCK_HEIGHT
     )
     assert part.HEAD_SHELL_MM3 == pytest.approx(
         math.pi
-        * ((spec.HEAD_DIA / 2.0) ** 2 - (spec.BLOCK_DIA / 2.0) ** 2)
+        * ((spec.HEAD_DIA / 2.0) ** 2 - (BLOCK_DIA / 2.0) ** 2)
         * spec.HEAD_HEIGHT
     )
 
@@ -984,7 +986,7 @@ def test_removed_view_letter_is_not_a_datum_letter() -> None:
 def test_datum_a_and_journal_finish_stand_off_the_body() -> None:
     """r5: datum A sat on Ø12.281's leader and the Ra landed on its triangle.
     r13 (rule 14): both stood inside View C's body outline."""
-    right_of_body = drawing.JOURNAL_CENTER[0] + spec.BLOCK_DIA / 2000.0
+    right_of_body = drawing.JOURNAL_CENTER[0] + BLOCK_DIA / 2000.0
     # Both right of the view, below the size's text; each leader lands
     # further round the rim than the one above it (the size's at about
     # -24 degrees), so none crosses another.

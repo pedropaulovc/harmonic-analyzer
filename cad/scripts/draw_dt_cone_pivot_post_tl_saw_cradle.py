@@ -155,7 +155,7 @@ def _seat(x_span: tuple[float, float], name: str) -> dict:
             "axis": _X_AXIS,
             "dia": (
                 limits(part_spec.SEAT_DIA, part_spec.SEAT_PLACES),
-                ("SEAT_DIA", "BODY_DIA_MAX", (_POST, "BLOCK_DIA")),
+                ("SEAT_DIA", "BODY_DIA_MAX", ("_cone_axis_constants", "BLOCK_DIA")),
             ),
             "nominal_dia": (part_spec.SEAT_DIA, ("SEAT_DIA",)),
             # Reference only: the print gives the saddle's two faces as
@@ -163,7 +163,7 @@ def _seat(x_span: tuple[float, float], name: str) -> dict:
             "length_nominal": (x_span[1] - x_span[0], (name,)),
             "height": (
                 limits(part_spec.SEAT_BOTTOM_Y, 1),
-                ("SEAT_BOTTOM_Y", (_POST, "BLOCK_DIA")),
+                ("SEAT_BOTTOM_Y", ("_cone_axis_constants", "BLOCK_DIA")),
             ),
             "height_nominal": (round(part_spec.SEAT_BOTTOM_Y, 1), ("SEAT_BOTTOM_Y",)),
             # The one printed SeatZ: the common seat axis across the base,
@@ -253,7 +253,7 @@ requirement("cap_pad",
         # the callout's acceptance, not a band, defines the fitted top.
         "height_nominal": (
             part_spec.PAD_HT,
-            ("PAD_HT", "PAD_FIT_STOCK_MIN", (_POST, "BLOCK_DIA"), (_POST, "CONE_BOSS_LENGTH")),
+            ("PAD_HT", "PAD_FIT_STOCK_MIN", ("_cone_axis_constants", "BLOCK_DIA"), (_POST, "CONE_BOSS_LENGTH")),
         ),
         # Reference sizes only: the print gives the pad's four faces as
         # stations (the pad_x0/x1/z0/z1 features).

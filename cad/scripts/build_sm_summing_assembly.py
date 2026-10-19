@@ -103,7 +103,7 @@ from _assembly import (
 from _native_spring_contact import assert_assembly_spring_contacts
 from _interference_contracts import allowed_interference_pairs
 from _transforms import IDENTITY, ROT_X_NEG90, ROT_Y_180, ROT_Y_POS90, euler_from_rows
-from dt_cone_pivot_post_installation import SUMMING_Z
+from _cone_axis_constants import SUMMING_Z
 import fr_top_frame_spec as top_frame
 import sm_knife_mount_spec as knife_mount
 import sm_vn_knife_hanger_stud_spec as hanger_screw

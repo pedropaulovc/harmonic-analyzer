@@ -9,6 +9,7 @@ import pytest
 import _config
 import draw_dt_cone_pivot_post_tl_bond_cradle as drawing
 import dt_cone_pivot_post_spec as post
+from _cone_axis_constants import BLOCK_DIA
 import dt_cone_pivot_post_tl_bond_cradle_spec as spec
 import export_features
 from _printed_tolerance import angular_band_deg, printed_band_mm
@@ -52,7 +53,7 @@ def test_notes_follow_the_simplicity_policy_and_permit_the_built_up_blocks() -> 
 
 def test_seats_take_the_post_body_and_its_raw_tail_on_one_axis() -> None:
     features = _features()
-    assert features["body_seat"]["dia_nominal"] >= post.BLOCK_DIA
+    assert features["body_seat"]["dia_nominal"] >= BLOCK_DIA
     assert spec.TAIL_SEAT_DIA > spec.BODY_SEAT_DIA
     assert features["body_seat"]["axis"] == features["tail_seat"]["axis"] == [0.0, 1.0, 0.0]
     # Both seats sit below the saddle tops: the post lies in them, not on them.

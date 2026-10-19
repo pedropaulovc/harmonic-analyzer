@@ -123,7 +123,7 @@ from fr_harmonic_base_spec import (
     UNDERSIDE_PAD_PREFIXES,
 )
 import fr_nameplate_spec
-from dt_cone_pivot_post_installation import (
+from _cone_axis_constants import (
     FRAME_FRONT_COLUMN_Z,
 )
 from cone_line import PIVOT_XZ as PIVOT_SCREW_XZ

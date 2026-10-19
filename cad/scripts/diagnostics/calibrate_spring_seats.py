@@ -92,7 +92,7 @@ from _transforms import (
     rot_z_rows,
 )  # noqa: E402
 from build_ch_channel_assembly import ARM_MID_DZ, FULCRUM, IDENTITY, z_station  # noqa: E402
-from dt_cone_pivot_post_installation import SUMMING_Z  # noqa: E402
+from _cone_axis_constants import SUMMING_Z  # noqa: E402
 from diagnostics._seat_search import ContactSolution, solve_component_contact  # noqa: E402
 from diagnostics.diag_build_1330K524 import build_1330K524  # noqa: E402
 

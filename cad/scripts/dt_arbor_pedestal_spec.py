@@ -12,7 +12,7 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 from _mcmaster_91375a106 import THREAD as SET_SCREW_THREAD
-from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
+from _cone_axis_constants import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
 
 
 MM_PER_IN = 25.4

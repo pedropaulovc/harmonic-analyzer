@@ -18,7 +18,7 @@ from _drawing_edges import ViewEdge, ViewEdges
 from _hole_spec import blind_cut_dia_mm
 import build_sm_summing_lever as lever_build
 import draw_sm_summing_lever as drawing
-from dt_cone_pivot_post_installation import SUMMING_Z
+from _cone_axis_constants import SUMMING_Z
 import rocker_bank_layout
 import sm_summing_lever_notes as notes
 import sm_summing_lever_spec

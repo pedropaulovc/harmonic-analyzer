@@ -33,6 +33,7 @@ import math
 
 import _config
 import dt_cone_pivot_post_spec as post
+from _cone_axis_constants import BLOCK_DIA
 from _hole_spec import THREAD_MAJOR_MM, TAP_DRILL_MM, HoleSpec
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 
@@ -67,12 +68,12 @@ POST_AXIS_Z = B6_Y_AT_SIDE
 # body's underside is. A smaller seat would carry a large body on its lips.
 SEAT_PLACES = 1
 BODY_DIA_MAX = round(
-    post.BLOCK_DIA + printed_deviations(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])[1], 12
+    BLOCK_DIA + printed_deviations(BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])[1], 12
 )
 SEAT_DIA = 43.6
 if round(SEAT_DIA + printed_deviations(SEAT_DIA, SEAT_PLACES)[0], 12) < BODY_DIA_MAX - 1e-9:
     raise AssertionError("the smallest saw-cradle seat is smaller than the largest post body")
-SEAT_BOTTOM_Y = -B6_Z_AT_UNDERSIDE - post.BLOCK_DIA / 2.0
+SEAT_BOTTOM_Y = -B6_Z_AT_UNDERSIDE - BLOCK_DIA / 2.0
 SEAT_CENTRE_Y = SEAT_BOTTOM_Y + SEAT_DIA / 2.0
 SEAT_Z = POST_AXIS_Z
 
@@ -101,8 +102,8 @@ POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
 # Narrow lines, so the block stands in the gap between the front and right views.
 PAD_FIT_CALLOUT = f"FIT TO SUIT\n{POST_NUMBER}\nCONE PIVOT\nPOST: CAP\nBEARS WITH\nBODY SEATED"
 _BODY_BAND = [
-    round(post.BLOCK_DIA + deviation, 12)
-    for deviation in printed_deviations(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])
+    round(BLOCK_DIA + deviation, 12)
+    for deviation in printed_deviations(BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])
 ]
 _BOSS_BAND = [
     round(post.CONE_BOSS_LENGTH + deviation, 12)
@@ -122,7 +123,7 @@ PAD_PROCESS = "mill"
 PAD_FIT_STOCK_WORST = PAD_HT - (SEAT_BOTTOM_Y + printed_band_mm(1) + CAP_OFFSET_MAX)
 if PAD_FIT_STOCK_WORST < PAD_FIT_STOCK_MIN:
     raise AssertionError("a compliant cap can stand above the unfitted pad")
-if abs(post.CONE_BOSS_LENGTH - post.BLOCK_DIA) > 1e-9:
+if abs(post.CONE_BOSS_LENGTH - BLOCK_DIA) > 1e-9:
     raise AssertionError("the cone cap no longer lies in the post body's tangent plane")
 
 # --- Cap-bridge stud taps (3/8-16 studs, inventory B6 Y+-30) --------------------
@@ -231,7 +232,7 @@ _CAP_RADIUS_MAX = round(
 ) / 2.0
 _POST_FLOAT_MAX = (
     round(SEAT_DIA + printed_deviations(SEAT_DIA, SEAT_PLACES)[1], 12)
-    - round(post.BLOCK_DIA + printed_deviations(post.BLOCK_DIA, 1)[0], 12)
+    - round(BLOCK_DIA + printed_deviations(BLOCK_DIA, 1)[0], 12)
 ) / 2.0
 PAD_CAP_COVER_WORST = (
     (PAD_LENGTH / 2.0 - 2.0 * _ROW1) - (_CAP_RADIUS_MAX + _POST_FLOAT_MAX + _ROW1)

@@ -38,7 +38,7 @@ from build_ch_channel_assembly import (
     rot_z_rows,
     z_station,
 )
-from dt_cone_pivot_post_installation import CHANNEL_Z0, DRUM_X
+from _cone_axis_constants import CHANNEL_Z0, DRUM_X
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows
 if __package__:
     from . import _script_paths  # noqa: F401

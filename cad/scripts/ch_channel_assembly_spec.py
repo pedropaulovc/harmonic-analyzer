@@ -43,8 +43,7 @@ from ch_fulcrum_keeper_spec import (
     LUG_HALF_T,
 )
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
-from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
-from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
+from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
 from fr_top_frame_spec import BOSS_DIA as SOCKET_BOSS_DIA
 from fr_top_frame_spec import WEB_T as RAIL_WEB_T
 from frame_column_stations import COLUMN_X

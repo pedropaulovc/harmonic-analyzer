@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
+from _cone_axis_constants import MECHANISM_X_SHIFT
 
 CURVE_RADIUS = 800.0  # top-edge arc radius = amplitude-bar length (stated)
 ARM_DEPTH = 16.0  # perpendicular top-to-bottom depth (p.29 callout)

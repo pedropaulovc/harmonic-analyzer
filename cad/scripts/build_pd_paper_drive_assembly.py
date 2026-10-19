@@ -151,7 +151,7 @@ from _transforms import (  # noqa: E402
     compose_rows,
     rot_z_rows,
 )
-from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
+from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
 from fr_harmonic_base_spec import STACK_HEIGHT as BASE_DECK_Y
 from _pd_paper_drive_explode import create_paper_drive_explode
 

@@ -24,7 +24,7 @@ from _drawing_layout_check import DrawableRegion
 from _gtol_frame import gtol_frame_signature, gtol_frame_xml
 from _layout_geometry import AnnotationGeometry, Box, Segment, segment_box_distance, text_overlap
 from _drawing_registry import DRAWINGS_BY_NAME
-from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
+from _cone_axis_constants import MECHANISM_X_SHIFT
 from _hole_spec import blind_cut_dia_mm
 
 

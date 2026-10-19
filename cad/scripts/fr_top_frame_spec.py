@@ -25,7 +25,7 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _gtol_cylinder import CylinderFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl
-from dt_cone_pivot_post_installation import (
+from _cone_axis_constants import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
 )
