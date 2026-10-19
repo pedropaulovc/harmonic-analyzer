@@ -40,6 +40,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from ch_fulcrum_keeper_spec import (
+    FOOT_TIP_X,
     FULCRUM_KEEPER_CENTRE_Z,
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_PLACES,
@@ -47,6 +48,7 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
     KEEPER_INNER_FACE_SPAN_MM,
+    KEEPER_WIDTH,
     KEEPER_Z_OFF,
     LUG_HALF_T,
 )
@@ -97,12 +99,16 @@ FULCRUM_Y = LEVER_FULCRUM_XY[1]
 # Keeper plan (machine x, z): the west rail's front socket centre, where its
 # web centre line (the socket axis, x = COLUMN_X) meets the line of the
 # upper socket centres (z = FRAME_FRONT_COLUMN_Z); the lug centre line
-# KEEPER_FITUP_X_FROM_WEB_MM west of it. The frame features are drawn in
-# phantom (b9ae review rule 10: the settings run from drawn features): the
-# socket's bore and boss; the web faces from where they leave the boss to
-# the front lug inner face station, under the front keeper, with the web
-# centre line between them over the same run; the socket line east past the
-# boss, toward its pair.
+# KEEPER_FITUP_X_FROM_WEB_MM west of it. The frame features are drawn (b9ae
+# review rule 10: the settings run from drawn features): in phantom, the
+# socket's bore and boss, the socket line east past the boss toward its pair,
+# and the web centre line from the socket to the front lug inner face
+# station; the web faces as visible lines, each from where it leaves the boss
+# for as far as it shows in plan. The front keeper stands on the web: its
+# KEEPER_WIDTH straddles the outer face (+x) and stops short of the inner
+# one, so the inner face runs on beside it to the inner-face station and the
+# outer face stops at the keeper's foot tip (r5 review: drawn on to the
+# station in phantom, the faces read as hidden lines through the keeper).
 KEEPER_SOCKET_XZ = (COLUMN_X, FRAME_FRONT_COLUMN_Z)
 KEEPER_LUG_X = COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM
 KEEPER_PLAN_SOCKET_LINE = 30.0  # east from the socket centre, past the boss
@@ -110,6 +116,11 @@ KEEPER_PLAN_WEB_HALF_T = RAIL_WEB_T / 2.0
 # Where each web face leaves the boss, rearward of the socket centre.
 KEEPER_PLAN_WEB_FACE_FROM_SOCKET = math.sqrt(
     (SOCKET_BOSS_DIA / 2.0) ** 2 - KEEPER_PLAN_WEB_HALF_T**2
+)
+# The front keeper's foot tip (build_fr_top_frame KEEPER_FOOT_TIP_Z_FRONT),
+# rearward of the socket centre: where the outer web face goes under it.
+KEEPER_PLAN_FOOT_TIP_FROM_SOCKET = (
+    FULCRUM_KEEPER_CENTRE_Z - KEEPER_Z_OFF - FOOT_TIP_X - FRAME_FRONT_COLUMN_Z
 )
 if KEEPER_PLAN_SOCKET_LINE <= SOCKET_BOSS_DIA / 2.0:
     raise AssertionError("the keeper plan's socket line ends inside the boss")
@@ -120,8 +131,19 @@ if any(
     for face, offset in zip(LUG_INNER_FACE_Z, KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM)
 ):
     raise AssertionError("the keeper plan's faces are not the fit-up stations")
-if FRAME_FRONT_COLUMN_Z + KEEPER_PLAN_WEB_FACE_FROM_SOCKET >= LUG_INNER_FACE_Z[0]:
+if not (
+    KEEPER_PLAN_WEB_FACE_FROM_SOCKET
+    < KEEPER_PLAN_FOOT_TIP_FROM_SOCKET
+    < LUG_INNER_FACE_Z[0] - FRAME_FRONT_COLUMN_Z
+):
     raise AssertionError("the keeper plan's web faces end before they start")
+if not (
+    COLUMN_X - KEEPER_PLAN_WEB_HALF_T
+    < KEEPER_LUG_X - KEEPER_WIDTH / 2.0
+    < COLUMN_X + KEEPER_PLAN_WEB_HALF_T
+    < KEEPER_LUG_X + KEEPER_WIDTH / 2.0
+):
+    raise AssertionError("the front keeper no longer covers just the outer web face")
 
 if abs(PIVOT_CHAIN_Z[1] - PIVOT_CHAIN_Z[0] - ROCKER_SPRING_SET) > 1e-9:
     raise AssertionError("the spring-set leg is not ROCKER_SPRING_SET")
