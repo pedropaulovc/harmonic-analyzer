@@ -38,7 +38,7 @@ DRAWING_NUMBER = "MHA-PD-000"
 # pointer follows any renumbering of MHA-DT-000; both print on its cone-and-crank
 # sequence sheet (draw_dt_drive_train_assembly.SEQUENCE_SHEET).
 CRANK_SIDE_KEYS = ("crank-mesh-checked", "paper-drive-wheel")
-CRANK_SIDE_SHEET = 6
+CRANK_SIDE_SHEET = 7
 CRANK_SIDE_REF = (
     f"{dt_drive_train_steps.DRAWING_NUMBER} SHEET {CRANK_SIDE_SHEET}, STEPS "
     + " AND ".join(str(dt_drive_train_steps.step_number(key)) for key in CRANK_SIDE_KEYS)
