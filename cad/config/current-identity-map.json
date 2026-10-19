@@ -1,0 +1,2432 @@
+{
+  "schema_version": 1,
+  "description": "Current naming cutover from the prior category identities to two-digit, immediate-parent vendor identities. Prior identity-migration-map.json remains immutable release provenance.",
+  "rules": {
+    "part_number_width": 2,
+    "machine_vendor_pattern": "MHA-<PARENT_CATEGORY>-VN-<NN>",
+    "tooling_vendor_pattern": "MHA-<PARENT_CATEGORY>-<PARENT_NN>-TL-VN-<NN>",
+    "machine_vendor_stem_pattern": "<parent-prefix>-vn-<old-stem-with-leading-vn-removed>",
+    "tooling_vendor_stem_pattern": "<fixture-parent-stem>-tl-vn-<old-tool-stem-after-tl->",
+    "allocation": "Within each direct-parent namespace, assign NN from 50 upward in ascending previous vendor Number (MHA-VN-NN); for tool purchases, ascending prior TL-NN. Sequences reset per parent namespace.",
+    "identity_segments": "Shrink every numeric identity segment, including parent 005->05 and assembly 000->00. Do not treat configuration qualifier T006 as an identity sequence; retain it.",
+    "cloning": "Each direct consuming assembly gets a separate registry/native model identity. Reuse the same supplier/SKU geometry recipe where it supports a parameterized part identity; do not alias one native part or keep a shared identity."
+  },
+  "parts_and_assemblies": [
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-nut-bracket",
+      "old_number": "MHA-CH-006-TL-29",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-nut-bracket",
+          "number": "MHA-CH-06-TL-29"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-nut-screw",
+      "old_number": "MHA-CH-006-TL-46",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-nut-screw",
+          "number": "MHA-CH-06-TL-VN-66"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-pillow-block",
+      "old_number": "MHA-CH-006-TL-36",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-pillow-block",
+          "number": "MHA-CH-06-TL-VN-56"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-hold-down-stud",
+      "old_number": "MHA-CH-006-TL-38",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-hold-down-stud",
+          "number": "MHA-CH-06-TL-VN-58"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-hub-pin",
+      "old_number": "MHA-CH-006-TL-25",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-hub-pin",
+          "number": "MHA-CH-06-TL-25"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-kp08-screw",
+      "old_number": "MHA-CH-006-TL-45",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-kp08-screw",
+          "number": "MHA-CH-06-TL-VN-65"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-leadscrew-nut",
+      "old_number": "MHA-CH-006-TL-35",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-nut",
+          "number": "MHA-CH-06-TL-VN-55"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-leadscrew",
+      "old_number": "MHA-CH-006-TL-34",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew",
+          "number": "MHA-CH-06-TL-VN-54"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-lever-screw",
+      "old_number": "MHA-CH-006-TL-49",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-lever-screw",
+          "number": "MHA-CH-06-TL-VN-69"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-lever-washer",
+      "old_number": "MHA-CH-006-TL-51",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-lever-washer",
+          "number": "MHA-CH-06-TL-VN-71"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-feed-lever",
+      "old_number": "MHA-CH-006-TL-26",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-feed-lever",
+          "number": "MHA-CH-06-TL-26"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-flange-nut",
+      "old_number": "MHA-CH-006-TL-40",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-flange-nut",
+          "number": "MHA-CH-06-TL-VN-60"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-handwheel",
+      "old_number": "MHA-CH-006-TL-37",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-handwheel",
+          "number": "MHA-CH-06-TL-VN-57"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-cl-dowel",
+      "old_number": "MHA-CH-006-TL-33",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-cl-dowel",
+          "number": "MHA-CH-06-TL-VN-53"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-clamp-screw",
+      "old_number": "MHA-CH-006-TL-48",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-clamp-screw",
+          "number": "MHA-CH-06-TL-VN-68"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-end-bracket",
+      "old_number": "MHA-CH-006-TL-28",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-end-bracket",
+          "number": "MHA-CH-06-TL-28"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-carriage-screw",
+      "old_number": "MHA-CH-006-TL-44",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-carriage-screw",
+          "number": "MHA-CH-06-TL-VN-64"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-carriage",
+      "old_number": "MHA-CH-006-TL-31",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-carriage",
+          "number": "MHA-CH-06-TL-VN-51"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-carrier",
+      "old_number": "MHA-CH-006-TL-21",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-carrier",
+          "number": "MHA-CH-06-TL-21"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-removable",
+      "old_number": "MHA-PD-009",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-removable",
+          "number": "MHA-PD-09"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-bracket-screw",
+      "old_number": "MHA-CH-006-TL-42",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-bracket-screw",
+          "number": "MHA-CH-06-TL-VN-62"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-rear-bushing",
+      "old_number": "MHA-PD-024",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-rear-bushing",
+          "number": "MHA-PD-24"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-bearing",
+      "old_number": "MHA-CH-006-TL-32",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-bearing",
+          "number": "MHA-CH-06-TL-VN-52"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-block-screw",
+      "old_number": "MHA-CH-006-TL-43",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-block-screw",
+          "number": "MHA-CH-06-TL-VN-63"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-block-washer",
+      "old_number": "MHA-CH-006-TL-50",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-block-washer",
+          "number": "MHA-CH-06-TL-VN-70"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-pin",
+      "old_number": "MHA-PD-023",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-pin",
+          "number": "MHA-PD-23"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-pivot-spacer",
+      "old_number": "MHA-PD-020",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-pivot-spacer",
+          "number": "MHA-PD-20"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-filing-stud",
+      "old_number": "MHA-CH-006-TL-05",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-filing-stud",
+          "number": "MHA-CH-06-TL-05"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-base-bar",
+      "old_number": "MHA-CH-006-TL-20",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-base-bar",
+          "number": "MHA-CH-06-TL-20"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-knob-cup",
+      "old_number": "MHA-PD-016",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-knob-cup",
+          "number": "MHA-PD-16"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-knob-shaft",
+      "old_number": "MHA-PD-008",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-knob-shaft",
+          "number": "MHA-PD-08"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-knob-thrust-ring",
+      "old_number": "MHA-PD-015",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-knob-thrust-ring",
+          "number": "MHA-PD-15"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-filing-button",
+      "old_number": "MHA-CH-006-TL-04",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-filing-button",
+          "number": "MHA-CH-06-TL-04"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-filing-stand",
+      "old_number": "MHA-CH-006-TL-12",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-filing-stand",
+          "number": "MHA-CH-06-TL-12"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-feed-pinion",
+      "old_number": "MHA-PD-010",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-feed-pinion",
+          "number": "MHA-PD-10"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-front-bushing",
+      "old_number": "MHA-PD-025",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-front-bushing",
+          "number": "MHA-PD-25"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-pivot-bracket-tl-ledge",
+      "old_number": "MHA-CH-008-TL-01",
+      "new_identities": [
+        {
+          "stem": "ch-pivot-bracket-tl-ledge",
+          "number": "MHA-CH-08-TL-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-pivot-bracket",
+      "old_number": "MHA-CH-008",
+      "new_identities": [
+        {
+          "stem": "ch-pivot-bracket",
+          "number": "MHA-CH-08"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-pivot-shaft",
+      "old_number": "MHA-CH-005",
+      "new_identities": [
+        {
+          "stem": "ch-pivot-shaft",
+          "number": "MHA-CH-05"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-arm",
+      "old_number": "MHA-PD-018",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-arm",
+          "number": "MHA-PD-18"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-disc-hub",
+      "old_number": "MHA-PD-017",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-disc-hub",
+          "number": "MHA-PD-17"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-drive-collar",
+      "old_number": "MHA-PD-022",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-drive-collar",
+          "number": "MHA-PD-22"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-connecting-rod",
+      "old_number": "MHA-CH-003",
+      "new_identities": [
+        {
+          "stem": "ch-connecting-rod",
+          "number": "MHA-CH-03"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-fulcrum-keeper",
+      "old_number": "MHA-CH-007",
+      "new_identities": [
+        {
+          "stem": "ch-fulcrum-keeper",
+          "number": "MHA-CH-07"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-fulcrum-shaft",
+      "old_number": "MHA-CH-004",
+      "new_identities": [
+        {
+          "stem": "ch-fulcrum-shaft",
+          "number": "MHA-CH-04"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-pivot-bracket-tl-angle-plate",
+      "old_number": "MHA-CH-008-TL-02",
+      "new_identities": [
+        {
+          "stem": "ch-pivot-bracket-tl-angle-plate",
+          "number": "MHA-CH-08-TL-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-rack-pinion",
+      "old_number": "MHA-PD-006",
+      "new_identities": [
+        {
+          "stem": "pd-rack-pinion",
+          "number": "MHA-PD-06"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-support-bar",
+      "old_number": "MHA-PD-007",
+      "new_identities": [
+        {
+          "stem": "pd-support-bar",
+          "number": "MHA-PD-07"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-arm-plate",
+      "old_number": "MHA-PD-019",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-arm-plate",
+          "number": "MHA-PD-19"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-bar-pivot-pin",
+      "old_number": "MHA-CH-011",
+      "new_identities": [
+        {
+          "stem": "ch-bar-pivot-pin",
+          "number": "MHA-CH-11"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-channel-lever",
+      "old_number": "MHA-CH-002",
+      "new_identities": [
+        {
+          "stem": "ch-channel-lever",
+          "number": "MHA-CH-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-platen-paper",
+      "old_number": "MHA-PD-004",
+      "new_identities": [
+        {
+          "stem": "pd-platen-paper",
+          "number": "MHA-PD-04"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-platen-rack",
+      "old_number": "MHA-PD-005",
+      "new_identities": [
+        {
+          "stem": "pd-platen-rack",
+          "number": "MHA-PD-05"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-platen",
+      "old_number": "MHA-PD-002",
+      "new_identities": [
+        {
+          "stem": "pd-platen",
+          "number": "MHA-PD-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-anchor-jam-nut",
+      "old_number": "MHA-CH-014",
+      "new_identities": [
+        {
+          "stem": "ch-anchor-jam-nut",
+          "number": "MHA-CH-14"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-platen-clip",
+      "old_number": "MHA-PD-003",
+      "new_identities": [
+        {
+          "stem": "pd-platen-clip",
+          "number": "MHA-PD-03"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-platen-guide",
+      "old_number": "MHA-PD-011",
+      "new_identities": [
+        {
+          "stem": "pd-platen-guide",
+          "number": "MHA-PD-11"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-amplitude-bar",
+      "old_number": "MHA-CH-001",
+      "new_identities": [
+        {
+          "stem": "ch-amplitude-bar",
+          "number": "MHA-CH-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "mg-wheel-axle",
+      "old_number": "MHA-MG-007",
+      "new_identities": [
+        {
+          "stem": "mg-wheel-axle",
+          "number": "MHA-MG-07"
+        }
+      ]
+    },
+    {
+      "old_stem": "mg-wheel-bar",
+      "old_number": "MHA-MG-008",
+      "new_identities": [
+        {
+          "stem": "mg-wheel-bar",
+          "number": "MHA-MG-08"
+        }
+      ]
+    },
+    {
+      "old_stem": "mg-wheel-drum",
+      "old_number": "MHA-MG-010",
+      "new_identities": [
+        {
+          "stem": "mg-wheel-drum",
+          "number": "MHA-MG-10"
+        }
+      ]
+    },
+    {
+      "old_stem": "ms-stick",
+      "old_number": "MHA-MS-001",
+      "new_identities": [
+        {
+          "stem": "ms-stick",
+          "number": "MHA-MS-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "ms-stop-block",
+      "old_number": "MHA-MS-002",
+      "new_identities": [
+        {
+          "stem": "ms-stop-block",
+          "number": "MHA-MS-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "ms-stop-plate",
+      "old_number": "MHA-MS-003",
+      "new_identities": [
+        {
+          "stem": "ms-stop-plate",
+          "number": "MHA-MS-03"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-guide-lock",
+      "old_number": "MHA-PD-012",
+      "new_identities": [
+        {
+          "stem": "pd-guide-lock",
+          "number": "MHA-PD-12"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-latch-hook",
+      "old_number": "MHA-PD-014",
+      "new_identities": [
+        {
+          "stem": "pd-latch-hook",
+          "number": "MHA-PD-14"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-transgear-pivot-shim",
+      "old_number": "MHA-VN-069",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-pivot-shim",
+          "number": "MHA-PD-VN-67"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-transgear-pivot-spring",
+      "old_number": "MHA-VN-049",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-pivot-spring",
+          "number": "MHA-PD-VN-63"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-transgear-retaining-ring",
+      "old_number": "MHA-VN-047",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-retaining-ring",
+          "number": "MHA-PD-VN-61"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-tube-frame-cap",
+      "old_number": "MHA-VN-028",
+      "new_identities": [
+        {
+          "parent": "fr-frame",
+          "stem": "fr-vn-tube-frame-cap",
+          "number": "MHA-FR-VN-54"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-wheel-axle-back-washer",
+      "old_number": "MHA-VN-057",
+      "new_identities": [
+        {
+          "parent": "mg-magnifier",
+          "stem": "mg-vn-wheel-axle-back-washer",
+          "number": "MHA-MG-VN-54"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-wheel-axle-front-washer",
+      "old_number": "MHA-VN-058",
+      "new_identities": [
+        {
+          "parent": "mg-magnifier",
+          "stem": "mg-vn-wheel-axle-front-washer",
+          "number": "MHA-MG-VN-55"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-wheel-axle-nut",
+      "old_number": "MHA-VN-025",
+      "new_identities": [
+        {
+          "parent": "mg-magnifier",
+          "stem": "mg-vn-wheel-axle-nut",
+          "number": "MHA-MG-VN-52"
+        }
+      ]
+    },
+    {
+      "old_stem": "mg-wheel-axle-spacer",
+      "old_number": "MHA-MG-011",
+      "new_identities": [
+        {
+          "stem": "mg-wheel-axle-spacer",
+          "number": "MHA-MG-11"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-transgear-pivot-screw",
+      "old_number": "MHA-VN-041",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-pivot-screw",
+          "number": "MHA-PD-VN-57"
+        }
+      ]
+    },
+    {
+      "old_stem": "mg-output-fixture",
+      "old_number": "MHA-MG-006",
+      "new_identities": [
+        {
+          "stem": "mg-output-fixture",
+          "number": "MHA-MG-06"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-transgear-knob-drive-pin",
+      "old_number": "MHA-VN-038",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-knob-drive-pin",
+          "number": "MHA-PD-VN-54"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-transgear-latch-pin",
+      "old_number": "MHA-VN-042",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-latch-pin",
+          "number": "MHA-PD-VN-58"
+        }
+      ]
+    },
+    {
+      "old_stem": "mg-magnifying-vertical-rod",
+      "old_number": "MHA-MG-004",
+      "new_identities": [
+        {
+          "stem": "mg-magnifying-vertical-rod",
+          "number": "MHA-MG-04"
+        }
+      ]
+    },
+    {
+      "old_stem": "mg-magnifying-wheel",
+      "old_number": "MHA-MG-005",
+      "new_identities": [
+        {
+          "stem": "mg-magnifying-wheel",
+          "number": "MHA-MG-05"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-transgear-knob-cup-pin",
+      "old_number": "MHA-VN-048",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-knob-cup-pin",
+          "number": "MHA-PD-VN-62"
+        }
+      ]
+    },
+    {
+      "old_stem": "mg-magnifying-bracket",
+      "old_number": "MHA-MG-001",
+      "new_identities": [
+        {
+          "stem": "mg-magnifying-bracket",
+          "number": "MHA-MG-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "mg-magnifying-clamp",
+      "old_number": "MHA-MG-002",
+      "new_identities": [
+        {
+          "stem": "mg-magnifying-clamp",
+          "number": "MHA-MG-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "mg-magnifying-lever",
+      "old_number": "MHA-MG-003",
+      "new_identities": [
+        {
+          "stem": "mg-magnifying-lever",
+          "number": "MHA-MG-03"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-transgear-arm-plate-locating-pin",
+      "old_number": "MHA-VN-056",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-arm-plate-locating-pin",
+          "number": "MHA-PD-VN-64"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-transgear-arm-plate-screw",
+      "old_number": "MHA-VN-040",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-arm-plate-screw",
+          "number": "MHA-PD-VN-56"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-transgear-disc-screw",
+      "old_number": "MHA-VN-039",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-transgear-disc-screw",
+          "number": "MHA-PD-VN-55"
+        }
+      ]
+    },
+    {
+      "old_stem": "fr-tube-frame",
+      "old_number": "MHA-FR-003",
+      "new_identities": [
+        {
+          "stem": "fr-tube-frame",
+          "number": "MHA-FR-03"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-swing-stop-screw",
+      "old_number": "MHA-VN-015",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-swing-stop-screw",
+          "number": "MHA-DT-VN-53"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-thumb-screw",
+      "old_number": "MHA-VN-011",
+      "new_identities": [
+        {
+          "parent": "mg-magnifier",
+          "stem": "mg-vn-thumb-screw",
+          "number": "MHA-MG-VN-50"
+        },
+        {
+          "parent": "ms-measuring-stick",
+          "stem": "ms-vn-thumb-screw",
+          "number": "MHA-MS-VN-50"
+        }
+      ]
+    },
+    {
+      "old_stem": "fr-top-frame",
+      "old_number": "MHA-FR-002",
+      "new_identities": [
+        {
+          "stem": "fr-top-frame",
+          "number": "MHA-FR-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "fr-rocker-arm-support",
+      "old_number": "MHA-FR-005",
+      "new_identities": [
+        {
+          "stem": "fr-rocker-arm-support",
+          "number": "MHA-FR-05"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-spring-hook",
+      "old_number": "MHA-VN-012",
+      "new_identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "ch-vn-spring-hook",
+          "number": "MHA-CH-VN-51"
+        }
+      ]
+    },
+    {
+      "old_stem": "fr-harmonic-base",
+      "old_number": "MHA-FR-001",
+      "new_identities": [
+        {
+          "stem": "fr-harmonic-base",
+          "number": "MHA-FR-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "fr-nameplate",
+      "old_number": "MHA-FR-004",
+      "new_identities": [
+        {
+          "stem": "fr-nameplate",
+          "number": "MHA-FR-04"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-rocker-bank-spring",
+      "old_number": "MHA-VN-053",
+      "new_identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "ch-vn-rocker-bank-spring",
+          "number": "MHA-CH-VN-54"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-rocker-thrust-washer",
+      "old_number": "MHA-VN-070",
+      "new_identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "ch-vn-rocker-thrust-washer",
+          "number": "MHA-CH-VN-56"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-slotted-screw",
+      "old_number": "MHA-VN-019",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-slotted-screw",
+          "number": "MHA-DT-VN-57"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-spring",
+      "old_number": "MHA-DT-024",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-spring",
+          "number": "MHA-DT-24"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-post-mount-screw",
+      "old_number": "MHA-VN-031",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-post-mount-screw",
+          "number": "MHA-DT-VN-61"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-pivot-shaft",
+      "old_number": "MHA-DT-019",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-pivot-shaft",
+          "number": "MHA-DT-19"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-pivot-block",
+      "old_number": "MHA-DT-018",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-pivot-block",
+          "number": "MHA-DT-18"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-pinion-strap-pin",
+      "old_number": "MHA-VN-033",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-pinion-strap-pin",
+          "number": "MHA-DT-VN-63"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-platen-clip-screw",
+      "old_number": "MHA-VN-059",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-platen-clip-screw",
+          "number": "MHA-PD-VN-65"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-lift-rod",
+      "old_number": "MHA-DT-017",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-lift-rod",
+          "number": "MHA-DT-17"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-pen-wire",
+      "old_number": "MHA-VN-067",
+      "new_identities": [
+        {
+          "parent": "pn-pen",
+          "stem": "pn-vn-pen-wire",
+          "number": "MHA-PN-VN-57"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-lever-pin",
+      "old_number": "MHA-DT-030",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-lever-pin",
+          "number": "MHA-DT-30"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-lever",
+      "old_number": "MHA-DT-016",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-lever",
+          "number": "MHA-DT-16"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-pen-rod-set-screw",
+      "old_number": "MHA-VN-061",
+      "new_identities": [
+        {
+          "parent": "pn-pen",
+          "stem": "pn-vn-pen-rod-set-screw",
+          "number": "MHA-PN-VN-52"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-pen-set-screw",
+      "old_number": "MHA-VN-010",
+      "new_identities": [
+        {
+          "parent": "pn-pen",
+          "stem": "pn-vn-pen-set-screw",
+          "number": "MHA-PN-VN-51"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-cam",
+      "old_number": "MHA-DT-023",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-cam",
+          "number": "MHA-DT-23"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-handle",
+      "old_number": "MHA-DT-015",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-handle",
+          "number": "MHA-DT-15"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-pen-hanger-nut",
+      "old_number": "MHA-VN-063",
+      "new_identities": [
+        {
+          "parent": "pn-pen",
+          "stem": "pn-vn-pen-hanger-nut",
+          "number": "MHA-PN-VN-54"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-pen-marker",
+      "old_number": "MHA-VN-065",
+      "new_identities": [
+        {
+          "parent": "pn-pen",
+          "stem": "pn-vn-pen-marker",
+          "number": "MHA-PN-VN-56"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-bracket",
+      "old_number": "MHA-DT-014",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-bracket",
+          "number": "MHA-DT-14"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-cam-pin",
+      "old_number": "MHA-DT-025",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-cam-pin",
+          "number": "MHA-DT-25"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-pedestal-hold-down-screw",
+      "old_number": "MHA-VN-032",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-pedestal-hold-down-screw",
+          "number": "MHA-DT-VN-62"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-pen-adjust-nut",
+      "old_number": "MHA-VN-062",
+      "new_identities": [
+        {
+          "parent": "pn-pen",
+          "stem": "pn-vn-pen-adjust-nut",
+          "number": "MHA-PN-VN-53"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-pen-hanger-jam-nut",
+      "old_number": "MHA-VN-064",
+      "new_identities": [
+        {
+          "parent": "pn-pen",
+          "stem": "pn-vn-pen-hanger-jam-nut",
+          "number": "MHA-PN-VN-55"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-arbor-collar",
+      "old_number": "MHA-DT-033",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-arbor-collar",
+          "number": "MHA-DT-33"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-pinion-arbor",
+      "old_number": "MHA-DT-022",
+      "new_identities": [
+        {
+          "stem": "dt-pinion-arbor",
+          "number": "MHA-DT-22"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-ms-stop-plate-screw",
+      "old_number": "MHA-VN-054",
+      "new_identities": [
+        {
+          "parent": "ms-measuring-stick",
+          "stem": "ms-vn-stop-plate-screw",
+          "number": "MHA-MS-VN-51"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cylinder-gear-shaft",
+      "old_number": "MHA-DT-013",
+      "new_identities": [
+        {
+          "stem": "dt-cylinder-gear-shaft",
+          "number": "MHA-DT-13"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cylinder-gear",
+      "old_number": "MHA-DT-012",
+      "new_identities": [
+        {
+          "stem": "dt-cylinder-gear",
+          "number": "MHA-DT-12"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-lever-wire",
+      "old_number": "MHA-VN-066",
+      "new_identities": [
+        {
+          "parent": "mg-magnifier",
+          "stem": "mg-vn-lever-wire",
+          "number": "MHA-MG-VN-56"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-magnifying-bracket-screw",
+      "old_number": "MHA-VN-050",
+      "new_identities": [
+        {
+          "parent": "mg-magnifier",
+          "stem": "mg-vn-magnifying-bracket-screw",
+          "number": "MHA-MG-VN-53"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-pin-ring",
+      "old_number": "MHA-DT-027",
+      "new_identities": [
+        {
+          "stem": "dt-crank-pin-ring",
+          "number": "MHA-DT-27"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-pin",
+      "old_number": "MHA-DT-009",
+      "new_identities": [
+        {
+          "stem": "dt-crank-pin",
+          "number": "MHA-DT-09"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-pinion-pin",
+      "old_number": "MHA-DT-029",
+      "new_identities": [
+        {
+          "stem": "dt-crank-pinion-pin",
+          "number": "MHA-DT-29"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-pinion",
+      "old_number": "MHA-DT-010",
+      "new_identities": [
+        {
+          "stem": "dt-crank-pinion",
+          "number": "MHA-DT-10"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crankshaft",
+      "old_number": "MHA-DT-011",
+      "new_identities": [
+        {
+          "stem": "dt-crankshaft",
+          "number": "MHA-DT-11"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cylinder-end-disc",
+      "old_number": "MHA-DT-026",
+      "new_identities": [
+        {
+          "stem": "dt-cylinder-end-disc",
+          "number": "MHA-DT-26"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-keeper-chain",
+      "old_number": "MHA-VN-035",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-keeper-chain",
+          "number": "MHA-DT-VN-65"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-knife-hanger-stud",
+      "old_number": "MHA-VN-024",
+      "new_identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-knife-hanger-stud",
+          "number": "MHA-SM-VN-52"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-knife-hanger-washer",
+      "old_number": "MHA-VN-060",
+      "new_identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-knife-hanger-washer",
+          "number": "MHA-SM-VN-54"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-knife-mount-dowel",
+      "old_number": "MHA-VN-051",
+      "new_identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-knife-mount-dowel",
+          "number": "MHA-SM-VN-53"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-lag-screw",
+      "old_number": "MHA-VN-009",
+      "new_identities": [
+        {
+          "parent": "fr-frame",
+          "stem": "fr-vn-lag-screw",
+          "number": "MHA-FR-VN-51"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-latch-hook-bracket-screw",
+      "old_number": "MHA-VN-043",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-latch-hook-bracket-screw",
+          "number": "MHA-PD-VN-59"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-keeper-chain-link",
+      "old_number": "MHA-VN-036",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-keeper-chain-link",
+          "number": "MHA-DT-VN-66"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-hub",
+      "old_number": "MHA-DT-031",
+      "new_identities": [
+        {
+          "stem": "dt-crank-hub",
+          "number": "MHA-DT-31"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-pin-eye",
+      "old_number": "MHA-DT-028",
+      "new_identities": [
+        {
+          "stem": "dt-crank-pin-eye",
+          "number": "MHA-DT-28"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-hanger-screw",
+      "old_number": "MHA-VN-007",
+      "new_identities": [
+        {
+          "parent": "pn-pen",
+          "stem": "pn-vn-hanger-screw",
+          "number": "MHA-PN-VN-50"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-handle",
+      "old_number": "MHA-DT-008",
+      "new_identities": [
+        {
+          "stem": "dt-crank-handle",
+          "number": "MHA-DT-08"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-guide-lock-screw",
+      "old_number": "MHA-VN-046",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-guide-lock-screw",
+          "number": "MHA-PD-VN-60"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-arm",
+      "old_number": "MHA-DT-006",
+      "new_identities": [
+        {
+          "stem": "dt-crank-arm",
+          "number": "MHA-DT-06"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-drive-gear",
+      "old_number": "MHA-DT-007",
+      "new_identities": [
+        {
+          "stem": "dt-crank-drive-gear",
+          "number": "MHA-DT-07"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-handle-butt-cup",
+      "old_number": "MHA-DT-035",
+      "new_identities": [
+        {
+          "stem": "dt-crank-handle-butt-cup",
+          "number": "MHA-DT-35"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-handle-ferrule",
+      "old_number": "MHA-DT-034",
+      "new_identities": [
+        {
+          "stem": "dt-crank-handle-ferrule",
+          "number": "MHA-DT-34"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-crank-handle-pivot-screw",
+      "old_number": "MHA-DT-032",
+      "new_identities": [
+        {
+          "stem": "dt-crank-handle-pivot-screw",
+          "number": "MHA-DT-32"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-fillister-screw",
+      "old_number": "MHA-VN-006",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-fillister-screw",
+          "number": "MHA-DT-VN-50"
+        },
+        {
+          "parent": "fr-frame",
+          "stem": "fr-vn-fillister-screw",
+          "number": "MHA-FR-VN-50"
+        },
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-fillister-screw",
+          "number": "MHA-PD-VN-52"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-foot-screw",
+      "old_number": "MHA-VN-020",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-foot-screw",
+          "number": "MHA-DT-VN-58"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-frame-cross-screw",
+      "old_number": "MHA-VN-027",
+      "new_identities": [
+        {
+          "parent": "fr-frame",
+          "stem": "fr-vn-frame-cross-screw",
+          "number": "MHA-FR-VN-53"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-frame-side-screw",
+      "old_number": "MHA-VN-022",
+      "new_identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "ch-vn-frame-side-screw",
+          "number": "MHA-CH-VN-52"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-fulcrum-set-screw",
+      "old_number": "MHA-VN-055",
+      "new_identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "ch-vn-fulcrum-set-screw",
+          "number": "MHA-CH-VN-55"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-gooseneck-set-screw",
+      "old_number": "MHA-VN-023",
+      "new_identities": [
+        {
+          "parent": "fr-frame",
+          "stem": "fr-vn-gooseneck-set-screw",
+          "number": "MHA-FR-VN-52"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-tip-block",
+      "old_number": "MHA-DT-021",
+      "new_identities": [
+        {
+          "stem": "dt-cone-tip-block",
+          "number": "MHA-DT-21"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-cylinder-bank-spring",
+      "old_number": "MHA-VN-052",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-cylinder-bank-spring",
+          "number": "MHA-DT-VN-68"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-swing-platform",
+      "old_number": "MHA-DT-020",
+      "new_identities": [
+        {
+          "stem": "dt-cone-swing-platform",
+          "number": "MHA-DT-20"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-crank-seat-drive-pin",
+      "old_number": "MHA-VN-044",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-crank-seat-drive-pin",
+          "number": "MHA-DT-VN-67"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-pivot-post-tl-soft-jaw",
+      "old_number": "MHA-DT-005-TL-04",
+      "new_identities": [
+        {
+          "stem": "dt-cone-pivot-post-tl-soft-jaw",
+          "number": "MHA-DT-05-TL-04"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-pivot-post",
+      "old_number": "MHA-DT-005",
+      "new_identities": [
+        {
+          "stem": "dt-cone-pivot-post",
+          "number": "MHA-DT-05"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-crank-hub-pin",
+      "old_number": "MHA-VN-029",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-crank-hub-pin",
+          "number": "MHA-DT-VN-59"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-pivot-post-tl-cap-jaw-button",
+      "old_number": "MHA-DT-005-TL-03",
+      "new_identities": [
+        {
+          "stem": "dt-cone-pivot-post-tl-cap-jaw-button",
+          "number": "MHA-DT-05-TL-03"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-pivot-post-tl-saw-cradle",
+      "old_number": "MHA-DT-005-TL-02",
+      "new_identities": [
+        {
+          "stem": "dt-cone-pivot-post-tl-saw-cradle",
+          "number": "MHA-DT-05-TL-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-cone-tip-pinch-screw",
+      "old_number": "MHA-VN-018",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-cone-tip-pinch-screw",
+          "number": "MHA-DT-VN-56"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-counter-spring",
+      "old_number": "MHA-VN-005",
+      "new_identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-counter-spring",
+          "number": "MHA-SM-VN-51"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-pivot-post-tl-bond-cradle",
+      "old_number": "MHA-DT-005-TL-01",
+      "new_identities": [
+        {
+          "stem": "dt-cone-pivot-post-tl-bond-cradle",
+          "number": "MHA-DT-05-TL-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-cone-tip-collar",
+      "old_number": "MHA-VN-016",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-cone-tip-collar",
+          "number": "MHA-DT-VN-54"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-cone-tip-block-screw",
+      "old_number": "MHA-VN-030",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-cone-tip-block-screw",
+          "number": "MHA-DT-VN-60"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-arbor-pedestal",
+      "old_number": "MHA-DT-002",
+      "new_identities": [
+        {
+          "stem": "dt-arbor-pedestal",
+          "number": "MHA-DT-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-gear-shaft",
+      "old_number": "MHA-DT-004",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear-shaft",
+          "number": "MHA-DT-04"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-cone-gear",
+      "old_number": "MHA-DT-003",
+      "new_identities": [
+        {
+          "stem": "dt-cone-gear",
+          "number": "MHA-DT-03"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-cone-lock-knob",
+      "old_number": "MHA-VN-013",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-cone-lock-knob",
+          "number": "MHA-DT-VN-51"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-cone-pivot-screw",
+      "old_number": "MHA-VN-014",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-cone-pivot-screw",
+          "number": "MHA-DT-VN-52"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-cone-tip-adjuster",
+      "old_number": "MHA-VN-017",
+      "new_identities": [
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-cone-tip-adjuster",
+          "number": "MHA-DT-VN-55"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-strap",
+      "old_number": "MHA-CH-013",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-strap",
+          "number": "MHA-CH-13"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rod-pivot-pin",
+      "old_number": "MHA-CH-010",
+      "new_identities": [
+        {
+          "stem": "ch-rod-pivot-pin",
+          "number": "MHA-CH-10"
+        }
+      ]
+    },
+    {
+      "old_stem": "dt-alignment-pinion",
+      "old_number": "MHA-DT-001",
+      "new_identities": [
+        {
+          "stem": "dt-alignment-pinion",
+          "number": "MHA-DT-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-channel-spring-installed",
+      "old_number": "MHA-VN-004",
+      "new_identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "ch-vn-channel-spring-installed",
+          "number": "MHA-CH-VN-50"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-clamp-screw",
+      "old_number": "MHA-VN-021",
+      "new_identities": [
+        {
+          "parent": "mg-magnifier",
+          "stem": "mg-vn-clamp-screw",
+          "number": "MHA-MG-VN-51"
+        },
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-clamp-screw",
+          "number": "MHA-PD-VN-53"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm",
+      "old_number": "MHA-CH-006",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm",
+          "number": "MHA-CH-06"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-hub",
+      "old_number": "MHA-CH-012",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-hub",
+          "number": "MHA-CH-12"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-chain-connecting-link",
+      "old_number": "MHA-VN-068",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-chain-connecting-link",
+          "number": "MHA-PD-VN-66"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-chain-inner-link",
+      "old_number": "MHA-VN-002",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-chain-inner-link",
+          "number": "MHA-PD-VN-50"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-chain-outer-link",
+      "old_number": "MHA-VN-003",
+      "new_identities": [
+        {
+          "parent": "pd-paper-drive",
+          "stem": "pd-vn-chain-outer-link",
+          "number": "MHA-PD-VN-51"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-setting-bar",
+      "old_number": "MHA-CH-006-TL-17",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-setting-bar",
+          "number": "MHA-CH-06-TL-17"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-scriber-point",
+      "old_number": "MHA-CH-006-TL-16",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-scriber-point",
+          "number": "MHA-CH-06-TL-16"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-boss-hook",
+      "old_number": "MHA-VN-001",
+      "new_identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-boss-hook",
+          "number": "MHA-SM-VN-50"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-bracket-hold-down-screw",
+      "old_number": "MHA-VN-071",
+      "new_identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "ch-vn-bracket-hold-down-screw",
+          "number": "MHA-CH-VN-57"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-pivot-point",
+      "old_number": "MHA-CH-006-TL-18",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-pivot-point",
+          "number": "MHA-CH-06-TL-18"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-scriber-block",
+      "old_number": "MHA-CH-006-TL-15",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-scriber-block",
+          "number": "MHA-CH-06-TL-15"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-arbor-set-screw",
+      "old_number": "MHA-VN-034",
+      "new_identities": [
+        {
+          "parent": "ch-channel",
+          "stem": "ch-vn-arbor-set-screw",
+          "number": "MHA-CH-VN-53"
+        },
+        {
+          "parent": "dt-drive-train",
+          "stem": "dt-vn-arbor-set-screw",
+          "number": "MHA-DT-VN-64"
+        }
+      ]
+    },
+    {
+      "old_stem": "vn-boss-hook-jam-nut",
+      "old_number": "MHA-VN-072",
+      "new_identities": [
+        {
+          "parent": "sm-summing",
+          "stem": "sm-vn-boss-hook-jam-nut",
+          "number": "MHA-SM-VN-55"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-strap-shim-stack",
+      "old_number": "MHA-CH-006-TL-11",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-strap-shim-stack",
+          "number": "MHA-CH-06-TL-11"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-pivot-block",
+      "old_number": "MHA-CH-006-TL-14",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-pivot-block",
+          "number": "MHA-CH-06-TL-14"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-trammel-pivot-plate",
+      "old_number": "MHA-CH-006-TL-19",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-trammel-pivot-plate",
+          "number": "MHA-CH-06-TL-19"
+        }
+      ]
+    },
+    {
+      "old_stem": "sm-knife-mount",
+      "old_number": "MHA-SM-002",
+      "new_identities": [
+        {
+          "stem": "sm-knife-mount",
+          "number": "MHA-SM-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "sm-summing-lever",
+      "old_number": "MHA-SM-003",
+      "new_identities": [
+        {
+          "stem": "sm-summing-lever",
+          "number": "MHA-SM-03"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-t-nut",
+      "old_number": "MHA-CH-006-TL-39",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-t-nut",
+          "number": "MHA-CH-06-TL-VN-59"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-outline-template",
+      "old_number": "MHA-CH-006-TL-13",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-outline-template",
+          "number": "MHA-CH-06-TL-13"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-riser-block",
+      "old_number": "MHA-CH-006-TL-10",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-riser-block",
+          "number": "MHA-CH-06-TL-10"
+        }
+      ]
+    },
+    {
+      "old_stem": "sh-column-clamp-back",
+      "old_number": "MHA-SH-002",
+      "new_identities": [
+        {
+          "stem": "sh-column-clamp-back",
+          "number": "MHA-SH-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "sh-column-clamp-front",
+      "old_number": "MHA-SH-001",
+      "new_identities": [
+        {
+          "stem": "sh-column-clamp-front",
+          "number": "MHA-SH-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "sm-gooseneck-spring-screw",
+      "old_number": "MHA-SM-004",
+      "new_identities": [
+        {
+          "stem": "sm-gooseneck-spring-screw",
+          "number": "MHA-SM-04"
+        }
+      ]
+    },
+    {
+      "old_stem": "sm-gooseneck",
+      "old_number": "MHA-SM-001",
+      "new_identities": [
+        {
+          "stem": "sm-gooseneck",
+          "number": "MHA-SM-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-rail",
+      "old_number": "MHA-CH-006-TL-30",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-rail",
+          "number": "MHA-CH-06-TL-VN-50"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-riser-screw",
+      "old_number": "MHA-CH-006-TL-47",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-riser-screw",
+          "number": "MHA-CH-06-TL-VN-67"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-riser",
+      "old_number": "MHA-CH-006-TL-24",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-riser",
+          "number": "MHA-CH-06-TL-24"
+        }
+      ]
+    },
+    {
+      "old_stem": "pn-pen-rod",
+      "old_number": "MHA-PN-004",
+      "new_identities": [
+        {
+          "stem": "pn-pen-rod",
+          "number": "MHA-PN-04"
+        }
+      ]
+    },
+    {
+      "old_stem": "pn-pen-v-block",
+      "old_number": "MHA-PN-005",
+      "new_identities": [
+        {
+          "stem": "pn-pen-v-block",
+          "number": "MHA-PN-05"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-rail-screw",
+      "old_number": "MHA-CH-006-TL-41",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm",
+          "stem": "ch-rocker-arm-tl-vn-oblique-rail-screw",
+          "number": "MHA-CH-06-TL-VN-61"
+        }
+      ]
+    },
+    {
+      "old_stem": "pn-pen-hanger",
+      "old_number": "MHA-PN-002",
+      "new_identities": [
+        {
+          "stem": "pn-pen-hanger",
+          "number": "MHA-PN-02"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-pivot-block",
+      "old_number": "MHA-CH-006-TL-22",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-pivot-block",
+          "number": "MHA-CH-06-TL-22"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-pivot-pin",
+      "old_number": "MHA-CH-006-TL-23",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-pivot-pin",
+          "number": "MHA-CH-06-TL-23"
+        }
+      ]
+    },
+    {
+      "old_stem": "pd-transgear-thumbnut",
+      "old_number": "MHA-PD-013",
+      "new_identities": [
+        {
+          "stem": "pd-transgear-thumbnut",
+          "number": "MHA-PD-13"
+        }
+      ]
+    },
+    {
+      "old_stem": "pn-pen-adjust-screw",
+      "old_number": "MHA-PN-007",
+      "new_identities": [
+        {
+          "stem": "pn-pen-adjust-screw",
+          "number": "MHA-PN-07"
+        }
+      ]
+    },
+    {
+      "old_stem": "pn-pen-frame",
+      "old_number": "MHA-PN-001",
+      "new_identities": [
+        {
+          "stem": "pn-pen-frame",
+          "number": "MHA-PN-01"
+        }
+      ]
+    },
+    {
+      "old_stem": "pn-pen",
+      "old_number": "MHA-PN-000",
+      "new_identities": [
+        {
+          "stem": "pn-pen",
+          "number": "MHA-PN-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "old_stem": "sm-summing",
+      "old_number": "MHA-SM-000",
+      "new_identities": [
+        {
+          "stem": "sm-summing",
+          "number": "MHA-SM-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "old_stem": "pd-paper-drive",
+      "old_number": "MHA-PD-000",
+      "new_identities": [
+        {
+          "stem": "pd-paper-drive",
+          "number": "MHA-PD-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "old_stem": "ms-measuring-stick",
+      "old_number": "MHA-MS-000",
+      "new_identities": [
+        {
+          "stem": "ms-measuring-stick",
+          "number": "MHA-MS-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "old_stem": "mg-magnifier",
+      "old_number": "MHA-MG-000",
+      "new_identities": [
+        {
+          "stem": "mg-magnifier",
+          "number": "MHA-MG-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "old_stem": "dt-drive-train",
+      "old_number": "MHA-DT-000",
+      "new_identities": [
+        {
+          "stem": "dt-drive-train",
+          "number": "MHA-DT-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "old_stem": "fr-frame",
+      "old_number": "MHA-FR-000",
+      "new_identities": [
+        {
+          "stem": "fr-frame",
+          "number": "MHA-FR-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "old_stem": "ha-harmonic-analyzer",
+      "old_number": "MHA-HA-000",
+      "new_identities": [
+        {
+          "stem": "ha-harmonic-analyzer",
+          "number": "MHA-HA-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-jig",
+      "old_number": "MHA-CH-006-TL-000",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-jig",
+          "number": "MHA-CH-06-TL-00"
+        }
+      ],
+      "kind": "assembly"
+    },
+    {
+      "old_stem": "ch-channel",
+      "old_number": "MHA-CH-000",
+      "new_identities": [
+        {
+          "stem": "ch-channel",
+          "number": "MHA-CH-00"
+        }
+      ],
+      "kind": "assembly"
+    }
+  ],
+  "historical_current_aliases": [
+    {
+      "old_stem": "mg-lever-wire",
+      "prior_current_stem": "vn-lever-wire",
+      "current_stem": "mg-vn-lever-wire"
+    },
+    {
+      "old_stem": "pn-pen-wire",
+      "prior_current_stem": "vn-pen-wire",
+      "current_stem": "pn-vn-pen-wire"
+    },
+    {
+      "old_stem": "pn-pen-marker",
+      "prior_current_stem": "vn-pen-marker",
+      "current_stem": "pn-vn-pen-marker"
+    }
+  ],
+  "classification_decisions": {
+    "ch-pivot-bracket-tl-angle-plate": "Shop-reworked bought stock remains fabricated tooling; only numeric width changes.",
+    "pd-platen-rack": "Fabricated from purchased rack stock; finished part remains fabricated."
+  }
+}
