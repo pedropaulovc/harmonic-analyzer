@@ -746,6 +746,7 @@ def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
 
+@_telemetry.traced("drawing.cone.sheet_bands", label_param="configuration")
 def _assert_sheet_bands(
     adapter: Any, annotations: list[Any], configuration: str, teeth: int
 ) -> None:
@@ -757,6 +758,7 @@ def _assert_sheet_bands(
     saved part, so this is the per-configuration readback after save and
     reopen.
     """
+    _telemetry.annotate(dimension_count=len(annotations), teeth=teeth)
     floor = [a for a in annotations if dimension_name(adapter, a) == "FloorDia"]
     if len(floor) != 1:
         raise RuntimeError(
@@ -851,13 +853,16 @@ def _hide_tangent_edges(view: Any, configuration: str) -> None:
     view.UpdateViewDisplayGeometry()
 
 
+@_telemetry.traced("drawing.cone.tooth_geometry", label_param="configuration")
 def _assert_tooth_geometry(front: Any, configuration: str, teeth: int) -> None:
     """Prove the view exposes patterned body edges, not a smooth bored blank."""
+    _telemetry.annotate(teeth=teeth)
     edge_count = len(
         visible_view_entities(
             front, 1, label=f"{configuration} front tooth topology"
         )
     )
+    _telemetry.annotate(visible_edge_count=edge_count)
     minimum = 2 * teeth + 2
     if edge_count < minimum:
         raise RuntimeError(
@@ -878,6 +883,7 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
     return name
 
 
+@_telemetry.traced("drawing.cone.center_bore_view", label_param="configuration")
 def _center_bore_view(adapter: Any, view: Any, configuration: str) -> None:
     """Move the configured bore view so the bore axis lands on BORE_VIEW_CENTER."""
     view = _early_bound(view, "IView")
@@ -908,6 +914,7 @@ def _hide_title_block_source(adapter: Any, view: Any) -> None:
         raise RuntimeError("the tooth-space sheet's T006 view still reads visible")
 
 
+@_telemetry.traced("drawing.cone.crop_bore_view", label_param="configuration")
 def _crop_bore_view(
     adapter: Any, view: Any, configuration: str, teeth: int, kept: set[str]
 ) -> None:
@@ -1218,6 +1225,7 @@ def _label_bore_view(adapter: Any, view: Any, teeth: int, *, label: str) -> None
         raise RuntimeError(f"{label} title did not land in its view: {owned!r}")
 
 
+@_telemetry.traced("drawing.cone.curate_repeated_dimensions", label_param="view_label")
 def _curate_repeated_dimensions(
     adapter: Any,
     view: Any,
@@ -1233,6 +1241,7 @@ def _curate_repeated_dimensions(
     must print the same driving dimensions on all twenty standalone sheets, so
     it deliberately passes false and then curates only the returned objects.
     """
+    _telemetry.annotate(keep_count=len(keep), curation_pass_count=2)
     declared = set().union(*DRAWING_DIMENSIONS.values())
     unknown = sorted(set(keep) - declared)
     if unknown:
@@ -1268,6 +1277,7 @@ def _curate_repeated_dimensions(
     annotations = delete_unnamed_imports(adapter, list(result))
     names = {dimension_name(adapter, annotation) for annotation in annotations}
     delete = tuple(sorted(name for name in names if name and name not in keep))
+    _telemetry.annotate(imported_count=len(annotations), delete_count=len(delete))
     curated = curate_dimensions(
         adapter, annotations, delete=delete, reposition=dict(keep)
     )
@@ -1389,41 +1399,48 @@ async def build(adapter: Any) -> dict[str, str]:
         # ENFORCE round 4 of #971: the OD's and the root envelope's
         # dimension lines crossed at the centre and over the bore; the OD
         # leader now stops on its near rim.
-        blank_dia = [
-            item for item in front_annotations
-            if dimension_name(adapter, item) == "BlankDia"
-        ]
-        if len(blank_dia) != 1:
-            raise RuntimeError(
-                f"{configuration}: expected one BlankDia dimension, found {len(blank_dia)}"
-            )
-        set_near_side_diameter(blank_dia[0], f"{configuration} blank diameter")
-        rebuild_drawing(adapter, label=f"{configuration} blank diameter near-side leader")
+        with _telemetry.span(
+            "drawing.cone.blank_diameter_layout", configuration=configuration
+        ):
+            blank_dia = [
+                item for item in front_annotations
+                if dimension_name(adapter, item) == "BlankDia"
+            ]
+            if len(blank_dia) != 1:
+                raise RuntimeError(
+                    f"{configuration}: expected one BlankDia dimension, found {len(blank_dia)}"
+                )
+            set_near_side_diameter(blank_dia[0], f"{configuration} blank diameter")
+            rebuild_drawing(adapter, label=f"{configuration} blank diameter near-side leader")
         right_annotations = _curate_repeated_dimensions(
             adapter,
             right,
             keep=right_keep(teeth),
             view_label=f"{configuration} right",
         )
-        annotations = [*bore_annotations, *front_annotations, *right_annotations]
-        set_dimension_callouts(adapter, annotations, callouts_below(teeth))
-        set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
-        assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-        _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
-        _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")
-        sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
-        if not sheet.SetScale(*view_scale, False, False):
-            raise RuntimeError(f"failed to pin the {configuration} sheet scale")
-        _label_bore_view(adapter, bore_view, teeth, label=f"{configuration} bore view")
+        with _telemetry.span(
+            "drawing.cone.sheet_annotations", configuration=configuration
+        ):
+            annotations = [*bore_annotations, *front_annotations, *right_annotations]
+            _telemetry.annotate(dimension_count=len(annotations), view_count=4)
+            set_dimension_callouts(adapter, annotations, callouts_below(teeth))
+            set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+            assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+            _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
+            _center_mark_bore(adapter, bore_view, teeth, label=f"{configuration} bore view")
+            sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+            if not sheet.SetScale(*view_scale, False, False):
+                raise RuntimeError(f"failed to pin the {configuration} sheet scale")
+            _label_bore_view(adapter, bore_view, teeth, label=f"{configuration} bore view")
 
-        add_property_linked_note(
-            adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025
-        )
-        add_property_linked_note(
-            adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_POS,
-            char_height=0.0025,
-        )
-        rebuild_drawing(adapter, label=f"{configuration} layout audit")
+            add_property_linked_note(
+                adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025
+            )
+            add_property_linked_note(
+                adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_POS,
+                char_height=0.0025,
+            )
+            rebuild_drawing(adapter, label=f"{configuration} layout audit")
         check_drawing_layout(
             adapter, layout=SPEC.layout, stem=f"cone-gear {configuration}"
         )
