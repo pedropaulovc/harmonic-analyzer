@@ -26,9 +26,7 @@ RECORDING_PAPER_LEFT_INSET_MM = 14.6
 RECORDING_PAPER_RIGHT_INSET_MM = (
     platen.PLATE_WIDTH - RECORDING_PAPER_WIDTH_MM - RECORDING_PAPER_LEFT_INSET_MM
 )
-PAPER_FRONT_Z = (
-    hook.BAR_BACK_FACE_Z - BAR_DEPTH - platen.PLATE_THICKNESS - 0.5
-)
+PAPER_FRONT_Z = hook.BAR_BACK_FACE_Z - BAR_DEPTH - platen.PLATE_THICKNESS - 0.5
 # The pen rod line. x: plumb under the magnifying wheel's rim-tangent wire (the
 # wire hangs from the rim groove's 3 o'clock point straight onto the adjuster
 # stud eye on the rod axis). z: the paper-most 0.1-grid line on which the pen

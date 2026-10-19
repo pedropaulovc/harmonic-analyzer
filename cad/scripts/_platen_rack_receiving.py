@@ -52,9 +52,12 @@ def feed_rack_receiving_constraint_uncertainty_mm() -> float:
 
 def feed_rack_receiving_boundary_uncertainty_mm() -> float:
     """Instrument-only XY point-envelope U floor; not a sampling theorem."""
-    return math.nextafter(math.hypot(
-        wire_measurement_uncertainty_mm(), pitch_index_measurement_uncertainty_mm()
-    ), math.inf)
+    return math.nextafter(
+        math.hypot(
+            wire_measurement_uncertainty_mm(), pitch_index_measurement_uncertainty_mm()
+        ),
+        math.inf,
+    )
 
 
 def feed_rack_receiving_root_uncertainty_mm() -> float:

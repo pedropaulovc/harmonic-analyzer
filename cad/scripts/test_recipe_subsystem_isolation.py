@@ -178,7 +178,7 @@ def test_transgear_pivot_isolation(part_closures, contract: Contract) -> None:
             mates=(
                 # The wheel's own builder owns this geometry.
                 ("build_mg_magnifying_wheel", "mg_magnifying_wheel_geom"),
-                # The axle journal mates the wheel bore.
+                # The axle's hub stack uses the spacer's wheel-back-face contact.
                 ("build_mg_wheel_axle", "mg_magnifying_wheel_geom"),
                 # The spacer contacts the wheel hub's back face.
                 ("build_mg_wheel_axle_spacer", "mg_magnifying_wheel_geom"),

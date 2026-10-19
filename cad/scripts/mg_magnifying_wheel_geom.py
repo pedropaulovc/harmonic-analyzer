@@ -208,5 +208,9 @@ def fillets_volume() -> float:
 
 if not SPOKE_X0 < side_meets_circle(HUB_DIA / 2.0)[0]:
     raise AssertionError("spoke root does not start inside the hub")
-if not side_meets_circle(_rim.RIM_INNER_DIA / 2.0)[0] < SPOKE_X1 < _rim.GROOVE_BOTTOM_DIA / 2.0:
+if (
+    not side_meets_circle(_rim.RIM_INNER_DIA / 2.0)[0]
+    < SPOKE_X1
+    < _rim.GROOVE_BOTTOM_DIA / 2.0
+):
     raise AssertionError("spoke tip must end inside the rim, short of the groove")
