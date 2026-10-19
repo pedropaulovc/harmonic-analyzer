@@ -23,6 +23,7 @@ from _hole_spec import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 import _cone_axis_constants as cone_axis
+import dt_cone_post_envelope as post_envelope
 import dt_cone_tip_block_spec
 import dt_cone_gear_shaft_spec as cone_shaft
 import dt_cone_pivot_post_spec
@@ -32,7 +33,7 @@ from cone_stack_end_play import CONE_FLOAT_NORTH
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
 
 POST_ATTACHMENT_SPACING = dt_cone_pivot_post_spec.ATTACHMENT_SPACING
-POST_BLOCK_DIA = cone_axis.BLOCK_DIA
+POST_BLOCK_DIA = post_envelope.BLOCK_DIA
 POST_CONE_BORE_HEIGHT = dt_cone_pivot_post_spec.BORE_HEIGHT
 
 

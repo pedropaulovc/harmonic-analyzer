@@ -52,7 +52,7 @@ from _holes import HoleSpec, wizard_holes
 from _named_views import octant_rotation
 from _part_pmi import author_part_pmi
 from solidworks_mcp.adapters.com_variant import double_array
-from _cone_axis_constants import BLOCK_DIA
+from dt_cone_post_envelope import BLOCK_DIA
 from dt_cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DEPTH,
     ATTACHMENT_CBORE_DIA,

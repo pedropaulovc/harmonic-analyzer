@@ -1,8 +1,9 @@
 """Import-free installation datums shared across the cone, channels and frame.
 
 These are geometric inputs, not post, tip-block or mounting-screw checks. The
-world-axis calculation in ``cone_line`` and shaft-local ``cone_stations`` read
-the same anchors as the parts that locate the surrounding mechanism.
+post body outline belongs to ``dt_cone_post_envelope``, not these axis datums.
+The world-axis calculation in ``cone_line`` and shaft-local ``cone_stations``
+read the same anchors as the parts that locate the surrounding mechanism.
 """
 
 # Move the working gear stack toward the fixed post.  Axially the stack now
@@ -35,6 +36,3 @@ SUMMING_Z = MECHANISM_Z_SHIFT
 CONE_AXIS_HEIGHT_MM = 1.5 * 25.4
 AXIS_RAISE_MM = CONE_AXIS_HEIGHT_MM - 33.368
 PLATFORM_THICKNESS_MM = 6.35
-
-# The cone post's harvested body sets the platform's southern footprint.
-BLOCK_DIA = 42.011

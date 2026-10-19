@@ -22,7 +22,7 @@ from typing import Any
 
 import _telemetry
 import dt_cone_pivot_post_spec as post
-from _cone_axis_constants import BLOCK_DIA
+from dt_cone_post_envelope import BLOCK_DIA
 import crank_boss_rim
 from _com import _early_bound
 

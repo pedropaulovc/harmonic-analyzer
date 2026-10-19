@@ -21,7 +21,7 @@ import dt_alignment_pinion_spec as alignment
 import dt_cone_gear_spec as cone
 import dt_cone_gear_shaft_spec as cone_shaft
 import dt_cone_pivot_post_spec as post
-from _cone_axis_constants import BLOCK_DIA
+from dt_cone_post_envelope import BLOCK_DIA
 import dt_cone_tip_block_spec as tip_block
 import dt_cone_swing_platform_geometry as platform_geometry
 import dt_cone_swing_platform_spec as platform

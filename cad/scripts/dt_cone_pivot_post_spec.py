@@ -21,6 +21,7 @@ from _gtol_controls import GeometricControl, PartDatum
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 import _cone_axis_constants as cone_axis
+import dt_cone_post_envelope as post_envelope
 from dt_post_mount_stack import (
     POST_BODY_HEIGHT_MM,
     POST_MOUNT_COUNTERBORE_DEPTH_MM,
@@ -82,7 +83,7 @@ CONE_AXIS_VIEW = "CONE JOURNAL"
 BORE_HEIGHT = cone_axis.CONE_AXIS_HEIGHT_MM
 CONE_BOSS_DIA = 17.2
 BORE_DIA = 12.2808
-CONE_BOSS_LENGTH = cone_axis.BLOCK_DIA
+CONE_BOSS_LENGTH = post_envelope.BLOCK_DIA
 
 # Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the top face.
 # Ry(180) maps part-local +X to machine -X, so the assembly intentionally mates
@@ -161,7 +162,7 @@ if CONE_BOSS_NORTH_STATION_TOLERANCE_MM > _row(2) / 2.0:
 # two through drills.  The head shell's height and the contained boss/pad/bore
 # intersections are unchanged; the builder independently recomputes them.
 HARVESTED_VOLUME_MM3 = 112_300.8902 + math.pi * (
-    (cone_axis.BLOCK_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
+    (post_envelope.BLOCK_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
 ) * (BLOCK_HEIGHT - 86.0)
 HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
 
@@ -256,7 +257,7 @@ for _name, _web in CRANK_BORE_WEBS_WORST.items():
 # the loosest title-block angular row on the cone axis; its BASIC angle and
 # angularity frame are tighter, so this overbounds the printed corner.
 MOUNT_OTHER_WEBS_WORST = {
-    "body foot OD": (round(cone_axis.BLOCK_DIA, 1) - _row(1)) / 2.0
+    "body foot OD": (round(post_envelope.BLOCK_DIA, 1) - _row(1)) / 2.0
     - (ATTACHMENT_X + _row(2))
     - (ATTACHMENT_THRU_DIA + _DRILL_OVERSIZE) / 2.0,
     "inclined cone bore": _HOLE_X_MIN

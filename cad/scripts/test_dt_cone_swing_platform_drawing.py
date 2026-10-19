@@ -23,7 +23,7 @@ import dt_cone_swing_platform_geometry as geometry
 import dt_cone_swing_platform_spec as spec
 import dt_cone_swing_platform_checks as checks
 import dt_cone_tip_block_spec as block
-from _cone_axis_constants import BLOCK_DIA
+from dt_cone_post_envelope import BLOCK_DIA
 import draw_dt_cone_swing_platform as drawing
 import pytest
 from _gtol_planar import PlanarFace

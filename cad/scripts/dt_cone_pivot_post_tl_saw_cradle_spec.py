@@ -33,7 +33,7 @@ import math
 
 import _config
 import dt_cone_pivot_post_spec as post
-from _cone_axis_constants import BLOCK_DIA
+from dt_cone_post_envelope import BLOCK_DIA
 from _hole_spec import THREAD_MAJOR_MM, TAP_DRILL_MM, HoleSpec
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 

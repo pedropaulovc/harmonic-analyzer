@@ -42,7 +42,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _surface_finish
 import dt_cone_gear_shaft_spec as cone_shaft
 import dt_cone_pivot_post_spec as cone
-from _cone_axis_constants import BLOCK_DIA
+from dt_cone_post_envelope import BLOCK_DIA
 from _feature_requirements import part_metadata, requirement
 from _printed_limits import drilled_limits as _drilled_band
 from _printed_limits import limits as _band
@@ -329,8 +329,8 @@ CONE_AXIS_LABEL_XY = (0.122, 0.2095)
 BODY = requirement(
     "body", faces=(CylinderFace(BLOCK_DIA),),
     kind="boss", requirements=("dia", "height"), fields={
-        "dia": (_band(BLOCK_DIA, _P["MainBodyDia"]), (("_cone_axis_constants", "BLOCK_DIA"),)),
-        "dia_nominal": (BLOCK_DIA, (("_cone_axis_constants", "BLOCK_DIA"),)),
+        "dia": (_band(BLOCK_DIA, _P["MainBodyDia"]), (("dt_cone_post_envelope", "BLOCK_DIA"),)),
+        "dia_nominal": (BLOCK_DIA, (("dt_cone_post_envelope", "BLOCK_DIA"),)),
         "height": (_band(cone.BLOCK_HEIGHT, _P["MainBodyHt"]), ("BLOCK_HEIGHT",)),
         "height_nominal": (cone.BLOCK_HEIGHT, ("BLOCK_HEIGHT",)),
         "frame": ("body_axis", (*_HEAD_SOURCES, ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
@@ -469,7 +469,7 @@ CONE_BOSS = requirement(
     "cone_boss", faces=(CylinderFace(cone.CONE_BOSS_DIA),),
     **_size_requirement("boss", {"dia": ("CONE_BOSS_DIA", "ConeBossDia")}, {
         "frame": ("cone_axis", ("BORE_HEIGHT", "INCLINE_DEG", "SURFACE_FINISHES", ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
-        "z_mm": ([round(-cone.CONE_BOSS_LENGTH / 2, 12), round(cone.CONE_BOSS_LENGTH / 2, 12)], ("CONE_BOSS_LENGTH", ("_cone_axis_constants", "BLOCK_DIA"))),
+        "z_mm": ([round(-cone.CONE_BOSS_LENGTH / 2, 12), round(cone.CONE_BOSS_LENGTH / 2, 12)], ("CONE_BOSS_LENGTH", ("dt_cone_post_envelope", "BLOCK_DIA"))),
     }),
 )
 JOURNAL_BORE = requirement(

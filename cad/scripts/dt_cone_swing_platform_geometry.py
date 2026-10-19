@@ -2,9 +2,13 @@ r"""Plan geometry of the MHA-DT-20 cone swing platform.
 
 PURE, SolidWorks-free: the plate outline, lock-notch seat and chord and the
 base-fixed swing hardware stations. The harmonic base reads these placements
-without the post/shaft/tip-block specifications. Spec-dependent mounting,
-web and manufactured-stop checks live in ``dt_cone_swing_platform_checks``;
-the fixed crank reference lives in ``dt_cone_swing_platform_crank_axis``.
+without the post/shaft/tip-block specifications. It does require the post's
+body envelope: BLOCK_DIA sets PLATE_SOUTH_Z and PLATE_LEN; that length sets
+the notch exit and tapered edge used by ``swing_hardware_geometry`` to
+calculate the base's swing-stop hole. Removing that dependency would duplicate
+the mating platform geometry in the base. Spec-dependent mounting, web and
+manufactured-stop checks live in ``dt_cone_swing_platform_checks``; the fixed
+crank reference lives in ``dt_cone_swing_platform_crank_axis``.
 """
 
 from __future__ import annotations
@@ -12,7 +16,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from _cone_axis_constants import BLOCK_DIA, PLATFORM_THICKNESS_MM
+from _cone_axis_constants import PLATFORM_THICKNESS_MM
+from dt_cone_post_envelope import BLOCK_DIA
 from cone_line import (
     COS_I as _COS_I,
     INCLINE_DEG,

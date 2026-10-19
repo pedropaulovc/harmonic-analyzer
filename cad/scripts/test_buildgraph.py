@@ -1577,7 +1577,7 @@ _GRANDFATHERED_BUILDER_EDGES = {
         "dtrefactor: reads FOOT_HEIGHT, FOOT_WIDTH, SCREW_Z"
     ),
     ("build_dt_drive_train_assembly.py", "build_dt_cone_pivot_post"): (
-        "dtrefactor: reads BLOCK_DIA, BORE_HEIGHT, CONE_BOSS_LENGTH, CRANK_BORE_HEIGHT, CRANK_BOSS_LENGTH, CRANK_BOSS_START_Z"
+        "dtrefactor: reads BORE_HEIGHT, CONE_BOSS_LENGTH, CRANK_BORE_HEIGHT, CRANK_BOSS_LENGTH, CRANK_BOSS_START_Z"
     ),
     ("build_dt_drive_train_assembly.py", "build_dt_crankshaft"): (
         "dtrefactor: reads PINION_PIN_STATION_Y, SEAT_PINION, SHAFT_LENGTH"

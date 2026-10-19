@@ -7,7 +7,7 @@ import re
 import _config
 import draw_dt_cone_pivot_post_tl_saw_cradle as drawing
 import dt_cone_pivot_post_spec as post
-from _cone_axis_constants import BLOCK_DIA
+from dt_cone_post_envelope import BLOCK_DIA
 import dt_cone_pivot_post_tl_saw_cradle_spec as spec
 import export_features
 from _printed_limits import limits

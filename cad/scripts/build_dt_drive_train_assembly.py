@@ -1247,10 +1247,10 @@ from dt_vn_pedestal_hold_down_screw_spec import (  # noqa: E402
     SHANK_LEN as HDSCREW_SHANK_LEN,
     THREAD as HDSCREW_THREAD,
 )
+from dt_cone_post_envelope import BLOCK_DIA as POST_BLOCK_DIA  # noqa: E402
 from build_dt_cone_pivot_post import (  # noqa: E402
     ATTACHMENT_CBORE_DEPTH as POST_CBORE_DEPTH,
     ATTACHMENT_X as POST_ATTACHMENT_X,
-    BLOCK_DIA as POST_BLOCK_DIA,
     BLOCK_HEIGHT as POST_BLOCK_HEIGHT,
     BORE_HEIGHT as POST_BORE_HEIGHT,
     CONE_BOSS_LENGTH as POST_CONE_BOSS_LENGTH,

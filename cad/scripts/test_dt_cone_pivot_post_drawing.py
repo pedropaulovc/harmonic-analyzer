@@ -14,7 +14,7 @@ import pytest
 import _config
 import build_dt_cone_pivot_post as part
 import dt_cone_pivot_post_spec as spec
-from _cone_axis_constants import BLOCK_DIA
+from dt_cone_post_envelope import BLOCK_DIA
 import _layout_geometry as layout
 import draw_dt_cone_pivot_post as drawing
 from _assembly import _seed_flip, activate_assembly_contract

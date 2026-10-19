@@ -37,7 +37,7 @@ from dataclasses import dataclass
 import _config
 import dt_cone_gear_shaft_spec as shaft
 import dt_cone_pivot_post_spec as post
-from _cone_axis_constants import BLOCK_DIA
+from dt_cone_post_envelope import BLOCK_DIA
 import dt_crank_drive_gear_spec as gear64
 
 Point = tuple[float, float, float]

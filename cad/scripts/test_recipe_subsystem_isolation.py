@@ -110,7 +110,12 @@ def assert_isolated(closures: dict[str, frozenset[str]], contract: Contract) -> 
                 "dt_cone_pivot_post_installation",
                 "dt_post_mount_stack",
                 "dt_cone_tip_block_spec",
+                "dt_cone_post_envelope",
             ),
+            # The base's swing-stop hole physically mates the platform edge:
+            # BLOCK_DIA -> PLATE_LEN -> swing_hardware_geometry().stop_xz.
+            # assert_isolated also rejects this exception if the edge vanishes.
+            mates=(("build_fr_harmonic_base", "dt_cone_post_envelope"),),
         )
     ],
     ids=["cone-axis"],
