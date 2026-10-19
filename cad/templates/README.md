@@ -43,18 +43,22 @@ the standard isometric projection as high-quality Shaded With Edges.
 
 ### Line weights
 
-Both drawing templates set Document Properties > Line Thickness to
-**Thin 0.13 mm** and **Normal 0.35 mm**. Line Font maps visible edges to Normal,
-and hidden edges, tangent edges, cosmetic threads, hatch, dimensions and
-annotation leaders/frames to Thin. Thick through Thick(6), section cutting
-lines and the border retain their existing settings; the border uses
-Thick(2), 0.5 mm.
+Both drawing templates use **Thin 0.13 mm**, **Normal 0.18 mm** and
+**Thick 0.35 mm** in Document Properties > Line Thickness. Line Font maps
+visible edges to Thick, and hidden edges, tangent edges, cosmetic threads,
+hatch, dimensions and annotation leaders/frames to Thin. Normal remains
+unchanged so unrelated sheet-format/sketch ink is not thickened. Thick(2)
+through Thick(6), section cutting lines and the border retain their existing
+settings; the border uses Thick(2), 0.5 mm.
 
 These are document properties persisted in each DRWDOT, not printer or
 seat-global preferences and not runtime drawing overrides. The native API
 `IModelDocExtension.SetUserPreferenceDouble` uses **metres** for the
-`swPageSetupPrinter{Thin,Normal}LineWeight` preferences. The corresponding
-line-font integer preferences select `swLineWeights_e` slots. To check the
+`swPageSetupPrinter{Thin,Thick}LineWeight` preferences. The corresponding
+line-font integer preferences select `swLineWeights_e` slots and their
+documented annotation scopes: balloon leaders/frames use `swDetailingBalloon`,
+and dimension leader/extension weights use their individual dimension types.
+To check the
 exported PDF, read its stroke widths with PyMuPDF `page.get_drawings()` and
 multiply by 25.4/72 to obtain millimetres. Inspect a representative part and
 dense assembly at print size; section cutting lines may legitimately have
@@ -154,13 +158,20 @@ declare as cache outputs:
 
 Each census records the original, edited and closed/reopened native document:
 sheet properties, sheet-format segments and block transforms, every note's
-linked/resolved text, position, extent, font settings/runs, and document
-line-weight slots/mappings. Existing note anchors, formatting and sheet
+linked/resolved text, position, extent, rich-font flag, font settings/runs, and
+document line-weight slots/scoped mappings. Empty, unrendered notes have an
+explicitly absent extent; populated notes must have a valid native extent.
+Existing note anchors, formatting and sheet
 geometry must remain unchanged. The inside-corner operation measures configured
 property values temporarily and adds its linked row only in a native free gap
 in the existing ruled tolerance cell; it refuses to move or shrink existing
 content to make space. No temporary literal values are saved. Source-template
 SHA-256 checks ensure the checked-in files were not mutated on the worker.
+The saved document must be confirmed closed before reopening it, and the
+reopened template must contain exactly one inside-corner property-linked row.
+If maintenance fails, its partial census (including measured placement
+evidence) is also copied to `cad/out/reports/failures/templates`, the farm
+worker's existing failure-artifact return path.
 
 After successful persisted readback, deliberately install the returned binaries
 into this directory, remove any temporary dispatch hook, and render portrait

@@ -65,18 +65,52 @@ _THIN_FONTS = (
     "swLineFontTangentEdgesThickness",
     "swLineFontCosmeticThreadThickness",
     "swLineFontCrosshatchThickness",
-    "swLineFontDimensionsThickness",
-    "swDimensionsExtensionLineStyleThickness",
     "swDetailingNoteLeaderLineThickness",
     "swDetailingGtolLeaderLineThickness",
     "swDetailingGtolFrameLineThickness",
     "swDetailingDatumLeaderLineThickness",
     "swDetailingDatumFrameLineThickness",
     "swDetailingSFSymbolLeaderLineThickness",
-    "swDetailingBalloonLeaderLineThickness",
-    "swDetailingBalloonFrameLineThickness",
 )
-_FONT_PREFS = ("swLineFontVisibleEdgesThickness", *_THIN_FONTS)
+_NO_OPTION = "swDetailingNoOptionSpecified"
+_DIMENSION_OPTIONS = (
+    "swDetailingLinearDimension",
+    "swDetailingDiameterDimension",
+    "swDetailingRadiusDimension",
+    "swDetailingAngleDimension",
+    "swDetailingOrdinateDimension",
+    "swDetailingHoleDimension",
+    "swDetailingChamferDimension",
+    "swDetailingArcLengthDimension",
+    "swDetailingAngularRunningDimension",
+)
+# Radius, hole-callout and chamfer pages have no extension-thickness setting.
+_EXTENSION_OPTIONS = tuple(
+    option
+    for option in _DIMENSION_OPTIONS
+    if option
+    not in (
+        "swDetailingRadiusDimension",
+        "swDetailingHoleDimension",
+        "swDetailingChamferDimension",
+    )
+)
+# DP_LineFont / DP_Annotations-Balloons / DP_Dimensions-* specify these scopes.
+# Use the identical preference+option pairs for mutation AND the native census.
+_LINE_FONT_SETTINGS = (
+    ("swLineFontVisibleEdgesThickness", _NO_OPTION, "swLW_THICK"),
+    *((name, _NO_OPTION, "swLW_THIN") for name in _THIN_FONTS),
+    ("swDetailingBalloonLeaderLineThickness", "swDetailingBalloon", "swLW_THIN"),
+    ("swDetailingBalloonFrameLineThickness", "swDetailingBalloon", "swLW_THIN"),
+    *(
+        ("swLineFontDimensionsThickness", option, "swLW_THIN")
+        for option in _DIMENSION_OPTIONS
+    ),
+    *(
+        ("swDimensionsExtensionLineStyleThickness", option, "swLW_THIN")
+        for option in _EXTENSION_OPTIONS
+    ),
+)
 
 
 def _numbers(values: Any) -> list[float]:
@@ -110,15 +144,25 @@ def _note_census(note: Any) -> dict[str, Any]:
                 **{name: getattr(fmt, name) for name in _FONT_FIELDS},
             }
         )
-    extent = _numbers(note.GetExtent() or ())
-    if len(extent) != 6:
-        raise RuntimeError(f"note {note.GetName()!r} has no visible native extent")
+    linked_text = str(note.PropertyLinkedText or "")
+    text = str(note.GetText() or "")
+    try:
+        extent = _numbers(note.GetExtent() or ())
+    except Exception:
+        if text.strip():
+            raise
+        extent = []
+    rendered = len(extent) == 6 and extent[3] > extent[0] and extent[4] > extent[1]
+    if not rendered and text.strip():
+        raise RuntimeError(f"populated note {note.GetName()!r} has no native extent")
     return {
         "name": str(note.GetName()),
-        "linked_text": str(note.PropertyLinkedText or ""),
-        "text": str(note.GetText() or ""),
+        "linked_text": linked_text,
+        "text": text,
         "position_m": _numbers(annotation.GetPosition()),
-        "extent_m": extent,
+        "extent_m": extent if rendered else None,
+        "extent_unavailable": None if rendered else "empty/unrendered note",
+        "has_multiple_fonts": bool(note.HasMultipleFonts),
         "angle": float(note.Angle),
         "justification": int(note.GetTextJustification()),
         "formats": formats,
@@ -182,8 +226,10 @@ def _weights(model: Any) -> dict[str, Any]:
             for slot in _WEIGHT_SLOTS
         },
         "line_fonts": {
-            name: int(extension.GetUserPreferenceInteger(constant(name), option))
-            for name in _FONT_PREFS
+            f"{name}:{scope}": int(
+                extension.GetUserPreferenceInteger(constant(name), constant(scope))
+            )
+            for name, scope, _weight in _LINE_FONT_SETTINGS
         },
     }
 
@@ -248,7 +294,11 @@ def _cell(geometry: dict[str, Any], note: dict[str, Any]) -> tuple[float, ...]:
 
 
 def _inside_corner(
-    model: Any, drawing: Any, geometry: dict[str, Any]
+    model: Any,
+    drawing: Any,
+    geometry: dict[str, Any],
+    *,
+    evidence: dict[str, Any],
 ) -> dict[str, Any]:
     notes = _notes(drawing)
     existing = [
@@ -262,7 +312,8 @@ def _inside_corner(
             raise RuntimeError(
                 "inside-corner row is duplicated or has unexpected wording"
             )
-        return {"already_present": True}
+        evidence["already_present"] = True
+        return evidence
     edge_notes = [
         note for note in notes if "TOL_EDGE_BREAK_R" in note.PropertyLinkedText
     ]
@@ -282,8 +333,11 @@ def _inside_corner(
                 note.PropertyLinkedText = resolved
         model.GraphicsRedraw2()
         measured = [_note_census(note) for note in notes]
+        evidence["resolved_existing_notes"] = measured
         edge_data = _note_census(edge)
+        evidence["edge_break"] = edge_data
         left, bottom, right, top = _cell(geometry, edge_data)
+        evidence["cell_m"] = [left, bottom, right, top]
         row = _early_bound(
             model.InsertNote(f"INSIDE CORNERS {props['TOL_INSIDE_CORNER']}"), "INote"
         )
@@ -301,12 +355,25 @@ def _inside_corner(
             raise RuntimeError("failed to measure inside-corner row")
         model.GraphicsRedraw2()
         trial = _note_census(row)
+        evidence["trial_row"] = trial
+        if not edge_data["text_runs"] or not trial["text_runs"]:
+            raise RuntimeError(
+                "inside-corner row or reference has no rendered font run"
+            )
+        reference_run, row_run = edge_data["text_runs"][0], trial["text_runs"][0]
+        if reference_run["font"] != row_run["font"] or not math.isclose(
+            reference_run["height_m"], row_run["height_m"], abs_tol=1e-10
+        ):
+            raise RuntimeError(
+                "inside-corner row differs from the rendered edge-break font"
+            )
         bounds = trial["extent_m"]
         height = bounds[4] - bounds[1]
         occupied = sorted(
             (max(bottom, item["extent_m"][1]), min(top, item["extent_m"][4]))
             for item in measured
-            if item["extent_m"][0] < right
+            if item["extent_m"] is not None
+            and item["extent_m"][0] < right
             and item["extent_m"][3] > left
             and item["extent_m"][1] < top
             and item["extent_m"][4] > bottom
@@ -319,6 +386,7 @@ def _inside_corner(
             cursor = max(cursor, high)
         if top - cursor >= height + 2 * _CLEARANCE:
             gaps.append((cursor, top))
+        evidence["gaps_m"] = gaps
         if not gaps:
             raise RuntimeError(
                 "no native text gap for inside-corner row without moving existing content"
@@ -351,12 +419,13 @@ def _inside_corner(
         row.PropertyLinkedText = INSIDE_CORNER_LINK
         if str(row.PropertyLinkedText) != INSIDE_CORNER_LINK:
             raise RuntimeError("inside-corner property link did not persist")
-        return {
-            "cell_m": [left, bottom, right, top],
-            "gap_m": [low, high],
-            "resolved_row": placed,
-            "resolved_existing_notes": measured,
-        }
+        evidence.update(
+            {
+                "gap_m": [low, high],
+                "resolved_row": placed,
+            }
+        )
+        return evidence
     finally:
         for note, text in originals:
             if str(note.PropertyLinkedText or "") != text:
@@ -366,10 +435,18 @@ def _inside_corner(
 def _line_weights(model: Any) -> None:
     # Exact API: DP_LineThickness specifies METRES, using document-extension
     # preferences, NOT ISldWorks system/printer preferences. DP_LineFont selects
-    # a swLineWeights_e slot. Normal is visible ink; Thin is annotation ink.
+    # a swLineWeights_e slot. Thick is visible ink; Thin is annotation ink.
     extension = _early_bound(model.Extension, "IModelDocExtension")
     option = constant("swDetailingNoOptionSpecified")
-    for slot, value in (("Thin", 0.00013), ("Normal", 0.00035)):
+    normal = extension.GetUserPreferenceDouble(
+        constant("swPageSetupPrinterNormalLineWeight"), option
+    )
+    if not math.isclose(normal, 0.00018, abs_tol=1e-10):
+        raise RuntimeError(
+            "source template Normal thickness is not the expected 0.18 mm"
+        )
+    # Keep Normal and every unrelated slot intact; visible edges use Thick.
+    for slot, value in (("Thin", 0.00013), ("Thick", 0.00035)):
         pref = constant(f"swPageSetupPrinter{slot}LineWeight")
         if not extension.SetUserPreferenceDouble(pref, option, value):
             raise RuntimeError(f"failed to set document {slot} thickness")
@@ -377,9 +454,10 @@ def _line_weights(model: Any) -> None:
             extension.GetUserPreferenceDouble(pref, option), value, abs_tol=1e-10
         ):
             raise RuntimeError(f"document {slot} thickness readback differs")
-    for name in _FONT_PREFS:
+    for name, scope, weight in _LINE_FONT_SETTINGS:
         pref = constant(name)
-        value = constant("swLW_NORMAL" if name == _FONT_PREFS[0] else "swLW_THIN")
+        option = constant(scope)
+        value = constant(weight)
         if not extension.SetUserPreferenceInteger(pref, option, value):
             raise RuntimeError(f"failed to set document line font {name}")
         if int(extension.GetUserPreferenceInteger(pref, option)) != value:
@@ -397,7 +475,14 @@ def _preserved(before: dict[str, Any], after: dict[str, Any], *, website: bool) 
         current = by_name.get(original["name"])
         if current is None:
             raise RuntimeError(f"lost original template note {original['name']!r}")
-        for key in ("position_m", "angle", "justification", "formats", "linked_text"):
+        for key in (
+            "position_m",
+            "angle",
+            "justification",
+            "formats",
+            "linked_text",
+            "has_multiple_fonts",
+        ):
             expected = original[key]
             if key == "linked_text" and website:
                 expected = expected.replace(OLD_WEBSITE, NEW_WEBSITE)
@@ -452,8 +537,13 @@ def maintain_templates(
                     _website(drawing)
                 if "inside-corner" in operations:
                     model.ClearSelection2(True)
-                    report["inside_corner_placement"] = _inside_corner(
-                        model, drawing, report["before"]["geometry"]
+                    placement: dict[str, Any] = {}
+                    report["inside_corner_placement"] = placement
+                    _inside_corner(
+                        model,
+                        drawing,
+                        report["before"]["geometry"],
+                        evidence=placement,
                     )
                 if "line-weights" in operations:
                     _line_weights(model)
@@ -468,7 +558,9 @@ def maintain_templates(
             edited_weights = report["edited"]["line_weights"]
             if "line-weights" not in operations and original_weights != edited_weights:
                 raise RuntimeError("non-weight template operation changed line weights")
-            for slot in _WEIGHT_SLOTS[2:]:
+            for slot in _WEIGHT_SLOTS:
+                if slot in ("Thin", "Thick"):
+                    continue
                 if (
                     original_weights["thickness_m"][slot]
                     != edited_weights["thickness_m"][slot]
@@ -478,7 +570,9 @@ def maintain_templates(
                     )
             with _telemetry.span("templates.save", layout=str(layout)):
                 extension = _early_bound(model.Extension, "IModelDocExtension")
-                ok, errors, warnings = extension.SaveAs3(str(output), 0, 1, None, None)
+                ok, errors, warnings = extension.SaveAs3(
+                    str(output), 0, 1, None, None, 0, 0
+                )
                 report["save"] = {
                     "ok": bool(ok),
                     "errors": int(errors),
@@ -488,10 +582,12 @@ def maintain_templates(
                     raise RuntimeError(f"template SaveAs3 failed: {report['save']!r}")
             with _telemetry.span("templates.reopen", layout=str(layout)):
                 title = str(model.GetTitle())
-                model = None
                 adapter.currentModel = None
                 sw.CloseDoc(title)
-                model, errors, warnings = sw.OpenDoc6(str(output), 3, 1, "")
+                if sw.GetOpenDocumentByName(str(output)) is not None:
+                    raise RuntimeError("saved template remained open after CloseDoc")
+                model = None
+                model, errors, warnings = sw.OpenDoc6(str(output), 3, 1, "", 0, 0)
                 if model is None or errors:
                     raise RuntimeError(
                         f"template reopen failed: errors={errors}, warnings={warnings}"
@@ -500,6 +596,24 @@ def maintain_templates(
                 adapter.currentModel = model
                 report["reopened"] = _census(model)
                 _preserved(report["edited"], report["reopened"], website=False)
+                if "inside-corner" in operations:
+                    inside_rows = [
+                        note
+                        for note in report["reopened"]["notes"]
+                        if "TOL_INSIDE_CORNER" in note["linked_text"]
+                    ]
+                    if (
+                        len(inside_rows) != 1
+                        or inside_rows[0]["linked_text"] != INSIDE_CORNER_LINK
+                    ):
+                        raise RuntimeError(
+                            "reopened template does not have exactly one linked inside-corner row"
+                        )
+                    if not report["inside_corner_placement"].get("already_present"):
+                        if inside_rows[0]["name"] != "HA_INSIDE_CORNERS":
+                            raise RuntimeError(
+                                "reopened inside-corner row lost its native name"
+                            )
                 if (
                     report["edited"]["line_weights"]
                     != report["reopened"]["line_weights"]
@@ -517,9 +631,21 @@ def maintain_templates(
             report["error"] = f"{type(exc).__name__}: {exc}"
             raise
         finally:
-            report_path.write_text(
-                json.dumps(report, indent=2) + "\n", encoding="utf-8"
-            )
+            report_json = json.dumps(report, indent=2) + "\n"
+            report_path.write_text(report_json, encoding="utf-8")
+            if report["status"] != "readback-passed":
+                # Failed leaves do not publish cache outputs. This existing
+                # failure tree is returned by the worker even when the leaf fails.
+                failure_path = (
+                    CAD_ROOT
+                    / "out"
+                    / "reports"
+                    / "failures"
+                    / "templates"
+                    / report_path.name
+                )
+                failure_path.parent.mkdir(parents=True, exist_ok=True)
+                failure_path.write_text(report_json, encoding="utf-8")
             if model is not None:
                 sw.CloseDoc(str(model.GetTitle()))
             adapter.currentModel = previous_model

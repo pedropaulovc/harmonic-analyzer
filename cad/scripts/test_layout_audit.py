@@ -1167,9 +1167,13 @@ def test_small_pdf_ring_survives_crossing_section_leader_and_centre_mark(tmp_pat
 
     cx, cy, radius = 0.072, 0.225, 0.003
     k = 0.5522847498
+    # Half a flattened piece: crossings must not fall on curve vertices.
+    phase = math.pi / 128
 
     def xy(x, y):
-        return f"{(cx + x * radius) / POINT_M} {(cy + y * radius) / POINT_M}"
+        rx = x * math.cos(phase) - y * math.sin(phase)
+        ry = x * math.sin(phase) + y * math.cos(phase)
+        return f"{(cx + rx * radius) / POINT_M} {(cy + ry * radius) / POINT_M}"
 
     curves = [
         ((1, k), (k, 1), (0, 1)),
@@ -1183,6 +1187,15 @@ def test_small_pdf_ring_survives_crossing_section_leader_and_centre_mark(tmp_pat
     ink = page_ink(read_pdf_ink(pdf)[0])
     ring = [stroke for stroke in ink["strokes"] if 0.068 <= stroke[0] <= 0.076]
     assert len(ring) == 128
+    # The historical proximity-only policy would swallow these crossed pieces.
+    assert any(
+        (s[0] - cx) * (s[2] - cx) < 0 and max(abs(s[0] - cx), abs(s[2] - cx)) < 0.0001
+        for s in ring
+    )
+    assert any(
+        (s[1] - cy) * (s[3] - cy) < 0 and max(abs(s[1] - cy), abs(s[3] - cy)) < 0.0001
+        for s in ring
+    )
     leader = _hole_callout("Crossing", [(0.065, cy, 0.079, cy)], [])
     mark = {
         "type": 13, "name": "CM1",
@@ -1198,7 +1211,23 @@ def test_small_pdf_ring_survives_crossing_section_leader_and_centre_mark(tmp_pat
 
 
 def test_leader_over_part_retains_crossings_of_short_small_ring_pieces():
-    ring = _ring(0.170, 0.150, 0.003, sides=128)
+    phase = math.pi / 128
+
+    def rotate(x, y):
+        dx, dy = x - 0.170, y - 0.150
+        return (
+            0.170 + dx * math.cos(phase) - dy * math.sin(phase),
+            0.150 + dx * math.sin(phase) + dy * math.cos(phase),
+        )
+
+    ring = [
+        (*rotate(x0, y0), *rotate(x1, y1))
+        for x0, y0, x1, y1 in _ring(0.170, 0.150, 0.003, sides=128)
+    ]
+    assert any(
+        (y0 - 0.150) * (y1 - 0.150) < 0 and max(abs(y0 - 0.150), abs(y1 - 0.150)) < 0.0001
+        for _x0, y0, _x1, y1 in ring
+    )
     tip = (0.230, 0.150)
     note = {
         "type": 6, "name": "AcrossRing", "visible": 1, "owner_type": 0,
@@ -1214,6 +1243,17 @@ def test_leader_over_part_retains_crossings_of_short_small_ring_pieces():
     [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
     assert finding.extra["over_part_mm"] == pytest.approx(63.0, abs=0.1)
     assert finding.extra["edge_crossings"] == 2
+
+
+def test_solid_model_edge_collinear_under_thin_callout_leader_remains_geometry():
+    callout = _hole_callout("Collinear", [(0.100, 0.120, 0.200, 0.180)], [])
+    edge = (0.140, 0.144, 0.160, 0.156)
+    view = _view("Part", (0.090, 0.110, 0.210, 0.190), [callout])
+    model = sheet_model(_dump(views=[view], strokes=_edges(edge, width=0.00035)))
+    [native] = [a for a in model.geometry.annotations if a.kind != "geometry"]
+    assert native.segments  # The native collinear annotation really is present.
+    [geometry] = [a for a in model.geometry.annotations if a.kind == "geometry"]
+    assert [(s.x0, s.y0, s.x1, s.y1) for s in geometry.segments] == [edge]
 
 
 # cone-swing-platform, Drawing View2: the 6.76 hole callout's leader runs

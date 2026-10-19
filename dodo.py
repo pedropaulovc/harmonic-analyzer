@@ -1932,14 +1932,12 @@ def _drawing_file_deps(stem: str) -> list[str]:
         )
     else:
         source_deps = (_sldprt(spec.part), _part_execution_token(spec.part))
-    # TEMPORARY issue #1636 FARM BOOTSTRAP: both source templates and the
-    # canonical displayed values must reach the existing admitted drawing leaf.
+    # TEMPORARY issue #1636 FARM BOOTSTRAP: maintenance source/display values.
+    # Both DRWDOTs are declared by this leaf's temporary registry layouts.
     bootstrap_deps = (
         [
             str(SCRIPTS_DIR / "maintain_drawing_templates.py"),
             str(CONFIG_DIR / "title_block.yaml"),
-            str(REPO_ROOT / "cad" / "templates" / "harmonic-analyzer-landscape.DRWDOT"),
-            str(REPO_ROOT / "cad" / "templates" / "harmonic-analyzer-portrait.DRWDOT"),
         ]
         if stem == "dt_cylinder_gear" else []
     )
