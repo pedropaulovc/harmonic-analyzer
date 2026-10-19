@@ -105,7 +105,8 @@ def test_pinch_thread_callout_keeps_native_variables_but_limits_both_extents() -
     assert rewritten[5] == (
         "<hw-threaddesc> <hw-threadclass> TO SLOT\nCOAXIAL WITH CLEARANCE"
     )
-    assert rewritten[7] == "<MOD-DIAM> <hw-thrutapdrldia> TO SLOT"
+    # Rule 12 (machinist review of 04848e25c): the tap drill says DRILL.
+    assert rewritten[7] == "<MOD-DIAM> <hw-thrutapdrldia> DRILL TO SLOT"
     assert "LEFT-JAW" not in text
 
 
@@ -176,7 +177,7 @@ def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None
     resolved = {
         1: "4-40 UNC - 2B TO SLOT\nCOAXIAL WITH CLEARANCE",
         2: "",
-        3: "<MOD-DIAM> 2.26 TO SLOT",
+        3: "<MOD-DIAM> 2.26 DRILL TO SLOT",
         4: "",
     }
     assert drawing._pinch_thread_callout_resolved(resolved)
@@ -185,6 +186,9 @@ def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None
     )
     assert not drawing._pinch_thread_callout_resolved(
         {**resolved, 3: "<MOD-DIAM> 2.26 THRU ALL"}
+    )
+    assert not drawing._pinch_thread_callout_resolved(
+        {**resolved, 3: "<MOD-DIAM> 2.26 TO SLOT"}
     )
 
 

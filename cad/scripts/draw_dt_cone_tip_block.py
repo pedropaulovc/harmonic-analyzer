@@ -1377,8 +1377,12 @@ def _pinch_thread_callout_definitions(
             "unexpected native pinch-thread callout definition: "
             f"missing={sorted(missing)!r}, definitions={definitions!r}"
         )
+    # The tap drill's line says DRILL as the clearance hole's does (rule 12,
+    # machinist review of 04848e25c); the thread's TO SLOT stands bare.
     updated = {
-        part: text.replace("<hw-thru>", "TO SLOT")
+        part: text.replace(
+            "<hw-thru>", "TO SLOT" if "<hw-threadclass>" in text else "DRILL TO SLOT"
+        )
         for part, text in definitions.items()
     }
     thread_parts = [part for part, text in updated.items() if "<hw-threadclass>" in text]
@@ -1459,11 +1463,14 @@ def _pinch_thread_callout_resolved(resolved_parts: dict[int, str]) -> bool:
     """
     joined = "\n".join(resolved_parts.values())
     thread = [text for text in resolved_parts.values() if "UNC" in text]
+    drill = [text for text in resolved_parts.values() if text.strip() and "UNC" not in text]
     return (
         "THRU ALL" not in joined
         and joined.count("TO SLOT") == 2
         and len(thread) == 1
         and thread[0].rstrip().endswith(f"TO SLOT\n{_PINCH_THREAD_QUALIFIER}")
+        and len(drill) == 1
+        and drill[0].rstrip().endswith("DRILL TO SLOT")
     )
 
 
