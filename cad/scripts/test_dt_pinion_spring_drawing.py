@@ -112,9 +112,22 @@ def test_profile_and_wing_are_baselined_from_the_hole_axis() -> None:
     assert free == {"FreeKinkH", "FreeKinkV", dt_pinion_spring_spec.FREE_KINK_ANGLE}
     assert set(drawing.DETAIL_KEEP) == {"KinkR", "FlatLen"}
     assert drawing.DETAIL_SCALE == (5, 1)
-    # Both views print the datum as a centreline on the hole's axis.
+    # Both views print the datum as a centreline on the hole's axis, and each
+    # row located from it draws that extension line as a centreline (spring
+    # r15): witness 0, the axis stub the builder picks first.
     for ends in (drawing.FRONT_HOLE_AXIS_ENDS, drawing.TOP_HOLE_AXIS_ENDS):
         assert {end[0] for end in ends} == {geometry.HOLE_X}
+    assert drawing.HOLE_AXIS_ROWS == ("FootLen", "FreeKinkH", "PadLen")
+    assert drawing.HOLE_AXIS_WITNESS == 0
+    for first, second in (
+        ("hole_axis", "foot"),
+        ("hole_axis", "blade"),
+        ("pad_axis", "pad_lines[0]"),
+    ):
+        assert f'f"{{{first}}}.start",\n        f"{{{second}}}.' in source
+    # The 4.50's arrows inside: its outside tail ran west past the hole
+    # axis, under the hole callout's leader (spring r15).
+    assert drawing._DIM_ARROWS_INSIDE == 0
 
 
 def test_pad_webs_clear_two_millimetres_at_the_printed_worst_case() -> None:

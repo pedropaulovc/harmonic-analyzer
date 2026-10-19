@@ -300,8 +300,14 @@ STRIP_WIDTH_TEXT_XY = (
 # Above-left of the pad: below it the leader crossed the front view's FREE,
 # TO TIP row (spring r1).  The note centres on this point; its leader lands
 # on the hole's upper-left rim, west of the 4.50's extension line at the
-# hole centre.
+# hole centre.  The 4.50's arrows stand inside its span: left smart, its
+# outside tail ran west past the hole axis's extension line, and this leader
+# crossed it (spring r15).
 HOLE_CALLOUT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END) - 0.040, _TOP_AFT + 0.0165)
+_DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+# The rows located from the pad hole's axis, whose witness 0 is that axis.
+HOLE_AXIS_ROWS = ("FootLen", "FreeKinkH", "PadLen")
+HOLE_AXIS_WITNESS = 0
 # The #4 normal clearance (3.264 mm = 0.1285 in) is a No. 30 drill; the shop
 # reaches for the number, the native size compartment still prints the diameter.
 HOLE_PROCESS = "#30 DRILL"
@@ -937,6 +943,7 @@ def _blank_dimensions(adapter: Any, top: Any) -> None:
             HOLE_END_TEXT_XY,
             "horizontal",
             HOLE_FROM_END,
+            _DIM_ARROWS_INSIDE,
         ),
         (
             "hole from the pad's lower edge",
@@ -950,6 +957,7 @@ def _blank_dimensions(adapter: Any, top: Any) -> None:
             HOLE_EDGE_TEXT_XY,
             "vertical",
             PAD_WIDTH / 2.0,
+            None,
         ),
         (
             "strip width across the free flat",
@@ -969,9 +977,10 @@ def _blank_dimensions(adapter: Any, top: Any) -> None:
             STRIP_WIDTH_TEXT_XY,
             "vertical",
             WIDTH,
+            None,
         ),
     )
-    for label, p0, p1, text_xy, orientation, expected in locations:
+    for label, p0, p1, text_xy, orientation, expected, arrow_side in locations:
         display = add_edge_dimension(
             adapter,
             top,
@@ -988,6 +997,41 @@ def _blank_dimensions(adapter: Any, top: Any) -> None:
             raise RuntimeError(
                 f"{label} measured {measured_mm:g}, expected {expected:g} mm"
             )
+        if arrow_side is not None:
+            display.ArrowSide = arrow_side
+            if int(display.ArrowSide) != arrow_side:
+                raise RuntimeError(f"{label} did not keep its arrows inside")
+
+
+def _hole_axis_witnesses_as_centerlines(adapter: Any, annotations: list[Any]) -> None:
+    """Draw each row's hole-axis extension line as a centreline.
+
+    Spring r15 (confirmed): the rows located from the hole ran to a plain
+    extension line in the profile, so the reader had to project to the plan
+    to see it was the hole's axis.  The builder picks the axis stub first, so
+    it is witness 0 (draw_mg_output_fixture's GrooveStation order).
+    """
+    found: dict[str, Any] = {}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in HOLE_AXIS_ROWS:
+            found.setdefault(name, []).append(annotation)
+    if {name: len(items) for name, items in found.items()} != dict.fromkeys(
+        HOLE_AXIS_ROWS, 1
+    ):
+        raise RuntimeError(f"expected one each of {HOLE_AXIS_ROWS}, found {found}")
+    for name, (annotation,) in found.items():
+        display = _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        if display.SetExtensionLineAsCenterline(HOLE_AXIS_WITNESS, True) is not True:
+            raise RuntimeError(f"{name} refused its hole-axis centreline")
+        if display.GetExtensionLineAsCenterline(HOLE_AXIS_WITNESS) is not True or (
+            display.GetExtensionLineAsCenterline(1 - HOLE_AXIS_WITNESS) is not False
+        ):
+            raise RuntimeError(f"{name} hole-axis centreline did not persist")
+    rebuild_drawing(adapter, label="hole-axis extension centrelines")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -1070,6 +1114,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _assert_kink_angle_wedge(adapter, front, front_annotations)
+    _hole_axis_witnesses_as_centerlines(adapter, annotations)
     # The fence and the labels go on once every import is done, so nothing
     # of the front view's own sketch is near its import.
     mark = _mark_kink_on_front(adapter, front)
