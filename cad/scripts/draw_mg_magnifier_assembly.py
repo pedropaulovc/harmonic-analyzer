@@ -209,9 +209,12 @@ BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
 # 20261016T072448223Z-614c0a10f732427c87668fb67f9db447) wrapped the 0.072
 # column's "#4-40 X 7/16 KNURLED THUMB SCREW" to two lines, pushing the BOM's
 # last row onto the reference caption.
+# Reserve a separate 48 mm column for full parent-scoped MHA-MG-VN-xx
+# Numbers. The old 32 mm allocation predates those longer IDs; widening it
+# uses the spare gap to the wheel field, not smaller text or description space.
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.032,
+    "part": 0.048,
     "description": 0.082,
     "sku": 0.032,
     "quantity": 0.012,
@@ -1326,14 +1329,53 @@ def _assert_bom_clears_reference_field(table: Any) -> None:
     bound = _early_bound(table, "ITableAnnotation")
     annotation = _early_bound(bound.GetAnnotation(), "IAnnotation")
     top = float(annotation.GetPosition()[1])
-    height = sum(float(bound.GetRowHeight(row)) for row in range(int(bound.RowCount)))
-    bottom = top - height
+    row_heights = tuple(
+        float(bound.GetRowHeight(row)) for row in range(int(bound.RowCount))
+    )
+    bottom = top - sum(row_heights)
     _telemetry.info(
         f"magnifier BOM spans y {bottom * 1000.0:.1f}..{top * 1000.0:.1f} mm",
         bom_top_mm=round(top * 1000.0, 2),
         bom_bottom_mm=round(bottom * 1000.0, 2),
     )
     if bottom < BOM_REFERENCE_FIELD[3] + 0.0025:
+        # Keep native width/height and full grown-row contents in the task log:
+        # failed farm leaves do not necessarily retain a drawing for inspection.
+        contents = _bom_cells(bound)
+        column_widths_mm = tuple(
+            round(float(bound.GetColumnWidth(column)) * 1000.0, 3)
+            for column in range(int(bound.ColumnCount))
+        )
+        row_heights_mm = tuple(round(height * 1000.0, 3) for height in row_heights)
+        _telemetry.info(
+            f"magnifier BOM columns mm {column_widths_mm!r}; "
+            f"rows mm {row_heights_mm!r}",
+            bom_column_widths_mm=column_widths_mm,
+            bom_row_heights_mm=row_heights_mm,
+        )
+        for row, height in enumerate(row_heights):
+            if height <= BOM_ROW_HEIGHT + 1e-6:
+                continue
+            text_heights_mm = tuple(
+                round(
+                    float(
+                        _early_bound(
+                            bound.GetCellTextFormat(row, column), "ITextFormat"
+                        ).CharHeight
+                    )
+                    * 1000.0,
+                    3,
+                )
+                for column in range(int(bound.ColumnCount))
+            )
+            _telemetry.info(
+                f"magnifier BOM row {row}: {height * 1000.0:.3f} mm, "
+                f"text heights mm {text_heights_mm!r}, cells {contents[row]!r}",
+                bom_row=row,
+                bom_row_height_mm=height * 1000.0,
+                bom_cell_text_heights_mm=text_heights_mm,
+                bom_cells=contents[row],
+            )
         raise RuntimeError(
             f"magnifier BOM bottom {bottom * 1000.0:.1f} mm runs into the reference "
             f"field at {BOM_REFERENCE_FIELD[3] * 1000.0:.1f} mm "

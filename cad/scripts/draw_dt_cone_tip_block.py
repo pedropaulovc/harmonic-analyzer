@@ -28,7 +28,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 import _drawing_hidden_sketches as hidden_sketches
@@ -222,8 +226,8 @@ DIMENSION_CALLOUTS = {
     "SlitDepth": "SLOT INTO BORE",
     # The adjuster thread runs through the block's depth: its length is the
     # cup screw's engagement window (build_dt_drive_train_assembly's embed
-    # stack).  Separate the full number so this left-hand block clears both
-    # the plan and the inner sheet border at the existing font size.
+    # stack).  Separate the full number at the existing font size; the whole
+    # value/mate block sits on a native offset shelf right of the plan.
     "Depth": "SETS\nMHA-DT-VN-55\nENGAGEMENT",
 }
 DIMENSION_CALLOUTS_ABOVE = {
@@ -302,15 +306,21 @@ ARROWS_INSIDE = (
 )
 _DIM_ARROWS_OUTSIDE = 1
 _DIM_ARROWS_INSIDE = 0
-# The plan: the block depth left of it, its value and rows mid-span on its
-# line, a text clearance off the plan.
-_PLAN_LEFT = TOP_CENTER[0] - BLOCK_X * _S / 2.0
+# The 9.750 value and its three mate/function rows are almost as tall as
+# the depth's 19.5 mm printed span.  Outside arrows alone still strike the
+# first and last rows (PR1709's reviewed PDF).  Put the dimension right of
+# the plan, then use native OffsetText so moving the complete text block
+# onto its right-hand shelf cannot drag the witnesses through it again.
 _PLAN_RIGHT = TOP_CENTER[0] + BLOCK_X * _S / 2.0
-PLAN_DEPTH_LINE_X = (
-    _PLAN_LEFT - TEXT_CLEARANCE - ROUND_OUT - _callout_half_width(DIMENSION_CALLOUTS["Depth"])
-)
+PLAN_DEPTH_LINE_X = _PLAN_RIGHT + 0.010
 TOP_KEEP = {
     "Depth": (PLAN_DEPTH_LINE_X, _plan_y(0.0)),
+}
+TOP_TEXT_OFFSETS = {
+    "Depth": (
+        PLAN_DEPTH_LINE_X + 0.010 + _callout_half_width(DIMENSION_CALLOUTS["Depth"]),
+        _plan_y(0.0),
+    ),
 }
 # The half-block station below runs from the north face to the pinch-hole
 # centre, so its value sits midway along its span.  Centred on the hole (run
@@ -680,6 +690,7 @@ def sheet_text_boxes(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dic
         **LEFT_KEEP,
         **BOTTOM_KEEP,
     }
+    keeps.update(TOP_TEXT_OFFSETS)
     boxes = {
         name: _extent_box(point, _VALUE_EXTENTS.get(name, _VALUE_EXTENT))
         for name, point in keeps.items()
@@ -841,7 +852,7 @@ def sheet_dimension_ink(
         "Depth": (
             v,
             (_plan_y(Z_NORTH), _plan_y(Z_SOUTH)),
-            (_PLAN_LEFT,) * 2,
+            (_PLAN_RIGHT,) * 2,
             PLAN_DEPTH_LINE_X,
             inside,
         ),
@@ -870,6 +881,19 @@ def sheet_dimension_ink(
         )
         for name, (axis, ends, origins, line, arrows) in specs.items()
     }
+    # The offset shelf belongs to the same native dimension.  Keep its text
+    # and connecting run in this recipe's ink model, not at the import seed.
+    depth = ink["Depth"]
+    ink["Depth"] = DimensionInk(
+        (
+            *depth.lines,
+            (
+                (PLAN_DEPTH_LINE_X, _plan_y(0.0)),
+                (texts["Depth"][0], TOP_TEXT_OFFSETS["Depth"][1]),
+            ),
+        ),
+        depth.arrows,
+    )
     # The hold-down tap's stations: both witnesses of each leave the model's
     # reference line, which runs through the tap's centre.
     ink["FootTapX"] = _dimension_ink(
@@ -1664,6 +1688,7 @@ async def build(adapter: Any) -> dict[str, str]:
             **{name: _DIM_ARROWS_INSIDE for name in ARROWS_INSIDE},
         },
     )
+    offset_dimension_text(adapter, top_annotations, TOP_TEXT_OFFSETS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     for view, label in (

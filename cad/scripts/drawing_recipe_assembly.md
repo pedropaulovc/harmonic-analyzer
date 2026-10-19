@@ -81,3 +81,29 @@ The drawing lifecycle also checks that the source assembly remains unchanged.
 
 Use `uv run python -m doit drawing:fr_frame_assembly` to regenerate the package.
 Inspect every page and complete the blind machinist review before release.
+
+## Magnifier package
+
+`draw_mg_magnifier_assembly.py` keeps its four sheets and all 19 BOM families.
+The BOM's final five columns are item, full canonical Number, description,
+vendor SKU and quantity. Their widths are 12/48/82/32/12 mm respectively;
+the Number column has its own room for `MHA-MG-VN-50` through `MHA-MG-VN-56`.
+The native table font, complete cell contents, 6 mm requested data-row height
+and three-line heading budget are unchanged.
+
+The naming migration lengthened those seven purchased Numbers from ten to
+twelve characters but left the Number column at 32 mm. The native failure at
+`5c5d3e3b3672` measured a 153.3 mm table, from Y109.4 to Y262.7, against a
+132 mm plan. That aggregate measurement does not identify the wrapped rows.
+The wider Number column addresses the newly longer input without taking room
+from descriptions or SKUs. It makes the table 186 mm wide at X229.1..415.1,
+still 17.1 mm right of the wheel-view field; no view field or scale changes.
+
+Native acceptance still requires the BOM bottom at or above Y123.2 mm:
+the unchanged reference field ends at Y120.7 and requires 2.5 mm of air.
+The planned bottom remains Y130.7. A clearance failure logs persisted native
+column widths and row heights, plus complete cells and font heights for grown
+rows, before refusing. Inspect the regenerated four-page package for all 19
+rows, full unbroken Numbers, readable descriptions/SKUs/quantities, unchanged
+reference-view handling and unobstructed balloons; the offline field-budget
+checks alone do not prove native text fit.

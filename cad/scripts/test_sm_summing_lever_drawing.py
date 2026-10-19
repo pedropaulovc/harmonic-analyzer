@@ -1084,6 +1084,7 @@ def test_thread_note_cleanup_requires_deletion_readback(monkeypatch) -> None:
     case.state.deletes = False  # EditDelete returns void even when nothing disappeared.
     with pytest.raises(RuntimeError, match="notes survived deletion"):
         drawing._remove_redundant_thread_notes(case.adapter)
+    case = _thread_annotation_drawing(monkeypatch)
     case.state.selectable = False
     with pytest.raises(RuntimeError, match="failed to select"):
         drawing._remove_redundant_thread_notes(case.adapter)

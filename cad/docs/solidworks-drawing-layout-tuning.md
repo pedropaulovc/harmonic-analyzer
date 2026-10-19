@@ -458,6 +458,21 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   zero-padding guarantee** or an assumed fixed capacity. Keep the existing
   1e-7 m displayed-height tolerance and original-exception forensic capture.
 
+## Longer parent-scoped identity callouts
+
+Budget the whole printed block, including its shelf, rather than just the
+dimension anchor. The fulcrum shaft's `SETS MHA-CH-VN-55` block measured 44.9 mm
+wide in the native PDF and overran the inner border by 0.19 mm. Its recipe moves
+the anchor 4 mm left; the containment check uses a 45 mm envelope and retains
+the 3 mm border clearance and greater-than-5 mm tip clearance.
+
+For a linear dimension whose identity/function text no longer fits between
+the witnesses, use `offset_dimension_text` to put the complete block on a
+native shelf, as on the cone-tip block's `9.750` engagement dimension. Preserve
+the value, precision and attachments; audit the new text box and leader, then
+check the native PDF for line strikes. This is not the radial/diametric
+`OffsetText` case below.
+
 ## Refusal catalogue — do / don't
 
 **a. `IDisplayDimension::OffsetText` on a radial or diametric dimension.**
