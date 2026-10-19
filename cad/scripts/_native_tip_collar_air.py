@@ -7,6 +7,7 @@ clock and manufactured limit. Native tooth/flat/bore relief is NOT a reserve.
 from __future__ import annotations
 
 import math
+import time
 from typing import Any
 
 import _telemetry
@@ -166,68 +167,95 @@ def _closest(face, point, label):
 
 def measure(adapter: Any, *, collar_component: str, shaft_component: str):
     """Read the saved solids against the printed-tolerance collar air stack."""
-    proof = air.full_sweep_proof()
-    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    collar, collar_bodies, collar_transform = _component(assembly, collar_component, 2)
-    _component(assembly, shaft_component, 1)
-    gear, gear_bodies, gear_transform = _component(assembly, GEAR_COMPONENT, 1)
-    pose = _array(collar_transform, "installed collar")
-    axis = (math.sin(math.radians(cone_line.INCLINE_DEG)), 0.0, math.cos(math.radians(cone_line.INCLINE_DEG)))
-    flat = (math.cos(math.radians(cone_line.INCLINE_DEG)), 0.0, -math.sin(math.radians(cone_line.INCLINE_DEG)))
-    station = cone_line.cone_station(air.SOUTH_STATION_MM)
-    expected_origin = tuple(station[k]+air.collar.INSTALLED_BORE_AXIS_OFFSET_MM*flat[k] for k in range(3))
-    if (max(abs(pose[9+k]*1000.0-expected_origin[k]) for k in range(3)) > NATIVE_RESOLUTION_MM
-            or max(abs(pose[3+k]-axis[k]) for k in range(3)) > 1e-8):
-        raise RuntimeError("collar air: saved collar is not the nonconcentric loaded source pose")
-    result = model.ClosestDistance(collar, gear)
-    if not isinstance(result, tuple) or len(result) != 3:
-        raise RuntimeError(f"collar air: malformed native ClosestDistance: {result!r}")
-    distance = float(result[0])*1000.0
-    points = tuple(tuple(float(value)*1000.0 for value in point) for point in result[1:])
-    if not math.isfinite(distance) or distance <= 0.0 or any(len(point) != 3 or not all(math.isfinite(v) for v in point) for point in points):
-        raise RuntimeError(f"collar air: actual component pair has no positive native air: {result!r}")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    modeler = _early_bound(adapter.swApp.GetModeler(), "IModeler")
-    if utility is None or modeler is None:
-        raise RuntimeError("collar air: native math utility/modeler unavailable")
-    rings, screws = [], []
-    for body in collar_bodies:
-        y_min = _extreme(body, (0.0, -1.0, 0.0), "collar part-local positive control")[1]
-        (rings if abs(y_min) <= NATIVE_RESOLUTION_MM else screws).append(body)
-    if len(rings) != 1 or len(screws) != 1:
-        raise RuntimeError("collar air: part-local actual ring/screw cannot be identified")
-    ring_north = _extreme(rings[0], (0.0, 1.0, 0.0), "whole ring partition control")[1]
-    if abs(ring_north-air.collar.WIDTH) > NATIVE_RESOLUTION_MM:
-        raise RuntimeError("collar air: native ring material escapes the complete local-Y partition")
-    parts = {
-        "nose": _clip(modeler, rings[0], -1.0, air.PARTITION_STATION_MM, "collar nose"),
-        "body": _clip(modeler, rings[0], air.PARTITION_STATION_MM, air.collar.WIDTH+1.0, "collar body"),
-        "screw": screws,
-    }
-    fixed_parts = {tier.name: [] for tier in air.DRUM_TIERS}
-    # The source nonnegative-Z support dominance is checked against ALL actual
-    # configured bank solids, not inferred from just the nearest component.
-    for number in range(1, air.bank.COUNT+1):
-        _component_obj, bodies, transform = _component(assembly, f"dt-cylinder-gear-{number}", 1)
-        body = bodies[0]
-        z_south = _extreme(body, (0.0, 0.0, -1.0), f"bank {number} whole material")[2]
-        z_north = _extreme(body, (0.0, 0.0, 1.0), f"bank {number} whole material")[2]
-        if abs(z_south) > NATIVE_RESOLUTION_MM or abs(z_north-air.drum.OVERALL_THICKNESS) > NATIVE_RESOLUTION_MM:
-            raise RuntimeError(f"bank {number}: actual material escapes the complete tooth/cam shadow partition")
-        bore_radius = air.drum.BORE_DIA/2.0
-        bore_faces = _cylinders(body, bore_radius, (0.0, 0.0, 1.0), f"bank {number} actual running bore")
-        for station_z in (air.DRUM_BORE_END_BREAK_MAX_MM,
-                          air.drum.OVERALL_THICKNESS-air.DRUM_BORE_END_BREAK_MAX_MM):
-            requested = (bore_radius, 0.0, station_z)
-            residual = min(math.dist(_closest(face, requested, f"bank {number} finite bore span"), requested)
-                           for face, *_ in bore_faces)
-            if residual > NATIVE_RESOLUTION_MM:
-                raise RuntimeError(f"bank {number}: actual finite running-bore contact span is too short")
-        for name, south, north in (("tooth_face", -1.0, air.drum.FACE_WIDTH),
-                                  ("cam", air.drum.FACE_WIDTH, air.drum.OVERALL_THICKNESS+1.0)):
-            for clipped in _clip(modeler, body, south, north, f"bank {number} {name}", axial_index=2):
-                fixed_parts[name].append(_copy(clipped, f"placed bank {number} {name}", transform))
+    with _telemetry.span("verify.tip_collar_j19_air.full_sweep_proof"):
+        proof = air.full_sweep_proof()
+    with _telemetry.span("verify.tip_collar_j19_air.native_read"):
+        assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        collar, collar_bodies, collar_transform = _component(assembly, collar_component, 2)
+        _component(assembly, shaft_component, 1)
+        gear, gear_bodies, gear_transform = _component(assembly, GEAR_COMPONENT, 1)
+        pose = _array(collar_transform, "installed collar")
+        axis = (math.sin(math.radians(cone_line.INCLINE_DEG)), 0.0, math.cos(math.radians(cone_line.INCLINE_DEG)))
+        flat = (math.cos(math.radians(cone_line.INCLINE_DEG)), 0.0, -math.sin(math.radians(cone_line.INCLINE_DEG)))
+        station = cone_line.cone_station(air.SOUTH_STATION_MM)
+        expected_origin = tuple(station[k]+air.collar.INSTALLED_BORE_AXIS_OFFSET_MM*flat[k] for k in range(3))
+        if (max(abs(pose[9+k]*1000.0-expected_origin[k]) for k in range(3)) > NATIVE_RESOLUTION_MM
+                or max(abs(pose[3+k]-axis[k]) for k in range(3)) > 1e-8):
+            raise RuntimeError("collar air: saved collar is not the nonconcentric loaded source pose")
+        result = model.ClosestDistance(collar, gear)
+        if not isinstance(result, tuple) or len(result) != 3:
+            raise RuntimeError(f"collar air: malformed native ClosestDistance: {result!r}")
+        distance = float(result[0])*1000.0
+        points = tuple(tuple(float(value)*1000.0 for value in point) for point in result[1:])
+        if not math.isfinite(distance) or distance <= 0.0 or any(len(point) != 3 or not all(math.isfinite(v) for v in point) for point in points):
+            raise RuntimeError(f"collar air: actual component pair has no positive native air: {result!r}")
+        utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+        modeler = _early_bound(adapter.swApp.GetModeler(), "IModeler")
+        if utility is None or modeler is None:
+            raise RuntimeError("collar air: native math utility/modeler unavailable")
+    with _telemetry.span("verify.tip_collar_j19_air.collar_partition"):
+        rings, screws = [], []
+        for body in collar_bodies:
+            y_min = _extreme(body, (0.0, -1.0, 0.0), "collar part-local positive control")[1]
+            (rings if abs(y_min) <= NATIVE_RESOLUTION_MM else screws).append(body)
+        if len(rings) != 1 or len(screws) != 1:
+            raise RuntimeError("collar air: part-local actual ring/screw cannot be identified")
+        ring_north = _extreme(rings[0], (0.0, 1.0, 0.0), "whole ring partition control")[1]
+        if abs(ring_north-air.collar.WIDTH) > NATIVE_RESOLUTION_MM:
+            raise RuntimeError("collar air: native ring material escapes the complete local-Y partition")
+        parts = {
+            "nose": _clip(modeler, rings[0], -1.0, air.PARTITION_STATION_MM, "collar nose"),
+            "body": _clip(modeler, rings[0], air.PARTITION_STATION_MM, air.collar.WIDTH+1.0, "collar body"),
+            "screw": screws,
+        }
+    with _telemetry.span("verify.tip_collar_j19_air.bank_material") as bank_sp:
+        acquisition_seconds = bore_seconds = clipping_seconds = 0.0
+        attempted_gears = completed_gears = 0
+        try:
+            fixed_parts = {tier.name: [] for tier in air.DRUM_TIERS}
+            # The source nonnegative-Z support dominance is checked against ALL actual
+            # configured bank solids, not inferred from just the nearest component.
+            for number in range(1, air.bank.COUNT+1):
+                attempted_gears += 1
+                phase_started = time.perf_counter()
+                try:
+                    _component_obj, bodies, transform = _component(assembly, f"dt-cylinder-gear-{number}", 1)
+                    body = bodies[0]
+                    z_south = _extreme(body, (0.0, 0.0, -1.0), f"bank {number} whole material")[2]
+                    z_north = _extreme(body, (0.0, 0.0, 1.0), f"bank {number} whole material")[2]
+                    if abs(z_south) > NATIVE_RESOLUTION_MM or abs(z_north-air.drum.OVERALL_THICKNESS) > NATIVE_RESOLUTION_MM:
+                        raise RuntimeError(f"bank {number}: actual material escapes the complete tooth/cam shadow partition")
+                finally:
+                    acquisition_seconds += time.perf_counter() - phase_started
+                phase_started = time.perf_counter()
+                try:
+                    bore_radius = air.drum.BORE_DIA/2.0
+                    bore_faces = _cylinders(body, bore_radius, (0.0, 0.0, 1.0), f"bank {number} actual running bore")
+                    for station_z in (air.DRUM_BORE_END_BREAK_MAX_MM,
+                                      air.drum.OVERALL_THICKNESS-air.DRUM_BORE_END_BREAK_MAX_MM):
+                        requested = (bore_radius, 0.0, station_z)
+                        residual = min(math.dist(_closest(face, requested, f"bank {number} finite bore span"), requested)
+                                       for face, *_ in bore_faces)
+                        if residual > NATIVE_RESOLUTION_MM:
+                            raise RuntimeError(f"bank {number}: actual finite running-bore contact span is too short")
+                finally:
+                    bore_seconds += time.perf_counter() - phase_started
+                phase_started = time.perf_counter()
+                try:
+                    for name, south, north in (("tooth_face", -1.0, air.drum.FACE_WIDTH),
+                                              ("cam", air.drum.FACE_WIDTH, air.drum.OVERALL_THICKNESS+1.0)):
+                        for clipped in _clip(modeler, body, south, north, f"bank {number} {name}", axial_index=2):
+                            fixed_parts[name].append(_copy(clipped, f"placed bank {number} {name}", transform))
+                finally:
+                    clipping_seconds += time.perf_counter() - phase_started
+                completed_gears += 1
+        finally:
+            bank_sp.set_attribute("tip_collar_j19.bank_acquisition_seconds", acquisition_seconds)
+            bank_sp.set_attribute("tip_collar_j19.bank_bore_seconds", bore_seconds)
+            bank_sp.set_attribute("tip_collar_j19.bank_clipping_seconds", clipping_seconds)
+            bank_sp.set_attribute("tip_collar_j19.bank_attempted_gears", attempted_gears)
+            bank_sp.set_attribute("tip_collar_j19.bank_completed_gears", completed_gears)
     minimum, governing, gear_support = math.inf, None, {}
     swing_angle, swept_key, swing, swept_bodies = None, None, None, None
     with _telemetry.span("verify.tip_collar_j19_air") as sp:

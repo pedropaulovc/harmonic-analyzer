@@ -1662,6 +1662,29 @@ event with `"drift_expected": true` and a `"drift_reason"` of `executor=farm` or
 `cache_mode=ro` — so `jq 'select(.event=="restore_hit_drift" and
 .drift_expected==false)' cache.jsonl` is the post-hoc list of *real* drift.
 
+### Measuring native COM time
+
+Separate worker execution from submitter elapsed time, queueing and cache
+transfers. App Insights `dependencies.duration` is in milliseconds. Nested spans
+overlap: compute a parent's exclusive time by subtracting the union of its
+immediate children's time intervals, not by summing every descendant. Compare
+the same task workload, source geometry, cache state and seat-start conditions;
+report queue time separately from COM savings.
+
+The trace exposes assembly insertion as `adapter.insert_component`, cone setup
+and topology audits under `cone.*`, and component isolation under
+`drawing.isolate_components.{enumerate,visibility,readback}`. Isolation records
+changed/unchanged leaf counts and verified effective visibility; its automatic
+view updates are suspended only during changed visibility writes and restored
+before the existing drawing rebuild.
+
+The native collar-air check keeps its sweep span
+`verify.tip_collar_j19_air` and attributes preparation to `.full_sweep_proof`,
+`.native_read`, `.collar_partition` and `.bank_material`. The bank span records
+aggregate acquisition, bore-scan and clipping seconds plus attempted/completed
+gear counts, including partial work on failure. These are phase timings, not
+additional per-face spans.
+
 ### Backend: Azure Blob over HTTPS (443)
 
 One content-addressed `<key>.tar.gz` blob per task in container `buildcache` on
