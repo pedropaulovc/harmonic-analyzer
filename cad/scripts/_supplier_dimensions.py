@@ -137,39 +137,55 @@ def supplier_reference_dimension(
     if display.SetUnits2(False, unit, fraction, denominator, False, 0) != 0:
         raise RuntimeError(f"{label}: supplier units were rejected")
     display.SetPrecision3(precision, -1, -1, -1)
-    display.ShowParenthesis = True
-    prefix = (
-        "<MOD-DIAM>"
-        if presentation == "diameter" and int(display.Type2) in _LINEAR_TYPES
-        else ""
-    )
-    suffix = "" if units == "deg" else f" {units}"
+    # ShowParenthesis can read back True yet render a bare value (lift rod
+    # and cylinder gear native evidence). Use the established prefix/suffix
+    # reference form, while keeping the actual numeric dimension visible.
+    display.ShowParenthesis = False
+    # A custom prefix replaces even a native diameter's automatic Ø glyph.
+    prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
+    suffix = ")" if units == "deg" else f" {units})"
     display.SetText(1, prefix)  # swDimensionTextPrefix, never swDimensionTextAll
     display.SetText(2, suffix)  # swDimensionTextSuffix
     if callout is not None:
         display.SetText(4, callout)  # swDimensionTextCalloutBelow
-    if not adapter.currentModel.EditRebuild3():
-        raise RuntimeError(f"{label}: supplier presentation rebuild failed")
-    if (
-        display.GetUseDocUnits()
-        or int(display.GetUnits()) != unit
-        or int(display.GetPrimaryPrecision2()) != precision
-        or int(display.GetFractionBase()) != fraction
-        or not display.ShowParenthesis
-        or display.GetOverride()
-        or not display.ShowDimensionValue
-        or str(display.GetText(1) or "") != prefix
-        or str(display.GetText(2) or "") != suffix
-        or (callout is not None and str(display.GetText(4) or "") != callout)
-    ):
-        raise RuntimeError(
-            f"{label}: native supplier presentation did not survive rebuild"
-        )
-    if fraction_denominator is not None and (
-        int(display.GetFractionValue()) != fraction_denominator
-        or display.GetRoundToFraction()
-    ):
-        raise RuntimeError(f"{label}: exact supplier fraction did not persist")
+    # Rebuild once at finalization, not between picks from one native scan.
+    # The same read-only assertion also runs in the caller's settled_checks.
+    assert_supplier_reference_dimension(
+        adapter,
+        display,
+        label=label,
+        units=units,
+        precision=precision,
+        expected_mm=expected_mm,
+        expected_degrees=expected_degrees,
+        presentation=presentation,
+        fraction_denominator=fraction_denominator,
+        callout=callout,
+    )
+    return display
+
+
+@_telemetry.traced("drawing.assert_supplier_reference_dimension", label_param="label")
+def assert_supplier_reference_dimension(
+    adapter: Any,
+    dimension: Any,
+    *,
+    label: str,
+    units: Literal["in", "mm", "deg"],
+    precision: int,
+    expected_mm: float | None = None,
+    expected_degrees: float | None = None,
+    presentation: Literal["length", "diameter", "angle"] = "length",
+    fraction_denominator: int | None = None,
+    callout: str | None = None,
+) -> None:
+    """Read native supplier state without mutation or rebuilding.
+
+    Run in ``finalize_drawing(settled_checks=...)`` after its last rebuild.
+    Physical attachment identity and supplier bands remain caller-owned checks;
+    this assertion additionally rejects detached/dangling annotations.
+    """
+    display = _early_bound(dimension, "IDisplayDimension")
     _measured_supplier_value(
         display,
         label=label,
@@ -177,4 +193,32 @@ def supplier_reference_dimension(
         expected_mm=expected_mm,
         expected_degrees=expected_degrees,
     )
-    return display
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if annotation.IsDangling() or not any(annotation.GetAttachedEntities3() or ()):
+        raise RuntimeError(
+            f"{label}: supplier reference has no sound native attachment"
+        )
+    unit = {"mm": 0, "in": 3, "deg": 0}[units]
+    fraction = 2 if fraction_denominator is not None else 1
+    prefix = "(<MOD-DIAM>" if presentation == "diameter" else "("
+    suffix = ")" if units == "deg" else f" {units})"
+    if (
+        display.GetUseDocUnits()
+        or int(display.GetUnits()) != unit
+        or int(display.GetPrimaryPrecision2()) != precision
+        or int(display.GetFractionBase()) != fraction
+        or display.ShowParenthesis
+        or display.GetOverride()
+        or not display.ShowDimensionValue
+        or str(display.GetText(1) or "") != prefix
+        or str(display.GetText(2) or "") != suffix
+        or (callout is not None and str(display.GetText(4) or "") != callout)
+    ):
+        raise RuntimeError(
+            f"{label}: native supplier presentation differs from its source"
+        )
+    if fraction_denominator is not None and (
+        int(display.GetFractionValue()) != fraction_denominator
+        or display.GetRoundToFraction()
+    ):
+        raise RuntimeError(f"{label}: exact supplier fraction did not persist")

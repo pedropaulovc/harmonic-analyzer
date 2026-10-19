@@ -16,7 +16,7 @@ stock name, which restates the material, is read and checked but not printed.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
@@ -148,17 +148,43 @@ def check_item(item: str, *, label: str) -> str:
     return text
 
 
-def footer_top(notes: str, *, label: str) -> float:
-    """The footer's top edge: its notes' first line, or the general line."""
+def _supplier_data_lines(data: Sequence[str], *, label: str) -> tuple[str, ...]:
+    """Source-grounded operating/suitability data, not fabrication notes."""
+    if isinstance(data, str):
+        raise ValueError(f"{label}: supplier_data must be a sequence of separate lines")
+    lines = tuple(data)
+    if any(
+        not isinstance(line, str)
+        or not line.strip()
+        or "\n" in line
+        or "\r" in line
+        or len(line) > MAX_ITEM_CHARS
+        for line in lines
+    ):
+        raise ValueError(f"{label}: supplier operating data must fit single footer lines")
+    return ("SUPPLIER OPERATING DATA (REFERENCE):", *lines) if lines else ()
+
+
+def footer_top(
+    notes: str, *, label: str, supplier_data: Sequence[str] = ()
+) -> float:
+    """Top of installation notes plus a separately labelled supplier data block."""
     lines = note_lines(notes, label=label)
-    if not lines:
+    data = _supplier_data_lines(supplier_data, label=label)
+    if not lines and not data:
         return _GENERAL_Y
-    return _NOTES_BOTTOM + len(lines) * _LINE_PITCH + 0.001
+    gap = _LINE_PITCH if lines and data else 0.0
+    return _NOTES_BOTTOM + (len(lines) + len(data)) * _LINE_PITCH + gap + 0.001
 
 
-def view_band_bottom(notes: str, *, label: str) -> float:
-    """The bottom view row's caption height: clear of the footer and title block."""
-    return max(footer_top(notes, label=label) + _CAPTION_CLEARANCE, _LOWEST_CAPTION_Y)
+def view_band_bottom(
+    notes: str, *, label: str, supplier_data: Sequence[str] = ()
+) -> float:
+    """The bottom view row's caption height: clear of the complete footer."""
+    return max(
+        footer_top(notes, label=label, supplier_data=supplier_data) + _CAPTION_CLEARANCE,
+        _LOWEST_CAPTION_Y,
+    )
 
 
 def _cell(
@@ -394,6 +420,7 @@ def add_purchased_footer(
     notes: str = "",
     cut_to_suit: bool = False,
     label: str,
+    supplier_data: Sequence[str] = (),
 ) -> list[tuple[Any, str, str, tuple[float, float, float, float]]]:
     """Notes, general line, ITEM, SUPPLIER and SKU rows, bottom-left of the sheet.
 
@@ -420,6 +447,17 @@ def add_purchased_footer(
                 text,
                 (0.015, _NOTES_BOTTOM - 0.001, _FOOTER_RIGHT, top + 0.001),
             )
+        )
+    data = _supplier_data_lines(supplier_data, label=label)
+    if data:
+        text = "\n".join(data)
+        top = footer_top(notes, label=label, supplier_data=supplier_data)
+        bottom = (
+            footer_top(notes, label=label) + _LINE_PITCH if lines else _NOTES_BOTTOM
+        )
+        note = _literal_note(adapter, text, _NOTE_X, top)
+        placed.append(
+            (note, text, text, (0.015, bottom - 0.001, _FOOTER_RIGHT, top + 0.001))
         )
     general = _GENERAL_TEXT[cut_to_suit]
     note = _literal_note(adapter, general, _NOTE_X, _GENERAL_Y)
@@ -456,6 +494,9 @@ async def build_purchased_fastener_drawing(
     item: str | None = None,
     cut_to_suit: bool = False,
     supplier_dimensions: SupplierDimensions | None = None,
+    configuration: str | None = None,
+    settled_checks: Sequence[Callable[[], None]] = (),
+    supplier_data: Sequence[str] = (),
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric with optional supplier references.
 
@@ -465,6 +506,12 @@ async def build_purchased_fastener_drawing(
     ``cut_to_suit`` marks a fastener its registry installation note cuts at
     assembly. ``supplier_dimensions(adapter, views_by_orientation)`` adds native
     reference annotations after fitting; it must not rescale the views.
+    ``configuration`` selects a saved source configuration for every view before
+    fitting, e.g. a full-length supplier-stock configuration of a cut fastener.
+    ``settled_checks`` is consumed after the annotation callback and forwarded
+    unchanged to the finalizer's last-rebuild, pre-save verification.
+    ``supplier_data`` is source-grounded operating/suitability data printed in
+    its own labelled reference block, separate from installation requirements.
     """
     stock = fastener(spec.artifact_stem)
     source = spec.source
@@ -511,6 +558,9 @@ async def build_purchased_fastener_drawing(
         cut_to_suit=cut_to_suit,
         document_title=str(registry["title"]),
         supplier_dimensions=supplier_dimensions,
+        configuration=configuration,
+        settled_checks=settled_checks,
+        supplier_data=supplier_data,
     )
 
 
@@ -520,6 +570,8 @@ async def build_purchased_spring_drawing(
     *,
     item: str,
     supplier_dimensions: SupplierDimensions | None = None,
+    settled_checks: Sequence[Callable[[], None]] = (),
+    supplier_data: Sequence[str] = (),
 ) -> dict[str, str]:
     """Use spring metadata without treating the part as a catalogued fastener.
 
@@ -545,6 +597,8 @@ async def build_purchased_spring_drawing(
         notes=properties["Manufacturing Notes"],
         spring=True,
         supplier_dimensions=supplier_dimensions,
+        settled_checks=settled_checks,
+        supplier_data=supplier_data,
     )
 
 
@@ -561,13 +615,20 @@ async def _build_reference_sheet(
     document_title: str | None = None,
     spring: bool = False,
     supplier_dimensions: SupplierDimensions | None = None,
+    configuration: str | None = None,
+    settled_checks: Sequence[Callable[[], None]] = (),
+    supplier_data: Sequence[str] = (),
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
     label = spec.artifact_stem
     # Validate the footer text before any native work.
     check_item(item, label=label)
-    caption_y = view_band_bottom(notes, label=label)
+    if configuration is not None and (
+        not isinstance(configuration, str) or not configuration.strip()
+    ):
+        raise ValueError(f"{label}: source configuration must be a nonempty name")
+    caption_y = view_band_bottom(notes, label=label, supplier_data=supplier_data)
     cells = (spring_view_cells if spring else fastener_view_cells)(caption_y)
     draw, sheet = new_project_drawing(adapter, layout=spec.layout)
     title_block_notes = _purchased_title_block(
@@ -605,8 +666,18 @@ async def _build_reference_sheet(
             view = _early_bound(
                 place_view(adapter, str(source), name, *center, scale=(1, 1)), "IView"
             )
+            if configuration is not None:
+                view.ReferencedConfiguration = configuration
             set_hidden_lines_removed(adapter, view)
             views.append(view)
+        if configuration is not None:
+            _rebuild(draw, phase="select supplier source configuration")
+            for view in views:
+                if str(view.ReferencedConfiguration) != configuration:
+                    raise RuntimeError(
+                        f"{view.GetOrientationName()}: source configuration "
+                        f"{configuration!r} did not persist"
+                    )
         # Later insertions may auto-adjust the sheet scale. Pin all views only
         # after insertion so the measurement pass is genuinely at native 1:1.
         for view in views:
@@ -676,7 +747,11 @@ async def _build_reference_sheet(
             # reaches past the outline and struck lifted captions (r5, 8:1
             # pins, rule 14).
             floor = cell[1]
-            if not center_marks[name] and supplier_dimensions is None:
+            annotated = (
+                supplier_dimensions is not None
+                and view.GetFirstDisplayDimension6() is not None
+            )
+            if not center_marks[name] and not annotated:
                 floor = max(_box(view.GetOutline(), label=name)[1], floor)
             caption_at = floor - _CAPTION_TO_CELL
             note = _literal_note(adapter, caption, center[0], caption_at)
@@ -702,6 +777,7 @@ async def _build_reference_sheet(
                 notes=notes,
                 cut_to_suit=cut_to_suit,
                 label=label,
+                supplier_data=supplier_data,
             )
         )
     with _telemetry.span("drawing.purchased_native_contract"):
@@ -733,6 +809,11 @@ async def _build_reference_sheet(
             view = views_by_orientation[name]
             if Path(view.GetReferencedModelName()).resolve() != source.resolve():
                 raise RuntimeError(f"{name}: purchased view references the wrong model")
+            if (
+                configuration is not None
+                and str(view.ReferencedConfiguration) != configuration
+            ):
+                raise RuntimeError(f"{name}: final purchased configuration changed")
             if tuple(view.ScaleRatio) != scales[name]:
                 raise RuntimeError(f"{name}: final purchased view scale changed")
             box = _box(view.GetOutline(), label=name)
@@ -759,6 +840,8 @@ async def _build_reference_sheet(
                     f"purchased note leaves its reserved space/border: {linked_text!r}: {box!r}"
                 )
 
+    if supplier_dimensions is not None and not settled_checks:
+        raise RuntimeError("supplier annotations require final settled native checks")
     paths = spec.outputs
     return await finalize_drawing(
         adapter,
@@ -766,4 +849,5 @@ async def _build_reference_sheet(
         layout=spec.layout,
         pdf_title=title,
         scale=scale,
+        settled_checks=settled_checks,
     )

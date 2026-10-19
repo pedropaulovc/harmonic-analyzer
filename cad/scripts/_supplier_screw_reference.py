@@ -23,8 +23,8 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-
-FEATURE_BY_PLANE = {"Front": "SupplierReference", "Top": "SupplierTopReference"}
+from _supplier_screw_reference_names import FEATURE_BY_PLANE
+import _telemetry
 
 
 def _construction(adapter: Any, entity: str) -> None:
@@ -130,6 +130,7 @@ async def _angle(
     dimensions.record(name)
 
 
+@_telemetry.traced("part.supplier_reference_sketch")
 async def add_supplier_reference_sketch(
     adapter: Any,
     dimensions: Sequence[tuple[str, float, str]],

@@ -47,18 +47,32 @@ cannot ask for what the authors were told to leave out.
   drawing's units, fractions and displayed precision separately from the
   exact model value (for example 7/16 inch remains 11.1125 mm when displayed
   as .438 in). `_supplier_dimensions.supplier_reference_dimension` checks the
-  native type/value, applies local units and precision, and reads back the
-  reference presentation after rebuilding. It never changes the numeric
-  value or supplies numeric replacement text. Supplier tolerance bands remain
+  native type/value and applies local units, precision and reference text
+  without rebuilding between selections. It never changes the numeric value
+  or supplies numeric replacement text. Supplier tolerance bands remain
   reference information; project general tolerances do not control purchased
   sizes. Finished/custom modification dimensions remain controlling and do
   not use this formatter.
   Shared purchased builders accept a synchronous optional
   `supplier_dimensions(adapter, views_by_orientation)` callback, keyed by
   `*Front`, `*Top`, `*Right` and `*Isometric`, after final view fitting and
-  before the native contracts. Captions stay at the cell floor with that
-  callback, reserving the existing cell whitespace for annotations. Dimensions
-  must fit without silently reducing the geometry-selected view scale.
+  before the native contracts. Captions stay at the cell floor only on views
+  carrying native supplier dimensions, reserving their existing cell whitespace.
+  Dimensions must fit without silently reducing the geometry-selected view scale.
+  Each hooked build supplies a build-local `settled_checks` sequence; the
+  callback may append read-only closures before the builder forwards that same
+  sequence to `finalize_drawing`. After its last rebuild and before saving,
+  checks reacquire current native dimensions/attachments and use
+  `_supplier_dimensions.assert_supplier_reference_dimension` plus source-specific
+  attachment, tolerance and required-count assertions.
+  The fastener builder also accepts `configuration="SupplierStock"` (or
+  another saved configuration name) for a stock-state sheet: every view selects
+  it and rebuilds before scale fitting, and the native contract verifies it
+  again. This does not change the saved part's active/installed configuration.
+  Sourced operating/suitability facts that have no honest geometric state may
+  use `supplier_data=(...)`: a separate `SUPPLIER OPERATING DATA (REFERENCE)`
+  footer block. Its full height is reserved before fitting, independently of
+  the installation-note budget; it does not create fictitious model geometry.
 - **Roughness grades (rule 6)** are the `_surface_finish` constants:
   `MACHINED_UM` (1.6) on `shaft_in_bushing` journals and bores,
   `cam_follower_contact` faces, the amplitude-bar slide, the knife edge and

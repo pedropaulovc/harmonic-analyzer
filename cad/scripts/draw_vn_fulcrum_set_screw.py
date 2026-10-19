@@ -26,6 +26,7 @@ ITEM = "#1-72 x 5/32 SOCKET SET SCREW, CUP POINT"
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    settled_checks = []
     return await build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM,
         supplier_dimensions=partial(
@@ -34,7 +35,9 @@ async def build(adapter: Any) -> dict[str, str]:
             formats=SUPPLIER_REFERENCE_FORMATS,
             starts=SUPPLIER_REFERENCE_STARTS,
             planes=SUPPLIER_REFERENCE_PLANES,
+            settled_checks=settled_checks,
         ),
+        settled_checks=settled_checks,
     )
 
 

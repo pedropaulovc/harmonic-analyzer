@@ -9,6 +9,7 @@ the orthographic views.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,8 @@ async def build_purchased_part_drawing(
     item: str,
     cut_to_suit: bool = False,
     supplier_dimensions: SupplierDimensions | None = None,
+    settled_checks: Sequence[Callable[[], None]] = (),
+    supplier_data: Sequence[str] = (),
 ) -> dict[str, str]:
     """Front/Top/Right plus Isometric of a purchased part, its note in the footer.
 
@@ -55,4 +58,6 @@ async def build_purchased_part_drawing(
         notes=properties["Manufacturing Notes"],
         cut_to_suit=cut_to_suit,
         supplier_dimensions=supplier_dimensions,
+        settled_checks=settled_checks,
+        supplier_data=supplier_data,
     )

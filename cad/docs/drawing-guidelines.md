@@ -27,6 +27,10 @@ units and displayed precision, with explicit units and reference parentheses;
 they are not fabrication or incoming-inspection controls. Finished/custom
 modifications retain their own controlling dimensions. That mix is intended;
 a callout is defective only when its unit is genuinely ambiguous.
+Source-grounded operating or suitability data with no represented geometric
+state may appear in a separately labelled `SUPPLIER OPERATING DATA (REFERENCE)`
+block. It is not a fabrication note or permission to invent a loaded state,
+mating feature or nominal dimension in the model.
 
 ## Rule 1 — No questions, nothing extra
 
