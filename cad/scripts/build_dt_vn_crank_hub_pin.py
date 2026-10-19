@@ -62,8 +62,8 @@ PULL_THREAD_ENTRY_NORMAL = (0.0, 0.0, -1.0)
 def _require_pull_thread_definition(definition: Any) -> None:
     """Prove the committed feature is the specified inch tap and #56 cut."""
     _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-VN-029 built pull thread")
-    # FastenerType2 is a catalog index that reads -1 on the native #56 tap.
-    # Prove the actual saved feature subtype using its separate legacy enum.
+    # FastenerType2 reports -1 on this native #56 tap. Use the documented
+    # saved-feature Type contract instead; do not accept an unknown type.
     native_type = definition.Type
     if native_type not in PULL_THREAD_NATIVE_THROUGH_TAP_TYPES:
         raise RuntimeError(
