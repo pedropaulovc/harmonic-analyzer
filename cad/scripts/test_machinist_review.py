@@ -2630,7 +2630,6 @@ def test_both_structured_verdict_parsers(tmp_path: Path) -> None:
 def test_arbitrary_png_reports_with_same_basename_do_not_collide(
     tmp_path: Path, monkeypatch
 ) -> None:
-    import subprocess
     from concurrent.futures import ThreadPoolExecutor
 
     verdict = _clean_verdict()
@@ -2675,8 +2674,6 @@ def test_arbitrary_png_reports_with_same_basename_do_not_collide(
 def test_multi_sheet_assembly_is_one_cross_sheet_review(
     tmp_path: Path, monkeypatch
 ) -> None:
-    import subprocess
-
     from pypdf import PdfWriter
 
     source = tmp_path / "assembly.pdf"
@@ -2734,7 +2731,6 @@ def test_multi_sheet_assembly_is_one_cross_sheet_review(
 
 def test_registry_part_pdf_reviews_every_page(tmp_path: Path, monkeypatch) -> None:
     import hashlib
-    import subprocess
     from types import SimpleNamespace
 
     from pypdf import PdfWriter
