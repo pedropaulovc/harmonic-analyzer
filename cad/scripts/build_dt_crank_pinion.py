@@ -49,7 +49,7 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _simplified_part import save_simplified_part
@@ -80,6 +80,9 @@ from dt_crank_pinion_spec import (
     PIN_STATION,
     SHOULDER_LENGTH,
     SHOULDER_LENGTH_LIMITS,
+    SHOULDER_RADIUS,
+    SHOULDER_RADIUS_BAND,
+    SHOULDER_RADIUS_TOL_TYPE,
     SURFACE_FINISHES,
     STOCK_PROFILE,
     stock_profile,
@@ -125,6 +128,35 @@ def turned_band_volume_mm3() -> float:
     return (outer_area - turned_area) * (FACE_WIDTH - SHOULDER_LENGTH)
 
 
+def _shoulder_radius_max_limit(adapter) -> None:
+    """ShoulderRadius as a MAX single limit carrying the band's deviations
+    (build_pn_pen_rod._shoulder_fillet_max_limit's recipe)."""
+    lower, upper = deviations(SHOULDER_RADIUS_BAND)
+    _, dimension = _named_dimension(adapter, "BossProfile", "ShoulderRadius")
+    label = "ShoulderRadius@BossProfile"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, SHOULDER_RADIUS / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
+            f"{SHOULDER_RADIUS}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = SHOULDER_RADIUS_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != SHOULDER_RADIUS_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {SHOULDER_RADIUS:g} MAX")
+
+
 async def assert_boss_present(adapter, label: str) -> None:
     """Fail loud unless the solid still reaches OVERALL_LENGTH along the axis
     and carries exactly one boss-radius cylinder outboard of the teeth."""
@@ -159,6 +191,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BossLength", f"{BOSS_LENGTH}mm")
     await set_global(adapter, "ShoulderLength", f"{SHOULDER_LENGTH}mm")
     await set_global(adapter, "TurnedDia", f"{TURNED_DIA}mm")
+    await set_global(adapter, "ShoulderRadius", f"{SHOULDER_RADIUS}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -213,13 +246,34 @@ async def build(adapter) -> dict[str, str]:
         "boss axis centerline",
         await adapter.add_centerline(-FACE_WIDTH, 0.0, -OVERALL_LENGTH, 0.0),
     )
-    boss_pts = [
-        (-FACE_WIDTH, 0.0),
-        (-FACE_WIDTH, BOSS_DIA / 2.0),
-        (-OVERALL_LENGTH, BOSS_DIA / 2.0),
-        (-OVERALL_LENGTH, 0.0),
-    ]
-    boss_lines = await add_line_chain(adapter, boss_pts)
+    # The internal shoulder at the tooth face is a tangent arc IN the profile
+    # (dt_crank_pinion_spec.SHOULDER_RADIUS), not a fillet feature: the gap
+    # floors touch the boss circle along that edge, the same coincidence the
+    # #906 note above keeps the profile's start away from. The arc runs CCW
+    # from the boss outline up to the band face; local x -> model -Z.
+    rho = SHOULDER_RADIUS
+    (boss_face,) = await add_line_chain(
+        adapter, [(-FACE_WIDTH, 0.0), (-FACE_WIDTH, BOSS_DIA / 2.0 + rho)], close=False
+    )
+    shoulder_arc = check(
+        "boss shoulder radius arc",
+        await adapter.add_arc(
+            -(FACE_WIDTH + rho), BOSS_DIA / 2.0 + rho,
+            -(FACE_WIDTH + rho), BOSS_DIA / 2.0,
+            -FACE_WIDTH, BOSS_DIA / 2.0 + rho,
+        ),
+    )
+    boss_rest = await add_line_chain(
+        adapter,
+        [
+            (-(FACE_WIDTH + rho), BOSS_DIA / 2.0),
+            (-OVERALL_LENGTH, BOSS_DIA / 2.0),
+            (-OVERALL_LENGTH, 0.0),
+            (-FACE_WIDTH, 0.0),
+        ],
+        close=False,
+    )
+    boss_lines = [boss_face, *boss_rest]
     # Construction-only side-view witnesses for the other two turned
     # diameters.  The gear helper's blank circle and the bore circle must stay
     # on Front to create their features, but drawing-simplicity-policy.md `How the repository implements the guidelines` permits a construction
@@ -270,12 +324,17 @@ async def build(adapter) -> dict[str, str]:
             f"lower witness {direction} {line}",
             await adapter.add_sketch_constraint(line, None, direction),
         )
-    for i, line in enumerate(boss_lines):
-        (_, y1), (_, y2) = boss_pts[i], boss_pts[(i + 1) % len(boss_lines)]
-        direction = "horizontal" if y1 == y2 else "vertical"
+    for line, direction in zip(
+        boss_lines, ("vertical", "horizontal", "vertical", "horizontal"), strict=True
+    ):
         check(
             f"boss {direction} {line}",
             await adapter.add_sketch_constraint(line, None, direction),
+        )
+    for first, second in ((boss_face, shoulder_arc), (shoulder_arc, boss_lines[1])):
+        check(
+            "tangent boss shoulder radius",
+            await adapter.add_sketch_constraint(first, second, "tangent"),
         )
     for label, line in (
         ("outside-diameter reference", outside_ref),
@@ -399,6 +458,11 @@ async def build(adapter) -> dict[str, str]:
         "BoreDia",
     )
     boss.record("BoreDia", '"BoreDia"')
+    check(
+        "boss shoulder radius",
+        await adapter.add_sketch_dimension(shoulder_arc, None, "radial", rho),
+    )
+    boss.record("ShoulderRadius", '"ShoulderRadius"')
     # The profile's start sits on the axis at the tooth face: one alignment
     # relation plus one distance, driven by FaceWidth.
     await anchor_point_to_origin(
@@ -413,7 +477,14 @@ async def build(adapter) -> dict[str, str]:
         "revolve boss", await adapter.create_revolve(RevolveParameters(angle=360.0))
     )
     name_last_feature(adapter, "Boss")
-    v_boss = math.pi * (BOSS_DIA / 2.0) ** 2 * BOSS_LENGTH
+    # The shoulder arc adds its spandrel ring: area rho^2 (1 - pi/4), centroid
+    # rho (10 - 3 pi) / (3 (4 - pi)) out from the boss, revolved (Pappus).
+    spandrel = rho**2 * (1.0 - math.pi / 4.0)
+    spandrel_r = BOSS_DIA / 2.0 + rho * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
+    v_boss = (
+        math.pi * (BOSS_DIA / 2.0) ** 2 * BOSS_LENGTH
+        + 2.0 * math.pi * spandrel_r * spandrel
+    )
     volume = await volume_check(adapter, "hub boss", volume + v_boss, 0.01 * v_boss)
 
     # Turned band (user ruling c'' variant B, 2026-09-30): north of the
@@ -611,6 +682,8 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "TurnedBandProfile", "TurnedDia", TURNED_DIA_TOLERANCE_MM
     )
+    # The tooth-face shoulder: sharp up to its printed R MAX (dt_crank_pinion_spec).
+    _shoulder_radius_max_limit(adapter)
     await volume_check(
         adapter, "driven crank pinion (equations neutral)", volume, 0.01 * v_bore
     )

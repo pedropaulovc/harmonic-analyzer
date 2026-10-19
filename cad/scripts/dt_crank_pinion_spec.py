@@ -301,6 +301,25 @@ if BOSS_WALL_WORST < BOSS_WALL_FLOOR_MM:
         "floor of the 2026-09-25 option-C ruling"
     )
 
+# The internal shoulder where the turned band steps down to the boss at the
+# tooth face is a lathe corner, so it carries a single-limit radius (machinist
+# review of 88d48ad2a7b4, drawing-guidelines.md rules 11 and 16): sharp up to
+# this maximum, printed "R0.4 MAX" from the model value (swTolMAX).  Only the
+# 64T crank-drive gear's tooth row reaches over the boss there; its worst tip
+# (max OD at the closest pose the drive train allows) keeps 0.22 mm radial
+# air to a full R0.4 ring around the boss, against 0.62 mm to the sharp corner.
+# The spaces' form cutter runs out through the ring, so TOOTH_RUNOUT_NOTE stays
+# true; the ring sits north of the teeth and changes no fit or wall.
+SHOULDER_RADIUS = 0.4
+# (upper, lower) deviations: the nominal IS the limit, down to sharp.
+SHOULDER_RADIUS_BAND = (0.0, -SHOULDER_RADIUS)
+SHOULDER_RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.4 MAX"
+SHOULDER_RADIUS_PLACES = 1
+if round(SHOULDER_RADIUS, SHOULDER_RADIUS_PLACES) != SHOULDER_RADIUS:
+    raise AssertionError("the shoulder radius must print exactly at its places")
+if BOSS_DIA / 2.0 + SHOULDER_RADIUS >= (TURNED_DIA - TURNED_DIA_TOLERANCE_MM) / 2.0:
+    raise AssertionError("the shoulder radius must end on the turned band's face")
+
 # Retention pin: a plain 1/8 in straight pin (stock drill rod) through the boss
 # and crankshaft, match-drilled at assembly with the pinion on its seat. The
 # drawing therefore governs the hole by its fit to the named pin, not by the
@@ -569,8 +588,9 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 # keeps exactly their union across its per-view ``keep`` maps. The
 # ``BossProfile`` is a Right-plane revolve profile with construction-only
 # witnesses. It therefore owns every printed turned diameter and length on the
-# side view but the turned band's, without changing the solid: ``BossDia``
-# and ``OverallLength`` drive the revolve, while ``OutsideDia``, ``BoreDia``,
+# side view but the turned band's, without changing the solid: ``BossDia``,
+# ``OverallLength`` and the shoulder's single-limit ``ShoulderRadius`` drive
+# the revolve, while ``OutsideDia``, ``BoreDia``,
 # ``FaceWidth``, ``ShoulderLength``, ``PinHoleDia`` and ``PinFromBossEnd`` are
 # equation-driven native reference dimensions on construction witnesses
 # (drawing-simplicity-policy.md `How the repository implements the
@@ -591,6 +611,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ShoulderLength",
         "PinHoleDia",
         "PinFromBossEnd",
+        "ShoulderRadius",
     },
     "TurnedBandProfile": {"TurnedDia"},
 }
@@ -613,7 +634,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # hole prints its reference size at two places and its station from the
 # boss's north face at one (PIN_FROM_BOSS_END). The overall length prints
 # one place like the face, with the W15 boss sized for the pin's wall to its
-# north face.
+# north face. The shoulder radius prints its single limit at one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BossProfile": {
         "OutsideDia": 2,
@@ -624,6 +645,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ShoulderLength": SHOULDER_LENGTH_PLACES,
         "PinHoleDia": PIN_HOLE_DIA_PLACES,
         "PinFromBossEnd": PIN_FROM_BOSS_END_PLACES,
+        "ShoulderRadius": SHOULDER_RADIUS_PLACES,
     },
     "TurnedBandProfile": {"TurnedDia": TURNED_DIA_PLACES},
 }
