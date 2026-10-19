@@ -625,9 +625,80 @@ def _loop_bound_names(path: Path, owner: ast.AST, call: ast.Call, name: str) -> 
             return result
     return set()
 
+def _literal_reference(path: Path, expression: ast.AST):
+    if isinstance(expression, ast.Name):
+        return _literal_named_value(path, expression.id)
+    if (
+        isinstance(expression, ast.Subscript) and isinstance(expression.value, ast.Name)
+        and isinstance(expression.slice, ast.Constant)
+    ):
+        return _literal_named_value(path, expression.value.id)[expression.slice.value]
+    if isinstance(expression, (ast.Tuple, ast.List)):
+        return [_literal_reference(path, item) for item in expression.elts]
+    if isinstance(expression, ast.Attribute) and isinstance(expression.value, ast.Name):
+        for statement in _tree(path).body:
+            if isinstance(statement, ast.Import):
+                for alias in statement.names:
+                    if (alias.asname or alias.name) == expression.value.id:
+                        return _literal_named_value(
+                            _SCRIPTS / f"{alias.name}.py", expression.attr
+                        )
+    try:
+        return ast.literal_eval(expression)
+    except (ValueError, TypeError) as error:
+        raise LookupError(f"unresolved literal reference {ast.unparse(expression)}") from error
+
+
+def _tuple_blanked_sketches(path: Path, owner: ast.AST, call: ast.Call) -> set[str] | None:
+    """Names from tuple(mapping) or a local literal list with explicit appends."""
+    expression = call.args[1]
+    if not (
+        isinstance(expression, ast.Call) and isinstance(expression.func, ast.Name)
+        and expression.func.id == "tuple" and len(expression.args) == 1
+    ):
+        return None
+    source = expression.args[0]
+    try:
+        value = _literal_reference(path, source)
+    except LookupError:
+        if not isinstance(source, ast.Name):
+            raise
+        initializers = [
+            node.value for node in ast.walk(owner)
+            if isinstance(node, ast.Assign) and node.lineno < call.lineno
+            and any(isinstance(target, ast.Name) and target.id == source.id for target in node.targets)
+        ]
+        if len(initializers) != 1 or not isinstance(initializers[0], ast.List):
+            raise LookupError(f"unresolved hidden sketch collection {source.id}")
+        value = list(_literal_reference(path, initializers[0]))
+        for node in ast.walk(owner):
+            if not (
+                isinstance(node, ast.Call) and node.lineno < call.lineno
+                and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == source.id
+            ):
+                continue
+            if node.func.attr != "append" or len(node.args) != 1:
+                raise LookupError(f"unsupported hidden sketch collection mutation {ast.unparse(node)}")
+            value.append(_literal_reference(path, node.args[0]))
+    if not isinstance(value, (dict, tuple, list, set)):
+        raise LookupError(f"hidden sketch collection is not a collection: {ast.unparse(source)}")
+    names = set(value)
+    if not all(isinstance(name, str) for name in names):
+        raise LookupError(f"non-string hidden sketch collection: {ast.unparse(source)}")
+    return names
+
+
 
 
 def _helper_fixed_blanked_sketches(module: str, function: str) -> set[str]:
+    try:
+        return _fixed_blanked_sketches(module, function)
+    except LookupError as error:
+        raise LookupError(f"{_SCRIPTS / f'{module}.py'}:{function}: {error}") from error
+
+
+def _fixed_blanked_sketches(module: str, function: str) -> set[str]:
     """Names a called author blanks directly, excluding its name parameters."""
     path = _SCRIPTS / f"{module}.py"
     if not path.is_file():
@@ -645,7 +716,8 @@ def _helper_fixed_blanked_sketches(module: str, function: str) -> set[str]:
                 continue
             sketches = call.args[1]
             if not isinstance(sketches, (ast.Tuple, ast.List)):
-                names |= _reference_sketches(tree)
+                resolved = _tuple_blanked_sketches(path, owner, call)
+                names |= resolved if resolved is not None else _reference_sketches(tree)
                 continue
             for item in sketches.elts:
                 if isinstance(item, ast.Constant) and isinstance(item.value, str):
@@ -663,24 +735,10 @@ def _helper_fixed_blanked_sketches(module: str, function: str) -> set[str]:
                             raise LookupError(f"{module}.{function}: non-string sketch {item.id}")
                         names.add(value)
                 elif isinstance(item, ast.Attribute) and isinstance(item.value, ast.Name):
-                    imported_module = next(
-                        (
-                            alias.name
-                            for statement in tree.body if isinstance(statement, ast.Import)
-                            for alias in statement.names
-                            if (alias.asname or alias.name) == item.value.id
-                        ),
-                        None,
-                    )
-                    if imported_module is None:
-                        names |= _reference_sketches(tree)
-                    else:
-                        value = _literal_named_value(
-                            _SCRIPTS / f"{imported_module}.py", item.attr
-                        )
-                        if not isinstance(value, str):
-                            raise LookupError(f"{module}.{function}: non-string sketch {item.attr}")
-                        names.add(value)
+                    value = _literal_reference(path, item)
+                    if not isinstance(value, str):
+                        raise LookupError(f"{module}.{function}: non-string sketch {item.attr}")
+                    names.add(value)
                 else:
                     names |= _reference_sketches(tree)
     return names
@@ -1050,6 +1108,60 @@ def test_computed_author_loop_resolves_actual_values_without_metadata(
         encoding="utf-8",
     )
     assert _blanked_sketches(build) == {"FrontReference", "TopReference"}
+
+
+@pytest.mark.parametrize("collection", ("local-appends", "mapping-keys"))
+@pytest.mark.parametrize("include_second", (False, True))
+def test_tuple_blanking_uses_actual_collection_not_declared_superset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    collection: str, include_second: bool,
+) -> None:
+    monkeypatch.setitem(globals(), "_SCRIPTS", tmp_path)
+    mapping = {"FirstReference": ("Size",)}
+    if include_second:
+        mapping["SecondReference"] = ("OtherSize",)
+    (tmp_path / "source_names.py").write_text(
+        "FIRST = 'FirstReference'\nSECOND = 'SecondReference'\n"
+        f"FEATURES = {mapping!r}\n",
+        encoding="utf-8",
+    )
+    if collection == "local-appends":
+        body = (
+            "    features = [names.FIRST]\n"
+            + ("    if application:\n        features.append(names.SECOND)\n" if include_second else "")
+            + "    blank_reference_sketches(adapter, tuple(features))\n"
+        )
+    else:
+        body = "    blank_reference_sketches(adapter, tuple(names.FEATURES))\n"
+    (tmp_path / "author.py").write_text(
+        "import source_names as names\n"
+        "REFERENCE_SKETCHES = ('UnrelatedDeclaredReference',)\n"
+        "def author(adapter):\n" + body,
+        encoding="utf-8",
+    )
+    build = tmp_path / "build_fixture.py"
+    build.write_text(
+        "from author import author\n"
+        "async def build(adapter):\n    author(adapter)\n",
+        encoding="utf-8",
+    )
+    assert _blanked_sketches(build) == set(mapping)
+
+
+def test_unknown_collection_binding_reports_its_source_and_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(globals(), "_SCRIPTS", tmp_path)
+    (tmp_path / "author.py").write_text(
+        "REFERENCE_SKETCHES = ('NotEvidenceForTheComputedName',)\n"
+        "def author(adapter):\n"
+        "    features = []\n"
+        "    features.append(computed_name())\n"
+        "    blank_reference_sketches(adapter, tuple(features))\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(LookupError, match=r"author\.py:author:.*computed_name"):
+        _helper_fixed_blanked_sketches("author", "author")
 
 
 def test_supplier_authors_blank_exactly_their_declared_reference_ownership(
