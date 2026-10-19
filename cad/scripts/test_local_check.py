@@ -168,12 +168,40 @@ def test_successful_check_keeps_top_level_span_depth(tmp_path, check_env, monkey
     assert json.loads((tmp_path / "trace.json").read_text()) == {"depth": 0, "parent": None}
 
 
+@pytest.mark.parametrize("option_source", ["environment", "configuration"])
+def test_serial_pytest_cannot_inherit_unbudgeted_workers(tmp_path, check_env, option_source):
+    """Pytest environment/config defaults must not turn one slot into a pool."""
+    check_env["PYTEST_ADDOPTS"] = "-n auto" if option_source == "environment" else ""
+    check_env["PYTEST_XDIST_AUTO_NUM_WORKERS"] = "2"
+    inherited = "--numprocesses=2" if option_source == "configuration" else ""
+    (tmp_path / "pytest.ini").write_text(
+        f"[pytest]\naddopts = {inherited}\n", encoding="utf-8",
+    )
+    worker_test = tmp_path / "test_serial.py"
+    worker_test.write_text(
+        "def test_serial(worker_id, request):\n"
+        "    assert worker_id == 'master'\n"
+        "    assert request.config.option.numprocesses == 0\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        _local_check.command(
+            [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+             "--", str(worker_test)],
+            "check:serial",
+        ),
+        cwd=tmp_path, env=check_env, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 @pytest.mark.parametrize("worker_args", [["-n", "8"], ["--numprocesses=auto"]])
 def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, check_env, worker_args):
     """Real xdist workers consume only free slots; small checks run alongside."""
     check_env["HARMONIC_LOCAL_CHECK_CPU_SLOTS"] = "3"
     # Explicit host capacity also governs auto when interpreter CPU counts differ.
     check_env["PYTHON_CPU_COUNT"] = "2"
+    check_env["PYTEST_ADDOPTS"] = "-n auto"
     hold = tmp_path / "hold.py"
     hold.write_text(
         "import os, sys\nprint(os.getpid(), flush=True)\nsys.stdin.read(1)\n",

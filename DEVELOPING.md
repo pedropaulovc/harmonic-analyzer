@@ -146,6 +146,9 @@ workers (rounded up, after capping the request to host capacity); an insufficien
 provisional allocation is released immediately. This avoids launching a long
 recipe at one worker just because short checks temporarily occupy the host.
 Worker counts stay fixed for that suite's lifetime.
+Pytest checks without an explicit parallel-worker request receive command-line
+`-n 0`; inherited `PYTEST_ADDOPTS` or configuration `addopts` cannot silently
+turn a one-slot check into an unbudgeted worker pool.
 This is a concurrency target, not a hard CPU-utilization cap: I/O waits,
 subprocesses inside tests, and unrelated applications affect measured usage.
 

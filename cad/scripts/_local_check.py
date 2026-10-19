@@ -131,6 +131,10 @@ def main() -> None:
         acquired = time.monotonic()
         if worker_option is not None:
             args[worker_option] = ["-n", str(granted)]
+        elif args[:2] == ["-m", "pytest"]:
+            # CLI options override both PYTEST_ADDOPTS and pytest config.
+            # Insert before any "--" so serial gates cannot inherit a pool.
+            args[2:2] = ["-n", "0"]
         try:
             _telemetry.info(
                 f"[local.check] {task} admitted {granted}/{capacity} CPU slots "
