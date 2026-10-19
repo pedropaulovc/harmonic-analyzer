@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -23,8 +22,6 @@ def test_required_drawing_paths() -> None:
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert pin.DRAWING_DIMENSIONS is dt_pinion_cam_pin_spec.DRAWING_DIMENSIONS
-    assert pin.SURFACE_FINISHES is dt_pinion_cam_pin_spec.SURFACE_FINISHES
-    assert drawing.SURFACE_FINISHES is dt_pinion_cam_pin_spec.SURFACE_FINISHES
     marked = set().union(*dt_pinion_cam_pin_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.RIGHT_KEEP)
     assert kept == marked
@@ -70,27 +67,46 @@ def test_side_view_lies_as_turned_with_the_end_view_in_projection() -> None:
     top = drawing.RIGHT_CENTER[1] + drawing.HALF_DIA
     bottom = drawing.RIGHT_CENTER[1] - drawing.HALF_DIA
     # The two lengths sit above the view (overall outermost), the diameter
-    # below, the crown leaders at the lower left of the crown.
+    # below, the crown radius leader at the lower left of the crown.
     assert top < drawing.RIGHT_KEEP["Depth"][1] < drawing.OVERALL_TEXT_XY[1] < 0.255
     assert 0.080 < drawing.RIGHT_KEEP["PinDia"][1] < bottom
     assert drawing.RIGHT_KEEP["PinDia"][0] > drawing.RIGHT_CENTER[0]
-    for x, y in (drawing.RIGHT_KEEP["CapR"], drawing.CROWN_FINISH_SYMBOL_XY):
-        assert end_view_right < x < crown_apex_x
-        assert 0.080 < y < drawing.RIGHT_CENTER[1]
+    x, y = drawing.RIGHT_KEEP["CapR"]
+    assert end_view_right < x < crown_apex_x
+    assert 0.080 < y < drawing.RIGHT_CENTER[1]
 
 
-def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
-    notes = dt_pinion_cam_pin_spec.DRAWING_NOTES
-    assert len(notes.splitlines()) <= 4
-    assert "LINEAR +/-" not in notes
-    assert " BA " not in f" {notes} "
-    assert "X.XX" not in notes
-    # Fable r4: the first line restated what the views show.
-    assert "ONE SPHERICAL CROWN" not in notes
-    assert "EXEMPT FROM TITLE-BLOCK EDGE-BREAK" in notes
-    assert "NO CHAMFER" in notes
+def test_sheet_has_no_general_notes() -> None:
+    """Machinist review r1 of #1009: the sharp-crown-root note argued with the
+    title block and named no reason; the crown root takes the title block's
+    edge break like every other edge, and the bond is the fit-up step."""
+    assert not hasattr(dt_pinion_cam_pin_spec, "DRAWING_NOTES")
+    for module in (drawing, pin):
+        assert "Manufacturing Notes" not in Path(module.__file__).read_text(
+            encoding="utf-8"
+        )
+
+
+def test_end_view_keeps_the_templates_one_center_mark(monkeypatch) -> None:
+    """Layout audit r1-r2 of #1009: the template's centre mark and an
+    unconditional auto_center_marks printed two identical marks on the end
+    view.  The sheet adds one only when the template did not."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "if _center_mark_count(front) == 0 and not auto_center_marks(" in source
+    assert "if found != 1:" in source
+    assert drawing._CENTER_MARK_ANNOTATION == 13
+
+    class _View:
+        def __init__(self, marks):
+            self.marks = marks
+
+        def GetAnnotationsByType(self, kind):  # noqa: N802 - the COM member name
+            assert kind == 13
+            return self.marks
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda view, _iface: view)
+    assert drawing._center_mark_count(_View(None)) == 0
+    assert drawing._center_mark_count(_View(("mark",))) == 1
 
 
 def test_bonded_slip_fit_replaces_the_press() -> None:
@@ -110,9 +126,6 @@ def test_bonded_slip_fit_replaces_the_press() -> None:
     assert round(seat_max - pin_min, 6) == 0.042
     assert seat_max - pin_min <= dt_pinion_cam_pin_spec.RETAINING_COMPOUND_MAX_GAP_MM
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's MHA-DT-025 eye pass): the bond is the fit-up step, not a note.
-    notes = dt_pinion_cam_pin_spec.DRAWING_NOTES
-    assert "LOCTITE" not in notes and "ON ASSEMBLY" not in notes
-    assert len(notes.splitlines()) == 2
     assert dt_pinion_cam_pin_spec.ASSEMBLY_STEP == (
         "BOND 2X MHA-DT-025, ONE INTO EACH MHA-DT-014 FOLLOWER SEAT WITH LOCTITE 638."
     )
@@ -137,30 +150,38 @@ def test_the_bond_step_counts_one_pin_per_strap() -> None:
     assert step.startswith(f"BOND {pins}X MHA-DT-025, ONE INTO EACH MHA-DT-014 ")
 
 
-def test_no_gdt_and_the_crown_carries_the_finish() -> None:
-    """drawing-simplicity-policy.md `GD&T allowlist (rule 5)`: a pin is not on the GD&T allowlist.  drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the crown
-    rides the cam; the bonded shank is a static seat."""
+def test_no_gdt_the_shank_carries_the_finish_and_only_the_fit_is_banded() -> None:
+    """drawing-simplicity-policy.md `GD&T allowlist (rule 5)`: a pin is not on
+    the GD&T allowlist.  drawing-guidelines.md rule 6 (roughness symbols only
+    where a surface runs, slides or locates): the cam rides the Ø4 shank, a
+    cam-follower contact (Codex P2 on #1687); the crown touches nothing.
+    Machinist review r1 of #1009: the length and crown radius bands named no
+    mate; they take the title block's .XX."""
+    from _gtol_cylinder import CylinderFace
+
     source = Path(drawing.__file__).read_text(encoding="utf-8")
+    build_source = Path(pin.__file__).read_text(encoding="utf-8")
     assert not hasattr(dt_pinion_cam_pin_spec, "GEOMETRIC_TOLERANCES_MM")
     assert "add_datum_feature(" not in source
     assert "add_feature_control_frame(" not in source
-    assert "add_view_centerline(" in source
     (control,) = dt_pinion_cam_pin_spec.SURFACE_FINISHES
-    assert control.key == "crown"
+    assert control.key == "shank"
     assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == 2.0 * dt_pinion_cam_pin_spec.CAP_RADIUS
+    assert control.face == CylinderFace(diameter_mm=dt_pinion_cam_pin_spec.PIN_DIA)
     assert source.count("add_surface_finish(") == 1
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "crown")' in source
-    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
-        pin.__file__
-    ).read_text(encoding="utf-8")
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "shank")' in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in (
+        build_source
+    )
+    assert "add_view_centerline(" in source
     assert model_toleranced_dimensions(pin) == {
         ("PinProfile", "PinDia"): "*deviations(PIN_DIA_BAND)",
-        ("PinProfile", "Depth"): "PIN_LENGTH_TOLERANCE_MM",
-        ("CapProfile", "CapR"): "CAP_RADIUS_TOLERANCE_MM",
     }
     assert "FINAL SIZE" not in drawing.DIMENSION_CALLOUTS["PinDia"]
-    assert "SEATED FLAT END" in drawing.DIMENSION_CALLOUTS["Depth"]
+    assert drawing.DIMENSION_CALLOUTS["Depth"] is dt_pinion_cam_pin_spec.DEPTH_CALLOUT
+    assert (
+        drawing.DIMENSION_CALLOUTS["CapR"] is dt_pinion_cam_pin_spec.CAP_RADIUS_CALLOUT
+    )
     assert "CapR" in drawing.RIGHT_KEEP
     # The reference overall replaces the crown-height prose (drawing-guidelines.md rule 10 (dimension from a real feature)).
     assert "_overall_reference(adapter, right)" in source
@@ -168,6 +189,60 @@ def test_no_gdt_and_the_crown_carries_the_finish() -> None:
     assert "SetPrecision3(DRAWING_REFERENCE_PRECISION" in source
     assert "REF AXIAL HEIGHT" not in source
     assert round(drawing.OVERALL, 6) == 20.8
+
+
+def test_the_cam_rides_the_shank_short_of_the_crown() -> None:
+    """The finish leader's station is the assembly's cam contact: the foot of
+    the pin line on the cam axis, parked and engaged, lies on the shank clear
+    of the seat and well short of the crown root."""
+    import build_dt_drive_train_assembly as asm
+
+    stations = []
+    for centre, normal, ecc in (
+        (asm._FPIN_C, asm._SPR_N, -asm.CAM_ECC),
+        (asm._FPIN_C_ENG, asm._N_ENG, asm.CAM_ECC),
+    ):
+        axis = (asm.LIFT_X, asm.LIFT_Y + ecc)
+        foot = -((axis[0] - centre[0]) * normal[0] + (axis[1] - centre[1]) * normal[1])
+        stations.append(foot - asm._FPIN_S0)
+    contact = drawing.CAM_CONTACT_FROM_SEATED_END_MM
+    assert min(stations) - 0.5 < contact < max(stations) + 0.5
+    assert dt_pinion_cam_pin_spec.SEAT_LEN < min(stations)
+    assert max(stations) < dt_pinion_cam_pin_spec.PIN_LEN - 3.0
+
+
+# The finish symbol's ink relative to its V root at 2.5 mm character height:
+# the leader leaves the shelf's right end; the "Ra 1.6" text sits above the
+# shelf, right of it (r5 layout audit: text 4.2-6.8 mm above the root), and
+# the CAM CONTACT target prints a row above the bar, about 11.5 mm up.
+_SHELF_LEFT_DX = -0.0030
+_TEXT_RIGHT_DX = 0.0148
+_SYMBOL_TOP_DY = 0.0115
+
+
+def test_shank_finish_sits_clear_above_the_shank() -> None:
+    x, y = drawing.SHANK_FINISH_SYMBOL_XY
+    model_x, model_y, model_z = drawing._shank_point()
+    target = (
+        drawing.side_view_x(model_z * 1000.0),
+        drawing.RIGHT_CENTER[1] + model_y * drawing.SHEET_SCALE[0],
+    )
+    assert model_x == 0.0
+    assert target[1] == pytest.approx(drawing.RIGHT_CENTER[1] + drawing.HALF_DIA)
+    # The leader falls from the shelf end to the shank's upper edge, so it
+    # passes below the text that sits above the shelf.
+    assert y > target[1] + 0.004
+    assert target[0] > x + _TEXT_RIGHT_DX
+    # Clear of the crown-root extension line and under the Depth block.
+    assert x + _SHELF_LEFT_DX > drawing.side_view_x(drawing.PIN_LEN) + 0.005
+    # r5 layout audit: the Depth dimension line runs 8 mm under its keep point.
+    depth_line = drawing.RIGHT_KEEP["Depth"][1] - 0.008
+    assert depth_line - (y + _SYMBOL_TOP_DY) > _SYMBOL_TOP_DY
+    assert (
+        dt_pinion_cam_pin_spec.SURFACE_FINISHES[0].production_method
+        == dt_pinion_cam_pin_spec.SHANK_FINISH_TARGET
+        == "CAM CONTACT"
+    )
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
@@ -240,93 +315,3 @@ def test_the_part_owns_the_printed_precision() -> None:
     )
     assert "draw_dt_pinion_cam_pin.py" in PRECISION_MIGRATED_DRAWINGS
     assert not drawing_specification_violations(draw_source, filename=drawing.__file__)
-
-
-# The crown symbol's ink relative to CROWN_FINISH_SYMBOL_XY (the V's root) at
-# its 2.5 mm character height, measured on the pc-r4-860 render: the leader
-# leaves the shelf's right end, and the "Ra 1.6" text sits above the shelf
-# with its lower-right corner up and to the right of that end.
-_SHELF_END_DX = 0.0064
-_TEXT_RIGHT_DX = 0.0148
-_TEXT_BOTTOM_DY = 0.0042
-_LEADER_TEXT_CLEARANCE = 0.0005
-
-
-def _crown_leader_rise_at_text_right(symbol_xy: tuple[float, float]) -> float:
-    """Height of the straight roughness leader, above the shelf, where it
-    passes the text's right edge."""
-    _x, y_model, z_model = drawing._crown_point(drawing.CROWN_FINISH_FROM_ROOT_MM)
-    crown = (
-        drawing.side_view_x(z_model * 1000.0),
-        drawing.RIGHT_CENTER[1] + y_model * drawing.SHEET_SCALE[0],
-    )
-    shelf_end = (symbol_xy[0] + _SHELF_END_DX, symbol_xy[1])
-    slope = (crown[1] - shelf_end[1]) / (crown[0] - shelf_end[0])
-    return slope * (_TEXT_RIGHT_DX - _SHELF_END_DX)
-
-
-def test_crown_finish_leader_passes_under_its_own_text() -> None:
-    """Machinist review of 7b21b56c0 (codex): the crown's Ra 1.6 leader crossed
-    its own text.  The leader rises from the shelf end to the crown point, so
-    it must still be below the text's baseline where the text ends."""
-    limit = _TEXT_BOTTOM_DY - _LEADER_TEXT_CLEARANCE
-    assert _crown_leader_rise_at_text_right(drawing.CROWN_FINISH_SYMBOL_XY) < limit
-    # Positive control: the reviewed position ran through the "1.6".
-    assert _crown_leader_rise_at_text_right((0.120, 0.140)) > _TEXT_BOTTOM_DY
-    # The leader still rises onto the crown's lower flank, from the lower left.
-    _x, y_model, _z = drawing._crown_point(drawing.CROWN_FINISH_FROM_ROOT_MM)
-    crown_y = drawing.RIGHT_CENTER[1] + y_model * drawing.SHEET_SCALE[0]
-    assert drawing.CROWN_FINISH_SYMBOL_XY[1] < crown_y
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_crown_point(CROWN_FINISH_FROM_ROOT_MM)" in source
-
-
-class _PinFace:
-    """IFace2 double: one surface identity, its parameters and the next face."""
-
-    def __init__(
-        self, identity: int, accessor: str, parameters: tuple[float, ...]
-    ) -> None:
-        self.surface = SimpleNamespace(Identity=identity, **{accessor: parameters})
-        self.next: _PinFace | None = None
-
-    def GetSurface(self):  # noqa: N802 - the COM member name
-        return self.surface
-
-    def GetBox(self):  # noqa: N802
-        return ()
-
-    def GetNextFace(self):  # noqa: N802
-        return self.next
-
-
-def test_crown_finish_attaches_the_controlled_crown_face() -> None:
-    """Farm run 20261002T180658288Z (@9, @15): the crown silhouette picked at
-    the crown point re-solved to another face's silhouette after insertion
-    (``same_entity=False``).  The finish attaches the one spherical face the
-    part-owned control names, on the part the view references -- not the
-    shank cylinder, and without hit-testing or sweeping the view."""
-    shank = _PinFace(
-        4002, "CylinderParams", (0, 0, 0, 0, 0, 1, dt_pinion_cam_pin_spec.PIN_DIA / 2000)
-    )
-    crown = _PinFace(
-        4004, "SphereParams", (0.0, 0.0, 0.0, dt_pinion_cam_pin_spec.CAP_RADIUS / 1000)
-    )
-    shank.next = crown
-    part = SimpleNamespace(
-        GetBodies2=lambda body_type, visible_only: [
-            SimpleNamespace(GetFirstFace=lambda: shank)
-        ]
-    )
-    view = SimpleNamespace(ReferencedDocument=part)
-
-    assert drawing._crown_face(view) is crown
-
-    crown.surface.SphereParams = (
-        0.0,
-        0.0,
-        0.0,
-        2.0 * dt_pinion_cam_pin_spec.CAP_RADIUS / 1000,
-    )
-    with pytest.raises(RuntimeError, match=r"crown: face spec .* matched 0 faces"):
-        drawing._crown_face(view)

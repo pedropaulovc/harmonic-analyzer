@@ -5,7 +5,9 @@ MHA-DT-014 strap's follower seat.  The sheet runs at 8:1 so the 20.8-long pin
 reads at arm's length.  The side view lies as the pin is turned (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and
 carries every dimension: the diameter, the length, the crown radius and a
 reference overall.  The end view projects to its left (third angle), and a
-4:1 isometric sits clear of the title block.
+4:1 isometric sits clear of the title block.  The shank the cam rides carries
+the one roughness symbol, and the sheet has no general notes
+(dt_pinion_cam_pin_spec).
 
 Run with SolidWorks open::
 
@@ -15,7 +17,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -48,13 +49,15 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_pinion_cam_pin_spec import (
-    CAP_RADIUS,
+    CAP_RADIUS_CALLOUT,
     CAP_SAG,
+    DEPTH_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
@@ -64,6 +67,9 @@ from dt_pinion_cam_pin_spec import (
     SURFACE_FINISHES,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_pinion_cam_pin"]
 PART_STEM = SPEC.artifact_stem
@@ -100,56 +106,68 @@ def side_view_x(z_mm: float) -> float:
 
 
 # Both lengths sit ABOVE the side view (Depth inner, the reference overall
-# outer), so every extension line runs up and the crown's radius and
-# roughness leaders reach it from the lower left without crossing one.  The
-# diameter sits below, its dimension line right of centre so the
-# axis-centerline pick at the view's middle lands on bare face.
+# outer), so every extension line runs up and the crown's radius leader
+# reaches it from the lower left without crossing one.  The diameter sits
+# below, its dimension line right of centre so the axis-centerline pick at
+# the view's middle lands on bare face.  The shank's roughness symbol sits
+# above the shank between the crown-root extension line and the Depth text.
 RIGHT_KEEP = {
     "PinDia": (RIGHT_CENTER[0] + 0.040, RIGHT_CENTER[1] - HALF_DIA - 0.030),
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.031),
+    # 39 mm above the shank (was 31): the shank's CAM CONTACT finish symbol
+    # sits between it and the shank, and the crowding gap must exceed the
+    # symbol's 11.5 mm height (machinist review r5 of #1009).
+    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.039),
     # Lower left, on the line from the crown centre through its lower flank,
     # so the radius leader lands on the crown below the axis.
     "CapR": (0.105, 0.110),
 }
-OVERALL_TEXT_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.059)
-# The crown's roughness leader leaves the symbol's shelf end and rises to the
-# crown, while its "Ra 1.6" text sits above the shelf to the right of that
-# end.  At (0.120, 0.140) the leader climbed 19 mm over 26 mm and ran through
-# the "1.6" (pc-r4-860 render; codex machinist review of 7b21b56c0).  Raised
-# 10 mm, it climbs 9 mm and passes under the text.
-CROWN_FINISH_SYMBOL_XY = (0.120, 0.150)
-CROWN_FINISH_FROM_ROOT_MM = 0.7
+OVERALL_TEXT_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.067)
 DIMENSION_CALLOUTS = {
     "PinDia": PIN_DIA_CALLOUT,
-    "Depth": "SEATED FLAT END\nTO CROWN ROOT",
-    "CapR": "OUTER CROWN",
+    "Depth": DEPTH_CALLOUT,
+    "CapR": CAP_RADIUS_CALLOUT,
 }
 
+# The cam rides the shank about 15 from the seated end (the foot of the pin
+# line on the cam axis in build_dt_drive_train_assembly, parked 14.8 and
+# engaged 15.5).  The finish leader lands on the shank's upper silhouette at
+# that station, leaving the symbol's shelf end and falling to the right, so it
+# passes below the "Ra 1.6" text that sits above the shelf.
+CAM_CONTACT_FROM_SEATED_END_MM = 15.0
+SHANK_FINISH_SYMBOL_XY = (0.168, RIGHT_CENTER[1] + HALF_DIA + 0.006)
 
-def _crown_point(axial_from_root_mm: float) -> tuple[float, float, float]:
-    """Model point on the crown's -Y silhouette (the side view's lower flank),
-    measured from the crown root."""
-    rise = CAP_RADIUS - CAP_SAG + axial_from_root_mm
-    radial = math.sqrt(CAP_RADIUS**2 - rise**2)
-    return (0.0, -radial / 1000.0, (PIN_LEN + axial_from_root_mm) / 1000.0)
+
+def _shank_point() -> tuple[float, float, float]:
+    """Model point on the shank's +Y silhouette (the side view's upper edge)
+    at the cam-contact station, measured from the seated end."""
+    return (0.0, PIN_DIA / 2000.0, CAM_CONTACT_FROM_SEATED_END_MM / 1000.0)
 
 
-def _crown_face(view: Any) -> Any:
-    """The crown's one controlled spherical model face, for a FACE finish.
-
-    Resolved on the part ``view`` references (exactly one match for the
-    part-owned control, as the part build's own PMI pass resolved it), not
-    hit-tested as a transient silhouette: on the first cold v39 build (farm
-    run 20261002T180658288Z, workers @9 and @15) the silhouette picked at the
-    crown point re-solved after insertion to a silhouette whose face was not
-    the selected one (``same_entity=False``).  A model face keeps its identity
-    through the rebuild, and the leader-landing readback keeps the crown point.
-    """
+def _shank_face(view: Any) -> Any:
+    """The shank's one controlled Ø4 cylindrical model face, for a FACE
+    finish: resolved on the part ``view`` references, not hit-tested as a
+    silhouette, which can re-solve to another face after insertion (farm run
+    20261002T180658288Z, ``same_entity=False``)."""
     document = _early_bound(
         _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
     )
-    control = surface_finish_by_key(SURFACE_FINISHES, "crown")
+    control = surface_finish_by_key(SURFACE_FINISHES, "shank")
     return resolve_faces(document, {control.key: control.face})[control.key]
+
+
+# swAnnotationType_e.swCenterMarkSym.  The template centre-marks the end
+# view's circle as it is placed; an unconditional auto_center_marks printed a
+# second identical mark over it (layout audit duplicate-annotation,
+# DetailItem347/348 on r1-r2 of #1009), so the sheet adds one only if the
+# template did not, and proves exactly one.
+_CENTER_MARK_ANNOTATION = 13
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
 
 
 def _overall_reference(adapter: Any, right: Any) -> None:
@@ -201,7 +219,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -209,7 +226,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -245,8 +261,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if _center_mark_count(front) == 0 and not auto_center_marks(
+        adapter, front, holes=True, size=0.0025
+    ):
         raise RuntimeError("failed to add ASME center mark to pin end view")
+    found = _center_mark_count(front)
+    if found != 1:
+        raise RuntimeError(f"expected 1 centre mark in the pin end view, found {found}")
 
     # Before the centreline, so the apex pick cannot land on the axis line.
     _overall_reference(adapter, right)
@@ -256,28 +277,21 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.004),
         label="pinion cam-pin shank axis centerline",
     )
-    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the crown rides the cam, so it carries the one roughness symbol.
-    # Its leader meets the crown's lower flank near the apex from the lower
-    # left, above the CapR leader (which lands further round the crown).
-    crown_finish_point = model_point_in_view(
-        adapter,
-        right,
-        _crown_point(CROWN_FINISH_FROM_ROOT_MM),
-        label="cam-pin crown finish point",
+    # drawing-guidelines.md rule 6: the shank is the cam-follower contact.
+    shank_finish_point = model_point_in_view(
+        adapter, right, _shank_point(), label="cam-pin shank finish point"
     )
     add_surface_finish(
         adapter,
         right,
-        entity=_crown_face(right),
-        leader_attach_xy=crown_finish_point,
-        symbol_xy=CROWN_FINISH_SYMBOL_XY,
-        control=surface_finish_by_key(SURFACE_FINISHES, "crown"),
-        label="cam-pin crown finish",
+        entity=_shank_face(right),
+        leader_attach_xy=shank_finish_point,
+        symbol_xy=SHANK_FINISH_SYMBOL_XY,
+        control=surface_finish_by_key(SURFACE_FINISHES, "shank"),
+        label="cam-pin shank finish",
         entity_type="FACE",
         char_height=0.0025,  # the pivot-block size; the default read oversized at 8:1
     )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.058)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

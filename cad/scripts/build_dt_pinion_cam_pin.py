@@ -50,21 +50,18 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from dt_pinion_cam_pin_spec import (
-    CAP_RADIUS_TOLERANCE_MM,
     CAP_SAG,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     PIN_DIA,
     PIN_DIA_BAND,
     PIN_LEN,
-    PIN_LENGTH_TOLERANCE_MM,
     SURFACE_FINISHES,
 )
 
@@ -75,7 +72,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
     "Isometric View Note",
 )
 
@@ -223,15 +219,11 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
+    # stamp the make-critical title-block properties.  Only the bonded
+    # diameter carries a band; the length and crown radius take the title
+    # block's .XX (dt_pinion_cam_pin_spec).
     set_dimension_bilateral_tolerance(
         adapter, "PinProfile", "PinDia", *deviations(PIN_DIA_BAND)
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "PinProfile", "Depth", PIN_LENGTH_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "CapProfile", "CapR", CAP_RADIUS_TOLERANCE_MM
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -245,10 +237,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
