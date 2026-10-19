@@ -365,7 +365,9 @@ HOLE_TOP_KEEP = {
     # reference sketch supplies real centre-to-centre extension origins;
     # place X below the plan and Y in the strip left of it, clear of the table.
     "PivotSeatX": (0.257, 0.145),
-    "PivotSeatY": (0.207, 0.170),
+    # Native proof: the old 23.7 x 3.5 mm text block crossed the datum's
+    # vertical axis. Keep it below the ORIGIN note and left of that axis.
+    "PivotSeatY": (0.192, 0.164),
 }
 # Section A-A lays machine +Y across the sheet, so the spotface depth -- a
 # machine-Z value, which the rotation lays UP the sheet -- sits off the rear

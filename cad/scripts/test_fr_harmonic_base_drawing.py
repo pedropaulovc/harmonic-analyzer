@@ -1192,6 +1192,33 @@ def test_datum_origin_boxes_pad_each_axis_for_its_labels() -> None:
         sheet.datum_origin_boxes([0.0] * 6)
 
 
+def test_pivot_y_lane_clears_the_native_datum_axis_and_origin_note() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    # Run 20261019T154928828Z: the real dimension ink at its old anchor
+    # (207, 170) mm was struck by the origin's vertical line. Replay the
+    # measured 23.7 x 3.5 mm box, not a character-count estimate.
+    old_box = (0.1954, 0.1682, 0.2191, 0.1717)
+    datum_axis = (0.2094, 0.1591, 0.2094, 0.1716)
+    assert sheet.segment_crosses_box(datum_axis, old_box)
+    x, y = sheet.HOLE_TOP_KEEP["PivotSeatY"]
+    dx, dy = x - 0.207, y - 0.170
+    box = tuple(
+        value + (dx if index % 2 == 0 else dy)
+        for index, value in enumerate(old_box)
+    )
+    assert not sheet.segment_crosses_box(datum_axis, box)
+    # Preserve at least a text-height gap from the native line, nearby note,
+    # table and plan; moving left alone would crowd the ORIGIN note.
+    assert datum_axis[0] - box[2] >= 0.0035
+    neighbors = {
+        "ORIGIN note": (0.1649072, 0.1725832, 0.2016029, 0.1864037),
+        "hole table": (0.018, 0.1630628, 0.1627634, 0.260),
+        "plan": (0.22285, 0.1591, 0.33715, 0.2309),
+    }
+    assert all(sheet.box_gap(box, neighbor) >= 0.0035 for neighbor in neighbors.values())
+
+
 def test_callout_box_rule_refuses_display_data_it_cannot_box() -> None:
     import draw_fr_harmonic_base as sheet
 
