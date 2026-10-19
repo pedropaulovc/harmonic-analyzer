@@ -3424,28 +3424,32 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # farm run 20261010T084710772Z-bcad1a8e9e664595b56e918f9cc4f1e4 (0d454fa91),
 # the finite-stock-profile 48DP drum: its weight volume fell 449 mm^3 and the
 # moments 1.0% parked, 4.5% engaged against the 2026-10-08 basis (fb97437).
+# Re-measured 2026-10-19 from farm run
+# 20261019T010353049Z-33ed7b8ae8d041f1950e4c49a3be18cd (b7e92cb29, #1685):
+# the MHA-DT-022 head grew forward 11.5 -> 12.2 (+124 mm^3), and the moments
+# rose 0.26% parked and engaged.
 # The 1e-5 mm KD-tree seam weld preserves every face; watertightness and winding
 # are checked separately. Centroids use this module's analytic transforms;
 # five weight volumes remain analytic, and drum/brackets use mesh volumes.
 # This preserves #859's hybrid method (03b51bce2), not native COM mass metrology.
 # Brass is 8500 nominal / 8800 corner; steel is 7800 kg/m^3.
 # Install the measured basis AND frozen fingerprint together (DEVELOPING.md).
-SWING_GRAVITY_NMM = (14.312953639673118, 24.418432096063757)
-SWING_GRAVITY_CORNER_NMM = (14.595168510026149, 24.893891179679525)
+SWING_GRAVITY_NMM = (14.350460013665435, 24.48162083389697)
+SWING_GRAVITY_CORNER_NMM = (14.632674884018465, 24.957079917512736)
 # The basis those moments were computed at: part -> (count, volume mm^3,
 # density kg/m^3). The measured basis and fingerprint deliberately stay frozen:
 # the support-layout regression names both moment constants when
 # any current part's analytic volume, material or governing dimensions move.
 SWING_GRAVITY_BASIS = {
     "dt-alignment-pinion": (1, 24200.015811223286, 8500.0),
-    "dt-pinion-arbor": (1, 13702.959423527212, 7800.0),
+    "dt-pinion-arbor": (1, 13826.65963426231, 7800.0),
     "dt-pinion-pivot-shaft": (1, 5937.0169027658985, 7800.0),
     "dt-pinion-bracket": (2, 4563.672483959315, 7800.0),
     "dt-pinion-arbor-collar": (1, 2135.7428529140184, 7800.0),
     "dt-pinion-handle": (1, 1837.831702350029, 7800.0),
     "dt-pinion-cam-pin": (2, 256.62204310603346, 7800.0),
 }
-SWING_GRAVITY_MASS_G = 465.0824258937632
+SWING_GRAVITY_MASS_G = 466.0472875374969
 # Frozen governing dimensions of the accepted native-STL calibration, never
 # live config aliases.
 SWING_GRAVITY_FINGERPRINT = {
