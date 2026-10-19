@@ -1040,7 +1040,7 @@ def test_weight_bands_do_not_promote_annotation_or_unrelated_ink(width, edge, an
     assert bool(ink_annotation_strokes(dump)) is annotation
 
 
-def _weight_contrast_pdf(path, edge_width, annotation_width):
+def _weight_contrast_pdf(path, edge_width, annotation_width, *, extra_paths=""):
     """Vector-only fixture in sheet metres, with native PDF stroke widths."""
     from _pdf_ink import POINT_M
 
@@ -1051,6 +1051,7 @@ def _weight_contrast_pdf(path, edge_width, annotation_width):
         f"{0.100 / POINT_M} {0.118 / POINT_M} m {0.140 / POINT_M} {0.118 / POINT_M} l S\n"
         f"BT /F1 12 Tf {0.1002 / POINT_M} {0.1189 / POINT_M} Td (ADJUSTER ENTRY) Tj ET\n"
     ).encode("ascii")
+    stream += extra_paths.encode("ascii")
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -1143,10 +1144,76 @@ def test_removing_heavy_section_ink_from_model_edges_keeps_its_text_collision_ga
     findings = [
         finding
         for finding in audit_dump(dump)
-        if finding.kind == "text-on-line" and finding.b == "section-line A"
+        if finding.kind == "text-on-line"
     ]
-    assert len(findings) == 1
+    assert [finding.b for finding in findings] == ["section-line A"]
     assert severity(findings[0]) is FindingSeverity.GATING
+
+
+def test_a_tiny_perpendicular_model_edge_is_not_claimed_by_a_crossing_annotation():
+    from types import SimpleNamespace
+
+    from _layout_audit import _unclaimed_model_edges
+
+    edge = Segment(0.01, 0.00995, 0.01, 0.01005, "geometry")
+    leader = SimpleNamespace(kind="leader", segments=[Segment(0.005, 0.01, 0.015, 0.01, "leader")])
+    assert _unclaimed_model_edges([edge], [leader]) == [edge]
+    # Dashed attribution deliberately retains the pre-existing endpoint policy.
+    assert _unclaimed_model_edges([edge], [leader], require_parallel=False) == []
+
+
+def test_small_pdf_ring_survives_crossing_section_leader_and_centre_mark(tmp_path):
+    from _pdf_ink import POINT_M, page_ink, read_pdf_ink
+
+    cx, cy, radius = 0.072, 0.225, 0.003
+    k = 0.5522847498
+
+    def xy(x, y):
+        return f"{(cx + x * radius) / POINT_M} {(cy + y * radius) / POINT_M}"
+
+    curves = [
+        ((1, k), (k, 1), (0, 1)),
+        ((-k, 1), (-1, k), (-1, 0)),
+        ((-1, -k), (-k, -1), (0, -1)),
+        ((k, -1), (1, -k), (1, 0)),
+    ]
+    paths = f"{0.00035 / POINT_M} w {xy(1, 0)} m\n"
+    paths += "\n".join(" ".join(xy(*point) for point in curve) + " c" for curve in curves) + "\nS\n"
+    pdf = _weight_contrast_pdf(tmp_path / "small-ring.pdf", 0.00035, 0.00013, extra_paths=paths)
+    ink = page_ink(read_pdf_ink(pdf)[0])
+    ring = [stroke for stroke in ink["strokes"] if 0.068 <= stroke[0] <= 0.076]
+    assert len(ring) == 128
+    leader = _hole_callout("Crossing", [(0.065, cy, 0.079, cy)], [])
+    mark = {
+        "type": 13, "name": "CM1",
+        "display": {"lines": [_line(0.065, 0.218, 0.079, 0.232)]},
+    }
+    view = _view(
+        "Drawing View2", (0.051412, 0.207412, 0.092588, 0.242588),
+        [leader, mark], sections=[CTB_SECTION_A],
+    )
+    model = sheet_model(_dump(views=[view], spans=CTB_SECTION_A_SPANS, strokes=ring))
+    [geometry] = [a for a in model.geometry.annotations if a.kind == "geometry"]
+    assert [(s.x0, s.y0, s.x1, s.y1) for s in geometry.segments] == [tuple(stroke[:4]) for stroke in ring]
+
+
+def test_leader_over_part_retains_crossings_of_short_small_ring_pieces():
+    ring = _ring(0.170, 0.150, 0.003, sides=128)
+    tip = (0.230, 0.150)
+    note = {
+        "type": 6, "name": "AcrossRing", "visible": 1, "owner_type": 0,
+        "leaders": [[0.140, 0.150, 0.0, *tip, 0.0]],
+        "display": {
+            "arrows": [[*tip, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0]],
+            "texts": [{"t": "FEATURE", "pos": [0.125, 0.151, 0.0], "h": 0.0025}],
+        },
+        "note": {"text": "FEATURE", "balloon": False},
+    }
+    view = _view("Part", (0.150, 0.130, 0.240, 0.170), [note])
+    findings = audit_dump(_dump(views=[view], strokes=_edges(*ring, width=0.00035)))
+    [finding] = [f for f in findings if f.kind.startswith("leader-over-part")]
+    assert finding.extra["over_part_mm"] == pytest.approx(63.0, abs=0.1)
+    assert finding.extra["edge_crossings"] == 2
 
 
 # cone-swing-platform, Drawing View2: the 6.76 hole callout's leader runs

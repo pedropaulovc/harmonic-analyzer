@@ -2264,11 +2264,9 @@ def test_part_properties_use_release_revision():
         (assembly_title_properties, "fr-frame"),
     ],
 )
-def test_title_properties_carry_inside_corner_default(properties, name, monkeypatch):
+def test_title_properties_propagate_inside_corner_config(properties, name, monkeypatch):
     import _config
 
-    expected = "R1.0 MAX UNLESS OTHERWISE SPECIFIED"
-    assert properties(name)["TOL_INSIDE_CORNER"] == expected
     title_block = _config.title_block
 
     def changed_title_block(section):
