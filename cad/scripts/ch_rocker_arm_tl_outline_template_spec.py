@@ -299,7 +299,9 @@ if LOW_POINT_BAND[0] + LOCATOR_REGISTRATION_MAX > 0.25 * _ROCKER_ZONE / 2.0 + 1e
 # pivot hole and this slot with pins in both.
 ROD_SLOT_PLACES = 3
 ROD_SLOT_X = round(rocker_interface.ROD_HOLE_X, ROD_SLOT_PLACES)  # 133.067 BASIC
-ROD_SLOT_Y = round(rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y, ROD_SLOT_PLACES)  # 8.456
+ROD_SLOT_Y = round(
+    rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y, ROD_SLOT_PLACES
+)  # 8.456
 ROD_SLOT_LEVER = math.hypot(ROD_SLOT_X, ROD_SLOT_Y)  # 133.335
 ROD_SLOT_AXIS = (ROD_SLOT_X / ROD_SLOT_LEVER, ROD_SLOT_Y / ROD_SLOT_LEVER)
 _ROD_SLOT_TANGENT = (-ROD_SLOT_AXIS[1], ROD_SLOT_AXIS[0])
@@ -361,7 +363,8 @@ if (ROD_SLOT_FLAT - printed_band_mm(ROD_SLOT_PLACES)) / 2.0 < (
 # ends 0.148 / 0.099; tapers 0.134 / 0.106; tip lands 0.062 / 0.062; apex 0.057).
 _ROD_SLOT_ROUNDING = abs(
     (ROD_SLOT_X - rocker_interface.ROD_HOLE_X) * _ROD_SLOT_TANGENT[0]
-    + (ROD_SLOT_Y - (rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y)) * _ROD_SLOT_TANGENT[1]
+    + (ROD_SLOT_Y - (rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y))
+    * _ROD_SLOT_TANGENT[1]
 )
 ROD_CLOCKING_PLAY = ROD_HOLE_PLAY + ROD_SLOT_PLAY + _ROD_SLOT_ROUNDING  # 0.0674
 # The template's share of the rocker's half-zone (0.25 either side of the

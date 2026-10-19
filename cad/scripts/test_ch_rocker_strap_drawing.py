@@ -46,7 +46,8 @@ def test_outline_is_the_finished_rocker_strap() -> None:
     assert spec.ROD_TIP_X == rocker.ROD_TIP_X
     assert spec.BOT_END_X == rocker.BOT_END_X
     assert spec.BOT_END_Y == pytest.approx(
-        rocker_interface.CENTER_Y - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker.BOT_END_X**2)
+        rocker_interface.CENTER_Y
+        - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker.BOT_END_X**2)
     )
     assert spec.ROD_TIP_Y < spec.TOP_END_Y
     # The tip land runs along the top arc's radius.
@@ -68,7 +69,8 @@ def test_outline_is_the_finished_rocker_strap() -> None:
     assert min(top_wall, bottom_wall) >= 2.0
     # The bottom edge sits where MHA-CH-06's R816 puts it on the axis.
     assert spec.BOTTOM_EDGE_BELOW_PIVOT == pytest.approx(
-        rocker_interface.PIVOT_MID_Y - (rocker_interface.CENTER_Y - rocker_interface.R_BOTTOM)
+        rocker_interface.PIVOT_MID_Y
+        - (rocker_interface.CENTER_Y - rocker_interface.R_BOTTOM)
     )
 
 

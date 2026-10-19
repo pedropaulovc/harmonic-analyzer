@@ -69,7 +69,10 @@ def test_apex_bands_sit_mid_zone_inside_the_rocker_arc_zone() -> None:
         rocker.TOP_EDGE_ABOVE_PIVOT,
         rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[0],
     )
-    zone_bottom = (rocker_interface.ARM_DEPTH - zone_top[1], rocker_interface.ARM_DEPTH - zone_top[0])
+    zone_bottom = (
+        rocker_interface.ARM_DEPTH - zone_top[1],
+        rocker_interface.ARM_DEPTH - zone_top[0],
+    )
     for (low, high), (zone_low, zone_high) in ((top, zone_top), (bottom, zone_bottom)):
         assert zone_low < low < high < zone_high
         assert math.isclose(
@@ -78,7 +81,9 @@ def test_apex_bands_sit_mid_zone_inside_the_rocker_arc_zone() -> None:
         assert high - low <= 0.25 * (zone_high - zone_low) + 1e-9
 
 
-_ROCKER_BOT_END_Y = rocker_interface.CENTER_Y - rocker_interface.R_BOTTOM * math.cos(rocker._ALPHA_BOT)
+_ROCKER_BOT_END_Y = rocker_interface.CENTER_Y - rocker_interface.R_BOTTOM * math.cos(
+    rocker._ALPHA_BOT
+)
 _ROCKER_TIP_Y = rocker.TOP_END_Y - rocker.TIP_FACE * math.cos(rocker._ALPHA_TOP)
 # The rocker's BASIC +X outline corners and arc centre, in the template frame.
 _ROCKER_TOP_END = (rocker.TOP_END_X, rocker.TOP_END_Y - rocker_interface.PIVOT_MID_Y)
@@ -236,7 +241,10 @@ def test_prechips_envelope_is_the_outline_extents_with_the_pin_voids() -> None:
 def test_rod_slot_station_is_the_rockers_rod_pin_hole() -> None:
     """The slot sits at the rocker's rod-pin hole (its datum C) in this
     frame, to the printed three places, and runs radially from the pivot."""
-    station = (rocker_interface.ROD_HOLE_X, rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y)
+    station = (
+        rocker_interface.ROD_HOLE_X,
+        rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y,
+    )
     slot = _features()["rod_slot"]
     assert slot["at"][:2] == [spec.ROD_SLOT_X, spec.ROD_SLOT_Y]
     assert math.dist(slot["at"][:2], station) <= math.sqrt(2.0) * 0.0005
