@@ -861,6 +861,18 @@ retried up to four times over about 4 s, each retry a `WARNING:` line on stderr.
 A persistent or other query fault ends that operation with exit 2 and the
 CIM error, not a successful outcome.
 
+The Windows launcher tests separate hermetic retry contracts from real
+process-tree integration: `test_win32_process_preserves_cim_retry_contract`
+executes the parsed production wrapper against synthetic transient failures,
+then deterministic rows/empty success or persistent failure; a separate synthetic
+dead-launcher status test preserves the full exit-2 fail-closed contract. Orphan
+fixtures record their parent's own PID and wait for an explicit socket release;
+they do not need a CIM lookup or expire during slow test startup. Ownership and
+cancellation integration (including some setup) still queries the real WMI
+provider. Persistent provider failures remain test failures, not skips or proof
+that ownership is empty (see
+[#1617](https://github.com/pedropaulovc/harmonic-analyzer/issues/1617)).
+
 If the final run-record refresh fails, the launcher still writes `.done` with
 the actual build outcome and reports the refresh error in `cleanup_errors`.
 It keeps the snapshot and records its output path instead of authorizing cleanup
