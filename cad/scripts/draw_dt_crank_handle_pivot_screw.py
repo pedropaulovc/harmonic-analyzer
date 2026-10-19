@@ -4,8 +4,9 @@ The SLDPRT remains authoritative.  A screw carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the running-fit shoulder keeps its
 native size band and one bearing-surface finish, the head keeps the two bands
 the MHA-DT-035 cup sets, and the tip chamfer and seat edge break print as
-single MAX limits.  The relief Ø retains its native size band and the relief
-lead its native limits; every size keeps its part-authored places.
+single MAX limits.  The relief Ø retains its native size band, the relief
+lead its native limits and the thread-side floor radius its native MAX;
+every size keeps its part-authored places.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the thread tip on
@@ -14,10 +15,11 @@ tip, the one faced end (see ``dt_crank_handle_pivot_screw_spec``).  The
 head-end view is the ``*Back`` orientation, which is exactly the third-angle
 RIGHT view of that profile, so it sits on the profile's axis to its right and
 shows the slot.
-The relief width, lead and modelled seat edge break read in a standalone
-cropped 10:1 ``*Right`` model view, labelled DETAIL A and circled on the side
-view.  The main profile keeps the relief Ø on its native near-side broken
-leader; no typed dimension note or offset-text surrogate replaces it.
+The relief width, lead, thread-side floor radius and modelled seat edge
+break read in a standalone cropped 10:1 ``*Right`` model view, labelled
+DETAIL A and circled on the side view.  The main profile keeps the relief Ø
+on its native near-side broken leader; no typed dimension note or
+offset-text surrogate replaces it.
 
 Run with SolidWorks open::
 
@@ -78,6 +80,8 @@ from dt_crank_handle_pivot_screw_spec import (
     HEAD_LENGTH_CALLOUT,
     OVERALL_LENGTH,
     REFERENCE_DIMENSIONS,
+    RELIEF_CORNER_CALLOUT,
+    RELIEF_CORNER_RADIUS_MAX,
     RELIEF_DIA,
     RELIEF_DIA_CALLOUT,
     RELIEF_END_STATION,
@@ -205,7 +209,8 @@ END_KEEP = {
 }
 # A standalone cropped model view offers the tiny model-owned dimensions
 # that a true detail child did not offer in the VN post-mount-screw recipe.
-# The broad width sits above the separate lead and seat-break text rows.
+# The radius owns the upper row; the broad width sits below the crop so its
+# dimension line cannot cross the native radius leader.
 DETAIL_SCALE = (10.0, 1.0)
 DETAIL_CENTER = (0.115, 0.058)
 DETAIL_RADIUS_MM = 3.0
@@ -213,7 +218,8 @@ DETAIL_RADIUS = DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 DETAIL_STATION = SEAT_STATION + RELIEF_WIDTH / 2.0
 DETAIL_REFERENCE_MM = (0.0, 0.0, DETAIL_STATION)
 DETAIL_KEEP = {
-    "ReliefWidth": (DETAIL_CENTER[0], 0.1045),
+    "ReliefCornerRadius": (DETAIL_CENTER[0], 0.105),
+    "ReliefWidth": (DETAIL_CENTER[0], 0.0265),
     "ReliefLead": (0.075, 0.0955),
     "SeatEdgeBreak": (0.180, 0.0955),
 }
@@ -444,7 +450,8 @@ def _assert_relief_diameter_leader(
     if not segments:
         raise RuntimeError("MHA-DT-032 relief diameter has no native leader ink")
     floor_left, floor_right = sorted(
-        (RELIEF_END_X, _sheet_x(SEAT_STATION + RELIEF_LEAD))
+        (_sheet_x(RELIEF_END_STATION - RELIEF_CORNER_RADIUS_MAX),
+         _sheet_x(SEAT_STATION + RELIEF_LEAD))
     )
     floor_y = SIDE_CENTER[1] - RELIEF_DIA * _S / 2000.0
     if not any(
@@ -623,6 +630,7 @@ async def build(adapter: Any) -> dict[str, str]:
         {
             "ReliefDia": RELIEF_DIA_CALLOUT,
             "ReliefLead": RELIEF_LEAD_CALLOUT,
+            "ReliefCornerRadius": RELIEF_CORNER_CALLOUT,
             "SeatEdgeBreak": SEAT_EDGE_BREAK_CALLOUT,
             "TipChamfer": CHAMFER_CALLOUT,
             "HeadDia": HEAD_DIA_CALLOUT,

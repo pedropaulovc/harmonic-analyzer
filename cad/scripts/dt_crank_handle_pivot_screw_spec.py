@@ -187,12 +187,13 @@ RELIEF_DIA = 1.9
 RELIEF_DIA_BAND = (0.0, -0.1)  # (upper, lower) deviations
 RELIEF_DIA_MIN = round(RELIEF_DIA + RELIEF_DIA_BAND[1], 6)
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_BAND[0], 6)
-# Routine at 2.2 (the MHA-DT-32 machinist review of crank-v4-16 called a
-# +/-0.10 band over-specification): at .X the straight floor past the
-# longest lead, 1.4 - 0.4 = 1.0, keeps 1.5 #4-40 pitches of die run-out
-# (local review of 20dac9d3f: the lead is not floor), and the widest 3.0
-# still leaves the 1.5D engagement.
-RELIEF_WIDTH = 2.2
+# Routine at 2.4: at .X the straight floor excludes the longest lead AND the
+# largest thread-side floor radius, 1.6 - 0.4 - 0.2 = 1.0, keeping 1.5 #4-40
+# pitches of die run-out.  The widest 3.2 still leaves the 1.5D engagement.
+# Both inside corners are real geometry; neither consumes the flat seat.
+RELIEF_WIDTH = 2.4
+RELIEF_CORNER_RADIUS_MAX = 0.2
+RELIEF_CORNER_CALLOUT = "DIE RUNOUT"
 # A 45-degree lead from the relief floor up into the seat face, so the groove
 # leaves no sharp inside corner.  0.3 keeps the lead inside the Ø2.845 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
@@ -303,8 +304,10 @@ ARM_PRINTED_THICKNESS_MAX = ARM_THICKNESS + GENERAL_1PL_TOL_MM
 RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + GENERAL_1PL_TOL_MM, 6)
 RELIEF_WIDTH_MIN = round(RELIEF_WIDTH - GENERAL_1PL_TOL_MM, 6)
 # The straight floor the die's incomplete teeth run out into: the shortest
-# relief less the longest lead.
-RELIEF_FLOOR_MIN = round(RELIEF_WIDTH_MIN - RELIEF_LEAD_LIMITS[1], 6)
+# relief less the longest lead and the largest thread-side floor corner.
+RELIEF_FLOOR_MIN = round(
+    RELIEF_WIDTH_MIN - RELIEF_LEAD_LIMITS[1] - RELIEF_CORNER_RADIUS_MAX, 6
+)
 # The title-block edge break on the tapped hole's inboard exit edge takes up
 # to its size of thread off the arm end of the engagement.
 TAP_EXIT_BREAK = EDGE_BREAK_MAX_MM
@@ -499,6 +502,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ReliefDia",
         "ReliefWidth",
         "ReliefLead",
+        "ReliefCornerRadius",
         "SeatEdgeBreak",
         "TipChamfer",
     },
@@ -520,6 +524,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ReliefDia": 1,
         "ReliefWidth": 1,
         "ReliefLead": 1,
+        "ReliefCornerRadius": 1,
         "SeatEdgeBreak": 1,
         "TipChamfer": 1,
     },
@@ -534,6 +539,7 @@ SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
         SEAT_EDGE_BREAK_MAX,
         SEAT_EDGE_BREAK_TOL_TYPE,
     ),
+    ("ScrewProfile", "ReliefCornerRadius"): (RELIEF_CORNER_RADIUS_MAX, 6),  # swTolMAX
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

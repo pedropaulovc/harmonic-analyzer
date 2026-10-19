@@ -57,7 +57,7 @@ def test_spec_is_the_single_source_of_marked_dimensions() -> None:
         assert all(not names & other for other in views[index + 1 :])
     # The threaded section is defined by its callout, not a Ø4.826 dimension.
     assert "ThreadDia" not in marked
-    assert {"ReliefLead", "SeatEdgeBreak"} <= spec.DRAWING_DIMENSIONS["ScrewProfile"]
+    assert {"ReliefLead", "ReliefCornerRadius", "SeatEdgeBreak"} <= spec.DRAWING_DIMENSIONS["ScrewProfile"]
     # The slot width is only true-size in the head-end view.
     assert set(drawing.END_KEEP) == {"SlotWidth"}
 
@@ -68,8 +68,8 @@ def test_model_owns_places_and_bands() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     # The running fit, the head's pocket-clearance/bearing band and the head
     # length that keeps it below the cup face print at two places.  The relief's
-    # bounded seating neck and lead, seat-edge break MAX, tip chamfer MAX,
-    # slot depth and thread length print at one (MHA-DT-032 r8).
+    # bounded seating neck and lead, relief-corner MAX, seat-edge break MAX,
+    # tip chamfer MAX, slot depth and thread length print at one (r8).
     running_fit = {"ShoulderDia", "HeadDia", "HeadLength"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
@@ -91,6 +91,7 @@ def test_model_owns_places_and_bands() -> None:
     assert spec.SINGLE_LIMITS == {
         ("ScrewProfile", "TipChamfer"): (spec.TIP_CHAMFER, 6),
         ("ScrewProfile", "SeatEdgeBreak"): (spec.SEAT_EDGE_BREAK_MAX, 6),
+        ("ScrewProfile", "ReliefCornerRadius"): (spec.RELIEF_CORNER_RADIUS_MAX, 6),
     }
     assert "_single_limits(adapter)" in Path(part.__file__).read_text(encoding="utf-8")
     assert spec.SHOULDER_DIA == 4.00
@@ -204,7 +205,10 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     )
     assert spec.THREAD_MINOR_2A_MIN_EST == pytest.approx(1.937, abs=1e-3)
     assert spec.RELIEF_DIA_MAX <= spec.THREAD_MINOR_2A_MIN_EST
-    assert spec.RELIEF_WIDTH == 2.2
+    assert spec.RELIEF_WIDTH == 2.4
+    assert spec.RELIEF_CORNER_RADIUS_MAX == 0.2
+    assert spec.RELIEF_CORNER_CALLOUT == "DIE RUNOUT"
+    assert drawing.RELIEF_CORNER_CALLOUT is spec.RELIEF_CORNER_CALLOUT
     assert spec.RELIEF_LEAD == 0.3
     assert spec.RELIEF_LEAD_LIMITS == (0.2, 0.4)
     # The printed limits are the model band's (Codex P2 on #1139).
@@ -213,7 +217,7 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     )
     assert spec.RELIEF_LEAD_CALLOUT == "X 45 DEG LEAD"
     assert drawing.RELIEF_LEAD_CALLOUT is spec.RELIEF_LEAD_CALLOUT
-    assert spec.RELIEF_END_STATION == pytest.approx(spec.SEAT_STATION + 2.2)
+    assert spec.RELIEF_END_STATION == pytest.approx(spec.SEAT_STATION + 2.4)
     # At or below the #4-40 external minor: the P/8-flat UN root
     # (2.845 - 1.299038 x 0.635 = Ø2.020) and the UNR-2A reference max
     # ((0.1114 - 1.226869 / 40) x 25.4 = Ø2.051).
@@ -261,16 +265,332 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.TENSILE_STRESS_AREA == pytest.approx(3.90, abs=0.01)
     assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.653, abs=0.001)
     # The lead's band and printed size are model-owned, not a numeric string
-    # on the relief diameter.  The relief width is routine at 2.2: at .X its
-    # straight floor past the longest lead keeps 1.5 #4-40 pitches (machinist
-    # review of crank-v4-16; local review of 20dac9d3f).
+    # on the relief diameter.  At routine .X the 2.4 width's straight floor
+    # excludes the longest lead AND largest thread-side floor radius, keeping
+    # 1.5 #4-40 pitches of die run-out.
     toleranced = {name for _, name in model_toleranced_dimensions(part)}
     assert "ReliefWidth" not in toleranced
-    assert spec.RELIEF_WIDTH_MIN == pytest.approx(1.4)
-    assert spec.RELIEF_FLOOR_MIN == pytest.approx(1.4 - 0.4)
+    assert spec.RELIEF_WIDTH_MIN == pytest.approx(1.6)
+    assert spec.RELIEF_FLOOR_MIN == pytest.approx(
+        spec.RELIEF_WIDTH_MIN - spec.RELIEF_LEAD_LIMITS[1] - spec.RELIEF_CORNER_RADIUS_MAX
+    )
+    assert spec.RELIEF_FLOOR_MIN == pytest.approx(1.0)
     assert spec.RELIEF_FLOOR_MIN >= 1.5 * 25.4 / 40.0
     assert spec.DRAWING_PRECISION["ScrewProfile"]["ReliefLead"] == 1
     assert spec.DRAWING_PRECISION["ScrewProfile"]["SeatEdgeBreak"] == 1
+    assert spec.DRAWING_PRECISION["ScrewProfile"]["ReliefCornerRadius"] == 1
+
+
+def _native_corner_limit_fixture(monkeypatch, refusal=None):
+    class Tolerance:
+        __slots__ = ("_type", "values", "calls")
+
+        def __init__(self):
+            self._type = 0
+            # A refused call can leave already-zero bounds.  Isolate its
+            # boolean result from the independent min/max readback guards.
+            self.values = (
+                (0.0, 0.0) if refusal in ("values", "void") else (-0.0001, 0.0001)
+            )
+            self.calls = []
+
+        @property
+        def Type(self):
+            return self._type
+
+        @Type.setter
+        def Type(self, value):
+            self.calls.append(("Type", value))
+            if refusal != "type":
+                self._type = value
+
+        def SetValues(self, lower, upper):
+            self.calls.append(("SetValues", lower, upper))
+            if refusal == "values":
+                return False
+            if refusal == "void":
+                return None
+            self.values = (
+                lower - (0.0001 if refusal == "lower" else 0.0),
+                upper + (0.0001 if refusal == "upper" else 0.0),
+            )
+            return True
+
+        def GetMinValue(self):
+            return self.values[0]
+
+        def GetMaxValue(self):
+            return self.values[1]
+
+    class Dimension:
+        __slots__ = ("Tolerance", "SystemValue")
+
+        def __init__(self):
+            self.Tolerance = Tolerance()
+            self.SystemValue = spec.RELIEF_CORNER_RADIUS_MAX / 1000.0
+            if refusal == "nominal":
+                self.SystemValue += 0.0001
+
+    dimension = Dimension()
+    adapter = object()
+    lookups = []
+    key = ("ScrewProfile", "ReliefCornerRadius")
+    monkeypatch.setattr(part, "SINGLE_LIMITS", {key: spec.SINGLE_LIMITS[key]})
+
+    def named_dimension(actual_adapter, feature, name):
+        assert actual_adapter is adapter
+        lookups.append((feature, name))
+        return None, dimension
+
+    def bind(value, interface):
+        assert interface == "IDimensionTolerance"
+        assert value is dimension.Tolerance
+        return value
+
+    monkeypatch.setattr(part, "_named_dimension", named_dimension)
+    monkeypatch.setattr(part, "_early_bound", bind)
+    return adapter, dimension, lookups
+
+
+def test_relief_corner_max_is_authored_on_the_native_radius(monkeypatch):
+    adapter, dimension, lookups = _native_corner_limit_fixture(monkeypatch)
+    part._single_limits(adapter)
+    assert lookups == [("ScrewProfile", "ReliefCornerRadius")]
+    assert dimension.SystemValue == pytest.approx(0.0002)
+    assert dimension.Tolerance.calls == [("Type", 6), ("SetValues", 0.0, 0.0)]
+    assert dimension.Tolerance.Type == 6
+    assert dimension.Tolerance.GetMinValue() == 0.0
+    assert dimension.Tolerance.GetMaxValue() == 0.0
+
+
+@pytest.mark.parametrize(
+    ("refusal", "message"),
+    [
+        ("nominal", "is not the limit"),
+        ("type", "cannot retain the single limit 6"),
+        ("values", "cannot retain the single limit 6"),
+        ("void", "cannot retain the single limit 6"),
+        ("lower", "cannot retain the single limit 6"),
+        ("upper", "cannot retain the single limit 6"),
+    ],
+)
+def test_relief_corner_max_rejects_native_nominal_and_limit_drift(
+    monkeypatch, refusal, message
+):
+    adapter, dimension, lookups = _native_corner_limit_fixture(monkeypatch, refusal)
+    with pytest.raises(RuntimeError, match=message):
+        part._single_limits(adapter)
+    assert lookups == [("ScrewProfile", "ReliefCornerRadius")]
+    if refusal == "nominal":
+        assert dimension.Tolerance.calls == []
+
+
+@pytest.fixture
+def corner_profile(monkeypatch):
+    """Record real builder calls up to the revolve; no native solver is run."""
+    from types import SimpleNamespace
+
+    class ProfileComplete(Exception):
+        pass
+
+    state = SimpleNamespace(
+        lines={}, arcs=[], constraints=[], dimensions=[], globals={}, rows=[],
+        events=[], failure=None,
+    )
+
+    def result(data=None, *, operation=None):
+        return SimpleNamespace(
+            is_success=state.failure != operation or operation is None,
+            data=data,
+            error=f"native {operation} refused",
+        )
+
+    class Adapter:
+        def __init__(self):
+            self.currentSketchManager = SimpleNamespace(AddToDB=False)
+
+        async def create_part(self):
+            return result()
+
+        async def create_sketch(self, plane):
+            assert plane == "Right"
+            return result()
+
+        async def add_centerline(self, *points):
+            return result("Axis")
+
+        async def add_line(self, *points):
+            assert self.currentSketchManager.AddToDB is True
+            name = f"Line{len(state.lines)}"
+            state.lines[name] = points
+            return result(name)
+
+        async def add_arc(self, *points):
+            assert self.currentSketchManager.AddToDB is True
+            state.arcs.append(points)
+            return result("Corner", operation="arc")
+
+        async def add_sketch_constraint(self, first, second, relation):
+            state.constraints.append((first, second, relation))
+            return result()
+
+        async def add_sketch_dimension(self, first, second, kind, value):
+            state.dimensions.append((first, second, kind, value))
+            return result(f"Dimension{len(state.dimensions)}", operation=kind)
+
+        async def exit_sketch(self):
+            state.events.append("exit")
+            return result()
+
+        async def create_revolve(self, parameters):
+            assert parameters.angle == 360.0
+            raise ProfileComplete
+
+    class Dimensions(part.SketchDims):
+        def apply(self, adapter, feature):
+            assert feature == "ScrewProfile"
+            state.rows = self._rows.copy()
+            return []
+
+    async def set_global(adapter, name, expression):
+        state.globals[name] = expression
+
+    async def diameter(adapter, axis, line, xy, name):
+        assert axis == "Axis"
+        state.dimensions.append((line, None, "diameter", name))
+
+    async def fully_defined(adapter, label):
+        assert label == "screw profile sketch"
+        assert adapter.currentSketchManager.AddToDB is False
+        state.events.append("fully_defined")
+
+    monkeypatch.setattr(part, "SketchDims", Dimensions)
+    monkeypatch.setattr(part, "set_global", set_global)
+    monkeypatch.setattr(part, "set_sketch_direct_db", lambda adapter, enabled:
+                        setattr(adapter.currentSketchManager, "AddToDB", enabled))
+    monkeypatch.setattr(part, "add_diametric_linear_dimension", diameter)
+    monkeypatch.setattr(part, "ensure_fully_defined", fully_defined)
+    monkeypatch.setattr(part, "name_last_feature", lambda adapter, name:
+                        state.events.append(name))
+    state.adapter = Adapter()
+    state.complete = ProfileComplete
+    return state
+
+
+@pytest.mark.asyncio
+async def test_builder_uses_the_supported_tangent_arc_and_associative_radius(corner_profile):
+    state = corner_profile
+    with pytest.raises(state.complete):
+        await part.build(state.adapter)
+    e = spec.RELIEF_CORNER_RADIUS_MAX
+    r = spec.RELIEF_DIA / 2.0
+    end = spec.RELIEF_END_STATION
+    # The adapter's CCW arc starts on the flank and ends on the floor.
+    assert state.arcs == [pytest.approx((-(end - e), r + e, -end, r + e, -(end - e), r))]
+    assert state.lines["Line7"] == pytest.approx(
+        (-(spec.SEAT_STATION + spec.RELIEF_LEAD), r, -(end - e), r)
+    )
+    assert state.lines["Line8"] == pytest.approx((-end, r + e, -end, part.THREAD_R))
+    for u, v in (state.arcs[0][2:4], state.arcs[0][4:6]):
+        # Contain the endpoints the builder REALLY sends to CreateArc, not
+        # the removed sharp floor/flank intersection.
+        assert drawing.DETAIL_RADIUS_MM - math.hypot(
+            -u - drawing.DETAIL_STATION, v
+        ) >= 0.2
+    for connection in (
+        ("Line7.end", "Corner.end", "coincident"),
+        ("Corner.start", "Line8.start", "coincident"),
+        ("Line7", "Corner", "tangent"),
+        ("Line8", "Corner", "tangent"),
+    ):
+        assert connection in state.constraints
+    assert not any(relation == "fix" for _, _, relation in state.constraints)
+    assert ("Corner", None, "radial", e) in state.dimensions
+    assert ("ReliefCornerRadius", '"ReliefCornerRadius"') in state.rows
+    assert state.globals["ReliefCornerRadius"] == f"{e}mm"
+    assert ("Line6.start", "Line8.start", "horizontal_distance", spec.RELIEF_WIDTH) in state.dimensions
+    assert ("ReliefWidth", '"ReliefWidth"') in state.rows
+    assert state.events == ["fully_defined", "exit", "ScrewProfile"]
+
+
+@pytest.mark.asyncio
+async def test_relief_corner_real_adapter_emits_a_90_degree_not_270_degree_arc(corner_profile):
+    from types import SimpleNamespace
+
+    from solidworks_mcp.adapters.solidworks.sketch import SolidWorksSketchMixin
+
+    state = corner_profile
+    with pytest.raises(state.complete):
+        await part.build(state.adapter)
+
+    class Manager:
+        __slots__ = ("calls", "segment")
+
+        def __init__(self):
+            self.calls = []
+            self.segment = object()
+
+        def CreateArc(self, xc, yc, zc, x1, y1, z1, x2, y2, z2, direction):
+            self.calls.append((xc, yc, zc, x1, y1, z1, x2, y2, z2, direction))
+            return self.segment
+
+    class Boundary:
+        __slots__ = ("currentSketchManager", "registered")
+
+        def __init__(self):
+            self.currentSketchManager = Manager()
+            self.registered = []
+
+        def _handle_com_operation(self, name, callback):
+            assert name == "add_arc"
+            return SimpleNamespace(is_success=True, data=callback())
+
+        def _register_sketch_entity(self, prefix, segment):
+            assert prefix == "Arc"
+            assert segment is self.currentSketchManager.segment
+            self.registered.append((prefix, segment))
+            return "Corner"
+
+    native = Boundary()
+    # Exercise the installed adapter's PUBLIC add_arc path, including its
+    # actual mm-to-metres conversion and CreateArc direction argument.
+    made = await SolidWorksSketchMixin.add_arc(native, *state.arcs[0])
+    assert made.is_success and made.data == "Corner"
+    assert native.registered == [("Arc", native.currentSketchManager.segment)]
+    assert len(native.currentSketchManager.calls) == 1
+    xc, yc, zc, x1, y1, z1, x2, y2, z2, direction = native.currentSketchManager.calls[0]
+    e = spec.RELIEF_CORNER_RADIUS_MAX / 1000.0
+    r = spec.RELIEF_DIA / 2000.0
+    station = spec.RELIEF_END_STATION / 1000.0
+    assert (xc, yc, zc, x1, y1, z1, x2, y2, z2) == pytest.approx(
+        (-(station - e), r + e, 0.0, -station, r + e, 0.0,
+         -(station - e), r, 0.0)
+    )
+    # ISketchManager.CreateArc: +1 is CCW in sketch coordinates.  Starting
+    # at the FLANK gives (-R, 0) -> (0, -R), a positive 90-degree turn.
+    # Starting at the floor instead would use the complementary 270 degrees.
+    assert direction == 1
+    start = (x1 - xc, y1 - yc)
+    end = (x2 - xc, y2 - yc)
+    assert start == pytest.approx((-e, 0.0))
+    assert end == pytest.approx((0.0, -e))
+    signed_turn = math.atan2(
+        start[0] * end[1] - start[1] * end[0],
+        start[0] * end[0] + start[1] * end[1],
+    )
+    sweep = (direction * signed_turn) % math.tau
+    assert math.degrees(sweep) == pytest.approx(90.0)
+    assert math.degrees((-direction * signed_turn) % math.tau) == pytest.approx(270.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["arc", "radial"])
+async def test_builder_rejects_a_failed_native_corner_or_radius(corner_profile, failure):
+    state = corner_profile
+    state.failure = failure
+    with pytest.raises(RuntimeError, match=f"native {failure} refused"):
+        await part.build(state.adapter)
+    assert state.events == []
 
 
 def _native_lead_limit_fixture(monkeypatch, refusal=None):
@@ -390,7 +710,7 @@ def test_relief_lead_limits_reject_ignored_native_settings(
     assert lookups == [("ScrewProfile", "ReliefLead")]
 
 
-def test_native_callouts_own_the_relief_lead_and_seat_break() -> None:
+def test_native_callouts_own_the_relief_lead_corner_and_seat_break() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     callouts = {}
     for node in ast.walk(ast.parse(source)):
@@ -416,6 +736,7 @@ def test_native_callouts_own_the_relief_lead_and_seat_break() -> None:
     assert callouts["below"] == {
         "ReliefDia": "RELIEF_DIA_CALLOUT",
         "ReliefLead": "RELIEF_LEAD_CALLOUT",
+        "ReliefCornerRadius": "RELIEF_CORNER_CALLOUT",
         "SeatEdgeBreak": "SEAT_EDGE_BREAK_CALLOUT",
         "TipChamfer": "CHAMFER_CALLOUT",
         "HeadDia": "HEAD_DIA_CALLOUT",
@@ -438,7 +759,7 @@ def test_native_seat_break_preserves_the_functional_shoulder_length() -> None:
     assert "(-(SEAT_STATION - SEAT_EDGE_BREAK_MAX), SHOULDER_R)," in body
     assert "(-SEAT_STATION, SHOULDER_R - SEAT_EDGE_BREAK_MAX)," in body
     assert "(-SEAT_STATION, RELIEF_R + RELIEF_LEAD)," in body
-    assert "lines = await add_line_chain(adapter, points)" in body
+    assert "lines = await add_line_chain(adapter, points, close=False)" in body
     assert "head_outline, shoulder_outline = lines[1], lines[3]" in body
     assert "seat_edge_break = lines[4]" in body
     assert '("SeatEdgeBreak", SEAT_EDGE_BREAK_MAX),' in body
@@ -478,6 +799,31 @@ def test_printed_relief_limits_reject_a_weaker_seating_neck(lower_deviation: flo
         exec(compile(probe, spec.__file__, "exec"), {"__name__": "_thin_relief_probe"})
 
 
+@pytest.mark.parametrize(
+    ("previous", "replacement", "message"),
+    [
+        (
+            "RELIEF_CORNER_RADIUS_MAX = 0.2",
+            "RELIEF_CORNER_RADIUS_MAX = 0.3",
+            "straight floor is under 1.5 pitches",
+        ),
+        (
+            "RELIEF_WIDTH = 2.4",
+            "RELIEF_WIDTH = 2.6",
+            "stock-arm worst-case engagement is under the 1.5D rule",
+        ),
+    ],
+)
+def test_relief_corner_and_width_mutations_trip_their_physical_floors(
+    previous, replacement, message
+) -> None:
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert source.count(previous) == 1
+    probe = source.replace(previous, replacement)
+    with pytest.raises(AssertionError, match=message):
+        exec(compile(probe, spec.__file__, "exec"), {"__name__": "_relief_geometry_probe"})
+
+
 def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
     # User ruling 2026-09-30: the #4-40 screw clears the policy's 1.5D rule at
     # the worst case, so the #8-32's U33b exception stays retired.
@@ -489,25 +835,25 @@ def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
     # The chamfer's partial threads are excluded: full thread reaches 9.2 - the
     # 0.3 MAX chamfer = 8.9 from the seat face (Codex P2 on #1138).
     assert spec.FULL_THREAD_REACH_MIN == pytest.approx(8.9)
-    # Nominal: min(10.0 - 0.3, arm 8.0) - 2.2 = 5.8 of full thread, 2.04 D.
-    assert spec.FULL_THREAD_NOMINAL == pytest.approx(5.8)
-    assert spec.FULL_THREAD_NOMINAL_DIAMETERS == pytest.approx(5.8 / 2.845)
-    # Thinnest stock 5/16-in arm (mill -0.004 in on a 1-in flat): min(8.9,
-    # 7.8359 - the 0.25 exit break) - (2.2 + the .X band 0.8) = 4.59,
-    # 1.61 D.  The arm governs.
+    # Nominal: min(10.0 - 0.3, arm 8.0) - 2.4 = 5.6 of full thread.
+    assert spec.FULL_THREAD_NOMINAL == pytest.approx(5.6)
+    assert spec.FULL_THREAD_NOMINAL_DIAMETERS == pytest.approx(5.6 / 2.845)
+    # Thinnest stock 5/16-in arm: min(8.9, 7.8359 - the 0.25 exit break)
+    # - (2.4 + the .X band 0.8) = 4.3859, above the 4.2675 floor.
+    # The arm governs; the radius stays inside the groove, not full thread.
     assert geometry.GENERAL_1PL_TOL_MM == pytest.approx(0.8)
     assert spec.TAP_EXIT_BREAK == pytest.approx(0.25)
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
-    assert spec.RELIEF_WIDTH_MAX == pytest.approx(3.0)
+    assert spec.RELIEF_WIDTH_MAX == pytest.approx(3.2)
     assert spec.ARM_STOCK_THICKNESS_MIN == pytest.approx(7.8359)
-    assert spec.FULL_THREAD_WORST == pytest.approx(4.5859)
-    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(4.5859 / 2.845, abs=1e-4)
+    assert spec.FULL_THREAD_WORST == pytest.approx(4.3859)
+    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(4.3859 / 2.845, abs=1e-4)
     assert spec.ENGAGEMENT_GOVERNED_BY == "arm"
-    # Arm at its printed maximum 8.8: min(8.9, 8.8 - 0.25) - 3.0 = 5.55,
-    # 1.95 D; the arm still governs.
+    # Arm at its printed maximum 8.8: min(8.9, 8.8 - 0.25) - 3.2 = 5.35;
+    # the arm still governs.
     assert spec.ARM_PRINTED_THICKNESS_MAX == pytest.approx(8.8)
-    assert spec.FULL_THREAD_WORST_PRINTED_ARM == pytest.approx(5.55)
-    assert spec.FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS == pytest.approx(5.55 / 2.845, abs=1e-3)
+    assert spec.FULL_THREAD_WORST_PRINTED_ARM == pytest.approx(5.35)
+    assert spec.FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS == pytest.approx(5.35 / 2.845, abs=1e-3)
     # The MHA-DT-32 review's own count: the shortest section less the widest
     # relief and 1.5 pitches of die run-in still spans the stock arm's
     # full-thread need.
@@ -565,8 +911,8 @@ def test_running_shoulder_carries_the_only_finish_symbol() -> None:
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     head = math.pi * 3.0**2 * 4.0
     shoulder = math.pi * 2.0**2 * 53.0
-    relief = math.pi * (1.9 / 2.0) ** 2 * 2.2
-    thread = math.pi * (2.845 / 2.0) ** 2 * 7.8
+    relief = math.pi * (1.9 / 2.0) ** 2 * 2.4
+    thread = math.pi * (2.845 / 2.0) ** 2 * 7.6
     # Pappus: the lead's 0.3 x 0.3 corner triangle, centroid 0.95 + 0.3/3
     # out, stays; the tip chamfer's 0.3 x 0.3, centroid 1.4225 - 0.3/3 out,
     # goes.
@@ -575,14 +921,19 @@ def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     # Pappus: the outer seat's 0.1 x 0.1 triangle is removed in both states.
     seat_break = math.pi * 0.1**2 * (2.0 - 0.1 / 3.0)
     assert part.V_LEAD == pytest.approx(lead)
-    assert part.V_BODY == pytest.approx(
-        head + shoulder + relief + thread + lead - tip - seat_break
+    corner = 2.0 * math.pi * (
+        0.95 * 0.2**2 * (1.0 - math.pi / 4.0)
+        + 0.2**3 * (5.0 / 6.0 - math.pi / 4.0)
     )
-    # Filed flush: 5.8 of full thread past the relief, a 0.25 edge break.
-    fitted_thread = math.pi * (2.845 / 2.0) ** 2 * 5.8
+    assert part.V_RELIEF_CORNER == pytest.approx(corner)
+    assert part.V_BODY == pytest.approx(
+        head + shoulder + relief + thread + lead + corner - tip - seat_break
+    )
+    # Filed flush: 5.6 of full thread past the relief, a 0.25 edge break.
+    fitted_thread = math.pi * (2.845 / 2.0) ** 2 * 5.6
     fitted_tip = 2.0 * math.pi * (2.845 / 2.0 - 0.25 / 3.0) * (0.25 * 0.25 / 2.0)
     assert part.turned_volume(8.0, 0.25) == pytest.approx(
-        head + shoulder + relief + fitted_thread + lead - fitted_tip - seat_break
+        head + shoulder + relief + fitted_thread + lead + corner - fitted_tip - seat_break
     )
     assert part.V_INSTALLED == pytest.approx(part.turned_volume(8.0, 0.25) - part.V_SLOT)
     # A 1.0 strip across a Ø6 circle: integrate the chord 2*sqrt(r^2 - y^2)
@@ -595,6 +946,23 @@ def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     assert part.slot_strip_area(3.0, 1.0) == pytest.approx(chords * dy, abs=1e-6)
     assert part.slot_strip_area(3.0, 1.0) < 1.0 * 6.0
     assert part.V_FINAL == pytest.approx(part.V_BODY - part.V_SLOT)
+
+
+def test_relief_corner_volume_matches_the_actual_quarter_circle() -> None:
+    radius = spec.RELIEF_DIA / 2.0
+    corner = spec.RELIEF_CORNER_RADIUS_MAX
+    steps = 10_000
+    dz = corner / steps
+    # The arc replaces the sharp floor with r + e - sqrt(e² - z²), over
+    # its last e of width.  Integrate annular slices independently of Pappus.
+    filled = sum(
+        math.pi * (
+            (radius + corner - math.sqrt(corner**2 - ((i + 0.5) * dz)**2))**2
+            - radius**2
+        ) * dz
+        for i in range(steps)
+    )
+    assert part.V_RELIEF_CORNER == pytest.approx(filled, abs=1e-6)
 
 
 def test_side_view_stations_follow_the_model() -> None:
@@ -731,7 +1099,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # Only the relief diameter stays in the side view.  Its native near-side
     # arrow must land on the groove floor; the actual ink is checked after
     # rebuild, not approximated by the rejected OffsetText calibration.
-    assert {"ReliefWidth", "ReliefLead", "SeatEdgeBreak"}.isdisjoint(drawing.SIDE_KEEP)
+    assert {"ReliefWidth", "ReliefLead", "ReliefCornerRadius", "SeatEdgeBreak"}.isdisjoint(drawing.SIDE_KEEP)
     text_x, text_y = drawing.SIDE_KEEP["ReliefDia"]
     half = max(len(line) for line in spec.RELIEF_DIA_CALLOUT.splitlines()) * 0.0028 / 2.0
     assert (text_x - half) - drawing.SEAT_X >= 0.003
@@ -774,11 +1142,14 @@ def test_sheet_placements_stay_inside_the_border() -> None:
 
 
 def test_relief_detail_contains_the_actual_native_dimension_endpoints() -> None:
-    assert set(drawing.DETAIL_KEEP) == {"ReliefWidth", "ReliefLead", "SeatEdgeBreak"}
+    assert set(drawing.DETAIL_KEEP) == {
+        "ReliefWidth", "ReliefLead", "ReliefCornerRadius", "SeatEdgeBreak"
+    }
     assert drawing.DETAIL_REFERENCE_MM == (0.0, 0.0, drawing.DETAIL_STATION)
     assert drawing.DETAIL_STATION == pytest.approx(
         spec.SEAT_STATION + spec.RELIEF_WIDTH / 2.0
     )
+    assert drawing.DETAIL_STATION == pytest.approx(58.2)
     assert drawing.DETAIL_SCALE == (10.0, 1.0)
     scale = drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1]
     assert drawing.DETAIL_RADIUS == pytest.approx(
@@ -789,7 +1160,14 @@ def test_relief_detail_contains_the_actual_native_dimension_endpoints() -> None:
         (spec.SEAT_STATION, spec.SHOULDER_DIA / 2.0 - spec.SEAT_EDGE_BREAK_MAX),
         (spec.SEAT_STATION, spec.RELIEF_DIA / 2.0 + spec.RELIEF_LEAD),
         (spec.SEAT_STATION + spec.RELIEF_LEAD, spec.RELIEF_DIA / 2.0),
-        (spec.SEAT_STATION + spec.RELIEF_WIDTH, spec.RELIEF_DIA / 2.0),
+        (
+            spec.RELIEF_END_STATION - spec.RELIEF_CORNER_RADIUS_MAX,
+            spec.RELIEF_DIA / 2.0,
+        ),
+        (
+            spec.RELIEF_END_STATION,
+            spec.RELIEF_DIA / 2.0 + spec.RELIEF_CORNER_RADIUS_MAX,
+        ),
     )
     for station, radius in endpoints:
         distance = math.hypot(station - drawing.DETAIL_STATION, radius)
@@ -809,12 +1187,15 @@ def test_relief_detail_text_and_circle_clear_the_baseline_rows_and_border() -> N
     assert cx - radius > 0.0127 and cx + radius < 0.218
     assert cy - radius > 0.0127
     assert drawing.SIDE_KEEP["OverallLength"][1] - 0.005 - (cy + radius) >= 0.005
-    assert drawing.DETAIL_KEEP["ReliefWidth"][1] - (
+    assert drawing.DETAIL_KEEP["ReliefCornerRadius"][1] - (
         drawing.DETAIL_KEEP["ReliefLead"][1] + 0.004
     ) >= 0.005
-    assert drawing.DETAIL_KEEP["ReliefWidth"][1] == pytest.approx(
-        drawing.DETAIL_KEEP["SeatEdgeBreak"][1] + 0.009
-    )
+    width_y = drawing.DETAIL_KEEP["ReliefWidth"][1]
+    # The broad width's line lies below the crop and the radius leader,
+    # safely inside the border.  Its value top clears even the thread crest.
+    assert width_y - 0.005 > 0.0127
+    lowest_thread = cy - spec.THREAD_MODEL_DIA / 2.0 * drawing.DETAIL_SCALE[0] / 1000.0
+    assert lowest_thread - (width_y + 0.006) >= 0.005
     scale = drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] / 1000.0
     lead_left = cx + (drawing.DETAIL_STATION - spec.SEAT_STATION - spec.RELIEF_LEAD) * scale
     seat_right = cx + (
@@ -824,6 +1205,28 @@ def test_relief_detail_text_and_circle_clear_the_baseline_rows_and_border() -> N
     seat_half = max(len(line) for line in spec.SEAT_EDGE_BREAK_CALLOUT.splitlines()) * 0.0028 / 2.0
     assert lead_left - (drawing.DETAIL_KEEP["ReliefLead"][0] + lead_half) >= 0.003
     assert drawing.DETAIL_KEEP["SeatEdgeBreak"][0] - seat_half - seat_right >= 0.003
+
+
+def test_relief_radius_leader_corridor_has_no_width_or_tiny_leg_crossing() -> None:
+    cx, cy = drawing.DETAIL_CENTER
+    scale = drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] / 1000.0
+    tangent_x = cx + (
+        drawing.DETAIL_STATION - spec.RELIEF_END_STATION + spec.RELIEF_CORNER_RADIUS_MAX
+    ) * scale
+    flank_x = cx + (drawing.DETAIL_STATION - spec.RELIEF_END_STATION) * scale
+    radius_x, radius_y = drawing.DETAIL_KEEP["ReliefCornerRadius"]
+    # Every segment from the real arc up to this text stays left of both
+    # tiny-leg witnesses.  Their 3 mm clearance is not traded for the radius.
+    corridor_right = max(tangent_x, flank_x, radius_x)
+    lead_witness_left = cx + (
+        drawing.DETAIL_STATION - spec.SEAT_STATION - spec.RELIEF_LEAD
+    ) * scale
+    seat_witness_left = cx + (drawing.DETAIL_STATION - spec.SEAT_STATION) * scale
+    assert lead_witness_left - corridor_right >= 0.003
+    assert seat_witness_left - corridor_right >= 0.003
+    arc_bottom = cy + spec.RELIEF_DIA / 2.0 * scale
+    width_line_y = drawing.DETAIL_KEEP["ReliefWidth"][1] - 0.005
+    assert min(arc_bottom, radius_y - 0.0065) - width_line_y >= 0.005
 
 
 def test_printed_material_fits_one_title_block_line() -> None:
@@ -873,7 +1276,7 @@ def test_installed_configuration_is_split_from_a_finished_default() -> None:
 
 def test_quarter_inch_arm_stock_fails_the_1_5d_rule(monkeypatch) -> None:
     # The arm stock governs the worst-case engagement: 1/4-in bar would leave
-    # min(8.9, 6.2484 - 0.25) - 3.0 = 3.00, 1.05D, under the 1.5D rule.
+    # min(8.9, 6.2484 - 0.25) - 3.2 = 2.80, under the 1.5D rule.
     # Executed as a separate, unregistered module: reloading the real one
     # would swap its band tuples for new objects under every importer
     # (test_fit_bands tracks them by identity).
@@ -889,7 +1292,7 @@ def test_quarter_inch_arm_stock_fails_the_1_5d_rule(monkeypatch) -> None:
     with pytest.raises(AssertionError, match="under the 1.5D rule"):
         probe_spec.loader.exec_module(probe)
     assert probe.ARM_STOCK_THICKNESS == pytest.approx(6.35)
-    assert probe.FULL_THREAD_WORST == pytest.approx(0.246 * 25.4 - 0.25 - 3.0)
+    assert probe.FULL_THREAD_WORST == pytest.approx(0.246 * 25.4 - 0.25 - 3.2)
     assert probe.FULL_THREAD_WORST < 1.5 * probe.THREAD_MODEL_DIA
 
 
@@ -1241,7 +1644,7 @@ def test_cropped_relief_view_individual_readback_refusals(relief_native, monkeyp
 def _relief_leader_geometry():
     """Derive physical floor/seat coordinates, without changing guard constants."""
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1]
-    floor_left = drawing.RELIEF_END_X
+    floor_left = drawing.RELIEF_END_X + spec.RELIEF_CORNER_RADIUS_MAX * scale / 1000.0
     floor_right = drawing.SEAT_X - spec.RELIEF_LEAD * scale / 1000.0
     floor = ((floor_left + floor_right) / 2.0,
              drawing.SIDE_CENTER[1] - spec.RELIEF_DIA * scale / 2000.0)
@@ -1271,6 +1674,16 @@ def test_relief_diameter_leader_refuses_wrong_lower_floor_landing():
     wrong = (floor[0], floor[1] - 0.000151)
     with pytest.raises(RuntimeError, match="does not land on the lower groove floor$"):
         drawing._assert_relief_diameter_leader([(wrong, bend), (bend, tail)])
+
+
+def test_relief_diameter_leader_refuses_the_removed_sharp_corner():
+    _, bend, tail, _ = _relief_leader_geometry()
+    dead_corner = (
+        drawing.RELIEF_END_X,
+        drawing.SIDE_CENTER[1] - spec.RELIEF_DIA * drawing.SHEET_SCALE[0] / 2000.0,
+    )
+    with pytest.raises(RuntimeError, match="does not land on the lower groove floor$"):
+        drawing._assert_relief_diameter_leader([(dead_corner, bend), (bend, tail)])
 
 
 @pytest.mark.parametrize("vertical", [False, True])
@@ -1335,7 +1748,8 @@ def relief_styles(monkeypatch, relief_native):
             return self.position_ok
 
     annotations = [Annotation(name) for name in
-                   ("ReliefDia", "ReliefLead", "SeatEdgeBreak", "ReliefWidth")]
+                   ("ReliefDia", "ReliefLead", "SeatEdgeBreak", "ReliefWidth",
+                    "ReliefCornerRadius")]
     state = SimpleNamespace(
         native=relief_native, annotations=annotations, near_side=[], ink_reads=[],
     )
@@ -1365,7 +1779,7 @@ def relief_styles(monkeypatch, relief_native):
 def test_style_relief_dimensions_positions_and_reads_real_leader_guard(relief_styles):
     state = relief_styles
     drawing.style_relief_dimensions(state.native.adapter, state.annotations)
-    diameter, lead, edge, unrelated = state.annotations
+    diameter, lead, edge, width, radius = state.annotations
     assert state.near_side == [(diameter, "MHA-DT-032 relief diameter")]
     assert state.ink_reads == [diameter]
     for annotation, xy in (
@@ -1377,7 +1791,10 @@ def test_style_relief_dimensions_positions_and_reads_real_leader_guard(relief_st
     for annotation in (lead, edge):
         assert annotation.display.CenterText is False
         assert annotation.display.ArrowSide == drawing.ARROWS_OUTSIDE
-    assert unrelated.positions == []
+    for unrelated in (width, radius):
+        assert unrelated.positions == []
+        assert unrelated.display.CenterText is True
+        assert unrelated.display.ArrowSide == drawing.ARROWS_OUTSIDE + 1
     assert state.native.model.rebuilds == 1
 
 

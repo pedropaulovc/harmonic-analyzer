@@ -9,9 +9,10 @@ arm face.  Dimensions and the derived fit facts live in
 Layout: one revolve about local +Z.  The slotted head face is at z=0; the head,
 shoulder and threaded section follow in +Z, the threaded section opening
 with a thread-relief groove against the seat face (a 45-degree lead from its
-floor into the seat face) so a die runs out into air and the shoulder seats
-tight.  A 45-degree outer seat-edge break clears the arm-face corner; the
-threaded section closes with a 45-degree thread-start chamfer on the tip.
+floor into the seat face and a tangent R0.2 MAX thread-side floor corner) so
+a die runs out into air and the shoulder seats tight.  A 45-degree outer
+seat-edge break clears the arm-face corner; the threaded section closes with
+a 45-degree thread-start chamfer on the tip.
 The driver slot is sketched on the Front
 Plane (the head face) and cut 1.6 deep across the full head, running along
 local X.  ``ArmSeat`` is a named plane on the shoulder's seat face and
@@ -75,6 +76,7 @@ from dt_crank_handle_pivot_screw_spec import (
     INSTALLED_TIP_CHAMFER,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
+    RELIEF_CORNER_RADIUS_MAX,
     RELIEF_DIA,
     RELIEF_DIA_BAND,
     RELIEF_END_STATION,
@@ -106,11 +108,17 @@ RELIEF_R = RELIEF_DIA / 2.0
 # Over-length of the slot rectangle along X: it only has to clear the head.
 SLOT_SPAN = HEAD_DIA + 2.0
 
-# The thread-relief groove: the thread-major -> relief-floor annulus
-# RELIEF_WIDTH long, less the 45-degree lead's corner triangle (legs
-# RELIEF_LEAD, centroid RELIEF_R + RELIEF_LEAD/3 from the axis) left standing.
+# The groove removes the thread-major -> relief-floor annulus, less the
+# 45-degree lead's triangle and the thread-side corner's filled spandrel.
+# Pappus gives both additions to the old sharp turned profile.
 V_LEAD = math.pi * RELIEF_LEAD**2 * (RELIEF_R + RELIEF_LEAD / 3.0)
-V_RELIEF = math.pi * (THREAD_R**2 - RELIEF_R**2) * RELIEF_WIDTH - V_LEAD
+V_RELIEF_CORNER = 2.0 * math.pi * (
+    RELIEF_R * RELIEF_CORNER_RADIUS_MAX**2 * (1.0 - math.pi / 4.0)
+    + RELIEF_CORNER_RADIUS_MAX**3 * (5.0 / 6.0 - math.pi / 4.0)
+)
+V_RELIEF = (
+    math.pi * (THREAD_R**2 - RELIEF_R**2) * RELIEF_WIDTH - V_LEAD - V_RELIEF_CORNER
+)
 
 
 def turned_volume(thread_length: float, tip_chamfer: float) -> float:
@@ -161,7 +169,12 @@ def _single_limits(adapter) -> None:
             )
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         tolerance.Type = tol_type
-        if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != tol_type:
+        if (
+            tolerance.SetValues(0.0, 0.0) is not True
+            or int(tolerance.Type) != tol_type
+            or not math.isclose(float(tolerance.GetMinValue()), 0.0, abs_tol=1e-12)
+            or not math.isclose(float(tolerance.GetMaxValue()), 0.0, abs_tol=1e-12)
+        ):
             raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
         _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
 
@@ -221,6 +234,7 @@ async def build(adapter) -> dict[str, str]:
         ("ReliefDia", RELIEF_DIA),
         ("ReliefWidth", RELIEF_WIDTH),
         ("ReliefLead", RELIEF_LEAD),
+        ("ReliefCornerRadius", RELIEF_CORNER_RADIUS_MAX),
         ("TipChamfer", TIP_CHAMFER),
         ("SlotWidth", SLOT_WIDTH),
         ("SlotDepth", SLOT_DEPTH),
@@ -241,8 +255,8 @@ async def build(adapter) -> dict[str, str]:
     )
     # The shoulder's outer corner has a 45-degree seat-edge break.  The seat
     # face remains at SEAT_STATION and steps down to a 45-degree lead onto the
-    # relief floor, which runs to RELIEF_WIDTH from the seat face before the
-    # flank rises to the thread major.
+    # relief floor, ending tangentially at the thread-side radius.  The flank
+    # still rises at RELIEF_WIDTH from the unchanged seat station.
     points = [
         (0.0, 0.0),
         (0.0, HEAD_R),
@@ -252,27 +266,55 @@ async def build(adapter) -> dict[str, str]:
         (-SEAT_STATION, SHOULDER_R - SEAT_EDGE_BREAK_MAX),
         (-SEAT_STATION, RELIEF_R + RELIEF_LEAD),
         (-(SEAT_STATION + RELIEF_LEAD), RELIEF_R),
-        (-RELIEF_END_STATION, RELIEF_R),
+        (-(RELIEF_END_STATION - RELIEF_CORNER_RADIUS_MAX), RELIEF_R),
+    ]
+    thread_points = [
+        (-RELIEF_END_STATION, RELIEF_R + RELIEF_CORNER_RADIUS_MAX),
         (-RELIEF_END_STATION, THREAD_R),
         (-(OVERALL_LENGTH - TIP_CHAMFER), THREAD_R),
         (-OVERALL_LENGTH, THREAD_R - TIP_CHAMFER),
         (-OVERALL_LENGTH, 0.0),
+        points[0],
     ]
-    lines = await add_line_chain(adapter, points)
+    lines = await add_line_chain(adapter, points, close=False)
+    thread_lines = await add_line_chain(adapter, thread_points, close=False)
+    # add_arc is counter-clockwise.  Traverse from the flank DOWN to the
+    # floor, opposite the profile chain, to make the short tangent quarter.
+    relief_corner = check(
+        "screw relief corner arc",
+        await adapter.add_arc(
+            -(RELIEF_END_STATION - RELIEF_CORNER_RADIUS_MAX),
+            RELIEF_R + RELIEF_CORNER_RADIUS_MAX,
+            *thread_points[0],
+            *points[-1],
+        ),
+    )
     set_sketch_direct_db(adapter, False)
-    for index, line in enumerate(lines):
-        (u0, v0), (u1, v1) = points[index], points[(index + 1) % len(lines)]
-        if u0 != u1 and v0 != v1:
-            continue  # a 45-degree lead or chamfer; its two legs define it
-        relation = "horizontal" if v0 == v1 else "vertical"
-        check(
-            f"screw profile {relation} {line}",
-            await adapter.add_sketch_constraint(line, None, relation),
-        )
+    for chain, vertices in ((lines, points), (thread_lines, thread_points)):
+        for index, line in enumerate(chain):
+            (u0, v0), (u1, v1) = vertices[index], vertices[index + 1]
+            if u0 != u1 and v0 != v1:
+                continue  # a 45-degree lead or chamfer; its two legs define it
+            relation = "horizontal" if v0 == v1 else "vertical"
+            check(
+                f"screw profile {relation} {line}",
+                await adapter.add_sketch_constraint(line, None, relation),
+            )
     head_outline, shoulder_outline = lines[1], lines[3]
     seat_edge_break = lines[4]
-    relief_lead, relief_floor, thread_outline = lines[6], lines[7], lines[9]
-    tip_chamfer = lines[10]
+    relief_lead, relief_floor = lines[6], lines[7]
+    relief_flank, thread_outline, tip_chamfer, _, closure = thread_lines
+    for label, first, second in (
+        ("floor-corner", f"{relief_floor}.end", f"{relief_corner}.end"),
+        ("corner-flank", f"{relief_corner}.start", f"{relief_flank}.start"),
+        ("closure-head", f"{closure}.end", f"{lines[0]}.start"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
+    for label, line in (("floor", relief_floor), ("flank", relief_flank)):
+        check(
+            f"screw relief corner tangent to {label}",
+            await adapter.add_sketch_constraint(line, relief_corner, "tangent"),
+        )
     # ShoulderLength spans from under the head to the actual seat face, not
     # the shortened cylindrical outline.  The threaded section is sized from
     # the seat face to the tip, across the relief; the relief width and lead's
@@ -292,7 +334,7 @@ async def build(adapter) -> dict[str, str]:
             SEAT_EDGE_BREAK_MAX,
         ),
         ("ThreadLength", f"{relief_lead}.start", f"{tip_chamfer}.end", THREAD_LENGTH),
-        ("ReliefWidth", f"{relief_lead}.start", f"{relief_floor}.end", RELIEF_WIDTH),
+        ("ReliefWidth", f"{relief_lead}.start", f"{relief_flank}.start", RELIEF_WIDTH),
         ("ReliefLead", f"{relief_lead}.start", f"{relief_lead}.end", RELIEF_LEAD),
         ("TipChamfer", f"{tip_chamfer}.start", f"{tip_chamfer}.end", TIP_CHAMFER),
     ):
@@ -328,6 +370,13 @@ async def build(adapter) -> dict[str, str]:
         "screw tip chamfer rise",
     )
     profile.record("TipChamferRise", '"TipChamfer"')
+    check(
+        "screw relief corner radius",
+        await adapter.add_sketch_dimension(
+            relief_corner, None, "radial", RELIEF_CORNER_RADIUS_MAX
+        ),
+    )
+    profile.record("ReliefCornerRadius", '"ReliefCornerRadius"')
     for name, line, u_mid, radius in (
         ("HeadDia", head_outline, -HEAD_LENGTH / 2.0, HEAD_R),
         (
@@ -529,8 +578,8 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ReliefDia", *deviations(RELIEF_DIA_BAND)
     )
-    # The disposable tip chamfer prints a single MAX within the thread depth;
-    # the slot depth and thread length are routine .X.
+    # The tip, seat break and relief corner print native MAX limits; the slot
+    # depth, relief width and thread length are routine .X.
     _single_limits(adapter)
     # The relief lead's own native dimension prints both limits of its band.
     _relief_lead_limits(adapter)
