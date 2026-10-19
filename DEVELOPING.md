@@ -846,13 +846,20 @@ The run's state is derived, never trusted from one file: `.done`'s `state` when
 it exists (`succeeded`, `failed` or `cancelled`), otherwise `running` while the
 recorded `pid` is alive (a PID reused by a process that started after the run is
 not the launcher), otherwise **`launcher-died`** — the launcher is gone and wrote
-no `.done`. Liveness comes from a `Win32_Process` CIM query, and a failed query
-is never read as a dead launcher. A transient WMI fault (`Call cancelled`,
+no `.done`. Liveness uses native `System.Diagnostics.Process` PID lookup and
+`StartTime`, not WMI. An absent PID or a creation time at or after the recorded
+run start is not the launcher; inability to read the process identity remains
+an error (exit 2), never evidence of launcher death. Thus `-Status`, `-Watch`
+and `-List` keep working for a live launcher during WMI query failures when
+native identity is readable. A process that exits between PID lookup and
+creation-time inspection is treated as absent.
+
+`-Cancel` and a dead launcher's orphan reporting still use `Win32_Process`
+CIM queries for descendant ownership. A transient WMI fault (`Call cancelled`,
 shutting down, transport or RPC failure, quota violation, retry later) is
-retried up to four times over about 4 s, each retry a `WARNING:` line on
-stderr. A fault that persists, or any other one, ends `-Status`, `-Watch`,
-`-List` or `-Cancel` with exit 2 and the CIM error. It is not an outcome:
-run the same command again.
+retried up to four times over about 4 s, each retry a `WARNING:` line on stderr.
+A persistent or other query fault ends that operation with exit 2 and the
+CIM error, not a successful outcome.
 
 If the final run-record refresh fails, the launcher still writes `.done` with
 the actual build outcome and reports the refresh error in `cleanup_errors`.

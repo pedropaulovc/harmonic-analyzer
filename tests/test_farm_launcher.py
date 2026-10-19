@@ -2002,8 +2002,8 @@ def test_status_and_watch_follow_a_live_run_to_its_outcome(tmp_path: Path) -> No
         watch_environment = dict(fixture["environment"])
         watch_environment["HARMONIC_FARM_DISPLAY_NAME"] = "invalid\ninherited label"
         watch = subprocess.Popen(
-            _tracking(
-                fixture, "-Watch", "-RunId", running["run_id"], "-PollSeconds", "1"
+            _tracking_with_cim_faults(
+                fixture, 1000, "-Watch", "-RunId", running["run_id"], "-PollSeconds", "1"
             ),
             env=watch_environment,
             stdout=subprocess.PIPE,
@@ -2020,6 +2020,7 @@ def test_status_and_watch_follow_a_live_run_to_its_outcome(tmp_path: Path) -> No
 
     assert process.returncode == 0
     assert watch.returncode == 0, (rest, errors)
+    assert "WBEM_E_CALL_CANCELLED" not in errors, errors
     lines = rest.splitlines()
     assert any(f"leaf part:pen_rod attached {LEAF_PEN}" in line for line in lines)
     assert any(f"leaf part:cone_gear succeeded {LEAF_CONE}" in line for line in lines)
@@ -2284,12 +2285,10 @@ exit $LASTEXITCODE
     return [str(fixture["pwsh"]), "-NoProfile", "-NonInteractive", "-Command", script]
 
 
-def test_status_retries_a_transient_cim_fault_and_reports_the_run_running(
+def test_status_ignores_persistent_wmi_failure_for_launcher_liveness(
     tmp_path: Path,
 ) -> None:
-    """amet 2026-10-15: one `Call cancelled` from the launcher's CIM query
-    ended -Status and -Watch, although the run was healthy and the same
-    query succeeded at once when run again."""
+    """WMI task-memory quota must not take healthy native tracking offline."""
     fixture = _launcher_fixture(tmp_path)
     _write_run_record(
         fixture, pid=os.getpid(), tag="flaky", workflow=None, argv=[], hexdigit="c"
@@ -2297,7 +2296,7 @@ def test_status_retries_a_transient_cim_fault_and_reports_the_run_running(
 
     status = _run_launcher(
         fixture,
-        _tracking_with_cim_faults(fixture, 2, "-Status", "-Tag", "flaky"),
+        _tracking_with_cim_faults(fixture, 1000, "-Status", "-Tag", "flaky"),
         fixture["environment"],
     )
 
@@ -2305,31 +2304,125 @@ def test_status_retries_a_transient_cim_fault_and_reports_the_run_running(
     report = json.loads(status.stdout)
     assert report["state"] == "running"
     assert report["launcher"]["alive"] is True
-    assert status.stderr.count("WBEM_E_CALL_CANCELLED") == 2, status.stderr
+    assert "WBEM_E_CALL_CANCELLED" not in status.stderr, status.stderr
 
 
-@pytest.mark.parametrize("operation", [["-Status"], ["-Watch", "-PollSeconds", "1"]])
-def test_a_persistent_cim_fault_is_an_error_never_launcher_died(
-    tmp_path: Path, operation: list[str]
-) -> None:
-    """A query that keeps failing proves nothing about the launcher: the
-    command fails (exit 2) with the CIM error after bounded retries, rather
-    than reporting launcher-died (exit 21) for a run that may be healthy."""
-    fixture = _launcher_fixture(tmp_path)
-    _write_run_record(
-        fixture, pid=os.getpid(), tag="broken", workflow=None, argv=[], hexdigit="d"
+@pytest.mark.parametrize(
+    ("case", "expected"),
+    [
+        ("alive", "True"),
+        ("absent", "False"),
+        ("reused", "False"),
+        ("equal", "False"),
+        ("lookup-denied", "ERROR"),
+        ("start-time-denied", "ERROR"),
+        ("exited", "False"),
+    ],
+)
+def test_native_launcher_identity_is_fail_closed(case: str, expected: str) -> None:
+    """Exercise only parsed liveness functions: no launcher, farm, or CIM."""
+    pwsh = shutil.which("pwsh")
+    if pwsh is None:
+        pytest.skip("PowerShell 7 is required")
+    script = f"""
+$ErrorActionPreference = 'Stop'
+$tokens = $null; $errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile(
+    {_ps_quote(str(LAUNCHER))}, [ref]$tokens, [ref]$errors)
+if ($errors.Count) {{ throw ($errors | Out-String) }}
+$names = @('ConvertTo-UtcTimestamp', 'Get-LauncherProcess', 'Test-LauncherAlive')
+foreach ($name in $names) {{
+    $node = $ast.Find({{
+        param($n)
+        $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name
+    }}, $true)
+    if ($null -eq $node) {{ throw "missing function $name" }}
+    . ([scriptblock]::Create($node.Extent.Text))
+}}
+function Get-CimInstance {{ throw 'liveness must not query WMI' }}
+$record = @{{ pid = $PID; started_at = [datetime]::UtcNow.ToString('o') }}
+switch ({_ps_quote(case)}) {{
+    'absent' {{ $record.pid = [int]::MaxValue }}
+    'reused' {{ $record.started_at = '1970-01-01T00:00:00Z' }}
+    'equal' {{
+        $self = [System.Diagnostics.Process]::GetProcessById($PID)
+        try {{ $record.started_at = $self.StartTime.ToUniversalTime().ToString('o') }}
+        finally {{ $self.Dispose() }}
+    }}
+    'lookup-denied' {{
+        function Get-LauncherProcess {{ throw [System.ComponentModel.Win32Exception]::new(5) }}
+    }}
+    {{ $_ -in @('start-time-denied', 'exited') }} {{
+        # Use a real .NET getter: ScriptMethod adds another PowerShell
+        # exception wrapper that System.Diagnostics.Process does not produce.
+        Add-Type -TypeDefinition @'
+public sealed class NativeIdentityFixture : System.IDisposable {{
+    public static bool Exited;
+    public static bool Disposed;
+    public System.DateTime StartTime {{
+        get {{
+            if (Exited)
+                throw new System.InvalidOperationException("process has exited");
+            throw new System.ComponentModel.Win32Exception(5);
+        }}
+    }}
+    public void Dispose() {{ Disposed = true; }}
+}}
+'@
+        [NativeIdentityFixture]::Exited = {_ps_quote(case)} -eq 'exited'
+        function Get-LauncherProcess {{ return [NativeIdentityFixture]::new() }}
+    }}
+}}
+try {{ [Console]::WriteLine((Test-LauncherAlive -Record $record)) }}
+catch {{
+    if ({_ps_quote(case)} -eq 'start-time-denied' -and
+        $_.Exception.GetBaseException() -isnot [System.ComponentModel.Win32Exception]) {{
+        throw 'start-time access failure lost its original diagnostic'
+    }}
+    [Console]::WriteLine('ERROR')
+}}
+if ({_ps_quote(case)} -in @('start-time-denied', 'exited') -and
+    -not [NativeIdentityFixture]::Disposed) {{
+    throw 'process handle was not disposed after identity read'
+}}
+"""
+    result = subprocess.run(
+        [pwsh, "-NoProfile", "-NonInteractive", "-Command", script],
+        capture_output=True,
+        text=True,
+        timeout=HANG_GUARD_S,
     )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == expected, (result.stdout, result.stderr)
 
+
+@pytest.mark.parametrize("faults", [2, 1000])
+def test_dead_launcher_status_preserves_cim_retry_contract(
+    tmp_path: Path, faults: int
+) -> None:
+    """Read-only orphan inspection still retries and fails closed on WMI faults."""
+    fixture = _launcher_fixture(tmp_path)
+    exited = subprocess.Popen([sys.executable, "-c", "pass"])
+    exited.wait(timeout=HANG_GUARD_S)
+    _write_run_record(
+        fixture, pid=exited.pid, tag="dead-cim", workflow=None, argv=[], hexdigit="d"
+    )
     result = _run_launcher(
         fixture,
-        _tracking_with_cim_faults(fixture, 1000, *operation, "-Tag", "broken"),
+        _tracking_with_cim_faults(fixture, faults, "-Status", "-Tag", "dead-cim"),
         fixture["environment"],
     )
-
-    assert result.returncode == 2, (result.stdout, result.stderr)
-    assert "launcher-died" not in result.stdout
-    assert "Call cancelled" in result.stderr
-    assert result.stderr.count("WBEM_E_CALL_CANCELLED") == 4, result.stderr
+    if faults == 2:
+        assert result.returncode == 0, result.stderr
+        report = json.loads(result.stdout)
+        assert report["state"] == "launcher-died"
+        assert report["launcher"]["alive"] is False
+        assert result.stderr.count("WBEM_E_CALL_CANCELLED") == 2, result.stderr
+    else:
+        assert result.returncode == 2, (result.stdout, result.stderr)
+        assert "launcher-died" not in result.stdout
+        assert "Call cancelled" in result.stderr
+        assert result.stderr.count("WBEM_E_CALL_CANCELLED") == 4, result.stderr
 
 
 def test_a_pre_registration_dead_run_breaks_neither_status_nor_cancel(
