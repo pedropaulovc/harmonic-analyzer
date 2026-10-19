@@ -86,7 +86,6 @@ from _assembly import (
     assembly_title_properties,
     assert_free_dof_necessity,
     assert_component_placed,
-    author_in_drawing_configurations,
     check_no_interference,
     coincident_mate,
     component_names,
@@ -934,12 +933,10 @@ async def build(adapter) -> dict[str, str]:
     )
     # The package drawing's exploded views reference Default (shaded) or
     # Default Simplified, so the explode is authored in both.
-    author_in_drawing_configurations(
-        adapter, ASM_NAME, lambda configuration: create_summing_explode(adapter, configuration)
-    )
     return await save_assembly_and_images(
         adapter,
         ASM_NAME,
+        author=lambda configuration: create_summing_explode(adapter, configuration),
         native_contact_check=assert_assembly_spring_contacts,
     )
 
