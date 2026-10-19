@@ -2353,18 +2353,24 @@ switch ({_ps_quote(case)}) {{
         function Get-LauncherProcess {{ throw [System.ComponentModel.Win32Exception]::new(5) }}
     }}
     {{ $_ -in @('start-time-denied', 'exited') }} {{
-        function Get-LauncherProcess {{
-            $script:identityCase = {_ps_quote(case)}
-            $fake = [pscustomobject]@{{}}
-            $fake | Add-Member ScriptMethod get_StartTime {{
-                if ($script:identityCase -eq 'exited') {{
-                    throw [System.InvalidOperationException]::new('process has exited')
-                }}
-                throw [System.ComponentModel.Win32Exception]::new(5)
-            }}
-            $fake | Add-Member ScriptMethod Dispose {{ $script:disposed = $true }}
-            return $fake
+        # Use a real .NET getter: ScriptMethod adds another PowerShell
+        # exception wrapper that System.Diagnostics.Process does not produce.
+        Add-Type -TypeDefinition @'
+public sealed class NativeIdentityFixture : System.IDisposable {{
+    public static bool Exited;
+    public static bool Disposed;
+    public System.DateTime StartTime {{
+        get {{
+            if (Exited)
+                throw new System.InvalidOperationException("process has exited");
+            throw new System.ComponentModel.Win32Exception(5);
         }}
+    }}
+    public void Dispose() {{ Disposed = true; }}
+}}
+'@
+        [NativeIdentityFixture]::Exited = {_ps_quote(case)} -eq 'exited'
+        function Get-LauncherProcess {{ return [NativeIdentityFixture]::new() }}
     }}
 }}
 try {{ [Console]::WriteLine((Test-LauncherAlive -Record $record)) }}
@@ -2375,7 +2381,8 @@ catch {{
     }}
     [Console]::WriteLine('ERROR')
 }}
-if ({_ps_quote(case)} -in @('start-time-denied', 'exited') -and -not $script:disposed) {{
+if ({_ps_quote(case)} -in @('start-time-denied', 'exited') -and
+    -not [NativeIdentityFixture]::Disposed) {{
     throw 'process handle was not disposed after identity read'
 }}
 """
