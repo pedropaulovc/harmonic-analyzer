@@ -52,9 +52,11 @@ from dt_pinion_cam_spec import (
     DRAWING_PRECISION_BY_NAME,
     ECC,
     ECCENTRICITY_CALLOUT,
+    SET_SCREW_STAKE_STEP_KEY,
     SURFACE_FINISHES,
     TAP_DRILL_CALLOUT,
 )
+from dt_drive_train_steps import step_ref
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -128,7 +130,7 @@ DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "CollarOd": COLLAR_OD_CALLOUT,
     "CollarCy": ECCENTRICITY_CALLOUT,
-    "TapDrillDia": TAP_DRILL_CALLOUT,
+    "TapDrillDia": f"{TAP_DRILL_CALLOUT}\n{step_ref(SET_SCREW_STAKE_STEP_KEY)}",
 }
 # Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
 # by build_pinion_cam): two on the critical bore, OD and eccentricity and on

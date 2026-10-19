@@ -11,7 +11,6 @@ in lockstep (``test_dt_pinion_cam_drawing.py``).
 
 from __future__ import annotations
 
-import dt_drive_train_steps
 from _fit_deviations import deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _gtol_cylinder import CylinderFace
@@ -71,13 +70,12 @@ ECCENTRICITY_CALLOUT = (
 )
 # drawing-guidelines.md rule 23 (lock threaded joints exposed to operating
 # loads), #1176: MHA-DT-000's cam-collars-set step stakes the tap mouth over
-# the set screw; the tap callout points at that step by key so the number
-# follows the assembly sequence (as MHA-CH-004's keeper does).
-SET_SCREW_STAKE_STEP = dt_drive_train_steps.step_ref("cam-collars-set")
-TAP_DRILL_CALLOUT = (
-    "TAP DRILL THRU TO BORE\nM2.5 X 0.45-6H\n"
-    f"STAKE AT ASSEMBLY PER\n{SET_SCREW_STAKE_STEP}"
-)
+# the set screw; the drawing resolves this key through dt_drive_train_steps
+# so the number follows the assembly sequence.  The spec holds only the key:
+# importing the steps module here would re-key the part on every step edit
+# (as MHA-DT-016 / MHA-DT-017 hold LEVER_PIN_SET_STEP_KEY).
+SET_SCREW_STAKE_STEP_KEY = "cam-collars-set"
+TAP_DRILL_CALLOUT = "TAP DRILL THRU TO BORE\nM2.5 X 0.45-6H\nSTAKE AT ASSEMBLY PER"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the roughness goes on the surface that runs.  The follower pin rides
 # the cam OD; the set-screwed bore never moves on the rod, so it carries none.

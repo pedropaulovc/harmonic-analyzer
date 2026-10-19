@@ -150,6 +150,19 @@ def test_tap_callout_points_at_the_drive_train_step_that_stakes_it() -> None:
     assert tap.endswith(f"STAKE AT ASSEMBLY PER\n{steps.step_ref('cam-collars-set')}")
 
 
+def test_part_recipe_does_not_reach_the_assembly_sequence() -> None:
+    # Codex P2 (#1686): the step number is sheet data; a steps import in the
+    # spec would re-key the cam (and DT-000) on every step edit.
+    from pathlib import Path
+
+    import _buildgraph
+
+    builder = Path(_buildgraph.__file__).with_name("build_dt_pinion_cam.py")
+    deps = {Path(dep).stem for dep in _buildgraph.module_deps_of(builder)}
+    assert "dt_pinion_cam_spec" in deps
+    assert "dt_drive_train_steps" not in deps
+
+
 def test_set_screw_thread_cannot_break_either_face_at_general_grade() -> None:
     # A 1.7 station once left 0.45 nominal wall between the M2.5 major and the
     # front face; the .X ±0.8 general grade the station prints under then
