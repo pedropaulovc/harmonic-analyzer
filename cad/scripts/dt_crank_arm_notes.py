@@ -52,6 +52,7 @@ PIVOT_TAP_ROWS = (
 FIDUCIAL_CALLOUT = "PUNCH FIDUCIAL MARK;\nLOCATE BY EYE"
 # The native leg prints its LIMIT band; these short rows identify the inboard
 # face and hub-clearance purpose without repeating the hub's radius dimension.
-# Keep the block compact: SolidWorks flips its side outside the cheek. Two
-# trailing spaces keep the last row clear of its native shoulder line.
-BORE_REAR_CHAMFER_CALLOUT = " X 45 DEG  \nINBOARD  \nCLEARS HUB  "
+# Outside the cheek this block grows right. Its existing two-space allowance
+# belongs on the LEFT, away from the native upright; moving the padding rather
+# than duplicating it preserves the audited block width.
+BORE_REAR_CHAMFER_CALLOUT = " X 45 DEG  \nINBOARD  \n  CLEARS HUB"

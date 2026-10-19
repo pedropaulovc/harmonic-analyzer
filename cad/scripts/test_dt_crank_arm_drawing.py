@@ -482,6 +482,10 @@ def test_bore_rear_chamfer_callout_identifies_the_face_and_clearance() -> None:
     rows = [row.strip() for row in notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()]
     assert rows == ["X 45 DEG", "INBOARD", "CLEARS HUB"]
     assert all(len(row) <= 10 for row in rows)
+    # This dimension intentionally grows right; its upright is on the left.
+    last_row = notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()[-1]
+    assert last_row.startswith("  ")
+    assert last_row == last_row.rstrip()
 
 
 def test_section_a_a_stands_in_open_sheet_and_its_line_clears_the_front_view() -> None:
