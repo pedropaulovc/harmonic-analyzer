@@ -105,7 +105,8 @@ def test_pinch_thread_callout_keeps_native_variables_but_limits_both_extents() -
     assert rewritten[5] == (
         "<hw-threaddesc> <hw-threadclass> TO SLOT\nCOAXIAL WITH CLEARANCE"
     )
-    assert rewritten[7] == "<MOD-DIAM> <hw-thrutapdrldia> TO SLOT"
+    # Rule 12 (machinist review of 04848e25c): the tap drill says DRILL.
+    assert rewritten[7] == "<MOD-DIAM> <hw-thrutapdrldia> DRILL TO SLOT"
     assert "LEFT-JAW" not in text
 
 
@@ -121,12 +122,13 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     assert spec.WORST_SCREW_ENVELOPE_GAP_MM > 0.0
     # U24b / U27: every web keeps 2.0 at the printed limits after edge breaks.
     # E11/W1's #10-32 root (ref Ø5.04 vs Ø8.28) adds ~1.6 to the adjuster webs.
-    # r3: PinchHeight .XX from the foot, BlockHt .X, AxisHeight .XXX +/-0.10
-    # (2026-09-29: the prism stands on the platform, so the axis height is
-    # the block's own fit); the 17 block adds 1.0 to the adjuster's side wall,
-    # and Width at .XXX (the hold-down containment) adds 0.67 more. On the
-    # 38.100 common cone-axis height the 52.66 block prints 52.7.
-    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(3.564, abs=1e-3)
+    # r3: PinchHeight .XX from the foot, BlockHt .X; AxisHeight .XX (the
+    # machinist review of d84a42ca7 dropped its +/-0.10: the cup capture
+    # closes at .XX, and the slit-mouth web keeps 3.15); the 17 block adds
+    # 1.0 to the adjuster's side wall, and Width at .XXX (the hold-down
+    # containment) adds 0.67 more. On the 38.100 common cone-axis height the
+    # 52.66 block prints 52.7.
+    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(3.154, abs=1e-3)
     assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.26, abs=1e-6)
     assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(5.720, abs=1e-3)
     for web in (
@@ -175,7 +177,7 @@ def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None
     resolved = {
         1: "4-40 UNC - 2B TO SLOT\nCOAXIAL WITH CLEARANCE",
         2: "",
-        3: "<MOD-DIAM> 2.26 TO SLOT",
+        3: "<MOD-DIAM> 2.26 DRILL TO SLOT",
         4: "",
     }
     assert drawing._pinch_thread_callout_resolved(resolved)
@@ -184,6 +186,9 @@ def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None
     )
     assert not drawing._pinch_thread_callout_resolved(
         {**resolved, 3: "<MOD-DIAM> 2.26 THRU ALL"}
+    )
+    assert not drawing._pinch_thread_callout_resolved(
+        {**resolved, 3: "<MOD-DIAM> 2.26 TO SLOT"}
     )
 
 
@@ -205,19 +210,17 @@ def test_part_hides_every_model_reference_sketch() -> None:
     )
 
 
-def test_section_a_carries_no_dimension_so_shows_no_hidden_sketch() -> None:
-    """A derived view keeps the part's sketch visibility from its creation.
-
-    995a7c94 hides every reference sketch in the part.  Section A used to
-    dimension PinchRise and was cut while the part showed that sketch; r3
-    moved the pinch height to the right view, so the section keeps nothing
-    and is cut with the part as saved.
-    """
-    assert drawing.SECTION_KEEP == {}
-    assert not hasattr(drawing, "SECTION_SKETCHES")
+def test_sheet_cuts_no_section() -> None:
+    """Machinist review of f86ff6bf8 (gating, two of three runs): section
+    A-A, cut down the slot at 8.500, clipped the Ø2.26 hold-down tap drill
+    at 7.500 into an unexplained 1 mm sliver, and every hole it showed is
+    fully defined by its callout (rule 1).  The sheet cuts no section, so no
+    cutting-plane line, label or ROTATED note prints."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert "part_sketches_shown(" not in body
+    assert "create_section_view" not in source
+    assert "ROTATED" not in source
+    assert "section A-A" not in drawing.sheet_view_silhouettes()
+    assert not any(name.startswith("section") for name in drawing.sheet_text_boxes())
 
 
 def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
@@ -270,7 +273,6 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
         *drawing.TOP_KEEP,
         *drawing.RIGHT_KEEP,
         *drawing.LEFT_KEEP,
-        *drawing.SECTION_KEEP,
         *drawing.BOTTOM_KEEP,
         *adjuster_axis,
     ]
@@ -296,7 +298,7 @@ def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
     assert text_x - drawing.VALUE_TEXT_HALF_WIDTH >= arrow_tail + 0.001
     passage_x = drawing._adjuster_axis_keep(drawing.FRONT_CENTER)["PassageCenter"][0]
     assert passage_x < slot_x < text_x
-    assert drawing.ARROWS_OUTSIDE == ("SlitW",)
+    assert "SlitW" in drawing.ARROWS_OUTSIDE
 
 
 def test_every_view_centres_on_the_prism_with_north_where_it_shows() -> None:
@@ -334,21 +336,11 @@ def test_half_block_station_value_clears_both_witnesses() -> None:
     assert text_x + half_width <= hole - 0.001
 
 
-def test_pinch_depth_dimension_line_stands_between_the_block_and_section_a() -> None:
+def test_pinch_depth_dimension_line_stands_clear_of_the_block() -> None:
     """At +0.003 the 6.0's dimension line printed on the block's top edge."""
     top = drawing._elevation_y(part.BLOCK_HEIGHT, drawing.RIGHT_CENTER)
     line_y = drawing.RIGHT_KEEP["PinchDepthCenter"][1]
-    # Section A-A is turned 90 degrees: its lowest ink is its native label and
-    # the ROTATED note under the view, not an elevation foot.
-    texts = drawing.sheet_text_boxes()
-    section_foot = min(
-        drawing.sheet_view_silhouettes()["section A-A"][1],
-        texts["SECTION A-A label"][1],
-        texts["ROTATED 90°"][1],
-    )
     assert line_y - top >= 0.005
-    assert line_y + drawing.VALUE_TEXT_HALF_HEIGHT <= section_foot - 0.005
-
 
 
 def _matches(finding: str, expected: str) -> bool:
@@ -406,10 +398,12 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
         "SlitDepth",
         "PinchHeight",
         "PinchDepthCenter",
-        "Depth",
+        "Width",
         "FootTapX",
-        "FootTapZ",
     )
+    # d84a42ca7: the 4.875's inside arrows struck its "5"; the plan depth's
+    # three rows fill its span.
+    assert drawing.ARROWS_OUTSIDE == ("SlitW", "Depth", "FootTapZ")
     assert not set(drawing.ARROWS_INSIDE) & set(drawing.ARROWS_OUTSIDE)
 
 
@@ -560,16 +554,15 @@ def test_no_leader_on_the_sheet_detours_over_the_part() -> None:
 # Every number below is recomputed from the print's own grades
 # (DRAWING_PRECISION) and the title block's general bands, never read back
 # from the spec's stack constants, so each test states the property itself.
-# The three explicit bands are the user's rulings: AxisHeight +/-0.10, and
-# the hold-down tap's two stations +/-0.10 (2026-09-29).
+# The machinist review of d84a42ca7 dropped the explicit +/-0.10 bands: every
+# dimension prints the title block's general band for its places.
 _GENERAL = {1: 0.8, 2: 0.51, 3: 0.13}
-_EXPLICIT = {"AxisHeight": 0.10, "FootTapX": 0.10, "FootTapZ": 0.10}
 _DRILLED_PLUS = 0.10
 
 
 def _printed(name: str, nominal: float) -> tuple[float, float]:
     places = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME[name]
-    band = _EXPLICIT.get(name, _GENERAL[places])
+    band = _GENERAL[places]
     return round(nominal, places) - band, round(nominal, places) + band
 
 
@@ -641,18 +634,35 @@ def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
     or asserted margin needing it.  The overall height drops to .X, the rise
     leaves the print (the pinch hole locates from the foot).  2026-09-29: the
     block's foot sits straight on the platform, so AxisHeight is the block's
-    own fit, .XXX with an explicit +/-0.10."""
+    own fit; the machinist review of d84a42ca7 printed it .XX, the cup
+    capture's grade, with no band of its own."""
     grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     assert grades["Depth"] == 3
     assert grades["BlockHt"] == 1
-    assert grades["AxisHeight"] == 3
+    assert grades["AxisHeight"] == 2
     assert "PinchRise" not in grades
     # Kept .XX, each for a named stack (see the report's list).
     assert {name for name, places in grades.items() if places == 2} == {
         "PinchHeight",
         "SlitW",
-        "FootTapX",
+        "AxisHeight",
     }
+
+
+def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
+    """Rules 3/4 (machinist review of d84a42ca7): a three-place size given a
+    function is a tight band, and its dimension names the mate it serves.
+    The tap's two stations locate one hole, named on that hole's callout."""
+    grades = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
+    texts = {**drawing.DIMENSION_CALLOUTS, **drawing.DIMENSION_CALLOUTS_ABOVE}
+    for name in ("FootTapX", "FootTapZ"):
+        texts[name] = drawing.FOOT_TAP_QUALIFIER
+    three_place = {name for name, places in grades.items() if places == 3}
+    assert three_place == {"Width", "Depth", "PassageCenter", "FootTapX", "FootTapZ"}
+    for name in three_place:
+        assert re.search(r"MHA-[A-Z]{2}-\d{3}", texts[name]), name
+    # SolidWorks drops multi-line text placed above a dimension.
+    assert all("\n" not in text for text in drawing.DIMENSION_CALLOUTS_ABOVE.values())
 
 
 def test_top_ligament_needs_the_pinch_height_at_two_places() -> None:
@@ -853,92 +863,6 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     assert dt_cone_tip_block_spec.PINCH_SCREW_SKU == "91794A112"
 
 
-# Run 1 (d09c2b9eb leaf dump, c2-dumps/cone-tip-block-d09c2b9eb.json.gz):
-# section A's north arrow ran 0.072 -> 0.084 at y 0.209, and PassageCenter's
-# 7.50 was centred at (0.0795, 0.205828).  layoutcheck's replay read the
-# arrow 1.45 mm over the value (c5-near-crops/cone-tip-block-01).
-_RUN1_SECTION_ARROW = ((0.072, 0.209), (0.084, 0.209))
-_RUN1_PASSAGE_CENTER = (0.0795, 0.205828)
-
-
-def test_sheet_audit_sees_section_arrows_run1_hid() -> None:
-    """The sheet's own audit fed only dimension and leader arrows, so a
-    cutting-plane arrow over a value passed it.  Planted from run 1, the
-    same value is clear without the section arrow and flagged with it."""
-    x, y = _RUN1_PASSAGE_CENTER
-    half_w, half_h = drawing.VALUE_TEXT_HALF_WIDTH, drawing.VALUE_TEXT_HALF_HEIGHT
-    texts = {"PassageCenter": (x - half_w, y - half_h, x + half_w, y + half_h)}
-    assert drawing.sheet_ink_collisions(texts, {}, {}, {}) == []
-    arrow = {"section A north": drawing.section_arrow_ink(*_RUN1_SECTION_ARROW)}
-    # Its head, 3.2 across, reached into the value's box, as on the render.
-    findings = drawing.sheet_ink_collisions(texts, {}, arrow, {})
-    assert _findings_match(
-        findings,
-        [
-            "text-on-line: section A north's dimension line crosses 'PassageCenter'",
-            "arrow-near-text: section A north's arrow ... 'PassageCenter'",
-        ],
-    ), findings
-
-
-def test_section_arrows_stand_clear_of_every_value() -> None:
-    """Today both cutting-plane arrows keep ARROW_TEXT_CLEARANCE (2 mm) from
-    every text: PassageCenter's value moved to the slit's left with its
-    datum, 3.57 mm from the north arrow on the 9.75 prism (2.5 on the 11.75
-    one, 3.5 until #955 dropped that end to clear its letter off the plan);
-    VIEW C's letter is 2.65 mm from the south one.  The build cuts the
-    section where the model draws it."""
-    from _drawing_leaders import distance_to_box
-
-    texts = drawing.sheet_text_boxes()
-    ink = drawing.sheet_dimension_ink()
-    gaps = {}
-    for arrow in drawing.sheet_section_arrows():
-        for name, box in texts.items():
-            if name == arrow:
-                continue
-            nearest = min(distance_to_box(s, box) for s in ink[arrow].arrows)
-            gaps[(arrow, name)] = nearest - drawing.ARROW_HALF_WIDTH
-    assert min(gaps.values()) >= drawing.ARROW_TEXT_CLEARANCE
-    assert gaps[("section A north", "PassageCenter")] == pytest.approx(0.00357, abs=5e-5)
-    assert gaps[("section A south", "view C letter")] == pytest.approx(0.00265, abs=5e-5)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert "_plan_y(Z_NORTH) - SECTION_NORTH_OVERSHOOT)" in body
-    assert "_plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT)" in body
-
-
-def _north_letter_ink_gap(overshoot: float) -> float:
-    """Nearest ink between section A's north letter and the plan's outline,
-    with the north end ``overshoot`` past the plan (the two boxes stand
-    corner to corner, so this is their corners' distance)."""
-    left, down, right, up = drawing.SECTION_LETTER_BOX
-    tip_x = drawing.TOP_CENTER[0] + drawing.SECTION_ARROW_LENGTH
-    tip_y = drawing._plan_y(drawing.Z_NORTH) - overshoot
-    letter = (tip_x + left, tip_y + down, tip_x + right, tip_y + up)
-    plan = drawing.sheet_view_silhouettes()["plan"]
-    dx = max(plan[0] - letter[2], letter[0] - plan[2], 0.0)
-    dy = max(plan[1] - letter[3], letter[1] - plan[3], 0.0)
-    return math.hypot(dx, dy)
-
-
-def test_section_a_north_letter_clears_the_plan() -> None:
-    """#955: the north letter keeps TEXT_CLEARANCE from the plan's outline,
-    the clearance every cutting-plane letter on the release sheets holds.
-    The model's letter is the one the build prints."""
-    assert drawing.sheet_text_boxes()["section A north"][3] == pytest.approx(
-        drawing._plan_y(drawing.Z_NORTH) - drawing.SECTION_NORTH_OVERSHOOT
-        + drawing.SECTION_LETTER_BOX[3]
-    )
-    assert _north_letter_ink_gap(drawing.SECTION_NORTH_OVERSHOOT) >= drawing.TEXT_CLEARANCE
-
-
-def test_the_4mm_north_end_left_its_letter_on_the_plan() -> None:
-    """Fail-first: at the 4 mm overshoot both ends had until #955, the letter
-    stood 1.45 mm off the 3:2 plan's edge; at 2:1 it meets the plan."""
-    assert _north_letter_ink_gap(0.004) < drawing.TEXT_CLEARANCE
-
-
 # --- the hold-down tap (user ruling 2026-09-29) -------------------------------
 # MHA-VN-030 rises from under the platform into a blind #4-40 tap in the foot.
 # Each mutation below moves one spec input past a limit the spec guards at
@@ -957,7 +881,7 @@ _FOOT_TAP_MUTATIONS = {
         "FOOT_DEPTH = 8.6",
     ),
     "tap station band eats a web": (
-        "FOOT_TAP_STATION_TOL_MM = 0.10",
+        "FOOT_TAP_STATION_TOL_MM = printed_band_mm(FOOT_TAP_X_PLACES)",
         "FOOT_TAP_STATION_TOL_MM = 4.0",
     ),
 }
@@ -1006,18 +930,34 @@ def test_hold_down_tap_keeps_every_limit_at_the_printed_extremes() -> None:
 
 def test_foot_tap_callout_reads_as_a_blind_tap_with_both_depths() -> None:
     """drawing-guidelines.md rule 12 (hole and slot callouts say what to do) on the resolved callout: the thread and its full-thread
-    depth on one line, the tap drill's depth on another, no THRU."""
+    depth on one line, the tap drill's depth on another, no THRU; rule 4:
+    the mate the .XXX stations locate on closes the thread's part."""
     spec = dt_cone_tip_block_spec
     places = spec.FOOT_DEPTH_PLACES
     thread = f"{spec.HOLDDOWN_THREAD.lstrip('#')} UNC-2B"
     full = f"{spec.FOOT_THREAD_DEPTH:.{places}f}"
     drill = f"{spec.FOOT_DEPTH:.{places}f}"
-    good = {1: f"{thread} x {full}", 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} x {drill}"}
+    mate = f"\n{drawing.FOOT_TAP_QUALIFIER}"
+    good = {1: f"{thread} x {full}{mate}", 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} x {drill}"}
     assert drawing._foot_tap_callout_resolved(good)
+    assert not drawing._foot_tap_callout_resolved({**good, 1: f"{thread} x {full}"})
     assert not drawing._foot_tap_callout_resolved({**good, 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} THRU"})
-    assert not drawing._foot_tap_callout_resolved({**good, 1: thread})
+    assert not drawing._foot_tap_callout_resolved({**good, 1: f"{thread}{mate}"})
     assert not drawing._foot_tap_callout_resolved({1: good[1], 2: ""})
     # The native two places would print 8.50 and 11.10; neither reads as .X.
     assert not drawing._foot_tap_callout_resolved(
-        {1: f"{thread} x {spec.FOOT_THREAD_DEPTH:.2f}", 2: f"x {spec.FOOT_DEPTH:.2f}"}
+        {1: f"{thread} x {spec.FOOT_THREAD_DEPTH:.2f}{mate}", 2: f"x {spec.FOOT_DEPTH:.2f}"}
     )
+
+
+def test_foot_tap_mate_line_closes_the_native_thread_part() -> None:
+    native = {
+        5: "<MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH> <hw-tapdrldepth>",
+        6: "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> <hw-threaddepth>",
+        7: "",
+        8: "",
+    }
+    rewritten = drawing._foot_tap_callout_definitions(native)
+    assert rewritten == {**native, 6: f"{native[6]}\n{drawing.FOOT_TAP_QUALIFIER}"}
+    with pytest.raises(RuntimeError):
+        drawing._foot_tap_callout_definitions({**native, 7: native[6]})

@@ -194,7 +194,7 @@ def test_post_mount_stations_need_their_explicit_band() -> None:
         bdt.tip_embed_worst_mm(bdt.TIP_EMBED_BAND_MM + grown)
 
 
-def test_foot_tap_stations_need_their_explicit_band() -> None:
+def test_foot_tap_stations_need_three_places() -> None:
     """FootTapZ at .XX moves the north face past the pivot head's air;
     FootTapX at .XX moves the adjuster axis past the post's take-up."""
     import build_dt_drive_train_assembly as bdt
