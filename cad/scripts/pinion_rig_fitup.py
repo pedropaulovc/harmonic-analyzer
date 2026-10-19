@@ -17,9 +17,9 @@ import it.
   MHA-DT-012's back face before the block seats are transferred (the base's
   RIG SET note, RIG_SET_STEP, which both transfer callouts name).  The bank pushed north is what keeps its end
   play out of j = 19's stack (#743), so the step says so.
-- The MHA-DT-023 collars (user ruling P1-1): the front collar's front face
-  FRONT_COLLAR_LEAF off the front block, the back collar's back face
-  BACK_COLLAR_LEAF_F off the back block (COLLAR_SET_STEP).  Nothing is cut
+- The MHA-DT-023 cams (user ruling P1-1): the front cam's front face
+  FRONT_COLLAR_LEAF off the front block, the back cam's back face
+  BACK_COLLAR_LEAF_F off the back block, then staked (COLLAR_SET_STEP).  Nothing is cut
   there, so it is a drive-train assembly step, never an MHA-DT-023 note (policy
   drawing-guidelines.md rule 7 (notes: few, flagged, never a method), as MHA-DT-018 keeps its feeler off its own print).
 - The MHA-DT-024 foot pad's aft edge, flush with the strip's, is set
@@ -124,10 +124,17 @@ RIG_SET_STEP = "\n".join(
     )
 )
 TRANSFER_AFTER_RIG_SET = f"AFTER {RIG_SET_NAME};"
+# Rule 23 (#1176): the set screw is each cam's only drive and its torque
+# reverses every engage/park, so the tap mouth is staked over it, as the
+# channel's fulcrum set screws are (fulcrum-set-screws-staked). The tap sits
+# 45 deg or more off the follower contact (test_dt_drive_train_support_layout),
+# so the stakes stay off the follower's track. "CAMS", the BOM's name (machinist
+# review of 82158b1bb).
 COLLAR_SET_STEP = (
-    f"SET MHA-DT-023 COLLARS ON {FEELER_GAGE_NAME} LEAVES, LOCK SCREWS:\n"
-    f"  FRONT COLLAR FRONT FACE {FRONT_COLLAR_LEAF:.2f} OFF FRONT MHA-DT-018;\n"
-    f"  BACK COLLAR BACK FACE {BACK_COLLAR_LEAF_F:.2f} OFF BACK MHA-DT-018."
+    f"SET THE MHA-DT-023 CAMS ON {FEELER_GAGE_NAME} LEAVES:\n"
+    f"  FRONT CAM FRONT FACE {FRONT_COLLAR_LEAF:.2f} OFF FRONT MHA-DT-018;\n"
+    f"  BACK CAM BACK FACE {BACK_COLLAR_LEAF_F:.2f} OFF BACK MHA-DT-018.\n"
+    "  TIGHTEN THEIR SET SCREWS AND STAKE EACH TAP MOUTH AT 2 POINTS."
 )
 
 # MHA-DT-019's drilling pose.  Main's re-ruling (2026-09-26, after the

@@ -25,7 +25,10 @@ PENDING_STEMS: frozenset[str] = frozenset()
 # Retired by the integral-arbor ruling (U11); refused if it reappears.
 RETIRED_STEMS = frozenset({"pinion-handle-pin"})
 
-Cluster = Literal["cylinder-bank", "cone-crank", "pinion-rig"]
+# The cone set and the crank are separate sheets: on one 1:4 view their 31
+# balloons converged at the crank column and the tip block (machinist review of
+# 9ebf51696, sheet 4 clarity finding).
+Cluster = Literal["cylinder-bank", "cone-set", "crank", "pinion-rig"]
 CLUSTERS: dict[Cluster, tuple[str, ...]] = {
     "cylinder-bank": (
         "dt-cylinder-gear-shaft",
@@ -36,7 +39,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "vn-pedestal-hold-down-screw",
         "vn-arbor-set-screw",
     ),
-    "cone-crank": (
+    "cone-set": (
         "dt-cone-gear-shaft",
         "dt-cone-gear",
         "dt-crank-drive-gear",
@@ -51,6 +54,8 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "vn-cone-lock-knob",
         "vn-cone-pivot-screw",
         "vn-swing-stop-screw",
+    ),
+    "crank": (
         "dt-crankshaft",
         "dt-crank-pinion",
         "dt-crank-pinion-pin",
@@ -153,7 +158,11 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # length; the tip hardware leads it far enough to clear the tip's embed in
     # the block (both checked against the live shaft spec offline).
     ExplodeStep("swing plate drops", ("dt-cone-swing-platform",), "y", -30.0),
-    ExplodeStep("post mount screws lift", ("vn-post-mount-screw",), "y", 100.0),
+    # The MHA-VN-031 pair sets the cone-set sheet's top: lifted 100 (their
+    # 94.9 length clear of the post) its 1:3 balloon ring read 176.6 mm tall
+    # against the region's 176.0 (r4, 20261018T074844468Z). 88 leaves the
+    # lower 7 of each below its seated top end, the rest standing clear.
+    ExplodeStep("post mount screws lift", ("vn-post-mount-screw",), "y", 88.0),
     ExplodeStep("pivot screw lifts", ("vn-cone-pivot-screw",), "y", 35.0),
     ExplodeStep("lock knob lifts", ("vn-cone-lock-knob",), "y", 30.0),
     # The withdrawn cone's upper silhouette covers a 25 lift: run
@@ -167,18 +176,32 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         "cone",
         50.0,
     ),
+    # The MHA-VN-016 collar then slips off the tip stub past the shaft's end,
+    # and the tip block hardware stands clear beyond it (#1121): the collar's
+    # 11.5 width sat on the last 18.4 of the stub, the block 3.7 past it, so 20
+    # puts the collar 1.6 past the tip and the block 18.7 past the collar.
+    ExplodeStep("tip collar slips off", ("vn-cone-tip-collar",), "cone", 20.0),
     ExplodeStep(
         "tip block slides off",
         ("dt-cone-tip-block", "vn-cone-tip-adjuster", "vn-cone-tip-pinch-screw"),
         "cone",
-        62.0,
+        85.0,
     ),
     ExplodeStep("tip pinch screw lifts", ("vn-cone-tip-pinch-screw",), "y", 25.0),
     # MHA-VN-030 comes down out of the dropped plate's counterbore: 50 carries
     # its tip ~7 below the plate's underside after the plate's 30.
     ExplodeStep("tip block screw drops", ("vn-cone-tip-block-screw",), "y", -50.0),
     ExplodeStep("tip adjuster backs out", ("vn-cone-tip-adjuster",), "cone", 30.0),
-    # crank: the arm group comes off the crankshaft's front end
+    # crank, step 4 order: the MHA-DT-010 pinion slides north off the
+    # crankshaft with its MHA-DT-029 cross pin, which then drives out of the
+    # boss along its own (pinion-local X, 14 deg off world X) axis; the two
+    # MHA-VN-044 come south out of the collar holes.
+    ExplodeStep(
+        "crank pinion slides off", ("dt-crank-pinion", "dt-crank-pinion-pin"), "z", 35.0
+    ),
+    ExplodeStep("pinion pin drives out", ("dt-crank-pinion-pin",), "x", -20.0),
+    ExplodeStep("crank drive pins", ("vn-crank-seat-drive-pin",), "z", -12.0),
+    # step 6: the arm group comes off the crankshaft's front end
     ExplodeStep(
         "crank arm group",
         (
@@ -222,9 +245,39 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         -25.0,
     ),
     ExplodeStep("keeper chain", ("vn-keeper-chain", "vn-keeper-chain-link"), "y", -20.0),
-    ExplodeStep("anchor screw", ("vn-fillister-screw",), "z", -20.0),
-    ExplodeStep("anchor eyelet", ("dt-crank-pin-eye",), "z", -10.0),
-    # alignment pinion rig
+    ExplodeStep("anchor screw", ("vn-fillister-screw",), "z", -35.0),
+    ExplodeStep("anchor eyelet", ("dt-crank-pin-eye",), "z", -18.0),
+    # MHA-VN-029 comes forward out of the arm/hub seam, past the anchor screw
+    # head (#1121): it sits 11 from the screw axis.
+    ExplodeStep("hub seam pin", ("vn-crank-hub-pin",), "z", -55.0),
+    # alignment pinion rig, steps 15-18 order: the base-mounted MHA-DT-018 pair
+    # and MHA-DT-024 drop with their screws, then the screws lift out of them;
+    # the lift rod, its cams and the lever drop out of the MHA-DT-018 lift
+    # bores to stand between the straps and the blocks (machinist review of
+    # 9ebf51696, sheet 5 clarity finding). The straps stay hung on the pivot
+    # shaft with their pins.
+    ExplodeStep(
+        "pivot blocks drop",
+        (
+            "dt-pinion-pivot-block",
+            "vn-slotted-screw",
+            "dt-pinion-spring",
+            "vn-foot-screw",
+        ),
+        "y",
+        -50.0,
+    ),
+    ExplodeStep(
+        "lift rod drops",
+        (
+            "dt-pinion-lift-rod",
+            "dt-pinion-cam",
+            "dt-pinion-lever",
+            "dt-pinion-lever-pin",
+        ),
+        "y",
+        -22.0,
+    ),
     ExplodeStep("block screws lift", ("vn-slotted-screw",), "y", 30.0),
     ExplodeStep("spring foot screw lifts", ("vn-foot-screw",), "y", 25.0),
     ExplodeStep("pinion lever", ("dt-pinion-lever", "dt-pinion-lever-pin"), "z", -40.0),
@@ -248,20 +301,11 @@ STATIONARY_STEMS = frozenset(
         "dt-cylinder-gear-shaft",
         "dt-cylinder-gear",
         "dt-cone-pivot-post",
-
         "dt-crankshaft",
-        # Pressed into the crankshaft's collar: they stay with it.
-        "vn-crank-seat-drive-pin",
-        "dt-crank-pinion",
-        "dt-crank-pinion-pin",
         "dt-alignment-pinion",
         "dt-pinion-bracket",
-        "dt-pinion-pivot-block",
         "dt-pinion-pivot-shaft",
-        "dt-pinion-lift-rod",
-        "dt-pinion-spring",
         "dt-pinion-cam-pin",
-        "dt-pinion-cam",
     }
 )
 if CONE_AXIS_SOURCE[0] not in STATIONARY_STEMS:

@@ -23,6 +23,22 @@ exploded view (r6b item 26). The pin replaces a head-rim pick that took the
 screw's largest listed circle by entity, whose leader SolidWorks ended on
 the pedestal's top face (run
 20260928T194845954Z-44f5de00de924735961d14f4aad40337, item 32).
+
+The thrust washer is pinned to the north one, cylinder-end-disc-2 (placed
+after the south): it stands alone at the sheet's west end, while the south
+one sits among the front strap, MHA-VN-052 and the apex set screw (#1051;
+the machinist review of 9ebf51696 found the visible washer unballooned).
+
+The MHA-VN-019 block screw is pinned to the front (south) block's west
+screw, slotted-screw-3 (x -4.65, z -85.59 in the assembly), which stands
+clear above that block: none of the 24 points tried on the first,
+slotted-screw-1, found its own ink, and the listed-edge leader SolidWorks
+placed ended on the front MHA-DT-014 strap (machinist review of 53a7c4266,
+balloon 31, two runs).
+
+The cone gear is pinned mid-stack, dt-cone-gear-10: dt-cone-gear-1 sits
+against MHA-DT-007, and its walked leader ended 1.9 mm from the 64T gear's
+(machinist review of 82158b1bb, balloons 35 and 36).
 """
 
 from __future__ import annotations
@@ -33,13 +49,13 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
     "cylinder-bank": {
         "dt-cylinder-gear-shaft": BalloonAnchor(),
         "dt-arbor-pedestal": BalloonAnchor(),
-        "dt-cylinder-end-disc": BalloonAnchor(),
+        "dt-cylinder-end-disc": BalloonAnchor(instance="dt-cylinder-end-disc-2"),
         "vn-cylinder-bank-spring": BalloonAnchor(),
         "vn-arbor-set-screw": BalloonAnchor(),
         "dt-cylinder-gear": BalloonAnchor(),
         "vn-pedestal-hold-down-screw": BalloonAnchor(instance="vn-pedestal-hold-down-screw-1"),
     },
-    "cone-crank": {
+    "cone-set": {
         "dt-cone-swing-platform": BalloonAnchor(),
         "dt-cone-pivot-post": BalloonAnchor(),
         "vn-post-mount-screw": BalloonAnchor(),
@@ -53,7 +69,9 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "vn-swing-stop-screw": BalloonAnchor(),
         "dt-cone-gear-shaft": BalloonAnchor(),
         "dt-crank-drive-gear": BalloonAnchor(),
-        "dt-cone-gear": BalloonAnchor(),
+        "dt-cone-gear": BalloonAnchor(instance="dt-cone-gear-10"),
+    },
+    "crank": {
         "dt-crankshaft": BalloonAnchor(),
         "vn-crank-seat-drive-pin": BalloonAnchor(),
         "dt-crank-pinion": BalloonAnchor(),
@@ -87,7 +105,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "dt-pinion-handle": BalloonAnchor(),
         "dt-pinion-arbor": BalloonAnchor(),
         "dt-pinion-arbor-collar": BalloonAnchor(),
-        "vn-slotted-screw": BalloonAnchor(),
+        "vn-slotted-screw": BalloonAnchor(instance="vn-slotted-screw-3"),
         "vn-foot-screw": BalloonAnchor(),
     },
 }

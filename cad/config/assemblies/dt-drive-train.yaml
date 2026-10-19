@@ -94,3 +94,13 @@ required_free_stems:
 # The crank spin, the cone-platform swing, the pinion engage swing and the
 # lift-rod/cam spin (PR8).
 free_dof: 4
+# machinist_exceptions: the assembly drawing's machinist-review exceptions
+#   (drawing-simplicity-policy.md "Named exceptions"); read by
+#   machinist_exceptions.load_exceptions for dt_drive_train_assembly.
+machinist_exceptions:
+  # TODO(#1179): remove DT-01 when MHA-FR-001 carries a lock for MHA-VN-014.
+  - id: "DT-01"
+    kind: "minor"
+    where: "sheet 10 step 23 and sheet 12 check 4: MHA-VN-014 shoulder screw run into its blind #10-24 MHA-FR-001 pivot seat, shoulder seated hard, MHA-DT-020 swinging on its oiled shoulder"
+    finding: "threaded joint under operating load without a lock (rule 23)"
+    reason: "temporary, pending owner confirmation (#1179): the receiver is the MHA-FR-001 base (joint_retention.py ha-harmonic-analyzer/cone-pivot-screw-in-base), whose blind seat under a bottomed shoulder leaves nothing this assembly can stake, nut or pin; every lock #1179 lists (a through tap with a jam nut or staked mouth underneath, a cross pin through the base boss, a keyed washer pinned to the base) is a base change. MHA-VN-013 clamps the swing in the saved and running pose; it is loosened only for checks 4 and 5"

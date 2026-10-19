@@ -1020,14 +1020,18 @@ JOINTS: tuple[Joint, ...] = (
             "shoulder seated tight on the arm's outboard face (ArmSeat on HandleSeat); thread "
             "through the arm's #4-40 tap, tip filed flush with the inboard face"
         ),
-        lock=Lock.THREADLOCKER_ONLY,
+        # Rule 23 staked end (#1174), after the PD pivot screw's user ruling
+        # 2026-10-15 and the standing no-threadlocker rule (2026-10-16).
+        lock=Lock.STAKED,
+        lock_part="dt_crank_arm:staked tap mouth",
+        lock_binds=("dt_crank_handle_pivot_screw", "dt_crank_arm"),
         lock_step="crank-handle-fitted",
         evidence=(
-            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 7 (crank-handle-fitted 'THREAD IT INTO "
-            "MHA-DT-006 WITH LOCTITE 222, SHOULDER TIGHT; ... FILE THE TIP FLUSH'), CONSUMABLES_NOTES; "
-            "build_dt_drive_train_assembly.py handle_screw placement and 'MHA-DT-032 shoulder seated' "
-            "mates; crank_handle_pivot_screw_spec THREAD_SIZE; crank_arm_spec "
-            "HANDLE_PIVOT_HOLE_SPEC; pending exception ruling #1375 MHA-DT-035 ('the head bears on the floor')"
+            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 7 (crank-handle-fitted 'NO THREADLOCKER, "
+            "SHOULDER TIGHT. FILE THE TIP FLUSH ... THEN STAKE THE TAP MOUTH ONTO IT AT 2 OPPOSITE "
+            "POINTS') and HANDLE_STAKE_NOTE; build_dt_drive_train_assembly.py handle_screw placement "
+            "and 'MHA-DT-032 shoulder seated' mates; crank_handle_pivot_screw_spec THREAD_SIZE and "
+            "INSTALLED_CONFIG (tip filed flush); crank_arm_spec HANDLE_PIVOT_HOLE_SPEC"
         ),
     ),
     Joint(
@@ -1180,14 +1184,18 @@ JOINTS: tuple[Joint, ...] = (
             "flat point clamped on the plain round Ø6.35 rod (slip-fit Ø6.40 bore, no flat or spot); the collars "
             "are set on 66MA leaves 0.25/0.90 off the MHA-DT-018 blocks and also carry the rod's axial location"
         ),
-        lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
+        # Rule 23 staked tap mouth (#1176), as the channel's fulcrum set screws
+        # (fulcrum-set-screws-staked); no threadlocker on any thread.
+        lock=Lock.STAKED,
+        lock_part="dt_pinion_cam:staked tap mouth",
+        lock_binds=("dt_pinion_cam", "dt_pinion_lift_rod"),
+        lock_step="cam-collars-set",
         evidence=(
             "draw_dt_drive_train_assembly.py rig_steps 'cams-and-lever-fitted' (set screw loose) and 'cam-collars-set' "
-            "(pinion_rig_fitup COLLAR SET: 'LOCK SCREWS'); dt_pinion_cam_spec.DRAWING_NOTES; pinion_cam_geometry "
-            "SET_SCREW_Z/TAP_DRILL_DIA; build_dt_drive_train_assembly.py pinion cam mates (~L5805-5841, 'set-pin anti-spin')"
+            "(pinion_rig_fitup COLLAR_SET_STEP: 'TIGHTEN THEIR SET SCREWS AND STAKE EACH TAP MOUTH AT 2 POINTS'); "
+            "dt_pinion_cam_spec.DRAWING_NOTES; dt_pinion_cam_geometry SET_SCREW_Z/TAP_DRILL_DIA (tap 45 deg or more "
+            "off the follower contact, test_cam_set_screw_hole_stays_clear_of_the_follower); "
+            "build_dt_drive_train_assembly.py pinion cam mates (~L5805-5841, 'set-pin anti-spin')"
         ),
     ),
     Joint(
