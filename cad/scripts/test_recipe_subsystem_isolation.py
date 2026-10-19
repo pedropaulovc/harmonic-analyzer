@@ -92,6 +92,37 @@ def assert_isolated(closures: dict[str, frozenset[str]], contract: Contract) -> 
     "contract",
     [
         Contract(
+            selectors=(
+                "build_ch_connecting_rod",
+                "build_ch_fulcrum_keeper",
+                "build_ch_rocker_arm",
+                "build_fr_harmonic_base",
+                "build_mg_magnifying_wheel",
+            ),
+            anchors=(
+                "build_ch_connecting_rod",
+                "build_ch_fulcrum_keeper",
+                "build_ch_rocker_arm",
+                "build_fr_harmonic_base",
+                "build_mg_magnifying_wheel",
+            ),
+            forbidden=(
+                "dt_cone_pivot_post_installation",
+                "dt_post_mount_stack",
+                "dt_cone_tip_block_spec",
+            ),
+        )
+    ],
+    ids=["cone-axis"],
+)
+def test_cone_axis_isolation(part_closures, contract: Contract) -> None:
+    assert_isolated(part_closures, contract)
+
+
+@pytest.mark.parametrize(
+    "contract",
+    [
+        Contract(
             selectors=("build_mg_*", "build_pd_*"),
             anchors=("build_mg_magnifying_wheel", "build_pd_support_bar"),
             forbidden=("sh_column_clamp_front_geom",),
