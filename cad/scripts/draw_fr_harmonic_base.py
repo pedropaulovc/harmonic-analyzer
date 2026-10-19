@@ -77,6 +77,7 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import create_view_theoretical_datum, insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -133,6 +134,8 @@ from fr_harmonic_base_spec import (
     STACK_HEIGHT,
     socket_bore_finish_key,
 )
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["fr_harmonic_base"]
