@@ -478,16 +478,14 @@ def test_imported_chamfer_rejects_changed_native_limits(monkeypatch, changed, me
             drawing._assert_chamfer_limits(annotation)
 
 
-def test_bore_rear_chamfer_callout_names_the_mate_from_the_contract() -> None:
+def test_bore_rear_chamfer_callout_identifies_the_face_and_clearance() -> None:
     rows = [row.strip() for row in notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()]
-    assert rows[0].startswith("X 45 DEG")
-    assert "INBOARD" in rows[0]
-    assert rows[1] == f"CLEARS MHA-DT-031 ROOT R{geometry.SEAT_ROOT_FILLET_R:.1f}"
-    assert all(len(row) < 30 for row in rows)
+    assert rows == ["X 45 DEG", "INBOARD", "CLEARS HUB"]
+    assert all(len(row) <= 10 for row in rows)
 
 
 def test_section_a_a_stands_in_open_sheet_and_its_line_clears_the_front_view() -> None:
-    row_pitch = 0.0056  # the hub seat callout's row pitch on the same render
+    row_pitch = 0.0055563  # native sol5/sol6 callout row pitch
     sx, sy = drawing.SECTION_CENTER
     k = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1] / 1000.0
     half_w = (spec.HALF_WIDTH - spec.HUB_SEAT_DIA / 2.0) / 2.0 * k  # cheek across
@@ -500,17 +498,19 @@ def test_section_a_a_stands_in_open_sheet_and_its_line_clears_the_front_view() -
     assert sx - half_w > side_view_right + 0.02
     assert sy + half_h < iso_note_bottom - 0.01
     tx, ty = drawing.SECTION_KEEP["BoreRearChamferSize"]
-    # Actual sol5 native layout: the 72.9993 mm block grows leftward from tx.
-    # Its previous centred-text assumption let it strike the side-view (8.0).
+    # Native text flips right of the cheek. Measured compact rows, rather
+    # than translating the old left-growing block, fit entirely in this lane.
     width = drawing.CHAMFER_CALLOUT_WIDTH
-    assert tx - width > side_view_right + 0.012
-    assert tx < border_right - row_pitch
-    assert tx - width / 2.0 == pytest.approx(sx)
+    section_outline_right = 0.380788
+    assert tx - section_outline_right >= 0.0035
+    assert border_right - (tx + width) >= 0.0035
     assert sy - half_h - (ty + row_pitch) > row_pitch
-    block_bottom = ty - 3.0 * row_pitch  # stacked limits + two callout rows
+    # The prior native second-row baseline is 10.0819 mm below ty. One more
+    # short row still clears the native caption's top by over a text height.
+    block_bottom = ty - 0.0100819 - row_pitch
     _cx, cy = drawing.SECTION_CAPTION_XY
-    assert cy < block_bottom - 0.002
-    assert cy - 2.0 * row_pitch > title_block_top  # caption and scale rows
+    assert block_bottom - (cy + 0.0002385) >= 0.0035
+    assert cy - 2.0 * row_pitch > title_block_top
     # The full cut closes across both ends of the arm, in the model XZ plane
     # holding the chamfer's defining -X rim. A partial YZ cut imported no native
     # dimension on sol4; cropping only follows the full native import.

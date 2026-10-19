@@ -313,17 +313,12 @@ SECTION_CROP_MODEL_MM = (
     (-HALF_WIDTH - 1.0, 0.0, -1.0),
     (-HUB_SEAT_DIA / 2.0 + 1.0, 0.0, ARM_THICKNESS + 1.0),
 )
-# Sol5 audit: this native vertical dimension's callout grows LEFT from its
-# placement point, not about it: [295.0007, 368.0] mm at x=368.0. Centre that
-# measured 72.9993 mm block under the cheek, leaving 17.9 mm to the right
-# view's 313.6 mm boundary; its dimension line then also stands off the cheek.
-CHAMFER_CALLOUT_WIDTH = 0.0729993
-SECTION_KEEP = {
-    "BoreRearChamferSize": (
-        SECTION_CENTER[0] + CHAMFER_CALLOUT_WIDTH / 2.0,
-        0.118,
-    )
-}
+# Sol6 proved that the native block flips to the RIGHT outside the cheek.
+# Compact rows measured from the actual Century Gothic PDF glyphs need at
+# most 29.864 mm including padding. At x=385 this leaves 4.236 mm to the inner
+# border and 4.212 mm to the section's audited outline; neither side is guessed.
+CHAMFER_CALLOUT_WIDTH = 0.029864
+SECTION_KEEP = {"BoreRearChamferSize": (0.385, 0.118)}
 SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.098)
 DIMENSION_CALLOUTS = {
     "HubSeatDia": HUB_SEAT_CALLOUT,

@@ -10,7 +10,6 @@ from dt_crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX
 from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
     AXIAL_PIN_LENGTH,
-    SEAT_ROOT_FILLET_R,
     SEAT_PRESS_INTERFERENCE,
 )
 
@@ -51,11 +50,8 @@ PIVOT_TAP_ROWS = (
 # (#984 machinist review r2/r3: an unlabelled crosshair could read as an
 # undimensioned hole).
 FIDUCIAL_CALLOUT = "PUNCH FIDUCIAL MARK;\nLOCATE BY EYE"
-# The hub seat's inboard-mouth chamfer: the native leg prints its LIMIT band
-# and the model's 45 degrees rides this row.  The rows name the face (section
-# A-A shows the corner) and the mate's seat-root radius it must clear
-# (drawing-guidelines.md rule 4).  Two trailing spaces keep each row's ink off
-# the leg's overrunning extension line (draw_dt_crank_drive_gear's finding).
-BORE_REAR_CHAMFER_CALLOUT = (
-    f" X 45 DEG, INBOARD FACE  \nCLEARS MHA-DT-031 ROOT R{SEAT_ROOT_FILLET_R:.1f}  "
-)
+# The native leg prints its LIMIT band; these short rows identify the inboard
+# face and hub-clearance purpose without repeating the hub's radius dimension.
+# Keep the block compact: SolidWorks flips its side outside the cheek. Two
+# trailing spaces keep the last row clear of its native shoulder line.
+BORE_REAR_CHAMFER_CALLOUT = " X 45 DEG  \nINBOARD  \nCLEARS HUB  "
