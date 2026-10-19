@@ -12,7 +12,7 @@ west-edge lock notch, four rounded plan corners and the counterbored #4
 clearance hole for the tip block's single hold-down screw, rising from the
 underside (user ruling 2026-09-29).  The three plan views run 1:2 and pivot
 section A-A 2:1.  Detail B enlarges a 12 mm radius around the pivot-to-hole
-region at 2:1 for the hole's station; section C-C (2:1, cropped to the
+region at 2:1 for the hole's station; section C-C (3:2, cropped to the
 strip), cut on the plate-profile plan through the hole's axis, shows the
 underside counterbore in solid lines and carries its native Hole Wizard
 callout. The isometric
@@ -384,29 +384,30 @@ ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
 # Each end clears its edge at the letter's far station by the letter's half
 # width (5.5 model mm at 1:2) plus 1.5.
 HOLDDOWN_SECTION_LINE_X_MM = (-26.0, 24.0)
-# 2:1, full width, cropped to the strip: the plate edge-on, 26.79 x 6.35 at
+# 3:2, full width, cropped to the strip: the plate edge-on, 26.79 x 6.35 at
 # the hold-down station.  At 1:1 (through r8) the Ø3.05/Ø5.56 step was 2.85
 # and 3.5 mm of sheet, and machinist review r8 (run 20261019T005546454Z, two
 # of three runs, confirmed) read the counterbore as opening on the TOP FACE
 # label's side.  Uncropped, the section's outline is the whole plate seen
-# past the cut (r8: 71 x 17.5 mm at 1:1): at 2:1 it would run across
-# detail B and into the title block.  A fence HOLDDOWN_CROP_MARGIN_MM (model)
-# outside the strip crops the view to the strip, with no crop boundary
-# drawn: the fence lies off the part, so every printed edge is a real one.
-# GetOutline pads the cropped view ~10 mm across and ~5.9 mm up and down
-# past its fence (r9, run 20261019T021702591Z: fence 55.6 x 14.7 mm,
-# outline 75.5 x 26.4), and the layout audit's text-on-view check holds
-# foreign text out of that padded box, 2 mm inset.
-HOLDDOWN_SECTION_SCALE = (2, 1)
+# past the cut (r8: 71 x 17.5 mm at 1:1), across detail B and into the
+# title block.  A fence HOLDDOWN_CROP_MARGIN_MM (model) outside the strip
+# crops the view to the strip, with no crop boundary drawn: the fence lies
+# off the part, so every printed edge is a real one.  GetOutline pads the
+# cropped view 10.95 mm across and 6.86 mm up and down past the strip
+# itself, whatever the fence (r9 at a 1.0 mm fence, r10 at 0.5, both 2:1).
+# The layout audit holds foreign text out of that padded box, 2 mm inset,
+# and the blocking audit the native label within 1.5 mm.  At 2:1 (r10, run
+# 20261019T025545367Z) the label under it, detail B's HoldDownX text left of
+# it and the title block right of the callout left no place for the strip.
+HOLDDOWN_SECTION_SCALE = (3, 2)
 HOLDDOWN_CROP_MARGIN_MM = 0.25
 # The strip's lower-left (east underside) corner on the sheet, where the
-# view is moved once cropped.  Detail B's HoldDownX text (x ..0.1286, y
-# 0.0498..0.0533) clears C-C's padded box both ways: its inset left 0.1292
-# stands right of the text's end, its inset top 0.0489 under the text's
-# foot.  The strip's right end (0.1912) keeps the padded box (..0.2017) off
-# the title block (0.216); C-C's native label lies under it, 2.9 mm under
-# the foot.
-HOLDDOWN_STRIP_LOWER_LEFT = (0.1376, 0.0318)
+# view is moved once cropped.  Detail B's HoldDownX text (x ..0.1300, y
+# 0.0498..0.0533) clears C-C's padded box both ways: its inset left 0.1306
+# stands right of the text's end, its inset top 0.0496 under the text's
+# foot.  The padded box's foot (0.0283) stands 0.7 mm over the native
+# label's top (0.0291), inside the blocking audit's 1.5 mm.
+HOLDDOWN_STRIP_LOWER_LEFT = (0.1395, 0.0352)
 # The hold-down callout, above and right of the hole: DRILL Ø3.05 THRU ALL,
 # the Ø5.56 counterbore row and its 3.50 depth, then FROM UNDERSIDE and the
 # mate (HOLDDOWN_CALLOUT_BELOW).  SolidWorks centres each row on the
@@ -415,13 +416,13 @@ HOLDDOWN_STRIP_LOWER_LEFT = (0.1376, 0.0318)
 # (r8: rows 0.0696..0.0528 for y 0.064, underline from 0.1371 for x
 # 0.175).  The leader lands on the counterbore's sheet-right wall at the
 # underside (r8's tip).  At 1:1 (r8) that line ran across the strip's left
-# piece; here the underline's left end (~0.1616..0.1626, y 0.0545) stands
-# up and left of the hole so the leader drops through the Ø3.05 hole into
-# the counterbore, 1.4..2.0 mm clear of the hole's left wall at the top
-# face and 1.1..1.4 mm clear of its right wall at the step.  The block's
-# right end (~0.2133) stands 2.7 mm off the title block, its top row
-# (~0.0748) 5.7 mm under the plan captions (0.0805).
-HOLDDOWN_CALLOUT_XY = (0.1882, 0.0657)
+# piece; here the underline's left end (~0.1564, y 0.0545) stands up and
+# left of the hole so the leader drops through the Ø3.05 hole into the
+# counterbore, ~1.1 mm clear of the hole's left wall at the top face and of
+# its right wall at the step.  The block's right end (~0.209) stands 7 mm
+# off the title block, its top row (~0.0748) 5.7 mm under the plan
+# captions (0.0805).
+HOLDDOWN_CALLOUT_XY = (0.1830, 0.0657)
 # Face labels on both sections (machinist review r3 blocker): A-A, looking
 # down the sheet, draws the top face at its foot; C-C, looking up it, at its
 # head.  Both are true projections, but with no face named a reader cannot
@@ -438,20 +439,20 @@ HOLDDOWN_CALLOUT_XY = (0.1882, 0.0657)
 # the two labels read side by side across the flip: A-A's TOP FACE (every
 # field over its strip lies in the relief note's box, x 0.2998..0.3784, y
 # 0.1144 up, or under the Ra 1.6 and (0.25) texts) and C-C's UNDERSIDE, the
-# face its callout's FROM UNDERSIDE names.  At 2:1 no field right of C-C's
-# strip holds a 22 mm label short of the title block.
+# face its callout's FROM UNDERSIDE names.  No field right of C-C's strip
+# holds a 22 mm label short of the hold-down callout and the title block.
 FACE_LABELS = (
     # Under A-A's strip, ending 2 mm left of its tip on the right-hand
     # piece, over the A-A label (top ~0.0995).
     ("A-A", "TOP FACE", (-6.8, 6.8), PLATE_THICKNESS, "max", (-0.024, -0.00515)),
     # Under C-C's strip, left of its native label: the tip on the left
-    # piece's underside (0.1460, 0.0318), the text 0.1195..0.1442 x
-    # 0.0254..0.0290, 1.6 mm right of detail B's outline (0.1179) and 4.5 mm
+    # piece's underside (0.1463, 0.0352), the text 0.1198..0.1445 x
+    # 0.0288..0.0324, 2.0 mm right of detail B's outline (0.1179) and 4.0 mm
     # left of the native label; the leader rises from the text's right end.
     (
         "C-C",
         "UNDERSIDE",
-        (HOLDDOWN_LOCAL_X - 11.4, HOLDDOWN_LOCAL_X + 11.4),
+        (HOLDDOWN_LOCAL_X - 11.1, HOLDDOWN_LOCAL_X + 11.1),
         0.0,
         "min",
         (-0.0265, -0.0028),
@@ -520,12 +521,13 @@ def holddown_hole_sheet_x() -> float:
     return HOLDDOWN_STRIP_LOWER_LEFT[0] + (HOLDDOWN_LOCAL_X - east) * scale
 
 
-# The native label prints 45.9 x 14.6 mm, its box 2.0 mm left of and 1.7 mm
-# over the requested lower-left (r8: 0.1369..0.1828 x 0.0172..0.0318 for
-# (0.13895, 0.0155)).  Under the strip, right of C-C's UNDERSIDE label:
-# 0.1487..0.1946 x 0.0143..0.0289, 4.5 mm right of that label's text, 2.9 mm
-# under the strip's foot, 1.6 mm over the border (0.0127).
-HOLDDOWN_SECTION_LABEL_LOWER_LEFT = (0.1507, 0.0126)
+# The native label: GetExtent 46.2 x 16.45 mm from the requested lower-left
+# (r10: 0.15078..0.19694 x 0.01262..0.02907 for (0.1507, 0.0126)), which the
+# blocking audit reads; the PDF prints it 2.0 mm left of and 1.7 mm over
+# that, 45.9 x 14.6 (r8).  Under the strip, right of C-C's UNDERSIDE label:
+# printed 0.1485..0.1944 x 0.0143..0.0289, 4.0 mm right of that label's
+# text, its top 6.3 mm under the strip's foot, 1.6 mm over the border.
+HOLDDOWN_SECTION_LABEL_LOWER_LEFT = (0.1505, 0.0126)
 
 
 def holddown_section_line_model_points() -> tuple[tuple[float, float, float], ...]:

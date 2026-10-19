@@ -497,21 +497,29 @@ def _holddown_x_text_box() -> tuple[float, float, float, float]:
     return (x - w / 2.0, line_y, x + w / 2.0, line_y + h)
 
 
+# The hold-down callout's widest row: DRILL Ø3.05 THRU ALL at 50.0 mm (r8),
+# or the mate row LOCATES MHA-DT-021, not yet printed (~47..52 mm).  The
+# underline's left end, where the leader leaves, stands 1.6 mm before it.
+_CALLOUT_HALF_WIDTHS = (0.0250, 0.0262)
+_CALLOUT_SHOULDER = 0.0016
+
+
 def _holddown_callout_box() -> tuple[float, float, float, float]:
     """Four rows centred on the request: r6 boxed them y 0.0523..0.0726 for
-    a request y of 0.0625.  The widest row is now DRILL Ø3.05 THRU ALL, 50.0
-    mm (r8), with the underline's 1.6 mm shoulder at its left."""
+    a request y of 0.0625, with the underline's shoulder at their left."""
     x, y = drawing.HOLDDOWN_CALLOUT_XY
-    return (x - 0.0266, y - 0.0102, x + 0.0250, y + 0.0101)
+    half = max(_CALLOUT_HALF_WIDTHS)
+    return (x - half - _CALLOUT_SHOULDER, y - 0.0102, x + half, y + 0.0101)
 
 
-def _holddown_leader() -> tuple[tuple[float, float], tuple[float, float]]:
+def _holddown_leader(half: float = 0.0250) -> tuple[tuple[float, float], tuple[float, float]]:
     """The hold-down callout's leader: from its underline's left end (r8:
     the last row's baseline, 11.17 mm under the requested y) to the
     counterbore's sheet-right wall at the underside (r8's tip)."""
     x, y = drawing.HOLDDOWN_CALLOUT_XY
     wall_x = _holddown_hole_x() + spec.HOLDDOWN_CBORE_DIA / 2.0 * _cc_scale()
-    return ((x - 0.0266, y - 0.011166), (wall_x, drawing.holddown_strip_box()[1]))
+    start = (x - half - _CALLOUT_SHOULDER, y - 0.011166)
+    return (start, (wall_x, drawing.holddown_strip_box()[1]))
 
 
 def _holddown_strip() -> tuple[float, float, float, float]:
@@ -576,12 +584,20 @@ def _holddown_label() -> tuple[float, float, float, float]:
     return (lx - 0.0020, ly + 0.0017, lx - 0.0020 + 0.0459, ly + 0.0017 + 0.0146)
 
 
+def _holddown_label_extent() -> tuple[float, float, float, float]:
+    """The native C-C label's GetExtent, which the blocking audit boxes:
+    46.2 x 16.45 mm from its requested lower-left (r10)."""
+    lx, ly = drawing.HOLDDOWN_SECTION_LABEL_LOWER_LEFT
+    return (lx, ly, lx + 0.04616, ly + 0.01645)
+
+
 def _holddown_padded_outline() -> tuple[float, float, float, float]:
-    """C-C's GetOutline once cropped and placed: the fence plus ~9.95 mm
-    across and ~5.86 mm up and down (r9's cropped outline against its
-    fence)."""
-    x0, y0, x1, y1 = _holddown_strip()
-    return (x0 - 0.00995, y0 - 0.00586, x1 + 0.00995, y1 + 0.00586)
+    """C-C's GetOutline once cropped and placed: the strip plus 10.95 mm
+    across and 6.86 mm up and down, whatever the fence (r9 at 1.0 mm, r10 at
+    0.5 mm: run 20261019T025545367Z, strip lower-left (0.1376, 0.0318),
+    outline 0.12665..0.20213 x 0.02494..0.05136)."""
+    x0, y0, x1, y1 = drawing.holddown_strip_box()
+    return (x0 - 0.01095, y0 - 0.00686, x1 + 0.01095, y1 + 0.00686)
 
 
 def _segments_cross(a, b) -> bool:
@@ -668,14 +684,22 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     assert label[3] < strip[1] - 0.0025
     # The layout audit holds foreign text out of C-C's padded outline, 2 mm
     # inset (text-on-view), and a view off the title block and detail B's
-    # padded outline within 1.5 mm.
+    # padded outline within 1.5 mm.  The blocking audit holds the native
+    # label's extent within 1.5 mm of the padded outline (r10 failed on its
+    # 4.2 mm overlap at 2:1).
     inset = 0.002
     padded = _holddown_padded_outline()
     inner = (padded[0] + inset, padded[1] + inset, padded[2] - inset, padded[3] - inset)
-    for name in ("10.45", "1.00 ±0.1", "detail label"):
+    for name in ("10.45", "1.00 ±0.1", "detail label", "C-C label"):
         assert not _boxes_overlap(ours[name], inner), name
     assert padded[2] < title_block[0] + 0.0015
     assert padded[0] > outline[2] - 0.0015
+    assert _holddown_label_extent()[3] < padded[1] + 0.0015 - 0.0005
+    assert _holddown_label_extent()[1] >= border_bottom - 0.0002
+    # Positive control: r10's 2:1 strip and label (0.1376, 0.0318),
+    # (0.1507, 0.0126) overlapped by 4.2 mm.
+    r10_padded_foot = 0.0318 - 0.00686
+    assert (0.0126 + 0.01645) - r10_padded_foot > 0.0015
     # Positive control: the relief note at its old anchor (0.029) meets the
     # C-C label.
     old_relief = (0.120, 0.029 - 0.0133, 0.120 + 0.0947, 0.029)
@@ -705,10 +729,11 @@ def test_holddown_callout_leader_drops_through_the_hole_to_its_counterbore() -> 
     start, tip = _holddown_leader()
     callout = _holddown_callout_box()
     assert callout[1] > _holddown_strip()[3] + 0.005  # the rows stand over the strip
-    for shift in (0.0, 0.0016):
-        leader = ((start[0] + shift, start[1]), tip)
-        assert x_at(leader, top) > narrow[0] + 0.0009
-        assert x_at(leader, step) < narrow[1] - 0.0009
+    for half in (0.0233, *_CALLOUT_HALF_WIDTHS):
+        leader = _holddown_leader(half)
+        assert leader[1] == tip
+        assert x_at(leader, top) > narrow[0] + 0.0005
+        assert x_at(leader, step) < narrow[1] - 0.0005
         assert not _segment_hits_box(leader, _holddown_label())
         for box in _cc_face_label_boxes().values():
             assert not _segment_hits_box(leader, box)
@@ -722,7 +747,7 @@ def test_holddown_callout_leader_drops_through_the_hole_to_its_counterbore() -> 
 
 
 class _CcSection:
-    """Section C-C at 2:1 looking south: sheet = Position + 2 x model (x, y).
+    """Section C-C looking south: sheet = Position + scale x model (x, y).
 
     Uncropped, its outline is the whole plate past the cut (r8: 71 mm wide
     at 1:1); cropped, the fence it was handed, moving with the view."""
@@ -735,7 +760,8 @@ class _CcSection:
         self.crops: list[tuple] = []
 
     def project(self, point):
-        return (self.Position[0] + 2.0 * point[0], self.Position[1] + 2.0 * point[1], 0.0)
+        k = 1000.0 * _cc_scale()
+        return (self.Position[0] + k * point[0], self.Position[1] + k * point[1], 0.0)
 
     def GetOutline(self):  # noqa: N802
         if self.cropped and self.shrinks:
@@ -796,7 +822,7 @@ def _crop_seat(monkeypatch, view: _CcSection):
 
 @pytest.mark.parametrize("defect", [None, "refused", "kept-outline", "ignored-move"])
 def test_holddown_section_is_cropped_to_its_strip_and_placed(monkeypatch, defect):
-    """Machinist review r8 misread C-C's counterbore at 1:1; at 2:1 its
+    """Machinist review r8 misread C-C's counterbore at 1:1; enlarged, its
     uncropped outline (the whole plate past the cut) would cross detail B
     and the title block, so the view is cropped to its strip and the strip
     moved onto HOLDDOWN_STRIP_LOWER_LEFT.  A refused crop, a crop that left
@@ -1472,7 +1498,7 @@ def test_both_sections_name_their_faces() -> None:
     at its head, and neither named a face.  Each names one face at its foot:
     A-A its top face, the only free field it has (r5: an UNDERSIDE label over
     its strip overlapped the relief note's box); C-C its underside, the face
-    its callout's FROM UNDERSIDE names (at 2:1 no field right of its strip
+    its callout's FROM UNDERSIDE names (enlarged, no field right of its strip
     holds a TOP FACE label short of the title block)."""
     labels = {(key, text) for key, text, *_ in drawing.FACE_LABELS}
     assert labels == {("A-A", "TOP FACE"), ("C-C", "UNDERSIDE")}
