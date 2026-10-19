@@ -103,3 +103,25 @@ def assert_isolated(closures: dict[str, frozenset[str]], contract: Contract) -> 
 )
 def test_support_bar_isolation(part_closures, contract: Contract) -> None:
     assert_isolated(part_closures, contract)
+
+
+@pytest.mark.parametrize(
+    "contract",
+    [
+        Contract(
+            selectors=("build_mg_*",),
+            anchors=(
+                "build_mg_magnifying_wheel",
+                "build_mg_wheel_axle",
+                "build_mg_wheel_axle_spacer",
+            ),
+            forbidden=(
+                "vn_transgear_pivot_screw_spec",
+                "vn_transgear_arm_plate_locating_pin_spec",
+            ),
+        )
+    ],
+    ids=["transgear-pivot-interface"],
+)
+def test_transgear_pivot_isolation(part_closures, contract: Contract) -> None:
+    assert_isolated(part_closures, contract)
