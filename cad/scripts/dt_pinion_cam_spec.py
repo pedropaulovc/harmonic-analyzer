@@ -31,7 +31,10 @@ from dt_pinion_cam_geometry import (
 # to slide on at assembly, small enough that the set screw's shift is noise
 # under the feeler-set rig location.
 LIFT_ROD_NUMBER = "MHA-DT-017"
-BORE_BAND = (0.03, -0.03)  # (upper, lower) deviations about BORE
+# Equal bilateral, so the model authors it symmetric and the sheet prints
+# +/-0.03 rather than stacked limits (ENFORCE r5).
+BORE_TOLERANCE_MM = 0.03
+BORE_BAND = (BORE_TOLERANCE_MM, -BORE_TOLERANCE_MM)  # (upper, lower) about BORE
 SLIP_CLEARANCE_MIN = round(
     BORE + BORE_BAND[1] - (LIFT_ROD_DIA + LIFT_ROD_DIA_BAND[0]), 6
 )

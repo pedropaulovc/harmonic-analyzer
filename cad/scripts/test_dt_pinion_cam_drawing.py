@@ -82,7 +82,7 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     # cam OD / eccentricity that sets the follower lift.  Routine controlling
     # dimensions take the title-block grade.
     assert model_toleranced_dimensions(cam) == {
-        ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
+        ("BoreProfile", "BoreDia"): "BORE_TOLERANCE_MM",
         ("CollarProfile", "CollarOd"): "COLLAR_OD_TOLERANCE_MM",
         ("CollarProfile", "CollarCy"): "COLLAR_AXIS_TOLERANCE_MM",
     }
