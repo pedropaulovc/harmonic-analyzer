@@ -439,14 +439,15 @@ FACE_LABELS = (
         (0.008, -0.001),
     ),
     # Under C-C's strip, starting 2.3 mm right of its tip on the left-hand
-    # piece, over the C-C label (top 0.0319; r6 left 2 mm between them).
+    # piece, over the C-C label: r7 stood its text 0.0336..0.0371, 1.76 mm
+    # over the label's (needs 1.78, text-clearance); 0.5 mm higher.
     (
         "C-C",
         "UNDERSIDE",
         (HOLDDOWN_LOCAL_X - 9.0, HOLDDOWN_LOCAL_X + 9.0),
         0.0,
         "min",
-        (0.0023, -0.0045),
+        (0.0023, -0.004),
     ),
 )
 # Rows printed under native hole callouts (swDimensionTextCalloutBelow).

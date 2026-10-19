@@ -265,11 +265,18 @@ if HOLDDOWN_LEDGE_RANGE[0] < 2.0:
 # Only functional sliding/locating surfaces carry roughness.  The existing
 # close-clearance pivot hole needs no bearing-finish control; the top locates
 # the post and tip block, and the underside slides on the harmonic-base deck.
+# The slide face's symbol says why it carries Ra 1.6 (machinist review r7:
+# nothing on the sheet said the underside runs, so the finish read as meant
+# for the bore), as fr_harmonic_base and dt_pinion_cam name their targets.
+BASE_SLIDE_FINISH_TARGET = "SLIDING FACE"
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "post_seat", SEAT_UM, PlanarFace((0, 1, 0), PLATE_THICKNESS)
     ),
     SurfaceFinishControl(
-        "base_slide", MACHINED_UM, PlanarFace((0, -1, 0), 0.0)
+        "base_slide",
+        MACHINED_UM,
+        PlanarFace((0, -1, 0), 0.0),
+        production_method=BASE_SLIDE_FINISH_TARGET,
     ),
 )
