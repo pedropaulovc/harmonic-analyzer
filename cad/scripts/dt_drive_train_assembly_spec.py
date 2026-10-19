@@ -167,9 +167,11 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("lock knob lifts", ("vn-cone-lock-knob",), "y", 30.0),
     # The withdrawn cone's upper silhouette covers a 25 lift: run
     # 20260929T174651337Z found no swing-stop-screw ink at any of 24 points
-    # and anchored its balloon on cone-gear-5.  50 puts its head ~2.9 mm of
-    # sheet (1:4) above that silhouette.
-    ExplodeStep("swing stop lifts", ("vn-swing-stop-screw",), "y", 50.0),
+    # and anchored its balloon on cone-gear-5.  At 50 the 1:3 sheet still
+    # showed only a head sliver there (#1687 r6 and DtPinionLeverPin r2,
+    # balloon 16); 75 stands the head 8 mm of sheet higher, below the
+    # MHA-VN-031 heads that set the sheet's top.
+    ExplodeStep("swing stop lifts", ("vn-swing-stop-screw",), "y", 75.0),
     ExplodeStep(
         "cone rotor withdraws",
         ("dt-cone-gear-shaft", "dt-cone-gear", "dt-crank-drive-gear", "vn-cone-tip-collar"),
