@@ -1175,6 +1175,8 @@ def _bind_left_column_balloon(
     """Bind to an actual outer tube rim on the open left side of the view."""
     _telemetry.annotate(component_count=len(components))
     candidates = []
+    binding_attempts = 0
+    _telemetry.annotate(binding_attempt_count=binding_attempts)
     for component, _full in components:
         rims = []
         for raw_edge in visible_component_entities(view, component, 1):
@@ -1193,12 +1195,16 @@ def _bind_left_column_balloon(
             (row for row in rims if abs(row[0] - radius) < 1e-7),
             key=lambda row: row[1],
         )[2]
+        binding_attempts += 1
+        _telemetry.annotate(binding_attempt_count=binding_attempts)
         note, _annotation, point = _bind_frame_balloon(adapter, view, note, rim, item)
         candidates.append((point[:2], rim))
-    _telemetry.annotate(candidate_count=len(candidates), binding_attempt_count=len(candidates) + 1)
+    _telemetry.annotate(candidate_count=len(candidates))
     if not candidates:
         raise RuntimeError("no visible outer column rim for the BOM balloon")
     rim = min(candidates, key=lambda row: row[0])[1]
+    binding_attempts += 1
+    _telemetry.annotate(binding_attempt_count=binding_attempts)
     note, annotation, _point = _bind_frame_balloon(adapter, view, note, rim, item)
     return note, annotation, rim
 
@@ -1620,6 +1626,8 @@ def _reattach_frame_balloons(
 
         item = item_by_stem["fr-vn-frame-cross-screw"]
         shanks = []
+        shank_binding_attempts = 0
+        _telemetry.annotate(shank_binding_attempt_count=shank_binding_attempts)
         for component, full in families["fr-vn-frame-cross-screw"]:
             if (
                 abs(
@@ -1640,17 +1648,19 @@ def _reattach_frame_balloons(
                     > 1e-7
                 ):
                     continue
+                shank_binding_attempts += 1
+                _telemetry.annotate(shank_binding_attempt_count=shank_binding_attempts)
                 notes[item], _annotation, point = _bind_frame_balloon(
                     adapter, view, notes[item], face, item
                 )
                 shanks.append(((point[0], point[1]), face))
-        _telemetry.annotate(
-            shank_candidate_count=len(shanks), shank_binding_attempt_count=len(shanks) + 1
-        )
+        _telemetry.annotate(shank_candidate_count=len(shanks))
         if not shanks:
             raise RuntimeError("no visibly exposed upper cross-screw shank")
         # The leftmost native attachment is outside the casting/column silhouettes.
         face = min(shanks, key=lambda row: row[0])[1]
+        shank_binding_attempts += 1
+        _telemetry.annotate(shank_binding_attempt_count=shank_binding_attempts)
         notes[item], _annotation, _point = _bind_frame_balloon(
             adapter, view, notes[item], face, item
         )
