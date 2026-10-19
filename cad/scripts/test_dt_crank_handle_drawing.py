@@ -36,6 +36,24 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert "draw_dt_crank_handle.py" in PRECISION_MIGRATED_DRAWINGS
 
 
+def test_butt_callouts_clear_ruling_b_native_text_envelopes() -> None:
+    # Native r4 at 966989134 measured the R77.3 box at 14.2 x 4.6 mm,
+    # the R1.5 box at 8.7 x 3.5, and the fitted-bore first row's right
+    # edge 47.9 mm right of its keep.  Preserve actual air, not just a
+    # different coordinate, when these leaders are repositioned.
+    keep = drawing.FRONT_KEEP
+    end_x = drawing._front_x(dt_crank_handle_spec.OAK_END_X)
+    dome_right = keep["DomeR"][0] + 0.0142 / 2.0
+    assert end_x - dome_right >= 0.0046
+    end_round_left = keep["EndRoundR"][0] - 0.0087 / 2.0
+    assert end_round_left - dome_right >= 0.0046
+    bore_text_right = keep["CounterboreDia"][0] + 0.0479
+    assert keep["CrestDia"][0] - bore_text_right >= 0.0035
+    crest_text_right = keep["CrestDia"][0] + 0.017
+    end_view_left = drawing.RIGHT_CENTER[0] - drawing.END_R
+    assert end_view_left - crest_text_right >= 0.0035
+
+
 def test_every_profile_size_is_a_model_dimension() -> None:
     # MHA-DT-008 machinist review of 2026-10-18: the profile's sizes print as
     # dimensions on the section, not in a note; the bore revolves with it.
@@ -252,7 +270,7 @@ def test_grip_contour_is_tangent_arcs_dimensioned_on_the_section() -> None:
     assert math.dist(spec.DOME_CENTER, spec.DOME_END) == pytest.approx(spec.DOME_R)
     assert math.dist(spec.END_ROUND_CENTER, spec.DOME_END) == pytest.approx(spec.END_ROUND_R)
     assert handle.CREST_DIA == spec.CREST_DIA
-    assert handle.DOME_R == drawing.DOME_R == spec.DOME_R
+    assert handle.DOME_R == spec.DOME_R
     assert not hasattr(spec, "CONTOUR_ALLOWANCE_DIA")
     assert not hasattr(spec, "BASIC_DIMENSIONS")
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")

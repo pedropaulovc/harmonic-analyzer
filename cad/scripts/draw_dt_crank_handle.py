@@ -69,8 +69,6 @@ from dt_crank_handle_spec import (
     COUNTERBORE_FIT_NOTE,
     COUNTERBORE_FLOOR_CALLOUT,
     COUNTERBORE_FLOOR_X,
-    DOME_CENTER,
-    DOME_R,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     END_ROUND_CENTER,
@@ -177,7 +175,10 @@ FRONT_KEEP = {
     "FlareR": _on_radius(FLARE_CENTER, 5.3, 245.0),
     "SConcaveR": _on_radius(S_CONCAVE_CENTER, 15.5, 285.0),
     "SConvexR": _on_radius(S_CONVEX_CENTER, S_CONVEX_R + 5.0, 100.0),
-    "DomeR": _on_radius(DOME_CENTER, DOME_R + 5.0, 78.0),
+    # Ruling-B native audit: the R77.3 text is 14.2 mm wide.  Its former
+    # radial keep straddled the oak-end extension at x 0.274; this left-side
+    # keep leaves 5.4 mm of air and separates it from the end-round callout.
+    "DomeR": (_front_x(OAK_END_X) - 0.0125, 0.185),
     "EndRoundR": _on_radius(END_ROUND_CENTER, 8.1, 42.5),
     # Diameters across their own cut.  The shoulder and waist shelves sit
     # under the section; the fitted tenon's and the counterbore's callout
@@ -195,9 +196,11 @@ FRONT_KEEP = {
     # The swell's diameter reads above the section, clear of the bore's
     # callout, beside the 40.0 station's extension line.
     "PeakDia": (_front_x(PEAK_X) + 2.0 * _SHELF, 0.225),
-    # Right of the oak end, above the crest, under the R1.5 and clear of the
-    # end view and of the counterbore's callout block.
-    "CrestDia": (_front_x(OAK_END_X) + 0.0095, 0.165),
+    # Ruling-B's longer diameter tail ends at y 0.09325, beside the fitted
+    # bore's text (right edge x 0.295).  Put the crest line at x 0.299:
+    # 4 mm clear of that text, with another 4 mm from its own text to the
+    # end view's x 0.320 outline.
+    "CrestDia": (_front_x(OAK_END_X) + 0.025, 0.165),
     # The inside corners' three-row blocks (R0.3 MAX / mate / SEAT), 8 x 2.75 =
     # 22.0 mm wide and 2 x 5.55 + 3.5 = 14.6 mm tall, centred on the keep (were
     # the rows to hang from the keep instead, each box drops ~7 mm and stays
