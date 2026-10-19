@@ -20,6 +20,8 @@ from dt_crank_hub_geometry import (
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
 )
+from dt_crank_pin_spec import BIG_END_DIA, PIN_LENGTH, SMALL_END_DIA
+from dt_crankshaft_spec import PIN_HOLE_SPEC as SHAFT_PIN_HOLE_SPEC
 
 
 def seat_callout(mate: str) -> str:
@@ -73,20 +75,30 @@ BORE_CALLOUT = (
 # it, so its nominal prints as a reference under the match-fit callout.
 SEAT_CALLOUT = seat_callout("MHA-DT-06")
 SEAM_CALLOUT = seam_callout("MHA-DT-06")
-# The cross-hole is drilled, then taper-reamed through hub and shaft together.
-# The ream fixes the hub on the shaft for good, so the front face is set flush
-# with the crankshaft's dome root first -- the crank face, CRANK_FACE_Z, where
-# the 3/8 in cylinder meets the dome; the dome stands proud of the hub (the
-# arm front is already flush with the hub front from the seat press).  The
-# MHA-DT-00 hub step prints the same datum.  The prose reads under the native
-# #14 drill size, in the order the work is done.
+# The cross-hole: this hub is drilled alone with its #14 pilot (the native
+# size and its station from the arm shoulder).  The shaft is NOT drilled
+# alone (#1678): drilled separately, the shaft's .X station and the hub's own
+# location could set the two holes up to ~1.8 mm apart, while the 1:48 ream
+# cleans up only ~0.2 mm radially round a #9 hole.  So at assembly, the front
+# face set flush with the crankshaft's dome root first -- the crank face,
+# CRANK_FACE_Z, where the 3/8 in cylinder meets the dome; the dome stands
+# proud of the hub (the arm front is already flush with the hub front from the
+# seat press) -- the shaft's #9 is drilled through this pilot, opening it, and
+# the pair is taper-reamed together.  The #9's DRILLED HOLES limit stays inside
+# the reamed taper along the whole pin (thinnest at the far hub wall).  The
+# drill and taper come from their owners (the shaft's hole spec and the pin's
+# end diameters); MHA-DT-00 step 6 and the shaft's callout read the same
+# names.  The prose reads under the native #14 drill size, in the order the
+# work is done.
 FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
+CROSS_HOLE_DRILL = SHAFT_PIN_HOLE_SPEC.size
+CROSS_HOLE_TAPER = f"1:{PIN_LENGTH / (BIG_END_DIA - SMALL_END_DIA):.0f}"
 CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "FRONT FACE FLUSH WITH",
-        f"{FRONT_FACE_DATUM};",
-        "MATCH TAPER-REAM 1:48 FOR",
-        "MHA-DT-09: LIGHT DRIVE FIT",
+        "AT ASSY, FRONT FACE FLUSH WITH",
+        f"{FRONT_FACE_DATUM}; DRILL",
+        f"{CROSS_HOLE_DRILL} THRU BOTH, TAPER-REAM {CROSS_HOLE_TAPER}",
+        "FOR MHA-DT-09: LIGHT DRIVE FIT",
     )
 )
 

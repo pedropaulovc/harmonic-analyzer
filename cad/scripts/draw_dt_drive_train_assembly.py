@@ -92,7 +92,11 @@ from dt_cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
 from dt_cone_tip_block_spec import ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT, ADJUSTER_THREAD
 import dt_crank_drive_gear_spec as gear64
 import dt_crank_handle_pivot_screw_spec as handle_screw
-from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
+from dt_crank_hub_notes import (
+    CROSS_HOLE_DRILL as HUB_CROSS_HOLE_DRILL,
+    CROSS_HOLE_TAPER as HUB_CROSS_HOLE_TAPER,
+    FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM,
+)
 import dt_crank_pinion_spec as pinion
 from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
@@ -837,8 +841,11 @@ CONE_CRANK_STEPS = _note_text(
         "6. PRESS MHA-DT-31 INTO MHA-DT-06 TO THE SHOULDER, FACES FLUSH.",
         "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-DT-VN-59 FLUSH. SLIDE",
         f"   ONTO MHA-DT-11, SET HUB FRONT FACE FLUSH WITH THE {HUB_FRONT_FACE_DATUM},",
-        "   PUNCH MARKS ALIGNED; ONLY THEN TAPER-REAM 1:48 THROUGH HUB AND",
-        "   SHAFT; LIGHT-DRIVE MHA-DT-09, REMOVABLE BY TAP ON SMALL END. HANG",
+        # #1678: the shaft is drilled through the hub's pilot here, never
+        # alone, so the ream only cleans up one drilled hole.
+        f"   PUNCH MARKS ALIGNED; ONLY THEN DRILL {HUB_CROSS_HOLE_DRILL} THROUGH THE HUB PILOT AND",
+        f"   SHAFT AND TAPER-REAM {HUB_CROSS_HOLE_TAPER} THROUGH BOTH; LIGHT-DRIVE MHA-DT-09,",
+        "   REMOVABLE BY TAP ON SMALL END. HANG",
         # Codex #1140: the keeper chain's length and topology belong on the
         # sheet; the bead count is the spec's solve, never a typed number.
         "   MHA-DT-27 FROM THE PIN HEAD; CLAMP MHA-DT-28 UNDER MHA-DT-VN-50. CUT MHA-DT-VN-65",

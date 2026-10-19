@@ -6,6 +6,7 @@ Imported ONLY by ``draw_crankshaft`` and its offline test (codex #361; see
 
 from __future__ import annotations
 
+from dt_crank_hub_notes import CROSS_HOLE_TAPER
 from dt_crankshaft_spec import (
     DRIVE_PIN_DEPTH_TOL,
     DRIVE_PIN_KNOCKOUT_PROCESS,
@@ -14,16 +15,24 @@ from dt_crankshaft_spec import (
 
 # Matched-fit requirement on the feature callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), naming both mates
 # and the acceptance of the custom 1:48 taper pin (crank_pin_spec).  It reads
-# under the native #9 drill size, in the order the work is done (drill, then
-# taper-ream with the hub).  Three rows, not four: the shorter block stands
-# higher, so the diameters under it have room for their mates.
+# under the native #9 drill size, in the order the work is done.  The shaft
+# is not drilled alone (#1678): at assembly, the hub flush on the dome root,
+# the #9 goes through the hub's pilot and the pair is taper-reamed together
+# (dt_crank_hub_notes, MHA-DT-00 step 6, the same taper name).  Three rows,
+# not four: the shorter block stands higher, so the diameters under it have
+# room for their mates.
 CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "MATCH TAPER-REAM 1:48 WITH",
-        "HUB MHA-DT-31 FOR PIN",
+        "AT ASSY THRU MHA-DT-31 PILOT,",
+        f"TAPER-REAM {CROSS_HOLE_TAPER} WITH HUB FOR",
         "MHA-DT-09: LIGHT DRIVE FIT",
     )
 )
+# The hub sets where the cross-hole lands (its pilot's station from the arm
+# shoulder, its front face on the dome root), so the shaft prints the
+# station as a reference only.  Drawing-only: kept out of dt_crankshaft_spec
+# so the part does not re-key.
+ASSEMBLY_SET_REFERENCES = frozenset({"PinHoleStation"})
 
 # Each banded size and length names the mate or stack its band serves, and a
 # fit its kind, at its own callout (drawing-guidelines.md rule 4; machinist

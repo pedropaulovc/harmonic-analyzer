@@ -324,6 +324,55 @@ def test_hub_front_face_is_set_on_the_dome_root_the_model_places_it_at() -> None
     assert not _names_the_dome_root("CRANKSHAFT MHA-DT-11 END")
 
 
+def test_shaft_cross_hole_is_drilled_through_the_hub_pilot_at_assembly() -> None:
+    """#1678: drilled separately, the shaft's .X station and the hub's own
+    location could set the two holes further apart than the 1:48 ream cleans
+    up round a #9 hole.  The shaft is drilled at assembly through the hub's
+    pilot instead, and the hub, shaft and MHA-DT-000 texts all say so from one
+    drill size and one taper."""
+    import dt_crank_pin_spec as pin
+    import dt_crank_pin_ring_spec as ring
+    import dt_crankshaft_notes
+    import draw_dt_drive_train_assembly as package
+    from _hole_spec import blind_cut_dia_mm
+    from _printed_tolerance import drilled_oversize_mm
+
+    drill = dt_crank_hub_notes.CROSS_HOLE_DRILL
+    taper = dt_crank_hub_notes.CROSS_HOLE_TAPER
+    assert drill == dt_crankshaft_spec.PIN_HOLE_SPEC.size == "#9"
+    assert taper == "1:48"
+    assert pin.BIG_END_DIA - pin.SMALL_END_DIA == pytest.approx(pin.PIN_LENGTH / 48.0)
+    hub = _flat(dt_crank_hub_notes.CROSS_HOLE_CALLOUT)
+    assert f"DRILL {drill} THRU BOTH" in hub
+    assert hub.index("FRONT FACE FLUSH") < hub.index(f"DRILL {drill}")
+    assert hub.index(f"DRILL {drill}") < hub.index(f"TAPER-REAM {taper}")
+    shaft = _flat(dt_crankshaft_notes.CROSS_HOLE_CALLOUT)
+    assert shaft.startswith("AT ASSY THRU MHA-DT-031 PILOT")
+    assert f"TAPER-REAM {taper} WITH HUB" in shaft
+    # The hub sets the station, so the shaft prints it as a reference.
+    assert dt_crankshaft_notes.ASSEMBLY_SET_REFERENCES == {"PinHoleStation"}
+    marked = {
+        n for names in dt_crankshaft_spec.DRAWING_DIMENSIONS.values() for n in names
+    }
+    assert dt_crankshaft_notes.ASSEMBLY_SET_REFERENCES <= marked
+    hub_step = _flat(package.CONE_CRANK_STEPS.split("\n6. ")[1].split("\n7. ")[0])
+    drill_step = f"DRILL {drill} THROUGH THE HUB PILOT AND SHAFT"
+    assert drill_step in hub_step
+    assert hub_step.index(drill_step) < hub_step.index(
+        f"TAPER-REAM {taper} THROUGH BOTH"
+    )
+    # The #9 at its DRILLED HOLES limit stays inside the reamed taper along
+    # the whole hub: thinnest where the pin leaves the far barrel wall.
+    drilled_max = (
+        blind_cut_dia_mm(dt_crankshaft_spec.PIN_HOLE_SPEC) + drilled_oversize_mm()
+    )
+    far_wall = ring.PIN_PROUD + geometry.HUB_BARREL_DIA
+    taper_at_far_wall = pin.BIG_END_DIA - far_wall / 48.0
+    assert drilled_max < taper_at_far_wall
+    # The hub's own pilot is smaller than the shaft drill it guides.
+    assert blind_cut_dia_mm(dt_crank_hub_spec.SERVICE_PIN_HOLE_SPEC) < drilled_max
+
+
 def test_seam_callout_attaches_to_the_hub_seam_clear_of_the_bore_callout() -> None:
     x, y = drawing.SEAM_EDGE_PICK
     cx, cy = drawing.SEAM_CENTER
