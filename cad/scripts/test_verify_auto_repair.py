@@ -284,7 +284,7 @@ def test_unchanged_channel_refresh_refuses_invalid_display_or_contact_and_never_
     monkeypatch.setattr(_assembly, "assembly_geometry_digest", digest)
     # The saved assembly already carries an up-to-date "Default Simplified".
     monkeypatch.setattr(
-        _assembly, "sync_simplified_configuration", lambda _adapter, _name, *, verify: 0
+        _assembly, "sync_simplified_configuration", lambda _adapter, _name: 0
     )
     monkeypatch.setattr(_assembly, "_export_assembly_images", images)
     monkeypatch.setattr(
@@ -347,7 +347,12 @@ def test_spring_assembly_rejects_missing_native_checker(operation, assembly_name
     import _assembly
 
     with pytest.raises(ValueError):
-        asyncio.run(getattr(_assembly, operation)(None, assembly_name))
+        kwargs = (
+            {"author": lambda _configuration: None}
+            if operation == "save_assembly_and_images"
+            else {}
+        )
+        asyncio.run(getattr(_assembly, operation)(None, assembly_name, **kwargs))
 
 
 @pytest.mark.parametrize("persisted_failure", ["ch-channel", "sm-summing", None])

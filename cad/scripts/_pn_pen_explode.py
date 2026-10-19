@@ -7,7 +7,7 @@ the intended instances (every other instance reads unmoved), and the
 operational model is left collapsed with its transforms unchanged.
 
 ``build_pn_pen_assembly`` calls :func:`create_pn_explode` only through its
-canonical ``author_in_drawing_configurations`` call, so an edit confined to
+canonical ``save_assembly_and_images(author=...)`` call, so an edit confined to
 this module and ``pn_pen_explode_spec`` takes the EXPLODE refresh tier
 (``_refresh_tier.explode_plan``): the saved model is reopened and its named
 explodes are re-authored, with no insert/mate loop.
@@ -102,7 +102,7 @@ def create_pn_explode(adapter: Any, configuration_name: str) -> None:
     leave the operational model collapsed (the ms-measuring-stick recipe).
 
     Run in Default and in Default Simplified
-    (``_assembly.author_in_drawing_configurations``): a drawing view shows the
+    (``_assembly.save_assembly_and_images``): a drawing view shows the
     explode of the configuration it references."""
     from solidworks_mcp.adapters.com_variant import null_callout
 

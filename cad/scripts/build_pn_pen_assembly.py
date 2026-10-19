@@ -97,7 +97,6 @@ from _named_views import name_octant_views, octant_key
 from _pn_pen_explode import create_pn_explode
 from _assembly import (
     activate_assembly_contract,
-    author_in_drawing_configurations,
     angle_driver,
     assembly_title_properties,
     assert_component_placed,
@@ -565,9 +564,6 @@ async def build(adapter) -> dict[str, str]:
     )
     # The fitter drawing's exploded view references Default Simplified, so
     # the explode is authored in both drawing configurations.
-    author_in_drawing_configurations(
-        adapter, ASM_NAME, lambda configuration: create_pn_explode(adapter, configuration)
-    )
     # The exploded view looks from the octant that sees the v-block's front
     # face and the set screw's tap in it (spec.EXPLODED_OCTANT).
     name_octant_views(
@@ -575,7 +571,11 @@ async def build(adapter) -> dict[str, str]:
         octants={octant_key(*spec.EXPLODED_OCTANT): spec.EXPLODED_OCTANT},
         label=ASM_NAME,
     )
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    return await save_assembly_and_images(
+        adapter,
+        ASM_NAME,
+        author=lambda configuration: create_pn_explode(adapter, configuration),
+    )
 
 
 if __name__ == "__main__":

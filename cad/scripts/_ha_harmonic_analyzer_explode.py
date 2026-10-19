@@ -130,7 +130,7 @@ def create_harmonic_analyzer_explode(adapter: Any, configuration_name: str) -> N
     and restore the working model.
 
     The builder runs this in Default and in Default Simplified
-    (``_assembly.author_in_drawing_configurations``): each owns its explode."""
+    (``_assembly.save_assembly_and_images``): each owns its explode."""
     from solidworks_mcp.adapters.com_variant import null_callout
 
     view_name = exploded_view_name(configuration_name)
