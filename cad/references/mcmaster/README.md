@@ -991,9 +991,12 @@ Catalog specifications checked on September 10, 2026:
   bounds nominal 6-mm stock to 5.75–6.25 mm;
   [c≈0.35 mm](https://fullerfasteners.com/tech/iso-2338-specifications-parallel-pins/)
   is approximate, not a hard end limit or full-cylinder certificate.
-  `pd_vn_transgear_arm_plate_locating_pin_spec.py` owns the ordinary installation
-  fits and proud set. The whole standard length family has at least 0.17 mm
-  bottom air in the custom arm blind hole. `diag_build_93600A189.py` uses the
+  `_transgear_arm_plate_locating_interface.py` owns the arm/plate hole limits,
+  proud set, blind depth and mouth breaks.
+  `pd_vn_transgear_arm_plate_locating_pin_spec.py` retains purchased-pin data and
+  the fit, insertion and bottom-air calculations. The whole standard length
+  family has at least 0.17 mm bottom air in the custom arm blind hole.
+  `diag_build_93600A189.py` uses the
   existing nominal-cylinder recipe: catalogue-only, no vendor model, no
   replica gate and no new commodity receiving procedure.
 - [98381A473](https://www.mcmaster.com/98381A473/) (`sm-vn-knife-mount-dowel`,

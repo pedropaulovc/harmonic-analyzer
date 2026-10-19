@@ -590,8 +590,9 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     ),
     # The two MHA-PD-VN-64 dowels (pd_vn_transgear_arm_plate_locating_pin_spec,
     # Ø2.0 model) pressed into the arm's Ø1.995 blind reams
-    # (pd_transgear_arm_geometry) over their 6.0 - 1.70 proud insertion: the
-    # press. They slip in the plate's Ø2.015 holes, so that pair has no row.
+    # (pd_transgear_arm_geometry); _transgear_arm_plate_locating_interface
+    # owns the 1.70 proud set in their 6.0 - 1.70 insertion: the press.
+    # They slip in the plate's Ø2.015 holes, so that pair has no row.
     **_numbered_pairs(
         "pd-vn-transgear-arm-plate-locating-pin",
         range(1, 3),
