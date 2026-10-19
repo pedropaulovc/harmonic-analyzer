@@ -3060,6 +3060,395 @@ def _leaves(children):
     return _drawing_balloons._view_component_leaves(_FakeAdapter(None), view, label="t")
 
 
+class _IsolationComponent(_FakeDrawingComponent):
+    def __init__(self, name, *, visible=True, children=(), events=None):
+        self._recording = False
+        self.visibility_writes = []
+        self.visibility_reads = 0
+        self.children_reads = 0
+        self.write_error = None
+        self.read_error = None
+        self.ignore_writes = False
+        self.events = events if events is not None else []
+        super().__init__(
+            name,
+            children=children,
+            path=f"C:/x/{name.rsplit('/', 1)[-1].rsplit('-', 1)[0]}.SLDPRT",
+            visible=visible,
+        )
+        self._recording = True
+
+    @property
+    def Visible(self):
+        self.visibility_reads += 1
+        if self.read_error is not None:
+            raise self.read_error
+        return self._visible
+
+    @Visible.setter
+    def Visible(self, value):
+        if self._recording:
+            self.visibility_writes.append(value)
+            self.events.append(("visibility", self.Name, value))
+            if self.write_error is not None:
+                raise self.write_error
+            if self.ignore_writes:
+                return
+        self._visible = value
+
+    def GetChildren(self):
+        self.children_reads += 1
+        return super().GetChildren()
+
+
+class _IsolationView:
+    def __init__(self, children, *, disabled=False, events=None):
+        # The synthetic root's Visible flag does not control view geometry.
+        self.root = _FakeDrawingComponent("root", children=children, visible=False)
+        self.root_reads = 0
+        self._disabled = disabled
+        self.update_reads = 0
+        self.update_writes = []
+        self.update_errors = {}
+        self.ignore_updates = set()
+        self.events = events if events is not None else []
+
+    def RootDrawingComponent2(self, resolve):
+        assert resolve is False
+        self.root_reads += 1
+        return self.root
+
+    @property
+    def DisableAutoUpdate(self):
+        self.update_reads += 1
+        return self._disabled
+
+    @DisableAutoUpdate.setter
+    def DisableAutoUpdate(self, value):
+        self.update_writes.append(value)
+        self.events.append(("updates", value))
+        if value not in self.ignore_updates:
+            self._disabled = value
+        # Native property puts can change state and then raise.
+        if value in self.update_errors:
+            raise self.update_errors[value]
+
+
+def _isolation_scene(*children, disabled=False, events=None, on_rebuild=None):
+    events = events if events is not None else []
+    view = _IsolationView(children, disabled=disabled, events=events)
+
+    def rebuild():
+        events.append(("rebuild", view._disabled))
+        if on_rebuild is not None:
+            on_rebuild()
+        return True
+
+    return _FakeAdapter(SimpleNamespace(EditRebuild3=rebuild)), view
+
+
+def test_isolation_batches_only_changed_leaf_flags_and_preserves_other_views():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    drop = _IsolationComponent("drop-1", events=events)
+    already_shown = _IsolationComponent("keep-2")
+    already_hidden = _IsolationComponent("drop-2", visible=False)
+    parent = _IsolationComponent("sub-1", children=[already_shown, already_hidden])
+    other_view_leaf = _IsolationComponent("keep-1", visible=False)
+    other_view_leaf.Component = keep.Component
+    other_view = _IsolationView([other_view_leaf])
+    source_state = vars(keep.Component).copy()
+    adapter, view = _isolation_scene(parent, keep, drop, events=events)
+
+    _drawing_balloons.isolate_drawing_view_components(
+        adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+    )
+
+    assert events == [
+        ("updates", True),
+        ("visibility", "drop-1", False),
+        ("visibility", "keep-1", True),
+        ("updates", False),
+        ("rebuild", False),
+    ]
+    assert already_shown.visibility_writes == []
+    assert already_hidden.visibility_writes == []
+    assert parent.visibility_writes == []
+    assert view.root_reads == 1
+    for node in (keep, drop, already_shown, already_hidden, parent):
+        assert node.children_reads == 1
+        assert node.visibility_reads == 2
+    assert other_view.root_reads == 0
+    assert other_view.update_writes == []
+    assert other_view_leaf.Visible is False
+    assert other_view_leaf.visibility_writes == []
+    assert vars(keep.Component) == source_state
+
+
+@pytest.mark.parametrize("disabled", [False, True])
+def test_isolation_unchanged_flags_never_touch_update_state_but_still_rebuild(disabled):
+    events = []
+    keep = _IsolationComponent("keep-1")
+    drop = _IsolationComponent("drop-1", visible=False)
+    adapter, view = _isolation_scene(keep, drop, disabled=disabled, events=events)
+
+    _drawing_balloons.isolate_drawing_view_components(
+        adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+    )
+
+    assert keep.visibility_writes == drop.visibility_writes == []
+    assert view.update_reads == 0
+    assert view.update_writes == []
+    assert events == [("rebuild", disabled)]
+    assert view.DisableAutoUpdate is disabled
+
+
+def test_isolation_preserves_already_disabled_updates_during_changed_writes():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, disabled=True, events=events)
+
+    _drawing_balloons.isolate_drawing_view_components(
+        adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+    )
+
+    assert view.update_writes == []
+    assert view.DisableAutoUpdate is True
+    assert events == [("visibility", "keep-1", True), ("rebuild", True)]
+
+
+def test_isolation_empty_selection_fails_without_enumeration_or_mutation():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, events=events)
+
+    with pytest.raises(ValueError, match="visible component set must not be empty"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset(), label="bank"
+        )
+
+    assert view.root_reads == 0
+    assert view.update_reads == 0
+    assert keep.visibility_writes == []
+    assert events == []
+
+
+def test_isolation_missing_root_fails_without_mutation():
+    events = []
+    adapter, view = _isolation_scene(events=events)
+    view.root = None
+
+    with pytest.raises(RuntimeError, match="drawing view has no root component"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert view.root_reads == 1
+    assert view.update_reads == 0
+    assert events == []
+
+
+def test_isolation_missing_family_fails_before_any_mutation():
+    events = []
+    drop = _IsolationComponent("drop-1", events=events)
+    adapter, view = _isolation_scene(drop, events=events)
+
+    with pytest.raises(RuntimeError, match="component families not found.*keep"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert drop.visibility_writes == []
+    assert view.update_reads == 0
+    assert view.update_writes == []
+    assert events == []
+
+
+def test_isolation_does_not_unhide_ancestors_to_satisfy_a_missing_visible_family():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    parent = _IsolationComponent("sub-1", children=[keep], visible=False, events=events)
+    adapter, view = _isolation_scene(parent, events=events)
+
+    with pytest.raises(RuntimeError, match="only hidden ancestors.*keep"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert parent.Visible is False
+    assert parent.visibility_writes == keep.visibility_writes == []
+    assert view.update_reads == 0
+    assert view.update_writes == []
+    assert events == []
+
+
+def test_isolation_accounts_for_hidden_ancestors_without_changing_their_flags():
+    hidden_keep = _IsolationComponent("keep-1", visible=False)
+    parent = _IsolationComponent("sub-1", children=[hidden_keep], visible=False)
+    visible_keep = _IsolationComponent("keep-2")
+    adapter, view = _isolation_scene(parent, visible_keep)
+
+    _drawing_balloons.isolate_drawing_view_components(
+        adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+    )
+
+    assert hidden_keep.Visible is True
+    assert hidden_keep.visibility_writes == [True]
+    assert visible_keep.Visible is True
+    assert parent.Visible is False
+    assert parent.visibility_writes == []
+
+
+@pytest.mark.parametrize("restore_fails", [False, True])
+def test_isolation_write_failure_restores_updates_and_preserves_primary(restore_fails):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    primary = RuntimeError("visibility write failed")
+    keep.write_error = primary
+    adapter, view = _isolation_scene(keep, events=events)
+    if restore_fails:
+        view.update_errors[False] = RuntimeError("restore failed")
+
+    with pytest.raises(RuntimeError, match="visibility write failed") as caught:
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert caught.value is primary
+    assert view.DisableAutoUpdate is False
+    assert view.update_writes == [True, False]
+    assert events[-1] == ("updates", False)
+    if restore_fails:
+        assert any("restore failed" in note for note in primary.__notes__)
+    else:
+        assert not getattr(primary, "__notes__", ())
+
+
+@pytest.mark.parametrize("ignored", [False, True])
+def test_isolation_failed_suspension_restores_a_partially_applied_put(ignored):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, events=events)
+    if ignored:
+        view.ignore_updates.add(True)
+    else:
+        view.update_errors[True] = RuntimeError("disabling updates failed after put")
+
+    with pytest.raises(RuntimeError, match="disabling"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert keep.visibility_writes == []
+    assert view.DisableAutoUpdate is False
+    assert events == [("updates", True), ("updates", False)]
+
+
+@pytest.mark.parametrize("ignored", [False, True])
+def test_isolation_failed_restore_is_not_silently_accepted(ignored):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, events=events)
+    if ignored:
+        view.ignore_updates.add(False)
+    else:
+        view.update_errors[False] = RuntimeError("restoring updates failed")
+
+    with pytest.raises(RuntimeError, match="restor"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert view.update_writes == [True, False]
+    assert events[-1] == ("updates", False)
+    assert keep.visibility_writes == [True]
+
+
+def test_isolation_detects_ignored_leaf_writes_only_after_restoring_and_rebuilding():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    keep.ignore_writes = True
+    adapter, view = _isolation_scene(keep, events=events)
+
+    with pytest.raises(RuntimeError, match="visibility readback failed.*keep-1"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert view.DisableAutoUpdate is False
+    assert events[-2:] == [("updates", False), ("rebuild", False)]
+    assert keep.visibility_reads == 2
+
+
+@pytest.mark.parametrize("changed_node", ["leaf", "ancestor"])
+def test_isolation_verifies_each_instance_and_ancestor_after_rebuild(changed_node):
+    events = []
+    first = _IsolationComponent("keep-1")
+    second = _IsolationComponent("keep-2")
+    parent = _IsolationComponent("sub-1", children=[first])
+    target = first if changed_node == "leaf" else parent
+
+    def change_during_rebuild():
+        target._visible = False
+
+    adapter, view = _isolation_scene(
+        parent, second, events=events, on_rebuild=change_during_rebuild
+    )
+    with pytest.raises(RuntimeError, match=f"{changed_node} {target.Name!r}"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert second.Visible is True  # Family-level presence is not per-instance proof.
+    assert events == [("rebuild", False)]
+    assert view.update_writes == []
+
+
+@pytest.mark.parametrize("after_rebuild", [False, True])
+def test_isolation_read_errors_propagate_instead_of_assuming_visible(after_rebuild):
+    events = []
+    keep = _IsolationComponent("keep-1")
+    primary = RuntimeError("visibility read failed")
+
+    def fail_reads():
+        keep.read_error = primary
+
+    adapter, view = _isolation_scene(
+        keep, events=events, on_rebuild=fail_reads if after_rebuild else None
+    )
+    if not after_rebuild:
+        fail_reads()
+    with pytest.raises(RuntimeError, match="visibility read failed") as caught:
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert caught.value is primary
+    assert keep.visibility_writes == []
+    assert view.update_writes == []
+    assert events == ([("rebuild", False)] if after_rebuild else [])
+
+
+def test_isolation_rebuild_failure_happens_with_original_update_state_restored():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    primary = RuntimeError("drawing rebuild failed")
+
+    def fail_rebuild():
+        raise primary
+
+    adapter, view = _isolation_scene(keep, events=events, on_rebuild=fail_rebuild)
+    with pytest.raises(RuntimeError, match="drawing rebuild failed") as caught:
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert caught.value is primary
+    assert view.DisableAutoUpdate is False
+    assert events[-2:] == [("updates", False), ("rebuild", False)]
+    assert keep.visibility_reads == 1
+
+
 _ANCHOR = _drawing_balloons.BalloonAnchor(point_mm=(1.0, 2.0, 3.0))
 
 
