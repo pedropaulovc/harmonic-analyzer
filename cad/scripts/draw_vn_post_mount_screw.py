@@ -22,13 +22,17 @@ moved to the tip and cropped to the detail's fence, that imports the break
 by feature.  It reads as a detail on the sheet: a "DETAIL A  SCALE 10:1"
 label owned by the view, and a circle and letter "A" on the Front at the
 tip.  The Front is re-activated before the notes so they do not land in
-the tip view.  The only
-note says to deburr the cut end and that the
-undimensioned purchased geometry is reference.  No installation sequence or rule number is
+the tip view. The notes retain the deburr/reference facts and identify the
+unspecified representative crown. No installation sequence or rule number is
 printed: the sequence is an MHA-DT-000 assembly step (Main's eye pass of
 warm-c486, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).  The engagement minimum prints as a plain fact,
 "ENGAGEMENT 0.90D MIN", on the cut-length callout's last line, never in a
 note; the spec's asserts still guard its value.
+
+A second sheet carries a separate construction-only supplier max-limit
+envelope, with a cropped slot-plane head schematic and the complete original
+stock/thread region. Its bounding crown invents no supplier radius. These
+native inch limits are distinct from the representative solid and finished controls.
 
 Run with SolidWorks open::
 
@@ -47,6 +51,8 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     dimension_name,
+    curate_dimensions,
+    iter_views,
     place_view,
     view_name,
 )
@@ -69,12 +75,18 @@ from _drawing_dimensions import (
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _drawing_view_display import set_hidden_lines_removed
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_sheet_region import sheet_drawable_region
 from _layout_geometry import Box, estimate_text_box
+from _purchased_fastener_drawing import _box, _inside, _literal_note, assert_supplier_view_fits
 from _session import run_build
 from _stock_trim_drawing import TrimSheet
 import _telemetry
+from _supplier_dimensions import (
+    assert_supplier_reference_dimension, supplier_reference_dimension,
+)
 from vn_post_mount_screw_spec import (
     CUT_END_BREAK_DIMENSION,
     CUT_END_BREAK_MAX_MM,
@@ -82,6 +94,9 @@ from vn_post_mount_screw_spec import (
     CUT_END_BREAK_TOL_TYPE,
     CUT_LENGTH_DIMENSION,
     CUT_LENGTH_MM,
+    CUT_LENGTH_SKETCH,
+    CUT_END_BREAK_SKETCH,
+    CUT_END_BREAK_BAND,
     CUT_TO_FIT_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -89,6 +104,14 @@ from vn_post_mount_screw_spec import (
     HEAD_H_MM,
     SKU,
     THREAD_DIA_MM,
+    SUPPLIER_PRECISION,
+    SUPPLIER_PROFILE_DIMENSIONS,
+    SUPPLIER_PROFILE_MM,
+    SUPPLIER_STOCK_CONFIGURATION,
+    SUPPLIER_STOCK_DIMENSIONS,
+    SUPPLIER_STOCK_FEATURE,
+    SUPPLIER_STOCK_NOTE,
+    SUPPLIER_STOCK_TITLE,
 )
 
 SPEC = DRAWINGS_BY_NAME["vn_post_mount_screw"]
@@ -188,6 +211,259 @@ STOCK_ROWS = (
     ("Supplier SKUs", 0.080, 0.060),
     ("Stock Name", 0.016, 0.049),
 )
+
+SHEET_NAMES = ("FINISHED", "SUPPLIER-MAX-ENVELOPE")
+STOCK_SCALE = (2.0, 1.0)
+STOCK_CENTER = (0.235, 0.110)
+STOCK_KEEP = {
+    "SupplierStockLength": (0.235, 0.081),
+    "SupplierThreadLength": (0.303, 0.151),
+}
+STOCK_HEAD_SCALE = (6.0, 1.0)
+STOCK_HEAD_CENTER = (0.100, 0.200)
+STOCK_HEAD_RADIUS_MM = 8.5
+STOCK_HEAD_KEEP = {
+    "SupplierHeadOD": (0.035, 0.200),
+    "SupplierHeadHeight": (0.100, 0.257),
+    "SupplierStraightSkirt": (0.108, 0.147),
+    "SupplierSlotWidth": (0.170, 0.200),
+    "SupplierSlotDepth": (0.095, 0.237),
+}
+# Fixed scales/centres reserve dimension ink BEFORE import, never by rescaling
+# the settled drawing. The native outline + complete annotation ink must fit.
+STOCK_VIEW_CELL = (0.115, 0.073, 0.410, 0.177)
+STOCK_HEAD_CELL = (0.018, 0.142, 0.193, 0.264)
+STOCK_NOTES = (
+    (SUPPLIER_STOCK_TITLE, 0.200, 0.258, (0.195, 0.247, 0.415, 0.264)),
+    (SUPPLIER_STOCK_NOTE, 0.016, 0.062, (0.014, 0.045, 0.2155, 0.065)),
+    (
+        f"SLOT-PLANE HEAD ENVELOPE  SCALE {STOCK_HEAD_SCALE[0]:g}:{STOCK_HEAD_SCALE[1]:g}",
+        0.030, 0.139, (0.018, 0.128, 0.193, 0.142),
+    ),
+    (
+        f"FULL ORIGINAL STOCK  SCALE {STOCK_SCALE[0]:g}:{STOCK_SCALE[1]:g}",
+        0.200, 0.187, (0.195, 0.178, 0.410, 0.190),
+    ),
+)
+
+
+def _supplier_contract(row) -> dict[str, Any]:
+    return dict(
+        label=row.name, expected_mm=row.source.envelope_mm,
+        units="in", precision=SUPPLIER_PRECISION, presentation=row.presentation,
+        callout=row.callout,
+    )
+
+
+def assert_supplier_profile_state(
+    row, *, qualified_name, native_type, driven_state, tolerance_type,
+    tolerance_band_mm, tolerance_precision, attachment_points_mm,
+) -> None:
+    """Source-specific read-only contract; no inferred band or witness geometry."""
+    if (
+        str(qualified_name).split("@")[:2] != [row.name, SUPPLIER_STOCK_FEATURE]
+        or native_type != row.native_type
+        or driven_state != 1
+    ):
+        raise RuntimeError(f"{row.name}: native source profile ownership/type changed")
+    band = row.source.deviations_mm
+    if tolerance_type != (0 if band is None else 3):
+        raise RuntimeError(f"{row.name}: native supplier limit type changed")
+    if tolerance_precision != SUPPLIER_PRECISION:
+        raise RuntimeError(f"{row.name}: supplier limit precision changed")
+    expected_band = (0.0, 0.0) if band is None else band
+    if len(tolerance_band_mm) != 2 or any(
+        not math.isclose(actual, expected, rel_tol=0.0, abs_tol=1e-8)
+        for actual, expected in zip(tolerance_band_mm, expected_band, strict=True)
+    ):
+        raise RuntimeError(f"{row.name}: native supplier limit band changed")
+    expected = sorted((*SUPPLIER_PROFILE_MM[index], 0.0) for index in row.vertices)
+    actual = sorted(tuple(point) for point in attachment_points_mm)
+    if len(actual) != 2 or any(
+        len(point) != 3 or not all(math.isfinite(value) for value in point)
+        or math.dist(point, target) > 1e-5
+        for point, target in zip(actual, expected, strict=True)
+    ):
+        raise RuntimeError(f"{row.name}: native dimension left its physical source vertices")
+
+
+def _supplier_stock_view(adapter, *, center, scale, keep, label, crop_head=False):
+    """Reveal zero-body source geometry before fitting, then import dimensions."""
+    stock = _early_bound(
+        place_view(adapter, str(SOURCE), "*Front", *center), "IView",
+    )
+    stock.ReferencedConfiguration = SUPPLIER_STOCK_CONFIGURATION
+    if str(stock.ReferencedConfiguration) != SUPPLIER_STOCK_CONFIGURATION:
+        raise RuntimeError(f"{label}: cannot select supplier source configuration")
+    set_hidden_lines_removed(adapter, stock)
+    shown = hidden_sketches._show_hidden_owners(
+        adapter, stock, (SUPPLIER_STOCK_FEATURE,), view_label=label,
+    )
+    if set(shown) != {SUPPLIER_STOCK_FEATURE}:
+        raise RuntimeError(f"{label}: supplier profile is not saved hidden")
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError(f"{label}: cannot rebuild revealed supplier profile")
+    # Preparation precedes the first scale/outline/projection operation. A
+    # zero-body source view cannot be fitted while its only geometry is hidden.
+    stock.UseSheetScale = 0
+    stock.ScaleRatio = double_array([float(value) for value in scale])
+    if (
+        int(stock.UseSheetScale) != 0
+        or tuple(float(value) for value in stock.ScaleRatio) != scale
+    ):
+        raise RuntimeError(f"{label}: supplier view did not retain its independent scale")
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError(f"{label}: cannot rebuild scaled supplier profile")
+    stock.UpdateViewDisplayGeometry()
+    _box(stock.GetOutline(), label=f"{label} revealed source profile")
+    head_height = next(
+        row.source.envelope_mm for row in SUPPLIER_PROFILE_DIMENSIONS
+        if row.name == "SupplierHeadHeight"
+    )
+    stock_length = next(
+        row.source.envelope_mm for row in SUPPLIER_PROFILE_DIMENSIONS
+        if row.name == "SupplierStockLength"
+    )
+    x_mm = -head_height / 2.0 if crop_head else (stock_length - head_height) / 2.0
+    reference = (x_mm / 1000.0, 0.0, 0.0)
+    projected = model_point_in_view(adapter, stock, reference, label=label)
+    position = tuple(float(value) for value in stock.Position)
+    if not stock.SetViewPosition(double_array([
+        position[index] + center[index] - projected[index] for index in range(2)
+    ]), False):
+        raise RuntimeError(f"{label}: cannot position complete source profile")
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError(f"{label}: cannot rebuild positioned source profile")
+    if crop_head:
+        _activate(adapter, stock, label=label)
+        _sketch_circle(
+            adapter, stock, center, STOCK_HEAD_RADIUS_MM * scale[0] / scale[1] / 1000.0,
+            label="supplier head bounding profile crop",
+        )
+        status = int(stock.Crop2(False, True, 5))
+        adapter.currentModel.ClearSelection2(True)
+        if not adapter.currentModel.EditRebuild3():
+            raise RuntimeError("cannot rebuild cropped source head profile")
+        if status != _CROP_NO_ERROR or not bool(stock.IsCropped()):
+            raise RuntimeError(f"source head profile crop failed ({status})")
+    # Only the settled, revealed geometry supplies the imported source sizes.
+    annotations = hidden_sketches.curate_view_dimensions(
+        adapter, stock, keep=keep, view_label=label,
+        dimensions_by_feature=SUPPLIER_STOCK_DIMENSIONS,
+    )
+    annotations = curate_dimensions(adapter, annotations, reposition=keep)
+    by_name = {row.name: row for row in SUPPLIER_PROFILE_DIMENSIONS}
+    for annotation in annotations:
+        row = by_name[dimension_name(adapter, annotation)]
+        supplier_reference_dimension(
+            adapter, annotation.GetSpecificAnnotation(), **_supplier_contract(row),
+        )
+    return stock
+
+
+def _supplier_stock_sheet(adapter):
+    full = _supplier_stock_view(
+        adapter, center=STOCK_CENTER, scale=STOCK_SCALE, keep=STOCK_KEEP,
+        label="source full stock and factory thread",
+    )
+    head = _supplier_stock_view(
+        adapter, center=STOCK_HEAD_CENTER, scale=STOCK_HEAD_SCALE, keep=STOCK_HEAD_KEEP,
+        label="source head slot-plane bounding profile", crop_head=True,
+    )
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    # ActivateView("") returns False for the sheet itself; read the actual
+    # edit context instead of treating that documented return as a failure.
+    ddoc.ActivateView("")
+    if ddoc.GetEditSheet() is not True or ddoc.ActiveDrawingView is not None:
+        raise RuntimeError("cannot activate source sheet for its labels")
+    notes = []
+    for text, x, y, cell in STOCK_NOTES:
+        note = _literal_note(adapter, text, x, y)
+        if int(_early_bound(note.GetAnnotation(), "IAnnotation").OwnerType) != 1:
+            raise RuntimeError("source envelope label is not sheet-owned")
+        notes.append((note, text, cell))
+    return view_name(adapter, full), view_name(adapter, head), notes
+
+
+def _verify_supplier_stock(adapter, full_name, head_name, notes) -> None:
+    """Fresh census and native ink assertions after the LAST rebuild."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if ddoc.ActivateSheet(SHEET_NAMES[1]) is not True:
+        raise RuntimeError("cannot activate settled source envelope sheet")
+    views = {view_name(adapter, view): _early_bound(view, "IView") for view in iter_views(adapter)}
+    if set(views) != {full_name, head_name}:
+        raise RuntimeError("source envelope lost its two native views")
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+    region = sheet_drawable_region(
+        adapter, sheet, width=template.width_m, height=template.height_m,
+    )
+    border = (region.xmin, region.ymin, region.xmax, region.ymax)
+    rows = {row.name: row for row in SUPPLIER_PROFILE_DIMENSIONS}
+    found = []
+    for view, keep, scale, cropped, cell in (
+        (views[full_name], STOCK_KEEP, STOCK_SCALE, False, STOCK_VIEW_CELL),
+        (views[head_name], STOCK_HEAD_KEEP, STOCK_HEAD_SCALE, True, STOCK_HEAD_CELL),
+    ):
+        if not _inside(cell, border):
+            raise RuntimeError("source annotation cell leaves the actual sheet border")
+        view.UpdateViewDisplayGeometry()
+        assert_supplier_view_fits(adapter, view, cell, label="MSC source envelope")
+        if (
+            str(view.ReferencedConfiguration) != SUPPLIER_STOCK_CONFIGURATION
+            or tuple(float(value) for value in view.ScaleRatio) != scale
+            or bool(view.IsCropped()) != cropped
+        ):
+            raise RuntimeError("supplier envelope view lost source configuration/scale/crop")
+        annotations = [
+            _early_bound(raw, "IAnnotation") for raw in (view.GetAnnotations() or ())
+            if dimension_name(adapter, _early_bound(raw, "IAnnotation"))
+        ]
+        names = [dimension_name(adapter, annotation) for annotation in annotations]
+        if sorted(names) != sorted(keep):
+            raise RuntimeError(f"source view required dimension coverage changed: {names}")
+        found.extend(names)
+        for annotation, name in zip(annotations, names, strict=True):
+            if int(annotation.Visible) != 1:
+                raise RuntimeError(f"{name}: supplier source dimension is hidden")
+            row = rows[name]
+            display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+            assert_supplier_reference_dimension(adapter, display, **_supplier_contract(row))
+            native = _early_bound(display.GetDimension2(0), "IDimension")
+            tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
+            kinds = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
+            entities = tuple(annotation.GetAttachedEntities3() or ())
+            if len(entities) != 2 or len(kinds) != 2 or any(kind not in (11, 25) for kind in kinds):
+                raise RuntimeError(f"{name}: source profile dimension must attach to two sketch vertices")
+            points = []
+            for entity in entities:
+                point = _early_bound(entity, "ISketchPoint")
+                points.append(tuple(float(value) * 1000.0 for value in (point.X, point.Y, point.Z)))
+            assert_supplier_profile_state(
+                row, qualified_name=str(native.FullName), native_type=int(display.Type2),
+                driven_state=int(native.DrivenState), tolerance_type=int(tolerance.Type),
+                tolerance_band_mm=(
+                    float(tolerance.GetMinValue()) * 1000.0,
+                    float(tolerance.GetMaxValue()) * 1000.0,
+                ),
+                tolerance_precision=int(display.GetPrimaryTolPrecision2()),
+                attachment_points_mm=points,
+            )
+    if sorted(found) != sorted(rows):
+        raise RuntimeError("supplier stock must retain all seven source dimension groups exactly once")
+    for note, text, cell in notes:
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        bounds = _box(note.GetExtent(), label=text, kind="note")
+        if (
+            int(annotation.OwnerType) != 1
+            or not _inside(bounds, cell)
+            or not _inside(bounds, border)
+            or (
+                bounds[2] > template.title_block_left_m
+                and bounds[1] < template.title_block_top_m
+            )
+        ):
+            raise RuntimeError(f"source envelope label leaves usable sheet space: {text!r}")
 
 
 def _sketch_circle(
@@ -732,10 +1008,68 @@ def _reference_cut_length(adapter: Any, annotations: list[Any]) -> None:
     raise RuntimeError("Front view has no cut length to mark reference")
 
 
+def _verify_finished_controls(adapter, front, tip, installed_configuration) -> None:
+    """Retain the original cut/fit and deburr controls independently of stock."""
+    for view in (front, tip):
+        if str(_early_bound(view, "IView").ReferencedConfiguration) != installed_configuration:
+            raise RuntimeError("finished control view no longer references the representative solid")
+    annotations = [
+        _early_bound(raw, "IAnnotation")
+        for raw in (_early_bound(front, "IView").GetAnnotations() or ())
+        if dimension_name(adapter, _early_bound(raw, "IAnnotation")) == CUT_LENGTH_DIMENSION
+    ]
+    if len(annotations) != 1:
+        raise RuntimeError("finished sheet lost its one cut-to-fit reference length")
+    assert_imported_precision(adapter, annotations, FRONT_PRECISION)
+    display = _early_bound(annotations[0].GetSpecificAnnotation(), "IDisplayDimension")
+    native = _early_bound(display.GetDimension2(0), "IDimension")
+    if (
+        str(native.FullName).split("@")[:2] != [CUT_LENGTH_DIMENSION, CUT_LENGTH_SKETCH]
+        or abs(float(native.SystemValue) * 1000.0 - CUT_LENGTH_MM) > 1e-6
+        or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0
+        or str(display.GetText(1) or "") != "("
+        or str(display.GetText(2) or "") != ")"
+        or str(display.GetText(4) or "") != CUT_TO_FIT_CALLOUT
+        or display.GetOverride()
+        or not display.ShowDimensionValue
+        or annotations[0].IsDangling()
+        or not any(annotations[0].GetAttachedEntities3() or ())
+    ):
+        raise RuntimeError("finished cut-to-fit reference changed")
+    _verify_tip_view(adapter, front, tip)
+    tip_annotations = [
+        _early_bound(raw, "IAnnotation")
+        for raw in (_early_bound(tip, "IView").GetAnnotations() or ())
+        if dimension_name(adapter, _early_bound(raw, "IAnnotation")) == CUT_END_BREAK_DIMENSION
+    ]
+    if len(tip_annotations) != 1:
+        raise RuntimeError("finished sheet lost its one cut-end break dimension")
+    assert_imported_precision(adapter, tip_annotations, DETAIL_PRECISION)
+    tip_display = _early_bound(tip_annotations[0].GetSpecificAnnotation(), "IDisplayDimension")
+    tip_native = _early_bound(tip_display.GetDimension2(0), "IDimension")
+    tip_tolerance = _early_bound(tip_native.Tolerance, "IDimensionTolerance")
+    upper, lower = CUT_END_BREAK_BAND
+    if (
+        str(tip_native.FullName).split("@")[:2] != [CUT_END_BREAK_DIMENSION, CUT_END_BREAK_SKETCH]
+        or abs(float(tip_tolerance.GetMinValue()) * 1000.0 - lower) > 1e-8
+        or abs(float(tip_tolerance.GetMaxValue()) * 1000.0 - upper) > 1e-8
+        or tip_display.GetOverride()
+        or not tip_display.ShowDimensionValue
+    ):
+        raise RuntimeError("finished cut-end break lost its original native band/attachment")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
     check("open cut post mount screw", await adapter.open_model(str(SOURCE)))
+    source_model = _early_bound(adapter.currentModel, "IModelDoc2")
+    installed_configuration = str(_early_bound(
+        _early_bound(source_model.ConfigurationManager, "IConfigurationManager").ActiveConfiguration,
+        "IConfiguration",
+    ).Name)
+    if installed_configuration == SUPPLIER_STOCK_CONFIGURATION:
+        raise RuntimeError("source part was saved with the supplier envelope active")
     required = (
         "Number",
         "Material Specification",
@@ -745,11 +1079,18 @@ async def build(adapter: Any) -> dict[str, str]:
         "Supplier",
         "Supplier SKUs",
         "Manufacturing Notes",
+        "Supplier Geometry Status",
+        "Supplier Reference Source",
+        "Supplier Reference Title",
     )
     read_required_properties(adapter.currentModel, required, required=required)
     draw, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="post mount screw source package")
+    drawing_doc = _early_bound(draw, "IDrawingDoc")
+    if not drawing_doc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot activate finished representative screw sheet")
     stamp_drawing_summary(adapter, draw, DRAWING_SUMMARY)
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=SHEET_SCALE)
@@ -791,14 +1132,21 @@ async def build(adapter: Any) -> dict[str, str]:
         add_property_linked_note(adapter, name, x, y, char_height=0.003)
 
     set_hidden_lines_removed(adapter, front)
-    # Re-read after the last rebuilds, before the save.
-    _verify_tip_view(adapter, front, tip)
+    if not drawing_doc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("cannot activate source max-limit envelope sheet")
+    full_stock_name, source_head_name, stock_notes = _supplier_stock_sheet(adapter)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title=TITLE,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE},
+        settled_checks=(
+            lambda: _verify_finished_controls(adapter, front, tip, installed_configuration),
+            lambda: _verify_supplier_stock(adapter, full_stock_name, source_head_name, stock_notes),
+        ),
     )
 
 

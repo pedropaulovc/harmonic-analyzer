@@ -1,7 +1,9 @@
-"""Create the four-view purchased-reference sheet for McMaster-Carr 3606T811, brass bead-chain loop link.
+"""Identification sheet for the 3606T811 trade-size-3 bead-chain loop link.
 
-Identification only: the part as installed, its stock and ordering SKU, and
-its cut-length or fitting note; no fabrication dimensions.
+The generic capsule model is an installed-clearance stand-in, not a replica
+of the supplier's photographed loop link. The supplier source publishes no
+numeric dimensions; trade size 3 is an ordering designation, not a size to
+attach to model geometry. Existing installed-loop controls remain unchanged.
 """
 
 from __future__ import annotations

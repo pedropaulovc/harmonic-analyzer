@@ -49,22 +49,42 @@ cannot ask for what the authors were told to leave out.
   as .438 in). `_supplier_dimensions.supplier_reference_dimension` checks the
   native type/value and applies local units, precision and reference text
   without rebuilding between selections. It never changes the numeric value
-  or supplies numeric replacement text. Supplier tolerance bands remain
-  reference information; project general tolerances do not control purchased
-  sizes. Finished/custom modification dimensions remain controlling and do
-  not use this formatter.
+  or supplies numeric replacement text. `SetPrecision3`'s method remarks
+  explicitly permit `swDoNotChangePrecisionSetting` (`-1`) for unchanged fields:
+  the formatter preserves source tolerance and dual precision, requires the
+  documented zero success status, and reads the requested nominal precision back.
+  Supplier tolerance precision stays source-owned and may differ from nominal
+  precision. Supplier tolerance bands remain reference information; project general
+  tolerances do not control purchased sizes. Finished/custom modification
+  dimensions remain controlling and do not use this formatter.
   Shared purchased builders accept a synchronous optional
   `supplier_dimensions(adapter, views_by_orientation)` callback, keyed by
   `*Front`, `*Top`, `*Right` and `*Isometric`, after final view fitting and
   before the native contracts. Captions stay at the cell floor only on views
-  carrying native supplier dimensions, reserving their existing cell whitespace.
-  Dimensions must fit without silently reducing the geometry-selected view scale.
-  Each hooked build supplies a build-local `settled_checks` sequence; the
-  callback may append read-only closures before the builder forwards that same
-  sequence to `finalize_drawing`. After its last rebuild and before saving,
-  checks reacquire current native dimensions/attachments and use
-  `_supplier_dimensions.assert_supplier_reference_dimension` plus source-specific
-  attachment, tolerance and required-count assertions.
+  carrying native supplier dimensions. Each hooked build declares `supplier_margins`
+  as a mapping from only its annotated orientations to `(left, bottom, right, top)`
+  sheet-metre clearances. Unannotated views and Isometric keep their original cells;
+  uniform padding must not shrink a shared scale for an unused small end view.
+  `supplier_fit_cells` insets only declared geometry cells before the first native
+  scale selection. Captions and final annotation containment use the original
+  note-dependent outer cells. A callback must not rescale or reposition fitted
+  views to make annotations pass.
+  Each hooked build supplies a build-local `settled_checks` sequence; the callback
+  may append read-only closures before the builder collects it for `finalize_drawing`.
+  After the last rebuild and before saving, checks reacquire current native
+  dimensions/attachments and use `_supplier_dimensions.assert_supplier_reference_dimension`
+  plus source-specific attachment, tolerance and required-count assertions.
+  The shared builder adds a final cell/ink check that also proves the fitted
+  positions/scales and actual annotated-view plan. Placement compares the projected
+  fixed model origin, not `IView.Position` (a geometric centre that visible
+  references may change). Captions/footer are sheet-owned, with ownership and
+  extents rechecked after the last rebuild. `assert_supplier_view_fits`
+  uses native dimension display primitives and view-owned note extents, refusing
+  unreadable/empty ink or any overflow into a caption or neighbouring cell.
+  It reuses the canonical text-width estimate only when the native display API
+  supplies no width; a printed-PDF eye pass remains required for actual glyph metrics.
+  Specialized supplier-state layouts reuse the same inset and per-view ink helpers
+  with their own named cells, configuration, dimension census and zero-Isometric plan.
   The fastener builder also accepts `configuration="SupplierStock"` (or
   another saved configuration name) for a stock-state sheet: every view selects
   it and rebuilds before scale fitting, and the native contract verifies it

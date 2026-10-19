@@ -11,7 +11,8 @@ Geometry source: the vendor-model replica ``diagnostics/diag_build_91794A055``
 (replica-gated against the local-only harvest; no .SLDPRT committed), which
 draws the cut directly (``build_91794A055(cut_length=..., cut_end_break=...)``):
 the revolve profile ends the shank at the cut with the break in place of the
-factory tip chamfer, as MHA-VN-040's ``build_vn_transgear_arm_plate_screw`` does.
+factory tip chamfer. The oval MHA-VN-040 instead retains a native stock
+configuration and applies its installed trim with a suppressible cut feature.
 
 Frame: axis +Y, head up, the under-head bearing face at y = 0 (Top Plane);
 the cut end is at y = -LENGTH (= -CUT_LENGTH).  The assembly mates the Top
@@ -23,10 +24,16 @@ from __future__ import annotations
 
 import sys
 
+from functools import partial
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
-from _simplified_part import save_simplified_part
+from _supplier_screw_reference import save_supplier_reference_part
+from _mcmaster_91794a055 import (
+    SUPPLIER_REFERENCE_DIMENSIONS,
+    SUPPLIER_REFERENCE_STARTS,
+    SUPPLIER_REFERENCE_PLANES,
+)
 from diagnostics.diag_build_91794A055 import build_91794A055
 from vn_transgear_disc_screw_spec import (
     CUT_END_BREAK_MAX,
@@ -63,7 +70,12 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
-        save_threaded_part=save_simplified_part,
+        save_threaded_part=partial(
+            save_supplier_reference_part,
+            dimensions=SUPPLIER_REFERENCE_DIMENSIONS,
+            starts=SUPPLIER_REFERENCE_STARTS,
+            planes=SUPPLIER_REFERENCE_PLANES,
+        ),
         screw_axis_planes=("Front Plane", "Right Plane"),
     )
 

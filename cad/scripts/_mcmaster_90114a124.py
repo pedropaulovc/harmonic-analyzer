@@ -18,3 +18,28 @@ HEAD_DIA = 0.14 * 25.4
 PITCH = 25.4 / 56.0
 
 FILLISTER_SIZE = (MAJOR_DIA, LENGTH, HEAD_H, HEAD_DIA, PITCH)
+
+# Actual supplier engineering drawing inspected 2026-10-19.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260619/961C5808/"
+    "90114A124_Brass%20Fillister%20Head%20Slotted%20ScrewsX.GIF"
+)
+# Route the thread witness away from the larger head.
+SUPPLIER_REFERENCE_SIDES = {"SupplierThreadDiameter": "bottom"}
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", -LENGTH, "vertical"),
+    ("SupplierHeadHeight", HEAD_H, "vertical"),
+    ("SupplierHeadDiameter", HEAD_DIA, "horizontal"),
+    ("SupplierThreadDiameter", MAJOR_DIA, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierHeadDiameter": (-HEAD_DIA / 2.0, 0.0),
+    "SupplierThreadDiameter": (-MAJOR_DIA / 2.0, -LENGTH / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (2, "length", None, None),
+    "SupplierHeadHeight": (3, "length", None, None),
+    "SupplierHeadDiameter": (2, "diameter", None, None),
+    "SupplierThreadDiameter": (3, "diameter", None, "2-56"),
+}

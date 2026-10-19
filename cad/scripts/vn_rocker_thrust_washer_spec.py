@@ -59,6 +59,20 @@ SUPPLIER_TOLERANCES = {
     "supplier thickness": (THICKNESS_MIN, THICKNESS_MAX, "symmetric"),
 }
 
+REFERENCE_SKETCHES = (
+    "SupplierWasherFaceReference",
+    "SupplierWasherThicknessReference",
+)
+DRAWING_PRECISION = {
+    "SupplierWasherFaceReference": {
+        "SupplierOuterDiameter": DRAWING_REFERENCE_PRECISION["supplier outer diameter"],
+        "SupplierBoreDiameter": DRAWING_REFERENCE_PRECISION["supplier bore diameter"],
+    },
+    "SupplierWasherThicknessReference": {
+        "SupplierThickness": DRAWING_REFERENCE_PRECISION["supplier thickness"],
+    },
+}
+
 
 def washer_volume() -> float:
     """The modelled annulus, mm^3."""

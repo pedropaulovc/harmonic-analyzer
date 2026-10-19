@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from functools import partial
+from math import isfinite
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
@@ -19,6 +20,7 @@ from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
+from _supplier_screw_layout import supplier_screw_lane_plan
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
 import _telemetry
 
@@ -104,6 +106,7 @@ def annotate_supplier_screw(
     formats: Mapping[str, tuple[int, str, int | None, str | None]],
     starts: Mapping[str, tuple[float, float]] | None = None,
     planes: Mapping[str, str] | None = None,
+    sides: Mapping[str, str] | None = None,
     settled_checks: list[Callable[[], None]] | None = None,
 ) -> dict[str, Any]:
     """Curate the model's supplier dimensions into their own orthographic views.
@@ -112,21 +115,32 @@ def annotate_supplier_screw(
     denominator and optional below-callout. Values remain the exact model sizes.
     Sketch coordinates are millimetres in the source Front/Top plane. Native
     projection places short head-height sizes at the head, not mid-shank.
+    Authored free sides keep smaller shank/collar witnesses away from wider
+    heads; the pre-fit budget consumes the identical pure lane plan.
     """
     starts = starts or {}
     planes = planes or {}
     names = {name for name, _, _ in dimensions}
     if names != set(formats) or len(names) != len(dimensions):
         raise ValueError("supplier screw references and display formats must match")
+    lane_plan = supplier_screw_lane_plan(dimensions, planes=planes, sides=sides)
     displays: dict[str, Any] = {}
     for plane, feature in FEATURE_BY_PLANE.items():
         rows = [row for row in dimensions if planes.get(row[0], "Front") == plane]
         if not rows:
             continue
-        view = _early_bound(views[f"*{plane}"], "IView")
+        orientation_name = f"*{plane}"
+        view = _early_bound(views[orientation_name], "IView")
+        if view.GetOrientationName() != orientation_name:
+            raise RuntimeError(
+                f"{plane}: supplier references target the wrong orientation"
+            )
+        view.UpdateViewDisplayGeometry()
         outline = tuple(float(value) for value in view.GetOutline())
-        if len(outline) != 4:
-            raise RuntimeError(f"{plane}: supplier reference view has no native outline")
+        if len(outline) != 4 or not all(isfinite(value) for value in outline):
+            raise RuntimeError(
+                f"{plane}: supplier reference view has no finite outline"
+            )
         points = []
         for name, value, orientation in rows:
             x, y = starts.get(name, (0.0, 0.0))
@@ -143,17 +157,18 @@ def annotate_supplier_screw(
             adapter, view, points, label=f"{plane} supplier reference centres"
         )
         keep = {}
-        lanes = {"horizontal": 0, "vertical": 0, "angle": 0}
-        for (name, _, orientation), (x, y) in zip(rows, projected, strict=True):
-            lane = lanes[orientation]
-            lanes[orientation] += 1
-            offset = 0.006 + (lane // 2) * 0.008
-            if orientation == "vertical":
-                x = outline[2] + offset if lane % 2 == 0 else outline[0] - offset
-            elif orientation == "horizontal":
-                y = outline[3] + offset if lane % 2 == 0 else outline[1] - offset
-            else:
+        for (name, _, _), (x, y) in zip(rows, projected, strict=True):
+            side, offset = lane_plan[name]
+            if side == "left":
                 x = outline[0] - offset
+            elif side == "right":
+                x = outline[2] + offset
+            elif side == "bottom":
+                y = outline[1] - offset
+            else:
+                y = outline[3] + offset
+            if not isfinite(x) or not isfinite(y):
+                raise RuntimeError(f"{name}: supplier reference lane is not finite")
             keep[name] = (x, y)
         annotations = curate_view_dimensions(
             adapter,

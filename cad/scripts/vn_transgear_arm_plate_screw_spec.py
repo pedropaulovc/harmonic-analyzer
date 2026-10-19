@@ -5,17 +5,20 @@ fully threaded 1 in stock, nominal 82 degree, ASME B18.6.3, flat tip.
 Populated primary page observed 2026-10-09T07:17:13.553Z:
 https://www.mcmaster.com/91790A199/ . Length is from BEVEL TOP,
 not crown or underhead. Catalog head diameter .312 in, total head .152 in,
-crown .052 in are nominal, not supplier tolerance bands. The derived
-82 degree cone/spherical crown recipe is not a vendor 3D model or a
-profile guarantee. The installed oval/slotted head look is unchanged.
+crown .052 in are nominal, not supplier tolerance bands. The 82 degree
+cone/spherical crown follow those catalogue sizes; the underhead neck,
+fillet and thread start are the supplier STEP's (``SOURCE_STEP_SHA256``,
+inspected out of tree, not committed). The installed oval/slotted head look
+is unchanged.
 
 Stock is bench-fitted and cut OFF MECHANISM before the guide-lock sweep.
 The installed cut length and deburr follow the actual arm/plate stack.
 Commodity hardware is used to its published catalogue/standard dimensions;
 there is no incoming screw-profile, crown or thread-loss inspection plan.
 
-Reference frame: axis+Y, bevel top y=0, crown above it; installed shank
-ends y=-CUT_LENGTH. Nominal native builds do not invent actual receipts.
+Reference frame: axis+Y, bevel top y=0, crown above it; the installed
+(default) shank ends y=-CUT_LENGTH, the SupplierStock configuration's factory
+tip y=-STOCK_LENGTH. Nominal native builds do not invent actual receipts.
 """
 
 from __future__ import annotations
@@ -43,6 +46,65 @@ HEAD_H = 0.152 * IN  # total, crown included
 CROWN_H = 0.052 * IN
 BEVEL_H = HEAD_H - CROWN_H
 HEAD_ANGLE_DEG = 82.0
+
+# --- Underhead transition: the supplier's own STEP -------------------------------
+# McMaster's CAD-chooser STEP for this SKU (1 solid, 77 faces), inspected with
+# headless FreeCAD on 2026-10-19 and kept out of tree. Its axis is +X with the
+# bevel top at x = -12.7; the depths below are measured from the bevel top.
+SOURCE_STEP_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260108/53AE5A4D/"
+    "91790A199_18-8%20Stainless%20Steel%20Slotted%20Oval%20Head%20Screws.STEP"
+)
+SOURCE_STEP_SHA256 = "8dce92581429d3c3fcf5e4d8b5a3588ce990af21ad99cd5d00051ff7653c71bb"
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260108/172E7CCB/"
+    "91790A199_18-8%20Stainless%20Steel%20Slotted%20Oval%20Head%20ScrewsX.GIF"
+)
+# Where the 82 deg bevel cone, run on, meets the thread major (the fillet's
+# theoretical sharp corner): STEP cone faces 1/71 hold r = THREAD_MAJOR / 2 there.
+BEVEL_CONE_DEPTH = (
+    (HEAD_DIA - THREAD_MAJOR) / 2.0 / math.tan(math.radians(HEAD_ANGLE_DEG / 2.0))
+)
+# The full-major neck (STEP face 64) ends and the thread starts at H = .100 in
+# (total .152 less crown .052): STEP x = -10.16, where the annular step
+# (face 69, major -> THREAD_START_STEP_R) and the thread-start cone (face 68)
+# begin and the groove flanks (faces 66/67) end. The .152 in head height is
+# therefore crown apex to thread start, a real model station.
+THREAD_START_DEPTH = BEVEL_H
+# The STEP's torus (faces 0/70) rounds the cone/neck corner with exactly the
+# neck's own length as its radius; its centre sits at depth
+# BEVEL_CONE_DEPTH + R * tan(20.5 deg) = 2.303474, so its tangents fall at
+# depths 2.05564 (cone) and 2.30347 (neck), not at the thread start.
+UNDER_HEAD_FILLET_R = THREAD_START_DEPTH - BEVEL_CONE_DEPTH
+# Thread start: an annular step from the major down to r = .077 in, then a
+# 60 deg half-angle cone (from the axis) down to the groove root.
+THREAD_START_STEP_R = 0.077 * IN
+THREAD_START_CONE_HALF_ANGLE_DEG = 60.0
+# The STEP's own readings, kept so the formulas above are checked against it.
+SOURCE_THREAD_START_DEPTH = -10.16 - -12.7
+SOURCE_UNDER_HEAD_FILLET_R = 0.377767541787383
+SOURCE_UNDER_HEAD_FILLET_CENTRE_DEPTH = -10.396526045506446 - -12.7
+SOURCE_THREAD_START_STEP_R = 1.9558000000000013
+SOURCE_THREAD_START_CONE_HALF_ANGLE_RAD = 1.0471975511966
+for _formula, _source, _tol in (
+    (THREAD_START_DEPTH, SOURCE_THREAD_START_DEPTH, 1e-9),
+    (UNDER_HEAD_FILLET_R, SOURCE_UNDER_HEAD_FILLET_R, 1e-9),
+    (
+        BEVEL_CONE_DEPTH
+        + UNDER_HEAD_FILLET_R * math.tan(math.radians(HEAD_ANGLE_DEG / 4.0)),
+        SOURCE_UNDER_HEAD_FILLET_CENTRE_DEPTH,
+        1e-9,
+    ),
+    (THREAD_START_STEP_R, SOURCE_THREAD_START_STEP_R, 1e-9),
+    (
+        math.radians(THREAD_START_CONE_HALF_ANGLE_DEG),
+        SOURCE_THREAD_START_CONE_HALF_ANGLE_RAD,
+        1e-12,
+    ),
+):
+    if abs(_formula - _source) > _tol:
+        raise ValueError(f"underhead transition {_formula!r} departs from the STEP's {_source!r}")
+
 # ASME B18.6.3-2013 Table 7 (printed p. 19), §§2.1.5, 2.1.6, 3.2–3.7:
 # https://www.finesz.com/pic/ASMEB18.6.3-2013.pdf
 # H=.100, C=.052 and total O=.152 are REF, not dimensional maxima.
@@ -86,8 +148,8 @@ HEAD_RADIUS_FROM_THREAD_AXIS_MAX_MM = (
 # The bevel top sits flush with the plate's rear face, so the tip is flush
 # with the arm's front face at the plate's over-arm section plus the arm.
 CUT_LENGTH = PLATE.THICKNESS_OVER_ARM + ARM.THICKNESS
-# The modelled screw is the installed one: placement, interference and the
-# joint stack read LENGTH as its length.
+# The default (installed) configuration is the installed screw: placement,
+# interference and the joint stack read LENGTH as its length.
 LENGTH = CUT_LENGTH
 # The cut end's 45 deg deburr, its radial leg; a single MAX limit, as MHA-VN-031's
 # CUT_END_BREAK_MAX_MM.  The model carries the maximum.  The part sheet's
@@ -102,4 +164,36 @@ PURCHASED_STOCK_NOTE = "\n".join((
     f"FRONT FACE; CUT-END BREAK {CUT_END_BREAK_TEXT}.",
 ))
 
-
+# --- Supplier engineering drawing references -------------------------------------
+# The part's native SupplierStock configuration suppresses only the CutToFit
+# trim, so it is the full 1 in stock with its factory tip; the reference sheet
+# shows that configuration, which makes these supplier sizes the solid's own
+# spans. Every value is the exact catalogue constant that drives the solid.
+# The supplier drawing (SUPPLIER_DRAWING_URL) labels the thread "8-32" and
+# prints no thread-major size, so none is added; the thread size rides the
+# stock-length callout instead.
+SUPPLIER_STOCK_CONFIGURATION = "SupplierStock"
+# Existing witness sides already clear the larger head.
+SUPPLIER_REFERENCE_SIDES = {}
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierStockLength", -STOCK_LENGTH, "vertical"),  # bevel top -> tip
+    ("SupplierHeadHeight", -HEAD_H, "vertical"),  # crown apex -> thread start
+    ("SupplierCrownHeight", CROWN_H, "vertical"),  # bevel top -> crown apex
+    ("SupplierHeadAngle", HEAD_ANGLE_DEG, "angle"),
+    ("SupplierHeadDiameter", HEAD_DIA, "horizontal"),  # rim at the bevel top
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierStockLength": (HEAD_DIA / 2.0, 0.0),
+    "SupplierHeadHeight": (-HEAD_DIA / 2.0, CROWN_H),
+    "SupplierCrownHeight": (HEAD_DIA / 2.0, 0.0),
+    "SupplierHeadAngle": (-HEAD_DIA / 2.0, 0.0),
+    "SupplierHeadDiameter": (-HEAD_DIA / 2.0, 0.0),
+}
+SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierStockLength": (0, "length", None, "8-32"),
+    "SupplierHeadHeight": (3, "length", None, None),
+    "SupplierCrownHeight": (3, "length", None, None),
+    "SupplierHeadAngle": (0, "angle", None, None),
+    "SupplierHeadDiameter": (3, "diameter", None, None),
+}

@@ -242,6 +242,10 @@ _DRAWING_OWN_ROW_READERS = {
     # _config.parts(stock.part_name) after the source identity check
     # (spec.source.stem == stock.part_name).
     "_purchased_fastener_drawing.py",
+    # Reads _config.parts(spec.source.stem). Callers below must pass their own
+    # registered DrawingSpec; the source-path/read-set contract is exercised
+    # without COM in test_supplier_state_drawing_reads_only_its_opened_source_row.
+    "_supplier_spring_drawing.py",
 }
 # Registry-reading helper -> index of its part-name argument.
 _OWN_ROW_HELPERS = {
@@ -250,6 +254,7 @@ _OWN_ROW_HELPERS = {
     "save_simplified_part": 1,
     "apply_drawing_properties": 1,
 }
+_OWN_ROW_SPEC_HELPERS = {"build_supplier_spring_drawing": 1}
 
 
 def _module_part_name(tree: ast.Module) -> str | None:
@@ -265,20 +270,73 @@ def _module_part_name(tree: ast.Module) -> str | None:
     return None
 
 
-def _helper_name_arguments(tree: ast.Module) -> tuple[tuple[str, str], ...]:
+def _helper_name_arguments(
+    tree: ast.Module, helpers=None, *, keyword="part_name"
+) -> tuple[tuple[str, str], ...]:
+    helpers = _OWN_ROW_HELPERS if helpers is None else helpers
+    helpers = {
+        **helpers,
+        **{
+            alias.asname: helpers[alias.name]
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom)
+            for alias in node.names
+            if alias.asname and alias.name in helpers
+        },
+    }
     found = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
         name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
-        if name not in _OWN_ROW_HELPERS:
+        if name not in helpers:
             continue
-        index = _OWN_ROW_HELPERS[name]
+        index = helpers[name]
         args = [*node.args[index : index + 1]]
-        args += [kw.value for kw in node.keywords if kw.arg == "part_name"]
+        args += [kw.value for kw in node.keywords if kw.arg == keyword]
         found.extend((name, ast.unparse(arg)) for arg in args)
     return tuple(found)
+
+
+def _selected_drawing_spec(tree: ast.Module, argument: str) -> str | None:
+    """Prove which registry row a reusable drawing builder receives."""
+    value = ast.parse(argument, mode="eval").body
+    if isinstance(value, ast.Name):
+        assignments = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == value.id
+                for target in node.targets
+            )
+        ]
+        stores = sum(
+            isinstance(node, ast.Name)
+            and isinstance(node.ctx, ast.Store)
+            and node.id == value.id
+            for node in ast.walk(tree)
+        )
+        if len(assignments) != 1 or stores != 1:
+            return None
+        value = assignments[0]
+    registries = {
+        alias.asname or alias.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module == "_drawing_registry"
+        for alias in node.names
+        if alias.name == "DRAWINGS_BY_NAME"
+    }
+    if (
+        isinstance(value, ast.Subscript)
+        and isinstance(value.value, ast.Name)
+        and value.value.id in registries
+        and isinstance(value.slice, ast.Constant)
+        and isinstance(value.slice.value, str)
+    ):
+        return value.slice.value
+    return None
 
 
 def test_drawing_closures_read_no_foreign_dynamic_part_row():
@@ -295,37 +353,214 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
         except bg._UnknownConfigUse:
             return None  # the whole-config fallback narrows nothing
         if source.name in _DRAWING_OWN_ROW_READERS:
-            return tokens, (), None  # forwards its caller's name
+            return tokens, (), None, ()  # forwards its caller's name
         tree = ast.parse(source.read_text(encoding="utf-8"))
-        return tokens, _helper_name_arguments(tree), _module_part_name(tree)
+        spec_calls = tuple(
+            (name, _selected_drawing_spec(tree, argument))
+            for name, argument in _helper_name_arguments(
+                tree, _OWN_ROW_SPEC_HELPERS, keyword="spec"
+            )
+        )
+        return tokens, _helper_name_arguments(tree), _module_part_name(tree), spec_calls
 
     for stem, spec in dodo.DRAWINGS_BY_NAME.items():
         script = spec.script.resolve()
+        supplier_contract = False
+        selected_supplier_specs = []
         own_build = f"build_{spec.part}.py"
         for source in (script, *(Path(path) for path in bg.module_deps_of(script))):
+            supplier_contract |= source.name == "_supplier_spring_drawing.py"
             facts = source_facts(source)
             if facts is None:
                 continue
-            tokens, calls, part_name = facts
+            tokens, calls, part_name, spec_calls = facts
             if "parts/*" in tokens:
                 assert source.name in {*_DRAWING_OWN_ROW_READERS, own_build}, (
                     f"drawing:{stem} reaches a new dynamic registry read in "
                     f"{source.name}; review it against _expand_parts_token"
+                )
+            for name, selected in spec_calls:
+                assert source == script, (stem, source.name, name)
+                assert selected == stem, (stem, source.name, selected)
+                selected_supplier_specs.append(selected)
+                assert dodo.DRAWINGS_BY_NAME[selected].source.stem == spec.part.replace(
+                    "_", "-"
                 )
             if not calls:
                 continue
             assert source.name == own_build, (stem, source.name, calls)
             assert {arg for _name, arg in calls} == {"PART_NAME"}, (stem, calls)
             assert part_name == spec.part.replace("_", "-"), stem
+        if supplier_contract:
+            assert selected_supplier_specs == [stem], (stem, selected_supplier_specs)
+
+
+@pytest.mark.parametrize(
+    "stem",
+    (
+        "vn_chain_connecting_link",
+        "vn_chain_inner_link",
+        "vn_chain_outer_link",
+        "vn_channel_spring_installed",
+        "vn_counter_spring",
+        "vn_cylinder_bank_spring",
+        "vn_rocker_bank_spring",
+        "vn_transgear_pivot_spring",
+    ),
+)
+@pytest.mark.parametrize("wrong_source", (False, True))
+def test_supplier_state_drawing_reads_only_its_opened_source_row(
+    tmp_path, monkeypatch, stem, wrong_source
+):
+    """Dynamic row narrowing is valid only for the actual registered source."""
+    import asyncio
+    from types import SimpleNamespace
+
+    import _supplier_spring_drawing as supplier
+    from _drawing_registry import DRAWINGS_BY_NAME
+
+    spec = DRAWINGS_BY_NAME[stem]
+    tree = ast.parse(spec.script.read_text(encoding="utf-8"))
+    builder_names = {
+        alias.asname or alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module == "_supplier_spring_drawing"
+        for alias in node.names
+        if alias.name == "build_supplier_spring_drawing"
+    }
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in builder_names
+    ]
+    assert len(calls) == 1, stem
+    options = {
+        keyword.arg: ast.literal_eval(keyword.value)
+        for keyword in calls[0].keywords
+        if keyword.arg in {"spring_metadata", "maximum"}
+    }
+    source = tmp_path / spec.source.name
+    source.touch()
+    opened = tmp_path / "another-part.SLDPRT" if wrong_source else source
+    events = []
+
+    def model_path():
+        events.append("source_path")
+        return str(opened)
+
+    def configuration_names():
+        events.append("configuration_names")
+        return (
+            "Installed",
+            supplier.SUPPLIER_FREE_CONFIGURATION,
+            supplier.SUPPLIER_MAX_CONFIGURATION,
+        )
+
+    model = SimpleNamespace(
+        GetPathName=model_path,
+        GetConfigurationNames=configuration_names,
+    )
+    raw_model = object()
+
+    async def open_model(path):
+        events.append("open")
+        assert Path(path) == source
+        return None
+
+    def early_bound(value, _interface):
+        events.append("bind")
+        assert value is raw_model
+        return model
+
+    def active_configuration(_adapter, value):
+        events.append("active_configuration")
+        assert value is model
+        return "Installed"
+
+    adapter = SimpleNamespace(currentModel=raw_model, open_model=open_model)
+    row_name = source.stem
+    read_parts = supplier._config.parts
+    row = read_parts(row_name)
+    properties = {
+        "Number": str(row["number"]),
+        "Title": row_name,
+        "Material": str(row["material"]),
+        "Stock Name": str(row["stock_name"]),
+        "Supplier": str(row["supplier"]),
+        "Supplier SKUs": ", ".join(str(sku) for sku in row["supplier_skus"]),
+        "Material Specification": str(row.get("material_specification", row["material"])),
+        "Finish": str(row["finish"]),
+        "Manufacturing Notes": "SOURCE NOTES",
+    }
+    reads = []
+
+    def registry(name):
+        events.append("registry")
+        reads.append(name)
+        return read_parts(name)
+
+    def source_properties(value, *_args, **_kwargs):
+        events.append("source_properties")
+        assert value is model
+        return properties
+
+    class ReachedSheet(Exception):
+        pass
+
+    def new_drawing(*_args, **_kwargs):
+        events.append("sheet")
+        raise ReachedSheet
+
+    monkeypatch.setattr(supplier, "_early_bound", early_bound)
+    monkeypatch.setattr(supplier, "check", lambda *_args: None)
+    monkeypatch.setattr(supplier, "active_configuration_name", active_configuration)
+    monkeypatch.setattr(supplier, "read_required_properties", source_properties)
+    monkeypatch.setattr(supplier._config, "parts", registry)
+    monkeypatch.setattr(supplier, "new_project_drawing", new_drawing)
+    supplied = SimpleNamespace(
+        source=source,
+        source_kind=spec.source_kind,
+        artifact_stem=spec.artifact_stem,
+        layout=spec.layout,
+    )
+    with pytest.raises(RuntimeError if wrong_source else ReachedSheet):
+        asyncio.run(
+            supplier.build_supplier_spring_drawing(
+                adapter,
+                supplied,
+                item="SPRING",
+                dimensions=lambda *_args: (),
+                supplier_margins={"free_front": (0.0, 0.0, 0.0, 0.001)},
+                **options,
+            )
+        )
+    assert set(reads) <= {row_name}
+    if wrong_source:
+        # The injected mismatch must be observed on the early-bound model,
+        # before any configuration, property, registry, or sheet work.
+        assert events == ["open", "bind", "source_path"]
+        assert not reads
+    else:
+        assert events[:3] == ["open", "bind", "source_path"]
+        assert "active_configuration" in events
+        assert "configuration_names" in events
+        assert "source_properties" in events
+        assert events[-1] == "sheet"
+        if not options.get("spring_metadata", False):
+            assert row_name in reads
 
 
 @pytest.fixture
-def isolated_drawing_keys(tmp_path, monkeypatch):
+def isolated_drawing_keys(tmp_path, monkeypatch, request):
     """Copy real drawing closures; keep all native inputs and writes isolated."""
     import _buildgraph as bg
 
     dodo = _load_dodo()
-    stems = ("pd_platen_guide", "vn_frame_side_screw", "pn_pen_assembly")
+    stems = getattr(
+        request, "param", ("pd_platen_guide", "vn_frame_side_screw", "pn_pen_assembly")
+    )
     release_relative = dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT)
     config_relative = dodo.CONFIG_DIR.relative_to(REPO_ROOT)
     # The drawing recipe folds the config rows its closure reads (Codex #936
@@ -528,6 +763,33 @@ def test_config_row_change_moves_only_its_readers_freshness_and_cache_key(
     assert all(a != b for a, b in zip(before["pd_platen_guide"], after["pd_platen_guide"]))
     for stem in ("vn_frame_side_screw", "pn_pen_assembly"):
         assert after[stem] == before[stem], stem
+
+
+@pytest.mark.parametrize(
+    "isolated_drawing_keys",
+    [("vn_cylinder_bank_spring", "vn_rocker_bank_spring", "vn_transgear_pivot_spring")],
+    indirect=True,
+)
+def test_supplier_state_own_row_changes_freshness_and_cache_key(isolated_drawing_keys):
+    dodo, _root, snapshot = isolated_drawing_keys()
+    before = snapshot()
+    stem = "vn_cylinder_bank_spring"
+    spec = dodo.DRAWINGS_BY_NAME[stem]
+    config = set(dodo._config_deps(spec.script, spec.part, "drawing"))
+    row = dodo.CONFIG_DIR / "parts" / "vn-cylinder-bank-spring.yaml"
+    assert str(row.resolve()) in config
+    assert str((row.parent / "_defaults.yaml").resolve()) in config
+    assert str((dodo.CONFIG_DIR / "dimensions.yaml").resolve()) not in config
+    for other in ("vn-rocker-bank-spring", "vn-transgear-pivot-spring"):
+        assert str((row.parent / f"{other}.yaml").resolve()) not in config
+    text = row.read_text(encoding="utf-8")
+    renumbered = re.sub(r"(?m)^(\s+number:\s*)\S+$", r"\g<1>MHA-VN-999", text, count=1)
+    assert renumbered != text
+    row.write_text(renumbered, encoding="utf-8")
+    after = snapshot()
+    assert all(a != b for a, b in zip(before[stem], after[stem]))
+    for other in ("vn_rocker_bank_spring", "vn_transgear_pivot_spring"):
+        assert after[other] == before[other], other
 
 
 @pytest.mark.parametrize(

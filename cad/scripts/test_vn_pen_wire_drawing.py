@@ -20,8 +20,21 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is vn_pen_wire_spec.DRAWING_DIMENSIONS
     marked = set().union(*vn_pen_wire_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.STOCK_KEEP)
     assert kept == marked
+
+
+def test_supplier_nominal_is_separate_from_installed_envelope() -> None:
+    import _mcmaster_9666k56 as stock
+    import _mcmaster_9666k56_reference as reference
+
+    assert part.WIRE_DIA == 0.8
+    assert stock.DIA == 0.031 * 25.4
+    assert stock.DIA_MIN <= part.WIRE_DIA <= stock.DIA_MAX
+    assert stock.DIA != part.WIRE_DIA
+    assert reference.SUPPLIER_DIAMETER_PRECISION == 4
+    assert set(drawing.FRONT_KEEP) == {"Depth"}
+    assert set(drawing.STOCK_KEEP) == {"SupplierStockDia"}
 
 
 def test_notes_name_the_registry_sku() -> None:

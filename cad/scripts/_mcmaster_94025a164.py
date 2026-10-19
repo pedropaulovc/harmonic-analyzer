@@ -74,6 +74,7 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierThreadDiameter": (-SS_MAJOR_R, SS_LEN / 2.0),
 }
 SUPPLIER_REFERENCE_PLANES = {}
+SUPPLIER_REFERENCE_SIDES = {}
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierThreadDiameter": (3, "diameter", None, "10-32"),

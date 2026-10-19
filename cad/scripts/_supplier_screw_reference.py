@@ -24,6 +24,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
+from _supplier_screw_reference_names import REFERENCE_SKETCHES as REFERENCE_SKETCHES
 import _telemetry
 
 

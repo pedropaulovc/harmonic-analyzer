@@ -1,15 +1,14 @@
 """Native supplier references for Y-axis dowels and X-axis spring pins.
 
-Nothing here sets a SystemValue or replaces numeric dimension text. Supplier
-bands apply only to newly owned references; existing finished controls and
-installation notes remain owned by the original model/drawing builders.
+Banded references and every model-owned witness import read-only. Only new
+bandless drawing geometry dimensions receive local presentation settings.
+Nothing here sets a SystemValue or replaces numeric dimension text.
 """
 
 from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable
-import math
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
@@ -25,11 +24,26 @@ from _supplier_dimensions import (
     supplier_reference_dimension,
 )
 from _supplier_pin_data import (
+    DIAMETER_DIMENSION,
     MATING_HOLE_DIMENSION,
     REFERENCE_DIMENSIONS,
     WALL_DIMENSION,
     SupplierPinReference,
 )
+from _supplier_pin_model import assert_supplier_pin_model_reference
+
+
+# Planned sheet-space lanes (left, bottom, right, top), before the first fit.
+# Only annotated views are listed. The application diagram's extra geometry
+# is <=38.05 mm right of the tube at the builder's maximum 8:1 scale.
+DOWEL_SUPPLIER_MARGINS = {
+    "*Front": (0.035, 0.006, 0.004, 0.006),
+    "*Top": (0.003, 0.018, 0.075, 0.012),
+}
+SPRING_PIN_SUPPLIER_MARGINS = {
+    "*Front": (0.004, 0.024, 0.004, 0.004),
+    "*Right": (0.040, 0.055, 0.095, 0.028),
+}
 
 
 def _axis_circles(edges: ViewEdges, axis: int, *, label: str) -> list[ViewEdge]:
@@ -102,38 +116,6 @@ def _diameter_dimension(
     return display
 
 
-def _set_band(
-    display: Any, *, lower_mm: float, upper_mm: float, limits: bool, places: int, label: str
-) -> None:
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    kind = 3 if limits else 2  # swTolLIMIT / swTolBILAT
-    tolerance.Type = kind
-    lower_m, upper_m = lower_mm / 1000.0, upper_mm / 1000.0
-    # Existing source-model tolerance helpers use this documented API because
-    # SetValues2 rejects some supported native dimensions on SolidWorks 2026.
-    if not tolerance.SetValues(lower_m, upper_m):
-        raise RuntimeError(f"{label}: native supplier band was rejected")
-    display.SetPrecision3(-1, -1, places, -1)
-    _assert_band(display, lower_m, upper_m, kind, places, label=label)
-
-
-def _assert_band(
-    display: Any, lower_m: float, upper_m: float, kind: int, places: int, *, label: str
-) -> None:
-    tolerance = _early_bound(
-        _early_bound(display.GetDimension2(0), "IDimension").Tolerance,
-        "IDimensionTolerance",
-    )
-    if (
-        int(tolerance.Type) != kind
-        or not math.isclose(float(tolerance.GetMinValue()), lower_m, rel_tol=0.0, abs_tol=1e-12)
-        or not math.isclose(float(tolerance.GetMaxValue()), upper_m, rel_tol=0.0, abs_tol=1e-12)
-        or int(display.GetPrimaryTolPrecision2()) != places
-    ):
-        raise RuntimeError(f"{label}: native supplier tolerance values/type/precision changed")
-
-
 def _assert_no_band(display: Any, *, label: str) -> None:
     tolerance = _early_bound(
         _early_bound(display.GetDimension2(0), "IDimension").Tolerance, "IDimensionTolerance"
@@ -160,6 +142,8 @@ def assert_supplier_pin_dimensions(
             counts[name] += 1
             if orientation != expected_view:
                 raise RuntimeError(f"{label}: {name} moved into {orientation}, expected {expected_view}")
+            if int(annotation.Visible) != 1:
+                raise RuntimeError(f"{label}: final supplier reference {name} is not visible")
             assertion(display)
     if any(counts[name] != 1 for name in required):
         raise RuntimeError(f"{label}: final supplier-reference census is {dict(counts)}, expected one each")
@@ -185,45 +169,27 @@ def _supplier_diameter(
     adapter: Any, view: Any, circles: list[ViewEdge], source: SupplierPinReference,
     *, text_xy: tuple[float, float]
 ) -> tuple[Any, Callable[[Any], None]]:
+    if source.diameter_band is not None:
+        raise ValueError(f"{source.sku}: banded OD must be imported from its model owner")
     label = f"{source.sku} supplier diameter"
     edge = _outer_circle(circles, source.diameter_mm, label=label)
     display = _diameter_dimension(adapter, view, edge, text_xy, label=label)
-    band = source.diameter_band
-    limits = False
-    if band is not None:
-        limits = not math.isclose(
-            source.diameter_nominal * source.unit_mm, source.diameter_mm,
-            rel_tol=0.0, abs_tol=1e-8,
-        )
-        lower_mm = (source.diameter_nominal + band[0]) * source.unit_mm - source.diameter_mm
-        upper_mm = (source.diameter_nominal + band[1]) * source.unit_mm - source.diameter_mm
-        _set_band(
-            display, lower_mm=lower_mm, upper_mm=upper_mm, limits=limits,
-            places=source.diameter_precision, label=label,
-        )
-    callout = "SUPPLIER LIMITS" if limits else None
     display = supplier_reference_dimension(
         adapter, display, label=label, units=source.units,
         precision=source.diameter_precision, expected_mm=source.diameter_mm,
-        presentation="diameter", callout=callout,
+        presentation="diameter",
     )
 
     def assert_diameter(current: Any) -> None:
         assert_supplier_reference_dimension(
             adapter, current, label=label, units=source.units,
             precision=source.diameter_precision, expected_mm=source.diameter_mm,
-            presentation="diameter", callout=callout,
+            presentation="diameter",
         )
         if int(current.Type2) != 6:
             raise RuntimeError(f"{label}: final reference is not a native diameter")
         _assert_attachments(adapter, current, (edge.edge,), label=label)
-        if band is not None:
-            _assert_band(
-                current, lower_mm / 1000.0, upper_mm / 1000.0,
-                3 if limits else 2, source.diameter_precision, label=label,
-            )
-        else:
-            _assert_no_band(current, label=label)
+        _assert_no_band(current, label=label)
 
     return display, assert_diameter
 
@@ -283,26 +249,55 @@ def _supplier_length(
     return display, assert_length
 
 
+def _import_model_references(
+    adapter: Any, view: Any, source: SupplierPinReference,
+    keep: dict[str, tuple[float, float]],
+) -> dict[str, tuple[Any, Callable[[Any], None]]]:
+    annotations = curate_view_dimensions(
+        adapter, view, keep=keep, view_label=f"{source.sku} model-owned supplier references",
+        dimensions_by_feature=REFERENCE_DIMENSIONS,
+    )
+    owners = {name: feature for feature, names in REFERENCE_DIMENSIONS.items() for name in names}
+    imported: dict[str, tuple[Any, Callable[[Any], None]]] = {}
+    for raw in annotations:
+        name = dimension_name(adapter, raw)
+        if name not in keep or name in imported:
+            raise RuntimeError(f"{source.sku}: unexpected/duplicate model reference {name!r}")
+        display = _early_bound(
+            _early_bound(raw, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
+        )
+
+        def assert_imported(current: Any, *, feature: str = owners[name]) -> None:
+            model = view.ReferencedDocument
+            if model is None or model == "":
+                raise RuntimeError(f"{source.sku}: imported reference has no source part")
+            assert_supplier_pin_model_reference(adapter, model, current, feature, source)
+
+        # A model-owned import is never reformatted or retoleranced here.
+        assert_imported(display)
+        imported[name] = (display, assert_imported)
+    if set(imported) != set(keep):
+        raise RuntimeError(f"{source.sku}: required model-owned references are incomplete")
+    return imported
+
+
 @_telemetry.traced("drawing.supplier_pin_dowel_author")
 def add_supplier_dowel_dimensions(
     adapter: Any, views: dict[str, Any], source: SupplierPinReference
 ) -> Callable[[], None]:
-    """Author native dowel references and return their post-rebuild proof."""
+    """Import source-owned OD/band; author only the bandless end-rim length."""
     front = views["*Front"]
     circles = _axis_circles(scan_view_edges(front, label=f"{source.sku} dowel"), 1, label=source.sku)
-    # Dimension the real circle normal to the view, not its edge-on projection.
-    top = views["*Top"]
-    end_circles = _axis_circles(
-        scan_view_edges(top, label=f"{source.sku} dowel end"), 1, label=source.sku
-    )
-    outline = tuple(float(value) for value in top.GetOutline())
-    diameter, diameter_check = _supplier_diameter(
-        adapter, top, end_circles, source,
-        text_xy=(outline[2] + 0.018, (outline[1] + outline[3]) / 2.0),
-    )
     length, length_check = _supplier_length(
         adapter, front, circles, source, axis=1, stations=(0.0, source.length_mm)
     )
+    top = views["*Top"]
+    outline = tuple(float(value) for value in top.GetOutline())
+    imported = _import_model_references(
+        adapter, top, source,
+        {DIAMETER_DIMENSION: (outline[2] + 0.018, (outline[1] + outline[3]) / 2.0)},
+    )
+    diameter, diameter_check = imported[DIAMETER_DIMENSION]
     return _settled_pin_check(
         adapter, views,
         [("*Top", diameter, diameter_check), ("*Front", length, length_check)],
@@ -314,7 +309,7 @@ def add_supplier_dowel_dimensions(
 def add_supplier_spring_pin_dimensions(
     adapter: Any, views: dict[str, Any], source: SupplierPinReference
 ) -> Callable[[], None]:
-    """Author pin/wall/application references and return post-rebuild proof."""
+    """Import wall/application read-only; author only bandless OD and length."""
     if (
         source.wall_mm is None or source.wall_precision is None
         or source.application_hole_limits is None or source.application_hole_precision is None
@@ -335,77 +330,21 @@ def add_supplier_spring_pin_dimensions(
         adapter, front, circles, source, axis=0,
         stations=(-source.length_mm / 2.0, source.length_mm / 2.0),
     )
-    references = [("*Right", diameter, diameter_check), ("*Front", length, length_check)]
-    # Both sketches stay part-hidden and are shown only in this orthographic
-    # end view. The hole circle is offset from the pin profile and labelled
-    # explicitly; its limits never attach to a pin rim or become pin OD.
     center = tuple(float(value) for value in right.Position)
-    annotations = curate_view_dimensions(
-        adapter, right,
-        keep={
+    imported = _import_model_references(
+        adapter, right, source,
+        {
             WALL_DIMENSION: (center[0] - 0.022, center[1] + 0.018),
             MATING_HOLE_DIMENSION: (center[0] + 0.029, center[1] - 0.031),
         },
-        view_label=f"{source.sku} supplier wall and mating-hole references",
-        dimensions_by_feature=REFERENCE_DIMENSIONS,
     )
-    imported: dict[str, Any] = {}
-    for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        if name not in (WALL_DIMENSION, MATING_HOLE_DIMENSION) or name in imported:
-            raise RuntimeError(f"{source.sku}: unexpected/duplicate source reference {name!r}")
-        imported[name] = _early_bound(
-            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
-        )
-    if set(imported) != {WALL_DIMENSION, MATING_HOLE_DIMENSION}:
-        raise RuntimeError(f"{source.sku}: wall/application source references are incomplete")
-
-    wall_label = f"{source.sku} supplier wall"
-    wall = supplier_reference_dimension(
-        adapter, imported[WALL_DIMENSION], label=wall_label, units=source.units,
-        precision=source.wall_precision, expected_mm=source.wall_mm, callout="WALL",
+    wall, wall_check = imported[WALL_DIMENSION]
+    hole, hole_check = imported[MATING_HOLE_DIMENSION]
+    return _settled_pin_check(
+        adapter, views,
+        [
+            ("*Right", diameter, diameter_check), ("*Front", length, length_check),
+            ("*Right", wall, wall_check), ("*Right", hole, hole_check),
+        ],
+        expected_count=4, label=source.sku,
     )
-    wall_entities = tuple(
-        _early_bound(wall.GetAnnotation(), "IAnnotation").GetAttachedEntities3() or ()
-    )
-
-    def assert_wall(current: Any) -> None:
-        assert_supplier_reference_dimension(
-            adapter, current, label=wall_label, units=source.units,
-            precision=source.wall_precision, expected_mm=source.wall_mm, callout="WALL",
-        )
-        if int(current.Type2) not in (2, 11, 12):
-            raise RuntimeError(f"{wall_label}: wall witness lost native linear type")
-        _assert_no_band(current, label=wall_label)
-        _assert_attachments(adapter, current, wall_entities, label=wall_label)
-
-    lower, upper = source.application_hole_limits
-    hole_label = f"{source.sku} supplier mating-hole application"
-    hole_callout = "MATING HOLE\nSUPPLIER APPLICATION ONLY"
-    hole = supplier_reference_dimension(
-        adapter, imported[MATING_HOLE_DIMENSION], label=hole_label, units=source.units,
-        precision=source.application_hole_precision, expected_mm=lower * source.unit_mm,
-        presentation="diameter", callout=hole_callout,
-    )
-    hole_entities = tuple(
-        _early_bound(hole.GetAnnotation(), "IAnnotation").GetAttachedEntities3() or ()
-    )
-
-    def assert_hole(current: Any) -> None:
-        assert_supplier_reference_dimension(
-            adapter, current, label=hole_label, units=source.units,
-            precision=source.application_hole_precision, expected_mm=lower * source.unit_mm,
-            presentation="diameter", callout=hole_callout,
-        )
-        if int(current.Type2) != 6:
-            raise RuntimeError(f"{hole_label}: application circle lost native diameter type")
-        _assert_attachments(adapter, current, hole_entities, label=hole_label)
-        _assert_band(
-            current, 0.0, (upper - lower) * source.unit_mm / 1000.0,
-            3, source.application_hole_precision, label=hole_label,
-        )
-
-    assert_wall(wall)
-    assert_hole(hole)
-    references.extend((("*Right", wall, assert_wall), ("*Right", hole, assert_hole)))
-    return _settled_pin_check(adapter, views, references, expected_count=4, label=source.sku)

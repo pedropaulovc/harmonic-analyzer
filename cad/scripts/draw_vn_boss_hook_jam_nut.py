@@ -17,6 +17,13 @@ import vn_boss_hook_jam_nut_spec as supplier
 
 SPEC = DRAWINGS_BY_NAME["vn_boss_hook_jam_nut"]
 ITEM = "#10-24 NARROW-PROFILE HEX NUT"
+# Sheet metres, (left, bottom, right, top). Reserve the AF fraction above
+# Front and its 14-character thread note 8 mm beyond the right outline.
+# Right's centred height text also needs lateral room outside its short span.
+SUPPLIER_MARGINS = {
+    "*Front": (0.0, 0.0, 0.044, 0.018),
+    "*Right": (0.007, 0.018, 0.007, 0.0),
+}
 
 
 def _supplier_dimensions(
@@ -52,6 +59,7 @@ async def build(adapter: Any) -> dict[str, str]:
         SPEC,
         item=ITEM,
         supplier_dimensions=supplier_dimensions,
+        supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_settled,),
     )
 

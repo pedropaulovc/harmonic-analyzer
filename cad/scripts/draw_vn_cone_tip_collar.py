@@ -28,8 +28,10 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import format_findings
+from _supplier_dimensions import assert_supplier_reference_dimension, supplier_reference_dimension
 from diagnostics.drawing_layout_audit import audit_document
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view, view_name
@@ -42,6 +44,19 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 SHEET_SCALE = (4, 1)
+# Keep the crowded, established manufacturing sheet intact. The second
+# sheet shows only SetScrew, never the custom collar or its controlling bands.
+SHEET_NAMES = ("COLLAR", f"{spec.SET_SCREW_SKU}-STOCK")
+STOCK_SCALE = (12, 1)
+SHEET_SCALES = {SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE}
+STOCK_SIDE_CENTER = (0.230, 0.155)
+STOCK_END_CENTER = (0.085, 0.155)
+STOCK_ISO_CENTER = (0.345, 0.210)
+STOCK_SIDE_KEEP = {
+    "ScrewLength": (STOCK_SIDE_CENTER[0], STOCK_SIDE_CENTER[1] + 0.035),
+    "ScrewMajorDia": (STOCK_SIDE_CENTER[0] + 0.070, STOCK_SIDE_CENTER[1]),
+}
+STOCK_END_KEEP = {"SocketAF": (STOCK_END_CENTER[0], STOCK_END_CENTER[1] - 0.035)}
 END_CENTER = (0.080, 0.170)
 SIDE_CENTER = (0.205, 0.170)
 # The radial tap view stands over the end view, left of the turning view.
@@ -102,13 +117,29 @@ def _placed_note(adapter, property_name, x, y) -> str:
     return _note_name(annotation)
 
 
-def _sheet_notes(adapter) -> dict[str, tuple[str, Any]]:
-    """Every note on the sheet, ``{name: (owner, IAnnotation)}``: each view's,
-    and the sheet's own but not its format's (the layout audit's universe)."""
-    rows = _early_bound(adapter.currentModel, "IDrawingDoc").GetViews()
-    if not rows or len(rows) != 1 or not rows[0]:
-        raise RuntimeError("collar drawing must hold one sheet with its views")
-    sheet_view, *views = (_early_bound(view, "IView") for view in rows[0])
+def _sheet_views(adapter, sheet_name):
+    """Select a named sheet before walking it: GetViews order is undefined."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(sheet_name):
+        raise RuntimeError(f"cannot activate collar package sheet {sheet_name}")
+    views = []
+    view = drawing.GetFirstView()
+    while view is not None:
+        view = _early_bound(view, "IView")
+        views.append(view)
+        view = view.GetNextView()
+    if not views:
+        raise RuntimeError(f"collar package sheet {sheet_name} has no sheet view")
+    return views
+
+
+def _sheet_notes(adapter, sheet_name=SHEET_NAMES[0]) -> dict[str, tuple[str, Any]]:
+    """Notes on one named sheet, excluding its format's template ink.
+
+    The stock reference sheet is a different note universe, so it cannot be
+    deleted by or counted against the collar's five-note contract.
+    """
+    sheet_view, *views = _sheet_views(adapter, sheet_name)
     notes = {}
     for owner, view in (("sheet", sheet_view), *((view_name(adapter, v), v) for v in views)):
         for raw in view.GetAnnotations() or ():
@@ -128,7 +159,7 @@ def _note_text(annotation: Any) -> str:
     return str(_early_bound(annotation.GetSpecificAnnotation(), "INote").GetText() or "")
 
 
-def _delete_unplaced_notes(adapter, placed: frozenset[str]) -> None:
+def _delete_unplaced_notes(adapter, placed: frozenset[str], *, sheet_name=SHEET_NAMES[0]) -> None:
     """Delete every note this recipe did not place, then read none back.
 
     The first single-sheet render (8087fd13c) counted 16 annotations for the
@@ -138,7 +169,7 @@ def _delete_unplaced_notes(adapter, placed: frozenset[str]) -> None:
     of ours, not by its text, so no placed note can be taken with it.
     """
     draw = adapter.currentModel
-    notes = _sheet_notes(adapter)
+    notes = _sheet_notes(adapter, sheet_name)
     if not placed <= notes.keys():
         raise RuntimeError(f"collar sheet lists {sorted(notes)}, not every placed note {sorted(placed)}")
     stray = {name: found for name, found in notes.items() if name not in placed}
@@ -150,7 +181,7 @@ def _delete_unplaced_notes(adapter, placed: frozenset[str]) -> None:
         draw.EditDelete()
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="collar unplaced notes")
-    left = sorted(set(_sheet_notes(adapter)) - placed)
+    left = sorted(set(_sheet_notes(adapter, sheet_name)) - placed)
     if left:
         raise RuntimeError(f"collar unplaced notes survived deletion: {left}")
 
@@ -163,10 +194,8 @@ def _assert_settled_annotations(adapter, placed: frozenset[str], callout: str) -
         raise RuntimeError(
             f"collar notes after the last rebuild: {sorted(notes)}; placed {sorted(placed)}"
         )
-    rows = _early_bound(adapter.currentModel, "IDrawingDoc").GetViews()
     found = []
-    for raw_view in rows[0][1:]:
-        view = _early_bound(raw_view, "IView")
+    for view in _sheet_views(adapter, SHEET_NAMES[0])[1:]:
         for raw in view.GetDisplayDimensions() or ():
             display = _early_bound(raw, "IDisplayDimension")
             if not display.IsHoleCallout():
@@ -302,6 +331,84 @@ def _bore_view(adapter):
     return view, _placed_note(adapter, "Bore View Note", *BORE_NOTE_XY)
 
 
+def _supplier_dimension(adapter, annotation):
+    name = dimension_name(adapter, annotation)
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    return supplier_reference_dimension(
+        adapter, display, label=f"McMaster {spec.SET_SCREW_SKU} {name}",
+        units=spec.SET_SCREW_SUPPLIER_UNITS, precision=spec.SET_SCREW_SUPPLIER_PRECISION,
+        expected_mm=spec.SET_SCREW_SUPPLIER_SIZES_MM[name],
+        presentation="diameter" if name == "ScrewMajorDia" else "length",
+        callout=spec.SET_SCREW_THREAD if name == "ScrewMajorDia" else (
+            "HEX SOCKET AF" if name == "SocketAF" else None
+        ),
+    )
+
+
+def _stock_reference_sheet(adapter):
+    """Supplier's three published sizes and thread, all on the stock screw."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("cannot activate stock set-screw reference sheet")
+    side = place_view(adapter, str(SOURCE), "*Front", *STOCK_SIDE_CENTER, scale=STOCK_SCALE)
+    end = place_view(adapter, str(SOURCE), "*Right", *STOCK_END_CENTER, scale=STOCK_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *STOCK_ISO_CENTER, scale=STOCK_SCALE)
+    _configuration(adapter, (side, end, iso), "SetScrew")
+    middle = (spec.SET_SCREW_SEAT_RADIUS + spec.SET_SCREW_END_RADIUS) / 2.0
+    for view, xyz, centre, label in (
+        (side, (middle, spec.TAP_STATION, 0.0), STOCK_SIDE_CENTER, "stock screw side"),
+        (end, (spec.SET_SCREW_END_RADIUS, spec.TAP_STATION, 0.0),
+         STOCK_END_CENTER, "stock screw socket"),
+        (iso, (middle, spec.TAP_STATION, 0.0), STOCK_ISO_CENTER, "stock screw isometric"),
+    ):
+        _centre_view(adapter, view, xyz, centre, label=label)
+        set_hidden_lines_removed(adapter, view)
+    side_marks = curate_view_dimensions(
+        adapter, side, keep=STOCK_SIDE_KEEP, view_label="stock screw supplier side sizes",
+        dimensions_by_feature=spec.SET_SCREW_SUPPLIER_DIMENSIONS,
+    )
+    end_marks = hidden_sketches.curate_view_dimensions(
+        adapter, end, keep=STOCK_END_KEEP, view_label="stock screw supplier socket AF",
+        dimensions_by_feature=spec.SET_SCREW_SUPPLIER_DIMENSIONS,
+    )
+    for annotation in side_marks + end_marks:
+        _supplier_dimension(adapter, annotation)
+    placed = frozenset({_placed_note(adapter, "Supplier Reference Title", 0.016, 0.252)})
+    _delete_unplaced_notes(adapter, placed, sheet_name=SHEET_NAMES[1])
+    return placed
+
+
+def _assert_stock_references(adapter, placed):
+    """Read the settled stock sheet independently of the collar's controls."""
+    if set(_sheet_notes(adapter, SHEET_NAMES[1])) != placed:
+        raise RuntimeError("stock set-screw reference title notes changed")
+    found = set()
+    for view in _sheet_views(adapter, SHEET_NAMES[1])[1:]:
+        if str(view.ReferencedConfiguration) != "SetScrew":
+            raise RuntimeError("supplier reference view does not isolate the stock set screw")
+        for raw in view.GetDisplayDimensions() or ():
+            display = _early_bound(raw, "IDisplayDimension")
+            annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+            name = dimension_name(adapter, annotation)
+            if name in found or name not in spec.SET_SCREW_SUPPLIER_SIZES_MM:
+                raise RuntimeError(f"unexpected stock set-screw supplier dimension {name}")
+            expected_mm = spec.SET_SCREW_SUPPLIER_SIZES_MM[name]
+            expected_callout = {
+                "ScrewMajorDia": spec.SET_SCREW_THREAD, "SocketAF": "HEX SOCKET AF",
+            }.get(name, "")
+            assert_supplier_reference_dimension(
+                adapter, display, label=f"stock set-screw {name}",
+                units=spec.SET_SCREW_SUPPLIER_UNITS,
+                precision=spec.SET_SCREW_SUPPLIER_PRECISION,
+                expected_mm=expected_mm,
+                presentation="diameter" if name == "ScrewMajorDia" else "length",
+                callout=expected_callout,
+            )
+            found.add(name)
+    if set(found) != set(spec.SET_SCREW_SUPPLIER_SIZES_MM):
+        raise RuntimeError(f"stock set-screw supplier coverage is incomplete: {sorted(found)}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part missing: {SOURCE}")
@@ -309,14 +416,18 @@ async def build(adapter: Any) -> dict[str, str]:
     read_required_properties(adapter.currentModel, (
         "Number", "Revision", "Title", "Material Specification", "Finish",
         "Quantity", "Manufacturing Notes", "Isometric View Note",
-        "Radial Tap View Note", "Bore View Note", "Installation Notes",
+        "Radial Tap View Note", "Bore View Note", "Installation Notes", "Supplier Reference Title",
     ), required=("Number", "Material Specification", "Manufacturing Notes",
-                 "Radial Tap View Note", "Bore View Note", "Installation Notes"))
+                 "Radial Tap View Note", "Bore View Note", "Installation Notes", "Supplier Reference Title"))
     drawing, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="collar and stock set screw")
+    if not _early_bound(drawing, "IDrawingDoc").ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot activate collar manufacturing sheet")
     stamp_drawing_summary(adapter, drawing, {
-        0: "Cone Tip Collar Manufacturing Drawing", 1: "Harmonic Analyzer hobby-machinist drawing",
+        0: "Cone Tip Collar Manufacturing and McMaster 94355A213 Stock Reference",
+        1: "Harmonic Analyzer hobby-machinist drawing",
         2: "Harmonic Analyzer Project", 3: "Custom steel collar and stock set screw",
         4: "Project-owned ASME B drawing standard",
     })
@@ -379,13 +490,19 @@ async def build(adapter: Any) -> dict[str, str]:
     if not callout_name:
         raise RuntimeError("collar tap callout has no annotation name")
     _delete_unplaced_notes(adapter, placed)
+    stock_notes = _stock_reference_sheet(adapter)
     findings = audit_document(adapter)
     if findings:
         raise RuntimeError("collar manufacturing layout:\n" + format_findings(findings))
     return await finalize_drawing(
-        adapter, OUTPUTS, pdf_title="Cone Tip Collar Manufacturing Drawing",
-        scale=SHEET_SCALE, layout=SPEC.layout,
-        settled_checks=(lambda: _assert_settled_annotations(adapter, placed, callout_name),),
+        adapter, OUTPUTS,
+        pdf_title="Cone Tip Collar Manufacturing and McMaster 94355A213 Stock Reference",
+        scale=SHEET_SCALE, layout=SPEC.layout, expected_sheet_names=SHEET_NAMES,
+        sheet_scales=SHEET_SCALES,
+        settled_checks=(
+            lambda: _assert_settled_annotations(adapter, placed, callout_name),
+            lambda: _assert_stock_references(adapter, stock_notes),
+        ),
     )
 
 

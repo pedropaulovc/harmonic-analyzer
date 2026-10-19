@@ -51,6 +51,13 @@ SUPPLIER_TOLERANCES = {
 }
 SUPPLIER_BORE_CALLOUT = "FOR No. 10 SCREW SIZE"
 
+REFERENCE_SKETCHES = ("SupplierWasherThicknessReference",)
+DRAWING_PRECISION = {
+    "SupplierWasherThicknessReference": {
+        "SupplierThickness": DRAWING_REFERENCE_PRECISION["supplier thickness"],
+    },
+}
+
 
 def washer_volume() -> float:
     """Nominal annulus volume, mm^3."""

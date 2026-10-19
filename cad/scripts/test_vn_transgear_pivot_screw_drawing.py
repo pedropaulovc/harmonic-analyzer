@@ -11,7 +11,9 @@ import ast
 import asyncio
 import contextlib
 import math
+import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -27,6 +29,11 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _printed_tolerance import angular_band_deg
 from _stock_recipe import recipe_declaration
+from _test_stock_configuration import (
+    FINISHED,
+    FINISHED_SIMPLIFIED,
+    stock_configuration_adapter,
+)
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_90325A174 as entry
 
@@ -393,6 +400,7 @@ def test_stock_build_faces_its_registered_recipe_head_up_on_the_origin(
     assert component.transform.rotation_radians == (0.0, 0.0, 0.0)
     assert seen["material"] == part.SPEC.material
     assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
+    assert seen["save_threaded_part"] is part._save_supplier_references
 
 
 def test_native_controls_are_owned_and_the_length_prints_as_reference() -> None:
@@ -449,7 +457,7 @@ def test_isometric_view_is_in_the_hidden_lines_removed_loop() -> None:
         )
     ]
     (loop,) = loops
-    assert {getattr(item, "id", "") for item in loop.iter.elts} == {"front", "iso"}
+    assert {getattr(item, "id", "") for item in loop.iter.elts} == {"front", "iso", "top"}
 
 
 def test_registry_row_is_the_faced_stock_without_sheet_instructions() -> None:
@@ -467,3 +475,179 @@ def test_registry_row_is_the_faced_stock_without_sheet_instructions() -> None:
     assert drawing.SPEC is spec
     assert spec.artifact_stem == part.PART_NAME
     assert spec.script == Path(drawing.__file__).resolve()
+
+
+def test_supplier_presentation_retains_fractional_native_geometry() -> None:
+    refs = screw.SUPPLIER_REFERENCE_DIMENSIONS
+    assert set(refs) == {
+        "SupplierHeadDiameter",
+        "SupplierHeadHeight",
+        "SupplierSocketAF",
+        "SupplierShoulderDiameter",
+        "SupplierShoulderLength",
+        "SupplierThreadMajor",
+        "SupplierStockThreadLength",
+    }
+    assert all(ref["units"] == "in" for ref in refs.values())
+    for name, exact, rounded in (
+        ("SupplierHeadDiameter", 5 / 16 * IN, 0.313 * IN),
+        ("SupplierHeadHeight", 5 / 32 * IN, 0.156 * IN),
+        ("SupplierShoulderDiameter", 3 / 16 * IN, 0.188 * IN),
+    ):
+        assert refs[name]["expected_mm"] == exact
+        assert exact != rounded
+        assert refs[name]["precision"] == 3
+    assert refs["SupplierSocketAF"]["fraction_denominator"] == 32
+    assert refs["SupplierSocketAF"]["expected_mm"] == 3 / 32 * IN
+    assert refs["SupplierThreadMajor"]["expected_mm"] == screw.THREAD_MAJOR
+    assert refs["SupplierThreadMajor"]["callout"].startswith("#8-32 UNC\n")
+    assert screw.SUPPLIER_REFERENCE_BANDS == {
+        "SupplierShoulderDiameter": (-0.001 * IN, 0.0),
+        "SupplierShoulderLength": (0.0, 0.002 * IN),
+    }
+    assert not set(refs) & set(screw.DIMENSION_PRECISION)
+    assert refs["SupplierStockThreadLength"]["expected_mm"] == screw.THREAD_LEN
+    assert refs["SupplierStockThreadLength"]["precision"] == 3
+    assert "AS SUPPLIED" in refs["SupplierStockThreadLength"]["callout"]
+    assert screw.SUPPLIER_STOCK_SUPPRESSED_FEATURES == ("StockDeburr", "StockTrim")
+    assert screw.THREAD_LEN == 0.375 * IN > screw.FITTED_THREAD_LEN == 9.15
+
+
+@pytest.mark.parametrize("fault", ["type", "lower", "upper", "precision"])
+def test_supplier_reference_rejects_changed_native_band(monkeypatch, fault) -> None:
+    name = "SupplierShoulderDiameter"
+    lower, upper = (value / 1000 for value in screw.SUPPLIER_REFERENCE_BANDS[name])
+    tolerance = SimpleNamespace(
+        Type=4 if fault == "type" else 2,
+        GetMinValue=lambda: 0.0 if fault == "lower" else lower,
+        GetMaxValue=lambda: 0.001 if fault == "upper" else upper,
+    )
+    display = SimpleNamespace(
+        GetDimension2=lambda _index: SimpleNamespace(Tolerance=tolerance),
+        GetPrimaryTolPrecision2=lambda: 2 if fault == "precision" else 3,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    with pytest.raises(RuntimeError, match="supplier.*(type changed|did not persist)"):
+        drawing._assert_supplier_tolerance(display, name)
+
+
+def test_supplier_reference_requires_complete_coverage() -> None:
+    with pytest.raises(RuntimeError, match="coverage changed"):
+        drawing._assert_supplier_references(None, {}, None, ())
+
+
+@pytest.mark.parametrize("finished_is_stock", [False, True])
+def test_supplier_reference_rejects_configuration_mixup(
+    monkeypatch, finished_is_stock
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    stock = SimpleNamespace(
+        ReferencedConfiguration=(
+            screw.SUPPLIER_STOCK_CONFIGURATION if finished_is_stock else "Default"
+        )
+    )
+    finished = SimpleNamespace(ReferencedConfiguration=screw.SUPPLIER_STOCK_CONFIGURATION)
+    references = dict.fromkeys(screw.SUPPLIER_REFERENCE_DIMENSIONS)
+    with pytest.raises(RuntimeError, match="(lost its stock|switched to source stock)"):
+        drawing._assert_supplier_references(None, references, stock, (finished,))
+
+
+_STOCK = screw.SUPPLIER_STOCK_CONFIGURATION
+_FINISHED_STATES = {"StockDeburr": False, "StockTrim": False, "ThreadGroove": False}
+_SIMPLIFIED_STATES = {**_FINISHED_STATES, "ThreadGroove": True}
+
+
+@pytest.mark.parametrize("auto_activates", [True, False])
+def test_stock_configuration_uses_the_activated_child_and_returns_finished(
+    monkeypatch, auto_activates
+) -> None:
+    """AddConfiguration2 (Options = 0) leaves the stock child active and SW2026
+    refuses ShowConfiguration2 of the active one: switch only when needed."""
+    adapter, model, copies = stock_configuration_adapter(
+        part, monkeypatch, auto_activates=auto_activates
+    )
+    assert part._add_stock_configuration(adapter) == FINISHED
+    assert model.active == FINISHED
+    assert model.shown == ([FINISHED] if auto_activates else [_STOCK, FINISHED])
+    assert model.parents[_STOCK] == FINISHED
+    assert model.rebuilt == [_STOCK]
+    assert copies == [(FINISHED, _STOCK, _STOCK)]
+    # Facing and deburr go in stock only; the original factory thread stays.
+    assert model.states(_STOCK) == {
+        "StockDeburr": True, "StockTrim": True, "ThreadGroove": False
+    }
+    assert model.states(FINISHED) == _FINISHED_STATES
+    assert model.states(FINISHED_SIMPLIFIED) == _SIMPLIFIED_STATES
+
+
+@pytest.mark.parametrize(
+    ("native", "refused", "left_active"),
+    [
+        # The child is not auto-activated and the needed switch is refused.
+        ({"auto_activates": False, "refuse_show": frozenset({_STOCK})}, _STOCK, FINISHED),
+        # Authoring succeeded, but the needed return to finished is refused.
+        ({"refuse_show": frozenset({FINISHED})}, FINISHED, _STOCK),
+    ],
+)
+def test_stock_configuration_refuses_a_needed_switch_that_fails(
+    monkeypatch, native, refused, left_active
+) -> None:
+    adapter, model, _copies = stock_configuration_adapter(part, monkeypatch, **native)
+    with pytest.raises(
+        RuntimeError, match=re.escape(f"cannot activate configuration {refused!r}")
+    ):
+        part._add_stock_configuration(adapter)
+    assert model.shown == [refused]
+    assert model.active == left_active
+    assert model.states(FINISHED) == _FINISHED_STATES
+
+
+@pytest.mark.parametrize("reported_parent", [None, FINISHED_SIMPLIFIED])
+def test_stock_parent_readback_failure_restores_finished(
+    monkeypatch, reported_parent
+) -> None:
+    adapter, model, copies = stock_configuration_adapter(
+        part, monkeypatch, reported_parent=reported_parent
+    )
+    with pytest.raises(RuntimeError, match="not derived from finished") as caught:
+        part._add_stock_configuration(adapter)
+    assert getattr(caught.value, "__notes__", []) == []
+    assert model.active == FINISHED
+    assert model.shown == [FINISHED]
+    assert copies == [] and model.rebuilt == []
+    assert model.states(_STOCK) == _FINISHED_STATES
+
+
+@pytest.mark.parametrize("restore_refused", [False, True])
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    [
+        ({"refuse_suppression": frozenset({"StockTrim"})}, "StockTrim: cannot suppress"),
+        ({"rebuild_fails": True}, "source-stock configuration did not rebuild"),
+        ({"bom_fails": True}, "BOM identity did not persist"),
+        (
+            {"drop_suppression": frozenset({"StockDeburr"})},
+            "StockDeburr: source-stock suppression is incorrect",
+        ),
+    ],
+)
+def test_stock_failure_restores_finished_and_keeps_the_primary_error(
+    monkeypatch, fault, message, restore_refused
+) -> None:
+    refuse = frozenset({FINISHED}) if restore_refused else frozenset()
+    adapter, model, _copies = stock_configuration_adapter(
+        part, monkeypatch, refuse_show=refuse, **fault
+    )
+    with pytest.raises(RuntimeError, match=re.escape(message)) as caught:
+        part._add_stock_configuration(adapter)
+    notes = getattr(caught.value, "__notes__", [])
+    if restore_refused:
+        assert model.active == _STOCK
+        assert len(notes) == 1
+        assert "restoring finished configuration also failed" in notes[0]
+        assert f"cannot activate configuration {FINISHED!r}" in notes[0]
+    else:
+        assert notes == []
+        assert model.active == FINISHED
+    assert model.states(FINISHED) == _FINISHED_STATES
+    assert model.states(FINISHED_SIMPLIFIED) == _SIMPLIFIED_STATES

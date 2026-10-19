@@ -20,6 +20,7 @@ from _drawing_registry import DrawingSpec
 from _purchased_fastener_drawing import (
     _PROPERTIES,
     SupplierDimensions,
+    SupplierMargins,
     _build_reference_sheet,
 )
 
@@ -31,6 +32,7 @@ async def build_purchased_part_drawing(
     item: str,
     cut_to_suit: bool = False,
     supplier_dimensions: SupplierDimensions | None = None,
+    supplier_margins: SupplierMargins | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
 ) -> dict[str, str]:
@@ -58,6 +60,7 @@ async def build_purchased_part_drawing(
         notes=properties["Manufacturing Notes"],
         cut_to_suit=cut_to_suit,
         supplier_dimensions=supplier_dimensions,
+        supplier_margins=supplier_margins,
         settled_checks=settled_checks,
         supplier_data=supplier_data,
     )

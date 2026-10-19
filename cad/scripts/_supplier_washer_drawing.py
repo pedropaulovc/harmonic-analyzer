@@ -1,376 +1,262 @@
-"""Native supplier reference dimensions on the five purchased washer sheets.
+"""Import model-owned washer supplier bands; add only unbanded rim refs.
 
-The source nominal and the representative solid are not always identical.
-Limits are authored as native deviations about the unchanged measured solid;
-no text or dimension-value override substitutes a supplier printed number.
+The part owns every banded dimension's native value, tolerance and supplier
+presentation. Drawing imports are positioned, then inspected read-only.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-import math
 from typing import Any, Literal
 
-from solidworks_mcp.adapters.solidworks.drawing import view_name
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 
 from _com import _early_bound
 from _drawing_attachment import _is_same_attachment
-from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_edges import ViewEdges, scan_view_edges
-from _drawing_projection import model_points_in_view
+from _drawing_hidden_sketches import curate_view_dimensions
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
+from _supplier_washer_model import (
+    BORE_DIAMETER,
+    OUTER_DIAMETER,
+    SOURCE_DIMENSIONS,
+    THICKNESS,
+    assert_supplier_washer_band,
+    assert_supplier_washer_body,
+    assert_supplier_washer_source_attachment,
+)
 import _telemetry
-
-
-OUTER_DIAMETER = "supplier outer diameter"
-BORE_DIAMETER = "supplier bore diameter"
-THICKNESS = "supplier thickness"
 
 
 @dataclass(frozen=True)
 class _WasherReference:
-    display: Any
     view: Any
+    selection_name: str
+    full_name: str
     label: str
     expected_mm: float
     presentation: Literal["length", "diameter"]
-    edges: tuple[Any, ...]
+    imported: bool
     callout: str | None = None
 
 
 def _rim(
-    edges: ViewEdges,
-    *,
-    axis: Literal["y", "z"],
-    station_mm: float,
-    diameter_mm: float,
-    label: str,
+    edges: ViewEdges, *, axis: Literal["y", "z"], station_mm: float,
+    diameter_mm: float, label: str,
 ) -> Any:
     center = (0.0, station_mm, 0.0) if axis == "y" else (0.0, 0.0, station_mm)
     normal = (0.0, 1.0, 0.0) if axis == "y" else (0.0, 0.0, 1.0)
     return edges.circle_at(
-        center,
-        diameter_mm / 2.0,
-        axis=normal,
-        label=label,
-        center_tol_mm=1e-5,
-        radius_tol_mm=1e-5,
+        center, diameter_mm / 2.0, axis=normal, label=label,
+        center_tol_mm=1e-6, radius_tol_mm=1e-6,
     ).edge
 
 
-def _assert_rims(
-    adapter: Any, display: Any, edges: tuple[Any, ...], *, label: str
-) -> None:
+def _assert_rim(adapter: Any, display: Any, rim: Any, *, label: str) -> None:
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     attached = list(annotation.GetAttachedEntities3() or ())
-    for edge in edges:
-        match = next(
-            (
-                index
-                for index, item in enumerate(attached)
-                if item is not None and _is_same_attachment(adapter, item, edge, "EDGE")
-            ),
-            None,
-        )
-        if match is None:
-            raise RuntimeError(f"{label}: native dimension lost its requested rim")
-        attached.pop(match)
-    if attached or annotation.IsDangling() or int(annotation.Visible) != 1:
-        raise RuntimeError(f"{label}: unexpected, hidden or dangling native attachments")
+    if (
+        len(attached) != 1 or attached[0] is None
+        or not _is_same_attachment(adapter, attached[0], rim, "EDGE")
+        or annotation.IsDangling() or int(annotation.Visible) != 1
+    ):
+        raise RuntimeError(f"{label}: native unbanded diameter lost its exact physical rim")
 
 
-def _native_dimension(
-    adapter: Any,
-    view: Any,
-    edges: tuple[Any, ...],
-    *,
-    text_xy: tuple[float, float],
-    dimension_type: int,
-    label: str,
-    landings: list[tuple[float, float]] | None = None,
+def _native_diameter(
+    adapter: Any, view: Any, rim: Any, *, text_xy: tuple[float, float], label: str,
 ) -> Any:
-    """Select actual rims by identity, not a graphics-window coordinate hit."""
+    """The policy exception: an unbanded reference on an actual solid rim."""
     draw = adapter.currentModel
     if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, view)):
         raise RuntimeError(f"{label}: failed to activate drawing view")
     draw.ClearSelection2(True)
     manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    for index, edge in enumerate(edges, 1):
-        data = manager.CreateSelectData()
-        data.View = view
-        if _early_bound(edge, "IEntity").Select4(index > 1, data) is not True:
-            raise RuntimeError(f"{label}: failed to select rim {index}")
-        selected = manager.GetSelectedObject6(index, -1)
-        if (
-            int(manager.GetSelectedObjectCount2(-1)) != index
-            or int(adapter.swApp.IsSame(selected, edge)) != 1
-        ):
-            raise RuntimeError(f"{label}: selection is not the requested rim {index}")
-        if landings is not None:
-            x, y = landings[index - 1]
-            if manager.SetSelectionPoint2(index, -1, x, y, 0.0) is not True:
-                raise RuntimeError(f"{label}: failed to set rim landing {index}")
-    # IModelDocExtension.AddSpecificDimension: early-bound [out] Error.
+    data = manager.CreateSelectData()
+    data.View = view
+    if _early_bound(rim, "IEntity").Select4(False, data) is not True:
+        raise RuntimeError(f"{label}: failed to select physical rim")
+    if (
+        int(manager.GetSelectedObjectCount2(-1)) != 1
+        or int(adapter.swApp.IsSame(manager.GetSelectedObject6(1, -1), rim)) != 1
+    ):
+        raise RuntimeError(f"{label}: selection is not the intended physical rim")
     display, status = _early_bound(draw.Extension, "IModelDocExtension").AddSpecificDimension(
-        text_xy[0], text_xy[1], 0.0, dimension_type, 0
+        text_xy[0], text_xy[1], 0.0, 6, 0  # swDiameterDimension
     )
     draw.ClearSelection2(True)
     if display is None or int(status) != 0:
-        raise RuntimeError(f"{label}: native dimension failed ({status})")
+        raise RuntimeError(f"{label}: native diameter failed ({status})")
     display = _early_bound(display, "IDisplayDimension")
-    if len(edges) == 2:
-        native = _early_bound(display.GetDimension2(0), "IDimension")
-        for endpoint in (1, 2):
-            # Measure the axial distance between rim centres, never the
-            # nearest/farthest points chosen by automatic arc inference.
-            if (
-                int(native.SetArcEndCondition(endpoint, 1)) != 0
-                or int(native.GetArcEndCondition(endpoint)) != 1
-            ):
-                raise RuntimeError(f"{label}: end {endpoint} is not rim-centred")
-    _assert_rims(adapter, display, edges, label=label)
+    _assert_rim(adapter, display, rim, label=label)
     return display
 
 
-def _supplier_band(
-    display: Any,
-    *,
-    nominal_mm: float,
-    band: tuple[float, float, str],
-    precision: int,
-    label: str,
-) -> None:
-    """Preserve exact source limits in SI, independently of display precision."""
-    lower_mm, upper_mm, style = band
-    if not all(map(math.isfinite, (lower_mm, upper_mm))) or lower_mm >= upper_mm:
-        raise ValueError(f"{label}: invalid supplier interval {band!r}")
-    tolerance_type = {"bilateral": 2, "limits": 3, "symmetric": 4}[style]
-    lower_m = (lower_mm - nominal_mm) / 1000.0
-    upper_m = (upper_mm - nominal_mm) / 1000.0
-    if style == "symmetric" and not math.isclose(
-        -lower_m, upper_m, rel_tol=0.0, abs_tol=1e-12
-    ):
-        raise ValueError(f"{label}: symmetric band is not centred on its native value")
-    native = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
-    tolerance.Type = tolerance_type
-    # The repository's exercised SetValues path stores deviations in metres.
-    if not tolerance.SetValues(lower_m, upper_m):
-        raise RuntimeError(f"{label}: native supplier tolerance values were rejected")
-    display.SetPrecision3(-1, -1, precision, -1)
-    _assert_supplier_band(
-        display, nominal_mm=nominal_mm, band=band, precision=precision, label=label
-    )
+def _reference(
+    display: Any, view: Any, label: str, expected_mm: float, *,
+    imported: bool, callout: str | None = None,
+) -> _WasherReference:
+    selection_name = str(display.GetNameForSelection() or "")
+    full_name = str(_early_bound(display.GetDimension2(0), "IDimension").FullName or "")
+    if not selection_name or not full_name:
+        raise RuntimeError(f"{label}: native dimension has no stable selection/full name")
+    return _WasherReference(view, selection_name, full_name, label, expected_mm,
+                            "length" if label == THICKNESS else "diameter", imported, callout)
 
 
-def _assert_supplier_band(
-    display: Any,
-    *,
-    nominal_mm: float,
-    band: tuple[float, float, str] | None,
-    precision: int,
-    label: str,
-) -> None:
-    native = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
-    if band is None:
-        if int(tolerance.Type) != 0:  # swTolNONE
-            raise RuntimeError(f"{label}: unexpected native supplier tolerance")
-        return
-    lower_mm, upper_mm, style = band
-    tolerance_type = {"bilateral": 2, "limits": 3, "symmetric": 4}[style]
-    lower_m = (lower_mm - nominal_mm) / 1000.0
-    upper_m = (upper_mm - nominal_mm) / 1000.0
-    if (
-        int(tolerance.Type) != tolerance_type
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower_m, rel_tol=0.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper_m, rel_tol=0.0, abs_tol=1e-12
-        )
-        or int(display.GetPrimaryTolPrecision2()) != precision
-    ):
-        raise RuntimeError(f"{label}: native supplier tolerance readback differs from source")
+def _visible_dimensions(view: Any) -> list[Any]:
+    visible = []
+    raw = _early_bound(view, "IView").GetFirstDisplayDimension5()
+    while raw is not None:
+        display = _early_bound(raw, "IDisplayDimension")
+        if int(_early_bound(display.GetAnnotation(), "IAnnotation").Visible) == 1:
+            visible.append(display)
+        raw = display.GetNext5()
+    return visible
 
 
 @_telemetry.traced("drawing.assert_supplier_washer_dimensions")
 def assert_supplier_washer_dimensions(
-    adapter: Any,
-    views: dict[str, Any],
-    references: tuple[_WasherReference, ...],
-    *,
-    units: Literal["in", "mm"],
-    precision: Mapping[str, int],
+    adapter: Any, views: dict[str, Any], references: tuple[_WasherReference, ...], *,
+    axis: Literal["y", "z"], bore_mm: float, outer_mm: float, thickness_mm: float,
+    units: Literal["in", "mm"], precision: Mapping[str, int],
     bands: Mapping[str, tuple[float, float, str]],
 ) -> None:
-    """Read only: prove the three exported references after the final rebuild."""
-    if len(references) != 3:
+    """Reacquire displays, source entities and final solid rims after rebuild."""
+    if len(references) != 3 or {reference.label for reference in references} != {
+        OUTER_DIAMETER, BORE_DIAMETER, THICKNESS,
+    }:
         raise RuntimeError("supplier washer must export exactly OD, bore and thickness")
-    for view in views.values():
-        expected = [
-            reference
-            for reference in references
-            if int(adapter.swApp.IsSame(reference.view, view)) == 1
-        ]
-        visible = []
-        raw = _early_bound(view, "IView").GetFirstDisplayDimension5()
-        while raw is not None:
-            display = _early_bound(raw, "IDisplayDimension")
-            if int(_early_bound(display.GetAnnotation(), "IAnnotation").Visible) == 1:
-                visible.append(display)
-            raw = display.GetNext5()
-        if len(visible) != len(expected):
-            raise RuntimeError(
-                f"supplier washer {view_name(adapter, view)} exports "
-                f"{len(visible)} dimensions, expected {len(expected)}"
-            )
+    face = views["*Top" if axis == "y" else "*Front"]
+    side = views["*Front" if axis == "y" else "*Top"]
+    model = _early_bound(face, "IView").ReferencedDocument
+    if model is None:
+        raise RuntimeError("supplier washer drawing has no referenced source part")
+    assert_supplier_washer_body(model, axis=axis, bore_mm=bore_mm,
+                               outer_mm=outer_mm, thickness_mm=thickness_mm)
+    face_edges = scan_view_edges(face, label="settled supplier washer face rims")
+    side_edges = scan_view_edges(side, label="settled supplier washer axial rims")
+    # Body-backed proof remains independent of construction-sketch attachments.
+    face_rims = {
+        label: _rim(face_edges, axis=axis, station_mm=thickness_mm,
+                    diameter_mm=diameter, label=label)
+        for label, diameter in ((OUTER_DIAMETER, outer_mm), (BORE_DIAMETER, bore_mm))
+    }
+    for station in (0.0, thickness_mm):
+        _rim(side_edges, axis=axis, station_mm=station, diameter_mm=outer_mm, label=THICKNESS)
+    current: dict[str, Any] = {}
+    for orientation, view in views.items():
+        expected = [reference for reference in references
+                    if int(adapter.swApp.IsSame(reference.view, view)) == 1]
+        visible = _visible_dimensions(view)
+        required_count = 2 if orientation == ("*Top" if axis == "y" else "*Front") else (
+            1 if orientation == ("*Front" if axis == "y" else "*Top") else 0
+        )
+        if len(expected) != required_count or len(visible) != required_count:
+            raise RuntimeError(f"supplier washer {orientation} exports {len(visible)} dimensions, expected {required_count}")
         for reference in expected:
-            matches = sum(
-                int(adapter.swApp.IsSame(display, reference.display)) == 1
-                for display in visible
-            )
-            if matches != 1:
-                raise RuntimeError(f"{reference.label}: exported dimension census failed")
+            matches = [display for display in visible
+                       if str(display.GetNameForSelection() or "") == reference.selection_name]
+            if len(matches) != 1:
+                raise RuntimeError(f"{reference.label}: settled native display census failed")
+            display = matches[0]
+            native = _early_bound(display.GetDimension2(0), "IDimension")
+            if str(native.FullName or "") != reference.full_name:
+                raise RuntimeError(f"{reference.label}: settled display resolves to another native dimension")
+            current[reference.label] = display
     for reference in references:
+        display = current[reference.label]
         assert_supplier_reference_dimension(
-            adapter,
-            reference.display,
-            label=reference.label,
-            units=units,
-            precision=precision[reference.label],
-            expected_mm=reference.expected_mm,
-            presentation=reference.presentation,
-            callout=reference.callout,
+            adapter, display, label=reference.label, units=units,
+            precision=precision[reference.label], expected_mm=reference.expected_mm,
+            presentation=reference.presentation, callout=reference.callout,
         )
-        _assert_rims(
-            adapter, reference.display, reference.edges, label=reference.label
+        if reference.imported:
+            assert_supplier_washer_source_attachment(
+                adapter, model, display, label=reference.label, axis=axis,
+                bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm, visible=True,
+            )
+        else:
+            _assert_rim(adapter, display, face_rims[reference.label], label=reference.label)
+        assert_supplier_washer_band(
+            display, nominal_mm=reference.expected_mm, band=bands.get(reference.label),
+            precision=precision[reference.label], label=reference.label,
         )
-        _assert_supplier_band(
-            reference.display,
-            nominal_mm=reference.expected_mm,
-            band=bands.get(reference.label),
-            precision=precision[reference.label],
-            label=reference.label,
-        )
-        if reference.label == THICKNESS:
-            native = _early_bound(reference.display.GetDimension2(0), "IDimension")
-            if any(int(native.GetArcEndCondition(end)) != 1 for end in (1, 2)):
-                raise RuntimeError("supplier thickness lost its rim-centre conditions")
 
 
 @_telemetry.traced("drawing.supplier_washer_dimensions")
 def supplier_washer_dimensions(
-    adapter: Any,
-    views: dict[str, Any],
-    *,
-    axis: Literal["y", "z"],
-    bore_mm: float,
-    outer_mm: float,
-    thickness_mm: float,
-    units: Literal["in", "mm"],
-    precision: Mapping[str, int],
-    bands: Mapping[str, tuple[float, float, str]],
+    adapter: Any, views: dict[str, Any], *, axis: Literal["y", "z"],
+    bore_mm: float, outer_mm: float, thickness_mm: float, units: Literal["in", "mm"],
+    precision: Mapping[str, int], bands: Mapping[str, tuple[float, float, str]],
     bore_callout: str | None = None,
 ) -> Callable[[], None]:
-    """Dimension the actual bore/OD rims and the two physical axial end rims."""
+    """Import every banded size; author only bandless OD/ID physical refs."""
+    if set(bands) not in ({THICKNESS}, {OUTER_DIAMETER, BORE_DIAMETER, THICKNESS}):
+        raise ValueError("unsupported washer supplier band coverage")
     face = views["*Top" if axis == "y" else "*Front"]
-    side = views["*Front" if axis == "y" else "*Right"]
-    face_edges = scan_view_edges(face, label="supplier washer end face")
-    side_edges = scan_view_edges(side, label="supplier washer thickness")
-    references: list[_WasherReference] = []
+    side = views["*Front" if axis == "y" else "*Top"]
     bounds = tuple(float(value) for value in face.GetOutline())
     center_y = (bounds[1] + bounds[3]) / 2.0
-    for label, diameter, offset in (
-        (OUTER_DIAMETER, outer_mm, 0.012),
-        (BORE_DIAMETER, bore_mm, -0.012),
-    ):
-        rim = _rim(
-            face_edges, axis=axis, station_mm=thickness_mm,
-            diameter_mm=diameter, label=label,
-        )
-        display = _native_dimension(
-            adapter, face, (rim,),
-            text_xy=(bounds[2] + 0.012, center_y + offset),
-            dimension_type=6,  # swDiameterDimension
-            label=label,
-        )
-        display = supplier_reference_dimension(
-            adapter, display, label=label, units=units,
-            precision=precision[label], expected_mm=diameter,
-            presentation="diameter",
-            callout=bore_callout if label == BORE_DIAMETER else None,
-        )
-        if label in bands:
-            _supplier_band(
-                display, nominal_mm=diameter, band=bands[label],
-                precision=precision[label], label=label,
-            )
-        references.append(
-            _WasherReference(
-                display, face, label, diameter, "diameter", (rim,),
-                bore_callout if label == BORE_DIAMETER else None,
-            )
-        )
-    rims = tuple(
-        _rim(
-            side_edges, axis=axis, station_mm=station,
-            diameter_mm=outer_mm, label=THICKNESS,
-        )
-        for station in (0.0, thickness_mm)
-    )
-    # Points are on each actual outer circle; in the side projection both lie
-    # on the same flank. The explicit selection points prevent arc-centre/tangent
-    # inference from turning the end-to-end distance into a different dimension.
-    points_mm = (
-        [(outer_mm / 2.0, station, 0.0) for station in (0.0, thickness_mm)]
-        if axis == "y"
-        else [(0.0, -outer_mm / 2.0, station) for station in (0.0, thickness_mm)]
-    )
-    landings = model_points_in_view(
-        adapter, side,
-        [tuple(value / 1000.0 for value in point) for point in points_mm],
-        label=THICKNESS,
-    )
-    horizontal = abs(landings[1][0] - landings[0][0]) > abs(
-        landings[1][1] - landings[0][1]
-    )
+    positions = {
+        OUTER_DIAMETER: (bounds[2] + 0.012, center_y + 0.012),
+        BORE_DIAMETER: (bounds[2] + 0.012, center_y - 0.012),
+    }
     side_bounds = tuple(float(value) for value in side.GetOutline())
-    display = _native_dimension(
-        adapter, side, rims,
-        text_xy=(side_bounds[2] + 0.014, (side_bounds[1] + side_bounds[3]) / 2.0),
-        dimension_type=11 if horizontal else 12,  # native horizontal/vertical length
-        label=THICKNESS,
-        landings=landings,
-    )
-    assert_dimension_measures(
-        adapter, display, expected_mm=thickness_mm, label=THICKNESS, entities=rims,
-    )
-    display = supplier_reference_dimension(
-        adapter, display, label=THICKNESS, units=units,
-        precision=precision[THICKNESS], expected_mm=thickness_mm,
-    )
-    if THICKNESS in bands:
-        _supplier_band(
-            display, nominal_mm=thickness_mm, band=bands[THICKNESS],
-            precision=precision[THICKNESS], label=THICKNESS,
+    positions[THICKNESS] = (side_bounds[2] + 0.014, (side_bounds[1] + side_bounds[3]) / 2.0)
+    values = {OUTER_DIAMETER: outer_mm, BORE_DIAMETER: bore_mm, THICKNESS: thickness_mm}
+    references: list[_WasherReference] = []
+    for view, labels in ((face, (OUTER_DIAMETER, BORE_DIAMETER)), (side, (THICKNESS,))):
+        imported_labels = tuple(label for label in labels if label in bands)
+        if not imported_labels:
+            continue
+        annotations = curate_view_dimensions(
+            adapter, view,
+            keep={SOURCE_DIMENSIONS[label][1]: positions[label] for label in imported_labels},
+            view_label="supplier washer face" if view is face else "supplier washer thickness",
+            dimensions_by_feature={
+                SOURCE_DIMENSIONS[label][0]: tuple(SOURCE_DIMENSIONS[item][1]
+                                                  for item in imported_labels
+                                                  if SOURCE_DIMENSIONS[item][0] == SOURCE_DIMENSIONS[label][0])
+                for label in imported_labels
+            },
         )
-    references.append(
-        _WasherReference(display, side, THICKNESS, thickness_mm, "length", rims)
-    )
+        named = {dimension_name(adapter, annotation): annotation for annotation in annotations}
+        for label in imported_labels:
+            annotation = named[SOURCE_DIMENSIONS[label][1]]
+            display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+            # No units, precision, tolerance or reference-ink setter on imports.
+            assert_supplier_reference_dimension(
+                adapter, display, label=label, units=units, precision=precision[label],
+                expected_mm=values[label], presentation="length" if label == THICKNESS else "diameter",
+                callout=bore_callout if label == BORE_DIAMETER else None,
+            )
+            references.append(_reference(display, view, label, values[label], imported=True,
+                                         callout=bore_callout if label == BORE_DIAMETER else None))
+    unbanded = tuple(label for label in (OUTER_DIAMETER, BORE_DIAMETER) if label not in bands)
+    if unbanded:
+        edges = scan_view_edges(face, label="supplier washer unbanded face rims")
+        for label in unbanded:
+            rim = _rim(edges, axis=axis, station_mm=thickness_mm,
+                       diameter_mm=values[label], label=label)
+            display = _native_diameter(adapter, face, rim, text_xy=positions[label], label=label)
+            display = supplier_reference_dimension(
+                adapter, display, label=label, units=units, precision=precision[label],
+                expected_mm=values[label], presentation="diameter",
+                callout=bore_callout if label == BORE_DIAMETER else None,
+            )
+            references.append(_reference(display, face, label, values[label], imported=False,
+                                         callout=bore_callout if label == BORE_DIAMETER else None))
 
     def settled_check() -> None:
         assert_supplier_washer_dimensions(
-            adapter,
-            views,
-            tuple(references),
-            units=units,
-            precision=precision,
-            bands=bands,
+            adapter, views, tuple(references), axis=axis, bore_mm=bore_mm,
+            outer_mm=outer_mm, thickness_mm=thickness_mm, units=units,
+            precision=precision, bands=bands,
         )
 
     return settled_check

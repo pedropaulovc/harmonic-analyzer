@@ -241,13 +241,14 @@ def test_manufacturing_configs_restore_the_installed_parent(monkeypatch):
     assert {name for config, name in suppressions if config == "SetScrew"} == set(part.COLLAR_FEATURES)
 
 
-def test_native_marks_and_single_sheet_collar_drawing():
+def test_native_collar_controls_and_stock_reference_sheet_are_separate():
     sheet = DRAWINGS_BY_NAME["vn_cone_tip_collar"]
     assert drawing.SPEC is sheet
     assert sheet.artifact_stem == part.PART_NAME
     assert sheet.script == Path(drawing.__file__).resolve()
     assert drawing.SHEET_SCALE == (4, 1)
-    assert not hasattr(drawing, "SHEET_NAMES")
+    assert drawing.SHEET_NAMES == ("COLLAR", "94355A213-STOCK")
+    assert drawing.SHEET_SCALES == {"COLLAR": (4, 1), "94355A213-STOCK": drawing.STOCK_SCALE}
     assert set(spec.DRAWING_DIMENSIONS) == set(spec.DRAWING_PRECISION)
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         assert names == set(spec.DRAWING_PRECISION[feature])
@@ -258,7 +259,7 @@ def test_native_marks_and_single_sheet_collar_drawing():
     assert set(drawing.TAP_KEEP) == {"TapStation", "TapRootLimit"}
     assert drawing.TAP_SCALE == spec.RADIAL_TAP_VIEW_SCALE
     assert spec.BORE_DIA * spec.BORE_VIEW_SCALE[0] / spec.BORE_VIEW_SCALE[1] >= 28.0
-    # The stock screw has no sheet, no datums and no geometric controls.
+    # The stock screw gets references only, never custom datums or controls.
     for retired in ("PART_DATUMS", "GEOMETRIC_CONTROLS", "SCREW_NOTES"):
         assert not hasattr(spec, retired)
     assert spec.DRAWING_NOTES == "3/4 STEEL BAR STOCK OK."
@@ -333,6 +334,18 @@ class _Sheet:
             GetAnnotations=lambda: self.views["Drawing View3"],
             GetDisplayDimensions=lambda: self.callouts,
         )
+        self.active_sheet = drawing.SHEET_NAMES[0]
+        self.stock_notes = []
+        self.stock_callouts = []
+        self.stock_sheet_view = SimpleNamespace(GetAnnotations=lambda: self.stock_notes)
+        self.stock_view = SimpleNamespace(
+            name="Stock View1", ReferencedConfiguration="SetScrew",
+            GetAnnotations=lambda: (), GetDisplayDimensions=lambda: self.stock_callouts,
+        )
+        self.sheet_view.GetNextView = lambda: self.tap_view
+        self.tap_view.GetNextView = lambda: None
+        self.stock_sheet_view.GetNextView = lambda: self.stock_view
+        self.stock_view.GetNextView = lambda: None
 
     def _note(self, name, text):
         note = SimpleNamespace(GetType=lambda: 6, OwnerType=1, GetName=lambda: name)
@@ -341,13 +354,23 @@ class _Sheet:
         return note
 
     def GetViews(self):
-        return [[self.sheet_view, self.tap_view]]
+        # SolidWorks explicitly leaves this order undefined.
+        return [[self.stock_sheet_view, self.stock_view], [self.sheet_view, self.tap_view]]
+
+    def ActivateSheet(self, name):
+        if name not in drawing.SHEET_NAMES:
+            return False
+        self.active_sheet = name
+        return True
+
+    def GetFirstView(self):
+        return self.sheet_view if self.active_sheet == drawing.SHEET_NAMES[0] else self.stock_sheet_view
 
     def ClearSelection2(self, _all):
         self.selected = None
 
     def EditDelete(self):
-        for notes in self.views.values():
+        for notes in (*self.views.values(), self.stock_notes):
             if self.selected in notes:
                 notes.remove(self.selected)
 
@@ -799,3 +822,119 @@ def test_installation_notes_name_the_journal_and_its_clearance() -> None:
     assert bore_low - land_high > 0.0
     # The longest line the notes box has printed (the old supply line).
     assert max(map(len, lines)) <= 55
+
+
+def test_stock_reference_coverage_matches_the_supplier_drawing_not_asme_envelopes():
+    assert spec.SET_SCREW_SUPPLIER_SIZES_MM == {
+        "ScrewLength": 5.0 * 25.4 / 16.0,
+        "ScrewMajorDia": 0.086 * 25.4,
+        "SocketAF": 0.035 * 25.4,
+    }
+    assert spec.SET_SCREW_SUPPLIER_SIZES_MM["ScrewLength"] != 0.313 * 25.4
+    assert spec.SET_SCREW_SUPPLIER_UNITS == "in"
+    assert spec.SET_SCREW_SUPPLIER_PRECISION == 3
+    assert spec.SET_SCREW_THREAD == "#2-56"
+    assert spec.SET_SCREW_SKU in spec.SET_SCREW_SUPPLIER_TITLE
+    assert "SUPPLIER REFERENCE ONLY" in spec.SET_SCREW_SUPPLIER_TITLE
+    stock = {name for names in spec.SET_SCREW_SUPPLIER_DIMENSIONS.values() for name in names}
+    controlling = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
+    assert stock == set(spec.SET_SCREW_SUPPLIER_SIZES_MM)
+    assert stock.isdisjoint(controlling)
+    assert set(drawing.STOCK_SIDE_KEEP) | set(drawing.STOCK_END_KEEP) == stock
+    assert spec.SET_SCREW_SUPPLIER_DIMENSIONS == {
+        "SetScrewProfile": {"ScrewLength", "ScrewMajorDia"},
+        "SocketAFReference": {"SocketAF"},
+    }
+    assert "SocketAFReference" in part.SCREW_FEATURES
+    assert "SocketAFReference" not in part.COLLAR_FEATURES
+
+
+def _stock_dimension(name):
+    annotation = SimpleNamespace(
+        name=name, IsDangling=lambda: False, GetAttachedEntities3=lambda: (object(),),
+    )
+    callouts = {"ScrewMajorDia": "#2-56", "SocketAF": "HEX SOCKET AF"}
+    display = SimpleNamespace(
+        Type2=6 if name == "ScrewMajorDia" else 11,
+        GetDimension2=lambda _index: SimpleNamespace(
+            SystemValue=spec.SET_SCREW_SUPPLIER_SIZES_MM[name] / 1000.0,
+        ),
+        GetUseDocUnits=lambda: False, GetUnits=lambda: 3, GetPrimaryPrecision2=lambda: 3,
+        GetFractionBase=lambda: 1,
+        ShowParenthesis=False, GetOverride=lambda: False, ShowDimensionValue=True,
+        GetText=lambda field: {
+            1: "(<MOD-DIAM>" if name == "ScrewMajorDia" else "(",
+            2: " in)", 4: callouts.get(name, ""),
+        }.get(field, ""),
+        GetAnnotation=lambda: annotation,
+    )
+    annotation.GetSpecificAnnotation = lambda: display
+    return display
+
+
+def _stock_sheet(monkeypatch):
+    import _supplier_dimensions
+
+    monkeypatch.setattr(_supplier_dimensions, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    sheet = _Sheet([("sheet", "CollarOnly", "CUSTOM COLLAR")], [])
+    sheet.stock_notes = [sheet._note("StockTitle", spec.SET_SCREW_SUPPLIER_TITLE)]
+    sheet.stock_callouts = [_stock_dimension(name) for name in spec.SET_SCREW_SUPPLIER_SIZES_MM]
+    return sheet
+
+
+def test_stock_note_cleanup_cannot_touch_the_collar_five_note_contract(monkeypatch):
+    sheet = _stock_sheet(monkeypatch)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    sheet.stock_notes.append(sheet._note("StrayStock", "AUTOMATIC THREAD NOTE"))
+    adapter = SimpleNamespace(currentModel=sheet)
+    drawing._delete_unplaced_notes(
+        adapter, frozenset({"StockTitle"}), sheet_name=drawing.SHEET_NAMES[1],
+    )
+    assert set(drawing._sheet_notes(adapter)) == {"CollarOnly"}
+    assert set(drawing._sheet_notes(adapter, drawing.SHEET_NAMES[1])) == {"StockTitle"}
+    drawing._assert_stock_references(adapter, frozenset({"StockTitle"}))
+
+
+@pytest.mark.parametrize("defect", [
+    "value", "type", "units", "precision", "parentheses", "prefix", "suffix", "override", "hidden_value",
+    "thread", "attachment", "dangling", "configuration", "missing", "duplicate",
+])
+def test_settled_stock_sheet_refuses_lost_supplier_reference_contract(monkeypatch, defect):
+    sheet = _stock_sheet(monkeypatch)
+    display = sheet.stock_callouts[1]  # ScrewMajorDia, including the supplier thread identity.
+    if defect == "value":
+        display.GetDimension2 = lambda _index: SimpleNamespace(SystemValue=0.003)
+    elif defect == "type":
+        display.Type2 = 3
+        display.GetDimension2 = lambda _index: pytest.fail("angle interpreted as a native length")
+    elif defect == "units":
+        display.GetUnits = lambda: 0
+    elif defect == "precision":
+        display.GetPrimaryPrecision2 = lambda: 2
+    elif defect == "parentheses":
+        display.ShowParenthesis = True
+    elif defect == "prefix":
+        display.GetText = lambda field: {1: "", 2: " in)", 4: "#2-56"}.get(field, "")
+    elif defect == "suffix":
+        display.GetText = lambda field: {1: "(<MOD-DIAM>", 2: " in", 4: "#2-56"}.get(field, "")
+    elif defect == "override":
+        display.GetOverride = lambda: True
+    elif defect == "hidden_value":
+        display.ShowDimensionValue = False
+    elif defect == "thread":
+        display.GetText = lambda field: {1: "(<MOD-DIAM>", 2: " in)"}.get(field, "")
+    elif defect == "attachment":
+        display.GetAnnotation().GetAttachedEntities3 = lambda: ()
+    elif defect == "dangling":
+        display.GetAnnotation().IsDangling = lambda: True
+    elif defect == "configuration":
+        sheet.stock_view.ReferencedConfiguration = "Default"
+    elif defect == "missing":
+        sheet.stock_callouts.pop()
+    elif defect == "duplicate":
+        sheet.stock_callouts.append(display)
+    with pytest.raises(RuntimeError, match="stock set-screw|supplier reference view"):
+        drawing._assert_stock_references(SimpleNamespace(currentModel=sheet), frozenset({"StockTitle"}))

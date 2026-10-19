@@ -446,3 +446,48 @@ def test_supplier_display_rounding_cannot_replace_exact_model_geometry(monkeypat
             expected_mm=11.1125,
             expected_degrees=None,
         )
+
+
+def test_supplier_fit_reserves_only_planned_views_above_actual_note_band():
+    cells = purchased.fastener_view_cells(
+        purchased.view_band_bottom("FIRST\nSECOND", label="supplier fit")
+    )
+    fitted = purchased.supplier_fit_cells(
+        cells, {"*Front": (0.034, 0.014, 0.045, 0.023)}, label="supplier fit"
+    )
+    original = {name: (center, bounds) for name, center, bounds in cells}
+    actual = {name: (center, bounds) for name, center, bounds in fitted}
+    bounds = original["*Front"][1]
+    # Two footer lines raise the real cell floor; a fixed .077 check misses it.
+    assert bounds[1] == pytest.approx(0.0805)
+    inset = (
+        bounds[0] + 0.034,
+        bounds[1] + 0.014,
+        bounds[2] - 0.045,
+        bounds[3] - 0.023,
+    )
+    assert actual["*Front"][1] == pytest.approx(inset)
+    assert actual["*Front"][0] == pytest.approx(
+        ((inset[0] + inset[2]) / 2.0, (inset[1] + inset[3]) / 2.0)
+    )
+    for name in ("*Top", "*Right", "*Isometric"):
+        assert actual[name] == original[name]
+
+
+@pytest.mark.parametrize(
+    "margins",
+    [
+        {},
+        {"*Missing": (0.01, 0.01, 0.01, 0.01)},
+        {"*Isometric": (0.01, 0.01, 0.01, 0.01)},
+        {"*Front": (0.0, 0.0, 0.0, 0.0)},
+        {"*Front": (-0.01, 0.0, 0.0, 0.0)},
+        {"*Front": (float("nan"), 0.0, 0.0, 0.0)},
+        {"*Front": (0.01, 0.01, 0.01)},
+        {"*Front": (0.20, 0.0, 0.0, 0.0)},
+    ],
+)
+def test_supplier_fit_rejects_invalid_or_unusable_annotation_plans(margins):
+    cells = purchased.fastener_view_cells(purchased.view_band_bottom("", label="fit"))
+    with pytest.raises(ValueError, match="supplier margins"):
+        purchased.supplier_fit_cells(cells, margins, label="fit")

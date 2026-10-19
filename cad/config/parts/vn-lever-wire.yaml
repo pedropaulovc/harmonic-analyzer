@@ -5,7 +5,7 @@ vn-lever-wire:
   supplier: McMaster-Carr
   supplier_skus: [9666K56]
   material: ASTM A228 music wire
-  material_specification: "ASTM A228 music wire, 0.031 in; McMaster-Carr 9666K56"
+  material_specification: "ASTM A228 music wire; McMaster-Carr 9666K56"
   finish: phosphate coated, as supplied
   installation_notes: |-
     INSTALLATION - HOOK IN THE MHA-MG-006 OUTPUT FIXTURE SPIGOT GROOVE;

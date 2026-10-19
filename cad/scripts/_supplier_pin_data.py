@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Literal
 
 
+DIAMETER_FEATURE = "SupplierPinDiameterReference"
+DIAMETER_DIMENSION = "SupplierPinDiameter"
 MATING_HOLE_FEATURE = "SupplierMatingHoleReference"
 MATING_HOLE_DIMENSION = "SupplierMatingHoleDia"
 WALL_FEATURE = "SupplierPinWallReference"
 WALL_DIMENSION = "SupplierPinWall"
 REFERENCE_DIMENSIONS = {
+    DIAMETER_FEATURE: {DIAMETER_DIMENSION},
     MATING_HOLE_FEATURE: {MATING_HOLE_DIMENSION},
     WALL_FEATURE: {WALL_DIMENSION},
 }
@@ -41,6 +45,25 @@ class SupplierPinReference:
     @property
     def unit_mm(self) -> float:
         return 25.4 if self.units == "in" else 1.0
+
+    @property
+    def diameter_uses_limits(self) -> bool:
+        """Present a discrepant print nominal as limits on the exact carrier."""
+        return self.diameter_band is not None and not math.isclose(
+            self.diameter_nominal * self.unit_mm, self.diameter_mm,
+            rel_tol=0.0, abs_tol=1e-8,
+        )
+
+    @property
+    def diameter_deviations_mm(self) -> tuple[float, float]:
+        """Signed drawing-source interval relative to the unchanged model OD."""
+        if self.diameter_band is None:
+            raise ValueError(f"{self.sku}: supplier diameter has no source band")
+        lower, upper = self.diameter_band
+        return (
+            (self.diameter_nominal + lower) * self.unit_mm - self.diameter_mm,
+            (self.diameter_nominal + upper) * self.unit_mm - self.diameter_mm,
+        )
 
     @property
     def application_hole_center(self) -> tuple[float, float]:

@@ -19,6 +19,10 @@ def test_three_thirty_seconds_source_band_uses_equivalent_limits(module_name) ->
     assert (lower - exact_inches, upper - exact_inches) == pytest.approx(
         (0.00005, 0.00025), abs=1e-15
     )
+    assert source.diameter_uses_limits
+    assert source.diameter_deviations_mm == pytest.approx(
+        (0.00005 * 25.4, 0.00025 * 25.4), abs=1e-12
+    )
 
 
 def test_knob_pin_three_place_print_does_not_round_three_sixteenths_geometry() -> None:
@@ -38,6 +42,8 @@ def test_metric_source_band_preserves_nominal_cylinder() -> None:
     )
     assert (lower, upper) == pytest.approx((2.002, 2.008), abs=1e-12)
     assert DIA < lower < upper
+    assert not SUPPLIER_REFERENCE.diameter_uses_limits
+    assert SUPPLIER_REFERENCE.diameter_deviations_mm == pytest.approx((0.002, 0.008), abs=1e-12)
 
 
 @pytest.mark.parametrize(

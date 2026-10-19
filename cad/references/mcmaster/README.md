@@ -15,16 +15,16 @@ recipes:
 
 | part number | production part stem(s) | stock item |
 |---|---|---|
-| 3088A429 | `vn-rocker-thrust-washer` (MHA-VN-070; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 1/4" ID x 3/8" OD, 0.031" Thick |
-| 3606T118 | `vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
-| 3606T811 | `vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
+| 3088A429 | `vn-rocker-thrust-washer` (MHA-VN-070; engineering drawing inspected; earlier CAD refusal is historical) | Carbon Steel Round Shim, 1/4" ID x 3/8" OD, 0.031" Thick |
+| 3606T118 | `vn-keeper-chain` (catalogue bead size only; no engineering drawing retrieved) | Bead Chain, Unfinished Brass, Trade Size 3 |
+| 3606T811 | `vn-keeper-chain-link` (catalogue identity only; no numeric engineering drawing retrieved) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 5972K41 | `ch-rocker-arm-tl-oblique-bearing` (MHA-CH-006-TL-32; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Steel Ball Bearing |
-| 6261K108 | `vn-chain-connecting-link` (the loop's one connecting link; catalogue-only, vendor model not downloaded) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
-| 6261K171 | `vn-chain-inner-link`, `vn-chain-outer-link` (cut to length; catalogue-only, vendor model not downloaded) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
+| 6261K108 | `vn-chain-connecting-link` (installed stand-in; separate source-derived stock representation) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
+| 6261K171 | `vn-chain-inner-link`, `vn-chain-outer-link` (cut to length; installed stand-ins; 6261K281 stock source inspected) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
 | 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
 | 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
-| 90114A124 | `vn-ms-stop-plate-screw`; `vn-platen-clip-screw` until 2026-10-15 (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
+| 90114A124 | `vn-ms-stop-plate-screw`; `vn-platen-clip-screw` until 2026-10-15 (engineering drawing inspected for current VN use) | Brass Fillister Head Slotted Screw |
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -35,11 +35,11 @@ recipes:
 | 90280A201 | `vn-clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A203 | `vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90480A009 | `vn-pen-hanger-nut` (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Nut |
-| 90760A009 | `vn-pen-hanger-jam-nut` (catalogue-only; no vendor model) | Zinc-Plated Steel Narrow-Profile Hex Nut |
-| 90760A140 | `vn-boss-hook-jam-nut` (MHA-VN-072; catalogue-only, no vendor model) | Zinc-Plated Steel Narrow-Profile Hex Nut |
+| 90480A009 | `vn-pen-hanger-nut` (engineering drawing inspected) | Low-Strength Zinc-Plated Steel Hex Nut |
+| 90760A009 | `vn-pen-hanger-jam-nut` (engineering drawing inspected) | Zinc-Plated Steel Narrow-Profile Hex Nut |
+| 90760A140 | `vn-boss-hook-jam-nut` (MHA-VN-072; engineering drawing inspected) | Zinc-Plated Steel Narrow-Profile Hex Nut |
 | 91247A720 | — (diagnostic recipe; a former `vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
-| 91251A108 | `vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
+| 91251A108 | `vn-cone-tip-block-screw` (engineering drawing inspected) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | — (catalogue-only diagnostic recipe; former `vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A188 | `ch-rocker-arm-tl-oblique-block-screw` (MHA-CH-006-TL-43; shop fixture; catalogue-only, CAD login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A196 | `ch-rocker-arm-tl-oblique-bracket-screw` (MHA-CH-006-TL-42; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
@@ -53,58 +53,64 @@ recipes:
 | 91290A115 | `ch-rocker-arm-tl-oblique-nut-screw` (MHA-CH-006-TL-46; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91290A148 | `ch-rocker-arm-tl-oblique-kp08-screw` (MHA-CH-006-TL-45; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91290A168 | `ch-rocker-arm-tl-oblique-carriage-screw` (MHA-CH-006-TL-44; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
-| 90325A174 | `vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
-| 91375A105 | `vn-pen-rod-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
+| 90325A174 | `vn-transgear-pivot-screw` (engineering drawing inspected; earlier CAD refusal is historical) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
+| 91375A105 | `vn-pen-rod-set-screw` (engineering drawing inspected) | Alloy Steel Cup-Tip Set Screw |
 | 91375A106 | `vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
-| 91375A942 | `vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
+| 91375A942 | `vn-fulcrum-set-screw` (engineering drawing inspected) | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | — (diagnostic recipe; `vn-gooseneck-set-screw` until 2026-10-12) | Steel Square-Head Cup-Point Set Screw |
-| 91410A540 | `vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
+| 91410A540 | `vn-gooseneck-set-screw` (engineering drawing inspected) | Steel Square-Head Cup-Point Set Screw |
+| 91585A377 | `vn-crank-hub-pin` (MHA-VN-029; engineering PDF and vendor STEP inspected) | Passivated 18-8 Stainless Steel ISO 2338-m6 Dowel Pin, 4 mm Diameter x 4 mm Long |
 | 91595A452 | `ch-rocker-arm-tl-oblique-cl-dowel` (MHA-CH-006-TL-33; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Dowel Pin |
 | 91771A110 | `ch-rocker-arm-tl-oblique-riser-screw` (MHA-CH-006-TL-47; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Stainless Steel Phillips Flat Head Screw |
-| 91790A199 | `vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
-| 91792A108 | `vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
+| 91790A199 | `vn-transgear-arm-plate-screw` (engineering PDF and STEP inspected; separate supplied-stock configuration) | 18-8 Stainless Steel Oval Head Slotted Screw |
+| 91792A108 | `vn-guide-lock-screw` (engineering drawing inspected) | 18-8 Stainless Steel Pan Head Slotted Screw |
 | 91794A112 | `vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A055 | `vn-transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
-| 91794A078 | `vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
-| 91794A080 | `vn-frame-side-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
+| 91794A078 | `vn-magnifying-bracket-screw` (engineering drawing inspected) | 18-8 Stainless Steel Fillister Head Slotted Screw |
+| 91794A080 | `vn-frame-side-screw` (engineering drawing inspected) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A540 | `vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
-| 92314A253 | `vn-knife-hanger-stud` (modified stock; catalogue-only, no vendor model) | 18-8 Stainless Steel Hex Head Screw, #10-24 × 2 in, cut to length |
-| 92446A077 | `vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Pan Head Slotted Screw |
+| 92314A253 | `vn-knife-hanger-stud` (modified stock; engineering drawing inspected; original stock shown separately) | 18-8 Stainless Steel Hex Head Screw, #10-24 × 2 in, cut to length |
+| 92446A077 | `vn-platen-clip-screw` (engineering drawing inspected) | Brass Pan Head Slotted Screw |
 | 91882A221 | `vn-thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `vn-tube-frame-cap` | Metal Round Cap |
-| 92671A005 | `vn-wheel-axle-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
-| 92671A115 | `vn-pen-adjust-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
+| 92671A005 | `vn-wheel-axle-nut` (engineering drawing inspected) | Brass Hex Nut |
+| 92671A115 | `vn-pen-adjust-nut` (engineering drawing inspected) | Brass Hex Nut |
 | 9414T1 | — (historical MHA-VN-016 until the 2026-10-08 terminal redesign) | Set Screw Shaft Collar for 1/16" Diameter |
 | 94355A213 | `vn-cone-tip-collar` set screw, fitted as supplied | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
 | 92865A585 | — (diagnostic recipe; former `vn-hex-bolt`, MHA-VN-008 retired) | Medium-Strength Grade 5 Steel Hex Head Screw |
-| 92916A250 | `vn-wheel-axle-front-washer` (catalogue-only; no vendor model) | Brass Washer for Number 4 Screw Size |
-| 96659A104 | `vn-knife-hanger-washer` (MHA-VN-060; catalogue-only, no vendor model) | 18-8 Stainless Steel SAE Washer for Number 10 Screw Size |
-| 92916A480 | `vn-wheel-axle-back-washer` (catalogue-only; no vendor model) | Brass Washer for Number 10 Screw Size |
+| 92916A250 | `vn-wheel-axle-front-washer` (engineering drawing inspected) | Brass Washer for Number 4 Screw Size |
+| 96659A104 | `vn-knife-hanger-washer` (MHA-VN-060; engineering drawing inspected) | 18-8 Stainless Steel SAE Washer for Number 10 Screw Size |
+| 92916A480 | `vn-wheel-axle-back-washer` (engineering drawing inspected) | Brass Washer for Number 10 Screw Size |
 | 93075A194 | — (diagnostic recipe; `vn-hanger-screw` until the 2026-10-14 through-strap nut stack) | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93075A199 | `vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93585A190 | `vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
-| 93600A189 | `vn-transgear-arm-plate-locating-pin` (catalogue-only; no vendor model) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
-| 9666K56 | `vn-lever-wire`, `vn-pen-wire` (cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |
-| 9714K24 | `vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
-| 9714K392 | `vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
-| 9715K43 | `vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
+| 93600A189 | `vn-transgear-arm-plate-locating-pin` (engineering drawing inspected) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
+| 9666K56 | `vn-lever-wire`, `vn-pen-wire` (cut from one coil; engineering drawing inspected; separate nominal-stock diagram) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |
+| 9714K24 | `vn-rocker-bank-spring` (installed approximation; supplier nominal-dimension diagram, NOT PART SHAPE) | Wave Disc Spring |
+| 9714K392 | `vn-cylinder-bank-spring` (installed approximation; supplier nominal-dimension diagram, NOT PART SHAPE) | Wave Disc Spring |
+| 9715K43 | `vn-transgear-pivot-spring` (installed approximation; supplier nominal-dimension diagram, NOT PART SHAPE) | Curved Disc Spring |
 | 97431A260 | `vn-transgear-retaining-ring` | Side-Mount External Retaining Ring |
-| 98055A098 | `vn-transgear-pivot-shim` (MHA-VN-069; catalogue-only, no vendor model) | DIN 988 Shim, Stress-Resistant Spring Steel |
+| 98055A098 | `vn-transgear-pivot-shim` (MHA-VN-069; engineering drawing inspected) | DIN 988 Shim, Stress-Resistant Spring Steel |
 | 98296A026 | `vn-transgear-collar-cross-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A031 | `vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
-| 98381A433 | `vn-transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
-| 98381A434 | `vn-crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
+| 98381A433 | `vn-transgear-knob-drive-pin` (engineering drawing inspected; unresolved catalogue/drawing diameter discrepancy below) | Alloy Steel Dowel Pin |
+| 98381A434 | `vn-crank-seat-drive-pin` (crank only; engineering drawing inspected; same unresolved discrepancy) | Alloy Steel Dowel Pin |
 | 98381A473 | `vn-knife-mount-dowel` | Alloy Steel Dowel Pin |
-| 98381A474 | `vn-transgear-latch-pin` (catalogue-only; no vendor model; SKU not yet read live) | Alloy Steel Dowel Pin |
+| 98381A474 | `vn-transgear-latch-pin` (engineering drawing inspected; stock size source-confirmed) | Alloy Steel Dowel Pin |
 | 99607A213 | `vn-pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_vn_cone_lock_knob.py`
 and `cad/scripts/build_vn_swing_stop_screw.py`.
+
+Current VN engineering-source status and source/installed distinctions are recorded
+under **Reference drawings** below (October 19, 2026). The dated research entries
+that follow retain their original CAD-access and replica-gate history; an earlier
+unavailable CAD download does not mean the engineering drawing is unavailable now.
 
 Oblique trammel jig shop-fixture hardware (MHA-CH-006-TL-32/33 and
 TL-41 to TL-49), modelled as purchased parts so the jig assembly can run
@@ -1400,3 +1406,150 @@ For example, `uv run python build.py drawing:vn_knife_mount_dowel` writes
 `cad/out/pdf/vn-knife-mount-dowel.pdf` and
 `cad/out/png/vn-knife-mount-dowel_drawing.png`. Run these tasks through the
 pipeline so they acquire the shared SolidWorks seat lock.
+
+### Current supplier dimensions (October 19, 2026)
+
+The current VN sheets use associative native reference dimensions in the supplier's
+units and displayed precision, including fractions and supplier tolerance bands.
+Exact model values are retained: a supplier display of 0.188 in can describe an
+exact 3/16-in source dimension. Numeric text/value overrides are not used.
+Supplier reference sizes identify stock; existing finished, cut-to-suit,
+installation and fit controls remain separate and retain their original units.
+Supplier bands do not turn nominal CAD into a measured conforming specimen.
+
+Where installed geometry differs from stock, the source dimensions belong to a
+separate stock configuration, nominal-dimension diagram or application gauge.
+The wire diagrams use the exact 0.0310-in stock diameter, while the installed
+0.8-mm envelopes and incomplete-development/DO NOT RELEASE limitations remain.
+The 110-ft coil package length is not a developed cut length. Boss-hook nominal
+stock likewise has its own diagram where supplier fractions differ from the
+vendor-CAD-derived installed eye. The collar's supplier references apply only
+to its purchased 94355A213 set screw, not the custom collar.
+
+For 9714K24, 9714K392 and 9715K43, `Supplier-Dimensions` contains native
+sketch/dimension diagrams with zero solid bodies and zero sheet bodies, labelled
+**NOT PART SHAPE**. They show nominal ID/OD, free-height envelopes and separate
+flat nominal-strip diagrams. Cylinder and pivot sheets also have distinct
+application gauges; these do not represent compressed spring solids. The installed
+0.60-mm and 0.95-mm annuli and 0.80-mm cone are unchanged approximations.
+Only supplier dimension/criterion data are used in these diagrams. Downloaded
+STEP/native sources and surface research remain out of tree; no vendor BRep,
+spline coefficients or reconstructed vendor spring shapes are shipped.
+The pivot's exact nominal strip remains 0.0113 in despite its 0.011-in drawing
+display. Rocker catalogue working-height data are not engineering-drawing content.
+
+Chain installed clearance stand-ins are also unchanged. Separate source-derived
+stock representations use the inspected connector and same-family 1-ft
+6261K171-6261K281 sources; they do not claim bit-identical vendor shapes.
+Retaining-ring shaft/groove dimensions and connecting-link roller dimensions are
+labelled application gauges, not measurements of nonexistent features on those
+parts. For keeper chain 3606T118, the only numeric supplier reference is the
+catalogue-attributed 3/32-in bead diameter. No engineering drawing was retrieved
+for it or 3606T811; the latter has no numeric supplier engineering coverage.
+Its generic 9-mm coupler remains illustrative, not supplier-qualified geometry.
+
+These statements record inspected source evidence and the intended native
+representation. They do not establish successful project builds, persisted native
+dimension readbacks or rendered-sheet qualification.
+
+#### Crank-hub pin 91585A377
+
+[91585A377](https://www.mcmaster.com/91585A377/) replaces the idealized
+sharp-ended stock cylinder for `vn-crank-hub-pin` (MHA-VN-029). The live source
+identifies passivated 18-8 stainless steel, ISO 2338-m6, chamfer ends, nominal
+4-mm diameter and 4-mm length. Its
+[engineering PDF](https://www.mcmaster.com/mvC/Library/CAD2/20260107/EB9E53DB/91585A377_18-8%20Stainless%20Steel%20Dowel%20Pin.PDF)
+prints 4.000 mm +0.012/+0.004 and 4 mm, without a length tolerance. Hardness
+and breaking strength are not rated. PDF SHA-256:
+`cdccbd62ea970dc31b68f149c8d42908ee563b3ee82561fb3af553b96836063d`.
+
+The [supplier STEP](https://www.mcmaster.com/mvC/Library/CAD2/20260107/66E54F2D/91585A377_18-8%20Stainless%20Steel%20Dowel%20Pin.STEP),
+SHA-256 `17baf944ce1b2cd76389991fc04f604aa3c5a6ac30d507787bdc6aceb80b5f20`,
+was measured headlessly: equal 0.630-mm axial end leads at 15 degrees to the
+axis, end-face diameter 3.662384017536785 mm, full-diameter body length
+2.740 mm and volume 48.96666084388053 mm³. These leads reduce the idealized
+full-diameter contact length; the comparison supplies no load or retention rating.
+Nominal diameter/overall length, six-o'clock seam pose, light-drive matched fit,
+flush installation and exclusion from the shaft bore remain unchanged.
+Supplier-source measurement is not native qualification of the replacement.
+
+#### Unresolved 98381A433/434 source discrepancy
+
+The inspected engineering drawings spell the diameter **0.0937 in
++0.0003/+0.0001**; the live catalogue specifies exact **3/32 in
++0.0003/+0.0001**. The existing catalogue-based control interval is
+0.09385–0.09405 in; the literal engineering-drawing interval is
+0.0938–0.0940 in. Both engineering limits are 0.00005 in = 1.27 µm lower.
+This nominal discrepancy is not ordinary display rounding. The exact
+0.09375-in model carriers and existing fit controls are unchanged. Equivalent
+native reference LIMITS 0.0940/0.0938 identify the engineering-drawing interval;
+the source conflict and its downstream fit implications have not been reconciled.
+
+#### MSC post-mount screw source
+
+The user-supplied `C:/Users/pedro/Downloads/msc-40923906.pdf` (one page,
+40923906 Machine Screws, INCH/NTS) resolves the earlier public-access failure
+for [MSC 40923906 / MPN 1464MSL](https://www.mscdirect.com/product/details/40923906).
+It specifies 1/4-20 UNC, 4.000/3.910-in under-head stock length and a distal
+1.500-in factory thread, not the alternate catalogue's fully-threaded shorthand.
+The six paired inch limits are head OD .414/.389, total head height .237/.207,
+skirt .170/.155, slot width .075/.064, slot depth .109/.087 and stock
+length 4.000/3.910; source references use three decimal places.
+
+The longest matching McMaster zinc-steel slotted fillister,
+[90280A555](https://www.mcmaster.com/90280A555/), is 3 in (76.2 mm), shorter
+than the required 82.8-mm finished under-head length. No qualifying McMaster
+length was found, so MSC stock is retained. The source correction uses
+`cad/scripts/diagnostics/diag_build_40923906.py`; original cut, seating and fit
+controls are preserved. Its separate supplier nominal maximum-limit envelope
+does not certify representative crown curvature or blade/preload behavior.
+The source correction has no claimed passing native result.
+
+#### Inspected engineering sources
+
+The following supplier engineering drawings were visually inspected on October
+19, 2026. They supersede earlier catalogue-only sourcing statements for current
+VN dimension coverage, without changing the dated replica/access history above.
+Vendor downloads remain subject to the no-redistribution policy.
+
+Hardware:
+
+- Nuts: [90760A140](https://www.mcmaster.com/mvC/Library/CAD2/20260407/5251DF9A/90760A140_Steel%20Narrow-Profile%20Hex%20NutsX.GIF), [92671A115](https://www.mcmaster.com/mvC/Library/CAD2/20260107/BBF5F10C/92671A115_Brass%20Hex%20NutX.GIF), [90760A009](https://www.mcmaster.com/mvC/Library/CAD2/20260407/31F0C83B/90760A009_Steel%20Narrow-Profile%20Hex%20NutsX.GIF), [90480A009](https://www.mcmaster.com/mvC/Library/CAD2/20260407/1C8D9587/90480A009_Zinc-Plated%20Low-Strength%20Steel%20Hex%20NutsX.GIF), [92671A005](https://www.mcmaster.com/mvC/Library/CAD2/20260107/A40FAE1C/92671A005_Brass%20Hex%20NutX.GIF).
+- Washers/shim: [96659A104](https://www.mcmaster.com/mvC/Library/CAD2/20260630/7FA79105/96659A104_18-8%20Stainless%20Steel%20SAE%20WasherX.GIF), [3088A429](https://www.mcmaster.com/mvC/Library/CAD2/20260108/095CF7B5/3088A429_Carbon%20Steel%20ShimX.GIF), [98055A098](https://www.mcmaster.com/mvC/Library/CAD2/20260108/1F378AF1/98055A098_Spring%20Steel%20ShimX.GIF), [92916A480](https://www.mcmaster.com/mvC/Library/CAD2/20260702/8C5AC0BA/92916A480_Brass%20WasherX.GIF), [92916A250](https://www.mcmaster.com/mvC/Library/CAD2/20260702/F5440C8D/92916A250_Brass%20WasherX.GIF).
+- Dowel pins: [98381A434](https://www.mcmaster.com/mvC/Library/CAD2/20260107/1D4F365E/98381A434_Dowel%20PinX.GIF), [98381A433](https://www.mcmaster.com/mvC/Library/CAD2/20260107/03FDE904/98381A433_Dowel%20PinX.GIF), [98381A473](https://www.mcmaster.com/mvC/Library/CAD2/20260107/0284150B/98381A473_Dowel%20PinX.GIF), [98381A474](https://www.mcmaster.com/mvC/Library/CAD2/20260107/12264175/98381A474_Dowel%20PinX.GIF), [93600A189](https://www.mcmaster.com/mvC/Library/CAD2/20260107/587786EA/93600A189_316%20Stainless%20Steel%20Dowel%20PinX.GIF).
+- Spring pins: [98296A027](https://www.mcmaster.com/mvC/Library/CAD2/20260513/4DAF2FB8/98296A027_1050-1095%20Spring%20Steel%20Slotted%20Spring%20PinX.GIF), [98296A031](https://www.mcmaster.com/mvC/Library/CAD2/20260513/F04BDF2E/98296A031_1050-1095%20Spring%20Steel%20Slotted%20Spring%20PinX.GIF).
+
+Springs, chain, retaining ring and cap:
+
+- Disc diagrams: [9714K24](https://www.mcmaster.com/mvC/Library/CAD2/20260115/21A4CCD6/9714K24_Wave%20Disc%20SpringX.GIF), [9714K392](https://www.mcmaster.com/mvC/Library/CAD2/20260323/3100F2B3/9714K392_Wave%20Disc%20SpringX.GIF), [9715K43](https://www.mcmaster.com/mvC/Library/CAD2/20260115/90C63C6C/9715K43_Curved%20Disc%20SpringsX.GIF).
+- Extension springs: [9432K31](https://www.mcmaster.com/mvC/Library/CAD2/20260617/4210389D/9432K31_Music-Wire%20Steel%20Extension%20Springs%20with%20Hook%20EndsX.GIF), [1330K524](https://www.mcmaster.com/mvC/Library/CAD2/20260501/24CCF480/1330K524_Extension%20SpringX.GIF).
+- Chain: [6261K108](https://www.mcmaster.com/mvC/Library/CAD2/20260118/6281C76E/6261K108_Connecting%20Link%20for%20ANSI%20Number%2025%20Single%20Strand%20Roller%20ChainX.GIF), [6261K281 (1-ft selection of 6261K171)](https://www.mcmaster.com/mvC/Library/CAD2/20260118/4B507DDD/6261K281_Roller%20ChainX.GIF).
+- [97431A260 retaining ring](https://www.mcmaster.com/mvC/Library/CAD2/20260108/11A85F12/97431A260_Side-Mount%20External%20Retaining%20RingsX.GIF); [9275K141 cap](https://www.mcmaster.com/mvC/Library/CAD2/20260103/8B1F2D71/9275K141_Metal%20Round%20CapX.GIF).
+
+Custom/reworked stock:
+
+- [9490T1 boss hook](https://www.mcmaster.com/mvC/Library/CAD2/20260114/77F834CD/9490T1_Zinc-Plated%20Steel%20Routing%20Eyebolt-Not%20for%20LiftingX.GIF); [9489T111 spring hook](https://www.mcmaster.com/mvC/Library/CAD2/20260408/6323B365/9489T111_Routing%20Eyebolt%20with%20Nut%20-%20Not%20for%20LiftingX.GIF).
+- [94355A213 collar set screw](https://www.mcmaster.com/mvC/Library/CAD2/20260604/1B55C491/94355A213_18-8%20Stainless%20Steel%20Flat-Tip%20Set%20ScrewX.GIF); [92314A253 stud stock](https://www.mcmaster.com/mvC/Library/CAD2/20260107/BB28DFA4/92314A253_18-8%20Stainless%20Steel%20Hex%20Head%20ScrewsX.GIF).
+- [9666K56 wire](https://www.mcmaster.com/mvC/Library/CAD2/20260111/6A9AB2E8/9666K56_Lubricated%201080%20Spring%20Steel%20WireX.GIF); [90325A174 pivot screw](https://www.mcmaster.com/mvC/Library/CAD2/20260701/7DFBF7EB/90325A174_18-8%20Stainless%20Steel%20Precision%20Shoulder%20ScrewX.GIF).
+
+Current screw sources that were previously marked catalogue-only:
+
+- [91251A108](https://www.mcmaster.com/mvC/Library/CAD2/20260108/B4B87592/91251A108_Black-Oxide%20Alloy%20Steel%20Socket%20Head%20ScrewX.GIF), [91375A942](https://www.mcmaster.com/mvC/Library/CAD2/20260925/B58B1B28/91375A942_Alloy%20Steel%20Cup-Tip%20Set%20ScrewX.GIF), [91410A540](https://www.mcmaster.com/mvC/Library/CAD2/20260108/9342C49D/91410A540_Steel%20Square-Head%20Cup-Point%20Set%20ScrewX.GIF).
+- [91792A108](https://www.mcmaster.com/mvC/Library/CAD2/20260610/3DCADCB9/91792A108_18-8%20Stainless%20Steel%20Pan%20Head%20Slotted%20ScrewsX.GIF), [91794A078](https://www.mcmaster.com/mvC/Library/CAD2/20260108/67729C16/91794A078_18-8%20Stainless%20Steel%20Fillister%20Head%20Slotted%20ScrewX.GIF), [91794A080](https://www.mcmaster.com/mvC/Library/CAD2/20260108/FAEE6E4F/91794A080_18-8%20Stainless%20Steel%20Fillister%20Head%20Slotted%20ScrewX.GIF).
+- [90114A124](https://www.mcmaster.com/mvC/Library/CAD2/20260619/961C5808/90114A124_Brass%20Fillister%20Head%20Slotted%20ScrewsX.GIF), [91375A105](https://www.mcmaster.com/mvC/Library/CAD2/20260925/7C42F185/91375A105_Alloy%20Steel%20Cup-Tip%20Set%20ScrewX.GIF), [92446A077](https://www.mcmaster.com/mvC/Library/CAD2/20260610/72386355/92446A077_Brass%20Pan%20Head%20Slotted%20ScrewsX.GIF).
+
+For [91790A199](https://www.mcmaster.com/mvC/Library/CAD2/20260108/172E7CCB/91790A199_18-8%20Stainless%20Steel%20Slotted%20Oval%20Head%20ScrewsX.GIF),
+the [PDF](https://www.mcmaster.com/mvC/Library/CAD2/20260108/E749DE72/91790A199_18-8%20Stainless%20Steel%20Slotted%20Oval%20Head%20Screws.PDF)
+and [STEP](https://www.mcmaster.com/mvC/Library/CAD2/20260108/53AE5A4D/91790A199_18-8%20Stainless%20Steel%20Slotted%20Oval%20Head%20Screws.STEP)
+were also retrieved. STEP SHA-256:
+`8dce92581429d3c3fcf5e4d8b5a3588ce990af21ad99cd5d00051ff7653c71bb`.
+The source places the neck/thread-start station 0.100 in below the bevel top
+(0.152-in total head minus 0.052-in crown) and gives the under-head fillet
+radius 0.377767541787383 mm. The recipe corrects that transition and exposes
+the 1-in supplied length through `SupplierStock`; installed length
+12.9375 mm, seating cone and cut controls remain. Undimensioned slot and
+factory-tip differences from the STEP remain deliberately unchanged, so this
+is not a full vendor-shape equivalence claim. Native interface/render proof
+remains outstanding. The [91794A055 drawing](https://www.mcmaster.com/mvC/Library/CAD2/20260108/1437E659/91794A055_18-8%20Stainless%20Steel%20Fillister%20Head%20Slotted%20ScrewX.GIF)
+similarly identifies 0.25-in stock length on a separate labelled stock witness,
+not on the shortened installed span.

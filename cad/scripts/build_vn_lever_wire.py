@@ -77,6 +77,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _visibility import blank_reference_geometry
+from _supplier_wire_stock import author_nominal_stock_cross_section
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from vn_lever_wire_spec import (
     BALLOON_RING_FRACTION,
@@ -311,16 +312,27 @@ async def build(adapter) -> dict[str, str]:
     # distance -- skew lines have ONE minimal distance, so no far-side flip,
     # and name selection survives solver motion, unlike a point-picked face).
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "wire axis")
+    # Every installed solid and solid-dependent feature, in tree order: the
+    # extrusion and its profile, the balloon-ring split and its sketch, and the
+    # two edge-centre datum points.  The plane-plane wire axis stays.
+    await author_nominal_stock_cross_section(
+        adapter,
+        installed_features=(
+            "WireProfile",
+            "Wire",
+            "BalloonRingReference",
+            "BalloonRingSplit",
+            "HookPoint",
+            "HubPoint",
+        ),
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: the Ø0.8 wire carries NO marked model
-    # dimension (nothing on it is a dependable pick), so the mark loop is a no-op
-    # over an empty contract; only the make-critical properties are stamped.  The
-    # straight rest-run length is COMPUTED here and APPENDED to the notes, so
-    # the derived value is never duplicated in the (import-pure) spec.  It is
-    # deliberately NOT called a cut length: hook + wrap development is absent.
+    # The installed wire retains its in-band envelope and solved rest run.
+    # Only the separate source-authored stock cross-section is marked; the
+    # rest-run note remains explicitly not a developed cut length.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

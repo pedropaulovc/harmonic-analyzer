@@ -17,6 +17,7 @@ _EXPECTED = {
     "vn-cone-tip-adjuster": (("94025A164",), "MHA-VN-017", 1),
     "vn-cone-tip-block-screw": (("91251A108",), "MHA-VN-030", 1),
     "vn-cone-tip-pinch-screw": (("91794A112",), "MHA-VN-018", 1),
+    "vn-crank-hub-pin": (("91585A377",), "MHA-VN-029", 1),
     "vn-crank-seat-drive-pin": (("98381A434",), "MHA-VN-044", 2),
     "vn-fillister-screw": (("90114A511",), "MHA-VN-006", 15),
     "vn-foot-screw": (("90280A108",), "MHA-VN-020", 1),

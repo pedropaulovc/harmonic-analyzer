@@ -127,3 +127,47 @@ DIMENSION_CALLOUTS = {
         "ALL REMAINING TAIL FULL FORM"
     ),
 }
+
+# Supplier engineering drawing inspected 2026-10-19. Presentation is separate
+# from the exact catalogue dimensions consumed by the stock solid recipe.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260107/BB28DFA4/"
+    "92314A253_18-8%20Stainless%20Steel%20Hex%20Head%20ScrewsX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = {
+    "SupplierHeadAF": {
+        "units": "in",
+        "precision": 0,
+        "fraction_denominator": 16,
+        "expected_mm": HEAD_AF,
+        "callout": "HEAD AF",
+    },
+    "SupplierHeadHeight": {
+        "units": "in",
+        "precision": 3,
+        "expected_mm": HEAD_H,
+        "callout": "HEAD HEIGHT",
+    },
+    "SupplierThreadMajor": {
+        "units": "in",
+        "precision": 2,
+        "expected_mm": SHANK_DIA,
+        "presentation": "diameter",
+        "callout": f"{PRINTED_THREAD}\nTHREAD MAJOR NOMINAL",
+    },
+    "SupplierStockLength": {
+        "units": "in",
+        "precision": 0,
+        "expected_mm": CATALOG_LENGTH,
+        "callout": "AS SUPPLIED\nSTOCK UNDER HEAD",
+    },
+}
+# The helical groove need not leave diametrically opposed crests in one view.
+# This construction-only chord preserves the same exact nominal as the solid.
+SUPPLIER_REFERENCE_SKETCH = (("SupplierThreadMajor", SHANK_DIA, "horizontal"),)
+SUPPLIER_REFERENCE_STARTS = {"SupplierThreadMajor": (-SHANK_DIA / 2, LENGTH / 2)}
+SUPPLIER_DRAWING_DIMENSIONS = {"SupplierReference": {"SupplierThreadMajor"}}
+# A separate native configuration restores the complete supplier solid. Only
+# the two finished cuts are suppressed there; the factory thread is retained.
+SUPPLIER_STOCK_CONFIGURATION = "AS SUPPLIED STOCK"
+SUPPLIER_STOCK_SUPPRESSED_FEATURES = ("StockDeburr", "StockTrim")

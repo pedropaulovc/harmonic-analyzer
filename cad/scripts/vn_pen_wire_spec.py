@@ -8,21 +8,21 @@ dimension NAME map + notes from here; ``draw_vn_pen_wire`` keeps exactly
 from __future__ import annotations
 
 from _mcmaster_9666k56 import SKU
+from _mcmaster_9666k56_reference import SUPPLIER_REFERENCE_DIMENSIONS
 
-# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  Only the straight rest-run LENGTH (the Wire extrude depth) is
-# marked; the purchased wire (McMaster-Carr 9666K56, 0.031 in) is named in a
-# note (a 0.8 mm circle is below the ink width of the view), and the form is a
-# plain straight run. ---
+# The finished rest run retains its own length; the supplier nominal diameter
+# belongs only to the separate, sketch-only stock cross-section, never the
+# installed 0.8 mm envelope.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Wire": {"Depth"},
+    **SUPPLIER_REFERENCE_DIMENSIONS,
 }
 
 # Lines kept short (<~66 chars) so the left-anchored block stays clear of the
 # title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
 DRAWING_NOTES = "\n".join(
     (
-        f"1. PURCHASED WIRE: McMASTER-CARR {SKU}, <MOD-DIAM>0.031 IN.",
+        f"1. PURCHASED WIRE: McMASTER-CARR {SKU}.",
         "2. LENGTH SHOWN IS THE STRAIGHT REST RUN, NOT A CUT",
         "   LENGTH.",
         "3. RIM WRAP, EYE TIE-OFF, AND DEVELOPED CUT LENGTH ARE",

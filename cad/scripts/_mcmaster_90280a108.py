@@ -21,6 +21,7 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierThreadDiameter": (-FILLISTER_SIZE[0] / 2.0, -FILLISTER_SIZE[1] / 2.0),
 }
 SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
+SUPPLIER_REFERENCE_SIDES = {"SupplierThreadDiameter": "bottom"}
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierHeadHeight": (3, "length", None, None),

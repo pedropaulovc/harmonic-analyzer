@@ -25,3 +25,12 @@ FLARE_CENTER_RADIUS = INNER_DIAMETER / 2.0 + FLARE_INNER_RADIUS
 MAX_OUTER_DIAMETER = 2.0 * (
     FLARE_CENTER_RADIUS - (FLARE_OUTER_RADIUS**2 - FLARE_HEIGHT**2) ** 0.5
 )
+
+# 9275K141 supplier ink rounds the exact 0.71875 in depth to 0.719 in.
+# These places change presentation only, never INSIDE_HEIGHT or the bore.
+SUPPLIER_DEPTH_PRECISION = 3
+SUPPLIER_TUBE_OD_PRECISION = 0
+SUPPLIER_DIMENSIONS = {
+    "CapSupplierDepth": ("SupplierInsideDepth",),
+    "CapSupplierBore": ("SupplierTubeOD",),
+}

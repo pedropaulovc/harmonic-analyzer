@@ -136,7 +136,13 @@ def supplier_reference_dimension(
     # swUnitsDecimalRounding_HalfAway=0 matches supplier decimal rounding.
     if display.SetUnits2(False, unit, fraction, denominator, False, 0) != 0:
         raise RuntimeError(f"{label}: supplier units were rejected")
-    display.SetPrecision3(precision, -1, -1, -1)
+    # SetPrecision3's method remarks explicitly permit the -1 do-not-change
+    # setting. Keep independently authored source tolerance/dual precision.
+    status = display.SetPrecision3(precision, -1, -1, -1)
+    if status != 0:
+        raise RuntimeError(
+            f"{label}: supplier precision was rejected (status {status!r})"
+        )
     # ShowParenthesis can read back True yet render a bare value (lift rod
     # and cylinder gear native evidence). Use the established prefix/suffix
     # reference form, while keeping the actual numeric dimension visible.

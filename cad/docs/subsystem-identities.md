@@ -28,9 +28,10 @@ Components of a built-up part are the detail parts a finished part may be made f
 
 Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. Wheel axle nut is VN by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
 
-Purchased ANSI #25 inner, outer and connecting chain links and finished ISO 2338 m6 crank
-hub dowel stock are VN, including cut-to-length modifications. Pins machined
-from raw drill rod remain owned by their subsystem.
+Purchased ANSI #25 inner, outer and connecting chain links and finished ISO 2338-m6
+dowel stock are VN, including cut-to-length modifications. The current crank-hub pin
+MHA-VN-029 is unmodified McMaster 91585A377 Ø4 × 4-mm stock, including its two end
+leads. Pins machined from raw drill rod remain owned by their subsystem.
 
 Doit selection uses the underscore stem:
 

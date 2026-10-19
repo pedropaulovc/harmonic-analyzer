@@ -1,13 +1,10 @@
 r"""Create the curated machinist drawing for the lever wire (WIRE 1).
 
-The lever wire is a purchased Ø0.8 (0.031 in) music-wire run ~353 long -- a hair-thin
-silhouette with no flat face, no pickable end and no selectable silhouette edge,
-so the print is note-based: nothing is a marked dimension, and the diameter +
-straight rest-run length ride the notes (the build stamps the computed length).
-That chord is not represented as a developed cut length because the source model
-does not define the formed hook or drum-wrap allowance.
-The wire axis is local +Y, so the FRONT view is the straight run reduced to fit
-(1:5) and the isometric confirms it is a plain straight rod.
+The installed straight-run envelope and its incomplete development remain
+unchanged. A separate sketch-only stock view carries the supplier's nominal
+diameter in supplier units and displayed precision, without applying that
+nominal to the installed in-band 0.8 mm silhouette. The rest-run note is not
+a developed cut length: the model does not define hook or drum-wrap allowance.
 
 Run with SolidWorks open::
 
@@ -36,6 +33,9 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_wire_stock_drawing import STOCK_KEEP as STOCK_KEEP
+from _supplier_wire_stock_drawing import add_nominal_stock_cross_section
+from vn_lever_wire_spec import DRAWING_DIMENSIONS
 import _telemetry
 
 
@@ -56,9 +56,8 @@ WIRE_SCALE = (1, 5)  # ~353 long reduced to ~71 mm on the sheet
 FRONT_CENTER = (0.135, 0.150)
 ISO_CENTER = (0.320, 0.160)
 
-# Note-based: the wire carries no marked model dimension, so every view keeps
-# nothing (the front view is curated with an empty keep to delete any stray
-# auto-import; the offline test asserts union(marks) == union(keeps) == {}).
+# The installed envelope carries no size import. The separate stock view
+# imports STOCK_KEEP from the source-authored nominal cross-section.
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
 
 
@@ -110,7 +109,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    assert_settled_stock = add_nominal_stock_cross_section(adapter, SOURCE)
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
     add_property_linked_note(adapter, "Front View Note", 0.100, 0.100)
@@ -122,6 +125,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Lever Wire (WIRE 1) Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(assert_settled_stock,),
     )
 
 

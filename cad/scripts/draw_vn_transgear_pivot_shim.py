@@ -17,6 +17,12 @@ import vn_transgear_pivot_shim_spec as part
 SPEC = DRAWINGS_BY_NAME["vn_transgear_pivot_shim"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "DIN 988 SHIM RING"
+# Sheet-metre reserves include the 12 mm diameter picks and two-line
+# unilateral bands; the 14 mm thickness pick has its own band ink reserve.
+SUPPLIER_MARGINS = {
+    "*Top": (0.0, 0.008, 0.040, 0.008),
+    "*Front": (0.0, 0.006, 0.035, 0.006),
+}
 
 
 def _supplier_dimensions(
@@ -51,6 +57,7 @@ async def build(adapter: Any) -> dict[str, str]:
         SPEC,
         item=ITEM,
         supplier_dimensions=dimensions,
+        supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_dimensions,),
     )
 

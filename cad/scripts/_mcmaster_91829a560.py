@@ -59,6 +59,10 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierThreadDiameter": (-THREAD_MAJOR / 2.0, -SHOULDER_LEN - THREAD_LEN / 2.0),
 }
 SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
+SUPPLIER_REFERENCE_SIDES = {
+    "SupplierShoulderDiameter": "bottom",
+    "SupplierThreadDiameter": "bottom",
+}
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierHeadHeight": (3, "length", None, None),
     "SupplierHeadDiameter": (3, "diameter", None, None),

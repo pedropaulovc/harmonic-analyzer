@@ -98,6 +98,31 @@ SET_SCREW_LENGTH = 5.0 * IN / 16.0
 SET_SCREW_LENGTH_BAND_MM = 0.01 * IN  # ASME B18.3 Table 14 note (11), L <= 0.63 in
 SET_SCREW_SOCKET_AF = 0.035 * IN
 SET_SCREW_SOCKET_DEPTH = 0.060 * IN  # Table 14 #2 minimum key engagement; not vendor-exact
+# Supplier drawing inspected 2026-10-19. Its .313 in label is the rounded
+# presentation of the retained exact 5/16 in native length, not a new size.
+# Point diameter/angle and socket depth are ASME envelope assumptions;
+# the supplier drawing does not dimension them.
+SET_SCREW_SUPPLIER_PAGE = "https://www.mcmaster.com/94355A213/"
+SET_SCREW_SUPPLIER_DRAWING = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260604/1B55C491/"
+    "94355A213_18-8%20Stainless%20Steel%20Flat-Tip%20Set%20ScrewX.GIF"
+)
+SET_SCREW_SUPPLIER_UNITS = "in"
+SET_SCREW_SUPPLIER_PRECISION = 3
+SET_SCREW_SUPPLIER_SIZES_MM = {
+    "ScrewLength": SET_SCREW_LENGTH,
+    "ScrewMajorDia": SET_SCREW_MAJOR_DIA,
+    "SocketAF": SET_SCREW_SOCKET_AF,
+}
+SET_SCREW_SUPPLIER_DIMENSIONS = {
+    "SetScrewProfile": {"ScrewLength", "ScrewMajorDia"},
+    "SocketAFReference": {"SocketAF"},
+}
+SET_SCREW_SUPPLIER_TITLE = "\n".join((
+    f"McMASTER {SET_SCREW_SKU} FLAT-POINT SET SCREW",
+    "AS SUPPLIED - SUPPLIER REFERENCE ONLY",
+    "CUSTOM COLLAR MANUFACTURING CONTROLS: SHEET 1",
+))
 SET_SCREW_END_FACE_MIN_ANGLE_DEG = 30.0  # Table 14 note (1): socket-face chamfer 30..45 deg
 SET_SCREW_FACTORY_POINT_MIN_DIA = 0.039 * IN  # Table 14 #2 flat-point P MIN
 SET_SCREW_FACTORY_POINT_MIN_ANGLE_DEG = 45.0  # Table 14 note (2), length >= B

@@ -3,8 +3,9 @@ r"""Purchased MHA-VN-052 cylinder bank spring: McMaster 9714K392.
 A wave disc spring (``vn_cylinder_bank_spring_spec``); on the MHA-DT-013
 arbor between the front MHA-DT-026 washer and the front MHA-DT-002 strap, it
 holds the 20-gear stack north on its datum (#948 ruling R).  The stock recipe
-``diagnostics/diag_build_9714K392.py`` models the installed envelope; no
-vendor model was fetched, so its standalone run is catalog-only.
+``diagnostics/diag_build_9714K392.py`` models the installed envelope. The
+separate zero-solid ``Supplier-Dimensions`` configuration carries nominal
+dimension diagrams, never a spring shape or an assembly state.
 
 Frame: the recipe is built about +Y and turned so its axis is +Z, the south
 bearing face on z = 0 (the Front Plane) and the north one at
@@ -19,6 +20,7 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from functools import partial
 import sys
 
 from _session import run_build
@@ -26,6 +28,8 @@ from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from diagnostics.diag_build_9714K392 import build_9714K392
 from vn_cylinder_bank_spring_spec import SKU
+import vn_cylinder_bank_spring_spec as spring_spec
+from vn_disc_spring_supplier_stock import add_supplier_disc_diagram
 
 PART_NAME = "vn-cylinder-bank-spring"
 SPEC = fastener(PART_NAME)
@@ -45,6 +49,7 @@ async def build(adapter) -> dict[str, str]:
         ),
         material=MATERIAL,
         screw_axis_planes=("Top Plane", "Right Plane"),
+        before_save=partial(add_supplier_disc_diagram, spec=spring_spec),
     )
 
 

@@ -22,3 +22,28 @@ HEX_SCREW_SIZE = (
     WASHER_DEPTH_MM,
     UNDERSIDE_MM,
 )
+
+# Supplier engineering drawing inspected 2026-10-19, not catalogue shorthand.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260107/676C0839/"
+    "92240A540_18-8%20Stainless%20Steel%20Hex%20Head%20Screw%20Made%20Outside%20The%20U.S.X.GIF"
+)
+# Route the thread witness away from the larger head.
+SUPPLIER_REFERENCE_SIDES = {"SupplierThreadDiameter": "bottom"}
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", -LENGTH_MM, "vertical"),
+    ("SupplierHeadHeight", HEX_HEIGHT_MM, "vertical"),
+    ("SupplierHeadWidth", HEX_WIDTH_MM, "horizontal"),
+    ("SupplierThreadDiameter", MAJOR_DIAMETER_MM, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierHeadWidth": (-HEX_WIDTH_MM / 2.0, 0.0),
+    "SupplierThreadDiameter": (-MAJOR_DIAMETER_MM / 2.0, -LENGTH_MM / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES = {"SupplierHeadWidth": "Top"}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (2, "length", None, None),
+    "SupplierHeadHeight": (4, "length", None, None),
+    "SupplierHeadWidth": (0, "length", 16, None),
+    "SupplierThreadDiameter": (2, "diameter", None, '1/4"-20'),
+}

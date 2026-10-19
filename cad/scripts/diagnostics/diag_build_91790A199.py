@@ -6,11 +6,12 @@ The chosen SKU was read live at https://www.mcmaster.com/91790A199/ on
 and published standard bounds, not a commodity receiving procedure.
 
 Built by the shared 91790A oval recipe in ``diag_mcmaster_oval.py`` (see its
-docstring for the live-page facts and the [INFERENCE] head, slot and thread
-laws).  Without arguments it builds the supplied screw; ``cut_length`` with
-``cut_end_break`` draws it cut to fit, as the MHA-VN-040 part installs it.  No
-vendor SLDPRT is downloaded or committed, so the standalone run is
-catalog-only (the supplied screw).
+docstring for the live-page facts, the supplier STEP's underhead transition
+and the [INFERENCE] head, slot and thread laws).  Without arguments it builds
+the supplied screw; ``cut_length`` with ``cut_end_break`` then trims it to fit
+with one revolve cut (``diag_mcmaster_oval.CUT_FEATURE``), as the MHA-VN-040
+part installs it.  The supplier STEP is inspected out of tree and no vendor
+SLDPRT is committed, so the standalone run is catalog-only (the supplied screw).
 
 Run standalone (SolidWorks open)::
 

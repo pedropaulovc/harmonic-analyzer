@@ -15,6 +15,12 @@ from _supplier_washer_drawing import supplier_washer_dimensions
 import vn_rocker_thrust_washer_spec as part
 
 SPEC = DRAWINGS_BY_NAME["vn_rocker_thrust_washer"]
+# The final +Z face is Front; Top is parallel to its thickness witness.
+# Reserve 12 mm face/14 mm side picks plus supplier band/limit ink widths.
+SUPPLIER_MARGINS = {
+    "*Front": (0.0, 0.008, 0.040, 0.008),
+    "*Top": (0.0, 0.006, 0.035, 0.006),
+}
 
 
 def _supplier_dimensions(
@@ -49,6 +55,7 @@ async def build(adapter: Any) -> dict[str, str]:
         SPEC,
         item="RING SHIM",
         supplier_dimensions=dimensions,
+        supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_dimensions,),
     )
 

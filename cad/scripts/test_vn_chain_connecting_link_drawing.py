@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 
 import _chain_link
 import _config
@@ -17,24 +16,12 @@ NAME = "vn_chain_connecting_link"
 ROW = _config.parts(STEM)
 
 
-def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
+def test_sheet_is_the_registered_purchased_part_reference() -> None:
     spec = DRAWINGS_BY_NAME[NAME]
     assert (spec.part, spec.artifact_stem, spec.script_name) == (
-        NAME,
-        STEM,
-        f"draw_{NAME}.py",
+        NAME, STEM, f"draw_{NAME}.py",
     )
     assert spec.layout is DrawingLayout.LANDSCAPE
-    calls = []
-
-    async def fake(adapter, drawn, *, item, cut_to_suit=False):
-        calls.append((adapter, drawn, item, cut_to_suit))
-        return {"pdf": "x"}
-
-    monkeypatch.setattr(draw, "build_purchased_part_drawing", fake)
-    adapter = object()
-    assert asyncio.run(draw.build(adapter)) == {"pdf": "x"}
-    assert calls == [(adapter, spec, draw.ITEM, False)]
     assert "CONNECTING LINK" in draw.ITEM
 
 

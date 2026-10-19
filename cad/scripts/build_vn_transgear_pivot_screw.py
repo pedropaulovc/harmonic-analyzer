@@ -34,11 +34,27 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import (
+    _set_tolerance_precision,
+    set_dimension_bilateral_tolerance,
+)
 from _fastener_catalog import fastener
 from _feature_tree import _feature_by_name, name_last_feature
-from _rebuild import force_rebuild
+from _rebuild import (
+    active_configuration_name,
+    assert_saved_configurations_regenerate,
+    force_rebuild,
+)
 from _session import run_build
-from _simplified_part import save_simplified_part
+from _simplified_part import (
+    _bstr_array,
+    _close_part,
+    _copy_bom_identity,
+    _suppression,
+    assert_simplified_configurations,
+    persist_configurations_in_place,
+    save_simplified_part,
+)
 from _sketch import (
     SketchDims,
     add_line_chain,
@@ -47,6 +63,8 @@ from _sketch import (
     ensure_fully_defined,
 )
 from _stock_fastener import StockComponent, build_stock_fastener
+from _supplier_dimensions import supplier_reference_dimension
+from _supplier_screw_reference import add_supplier_reference_sketch
 from diagnostics.diag_build_90325A174 import build_90325A174
 from diagnostics.diag_mcmaster_lib import no_sketch_inference
 from vn_transgear_pivot_screw_spec import (
@@ -63,6 +81,12 @@ from vn_transgear_pivot_screw_spec import (
     THREAD_LENGTH_MIN,
     THREAD_MAJOR,
     TIP_Y,
+    SUPPLIER_REFERENCE_BANDS,
+    SUPPLIER_REFERENCE_DIMENSIONS,
+    SUPPLIER_REFERENCE_SKETCH,
+    SUPPLIER_REFERENCE_STARTS,
+    SUPPLIER_STOCK_CONFIGURATION,
+    SUPPLIER_STOCK_SUPPRESSED_FEATURES,
 )
 
 PART_NAME = "vn-transgear-pivot-screw"
@@ -400,13 +424,117 @@ async def _face_to_fit(adapter, truth=None, **parameters):
     return receipt
 
 
+def _activate_configuration(adapter, model, name: str) -> None:
+    """Show ``name`` only when it is not already active, then read it back.
+
+    SW2026 ``ShowConfiguration2`` of the already-active configuration returns
+    False, so the native active name decides whether a switch is needed.
+    """
+    if (
+        active_configuration_name(adapter, model) != name
+        and model.ShowConfiguration2(name) is not True
+    ):
+        raise RuntimeError(f"cannot activate configuration {name!r}")
+    if active_configuration_name(adapter, model) != name:
+        raise RuntimeError(f"configuration {name!r} did not become active")
+
+
+def _add_stock_configuration(adapter) -> str:
+    """Restore original shoulder-screw stock in a drawing-only child."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    finished = active_configuration_name(adapter, model)
+    names = tuple(str(name) for name in (model.GetConfigurationNames() or ()))
+    if model.GetConfigurationByName(SUPPLIER_STOCK_CONFIGURATION) is not None:
+        raise RuntimeError("source-stock configuration already exists")
+    features = {
+        name: _feature_by_name(adapter, name)
+        for name in (*SUPPLIER_STOCK_SUPPRESSED_FEATURES, "ThreadGroove")
+    }
+    before = {name: _suppression(feature, names) for name, feature in features.items()}
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+    # Options = 0 (no swConfigOption_DontActivate) also activates the new
+    # child, so every failure from creation on must return to finished.
+    created = manager.AddConfiguration2(
+        SUPPLIER_STOCK_CONFIGURATION,
+        "Original McMaster stock; finished facing and deburr suppressed",
+        "",
+        0,
+        finished,
+        "",
+        False,
+    )
+    if created is None:
+        raise RuntimeError("cannot create source-stock configuration")
+    try:
+        parent = _early_bound(created, "IConfiguration").GetParent()
+        if parent is None or str(_early_bound(parent, "IConfiguration").Name) != finished:
+            raise RuntimeError("source-stock configuration is not derived from finished")
+        _activate_configuration(adapter, model, SUPPLIER_STOCK_CONFIGURATION)
+        for name in SUPPLIER_STOCK_SUPPRESSED_FEATURES:
+            if not features[name].SetSuppression2(
+                0, 3, _bstr_array((SUPPLIER_STOCK_CONFIGURATION,))
+            ):
+                raise RuntimeError(f"{name}: cannot suppress the finished cut in stock")
+        if not model.ForceRebuild3(False):
+            raise RuntimeError("source-stock configuration did not rebuild")
+        _copy_bom_identity(model, finished, SUPPLIER_STOCK_CONFIGURATION)
+        for name, feature in features.items():
+            expected = name in SUPPLIER_STOCK_SUPPRESSED_FEATURES
+            if _suppression(feature, (SUPPLIER_STOCK_CONFIGURATION,)) != (expected,):
+                raise RuntimeError(f"{name}: source-stock suppression is incorrect")
+    except BaseException as primary:
+        try:
+            _activate_configuration(adapter, model, finished)
+        except Exception as restore:
+            primary.add_note(f"restoring finished configuration also failed: {restore!r}")
+        raise
+    _activate_configuration(adapter, model, finished)
+    for name, feature in features.items():
+        if _suppression(feature, names) != before[name]:
+            raise RuntimeError(f"{name}: source-stock authoring changed finished states")
+    return finished
+
+
+async def _save_supplier_references(adapter, part_name, suppressed_features):
+    """Author separate source-band carriers; leave all solid controls alone."""
+    await add_supplier_reference_sketch(
+        adapter, SUPPLIER_REFERENCE_SKETCH, starts=SUPPLIER_REFERENCE_STARTS
+    )
+    for name, band in SUPPLIER_REFERENCE_BANDS.items():
+        set_dimension_bilateral_tolerance(adapter, "SupplierReference", name, *band)
+        display, _dimension = _named_dimension(adapter, "SupplierReference", name)
+        supplier_reference_dimension(
+            adapter, display, label=name, **SUPPLIER_REFERENCE_DIMENSIONS[name]
+        )
+        # Tolerance setters use millimetres by default. These native references
+        # now display inches, so the source's three-place bands need three
+        # places in that local unit, not four-place metric conversions.
+        _set_tolerance_precision(
+            display,
+            tuple(value / 25.4 for value in band),
+            label=name,
+            places=SUPPLIER_REFERENCE_DIMENSIONS[name]["precision"],
+        )
+    artefacts = await save_simplified_part(adapter, part_name, suppressed_features)
+    # Add stock only after the normal saved/reopened finished-only derivation.
+    finished = _add_stock_configuration(adapter)
+    persist_configurations_in_place(adapter, part_name)
+    _close_part(adapter)
+    check("reopen source-stock pivot screw", await adapter.open_model(artefacts["part"]))
+    assert_saved_configurations_regenerate(adapter, part_name)
+    assert_simplified_configurations(
+        adapter, part_name, suppressed_features, parents=(finished,)
+    )
+    return artefacts
+
+
 async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
         components=(StockComponent(SKU, _face_to_fit),),
         material=MATERIAL,
-        save_threaded_part=save_simplified_part,
+        save_threaded_part=_save_supplier_references,
         screw_axis_planes=("Front Plane", "Right Plane"),
     )
 

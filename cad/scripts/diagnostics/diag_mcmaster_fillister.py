@@ -1,11 +1,11 @@
-r"""Shared recipe for the McMaster 90280A* narrow fillister head screws, and
-the 91794A112 stainless fillister screw on the same #4-40 head, plus the
-catalog-only MSC 40923906 model.
+r"""Shared recipe for the McMaster 90280A* narrow fillister head screws and
+the 91794A112 stainless fillister screw on the same #4-40 head.
 
 The McMaster vendor drives every derived number off 5 named dims via
-equations, reproduced here and reused as modeling conventions for the MSC
-row. The 90280A837, 91794A112 and 91794A080 extensions have no completed
-native comparison:
+equations, reproduced here. MSC 40923906 now has its own source-drawing-based
+partial-thread author in ``diag_build_40923906.py``; it does not use these
+shared head/slot/full-thread laws. The 90280A837, 91794A112 and 91794A080
+extensions have no completed native comparison:
 
 - slot width = HeadDia*0.135, slot depth = width*1.5 (from the dome apex)
 - head cylinder band = HeadHeight*0.8; dome = spherical cap (centre on
@@ -23,10 +23,10 @@ native comparison:
 Frame: head UP, under-head junction at y = 0 (the stock Top Plane plays
 the vendor Plane1's three roles: split plane, helix seed, runout).
 
-Per-part entry points: ``diag_build_90280A*.py``, ``diag_build_40923906.py``.
+Per-part entry points: ``diag_build_90280A*.py``, ``diag_build_91794A*.py``.
 
-Each SKU's dimensions live in its pure ``_mcmaster_<sku>``/``_msc_<sku>``
-module; the per-part entry point passes them to ``build_fillister``.
+Each SKU's dimensions live in its pure ``_mcmaster_<sku>`` module; the
+per-part entry point passes them to ``build_fillister``.
 """
 
 from __future__ import annotations

@@ -4,7 +4,7 @@ The sheet's footer holds at most three note lines (drawing-guidelines rule 7):
 the matched-set acceptance only.  The catalogue's +/-10% rate band is too wide
 for channel consistency, so the springs are bought as one lot and the set is
 selected by measured rate (tolerance-policy.md, spring rate); the ITEM row
-identifies the spring and the Front view shows it at its installed length.
+identifies the spring and the isometric preserves its installed pose.
 """
 
 from __future__ import annotations

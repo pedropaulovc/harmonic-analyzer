@@ -25,6 +25,7 @@ SUPPLIER_REFERENCE_PLANES = {
     "SupplierThreadDiameter": "Top",
     "SupplierDriveWidth": "Top",
 }
+SUPPLIER_REFERENCE_SIDES = {}
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),
     "SupplierThreadDiameter": (3, "diameter", None, "1-72"),

@@ -18,6 +18,12 @@ import vn_wheel_axle_back_washer_spec as part
 SPEC = DRAWINGS_BY_NAME["vn_wheel_axle_back_washer"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#10 FLAT WASHER"
+# Sheet-metre reserves: 12 mm face picks plus the supplier screw callout,
+# and a 14 mm Top thickness pick plus native stacked-limit ink.
+SUPPLIER_MARGINS = {
+    "*Front": (0.0, 0.008, 0.040, 0.006),
+    "*Top": (0.0, 0.008, 0.035, 0.008),
+}
 
 
 def _supplier_dimensions(
@@ -53,6 +59,7 @@ async def build(adapter: Any) -> dict[str, str]:
         SPEC,
         item=ITEM,
         supplier_dimensions=dimensions,
+        supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_dimensions,),
     )
 

@@ -15,13 +15,13 @@ import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
-from _supplier_pin_drawing import add_supplier_spring_pin_dimensions
+from _supplier_pin_drawing import SPRING_PIN_SUPPLIER_MARGINS, add_supplier_spring_pin_dimensions
 from vn_transgear_knob_cup_pin_spec import SUPPLIER_REFERENCE
 
 
 SPEC = DRAWINGS_BY_NAME["vn_transgear_knob_cup_pin"]
 # The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "Ø1/16 x 5/8 SLOTTED SPRING PIN (Ø1.59 x 15.88); SLOT NOT SHOWN"
+ITEM = "Ø1/16 x 5/8 SLOTTED SPRING PIN; SLOT NOT SHOWN"
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -38,6 +38,7 @@ async def build(adapter: Any) -> dict[str, str]:
     return await build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, supplier_dimensions=supplier_dimensions,
         settled_checks=(assert_supplier_dimensions,),
+        supplier_margins=SPRING_PIN_SUPPLIER_MARGINS,
     )
 
 

@@ -10,12 +10,12 @@ import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
-from _supplier_pin_drawing import add_supplier_dowel_dimensions
+from _supplier_pin_drawing import DOWEL_SUPPLIER_MARGINS, add_supplier_dowel_dimensions
 from vn_transgear_arm_plate_locating_pin_spec import SUPPLIER_REFERENCE
 
 SPEC = DRAWINGS_BY_NAME["vn_transgear_arm_plate_locating_pin"]
 # The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "Ø2 x 6 DOWEL PIN, ISO 2338 m6"
+ITEM = "DOWEL PIN, ISO 2338 m6"
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -32,6 +32,7 @@ async def build(adapter: Any) -> dict[str, str]:
     return await build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, supplier_dimensions=supplier_dimensions,
         settled_checks=(assert_supplier_dimensions,),
+        supplier_margins=DOWEL_SUPPLIER_MARGINS,
     )
 
 

@@ -9,6 +9,10 @@ build_pd_paper_drive_assembly.py, and the connecting link
 (build_vn_chain_connecting_link.py) joins the cut chain's two inner-link ends.
 Geometry and clearances: _chain.py / _chain_link.py.
 
+Installed geometry is a clearance stand-in, not the supplier's dimensions.
+A separate Supplier-Free source-derived stock segment supplies identification
+references without changing the original installed configurations or path axes.
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_vn_chain_inner_link.py
@@ -20,6 +24,7 @@ import sys
 
 from _chain_link import INNER_LINK, build_link
 from _session import run_build
+from _supplier_chain_stock import add_chain_stock_references
 
 PART_NAME = "vn-chain-inner-link"
 MATERIAL = "Plain Carbon Steel"
@@ -27,7 +32,8 @@ MATERIAL = "Plain Carbon Steel"
 
 async def build(adapter) -> dict[str, str]:
     return await build_link(
-        adapter, part_name=PART_NAME, material=MATERIAL, **INNER_LINK
+        adapter, part_name=PART_NAME, material=MATERIAL, **INNER_LINK,
+        before_save=add_chain_stock_references,
     )
 
 
