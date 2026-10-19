@@ -1571,6 +1571,18 @@ def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
     sketch = _early_bound(native.GetSketch(), "ISketch")
     creation_preference = _sw_type_info.constant("swDisplayVirtualSharps")
     application = _early_bound(adapter.swApp, "ISldWorks")
+    factory = _early_bound(draw.SketchManager, "ISketchManager")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    expected = model_point_in_view(
+        adapter,
+        native,
+        (x / 1000.0, PLATE_THICKNESS / 1000.0, z / 1000.0),
+        label=f"{label} original PlateProfile sharp",
+    )
+    factory_coordinates = _transform_point(
+        utility, expected, transform, label=f"{label} source corner sheet to sketch"
+    )
 
     def points():
         result = {}
@@ -1624,7 +1636,20 @@ def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
                 raise RuntimeError(
                     f"{label}: selected support {i} failed native identity readback"
                 )
-        draw.InsertPoint()  # SDK return is void; creation must be proved below.
+        # SDK CreatePoint returns a nullable sketch point. Selected-edge Type4
+        # creation is unproved: only the native readbacks below can accept it.
+        raw_point = factory.CreatePoint(*factory_coordinates)
+        returned = (
+            None if raw_point is None else _early_bound(raw_point, "ISketchPoint")
+        )
+        returned_snapshot = (
+            None
+            if returned is None
+            else {
+                "id": tuple(int(value) for value in returned.GetID()),
+                "type": int(returned.Type),
+            }
+        )
         immediate_snapshot = snapshot(points())  # Before clearing the two supports.
     finally:
         draw.ClearSelection2(True)
@@ -1633,36 +1658,36 @@ def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
     after = points()
     rebuilt_snapshot = snapshot(after)
     evidence = (
-        f"before={before_snapshot} immediately_after_InsertPoint={immediate_snapshot} "
+        f"CreatePoint_sketch_coordinates={factory_coordinates} returned={returned_snapshot} "
+        f"before={before_snapshot} immediately_after_CreatePoint={immediate_snapshot} "
         f"after_rebuild={rebuilt_snapshot}"
     )
+    if returned is None:
+        raise RuntimeError(f"{label}: CreatePoint returned null; {evidence}")
     new = set(after) - set(before)
     if len(new) != 1 or not set(before) <= set(after):
         raise RuntimeError(
             f"{label}: expected exactly one new native virtual sharp point; {evidence}"
         )
     point = after[new.pop()]
-    if int(point.Type) != 4:  # swSketchPointType_VirtualSharp; never assigned.
+    if int(adapter.swApp.IsSame(returned, point)) != 1:
         raise RuntimeError(
-            f"{label}: inserted point is not naturally a native virtual sharp; {evidence}"
+            f"{label}: CreatePoint return differs from the new profile point; {evidence}"
+        )
+    if int(point.Type) != 4 or returned_snapshot["type"] != 4:  # Natural Type4 only.
+        raise RuntimeError(
+            f"{label}: CreatePoint result is not naturally a native virtual sharp; {evidence}"
         )
     if int(adapter.swApp.IsSame(point.GetSketch(), sketch)) != 1:
         raise RuntimeError(
             f"{label}: native virtual sharp is not owned by the profile sketch; {evidence}"
         )
-    inverse = _early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse()
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    inverse = transform.Inverse()
     sheet = _transform_point(
         utility,
         (float(point.X), float(point.Y), float(point.Z)),
         inverse,
         label=f"{label} virtual sharp sketch to sheet",
-    )
-    expected = model_point_in_view(
-        adapter,
-        native,
-        (x / 1000.0, PLATE_THICKNESS / 1000.0, z / 1000.0),
-        label=f"{label} original PlateProfile sharp",
     )
     if math.dist(sheet[:2], expected[:2]) > 0.00002 or abs(sheet[2]) > 0.00002:
         raise RuntimeError(

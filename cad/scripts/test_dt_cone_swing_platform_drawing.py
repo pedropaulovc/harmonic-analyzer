@@ -1975,6 +1975,8 @@ def test_virtual_sharp_supports_use_source_lines_and_nearest_notch_segment(
         "misselected",
         "unknown",
         "missing",
+        "null",
+        "returned_identity",
         "multiple",
         "removed",
         "renumbered",
@@ -1991,7 +1993,7 @@ def test_virtual_sharp_supports_use_source_lines_and_nearest_notch_segment(
 def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
     monkeypatch, capsys, failure, creation_toggle
 ):
-    state = {"inserted": False, "selected": [], "insert_calls": 0, "phase": "before"}
+    state = {"inserted": False, "selected": [], "factory_calls": 0, "phase": "before"}
     creation_reads = []
 
     def creation_preference(name):
@@ -2009,15 +2011,17 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
     source = (x / 1000, spec.PLATE_THICKNESS / 1000, z / 1000)
     expected = (0.0718 + source[0] / 2, 0.1267 - source[2] / 2, 0)
     inverse = object()
+    forward = types.SimpleNamespace(Inverse=lambda: inverse)
+    factory_coordinates = (expected[0] * 2 - 0.11, expected[1] * 3 + 0.025, 0.0)
     sketch = types.SimpleNamespace(
-        ModelToSketchTransform=types.SimpleNamespace(Inverse=lambda: inverse),
+        ModelToSketchTransform=forward,
     )
     point = types.SimpleNamespace(
         GetID=lambda: (7, 19),
         Type=1 if failure == "type" else 4,
-        X=0.02,
-        Y=0.03,
-        Z=0,
+        X=factory_coordinates[0] + (0.001 if failure == "coordinate" else 0),
+        Y=factory_coordinates[1],
+        Z=factory_coordinates[2],
         GetSketch=lambda: object() if failure == "owner" else sketch,
     )
     existing = types.SimpleNamespace(
@@ -2035,7 +2039,7 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
         lost = (failure == "clear_lifecycle" and state["phase"] != "immediate") or (
             failure == "rebuild_lifecycle" and state["phase"] == "rebuilt"
         )
-        created = [] if failure == "missing" or lost else [point]
+        created = [] if failure in {"missing", "null"} or lost else [point]
         return retained + created + ([extra] if failure == "multiple" else [])
 
     sketch.GetSketchPoints2 = enumerated_points
@@ -2101,13 +2105,19 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
         state["selected"].append(edge)
         return True
 
-    def insert():
-        # Model commanded side effects, not an SDK guarantee that InsertPoint
-        # creates a virtual sharp. It returns void; every result is read back.
-        assert len(state["selected"]) == 2
-        state["insert_calls"] += 1
+    def create_point(*coordinates):
+        # Hypothetical native outputs exercise the proof gate; the SDK does not
+        # promise that selected-edge CreatePoint produces a Type4 point.
+        assert coordinates == factory_coordinates
+        assert state["selected"] == list(edges)
+        state["factory_calls"] += 1
         state["inserted"] = True
         state["phase"] = "immediate"
+        if failure == "null":
+            return None
+        if failure == "returned_identity":
+            return types.SimpleNamespace(GetID=point.GetID, Type=point.Type)
+        return point
 
     def clear(_all):
         state["selected"].clear()
@@ -2122,7 +2132,7 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
         # ActivateView intentionally exists only on the IDrawingDoc fake below.
         SelectionManager=manager,
         ClearSelection2=clear,
-        InsertPoint=insert,
+        SketchManager=types.SimpleNamespace(CreatePoint=create_point),
     )
     adapter = types.SimpleNamespace(
         currentModel=draw,
@@ -2145,10 +2155,13 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
     monkeypatch.setattr(drawing, "_profile_corner_edges", lambda *_args: edges)
     monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
 
-    def transform(_utility, xyz, actual_inverse, **_kw):
+    def transform(_utility, xyz, actual_transform, **_kw):
+        if actual_transform is forward:
+            assert xyz == expected
+            return factory_coordinates
+        assert actual_transform is inverse
         assert xyz == (point.X, point.Y, point.Z)
-        assert actual_inverse is inverse
-        return (expected[0] + (0.001 if failure == "coordinate" else 0), *expected[1:])
+        return ((xyz[0] + 0.11) / 2, (xyz[1] - 0.025) / 3, 0.0)
 
     def project(_adapter, actual_view, xyz, **_kw):
         assert actual_view is view and xyz == source
@@ -2159,6 +2172,25 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
     if failure:
         with pytest.raises(RuntimeError) as caught:
             drawing._insert_profile_virtual_sharp(adapter, view, index)
+        if failure == "null":
+            assert "CreatePoint returned null" in str(caught.value)
+            assert "returned=None" in str(caught.value)
+        if failure == "returned_identity":
+            assert "CreatePoint return differs from the new profile point" in str(
+                caught.value
+            )
+        if failure not in {
+            "activate",
+            "select",
+            "count",
+            "misselected",
+            "unknown",
+            "null",
+        }:
+            assert "returned={'id': (7, 19)," in str(caught.value)
+        if failure == "type":
+            assert "returned={'id': (7, 19), 'type': 1}" in str(caught.value)
+            assert "not naturally a native virtual sharp" in str(caught.value)
         if failure in {
             "type",
             "owner",
@@ -2171,7 +2203,7 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
             assert (
                 "before={'point_count': 1, 'point_ids_types': [((2, 3), 1)]" in message
             )
-            assert "immediately_after_InsertPoint=" in message
+            assert "immediately_after_CreatePoint=" in message
             assert "after_rebuild=" in message
             assert "'raw_witness':" in message
         if failure == "witness_size":
@@ -2203,11 +2235,11 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
                 f"after_rebuild={{'point_count': {len(after_points)}, "
                 f"'point_ids_types': {after_points}"
             ) in message
-            assert "immediately_after_InsertPoint=" in message
+            assert "immediately_after_CreatePoint=" in message
             assert "'witness_count': 0, 'witness_size': 0, 'raw_witness': ()" in message
             if failure in {"clear_lifecycle", "rebuild_lifecycle"}:
                 assert (
-                    "immediately_after_InsertPoint={'point_count': 2, "
+                    "immediately_after_CreatePoint={'point_count': 2, "
                     "'point_ids_types': [((2, 3), 1), ((7, 19), 4)], "
                     "'witness_count': 2, 'witness_size': 21, 'raw_witness': "
                     "(0.0, -1.0, -1.0, -1.0, 0.0, 0.0, 2.0, "
@@ -2218,10 +2250,10 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
     else:
         drawing._insert_profile_virtual_sharp(adapter, view, index)
         output = capsys.readouterr().out
-        assert "immediately_after_InsertPoint" not in output
+        assert "immediately_after_CreatePoint" not in output
         assert "raw_witness" not in output
     assert not state["selected"]
-    assert state["insert_calls"] == (
+    assert state["factory_calls"] == (
         0 if failure in {"activate", "select", "count", "misselected", "unknown"} else 1
     )
     assert len(creation_reads) == (
