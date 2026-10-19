@@ -42,7 +42,7 @@ def cpu_slots() -> int:
     return capacity
 
 
-def _worker_request(args: list[str]) -> tuple[int, slice | None]:
+def _worker_request(args: list[str], capacity: int) -> tuple[int, slice | None]:
     """Read pytest's last xdist worker option; other entry points use one slot."""
     if args[:2] != ["-m", "pytest"]:
         return 1, None
@@ -62,7 +62,7 @@ def _worker_request(args: list[str]) -> tuple[int, slice | None]:
             value = arg[2:]
             option = slice(index, index + 1)
     if value in ("auto", "logical"):
-        return os.cpu_count() or 1, option
+        return capacity, option
     workers = int(value)
     if workers < 0:
         raise ValueError("pytest worker count must be nonnegative")
@@ -86,7 +86,7 @@ def main() -> None:
     path = lock_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     capacity = cpu_slots()
-    requested, worker_option = _worker_request(args)
+    requested, worker_option = _worker_request(args, capacity)
     minimum = (min(requested, capacity) + 1) // 2
     started = time.monotonic()
     next_log = started + 30

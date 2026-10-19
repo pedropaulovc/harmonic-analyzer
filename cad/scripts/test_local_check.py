@@ -172,6 +172,8 @@ def test_successful_check_keeps_top_level_span_depth(tmp_path, check_env, monkey
 def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, check_env, worker_args):
     """Real xdist workers consume only free slots; small checks run alongside."""
     check_env["HARMONIC_LOCAL_CHECK_CPU_SLOTS"] = "3"
+    # Explicit host capacity also governs auto when interpreter CPU counts differ.
+    check_env["PYTHON_CPU_COUNT"] = "2"
     hold = tmp_path / "hold.py"
     hold.write_text(
         "import os, sys\nprint(os.getpid(), flush=True)\nsys.stdin.read(1)\n",
