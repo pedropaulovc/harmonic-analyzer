@@ -9,7 +9,8 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TypeVar
 
@@ -2396,11 +2397,130 @@ if ({_ps_quote(case)} -in @('start-time-denied', 'exited') -and
     assert result.stdout.strip() == expected, (result.stdout, result.stderr)
 
 
-@pytest.mark.parametrize("faults", [2, 1000])
-def test_dead_launcher_status_preserves_cim_retry_contract(
-    tmp_path: Path, faults: int
+@pytest.mark.parametrize("case", ["rows", "empty", "persistent"])
+def test_win32_process_preserves_cim_retry_contract(case: str) -> None:
+    """Run the real retry wrapper without depending on the host WMI provider."""
+    pwsh = shutil.which("pwsh")
+    if pwsh is None:
+        pytest.skip("PowerShell 7 is required")
+    script = f"""
+$ErrorActionPreference = 'Stop'
+$tokens = $null; $errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile(
+    {_ps_quote(str(LAUNCHER))}, [ref]$tokens, [ref]$errors)
+if ($errors.Count) {{ throw ($errors | Out-String) }}
+foreach ($name in @('TransientCimFaults', 'CimAttempts', 'CimRetryMilliseconds')) {{
+    $node = $ast.Find({{
+        param($n)
+        $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $n.Left.Extent.Text -eq ('$script:' + $name)
+    }}, $true)
+    if ($null -eq $node) {{ throw "missing retry setting $name" }}
+    . ([scriptblock]::Create($node.Extent.Text))
+}}
+$node = $ast.Find({{
+    param($n)
+    $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $n.Name -eq 'Get-Win32Process'
+}}, $true)
+if ($null -eq $node) {{ throw 'missing Get-Win32Process' }}
+. ([scriptblock]::Create($node.Extent.Text))
+$script:Queries = [System.Collections.Generic.List[object]]::new()
+$script:Delays = [System.Collections.Generic.List[int]]::new()
+$script:Faults = if ({_ps_quote(case)} -eq 'persistent') {{ 1000 }} else {{ 2 }}
+function Get-CimInstance {{
+    [CmdletBinding()]
+    param([string]$ClassName, [string]$Filter, [string[]]$Property)
+    $script:Queries.Add(@{{
+        class = $ClassName; filter = $Filter; properties = @($Property)
+        error_action = $PSBoundParameters['ErrorAction'].ToString()
+        has_filter = $PSBoundParameters.ContainsKey('Filter')
+        has_properties = $PSBoundParameters.ContainsKey('Property')
+    }})
+    if ($script:Faults-- -gt 0) {{
+        $data = New-CimInstance -ClientOnly -Namespace root/cimv2 -ClassName MSFT_ExtendedStatus -Property @{{
+            CIMStatusCode = [uint32]1; Message = 'synthetic Call cancelled'; MessageID = 'HRESULT 0x80041032'
+            error_Code = 0x80041032u; error_Type = 'HRESULT'
+        }}
+        $PSCmdlet.WriteError([System.Management.Automation.ErrorRecord]::new(
+            [Microsoft.Management.Infrastructure.CimException]::new($data),
+            'HRESULT 0x80041032,Microsoft.Management.Infrastructure.CimCmdlets.GetCimInstanceCommand',
+            [System.Management.Automation.ErrorCategory]::InvalidOperation, $ClassName))
+        return
+    }}
+    if ({_ps_quote(case)} -ne 'empty') {{
+        [pscustomobject]@{{ ProcessId = 1234; ParentProcessId = 5678 }}
+        [pscustomobject]@{{ ProcessId = 4321; ParentProcessId = 8765 }}
+    }}
+}}
+function Start-Sleep {{ param([int]$Milliseconds); $script:Delays.Add($Milliseconds) }}
+$query = @{{}}
+if ({_ps_quote(case)} -ne 'empty') {{
+    $query = @{{ Filter = 'ProcessId=1234'; Property = @('ProcessId', 'ParentProcessId') }}
+}}
+$rows = [System.Collections.Generic.List[object]]::new()
+$warnings = [System.Collections.Generic.List[string]]::new()
+$failure = $null
+try {{
+    & {{ Get-Win32Process @query }} 3>&1 | ForEach-Object {{
+        if ($_ -is [System.Management.Automation.WarningRecord]) {{ $warnings.Add($_.Message) }}
+        else {{ $rows.Add($_) }}
+    }}
+}}
+catch {{
+    if ($_.Exception -isnot [Microsoft.Management.Infrastructure.CimException]) {{ throw }}
+    $failure = @{{
+        message = $_.Exception.Message
+        code = $_.Exception.ErrorData.CimInstanceProperties['error_Code'].Value
+    }}
+}}
+@{{
+    rows = @($rows.ToArray()); warnings = @($warnings.ToArray())
+    queries = @($script:Queries.ToArray()); delays = @($script:Delays.ToArray())
+    failure = $failure
+}} | ConvertTo-Json -Depth 8 -Compress
+"""
+    result = subprocess.run(
+        [pwsh, "-NoProfile", "-NonInteractive", "-Command", script],
+        capture_output=True,
+        text=True,
+        timeout=HANG_GUARD_S,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    report = json.loads(result.stdout)
+    persistent = case == "persistent"
+    assert len(report["queries"]) == (5 if persistent else 3), report
+    assert report["delays"] == ([250, 500, 1000, 2000] if persistent else [250, 500])
+    assert len(report["warnings"]) == (4 if persistent else 2), report
+    assert all("WBEM_E_CALL_CANCELLED" in warning for warning in report["warnings"])
+    for query in report["queries"]:
+        assert query["class"] == "Win32_Process"
+        assert query["error_action"] == "Stop"
+        assert query["has_filter"] is (case != "empty")
+        assert query["has_properties"] is (case != "empty")
+        if case != "empty":
+            assert query["filter"] == "ProcessId=1234"
+            assert query["properties"] == ["ProcessId", "ParentProcessId"]
+    if persistent:
+        assert report["rows"] == []
+        assert report["failure"]["code"] == 0x80041032
+        assert "synthetic Call cancelled" in report["failure"]["message"]
+    else:
+        assert report["failure"] is None
+        assert report["rows"] == (
+            [
+                {"ProcessId": 1234, "ParentProcessId": 5678},
+                {"ProcessId": 4321, "ParentProcessId": 8765},
+            ]
+            if case == "rows"
+            else []
+        )
+
+
+def test_dead_launcher_status_fails_closed_on_persistent_cim_fault(
+    tmp_path: Path,
 ) -> None:
-    """Read-only orphan inspection still retries and fails closed on WMI faults."""
+    """Full orphan-status handling must not swallow the synthetic query failure."""
     fixture = _launcher_fixture(tmp_path)
     exited = subprocess.Popen([sys.executable, "-c", "pass"])
     exited.wait(timeout=HANG_GUARD_S)
@@ -2409,20 +2529,13 @@ def test_dead_launcher_status_preserves_cim_retry_contract(
     )
     result = _run_launcher(
         fixture,
-        _tracking_with_cim_faults(fixture, faults, "-Status", "-Tag", "dead-cim"),
+        _tracking_with_cim_faults(fixture, 1000, "-Status", "-Tag", "dead-cim"),
         fixture["environment"],
     )
-    if faults == 2:
-        assert result.returncode == 0, result.stderr
-        report = json.loads(result.stdout)
-        assert report["state"] == "launcher-died"
-        assert report["launcher"]["alive"] is False
-        assert result.stderr.count("WBEM_E_CALL_CANCELLED") == 2, result.stderr
-    else:
-        assert result.returncode == 2, (result.stdout, result.stderr)
-        assert "launcher-died" not in result.stdout
-        assert "Call cancelled" in result.stderr
-        assert result.stderr.count("WBEM_E_CALL_CANCELLED") == 4, result.stderr
+    assert result.returncode == 2, (result.stdout, result.stderr)
+    assert "launcher-died" not in result.stdout
+    assert "Call cancelled" in result.stderr
+    assert result.stderr.count("WBEM_E_CALL_CANCELLED") == 4, result.stderr
 
 
 def test_a_pre_registration_dead_run_breaks_neither_status_nor_cancel(
@@ -2502,20 +2615,86 @@ def test_a_pre_registration_dead_run_breaks_neither_status_nor_cancel(
 
 
 SLEEPER = "__import__('time').sleep(120)"
+# No whitespace: the recorded argv marker must appear verbatim without quoting.
+ORPHAN_WAITER = (
+    "gate=__import__('socket').create_connection("
+    "('127.0.0.1',int(__import__('sys').argv[1])));"
+    "gate.recv(1);gate.close()"
+)
+
+
+@contextmanager
+def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
+    """Keep a real orphan alive until the test releases its socket, not a timer."""
+    child = None
+    gate = None
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        listener.settimeout(HANG_GUARD_S)
+        try:
+            parent = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "import json, os, subprocess, sys; "
+                    f"child=subprocess.Popen([sys.executable, '-c', {ORPHAN_WAITER!r}, "
+                    f"'{listener.getsockname()[1]}', *{extra!r}], "
+                    "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
+                    "stderr=subprocess.DEVNULL); "
+                    "print(json.dumps({'parent_pid':os.getpid(), 'child_pid':child.pid}))",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=HANG_GUARD_S,
+            )
+            evidence = json.loads(parent.stdout)
+            child = int(evidence["child_pid"])
+            parent_pid = int(evidence["parent_pid"])
+            gate, _ = listener.accept()
+            assert not _process_alive(parent_pid), evidence
+            assert _process_alive(child), evidence
+            yield parent_pid, child
+        finally:
+            if gate is not None:
+                # EOF also releases the child if the test failed or was interrupted.
+                gate.close()
+            # Closing the listener refuses any child that has not connected yet.
+            listener.close()
+            if child is not None:
+                deadline = time.monotonic() + HANG_GUARD_S
+                while _process_alive(child) and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                if _process_alive(child):
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(child)],
+                        capture_output=True,
+                        timeout=HANG_GUARD_S,
+                    )
+                    pytest.fail(f"orphan fixture {child} did not exit after socket release")
+
+
+def test_orphan_fixture_lifetime_is_controlled_by_release() -> None:
+    with _orphan_process([]) as (parent, child):
+        assert not _process_alive(parent)
+        time.sleep(0.1)
+        assert _process_alive(child)
+    assert not _process_alive(child)
 
 
 @pytest.mark.parametrize(
     ("recorded_code", "names", "orphaned"),
     [
         # The recorded build command: the dead launcher's own child.
-        (SLEEPER, None, True),
+        (ORPHAN_WAITER, None, True),
         # Codex on #1125 (d05cb04d9): a preparation or cleanup command (git
         # worktree add/remove, submodule update, uv sync) names the snapshot...
-        ("__import__('time').sleep(121)", "snapshots/reused", True),
+        (SLEEPER, "snapshots/reused", True),
         # ...and uv venv names the run's private staging environment.
-        ("__import__('time').sleep(121)", "envs/reused.staging-reused", True),
+        (SLEEPER, "envs/reused.staging-reused", True),
         # A different command under the same (dead) parent PID: not the run's.
-        ("__import__('time').sleep(121)", None, False),
+        (SLEEPER, None, False),
     ],
     ids=["build", "snapshot", "staging", "other"],
 )
@@ -2529,25 +2708,10 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
     log_directory.mkdir()
     extra = [] if names is None else [str(log_directory / names)]
     started = time.time()
-    parent = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "import subprocess, sys; "
-            f"print(subprocess.Popen([sys.executable, '-c', {SLEEPER!r}, *{extra!r}], "
-            "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
-            "stderr=subprocess.DEVNULL).pid)",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=HANG_GUARD_S,
-    )
-    child = int(parent.stdout)
-    try:
+    with _orphan_process(extra) as (parent, child):
         _write_run_record(
             fixture,
-            pid=_dead_parent_pid(child),
+            pid=parent,
             tag="reused",
             workflow=LEAF_NUT,
             argv=["uv", "-c", recorded_code],
@@ -2559,32 +2723,11 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
             _tracking(fixture, "-Status", "-Tag", "reused"),
             fixture["environment"],
         )
-    finally:
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(child)], capture_output=True
-        )
 
     assert status.returncode == 0, status.stderr
     report = json.loads(status.stdout)
     assert report["state"] == "launcher-died"
     assert (child in report["launcher"]["orphaned_processes"]) is orphaned
-
-
-def _dead_parent_pid(child: int) -> int:
-    listed = subprocess.run(
-        [
-            "pwsh.exe",
-            "-NoProfile",
-            "-Command",
-            f"(Get-CimInstance Win32_Process -Filter 'ProcessId={child}').ParentProcessId",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    parent = int(listed.stdout)
-    assert not _process_alive(parent)
-    return parent
 
 
 def test_cancel_finds_a_build_whose_launcher_and_uv_both_died(
