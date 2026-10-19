@@ -1,8 +1,11 @@
 dt-pinion-arbor-collar:
   title: Pinion Arbor Retention Collar
   number: MHA-DT-033
-  material: AISI 1018 cold-finished steel
-  material_specification: AISI 1018 cold-finished steel bar, ASTM A108
+  # Machinist review r1 (#1697), rule 2: the collar has no hardness, weld or
+  # other property that needs one grade, so the MATERIAL cell names the
+  # acceptable cold-finished low-carbon families (the MHA-DT-015 precedent).
+  material: "Low-carbon steel: 1018, 1020 or 12L14"
+  material_specification: low-carbon cold-finished steel bar, ASTM A108 (1018, 1020 or 12L14)
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
