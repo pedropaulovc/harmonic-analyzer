@@ -29,23 +29,159 @@ def test_six_oclock_seam_leaves_the_u27_web_without_a_matched_check() -> None:
     assert len(pin_spec.DRAWING_NOTES.splitlines()) <= 4
 
 
-def test_pull_thread_is_nominally_two_diameters_with_distinct_walls() -> None:
-    assert pin_spec.PULL_THREAD == "M2x0.4"
-    assert pin_spec.PULL_THREAD_MAJOR == pytest.approx(2.0)
-    assert pin_spec.PULL_THREAD_TAP_DRILL == pytest.approx(1.6)
+def test_pull_thread_is_unified_through_with_distinct_nominal_walls() -> None:
+    assert pin_spec.PULL_THREAD == "#0-80"
+    assert pin_spec.PULL_THREAD_TPI == 80
+    assert pin_spec.PULL_THREAD_MAJOR_IN == 0.060
+    assert pin_spec.PULL_THREAD_TAP_DRILL_IN == 0.0465
+    assert pin_spec.PULL_THREAD_MAJOR == pytest.approx(1.524)
+    assert pin_spec.PULL_THREAD_TAP_DRILL == pytest.approx(1.1811)
     assert pin_spec.PULL_THREAD_LEN == pin_spec.PIN_LEN == 4.0
-    assert pin_spec.PULL_THREAD_MIN_ENGAGEMENT_DIAMETERS == 2.0
-    assert pin_spec.PULL_THREAD_LEN / pin_spec.PULL_THREAD_MAJOR == 2.0
-    assert pin_spec.PULL_THREAD_TAP_DRILL_WALL == pytest.approx(1.2)
-    assert pin_spec.PULL_THREAD_MAJOR_WALL == pytest.approx(1.0)
+    assert pin_spec.PULL_THREAD_NOMINAL_LENGTH_DIAMETERS == pytest.approx(4.0 / 1.524)
+    assert pin_spec.PULL_THREAD_NOMINAL_LENGTH_DIAMETERS >= 2.0
+    assert pin_spec.PULL_THREAD_TAP_DRILL_WALL == pytest.approx(1.40945)
+    assert pin_spec.PULL_THREAD_MAJOR_WALL == pytest.approx(1.238)
     assert pin_spec.PULL_THREAD_TAP_DRILL_WALL > pin_spec.PULL_THREAD_MAJOR_WALL
-    assert pin_spec.PULL_THREAD_HOLE.kind == "tapped_metric"
+    assert pin_spec.PULL_THREAD_HOLE.kind == "tapped"
     assert pin_spec.PULL_THREAD_HOLE.size == pin_spec.PULL_THREAD
     assert pin_spec.PULL_THREAD_HOLE.end == "through_all"
+    assert pin_spec.PULL_THREAD_HOLE.thread_class == "2B"
+    assert pin_spec.PULL_THREAD_HOLE.overrides_mm == {
+        "ThruTapDrillDiameter": pin_spec.PULL_THREAD_TAP_DRILL
+    }
     # Rule 7: the thread is a view callout, and notes carry no method/sizes.
-    assert "M2" not in pin_spec.DRAWING_NOTES
+    assert "#0-80" not in pin_spec.DRAWING_NOTES
     assert "O'CLOCK" not in pin_spec.DRAWING_NOTES
     assert "DRILL" not in pin_spec.DRAWING_NOTES
+
+
+def test_pull_thread_uses_supported_native_inch_factory_contract() -> None:
+    from _holes import _KINDS, _standard, _through_tap_metadata
+
+    hole = pin_spec.PULL_THREAD_HOLE
+    assert _standard(hole.kind) == 0  # swStandardAnsiInch
+    assert _KINDS[hole.kind] == (4, 27)  # swWzdTap, AnsiInchTappedHole
+    assert _through_tap_metadata(hole) == [
+        ("ThreadClass", "2B"), ("ThreadEndCondition", 1)
+    ]
+
+
+def test_pw01_accepts_only_this_computed_nominal_wall() -> None:
+    import _config
+    from _paths import CAD_ROOT
+    from machinist_exceptions import load_exceptions
+
+    (entry,) = load_exceptions(CAD_ROOT / "config", "vn_crank_hub_pin", "part")
+    assert (entry.id, entry.kind) == ("PW-01", "minor")
+    assert pin_spec.PULL_THREAD_HOLE.size + " UNF" in entry.where
+    assert "MHA-VN-029 only" in entry.where
+    assert f"{pin_spec.PULL_THREAD_MAJOR_WALL:.3f} mm" in entry.finding
+    assert pin_spec.PULL_THREAD_WALL_CALLOUT in entry.finding
+    assert entry.reason.startswith("OWNER ACCEPTED 2026-10-19:")
+    assert f"{pin_spec.PULL_THREAD_MAJOR_WALL:.3f} mm nominal" in entry.reason
+    assert "not a minimum-wall guarantee" in entry.reason
+    assert "not a guaranteed full-profile engagement" in entry.reason
+    assert "1.0 mm" not in entry.reason
+    process = _config.parts("vn-crank-hub-pin")["process"]
+    assert pin_spec.PULL_THREAD_HOLE.size + " UNF" in process
+    assert "#56 tap drill" in process
+
+
+def test_wall_fact_uses_nominal_major_wall_not_tap_drill_wall() -> None:
+    nominal_major_wall = (pin_spec.PIN_DIA - pin_spec.PULL_THREAD_MAJOR) / 2.0
+    assert pin_spec.PULL_THREAD_MAJOR_WALL == nominal_major_wall
+    assert pin_spec.PULL_THREAD_WALL_CALLOUT == (
+        f"THREAD-MAJOR WALL {nominal_major_wall:.2f} NOM"
+    )
+    assert pin_spec.PULL_THREAD_WALL_CALLOUT == "THREAD-MAJOR WALL 1.24 NOM"
+    assert "MIN" not in pin_spec.PULL_THREAD_WALL_CALLOUT
+    assert nominal_major_wall == pytest.approx(1.238)
+
+
+def _callout_text(definitions: dict[int, str], part: int) -> str:
+    """Model native definition lanes separately from their resolved getters."""
+    if part in (5, 6, 7, 8):
+        return definitions[part]
+    return (
+        definitions[part + 4]
+        .replace("<hw-threadsize>", "#0-80")
+        .replace("<hw-thruholedia>", "1.1811")
+    )
+
+
+@pytest.mark.parametrize("below", ["", "<MOD-DIAM> <hw-thruholedia> THRU ALL"])
+def test_wall_fact_appends_without_replacing_native_thread_or_drill(
+    monkeypatch: pytest.MonkeyPatch, below: str
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    definitions = {
+        5: "<hw-threadsize> UNF - 2B",
+        6: " THRU ALL",
+        7: "",
+        8: below,
+    }
+    original = dict(definitions)
+
+    def set_text(part, text):
+        # Native API's writable below lane maps to definition lane 8.
+        assert part == 4
+        definitions[8] = text
+
+    display = SimpleNamespace(
+        GetText=lambda part: _callout_text(definitions, part),
+        SetText=set_text,
+    )
+    drawing._append_pull_thread_wall(display)
+    assert {part: definitions[part] for part in (5, 6, 7)} == {
+        part: original[part] for part in (5, 6, 7)
+    }
+    expected = "\n".join(filter(None, (below, pin_spec.PULL_THREAD_WALL_CALLOUT)))
+    assert definitions[8] == expected
+    assert pin_spec.PULL_THREAD_WALL_CALLOUT in display.GetText(4)
+    assert display.GetText(1) == "#0-80 UNF - 2B"
+    assert display.GetText(4) == expected.replace("<hw-thruholedia>", "1.1811")
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "unchanged", "corrupt_thread", "unresolved",
+        "corrupt_resolved_thread", "corrupt_resolved_drill",
+    ],
+)
+def test_wall_fact_refuses_failed_or_destructive_native_append(
+    monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    definitions = {
+        5: "<hw-threadsize> UNF - 2B",
+        6: " THRU ALL",
+        7: "",
+        8: "<MOD-DIAM> <hw-thruholedia> THRU ALL",
+    }
+    original_below = definitions[8]
+
+    def set_text(_part, text):
+        if failure == "unchanged":
+            return None
+        definitions[8] = text
+        if failure == "corrupt_thread":
+            definitions[5] = "#1-72 UNF - 2B"
+
+    def get_text(part):
+        if part == 4:
+            if failure == "unresolved":
+                return original_below
+            if failure == "corrupt_resolved_drill" and definitions[8] != original_below:
+                return _callout_text(definitions, part).replace("1.1811", "1.191")
+        if part == 1 and failure == "corrupt_resolved_thread" and definitions[8] != original_below:
+            return "#1-72 UNF - 2B"
+        return _callout_text(definitions, part)
+
+    display = SimpleNamespace(GetText=get_text, SetText=set_text)
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._append_pull_thread_wall(display)
+
 
 
 def test_pull_tap_outer_end_and_callout_layout() -> None:
@@ -53,14 +189,19 @@ def test_pull_tap_outer_end_and_callout_layout() -> None:
 
     import build_vn_crank_hub_pin as build
 
-    assert build.TAP_R == pytest.approx(0.8)
-    assert build.V_TAP == pytest.approx(math.pi * 0.8**2 * pin_spec.PIN_LEN)
+    assert build.TAP_R == pytest.approx(1.1811 / 2.0)
+    assert build.V_TAP == pytest.approx(math.pi * (1.1811 / 2.0)**2 * pin_spec.PIN_LEN)
     assert build.PULL_THREAD_ENTRY_POINT == (0.0, 0.0, 0.0)
     assert build.PULL_THREAD_ENTRY_NORMAL == (0.0, 0.0, -1.0)
 
     # Callout above the pin outline and left of the right view's PinDia text.
     assert drawing.THREAD_NOTE_XY[1] > drawing.END_CENTER[1] + drawing.HALF_DIA
     assert drawing.THREAD_NOTE_XY[0] + 0.035 < drawing.RIGHT_KEEP["PinDia"][0] - 0.018
+    # The 26-glyph fact is slightly wider than the measured 25-glyph / 67 mm row.
+    assert drawing.THREAD_NOTE_XY == pytest.approx((0.122, 0.216))
+    assert drawing.THREAD_NOTE_XY[0] + (0.067 * 26.0 / 25.0) / 2.0 < (
+        drawing.RIGHT_KEEP["PinDia"][0] - 0.020
+    )
 
 
 def _circle(
@@ -112,10 +253,13 @@ def saved_pull_thread(
     """Only COM wrapper conversion is replaced; validators read the data."""
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     definition = SimpleNamespace(
-        FastenerSize="M2x0.4",
+        FastenerSize="#0-80",
+        Standard2=0,
+        FastenerType2=27,
         EndCondition=1,
         ThreadEndCondition=1,
-        ThruTapDrillDiameter=0.0016,
+        ThreadClass="2B",
+        ThruTapDrillDiameter=0.0011811,
     )
     feature = SimpleNamespace(
         GetTypeName2=lambda: "HoleWzd",
@@ -132,17 +276,25 @@ def test_saved_pull_thread_accepts_correct_native_data(
 ) -> None:
     model, _definition = saved_pull_thread
     drawing._require_saved_pull_thread(model)
+    import build_vn_crank_hub_pin as build
+
+    build._require_pull_thread_definition(_definition)
 
 
 @pytest.mark.parametrize(
     ("member", "value"),
     [
-        ("FastenerSize", "M2.5x0.45"),
+        ("FastenerSize", "#1-72"),
+        ("Standard2", 1),
+        ("Standard2", -1),
+        ("FastenerType2", 26),
+        ("FastenerType2", 43),
         ("EndCondition", 0),
         ("EndCondition", 2),
         ("ThreadEndCondition", 0),
         ("ThreadEndCondition", 2),
-        ("ThruTapDrillDiameter", 0.0017),
+        ("ThreadClass", "3B"),
+        ("ThruTapDrillDiameter", 0.001191),
         ("ThruTapDrillDiameter", float("nan")),
     ],
 )
@@ -155,6 +307,10 @@ def test_saved_pull_thread_rejects_wrong_native_data(
     setattr(definition, member, value)
     with pytest.raises(RuntimeError):
         drawing._require_saved_pull_thread(model)
+    import build_vn_crank_hub_pin as build
+
+    with pytest.raises(RuntimeError):
+        build._require_pull_thread_definition(definition)
 
 
 def test_saved_pull_thread_rejects_missing_feature(
@@ -169,15 +325,20 @@ def test_saved_pull_thread_rejects_missing_feature(
 @pytest.mark.parametrize(
     ("texts", "valid"),
     [
-        (("M2x0.4 - 6H", "THRU ALL"), True),
-        (("M2 × 0.4", "THRU"), True),
-        (("M2.5x0.45", "THRU ALL"), False),
-        (("M2x0.45", "THRU ALL"), False),
-        (("M2x0.4", "NOTTHRU"), False),
-        (("M2x0.4", "<HOLE-DEPTH> 4.0"), False),
-        (("<MOD-DIAM> 1.60 THRU ALL",), False),
-        (("M2x0.4 Tapped Hole",), False),
-        (("M2x0.4 THRU ALL", "<HOLE-DEPTH> 0.0"), False),
+        (("#0-80 UNF - 2B", "THRU ALL"), True),
+        (("#0 - 80 UNF - 2B", "THRU"), True),
+        (("0-80 UNF - 2B", "THRU ALL"), True),
+        (("10-80 UNF - 2B", "THRU ALL"), False),
+        (("#1-72 UNF - 2B", "THRU ALL"), False),
+        (("#0-800 UNF - 2B", "THRU ALL"), False),
+        (("#0-80 UNC - 2B", "THRU ALL"), False),
+        (("#0-80 UNF - 3B", "THRU ALL"), False),
+        (("#0-80 UNF", "THRU ALL"), False),
+        (("#0-80 UNF", "NOTTHRU"), False),
+        (("#0-80 UNF", "<HOLE-DEPTH> 4.0"), False),
+        (("<MOD-DIAM> 1.1811 THRU ALL",), False),
+        (("#0-80 UNF Tapped Hole",), False),
+        (("#0-80 UNF THRU ALL", "<HOLE-DEPTH> 0.0"), False),
         ((), False),
     ],
 )
@@ -199,11 +360,13 @@ def test_native_pull_thread_callout_validates_rendered_text(
 
 
 @pytest.mark.parametrize("drill_only", [False, True])
+@pytest.mark.parametrize("lose_thread_after_append", [False, True])
 def test_build_uses_entry_native_callout_and_exact_automatic_note_cleanup(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     saved_pull_thread: tuple[SimpleNamespace, SimpleNamespace],
     drill_only: bool,
+    lose_thread_after_append: bool,
 ) -> None:
     """Exercise authoring, unchanged rendered-text refusal and finalizer policy."""
     model, _definition = saved_pull_thread
@@ -238,24 +401,48 @@ def test_build_uses_entry_native_callout_and_exact_automatic_note_cleanup(
 
     monkeypatch.setattr(drawing, "auto_center_marks", auto_center_marks)
     native_calls = []
+    authored_callouts = []
 
     def add_native_hole_callout(_adapter, view, *, edge, callout_xy, label):
         native_calls.append((view, edge, callout_xy))
-        texts = (
-            ("<MOD-DIAM> 1.60 THRU ALL",)
-            if drill_only else ("M2x0.4 - 6H THRU ALL",)
+        texts = list(
+            ("<MOD-DIAM> 1.1811 THRU ALL",)
+            if drill_only else ("#0-80 UNF - 2B THRU ALL", "<MOD-DIAM> 1.1811 THRU ALL")
         )
         data = SimpleNamespace(
             GetTextCount=lambda: len(texts), GetTextAtIndex=lambda index: texts[index]
         )
         annotation = SimpleNamespace(GetDisplayData=lambda: data)
-        # No writable text member: this route may not manufacture a thread label.
-        return SimpleNamespace(GetAnnotation=lambda: annotation)
+        definitions = {
+            5: "<hw-threadsize> UNF - 2B",
+            6: " THRU ALL",
+            7: "",
+            8: "<MOD-DIAM> <hw-thruholedia> THRU ALL",
+        }
+
+        def set_text(part, text):
+            # Only the additive below lane is writable; thread replacement fails.
+            assert part == 4
+            assert text == (
+                "<MOD-DIAM> <hw-thruholedia> THRU ALL\n"
+                + pin_spec.PULL_THREAD_WALL_CALLOUT
+            )
+            definitions[8] = text
+            if lose_thread_after_append:
+                texts[:] = ["<MOD-DIAM> 1.1811 THRU ALL", pin_spec.PULL_THREAD_WALL_CALLOUT]
+
+        display = SimpleNamespace(
+            GetAnnotation=lambda: annotation,
+            GetText=lambda part: _callout_text(definitions, part),
+            SetText=set_text,
+        )
+        authored_callouts.append((display, definitions))
+        return display
 
     monkeypatch.setattr(drawing, "add_native_hole_callout", add_native_hole_callout)
     finalize = AsyncMock(return_value={"pdf": str(drawing.PDF)})
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
-    if drill_only:
+    if drill_only or lose_thread_after_append:
         with pytest.raises(RuntimeError, match="through semantics"):
             asyncio.run(drawing.build(adapter))
         finalize.assert_not_awaited()
@@ -266,6 +453,14 @@ def test_build_uses_entry_native_callout_and_exact_automatic_note_cleanup(
         assert options["pdf_title"] == "Crank Hub Axial Pin Manufacturing Drawing"
         assert options["redundant_note_substrings"] == ("Tapped Hole",)
         assert options["expected_redundant_notes"] == 1
+        [(_display, definitions)] = authored_callouts
+        assert definitions == {
+            5: "<hw-threadsize> UNF - 2B",
+            6: " THRU ALL",
+            7: "",
+            8: "<MOD-DIAM> <hw-thruholedia> THRU ALL\n"
+            + pin_spec.PULL_THREAD_WALL_CALLOUT,
+        }
     [(view, edge, xy)] = native_calls
     assert edge is entry.edge
     assert xy == drawing.THREAD_NOTE_XY

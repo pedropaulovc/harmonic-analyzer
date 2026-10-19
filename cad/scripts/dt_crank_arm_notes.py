@@ -29,7 +29,7 @@ HUB_SEAT_CALLOUT = "\n".join(
 )
 # The MHA-DT-VN-59 seam is match-drilled with the hub at assembly.  The dowel's
 # axial pull thread gives it a way out of the blind seat without first
-# pressing the arm off the hub (coordinator's corrected M2 THRU ruling).
+# pressing the arm off the hub (owner's #0-80 UNF THRU ruling).
 SEAM_CALLOUT = "\n".join(
     (
         f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",

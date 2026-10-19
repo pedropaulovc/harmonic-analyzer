@@ -35,7 +35,7 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
-from _holes import _verify_tap_metadata
+from _holes import _KINDS, _standard, _verify_tap_metadata
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -45,6 +45,7 @@ from dt_vn_crank_hub_pin_spec import (
     PIN_DIA,
     PULL_THREAD_HOLE,
     PULL_THREAD_TAP_DRILL,
+    PULL_THREAD_WALL_CALLOUT,
     REFERENCE_DIMENSIONS,
 )
 
@@ -81,7 +82,7 @@ FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
 
 
 def _pull_thread_entry_edge(view: Any) -> Any:
-    """The visible Ø1.6 rim at the Hole Wizard's Z=0 extraction entry."""
+    """The visible tap-drill rim at the Hole Wizard's Z=0 extraction entry."""
     return (
         scan_view_edges(view, label="MHA-VN-029 extraction entry")
         .circle_at(
@@ -97,15 +98,25 @@ def _pull_thread_entry_edge(view: Any) -> Any:
 def _require_pull_thread_definition(definition: Any) -> None:
     """Validate actual feature data, including drill and thread termination."""
     _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-VN-029 saved pull thread")
-    if str(definition.FastenerSize).strip() != PULL_THREAD_HOLE.size:
-        raise RuntimeError("MHA-VN-029 saved extraction thread is not M2x0.4")
+    for member, expected in (
+        ("Standard2", _standard(PULL_THREAD_HOLE.kind)),
+        ("FastenerType2", _KINDS[PULL_THREAD_HOLE.kind][1]),
+        ("FastenerSize", PULL_THREAD_HOLE.size),
+    ):
+        actual = getattr(definition, member)
+        if actual != expected:
+            raise RuntimeError(
+                f"MHA-VN-029 saved extraction {member} {actual!r} != {expected!r}"
+            )
     if not math.isclose(
         float(definition.ThruTapDrillDiameter) * 1000.0,
         PULL_THREAD_TAP_DRILL,
         rel_tol=0.0,
         abs_tol=0.005,
     ):
-        raise RuntimeError("MHA-VN-029 saved tap drill is not 1.6 mm")
+        raise RuntimeError(
+            f"MHA-VN-029 saved tap drill is not #56 ({PULL_THREAD_TAP_DRILL:.4f} mm)"
+        )
 
 
 def _require_saved_pull_thread(model: Any) -> None:
@@ -130,14 +141,47 @@ def _require_pull_thread_callout(display: Any) -> None:
         str(data.GetTextAtIndex(index)) for index in range(int(data.GetTextCount()))
     )
     normalized = "".join(text.upper().split()).replace("×", "X")
+    thread_token = re.escape(PULL_THREAD_HOLE.size.upper().lstrip("#"))
     if (
-        re.search(re.escape(PULL_THREAD_HOLE.size.upper()) + r"(?![\d.])", normalized)
-        is None
+        re.search(r"(?<![\w#])#?" + thread_token + r"(?![\d.])", normalized) is None
+        or re.search(r"\bUNF\b", text, re.IGNORECASE) is None
+        or re.search(r"\b" + PULL_THREAD_HOLE.thread_class + r"\b", text) is None
         or re.search(r"\bTHRU(?:\s+ALL)?\b", text, re.IGNORECASE) is None
         or "<HOLE-DEPTH>" in normalized
     ):
         raise RuntimeError(
-            f"MHA-VN-029 native callout lost M2x0.4 through semantics: {text!r}"
+            f"MHA-VN-029 native callout lost {PULL_THREAD_HOLE.size} through semantics: {text!r}"
+        )
+
+
+def _append_pull_thread_wall(display: Any) -> None:
+    """Append a nominal fact, preserving every native Hole Wizard definition."""
+    display = _early_bound(display, "IDisplayDimension")
+    # As in draw_ch_channel_lever: read the below DEFINITION (8), not its
+    # resolved text (4), so the existing drill row keeps its native variables.
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
+    below = definitions[8].replace("\r", "").rstrip()
+    updated = (
+        f"{below}\n{PULL_THREAD_WALL_CALLOUT}" if below else PULL_THREAD_WALL_CALLOUT
+    )
+    resolved_below = resolved[4].replace("\r", "").rstrip()
+    expected_resolved = (
+        f"{resolved_below}\n{PULL_THREAD_WALL_CALLOUT}"
+        if resolved_below
+        else PULL_THREAD_WALL_CALLOUT
+    )
+    display.SetText(4, updated)  # swDimensionTextCalloutBelow
+    if (
+        str(display.GetText(8) or "").replace("\r", "") != updated
+        or str(display.GetText(4) or "").replace("\r", "") != expected_resolved
+        or any(
+            str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+        )
+        or any(str(display.GetText(part) or "") != resolved[part] for part in (1, 2, 3))
+    ):
+        raise RuntimeError(
+            "MHA-VN-029 wall fact or native callout definitions did not persist"
         )
 
 
@@ -211,6 +255,8 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=THREAD_NOTE_XY,
         label="MHA-VN-029 pull thread callout",
     )
+    _require_pull_thread_callout(thread_callout)
+    _append_pull_thread_wall(thread_callout)
     _require_pull_thread_callout(thread_callout)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.082)
     return await finalize_drawing(
