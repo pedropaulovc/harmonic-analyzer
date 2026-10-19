@@ -498,10 +498,20 @@ def _holddown_x_text_box() -> tuple[float, float, float, float]:
 
 
 def _holddown_callout_box() -> tuple[float, float, float, float]:
-    """Four rows centred on the request: r6 boxed them x 0.1391..0.2112,
-    y 0.0523..0.0726 for a request of (0.175, 0.0625)."""
+    """Four rows centred on the request: r6 boxed them y 0.0523..0.0726 for
+    a request y of 0.0625.  The widest row is now DRILL Ø3.05 THRU ALL, 50.0
+    mm (r8), with the underline's 1.6 mm shoulder at its left."""
     x, y = drawing.HOLDDOWN_CALLOUT_XY
-    return (x - 0.0359, y - 0.0102, x + 0.0362, y + 0.0101)
+    return (x - 0.0266, y - 0.0102, x + 0.0250, y + 0.0101)
+
+
+def _holddown_leader() -> tuple[tuple[float, float], tuple[float, float]]:
+    """The hold-down callout's leader: from its underline's left end (r8:
+    the last row's baseline, 11.17 mm under the requested y) to the
+    counterbore's sheet-right wall at the underside (r8's tip)."""
+    x, y = drawing.HOLDDOWN_CALLOUT_XY
+    wall_x = _holddown_hole_x() + spec.HOLDDOWN_CBORE_DIA / 2.0 * _cc_scale()
+    return ((x - 0.0266, y - 0.011166), (wall_x, drawing.holddown_strip_box()[1]))
 
 
 def _holddown_strip() -> tuple[float, float, float, float]:
@@ -522,10 +532,14 @@ def _holddown_hole_x() -> float:
     return drawing.holddown_hole_sheet_x()
 
 
+# Face-label text widths the layout audit read at r8 (3.5 mm Century Gothic).
+_FACE_LABEL_WIDTHS = {"TOP FACE": 0.0221, "UNDERSIDE": 0.0247}
+
+
 def _face_labels() -> dict[str, tuple[tuple[float, float], tuple]]:
-    """Each face label's estimated tip and text box (2.8 mm a character,
-    3.6 mm tall, r6), keyed "<view> <text>".  Tips: A-A at 2:1 about the
-    bore axis (x 0.372, top face y 0.11365, r5); C-C on its placed strip."""
+    """Each face label's estimated tip and text box (_FACE_LABEL_WIDTHS by
+    3.6 mm tall), keyed "<view> <text>".  Tips: A-A at 2:1 about the bore
+    axis (x 0.372, top face y 0.11365, r5); C-C on its placed strip."""
     strip = drawing.holddown_strip_box()
     labels = {}
     for key, text, xs, _y, pick, offset in drawing.FACE_LABELS:
@@ -536,7 +550,7 @@ def _face_labels() -> dict[str, tuple[tuple[float, float], tuple]]:
             tip_x = _holddown_hole_x() + (chosen - spec.HOLDDOWN_LOCAL_X) * _cc_scale()
             tip = (tip_x, strip[3] if text == "TOP FACE" else strip[1])
         x, y = tip[0] + offset[0], tip[1] + offset[1]
-        labels[f"{key} {text}"] = (tip, (x, y - 0.0036, x + len(text) * 0.0028, y))
+        labels[f"{key} {text}"] = (tip, (x, y - 0.0036, x + _FACE_LABEL_WIDTHS[text], y))
     return labels
 
 
@@ -556,8 +570,18 @@ def _cc_face_label_boxes() -> dict[str, tuple[float, float, float, float]]:
 
 
 def _holddown_label() -> tuple[float, float, float, float]:
+    """The native C-C label as printed: 45.9 x 14.6 mm, 2.0 mm left of and
+    1.7 mm over its requested lower-left (r8)."""
     lx, ly = drawing.HOLDDOWN_SECTION_LABEL_LOWER_LEFT
-    return (lx, ly, lx + 0.0465, ly + 0.0162)
+    return (lx - 0.0020, ly + 0.0017, lx - 0.0020 + 0.0459, ly + 0.0017 + 0.0146)
+
+
+def _holddown_padded_outline() -> tuple[float, float, float, float]:
+    """C-C's GetOutline once cropped and placed: the fence plus ~9.95 mm
+    across and ~5.86 mm up and down (r9's cropped outline against its
+    fence)."""
+    x0, y0, x1, y1 = _holddown_strip()
+    return (x0 - 0.00995, y0 - 0.00586, x1 + 0.00995, y1 + 0.00586)
 
 
 def _segments_cross(a, b) -> bool:
@@ -626,7 +650,6 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     # face labels are its own notes, standing in its padding beside the ink.
     own = {
         ("detail outline", "1.00 ±0.1"),
-        ("C-C strip", "C-C TOP FACE"),
         ("C-C strip", "C-C UNDERSIDE"),
     }
     for i, first in enumerate(names):
@@ -638,32 +661,64 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     # so SolidWorks hangs it off the line instead of centring the line through
     # it (81788ce9: "11.|00").
     assert ours["10.45"][1] >= drawing.DETAIL_HOLDDOWN_Y > drawing.DETAIL_PIVOT_Y
-    # The label centres under its own strip (8783776d printed it 50 mm off).
-    lx = drawing.HOLDDOWN_SECTION_LABEL_LOWER_LEFT[0]
+    # The label lies under its own strip (8783776d printed it 50 mm off).
+    label = ours["C-C label"]
     strip = drawing.holddown_strip_box()
-    assert lx + 0.0465 / 2.0 == pytest.approx((strip[0] + strip[2]) / 2.0)
+    assert strip[0] < (label[0] + label[2]) / 2.0 < strip[2]
+    assert label[3] < strip[1] - 0.0025
+    # The layout audit holds foreign text out of C-C's padded outline, 2 mm
+    # inset (text-on-view), and a view off the title block and detail B's
+    # padded outline within 1.5 mm.
+    inset = 0.002
+    padded = _holddown_padded_outline()
+    inner = (padded[0] + inset, padded[1] + inset, padded[2] - inset, padded[3] - inset)
+    for name in ("10.45", "1.00 ±0.1", "detail label"):
+        assert not _boxes_overlap(ours[name], inner), name
+    assert padded[2] < title_block[0] + 0.0015
+    assert padded[0] > outline[2] - 0.0015
     # Positive control: the relief note at its old anchor (0.029) meets the
     # C-C label.
     old_relief = (0.120, 0.029 - 0.0133, 0.120 + 0.0947, 0.029)
     assert _boxes_overlap(old_relief, ours["C-C label"])
 
 
-def test_holddown_callout_leader_reaches_its_counterbore_wall() -> None:
-    """The callout's leader drops to the counterbore's sheet-right wall in
-    section C-C, where the underside counterbore is solid, clear of the
-    section's label and its face labels."""
+def test_holddown_callout_leader_drops_through_the_hole_to_its_counterbore() -> None:
+    """Machinist review r8 read C-C's counterbore as opening on the top face
+    with the leader run across the strip's left piece to the counterbore's
+    underside corner.  The leader now leaves the underline's left end up and
+    left of the hole and drops through the Ø3.05 hole into the counterbore,
+    clear of the hole's left wall at the top face and its right wall at the
+    step, whether the underline starts at the widest row (50.0 mm) or the
+    shorter mate row."""
     z = spec.HOLDDOWN_LOCAL_Z
-    wall_x = _holddown_hole_x() + spec.HOLDDOWN_CBORE_DIA / 2.0 * _cc_scale()
-    # C-C draws the underside at the strip's foot (r3).
-    wall_y = drawing.holddown_strip_box()[1] + spec.HOLDDOWN_CBORE_DEPTH / 2.0 * _cc_scale()
     assert drawing.plate_edge_mm(z, 1) > spec.HOLDDOWN_LOCAL_X + spec.HOLDDOWN_CBORE_DIA
+    s = _cc_scale()
+    hole = _holddown_hole_x()
+    narrow = (hole - spec.HOLDDOWN_CLEARANCE_DIA / 2.0 * s, hole + spec.HOLDDOWN_CLEARANCE_DIA / 2.0 * s)
+    foot, top = drawing.holddown_strip_box()[1], drawing.holddown_strip_box()[3]
+    step = foot + spec.HOLDDOWN_CBORE_DEPTH * s
+
+    def x_at(leader, y):
+        (x0, y0), (x1, y1) = leader
+        return x0 + (x1 - x0) * (y - y0) / (y1 - y0)
+
+    start, tip = _holddown_leader()
     callout = _holddown_callout_box()
-    assert callout[0] < wall_x < callout[2]  # a short leader
-    assert callout[1] > _holddown_strip()[3]  # the rows stand over the strip
-    leader = ((wall_x, wall_y), (wall_x, callout[1]))
-    assert not _segment_hits_box(leader, _holddown_label())
-    for box in _cc_face_label_boxes().values():
-        assert not _segment_hits_box(leader, box)
+    assert callout[1] > _holddown_strip()[3] + 0.005  # the rows stand over the strip
+    for shift in (0.0, 0.0016):
+        leader = ((start[0] + shift, start[1]), tip)
+        assert x_at(leader, top) > narrow[0] + 0.0009
+        assert x_at(leader, step) < narrow[1] - 0.0009
+        assert not _segment_hits_box(leader, _holddown_label())
+        for box in _cc_face_label_boxes().values():
+            assert not _segment_hits_box(leader, box)
+    # Positive control, r8 at 1:1: underline from (0.1371, 0.0528), tip on
+    # the counterbore wall's underside corner; the line entered the strip's
+    # top 11.6 mm left of the hole.
+    r8_hole, r8_foot = 0.1622072, 0.041675
+    r8 = ((0.1370976, 0.052834), (r8_hole + spec.HOLDDOWN_CBORE_DIA / 2000.0, r8_foot))
+    r8_top = r8_foot + spec.PLATE_THICKNESS / 1000.0
+    assert x_at(r8, r8_top) < r8_hole - spec.HOLDDOWN_CLEARANCE_DIA / 2000.0 - 0.01
 
 
 class _CcSection:
@@ -1338,7 +1393,7 @@ def test_holddown_callout_drills_in_its_thru_row_and_names_face_and_mate() -> No
     updated = drawing.holddown_callout_definitions(dict(_CBORE_PARTS))
     assert updated[5] == _CBORE_PARTS[5]
     assert updated[7] == "DRILL <MOD-DIAM><hw-diam> THRU ALL"
-    assert updated[8] == "FROM UNDERSIDE\nLOCATES MHA-DT-021 TIP BLOCK"
+    assert updated[8] == "FROM UNDERSIDE\nLOCATES MHA-DT-021"
     counted = drawing.holddown_callout_definitions(
         {**_CBORE_PARTS, 7: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"}
     )
@@ -1414,15 +1469,14 @@ def test_relief_fit_note_stands_over_section_a_a_clear_of_its_neighbours() -> No
 
 def test_both_sections_name_their_faces() -> None:
     """Machinist review r3 blocker: A-A draws the top face at its foot, C-C
-    at its head, and neither named a face.  C-C names both; A-A its top
-    face, the only free field it has (r5: an UNDERSIDE label over its strip
-    overlapped the relief note's box)."""
+    at its head, and neither named a face.  Each names one face at its foot:
+    A-A its top face, the only free field it has (r5: an UNDERSIDE label over
+    its strip overlapped the relief note's box); C-C its underside, the face
+    its callout's FROM UNDERSIDE names (at 2:1 no field right of its strip
+    holds a TOP FACE label short of the title block)."""
     labels = {(key, text) for key, text, *_ in drawing.FACE_LABELS}
-    assert labels == {
-        ("A-A", "TOP FACE"),
-        ("C-C", "TOP FACE"),
-        ("C-C", "UNDERSIDE"),
-    }
+    assert labels == {("A-A", "TOP FACE"), ("C-C", "UNDERSIDE")}
+    assert "FROM UNDERSIDE" in drawing.HOLDDOWN_CALLOUT_BELOW
     for _key, text, _xs, model_y, pick, _offset in drawing.FACE_LABELS:
         assert model_y == (spec.PLATE_THICKNESS if text == "TOP FACE" else 0.0)
         assert pick in {"max", "min"}
@@ -1436,14 +1490,13 @@ def test_both_sections_name_their_faces() -> None:
     assert top[1] > 0.0995 + 0.002  # A-A label
     assert top[2] < 0.3955 - 0.002  # (0.25) dimension line
     assert max(top[3], tip[1]) < 0.1144  # the relief note's box (r5)
-    # C-C's two labels clear each other with their leaders (r5 overlapped).
-    boxes = _cc_face_label_boxes()
-    assert not _boxes_overlap(boxes["C-C TOP FACE"], boxes["C-C UNDERSIDE"])
-    # Stacked texts stand more than the audit's row pitch (5.66 mm) apart, or
-    # they merge into one block (r6, enforced: callout 4.27 over TOP FACE).
-    pitch = 0.00566
-    top_text = labels["C-C TOP FACE"][1]
-    assert _holddown_callout_box()[1] - top_text[3] > pitch + 0.001
-    assert top_text[1] - labels["C-C UNDERSIDE"][1][3] > pitch
-    r6_top = 0.0480  # positive control: r6's TOP FACE text top
-    assert (0.0625 - 0.0102) - r6_top < pitch
+    # C-C's UNDERSIDE: its tip on the solid underside left of the
+    # counterbore, its text clear of the native label by more than the
+    # audit's separation (3.57 mm; r8 advisory at 2.26).
+    tip, under = labels["C-C UNDERSIDE"]
+    strip = drawing.holddown_strip_box()
+    cbore_left = _holddown_hole_x() - spec.HOLDDOWN_CBORE_DIA / 2.0 * _cc_scale()
+    assert strip[0] + 0.001 < tip[0] < cbore_left - 0.001
+    assert tip[1] == pytest.approx(strip[1])
+    assert _holddown_label()[0] - under[2] > 0.0036
+    assert under[3] < strip[1] - 0.002
