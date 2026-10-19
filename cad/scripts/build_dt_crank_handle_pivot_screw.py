@@ -1,7 +1,7 @@
 r"""Build MHA-DT-32, the crank handle pivot screw (user ruling U33).
 
-A made slotted shoulder screw turned from 3/8-in cold-finished rod.  The oak
-handle MHA-DT-08 spins on the Ø6 shoulder; the #8-32 thread screws into the
+A made slotted shoulder screw turned from 1/4-in cold-finished rod.  The oak
+handle MHA-DT-08 spins on the Ø4 shoulder; the #4-40 thread screws into the
 crank arm MHA-DT-06's tapped through hole and the shoulder seats tight on the
 arm face.  Dimensions and the derived fit facts live in
 ``dt_crank_handle_pivot_screw_spec``.
@@ -11,7 +11,7 @@ shoulder and threaded section follow in +Z, the threaded section opening
 with a thread-relief groove against the seat face (a 45-degree lead from its
 floor into the seat face) so a die runs out into air and the shoulder seats
 tight, and closing with a 45-degree thread-start chamfer on the tip.  The driver slot is sketched on the Front
-Plane (the head face) and cut 1.0 deep across the full head, running along
+Plane (the head face) and cut 1.6 deep across the full head, running along
 local X.  ``ArmSeat`` is a named plane on the shoulder's seat face and
 ``Axis1`` the screw axis, for the assembly mates.
 

@@ -102,7 +102,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # Both orthographic views print at the sheet scale, so neither needs a caption.
-# 3:1 lays the 69.5 profile 208 mm long and the 1.0 slot 3 mm wide.
+# 3:1 lays the 67.0 profile 201 mm long and the 1.0 slot 3 mm wide.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -191,13 +191,13 @@ SIDE_KEEP = {
 # goes on an OffsetText leader so the seat-face extension line (the thread
 # length's right side) cannot run through "0.5 X 45 DEG LEAD".  With
 # OffsetText the anchor is the CENTRE of the Ø line's bottom edge and the
-# callout is centred under it (a dimension exposes no GetExtent), measured
-# on farm run 69a2f961's render: the LEAD line spans 40.8 mm and its
-# underline, where the leader lands, sits 5.6 mm below the anchor.  The
-# text's left edge stands 3.5 mm right of the seat face, and 21 mm below
-# the axis the leader drops steeply enough to pass under the seat-face
-# corner rather than through the shoulder.  The Ø6.00 arrow is right of it.
-RELIEF_DIA_TEXT_WIDTH = 0.045  # "0.3-0.5 X 45 DEG LEAD": 41 mm measured for "0.5 ...", +4 chars
+# callout is centred under it (a dimension exposes no GetExtent).  The r4
+# audit measured the complete lead line at 49.2917 mm, with its underline
+# 5.6 mm below the anchor.  Using that full width puts the text's left edge
+# 3.5 mm right of the seat face instead of the r4 audit's 1.5 mm advisory.
+# At 21 mm below the axis the leader passes under the seat-face corner,
+# and the block's right edge stays 3 mm clear of the shoulder Ø line.
+RELIEF_DIA_TEXT_WIDTH = 0.0493
 RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0056
 RELIEF_DIA_TEXT_CLEARANCE = 0.0035
 RELIEF_DIA_TEXT_XY = (

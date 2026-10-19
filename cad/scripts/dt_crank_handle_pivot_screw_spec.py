@@ -65,19 +65,23 @@ HEAD_DIA_TOL = 0.10
 # machinist review of 04b95f481: the reasons only in a general note), one
 # line under the value so it stays clear of the head's extension lines.
 HEAD_DIA_CALLOUT = "ON MHA-DT-35 FLOOR"
-# A 4.0 head (user ruling 2026-09-29, MHA-DT-32 machinist review): under the
-# deepest .X slot below, the worst case leaves 2.1 of head under the slot,
-# not 0.4.  Banded (Codex P2 on #1139, user ruling 2026-09-30): at .X the
-# longest head, at the widest fitted end play, stood 1.6 proud of the cup.
+# A 4.0 head (user ruling 2026-09-29, MHA-DT-32 machinist review) keeps
+# 1.5 of head under the deepest .X slot below.  Banded (Codex P2 on #1139,
+# user ruling 2026-09-30): at .X the longest head, at the widest fitted end
+# play, stood 1.6 proud of the cup.
 HEAD_LENGTH = 4.0
 HEAD_LENGTH_TOL = 0.10
 HEAD_LENGTH_CALLOUT = "BELOW MHA-DT-035 FACE"
 SLOT_WIDTH = 1.0
 # Routine (.X; the MHA-DT-32 machinist review of 04b95f481 called its
-# +/-0.20 band over-specification): the shortest head under the deepest .X
-# slot still keeps the 1.5 web asserted below.
-SLOT_DEPTH = 1.0
+# +/-0.20 band over-specification).  Codex P2 on #1694: a 1.0 depth at .X
+# admitted only 0.2 of driver seating.  Deepen the slot, not its tolerance:
+# 1.6 at .X retains the former 0.8 minimum and a 1.5 minimum head web.
+# This changes no mating surface or cup/head envelope.
+SLOT_DEPTH = 1.6
 SLOT_DEPTH_TOL = GENERAL_1PL_TOL_MM
+SLOT_DEPTH_MIN = round(SLOT_DEPTH - SLOT_DEPTH_TOL, 6)
+SLOT_DEPTH_MAX = round(SLOT_DEPTH + SLOT_DEPTH_TOL, 6)
 
 # The running surface under the oak bore.  (upper, lower) deviations from the
 # Ø4.00 nominal; the model carries the band natively (drawing-simplicity-policy.md `How the repository implements the guidelines`).  Ø4.00
@@ -114,7 +118,7 @@ SHOULDER_LENGTH = round(HANDLE_STACK_NOMINAL + END_PLAY_NOMINAL, 6)
 # engagement at the worst case, so the #8-32's U33b exception (1.26D) stays
 # retired.
 THREAD_SIZE = "#4-40"
-# The threaded section is modelled as a plain cylinder at the basic #6 major
+# The threaded section is modelled as a plain cylinder at the basic #4 major
 # diameter, the fleet convention for a stock screw in a tap-drill-modelled hole.
 THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
 # 10.0 at the title block's .X (the MHA-DT-32 machinist review of 04b95f481
@@ -261,9 +265,7 @@ HEAD_RECESS_WORST = round(
 POCKET_MAX = HEAD_DIA + HEAD_DIA_TOL + CUP_POCKET_CLEARANCE[1]
 CUP_POCKET_WALL_MIN = round(((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2.0, 6)
 # The slot's worst-case web: the shortest head under the deepest slot.
-SLOT_WEB_MIN = round(
-    HEAD_LENGTH - HEAD_LENGTH_TOL - (SLOT_DEPTH + SLOT_DEPTH_TOL), 6
-)
+SLOT_WEB_MIN = round(HEAD_LENGTH - HEAD_LENGTH_TOL - SLOT_DEPTH_MAX, 6)
 TIP_CHAMFER_MAX = TIP_CHAMFER
 # Under-head bearing annulus on the cup floor at the worst case: the smallest
 # head over the largest drilled floor hole, less a title-block edge break on
@@ -479,6 +481,7 @@ for _ok, _what in (
     ),
     (SHOULDER_DIA_MIN > THREAD_MODEL_DIA, "shoulder has no seat annulus"),
     (HEAD_LENGTH - SLOT_DEPTH >= 2.0, "under 2.0 of head remains under the slot"),
+    (SLOT_DEPTH_MIN >= 0.8, "under 0.8 of driver seating at the slot's printed limits"),
     (SLOT_WEB_MIN >= WALL_FLOOR_MM, "under 1.5 of head remains under the slot at its limits"),
 ):
     if not _ok:

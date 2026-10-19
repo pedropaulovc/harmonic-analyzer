@@ -114,14 +114,14 @@ def test_geometry_matches_the_u33_ruling() -> None:
     # Ø6 head; #4-40 (user ruling 2026-09-30, local review of fbf82ad96).
     assert spec.HEAD_DIA == 6.0
     assert spec.HEAD_DIA_TOL == 0.10
-    # User ruling 2026-09-29 (MHA-DT-32 review): a 4.0 head; the 1.0 slot is
-    # routine (.X, machinist review of 04b95f481) and still leaves 2.1 of head
-    # under it at the worst case.
+    # The head retains its established cup interface.  The slot is deeper
+    # at the same routine .X tolerance so the driver still seats at least
+    # 0.8, while the remaining web meets the 1.5 floor (Codex P2 on #1694).
     assert spec.HEAD_LENGTH == 4.0
     assert spec.SLOT_WIDTH == 1.0
-    assert spec.SLOT_DEPTH == 1.0
+    assert spec.SLOT_DEPTH == 1.6
     assert spec.SLOT_DEPTH_TOL == geometry.GENERAL_1PL_TOL_MM
-    assert spec.SLOT_WEB_MIN == pytest.approx(2.1)
+    assert spec.SLOT_WEB_MIN == pytest.approx(1.5)
     # The tip chamfer is a single MAX limit that never cuts past the thread
     # depth; the tip is filed away at assembly.
     assert spec.TIP_CHAMFER_MAX == spec.TIP_CHAMFER
@@ -135,6 +135,21 @@ def test_geometry_matches_the_u33_ruling() -> None:
     # The largest tip chamfer stays within the 0.39 thread depth (17/24 H).
     assert spec.TIP_CHAMFER_MAX <= 0.61343 * 25.4 / 40.0
     assert spec.HEAD_DIA + spec.HEAD_DIA_TOL < spec.STOCK_DIA == pytest.approx(6.35)
+
+
+def test_slot_printed_limits_keep_driver_seating_and_the_head_web() -> None:
+    assert spec.SLOT_DEPTH_MIN == pytest.approx(spec.SLOT_DEPTH - spec.SLOT_DEPTH_TOL)
+    assert spec.SLOT_DEPTH_MAX == pytest.approx(spec.SLOT_DEPTH + spec.SLOT_DEPTH_TOL)
+    assert (spec.SLOT_DEPTH_MIN, spec.SLOT_DEPTH_MAX) == pytest.approx((0.8, 2.4))
+    assert spec.SLOT_DEPTH_MIN >= 0.8
+    assert spec.SLOT_WEB_MIN == pytest.approx(
+        spec.HEAD_LENGTH - spec.HEAD_LENGTH_TOL - spec.SLOT_DEPTH_MAX
+    )
+    assert spec.SLOT_WEB_MIN >= 1.5
+    # The rejected 1.0 nominal at the same loose band admitted only 0.2.
+    assert 1.0 - spec.SLOT_DEPTH_TOL < 0.8
+    # Deepening one more tenth without changing the head would miss the floor.
+    assert spec.HEAD_LENGTH - spec.HEAD_LENGTH_TOL - (1.7 + spec.SLOT_DEPTH_TOL) < 1.5
 
 
 def test_u33_running_fit_end_play_and_engagement() -> None:
@@ -492,6 +507,8 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # shoulder Ø's dimension line.
     text_x, text_y = drawing.RELIEF_DIA_TEXT_XY
     half = drawing.RELIEF_DIA_TEXT_WIDTH / 2.0
+    # Full native callout width from r4, not the older shorter lead text.
+    assert drawing.RELIEF_DIA_TEXT_WIDTH >= 0.0492917
     assert (text_x - half) - drawing.SEAT_X >= 0.003
     assert (text_x + half) + 0.003 <= drawing.SIDE_KEEP["ShoulderDia"][0]
     # Failing control: 0f50950a anchored at floor + 6 mm, which run 69a2f961
