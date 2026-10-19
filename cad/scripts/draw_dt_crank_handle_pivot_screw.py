@@ -192,18 +192,19 @@ SIDE_KEEP = {
 # goes on an OffsetText leader so the seat-face extension line (the thread
 # length's right side) cannot run through "0.5 X 45 DEG LEAD".  With
 # OffsetText the anchor is the CENTRE of the Ø line's bottom edge and the
-# callout is centred under it (a dimension exposes no GetExtent).  The r4
-# audit measured the complete lead line at 49.2917 mm, with its underline
-# 5.6 mm below the anchor.  Using that full width puts the text's left edge
-# 3.5 mm right of the seat face instead of the r4 audit's 1.5 mm advisory.
-# At 21 mm below the axis the leader passes under the seat-face corner,
-# and the block's right edge stays 3 mm clear of the shoulder Ø line.
+# callout is centred under it (a dimension exposes no GetExtent).  The lead
+# line measured 49.2917 mm in r4 and r6.  Keep the seating reason shorter:
+# r6's "SEATING TORQUE NECK" measured 52.4319 mm and left only 1.99 mm
+# beside the seat-face witness.  The bilateral relief's underline is
+# 10.0819 mm below the anchor.  The full-width block stands 3.5 mm right of
+# the seat face and 3 mm clear of the shoulder Ø line; its leader passes
+# below the seat-face corner.
 RELIEF_DIA_TEXT_WIDTH = 0.0493
-RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0056
+RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0101
 RELIEF_DIA_TEXT_CLEARANCE = 0.0035
 RELIEF_DIA_TEXT_XY = (
     SEAT_X + RELIEF_DIA_TEXT_CLEARANCE + RELIEF_DIA_TEXT_WIDTH / 2.0,
-    SIDE_CENTER[1] - 0.021,
+    SIDE_CENTER[1] - 0.0185,
 )
 # The 3-mm slot is narrower than the text, so the value stands above its
 # extension lines rather than between them.

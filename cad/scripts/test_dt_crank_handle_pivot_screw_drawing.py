@@ -185,7 +185,7 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert (spec.RELIEF_DIA_MIN, spec.RELIEF_DIA_MAX) == pytest.approx((1.8, 1.9))
     assert spec.RELIEF_DIA_MIN == pytest.approx(spec.RELIEF_DIA + spec.RELIEF_DIA_BAND[1])
     assert spec.RELIEF_DIA_MAX == pytest.approx(spec.RELIEF_DIA + spec.RELIEF_DIA_BAND[0])
-    assert spec.RELIEF_STRENGTH_CALLOUT == "SEATING TORQUE NECK"
+    assert spec.RELIEF_STRENGTH_CALLOUT == "SEATING TORQUE"
     assert drawing.RELIEF_STRENGTH_CALLOUT is spec.RELIEF_STRENGTH_CALLOUT
     assert "\n" not in spec.RELIEF_STRENGTH_CALLOUT
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -529,8 +529,13 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # shoulder Ø's dimension line.
     text_x, text_y = drawing.RELIEF_DIA_TEXT_XY
     half = drawing.RELIEF_DIA_TEXT_WIDTH / 2.0
-    # Full native callout width from r4, not the older shorter lead text.
+    # Full native lead width from r4/r6, not the older shorter lead text.
     assert drawing.RELIEF_DIA_TEXT_WIDTH >= 0.0492917
+    # The redundant NECK made r6's reason wider than the calibrated block;
+    # the shorter reason stays within it at the measured ~2.8 mm/character.
+    assert 0.0524319 > drawing.RELIEF_DIA_TEXT_WIDTH
+    assert len(spec.RELIEF_STRENGTH_CALLOUT) * 0.0028 < drawing.RELIEF_DIA_TEXT_WIDTH
+    assert drawing.RELIEF_DIA_TEXT_UNDERLINE_DROP >= 0.0100819
     assert (text_x - half) - drawing.SEAT_X >= 0.003
     assert (text_x + half) + 0.003 <= drawing.SIDE_KEEP["ShoulderDia"][0]
     # Failing control: 0f50950a anchored at floor + 6 mm, which run 69a2f961
@@ -545,6 +550,9 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     leader_y_at_seat = start_y + t * (end_y - start_y)
     shoulder_bottom = 2.0 * drawing.SIDE_CENTER[1] - drawing.SHOULDER_TOP_Y
     assert shoulder_bottom - leader_y_at_seat >= 0.002
+    # The above-callout's top rose ~9 mm above the anchor in r6.  Raising the
+    # block for the bilateral stack still keeps it >= 3 mm below the profile.
+    assert shoulder_bottom - (text_y + 0.0092) >= 0.003
     # The block stays above the thread-length row's text.
     assert end_y - drawing.SIDE_KEEP["ThreadLength"][1] >= 0.005
     # The 45-degree lead rides the Ø callout; only the width stands above.

@@ -187,7 +187,7 @@ RELIEF_DIA = 1.9
 RELIEF_DIA_BAND = (0.0, -0.1)  # (upper, lower) deviations
 RELIEF_DIA_MIN = round(RELIEF_DIA + RELIEF_DIA_BAND[1], 6)
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_BAND[0], 6)
-RELIEF_STRENGTH_CALLOUT = "SEATING TORQUE NECK"
+RELIEF_STRENGTH_CALLOUT = "SEATING TORQUE"
 # Routine at 2.2 (the MHA-DT-32 machinist review of crank-v4-16 called a
 # +/-0.10 band over-specification): at .X the straight floor past the
 # longest lead, 1.4 - 0.4 = 1.0, keeps 1.5 #4-40 pitches of die run-out
