@@ -130,6 +130,17 @@ def test_both_tight_collar_bands_name_the_follower_pin_they_serve() -> None:
         assert pin in drawing.DIMENSION_CALLOUTS[name], name
 
 
+def test_od_callout_claims_the_follower_arc_the_assembly_proves() -> None:
+    # ENFORCE r8: the callout's "clear of the tap" is the DT-000 layout proof,
+    # not a free claim; keep the proof present while the sheet states it.
+    import test_dt_drive_train_support_layout as layout
+
+    assert drawing.DIMENSION_CALLOUTS["CollarOd"].endswith(
+        "ON AN ARC CLEAR\nOF THE TAP"
+    )
+    assert callable(layout.test_cam_set_screw_hole_stays_clear_of_the_follower)
+
+
 def test_tap_callout_points_at_the_drive_train_step_that_stakes_it() -> None:
     # Rule 23 (#1176): the stake is performed at MHA-DT-000's cam-collars-set
     # step; the pointer follows the step registry, never a typed number.

@@ -58,7 +58,14 @@ FOLLOWER_PIN_NUMBER = "MHA-DT-025"
 COLLAR_OD_TOLERANCE_MM = 0.05
 COLLAR_AXIS_TOLERANCE_MM = 0.05
 BORE_CALLOUT = f"REAM THRU\nSLIP FIT ON LIFT ROD {LIFT_ROD_NUMBER}"
-COLLAR_OD_CALLOUT = f"{FOLLOWER_PIN_NUMBER} FOLLOWER\nPIN RIDES THIS OD"
+# ENFORCE r8 (gating): the tap breaks out on the heavy side of this OD, and a
+# blind reader could not tell whether the pin's track crosses it.  It does
+# not: the follower contact stays 45 deg or more off the tap mouth over the
+# whole stroke (test_cam_set_screw_hole_stays_clear_of_the_follower), so the
+# callout says so, without a number (notes carry no dimensions).
+COLLAR_OD_CALLOUT = (
+    f"{FOLLOWER_PIN_NUMBER} FOLLOWER\nPIN RIDES THIS OD\nON AN ARC CLEAR\nOF THE TAP"
+)
 ECCENTRICITY_CALLOUT = (
     f"ECCENTRICITY\nBORE AXIS TO OD AXIS\nSETS {FOLLOWER_PIN_NUMBER} PIN LIFT"
 )
