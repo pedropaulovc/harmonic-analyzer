@@ -400,50 +400,53 @@ HOLDDOWN_SECTION_LABEL_LOWER_LEFT = (HOLDDOWN_SECTION_CENTER[0] - 0.02325, 0.015
 # ALL, the Ø5.56 counterbore row and its 3.50 depth, then FROM UNDERSIDE
 # and the mate (HOLDDOWN_CALLOUT_BELOW).  SolidWorks centres the block on
 # the requested point: r3's four rows sat at x 0.139..0.211, y 0.0608..
-# 0.0849 for a requested y 0.072, the top row on the plan caption.  Here
-# they stand ~0.051..0.075: 3 mm over the strip (top ~0.0479), 5 mm under
-# the captions, left of the title block (0.216).  Its leader drops to the
-# counterbore's sheet-right wall.
-HOLDDOWN_CALLOUT_XY = (HOLDDOWN_SECTION_CENTER[0] + 0.015, 0.0625)
+# 0.0849 for a requested y 0.072, the top row on the plan caption; r6's at
+# 0.0523..0.0726 for 0.0625.  Here they stand ~0.0538..0.0741: 7 mm over
+# C-C's TOP FACE label (the 5.66 mm row pitch keeps them two blocks), 6 mm
+# under the captions (0.0805), left of the title block (0.216).  Its leader
+# drops to the counterbore's sheet-right wall.
+HOLDDOWN_CALLOUT_XY = (HOLDDOWN_SECTION_CENTER[0] + 0.015, 0.064)
 # Face labels on both sections (machinist review r3 blocker): A-A, looking
 # down the sheet, draws the top face at its foot; C-C, looking up it, at its
 # head.  Both are true projections, but with no face named a reader cannot
 # tell the relief (top) from the counterbore (underside).  Each label is a
 # pointer note on its face: (view key, text, model x candidates in mm, model
 # y in mm, which candidate -- the one furthest "max" right or "min" left on
-# the sheet -- and the note's upper-left corner relative to the tip).  At
-# r2's 2.8 mm a character a label is 22..25 mm long; each tip sits near one
-# end of its label, so the smart-side leader leaves from that end.  The
-# layout audit boxes a note with its leader, text to tip.
-# Positions are measured on r3/r5's renders; the tip is projected on the
+# the sheet -- and the note's upper-left corner relative to the tip).  A
+# label's text is ~21.8 x 3.6 mm (r6).  Each tip stands ~2 mm beyond one end
+# of its text, so the leader leaves that end without running back through
+# the letters (r6: two leader-through-own-text with tips over the text's
+# span).  The layout audit boxes a note with its leader, text to tip.
+# Positions are measured on r3..r6's renders; the tip is projected on the
 # face.  A-A names its top face only: everything over its strip lies in
 # the relief note's box (x 0.2998..0.3784, y 0.1144 up, r5 overlapped an
 # UNDERSIDE label there) or under the Ra 1.6 and (0.25) texts, and the
 # relief note, its TOP RELIEF and the label already name that face.
 FACE_LABELS = (
-    # Under A-A's right-hand piece, right of the relief, over the A-A label
-    # (top ~0.0995) and left of the (0.25) dimension line (x 0.3955).
-    ("A-A", "TOP FACE", (-6.8, 6.8), PLATE_THICKNESS, "max", (-0.0196, -0.00515)),
-    # Right of C-C's strip, its text standing from the tip's height down
-    # (~0.048..0.0435), under the hold-down callout (~0.051).
+    # Under A-A's strip, ending 2 mm left of its tip on the right-hand
+    # piece, over the A-A label (top ~0.0995).
+    ("A-A", "TOP FACE", (-6.8, 6.8), PLATE_THICKNESS, "max", (-0.024, -0.00515)),
+    # Right of C-C's strip, under the hold-down callout.  r6's text stood
+    # 0.0444..0.0480 for a tip-level request and 4.27 mm under the callout
+    # (merged-blocks: under the 5.66 mm row pitch, enforced).  1 mm lower,
+    # it stands ~6.8 mm under the callout and ~6.2 mm over UNDERSIDE.
     (
         "C-C",
         "TOP FACE",
         (HOLDDOWN_LOCAL_X - 6.0, HOLDDOWN_LOCAL_X + 6.0),
         PLATE_THICKNESS,
         "max",
-        (0.008, 0.0),
+        (0.008, -0.001),
     ),
-    # Under C-C's left-hand piece, over the C-C label (top 0.0319): r5 boxed
-    # it 0.0339..0.0420, its top the tip's.  It overlapped r5's TOP FACE box
-    # (foot 0.0415, text 2 mm lower than now) by 0.5 mm.
+    # Under C-C's strip, starting 2.3 mm right of its tip on the left-hand
+    # piece, over the C-C label (top 0.0319; r6 left 2 mm between them).
     (
         "C-C",
         "UNDERSIDE",
         (HOLDDOWN_LOCAL_X - 9.0, HOLDDOWN_LOCAL_X + 9.0),
         0.0,
         "min",
-        (-0.004, -0.0035),
+        (0.0023, -0.0045),
     ),
 )
 # Rows printed under native hole callouts (swDimensionTextCalloutBelow).

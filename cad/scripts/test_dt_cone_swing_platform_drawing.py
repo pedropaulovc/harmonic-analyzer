@@ -498,10 +498,10 @@ def _holddown_x_text_box() -> tuple[float, float, float, float]:
 
 
 def _holddown_callout_box() -> tuple[float, float, float, float]:
-    """Four rows centred on the request: r3 boxed them x 0.139..0.211,
-    y 0.0608..0.0849 for a request of (0.175, 0.072)."""
+    """Four rows centred on the request: r6 boxed them x 0.1391..0.2112,
+    y 0.0523..0.0726 for a request of (0.175, 0.0625)."""
     x, y = drawing.HOLDDOWN_CALLOUT_XY
-    return (x - 0.036, y - 0.0117, x + 0.036, y + 0.0125)
+    return (x - 0.0359, y - 0.0102, x + 0.0362, y + 0.0101)
 
 
 def _holddown_strip() -> tuple[float, float, float, float]:
@@ -524,26 +524,38 @@ def _holddown_hole_x() -> float:
     return cx - width / 2000.0 + (spec.HOLDDOWN_LOCAL_X - east) / 1000.0
 
 
-def _cc_face_label_boxes() -> dict[str, tuple[float, float, float, float]]:
-    """C-C's face labels as the layout audit boxes them: text (2.8 mm a
-    character, 4.5 mm tall) and leader, out to the tip on the strip."""
+def _face_labels() -> dict[str, tuple[tuple[float, float], tuple]]:
+    """Each face label's estimated tip and text box (2.8 mm a character,
+    3.6 mm tall, r6), keyed "<view> <text>".  Tips: A-A at 2:1 about the
+    bore axis (x 0.372, top face y 0.11365, r5); C-C's strip 3.0..9.4 mm
+    over its requested centre (r3)."""
     cy = drawing.HOLDDOWN_SECTION_CENTER[1]
-    faces = {"TOP FACE": cy + 0.0094, "UNDERSIDE": cy + 0.003}
-    boxes = {}
+    labels = {}
     for key, text, xs, _y, pick, offset in drawing.FACE_LABELS:
-        if key != "C-C":
-            continue
-        offsets = [x - spec.HOLDDOWN_LOCAL_X for x in xs]
-        tip_x = _holddown_hole_x() + (max if pick == "max" else min)(offsets) / 1000.0
-        tip_y = faces[text]
-        x, y = tip_x + offset[0], tip_y + offset[1]
-        boxes[f"C-C {text}"] = (
-            min(x, tip_x),
-            min(y - 0.0045, tip_y),
-            max(x + len(text) * 0.0028, tip_x),
-            max(y, tip_y),
+        chosen = (max if pick == "max" else min)(xs)
+        if key == "A-A":
+            tip = (0.372 + 2 * chosen / 1000.0, 0.11365)
+        else:
+            tip_x = _holddown_hole_x() + (chosen - spec.HOLDDOWN_LOCAL_X) / 1000.0
+            tip = (tip_x, cy + (0.0094 if text == "TOP FACE" else 0.003))
+        x, y = tip[0] + offset[0], tip[1] + offset[1]
+        labels[f"{key} {text}"] = (tip, (x, y - 0.0036, x + len(text) * 0.0028, y))
+    return labels
+
+
+def _cc_face_label_boxes() -> dict[str, tuple[float, float, float, float]]:
+    """C-C's face labels as the layout audit boxes them: text and leader,
+    out to the tip on the strip."""
+    return {
+        name: (
+            min(text[0], tip[0]),
+            min(text[1], tip[1]),
+            max(text[2], tip[0]),
+            max(text[3], tip[1]),
         )
-    return boxes
+        for name, (tip, text) in _face_labels().items()
+        if name.startswith("C-C")
+    }
 
 
 def _holddown_label() -> tuple[float, float, float, float]:
@@ -1312,17 +1324,24 @@ def test_both_sections_name_their_faces() -> None:
     for _key, text, _xs, model_y, pick, _offset in drawing.FACE_LABELS:
         assert model_y == (spec.PLATE_THICKNESS if text == "TOP FACE" else 0.0)
         assert pick in {"max", "min"}
-    # r5's A-A tip (2:1 about the bore axis x 0.372, top face y 0.11365)
-    # puts the label in its free field (2.8 mm a character).
-    (offset,) = (
-        o for k, t, *_r, o in drawing.FACE_LABELS if (k, t) == ("A-A", "TOP FACE")
-    )
-    tip = (0.372 + 2 * 0.0068, 0.11365)
-    x, y = tip[0] + offset[0], tip[1] + offset[1]
-    top = (x, y - 0.0045, x + len("TOP FACE") * 0.0028, tip[1])
+    labels = _face_labels()
+    # Each tip stands beyond one end of its text, so the leader does not run
+    # back through the letters (r6: two leader-through-own-text).
+    for name, (tip, text) in labels.items():
+        assert tip[0] < text[0] - 0.0015 or tip[0] > text[2] + 0.0015, name
+    # A-A's label in its free field.
+    tip, top = labels["A-A TOP FACE"]
     assert top[1] > 0.0995 + 0.002  # A-A label
     assert top[2] < 0.3955 - 0.002  # (0.25) dimension line
-    assert top[3] < 0.1144  # the relief note's box (r5)
+    assert max(top[3], tip[1]) < 0.1144  # the relief note's box (r5)
     # C-C's two labels clear each other with their leaders (r5 overlapped).
-    first, second = _cc_face_label_boxes().values()
-    assert not _boxes_overlap(first, second)
+    boxes = _cc_face_label_boxes()
+    assert not _boxes_overlap(boxes["C-C TOP FACE"], boxes["C-C UNDERSIDE"])
+    # Stacked texts stand more than the audit's row pitch (5.66 mm) apart, or
+    # they merge into one block (r6, enforced: callout 4.27 over TOP FACE).
+    pitch = 0.00566
+    top_text = labels["C-C TOP FACE"][1]
+    assert _holddown_callout_box()[1] - top_text[3] > pitch + 0.001
+    assert top_text[1] - labels["C-C UNDERSIDE"][1][3] > pitch
+    r6_top = drawing.HOLDDOWN_SECTION_CENTER[1] + 0.0094  # positive control
+    assert (0.0625 - 0.0102) - r6_top < pitch
