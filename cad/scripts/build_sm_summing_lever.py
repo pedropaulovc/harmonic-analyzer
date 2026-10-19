@@ -72,7 +72,7 @@ from _check import check
 from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _paths import IN
@@ -123,9 +123,11 @@ from sm_summing_lever_notes import (
     DRAWING_DIMENSIONS,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    STUB_ROOT_VIEW_NOTE,
 )
 from sm_summing_lever_spec import (
     ANCHOR_H,
+    ARC_R,
     CHANNEL_PITCH,
     CHANNEL_Z0,
     COUNTER_HOLE_SPEC,
@@ -133,14 +135,22 @@ from sm_summing_lever_spec import (
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_OFFSET,
+    INSIDE_CORNER_R_TOL_TYPE,
     KNIFE_FLANK_TO_SIDE_TOL_DEG,
     KNIFE_RIDGE_R,
     KNIFE_RIDGE_R_BAND,
     KNIFE_RIDGE_R_TOL_TYPE,
+    KNIFE_RIDGE_TANGENT_XY,
+    RIB_END_R,
+    RIB_END_R_BAND,
+    RIB_PAD,
+    RIB_PLATE_REACH,
     RIDGE_ANGLE_DEG,
     RIDGE_FROM_SIDE_TOL,
     SPRING_PAD_W,
     SPRING_SEAT_T,
+    STUB_ROOT_R,
+    STUB_ROOT_R_BAND,
     SURFACE_FINISHES,
 )
 
@@ -158,7 +168,6 @@ PLATE_L = 6.0 * IN  # coefficients/pivot length (along Z)           152.40
 PLATE_T = 0.2 * IN  # plate thickness                                5.08
 CYL_R = 0.5 * IN  # pivot cylinder radius                          12.70
 RIB_T = 0.2 * IN  # edge / middle rib thickness                     5.08
-RIB_PAD = 0.1 * IN  # rib arc padding over the cylinder              2.54
 SUM_H = 3.0 * IN  # summation plate height (tip reach)             76.20
 SUM_CURV = 0.3 * IN  # summation plate side curvature                7.62
 ANCHOR_R = 0.375 * IN  # summation anchor outer radius               9.525
@@ -203,7 +212,7 @@ KNIFE_LATERAL_FACES = 6  # per stub: two flanks, two sides, two lower faces
 # --- derived ---------------------------------------------------------------
 SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
 TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
-ARC_R = CYL_R + RIB_PAD  # rib arc radius wrapping the cylinder     15.24
+# ARC_R (sm_summing_lever_spec, CYL_R + RIB_PAD = 15.24): the rib arc radius.
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
 # Only the -Z edge rib is the magnifier bracket's receiver: its inward
 # extension gives the #2-56 drill an ordinary depth band without moving the
@@ -220,7 +229,7 @@ RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 68.00
 # hole column by the spring coil radius (~3.25) + margin so every hole stays
 # open; the ribs still stiffen the inner lever, the outer plate arm is the (thin)
 # spring-hole field.
-RIB_PLATE_REACH = HOLE_X - 4.1  # 35.75 local +X: clears the hole column
+# RIB_PLATE_REACH (sm_summing_lever_spec, 35.75 local +X) clears the hole column.
 if RIB_PLATE_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
     raise AssertionError("a rib's +X vertex reaches the spring-hole column")
 # The edge ribs keep SummingLever.cs's slant -- from the arc top towards the
@@ -239,6 +248,10 @@ EDGE_RIB_END_STEP = EDGE_RIB_END_HALF_H - PLATE_T / 2.0  # 0.44
 if not math.isclose(EDGE_RIB_END_STEP, 0.44, abs_tol=0.005):
     raise AssertionError(
         f"edge-rib end step {EDGE_RIB_END_STEP:.4f} is not the built 0.44"
+    )
+if not RIB_END_R < EDGE_RIB_END_STEP:
+    raise AssertionError(
+        f"rib-end round R{RIB_END_R} swallows the {EDGE_RIB_END_STEP:.2f} step"
     )
 
 # Receiver-coordinate marks (``_receiver_coordinate_dimensions``): short
@@ -711,24 +724,30 @@ async def _measured_volume(adapter, label: str) -> float:
     return float(mass.data.volume)
 
 
-def _knife_ridge_max_limit(adapter) -> None:
-    """KnifeRidgeRadius as the single limit "R0.1 MAX" carrying the band's
+def _radius_max_limit(
+    adapter,
+    feature: str,
+    name: str,
+    radius: float,
+    band: tuple[float, float],
+    tol_type: int,
+) -> None:
+    """``name`` as the single limit "R<radius> MAX" carrying ``band``'s
     deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
-    lower, upper = deviations(KNIFE_RIDGE_R_BAND)
-    _, dimension = _named_dimension(adapter, "KnifeRidgeFillet", "KnifeRidgeRadius")
-    label = "KnifeRidgeRadius@KnifeRidgeFillet"
+    lower, upper = deviations(band)
+    _, dimension = _named_dimension(adapter, feature, name)
+    label = f"{name}@{feature}"
     value = float(dimension.SystemValue)
-    if not math.isclose(value, KNIFE_RIDGE_R / 1000.0, abs_tol=1e-9):
+    if not math.isclose(value, radius / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
-            f"{KNIFE_RIDGE_R}"
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {radius}"
         )
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = KNIFE_RIDGE_R_TOL_TYPE
+    tolerance.Type = tol_type
     if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
         raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
     if (
-        int(tolerance.Type) != KNIFE_RIDGE_R_TOL_TYPE
+        int(tolerance.Type) != tol_type
         or not math.isclose(
             float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
         )
@@ -737,8 +756,148 @@ def _knife_ridge_max_limit(adapter) -> None:
         )
     ):
         raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    set_dimension_display_precision(adapter, "KnifeRidgeFillet", "KnifeRidgeRadius", 1)
-    _telemetry.success(f"{label}: single limit {KNIFE_RIDGE_R:g} MAX")
+    set_dimension_display_precision(adapter, feature, name, 1)
+    _telemetry.success(f"{label}: single limit {radius:g} MAX")
+
+
+# A concave fillet of radius r leaves (1 - pi/4) r^2 of material in its corner,
+# whose centroid sits CORNER_FILL_CENTROID * r from the corner on each leg.
+CORNER_FILL_CENTROID = (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
+
+
+def _stub_root_picks(z_mm: float) -> list[list[float]]:
+    """A point on each of one stub's seven root edges in the body end face at
+    ``z_mm``: the -X side face's first (the imported radius rides a fillet's
+    first edge, build_pd_guide_lock's ``StopperChamfer`` finding), then the
+    +X side, both lower flanks, both upper flanks between their shoulder and
+    the ridge round's tangent line, and the round's own root arc at its
+    apex.  Each is the only edge within the adapter's 0.5 mm pick tolerance
+    but the apex, whose nearest neighbours, the flanks ending at the round's
+    tangent points, lie ~0.06 mm off."""
+    tangent_x, tangent_y = KNIFE_RIDGE_TANGENT_XY
+    half = math.radians(RIDGE_ANGLE_DEG) / 2.0
+    apex_y = HEX_H / 2.0 - KNIFE_RIDGE_R * (1.0 / math.sin(half) - 1.0)
+    picks = [[side * HEX_W / 2.0, 0.0, z_mm] for side in (-1.0, 1.0)]
+    picks += [[side * HEX_W / 4.0, -3.0 * HEX_H / 8.0, z_mm] for side in (-1.0, 1.0)]
+    picks += [
+        [
+            side * (HEX_W / 2.0 + tangent_x) / 2.0,
+            (HEX_H / 4.0 + tangent_y) / 2.0,
+            z_mm,
+        ]
+        for side in (-1.0, 1.0)
+    ]
+    picks.append([0.0, apex_y, z_mm])
+    return picks
+
+
+def _stub_root_fill() -> float:
+    """Material one stub's R STUB_ROOT_R root fillet adds: the corner fill
+    swept along the ridge-rounded hexagon's perimeter plus, by Pappus, its
+    turn of 2 pi about the convex corners."""
+    half = math.radians(RIDGE_ANGLE_DEG) / 2.0
+    flank = math.hypot(HEX_W / 2.0, HEX_H / 4.0)
+    setback = KNIFE_RIDGE_R / math.tan(half)
+    perimeter = (
+        HEX_H + 4.0 * flank - 2.0 * setback + KNIFE_RIDGE_R * (math.pi - 2.0 * half)
+    )
+    area = (1.0 - math.pi / 4.0) * STUB_ROOT_R**2
+    return area * (perimeter + 2.0 * math.pi * CORNER_FILL_CENTROID * STUB_ROOT_R)
+
+
+@_telemetry.traced("lever.inside_corner_fillet", label_param="feature")
+async def _inside_corner_fillet(
+    adapter,
+    drive_jobs: list[tuple[str, str]],
+    *,
+    feature: str,
+    dimension: str,
+    radius: float,
+    global_name: str,
+    picks: list[list[float]],
+) -> None:
+    """One ``FeatureFillet3`` over ``picks``' edges, named and driven by
+    ``global_name``; propagation stays off so only the enumerated root edges
+    participate.
+
+    Each pick must lie ON an edge (1 um, not the adapter's 0.5 mm reach, which
+    would let the apex pick fall to a flank 0.056 mm off), and the stored
+    definition must hold one edge per pick at the radius: a pick that fell to
+    an edge another already took leaves the count short."""
+    from solidworks_mcp.adapters.solidworks.features import _select_edges_geometric
+
+    if _select_edges_geometric(adapter, picks, tol_mm=0.001) is not True:
+        raise RuntimeError(f"{feature}: a pick lies on no edge within 1 um")
+    adapter.currentModel.ClearSelection2(True)
+    check(
+        f"fillet {feature}",
+        await adapter.add_fillet(radius, picks, propagate=False),
+    )
+    name_last_feature(adapter, feature)
+    native = _feature_by_name(adapter, feature)
+    if native is None:
+        raise RuntimeError(f"{feature}: native fillet feature is missing")
+    definition = _early_bound(native, "IFeature").GetDefinition()
+    if definition is None:
+        raise RuntimeError(f"{feature}: fillet definition is missing")
+    definition = _early_bound(definition, "ISimpleFilletFeatureData2")
+    edges = int(definition.GetEdgeCount())
+    stored = float(definition.DefaultRadius) * 1000.0
+    _telemetry.annotate(fillet_edges=edges, fillet_radius_mm=stored)
+    if edges != len(picks):
+        raise RuntimeError(f"{feature}: {edges} edges stored, {len(picks)} picked")
+    if not math.isclose(stored, radius, abs_tol=1e-9):
+        raise RuntimeError(f"{feature}: radius {stored:.7f} stored, {radius} built")
+    _telemetry.success(f"{feature}: {edges} edges R{radius:g}, picks on edge <= 1 um")
+    [radius_name] = name_dimensions(adapter, feature, [dimension])
+    drive_jobs.append((radius_name, f'"{global_name}"'))
+
+
+async def _inside_corner_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+    """Round the casting's inside corners at their printed limits (#1625): the
+    root of each trunnion stub on its body end face (STUB_ROOT_R) and the foot
+    of each end rib's 0.44 step onto the plate's top face (RIB_END_R).
+
+    Each corner is one feature per end.  The -Z end's StubRootFillet and
+    RibEndFillet carry the marked radii the print's sheet 2 shows on that
+    end (VIEW K, DETAIL J); the +Z end's Other* twins share their globals and
+    carry no ink.  The middle rib ends in a point inside the plate, with no
+    step to round."""
+    v_before = await _measured_volume(adapter, "before the inside-corner fillets")
+    for feature, z_mm in (
+        ("StubRootFillet", -HEX_Z_INNER),
+        ("OtherStubRootFillet", HEX_Z_INNER),
+    ):
+        await _inside_corner_fillet(
+            adapter,
+            drive_jobs,
+            feature=feature,
+            dimension=feature.replace("Fillet", "Radius"),
+            radius=STUB_ROOT_R,
+            global_name="StubRootR",
+            picks=_stub_root_picks(z_mm),
+        )
+    for feature, z_mm in (
+        ("RibEndFillet", -(PLATE_L / 2.0 - RECEIVER_RIB_T / 2.0)),
+        ("OtherRibEndFillet", PLATE_L / 2.0 - RIB_T / 2.0),
+    ):
+        await _inside_corner_fillet(
+            adapter,
+            drive_jobs,
+            feature=feature,
+            dimension=feature.replace("Fillet", "Radius"),
+            radius=RIB_END_R,
+            global_name="RibEndR",
+            picks=[[RIB_PLATE_REACH, PLATE_T / 2.0, z_mm]],
+        )
+    v_fill = 2.0 * _stub_root_fill() + (1.0 - math.pi / 4.0) * RIB_END_R**2 * (
+        RECEIVER_RIB_T + RIB_T
+    )
+    # ~3 mm^3 on the whole body is below the mass-property noise, so this
+    # only proves the fillets took nothing else.
+    await volume_check(
+        adapter, "inside-corner fillets", v_before + v_fill, 1e-4 * v_before
+    )
 
 
 def edge_rib_added_area_mm2() -> float:
@@ -1767,6 +1926,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HexH", f"{HEX_H}mm")
     await set_global(adapter, "HexDepth", f"{HEX_DEPTH}mm")
     await set_global(adapter, "KnifeRidgeR", f"{KNIFE_RIDGE_R}mm")
+    await set_global(adapter, "StubRootR", f"{STUB_ROOT_R}mm")
+    await set_global(adapter, "RibEndR", f"{RIB_END_R}mm")
     await set_global(adapter, "ArcR", '"CylR" + "RibPad"')
     await set_global(adapter, "RibReach", '"HoleX" - 4.1mm')
     # EDGE_RIB_END_HALF_H: the edge-rib slant's height at the end face.
@@ -1798,6 +1959,7 @@ async def build(adapter) -> dict[str, str]:
     await _summation_plate(adapter, drive_jobs)
     await _summation_anchor(adapter, drive_jobs)
     await _middle_rib(adapter, drive_jobs)
+    await _inside_corner_fillets(adapter, drive_jobs)
     await _counter_anchor_tap(adapter, drive_jobs)
     await _bracket_mounting_taps(adapter)
     await _knife_envelope_reference(adapter, drive_jobs)
@@ -1846,7 +2008,30 @@ async def build(adapter) -> dict[str, str]:
     # stamp the make-critical title-block properties.
     clear_dimensions_for_drawing(adapter)
     _drawing_dimension_contract(adapter)
-    _knife_ridge_max_limit(adapter)
+    _radius_max_limit(
+        adapter,
+        "KnifeRidgeFillet",
+        "KnifeRidgeRadius",
+        KNIFE_RIDGE_R,
+        KNIFE_RIDGE_R_BAND,
+        KNIFE_RIDGE_R_TOL_TYPE,
+    )
+    _radius_max_limit(
+        adapter,
+        "StubRootFillet",
+        "StubRootRadius",
+        STUB_ROOT_R,
+        STUB_ROOT_R_BAND,
+        INSIDE_CORNER_R_TOL_TYPE,
+    )
+    _radius_max_limit(
+        adapter,
+        "RibEndFillet",
+        "RibEndRadius",
+        RIB_END_R,
+        RIB_END_R_BAND,
+        INSIDE_CORNER_R_TOL_TYPE,
+    )
     _receiver_model_bands(adapter)
     await _receiver_coordinate_dimensions(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
@@ -1857,6 +2042,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Back View Note": BACK_VIEW_NOTE,
             "Front View Note": FRONT_VIEW_NOTE,
+            "Stub Root View Note": STUB_ROOT_VIEW_NOTE,
         },
     )
     # Native dimension metadata must not erase the already-verified blind taps.
@@ -1876,6 +2062,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
+            "Stub Root View Note",
         ),
     )
     return artefacts

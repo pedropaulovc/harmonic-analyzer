@@ -58,11 +58,10 @@ seat-global preferences and not runtime drawing overrides. The native API
 line-font integer preferences select `swLineWeights_e` slots and their
 documented annotation scopes: balloon leaders/frames use `swDetailingBalloon`,
 and dimension leader/extension weights use their individual dimension types.
-To check the
-exported PDF, read its stroke widths with PyMuPDF `page.get_drawings()` and
-multiply by 25.4/72 to obtain millimetres. Inspect a representative part and
-dense assembly at print size; section cutting lines may legitimately have
-the same width as visible edges.
+To check exported PDFs, use `_pdf_ink.read_pdf_ink` from the locked project
+environment; each stroke's `width` is in metres, so multiply by 1000 for
+millimetres. Inspect a representative part and dense assembly at print size;
+section cutting lines may legitimately have the same width as visible edges.
 
 `third-angle-projection.SLDBLK` is the projection-symbol block embedded in both
 templates and remains the editable source for future template work.
@@ -92,6 +91,13 @@ issue #249.
 
 `finalize_drawing` requires the `TOL_*` set on the linked model, so a stale
 source part fails before it can save blank tolerance cells.
+
+Local inside-corner limits override the title-block default. The summing lever
+models its two stub roots at R0.5 MAX and its two rib-end feet at R0.4 MAX;
+sheet 2 imports those native fillet dimensions into VIEW K and DETAIL J.
+The part build checks each intended edge pick within 1 µm and reads back each
+fillet's stored edge count and radius. Those checks do not replace inspection
+of the resulting geometry and the drawing leaders.
 
 The cone-pivot-post drawing also checks the linked Finish note's native extent
 against the landscape template's cell rules. In the exported sheet, those rules

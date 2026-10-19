@@ -29,6 +29,8 @@ PLATE_W = 1.75 * MM_PER_IN  # 44.45 coefficients-plate width (X)
 PLATE_L = 6.0 * MM_PER_IN  # 152.40 plate / pivot length (Z)
 PLATE_T = 0.2 * MM_PER_IN  # 5.08 plate thickness
 CYL_R = 0.5 * MM_PER_IN  # 12.70 pivot-cylinder radius
+RIB_PAD = 0.1 * MM_PER_IN  # 2.54 rib arc padding over the cylinder
+ARC_R = CYL_R + RIB_PAD  # 15.24 rib arc radius wrapping the cylinder
 SUM_H = 3.0 * MM_PER_IN  # 76.20 summation reach (-X)
 ANCHOR_R = 0.375 * MM_PER_IN  # 9.525 summation-anchor outer radius
 ANCHOR_H = 0.75 * MM_PER_IN  # 19.05 summation-anchor boss height (Y)
@@ -60,6 +62,15 @@ KNIFE_RIDGE_TANGENT_XY = (
     _RIDGE_SETBACK * math.sin(_RIDGE_HALF),
     HEX_H / 2.0 - _RIDGE_SETBACK * math.cos(_RIDGE_HALF),
 )
+# The casting's two inside corners, each modelled at its printed limit as the
+# ridge round is (issue #1625): the root where each trunnion stub leaves its
+# body end face, and the foot of each end rib's 0.44 step onto the plate's
+# top face, whose radius stays under that step so the step's face survives.
+STUB_ROOT_R = 0.5
+STUB_ROOT_R_BAND = (0.0, -STUB_ROOT_R)  # (upper, lower)
+RIB_END_R = 0.4
+RIB_END_R_BAND = (0.0, -RIB_END_R)  # (upper, lower)
+INSIDE_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.5 MAX"
 # Code review C09 (owner ruling T1, 2026-10-17): the included angle with
 # HexWidth and HexHeight left the ridge's position between the sides and each
 # flank's own angle free; one flank could take the whole angle band.  Detail D
@@ -128,6 +139,10 @@ HOLE_X = 39.85
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1
 CHANNEL_PITCH = 7.0565
+# Each edge rib's end face stops short of the hole column by the spring coil
+# radius (~3.25) plus margin (build_sm_summing_lever): the station of its
+# 0.44 step and of the R RIB_END_R inside corner at that step's foot.
+RIB_PLATE_REACH = HOLE_X - 4.1  # 35.75 (+X)
 # The spring stations sit on the channel arm plane, the cam plane
 # (rocker_bank_layout.ARM_MID_DZ = cam_plane.CAM_MID_DZ). Restated,
 # like CHANNEL_Z0/CHANNEL_PITCH, not imported: this spec is read by

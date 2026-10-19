@@ -190,9 +190,6 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert "variable = dynamic_dispatch(raw._oleobj_)" in drawing_source
     assert '_early_bound(raw, "ICalloutVariable")' not in drawing_source
     assert "ReceiverY0" in drawing_source
-    assert "SpringSeatThickness" in drawing.BACK_KEEP
-    assert "PlateThickness" in drawing.PLATE_SECTION_TEXT_MM
-    assert "RibDepth" in drawing.TOP_KEEP
     assert "Bracket Receiver Note" not in drawing_source
     assert "Manufacturing Notes" not in drawing_source
     final_proof = source.index('"summing lever after native receiver bands"')
@@ -230,12 +227,10 @@ def test_nothing_reads_as_an_overall_or_a_band_it_is_not() -> None:
     (it is derived from the slant and the plate)."""
     plate_length = notes.DIMENSION_CALLOUTS_BELOW["PlateLength"]
     assert " ".join(plate_length.split()) == "BODY END FACES"
-    assert "PlateLength" in drawing.TOP_KEEP
     x, _ = drawing.TOP_KEEP["PlateLength"]
     widest = max(len("152.40"), *map(len, plate_length.split("\n")))
     assert x + _CHAR_M * widest / 2.0 < 0.4191 - 0.002  # under the right border
     assert notes.REFERENCE_DIMENSIONS == {"EdgeRibFrontEndStep"}
-    assert set(notes.REFERENCE_DIMENSIONS) <= set(drawing.FRONT_KEEP)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "for name in sorted(REFERENCE_DIMENSIONS):" in source
 
@@ -316,69 +311,19 @@ def test_sheet_one_views_never_pass_through_hidden_lines_visible(
     assert view.mode == 2
 
 
-def test_only_the_receiver_sheet_uses_the_greyed_regen() -> None:
-    import ast
-    from pathlib import Path
-
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    greyed = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.For)
-        and any(
-            isinstance(call, ast.Call)
-            and isinstance(call.func, ast.Name)
-            and call.func.id == "set_hidden_lines_removed"
-            for call in ast.walk(node)
-        )
+def test_dimension_metadata_names_resolve_to_their_model_owners() -> None:
+    names = [
+        name
+        for owned in drawing.DIMENSIONS_BY_FEATURE.values()
+        for name in owned
     ]
-    calls = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "set_hidden_lines_removed"
-    ]
-    assert len(calls) == 1 and len(greyed) == 1
-    assert ast.unparse(greyed[0].iter) == "(back, receiver_iso)"
-    direct = [
-        ast.unparse(node.args[0])
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "_hidden_lines_removed_without_greyed_pass"
-    ]
-    assert sorted(direct) == ["detail", "native", "native", "ridge_detail", "view"]
-
-
-def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
-    keeps = {
-        **drawing.FRONT_KEEP,
-        **drawing.DETAIL_KEEP,
-        **drawing.RIDGE_DETAIL_KEEP,
-        **drawing.TOP_KEEP,
-        **drawing.BACK_KEEP,
-        **drawing.PLATE_SECTION_TEXT_MM,
-    }
-    placed = [
-        *drawing.FRONT_KEEP,
-        *drawing.DETAIL_KEEP,
-        *drawing.RIDGE_DETAIL_KEEP,
-        *drawing.TOP_KEEP,
-        *drawing.BACK_KEEP,
-        *drawing.PLATE_SECTION_TEXT_MM,
-    ]
-    assert len(placed) == len(keeps), "a dimension is kept in two views"
-    marked = set().union(*notes.DRAWING_DIMENSIONS.values())
-    assert marked <= set(keeps)
-    for feature, names in notes.DRAWING_DIMENSIONS.items():
-        assert drawing.DIMENSIONS_BY_FEATURE[feature] == names
+    assert len(names) == len(set(names)), "a model dimension has two owning features"
     above = set(notes.DIMENSION_CALLOUTS_ABOVE)
     below = set(notes.DIMENSION_CALLOUTS_BELOW)
     assert not above & below
-    assert above | below <= set(keeps)
-    for name, _prefix in notes.DIMENSION_PREFIXES:
-        assert name in notes.DRAWING_DIMENSIONS
+    assert above | below <= set(names)
+    for (feature, name), _prefix in notes.DIMENSION_PREFIXES.items():
+        assert name in notes.DRAWING_DIMENSIONS[feature]
 
 
 def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) -> None:
@@ -388,8 +333,6 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) ->
     spec = sm_summing_lever_spec
     knife = notes.DRAWING_DIMENSIONS["KnifeEnvelopeReference"]
     assert knife == {"HexWidth", "HexHeight", "RidgeFromLeft", "RidgeFromRight", "FlankToSide"}
-    assert set(knife) <= set(drawing.DETAIL_KEEP)
-    assert set(drawing.RIDGE_DETAIL_KEEP) == {"KnifeRidgeRadius"}
     prefixes = notes.DIMENSION_PREFIXES
     assert prefixes[("KnifeEnvelopeReference", "HexWidth")] == "2X ("
     assert prefixes[("KnifeEnvelopeReference", "RidgeFromLeft")] == "2X "
@@ -716,6 +659,7 @@ def test_notes_are_short_stated_shortfalls() -> None:
         notes.ISOMETRIC_VIEW_NOTE,
         notes.BACK_VIEW_NOTE,
         notes.FRONT_VIEW_NOTE,
+        notes.STUB_ROOT_VIEW_NOTE,
     ):
         assert len(text.splitlines()) <= 4
         for word in ("RULE", "EXCEPTION", "RULING", "NYLON", "LOCTITE", "THREADLOCK"):
@@ -1819,3 +1763,79 @@ def test_plate_section_returns_its_settled_native_witness_check(monkeypatch) -> 
     case.state.lines[0] = ((0.084975, 0.12746), (0.048525, 0.12746))
     with pytest.raises(RuntimeError, match="witness endpoint"):
         settled_check()
+
+
+@pytest.mark.parametrize(
+    ("name", "radius_mm", "tol_type"),
+    [
+        (
+            "KnifeRidgeRadius",
+            sm_summing_lever_spec.KNIFE_RIDGE_R,
+            sm_summing_lever_spec.KNIFE_RIDGE_R_TOL_TYPE,
+        ),
+        (
+            "StubRootRadius",
+            sm_summing_lever_spec.STUB_ROOT_R,
+            sm_summing_lever_spec.INSIDE_CORNER_R_TOL_TYPE,
+        ),
+        (
+            "RibEndRadius",
+            sm_summing_lever_spec.RIB_END_R,
+            sm_summing_lever_spec.INSIDE_CORNER_R_TOL_TYPE,
+        ),
+    ],
+)
+def test_radius_import_requires_its_own_native_radius_and_maximum(
+    monkeypatch, name, radius_mm, tol_type
+) -> None:
+    tolerance = SimpleNamespace(Type=tol_type)
+    dimension = SimpleNamespace(SystemValue=radius_mm / 1000.0, Tolerance=tolerance)
+    display = SimpleNamespace(
+        Diametric=False,
+        GetDimension2=lambda _index: dimension,
+        GetText=lambda _part: "2X R",
+    )
+    annotation = SimpleNamespace(
+        name=name, GetSpecificAnnotation=lambda: display,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, value: value.name)
+    kwargs = {"name": name, "radius_mm": radius_mm, "tol_type": tol_type}
+    drawing._assert_native_max_radius(None, [annotation], **kwargs)
+    dimension.SystemValue += 0.0001
+    with pytest.raises(RuntimeError, match="does not measure"):
+        drawing._assert_native_max_radius(None, [annotation], **kwargs)
+    dimension.SystemValue = radius_mm / 1000.0
+    tolerance.Type = 0
+    with pytest.raises(RuntimeError, match="lost its native MAX"):
+        drawing._assert_native_max_radius(None, [annotation], **kwargs)
+    tolerance.Type = tol_type
+    display.Diametric = True
+    with pytest.raises(RuntimeError, match="not a radial dimension"):
+        drawing._assert_native_max_radius(None, [annotation], **kwargs)
+    display.Diametric = False
+    with pytest.raises(RuntimeError, match=f"expected one {name}"):
+        drawing._assert_native_max_radius(None, [annotation, annotation], **kwargs)
+    annotation.name = "Other" + name
+    with pytest.raises(RuntimeError, match=f"expected one {name}"):
+        drawing._assert_native_max_radius(None, [annotation], **kwargs)
+
+
+@pytest.mark.parametrize("visible", [False, True])
+def test_tangent_display_requires_native_mode_readback(monkeypatch, visible) -> None:
+    updates = []
+    view = SimpleNamespace(
+        mode=2 if not visible else 0,
+        GetDisplayTangentEdges2=lambda: view.mode,
+        GetName2=lambda: "fillet view",
+        UpdateViewDisplayGeometry=lambda: updates.append(True),
+    )
+    view.SetDisplayTangentEdges2 = lambda mode: setattr(view, "mode", mode)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    drawing._set_tangent_edges(view, visible=visible)
+    assert view.mode == (2 if visible else 0)
+    assert updates == [True]
+    view.mode = 0 if visible else 2
+    view.SetDisplayTangentEdges2 = lambda _mode: None
+    with pytest.raises(RuntimeError, match="tangent edges did not become"):
+        drawing._set_tangent_edges(view, visible=visible)

@@ -20,8 +20,9 @@ cut in the front profile along the outer receiver tap through the -Z end
 rib, and a 1:4 isometric; sheet 2 shows VIEW F at 1:1, the -Z end with the
 two bracket receiver taps and the spring-anchor pad under the plate they sit
 in, so the end rib's slant over each tap reads, and the tap row's centreline
-through the hex centre.  Sheet 1
-runs at 1:2.
+through the hex centre.  Removed VIEW K at 5:1 shows the stub-root rounds
+in plan; Detail J at 10:1 shows the end-rib step's round onto the plate.
+Sheet 1 runs at 1:2.
 
 Run with SolidWorks open::
 
@@ -102,10 +103,12 @@ from sm_summing_lever_notes import (
     FRONT_VIEW_LETTER,
     REFERENCE_DIMENSIONS,
     SPRING_TAP_CALLOUT_PROCESS,
+    STUB_ROOT_VIEW_LETTER,
 )
 from sm_summing_lever_spec import (
     ANCHOR_H,
     ANCHOR_R,
+    ARC_R,
     CHANNEL_PITCH,
     COUNTER_HOLE_SPEC,
     GEOMETRIC_TOLERANCES_MM,
@@ -118,13 +121,17 @@ from sm_summing_lever_spec import (
     HOLE_X,
     HOLE_Z_FIRST,
     HOLE_Z_LAST,
+    INSIDE_CORNER_R_TOL_TYPE,
     KNIFE_RIDGE_R,
     KNIFE_RIDGE_R_TOL_TYPE,
     KNIFE_RIDGE_TANGENT_XY,
     PLATE_L,
     PLATE_T,
     PLATE_W,
+    RIB_END_R,
+    RIB_PLATE_REACH,
     RIDGE_ANGLE_DEG,
+    STUB_ROOT_R,
     SURFACE_FINISHES,
     TIP_X,
 )
@@ -204,6 +211,27 @@ RIDGE_DETAIL_LABEL_XY = (0.070, 0.052)
 # ridge-to-side dimension's extension lines and under its dimension line
 # (the vertex height's upper extension line runs left from the vertex).
 RIDGE_DETAIL_LETTER_OFFSET = (0.009, 0.0045)
+
+# The two local inside-corner ceilings live on sheet 2, not in sheet 1's
+# crowded trunnion detail.  K is a removed plan, turned to project from F
+# (+X left), cropped around the -Z stub's root.  Its -X side root, the
+# model fillet's dimensioned first edge, is on the right of this view.
+STUB_ROOT_CENTER = (0.080, 0.225)
+STUB_ROOT_SCALE = (5.0, 1.0)
+STUB_ROOT_CROP_RADIUS_MM = 6.5
+STUB_ROOT_ANCHOR_MM = (0.0, 0.0, -PLATE_L / 2.0)
+STUB_ROOT_KEEP = {"StubRootRadius": (0.130, 0.208)}
+STUB_ROOT_NOTE_XY = (0.0605, 0.189)
+
+# J enlarges only the -Z end rib's step-foot onto the plate top; its
+# 1.2-model-mm fence in F keeps the receiver taps outside the detail.
+RIB_END_DETAIL_LETTER = "J"
+RIB_END_DETAIL_CENTER = (0.060, 0.065)
+RIB_END_DETAIL_SCALE = (10.0, 1.0)
+RIB_END_DETAIL_RADIUS_MM = 1.2
+RIB_END_DETAIL_LABEL_XY = (0.060, 0.045)
+RIB_END_DETAIL_LETTER_OFFSET = (-0.0055, 0.0085)
+RIB_END_KEEP = {"RibEndRadius": (0.030, 0.090)}
 
 # Section C-C: the plate's own thickness.  Every end view shows the end ribs
 # over the plate and the spring-anchor pad below its free edge, so no view
@@ -361,6 +389,22 @@ def _ridge_detail(adapter: Any, detail: Any) -> Any:
         label_xy=RIDGE_DETAIL_LABEL_XY,
         letter_offset=RIDGE_DETAIL_LETTER_OFFSET,
         label="ridge detail",
+    )
+
+
+def _rib_end_detail(adapter: Any, back: Any) -> Any:
+    """Native Detail J of the -Z rib's round onto the plate top, from F."""
+    return _detail_view(
+        adapter,
+        back,
+        centre_mm=(RIB_PLATE_REACH, PLATE_T / 2.0, -PLATE_L / 2.0),
+        radius_m=RIB_END_DETAIL_RADIUS_MM / 1000.0,
+        at_xy=RIB_END_DETAIL_CENTER,
+        scale=RIB_END_DETAIL_SCALE,
+        letter=RIB_END_DETAIL_LETTER,
+        label_xy=RIB_END_DETAIL_LABEL_XY,
+        letter_offset=RIB_END_DETAIL_LETTER_OFFSET,
+        label="rib end detail",
     )
 
 
@@ -561,8 +605,7 @@ def _add_view_arrow(
     letter: str,
     arrow: tuple[tuple[float, float], tuple[float, float]],
 ) -> None:
-    """A letter arrow on the plan that names a removed view: square onto the
-    end face it looks at."""
+    """A square lettered viewing arrow onto the face a removed view looks at."""
     text_xy, tip_xy = arrow
     label = f"view {letter} viewing arrow"
     note = add_leader_note(
@@ -607,34 +650,35 @@ def _add_view_arrow(
     )
 
 
-def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Prove Detail E's KnifeRidgeRadius prints the part's R MAX: radial,
-    measuring KNIFE_RIDGE_R, the native swTolMAX the part set
-    (draw_ch_pivot_bracket._dress_corner_radius's readback)."""
+def _assert_native_max_radius(
+    adapter: Any,
+    annotations: list[Any],
+    *,
+    name: str,
+    radius_mm: float,
+    tol_type: int,
+) -> None:
+    """Read an imported fillet's native radial value and MAX tolerance."""
     found = [
         annotation
         for annotation in annotations
-        if dimension_name(adapter, annotation) == "KnifeRidgeRadius"
+        if dimension_name(adapter, annotation) == name
     ]
     if len(found) != 1:
-        raise RuntimeError(
-            f"expected one KnifeRidgeRadius in the ridge detail, found {len(found)}"
-        )
+        raise RuntimeError(f"expected one {name} on the sheet, found {len(found)}")
     annotation = _early_bound(found[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     if bool(display.Diametric):
-        raise RuntimeError("the imported knife-ridge radius is not radial")
+        raise RuntimeError(f"{name} is not a radial dimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    if int(tolerance.Type) != KNIFE_RIDGE_R_TOL_TYPE:
-        raise RuntimeError(
-            f"KnifeRidgeRadius lost its native MAX type: {int(tolerance.Type)}"
-        )
+    if int(tolerance.Type) != tol_type:
+        raise RuntimeError(f"{name} lost its native MAX type: {int(tolerance.Type)}")
     if not math.isclose(
-        float(dimension.SystemValue), KNIFE_RIDGE_R / 1000.0, abs_tol=1e-9
+        float(dimension.SystemValue), radius_mm / 1000.0, abs_tol=1e-9
     ):
-        raise RuntimeError("KnifeRidgeRadius does not measure the ridge round")
-    _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
+        raise RuntimeError(f"{name} does not measure its modelled radius")
+    _telemetry.info(f"{name}: native R{radius_mm:g} MAX, text {display.GetText(1)!r}")
 
 
 # Datum A's box over the vertex in Detail E, inside E's 15 mm fence: the
@@ -1096,6 +1140,95 @@ def _sheet_to_view_sketch(
     return points
 
 
+def _stub_root_view(adapter: Any) -> Any:
+    """Removed Top K, turned to match F and cropped around the -Z root.
+
+    The crop and recenter use section H-H's proven view-sketch circle and
+    model-anchor readback, not the model view's padded outline centre.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(
+        place_view(
+            adapter, str(SOURCE), "*Top", *STUB_ROOT_CENTER, scale=STUB_ROOT_SCALE
+        ),
+        "IView",
+    )
+    _hidden_lines_removed_without_greyed_pass(native)
+    _set_tangent_edges(native, visible=True)
+    native.Angle = math.pi
+    rebuild_drawing(adapter, label="stub root view turned")
+    if not math.isclose(float(native.Angle), math.pi, abs_tol=1e-9):
+        raise RuntimeError("stub root view did not retain its half turn")
+    anchor = _metres(STUB_ROOT_ANCHOR_MM)
+    fence = model_points_in_view(
+        adapter,
+        native,
+        [
+            anchor,
+            _metres(
+                (
+                    STUB_ROOT_CROP_RADIUS_MM,
+                    STUB_ROOT_ANCHOR_MM[1],
+                    STUB_ROOT_ANCHOR_MM[2],
+                )
+            ),
+        ],
+        label="stub root crop circle",
+        names=("centre", "rim"),
+    )
+    if not drawing.ActivateView(view_name(adapter, native)):
+        raise RuntimeError("failed to activate stub root view for its crop")
+    draw.ClearSelection2(True)
+    centre, rim = _sheet_to_view_sketch(adapter, native, fence)
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        circle = manager.CreateCircle(*centre, *rim)
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if circle is None:
+        raise RuntimeError("failed to create the stub root crop circle")
+    if not _early_bound(circle, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select the stub root crop circle")
+    status = int(native.Crop2(False, True, 0))
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="stub root view cropped")
+    native.UpdateViewDisplayGeometry()
+    outline = tuple(float(value) for value in native.GetOutline())
+    diameter = 2.0 * math.dist(fence[0], fence[1])
+    if (
+        status != 1
+        or not bool(native.IsCropped())
+        or max(outline[2] - outline[0], outline[3] - outline[1]) > diameter + 0.025
+    ):
+        raise RuntimeError(
+            f"stub root view did not crop to {diameter * 1000.0:.1f} mm: "
+            f"status {status}, outline {outline!r}"
+        )
+    for attempt in range(4):
+        native.UpdateViewDisplayGeometry()
+        projected = model_point_in_view(
+            adapter, native, anchor, label=f"K root, pass {attempt}"
+        )
+        if math.dist(projected, STUB_ROOT_CENTER) <= 1e-4:
+            break
+        position = tuple(float(value) for value in native.Position)
+        moved = [
+            position[axis] + STUB_ROOT_CENTER[axis] - projected[axis]
+            for axis in (0, 1)
+        ]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to recenter stub root view")
+        rebuild_drawing(adapter, label=f"stub root recentered, pass {attempt}")
+    else:
+        raise RuntimeError(
+            f"stub root centre stands at {projected}, not {STUB_ROOT_CENTER}"
+        )
+    return native
+
+
 def _thin_visible_layer(adapter: Any) -> None:
     """Create (once) TAP_THREAD_LAYER, black thin continuous, and read its
     state back: section H-H's cosmetic thread and its break line print on
@@ -1344,7 +1477,7 @@ _SW_HIDDEN = 2  # swDisplayMode_e.swHIDDEN: hidden lines removed
 
 
 def _hidden_lines_removed_without_greyed_pass(view: Any) -> None:
-    """Set a sheet-1 ``view`` hidden-lines-removed, never showing hidden lines.
+    """Set a newly created ``view`` to HLR without showing hidden lines.
 
     set_hidden_lines_removed passes through hidden-lines-visible to force a
     regen.  That pass is where the bracket taps' "#2-56 Tapped Hole" label,
@@ -1352,11 +1485,13 @@ def _hidden_lines_removed_without_greyed_pass(view: Any) -> None:
     builds only (#1591, farm 2026-10-17): on the plan right after its pass
     (ba33167e's stage log), on section C-C (493638fa), on neither in
     2fa756e1 and 802e4117 -- the one note the sweep's count varied by.  Each
-    caller sets the view straight after creating it, before anything is
-    attached, so the regen is not needed.  Farm seats place all six sheet-1
-    views in HLR already (5a58480d), where the set is a no-op; that build,
+    caller sets the view straight after creating it, before the recipe attaches
+    dimensions or feature callouts, so the regen is not needed.  Farm seats
+    placed all six sheet-1 views in HLR already (5a58480d), where the set is
+    a no-op; that build,
     on the seat behind both 9-label builds, swept 8 and its PDF is
     pixel-identical to r18b's, which still had the pass.
+    K and J use this same direct path immediately after placement.
     """
     bound = _early_bound(view, "IView")
     placed = int(bound.GetDisplayMode2())
@@ -1367,6 +1502,19 @@ def _hidden_lines_removed_without_greyed_pass(view: Any) -> None:
             f"failed to set hidden-lines-removed drawing view (mode reads {mode})"
         )
     _telemetry.info(f"{bound.GetName2()} placed in display mode {placed}, now HLR")
+
+
+def _set_tangent_edges(view: Any, *, visible: bool) -> None:
+    """Keep K's fillet arcs; suppress root rings that read as steps in end views."""
+    bound = _early_bound(view, "IView")
+    mode = 2 if visible else 0  # swTangentEdgesVisible / swTangentEdgesHidden
+    bound.SetDisplayTangentEdges2(mode)
+    if int(bound.GetDisplayTangentEdges2()) != mode:
+        raise RuntimeError(
+            f"{bound.GetName2()}: tangent edges did not become "
+            f"{'visible' if visible else 'hidden'}"
+        )
+    bound.UpdateViewDisplayGeometry()
 
 
 def _remove_redundant_thread_notes(adapter: Any) -> None:
@@ -1664,7 +1812,8 @@ TOP_KEEP = {
 BACK_KEEP = {
     "SpringSeatThickness": (0.153, 0.133),
     "SpringPadWidth": (0.130, 0.116),
-    "ReceiverX0": (0.220, 0.1815),
+    # Leave the K viewing letter and its downward arrow clear below this block.
+    "ReceiverX0": (0.220, 0.1955),
     # Each tight station names the bracket (machinist review r5): the 14.75's
     # two lines stand over the row height's one, which prints above its value.
     "ReceiverX1": (0.130, 0.1745),
@@ -1785,6 +1934,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
+            "Stub Root View Note",
         ),
         required=(
             "Number",
@@ -1794,6 +1944,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
             "Back View Note",
             "Front View Note",
+            "Stub Root View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -1820,6 +1971,7 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
     for view in (top, iso):
         _hidden_lines_removed_without_greyed_pass(view)
+    _set_tangent_edges(front, visible=False)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -1851,6 +2003,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         detail = _knife_detail(adapter, front)
         _hidden_lines_removed_without_greyed_pass(detail)
+        _set_tangent_edges(detail, visible=False)
         detail_annotations = curate_hidden_dimensions(
             adapter,
             detail,
@@ -1876,6 +2029,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_near_side_diameter(boss_dia, "boss diameter")
     ridge_detail = _ridge_detail(adapter, detail)
     _hidden_lines_removed_without_greyed_pass(ridge_detail)
+    _set_tangent_edges(ridge_detail, visible=False)
     ridge_annotations = curate_hidden_dimensions(
         adapter,
         ridge_detail,
@@ -1886,7 +2040,13 @@ async def build(adapter: Any) -> dict[str, str]:
     _attach_radial_leaders(
         adapter, ridge_annotations, ("KnifeRidgeRadius",), label="ridge detail"
     )
-    _assert_knife_ridge_radius(adapter, ridge_annotations)
+    _assert_native_max_radius(
+        adapter,
+        ridge_annotations,
+        name="KnifeRidgeRadius",
+        radius_mm=KNIFE_RIDGE_R,
+        tol_type=KNIFE_RIDGE_R_TOL_TYPE,
+    )
     _ridge_datum(adapter, ridge_detail)
     _apply_callouts(
         adapter,
@@ -2240,6 +2400,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (back, receiver_iso):
         set_hidden_lines_removed(adapter, view)
+    _set_tangent_edges(back, visible=False)
     back_edges = scan_view_edges(back, label="bracket receiver face")
     mounting_rims = _mounting_rims(back_edges)
     # Right of the view, where the 2026-10-09 render seated it.
@@ -2258,6 +2419,62 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _apply_callouts(adapter, back_annotations, label="bracket receiver")
     _receiver_axis_centerline(adapter, back)
+    stub_root = _stub_root_view(adapter)
+    stub_annotations = curate_view_dimensions(
+        adapter,
+        stub_root,
+        keep=STUB_ROOT_KEEP,
+        view_label="stub root",
+        dimensions_by_feature=DIMENSIONS_BY_FEATURE,
+    )
+    _attach_radial_leaders(
+        adapter, stub_annotations, ("StubRootRadius",), label="stub root"
+    )
+    _apply_callouts(adapter, stub_annotations, label="stub root")
+    _assert_native_max_radius(
+        adapter,
+        stub_annotations,
+        name="StubRootRadius",
+        radius_mm=STUB_ROOT_R,
+        tol_type=INSIDE_CORNER_R_TOL_TYPE,
+    )
+    add_property_linked_note(adapter, "Stub Root View Note", *STUB_ROOT_NOTE_XY)
+    # Down onto the rib arc's top, above the stub: K is a plan, not another
+    # end view.  The 28.45 receiver block stands 14 mm higher to clear it.
+    root_tip = model_point_in_view(
+        adapter, back, _metres((0.0, ARC_R, -PLATE_L / 2.0)),
+        label="K viewing arrow",
+    )
+    _add_view_arrow(
+        adapter,
+        back,
+        STUB_ROOT_VIEW_LETTER,
+        (
+            (root_tip[0] - VIEW_F_LEADER_DX, root_tip[1] + 0.013),
+            root_tip,
+        ),
+    )
+    rib_end = _rib_end_detail(adapter, back)
+    _hidden_lines_removed_without_greyed_pass(rib_end)
+    _set_tangent_edges(rib_end, visible=True)
+    rib_annotations = curate_view_dimensions(
+        adapter,
+        rib_end,
+        keep=RIB_END_KEEP,
+        view_label="rib end",
+        dimensions_by_feature=DIMENSIONS_BY_FEATURE,
+    )
+    _attach_radial_leaders(
+        adapter, rib_annotations, ("RibEndRadius",), label="rib end"
+    )
+    _apply_callouts(adapter, rib_annotations, label="rib end")
+    _assert_native_max_radius(
+        adapter,
+        rib_annotations,
+        name="RibEndRadius",
+        radius_mm=RIB_END_R,
+        tol_type=INSIDE_CORNER_R_TOL_TYPE,
+    )
     # The view label below the pad's width, left of the view and the receiver
     # callout's leader: at (0.205, 0.172) that leader ran through it (farm r1
     # 2026-10-16, leader-through-text).

@@ -39,6 +39,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "MiddleRib": {"MiddleRibThickness"},
     "KnifeStubReference": {"KnifeStubLength"},
     "KnifeRidgeFillet": {"KnifeRidgeRadius"},
+    "StubRootFillet": {"StubRootRadius"},
+    "RibEndFillet": {"RibEndRadius"},
     "KnifeEnvelopeReference": {
         "HexWidth",
         "HexHeight",
@@ -58,6 +60,8 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("SummationPlateProfile", "SummationArcRadius"): "2X R",
     ("KnifeStubReference", "KnifeStubLength"): "2X ",
     ("KnifeRidgeFillet", "KnifeRidgeRadius"): "2X R",
+    ("StubRootFillet", "StubRootRadius"): "2X R",
+    ("RibEndFillet", "RibEndRadius"): "2X R",
     ("KnifeEnvelopeReference", "HexWidth"): "2X (",
     ("KnifeEnvelopeReference", "HexHeight"): "2X ",
     ("KnifeEnvelopeReference", "RidgeFromLeft"): "2X ",
@@ -129,6 +133,8 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "RidgeFromRight": f"KNIFE-EDGE SEAT IN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS",
     "FlankToSide": f"{KNIFE_MOUNT_NUMBER} SEAT",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
+    "StubRootRadius": "STUB ROOTS\nALL AROUND",
+    "RibEndRadius": "END RIB STEP\nTO PLATE TOP",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
     "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
@@ -215,3 +221,8 @@ BACK_VIEW_NOTE = f"VIEW {BACK_VIEW_LETTER} SCALE 1:1 ROTATED 180°"
 # named by a letter arrow onto the +Z end.
 FRONT_VIEW_LETTER = "G"
 FRONT_VIEW_NOTE = f"VIEW {FRONT_VIEW_LETTER} SCALE 1:2"
+# Sheet 2's cropped plan looks down onto the -Z stub root from VIEW F.
+# Turning the standard Top view half a turn keeps VIEW F's reversed X;
+# K is removed to the open upper-left field instead of aligned above F.
+STUB_ROOT_VIEW_LETTER = "K"
+STUB_ROOT_VIEW_NOTE = f"VIEW {STUB_ROOT_VIEW_LETTER} SCALE 5:1"
