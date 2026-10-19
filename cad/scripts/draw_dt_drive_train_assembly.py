@@ -98,7 +98,10 @@ from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
-from dt_drive_train_assembly_notes import T120_FITUP_ASSEMBLY_CHECK
+from dt_drive_train_assembly_notes import (
+    LEVER_PIN_HOLE_FIT,
+    T120_FITUP_ASSEMBLY_CHECK,
+)
 from dt_drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -919,10 +922,10 @@ BANK_STEPS = _note_text(
         f"   CENTRE (EDGE-FIND BOTH SIDES, HALVE) TO X {BANK_X_LIMITS}.",
         "   SPOT MHA-FR-001 THROUGH THE FOOT HOLE (11/64 TRANSFER PUNCH);",
         "   LIFT OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
-        "   BOTTOMING); BLOW OUT CHIPS. REFIT, RE-SET Y AND X, TIGHTEN",
+        "   BOTTOMING); CLEAR CHIPS. REFIT AT X AND Y; TIGHTEN",
         # Check 4 re-reads both coordinates against the step 9 setting bands
         # after the cone swing's radial shims move the pedestals.
-        "   MHA-VN-032, RECHECK AND RECORD X AND BACK INNER-FACE Y.",
+        "   MHA-VN-032, RECHECK AND RECORD X AND Y.",
         # dtrefactor's #937 review: the loaded mandrel hangs from the back
         # strap alone until the front one goes on (F2), and its front end sits
         # over the front foot hole, where no chuck or tap wrench reaches (F1).
@@ -1083,7 +1086,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "cam-collars-set",
             f"MHA-DT-016 AT PARK, EACH CAM ECCENTRIC DOWN;\n{_COLLAR_SET_STEP}",
         ),
-        ("lever-pin-set", _LEVER_PIN_STEP),
+        ("lever-pin-set", f"{_LEVER_PIN_STEP}\n{LEVER_PIN_HOLE_FIT}"),
         # The cone set goes on last, into the pivot seat drilled at 9C; the
         # stop and lock seats are MHA-FR-001 print holes.  Check 4 then sets
         # the swing and clamps it with MHA-VN-013.

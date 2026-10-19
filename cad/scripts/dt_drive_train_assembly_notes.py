@@ -1,7 +1,7 @@
 """Assembly-only fit-up instructions for MHA-DT-000.
 
-Part specifications own the permitted cuts and their limits. The assembly
-prints the check and its remedies, without the design-clearance narration.
+Part specifications own permitted cuts, limits and pin fits. The assembly
+prints their bench checks and remedies, without design-clearance narration.
 Kept separate from the explode contract so text changes do not rebuild CAD.
 """
 
@@ -17,5 +17,14 @@ T120_FITUP_ASSEMBLY_CHECK = "\n".join(
         "   MHA-DT-010 SHOULDER TO T120 SOUTH FACE: IF THE FEELER STOPS,",
         "   FACE THE MHA-DT-010 SHOULDER BACK,",
         f"   {pinion.SHOULDER_LENGTH_FITUP_MIN:.{pinion.SHOULDER_LENGTH_PLACES}f} MIN. RESET, RECHECK.",
+    )
+)
+
+# The lever and lift-rod prints defer this hole to assembly. The pin contract
+# specifies a stock 1/16 in slip fit retained by peening, not a reamed press fit.
+LEVER_PIN_HOLE_FIT = "\n".join(
+    (
+        "HOLE AT MHA-DT-016'S PRINTED STATION: 1/16 IN DRILL THRU;",
+        "MHA-DT-030 SLIP FIT.",
     )
 )

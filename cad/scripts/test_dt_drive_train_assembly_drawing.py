@@ -434,7 +434,7 @@ def test_cone_swing_shims_hold_the_step_9_bands_and_check_7_resets_the_rig() -> 
     assert "BACK THE SWING OFF" not in check
     bank = _flat(drawing.BANK_STEPS)
     assert bank.count("RECHECK AND RECORD X") == 2
-    assert "RECHECK AND RECORD X AND BACK INNER-FACE Y" in bank
+    assert "RECHECK AND RECORD X AND Y" in bank
     assert "THE Y READING IS ZERO" not in check
     assert "MHA-DT-013 BAR" not in bank
     located = steps.step_number("rig-located")
@@ -547,6 +547,20 @@ def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
     ):
         assert steps.step_ref(key) in _flat(sheet.DIMENSION_CALLOUTS["PinHoleDia"])
         assert name in _rig_step_body(key)
+
+
+def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
+    """r8: name the hole and acceptance without inventing a pilot or press fit."""
+    import dt_pinion_lever_pin_spec as pin
+
+    assert pin.PIN_DIA == 25.4 / 16.0
+    assert "SLIP FIT" in _flat(pin.DIMENSION_CALLOUTS["PinDia"])
+    step = _rig_step_body(pin.LEVER_PIN_SET_STEP_KEY)
+    assert step.endswith(_flat(drawing.LEVER_PIN_HOLE_FIT))
+    assert "MHA-DT-016'S PRINTED STATION: 1/16 IN DRILL THRU" in step
+    assert "MHA-DT-030 SLIP FIT" in step
+    assert "LIGHT HAMMER" not in step
+    assert "REAM" not in step
 
 
 def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
