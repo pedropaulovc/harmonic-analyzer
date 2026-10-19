@@ -65,8 +65,9 @@ geometry is casting-shaped, not milling-shaped.
      the collar's north / 64T-seat face to the three shoulders and the tip.
      These are native, parenthesized reference measurements only, with no
      independent acceptance band; **Shaft Controls** (sheet 1) retains every
-     controlling dimension from the journal-side thrust face and the existing
-     tolerance correlations. The presentation does not establish chuck access
+     controlling dimension, including the tip-side stations measured from the
+     journal-side thrust face, and the existing tolerance correlations.
+     The presentation does not establish chuck access
      to either collar face or prescribe a workholding arrangement.
 
 - **The CNC repeat families (make N identical on the PM-30MV — this is where CNC earns its keep):**
