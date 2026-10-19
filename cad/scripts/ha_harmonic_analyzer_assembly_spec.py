@@ -8,7 +8,7 @@ and consumables, and the settings only the complete machine can make.
 The builder (build_ha_harmonic_analyzer_assembly) authors the named explode
 and the hidden integration-settings sketch from this module; the drawing
 (draw_ha_harmonic_analyzer_assembly) only consumes them. The sheets' text,
-BOM descriptions and balloon targets live in ha_harmonic_analyzer_assembly_notes,
+BOM descriptions and balloon targets live in ha_harmonic_analyzer_assembly_sheet,
 which the builder does not import, so wording edits leave the assembly's
 recipe alone. No SolidWorks.
 

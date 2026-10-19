@@ -113,7 +113,9 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
         elif drawing is draw_ch_channel_assembly:
             scripts_dir = Path(draw_ch_channel_assembly.__file__).resolve().parent
             assert {
-                str(scripts_dir / "ch_channel_assembly_notes.py"),
+                str(scripts_dir / "ch_channel_assembly_spec.py"),
+                str(scripts_dir / "ch_channel_explode_spec.py"),
+                str(scripts_dir / "ch_channel_assembly_sheet.py"),
                 str(scripts_dir / "ch_channel_assembly_steps.py"),
                 str(scripts_dir / "rocker_bank_layout.py"),
             } <= set(deps)
@@ -192,15 +194,15 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_mg_magnifier_assembly:
             scripts_dir = Path(draw_mg_magnifier_assembly.__file__).resolve().parent
-            # The stack spec whose settings the sheets print, the notes with
-            # its BOM, callout and step text, the step order, the explode plan
+            # The stack spec whose settings the sheets print, the sheet module
+            # with its BOM, callout and step text, the step order, the explode plan
             # (pure: not the builder's COM explode), and the axle spec that
             # places the endshake detail.
             assert {
                 str(scripts_dir / name)
                 for name in (
                     "mg_magnifier_assembly_spec.py",
-                    "mg_magnifier_assembly_notes.py",
+                    "mg_magnifier_assembly_sheet.py",
                     "mg_magnifier_assembly_steps.py",
                     "mg_magnifier_explode_spec.py",
                     "mg_wheel_axle_spec.py",
@@ -210,34 +212,40 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_pn_pen_assembly:
             scripts_dir = Path(draw_pn_pen_assembly.__file__).resolve().parent
-            # The fitting spec (inventory, explode, settings), the sheet text
-            # and the carriage geometry its settings derive from.
+            # The fitting spec (inventory, settings), the explode spec, the
+            # sheet module and the carriage geometry its settings derive from.
             assert {
                 str(scripts_dir / name)
                 for name in (
                     "pn_pen_assembly_spec.py",
-                    "pn_pen_assembly_notes.py",
+                    "pn_pen_explode_spec.py",
+                    "pn_pen_assembly_sheet.py",
                     "pn_pen_carriage_geom.py",
                 )
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_sm_summing_assembly:
             scripts_dir = Path(draw_sm_summing_assembly.__file__).resolve().parent
-            # The spec module (settings, explode plan) and the sheet text.
+            # The spec module (settings), the explode spec and the sheet module.
             assert {
                 str(scripts_dir / name)
-                for name in ("sm_summing_assembly_spec.py", "sm_summing_assembly_notes.py")
+                for name in (
+                    "sm_summing_assembly_spec.py",
+                    "sm_summing_explode_spec.py",
+                    "sm_summing_assembly_sheet.py",
+                )
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_ha_harmonic_analyzer_assembly:
             scripts_dir = Path(draw_ha_harmonic_analyzer_assembly.__file__).resolve().parent
-            # The spec (BOM, explode, settings, step text), its step order,
-            # and the sibling step lists and pose sources it cites.
+            # The spec (BOM, explode, settings), the sheet module (step text),
+            # its step order, and the sibling step lists and pose sources it
+            # cites.
             assert {
                 str(scripts_dir / name)
                 for name in (
                     "ha_harmonic_analyzer_assembly_spec.py",
-                    "ha_harmonic_analyzer_assembly_notes.py",
+                    "ha_harmonic_analyzer_assembly_sheet.py",
                     "ha_harmonic_analyzer_assembly_steps.py",
                     "dt_drive_train_steps.py",
                     "pd_paper_drive_assembly_steps.py",

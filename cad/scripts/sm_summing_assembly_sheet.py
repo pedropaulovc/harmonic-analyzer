@@ -1,18 +1,23 @@
-"""Drawing-only text of the summing-lever fitter package (MHA-SM-000).
+"""Drawing-only data of the summing-lever fitter package (MHA-SM-000).
 
-The BOM descriptions, setting callouts, detail title, assembled-view notes,
-assembly steps and checks the sheets print. Only draw_sm_summing_assembly
-(and its tests) import this module; the builder reads sm_summing_assembly_spec
-alone, so a wording edit here does not rebuild the summing assembly. No
-SolidWorks.
+The drawing number, BOM order, the setting dimensions the drawing imports,
+the level tolerance, the BOM descriptions, setting callouts, detail title,
+assembled-view notes, assembly steps and checks the sheets print. Only
+draw_sm_summing_assembly (and its tests) import this module; no assembly
+builder may (``test_assembly_sheet_isolation`` pins it), so a wording edit
+here does not rebuild the summing assembly. No SolidWorks.
 """
 
 from __future__ import annotations
 
+import _config
+import vn_knife_mount_dowel_spec as knife_dowel
+from _inch_fraction import inch_fraction
 from sm_summing_assembly_spec import (
     BOSS_HOOK,
     BOSS_JAM_NUT,
     COUNTER_DIMENSION,
+    COUNTER_FEATURE,
     COUNTER_SPRING,
     DOWEL,
     GOOSENECK,
@@ -21,13 +26,30 @@ from sm_summing_assembly_spec import (
     HANGER_FIT_REACH_PLACES,
     HANGER_FIT_REACH_TOL,
     HANGER_WASHER,
+    KNIFE_FREE_ROCK_FLOOR_DEG,
     KNIFE_MOUNT,
-    LEVEL_TOLERANCE_DEG,
     LEVER,
     QUANTITIES,
     ROCK_DIMENSION,
+    ROCK_FEATURE,
     SPRING_SCREW,
 )
+
+DRAWING_NUMBER = "MHA-SM-000"
+# The BOM lists every family in the builder's insertion order.
+BOM_ORDER = tuple(QUANTITIES)
+# The drawing imports exactly these, each in the one view that dimensions it.
+DRAWING_DIMENSIONS = {
+    COUNTER_FEATURE: {COUNTER_DIMENSION},
+    ROCK_FEATURE: {ROCK_DIMENSION},
+}
+# The lever is set level to the title block's general angular tolerance: the
+# operating rock (about 1 deg) then stays well inside the free-rock floor.
+LEVEL_TOLERANCE_DEG = float(_config.title_block("angular")["value_deg"])
+if LEVEL_TOLERANCE_DEG + 1.0 >= KNIFE_FREE_ROCK_FLOOR_DEG:
+    raise AssertionError("the level tolerance eats the knife edge's free rock")
+# The feeler check 1 tries round each mount's clamped top seat.
+SEAT_FEELER_MM = 0.05
 
 # The DESCRIPTION cell is drawing wording: the part numbers and vendor SKUs
 # print in their own columns, so no size the part drawings own is restated.
@@ -35,7 +57,7 @@ BOM_DESCRIPTIONS = {
     KNIFE_MOUNT: "KNIFE-EDGE MOUNT",
     HANGER_WASHER: "#10 SAE FLAT WASHER",
     HANGER_BOLT: "#10-24 HEX BOLT, CUT",
-    DOWEL: "1/8 DOWEL PIN",
+    DOWEL: f"{inch_fraction(knife_dowel.DIA, what='knife-mount dowel')} DOWEL PIN",
     LEVER: "SUMMING LEVER",
     BOSS_HOOK: "#10-24 OPEN EYEBOLT, TRIMMED",
     BOSS_JAM_NUT: "#10-24 THIN HEX JAM NUT",
@@ -69,8 +91,8 @@ ASSEMBLED_NOTES = (
     "TRUNNION) UNDER THE TOP OF EACH MOUNT BORE.",
     f"3. LEVEL SETTING: {LEVEL_CRITERION}, SHEET 3 STEP 10.",
 )
-# The fitter's order; the spec's EXPLODE_STEPS run it backwards. Steps 4-10 are
-# done on the top frame, steps 9-10 at final assembly (MHA-HA-000).
+# The fitter's order; sm_summing_explode_spec.EXPLODE_STEPS runs it backwards.
+# Steps 4-10 are done on the top frame, steps 9-10 at final assembly (MHA-HA-000).
 ASSEMBLY_STEPS = (
     "1. PRESS TWO MHA-VN-051 DOWELS, CHAMFER END FIRST, INTO THE TOP-SEAT "
     "HOLES OF EACH MHA-SM-002 KNIFE MOUNT, EACH TO THE HOLE FLOOR.",
@@ -108,8 +130,8 @@ ASSEMBLY_STEPS = (
 )
 ASSEMBLY_CHECKS = (
     "CHECKS:",
-    "1. EACH MOUNT'S TOP SEAT IS FLAT TO THE CROSSBAR UNDERSIDE: A 0.05 FEELER "
-    "ENTERS NOWHERE ROUND IT.",
+    f"1. EACH MOUNT'S TOP SEAT IS FLAT TO THE CROSSBAR UNDERSIDE: A {SEAT_FEELER_MM:g} "
+    "FEELER ENTERS NOWHERE ROUND IT.",
     "2. COUNTER SPRING OFF, THE LEVER ROCKS FREELY ON ITS KNIFE EDGE: THE "
     "OUTER EDGE OF THE BOSS TOP FACE MOVES AT LEAST THE KNIFE-EDGE DETAIL DISTANCE UP "
     "AND DOWN FROM LEVEL "

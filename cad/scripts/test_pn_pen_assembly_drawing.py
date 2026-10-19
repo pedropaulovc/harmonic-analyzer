@@ -7,7 +7,7 @@ import pytest
 import build_pn_pen_assembly as builder
 import draw_pn_pen_assembly as drawing
 import pn_pen_adjust_screw_spec as stud
-import pn_pen_assembly_notes as notes
+import pn_pen_assembly_sheet as notes
 import pn_pen_assembly_spec as spec
 import pn_pen_explode_spec as explode
 import pn_pen_carriage_geom as carriage
@@ -63,9 +63,9 @@ def test_stud_set_from_its_measured_length_holds_engagement_at_both_extremes() -
 
 
 def test_stud_setting_prints_as_a_reference_with_the_measured_length_rule() -> None:
-    assert spec.REFERENCE_DIMENSIONS == {spec.STUD_DIMENSION}
-    assert spec.STUD_DIMENSION not in spec.DIMENSION_TOLERANCES
-    assert spec.STUD_DIMENSION not in spec.TOLERANCE_PRECISION
+    assert notes.REFERENCE_DIMENSIONS == {spec.STUD_DIMENSION}
+    assert spec.STUD_DIMENSION not in notes.DIMENSION_TOLERANCES
+    assert spec.STUD_DIMENSION not in notes.TOLERANCE_PRECISION
     builder_source = Path(builder.__file__).read_text(encoding="utf-8")
     assert "spec.STUD_TOLERANCE_MM" not in builder_source
     assert notes.DIMENSION_CALLOUTS[spec.STUD_DIMENSION].endswith(
@@ -92,16 +92,24 @@ def test_pen_package_keeps_registry_outputs() -> None:
 
 
 def test_sheet_text_stays_out_of_the_assembly_recipe() -> None:
-    # Recipe closures are file-granular: a wording edit in the notes must
-    # re-key only the drawing, never the native pen assembly (code review C03).
+    # Recipe closures are file-granular: a wording edit in the sheet module
+    # must re-key only the drawing, never the native pen assembly (code review
+    # C03).
     def closure(module: object) -> set[str]:
         return {Path(path).name for path in module_deps_of(Path(module.__file__))}
 
     assembly = closure(builder)
     assert "pn_pen_assembly_spec.py" in assembly
-    assert "pn_pen_assembly_notes.py" not in assembly
-    assert "pn_pen_assembly_notes.py" in closure(drawing)
+    assert "pn_pen_assembly_sheet.py" not in assembly
+    assert "pn_pen_assembly_sheet.py" in closure(drawing)
     for name in (
+        "DRAWING_NUMBER",
+        "ITEM",
+        "REFERENCE_DIMENSIONS",
+        "DIMENSION_TOLERANCES",
+        "ANGULAR_TOLERANCES",
+        "TOLERANCE_PRECISION",
+        "DIMENSION_NOMINALS",
         "BOM_DESCRIPTIONS",
         "DIMENSION_CALLOUTS",
         "SETTINGS_NOTE",
@@ -109,6 +117,7 @@ def test_sheet_text_stays_out_of_the_assembly_recipe() -> None:
         "ASSEMBLY_CHECKS",
     ):
         assert not hasattr(spec, name), name
+    assert not hasattr(explode, "exploded_point")
 
 
 def test_pen_package_is_three_landscape_sheets_at_half_scale() -> None:
@@ -127,7 +136,7 @@ def test_pen_package_is_three_landscape_sheets_at_half_scale() -> None:
 def test_bom_covers_every_family_in_builder_order_with_registry_identity() -> None:
     assert drawing.BOM_COMPONENTS == spec.BOM_ORDER
     assert set(drawing.BALLOON_ANCHORS) == set(spec.BOM_ORDER)
-    assert [spec.ITEM[stem] for stem in spec.BOM_ORDER] == list(
+    assert [notes.ITEM[stem] for stem in spec.BOM_ORDER] == list(
         range(1, len(spec.BOM_ORDER) + 1)
     )
     # The builder inserts the hanger, the rod, then the riders in RIDERS

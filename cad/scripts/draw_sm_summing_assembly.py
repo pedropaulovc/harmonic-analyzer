@@ -7,7 +7,8 @@ builder-owned SM_EXPLODED isometric with its BOM (vendor SKU added) and one
 balloon per BOM row. Sheet 3 is the finished isometric beside the numbered
 assembly steps and checks. Both settings are the assembly's own sketch
 dimensions (``build_sm_summing_assembly._author_settings``), imported here;
-every printed text comes from ``sm_summing_assembly_notes``.
+the explode from ``sm_summing_explode_spec``; every printed text comes from
+``sm_summing_assembly_sheet``.
 
 Usage:
     uv run python cad\scripts\draw_sm_summing_assembly.py sm-summing-assembly
@@ -32,8 +33,9 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 import _config
 import _telemetry
-import sm_summing_assembly_notes as notes
+import sm_summing_assembly_sheet as notes
 import sm_summing_assembly_spec as spec
+import sm_summing_explode_spec as explode
 from _check import check
 from _com import _early_bound
 from _drawing_balloons import (
@@ -178,7 +180,7 @@ ASSEMBLY_ISO_CENTER = (0.322, 0.172)
 STEPS_XY = (0.018, 0.262)
 STEPS_LINE_WIDTH = 60  # characters; default-format note text
 
-BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in spec.BOM_ORDER}
+BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in notes.BOM_ORDER}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 # Literal stems, so the config-dependency analysis reads exactly these rows.
 PART_ROWS = {
@@ -212,10 +214,10 @@ BOM_NORMALIZED_ALIASES = {
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
 
 EXPLODED_VIEW_NAMES = {
-    ASSEMBLY_VIEW_CONFIGURATION: spec.EXPLODED_VIEW_NAME,
-    SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(spec.EXPLODED_VIEW_NAME),
+    ASSEMBLY_VIEW_CONFIGURATION: explode.EXPLODED_VIEW_NAME,
+    SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(explode.EXPLODED_VIEW_NAME),
 }
-if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
+if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the summing explode is authored in Default")
 
 # Callouts print below the value (above-callout line breaks do not print).
@@ -406,7 +408,7 @@ def _imported_setting(
         view,
         keep={dimension: text_xy},
         view_label=label,
-        dimensions_by_feature={feature: spec.DRAWING_DIMENSIONS[feature]},
+        dimensions_by_feature={feature: notes.DRAWING_DIMENSIONS[feature]},
     )
     if len(annotations) != 1:
         raise RuntimeError(f"{label} must import exactly one dimension")
@@ -860,9 +862,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
         required=("Number", "Revision", "Material Specification", "Finish", "Quantity"),
     )
-    if properties["Number"] != spec.DRAWING_NUMBER:
+    if properties["Number"] != notes.DRAWING_NUMBER:
         raise RuntimeError(
-            f"summing source Number {properties['Number']!r} != {spec.DRAWING_NUMBER!r}"
+            f"summing source Number {properties['Number']!r} != {notes.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
 

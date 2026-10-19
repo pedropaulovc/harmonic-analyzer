@@ -294,6 +294,7 @@ def test_the_package_sheets_and_settings_contract() -> None:
     )
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
     asm = drawing.asm
+    explode = drawing.explode
     kept = {
         **drawing.STACK_KEEP,
         **drawing.SPRING_KEEP,
@@ -312,8 +313,8 @@ def test_the_package_sheets_and_settings_contract() -> None:
         asm.KEEPER_PLAN_FEATURE
     }
     assert set(drawing.notes.DIMENSION_CALLOUTS) == set(kept)
-    assert asm.REFERENCE_DIMENSIONS == {asm.LUG_SPAN_DIMENSION}
-    assert set(asm.DIMENSION_TOLERANCES) == set(kept) - asm.REFERENCE_DIMENSIONS
+    assert drawing.notes.REFERENCE_DIMENSIONS == {asm.LUG_SPAN_DIMENSION}
+    assert set(asm.DIMENSION_TOLERANCES) == set(kept) - drawing.notes.REFERENCE_DIMENSIONS
     lower, upper = asm.DIMENSION_TOLERANCES[asm.SPRING_SET_DIMENSION]
     assert (lower, upper) == (-bank.ROCKER_SPRING_SET_BAND, bank.ROCKER_SPRING_SET_BAND)
     # Every kept dimension text lands on its own sheet, inside the border.
@@ -335,7 +336,7 @@ def test_the_package_sheets_and_settings_contract() -> None:
     # inside the crop circle and each text outside it.
     assert [text.split()[0] for text, _, _ in drawing.DETAIL_POINTERS] == [
         drawing.BOM_PART_NUMBERS[stem]
-        for stem in ("ch-rocker-arm", asm.WASHER, asm.BANK_SPRING, asm.BRACKET)
+        for stem in ("ch-rocker-arm", explode.WASHER, explode.BANK_SPRING, explode.BRACKET)
     ]
     for text, (tx, ty), (px, py) in drawing.DETAIL_POINTERS:
         assert (px - detail.centre[0]) ** 2 + (py - detail.centre[1]) ** 2 < radius**2
@@ -370,18 +371,18 @@ def _iso(point: tuple[float, float, float]) -> tuple[float, float]:
 
 
 def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> None:
-    asm = drawing.asm
+    explode = drawing.explode
     north = "north"
     lug_z = drawing.FULCRUM_KEEPER_CENTRE_Z + drawing.KEEPER_Z_OFF
     # 60 north, then the whole north-end cluster 30 further north and 570 up,
     # clear of the hanging rocker arms (r10 machinist review, DETAIL B), and
     # (r11) between the bank and the north-most channel pulled out of it.
-    assert drawing.exploded_offset(asm.BRACKET, north) == (0.0, 570.0, 90.0)
-    assert drawing.exploded_offset(asm.BRACKET_SET_SCREW, north) == (0.0, 595.0, 90.0)
-    assert drawing.exploded_offset(asm.WASHER, north) == (0.0, 570.0, 50.0)
-    assert drawing.exploded_offset(asm.KEEPER_FOOT_SCREW, north) == (0.0, 50.0, 50.0)
-    assert drawing.exploded_offset(asm.BRACKET_HOLD_DOWN, north) == (0.0, 630.0, 90.0)
-    assert drawing.exploded_offset(asm.BRACKET, "south") == (0.0, 0.0, -60.0)
+    assert drawing.exploded_offset(explode.BRACKET, north) == (0.0, 570.0, 90.0)
+    assert drawing.exploded_offset(explode.BRACKET_SET_SCREW, north) == (0.0, 595.0, 90.0)
+    assert drawing.exploded_offset(explode.WASHER, north) == (0.0, 570.0, 50.0)
+    assert drawing.exploded_offset(explode.KEEPER_FOOT_SCREW, north) == (0.0, 50.0, 50.0)
+    assert drawing.exploded_offset(explode.BRACKET_HOLD_DOWN, north) == (0.0, 630.0, 90.0)
+    assert drawing.exploded_offset(explode.BRACKET, "south") == (0.0, 0.0, -60.0)
     bracket, keeper = drawing.NORTH_BRACKET_DETAIL, drawing.NORTH_KEEPER_DETAIL
     assert drawing.EXPLODED_DETAILS == (bracket, keeper)
     # #1660 r3 (rule 22): lifted, the cluster read as the lever bank's, so an
@@ -403,23 +404,23 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     washer_z = sum(bank.NORTH_WASHER_Z) / 2.0
     members = {
         bracket: (
-            drawing._exploded((pivot_x, pivot_y, washer_z), asm.WASHER, north),
+            drawing._exploded((pivot_x, pivot_y, washer_z), explode.WASHER, north),
             drawing._exploded(
-                (pivot_x, pivot_y + 15.0, ear_z), asm.BRACKET_SET_SCREW, north
+                (pivot_x, pivot_y + 15.0, ear_z), explode.BRACKET_SET_SCREW, north
             ),
             drawing._exploded(
-                (pivot_x, pivot_y - 15.0, ear_z + 8.0), asm.BRACKET_HOLD_DOWN, north
+                (pivot_x, pivot_y - 15.0, ear_z + 8.0), explode.BRACKET_HOLD_DOWN, north
             ),
         ),
         keeper: (
             drawing._exploded(
                 (keeper.centre_xyz[0], drawing.LEVER_FULCRUM_XY[1] + 10.0, lug_z),
-                asm.KEEPER_SET_SCREW,
+                explode.KEEPER_SET_SCREW,
                 north,
             ),
             drawing._exploded(
                 (keeper.centre_xyz[0], drawing.LEVER_FULCRUM_XY[1] - 20.0, lug_z + 8.5),
-                asm.KEEPER_FOOT_SCREW,
+                explode.KEEPER_FOOT_SCREW,
                 north,
             ),
         ),
@@ -461,7 +462,7 @@ def test_the_lifted_foot_screws_clear_their_uprights_in_the_isometric() -> None:
     import vn_bracket_hold_down_screw_spec as hold_down
     import vn_frame_side_screw_spec as foot_screw
 
-    asm = drawing.asm
+    explode = drawing.explode
     root2, root5, root6 = 2.0**0.5, 5.0**0.5, 6.0**0.5
     # 2y - x - z (the isometric's v times root 6) over a round top: the
     # half-round of radius r about height h peaks at 2h + r * root 5, and the
@@ -471,8 +472,8 @@ def test_the_lifted_foot_screws_clear_their_uprights_in_the_isometric() -> None:
     ear_top = 2.0 * arch_h + bracket.EAR_ARCH_R * root5 + bracket.EAR_T / 2.0
     keeper_out = keeper.KEEPER_SCREW_Z_OFF - keeper.KEEPER_Z_OFF
     keeper_seat = keeper.FOOT_H - keeper.CBORE_DEPTH_MM
-    keeper_case = (asm.KEEPER_FOOT_SCREW, asm.KEEPER, lug_top, keeper_out)
-    bracket_case = (asm.BRACKET_HOLD_DOWN, asm.BRACKET, ear_top, sides.HOLE_Z)
+    keeper_case = (explode.KEEPER_FOOT_SCREW, explode.KEEPER, lug_top, keeper_out)
+    bracket_case = (explode.BRACKET_HOLD_DOWN, explode.BRACKET, ear_top, sides.HOLE_Z)
     cases = (
         (*keeper_case, keeper_seat, foot_screw),
         (*bracket_case, bracket.FOOT_H, hold_down),
@@ -501,8 +502,8 @@ def test_the_lifted_foot_screws_clear_their_uprights_in_the_isometric() -> None:
         fulcrum_y - keeper.SHAFT_AXIS_H + keeper.FOOT_H,
         keeper_z + keeper_out,
     )
-    bracket_head = (drawing.NORTH_BRACKET_DETAIL, hold_down_top, asm.BRACKET_HOLD_DOWN)
-    keeper_head = (drawing.NORTH_KEEPER_DETAIL, foot_screw_top, asm.KEEPER_FOOT_SCREW)
+    bracket_head = (drawing.NORTH_BRACKET_DETAIL, hold_down_top, explode.BRACKET_HOLD_DOWN)
+    keeper_head = (drawing.NORTH_KEEPER_DETAIL, foot_screw_top, explode.KEEPER_FOOT_SCREW)
     heads = ((*bracket_head, hold_down), (*keeper_head, foot_screw))
     for detail, head_top, stem, screw in heads:
         cu, cv = _iso(detail.centre_xyz)
@@ -529,8 +530,8 @@ def test_the_bracket_balloon_lands_left_of_its_lifted_hold_down() -> None:
     # The north bracket's part frame runs with the machine's (its foot
     # toward machine +z), so the part point projects like a machine one.
     assert sides.OUTBOARD_SIGN["N"] == 1.0
-    moved = drawing.exploded_offset(drawing.asm.BRACKET_HOLD_DOWN, "north")
-    carried = drawing.exploded_offset(drawing.asm.BRACKET, "north")
+    moved = drawing.exploded_offset(drawing.explode.BRACKET_HOLD_DOWN, "north")
+    carried = drawing.exploded_offset(drawing.explode.BRACKET, "north")
     assert (moved[0], moved[2]) == (carried[0], carried[2])
     head_left = _iso((0.0, 0.0, sides.HOLE_Z))[0] - hold_down.HEAD_DIA / 2.0
     # 6.0 model mm, 0.86 on the sheet at 1:7: a leader's width and more.
@@ -551,8 +552,8 @@ def test_the_bom_covers_every_family_once_with_its_sku() -> None:
     assert drawing.BOM_QUANTITIES[drawing.SPRING_STEM] == drawing.CHANNELS
     assert sum(drawing.BOM_QUANTITIES.values()) == 2 + 7 * 2 + 1 + 9 * drawing.CHANNELS
     # The anchor's jam nut (MHA-CH-014, made) is its own row, one per anchor.
-    nut = drawing.asm.ANCHOR_NUT
-    assert drawing.BOM_QUANTITIES[nut] == drawing.BOM_QUANTITIES[drawing.asm.HOOK]
+    nut = drawing.explode.ANCHOR_NUT
+    assert drawing.BOM_QUANTITIES[nut] == drawing.BOM_QUANTITIES[drawing.explode.HOOK]
     assert drawing.BOM_SKUS[nut] == drawing.MADE_PART_SKU
     body = _step_body(steps.SPRINGS_HOOKED_KEY)
     assert (
@@ -595,75 +596,79 @@ def test_a_preset_with_several_spring_lengths_is_refused_at_drawing_time(
 
 
 def test_the_sheet_text_stays_out_of_the_assembly_recipe() -> None:
-    """Code review C03: the BOM descriptions and dimension callouts are read
-    by the drawing alone. The builder's recipe closure (file-granular, every
-    local import followed) must not reach them, or a wording edit would force
-    a full native rebuild of the channel assembly."""
+    """Code review C03: the BOM descriptions, dimension callouts and which
+    dimension prints as a reference are read by the drawing alone. The
+    builder's recipe closure (file-granular, every local import followed)
+    must not reach them, or a wording edit would force a full native rebuild
+    of the channel assembly."""
     scripts = Path(drawing.__file__).resolve().parent
-    notes = str(scripts / "ch_channel_assembly_notes.py")
+    sheet = str(scripts / "ch_channel_assembly_sheet.py")
+    explode_spec = str(scripts / "ch_channel_explode_spec.py")
     for builder in ("build_ch_channel_assembly.py", "_ch_channel_explode.py"):
-        assert notes not in _buildgraph.module_deps_of(scripts / builder)
-    assert notes in _buildgraph.module_deps_of(scripts / "draw_ch_channel_assembly.py")
-    for text in ("BOM_DESCRIPTIONS", "DIMENSION_CALLOUTS"):
+        assert sheet not in _buildgraph.module_deps_of(scripts / builder)
+        assert explode_spec in _buildgraph.module_deps_of(scripts / builder)
+    assert sheet in _buildgraph.module_deps_of(scripts / "draw_ch_channel_assembly.py")
+    for text in ("BOM_DESCRIPTIONS", "DIMENSION_CALLOUTS", "REFERENCE_DIMENSIONS"):
         assert not hasattr(drawing.asm, text)
+        assert not hasattr(drawing.explode, text)
 
 
 def test_the_explode_plan_moves_every_family_and_only_them() -> None:
-    asm = drawing.asm
-    names = {asm.EXPLODED_VIEW_NAME}
+    explode = drawing.explode
+    names = {explode.EXPLODED_VIEW_NAME}
     assert names == {drawing.EXPLODED_VIEW_NAMES[drawing.ASSEMBLY_VIEW_CONFIGURATION]}
     instances = []
     for stem, quantity in drawing.BOM_QUANTITIES.items():
         if quantity == 2:
             instances += [
-                asm.Instance(f"{stem}-1", stem, -70.0),
-                asm.Instance(f"{stem}-2", stem, 70.0),
+                explode.Instance(f"{stem}-1", stem, -70.0),
+                explode.Instance(f"{stem}-2", stem, 70.0),
             ]
         else:
             instances += [
-                asm.Instance(f"{stem}-{j + 1}", stem, -70.0 + 7.0 * j)
+                explode.Instance(f"{stem}-{j + 1}", stem, -70.0 + 7.0 * j)
                 for j in range(quantity)
             ]
-    plan = asm.plan_explode(instances)
+    plan = explode.plan_explode(instances)
     moved = {name for step in plan for name in step[1]}
     # r11 machinist review: one channel, the north-most (the balloons'), is
     # pulled out of the closed-up bank; every other channel stays in it.
     channel = {
         stem: max(
-            (instance for instance in instances if asm.family(instance.stem) == stem),
+            (instance for instance in instances if explode.family(instance.stem) == stem),
             key=lambda instance: instance.z_mm,
         ).name
-        for stem in asm.EXPLODED_STEMS - asm.FULLY_EXPLODED_STEMS
+        for stem in explode.EXPLODED_STEMS - explode.FULLY_EXPLODED_STEMS
     }
-    assert set(channel) == {asm.ARM, asm.ROD_PIN, asm.LEVER, asm.CHANNEL_SPRING}
+    assert set(channel) == {explode.ARM, explode.ROD_PIN, explode.LEVER, explode.CHANNEL_SPRING}
     assert moved == {
         instance.name
         for instance in instances
-        if asm.family(instance.stem) in asm.FULLY_EXPLODED_STEMS
+        if explode.family(instance.stem) in explode.FULLY_EXPLODED_STEMS
     } | set(channel.values())
     (pulled,) = [
         names for step, names in plan if step.label == "north-most channel out"
     ]
     assert len(pulled) == 9 and set(channel.values()) <= set(pulled)
     assert all(name.endswith("-20") for name in pulled)
-    assert drawing.exploded_offset(asm.ARM, "north-most") == (0.0, 0.0, 300.0)
-    assert drawing.exploded_offset(asm.ROD, "north-most") == (0.0, -50.0, 300.0)
-    assert drawing.exploded_offset(asm.ROD_PIN, "north-most") == (0.0, 0.0, 325.0)
+    assert drawing.exploded_offset(explode.ARM, "north-most") == (0.0, 0.0, 300.0)
+    assert drawing.exploded_offset(explode.ROD, "north-most") == (0.0, -50.0, 300.0)
+    assert drawing.exploded_offset(explode.ROD_PIN, "north-most") == (0.0, 0.0, 325.0)
     # Machinist review (PR #1605): withdrawn north the bar pin sat on the
     # lever's lower edge and balloon 16's arrowhead lay along the lever, so it
     # read as landing on the lever end with 17. South, along its own axis
     # (still coaxial with its bar), it stands in the open past the bar's top.
-    assert drawing.exploded_offset(asm.BAR_PIN, "north-most") == (0.0, 20.0, 275.0)
-    bar_offset = drawing.exploded_offset(asm.BAR, "north-most")
-    pin_offset = drawing.exploded_offset(asm.BAR_PIN, "north-most")
+    assert drawing.exploded_offset(explode.BAR_PIN, "north-most") == (0.0, 20.0, 275.0)
+    bar_offset = drawing.exploded_offset(explode.BAR, "north-most")
+    pin_offset = drawing.exploded_offset(explode.BAR_PIN, "north-most")
     assert pin_offset[:2] == bar_offset[:2] and pin_offset[2] < bar_offset[2]
-    assert drawing.exploded_offset(asm.BAR, "north-most") == (0.0, 20.0, 300.0)
-    assert drawing.exploded_offset(asm.BAR, "north") == (0.0, 50.0, 0.0)
+    assert drawing.exploded_offset(explode.BAR, "north-most") == (0.0, 20.0, 300.0)
+    assert drawing.exploded_offset(explode.BAR, "north") == (0.0, 50.0, 0.0)
     spring = drawing.exploded_offset(drawing.SPRING_STEM, "north-most")
     assert spring == (0.0, 0.0, 300.0)
-    assert drawing.exploded_offset(asm.ARM, "north") == (0.0, 0.0, 0.0)
-    assert {"ch-pivot-shaft", asm.ARM, asm.LEVER}.isdisjoint(asm.FULLY_EXPLODED_STEMS)
-    assert asm.FULCRUM_SHAFT in asm.EXPLODED_STEMS
+    assert drawing.exploded_offset(explode.ARM, "north") == (0.0, 0.0, 0.0)
+    assert {"ch-pivot-shaft", explode.ARM, explode.LEVER}.isdisjoint(explode.FULLY_EXPLODED_STEMS)
+    assert explode.FULCRUM_SHAFT in explode.EXPLODED_STEMS
 
 
 def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:

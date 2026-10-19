@@ -979,7 +979,9 @@ Assembly data splits by consumer: `<stem>_assembly_spec.py` (reaches the .SLDASM
 `<stem>_explode_spec.py` (pure explode the builder authors), and drawing-only
 `<stem>_assembly_sheet.py` / `*_steps.py` (BOM, captions, sequence text).
 `test_assembly_sheet_isolation.py` (`check:graph`) fails if a builder's closure
-reaches a sheet/steps/`draw_*` module, or their literals type a dimension (`22.0`).
+reaches a sheet/steps/`draw_*` module, their literals type a dimension (`22.0`),
+they rebind a name the spec/explode spec defines, or a drawing-only
+`<stem>_assembly_*` module carries another name (`_notes`) the guards miss.
 
 ## Fine-grained config deps
 

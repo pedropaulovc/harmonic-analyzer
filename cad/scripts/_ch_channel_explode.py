@@ -1,7 +1,7 @@
 """Author the channel's named exploded presentation (CHANNEL_EXPLODED).
 
 Follows ``_pd_paper_drive_explode``: the builder owns the presentation, the
-drawing only consumes it. Each step of ``ch_channel_assembly_spec.EXPLODE_STEPS``
+drawing only consumes it. Each step of ``ch_channel_explode_spec.EXPLODE_STEPS``
 is authored along a global axis, read back as a world translation of exactly
 the intended instances (every other instance reads unmoved), and the assembly
 is collapsed again before save -- the saved operational pose is proven
@@ -22,7 +22,7 @@ import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
 from _simplified_names import simplified_name
-from ch_channel_assembly_spec import (
+from ch_channel_explode_spec import (
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
     Instance,

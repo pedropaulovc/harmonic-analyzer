@@ -3,8 +3,8 @@ r"""Create the MHA-CH-000 channel assembly fitter package (four sheets).
 1. ASSEMBLED VIEWS: Front and Right at 1:5 and the full-detail isometric at
    1:7.
 2. EXPLODED VIEW + BOM: the builder-owned CHANNEL_EXPLODED isometric
-   (ch_channel_assembly_spec), the native BOM with the registry's part
-   numbers, vendor SKUs and ch_channel_assembly_notes' descriptions, and one
+   (ch_channel_explode_spec), the native BOM with the registry's part
+   numbers, vendor SKUs and ch_channel_assembly_sheet's descriptions, and one
    balloon per BOM row.
 3. ROCKER BANK FIT-UP: the bank isolated at 1:1 with the closed-up stack
    length, a cropped 4:1 detail of the south end with the spring set, and
@@ -83,8 +83,9 @@ from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
-import ch_channel_assembly_notes as notes
+import ch_channel_assembly_sheet as notes
 import ch_channel_assembly_spec as asm
+import ch_channel_explode_spec as explode
 import ch_channel_assembly_steps as steps
 from ch_channel_lever_spec import (
     HUB_LENGTH as LEVER_HUB_LENGTH,
@@ -273,23 +274,23 @@ SPRING_STEM = SPRING_STEMS[0]
 BOM_QUANTITIES = {
     "ch-pivot-shaft": 1,
     "ch-fulcrum-shaft": 1,
-    asm.BRACKET: 2,
-    asm.BRACKET_SET_SCREW: 2,
-    asm.WASHER: 2,
-    asm.BANK_SPRING: 1,
-    asm.BRACKET_HOLD_DOWN: 2,
-    asm.KEEPER: 2,
-    asm.KEEPER_FOOT_SCREW: 2,
-    asm.KEEPER_SET_SCREW: 2,
+    explode.BRACKET: 2,
+    explode.BRACKET_SET_SCREW: 2,
+    explode.WASHER: 2,
+    explode.BANK_SPRING: 1,
+    explode.BRACKET_HOLD_DOWN: 2,
+    explode.KEEPER: 2,
+    explode.KEEPER_FOOT_SCREW: 2,
+    explode.KEEPER_SET_SCREW: 2,
     "ch-rocker-arm": CHANNELS,
-    asm.ROD: CHANNELS,
-    asm.BAR: CHANNELS,
+    explode.ROD: CHANNELS,
+    explode.BAR: CHANNELS,
     "ch-channel-lever": CHANNELS,
     "ch-rod-pivot-pin": CHANNELS,
-    asm.BAR_PIN: CHANNELS,
+    explode.BAR_PIN: CHANNELS,
     SPRING_STEM: CHANNELS,
-    asm.HOOK: CHANNELS,
-    asm.ANCHOR_NUT: CHANNELS,
+    explode.HOOK: CHANNELS,
+    explode.ANCHOR_NUT: CHANNELS,
 }
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 # Literal stems, so the config-dependency analysis reads exactly these rows.
@@ -333,10 +334,10 @@ BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
 EXPLODED_VIEW_NAMES = {
-    ASSEMBLY_VIEW_CONFIGURATION: asm.EXPLODED_VIEW_NAME,
-    SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(asm.EXPLODED_VIEW_NAME),
+    ASSEMBLY_VIEW_CONFIGURATION: explode.EXPLODED_VIEW_NAME,
+    SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(explode.EXPLODED_VIEW_NAME),
 }
-if asm.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
+if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the channel explode is authored in Default")
 
 # --- sheets 3 and 4: isolated 1:1 bank views, the south-end detail, steps ----
@@ -428,11 +429,11 @@ ROCKER_BANK = BankView(
     frozenset(
         {
             "ch-pivot-shaft",
-            asm.BRACKET,
-            asm.BRACKET_SET_SCREW,
-            asm.BRACKET_HOLD_DOWN,
-            asm.WASHER,
-            asm.BANK_SPRING,
+            explode.BRACKET,
+            explode.BRACKET_SET_SCREW,
+            explode.BRACKET_HOLD_DOWN,
+            explode.WASHER,
+            explode.BANK_SPRING,
             "ch-rocker-arm",
         }
     ),
@@ -449,10 +450,10 @@ SOUTH_END = BankView(
     frozenset(
         {
             "ch-pivot-shaft",
-            asm.BRACKET,
-            asm.BRACKET_SET_SCREW,
-            asm.WASHER,
-            asm.BANK_SPRING,
+            explode.BRACKET,
+            explode.BRACKET_SET_SCREW,
+            explode.WASHER,
+            explode.BANK_SPRING,
             "ch-rocker-arm",
         }
     ),
@@ -495,11 +496,11 @@ LEVER_BANK = BankView(
     frozenset(
         {
             "ch-fulcrum-shaft",
-            asm.KEEPER,
-            asm.KEEPER_FOOT_SCREW,
-            asm.KEEPER_SET_SCREW,
+            explode.KEEPER,
+            explode.KEEPER_FOOT_SCREW,
+            explode.KEEPER_SET_SCREW,
             "ch-channel-lever",
-            asm.BAR_PIN,
+            explode.BAR_PIN,
         }
     ),
 )
@@ -531,9 +532,9 @@ KEEPER_PLAN = BankView(
     frozenset(
         {
             "ch-fulcrum-shaft",
-            asm.KEEPER,
-            asm.KEEPER_FOOT_SCREW,
-            asm.KEEPER_SET_SCREW,
+            explode.KEEPER,
+            explode.KEEPER_FOOT_SCREW,
+            explode.KEEPER_SET_SCREW,
         }
     ),
     # The frame's front is the bank's south end (machine -z: the front
@@ -590,20 +591,20 @@ PLAN_POINTERS = (
 )
 
 
-def exploded_offset(stem: str, side: asm.Side) -> tuple[float, float, float]:
+def exploded_offset(stem: str, side: explode.Side) -> tuple[float, float, float]:
     """The net channel-explode displacement (model mm) of ``stem``'s
     instance on ``side``: every step that moves its family, summed. The
     north-most instance is on the north side too."""
     sides = {None, side} | ({"north"} if side == "north-most" else set())
     offset = [0.0, 0.0, 0.0]
-    for step in asm.EXPLODE_STEPS:
-        if asm.family(stem) in step.stems and step.side in sides:
+    for step in explode.EXPLODE_STEPS:
+        if explode.family(stem) in step.stems and step.side in sides:
             offset["xyz".index(step.axis)] += step.distance_mm
     return offset[0], offset[1], offset[2]
 
 
 def _exploded(
-    point: tuple[float, float, float], stem: str, side: asm.Side
+    point: tuple[float, float, float], stem: str, side: explode.Side
 ) -> tuple[float, float, float]:
     dx, dy, dz = exploded_offset(stem, side)
     return point[0] + dx, point[1] + dy, point[2] + dz
@@ -621,9 +622,16 @@ EXPLODED_DETAIL_X = 0.392  # the column between the BOM and the right border
 NORTH_BRACKET_DETAIL = BankView(
     "DETAIL B",
     EXPLODED_DETAIL_SCALE,
-    _exploded((_PIVOT_X, _PIVOT_Y, PIVOT_BRACKET_Z[1]), asm.BRACKET, "north"),
+    _exploded((_PIVOT_X, _PIVOT_Y, PIVOT_BRACKET_Z[1]), explode.BRACKET, "north"),
     (EXPLODED_DETAIL_X, 0.240),
-    frozenset({asm.BRACKET, asm.BRACKET_SET_SCREW, asm.BRACKET_HOLD_DOWN, asm.WASHER}),
+    frozenset(
+        {
+            explode.BRACKET,
+            explode.BRACKET_SET_SCREW,
+            explode.BRACKET_HOLD_DOWN,
+            explode.WASHER,
+        }
+    ),
     crop_radius_mm=44.0,
     parts="NORTH BRACKET",
     orientation="*Isometric",
@@ -639,11 +647,11 @@ NORTH_KEEPER_DETAIL = BankView(
     EXPLODED_DETAIL_SCALE,
     _exploded(
         (_FULCRUM_X, _FULCRUM_Y, FULCRUM_KEEPER_CENTRE_Z + KEEPER_Z_OFF),
-        asm.KEEPER,
+        explode.KEEPER,
         "north",
     ),
     (EXPLODED_DETAIL_X, 0.170),
-    frozenset({asm.KEEPER, asm.KEEPER_SET_SCREW, asm.KEEPER_FOOT_SCREW}),
+    frozenset({explode.KEEPER, explode.KEEPER_SET_SCREW, explode.KEEPER_FOOT_SCREW}),
     crop_radius_mm=36.0,
     parts="NORTH KEEPER",
     orientation="*Isometric",
@@ -698,19 +706,19 @@ DETAIL_POINTERS = tuple(
             3.0,
         ),
         (
-            f"{BOM_PART_NUMBERS[asm.WASHER]} WASHER",
+            f"{BOM_PART_NUMBERS[explode.WASHER]} WASHER",
             (0.110, 0.121),
             _WASHER_MID,
             -1.5,
         ),
         (
-            f"{BOM_PART_NUMBERS[asm.BANK_SPRING]} SPRING",
+            f"{BOM_PART_NUMBERS[explode.BANK_SPRING]} SPRING",
             (0.110, 0.108),
             _SPRING_MID,
             -3.0,
         ),
         (
-            f"{BOM_PART_NUMBERS[asm.BRACKET]} EAR",
+            f"{BOM_PART_NUMBERS[explode.BRACKET]} EAR",
             (0.110, 0.095),
             asm.PIVOT_CHAIN_Z[0] - 3.0,
             -4.5,
@@ -1330,7 +1338,7 @@ def _place_exploded_sheet(
         items=items,
         anchors={
             stem: BalloonAnchor(
-                point_mm=BRACKET_BALLOON_POINT_MM if stem == asm.BRACKET else None,
+                point_mm=BRACKET_BALLOON_POINT_MM if stem == explode.BRACKET else None,
                 instance=north_instances[stem],
             )
             for stem in BOM_COMPONENTS
@@ -1467,7 +1475,7 @@ def north_end_trail_mm() -> tuple[tuple[float, float, float], ...]:
     """The north bracket's explode path (model mm): its seat on the
     MHA-CH-005 axis, north along that axis, then up to its exploded bore."""
     seat = (_PIVOT_X, _PIVOT_Y, PIVOT_BRACKET_Z[1])
-    dx, dy, dz = exploded_offset(asm.BRACKET, "north")
+    dx, dy, dz = exploded_offset(explode.BRACKET, "north")
     if dx != 0.0 or dy <= 0.0 or dz <= 0.0:
         raise RuntimeError(
             f"the north bracket no longer explodes north then up: {(dx, dy, dz)}"
@@ -1662,7 +1670,7 @@ def _assert_settings(displays: dict[str, Any]) -> None:
             str(display.GetText(REFERENCE_PREFIX_PART) or ""),
             str(display.GetText(REFERENCE_SUFFIX_PART) or ""),
         ) == ("(", ")")
-        if name in asm.REFERENCE_DIMENSIONS:
+        if name in notes.REFERENCE_DIMENSIONS:
             if not reference:
                 raise RuntimeError(f"{name}: not shown as a reference")
         else:
@@ -1715,7 +1723,7 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     displays = _displays(adapter, annotations)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
-        if name in asm.REFERENCE_DIMENSIONS:
+        if name in notes.REFERENCE_DIMENSIONS:
             set_reference_dimension(adapter, annotation, label=f"channel {name}")
     if sorted(displays) != sorted(asm.DIMENSION_FEATURE):
         raise RuntimeError(f"fit-up views imported {sorted(displays)}")

@@ -9,7 +9,7 @@ insert/mate loop. Distances are presentation offsets, not dimensions;
 directions come from the carriage's own axes (``pn_pen_carriage_geom``) or
 the assembly's global axes. No SolidWorks imports.
 
-The disassembly order, the notes' ASSEMBLY_STEPS read back to front: the
+The disassembly order, the sheet's ASSEMBLY_STEPS read back to front: the
 hanger's loose fastening off, the wire off the eye, the carriage out of the
 U guides' open front ends, the stud and its jam nut up off the rod top, the
 carriage down off the rod's pivot, the rod set screw back out along its tap,
@@ -132,16 +132,6 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # The thumb screw rides on in the stirrup's tap, as it does off the bench.
     *_along("stirrup off", (FRAME, THUMB_SCREW), _negated(BLOCK_X), STIRRUP_OFF),
 )
-
-
-def exploded_point(stem: str, point: tuple[float, float, float]) -> tuple[float, ...]:
-    """``point`` (machine mm, assembled) carried by every step that moves
-    ``stem``."""
-    moved = list(point)
-    for _label, stems, key, distance in EXPLODE_STEPS:
-        if stem in stems:
-            moved["xyz".index(key)] += distance
-    return tuple(moved)
 
 
 # --- contract asserts ---------------------------------------------------------

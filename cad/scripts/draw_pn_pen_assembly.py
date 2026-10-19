@@ -11,7 +11,7 @@ presentation (``pn_pen_explode_spec``) with its explode trails, the BOM
 sheet 3 the finished isometric beside the numbered assembly sequence and
 checks. Every setting and pose comes from ``pn_pen_assembly_spec``, every
 printed text and detail region from
-``pn_pen_assembly_notes``, the rest from the part registry; this recipe only
+``pn_pen_assembly_sheet``, the rest from the part registry; this recipe only
 lays the sheets out. It never edits the source assembly or its explodes.
 """
 
@@ -28,7 +28,7 @@ from typing import Any, Callable
 import _config
 import _telemetry
 import pn_pen_adjust_screw_spec as stud
-import pn_pen_assembly_notes as notes
+import pn_pen_assembly_sheet as notes
 import pn_pen_assembly_spec as spec
 import pn_pen_explode_spec as explode
 import pn_pen_hanger_spec as hanger
@@ -899,9 +899,9 @@ def _assert_dimension_ink_on_sheet(display: Any, *, label: str) -> None:
 
 def _band(name: str) -> tuple[float, float]:
     """``name``'s nominal and symmetric band in SolidWorks system units."""
-    if name in spec.ANGULAR_TOLERANCES:
-        return math.radians(spec.YAW_DEG), math.radians(spec.ANGULAR_TOLERANCES[name])
-    return spec.DIMENSION_NOMINALS[name] / 1000.0, spec.DIMENSION_TOLERANCES[
+    if name in notes.ANGULAR_TOLERANCES:
+        return math.radians(spec.YAW_DEG), math.radians(notes.ANGULAR_TOLERANCES[name])
+    return notes.DIMENSION_NOMINALS[name] / 1000.0, notes.DIMENSION_TOLERANCES[
         name
     ] / 1000.0
 
@@ -915,7 +915,7 @@ def _assert_reference(name: str, display: Any, *, when: str) -> None:
     brackets = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
     callout = str(display.GetText(CALLOUT_TEXT_PART) or "").replace("\r\n", "\n")
     if (
-        abs(value - spec.DIMENSION_NOMINALS[name] / 1000.0) > 1e-8
+        abs(value - notes.DIMENSION_NOMINALS[name] / 1000.0) > 1e-8
         or brackets != ("(", ")")
         or int(tolerance.Type) != 0  # swTolNONE
         or callout != notes.DIMENSION_CALLOUTS[name]
@@ -931,7 +931,7 @@ def _assert_settings(displays: list[tuple[str, Any]], *, when: str) -> None:
     symmetric band and places, and its callout; a reference setting its
     parenthesised nominal."""
     for name, display in displays:
-        if name in spec.REFERENCE_DIMENSIONS:
+        if name in notes.REFERENCE_DIMENSIONS:
             _assert_reference(name, display, when=when)
             continue
         nominal, band = _band(name)
@@ -944,7 +944,7 @@ def _assert_settings(displays: list[tuple[str, Any]], *, when: str) -> None:
             or int(tolerance.Type) != 4  # swTolSYMMETRIC
             or abs(float(tolerance.GetMaxValue()) - band) > 1e-9
             or abs(float(tolerance.GetMinValue()) + band) > 1e-9
-            or int(display.GetPrimaryTolPrecision2()) != spec.TOLERANCE_PRECISION[name]
+            or int(display.GetPrimaryTolPrecision2()) != notes.TOLERANCE_PRECISION[name]
             or callout != notes.DIMENSION_CALLOUTS[name]
         ):
             raise RuntimeError(
@@ -991,7 +991,7 @@ def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
         for annotation in annotations
     ]
     for annotation, (name, _display) in zip(annotations, displays):
-        if name in spec.REFERENCE_DIMENSIONS:
+        if name in notes.REFERENCE_DIMENSIONS:
             set_reference_dimension(adapter, annotation, label=f"pen {name}")
     if sorted(name for name, _ in displays) != sorted(notes.DIMENSION_CALLOUTS):
         raise RuntimeError(f"pen details imported {sorted(n for n, _ in displays)}")
@@ -1083,9 +1083,9 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
         raise RuntimeError(
             f"pen BOM identities {sorted(actual)!r} != {sorted(BOM_COMPONENTS)!r}"
         )
-    # The sequence and checks cite these item numbers (spec.ITEM).
+    # The sequence and checks cite these item numbers (notes.ITEM).
     numbering = {stem: values[1] for stem, values in actual.items()}
-    expected_numbering = {stem: str(spec.ITEM[stem]) for stem in BOM_COMPONENTS}
+    expected_numbering = {stem: str(notes.ITEM[stem]) for stem in BOM_COMPONENTS}
     if numbering != expected_numbering:
         raise RuntimeError(
             f"pen BOM item numbers {numbering!r} != {expected_numbering!r}"
@@ -1370,9 +1370,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
         required=("Number", "Revision", "Material Specification", "Finish", "Quantity"),
     )
-    if properties["Number"] != spec.DRAWING_NUMBER:
+    if properties["Number"] != notes.DRAWING_NUMBER:
         raise RuntimeError(
-            f"pen source Number {properties['Number']!r} != {spec.DRAWING_NUMBER!r}"
+            f"pen source Number {properties['Number']!r} != {notes.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
 
