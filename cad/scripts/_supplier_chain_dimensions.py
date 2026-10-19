@@ -41,9 +41,18 @@ def annotate_chain_pitch(
     if kind not in ("inner", "outer", "connecting"):
         raise ValueError(f"unknown roller-chain source {kind!r}")
     radius = stock.PIN_DIAMETER / 2
-    z = stock.CONNECTING_PIN_END if kind == "connecting" else stock.CHAIN_PIN_HALF_LENGTH
-    stations = (-SUPPLIER_PITCH_MM / 2, SUPPLIER_PITCH_MM / 2) if kind == "connecting" else (
-        SUPPLIER_PITCH_MM, 2 * SUPPLIER_PITCH_MM,
+    z = (
+        stock.CONNECTING_PIN_END
+        if kind == "connecting"
+        else stock.CHAIN_PIN_HALF_LENGTH
+    )
+    stations = (
+        (-SUPPLIER_PITCH_MM / 2, SUPPLIER_PITCH_MM / 2)
+        if kind == "connecting"
+        else (
+            SUPPLIER_PITCH_MM,
+            2 * SUPPLIER_PITCH_MM,
+        )
     )
     label = f"{kind} chain link supplier pitch"
     view = _early_bound(views["free_front"], "IView")
@@ -83,7 +92,9 @@ def annotate_chain_pitch(
         _early_bound(display, "IDisplayDimension").GetDimension2(0), "IDimension"
     )
     if any(int(native.GetArcEndCondition(index)) != 1 for index in (1, 2)):
-        raise RuntimeError(f"{label}: both circular endpoints must measure their centres")
+        raise RuntimeError(
+            f"{label}: both circular endpoints must measure their centres"
+        )
     assert_dimension_measures(
         adapter, display, expected_mm=SUPPLIER_PITCH_MM, label=label, entities=entities
     )
@@ -102,9 +113,12 @@ def annotate_chain_pitch(
         final_scan = scan_view_edges(view, label=f"{label} settled")
         final_entities = tuple(
             final_scan.circle_at(
-                (x, 0.0, z), radius, axis=(0.0, 0.0, 1.0),
+                (x, 0.0, z),
+                radius,
+                axis=(0.0, 0.0, 1.0),
                 label=f"{label} settled station {index}",
-                center_tol_mm=1e-5, radius_tol_mm=1e-5,
+                center_tol_mm=1e-5,
+                radius_tol_mm=1e-5,
             ).edge
             for index, x in enumerate(stations)
         )
@@ -112,12 +126,17 @@ def annotate_chain_pitch(
             _early_bound(display, "IDisplayDimension").GetDimension2(0), "IDimension"
         )
         if any(int(final_native.GetArcEndCondition(index)) != 1 for index in (1, 2)):
-            raise RuntimeError(f"{label}: settled circular endpoints lost their centres")
+            raise RuntimeError(
+                f"{label}: settled circular endpoints lost their centres"
+            )
         if int(_early_bound(final_native.Tolerance, "IDimensionTolerance").Type) != 0:
             raise RuntimeError(f"{label}: unprovided supplier tolerance appeared")
         assert_dimension_measures(
-            adapter, display, expected_mm=SUPPLIER_PITCH_MM,
-            label=label, entities=final_entities,
+            adapter,
+            display,
+            expected_mm=SUPPLIER_PITCH_MM,
+            label=label,
+            entities=final_entities,
         )
         assert_supplier_reference_dimension(adapter, display, **presentation)
 
@@ -125,7 +144,9 @@ def annotate_chain_pitch(
 
 
 def annotate_chain_stock(
-    adapter: Any, views: Mapping[str, Any], *,
+    adapter: Any,
+    views: Mapping[str, Any],
+    *,
     kind: Literal["inner", "outer", "connecting"],
 ) -> tuple[Callable[[], None], ...]:
     """Supplier-source sections and physical centre pitch; no installed sizes."""
@@ -135,18 +156,34 @@ def annotate_chain_stock(
     rows_by_view = {
         "free_front": (
             (stock.PIN_DIMENSION, stock.PIN_DIAMETER, 3, "diameter", "PIN"),
-            (stock.ROLLER_DIMENSION, stock.ROLLER_DIAMETER, 3 if connecting else 2,
-             "diameter", "FOR ROLLER" if connecting else "ROLLER"),
+            (
+                stock.ROLLER_DIMENSION,
+                stock.ROLLER_DIAMETER,
+                3 if connecting else 2,
+                "diameter",
+                "FOR ROLLER" if connecting else "ROLLER",
+            ),
         ),
         "free_top": (
-            (stock.WIDTH_DIMENSION, stock.ROLLER_WIDTH, 3, "length",
-             "FOR ROLLER WIDTH" if connecting else "ROLLER WIDTH"),
+            (
+                stock.WIDTH_DIMENSION,
+                stock.ROLLER_WIDTH,
+                3,
+                "length",
+                "FOR ROLLER WIDTH" if connecting else "ROLLER WIDTH",
+            ),
         ),
     }
     if connecting:
         rows_by_view["free_top"] += (
             (stock.PLATE_DIMENSION, stock.PLATE_THICKNESS, 3, "length", "PLATE"),
-            (stock.LENGTH_DIMENSION, stock.CONNECTING_PIN_LENGTH, 3, "length", "OVERALL PIN"),
+            (
+                stock.LENGTH_DIMENSION,
+                stock.CONNECTING_PIN_LENGTH,
+                3,
+                "length",
+                "OVERALL PIN",
+            ),
         )
     checks = []
     for key, rows in rows_by_view.items():
@@ -160,47 +197,84 @@ def annotate_chain_stock(
         else:
             positions = {stock.WIDTH_DIMENSION: (xmin - 0.007, (ymin + ymax) / 2)}
             if connecting:
-                positions.update({
-                    stock.PLATE_DIMENSION: (xmax + 0.007, ymax + 0.008),
-                    stock.LENGTH_DIMENSION: (xmax + 0.013, (ymin + ymax) / 2),
-                })
+                positions.update(
+                    {
+                        stock.PLATE_DIMENSION: (xmax + 0.007, ymax + 0.008),
+                        stock.LENGTH_DIMENSION: (xmax + 0.013, (ymin + ymax) / 2),
+                    }
+                )
         annotations = curate_view_dimensions(
-            adapter, view, keep=positions, view_label=f"{kind} supplier {key}",
+            adapter,
+            view,
+            keep=positions,
+            view_label=f"{kind} supplier {key}",
             dimensions_by_feature=stock.DIMENSIONS_BY_FEATURE,
         )
-        by_name = {dimension_name(adapter, annotation): annotation for annotation in annotations}
+        by_name = {
+            dimension_name(adapter, annotation): annotation
+            for annotation in annotations
+        }
         if len(annotations) != len(rows) or set(by_name) != set(positions):
-            raise RuntimeError(f"{kind} {key}: supplier source dimension inventory differs")
+            raise RuntimeError(
+                f"{kind} {key}: supplier source dimension inventory differs"
+            )
         for name, expected, precision, presentation, callout in rows:
-            display = _early_bound(by_name[name].GetSpecificAnnotation(), "IDisplayDimension")
-            owner = stock.FRONT_FEATURE if key == "free_front" else stock.SECTION_FEATURE
+            display = _early_bound(
+                by_name[name].GetSpecificAnnotation(), "IDisplayDimension"
+            )
+            owner = (
+                stock.FRONT_FEATURE if key == "free_front" else stock.SECTION_FEATURE
+            )
             options = {
-                "label": f"{name}@{owner}", "units": "in", "precision": precision,
-                "expected_mm": expected, "presentation": presentation, "callout": callout,
+                "label": f"{name}@{owner}",
+                "units": "in",
+                "precision": precision,
+                "expected_mm": expected,
+                "presentation": presentation,
+                "callout": callout,
             }
             supplier_reference_dimension(adapter, display, **options)
 
-            def settled(display=display, name=name, owner=owner, options=options) -> None:
+            def settled(
+                display=display, name=name, owner=owner, options=options
+            ) -> None:
                 native = _early_bound(display.GetDimension2(0), "IDimension")
                 if str(native.FullName).split("@")[:2] != [name, owner]:
-                    raise RuntimeError(f"{name}: supplier dimension lost its source section")
+                    raise RuntimeError(
+                        f"{name}: supplier dimension lost its source section"
+                    )
                 if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
-                    raise RuntimeError(f"{name}: unprovided supplier tolerance appeared")
+                    raise RuntimeError(
+                        f"{name}: unprovided supplier tolerance appeared"
+                    )
                 assert_supplier_reference_dimension(adapter, display, **options)
 
             checks.append(settled)
     # Import first: curating source dimensions must not delete a drawing-owned
     # centre-to-centre pitch that was authored before an import/rebuild.
-    checks.append(annotate_chain_pitch(
-        adapter, views, kind=kind,
-        precision=CONNECTING_LINK_PITCH_PRECISION if connecting else CHAIN_PITCH_PRECISION,
-    ))
+    checks.append(
+        annotate_chain_pitch(
+            adapter,
+            views,
+            kind=kind,
+            precision=CONNECTING_LINK_PITCH_PRECISION
+            if connecting
+            else CHAIN_PITCH_PRECISION,
+        )
+    )
 
     def inventory() -> None:
-        expected = {"free_front": 3, "free_top": 3 if connecting else 1,
-                    "free_right": 0, "installed_iso": 0}
+        expected = {
+            "free_front": 3,
+            "free_top": 3 if connecting else 1,
+            "free_right": 0,
+            "installed_iso": 0,
+        }
         for key, count in expected.items():
-            if int(_early_bound(views[key], "IView").GetDisplayDimensionCount()) != count:
+            if (
+                int(_early_bound(views[key], "IView").GetDisplayDimensionCount())
+                != count
+            ):
                 raise RuntimeError(f"{kind} {key}: supplier reference count changed")
 
     checks.append(inventory)
@@ -228,7 +302,9 @@ def annotate_keeper_bead(adapter: Any, views: Mapping[str, Any]) -> Callable[[],
         dimensions_by_feature=chain.DRAWING_DIMENSIONS,
     )
     if len(annotations) != 1:
-        raise RuntimeError("keeper catalogue bead diameter: expected one native source dimension")
+        raise RuntimeError(
+            "keeper catalogue bead diameter: expected one native source dimension"
+        )
     display = _early_bound(
         _early_bound(annotations[0], "IAnnotation").GetSpecificAnnotation(),
         "IDisplayDimension",
@@ -259,13 +335,19 @@ def annotate_keeper_bead(adapter: Any, views: Mapping[str, Any]) -> Callable[[],
             or str(native.Name) != name
             or str(native.FullName).split("@")[1:2] != ["SeedProfile"]
         ):
-            raise RuntimeError("keeper catalogue bead size lost its native source diameter")
+            raise RuntimeError(
+                "keeper catalogue bead size lost its native source diameter"
+            )
         if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
-            raise RuntimeError("keeper catalogue bead size acquired an unprovided tolerance")
+            raise RuntimeError(
+                "keeper catalogue bead size acquired an unprovided tolerance"
+            )
         for orientation, item in views.items():
             count = int(_early_bound(item, "IView").GetDisplayDimensionCount())
             if count != (1 if orientation == "*Front" else 0):
-                raise RuntimeError("keeper catalogue bead reference count changed after final rebuild")
+                raise RuntimeError(
+                    "keeper catalogue bead reference count changed after final rebuild"
+                )
         assert_supplier_reference_dimension(adapter, final_display, **presentation)
 
     return settled

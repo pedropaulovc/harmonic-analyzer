@@ -25,9 +25,7 @@ SUPPLIER_MARGINS = {
 }
 
 
-def _supplier_dimensions(
-    adapter: Any, views: dict[str, Any]
-) -> Callable[[], None]:
+def _supplier_dimensions(adapter: Any, views: dict[str, Any]) -> Callable[[], None]:
     return supplier_washer_dimensions(
         adapter,
         views,
@@ -49,7 +47,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     def assert_dimensions() -> None:
         if len(proofs) != 1:
-            raise RuntimeError("supplier washer dimensions must be authored exactly once")
+            raise RuntimeError(
+                "supplier washer dimensions must be authored exactly once"
+            )
         proofs[0]()
 
     return await build_purchased_fastener_drawing(

@@ -18,7 +18,6 @@ from _mcmaster_91794a078 import (
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_REFERENCE_STARTS,
     SUPPLIER_REFERENCE_PLANES,
-    SUPPLIER_REFERENCE_FORMATS,
 )
 from diagnostics.diag_build_91794A078 import build_91794A078
 from vn_magnifying_bracket_screw_spec import SKU

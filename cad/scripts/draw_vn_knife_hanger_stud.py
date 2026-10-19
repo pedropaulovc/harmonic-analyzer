@@ -234,9 +234,7 @@ def _format_supplier_reference(adapter: Any, display: Any, name: str) -> Any:
 
 def _add_stock_reference(adapter: Any) -> tuple[Any, Any]:
     """Measure the original stock solid, clearly separate from the fitted bolt."""
-    stock = place_view(
-        adapter, str(SOURCE), "*Front", *STOCK_CENTER, scale=SHEET_SCALE
-    )
+    stock = place_view(adapter, str(SOURCE), "*Front", *STOCK_CENTER, scale=SHEET_SCALE)
     bound = _early_bound(stock, "IView")
     bound.ReferencedConfiguration = SUPPLIER_STOCK_CONFIGURATION
     if not adapter.currentModel.EditRebuild3():
@@ -276,7 +274,10 @@ def _assert_supplier_references(
     """Re-read every source reference after the final rebuild, before saving."""
     if set(references) != set(SUPPLIER_REFERENCE_DIMENSIONS):
         raise RuntimeError("supplier reference coverage changed before saving")
-    if str(_early_bound(stock, "IView").ReferencedConfiguration) != SUPPLIER_STOCK_CONFIGURATION:
+    if (
+        str(_early_bound(stock, "IView").ReferencedConfiguration)
+        != SUPPLIER_STOCK_CONFIGURATION
+    ):
         raise RuntimeError("source-stock view lost its stock configuration")
     if any(
         str(_early_bound(view, "IView").ReferencedConfiguration)
@@ -388,7 +389,9 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         settled_checks=(
-            lambda: _assert_supplier_references(adapter, supplier_refs, stock, (front, iso)),
+            lambda: _assert_supplier_references(
+                adapter, supplier_refs, stock, (front, iso)
+            ),
         ),
     )
 

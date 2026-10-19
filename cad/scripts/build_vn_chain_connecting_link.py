@@ -35,7 +35,10 @@ async def _stock_references(adapter) -> None:
 
 async def build(adapter) -> dict[str, str]:
     return await build_link(
-        adapter, part_name=PART_NAME, material=MATERIAL, **CONNECTING_LINK,
+        adapter,
+        part_name=PART_NAME,
+        material=MATERIAL,
+        **CONNECTING_LINK,
         before_save=_stock_references,
     )
 

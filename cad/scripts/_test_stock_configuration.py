@@ -75,7 +75,10 @@ class StockConfigurationPart:
         drop_suppression: frozenset[str] = frozenset(),
         rebuild_fails: bool = False,
     ) -> None:
-        self.parents: dict[str, str | None] = {FINISHED: None, FINISHED_SIMPLIFIED: FINISHED}
+        self.parents: dict[str, str | None] = {
+            FINISHED: None,
+            FINISHED_SIMPLIFIED: FINISHED,
+        }
         self.active = FINISHED
         self.auto_activates = auto_activates
         self.refuse_show = refuse_show
@@ -100,8 +103,9 @@ class StockConfigurationPart:
     def GetConfigurationByName(self, name: str) -> Configuration | None:
         return Configuration(name, None) if name in self.parents else None
 
-    def AddConfiguration2(self, name, _comment, _alternate, options, parent, _description,
-                          _rebuild) -> Configuration | None:
+    def AddConfiguration2(
+        self, name, _comment, _alternate, options, parent, _description, _rebuild
+    ) -> Configuration | None:
         if name in self.parents or parent not in self.parents:
             return None
         self.parents[name] = parent
@@ -130,10 +134,15 @@ class StockConfigurationPart:
         return not self.rebuild_fails
 
     def states(self, configuration: str) -> dict[str, bool]:
-        return {name: feature.states[configuration] for name, feature in self.features.items()}
+        return {
+            name: feature.states[configuration]
+            for name, feature in self.features.items()
+        }
 
 
-def stock_configuration_adapter(module, monkeypatch, *, bom_fails: bool = False, **native):
+def stock_configuration_adapter(
+    module, monkeypatch, *, bom_fails: bool = False, **native
+):
     """Bind ``module``'s helper to a ``StockConfigurationPart``; return
     ``(adapter, part, bom_copies)``.  Only the COM wrapper, the feature
     lookup and the BOM-identity copy are stood in; the active-name and
@@ -150,6 +159,8 @@ def stock_configuration_adapter(module, monkeypatch, *, bom_fails: bool = False,
     monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(module, "_bstr_array", tuple)
     monkeypatch.setattr(_simplified_part, "_bstr_array", tuple)
-    monkeypatch.setattr(module, "_feature_by_name", lambda _adapter, name: part.features[name])
+    monkeypatch.setattr(
+        module, "_feature_by_name", lambda _adapter, name: part.features[name]
+    )
     monkeypatch.setattr(module, "_copy_bom_identity", copy_bom_identity)
     return SimpleNamespace(currentModel=part), part, copies

@@ -166,13 +166,13 @@ def _supplier_data_lines(data: Sequence[str], *, label: str) -> tuple[str, ...]:
         or len(line) > MAX_ITEM_CHARS
         for line in lines
     ):
-        raise ValueError(f"{label}: supplier operating data must fit single footer lines")
+        raise ValueError(
+            f"{label}: supplier operating data must fit single footer lines"
+        )
     return ("SUPPLIER OPERATING DATA (REFERENCE):", *lines) if lines else ()
 
 
-def footer_top(
-    notes: str, *, label: str, supplier_data: Sequence[str] = ()
-) -> float:
+def footer_top(notes: str, *, label: str, supplier_data: Sequence[str] = ()) -> float:
     """Top of installation notes plus a separately labelled supplier data block."""
     lines = note_lines(notes, label=label)
     data = _supplier_data_lines(supplier_data, label=label)
@@ -187,7 +187,8 @@ def view_band_bottom(
 ) -> float:
     """The bottom view row's caption height: clear of the complete footer."""
     return max(
-        footer_top(notes, label=label, supplier_data=supplier_data) + _CAPTION_CLEARANCE,
+        footer_top(notes, label=label, supplier_data=supplier_data)
+        + _CAPTION_CLEARANCE,
         _LOWEST_CAPTION_Y,
     )
 
@@ -251,7 +252,9 @@ def supplier_fit_cells(cells: tuple, margins: SupplierMargins, *, label: str) ->
         left, bottom, right, top = padding
         inset = (cell[0] + left, cell[1] + bottom, cell[2] - right, cell[3] - top)
         if inset[0] >= inset[2] or inset[1] >= inset[3]:
-            raise ValueError(f"{label} {name}: supplier margins leave no geometry space")
+            raise ValueError(
+                f"{label} {name}: supplier margins leave no geometry space"
+            )
         fitted.append(_cell(name, *inset))
     return tuple(fitted)
 
@@ -1005,9 +1008,11 @@ async def _build_reference_sheet(
                     f"{name}: purchased view leaves its cell/border: {box!r}"
                 )
         for note, linked_text, resolved_text, cell in placed:
-            if supplier_dimensions is not None and int(
-                _early_bound(note.GetAnnotation(), "IAnnotation").OwnerType
-            ) != 1:
+            if (
+                supplier_dimensions is not None
+                and int(_early_bound(note.GetAnnotation(), "IAnnotation").OwnerType)
+                != 1
+            ):
                 raise RuntimeError(
                     f"{label}: caption/footer note is not sheet-owned: {linked_text!r}"
                 )
@@ -1032,7 +1037,9 @@ async def _build_reference_sheet(
     final_checks = settled_checks
     if supplier_dimensions is not None:
         if not settled_checks:
-            raise RuntimeError("supplier annotations require final settled native checks")
+            raise RuntimeError(
+                "supplier annotations require final settled native checks"
+            )
         final_checks = (
             *settled_checks,
             lambda: _assert_supplier_layout(

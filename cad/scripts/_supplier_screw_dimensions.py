@@ -74,9 +74,7 @@ def assert_supplier_screw(
                 continue
             name, feature = identity[:2]
             if name not in expected:
-                raise RuntimeError(
-                    f"unexpected settled supplier reference {full_name}"
-                )
+                raise RuntimeError(f"unexpected settled supplier reference {full_name}")
             plane = planes.get(name, "Front")
             if feature != FEATURE_BY_PLANE[plane] or orientation != f"*{plane}":
                 raise RuntimeError(

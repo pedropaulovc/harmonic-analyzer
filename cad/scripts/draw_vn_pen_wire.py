@@ -117,7 +117,10 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front",
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_settled_stock = add_nominal_stock_cross_section(adapter, SOURCE)

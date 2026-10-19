@@ -36,7 +36,11 @@ def _construction(adapter: Any, entity: str) -> None:
 
 
 async def _anchor(
-    adapter: Any, dimensions: SketchDims, entity: str, start: tuple[float, float], name: str
+    adapter: Any,
+    dimensions: SketchDims,
+    entity: str,
+    start: tuple[float, float],
+    name: str,
 ) -> None:
     await anchor_point_to_origin(adapter, f"{entity}.start", *start, name)
     for coordinate, axis in zip(start, ("X", "Y"), strict=True):
@@ -59,7 +63,9 @@ async def _linear(
     )
     set_sketch_direct_db(adapter, True)
     try:
-        line = check(f"create {name} supplier reference", await adapter.add_line(*start, *end))
+        line = check(
+            f"create {name} supplier reference", await adapter.add_line(*start, *end)
+        )
     finally:
         set_sketch_direct_db(adapter, False)
     _construction(adapter, line)
@@ -110,7 +116,12 @@ async def _angle(
         await adapter.add_sketch_constraint(baseline, None, "horizontal"),
     )
     await dimension_between(
-        adapter, f"{baseline}.start", f"{baseline}.end", "horizontal_distance", 1.0, name
+        adapter,
+        f"{baseline}.start",
+        f"{baseline}.end",
+        "horizontal_distance",
+        1.0,
+        name,
     )
     dimensions.record(f"{name}BaselineLength")
     await _anchor(adapter, dimensions, baseline, start, name)
@@ -156,11 +167,15 @@ async def add_supplier_reference_sketch(
         raise ValueError("supplier reference placement names do not match dimensions")
     for name, value, orientation in dimensions:
         if not name or not math.isfinite(value) or value == 0.0:
-            raise ValueError(f"{name}: supplier reference value must be finite and nonzero")
+            raise ValueError(
+                f"{name}: supplier reference value must be finite and nonzero"
+            )
         if orientation not in ("horizontal", "vertical", "angle"):
             raise ValueError(f"{name}: unsupported supplier reference orientation")
         if orientation == "angle" and not 0.0 < value < 180.0:
-            raise ValueError(f"{name}: supplier included angle must be between 0 and 180")
+            raise ValueError(
+                f"{name}: supplier included angle must be between 0 and 180"
+            )
         if planes.get(name, "Front") not in FEATURE_BY_PLANE:
             raise ValueError(f"{name}: unsupported supplier reference plane")
         if not all(math.isfinite(value) for value in starts.get(name, (0.0, 0.0))):

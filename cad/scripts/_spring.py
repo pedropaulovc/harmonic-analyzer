@@ -45,10 +45,14 @@ async def run_before_save(
     """
     installed_configuration = active_configuration_name(adapter)
     if not installed_configuration:
-        raise RuntimeError(f"{part_name}: installed configuration identity is unavailable")
+        raise RuntimeError(
+            f"{part_name}: installed configuration identity is unavailable"
+        )
     await before_save(adapter)
     if active_configuration_name(adapter) != installed_configuration:
-        raise RuntimeError(f"{part_name}: before_save changed the installed active configuration")
+        raise RuntimeError(
+            f"{part_name}: before_save changed the installed active configuration"
+        )
 
 
 @_telemetry.traced("spring.build_variant", label_param="part_name")

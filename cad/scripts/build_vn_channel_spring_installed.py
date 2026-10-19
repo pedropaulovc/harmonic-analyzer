@@ -28,10 +28,14 @@ PART_NAME = "vn-channel-spring-installed"
 
 async def _add_supplier_references(adapter) -> None:
     await add_extension_spring_references(
-        adapter, author=build_9432K31,
-        free_length_mm=spec.FREE_LENGTH_MM, max_length_mm=spec.MAX_LENGTH_MM,
-        coil_od_mm=spec.SUPPLIER_COIL_OD_MM, wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
-        body_count=1, od_tolerance_mm=spec.SUPPLIER_COIL_OD_TOLERANCE_MM,
+        adapter,
+        author=build_9432K31,
+        free_length_mm=spec.FREE_LENGTH_MM,
+        max_length_mm=spec.MAX_LENGTH_MM,
+        coil_od_mm=spec.SUPPLIER_COIL_OD_MM,
+        wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
+        body_count=1,
+        od_tolerance_mm=spec.SUPPLIER_COIL_OD_TOLERANCE_MM,
         od_tolerance_precision=spec.SUPPLIER_COIL_OD_TOLERANCE_PRECISION,
     )
 

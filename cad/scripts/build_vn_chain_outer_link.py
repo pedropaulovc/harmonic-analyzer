@@ -33,7 +33,10 @@ MATERIAL = "Plain Carbon Steel"
 
 async def build(adapter) -> dict[str, str]:
     return await build_link(
-        adapter, part_name=PART_NAME, material=MATERIAL, **OUTER_LINK,
+        adapter,
+        part_name=PART_NAME,
+        material=MATERIAL,
+        **OUTER_LINK,
         before_save=add_chain_stock_references,
     )
 

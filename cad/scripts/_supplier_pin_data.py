@@ -50,8 +50,10 @@ class SupplierPinReference:
     def diameter_uses_limits(self) -> bool:
         """Present a discrepant print nominal as limits on the exact carrier."""
         return self.diameter_band is not None and not math.isclose(
-            self.diameter_nominal * self.unit_mm, self.diameter_mm,
-            rel_tol=0.0, abs_tol=1e-8,
+            self.diameter_nominal * self.unit_mm,
+            self.diameter_mm,
+            rel_tol=0.0,
+            abs_tol=1e-8,
         )
 
     @property

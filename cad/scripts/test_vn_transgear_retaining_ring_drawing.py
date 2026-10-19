@@ -151,12 +151,17 @@ def test_supplier_thickness_picks_the_two_real_ring_faces_not_the_pin_groove() -
     groove = line("pin groove", (0.0, 3.0, 0.0), (0.0, 3.0, spec.GROOVE_WIDTH))
     slant = line("slanted", (0.0, 3.0, 0.0), (0.1, 3.0, spec.THICKNESS))
     shifted = line("wrong face", (0.0, 3.0, 1.0), (0.0, 3.0, 1.0 + spec.THICKNESS))
-    assert drawing._thickness_edge(ViewEdges("top", (groove, slant, shifted, actual))) == actual.edge
+    assert (
+        drawing._thickness_edge(ViewEdges("top", (groove, slant, shifted, actual)))
+        == actual.edge
+    )
     with pytest.raises(RuntimeError, match="exact ring thickness"):
         drawing._thickness_edge(ViewEdges("top", (groove, slant, shifted)))
 
 
-def test_ring_settled_guard_rejects_census_attachment_and_thickness_band_drift(monkeypatch) -> None:
+def test_ring_settled_guard_rejects_census_attachment_and_thickness_band_drift(
+    monkeypatch,
+) -> None:
     from types import SimpleNamespace
     from _drawing_edges import ViewEdge, ViewEdges
     import draw_vn_transgear_retaining_ring as drawing
@@ -192,7 +197,9 @@ def test_ring_settled_guard_rejects_census_attachment_and_thickness_band_drift(m
             self.edge = edge
             self.tolerance = SourceTolerance()
             self.native = SimpleNamespace(
-                Tolerance=self.tolerance, DrivenState=1, Name=drawing.THICKNESS_DIMENSION,
+                Tolerance=self.tolerance,
+                DrivenState=1,
+                Name=drawing.THICKNESS_DIMENSION,
                 FullName=f"{drawing.THICKNESS_DIMENSION}@{drawing.THICKNESS_SKETCH}@Ring",
             )
 
@@ -202,7 +209,8 @@ def test_ring_settled_guard_rejects_census_attachment_and_thickness_band_drift(m
         def GetAnnotation(self):
             attached = thickness_attachment if self.edge == "thickness" else self.edge
             return SimpleNamespace(
-                Visible=1, GetAttachedEntities3=lambda: (attached,),
+                Visible=1,
+                GetAttachedEntities3=lambda: (attached,),
                 GetAttachedEntityTypes=lambda: (10,),
                 GetSpecificAnnotation=lambda: self,
             )
@@ -211,13 +219,23 @@ def test_ring_settled_guard_rejects_census_attachment_and_thickness_band_drift(m
             return 3
 
     front, top, right = View(2), View(1), View(3)
-    source_feature = SimpleNamespace(Visible=1, GetSpecificFeature2=lambda: source_sketch)
+    source_feature = SimpleNamespace(
+        Visible=1, GetSpecificFeature2=lambda: source_sketch
+    )
     top.ReferencedDocument = SimpleNamespace(FeatureByName=lambda _: source_feature)
     circles = tuple(
-        ViewEdge(name, None, (0.0, 0.0, spec.THICKNESS, 0.0, 0.0, 1.0, diameter / 2.0), None)
-        for name, diameter in (("free", spec.FREE_DIA), ("od", spec.OD), ("pin groove", spec.GROOVE_DIA))
+        ViewEdge(
+            name, None, (0.0, 0.0, spec.THICKNESS, 0.0, 0.0, 1.0, diameter / 2.0), None
+        )
+        for name, diameter in (
+            ("free", spec.FREE_DIA),
+            ("od", spec.OD),
+            ("pin groove", spec.GROOVE_DIA),
+        )
     )
-    thickness = ViewEdge("thickness", ((0.0, 3.0, 0.0), (0.0, 3.0, spec.THICKNESS)), None, None)
+    thickness = ViewEdge(
+        "thickness", ((0.0, 3.0, 0.0), (0.0, 3.0, spec.THICKNESS)), None, None
+    )
     scans = {front: ViewEdges("front", circles), top: ViewEdges("top", (thickness,))}
     monkeypatch.setattr(drawing, "scan_view_edges", lambda view, **_: scans[view])
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
@@ -229,14 +247,30 @@ def test_ring_settled_guard_rejects_census_attachment_and_thickness_band_drift(m
         return display
 
     monkeypatch.setattr(drawing, "_edge_reference", reference)
-    monkeypatch.setattr(drawing, "_is_same_attachment", lambda _adapter, actual, expected, _kind: actual == expected)
-    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "supplier_reference_dimension", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_args, **_kwargs: [displays["thickness"].GetAnnotation()])
-    monkeypatch.setattr(drawing, "add_application_gauges", lambda _adapter, _views: lambda: None)
+    monkeypatch.setattr(
+        drawing,
+        "_is_same_attachment",
+        lambda _adapter, actual, expected, _kind: actual == expected,
+    )
+    monkeypatch.setattr(
+        drawing, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        drawing, "supplier_reference_dimension", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        drawing,
+        "curate_view_dimensions",
+        lambda *_args, **_kwargs: [displays["thickness"].GetAnnotation()],
+    )
+    monkeypatch.setattr(
+        drawing, "add_application_gauges", lambda _adapter, _views: lambda: None
+    )
     settled = drawing.supplier_dimensions(
         SimpleNamespace(
-            currentModel=SimpleNamespace(EditRebuild3=lambda: pytest.fail("no per-dimension rebuild")),
+            currentModel=SimpleNamespace(
+                EditRebuild3=lambda: pytest.fail("no per-dimension rebuild")
+            ),
             swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
         ),
         {"*Front": front, "*Top": top, "*Right": right, "*Isometric": View(0)},
@@ -251,41 +285,71 @@ def test_ring_settled_guard_rejects_census_attachment_and_thickness_band_drift(m
         settled()
     displays["free"].edge = "free"
     thickness_attachment.GetSketch = lambda: object()
-    with pytest.raises(RuntimeError, match="thickness attachment left its actual converted source"):
+    with pytest.raises(
+        RuntimeError, match="thickness attachment left its actual converted source"
+    ):
         settled()
     thickness_attachment.GetSketch = lambda: source_sketch
     displays["thickness"].tolerance.values = (0.0, 0.0)
-    with pytest.raises(RuntimeError, match="settled model-owned thickness tolerance changed"):
+    with pytest.raises(
+        RuntimeError, match="settled model-owned thickness tolerance changed"
+    ):
         settled()
 
 
 @pytest.mark.parametrize("wrong_attachment", [False, True])
-def test_ring_native_reference_rejects_a_different_attached_edge(monkeypatch, wrong_attachment) -> None:
+def test_ring_native_reference_rejects_a_different_attached_edge(
+    monkeypatch, wrong_attachment
+) -> None:
     from types import SimpleNamespace
     import draw_vn_transgear_retaining_ring as drawing
 
     native = SimpleNamespace(DrivenState=0)
     edge, other = object(), object()
-    annotation = SimpleNamespace(GetAttachedEntities3=lambda: (other if wrong_attachment else edge,))
-    display = SimpleNamespace(GetDimension2=lambda _: native, GetAnnotation=lambda: annotation)
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: (other if wrong_attachment else edge,)
+    )
+    display = SimpleNamespace(
+        GetDimension2=lambda _: native, GetAnnotation=lambda: annotation
+    )
     model = SimpleNamespace(
         AddDiameterDimension2=lambda *_: display,
-        AddDimension2=lambda *_: pytest.fail("gripping circle must use a native diameter"),
+        AddDimension2=lambda *_: pytest.fail(
+            "gripping circle must use a native diameter"
+        ),
         ClearSelection2=lambda _: None,
     )
     adapter = SimpleNamespace(currentModel=model)
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
     monkeypatch.setattr(drawing, "_select_view_entity", lambda *_, **__: edge)
-    monkeypatch.setattr(drawing, "_is_same_attachment", lambda _adapter, actual, expected, _kind: actual is expected)
-    monkeypatch.setattr(drawing, "supplier_reference_dimension", lambda _adapter, value, **_kwargs: value)
+    monkeypatch.setattr(
+        drawing,
+        "_is_same_attachment",
+        lambda _adapter, actual, expected, _kind: actual is expected,
+    )
+    monkeypatch.setattr(
+        drawing,
+        "supplier_reference_dimension",
+        lambda _adapter, value, **_kwargs: value,
+    )
     if wrong_attachment:
         with pytest.raises(RuntimeError, match="selected ring edge"):
             drawing._edge_reference(
-                adapter, object(), edge, label="free gripping diameter",
-                expected_mm=spec.FREE_DIA, text_xy=(0.15, 0.1), diameter=True,
+                adapter,
+                object(),
+                edge,
+                label="free gripping diameter",
+                expected_mm=spec.FREE_DIA,
+                text_xy=(0.15, 0.1),
+                diameter=True,
             )
     else:
         drawing._edge_reference(
-            adapter, object(), edge, label="free gripping diameter",
-            expected_mm=spec.FREE_DIA, text_xy=(0.15, 0.1), diameter=True,
+            adapter,
+            object(),
+            edge,
+            label="free gripping diameter",
+            expected_mm=spec.FREE_DIA,
+            text_xy=(0.15, 0.1),
+            diameter=True,
         )

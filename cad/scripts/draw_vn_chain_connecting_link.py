@@ -26,13 +26,18 @@ PART_STEM = SPEC.artifact_stem
 ITEM = "ANSI #25 ROLLER CHAIN, CONNECTING LINK (1/4 PITCH)"
 
 
-def supplier_dimensions(adapter: Any, views: dict[str, Any]) -> tuple[Callable[[], None], ...]:
+def supplier_dimensions(
+    adapter: Any, views: dict[str, Any]
+) -> tuple[Callable[[], None], ...]:
     return annotate_chain_stock(adapter, views, kind="connecting")
 
 
 async def build(adapter: Any) -> dict[str, str]:
     return await build_supplier_spring_drawing(
-        adapter, SPEC, item=ITEM, cut_to_suit=False,
+        adapter,
+        SPEC,
+        item=ITEM,
+        cut_to_suit=False,
         spring_metadata=True,
         stock_caption="SUPPLIER CONNECTING LINK",
         right_caption="SUPPLIER CONNECTING LINK — RIGHT",

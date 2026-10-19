@@ -46,12 +46,18 @@ def application_profile() -> list[tuple[float, float]]:
     shaft_r = ring.SHAFT_DIA / 2.0
     groove_r = ring.GROOVE_DIA / 2.0
     return [
-        (u - half_length, shaft_r), (u - half_width, shaft_r),
-        (u - half_width, groove_r), (u + half_width, groove_r),
-        (u + half_width, shaft_r), (u + half_length, shaft_r),
-        (u + half_length, -shaft_r), (u + half_width, -shaft_r),
-        (u + half_width, -groove_r), (u - half_width, -groove_r),
-        (u - half_width, -shaft_r), (u - half_length, -shaft_r),
+        (u - half_length, shaft_r),
+        (u - half_width, shaft_r),
+        (u - half_width, groove_r),
+        (u + half_width, groove_r),
+        (u + half_width, shaft_r),
+        (u + half_length, shaft_r),
+        (u + half_length, -shaft_r),
+        (u + half_width, -shaft_r),
+        (u + half_width, -groove_r),
+        (u - half_width, -groove_r),
+        (u - half_width, -shaft_r),
+        (u - half_length, -shaft_r),
     ]
 
 
@@ -69,18 +75,27 @@ def _select_lines(adapter: Any, lines: list[str], indices: tuple[int, int]) -> N
 
 def _driven(raw: Any, name: str, expected_mm: float) -> None:
     if raw is None:
-        raise RuntimeError(f"97431A260 {name}: native application gauge dimension failed")
+        raise RuntimeError(
+            f"97431A260 {name}: native application gauge dimension failed"
+        )
     display = _early_bound(raw, "IDisplayDimension")
     if int(display.Type2) not in (2, 11, 12):
-        raise RuntimeError(f"97431A260 {name}: application gauge is not a linear measurement")
+        raise RuntimeError(
+            f"97431A260 {name}: application gauge is not a linear measurement"
+        )
     native = _early_bound(display.GetDimension2(0), "IDimension")
     native.DrivenState = 1
     native.Name = name
     if (
-        int(native.DrivenState) != 1 or str(native.Name) != name
-        or not math.isclose(float(native.SystemValue) * 1000.0, expected_mm, rel_tol=0.0, abs_tol=1e-6)
+        int(native.DrivenState) != 1
+        or str(native.Name) != name
+        or not math.isclose(
+            float(native.SystemValue) * 1000.0, expected_mm, rel_tol=0.0, abs_tol=1e-6
+        )
     ):
-        raise RuntimeError(f"97431A260 {name}: exact driven application gauge value changed")
+        raise RuntimeError(
+            f"97431A260 {name}: exact driven application gauge value changed"
+        )
 
 
 def _thickness_model_edge(model: Any) -> Any:
@@ -96,17 +111,23 @@ def _thickness_model_edge(model: Any) -> Any:
             if any(vertex is None for vertex in vertices):
                 continue
             a, b = (
-                tuple(float(value) * 1000.0 for value in _early_bound(vertex, "IVertex").GetPoint())
+                tuple(
+                    float(value) * 1000.0
+                    for value in _early_bound(vertex, "IVertex").GetPoint()
+                )
                 for vertex in vertices
             )
             if (
-                abs(a[0] - b[0]) < 1e-6 and abs(a[1] - b[1]) < 1e-6
+                abs(a[0] - b[0]) < 1e-6
+                and abs(a[1] - b[1]) < 1e-6
                 and abs(min(a[2], b[2])) < 1e-6
                 and abs(max(a[2], b[2]) - ring.THICKNESS) < 1e-6
             ):
                 candidates.append(((a[1] + b[1]) / 2.0, raw_edge))
     if not candidates:
-        raise RuntimeError("97431A260: no normalized solid edge spans the actual ring thickness")
+        raise RuntimeError(
+            "97431A260: no normalized solid edge spans the actual ring thickness"
+        )
     return max(candidates, key=lambda item: item[0])[1]
 
 
@@ -119,48 +140,76 @@ async def author_thickness_reference(adapter: Any) -> None:
     data = _early_bound(model.SelectionManager, "ISelectionMgr").CreateSelectData()
     if data is None or not _early_bound(edge, "IEntity").Select4(False, data):
         raise RuntimeError("97431A260: actual thickness edge selection failed")
-    if not _early_bound(adapter.currentSketchManager, "ISketchManager").SketchUseEdge3(False, False):
+    if not _early_bound(adapter.currentSketchManager, "ISketchManager").SketchUseEdge3(
+        False, False
+    ):
         raise RuntimeError("97431A260: actual thickness edge conversion failed")
     model.ClearSelection2(True)
     sketch = _early_bound(model.GetActiveSketch2(), "ISketch")
     segments = tuple(sketch.GetSketchSegments() or ())
-    if len(segments) != 1 or int(_early_bound(segments[0], "ISketchSegment").GetType()) != 0:
-        raise RuntimeError("97431A260: thickness carrier is not one converted native line")
+    if (
+        len(segments) != 1
+        or int(_early_bound(segments[0], "ISketchSegment").GetType()) != 0
+    ):
+        raise RuntimeError(
+            "97431A260: thickness carrier is not one converted native line"
+        )
     if not _early_bound(segments[0], "ISketchSegment").Select4(False, data):
         raise RuntimeError("97431A260: converted thickness line selection failed")
     app = _early_bound(adapter.swApp, "ISldWorks")
     app.SetUserPreferenceToggle(10, False)
     if app.GetUserPreferenceToggle(10):
-        raise RuntimeError("97431A260: thickness measurement value input remains enabled")
+        raise RuntimeError(
+            "97431A260: thickness measurement value input remains enabled"
+        )
     toggles = {
         constant("swSketchOverdefiningDimsPromptToSetState"): False,
         constant("swSketchOverdefiningDimsSetDrivenByDefault"): True,
     }
     preferences = PreferenceSpec(
-        label="97431A260-driven-thickness-reference", toggles=toggles,
+        label="97431A260-driven-thickness-reference",
+        toggles=toggles,
         baseline_toggles=dict.fromkeys(toggles, False),
     )
     with preference_override(adapter, preferences):
-        if any(bool(app.GetUserPreferenceToggle(key)) != wanted for key, wanted in toggles.items()):
-            raise RuntimeError("97431A260: native thickness creation preferences were refused")
-        _driven(model.AddDimension2(0.006, 0.003, 0.0), THICKNESS_DIMENSION, ring.THICKNESS)
+        if any(
+            bool(app.GetUserPreferenceToggle(key)) != wanted
+            for key, wanted in toggles.items()
+        ):
+            raise RuntimeError(
+                "97431A260: native thickness creation preferences were refused"
+            )
+        _driven(
+            model.AddDimension2(0.006, 0.003, 0.0), THICKNESS_DIMENSION, ring.THICKNESS
+        )
     model.ClearSelection2(True)
     check("exit native ring thickness carrier", await adapter.exit_sketch())
     name_last_feature(adapter, THICKNESS_SKETCH)
     display, _native = _named_dimension(adapter, THICKNESS_SKETCH, THICKNESS_DIMENSION)
     display.MarkedForDrawing = True
     if not bool(display.MarkedForDrawing):
-        raise RuntimeError("97431A260: source thickness reference was not marked for import")
+        raise RuntimeError(
+            "97431A260: source thickness reference was not marked for import"
+        )
     set_dimension_symmetric_tolerance(
-        adapter, THICKNESS_SKETCH, THICKNESS_DIMENSION, ring.THICKNESS_TOL,
+        adapter,
+        THICKNESS_SKETCH,
+        THICKNESS_DIMENSION,
+        ring.THICKNESS_TOL,
     )
     supplier_reference_dimension(
-        adapter, display, label="97431A260 ring thickness", units="in",
-        precision=ring.SUPPLIER_REFERENCE_PRECISION, expected_mm=ring.THICKNESS,
+        adapter,
+        display,
+        label="97431A260 ring thickness",
+        units="in",
+        precision=ring.SUPPLIER_REFERENCE_PRECISION,
+        expected_mm=ring.THICKNESS,
     )
     places = ring.SUPPLIER_REFERENCE_PRECISION
     if int(display.SetPrecision3(places, places, places, places)) != 0:
-        raise RuntimeError("97431A260: source thickness precision settings were rejected")
+        raise RuntimeError(
+            "97431A260: source thickness precision settings were rejected"
+        )
     tolerance = _early_bound(_native.Tolerance, "IDimensionTolerance")
     band = ring.THICKNESS_TOL / 1000.0
     if (
@@ -178,39 +227,61 @@ async def author_application_gauges(adapter: Any) -> None:
     check("create supplier application gauges", await adapter.create_sketch("Right"))
     points = application_profile()
     lines = await add_line_chain(adapter, points, close=True)
-    await define_rectilinear_chain(adapter, lines, points, label="supplier application gauge section")
+    await define_rectilinear_chain(
+        adapter, lines, points, label="supplier application gauge section"
+    )
     await ensure_fully_defined(adapter, "supplier application gauge section")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     app = _early_bound(adapter.swApp, "ISldWorks")
     app.SetUserPreferenceToggle(10, False)  # swInputDimValOnCreate
     if app.GetUserPreferenceToggle(10):
-        raise RuntimeError("97431A260: application gauge dimension input remains enabled")
+        raise RuntimeError(
+            "97431A260: application gauge dimension input remains enabled"
+        )
     toggles = {
         constant("swSketchOverdefiningDimsPromptToSetState"): False,
         constant("swSketchOverdefiningDimsSetDrivenByDefault"): True,
     }
     preferences = PreferenceSpec(
-        label="97431A260-driven-application-gauges", toggles=toggles,
+        label="97431A260-driven-application-gauges",
+        toggles=toggles,
         baseline_toggles=dict.fromkeys(toggles, False),
     )
     with preference_override(adapter, preferences):
-        if any(bool(app.GetUserPreferenceToggle(key)) != wanted for key, wanted in toggles.items()):
-            raise RuntimeError("97431A260: driven application gauge creation preferences were refused")
+        if any(
+            bool(app.GetUserPreferenceToggle(key)) != wanted
+            for key, wanted in toggles.items()
+        ):
+            raise RuntimeError(
+                "97431A260: driven application gauge creation preferences were refused"
+            )
         for name, indices, expected, horizontal in (
             ("ApplicationShaftOD", (0, 10), ring.SHAFT_DIA, False),
             ("ApplicationGrooveDiameter", (2, 8), ring.GROOVE_DIA, False),
             ("ApplicationGrooveWidth", (1, 3), ring.GROOVE_WIDTH, True),
         ):
             _select_lines(adapter, lines, indices)
-            create = model.AddHorizontalDimension2 if horizontal else model.AddVerticalDimension2
-            _driven(create(ring.SUPPLIER_GAUGE_CENTER_U / 1000.0, -0.004, 0.0), name, expected)
+            create = (
+                model.AddHorizontalDimension2
+                if horizontal
+                else model.AddVerticalDimension2
+            )
+            _driven(
+                create(ring.SUPPLIER_GAUGE_CENTER_U / 1000.0, -0.004, 0.0),
+                name,
+                expected,
+            )
     model.ClearSelection2(True)
     check("exit supplier application gauges", await adapter.exit_sketch())
     name_last_feature(adapter, ring.SUPPLIER_APPLICATION_SKETCH)
-    feature = _early_bound(model, "IPartDoc").FeatureByName(ring.SUPPLIER_APPLICATION_SKETCH)
+    feature = _early_bound(model, "IPartDoc").FeatureByName(
+        ring.SUPPLIER_APPLICATION_SKETCH
+    )
     if feature is None:
         raise RuntimeError("97431A260: named application gauge sketch is missing")
-    required = set(ring.SUPPLIER_APPLICATION_DIMENSIONS[ring.SUPPLIER_APPLICATION_SKETCH])
+    required = set(
+        ring.SUPPLIER_APPLICATION_DIMENSIONS[ring.SUPPLIER_APPLICATION_SKETCH]
+    )
     for raw in _feature_display_dimensions(feature):
         display = _early_bound(raw, "IDisplayDimension")
         name = str(_early_bound(display.GetDimension2(0), "IDimension").Name)
@@ -222,22 +293,37 @@ async def author_application_gauges(adapter: Any) -> None:
         ("ApplicationGrooveWidth", ring.GROOVE_WIDTH_BAND),
     ):
         set_dimension_bilateral_tolerance(
-            adapter, ring.SUPPLIER_APPLICATION_SKETCH, name, -band[1], band[0],
+            adapter,
+            ring.SUPPLIER_APPLICATION_SKETCH,
+            name,
+            -band[1],
+            band[0],
         )
     for name, expected, presentation in (
         ("ApplicationShaftOD", ring.SHAFT_DIA, "diameter"),
         ("ApplicationGrooveDiameter", ring.GROOVE_DIA, "diameter"),
         ("ApplicationGrooveWidth", ring.GROOVE_WIDTH, "length"),
     ):
-        display, _native = _named_dimension(adapter, ring.SUPPLIER_APPLICATION_SKETCH, name)
+        display, _native = _named_dimension(
+            adapter, ring.SUPPLIER_APPLICATION_SKETCH, name
+        )
         supplier_reference_dimension(
-            adapter, display, label=f"97431A260 {name}", units="in",
+            adapter,
+            display,
+            label=f"97431A260 {name}",
+            units="in",
             precision=ring.SUPPLIER_SUITABILITY_PRECISION,
-            expected_mm=expected, presentation=presentation,
+            expected_mm=expected,
+            presentation=presentation,
         )
         display.SetPrecision3(-1, -1, ring.SUPPLIER_SUITABILITY_PRECISION, -1)
-        if int(display.GetPrimaryTolPrecision2()) != ring.SUPPLIER_SUITABILITY_PRECISION:
-            raise RuntimeError(f"97431A260 {name}: source supplier tolerance places changed")
+        if (
+            int(display.GetPrimaryTolPrecision2())
+            != ring.SUPPLIER_SUITABILITY_PRECISION
+        ):
+            raise RuntimeError(
+                f"97431A260 {name}: source supplier tolerance places changed"
+            )
     blank_reference_sketches(adapter, (ring.SUPPLIER_APPLICATION_SKETCH,))
 
 

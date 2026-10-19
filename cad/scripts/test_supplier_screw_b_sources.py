@@ -66,7 +66,9 @@ def test_thread_witness_interval_does_not_cross_the_head(sku):
     planes = source.SUPPLIER_REFERENCE_PLANES
     name = "SupplierThreadDiameter"
     plane = planes.get(name, "Front")
-    length = "SupplierStockLength" if "SupplierStockLength" in rows else "SupplierLength"
+    length = (
+        "SupplierStockLength" if "SupplierStockLength" in rows else "SupplierLength"
+    )
     assert rows[name][1] == "horizontal"
     assert (
         planes.get(length, "Front")
@@ -115,9 +117,7 @@ def test_shoulder_and_thread_witnesses_escape_below_the_pivot_head():
     for name in ("SupplierShoulderDiameter", "SupplierThreadDiameter"):
         side, offset = plan[name]
         destination = (
-            head_high + offset * 1000.0
-            if side == "top"
-            else tip - offset * 1000.0
+            head_high + offset * 1000.0 if side == "top" else tip - offset * 1000.0
         )
         low, high = sorted((starts[name][1], destination))
         assert max(low, 0.0) >= min(high, head_high)
@@ -145,9 +145,7 @@ def test_thumb_collar_and_thread_witnesses_do_not_traverse_the_larger_head():
     for name in ("SupplierCollarDiameter", "SupplierThreadDiameter"):
         side, offset = plan[name]
         destination = (
-            tip + offset * 1000.0
-            if side == "right"
-            else head_start - offset * 1000.0
+            tip + offset * 1000.0 if side == "right" else head_start - offset * 1000.0
         )
         low, high = sorted((starts[name][0], destination))
         assert rows[name] < rows["SupplierHeadDiameter"]
@@ -216,18 +214,10 @@ def test_nested_diameter_witnesses_do_not_cross_the_other_dimension_line(sku, pa
             start, end = points[name]
             offset_mm = offset * 1000.0
             if side in ("left", "right"):
-                x = (
-                    bounds[0] - offset_mm
-                    if side == "left"
-                    else bounds[2] + offset_mm
-                )
+                x = bounds[0] - offset_mm if side == "left" else bounds[2] + offset_mm
                 first, second = (x, start[1]), (x, end[1])
             else:
-                y = (
-                    bounds[1] - offset_mm
-                    if side == "bottom"
-                    else bounds[3] + offset_mm
-                )
+                y = bounds[1] - offset_mm if side == "bottom" else bounds[3] + offset_mm
                 first, second = (start[0], y), (end[0], y)
             for a, b in ((start, first), (end, second), (first, second)):
                 result.append(

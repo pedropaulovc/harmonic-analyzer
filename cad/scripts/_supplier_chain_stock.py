@@ -22,12 +22,18 @@ from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _rebuild import active_configuration_name
 from _sketch import (
-    SketchDims, anchor_point_to_origin, blank_reference_sketches,
-    dimension_between, ensure_fully_defined, set_sketch_direct_db,
+    SketchDims,
+    anchor_point_to_origin,
+    blank_reference_sketches,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
 from _supplier_spring_reference import (
-    ReferenceState, SUPPLIER_FREE_CONFIGURATION, add_supplier_reference_configurations,
+    ReferenceState,
+    SUPPLIER_FREE_CONFIGURATION,
+    add_supplier_reference_configurations,
 )
 from diagnostics.diag_mcmaster_lib import assert_profile_closed, draw_closed_profile
 from diagnostics.sketch_profile import Arc, Line, Segment, minor_arc
@@ -103,24 +109,44 @@ def clip_profile() -> tuple[Segment, ...]:
     f = (-1.3561021848618533, -0.8020192113846334)
     g = (-0.47514934787619234, -1.2345764132403254)
     h = (3.2431484126331394, -0.9745677049912083)
-    i, j, k, l, m, n, o, p = tuple((x, -y) for x, y in (h, g, f, e, d, c, b, a))
+    (
+        h_reflected,
+        g_reflected,
+        f_reflected,
+        e_reflected,
+        d_reflected,
+        c_reflected,
+        b_reflected,
+        a_reflected,
+    ) = tuple((x, -y) for x, y in (h, g, f, e, d, c, b, a))
     return (
-        Line(a, b), minor_arc((-4.329074554850771, -1.6717406874999967), b, c),
-        Line(c, d), minor_arc((-3.175, 0.0), d, e),
+        Line(a, b),
+        minor_arc((-4.329074554850771, -1.6717406874999967), b, c),
+        Line(c, d),
+        minor_arc((-3.175, 0.0), d, e),
         minor_arc((-1.9657055031262445, -1.208527088736271), e, f),
         minor_arc((-0.5432977605093329, -0.2600087082491161), f, g),
-        Line(g, h), minor_arc((3.175, 0.0), h, i), Line(i, j),
-        minor_arc((-0.5432977605093329, 0.2600087082491161), j, k),
-        minor_arc((-1.9657055031262445, 1.208527088736271), k, l),
-        minor_arc((-3.175, 0.0), l, m), Line(m, n),
-        minor_arc((-4.329074554850771, 1.6717406874999967), n, o),
-        Line(o, p), Arc((3.175, 0.0), a, p),
+        Line(g, h),
+        minor_arc((3.175, 0.0), h, h_reflected),
+        Line(h_reflected, g_reflected),
+        minor_arc((-0.5432977605093329, 0.2600087082491161), g_reflected, f_reflected),
+        minor_arc((-1.9657055031262445, 1.208527088736271), f_reflected, e_reflected),
+        minor_arc((-3.175, 0.0), e_reflected, d_reflected),
+        Line(d_reflected, c_reflected),
+        minor_arc((-4.329074554850771, 1.6717406874999967), c_reflected, b_reflected),
+        Line(b_reflected, a_reflected),
+        Arc((3.175, 0.0), a, a_reflected),
     )
 
 
 async def _plate(
-    adapter: Any, name: str, profile: tuple[Segment, ...], *,
-    stations: Sequence[float], hole_radius: float, offset: float,
+    adapter: Any,
+    name: str,
+    profile: tuple[Segment, ...],
+    *,
+    stations: Sequence[float],
+    hole_radius: float,
+    offset: float,
 ) -> None:
     check(f"create {name}", await adapter.create_sketch("Front"))
     await draw_closed_profile(adapter, profile, label=name, loops=1)
@@ -138,8 +164,15 @@ async def _plate(
 
 
 async def _round_pair(
-    adapter: Any, name: str, *, stations: Sequence[float], radius: float,
-    start: float, end: float, bore: float | None = None, merge: bool = False,
+    adapter: Any,
+    name: str,
+    *,
+    stations: Sequence[float],
+    radius: float,
+    start: float,
+    end: float,
+    bore: float | None = None,
+    merge: bool = False,
 ) -> None:
     check(f"create {name}", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -160,20 +193,52 @@ async def _round_pair(
 async def author_chain_stock(adapter: Any) -> None:
     """One actual inner/outer component pair, including rollers and bushings."""
     inner, outer = (0.0, PITCH), (PITCH, 2 * PITCH)
-    await _round_pair(adapter, "StockPins", stations=outer, radius=PIN_DIAMETER / 2,
-                      start=-CHAIN_PIN_HALF_LENGTH, end=CHAIN_PIN_HALF_LENGTH)
-    await _round_pair(adapter, "StockBushings", stations=inner, radius=BUSH_RADIUS,
-                      bore=PIN_DIAMETER / 2, start=-BUSH_HALF_LENGTH, end=BUSH_HALF_LENGTH)
-    await _round_pair(adapter, "StockRollers", stations=inner, radius=ROLLER_DIAMETER / 2,
-                      bore=BUSH_RADIUS, start=-ROLLER_WIDTH / 2, end=ROLLER_WIDTH / 2)
+    await _round_pair(
+        adapter,
+        "StockPins",
+        stations=outer,
+        radius=PIN_DIAMETER / 2,
+        start=-CHAIN_PIN_HALF_LENGTH,
+        end=CHAIN_PIN_HALF_LENGTH,
+    )
+    await _round_pair(
+        adapter,
+        "StockBushings",
+        stations=inner,
+        radius=BUSH_RADIUS,
+        bore=PIN_DIAMETER / 2,
+        start=-BUSH_HALF_LENGTH,
+        end=BUSH_HALF_LENGTH,
+    )
+    await _round_pair(
+        adapter,
+        "StockRollers",
+        stations=inner,
+        radius=ROLLER_DIAMETER / 2,
+        bore=BUSH_RADIUS,
+        start=-ROLLER_WIDTH / 2,
+        end=ROLLER_WIDTH / 2,
+    )
     for side, inner_offset, outer_offset in (
         ("Back", -BUSH_HALF_LENGTH, -CLIP_START),
         ("Front", ROLLER_WIDTH / 2, BUSH_HALF_LENGTH),
     ):
-        await _plate(adapter, f"StockInnerPlate{side}", plate_profile(inner=True, center_x=PITCH / 2),
-                     stations=inner, hole_radius=BUSH_RADIUS, offset=inner_offset)
-        await _plate(adapter, f"StockOuterPlate{side}", plate_profile(inner=False, center_x=1.5 * PITCH),
-                     stations=outer, hole_radius=PIN_DIAMETER / 2, offset=outer_offset)
+        await _plate(
+            adapter,
+            f"StockInnerPlate{side}",
+            plate_profile(inner=True, center_x=PITCH / 2),
+            stations=inner,
+            hole_radius=BUSH_RADIUS,
+            offset=inner_offset,
+        )
+        await _plate(
+            adapter,
+            f"StockOuterPlate{side}",
+            plate_profile(inner=False, center_x=1.5 * PITCH),
+            stations=outer,
+            hole_radius=PIN_DIAMETER / 2,
+            offset=outer_offset,
+        )
 
 
 async def author_connecting_stock(adapter: Any) -> None:
@@ -185,36 +250,69 @@ async def author_connecting_stock(adapter: Any) -> None:
         ("StockPinGrooves", GROOVE_RADIUS, CLIP_START, CLIP_END, True),
         ("StockPinEnds", PIN_DIAMETER / 2, CLIP_END, CONNECTING_PIN_END, True),
     ):
-        await _round_pair(adapter, name, stations=stations, radius=radius,
-                          start=start, end=end, merge=merge)
-    await _plate(adapter, "StockConnectingFixedPlate", connecting_fixed_plate_profile(),
-                 stations=stations, hole_radius=PIN_DIAMETER / 2, offset=BUSH_HALF_LENGTH)
-    await _plate(adapter, "StockConnectingLoosePlate", plate_profile(inner=False, center_x=0.0),
-                 stations=stations, hole_radius=PIN_DIAMETER / 2, offset=-CLIP_START)
+        await _round_pair(
+            adapter,
+            name,
+            stations=stations,
+            radius=radius,
+            start=start,
+            end=end,
+            merge=merge,
+        )
+    await _plate(
+        adapter,
+        "StockConnectingFixedPlate",
+        connecting_fixed_plate_profile(),
+        stations=stations,
+        hole_radius=PIN_DIAMETER / 2,
+        offset=BUSH_HALF_LENGTH,
+    )
+    await _plate(
+        adapter,
+        "StockConnectingLoosePlate",
+        plate_profile(inner=False, center_x=0.0),
+        stations=stations,
+        hole_radius=PIN_DIAMETER / 2,
+        offset=-CLIP_START,
+    )
     check("create source spring clip", await adapter.create_sketch("Front"))
-    await draw_closed_profile(adapter, clip_profile(), label="source spring clip", loops=1)
+    await draw_closed_profile(
+        adapter, clip_profile(), label="source spring clip", loops=1
+    )
     check("exit source spring clip", await adapter.exit_sketch())
     name_last_feature(adapter, "StockSpringClipProfile")
-    assert_profile_closed(adapter, "source spring clip", loops=1, feature="StockSpringClipProfile")
+    assert_profile_closed(
+        adapter, "source spring clip", loops=1, feature="StockSpringClipProfile"
+    )
     extrude_at_offset(adapter, CLIP_END - CLIP_START, CLIP_START, merge_result=False)
     name_last_feature(adapter, "StockSpringClip")
 
 
-def _require_circle(adapter: Any, center: tuple[float, float, float], radius: float) -> None:
+def _require_circle(
+    adapter: Any, center: tuple[float, float, float], radius: float
+) -> None:
     """Prove nominal sections coincide with the authored physical stock features."""
-    for body in _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ():
+    for body in (
+        _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
+    ):
         for edge in _early_bound(body, "IBody2").GetEdges() or ():
             curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
             if not curve.IsCircle():
                 continue
             values = tuple(float(value) for value in curve.CircleParams)
-            if (len(values) == 7
-                    and all(abs(values[index] * 1000 - target) < 1e-6
-                            for index, target in enumerate(center))
-                    and abs(values[6] * 1000 - radius) < 1e-6
-                    and abs(abs(values[5]) - 1.0) < 1e-10):
+            if (
+                len(values) == 7
+                and all(
+                    abs(values[index] * 1000 - target) < 1e-6
+                    for index, target in enumerate(center)
+                )
+                and abs(values[6] * 1000 - radius) < 1e-6
+                and abs(abs(values[5]) - 1.0) < 1e-10
+            ):
                 return
-    raise RuntimeError(f"source stock section has no physical circle at {center}, radius {radius}")
+    raise RuntimeError(
+        f"source stock section has no physical circle at {center}, radius {radius}"
+    )
 
 
 async def _reference_front(adapter: Any, *, connecting: bool) -> str:
@@ -227,12 +325,21 @@ async def _reference_front(adapter: Any, *, connecting: bool) -> str:
     check("create supplier chain nominal front", await adapter.create_sketch("Front"))
     dims = SketchDims()
     for name, diameter, x in rows:
-        entity = await define_circle(adapter, x, 0.0, diameter / 2, name, dims=dims,
-                                     names=(f"{name}CenterX", f"{name}CenterY", name))
+        entity = await define_circle(
+            adapter,
+            x,
+            0.0,
+            diameter / 2,
+            name,
+            dims=dims,
+            names=(f"{name}CenterX", f"{name}CenterY", name),
+        )
         segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not segment.ConstructionGeometry:
-            raise RuntimeError(f"{name}: supplier section must be construction geometry")
+            raise RuntimeError(
+                f"{name}: supplier section must be construction geometry"
+            )
     await ensure_fully_defined(adapter, FRONT_FEATURE)
     check("exit supplier chain nominal front", await adapter.exit_sketch())
     name_last_feature(adapter, FRONT_FEATURE)
@@ -246,13 +353,25 @@ async def _reference_sections(adapter: Any, *, connecting: bool) -> str:
     # Top-plane sketch +Y is model -Z. Each chord is the actual source section
     # span. FOR roller width on the connector is the source's application gauge.
     rows = [
-        (WIDTH_DIMENSION, -PITCH / 2 if connecting else 0.0, -ROLLER_WIDTH / 2, ROLLER_WIDTH / 2),
+        (
+            WIDTH_DIMENSION,
+            -PITCH / 2 if connecting else 0.0,
+            -ROLLER_WIDTH / 2,
+            ROLLER_WIDTH / 2,
+        ),
     ]
     if connecting:
-        rows.extend((
-            (PLATE_DIMENSION, 0.0, -CLIP_START, -BUSH_HALF_LENGTH),
-            (LENGTH_DIMENSION, PITCH / 2, -CONNECTING_PIN_END, -CONNECTING_PIN_START),
-        ))
+        rows.extend(
+            (
+                (PLATE_DIMENSION, 0.0, -CLIP_START, -BUSH_HALF_LENGTH),
+                (
+                    LENGTH_DIMENSION,
+                    PITCH / 2,
+                    -CONNECTING_PIN_END,
+                    -CONNECTING_PIN_START,
+                ),
+            )
+        )
     check("create supplier chain nominal sections", await adapter.create_sketch("Top"))
     dims = SketchDims()
     for name, x, y0, y1 in rows:
@@ -264,9 +383,16 @@ async def _reference_sections(adapter: Any, *, connecting: bool) -> str:
         segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not segment.ConstructionGeometry:
-            raise RuntimeError(f"{name}: supplier section must be construction geometry")
-        check(f"vertical {name}", await adapter.add_sketch_constraint(line, None, "vertical"))
-        await dimension_between(adapter, f"{line}.start", f"{line}.end", "vertical_distance", y1 - y0, name)
+            raise RuntimeError(
+                f"{name}: supplier section must be construction geometry"
+            )
+        check(
+            f"vertical {name}",
+            await adapter.add_sketch_constraint(line, None, "vertical"),
+        )
+        await dimension_between(
+            adapter, f"{line}.start", f"{line}.end", "vertical_distance", y1 - y0, name
+        )
         dims.record(name)
         await anchor_point_to_origin(adapter, f"{line}.start", x, y0, name)
         if x != 0.0:
@@ -287,35 +413,63 @@ async def add_chain_stock_references(adapter: Any, *, connecting: bool = False) 
     installed = active_configuration_name(adapter, original_model)
     if not installed:
         raise RuntimeError("chain stock source has no original installed configuration")
+
     async def references(target: Any) -> tuple[str, ...]:
         station = PITCH / 2 if connecting else 2 * PITCH
         end = CONNECTING_PIN_END if connecting else CHAIN_PIN_HALF_LENGTH
         _require_circle(target, (station, 0.0, end), PIN_DIAMETER / 2)
-        _require_circle(target, (station, 0.0, CONNECTING_PIN_START if connecting else -end), PIN_DIAMETER / 2)
+        _require_circle(
+            target,
+            (station, 0.0, CONNECTING_PIN_START if connecting else -end),
+            PIN_DIAMETER / 2,
+        )
         plate_station = PITCH / 2 if connecting else 2 * PITCH
         for z in (BUSH_HALF_LENGTH, CLIP_START):
             _require_circle(target, (plate_station, 0.0, z), OUTER_PLATE_RADIUS)
         if not connecting:
             for z in (-ROLLER_WIDTH / 2, ROLLER_WIDTH / 2):
                 _require_circle(target, (0.0, 0.0, z), ROLLER_DIAMETER / 2)
-        return await _reference_front(target, connecting=connecting), await _reference_sections(target, connecting=connecting)
+        return await _reference_front(
+            target, connecting=connecting
+        ), await _reference_sections(target, connecting=connecting)
 
-    await add_supplier_reference_configurations(adapter, (
-        ReferenceState(SUPPLIER_FREE_CONFIGURATION,
-                       author_connecting_stock if connecting else author_chain_stock,
-                       references, body_count=5 if connecting else 10),
-    ), body_count=4)
+    await add_supplier_reference_configurations(
+        adapter,
+        (
+            ReferenceState(
+                SUPPLIER_FREE_CONFIGURATION,
+                author_connecting_stock if connecting else author_chain_stock,
+                references,
+                body_count=5 if connecting else 10,
+            ),
+        ),
+        body_count=4,
+    )
     model = adapter.currentModel
-    if int(adapter.swApp.IsSame(model, original_model)) != 1 or active_configuration_name(adapter, model) != installed:
-        raise RuntimeError("chain stock source changed the original installed document/configuration")
+    if (
+        int(adapter.swApp.IsSame(model, original_model)) != 1
+        or active_configuration_name(adapter, model) != installed
+    ):
+        raise RuntimeError(
+            "chain stock source changed the original installed document/configuration"
+        )
     try:
         for name in model.GetConfigurationNames() or ():
             if not model.ShowConfiguration2(str(name)):
-                raise RuntimeError(f"cannot inspect chain source sketch visibility in {name}")
+                raise RuntimeError(
+                    f"cannot inspect chain source sketch visibility in {name}"
+                )
             part = _early_bound(model, "IPartDoc")
             for feature in (FRONT_FEATURE, SECTION_FEATURE):
-                if int(_early_bound(part.FeatureByName(feature), "IFeature").Visible) != 1:
-                    raise RuntimeError(f"{feature}: source reference sketch is shown in {name}")
+                if (
+                    int(_early_bound(part.FeatureByName(feature), "IFeature").Visible)
+                    != 1
+                ):
+                    raise RuntimeError(
+                        f"{feature}: source reference sketch is shown in {name}"
+                    )
     finally:
         if not model.ShowConfiguration2(installed):
-            raise RuntimeError("cannot restore installed chain configuration after source visibility proof")
+            raise RuntimeError(
+                "cannot restore installed chain configuration after source visibility proof"
+            )

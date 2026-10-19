@@ -168,8 +168,16 @@ def native_env(monkeypatch):
 
     def prepare(kind):
         radius = stock.PIN_DIAMETER / 2
-        z = stock.CONNECTING_PIN_END if kind == "connecting" else stock.CHAIN_PIN_HALF_LENGTH
-        stations = (-stock.PITCH / 2, stock.PITCH / 2) if kind == "connecting" else (stock.PITCH, 2 * stock.PITCH)
+        z = (
+            stock.CONNECTING_PIN_END
+            if kind == "connecting"
+            else stock.CHAIN_PIN_HALF_LENGTH
+        )
+        stations = (
+            (-stock.PITCH / 2, stock.PITCH / 2)
+            if kind == "connecting"
+            else (stock.PITCH, 2 * stock.PITCH)
+        )
         edges = (Edge(), Edge())
         circles = tuple(
             ViewEdge(edge, None, (x, 0.0, z, 0.0, 0.0, 1.0, radius), None)
@@ -180,8 +188,11 @@ def native_env(monkeypatch):
         scan = ViewEdges("Front", (decoy, *circles))
         monkeypatch.setattr(refs, "scan_view_edges", lambda *_args, **_kwargs: scan)
         monkeypatch.setattr(
-            refs, "model_points_in_view",
-            lambda _adapter, _view, points, **_: [(0.12 + 4 * p[0], 0.12 + 4 * p[1]) for p in points],
+            refs,
+            "model_points_in_view",
+            lambda _adapter, _view, points, **_: [
+                (0.12 + 4 * p[0], 0.12 + 4 * p[1]) for p in points
+            ],
         )
         display = Display(refs.SUPPLIER_PITCH_MM, edges)
 
@@ -200,7 +211,9 @@ def native_env(monkeypatch):
 def test_pitch_uses_exact_native_station_circles(native_env, kind, places):
     env = native_env
     source = env.prepare(kind)
-    settled = refs.annotate_chain_pitch(env.adapter, {"free_front": env.view}, kind=kind, precision=places)
+    settled = refs.annotate_chain_pitch(
+        env.adapter, {"free_front": env.view}, kind=kind, precision=places
+    )
     assert env.model.EditRebuild3()
     settled()
     display = source.display
@@ -209,7 +222,19 @@ def test_pitch_uses_exact_native_station_circles(native_env, kind, places):
     assert env.view.ScaleDecimal == 4.0
 
 
-@pytest.mark.parametrize("defect", ["value", "attachment", "dangling", "type", "override", "after_rebuild", "non_arc", "tolerance"])
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "value",
+        "attachment",
+        "dangling",
+        "type",
+        "override",
+        "after_rebuild",
+        "non_arc",
+        "tolerance",
+    ],
+)
 def test_pitch_refuses_wrong_native_value_or_reference(native_env, defect):
     env = native_env
     source = env.prepare("outer")
@@ -225,16 +250,20 @@ def test_pitch_refuses_wrong_native_value_or_reference(native_env, defect):
     elif defect == "override":
         display.override = True
     elif defect == "after_rebuild":
+
         def rebuild():
             display.native.mm = 6.34
             return True
+
         env.model.EditRebuild3 = rebuild
     elif defect == "non_arc":
         display.native.ends[2] = 0
     elif defect == "tolerance":
         display.native.Tolerance.Type = 4
     with pytest.raises(RuntimeError):
-        settled = refs.annotate_chain_pitch(env.adapter, {"free_front": env.view}, kind="outer", precision=2)
+        settled = refs.annotate_chain_pitch(
+            env.adapter, {"free_front": env.view}, kind="outer", precision=2
+        )
         assert env.model.EditRebuild3()
         settled()
 
@@ -242,22 +271,45 @@ def test_pitch_refuses_wrong_native_value_or_reference(native_env, defect):
 def test_pitch_does_not_substitute_a_nearby_clearance_circle(native_env, monkeypatch):
     env = native_env
     source = env.prepare("inner")
-    wrong = ViewEdge(object(), None, (12.7001, 0.0, stock.CHAIN_PIN_HALF_LENGTH, 0.0, 0.0, 1.0, stock.PIN_DIAMETER / 2), None)
+    wrong = ViewEdge(
+        object(),
+        None,
+        (
+            12.7001,
+            0.0,
+            stock.CHAIN_PIN_HALF_LENGTH,
+            0.0,
+            0.0,
+            1.0,
+            stock.PIN_DIAMETER / 2,
+        ),
+        None,
+    )
     scan = ViewEdges("Front", (source.circles[0], wrong))
     monkeypatch.setattr(refs, "scan_view_edges", lambda *_args, **_kwargs: scan)
     with pytest.raises(RuntimeError, match="no visible circle"):
-        refs.annotate_chain_pitch(env.adapter, {"free_front": env.view}, kind="inner", precision=2)
+        refs.annotate_chain_pitch(
+            env.adapter, {"free_front": env.view}, kind="inner", precision=2
+        )
 
 
-@pytest.mark.parametrize("defect", ["owner", "value", "type", "attachment", "tolerance", "count"])
-def test_keeper_bead_rejects_corruption_after_final_rebuild(native_env, monkeypatch, defect):
+@pytest.mark.parametrize(
+    "defect", ["owner", "value", "type", "attachment", "tolerance", "count"]
+)
+def test_keeper_bead_rejects_corruption_after_final_rebuild(
+    native_env, monkeypatch, defect
+):
     env = native_env
     display = Display(chain.BEAD_DIA, (object(),), kind=6)
-    monkeypatch.setattr(refs, "curate_view_dimensions", lambda *_args, **_kwargs: [display.annotation])
+    monkeypatch.setattr(
+        refs, "curate_view_dimensions", lambda *_args, **_kwargs: [display.annotation]
+    )
     settled = refs.annotate_keeper_bead(env.adapter, {"*Front": env.view})
     assert env.model.EditRebuild3()
     if defect == "owner":
-        display.native.FullName = f"{chain.CATALOGUE_BEAD_DIMENSION}@WrongSketch@part.SLDPRT"
+        display.native.FullName = (
+            f"{chain.CATALOGUE_BEAD_DIMENSION}@WrongSketch@part.SLDPRT"
+        )
     elif defect == "value":
         display.native.mm = 2.38
     elif defect == "type":
@@ -273,14 +325,16 @@ def test_keeper_bead_rejects_corruption_after_final_rebuild(native_env, monkeypa
 
 
 @pytest.mark.parametrize("kind,mm", [(5, chain.BEAD_R), (6, 2.38), (6, chain.ROD_DIA)])
-def test_keeper_bead_rejects_radius_rounding_and_rod_intersection(native_env, monkeypatch, kind, mm):
+def test_keeper_bead_rejects_radius_rounding_and_rod_intersection(
+    native_env, monkeypatch, kind, mm
+):
     env = native_env
     display = Display(mm, (object(),), kind=kind)
-    monkeypatch.setattr(refs, "curate_view_dimensions", lambda *_args, **_kwargs: [display.annotation])
+    monkeypatch.setattr(
+        refs, "curate_view_dimensions", lambda *_args, **_kwargs: [display.annotation]
+    )
     with pytest.raises(RuntimeError):
         refs.annotate_keeper_bead(env.adapter, {"*Front": env.view})
-
-
 
 
 def test_keeper_source_diameter_retains_exact_catalogue_geometry():
@@ -289,14 +343,14 @@ def test_keeper_source_diameter_retains_exact_catalogue_geometry():
     assert chain.CHAIN_PART_BEADS[0] == (0.0, 0.0, 0.0)
 
 
-
-
 @pytest.mark.parametrize("installed", ["Default", "Simplified"])
 def test_stock_callback_restores_the_original_installed_configuration(installed):
     import _chain_link as links
 
     active = SimpleNamespace(Name=installed)
-    model = SimpleNamespace(ConfigurationManager=SimpleNamespace(ActiveConfiguration=active))
+    model = SimpleNamespace(
+        ConfigurationManager=SimpleNamespace(ActiveConfiguration=active)
+    )
     adapter = SimpleNamespace(
         currentModel=model,
         swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
@@ -318,7 +372,9 @@ def test_stock_callback_cannot_change_the_canonical_installed_state(defect):
     import _chain_link as links
 
     active = SimpleNamespace(Name="Default")
-    model = SimpleNamespace(ConfigurationManager=SimpleNamespace(ActiveConfiguration=active))
+    model = SimpleNamespace(
+        ConfigurationManager=SimpleNamespace(ActiveConfiguration=active)
+    )
     adapter = SimpleNamespace(
         currentModel=model,
         swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
@@ -329,23 +385,37 @@ def test_stock_callback_cannot_change_the_canonical_installed_state(defect):
             active.Name = "Supplier-Free"
         else:
             target.currentModel = SimpleNamespace(
-                ConfigurationManager=SimpleNamespace(ActiveConfiguration=SimpleNamespace(Name="Default"))
+                ConfigurationManager=SimpleNamespace(
+                    ActiveConfiguration=SimpleNamespace(Name="Default")
+                )
             )
 
-    with pytest.raises(RuntimeError, match="changed the installed document/configuration"):
+    with pytest.raises(
+        RuntimeError, match="changed the installed document/configuration"
+    ):
         asyncio.run(links._run_before_save(adapter, author))
 
 
-@pytest.mark.parametrize("drawing,kind", [(inner, "inner"), (outer, "outer"), (connecting, "connecting")])
-def test_stock_dimensions_reject_corruption_after_final_rebuild(native_env, monkeypatch, drawing, kind):
+@pytest.mark.parametrize(
+    "drawing,kind", [(inner, "inner"), (outer, "outer"), (connecting, "connecting")]
+)
+def test_stock_dimensions_reject_corruption_after_final_rebuild(
+    native_env, monkeypatch, drawing, kind
+):
     env = native_env
     env.prepare(kind)
     connector = kind == "connecting"
-    counts = {"free_front": 3, "free_top": 3 if connector else 1,
-              "free_right": 0, "installed_iso": 0}
+    counts = {
+        "free_front": 3,
+        "free_top": 3 if connector else 1,
+        "free_right": 0,
+        "installed_iso": 0,
+    }
     views = {
-        key: SimpleNamespace(GetOutline=env.view.GetOutline,
-                             GetDisplayDimensionCount=lambda key=key: counts[key])
+        key: SimpleNamespace(
+            GetOutline=env.view.GetOutline,
+            GetDisplayDimensionCount=lambda key=key: counts[key],
+        )
         for key in counts
     }
     views["free_front"] = env.view
@@ -372,16 +442,24 @@ def test_stock_dimensions_reject_corruption_after_final_rebuild(native_env, monk
         return result
 
     monkeypatch.setattr(refs, "curate_view_dimensions", curate)
-    monkeypatch.setattr(refs, "dimension_name", lambda _adapter, annotation: annotation.display.native.Name)
+    monkeypatch.setattr(
+        refs,
+        "dimension_name",
+        lambda _adapter, annotation: annotation.display.native.Name,
+    )
     checks = drawing.supplier_dimensions(env.adapter, views)
     assert env.model.EditRebuild3()
     for check in checks:
         check()
 
-    imported[stock.PIN_DIMENSION].native.FullName = "SupplierPinDiameter@WrongSketch@stock.SLDPRT"
+    imported[
+        stock.PIN_DIMENSION
+    ].native.FullName = "SupplierPinDiameter@WrongSketch@stock.SLDPRT"
     with pytest.raises(RuntimeError, match="lost its source section"):
         checks[0]()
-    imported[stock.PIN_DIMENSION].native.FullName = f"{stock.PIN_DIMENSION}@{stock.FRONT_FEATURE}@stock.SLDPRT"
+    imported[
+        stock.PIN_DIMENSION
+    ].native.FullName = f"{stock.PIN_DIMENSION}@{stock.FRONT_FEATURE}@stock.SLDPRT"
     imported[stock.PIN_DIMENSION].native.Tolerance.Type = 4
     with pytest.raises(RuntimeError, match="unprovided supplier tolerance"):
         checks[0]()
@@ -402,7 +480,8 @@ def test_source_stock_profiles_close_without_replacing_installed_geometry():
     for profile in (
         stock.plate_profile(inner=True, center_x=stock.PITCH / 2),
         stock.plate_profile(inner=False, center_x=1.5 * stock.PITCH),
-        stock.connecting_fixed_plate_profile(), stock.clip_profile(),
+        stock.connecting_fixed_plate_profile(),
+        stock.clip_profile(),
     ):
         endpoint_merges(profile)
         assert len(closed_loops(profile)) == 1
@@ -415,10 +494,11 @@ def test_source_stock_profiles_close_without_replacing_installed_geometry():
     assert stock.PLATE_THICKNESS != _chain.PLATE_THICK
 
 
-
-
 def test_nominal_physical_section_requires_the_actual_native_stock_circle(monkeypatch):
-    curve = SimpleNamespace(IsCircle=lambda: True, CircleParams=(0.0127, 0.0, 0.00381, 0.0, 0.0, 1.0, 0.00114935))
+    curve = SimpleNamespace(
+        IsCircle=lambda: True,
+        CircleParams=(0.0127, 0.0, 0.00381, 0.0, 0.0, 1.0, 0.00114935),
+    )
     body = SimpleNamespace(GetEdges=lambda: (SimpleNamespace(GetCurve=lambda: curve),))
     model = SimpleNamespace(GetBodies2=lambda *_: (body,))
     adapter = SimpleNamespace(currentModel=model)
@@ -426,8 +506,6 @@ def test_nominal_physical_section_requires_the_actual_native_stock_circle(monkey
     stock._require_circle(adapter, (12.7, 0.0, 3.81), stock.PIN_DIAMETER / 2)
     with pytest.raises(RuntimeError, match="no physical circle"):
         stock._require_circle(adapter, (12.7, 0.0, 3.81), 0.091 * 25.4 / 2)
-
-
 
 
 def test_connector_clip_profile_matches_independent_supplier_step_volume():
@@ -439,8 +517,11 @@ def test_connector_clip_profile_matches_independent_supplier_step_volume():
     start = cursor = pending[0].start
     integral = 0.0
     while pending:
-        index = next(index for index, segment in enumerate(pending)
-                     if cursor in (segment.start, segment.end))
+        index = next(
+            index
+            for index, segment in enumerate(pending)
+            if cursor in (segment.start, segment.end)
+        )
         segment = pending.pop(index)
         forward = cursor == segment.start
         end = segment.end if forward else segment.start
@@ -450,7 +531,11 @@ def test_connector_clip_profile_matches_independent_supplier_step_volume():
             cx, cy = segment.center
             radius = math.dist(segment.center, segment.start)
             sweep = math.radians(arc_sweep_deg(segment)) * (1 if forward else -1)
-            integral += cx * (end[1] - cursor[1]) - cy * (end[0] - cursor[0]) + radius**2 * sweep
+            integral += (
+                cx * (end[1] - cursor[1])
+                - cy * (end[0] - cursor[0])
+                + radius**2 * sweep
+            )
         cursor = end
     assert cursor == start
     volume = abs(integral) / 2 * (stock.CLIP_END - stock.CLIP_START)

@@ -23,7 +23,9 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
 
-async def _save_supplier_part(adapter, part_name, suppressed_features) -> dict[str, str]:
+async def _save_supplier_part(
+    adapter, part_name, suppressed_features
+) -> dict[str, str]:
     await add_supplier_reference_sketch(
         adapter,
         SUPPLIER_REFERENCE_DIMENSIONS,

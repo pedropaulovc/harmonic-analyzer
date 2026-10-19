@@ -192,15 +192,21 @@ def add_supplier_nut_dimensions(
                 kind = int(annotation.GetType())
                 if kind == 4:  # swAnnotationType_e.swDisplayDimension
                     if int(annotation.Visible) != 1:  # swAnnotationVisible
-                        raise RuntimeError(f"{orientation}: supplier nut dimension is hidden")
+                        raise RuntimeError(
+                            f"{orientation}: supplier nut dimension is hidden"
+                        )
                     dimensions.append(
-                        _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+                        _early_bound(
+                            annotation.GetSpecificAnnotation(), "IDisplayDimension"
+                        )
                     )
                 elif kind == 6:  # swAnnotationType_e.swNote
                     note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
                     if note.GetText() == thread_text:
                         if orientation != "*Front" or int(annotation.Visible) != 1:
-                            raise RuntimeError("supplier nut thread note lost its visible Front owner")
+                            raise RuntimeError(
+                                "supplier nut thread note lost its visible Front owner"
+                            )
                         thread_annotations.append(annotation)
             expected_count = 1 if orientation in references else 0
             if len(dimensions) != expected_count:
@@ -210,11 +216,15 @@ def add_supplier_nut_dimensions(
                 )
             if not expected_count:
                 continue
-            name, entities, expected, places, denominator, callout, label = references[orientation]
+            name, entities, expected, places, denominator, callout, label = references[
+                orientation
+            ]
             display = dimensions[0]
             native = _early_bound(display.GetDimension2(0), "IDimension")
             if str(native.FullName) != name:
-                raise RuntimeError(f"{label}: the authored native dimension was replaced")
+                raise RuntimeError(
+                    f"{label}: the authored native dimension was replaced"
+                )
             assert_supplier_reference_dimension(
                 adapter,
                 display,

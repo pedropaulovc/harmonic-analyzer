@@ -49,7 +49,9 @@ def _contains(outer, inner):
         pytest.param(False, _DIAGRAM_MARGINS, id="nominal-diagrams"),
     ],
 )
-@pytest.mark.parametrize("notes", ["", "FIRST\nSECOND\nTHIRD"], ids=["bare-footer", "full-footer"])
+@pytest.mark.parametrize(
+    "notes", ["", "FIRST\nSECOND\nTHIRD"], ids=["bare-footer", "full-footer"]
+)
 def test_state_cells_leave_positive_geometry_and_all_annotation_budgets(
     maximum, margins, notes
 ):
@@ -94,12 +96,10 @@ def test_state_cells_leave_positive_geometry_and_all_annotation_budgets(
     # Insets cannot hide overlapping outer view/caption plans. In particular,
     # the maximum-state Right and installed Iso need separate sheet regions.
     for (name_a, _, a), (name_b, _, b) in combinations(cells, 2):
-        assert (
-            a[2] <= b[0]
-            or b[2] <= a[0]
-            or a[3] <= b[1]
-            or b[3] <= a[1]
-        ), (name_a, name_b)
+        assert a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1], (
+            name_a,
+            name_b,
+        )
 
 
 @pytest.mark.parametrize(
@@ -126,8 +126,12 @@ def test_old_right_widths_cannot_reserve_the_requested_annotation_room(
 
     right_budget = margins["free_right"]
     assert right_budget[0] + right_budget[2] > legacy_width
-    with pytest.raises(ValueError, match="free_right: supplier margins leave no geometry space"):
-        purchased.supplier_fit_cells(tuple(old_cells), margins, label="legacy supplier layout")
+    with pytest.raises(
+        ValueError, match="free_right: supplier margins leave no geometry space"
+    ):
+        purchased.supplier_fit_cells(
+            tuple(old_cells), margins, label="legacy supplier layout"
+        )
 
 
 class _CoilEndView:
@@ -156,11 +160,15 @@ class _CoilEndView:
         return True
 
 
-def test_largest_scale_is_chosen_with_annotation_room_not_the_bare_outer_cell(monkeypatch):
+def test_largest_scale_is_chosen_with_annotation_room_not_the_bare_outer_cell(
+    monkeypatch,
+):
     monkeypatch.setattr(purchased, "double_array", tuple)
     caption_y = purchased.view_band_bottom("", label="extension scale")
     cells = supplier_state_cells(caption_y, maximum=True)
-    fitted = purchased.supplier_fit_cells(cells, _EXTENSION_MARGINS, label="extension scale")
+    fitted = purchased.supplier_fit_cells(
+        cells, _EXTENSION_MARGINS, label="extension scale"
+    )
     outer_cell = next(cell for cell in cells if cell[0] == "free_right")
     inner_cell = next(cell for cell in fitted if cell[0] == "free_right")
     draw = SimpleNamespace(EditRebuild3=lambda: True)
@@ -180,10 +188,15 @@ def test_largest_scale_is_chosen_with_annotation_room_not_the_bare_outer_cell(mo
         numerator / denominator
         for numerator, denominator in purchased._SCALES
         if channel.COIL_OD_MM / 1000.0 * numerator / denominator
-        + 2.0 * _CoilEndView.PADDING_M <= available_span
+        + 2.0 * _CoilEndView.PADDING_M
+        <= available_span
     ]
     assert ratio == max(fitting_ratios)
     assert _contains(inner, annotated_view.GetOutline())
     margins = _EXTENSION_MARGINS["free_right"]
-    assert _contains(outer_cell[2], _annotation_envelope(annotated_view.GetOutline(), margins))
-    assert not _contains(outer_cell[2], _annotation_envelope(bare_view.GetOutline(), margins))
+    assert _contains(
+        outer_cell[2], _annotation_envelope(annotated_view.GetOutline(), margins)
+    )
+    assert not _contains(
+        outer_cell[2], _annotation_envelope(bare_view.GetOutline(), margins)
+    )

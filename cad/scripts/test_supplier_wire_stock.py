@@ -224,7 +224,9 @@ def seat(monkeypatch):
         try:
             return adapter.currentModel.features[name]
         except KeyError:
-            raise RuntimeError(f"feature {name!r} not found in the active document") from None
+            raise RuntimeError(
+                f"feature {name!r} not found in the active document"
+            ) from None
 
     monkeypatch.setattr(stock, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(_rebuild, "_early_bound", lambda value, _interface: value)
@@ -261,7 +263,10 @@ def test_autoactivated_stock_suppresses_every_inventoried_feature_explicitly(
     assert part.shown == [INSTALLED]
     # Dependents first, every feature by its own call, all in the stock child.
     assert part.set_calls == [(name, STOCK) for name in reversed(features)]
-    assert part.view(STOCK) == {**{name: True for name in features}, STOCK_SKETCH: False}
+    assert part.view(STOCK) == {
+        **{name: True for name in features},
+        STOCK_SKETCH: False,
+    }
     assert part.rebuilt == [STOCK, INSTALLED]
     assert_installed_restored(part)
 
@@ -282,7 +287,9 @@ def test_seat_that_leaves_the_parent_active_is_switched_once(seat) -> None:
     ],
     ids=["refused", "accepted-but-not-active"],
 )
-def test_unactivated_stock_never_suppresses_installed_features(seat, native, message) -> None:
+def test_unactivated_stock_never_suppresses_installed_features(
+    seat, native, message
+) -> None:
     adapter, part = seat(auto_activates=False, **native)
     with pytest.raises(RuntimeError, match=message) as raised:
         isolate(adapter)
@@ -294,7 +301,9 @@ def test_unactivated_stock_never_suppresses_installed_features(seat, native, mes
 @pytest.mark.parametrize("reported", ["Other", None], ids=["misparented", "orphan"])
 def test_misparented_stock_is_refused_and_installed_restored(seat, reported) -> None:
     adapter, part = seat(reported_parent=reported)
-    with pytest.raises(RuntimeError, match="must derive from the installed configuration"):
+    with pytest.raises(
+        RuntimeError, match="must derive from the installed configuration"
+    ):
         isolate(adapter)
     assert part.set_calls == []
     assert part.shown == [INSTALLED]
@@ -330,7 +339,9 @@ def test_root_only_suppression_is_not_trusted_for_independent_features(seat) -> 
 
 
 def test_stock_sketch_dragged_into_suppression_is_refused(seat) -> None:
-    adapter, part = seat(children={**LEVER_CHILDREN, "Wire": (*LEVER_CHILDREN["Wire"], STOCK_SKETCH)})
+    adapter, part = seat(
+        children={**LEVER_CHILDREN, "Wire": (*LEVER_CHILDREN["Wire"], STOCK_SKETCH)}
+    )
     with pytest.raises(RuntimeError, match="stock circle is suppressed"):
         isolate(adapter)
     assert_installed_restored(part)
@@ -343,7 +354,8 @@ def test_stock_hard_fault_is_refused_but_a_warning_is_not(seat) -> None:
 
     adapter, part = seat(faults={STOCK: (("BalloonRingSplit", 3, False),)})
     with pytest.raises(
-        RuntimeError, match=r"hard faults: \['BalloonRingSplit \(dangling-no-members\)'\]"
+        RuntimeError,
+        match=r"hard faults: \['BalloonRingSplit \(dangling-no-members\)'\]",
     ):
         isolate(adapter)
     assert_installed_restored(part)
@@ -361,12 +373,20 @@ def test_uninventoried_solid_left_in_stock_is_refused(seat) -> None:
 @pytest.mark.parametrize(
     ("native", "message"),
     [
-        ({"suppressed": frozenset({"HubPoint"})}, "installed wire configuration has suppressed"),
-        ({"suppressed": frozenset({STOCK_SKETCH})}, "installed wire configuration has suppressed"),
+        (
+            {"suppressed": frozenset({"HubPoint"})},
+            "installed wire configuration has suppressed",
+        ),
+        (
+            {"suppressed": frozenset({STOCK_SKETCH})},
+            "installed wire configuration has suppressed",
+        ),
     ],
     ids=["installed-feature", "stock-sketch"],
 )
-def test_suppressed_original_state_is_refused_before_creation(seat, native, message) -> None:
+def test_suppressed_original_state_is_refused_before_creation(
+    seat, native, message
+) -> None:
     adapter, part = seat(**native)
     with pytest.raises(RuntimeError, match=message):
         isolate(adapter)
@@ -397,7 +417,9 @@ def test_primary_failure_survives_a_failed_restore(seat) -> None:
         faults={STOCK: (("BalloonRingSplit", 1, False),)},
         refuse_show=frozenset({INSTALLED}),
     )
-    with pytest.raises(RuntimeError, match="supplier stock configuration has hard faults") as raised:
+    with pytest.raises(
+        RuntimeError, match="supplier stock configuration has hard faults"
+    ) as raised:
         isolate(adapter)
     assert raised.value.__notes__ == [
         "restoration also failed: cannot restore installed wire configuration"
@@ -413,11 +435,16 @@ def test_primary_failure_survives_a_failed_restore(seat) -> None:
             {"faults": {INSTALLED: (("Wire", 2, False),)}},
             r"restored installed wire has hard faults: \['Wire \(rebuild-error\)'\]",
         ),
-        ({"show_ignored": frozenset({INSTALLED})}, "installed wire configuration is not active"),
+        (
+            {"show_ignored": frozenset({INSTALLED})},
+            "installed wire configuration is not active",
+        ),
     ],
     ids=["leaked-suppression", "installed-hard-fault", "restore-not-active"],
 )
-def test_restore_readback_failure_raises_without_a_primary(seat, native, message) -> None:
+def test_restore_readback_failure_raises_without_a_primary(
+    seat, native, message
+) -> None:
     adapter, part = seat(**native)
     with pytest.raises(RuntimeError, match=message) as raised:
         isolate(adapter)
@@ -442,7 +469,9 @@ def test_invalid_inventory_is_refused_before_any_native_call(inventory) -> None:
     # raise AttributeError instead.
     with pytest.raises(ValueError, match="installed_features must be"):
         asyncio.run(
-            stock.author_nominal_stock_cross_section(object(), installed_features=inventory)
+            stock.author_nominal_stock_cross_section(
+                object(), installed_features=inventory
+            )
         )
 
 

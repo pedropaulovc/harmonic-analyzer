@@ -64,7 +64,9 @@ SUPPLIER_NATIVE_URL = (
     "https://www.mcmaster.com/mvC/Library/CAD2/20260115/0FAE8731/"
     "9715K43_Curved%20Disc%20Springs.SLDPRT"
 )
-SUPPLIER_NATIVE_SHA256 = "30ffa536a8a0b2531d8f1711fddbd8089ed58caee40448ff34addd8d4a9f8822"
+SUPPLIER_NATIVE_SHA256 = (
+    "30ffa536a8a0b2531d8f1711fddbd8089ed58caee40448ff34addd8d4a9f8822"
+)
 SUPPLIER_DRAWING_PRECISION = {
     "ID": 1,
     "OD": 3,

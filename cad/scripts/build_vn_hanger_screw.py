@@ -14,7 +14,6 @@ from _mcmaster_93075a199 import (
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_REFERENCE_STARTS,
     SUPPLIER_REFERENCE_PLANES,
-    SUPPLIER_REFERENCE_FORMATS,
 )
 from _mcmaster_93075a199 import HX_UNDERSIDE
 from diagnostics.diag_build_93075A199 import build_93075A199

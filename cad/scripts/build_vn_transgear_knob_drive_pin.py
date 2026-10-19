@@ -44,7 +44,9 @@ async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        components=(StockComponent(sku=SKU, author=_build_pin_with_supplier_references),),
+        components=(
+            StockComponent(sku=SKU, author=_build_pin_with_supplier_references),
+        ),
         material=MATERIAL,
         color=POLISHED_STEEL,
         screw_axis_planes=("Front Plane", "Right Plane"),

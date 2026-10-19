@@ -40,7 +40,6 @@ from _mcmaster_91792a108 import (
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_REFERENCE_STARTS,
     SUPPLIER_REFERENCE_PLANES,
-    SUPPLIER_REFERENCE_FORMATS,
 )
 from diagnostics.diag_build_91792A108 import build_91792A108
 from vn_guide_lock_screw_spec import SKU

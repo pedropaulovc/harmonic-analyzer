@@ -14,7 +14,6 @@ from _mcmaster_99607a213 import (
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_REFERENCE_STARTS,
     SUPPLIER_REFERENCE_PLANES,
-    SUPPLIER_REFERENCE_FORMATS,
 )
 from _mcmaster_99607a213 import HEAD_STACK_LEN
 from diagnostics.diag_build_99607A213 import build_99607A213

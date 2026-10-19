@@ -130,14 +130,25 @@ async def _isolate_stock_configuration(
         raise RuntimeError("cannot create supplier nominal stock configuration")
     try:
         parent = _early_bound(created, "IConfiguration").GetParent()
-        if parent is None or str(_early_bound(parent, "IConfiguration").Name) != original:
+        if (
+            parent is None
+            or str(_early_bound(parent, "IConfiguration").Name) != original
+        ):
             raise RuntimeError(
                 "supplier nominal stock must derive from the installed configuration"
             )
-        if active_configuration_name(adapter, model) != SUPPLIER_REFERENCE_CONFIGURATION:
+        if (
+            active_configuration_name(adapter, model)
+            != SUPPLIER_REFERENCE_CONFIGURATION
+        ):
             if model.ShowConfiguration2(SUPPLIER_REFERENCE_CONFIGURATION) is not True:
-                raise RuntimeError("cannot activate supplier nominal stock configuration")
-        if active_configuration_name(adapter, model) != SUPPLIER_REFERENCE_CONFIGURATION:
+                raise RuntimeError(
+                    "cannot activate supplier nominal stock configuration"
+                )
+        if (
+            active_configuration_name(adapter, model)
+            != SUPPLIER_REFERENCE_CONFIGURATION
+        ):
             raise RuntimeError("supplier nominal stock configuration is not active")
         # Dependents first, so no feature rebuilds against a suppressed parent;
         # one already suppressed through its parent is read, not re-suppressed.
@@ -164,7 +175,9 @@ async def _isolate_stock_configuration(
             raise RuntimeError("supplier nominal stock circle is suppressed")
         faults = _hard_fault_names(adapter, model)
         if faults:
-            raise RuntimeError(f"supplier stock configuration has hard faults: {faults}")
+            raise RuntimeError(
+                f"supplier stock configuration has hard faults: {faults}"
+            )
         if tuple(part.GetBodies2(0, False) or ()):
             raise RuntimeError(
                 "nominal wire stock configuration contains an installed solid"

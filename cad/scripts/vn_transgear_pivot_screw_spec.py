@@ -234,7 +234,9 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierShoulderLength": (SHOULDER_DIA / 2, SHOULDER_END_Y),
 }
 SUPPLIER_DRAWING_DIMENSIONS = {
-    "SupplierReference": {name for name, _value, _orientation in SUPPLIER_REFERENCE_SKETCH},
+    "SupplierReference": {
+        name for name, _value, _orientation in SUPPLIER_REFERENCE_SKETCH
+    },
 }
 # The source-stock view restores the actual untrimmed solid, not a witness
 # length on the faced geometry. Its factory thread/chamfer remain intact.

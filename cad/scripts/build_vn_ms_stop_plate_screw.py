@@ -17,7 +17,6 @@ from _mcmaster_90114a124 import (
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_REFERENCE_STARTS,
     SUPPLIER_REFERENCE_PLANES,
-    SUPPLIER_REFERENCE_FORMATS,
 )
 from diagnostics.diag_build_90114A124 import build_90114A124
 from _mcmaster_90114a124 import SKU

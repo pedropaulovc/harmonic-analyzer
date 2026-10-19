@@ -22,7 +22,12 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note, curate_dimensions, dimension_name, iter_views, place_view, view_name,
+    add_note,
+    curate_dimensions,
+    dimension_name,
+    iter_views,
+    place_view,
+    view_name,
 )
 
 from _check import check
@@ -51,7 +56,8 @@ from _drawing_selection import _select_view_entity
 from _session import run_build
 import _stock_trim_drawing as trim_drawing
 from _supplier_dimensions import (
-    assert_supplier_reference_dimension, supplier_reference_dimension,
+    assert_supplier_reference_dimension,
+    supplier_reference_dimension,
 )
 import _telemetry
 from vn_spring_hook_spec import (
@@ -143,7 +149,9 @@ def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
     )
 
 
-def _supplier_references(adapter: Any, front: Any) -> list[tuple[Any, dict[str, Any], Any]]:
+def _supplier_references(
+    adapter: Any, front: Any
+) -> list[tuple[Any, dict[str, Any], Any]]:
     """Reference the unchanged eye contours and identify the surviving thread."""
     eye = {}
     thread = None
@@ -185,7 +193,9 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[Any, dict[str, 
         ("EyeID", (0.165, 0.228)),
     ):
         if name not in eye:
-            raise RuntimeError(f"{name}: unchanged spring eye has no circular silhouette")
+            raise RuntimeError(
+                f"{name}: unchanged spring eye has no circular silhouette"
+            )
         _select_view_entity(
             adapter, front, "SILHOUETTE", None, label=name, entity=eye[name]
         )
@@ -194,13 +204,20 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[Any, dict[str, 
         if display is None:
             raise RuntimeError(f"{name}: cannot dimension the spring eye silhouette")
         contract = dict(
-            label=name, expected_mm=SUPPLIER_EYE_MM[name], units="in",
-            precision=SUPPLIER_REFERENCE_PRECISION[name], presentation="diameter",
+            label=name,
+            expected_mm=SUPPLIER_EYE_MM[name],
+            units="in",
+            precision=SUPPLIER_REFERENCE_PRECISION[name],
+            presentation="diameter",
         )
         supplier_reference_dimension(adapter, display, **contract)
-        refs.append((
-            _early_bound(display, "IDisplayDimension").GetAnnotation(), contract, eye[name]
-        ))
+        refs.append(
+            (
+                _early_bound(display, "IDisplayDimension").GetAnnotation(),
+                contract,
+                eye[name],
+            )
+        )
     if thread is None:
         raise RuntimeError("spring anchor has no surviving supplier thread crest")
     add_attached_note(
@@ -238,7 +255,10 @@ def _supplier_stock_sheet(adapter):
         "SupplierStockOverall": (0.065, STOCK_CENTER[1]),
     }
     annotations = curate_stock_dimensions(
-        adapter, stock, keep=keep, view_label="as-supplied original bolt dimensions",
+        adapter,
+        stock,
+        keep=keep,
+        view_label="as-supplied original bolt dimensions",
         dimensions_by_feature=SUPPLIER_STOCK_DIMENSIONS,
     )
     midpoint = (
@@ -250,10 +270,12 @@ def _supplier_stock_sheet(adapter):
         adapter, stock, [midpoint], label="original stock bolt centre"
     )[0]
     before = tuple(float(value) for value in stock.Position)
-    stock.Position = double_array([
-        before[0] + STOCK_CENTER[0] - projected[0],
-        before[1] + STOCK_CENTER[1] - projected[1],
-    ])
+    stock.Position = double_array(
+        [
+            before[0] + STOCK_CENTER[0] - projected[0],
+            before[1] + STOCK_CENTER[1] - projected[1],
+        ]
+    )
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("cannot centre the full original stock bolt")
     annotations = curate_dimensions(adapter, annotations, reposition=keep)
@@ -261,7 +283,9 @@ def _supplier_stock_sheet(adapter):
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
         contract = dict(
-            label=name, expected_mm=SUPPLIER_STOCK_MM[name], units="in",
+            label=name,
+            expected_mm=SUPPLIER_STOCK_MM[name],
+            units="in",
             precision=SUPPLIER_REFERENCE_PRECISION[name],
             callout={
                 "SupplierStockShank": "AS-SUPPLIED SHANK",
@@ -269,7 +293,9 @@ def _supplier_stock_sheet(adapter):
                 "SupplierStockOverall": "AS-SUPPLIED OVERALL",
             }[name],
         )
-        supplier_reference_dimension(adapter, annotation.GetSpecificAnnotation(), **contract)
+        supplier_reference_dimension(
+            adapter, annotation.GetSpecificAnnotation(), **contract
+        )
         refs.append((annotation, contract, None))
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     drawing.ActivateView("")  # False is documented for sheet context.
@@ -284,12 +310,14 @@ def _supplier_stock_sheet(adapter):
     for text, x, y in (
         (
             "AS-SUPPLIED EYEBOLT BODY — SUPPLIER REFERENCE",
-            region.xmin + 0.0033, region.ymax - 0.004,
+            region.xmin + 0.0033,
+            region.ymax - 0.004,
         ),
         (
             "SUPPLIED HEX NUT OMITTED FROM THIS BODY VIEW\n"
             "STOCK REFERENCES ONLY — FINISHED CUTTING CONTROLS: SHEET 1",
-            0.016, 0.089,
+            0.016,
+            0.089,
         ),
         (f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}", 0.275, 0.163),
     ):
@@ -313,20 +341,33 @@ def _verify_supplier_references(adapter, refs, stock_views):
         assert_supplier_reference_dimension(adapter, display, **contract)
         native = _early_bound(display.GetDimension2(0), "IDimension")
         if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
-            raise RuntimeError(f"{contract['label']}: supplier reference acquired a tolerance band")
+            raise RuntimeError(
+                f"{contract['label']}: supplier reference acquired a tolerance band"
+            )
         if expected_entity is None:
             if str(native.FullName).split("@")[:2] != [
-                contract["label"], SUPPLIER_STOCK_FEATURE
+                contract["label"],
+                SUPPLIER_STOCK_FEATURE,
             ]:
-                raise RuntimeError(f"{contract['label']}: source stock dimension changed its model attachment")
+                raise RuntimeError(
+                    f"{contract['label']}: source stock dimension changed its model attachment"
+                )
         else:
             current = _early_bound(display.GetAnnotation(), "IAnnotation")
             entities = tuple(current.GetAttachedEntities3() or ())
-            kinds = tuple(int(value) for value in (current.GetAttachedEntityTypes() or ()))
-            if len(entities) != 1 or kinds != (46,) or not _is_same_attachment(
-                adapter, entities[0], expected_entity, "SILHOUETTE"
+            kinds = tuple(
+                int(value) for value in (current.GetAttachedEntityTypes() or ())
+            )
+            if (
+                len(entities) != 1
+                or kinds != (46,)
+                or not _is_same_attachment(
+                    adapter, entities[0], expected_entity, "SILHOUETTE"
+                )
             ):
-                raise RuntimeError(f"{contract['label']}: supplier eye reference moved to another contour")
+                raise RuntimeError(
+                    f"{contract['label']}: supplier eye reference moved to another contour"
+                )
 
 
 def _verify_supplier_layout(adapter, view_names, notes):
@@ -342,23 +383,31 @@ def _verify_supplier_layout(adapter, view_names, notes):
         )
         border = (region.xmin, region.ymin, region.xmax, region.ymax)
         cell = (
-            region.xmin, 0.094 if sheet_name == SHEET_NAMES[1] else 0.0651,
-            region.xmax, region.ymax - (0.009 if sheet_name == SHEET_NAMES[1] else 0.0),
+            region.xmin,
+            0.094 if sheet_name == SHEET_NAMES[1] else 0.0651,
+            region.xmax,
+            region.ymax - (0.009 if sheet_name == SHEET_NAMES[1] else 0.0),
         )
-        views = {view_name(adapter, view): _early_bound(view, "IView") for view in iter_views(adapter)}
+        views = {
+            view_name(adapter, view): _early_bound(view, "IView")
+            for view in iter_views(adapter)
+        }
         for name in names:
             if name not in views:
                 raise RuntimeError(f"{sheet_name}: supplier dimension view disappeared")
             view = views[name]
             view.UpdateViewDisplayGeometry()
-            assert_supplier_view_fits(adapter, view, cell, label=f"spring anchor {sheet_name}")
+            assert_supplier_view_fits(
+                adapter, view, cell, label=f"spring anchor {sheet_name}"
+            )
         if sheet_name == SHEET_NAMES[1]:
             for note, text in notes:
                 annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
                 bounds = _box(note.GetExtent(), label=text, kind="note")
                 if int(annotation.OwnerType) != 1 or not _inside(bounds, border):
-                    raise RuntimeError(f"original stock label leaves the usable sheet: {text}")
-
+                    raise RuntimeError(
+                        f"original stock label leaves the usable sheet: {text}"
+                    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -380,7 +429,9 @@ async def build(adapter: Any) -> dict[str, str]:
     draw, _sheet = new_project_drawing(
         adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
     )
-    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="spring anchor stock package")
+    create_blank_drawing_sheets(
+        adapter, SHEET_NAMES, label="spring anchor stock package"
+    )
     drawing = _early_bound(draw, "IDrawingDoc")
     if not drawing.ActivateSheet(SHEET_NAMES[0]):
         raise RuntimeError("cannot activate finished spring anchor sheet")
@@ -402,7 +453,10 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
     annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="finished overall and cut end",
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="finished overall and cut end",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)

@@ -58,7 +58,9 @@ SUPPLIER_SUITABILITY_PRECISION = 3
 SUPPLIER_APPLICATION_SKETCH = "SupplierApplicationGauges"
 SUPPLIER_APPLICATION_DIMENSIONS = {
     SUPPLIER_APPLICATION_SKETCH: (
-        "ApplicationShaftOD", "ApplicationGrooveDiameter", "ApplicationGrooveWidth",
+        "ApplicationShaftOD",
+        "ApplicationGrooveDiameter",
+        "ApplicationGrooveWidth",
     ),
 }
 # Only the drawing's schematic gauge envelope uses this offset/axial span;

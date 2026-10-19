@@ -96,14 +96,14 @@ def add_nominal_stock_cross_section(adapter, source) -> Callable[[], None]:
     note = add_note(adapter, STOCK_CAPTION, 0.180, 0.217)
     if (
         note is None
-        or str(_early_bound(note, "INote").GetText()).replace("\r", "")
-        != STOCK_CAPTION
+        or str(_early_bound(note, "INote").GetText()).replace("\r", "") != STOCK_CAPTION
     ):
         raise RuntimeError("supplier stock caption did not persist")
     caption_annotation = _early_bound(note, "INote").GetAnnotation()
-    if caption_annotation is None or int(
-        _early_bound(caption_annotation, "IAnnotation").OwnerType
-    ) != 1:  # swAnnotationOwner_DrawingSheet
+    if (
+        caption_annotation is None
+        or int(_early_bound(caption_annotation, "IAnnotation").OwnerType) != 1
+    ):  # swAnnotationOwner_DrawingSheet
         raise RuntimeError("supplier stock caption is not sheet-owned")
 
     def assert_settled_stock() -> None:
@@ -134,9 +134,10 @@ def add_nominal_stock_cross_section(adapter, source) -> Callable[[], None]:
         ):
             raise RuntimeError("settled wire stock package caption changed")
         caption_annotation = _early_bound(note, "INote").GetAnnotation()
-        if caption_annotation is None or int(
-            _early_bound(caption_annotation, "IAnnotation").OwnerType
-        ) != 1:  # swAnnotationOwner_DrawingSheet
+        if (
+            caption_annotation is None
+            or int(_early_bound(caption_annotation, "IAnnotation").OwnerType) != 1
+        ):  # swAnnotationOwner_DrawingSheet
             raise RuntimeError("settled supplier stock caption is not sheet-owned")
 
     return assert_settled_stock

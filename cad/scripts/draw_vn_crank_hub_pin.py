@@ -120,7 +120,9 @@ def _assert_source_end_planes(model: Any) -> None:
         )
         for radius in radii
     ):
-        raise RuntimeError(f"{SKU}: actual pin cylinder differs from the source diameter")
+        raise RuntimeError(
+            f"{SKU}: actual pin cylinder differs from the source diameter"
+        )
 
 
 def _source_profile_entities(model: Any, name: str) -> tuple[Any, tuple[Any, ...]]:
@@ -147,11 +149,14 @@ def _source_profile_entities(model: Any, name: str) -> tuple[Any, tuple[Any, ...
             if not all(map(math.isfinite, xyz)):
                 raise RuntimeError(f"{SKU}: invalid source profile point")
             coordinates.append(xyz)
-        records.append((segment, endpoints, coordinates, bool(segment.ConstructionGeometry)))
+        records.append(
+            (segment, endpoints, coordinates, bool(segment.ConstructionGeometry))
+        )
 
     def resolve(first, second, construction):
         matches = [
-            record for record in records
+            record
+            for record in records
             if record[3] == construction
             and any(
                 math.dist(record[2][0], a) <= 1e-6
@@ -160,7 +165,9 @@ def _source_profile_entities(model: Any, name: str) -> tuple[Any, tuple[Any, ...
             )
         ]
         if len(matches) != 1:
-            raise RuntimeError(f"{SKU}: intended {name} source profile geometry changed")
+            raise RuntimeError(
+                f"{SKU}: intended {name} source profile geometry changed"
+            )
         return matches[0]
 
     outer = PIN_DIA / 2.0
@@ -173,9 +180,7 @@ def _source_profile_entities(model: Any, name: str) -> tuple[Any, tuple[Any, ...
     closing = resolve((-PIN_LEN, 0.0, 0.0), (0.0, 0.0, 0.0), False)
     resolve((0.0, 0.0, 0.0), (0.0, PIN_END_RADIUS, 0.0), False)
     resolve((-PIN_LEN, PIN_END_RADIUS, 0.0), (-PIN_LEN, 0.0, 0.0), False)
-    resolve(
-        (0.0, PIN_END_RADIUS, 0.0), (-PIN_CHAMFER_AXIAL, outer, 0.0), False
-    )
+    resolve((0.0, PIN_END_RADIUS, 0.0), (-PIN_CHAMFER_AXIAL, outer, 0.0), False)
     resolve(
         (-(PIN_LEN - PIN_CHAMFER_AXIAL), outer, 0.0),
         (-PIN_LEN, PIN_END_RADIUS, 0.0),
@@ -220,7 +225,9 @@ def _assert_supplier_pin_reference(
         or owner is None
         or int(adapter.swApp.IsSame(owner, feature)) != 1
     ):
-        raise RuntimeError(f"{SKU} {name}: imported dimension has the wrong model owner")
+        raise RuntimeError(
+            f"{SKU} {name}: imported dimension has the wrong model owner"
+        )
     if int(tolerance.Type) != (2 if diameter else 0):
         raise RuntimeError(f"{SKU} {name}: supplier tolerance type changed")
     if diameter and (
@@ -242,7 +249,8 @@ def _assert_supplier_pin_reference(
     remaining = list(attached)
     for expected in entities:
         matches = [
-            index for index, actual in enumerate(remaining)
+            index
+            for index, actual in enumerate(remaining)
             if actual is not None and int(adapter.swApp.IsSame(actual, expected)) == 1
         ]
         if len(matches) != 1:
@@ -268,24 +276,30 @@ def _supplier_references(
             _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
             label=f"{SKU} {name}",
             units=source.units,
-            precision=source.diameter_precision if diameter else source.length_precision,
+            precision=source.diameter_precision
+            if diameter
+            else source.length_precision,
             expected_mm=source.diameter_mm if diameter else source.length_mm,
             presentation="diameter" if diameter else "length",
         )
         assertion = partial(
-            _assert_supplier_pin_reference, adapter, name=name, source_model=source_model
+            _assert_supplier_pin_reference,
+            adapter,
+            name=name,
+            source_model=source_model,
         )
         assertion(display)
         full_name = str(_early_bound(display.GetDimension2(0), "IDimension").FullName)
         if not full_name or full_name in required:
-            raise RuntimeError(f"{SKU}: supplier dimension has no unique native identity")
+            raise RuntimeError(
+                f"{SKU}: supplier dimension has no unique native identity"
+            )
         required[full_name] = ("*Right", assertion)
     if names != set(DRAWING_PRECISION_BY_NAME):
         raise RuntimeError(f"{SKU}: supplier engineering sizes are incomplete")
     return lambda: assert_supplier_pin_dimensions(
         adapter, {"*Right": view}, required, label=SKU
     )
-
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -318,10 +332,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Supplier SKUs",
         ),
     )
-    if (
-        properties["Supplier"] != "McMaster-Carr"
-        or properties["Supplier SKUs"] != SKU
-    ):
+    if properties["Supplier"] != "McMaster-Carr" or properties["Supplier SKUs"] != SKU:
         raise RuntimeError(f"{SKU}: source part has a different supplier identity")
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout

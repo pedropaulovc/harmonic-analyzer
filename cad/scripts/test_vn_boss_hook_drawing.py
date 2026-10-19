@@ -113,19 +113,26 @@ def test_supplier_nominals_are_distinct_from_the_exact_finished_solid():
     assert spec.SUPPLIER_NOMINAL_WIRE_MM != pytest.approx(anchor.wire_dia_mm)
     assert spec.SUPPLIER_STOCK_DIMENSIONS == {
         spec.SUPPLIER_STOCK_FEATURE: {
-            "SupplierNominalEyeOD", "SupplierNominalWire",
-            "SupplierStockShank", "SupplierStockOverall",
+            "SupplierNominalEyeOD",
+            "SupplierNominalWire",
+            "SupplierStockShank",
+            "SupplierStockOverall",
         }
     }
     assert spec.SUPPLIER_REFERENCE_PRECISION == {
-        "EyeID": 0, "SupplierNominalEyeOD": 0, "SupplierNominalWire": 0,
-        "SupplierStockShank": 0, "SupplierStockOverall": 0,
+        "EyeID": 0,
+        "SupplierNominalEyeOD": 0,
+        "SupplierNominalWire": 0,
+        "SupplierStockShank": 0,
+        "SupplierStockOverall": 0,
     }
     assert spec.SUPPLIER_FRACTION_DENOMINATOR == 16
     assert spec.SUPPLIER_THREAD == "#10-24"
     # Original stock lengths never become finished manufacturing controls.
     assert set(drawing.EXPECTED_CONTROLS) == {
-        "FinishedOverall", "ChamferWidth", "ChamferAngle"
+        "FinishedOverall",
+        "ChamferWidth",
+        "ChamferAngle",
     }
 
 
@@ -156,11 +163,13 @@ def test_simplified_save_excludes_the_source_stock_configuration(
     monkeypatch.setattr(part, "derive_simplified_on_saved_part", derive)
     monkeypatch.setattr(part, "check", lambda _label, result: result)
     monkeypatch.setattr(
-        part, "assert_saved_configurations_regenerate",
+        part,
+        "assert_saved_configurations_regenerate",
         lambda *_args: events.append("saved-cache-readback"),
     )
     monkeypatch.setattr(
-        part, "assert_simplified_configurations",
+        part,
+        "assert_simplified_configurations",
         lambda _adapter, name, features, *, parents: events.append(
             ("simplified-readback", name, features, parents)
         ),
@@ -168,15 +177,24 @@ def test_simplified_save_excludes_the_source_stock_configuration(
     adapter = SimpleNamespace(currentModel=object(), open_model=open_model)
     if stock_active:
         with pytest.raises(RuntimeError):
-            asyncio.run(part._save_anchor(adapter, "hook-under-test", ("ThreadGroove",)))
+            asyncio.run(
+                part._save_anchor(adapter, "hook-under-test", ("ThreadGroove",))
+            )
         assert events == []
         return
-    assert asyncio.run(
-        part._save_anchor(adapter, "hook-under-test", ("ThreadGroove",))
-    ) == artefacts
+    assert (
+        asyncio.run(part._save_anchor(adapter, "hook-under-test", ("ThreadGroove",)))
+        == artefacts
+    )
     assert events == [
         "save",
-        ("derive", "hook-under-test", ("ThreadGroove",), artefacts["part"], ("Default",)),
+        (
+            "derive",
+            "hook-under-test",
+            ("ThreadGroove",),
+            artefacts["part"],
+            ("Default",),
+        ),
         ("open", artefacts["part"]),
         "saved-cache-readback",
         ("simplified-readback", "hook-under-test", ("ThreadGroove",), ("Default",)),
@@ -211,17 +229,25 @@ def test_full_stock_envelope_connects_the_source_eye_to_the_original_end():
     outline = spec.SUPPLIER_STOCK_SHANK_OUTLINE_MM
     assert outline[0][1] == outline[1][1] == shank_start[1]
     assert outline[2][1] == outline[3][1] == end[1]
-    assert math.dist(outline[0], outline[1]) == pytest.approx(spec.SUPPLIER_NOMINAL_WIRE_MM)
+    assert math.dist(outline[0], outline[1]) == pytest.approx(
+        spec.SUPPLIER_NOMINAL_WIRE_MM
+    )
     # The source envelope and the finished, model-authored acceptance size
     # deliberately have different ends; no stock length relabels that cut.
     assert spec.SUPPLIER_STOCK_OVERALL_MM > spec.FINISHED_OVERALL_MM
     assert spec.SUPPLIER_STOCK_SHANK_MM > spec.SHANK_LENGTH_MM
 
 
-@pytest.mark.parametrize("count,configuration", [
-    (4, spec.SUPPLIER_STOCK_CONFIGURATION), (5, "Default"),
-])
-def test_settled_supplier_gate_rejects_missing_refs_or_finished_stock_view(count, configuration):
+@pytest.mark.parametrize(
+    "count,configuration",
+    [
+        (4, spec.SUPPLIER_STOCK_CONFIGURATION),
+        (5, "Default"),
+    ],
+)
+def test_settled_supplier_gate_rejects_missing_refs_or_finished_stock_view(
+    count, configuration
+):
     with pytest.raises(RuntimeError):
         drawing._verify_supplier_references(
             None, [None] * count, SimpleNamespace(ReferencedConfiguration=configuration)
@@ -272,7 +298,9 @@ def _hook_configuration_fixture(monkeypatch, module_name):
         def ActiveConfiguration(self):
             return self.configurations[self.active]
 
-        def AddConfiguration2(self, name, comment, alternate, options, parent, description, rebuild):
+        def AddConfiguration2(
+            self, name, comment, alternate, options, parent, description, rebuild
+        ):
             created = super().AddConfiguration2(
                 name, comment, alternate, options, parent, description, rebuild
             )
@@ -301,7 +329,10 @@ def _hook_configuration_fixture(monkeypatch, module_name):
                 if self.stock_body_count is not None:
                     return [object()] * self.stock_body_count
                 if module_name == "build_vn_boss_hook":
-                    roots = (self.feature_map[name].states[self.active] for name in ("Shank", "Wire"))
+                    roots = (
+                        self.feature_map[name].states[self.active]
+                        for name in ("Shank", "Wire")
+                    )
                     return [] if all(roots) else [object()]
             return [object()]
 
@@ -318,18 +349,27 @@ def _hook_configuration_fixture(monkeypatch, module_name):
         model.rebuilds.append(model.active)
 
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(_configuration_material, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        _configuration_material, "_early_bound", lambda value, _interface: value
+    )
     monkeypatch.setattr(part, "null_variant", lambda: None)
-    monkeypatch.setattr(part, "_feature_by_name", lambda _adapter, name: model.feature_map[name])
+    monkeypatch.setattr(
+        part, "_feature_by_name", lambda _adapter, name: model.feature_map[name]
+    )
     monkeypatch.setattr(part, "force_rebuild", rebuild)
     profile_name = (
-        "_supplier_nominal_stock_profile" if module_name == "build_vn_boss_hook"
+        "_supplier_nominal_stock_profile"
+        if module_name == "build_vn_boss_hook"
         else "_supplier_stock_profile"
     )
     monkeypatch.setattr(part, profile_name, profile)
     if module_name == "build_vn_boss_hook":
         monkeypatch.setattr(part, "_hard_faults", lambda *_args: [])
-    callback = part._supplier_nominal_stock if module_name == "build_vn_boss_hook" else part._supplier_stock
+    callback = (
+        part._supplier_nominal_stock
+        if module_name == "build_vn_boss_hook"
+        else part._supplier_stock
+    )
     return part, callback, adapter, model
 
 
@@ -337,7 +377,9 @@ def _hook_configuration_fixture(monkeypatch, module_name):
 def test_supplier_configuration_activates_on_add_and_isolates_only_its_intended_features(
     monkeypatch, module_name
 ):
-    part, callback, adapter, model = _hook_configuration_fixture(monkeypatch, module_name)
+    part, callback, adapter, model = _hook_configuration_fixture(
+        monkeypatch, module_name
+    )
     asyncio.run(callback(adapter))
     assert model.active == "Default"
     # Calling ShowConfiguration2(STOCK) would return False in this native-faithful
@@ -345,12 +387,13 @@ def test_supplier_configuration_activates_on_add_and_isolates_only_its_intended_
     assert model.switches == ["Default"]
     stock = part.SUPPLIER_STOCK_CONFIGURATION
     intended = (
-        set(part.FINISHED_FEATURES) if module_name == "build_vn_boss_hook"
+        set(part.FINISHED_FEATURES)
+        if module_name == "build_vn_boss_hook"
         else {"StockTrim", "StockDeburr"}
     )
-    assert {(name, state) for config, name, state in model.writes if config == stock} == {
-        (name, 0) for name in intended
-    }
+    assert {
+        (name, state) for config, name, state in model.writes if config == stock
+    } == {(name, 0) for name in intended}
     for name, feature in model.feature_map.items():
         assert feature.states["Default"] is False
         assert feature.states[stock] is (name in intended)
@@ -363,7 +406,9 @@ def test_supplier_configuration_activates_on_add_and_isolates_only_its_intended_
 def test_supplier_configuration_restores_finished_after_native_inspection_failure(
     monkeypatch, module_name, fault
 ):
-    _part, callback, adapter, model = _hook_configuration_fixture(monkeypatch, module_name)
+    _part, callback, adapter, model = _hook_configuration_fixture(
+        monkeypatch, module_name
+    )
     if fault == "parent":
         model.parent_error = RuntimeError("parent read failed")
     elif fault == "suppress":
@@ -375,12 +420,16 @@ def test_supplier_configuration_restores_finished_after_native_inspection_failur
     with pytest.raises(RuntimeError):
         asyncio.run(callback(adapter))
     assert model.active == "Default"
-    assert all(feature.states["Default"] is False for feature in model.feature_map.values())
+    assert all(
+        feature.states["Default"] is False for feature in model.feature_map.values()
+    )
     assert model.switches == ["Default"]
 
 
 def test_boss_diagram_refuses_independent_cut_faults_and_restores_finished(monkeypatch):
-    part, callback, adapter, model = _hook_configuration_fixture(monkeypatch, "build_vn_boss_hook")
+    part, callback, adapter, model = _hook_configuration_fixture(
+        monkeypatch, "build_vn_boss_hook"
+    )
     monkeypatch.setattr(part, "_hard_faults", lambda *_args: ["ThreadGroove (1)"])
     with pytest.raises(RuntimeError, match="ThreadGroove"):
         asyncio.run(callback(adapter))
@@ -388,8 +437,12 @@ def test_boss_diagram_refuses_independent_cut_faults_and_restores_finished(monke
 
 
 @pytest.mark.parametrize("module_name", ["build_vn_boss_hook", "build_vn_spring_hook"])
-def test_restoration_failure_does_not_replace_the_primary_native_exception(monkeypatch, module_name):
-    _part, callback, adapter, model = _hook_configuration_fixture(monkeypatch, module_name)
+def test_restoration_failure_does_not_replace_the_primary_native_exception(
+    monkeypatch, module_name
+):
+    _part, callback, adapter, model = _hook_configuration_fixture(
+        monkeypatch, module_name
+    )
     primary = RuntimeError("parent read failed")
     model.parent_error = primary
     model.restore_error = RuntimeError("restore refused")
@@ -400,16 +453,24 @@ def test_restoration_failure_does_not_replace_the_primary_native_exception(monke
 
 
 @pytest.mark.parametrize("module_name", ["build_vn_boss_hook", "build_vn_spring_hook"])
-def test_a_restore_failure_without_a_primary_error_is_not_silenced(monkeypatch, module_name):
-    _part, callback, adapter, model = _hook_configuration_fixture(monkeypatch, module_name)
+def test_a_restore_failure_without_a_primary_error_is_not_silenced(
+    monkeypatch, module_name
+):
+    _part, callback, adapter, model = _hook_configuration_fixture(
+        monkeypatch, module_name
+    )
     model.restore_error = RuntimeError("restore refused")
     with pytest.raises(RuntimeError, match="restore refused"):
         asyncio.run(callback(adapter))
 
 
 @pytest.mark.parametrize("module_name", ["build_vn_boss_hook", "build_vn_spring_hook"])
-def test_all_finished_feature_states_are_checked_after_the_restore_rebuild(monkeypatch, module_name):
-    _part, callback, adapter, model = _hook_configuration_fixture(monkeypatch, module_name)
+def test_all_finished_feature_states_are_checked_after_the_restore_rebuild(
+    monkeypatch, module_name
+):
+    part, callback, adapter, model = _hook_configuration_fixture(
+        monkeypatch, module_name
+    )
 
     async def rebuild(_adapter):
         # A one-body readback alone would miss these non-generator leaks.
@@ -422,8 +483,12 @@ def test_all_finished_feature_states_are_checked_after_the_restore_rebuild(monke
 
 
 @pytest.mark.parametrize("module_name", ["build_vn_boss_hook", "build_vn_spring_hook"])
-def test_restore_guard_skips_an_already_restored_configuration(monkeypatch, module_name):
-    part, callback, adapter, model = _hook_configuration_fixture(monkeypatch, module_name)
+def test_restore_guard_skips_an_already_restored_configuration(
+    monkeypatch, module_name
+):
+    part, callback, adapter, model = _hook_configuration_fixture(
+        monkeypatch, module_name
+    )
     primary = RuntimeError("stock inspection failed after returning to finished")
 
     async def rebuild(_adapter):
@@ -441,7 +506,9 @@ def test_restore_guard_skips_an_already_restored_configuration(monkeypatch, modu
 
 @pytest.mark.parametrize("module_name", ["build_vn_boss_hook", "build_vn_spring_hook"])
 def test_stock_callback_runs_after_material_and_before_save(monkeypatch, module_name):
-    part, _callback, adapter, model = _hook_configuration_fixture(monkeypatch, module_name)
+    part, _callback, adapter, model = _hook_configuration_fixture(
+        monkeypatch, module_name
+    )
     model.materials["Default"] = ""
     events = []
 
@@ -460,7 +527,9 @@ def test_stock_callback_runs_after_material_and_before_save(monkeypatch, module_
     assert events == ["material", "stock", "save"]
 
 
-def test_source_profile_follows_eye_wire_and_shank_edits_as_one_constrained_sketch(monkeypatch):
+def test_source_profile_follows_eye_wire_and_shank_edits_as_one_constrained_sketch(
+    monkeypatch,
+):
     """Solve the emitted constraints, not a second set of equal-valued literals.
 
     This is an offline geometric regression, not proof of the native solver or
@@ -479,7 +548,9 @@ def test_source_profile_follows_eye_wire_and_shank_edits_as_one_constrained_sket
             self.currentSketchManager = SimpleNamespace(AddToDB=False)
             self.currentModel = SimpleNamespace(
                 ClearSelection2=lambda _all: self.selected.clear(),
-                Extension=SimpleNamespace(AddSpecificDimension=self.reference_dimension),
+                Extension=SimpleNamespace(
+                    AddSpecificDimension=self.reference_dimension
+                ),
             )
             self._sketch_entities = {}
             self.coordinates, self.point_indices, self.refs = [], {}, {}
@@ -522,13 +593,21 @@ def test_source_profile_follows_eye_wire_and_shank_edits_as_one_constrained_sket
             return ok()
 
         async def add_sketch_dimension(self, first, second, kind, value):
-            self.rows.append(dict(first=first, second=second, kind=kind, value=value, driven=False))
+            self.rows.append(
+                dict(first=first, second=second, kind=kind, value=value, driven=False)
+            )
             return ok(f"D{len(self.rows)}")
 
         def reference_dimension(self, _x, _y, _z, dimension_type, _error):
             assert dimension_type == 12
             first, second = self.selected
-            row = dict(first=first, second=second, kind="vertical_distance", value=0.0, driven=True)
+            row = dict(
+                first=first,
+                second=second,
+                kind="vertical_distance",
+                value=0.0,
+                driven=True,
+            )
             self.rows.append(row)
             adapter = self
 
@@ -541,15 +620,19 @@ def test_source_profile_follows_eye_wire_and_shank_edits_as_one_constrained_sket
                     b = adapter.xy(np.array(adapter.coordinates), second)
                     return abs(a[1] - b[1]) / 1000.0
 
-            return SimpleNamespace(Type2=12, GetDimension2=lambda _index: Dimension()), 0
+            return SimpleNamespace(
+                Type2=12, GetDimension2=lambda _index: Dimension()
+            ), 0
 
         def xy(self, values, ref):
             index = None if ref == "origin" else self.refs[ref]
-            return np.zeros(2) if index is None else values[index:index + 2]
+            return np.zeros(2) if index is None else values[index : index + 2]
 
         def residual(self, values, edits):
             residuals = []
-            targets = {row["name"]: edits.get(row["name"], row["value"]) for row in self.rows}
+            targets = {
+                row["name"]: edits.get(row["name"], row["value"]) for row in self.rows
+            }
             for target, expression in self.equations.items():
                 source = expression.strip('"').split("@")[0]
                 targets[target.split("@")[0]] = targets[source]
@@ -561,25 +644,39 @@ def test_source_profile_follows_eye_wire_and_shank_edits_as_one_constrained_sket
                     actual = 2.0 * values[self._sketch_entities[row["first"]].radius]
                 else:
                     axis = 0 if row["kind"] == "horizontal_distance" else 1
-                    actual = abs(self.xy(values, row["first"])[axis] - self.xy(values, row["second"])[axis])
+                    actual = abs(
+                        self.xy(values, row["first"])[axis]
+                        - self.xy(values, row["second"])[axis]
+                    )
                 residuals.append(actual - target)
             for first, second, kind in self.relations:
                 if kind in ("horizontal", "vertical"):
-                    delta = self.xy(values, f"{first}.end") - self.xy(values, f"{first}.start")
+                    delta = self.xy(values, f"{first}.end") - self.xy(
+                        values, f"{first}.start"
+                    )
                     residuals.append(delta[1 if kind == "horizontal" else 0])
                 elif kind in ("horizontal_points", "vertical_points"):
                     axis = 1 if kind == "horizontal_points" else 0
-                    residuals.append(self.xy(values, first)[axis] - self.xy(values, second)[axis])
+                    residuals.append(
+                        self.xy(values, first)[axis] - self.xy(values, second)[axis]
+                    )
                 elif kind == "midpoint":
-                    middle = (self.xy(values, f"{second}.start") + self.xy(values, f"{second}.end")) / 2.0
+                    middle = (
+                        self.xy(values, f"{second}.start")
+                        + self.xy(values, f"{second}.end")
+                    ) / 2.0
                     residuals.extend(self.xy(values, first) - middle)
                 elif kind == "coincident":
                     if second in self._sketch_entities:
                         circle = self._sketch_entities[second]
-                        distance = np.linalg.norm(self.xy(values, first) - self.xy(values, f"{second}.center"))
+                        distance = np.linalg.norm(
+                            self.xy(values, first) - self.xy(values, f"{second}.center")
+                        )
                         residuals.append(distance - values[circle.radius])
                     else:
-                        residuals.extend(self.xy(values, first) - self.xy(values, second))
+                        residuals.extend(
+                            self.xy(values, first) - self.xy(values, second)
+                        )
                 else:
                     raise AssertionError(f"unmodelled sketch constraint: {kind}")
             return np.array(residuals)
@@ -587,9 +684,15 @@ def test_source_profile_follows_eye_wire_and_shank_edits_as_one_constrained_sket
     class RecordedDims(SketchDims):
         def apply(self, adapter, feature):
             assert len(self._rows) == len(adapter.rows)
-            for index, (row, (name, _drive)) in enumerate(zip(adapter.rows, self._rows, strict=True)):
+            for index, (row, (name, _drive)) in enumerate(
+                zip(adapter.rows, self._rows, strict=True)
+            ):
                 row["name"] = name or f"D{index}"
-            return [(f"{name}@{feature}", drive) for name, drive in self._rows if name and drive]
+            return [
+                (f"{name}@{feature}", drive)
+                for name, drive in self._rows
+                if name and drive
+            ]
 
     async def nothing(*_args):
         pass
@@ -602,6 +705,7 @@ def test_source_profile_follows_eye_wire_and_shank_edits_as_one_constrained_sket
             assert append is True and data is None
             adapter.selected.append(ref)
             return True
+
         return SimpleNamespace(Select4=select)
 
     monkeypatch.setattr(part, "SketchDims", RecordedDims)
@@ -610,15 +714,27 @@ def test_source_profile_follows_eye_wire_and_shank_edits_as_one_constrained_sket
     monkeypatch.setattr(part, "ensure_fully_defined", nothing)
     monkeypatch.setattr(part, "force_rebuild", nothing)
     monkeypatch.setattr(part, "drive_dimension", equation)
-    for name in ("name_last_feature", "mark_dimensions_for_drawing", "blank_reference_sketches"):
+    for name in (
+        "name_last_feature",
+        "mark_dimensions_for_drawing",
+        "blank_reference_sketches",
+    ):
         monkeypatch.setattr(part, name, lambda *_args: None)
     adapter = Adapter()
     asyncio.run(part._supplier_nominal_stock_profile(adapter))
-    assert all(entity.ConstructionGeometry is True for entity in adapter._sketch_entities.values())
+    assert all(
+        entity.ConstructionGeometry is True
+        for entity in adapter._sketch_entities.values()
+    )
     overall = next(row for row in adapter.rows if row["name"] == "SupplierStockOverall")
     shank = next(row for row in adapter.rows if row["name"] == "SupplierStockShank")
     width = next(row for row in adapter.rows if row["name"] == "SupplierStockWireWidth")
-    for od_delta, wire_delta, shank_delta in ((0, 0, 0), (2, 0, 0), (0, 1, 0), (2, 1, 5)):
+    for od_delta, wire_delta, shank_delta in (
+        (0, 0, 0),
+        (2, 0, 0),
+        (0, 1, 0),
+        (2, 1, 5),
+    ):
         eye_od = spec.SUPPLIER_NOMINAL_EYE_OD_MM + od_delta
         wire = spec.SUPPLIER_NOMINAL_WIRE_MM + wire_delta
         shank_length = spec.SUPPLIER_STOCK_SHANK_MM + shank_delta
@@ -628,8 +744,12 @@ def test_source_profile_follows_eye_wire_and_shank_edits_as_one_constrained_sket
             "SupplierStockShank": shank_length,
         }
         solved = least_squares(
-            adapter.residual, np.array(adapter.coordinates), args=(edits,),
-            ftol=1e-12, xtol=1e-12, gtol=1e-12,
+            adapter.residual,
+            np.array(adapter.coordinates),
+            args=(edits,),
+            ftol=1e-12,
+            xtol=1e-12,
+            gtol=1e-12,
         )
         assert np.max(np.abs(solved.fun)) < 1e-7
         assert np.linalg.matrix_rank(solved.jac, tol=1e-7) == len(adapter.coordinates)
@@ -645,16 +765,24 @@ def test_source_profile_follows_eye_wire_and_shank_edits_as_one_constrained_sket
 
 
 @pytest.mark.parametrize("fault", [None, "empty_outline", "not_saved_hidden"])
-def test_zero_body_source_is_revealed_rebuilt_and_centred_before_dimension_import(monkeypatch, fault):
+def test_zero_body_source_is_revealed_rebuilt_and_centred_before_dimension_import(
+    monkeypatch, fault
+):
     """A dimension callback must not be what first makes a zero-body view fit."""
     events = []
-    state = SimpleNamespace(revealed=False, rebuilt=False, measured=False, centred=False)
+    state = SimpleNamespace(
+        revealed=False, rebuilt=False, measured=False, centred=False
+    )
     ratio = drawing.STOCK_SCALE[0] / drawing.STOCK_SCALE[1]
     width = (
-        spec.SUPPLIER_STOCK_WIRE_CENTER_MM[0]
-        + spec.SUPPLIER_NOMINAL_WIRE_MM / 2
-        + spec.SUPPLIER_NOMINAL_EYE_OD_MM / 2
-    ) / 1000.0 * ratio
+        (
+            spec.SUPPLIER_STOCK_WIRE_CENTER_MM[0]
+            + spec.SUPPLIER_NOMINAL_WIRE_MM / 2
+            + spec.SUPPLIER_NOMINAL_EYE_OD_MM / 2
+        )
+        / 1000.0
+        * ratio
+    )
     height = spec.SUPPLIER_STOCK_OVERALL_MM / 1000.0 * ratio
 
     class StockView:
@@ -679,7 +807,12 @@ def test_zero_body_source_is_revealed_rebuilt_and_centred_before_dimension_impor
             assert state.revealed and state.rebuilt
             state.measured = True
             events.append("outline")
-            return (0.100, 0.100, 0.100 if fault == "empty_outline" else 0.100 + width, 0.100 + height)
+            return (
+                0.100,
+                0.100,
+                0.100 if fault == "empty_outline" else 0.100 + width,
+                0.100 + height,
+            )
 
     stock = StockView()
     sheet = SimpleNamespace(
@@ -694,8 +827,11 @@ def test_zero_body_source_is_revealed_rebuilt_and_centred_before_dimension_impor
         return True
 
     draw = SimpleNamespace(
-        EditRebuild3=rebuild, ActivateView=lambda _name: False,
-        GetEditSheet=lambda: True, ActiveDrawingView=None, GetCurrentSheet=lambda: sheet,
+        EditRebuild3=rebuild,
+        ActivateView=lambda _name: False,
+        GetEditSheet=lambda: True,
+        ActiveDrawingView=None,
+        GetCurrentSheet=lambda: sheet,
     )
     adapter = SimpleNamespace(currentModel=draw, _attempt=lambda call: call())
 
@@ -732,8 +868,12 @@ def test_zero_body_source_is_revealed_rebuilt_and_centred_before_dimension_impor
     monkeypatch.setattr(drawing, "_show_hidden_owners", reveal)
     monkeypatch.setattr(drawing, "model_points_in_view", project)
     monkeypatch.setattr(drawing, "curate_stock_dimensions", curate)
-    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
-    monkeypatch.setattr(drawing, "supplier_reference_dimension", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "dimension_name", lambda _adapter, annotation: annotation.name
+    )
+    monkeypatch.setattr(
+        drawing, "supplier_reference_dimension", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(drawing, "double_array", list)
     monkeypatch.setattr(drawing, "add_note", note)
     if fault is not None:
@@ -744,8 +884,14 @@ def test_zero_body_source_is_revealed_rebuilt_and_centred_before_dimension_impor
     result_view, refs, notes = drawing._supplier_stock_diagram(adapter)
     assert result_view is stock and len(refs) == 4 and len(notes) == 2
     assert events == [
-        "reveal", "rebuild", "display-update", "outline",
-        "project", "centre", "rebuild", "dimensions",
+        "reveal",
+        "rebuild",
+        "display-update",
+        "outline",
+        "project",
+        "centre",
+        "rebuild",
+        "dimensions",
     ]
     _title, _x, title_top = placed_notes[0]
     assert title_top < 0.2667

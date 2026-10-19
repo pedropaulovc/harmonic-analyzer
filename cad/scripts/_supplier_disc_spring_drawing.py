@@ -36,7 +36,8 @@ def prepare_supplier_disc_diagram(
         features["free_right"] = ("DiscSupplierApplication",)
     expected_extents = supplier_diagram_extents(spec)
     if set(features) != set(expected_extents) or set(views) != {
-        *features, "installed_iso"
+        *features,
+        "installed_iso",
     }:
         raise RuntimeError(f"{spec.SKU}: nominal diagram view/feature mismatch")
     for key, owners in features.items():
@@ -101,9 +102,7 @@ def supplier_disc_spring_dimensions(
 
     application = set(spec.SUPPLIER_APPLICATION_DIMENSIONS)
     if "SHAFT_DIA" in application:
-        x0, _y0, x1, y1 = (
-            float(value) for value in views["free_top"].GetOutline()
-        )
+        x0, _y0, x1, y1 = (float(value) for value in views["free_top"].GetOutline())
         placements["free_top"]["SHAFT_DIA"] = ((x0 + x1) / 2.0, y1 + 0.010)
     height_sizes = [
         semantic
@@ -111,9 +110,7 @@ def supplier_disc_spring_dimensions(
         if semantic in application
     ]
     if height_sizes:
-        x0, y0, x1, y1 = (
-            float(value) for value in views["free_right"].GetOutline()
-        )
+        x0, y0, x1, y1 = (float(value) for value in views["free_right"].GetOutline())
         placements["free_right"] = {
             semantic: (
                 x0 - 0.014 if index == 0 else x1 + 0.014,
@@ -129,8 +126,7 @@ def supplier_disc_spring_dimensions(
 
     for key, positions in placements.items():
         keep = {
-            SUPPLIER_DIMENSION_NAMES[semantic]: xy
-            for semantic, xy in positions.items()
+            SUPPLIER_DIMENSION_NAMES[semantic]: xy for semantic, xy in positions.items()
         }
         imported = curate_view_dimensions(
             adapter,

@@ -16,7 +16,10 @@ import vn_transgear_retaining_ring_application_drawing as drawing
 def test_application_profile_geometrically_carries_all_supplier_for_sizes() -> None:
     points = refs.application_profile()
     assert len(points) == 12
-    assert all(a[0] == b[0] or a[1] == b[1] for a, b in zip(points, points[1:] + points[:1], strict=True))
+    assert all(
+        a[0] == b[0] or a[1] == b[1]
+        for a, b in zip(points, points[1:] + points[:1], strict=True)
+    )
     assert points[0][1] - points[10][1] == pytest.approx(5.0 / 32.0 * 25.4)
     assert points[2][1] - points[8][1] == pytest.approx(0.116 * 25.4)
     assert points[3][0] - points[1][0] == pytest.approx(0.029 * 25.4)
@@ -24,7 +27,9 @@ def test_application_profile_geometrically_carries_all_supplier_for_sizes() -> N
     assert min(u for u, _ in points) > ring.OD / 2.0
 
 
-def test_source_thickness_edge_rejects_groove_slant_and_shifted_faces(monkeypatch) -> None:
+def test_source_thickness_edge_rejects_groove_slant_and_shifted_faces(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(refs, "_early_bound", lambda obj, _: obj)
 
     class Edge:
@@ -35,10 +40,14 @@ def test_source_thickness_edge_rejects_groove_slant_and_shifted_faces(monkeypatc
             return SimpleNamespace(IsLine=lambda: True)
 
         def GetStartVertex(self):
-            return SimpleNamespace(GetPoint=lambda: tuple(value / 1000.0 for value in self.a))
+            return SimpleNamespace(
+                GetPoint=lambda: tuple(value / 1000.0 for value in self.a)
+            )
 
         def GetEndVertex(self):
-            return SimpleNamespace(GetPoint=lambda: tuple(value / 1000.0 for value in self.b))
+            return SimpleNamespace(
+                GetPoint=lambda: tuple(value / 1000.0 for value in self.b)
+            )
 
     actual = Edge((0.0, 3.0, ring.THICKNESS), (0.0, 3.0, 0.0))
     groove = Edge((0.0, 3.0, 0.0), (0.0, 3.0, ring.GROOVE_WIDTH))
@@ -81,8 +90,12 @@ class Display:
         return self.tol_places
 
 
-@pytest.mark.parametrize("value_mm,accepted", [(5.0 / 32.0 * 25.4, True), (0.156 * 25.4, False)])
-def test_gauge_shaft_native_value_rejects_rounded_supplier_ink(monkeypatch, value_mm, accepted) -> None:
+@pytest.mark.parametrize(
+    "value_mm,accepted", [(5.0 / 32.0 * 25.4, True), (0.156 * 25.4, False)]
+)
+def test_gauge_shaft_native_value_rejects_rounded_supplier_ink(
+    monkeypatch, value_mm, accepted
+) -> None:
     monkeypatch.setattr(refs, "_early_bound", lambda obj, _: obj)
     display = Display(Native(value_mm), 12)
     if accepted:
@@ -92,15 +105,21 @@ def test_gauge_shaft_native_value_rejects_rounded_supplier_ink(monkeypatch, valu
             refs._driven(display, "ApplicationShaftOD", ring.SHAFT_DIA)
 
 
-def test_application_gauge_dimensions_measure_the_authored_section_flanks(monkeypatch) -> None:
+def test_application_gauge_dimensions_measure_the_authored_section_flanks(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(refs, "_early_bound", lambda obj, _: obj)
     selected, segments, displays = [], [], []
     feature = object()
     preferences = {10: True, 101: False, 102: False}
-    monkeypatch.setattr(refs, "constant", {
-        "swSketchOverdefiningDimsPromptToSetState": 101,
-        "swSketchOverdefiningDimsSetDrivenByDefault": 102,
-    }.__getitem__)
+    monkeypatch.setattr(
+        refs,
+        "constant",
+        {
+            "swSketchOverdefiningDimsPromptToSetState": 101,
+            "swSketchOverdefiningDimsSetDrivenByDefault": 102,
+        }.__getitem__,
+    )
 
     class Model:
         def ClearSelection2(self, _all):
@@ -151,7 +170,11 @@ def test_application_gauge_dimensions_measure_the_authored_section_flanks(monkey
         selected[:] = indices
 
     def named(_adapter, _feature_name, name):
-        return next((display, display.native) for display in displays if display.native.Name == name)
+        return next(
+            (display, display.native)
+            for display in displays
+            if display.native.Name == name
+        )
 
     monkeypatch.setattr(refs, "add_line_chain", add_chain)
     monkeypatch.setattr(refs, "define_rectilinear_chain", constrain)
@@ -161,16 +184,28 @@ def test_application_gauge_dimensions_measure_the_authored_section_flanks(monkey
     monkeypatch.setattr(refs, "_feature_display_dimensions", lambda _: displays)
     monkeypatch.setattr(refs, "_named_dimension", named)
     monkeypatch.setattr(refs, "set_dimension_bilateral_tolerance", lambda *_: None)
-    monkeypatch.setattr(refs, "supplier_reference_dimension", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        refs, "supplier_reference_dimension", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(refs, "blank_reference_sketches", lambda *_: None)
     asyncio.run(refs.author_application_gauges(Adapter()))
-    assert [display.native.SystemValue * 1000.0 for display in displays] == pytest.approx([
-        5.0 / 32.0 * 25.4, 0.116 * 25.4, 0.029 * 25.4,
-    ])
-    assert set(Counter(point for segment in segments for point in segment).values()) == {2}
+    assert [
+        display.native.SystemValue * 1000.0 for display in displays
+    ] == pytest.approx(
+        [
+            5.0 / 32.0 * 25.4,
+            0.116 * 25.4,
+            0.029 * 25.4,
+        ]
+    )
+    assert set(
+        Counter(point for segment in segments for point in segment).values()
+    ) == {2}
 
 
-def test_application_settled_guard_rejects_attachment_tolerance_and_view_drift(monkeypatch) -> None:
+def test_application_settled_guard_rejects_attachment_tolerance_and_view_drift(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
     owner_sketch = object()
     feature = SimpleNamespace(Visible=1, GetSpecificFeature2=lambda: owner_sketch)
@@ -198,20 +233,37 @@ def test_application_settled_guard_rejects_attachment_tolerance_and_view_drift(m
         native.DrivenState, native.Name = 1, name
         native.FullName = f"{name}@{ring.SUPPLIER_APPLICATION_SKETCH}@Ring"
         if upper is not None:
-            native.Tolerance = SimpleNamespace(Type=2, GetMinValue=lambda: 0.0, GetMaxValue=lambda upper=upper: upper / 1000.0)
+            native.Tolerance = SimpleNamespace(
+                Type=2,
+                GetMinValue=lambda: 0.0,
+                GetMaxValue=lambda upper=upper: upper / 1000.0,
+            )
         display = Display(native, 12)
         display.tol_places = 3
         entity = SimpleNamespace(GetSketch=lambda: owner_sketch)
-        annotation = SimpleNamespace(Visible=1, GetSpecificAnnotation=lambda display=display: display,
-            GetAttachedEntities3=lambda entity=entity: (entity, entity), GetAttachedEntityTypes=lambda: (10, 10))
+        annotation = SimpleNamespace(
+            Visible=1,
+            GetSpecificAnnotation=lambda display=display: display,
+            GetAttachedEntities3=lambda entity=entity: (entity, entity),
+            GetAttachedEntityTypes=lambda: (10, 10),
+        )
         display.GetAnnotation = lambda annotation=annotation: annotation
         natives.append(native)
         annotations.append(annotation)
 
-    note = SimpleNamespace(GetText=lambda: "SUPPLIER APPLICATION GAUGES", GetExtent=lambda: (0.339, 0.165, 0.0, 0.389, 0.168, 0.0))
-    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_args, **_kwargs: annotations)
-    monkeypatch.setattr(drawing, "supplier_reference_dimension", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
+    note = SimpleNamespace(
+        GetText=lambda: "SUPPLIER APPLICATION GAUGES",
+        GetExtent=lambda: (0.339, 0.165, 0.0, 0.389, 0.168, 0.0),
+    )
+    monkeypatch.setattr(
+        drawing, "curate_view_dimensions", lambda *_args, **_kwargs: annotations
+    )
+    monkeypatch.setattr(
+        drawing, "supplier_reference_dimension", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        drawing, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(drawing, "_literal_note", lambda *_: note)
     adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
     settled = drawing.add_application_gauges(adapter, views)

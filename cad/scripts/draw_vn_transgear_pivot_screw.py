@@ -260,9 +260,7 @@ def _add_supplier_references(adapter: Any, front: Any, top: Any) -> dict[str, An
 
 def _add_stock_reference(adapter: Any) -> tuple[Any, Any]:
     """Dimension the complete stock thread on its restored supplier solid."""
-    stock = place_view(
-        adapter, str(SOURCE), "*Front", *STOCK_CENTER, scale=SHEET_SCALE
-    )
+    stock = place_view(adapter, str(SOURCE), "*Front", *STOCK_CENTER, scale=SHEET_SCALE)
     bound = _early_bound(stock, "IView")
     bound.ReferencedConfiguration = SUPPLIER_STOCK_CONFIGURATION
     if not adapter.currentModel.EditRebuild3():
@@ -291,7 +289,9 @@ def _add_stock_reference(adapter: Any) -> tuple[Any, Any]:
         label="SupplierStockThreadLength",
         orientation="vertical",
     )
-    return stock, _format_supplier_reference(adapter, display, "SupplierStockThreadLength")
+    return stock, _format_supplier_reference(
+        adapter, display, "SupplierStockThreadLength"
+    )
 
 
 def _assert_supplier_references(
@@ -303,7 +303,10 @@ def _assert_supplier_references(
     """Check settled native source values, bands, attachments and configurations."""
     if set(references) != set(SUPPLIER_REFERENCE_DIMENSIONS):
         raise RuntimeError("supplier reference coverage changed before saving")
-    if str(_early_bound(stock, "IView").ReferencedConfiguration) != SUPPLIER_STOCK_CONFIGURATION:
+    if (
+        str(_early_bound(stock, "IView").ReferencedConfiguration)
+        != SUPPLIER_STOCK_CONFIGURATION
+    ):
         raise RuntimeError("source-stock view lost its stock configuration")
     if any(
         str(_early_bound(view, "IView").ReferencedConfiguration)

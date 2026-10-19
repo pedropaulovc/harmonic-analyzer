@@ -91,7 +91,9 @@ def nominal_diagram(monkeypatch):
 
         def __init__(self, value, entity):
             self.dimension = SimpleNamespace(
-                SystemValue=value / 1000.0, Tolerance=Tolerance(), entity=entity,
+                SystemValue=value / 1000.0,
+                Tolerance=Tolerance(),
+                entity=entity,
             )
 
         def SetPrecision3(self, primary, dual, tolerance, dual_tolerance):
@@ -114,10 +116,15 @@ def nominal_diagram(monkeypatch):
 
         async def create_sketch(self, plane):
             self.active = SimpleNamespace(
-                plane=plane, segments=[], dimensions=[], Visible=2, checked=False,
+                plane=plane,
+                segments=[],
+                dimensions=[],
+                Visible=2,
+                checked=False,
             )
             self.active.GetSketchSegments = lambda: (
-                self.active.segments[:-1] if self.failure == "missing_geometry"
+                self.active.segments[:-1]
+                if self.failure == "missing_geometry"
                 else self.active.segments
             )
             return success()
@@ -130,26 +137,39 @@ def nominal_diagram(monkeypatch):
             return success()
 
         async def add_line(self, x0, y0, x1, y1):
-            return self.add_entity(SimpleNamespace(
-                kind="line", start=(x0, y0), end=(x1, y1),
-                ConstructionGeometry=False,
-            ))
+            return self.add_entity(
+                SimpleNamespace(
+                    kind="line",
+                    start=(x0, y0),
+                    end=(x1, y1),
+                    ConstructionGeometry=False,
+                )
+            )
 
         async def add_circle(self, x, y, radius):
-            return self.add_entity(SimpleNamespace(
-                kind="circle", center=(x, y), radius=radius,
-                ConstructionGeometry=False,
-            ))
+            return self.add_entity(
+                SimpleNamespace(
+                    kind="circle",
+                    center=(x, y),
+                    radius=radius,
+                    ConstructionGeometry=False,
+                )
+            )
 
         def add_entity(self, segment):
             segment.GetType = lambda: (
-                3 if self.failure == "segment_type" else (1 if segment.kind == "circle" else 0)
+                3
+                if self.failure == "segment_type"
+                else (1 if segment.kind == "circle" else 0)
             )
             segment.IsCircle = lambda: 0 if self.failure == "partial_circle" else 1
             segment.GetLength = lambda: (
                 (2.0 if self.failure == "segment_length" else 1.0)
-                * (2.0 * math.pi * segment.radius if segment.kind == "circle"
-                   else math.dist(segment.start, segment.end))
+                * (
+                    2.0 * math.pi * segment.radius
+                    if segment.kind == "circle"
+                    else math.dist(segment.start, segment.end)
+                )
                 / 1000.0
             )
             name = f"entity{len(self.entities)}"
@@ -189,9 +209,15 @@ def nominal_diagram(monkeypatch):
 
         async def check_sketch_fully_defined(self):
             self.active.checked = True
-            return success({"definition_state": (
-                "under_defined" if self.failure == "underdefined" else "fully_defined"
-            )})
+            return success(
+                {
+                    "definition_state": (
+                        "under_defined"
+                        if self.failure == "underdefined"
+                        else "fully_defined"
+                    )
+                }
+            )
 
         def rename(self, name):
             self.last.Name = name
@@ -213,7 +239,8 @@ def nominal_diagram(monkeypatch):
 
         def named(self, feature, name):
             display = next(
-                item for item in self.sketches[feature].dimensions
+                item
+                for item in self.sketches[feature].dimensions
                 if item.dimension.Name == name
             )
             return display, display.dimension
@@ -221,7 +248,9 @@ def nominal_diagram(monkeypatch):
     def apply(dims, adapter, feature):
         displays = adapter.sketches[feature].dimensions
         assert len(displays) == len(dims._rows)
-        for index, (display, (name, _drive)) in enumerate(zip(displays, dims._rows, strict=True)):
+        for index, (display, (name, _drive)) in enumerate(
+            zip(displays, dims._rows, strict=True)
+        ):
             display.dimension.Name = name or f"D{index + 1}"
         return []
 
@@ -234,16 +263,21 @@ def nominal_diagram(monkeypatch):
         monkeypatch.setattr(module, "_early_bound", lambda value, interface: value)
     for module in (supplier, _drawing_tolerances):
         monkeypatch.setattr(
-            module, "_named_dimension",
+            module,
+            "_named_dimension",
             lambda adapter, feature, name: adapter.named(feature, name),
         )
     monkeypatch.setattr(supplier.SketchDims, "apply", apply)
-    monkeypatch.setattr(supplier, "name_last_feature", lambda adapter, name: adapter.rename(name))
+    monkeypatch.setattr(
+        supplier, "name_last_feature", lambda adapter, name: adapter.rename(name)
+    )
     monkeypatch.setattr(supplier, "mark_dimensions_for_drawing", mark)
 
     def author(source, *, failure=None):
         adapter = Adapter(failure)
-        features = asyncio.run(supplier.author_supplier_references(adapter, spec=source))
+        features = asyncio.run(
+            supplier.author_supplier_references(adapter, spec=source)
+        )
         return adapter, features
 
     return author
@@ -258,24 +292,39 @@ def nominal_diagram(monkeypatch):
     ],
 )
 def test_authored_nominal_diagrams_carry_native_geometry_and_supplier_bands(
-    nominal_diagram, source, inner, outer, low, high, thickness, count, band_type,
+    nominal_diagram,
+    source,
+    inner,
+    outer,
+    low,
+    high,
+    thickness,
+    count,
+    band_type,
 ) -> None:
     adapter, features = nominal_diagram(source)
     assert set(features) == set(adapter.sketches)
-    assert all(sketch.Visible == 1 and sketch.checked for sketch in adapter.sketches.values())
+    assert all(
+        sketch.Visible == 1 and sketch.checked for sketch in adapter.sketches.values()
+    )
     assert all(
         not segment.ConstructionGeometry
-        for sketch in adapter.sketches.values() for segment in sketch.segments
+        for sketch in adapter.sketches.values()
+        for segment in sketch.segments
     )
     plan = adapter.sketches["DiscSupplierPlan"]
     assert len(plan.segments) == 2
-    assert [2.0 * circle.radius for circle in plan.segments] == pytest.approx([inner, outer])
+    assert [2.0 * circle.radius for circle in plan.segments] == pytest.approx(
+        [inner, outer]
+    )
     assert all(circle.center == (0.0, 0.0) for circle in plan.segments)
     envelope = adapter.sketches["DiscSupplierHeight"].segments
     assert len(envelope) == 4
     expected_corners = [
-        (-outer / 2.0, low), (-outer / 2.0, high),
-        (outer / 2.0, high), (outer / 2.0, low),
+        (-outer / 2.0, low),
+        (-outer / 2.0, high),
+        (outer / 2.0, high),
+        (outer / 2.0, low),
     ]
     for line, corner in zip(envelope, expected_corners, strict=True):
         assert line.start == pytest.approx(corner, abs=1e-12)
@@ -285,7 +334,9 @@ def test_authored_nominal_diagrams_carry_native_geometry_and_supplier_bands(
     )
     strip = adapter.sketches["DiscSupplierStrip"].segments
     assert len(strip) == 4
-    assert math.dist(strip[0].start, strip[0].end) == pytest.approx(thickness, abs=1e-12)
+    assert math.dist(strip[0].start, strip[0].end) == pytest.approx(
+        thickness, abs=1e-12
+    )
     if source is rocker_spec:
         assert strip[0].start == pytest.approx((3.3655, 0.2286), abs=1e-12)
         assert strip[0].end == pytest.approx((3.3655, 0.381), abs=1e-12)
@@ -295,12 +346,15 @@ def test_authored_nominal_diagrams_carry_native_geometry_and_supplier_bands(
         assert len(shaft) == 1
         assert shaft[0].radius * 2.0 == pytest.approx(4.826)
     marked = [
-        display for sketch in adapter.sketches.values()
-        for display in sketch.dimensions if display.MarkedForDrawing
+        display
+        for sketch in adapter.sketches.values()
+        for display in sketch.dimensions
+        if display.MarkedForDrawing
     ]
     assert len(marked) == count
     assert {display.dimension.Name for display in marked} == {
-        supplier.SUPPLIER_DIMENSION_NAMES[key] for key in source.SUPPLIER_DRAWING_PRECISION
+        supplier.SUPPLIER_DIMENSION_NAMES[key]
+        for key in source.SUPPLIER_DRAWING_PRECISION
     }
     for key in ("SupplierID", "SupplierOD"):
         display, dimension = adapter.named("DiscSupplierPlan", key)
@@ -316,17 +370,23 @@ def test_authored_nominal_diagrams_carry_native_geometry_and_supplier_bands(
         gauge = adapter.sketches["DiscSupplierApplication"]
         expected = (
             {"SupplierWorkingHeight": 0.6096, "SupplierWorkingDeflection": 0.6604}
-            if source is spec else {"SupplierWorkingHeight": 0.6858}
+            if source is spec
+            else {"SupplierWorkingHeight": 0.6858}
         )
         assert {
             display.dimension.Name: display.dimension.SystemValue * 1000.0
-            for display in gauge.dimensions if display.MarkedForDrawing
+            for display in gauge.dimensions
+            if display.MarkedForDrawing
         } == pytest.approx(expected, abs=1e-12)
 
     # The pre-fit contract comes from the same geometry, including shaft and
     # gauge extents, rather than whichever outline a native view happened to return.
     extents = supplier.supplier_diagram_extents(source)
-    for key, plane in (("free_top", "Top"), ("free_front", "Front"), ("free_right", "Right")):
+    for key, plane in (
+        ("free_top", "Top"),
+        ("free_front", "Front"),
+        ("free_right", "Right"),
+    ):
         points = []
         for sketch in adapter.sketches.values():
             if sketch.plane != plane:
@@ -336,8 +396,12 @@ def test_authored_nominal_diagrams_carry_native_geometry_and_supplier_bands(
                     points.extend((segment.start, segment.end))
                 else:
                     x, y = segment.center
-                    points.extend(((x - segment.radius, y - segment.radius),
-                                   (x + segment.radius, y + segment.radius)))
+                    points.extend(
+                        (
+                            (x - segment.radius, y - segment.radius),
+                            (x + segment.radius, y + segment.radius),
+                        )
+                    )
         if not points:
             assert key not in extents
             continue
@@ -351,14 +415,20 @@ def test_authored_nominal_diagrams_carry_native_geometry_and_supplier_bands(
 
 @pytest.mark.parametrize(
     ("failure", "message"),
-    [("value", "exact supplier dimension"), ("unmarked", "exact supplier dimension"),
-     ("underdefined", "sketch not fully defined"), ("visible", "still visible"),
-     ("missing_geometry", "native nominal diagram segments changed"),
-     ("segment_type", "native nominal diagram segment type changed"),
-     ("segment_length", "native nominal diagram segment lengths changed"),
-     ("partial_circle", "requires complete circles")],
+    [
+        ("value", "exact supplier dimension"),
+        ("unmarked", "exact supplier dimension"),
+        ("underdefined", "sketch not fully defined"),
+        ("visible", "still visible"),
+        ("missing_geometry", "native nominal diagram segments changed"),
+        ("segment_type", "native nominal diagram segment type changed"),
+        ("segment_length", "native nominal diagram segment lengths changed"),
+        ("partial_circle", "requires complete circles"),
+    ],
 )
-def test_nominal_diagrams_reject_bad_native_readbacks(nominal_diagram, failure, message) -> None:
+def test_nominal_diagrams_reject_bad_native_readbacks(
+    nominal_diagram, failure, message
+) -> None:
     with pytest.raises(RuntimeError, match=message):
         nominal_diagram(spec, failure=failure)
 

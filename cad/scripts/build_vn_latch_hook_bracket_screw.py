@@ -23,7 +23,6 @@ from _mcmaster_90280a108 import (
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_REFERENCE_STARTS,
     SUPPLIER_REFERENCE_PLANES,
-    SUPPLIER_REFERENCE_FORMATS,
 )
 from diagnostics.diag_build_90280A108 import build_90280A108
 from vn_latch_hook_bracket_screw_spec import SKU

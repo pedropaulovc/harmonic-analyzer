@@ -19,7 +19,9 @@ ROW = _config.parts(STEM)
 def test_sheet_is_the_registered_purchased_part_reference() -> None:
     spec = DRAWINGS_BY_NAME[NAME]
     assert (spec.part, spec.artifact_stem, spec.script_name) == (
-        NAME, STEM, f"draw_{NAME}.py",
+        NAME,
+        STEM,
+        f"draw_{NAME}.py",
     )
     assert spec.layout is DrawingLayout.LANDSCAPE
     assert "OUTER LINK" in draw.ITEM

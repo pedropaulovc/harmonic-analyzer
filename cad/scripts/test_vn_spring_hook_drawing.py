@@ -263,8 +263,11 @@ def test_supplier_reference_set_matches_only_source_dimensioned_unchanged_geomet
     assert spec.SUPPLIER_EYE_MM["EyeOD"] == pytest.approx(0.5 * 25.4)
     assert spec.SUPPLIER_EYE_MM["EyeID"] == pytest.approx(0.25 * 25.4)
     assert spec.SUPPLIER_REFERENCE_PRECISION == {
-        "EyeOD": 1, "EyeID": 2,
-        "SupplierStockShank": 2, "SupplierStockThread": 3, "SupplierStockOverall": 2,
+        "EyeOD": 1,
+        "EyeID": 2,
+        "SupplierStockShank": 2,
+        "SupplierStockThread": 3,
+        "SupplierStockOverall": 2,
     }
     assert spec.SUPPLIER_THREAD == "#6-32"
     assert spec.SUPPLIER_THREAD_MAJOR_MM == anchor.thread_major_dia_mm
@@ -272,7 +275,9 @@ def test_supplier_reference_set_matches_only_source_dimensioned_unchanged_geomet
     # stock lengths end at the removed factory end, not the finished cut end.
     assert set(spec.SUPPLIER_EYE_MM) == {"EyeOD", "EyeID"}
     assert set(drawing.EXPECTED_CONTROLS) == {
-        "FinishedOverall", "ChamferWidth", "ChamferAngle"
+        "FinishedOverall",
+        "ChamferWidth",
+        "ChamferAngle",
     }
 
 
@@ -289,22 +294,36 @@ def test_original_stock_axis_reproduces_all_three_source_lengths():
     assert spec.SUPPLIER_STOCK_DIMENSIONS == {
         spec.SUPPLIER_STOCK_FEATURE: set(spec.SUPPLIER_STOCK_MM)
     }
-    assert spec.SUPPLIER_STOCK_MM["SupplierStockShank"] - spec.SHANK_LENGTH_MM == pytest.approx(0.45)
-    assert spec.SUPPLIER_STOCK_MM["SupplierStockOverall"] - spec.FINISHED_OVERALL_MM == pytest.approx(0.45)
+    assert spec.SUPPLIER_STOCK_MM[
+        "SupplierStockShank"
+    ] - spec.SHANK_LENGTH_MM == pytest.approx(0.45)
+    assert spec.SUPPLIER_STOCK_MM[
+        "SupplierStockOverall"
+    ] - spec.FINISHED_OVERALL_MM == pytest.approx(0.45)
 
 
-@pytest.mark.parametrize("count,configuration", [
-    (4, spec.SUPPLIER_STOCK_CONFIGURATION), (5, "Default"),
-])
-def test_settled_supplier_gate_rejects_lost_refs_or_wrong_stock_configuration(count, configuration):
+@pytest.mark.parametrize(
+    "count,configuration",
+    [
+        (4, spec.SUPPLIER_STOCK_CONFIGURATION),
+        (5, "Default"),
+    ],
+)
+def test_settled_supplier_gate_rejects_lost_refs_or_wrong_stock_configuration(
+    count, configuration
+):
     with pytest.raises(RuntimeError):
         drawing._verify_supplier_references(
-            None, [None] * count, [SimpleNamespace(ReferencedConfiguration=configuration)]
+            None,
+            [None] * count,
+            [SimpleNamespace(ReferencedConfiguration=configuration)],
         )
 
 
 @pytest.mark.parametrize("module_name", ["draw_vn_boss_hook", "draw_vn_spring_hook"])
-def test_finished_front_import_cannot_visit_supplier_stock_features(monkeypatch, module_name):
+def test_finished_front_import_cannot_visit_supplier_stock_features(
+    monkeypatch, module_name
+):
     """Exercise the actual curation dispatcher from each full drawing entry point."""
     import _drawing_dimension_import as imports
 
@@ -320,10 +339,16 @@ def test_finished_front_import_cannot_visit_supplier_stock_features(monkeypatch,
     monkeypatch.setattr(module, "SOURCE", SimpleNamespace(is_file=lambda: True))
     monkeypatch.setattr(module, "check", lambda _label, result: result)
     monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(module, "new_project_drawing", lambda *_args, **_kwargs: (draw, object()))
+    monkeypatch.setattr(
+        module, "new_project_drawing", lambda *_args, **_kwargs: (draw, object())
+    )
     for name in (
-        "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
-        "set_hidden_lines_removed", "set_dimension_precision", "set_dimension_callouts",
+        "read_required_properties",
+        "create_blank_drawing_sheets",
+        "stamp_drawing_summary",
+        "set_hidden_lines_removed",
+        "set_dimension_precision",
+        "set_dimension_callouts",
     ):
         monkeypatch.setattr(module, name, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module, "place_view", lambda *_args, **_kwargs: object())
@@ -332,7 +357,8 @@ def test_finished_front_import_cannot_visit_supplier_stock_features(monkeypatch,
         imported.extend(features)
         return [
             (name, SimpleNamespace(name=name))
-            for feature in features for name in module.DRAWING_DIMENSIONS[feature]
+            for feature in features
+            for name in module.DRAWING_DIMENSIONS[feature]
         ]
 
     def refuse_entire_model(*_args, **_kwargs):
@@ -340,9 +366,13 @@ def test_finished_front_import_cannot_visit_supplier_stock_features(monkeypatch,
 
     monkeypatch.setattr(imports, "insert_feature_dimensions", import_features)
     monkeypatch.setattr(imports, "_curate_entire_model_import", refuse_entire_model)
-    monkeypatch.setattr(imports, "curate_dimensions", lambda _adapter, rows, **_kwargs: rows)
+    monkeypatch.setattr(
+        imports, "curate_dimensions", lambda _adapter, rows, **_kwargs: rows
+    )
     monkeypatch.setattr(imports, "dimension_name", lambda _adapter, row: row.name)
-    monkeypatch.setattr(imports, "_reposition_rerun_reason", lambda *_args, **_kwargs: "none")
+    monkeypatch.setattr(
+        imports, "_reposition_rerun_reason", lambda *_args, **_kwargs: "none"
+    )
     observed = []
 
     class ReachedSupplierReferences(Exception):
@@ -365,7 +395,16 @@ def test_finished_front_import_cannot_visit_supplier_stock_features(monkeypatch,
 
 @pytest.mark.parametrize("module_name", ["draw_vn_boss_hook", "draw_vn_spring_hook"])
 @pytest.mark.parametrize(
-    "fault", [None, "dimension_top", "title_268", "title_278", "unreadable_ink", "view_owned_title", "missing_view"]
+    "fault",
+    [
+        None,
+        "dimension_top",
+        "title_268",
+        "title_278",
+        "unreadable_ink",
+        "view_owned_title",
+        "missing_view",
+    ],
 )
 def test_settled_supplier_ink_uses_real_sheet_height_and_inner_border(
     monkeypatch, module_name, fault
@@ -375,16 +414,22 @@ def test_settled_supplier_ink_uses_real_sheet_height_and_inner_border(
 
     module = importlib.import_module(module_name)
     native_ink = {
-        "texts": [{
-            "t": "(11/16 in) SOURCE REF", "pos": [0.100, 0.245, 0.0],
-            "h": 0.003, "w": 0.060,
-        }],
+        "texts": [
+            {
+                "t": "(11/16 in) SOURCE REF",
+                "pos": [0.100, 0.245, 0.0],
+                "h": 0.003,
+                "w": 0.060,
+            }
+        ],
     }
     if fault == "dimension_top":
         native_ink["texts"][0]["pos"][1] = 0.268
     annotation = object()
     display = SimpleNamespace(
-        GetDimension2=lambda _index: SimpleNamespace(FullName="SourceDim@SupplierProfile@Hook"),
+        GetDimension2=lambda _index: SimpleNamespace(
+            FullName="SourceDim@SupplierProfile@Hook"
+        ),
         GetAnnotation=lambda: annotation,
         GetNext5=lambda: None,
     )
@@ -419,36 +464,53 @@ def test_settled_supplier_ink_uses_real_sheet_height_and_inner_border(
     adapter = SimpleNamespace(currentModel=draw, _attempt=lambda call: call())
     monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(module, "iter_views", lambda _adapter: iter(() if fault == "missing_view" else (fresh_view,)))
+    monkeypatch.setattr(
+        module,
+        "iter_views",
+        lambda _adapter: iter(() if fault == "missing_view" else (fresh_view,)),
+    )
     monkeypatch.setattr(module, "view_name", lambda _adapter, view: view.Name)
     monkeypatch.setattr(
-        collector, "annotation_display",
-        lambda *_args: (native_ink, ["unreadable text"] if fault == "unreadable_ink" else []),
+        collector,
+        "annotation_display",
+        lambda *_args: (
+            native_ink,
+            ["unreadable text"] if fault == "unreadable_ink" else [],
+        ),
     )
     title_top = {"title_268": 0.268, "title_278": 0.278}.get(fault, 0.263)
     note = SimpleNamespace(
-        GetAnnotation=lambda: SimpleNamespace(OwnerType=0 if fault == "view_owned_title" else 1),
+        GetAnnotation=lambda: SimpleNamespace(
+            OwnerType=0 if fault == "view_owned_title" else 1
+        ),
         GetExtent=lambda: (0.016, title_top - 0.003, 0.0, 0.200, title_top, 0.0),
     )
     name = "FreshSupplierView"
     names = name if module_name == "draw_vn_boss_hook" else (name,)
     if fault is None:
-        module._verify_supplier_layout(adapter, {module.SHEET_NAMES[1]: names}, [(note, "source title")])
+        module._verify_supplier_layout(
+            adapter, {module.SHEET_NAMES[1]: names}, [(note, "source title")]
+        )
         assert fresh_view.updates == 1
     else:
         with pytest.raises(RuntimeError):
-            module._verify_supplier_layout(adapter, {module.SHEET_NAMES[1]: names}, [(note, "source title")])
+            module._verify_supplier_layout(
+                adapter, {module.SHEET_NAMES[1]: names}, [(note, "source title")]
+            )
 
 
 @pytest.mark.parametrize("module_name", ["build_vn_boss_hook", "build_vn_spring_hook"])
-@pytest.mark.parametrize("fault", [None, "selection", "wrong_type", "wrong_span", "missing_dimension"])
+@pytest.mark.parametrize(
+    "fault", [None, "selection", "wrong_type", "wrong_span", "missing_dimension"]
+)
 def test_source_spans_select_native_endpoints_and_refuse_wrong_measurements(
     monkeypatch, module_name, fault
 ):
     module = importlib.import_module(module_name)
     selected, clears, recorded = [], [], []
     expected = (
-        module.SUPPLIER_STOCK_OVERALL_MM if module_name == "build_vn_boss_hook"
+        module.SUPPLIER_STOCK_OVERALL_MM
+        if module_name == "build_vn_boss_hook"
         else module.SUPPLIER_STOCK_MM["SupplierStockOverall"]
     )
     dimension = SimpleNamespace(
@@ -476,6 +538,7 @@ def test_source_spans_select_native_endpoints_and_refuse_wrong_measurements(
             assert append is True and data is None
             selected.append(ref)
             return fault != "selection"
+
         return SimpleNamespace(Select4=select)
 
     monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
@@ -486,7 +549,14 @@ def test_source_spans_select_native_endpoints_and_refuse_wrong_measurements(
         if module_name == "build_vn_boss_hook":
             module._stock_overall_reference(adapter, "Axis.start", "Axis.end", dims)
         else:
-            module._stock_span(adapter, "Axis.start", "Axis.end", expected, "SupplierStockOverall", dims)
+            module._stock_span(
+                adapter,
+                "Axis.start",
+                "Axis.end",
+                expected,
+                "SupplierStockOverall",
+                dims,
+            )
 
     if fault is None:
         measure()
@@ -498,10 +568,14 @@ def test_source_spans_select_native_endpoints_and_refuse_wrong_measurements(
     assert clears == ["clear", "clear"]
 
 
-def test_spring_stock_requires_the_material_inherited_after_the_before_save_split(monkeypatch):
+def test_spring_stock_requires_the_material_inherited_after_the_before_save_split(
+    monkeypatch,
+):
     from test_vn_boss_hook_drawing import _hook_configuration_fixture
 
-    part, callback, adapter, model = _hook_configuration_fixture(monkeypatch, "build_vn_spring_hook")
+    part, callback, adapter, model = _hook_configuration_fixture(
+        monkeypatch, "build_vn_spring_hook"
+    )
     original_read = model.GetMaterialPropertyName2
 
     def missing_stock_material(name):

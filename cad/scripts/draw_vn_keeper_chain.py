@@ -32,7 +32,10 @@ async def build(adapter: Any) -> dict[str, str]:
         settled_checks.append(annotate_keeper_bead(target, views))
 
     return await build_purchased_part_drawing(
-        adapter, SPEC, item=ITEM, cut_to_suit=True,
+        adapter,
+        SPEC,
+        item=ITEM,
+        cut_to_suit=True,
         supplier_dimensions=add_dimensions,
         supplier_margins={"*Front": (0.0, 0.0, 0.040, 0.020)},
         settled_checks=settled_checks,

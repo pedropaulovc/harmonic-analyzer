@@ -17,8 +17,20 @@ class _Body:
         self.faces = faces
 
     def GetMassProperties(self, density):
-        return (0.0, 0.0, 0.0, self.value, self.value * 2, self.value * density,
-                self.value / 10, self.value / 10, self.value / 10, 0.0, 0.0, 0.0)
+        return (
+            0.0,
+            0.0,
+            0.0,
+            self.value,
+            self.value * 2,
+            self.value * density,
+            self.value / 10,
+            self.value / 10,
+            self.value / 10,
+            0.0,
+            0.0,
+            0.0,
+        )
 
     def GetFaces(self):
         return [object()] * self.faces
@@ -76,8 +88,10 @@ class _Model:
         self.initial = bodies
         self.features = []
         self.active = active
-        self.configurations = {name: SimpleNamespace(AddRebuildSaveMark=False)
-                               for name in ("Default", "Default Simplified")}
+        self.configurations = {
+            name: SimpleNamespace(AddRebuildSaveMark=False)
+            for name in ("Default", "Default Simplified")
+        }
         self.ConfigurationManager = self
         self.FeatureManager = self
         self.SelectionManager = SimpleNamespace(CreateSelectData=lambda: object())
@@ -91,7 +105,9 @@ class _Model:
     def GetConfigurationByName(self, name):
         return self.configurations.get(name)
 
-    def AddConfiguration2(self, name, comment, alternate, options, parent, description, rebuild):
+    def AddConfiguration2(
+        self, name, comment, alternate, options, parent, description, rebuild
+    ):
         # Options without swConfigOption_DontActivate activate the new configuration.
         assert not options & 0x80
         self.configurations[name] = SimpleNamespace(AddRebuildSaveMark=False)
@@ -132,7 +148,9 @@ class _Model:
         return _Feature(self, "body", body)
 
     def FeatureByName(self, name):
-        return next((feature for feature in self.features if feature.Name == name), None)
+        return next(
+            (feature for feature in self.features if feature.Name == name), None
+        )
 
     def EditRebuild3(self):
         return True
@@ -164,7 +182,11 @@ def _adapter(monkeypatch, active="Default"):
     monkeypatch.setattr(_dimensions, "_com_invoke", _invoke)
     monkeypatch.setattr(refs, "bstr_array", list)
     monkeypatch.setattr(refs, "check", lambda label, result: result)
-    monkeypatch.setattr(refs, "active_configuration_name", lambda adapter, model=None: (model or adapter.currentModel).active)
+    monkeypatch.setattr(
+        refs,
+        "active_configuration_name",
+        lambda adapter, model=None: (model or adapter.currentModel).active,
+    )
     return adapter, installed
 
 
@@ -183,13 +205,20 @@ def _bodies_in(model, name, kind=0):
 
 
 def _run(adapter, *states, body_count=2):
-    asyncio.run(refs.add_supplier_reference_configurations(adapter, states, body_count=body_count))
+    asyncio.run(
+        refs.add_supplier_reference_configurations(
+            adapter, states, body_count=body_count
+        )
+    )
 
 
 def _diagram(references):
     return refs.ReferenceState(
-        refs.SUPPLIER_DIAGRAM_CONFIGURATION, author=None, references=references,
-        body_count=0, kind="diagram",
+        refs.SUPPLIER_DIAGRAM_CONFIGURATION,
+        author=None,
+        references=references,
+        body_count=0,
+        kind="diagram",
     )
 
 
@@ -218,9 +247,13 @@ def test_source_counts_are_independent_and_installed_topology_survives(monkeypat
 
     # Starts on the active installed configuration, which the fake (like
     # SolidWorks) refuses to re-show.
-    _run(adapter,
-         refs.ReferenceState(refs.SUPPLIER_FREE_CONFIGURATION, free, sketch, body_count=1),
-         refs.ReferenceState(refs.SUPPLIER_MAX_CONFIGURATION, maximum, body_count=2))
+    _run(
+        adapter,
+        refs.ReferenceState(
+            refs.SUPPLIER_FREE_CONFIGURATION, free, sketch, body_count=1
+        ),
+        refs.ReferenceState(refs.SUPPLIER_MAX_CONFIGURATION, maximum, body_count=2),
+    )
     assert adapter.currentModel is installed
     assert installed.active == "Default"
     assert len(adapter.closed) == 2
@@ -234,7 +267,9 @@ def test_source_counts_are_independent_and_installed_topology_survives(monkeypat
         assert refs._signature(_bodies_in(installed, name)) == signature
 
 
-def test_single_state_from_last_installed_configuration_needs_no_same_active_switch(monkeypatch):
+def test_single_state_from_last_installed_configuration_needs_no_same_active_switch(
+    monkeypatch,
+):
     # AddConfiguration2 leaves the only new state active and the installed
     # configuration is the last original one read: both switches are no-ops.
     adapter, installed = _adapter(monkeypatch, active="Default Simplified")
@@ -243,7 +278,10 @@ def test_single_state_from_last_installed_configuration_needs_no_same_active_swi
     async def free(target):
         target.currentModel.initial = [_Body(0.8)]
 
-    _run(adapter, refs.ReferenceState(refs.SUPPLIER_FREE_CONFIGURATION, free, body_count=1))
+    _run(
+        adapter,
+        refs.ReferenceState(refs.SUPPLIER_FREE_CONFIGURATION, free, body_count=1),
+    )
     assert adapter.currentModel is installed
     assert installed.active == "Default Simplified"
     assert refs._signature(_bodies_in(installed, "Default")) == original
@@ -277,10 +315,17 @@ def test_diagram_state_authors_references_in_installed_part_without_bodies(monke
     seen = []
 
     async def references(target):
-        seen.append((target.currentModel, target.currentModel.active,
-                     len(target.currentModel.GetBodies2(0, False))))
-        return tuple(_sketch(target.currentModel, name).Name
-                     for name in ("DiscSupplierPlan", "DiscSupplierHeight"))
+        seen.append(
+            (
+                target.currentModel,
+                target.currentModel.active,
+                len(target.currentModel.GetBodies2(0, False)),
+            )
+        )
+        return tuple(
+            _sketch(target.currentModel, name).Name
+            for name in ("DiscSupplierPlan", "DiscSupplierHeight")
+        )
 
     _run(adapter, _diagram(references), body_count=2)
     # The callback ran in the installed part, in the diagram state, after the
@@ -296,7 +341,8 @@ def test_diagram_state_authors_references_in_installed_part_without_bodies(monke
     assert installed.features, "diagram state added no feature"
     for feature in installed.features:
         assert feature.suppressed == {
-            "Default": True, "Default Simplified": True,
+            "Default": True,
+            "Default Simplified": True,
             refs.SUPPLIER_DIAGRAM_CONFIGURATION: False,
         }, feature.Name
 
@@ -326,7 +372,9 @@ def _assert_originals_restored(installed, original, error):
     installed.active = "Default"
 
 
-def test_partial_reference_failure_is_suppressed_in_original_configurations(monkeypatch):
+def test_partial_reference_failure_is_suppressed_in_original_configurations(
+    monkeypatch,
+):
     adapter, installed = _adapter(monkeypatch)
     original = refs._signature(installed.GetBodies2(0, False))
 
@@ -391,15 +439,18 @@ def _empty(model):
     return ()
 
 
-@pytest.mark.parametrize(("author", "message"), [
-    (_shown, "must be hidden"),
-    (_unmarked, "no drawing-marked dimension"),
-    (_plane_dimension, "no drawing-marked dimension"),
-    (_undimensioned, "no drawing-marked dimension"),
-    (_not_sketch, "is not a sketch"),
-    (_duplicate, "distinct reference sketches"),
-    (_empty, "distinct reference sketches"),
-])
+@pytest.mark.parametrize(
+    ("author", "message"),
+    [
+        (_shown, "must be hidden"),
+        (_unmarked, "no drawing-marked dimension"),
+        (_plane_dimension, "no drawing-marked dimension"),
+        (_undimensioned, "no drawing-marked dimension"),
+        (_not_sketch, "is not a sketch"),
+        (_duplicate, "distinct reference sketches"),
+        (_empty, "distinct reference sketches"),
+    ],
+)
 def test_diagram_requires_new_hidden_dimensioned_sketches(monkeypatch, author, message):
     adapter, installed = _adapter(monkeypatch)
 
@@ -424,21 +475,28 @@ def test_diagram_cannot_claim_a_sketch_that_already_existed(monkeypatch):
     assert installed.active == "Default"
 
 
-@pytest.mark.parametrize(("author", "references", "body_count", "kind"), [
-    (None, _references, None, "diagram"),
-    (None, None, 0, "diagram"),
-    (None, _references, 1, "diagram"),
-    (_author, _references, 0, "diagram"),
-    (None, _references, 0, "body"),   # the diagram shape without its declared kind
-    (None, None, None, "body"),
-    (_author, None, 0, "body"),
-    (_author, None, -1, "body"),
-    (_author, "sketch", None, "body"),
-    (_author, None, None, "sketch"),  # unknown kind, whatever the annotation says
-])
-def test_state_constructor_rejects_undeclared_or_mixed_states(author, references, body_count, kind):
+@pytest.mark.parametrize(
+    ("author", "references", "body_count", "kind"),
+    [
+        (None, _references, None, "diagram"),
+        (None, None, 0, "diagram"),
+        (None, _references, 1, "diagram"),
+        (_author, _references, 0, "diagram"),
+        (None, _references, 0, "body"),  # the diagram shape without its declared kind
+        (None, None, None, "body"),
+        (_author, None, 0, "body"),
+        (_author, None, -1, "body"),
+        (_author, "sketch", None, "body"),
+        (_author, None, None, "sketch"),  # unknown kind, whatever the annotation says
+    ],
+)
+def test_state_constructor_rejects_undeclared_or_mixed_states(
+    author, references, body_count, kind
+):
     with pytest.raises(ValueError):
-        refs.ReferenceState(refs.SUPPLIER_DIAGRAM_CONFIGURATION, author, references, body_count, kind)
+        refs.ReferenceState(
+            refs.SUPPLIER_DIAGRAM_CONFIGURATION, author, references, body_count, kind
+        )
 
 
 def test_four_positional_fields_still_declare_a_body_state():
@@ -482,8 +540,10 @@ def test_restoration_failure_does_not_hide_author_failure(monkeypatch):
 
     with pytest.raises(RuntimeError, match="source author failed") as raised:
         _run(adapter, refs.ReferenceState(refs.SUPPLIER_FREE_CONFIGURATION, fails))
-    assert any("cannot restore installed part document" in note
-               for note in getattr(raised.value, "__notes__", ()))
+    assert any(
+        "cannot restore installed part document" in note
+        for note in getattr(raised.value, "__notes__", ())
+    )
     assert adapter.closed == ["Transient.sldprt"]
     assert installed.active == "Default"
 
@@ -509,7 +569,10 @@ def test_same_count_source_corruption_during_insertion_is_rejected(monkeypatch):
 
     monkeypatch.setattr(installed, "CreateFeatureFromBody3", corrupt_insert)
     with pytest.raises(RuntimeError, match="native bodies/topology changed"):
-        _run(adapter, refs.ReferenceState(refs.SUPPLIER_FREE_CONFIGURATION, source, body_count=1))
+        _run(
+            adapter,
+            refs.ReferenceState(refs.SUPPLIER_FREE_CONFIGURATION, source, body_count=1),
+        )
     assert adapter.currentModel is installed
     assert installed.active == "Default"
     assert refs._signature(_bodies_in(installed, "Default")) == original

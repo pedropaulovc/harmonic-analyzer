@@ -459,10 +459,14 @@ async def build_stock_fastener(
     if before_save is not None:
         installed_configuration = active_configuration_name(adapter)
         if not installed_configuration:
-            raise RuntimeError(f"{part_name}: installed configuration identity is unavailable")
+            raise RuntimeError(
+                f"{part_name}: installed configuration identity is unavailable"
+            )
         await before_save(adapter)
         if active_configuration_name(adapter) != installed_configuration:
-            raise RuntimeError(f"{part_name}: before_save changed the installed active configuration")
+            raise RuntimeError(
+                f"{part_name}: before_save changed the installed active configuration"
+            )
     return await _save_stock_part(
         adapter, part_name, threaded=threaded, save_threaded_part=save_threaded_part
     )

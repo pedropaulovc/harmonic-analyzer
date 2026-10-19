@@ -20,7 +20,6 @@ from _mcmaster_92240a540 import (
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_REFERENCE_STARTS,
     SUPPLIER_REFERENCE_PLANES,
-    SUPPLIER_REFERENCE_FORMATS,
 )
 from diagnostics.diag_build_92240A540 import build_92240A540
 from vn_lag_screw_spec import SPECIFIED_SKU

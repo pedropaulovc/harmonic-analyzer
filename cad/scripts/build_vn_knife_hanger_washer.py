@@ -23,9 +23,14 @@ MATERIAL = SPEC.material
 async def _build_with_supplier_references(adapter, truth=None):
     await build_96659A104(adapter, truth)
     await author_supplier_washer_references(
-        adapter, axis="y", bore_mm=part.ID, outer_mm=part.OD,
-        thickness_mm=part.THICKNESS, units=part.SUPPLIER_UNITS,
-        precision=part.DRAWING_REFERENCE_PRECISION, bands=part.SUPPLIER_TOLERANCES,
+        adapter,
+        axis="y",
+        bore_mm=part.ID,
+        outer_mm=part.OD,
+        thickness_mm=part.THICKNESS,
+        units=part.SUPPLIER_UNITS,
+        precision=part.DRAWING_REFERENCE_PRECISION,
+        bands=part.SUPPLIER_TOLERANCES,
         bore_callout=part.SUPPLIER_BORE_CALLOUT,
     )
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)

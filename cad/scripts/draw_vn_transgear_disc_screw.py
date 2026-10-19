@@ -35,7 +35,8 @@ async def build(adapter: Any) -> dict[str, str]:
         item=ITEM,
         cut_to_suit=True,
         supplier_margins=supplier_screw_margins(
-            SUPPLIER_REFERENCE_DIMENSIONS, planes=SUPPLIER_REFERENCE_PLANES,
+            SUPPLIER_REFERENCE_DIMENSIONS,
+            planes=SUPPLIER_REFERENCE_PLANES,
             sides=SUPPLIER_REFERENCE_SIDES,
         ),
         supplier_dimensions=partial(

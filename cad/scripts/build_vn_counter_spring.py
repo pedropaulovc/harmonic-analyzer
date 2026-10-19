@@ -76,8 +76,10 @@ async def build(adapter) -> dict[str, str]:
         partial(
             add_extension_spring_references,
             author=build_1330K524,
-            free_length_mm=spec.FREE_LENGTH_MM, max_length_mm=spec.MAX_LENGTH_MM,
-            coil_od_mm=spec.SUPPLIER_COIL_OD_MM, wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
+            free_length_mm=spec.FREE_LENGTH_MM,
+            max_length_mm=spec.MAX_LENGTH_MM,
+            coil_od_mm=spec.SUPPLIER_COIL_OD_MM,
+            wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
             body_count=2,
         ),
     )

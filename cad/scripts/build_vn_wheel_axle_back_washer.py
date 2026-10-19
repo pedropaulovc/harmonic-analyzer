@@ -44,9 +44,14 @@ TRANSFORM = RigidTransform(rotation_radians=(math.pi / 2.0, 0.0, 0.0))
 async def _build_with_supplier_references(adapter, truth=None):
     await build_92916A480(adapter, truth)
     await author_supplier_washer_references(
-        adapter, axis="z", bore_mm=part.ID, outer_mm=part.OD,
-        thickness_mm=part.MODEL_THICKNESS, units=part.SUPPLIER_UNITS,
-        precision=part.DRAWING_REFERENCE_PRECISION, bands=part.SUPPLIER_TOLERANCES,
+        adapter,
+        axis="z",
+        bore_mm=part.ID,
+        outer_mm=part.OD,
+        thickness_mm=part.MODEL_THICKNESS,
+        units=part.SUPPLIER_UNITS,
+        precision=part.DRAWING_REFERENCE_PRECISION,
+        bands=part.SUPPLIER_TOLERANCES,
         bore_callout=part.SUPPLIER_BORE_CALLOUT,
     )
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
@@ -57,7 +62,9 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         part_name=PART_NAME,
         components=(
-            StockComponent(sku=SKU, author=_build_with_supplier_references, transform=TRANSFORM),
+            StockComponent(
+                sku=SKU, author=_build_with_supplier_references, transform=TRANSFORM
+            ),
         ),
         material=MATERIAL,
         screw_axis_planes=("Top Plane", "Right Plane"),

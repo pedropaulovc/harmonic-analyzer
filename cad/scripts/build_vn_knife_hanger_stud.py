@@ -430,8 +430,13 @@ def _add_stock_configuration(adapter) -> str:
         raise RuntimeError("cannot create source-stock configuration")
     try:
         parent = _early_bound(created, "IConfiguration").GetParent()
-        if parent is None or str(_early_bound(parent, "IConfiguration").Name) != finished:
-            raise RuntimeError("source-stock configuration is not derived from finished")
+        if (
+            parent is None
+            or str(_early_bound(parent, "IConfiguration").Name) != finished
+        ):
+            raise RuntimeError(
+                "source-stock configuration is not derived from finished"
+            )
         _activate_configuration(adapter, model, SUPPLIER_STOCK_CONFIGURATION)
         for name in SUPPLIER_STOCK_SUPPRESSED_FEATURES:
             if not features[name].SetSuppression2(
@@ -449,12 +454,16 @@ def _add_stock_configuration(adapter) -> str:
         try:
             _activate_configuration(adapter, model, finished)
         except Exception as restore:
-            primary.add_note(f"restoring finished configuration also failed: {restore!r}")
+            primary.add_note(
+                f"restoring finished configuration also failed: {restore!r}"
+            )
         raise
     _activate_configuration(adapter, model, finished)
     for name, feature in features.items():
         if _suppression(feature, names) != before[name]:
-            raise RuntimeError(f"{name}: source-stock authoring changed finished states")
+            raise RuntimeError(
+                f"{name}: source-stock authoring changed finished states"
+            )
     return finished
 
 
@@ -472,7 +481,10 @@ async def _save_supplier_references(adapter, part_name, suppressed_features):
     finished = _add_stock_configuration(adapter)
     persist_configurations_in_place(adapter, part_name)
     _close_part(adapter)
-    check("reopen source-stock knife-hanger bolt", await adapter.open_model(artefacts["part"]))
+    check(
+        "reopen source-stock knife-hanger bolt",
+        await adapter.open_model(artefacts["part"]),
+    )
     assert_saved_configurations_regenerate(adapter, part_name)
     assert_simplified_configurations(
         adapter, part_name, suppressed_features, parents=(finished,)

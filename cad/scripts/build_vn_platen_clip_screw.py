@@ -18,7 +18,6 @@ from _mcmaster_92446a077 import (
     SUPPLIER_REFERENCE_DIMENSIONS,
     SUPPLIER_REFERENCE_STARTS,
     SUPPLIER_REFERENCE_PLANES,
-    SUPPLIER_REFERENCE_FORMATS,
 )
 from diagnostics.diag_build_92446A077 import build_92446A077
 from vn_platen_clip_screw_spec import SKU

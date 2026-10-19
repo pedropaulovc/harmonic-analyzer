@@ -457,7 +457,11 @@ def test_isometric_view_is_in_the_hidden_lines_removed_loop() -> None:
         )
     ]
     (loop,) = loops
-    assert {getattr(item, "id", "") for item in loop.iter.elts} == {"front", "iso", "top"}
+    assert {getattr(item, "id", "") for item in loop.iter.elts} == {
+        "front",
+        "iso",
+        "top",
+    }
 
 
 def test_registry_row_is_the_faced_stock_without_sheet_instructions() -> None:
@@ -546,7 +550,9 @@ def test_supplier_reference_rejects_configuration_mixup(
             screw.SUPPLIER_STOCK_CONFIGURATION if finished_is_stock else "Default"
         )
     )
-    finished = SimpleNamespace(ReferencedConfiguration=screw.SUPPLIER_STOCK_CONFIGURATION)
+    finished = SimpleNamespace(
+        ReferencedConfiguration=screw.SUPPLIER_STOCK_CONFIGURATION
+    )
     references = dict.fromkeys(screw.SUPPLIER_REFERENCE_DIMENSIONS)
     with pytest.raises(RuntimeError, match="(lost its stock|switched to source stock)"):
         drawing._assert_supplier_references(None, references, stock, (finished,))
@@ -574,7 +580,9 @@ def test_stock_configuration_uses_the_activated_child_and_returns_finished(
     assert copies == [(FINISHED, _STOCK, _STOCK)]
     # Facing and deburr go in stock only; the original factory thread stays.
     assert model.states(_STOCK) == {
-        "StockDeburr": True, "StockTrim": True, "ThreadGroove": False
+        "StockDeburr": True,
+        "StockTrim": True,
+        "ThreadGroove": False,
     }
     assert model.states(FINISHED) == _FINISHED_STATES
     assert model.states(FINISHED_SIMPLIFIED) == _SIMPLIFIED_STATES
@@ -584,7 +592,11 @@ def test_stock_configuration_uses_the_activated_child_and_returns_finished(
     ("native", "refused", "left_active"),
     [
         # The child is not auto-activated and the needed switch is refused.
-        ({"auto_activates": False, "refuse_show": frozenset({_STOCK})}, _STOCK, FINISHED),
+        (
+            {"auto_activates": False, "refuse_show": frozenset({_STOCK})},
+            _STOCK,
+            FINISHED,
+        ),
         # Authoring succeeded, but the needed return to finished is refused.
         ({"refuse_show": frozenset({FINISHED})}, FINISHED, _STOCK),
     ],
@@ -622,7 +634,10 @@ def test_stock_parent_readback_failure_restores_finished(
 @pytest.mark.parametrize(
     ("fault", "message"),
     [
-        ({"refuse_suppression": frozenset({"StockTrim"})}, "StockTrim: cannot suppress"),
+        (
+            {"refuse_suppression": frozenset({"StockTrim"})},
+            "StockTrim: cannot suppress",
+        ),
         ({"rebuild_fails": True}, "source-stock configuration did not rebuild"),
         ({"bom_fails": True}, "BOM identity did not persist"),
         (
