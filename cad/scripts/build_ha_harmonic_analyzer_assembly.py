@@ -309,7 +309,9 @@ async def build(adapter) -> dict[str, str]:
     artefacts = await save_assembly_and_images(
         adapter,
         ASM_NAME,
-        author=lambda configuration: create_harmonic_analyzer_explode(adapter, configuration),
+        author=lambda configuration: create_harmonic_analyzer_explode(
+            adapter, configuration
+        ),
     )
     # save_assembly_and_images deliberately discards the dirty anonymous source
     # after its SaveAsCopy.  Reopen the clean copy for the top-only gallery/BOM;
