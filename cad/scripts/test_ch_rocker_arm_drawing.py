@@ -2634,16 +2634,18 @@ def test_rod_hole_keeps_two_mm_normal_wall_to_the_real_k_taper_at_printed_bands(
     )
     assert normal_distance == pytest.approx(face_distance)
     assert normal_distance == pytest.approx(3.81835328575)
-    printed_hole_max = (
-        round(blind_cut_dia_mm(spec.ROD_HOLE_SPEC), drawing.ROD_HOLE.precision["dia"])
-        + drilled_oversize_mm()
-    )
-    assert printed_hole_max == pytest.approx(2.09)
+    hole_nominal = blind_cut_dia_mm(spec.ROD_HOLE_SPEC)
+    # A named drill retains its real size even when its numeric callout rounds
+    # down. Charge the larger of the native and displayed nominal.
+    conservative_hole_max = max(
+        hole_nominal, round(hole_nominal, drawing.ROD_HOLE.precision["dia"])
+    ) + drilled_oversize_mm()
+    assert conservative_hole_max == pytest.approx(2.094)
     position_diameter = float(spec.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
     assert position_diameter == drawing.ROD_HOLE.fields["position_dia"][0]
     profile_allowance = float(drawing.ARC_PROFILE_ZONE_MM)
-    worst_wall = normal_distance - printed_hole_max / 2.0 - position_diameter / 2.0 - profile_allowance
-    assert worst_wall == pytest.approx(2.17335328575)
+    worst_wall = normal_distance - conservative_hole_max / 2.0 - position_diameter / 2.0 - profile_allowance
+    assert worst_wall == pytest.approx(2.17135328575)
     assert worst_wall >= 2.0, f"rod-pin hole to K-taper normal wall is only {worst_wall:g} mm"
 
 
@@ -3007,6 +3009,27 @@ def test_imported_front_sizes_require_each_sourced_native_readback(
         )
     with pytest.raises(RuntimeError):
         drawing._dress_detail_dimensions(adapter, [display.GetAnnotation() for display in displays.values()], keep={**drawing.HUB_KEEP, **drawing.END_KEEP})
+
+
+@pytest.mark.parametrize("sign", [-1, 1])
+@pytest.mark.parametrize("offset,accepted", [(0.0, True), (5e-9, True), (2e-8, False)])
+def test_tip_angle_import_preserves_the_builder_signed_readback_contract(
+    monkeypatch: pytest.MonkeyPatch, sign: int, offset: float, accepted: bool,
+) -> None:
+    adapter, displays = _imported_native_quantities(monkeypatch)
+    angle = displays["TipLandAngle"]
+    actual = sign * (ch_rocker_arm_spec._ALPHA_TOP + offset)
+    angle.model.SystemValue = actual
+    annotations = [displays[name].GetAnnotation() for name in drawing.END_KEEP]
+    if not accepted:
+        with pytest.raises(RuntimeError, match="native radial-land measurement"):
+            drawing._dress_detail_dimensions(adapter, annotations, keep=drawing.END_KEEP)
+        return
+    drawing._dress_detail_dimensions(adapter, annotations, keep=drawing.END_KEEP)
+    assert angle.model.SystemValue == actual
+    assert angle.model.GetToleranceType() == 1
+    assert angle.text[1] == ch_rocker_arm_notes.TIP_LAND_ANGLE_PREFIX
+    assert not any(part == 0 for part, _text in angle.writes)
 
 
 @pytest.mark.parametrize("defect", ["linear", "prefix", "basic"])

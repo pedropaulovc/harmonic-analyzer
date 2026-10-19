@@ -157,9 +157,9 @@ PIVOT_FIT_CALLOUT = (
     "SHAFT MHA-CH-005)"
 )
 STRAP_FIT_CALLOUT = (
-    f"({_limits(ROD_JOINT_BUDGET['side_clearance_min'], ROD_JOINT_BUDGET['side_clearance_max'])} SIDE\n"
-    "CLEARANCE IN ROD\n"
-    "FORK MHA-CH-003)"
+    f"({_limits(ROD_JOINT_BUDGET['side_clearance_min'], ROD_JOINT_BUDGET['side_clearance_max'])} TOTAL\n"
+    "SIDE CLEARANCE IN\n"
+    "MHA-CH-003 FORK)"
 )
 # Integral hub length, not spacers, sets channel pitch: the hubs stack face to
 # face on the pivot shaft (rocker_bank_layout). Below-text rows (above-text

@@ -439,7 +439,7 @@ for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x",
             "land_angle_nominal_deg": (_LAND_ANGLE, ("_ALPHA_TOP",)),
             "dimension_type": ("basic", (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)),
             "radial_tip_end": ([_sign * _TIP[0], _TIP[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
-            "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
+            "top_edge_feature": ("top_edge", (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)),
             # Each land's own BASIC LAND row from A (the J row, main-r1 Opus).
             "station": (rocker.ROD_TIP_X, ("ROD_TIP_X", ("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"))),
             "station_nominal": (rocker.ROD_TIP_X, ("ROD_TIP_X",)),
@@ -2156,7 +2156,7 @@ def _dress_detail_dimensions(
                 int(display.Type2) != 3
                 or type(actual) not in (int, float)
                 or not math.isfinite(actual)
-                or not math.isclose(actual, remaining.pop(name), abs_tol=1e-9)
+                or not math.isclose(abs(actual), remaining.pop(name), abs_tol=1e-8)
             ):
                 raise RuntimeError("tip-land angle lost its native radial-land measurement")
             set_basic_dimension(adapter, display, label="tip land angle")

@@ -113,6 +113,29 @@ def test_worst_case_joint_budget() -> None:
     assert not any(key.startswith(("upset", "retention")) for key in b)
 
 
+def test_strap_running_clearance_uses_both_printed_size_bands() -> None:
+    slot_places = rod_notes.DRAWING_PRECISION["ForkSlotProfile"]["SlotWidth"]
+    strap_places = arm_notes.DRAWING_PRECISION["Strap"]["StrapThickness"]
+    slot_limits = tuple(
+        round(rod.FORK_SLOT_WIDTH, slot_places) + round(band, slot_places)
+        for band in rod.FORK_SLOT_BAND
+    )
+    strap_limits = tuple(
+        round(arm.ARM_THICKNESS, strap_places) + round(band, strap_places)
+        for band in arm.ARM_THICKNESS_BAND
+    )
+    minimum = slot_limits[1] - strap_limits[0]
+    maximum = slot_limits[0] - strap_limits[1]
+    assert minimum == pytest.approx(0.100)
+    assert maximum == pytest.approx(0.250)
+    assert minimum == pytest.approx(pin.BUDGET["side_clearance_min"])
+    assert maximum == pytest.approx(pin.BUDGET["side_clearance_max"])
+    callout = " ".join(arm_notes.STRAP_FIT_CALLOUT.split())
+    assert "TOTAL SIDE" in callout
+    assert _config.parts("ch-connecting-rod")["number"] in callout
+    assert arm_notes._limits(minimum, maximum) in callout
+
+
 def test_the_pin_bears_on_the_whole_tine() -> None:
     """PR #1292 review F1: the land the pin bears on in each tine is the
     thinnest tine itself, the tine's own printed band (#982), and it holds

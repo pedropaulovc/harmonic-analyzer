@@ -498,7 +498,8 @@ The later #1020 follow-up restores the land's BASIC angle on **Detail E** as
 the imported `TipLandAngle@StrapProfile`, not the abandoned front-view offset
 dimension. Its native driven angle measures the actual radial land against a
 vertical construction ray in the part sketch; the drawing checks the angular
-type and radian value before adding the BASIC box and `2X` count. The
+type and magnitude of its native radian readback with the builder's `1e-8`
+radian tolerance before adding the BASIC box and `2X` count. The
 construction ray changes neither the solid nor the profile zone. Keep the
 common arc-centre location in the notes, but do not substitute a typed angle
 or ambiguous radial-land prose for this model-owned dimension.
