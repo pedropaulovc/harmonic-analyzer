@@ -226,11 +226,11 @@ PROFILE_KEEP = {
     "SouthWestX": _planned(0.104, 0.258),
     "SouthEastX": _planned(0.045, 0.259),
     # Radial rays must meet actual trimmed corners, not circle extensions.
-    # CornerNE/R10 is left and CornerNW/R8 is right in this view.  Their
-    # native positions (45,136)/(115,142) mm clear both profile section
-    # indicators; _planned accounts for the common plan drop.
-    "CornerNER": _planned(0.045, 0.145),
-    "CornerNWR": _planned(0.115, 0.151),
+    # CornerNE/R10 is left and CornerNW/R8 is right in this view.  Keep
+    # their shelves down/outward from the fillet centres so native radius
+    # arrows remain on the trimmed arcs, not their circle extensions.
+    "CornerNER": _planned(0.045, 0.139),
+    "CornerNWR": _planned(0.137, 0.110),
     "CornerSWR": _planned(0.110, 0.249),
     # R12's arrow lands at its arc's middle (corner_radius_text_xy); its
     # text stands between the 223.4 south witness and the 24.0 line.
@@ -1518,12 +1518,13 @@ async def build(adapter: Any) -> dict[str, str]:
     profile_section_pivot = model_point_in_view(
         adapter, profile, (0.0, 0.0, 0.0), label="pivot section station"
     )
-    profile_outline = tuple(float(value) for value in profile.GetOutline())
     section = create_section_view(
         adapter,
         profile,
-        line_start=(profile_outline[0] - 0.002, profile_section_pivot[1]),
-        line_end=(profile_outline[2] + 0.002, profile_section_pivot[1]),
+        # Wider end-only ends clear R10's text on the left and R8's leader
+        # on the right, with 6 mm before the feature plan's Z witness.
+        line_start=(PROFILE_CENTER[0] - 0.046, profile_section_pivot[1]),
+        line_end=(PROFILE_CENTER[0] + 0.048, profile_section_pivot[1]),
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=(2, 1),
