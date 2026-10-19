@@ -17,7 +17,7 @@ The explode closure is decided statically from the builder's source. It is the
 ``_<stem>_explode`` module plus its own local imports, minus everything the
 rest of the builder reaches without it. An assembly qualifies only when the
 builder's sole use of that module is the canonical
-``author_in_drawing_configurations(adapter, ASM_NAME, lambda configuration:
+``save_assembly_and_images(adapter, ASM_NAME, author=lambda configuration:
 <fn>(adapter, configuration))`` call: an explode that takes other build-time
 state (``dt_drive_train``'s collar-pin roles) or lives inline in the builder is
 entangled with the build and always declines to FULL.
@@ -42,7 +42,7 @@ from _buildgraph import (
     script_for,
 )
 
-AUTHOR_CALL = "author_in_drawing_configurations"
+AUTHOR_CALL = "save_assembly_and_images"
 # How many changed inputs a decision's reason names before eliding the rest.
 _REASON_PATHS = 4
 
@@ -125,11 +125,17 @@ def _canonical_author(
     call: ast.Call, imported: Mapping[str, str]
 ) -> tuple[ast.Lambda, str] | None:
     """The authoring lambda and the binding it calls when ``call`` is
-    ``author_in_drawing_configurations(<adapter>, <name>, lambda c: f(<adapter>, c))``
+    ``save_assembly_and_images(<adapter>, <name>, ..., author=lambda c: f(<adapter>, c))``
     with ``f`` from the explode module; None for any other call."""
-    if _call_name(call) != AUTHOR_CALL or call.keywords or len(call.args) != 3:
+    if _call_name(call) != AUTHOR_CALL or len(call.args) not in (2, 3):
         return None
-    adapter, _name, author = call.args
+    if any(keyword.arg is None for keyword in call.keywords):
+        return None
+    authors = [keyword.value for keyword in call.keywords if keyword.arg == "author"]
+    if len(authors) != 1:
+        return None
+    adapter, _name = call.args[:2]
+    (author,) = authors
     if not isinstance(adapter, ast.Name) or not isinstance(author, ast.Lambda):
         return None
     params = author.args
@@ -168,7 +174,7 @@ def _author_function(source: str, module: str) -> str:
     ]
     if len(authors) != 1:
         raise _Entangled(
-            f"needs exactly one {AUTHOR_CALL}(adapter, name, lambda configuration: "
+            f"needs exactly one {AUTHOR_CALL}(adapter, name, author=lambda configuration: "
             f"<explode>(adapter, configuration)) call, found {len(authors)}"
         )
     ((author, binding),) = authors
