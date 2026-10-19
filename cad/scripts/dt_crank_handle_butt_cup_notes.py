@@ -51,6 +51,11 @@ POCKET_DEPTH_CALLOUT = "\n".join(
         f"FLOOR CORNER R{POCKET_FLOOR_CORNER_R_MAX:.1f} MAX",
     )
 )
+# The bottom chamfer's band reason: it clears the rounded corner of the
+# MHA-DT-008 counterbore floor, so the cup seats with its face flush.
+BODY_CHAMFER_CALLOUT = "\n".join(
+    ("X 45 DEG", f"CLEARS {HANDLE_NUMBER}", "COUNTERBORE CORNER")
+)
 
 # Pending owner ruling on the MHA-DT-035 pocket wall (#1375): stated as a plain
 # fact, never argued (rule 20).

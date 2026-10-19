@@ -59,6 +59,14 @@ POCKET_FLOOR_CORNER_R_MAX = POCKET_CLEARANCE[0] / 2.0
 # The floor hole passes the MHA-DT-032 shoulder: a drilled hole under the title
 # block's DRILLED HOLES band (+0.10/0).
 FLOOR_HOLE_DIA = 4.2
+# The body's bottom edge, broken 45 degrees (owner ruling A on #1661): the
+# MHA-DT-008 counterbore floor's corner is rounded up to R0.3, so the leg's
+# lower limit clears it and the cup still seats on the floor, face flush.
+# Modelled at the middle; printed as BODY_CHAMFER +/- its tolerance.
+BODY_CHAMFER = 0.4
+BODY_CHAMFER_TOL = 0.1
+BODY_CHAMFER_MIN = round(BODY_CHAMFER - BODY_CHAMFER_TOL, 6)
+BODY_CHAMFER_MAX = round(BODY_CHAMFER + BODY_CHAMFER_TOL, 6)
 
 FLOOR_THICKNESS = OVERALL_LENGTH - POCKET_DEPTH
 
@@ -91,6 +99,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PocketDepth",
         "PocketDia",
         "FloorHoleDia",
+        "BodyChamfer",
     },
 }
 # Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the body diameter and the
@@ -101,6 +110,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BodyDia": 2,
         "OverallLength": 1,
         "PocketDepth": 2,
+        "BodyChamfer": 1,
         "PocketDia": 1,
         "FloorHoleDia": 1,
     },

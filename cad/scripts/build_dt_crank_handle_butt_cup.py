@@ -34,6 +34,7 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     add_line_chain,
+    dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
@@ -43,6 +44,8 @@ from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawin
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from dt_crank_handle_butt_cup_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
 from dt_crank_handle_butt_cup_spec import (
+    BODY_CHAMFER,
+    BODY_CHAMFER_TOL,
     BODY_DIA,
     BODY_DIA_TOL,
     DRAWING_DIMENSIONS,
@@ -64,7 +67,7 @@ V_CUP = math.pi * (
     BODY_R**2 * OVERALL_LENGTH
     - POCKET_R**2 * POCKET_DEPTH
     - FLOOR_HOLE_R**2 * (OVERALL_LENGTH - POCKET_DEPTH)
-)
+) - math.pi * BODY_CHAMFER**2 * (BODY_R - BODY_CHAMFER / 3.0)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -79,15 +82,16 @@ async def build(adapter) -> dict[str, str]:
         ("PocketDia", POCKET_DIA),
         ("PocketDepth", POCKET_DEPTH),
         ("FloorHoleDia", FLOOR_HOLE_DIA),
+        ("BodyChamfer", BODY_CHAMFER),
     ):
         await set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Stepped section on the Front plane, revolved about the X axis: pocket
-    # mouth -> face -> body OD -> bottom -> floor hole -> floor top -> pocket
-    # wall.  Nothing touches the axis: the
-    # floor hole passes the screw shoulder.
+    # mouth -> face -> body OD -> bottom chamfer -> bottom -> floor hole ->
+    # floor top -> pocket wall.  Nothing touches the axis: the floor hole
+    # passes the screw shoulder.
     profile = SketchDims()
     check("create_sketch cup profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -98,17 +102,20 @@ async def build(adapter) -> dict[str, str]:
     points = [
         (0.0, POCKET_R),
         (0.0, BODY_R),
-        (-OVERALL_LENGTH, BODY_R),
+        (-(OVERALL_LENGTH - BODY_CHAMFER), BODY_R),
+        (-OVERALL_LENGTH, BODY_R - BODY_CHAMFER),
         (-OVERALL_LENGTH, FLOOR_HOLE_R),
         (-POCKET_DEPTH, FLOOR_HOLE_R),
         (-POCKET_DEPTH, POCKET_R),
     ]
     lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
-    face, body_od, bottom, floor_hole, floor_top, pocket_wall = lines
+    face, body_od, chamfer, bottom, floor_hole, floor_top, pocket_wall = lines
     check("axis horizontal", await adapter.add_sketch_constraint(axis, None, "horizontal"))
     for index, line in enumerate(lines):
         (u0, v0), (u1, v1) = points[index], points[(index + 1) % len(points)]
+        if u0 != u1 and v0 != v1:
+            continue  # the 45-degree bottom chamfer; its two legs define it
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"cup profile {relation} {line}",
@@ -128,9 +135,13 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(axis, None, "linear", OVERALL_LENGTH),
     )
     profile.record("AxisLength", '"OverallLength"')
-    check(
+    await dimension_between(
+        adapter,
+        f"{body_od}.start",
+        f"{bottom}.start",
+        "horizontal_distance",
+        OVERALL_LENGTH,
         "cup overall length",
-        await adapter.add_sketch_dimension(body_od, None, "linear", OVERALL_LENGTH),
     )
     profile.record("OverallLength", '"OverallLength"')
     # Every axial size reads from the face (MHA-DT-035 re-review); the
@@ -140,8 +151,28 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(pocket_wall, None, "linear", POCKET_DEPTH),
     )
     profile.record("PocketDepth", '"PocketDepth"')
+    # The bottom chamfer's axial leg, and its radial leg equal to it by
+    # equation: 45 degrees.
+    await dimension_between(
+        adapter,
+        f"{chamfer}.start",
+        f"{chamfer}.end",
+        "horizontal_distance",
+        BODY_CHAMFER,
+        "cup bottom chamfer",
+    )
+    profile.record("BodyChamfer", '"BodyChamfer"')
+    await dimension_between(
+        adapter,
+        f"{chamfer}.start",
+        f"{chamfer}.end",
+        "vertical_distance",
+        BODY_CHAMFER,
+        "cup bottom chamfer rise",
+    )
+    profile.record("BodyChamferRise", '"BodyChamfer"')
     for name, line, u_mid, radius in (
-        ("BodyDia", body_od, -OVERALL_LENGTH / 2.0, BODY_R),
+        ("BodyDia", body_od, -(OVERALL_LENGTH - BODY_CHAMFER) / 2.0, BODY_R),
         ("PocketDia", pocket_wall, -POCKET_DEPTH / 2.0, POCKET_R),
         ("FloorHoleDia", floor_hole, -(POCKET_DEPTH + OVERALL_LENGTH) / 2.0, FLOOR_HOLE_R),
     ):
@@ -168,12 +199,16 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # The model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the body diameter that holds the
-    # pocket wall, and the pocket depth that keeps the MHA-DT-032 head below the
-    # face.  Every other size is routine (.X); the pocket is bored to suit
-    # the head's diameter.
+    # pocket wall, the pocket depth that keeps the MHA-DT-032 head below the
+    # face, and the bottom chamfer that clears the MHA-DT-008 floor corner.
+    # Every other size is routine (.X); the pocket is bored to suit the
+    # head's diameter.
     set_dimension_symmetric_tolerance(adapter, "CupProfile", "BodyDia", BODY_DIA_TOL)
     set_dimension_symmetric_tolerance(
         adapter, "CupProfile", "PocketDepth", POCKET_DEPTH_TOL
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "CupProfile", "BodyChamfer", BODY_CHAMFER_TOL
     )
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

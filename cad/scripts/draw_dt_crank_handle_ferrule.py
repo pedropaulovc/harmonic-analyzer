@@ -1,11 +1,12 @@
 r"""Create the curated machinist drawing for MHA-DT-034, the crank handle ferrule.
 
-A plain brass ring (user ruling 2026-09-29, ch11 p.14/p.15): OD, bore and
-length.  The end view carries only its centre mark and the cutting plane; the
-longitudinal section A-A is the ring's length view (drawing-guidelines.md rule 9 (show internal shape in solid lines)) and takes
+A plain brass ring (user ruling 2026-09-29, ch11 p.14/p.15): OD, bore, length
+and the 45-degree chamfer at the bore's seat-end mouth.  The end view carries
+only its centre mark and the cutting plane; the longitudinal section A-A is
+the ring's length view (drawing-guidelines.md rule 9 (show internal shape in solid lines)) and takes
 every dimension, so the bore reads on cut edges rather than hidden lines (the
-MHA-DT-034 machinist review).  Every size is routine (.X): the oak tenon is
-turned to suit this bore.
+MHA-DT-034 machinist review).  Every size but the bore and the chamfer is
+routine (.X): the oak tenon is turned to suit this bore.
 
 Run with SolidWorks open::
 
@@ -34,7 +35,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_reference_dimension
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -45,11 +50,13 @@ from _section_axis import create_section_axis_centerline, position_section_capti
 from _session import run_build
 import _telemetry
 from dt_crank_handle_ferrule_spec import (
+    BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LENGTH,
     OUTER_DIA,
     REFERENCE_DIMENSIONS,
+    SEAT_MOUTH_CHAMFER_CALLOUT,
 )
 
 
@@ -78,6 +85,10 @@ ISO_NOTE_POS = (0.335, 0.160)
 
 OUTER_R = OUTER_DIA * VIEW_SCALE[0] / 2000.0  # 0.030
 HALF_LENGTH = LENGTH * VIEW_SCALE[0] / 2000.0  # 0.014
+# A-A's arrows point right, so the section looks along model -Z: local +X
+# runs right and the seat face (x=LENGTH) is the section's right edge.
+SEAT_FACE_X = SECTION_CENTER[0] + HALF_LENGTH  # 0.229
+BORE_TOP_Y = SECTION_CENTER[1] + BORE_DIA * VIEW_SCALE[0] / 2000.0  # 0.1804
 
 # The OD stands left of the section and the bore right of it; the length
 # above.  The cutting line runs vertically through the end view's centre.
@@ -85,6 +96,19 @@ SECTION_KEEP = {
     "OuterDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.022, SECTION_CENTER[1]),
     "BoreDia": (SECTION_CENTER[0] + HALF_LENGTH + 0.022, SECTION_CENTER[1]),
     "Length": (SECTION_CENTER[0], SECTION_CENTER[1] + OUTER_R + 0.012),
+    # The seat mouth's axial leg (1.4 at 4:1, at the upper bore corner by
+    # the seat face) reads up and right of it, outside the ring.  Value plus
+    # three callout rows: 4 x 5.55 = 22.2 tall, the widest row 17 chars x
+    # 2.75 = 46.75 wide, centred on the keep point, so the box spans x
+    # 0.2336-0.2804, y 0.1844-0.2066 (release-v43 layout audit).  It clears
+    # the seat face and Length's right extension line (x 0.229, from 0.1946
+    # up) by 4.6; the Ø7.70's extension line on the bore edge (y 0.1804,
+    # to x 0.252) and its dimension line's top (0.251, 0.1804) by 4.0; the
+    # "7.0" (right edge 0.2181) by 15; the isometric view and its note
+    # (x 0.3346 on) by 54.  The dimension line runs under the last row
+    # (y ~0.1844) back to the chamfer's extension lines, 2.6-4.0 long up
+    # from its ends, and crosses no other dimension or extension line.
+    "SeatMouthChamfer": (SEAT_FACE_X + 0.028, BORE_TOP_Y + 0.0151),
 }
 CUT_START = (END_CENTER[0], END_CENTER[1] - OUTER_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)
@@ -156,6 +180,13 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # The chamfer's band names its end and the MHA-DT-008 tenon root it clears.
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {"SeatMouthChamfer": SEAT_MOUTH_CHAMFER_CALLOUT},
+        location="below",
+    )
     # The OD is the 9/16-in rod as supplied, skimmed at assembly: a reference.
     by_name = {dimension_name(adapter, a): a for a in annotations}
     for name in sorted(REFERENCE_DIMENSIONS):

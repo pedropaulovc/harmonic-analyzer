@@ -33,6 +33,7 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert spec.REFERENCE_DIMENSIONS == {"PocketDia"}
     assert drawing.DIMENSION_CALLOUTS == {
+        "BodyChamfer": notes.BODY_CHAMFER_CALLOUT,
         "BodyDia": notes.BODY_FIT_CALLOUT,
         "FloorHoleDia": "DRILL THRU",
         "PocketDepth": notes.POCKET_DEPTH_CALLOUT,
@@ -40,11 +41,14 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
-    # Two bands: the body diameter that holds the pocket wall, and the pocket
-    # depth that keeps the MHA-DT-032 head below the face (Codex P2 on #1139).
+    # Three bands: the body diameter that holds the pocket wall, the pocket
+    # depth that keeps the MHA-DT-032 head below the face (Codex P2 on #1139),
+    # and the bottom chamfer that clears the MHA-DT-008 counterbore corner
+    # (owner ruling A on #1661).
     assert model_toleranced_dimensions(part) == {
         ("CupProfile", "BodyDia"): "BODY_DIA_TOL",
         ("CupProfile", "PocketDepth"): "POCKET_DEPTH_TOL",
+        ("CupProfile", "BodyChamfer"): "BODY_CHAMFER_TOL",
     }
     assert {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 2
@@ -52,10 +56,21 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert "set_dimension_bilateral_tolerance" not in source
 
 
-def test_the_floor_holds_1_5_and_the_wall_its_named_exception() -> None:
+def test_bottom_chamfer_clears_the_handle_counterbore_corner() -> None:
+    # Owner ruling A on #1661: 0.3-0.5 X 45 DEG, so its smallest leg still
+    # clears the MHA-DT-008 counterbore floor's R0.3 MAX corner.
+    assert (spec.BODY_CHAMFER_MIN, spec.BODY_CHAMFER_MAX) == (0.3, 0.5)
+    assert notes.BODY_CHAMFER_CALLOUT.splitlines() == [
+        "X 45 DEG",
+        "CLEARS MHA-DT-008",
+        "COUNTERBORE CORNER",
+    ]
+
+
+def test_the_floor_holds_1_5_and_the_wall_states_its_shortfall() -> None:
     # User rulings 2026-09-30 (ch30 eight-views-4, concept v4): a plain cup
-    # sized to the photographed Ø6 head.  The pocket wall is the named 0.8
-    # exception; the floor keeps the 1.5 floor.
+    # sized to the photographed Ø6 head.  The pocket wall is 0.8, stated on
+    # the sheet pending the owner's ruling (#1375); the floor keeps 1.5.
     assert not hasattr(spec, "FLANGE_DIA") and not hasattr(spec, "FLANGE_THICKNESS")
     # The floor is what the overall (.X) leaves after the banded pocket depth,
     # both from the face (re-review: one faced end).

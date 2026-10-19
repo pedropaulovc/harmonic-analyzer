@@ -7,7 +7,9 @@ the arm.  Dimensions live in ``dt_crank_handle_ferrule_spec``.
 
 Layout: one revolve about local +X, in the handle's own frame -- the
 arm-bearing face at x=0, the seat face at x=LENGTH -- so the drive train
-places it with the handle's transform.  ``Axis1`` is the ferrule axis.
+places it with the handle's transform.  The bore's mouth at the seat face is
+chamfered 45 degrees in the revolve profile, so both configurations carry it.
+``Axis1`` is the ferrule axis.
 
 Run (SolidWorks already open)::
 
@@ -60,6 +62,8 @@ from dt_crank_handle_ferrule_spec import (
     ISOMETRIC_VIEW_NOTE,
     LENGTH,
     OUTER_DIA,
+    SEAT_MOUTH_CHAMFER,
+    SEAT_MOUTH_CHAMFER_TOL,
 )
 
 PART_NAME = "dt-crank-handle-ferrule"
@@ -67,9 +71,12 @@ MATERIAL = "Brass"  # the gears' gold; see _appearance.apply_material docstring
 
 OUTER_R = OUTER_DIA / 2.0
 BORE_R = BORE_DIA / 2.0
-V_FERRULE = math.pi * (OUTER_R**2 - BORE_R**2) * LENGTH
+# The seat mouth's 45-degree chamfer turns away a right triangle of legs c at
+# the bore radius r, its centroid r + c/3 off the axis: pi c^2 (r + c/3).
+V_SEAT_MOUTH = math.pi * SEAT_MOUTH_CHAMFER**2 * (BORE_R + SEAT_MOUTH_CHAMFER / 3.0)
+V_FERRULE = math.pi * (OUTER_R**2 - BORE_R**2) * LENGTH - V_SEAT_MOUTH
 INSTALLED_R = INSTALLED_OUTER_DIA / 2.0
-V_INSTALLED = math.pi * (INSTALLED_R**2 - BORE_R**2) * LENGTH
+V_INSTALLED = math.pi * (INSTALLED_R**2 - BORE_R**2) * LENGTH - V_SEAT_MOUTH
 _SKIM_MARGIN = 0.5
 
 
@@ -86,13 +93,14 @@ async def build(adapter) -> dict[str, str]:
         ("OuterDia", OUTER_DIA),
         ("BoreDia", BORE_DIA),
         ("Length", LENGTH),
+        ("SeatMouthChamfer", SEAT_MOUTH_CHAMFER),
     ):
         await set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Rectangular section on the Front plane, revolved about the X axis:
-    # arm face -> OD -> seat face -> bore.
+    # Section on the Front plane, revolved about the X axis: arm face -> OD
+    # -> seat face -> the seat mouth's 45-degree chamfer -> bore.
     profile = SketchDims()
     check("create_sketch ferrule profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -100,9 +108,15 @@ async def build(adapter) -> dict[str, str]:
         "ferrule axis centerline",
         await adapter.add_centerline(0.0, 0.0, LENGTH, 0.0),
     )
-    arm_face, outer, seat_face, bore = await add_line_chain(
+    arm_face, outer, seat_face, seat_mouth, bore = await add_line_chain(
         adapter,
-        [(0.0, BORE_R), (0.0, OUTER_R), (LENGTH, OUTER_R), (LENGTH, BORE_R)],
+        [
+            (0.0, BORE_R),
+            (0.0, OUTER_R),
+            (LENGTH, OUTER_R),
+            (LENGTH, BORE_R + SEAT_MOUTH_CHAMFER),
+            (LENGTH - SEAT_MOUTH_CHAMFER, BORE_R),
+        ],
     )
     set_sketch_direct_db(adapter, False)
     check("axis horizontal", await adapter.add_sketch_constraint(axis, None, "horizontal"))
@@ -111,6 +125,7 @@ async def build(adapter) -> dict[str, str]:
         ("OD", outer, "horizontal"),
         ("seat face", seat_face, "vertical"),
         ("bore", bore, "horizontal"),
+        # No relation on the chamfer: its two legs define it.
     ):
         check(
             f"ferrule {label} {relation}",
@@ -143,6 +158,26 @@ async def build(adapter) -> dict[str, str]:
         adapter, axis, bore, (LENGTH / 2.0, BORE_R - 2.0), "BoreDia"
     )
     profile.record("BoreDia", '"BoreDia"')
+    # The chamfer's axial leg, and its radial leg equal to it by equation:
+    # 45 degrees.
+    await dimension_between(
+        adapter,
+        f"{seat_mouth}.start",
+        f"{seat_mouth}.end",
+        "horizontal_distance",
+        SEAT_MOUTH_CHAMFER,
+        "ferrule SeatMouthChamfer",
+    )
+    profile.record("SeatMouthChamfer", '"SeatMouthChamfer"')
+    await dimension_between(
+        adapter,
+        f"{seat_mouth}.start",
+        f"{seat_mouth}.end",
+        "vertical_distance",
+        SEAT_MOUTH_CHAMFER,
+        "ferrule seat mouth chamfer rise",
+    )
+    profile.record("SeatMouthChamferRise", '"SeatMouthChamfer"')
     await ensure_fully_defined(adapter, "ferrule profile sketch")
     check("exit_sketch ferrule profile", await adapter.exit_sketch())
     name_last_feature(adapter, "FerruleProfile")
@@ -161,11 +196,16 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven brass ferrule (equations neutral)", V_FERRULE, 0.005 * V_FERRULE
     )
 
-    # The one model-owned band (drawing-simplicity-policy.md `How the repository implements the guidelines`): the bore, which the oak tenon
+    # The model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the bore, which the oak tenon
     # is turned to suit, holds both the MHA-DT-008 seat and the oak round the
-    # pivot bore.  The OD is the rod as supplied, skimmed at assembly; the
-    # handle's end play is fitted on the MHA-DT-032 shoulder.
+    # pivot bore; the seat mouth's chamfer clears the MHA-DT-008 tenon root
+    # and leaves the tenon its glue length.  The OD is the rod as supplied,
+    # skimmed at assembly; the handle's end play is fitted on the MHA-DT-032
+    # shoulder.
     set_dimension_symmetric_tolerance(adapter, "FerruleProfile", "BoreDia", BORE_DIA_TOL)
+    set_dimension_symmetric_tolerance(
+        adapter, "FerruleProfile", "SeatMouthChamfer", SEAT_MOUTH_CHAMFER_TOL
+    )
     # Every model edit precedes the INSTALLED split, so the split copies a
     # finished default (the MHA-DT-030 lesson).
     await apply_material(adapter, MATERIAL)

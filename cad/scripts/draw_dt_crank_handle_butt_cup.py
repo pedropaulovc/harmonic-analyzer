@@ -53,6 +53,7 @@ from _section_axis import create_section_axis_centerline, position_section_capti
 from _session import run_build
 import _telemetry
 from dt_crank_handle_butt_cup_notes import (
+    BODY_CHAMFER_CALLOUT,
     BODY_FIT_CALLOUT,
     FLOOR_HOLE_CALLOUT,
     POCKET_DEPTH_CALLOUT,
@@ -117,6 +118,12 @@ FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 # - PocketDepth, four lines ~58 mm wide, cannot fit between its extension
 #   lines (27.5 mm), so it stands outside them right of the face, its top
 #   ~3.6 mm under the pocket-diameter extension line.
+# - BodyChamfer (the profile sketch is the section's upper half, so the
+#   chamfer is the floor end's top corner, 2 mm on paper), four lines ~50 mm
+#   wide, stands outside its extension lines left of the floor end: line at
+#   y ~0.1905 (part top 0.1855, overall's line 0.1947 right of x 0.2047),
+#   block x ~0.150-0.200 and y ~0.190-0.211, 15 mm over the floor-hole
+#   extension line (0.1755) and 4 mm left of the floor end.
 SECTION_KEEP = {
     "PocketDia": (FACE_X + 0.039, SECTION_CENTER[1] + 0.001),
     "BodyDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.038, SECTION_CENTER[1] + 0.001),
@@ -128,8 +135,13 @@ SECTION_KEEP = {
     ),
     "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] + BODY_R + 0.012),
     "PocketDepth": (FACE_X + 0.033, SECTION_CENTER[1] - BODY_R - 0.008),
+    "BodyChamfer": (
+        SECTION_CENTER[0] - HALF_LENGTH - 0.0295,
+        SECTION_CENTER[1] + BODY_R + 0.0161,
+    ),
 }
 DIMENSION_CALLOUTS = {
+    "BodyChamfer": BODY_CHAMFER_CALLOUT,
     "BodyDia": BODY_FIT_CALLOUT,
     "FloorHoleDia": FLOOR_HOLE_CALLOUT,
     "PocketDepth": POCKET_DEPTH_CALLOUT,

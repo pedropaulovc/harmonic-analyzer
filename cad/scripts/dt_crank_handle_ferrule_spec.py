@@ -9,10 +9,10 @@ the crank arm MHA-DT-006.
 The oak tenon is turned to suit this bore, and the handle's end play is set by
 facing the MHA-DT-032 shoulder at assembly (user ruling 2026-09-29, after the
 MHA-DT-034 machinist review), so no length here is a stack term and every size
-but the bore is routine (.X).  The bore keeps a +/-0.10 band (Codex P1/P2 on
-#1139, user ruling 2026-09-30): at .X a large bore let the fitted tenon
-outgrow the MHA-DT-008 shoulder it seats on, and a small one thinned the oak
-round the pivot bore under 1.5.
+but the bore and the seat mouth's chamfer is routine (.X).  The bore keeps a
++/-0.10 band (Codex P1/P2 on #1139, user ruling 2026-09-30): at .X a large
+bore let the fitted tenon outgrow the MHA-DT-008 shoulder it seats on, and a
+small one thinned the oak round the pivot bore under 1.5.
 
 Local frame: the axis is local +X, the part's origin plane is the arm-bearing
 end face (x=0), and the seat face against the oak shoulder is at x=LENGTH --
@@ -43,6 +43,16 @@ INSTALLED_CONFIG = "INSTALLED"
 BORE_DIA = 7.7
 BORE_DIA_TOL = 0.10
 LENGTH = 7.0
+# The bore's mouth at the seat face, broken 45 degrees (owner ruling A on
+# #1661): the MHA-DT-008 tenon root is rounded up to R0.3, so the leg's lower
+# limit clears it and the ring seats on the shoulder.  The upper limit is
+# MHA-DT-008's: the chamfer eats into the tenon's bonded length, and 0.4 keeps
+# it at 3.5, half this ring's length (asserted in dt_crank_handle_spec).
+# Modelled at the middle; printed as SEAT_MOUTH_CHAMFER +/- its tolerance.
+SEAT_MOUTH_CHAMFER = 0.35
+SEAT_MOUTH_CHAMFER_TOL = 0.05
+SEAT_MOUTH_CHAMFER_MIN = round(SEAT_MOUTH_CHAMFER - SEAT_MOUTH_CHAMFER_TOL, 6)
+SEAT_MOUTH_CHAMFER_MAX = round(SEAT_MOUTH_CHAMFER + SEAT_MOUTH_CHAMFER_TOL, 6)
 
 # Brass wall, on radius, as made: the smallest stock over the largest bore.
 # The skimmed wall, with the ring off-centre, is MHA-DT-008's check.
@@ -51,10 +61,10 @@ if WALL_WORST < 1.5:
     raise AssertionError("MHA-DT-034 ferrule wall is under 1.5 at the worst case")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "FerruleProfile": {"OuterDia", "BoreDia", "Length"},
+    "FerruleProfile": {"OuterDia", "BoreDia", "Length", "SeatMouthChamfer"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "FerruleProfile": {"OuterDia": 2, "BoreDia": 2, "Length": 1},
+    "FerruleProfile": {"OuterDia": 2, "BoreDia": 2, "Length": 1, "SeatMouthChamfer": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -71,6 +81,18 @@ REFERENCE_DIMENSIONS = frozenset({"OuterDia"})
 # offline test checks it against the registry.
 HANDLE_NUMBER = "MHA-DT-008"
 HANDLE_NAME = "CRANK HANDLE"
+# The tenon root's largest radius on MHA-DT-008, quoted for the chamfer's
+# callout: dt_crank_handle_spec.INSIDE_CORNER_R_MAX, which cannot be imported
+# here (that spec imports this one); the offline test checks it.
+HANDLE_ROOT_R_MAX = 0.3
+# The chamfer's band names its end and its reason at the callout (rule 4).
+SEAT_MOUTH_CHAMFER_CALLOUT = "\n".join(
+    (
+        "X 45 DEG SEAT END",
+        f"CLEARS {HANDLE_NUMBER}",
+        f"TENON ROOT R{HANDLE_ROOT_R_MAX:.1f}",
+    )
+)
 # The oak tenon is turned to suit this bore for an epoxy line (the handle spec
 # reads it from here); stated on this sheet too, so the fitted joint has its
 # acceptance (MHA-DT-034 re-review).

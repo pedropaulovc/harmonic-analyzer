@@ -117,9 +117,11 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert "set_dimension_symmetric_tolerance" not in source
     assert not hasattr(spec, "TENON_LENGTH_TOL")
     assert spec.TENON_END_GAP_MIN == pytest.approx((7.0 - 0.8) - (5.0 + 0.8))
-    # The shortest tenon's bonded length after the tenon-end and bore-mouth
-    # edge breaks (local review of 21bb244c5).
-    assert spec.TENON_GLUE_LENGTH_MIN == pytest.approx(5.0 - 0.8 - 0.25 - 0.25)
+    # The shortest tenon's bonded length after the tenon end's edge break and
+    # the ferrule's seat-mouth chamfer at its largest (owner ruling A on
+    # #1661; the tenon root's R0.3 MAX sits inside that chamfer).
+    assert spec.TENON_GLUE_LENGTH_MIN == pytest.approx(5.0 - 0.8 - 0.25 - 0.4)
+    assert spec.TENON_GLUE_LENGTH_MIN == pytest.approx(3.55)
     assert spec.TENON_GLUE_LENGTH_MIN >= 3.5
     # The reamed bore prints 4.10 +0.05/0, its two-place nominal the limit
     # itself (local review of fbf82ad96: 4.125 printed 4.13 +/-0.025).
@@ -130,6 +132,44 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert spec.CUP_OFFSET_MAX == pytest.approx(0.175)
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "for name in sorted(REFERENCE_DIMENSIONS):" in drawing_source
+
+
+def test_inside_corners_print_a_max_radius_their_mates_chamfers_clear() -> None:
+    # Owner ruling A on #1661: the tenon root and the counterbore's floor
+    # corner are modelled at R0.3 and print the single limit "R0.3 MAX"
+    # (swTolMAX, build_pn_pen_rod's ShoulderRadius), each naming the part that
+    # seats on it; the ferrule's and the cup's 45-degree chamfers clear them.
+    spec = dt_crank_handle_spec
+    corners = {"TenonRootRadius", "CounterboreFloorRadius"}
+    assert spec.INSIDE_CORNER_R_MAX == 0.3
+    assert spec.INSIDE_CORNER_R_BAND == (0.0, -spec.INSIDE_CORNER_R_MAX)
+    assert spec.INSIDE_CORNER_R_TOL_TYPE == 6
+    assert corners <= spec.DRAWING_DIMENSIONS["HandleProfile"]
+    assert not corners & (spec.REFERENCE_RADII | spec.REFERENCE_DIMENSIONS)
+    assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 1 for name in corners)
+    assert ferrule.SEAT_MOUTH_CHAMFER_MIN >= spec.INSIDE_CORNER_R_MAX
+    assert cup.BODY_CHAMFER_MIN >= spec.INSIDE_CORNER_R_MAX
+    assert drawing.DIMENSION_CALLOUTS["TenonRootRadius"] == spec.TENON_ROOT_CALLOUT
+    assert (
+        drawing.DIMENSION_CALLOUTS["CounterboreFloorRadius"]
+        == spec.COUNTERBORE_FLOOR_CALLOUT
+    )
+    assert spec.FERRULE_NAME in spec.TENON_ROOT_CALLOUT
+    assert spec.CUP_NAME in spec.COUNTERBORE_FLOOR_CALLOUT
+    # The blocks stand in gaps 22.6 and 31.3 mm wide: no row longer than
+    # "R0.3 MAX" (8 x 2.75 = 22.0 mm).
+    for callout in (spec.TENON_ROOT_CALLOUT, spec.COUNTERBORE_FLOOR_CALLOUT):
+        assert max(len(row) for row in callout.split("\n")) <= len("R0.3 MAX")
+    assert set(drawing.INSIDE_CORNER_ARC_EXTENSION) == corners
+    build_source = Path(handle.__file__).read_text(encoding="utf-8")
+    assert '("InsideCornerR", INSIDE_CORNER_R_MAX)' in build_source
+    assert "profile.record(name, '\"InsideCornerR\"')" in build_source
+    assert "_inside_corner_max_limit(adapter, name)" in build_source
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        "_dress_inside_corner(adapter, front_by_name[name], name=name)"
+        in drawing_source
+    )
 
 
 def test_grip_contour_is_tangent_arcs_dimensioned_on_the_section() -> None:
