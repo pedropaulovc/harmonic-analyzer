@@ -108,7 +108,6 @@ from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,
     angle_driver,
-    author_in_drawing_configurations,
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
@@ -3394,12 +3393,11 @@ async def build(adapter) -> dict[str, str]:
     )
     # Both drawing configurations own the explode: the exploded sheet's view
     # at 1:3 references Default Simplified.
-    author_in_drawing_configurations(
+    return await save_assembly_and_images(
         adapter,
         ASM_NAME,
-        lambda configuration: create_paper_drive_explode(adapter, configuration),
+        author=lambda configuration: create_paper_drive_explode(adapter, configuration),
     )
-    return await save_assembly_and_images(adapter, ASM_NAME)
 
 
 if __name__ == "__main__":

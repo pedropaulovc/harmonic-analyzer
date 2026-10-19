@@ -123,7 +123,7 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
     leave the operational model collapsed.
 
     Run in Default and in Default Simplified
-    (``_assembly.author_in_drawing_configurations``): a drawing view shows the
+    (``_assembly.save_assembly_and_images``): a drawing view shows the
     explode of the configuration it references."""
     from solidworks_mcp.adapters.com_variant import null_callout
 
