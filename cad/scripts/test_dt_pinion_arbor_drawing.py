@@ -23,6 +23,7 @@ import dt_pinion_handle_geometry as rod_geometry
 import dt_pinion_handle_spec as crossrod
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _printed_tolerance import printed_band_mm
 
 
 def test_required_drawing_paths_and_registry() -> None:
@@ -53,12 +54,15 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
 def test_integral_arbor_keeps_the_released_stations_around_a_longer_head() -> None:
     # drawing-guidelines.md rule 17 (walls and webs) (audit W6) grew the head 9.0 -> 10.5, and the machinist review of
     # 7f7fc1717 (Main's option 2) to 11.5, each time about the released
-    # crossrod station; the shaft and back crown stay put.  The neck shoulder
-    # moves 0.25 forward so every length but the drum station prints at .X.
+    # crossrod station; machinist review r5 of #1685 grew it forward only, to
+    # 12.2, so the rear face stays 5.75 aft of the crossrod.  The shaft and
+    # back crown stay put.  The neck shoulder moves 0.25 forward so every
+    # turned length prints at .X.
     assert spec.HEAD_CENTER_Z == pytest.approx(-6.5)
-    assert spec.HEAD_LEN == pytest.approx(11.5)
-    assert spec.HEAD_FRONT_Z == pytest.approx(spec.HEAD_CENTER_Z - spec.HEAD_LEN / 2.0)
-    assert spec.HEAD_REAR_Z == pytest.approx(spec.HEAD_CENTER_Z + spec.HEAD_LEN / 2.0)
+    assert spec.HEAD_LEN == pytest.approx(12.2)
+    assert spec.HEAD_REAR_Z == pytest.approx(-0.75)
+    assert spec.HEAD_REAR_Z == pytest.approx(spec.HEAD_CENTER_Z + spec.CROSS_HOLE_STATION)
+    assert spec.HEAD_FRONT_Z == pytest.approx(spec.HEAD_REAR_Z - spec.HEAD_LEN)
     assert spec.NECK_END_Z == pytest.approx(9.75)
     assert spec.SHAFT_LEN == pytest.approx(226.25)
     assert spec.SHAFT_LEN + spec.BACK_CAP_SAG == pytest.approx(227.45)
@@ -73,7 +77,9 @@ def test_only_the_drum_station_prints_two_places() -> None:
     """Machinist review of 7f7fc1717: NeckLen printed 11.25 at .XX.  Every
     station runs from the head rear face, so the head and neck shoulder are
     chosen so every turned length lands on .X; the drum station, an assembly
-    station, is the one .XX length (as at 61.55)."""
+    station, is the one .XX length (as at 61.55).  The crossrod station (5.75)
+    is not a turned length.  r5 of #1685: no length prints extra places to
+    hold a wall."""
     lengths = {
         "HeadLen": spec.HEAD_LEN,
         "NeckLen": spec.NECK_LEN,
@@ -89,34 +95,60 @@ def test_only_the_drum_station_prints_two_places() -> None:
         name for name in lengths if spec.DRAWING_PRECISION_BY_NAME[name] == 2
     }
     assert two_places == {"DrumStationFromHeadRear"}
+    assert spec.HEAD_LEN_PLACES == 1
     for name, value in lengths.items():
-        if name in two_places:
+        if name == "DrumStationFromHeadRear":
             assert value != pytest.approx(round(value, 1), abs=1e-9), name
+        else:
+            assert value == pytest.approx(round(value, 1), abs=1e-9), name
 
 
-def test_crossrod_hole_is_centred_with_a_rule_12_web() -> None:
-    # Printed centred on the Ø15 cylinder's length: only HeadLen's .X band
-    # reaches the web, never a separate station band.  The machinist review of
-    # 7f7fc1717 holds the web to the novice-machinist 2.0 target.
-    assert "CrossHoleReference" not in spec.DRAWING_DIMENSIONS
-    assert f"CENTRED ON<MOD-DIAM>{spec.HEAD_DIA:.0f} CYLINDER LENGTH" in (
-        spec.CROSS_HOLE_CALLOUT
+def test_crossrod_hole_station_is_toleranced_with_a_rule_12_web() -> None:
+    # Machinist review r3 of #1685 (clarity, 3 of 3 runs): CENTRED gave no
+    # datum face and no band, so the hole prints an ordinary station from the
+    # head rear face.  r5 (over-specification): a .XXX station and .XX
+    # HeadLen were bands tightened to hold the wall (rules 4 and 17), so the
+    # head grew forward and every band is the title-block row for the places
+    # its value needs.  Both webs hold the novice-machinist 2.0 target held
+    # since the review of 7f7fc1717.
+    assert spec.DRAWING_DIMENSIONS["CrossHoleStationReference"] == {
+        "CrossHoleFromHeadRear"
+    }
+    assert spec.CROSS_HOLE_FROM_HEAD_REAR == pytest.approx(spec.CROSS_HOLE_STATION)
+    assert spec.CROSS_HOLE_STATION == pytest.approx(5.75)
+    assert spec.DRAWING_PRECISION_BY_NAME["CrossHoleFromHeadRear"] == 2
+    assert spec.CROSS_HOLE_STATION_BAND == printed_band_mm(2)
+    assert spec.HEAD_LEN_BAND == printed_band_mm(1)
+    assert "CrossHoleFromHeadRear" not in drawing.DIMENSION_CALLOUTS
+    assert "CrossHoleFromHeadRear" in drawing.DETAIL_KEEP
+    # Printed toleranced, never as a reference.
+    build = inspect.getsource(drawing.build)
+    assert '"CrossHoleFromHeadRear"' not in build
+    source = inspect.getsource(part.build)
+    call = source[source.index('feature_name="CrossHoleStationReference"') :]
+    call = call[: call.index("\n    )")]
+    assert "drive_expression='\"CrossHoleStation\"'" in call
+    assert "end_v=-HEAD_CENTER_Z" in call
+    assert "CENTRED" not in spec.CROSS_HOLE_CALLOUT
+    hole_upper = (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]) / 2.0
+    rear = spec.CROSS_HOLE_STATION - spec.CROSS_HOLE_STATION_BAND - hole_upper
+    front = (
+        (spec.HEAD_LEN - spec.HEAD_LEN_BAND)
+        - (spec.CROSS_HOLE_STATION + spec.CROSS_HOLE_STATION_BAND)
+        - hole_upper
     )
-    assert spec.CROSS_HOLE_WEB_WORST == pytest.approx(
-        (spec.HEAD_LEN - spec.HEAD_LEN_BAND) / 2.0
-        - (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]) / 2.0
-    )
+    assert spec.CROSS_HOLE_WEB_WORST == pytest.approx(min(rear, front))
     assert spec.CROSS_HOLE_WEB_TARGET == 2.0
     assert spec.CROSS_HOLE_WEB_WORST >= spec.CROSS_HOLE_WEB_TARGET
 
 
-def test_cross_hole_callout_names_the_cylinder_not_the_crowned_head() -> None:
+def test_cross_hole_callout_does_not_name_the_crowned_head() -> None:
     """Machinist review of 7f7fc1717 (blocker): "CENTRED ON HEAD LENGTH" could
-    mean the straight Ø15 cylinder or the whole crowned head.  The callout
-    names the cylinder, its Ø read from the spec rather than typed."""
+    mean the straight Ø15 cylinder or the whole crowned head.  Since r3 of
+    #1685 the station is a dimension from the head rear face, and the
+    callout names only the process and the mate."""
     assert "HEAD LENGTH" not in spec.CROSS_HOLE_CALLOUT
-    assert f"<MOD-DIAM>{spec.HEAD_DIA:.0f} CYLINDER" in spec.CROSS_HOLE_CALLOUT
-    assert "15" not in spec.CROSS_HOLE_CALLOUT.replace(f"{spec.HEAD_DIA:.0f}", "", 1)
+    assert "CYLINDER" not in spec.CROSS_HOLE_CALLOUT
 
 
 def test_integral_head_owns_the_crossrod_interface() -> None:
@@ -125,7 +157,14 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert spec.NECK_LEN == pytest.approx(spec.NECK_END_Z - spec.HEAD_REAR_Z)
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is spec.CROSS_HOLE_CALLOUT
-    assert callout == "REAM THRU,\nCENTRED ON<MOD-DIAM>15 CYLINDER LENGTH"
+    assert callout == "REAM THRU, BONDED FIT\nON MHA-DT-015 CROSSROD"
+    # Machinist review r1 of #1685 (blocker): the band names its mate, and
+    # every mate a callout names is the registry's part number.
+    import _config
+
+    assert spec.CROSSROD_NUMBER == _config.parts("dt-pinion-handle")["number"]
+    assert spec.STRAP_NUMBER == "MHA-DT-014"
+    assert spec.DRUM_NUMBER == "MHA-DT-001"
     # Fable r-delta (Main ruling B): MHA-DT-015's bond and acceptance are
     # instructions for a part not on this print; MHA-DT-015 carries both.
     assert "MHA-DT-015" not in spec.DRAWING_NOTES
@@ -186,8 +225,11 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert set(drawing.JOURNAL_FINISHES) == set(lands)
     for key, (station_z, _symbol_xy, _flank) in drawing.JOURNAL_FINISHES.items():
         assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
-    assert "MHA-DT-014" in spec.DRAWING_NOTES
-    assert "PRESSES INTO" not in spec.DRAWING_NOTES
+    # Machinist review r1 of #1685: each land's callout names its bore.
+    assert spec.JOURNAL_CALLOUT == "JOURNAL,\nRUNS IN MHA-DT-014"
+    for key in ("FrontJournalDia", "BackJournalDia"):
+        assert drawing.DIMENSION_CALLOUTS[key] is spec.JOURNAL_CALLOUT
+    assert "MHA-DT-014" not in spec.DRAWING_NOTES
     assert not hasattr(spec, "PART_DATUMS")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
 
@@ -266,7 +308,10 @@ def test_back_crown_radius_is_the_model_dimension_not_typed_text() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["BackCapR"] == 1
     assert "BackCapR" in drawing.PRINCIPAL_KEEP
     assert drawing.DIMENSION_CALLOUTS["BackCapSagDim"] == "BACK CROWN"
-    assert not any("SR" in text for text in drawing.DIMENSION_CALLOUTS.values())
+    # A word-initial SR: the crossrod's name in the Ø6 callout is not one.
+    assert not any(
+        re.search(r"\bSR", text) for text in drawing.DIMENSION_CALLOUTS.values()
+    )
 
 
 def test_every_printed_length_is_exact_at_its_authored_places() -> None:
@@ -310,14 +355,16 @@ def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> Non
     witnesses (x 0.079-0.081) on its crown side ran through its text at
     30620a85, and the 199.9 witness and Ra leader sit on its head side.  Its
     diameter hangs above, text right of the line; its 19.0 goes below."""
-    width, height = drawing.DIAMETER_BLOCK_SIZE
+    width, height = drawing._diameter_block_size(spec.JOURNAL_CALLOUT)
     x, y = drawing.PRINCIPAL_KEEP["BackJournalDia"]
     shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
     # 12 -> 15 mm: the back Ra symbol now sits between block and shaft.
     assert 0.003 <= (y - height / 2.0) - shaft_top <= 0.015
     assert x - 0.081 >= 0.010  # clear of the crown witnesses rising to the sag
     detail_left = drawing.DETAIL_LABEL_XY[0] - drawing.DETAIL_LABEL_HALF_WIDTH
-    assert detail_left - (x + width) >= 0.010
+    # The two-line callout (r1 of #1685) is ~23 mm wider; the label's own
+    # text measured 4.9 mm inside DETAIL_LABEL_HALF_WIDTH on that sheet.
+    assert detail_left - (x + width) >= 0.006
     # The 19.0 sits below, clear of the land's crown-side end.
     len_x, _len_y = drawing.PRINCIPAL_KEEP["BackJournalLen"]
     crown_end = drawing._sheet_x(spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN)
@@ -344,7 +391,7 @@ def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
     assert dia_line_x + 0.010 < arrow_x < symbol_x
     assert symbol_x + left - dia_line_x >= 0.010
     # Under the back JOURNAL block, with a gap.
-    _width, height = drawing.DIAMETER_BLOCK_SIZE
+    _width, height = drawing._diameter_block_size(spec.JOURNAL_CALLOUT)
     dia_bottom = drawing.PRINCIPAL_KEEP["BackJournalDia"][1] - height / 2.0
     assert dia_bottom - (symbol_y + top) >= 0.002
     # Clear of the DETAIL A label to its right.
@@ -354,31 +401,37 @@ def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
     assert "leader-crosses-leader" in drawing.BLOCKING_LAYOUT_FINDINGS
 
 
-def test_bond_zone_callout_sits_above_the_shaft_clear_of_its_neighbours() -> None:
+def test_bond_zone_callout_hangs_below_the_shaft_clear_of_its_neighbours() -> None:
     """At 63468ee9 the BOND ZONE shelf ended 1 mm short of the front JOURNAL
     shelf below the shaft, so a novice could read -0.01/-0.10 as the
-    journal's (Main, Fable).  It now hangs above the shaft, where no other
-    diameter is, clear of detail A, its label and the front land's 19.0."""
-    width, height = drawing.DIAMETER_BLOCK_SIZE
+    journal's (Main, Fable).  Machinist review r1 of #1685: its callout now
+    names every Ø8 span but the lands and the drum, too tall for the gap
+    above the shaft, so it hangs below between the back land and the drum
+    station's text, well short of the front JOURNAL block."""
+    width, height = drawing._diameter_block_size(spec.BOND_ZONE_CALLOUT)
     x, y = drawing.PRINCIPAL_KEEP["BondZoneDia"]
-    left, right, bottom, top = x, x + width, y - height / 2.0, y + height / 2.0
-    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
-    # Short witnesses: the block starts a few mm off the silhouette.
-    assert 0.003 <= bottom - shaft_top <= 0.012
-    # Right of the DETAIL A label and the detail circle.
-    detail_x, detail_y = drawing.DETAIL_CENTER
-    detail_r = drawing.DETAIL_CROP_RADIUS
-    near_x = max(left - detail_x, 0.0, detail_x - right)
-    near_y = max(bottom - detail_y, 0.0, detail_y - top)
-    assert (near_x**2 + near_y**2) ** 0.5 - detail_r >= 0.010
-    assert (
-        left - (drawing.DETAIL_LABEL_XY[0] + drawing.DETAIL_LABEL_HALF_WIDTH) >= 0.010
-    )
-    # Short of the front land's 19.0 witness and its outside arrow tail.
-    front_land_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN)
-    assert front_land_end - 0.006 - right >= 0.005
-    # Under detail A's "(3.0)" line (sheet y ~0.207).
-    assert top <= 0.200
+    centre = y - 0.0005
+    left, right, bottom, top = x, x + width, centre - height / 2.0, centre + height / 2.0
+    shaft_bottom = drawing.PRINCIPAL_CENTER[1] - spec.SHAFT_DIA / 2000.0
+    # Short witnesses: the block ends a few mm under the silhouette.
+    assert 0.003 <= shaft_bottom - top <= 0.008
+    # Right of the back land's head-end witness, clear of it.
+    assert left - drawing._sheet_x(spec.BACK_JOURNAL_Z) >= 0.010
+    # 10 mm short of the front JOURNAL block.
+    journal_width, _ = drawing._diameter_block_size(spec.JOURNAL_CALLOUT)
+    front_x = drawing.PRINCIPAL_KEEP["FrontJournalDia"][0]
+    assert front_x - journal_width - right >= 0.008
+    # Left of the drum station's text block (r3 of #1685: three lines put
+    # its bottom level with that block's top), and over the 199.0's text.
+    drum_x, _drum_y = drawing.DRUM_STATION_TEXT_XY
+    assert drum_x - drawing.DRUM_STATION_TEXT_WIDTH / 2.0 - right >= 0.0015
+    assert bottom >= 0.125
+    # Its arrows sit between the flanks: an outside tail would rise into the
+    # back Ra symbol over the shaft.
+    assert "BondZoneDia" in drawing.ARROWS_INSIDE
+    ra_x = drawing.BACK_RA_XY[0]
+    ra_left, ra_right, _top = drawing.RA_SYMBOL_EXTENT
+    assert ra_x + ra_left - 0.008 < x < ra_x + ra_right
 
 
 FENCE = {"center": (0.3132, 0.171), "radius": 0.015, "axis": (-1.0, 0.0)}
@@ -469,7 +522,24 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     own Top-plane diameter, printed over its witness, clear of the fence."""
     assert "ShaftProfile" not in spec.DRAWING_DIMENSIONS
     assert spec.DRAWING_DIMENSIONS["BondZoneReference"] == {"BondZoneDia"}
-    assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] == "BOND ZONE"
+    assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is spec.BOND_ZONE_CALLOUT
+    assert spec.BOND_ZONE_CALLOUT == (
+        "ALL<MOD-DIAM>8 EXCEPT JOURNALS;\nMHA-DT-001 BOND ZONE,\nDRUM ENDS ON JOURNALS"
+    )
+    # Machinist review r3 of #1685 (blocker): the drum station falls on the
+    # front land; each drum end rests on its land at every printed limit.
+    front_min = (
+        spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN - 2 * spec.LINEAR_X_BAND
+    ) - (spec.DRUM_STATION + spec.DRUM_STATION_BAND)
+    back_min = (
+        spec.DRUM_STATION
+        - spec.DRUM_STATION_BAND
+        + geometry.DRUM_LEN
+        + geometry.DRUM_LEN_BAND[1]
+    ) - (spec.BACK_JOURNAL_FROM_HEAD_REAR + spec.LINEAR_X_BAND)
+    assert spec.DRUM_FRONT_END_ON_JOURNAL_MIN == pytest.approx(front_min)
+    assert spec.DRUM_BACK_END_ON_JOURNAL_MIN == pytest.approx(back_min)
+    assert min(front_min, back_min) > 0.0
     station = spec.BOND_ZONE_DIA_FROM_HEAD_REAR
     clear = spec.BOND_ZONE_LAND_CLEARANCE
     assert spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN + clear <= station
@@ -483,7 +553,7 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
 
 def test_head_diameter_line_stands_between_crown_apex_and_fence() -> None:
     x = drawing.DIAMETER_POSITIONS["HeadDia"][0]
-    to_x = lambda z: drawing.PRINCIPAL_CENTER[0] - (z - 106.725) / 1000.0  # noqa: E731
+    to_x = drawing._sheet_x
     apex = to_x(spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG)
     center = to_x(spec.HEAD_CENTER_Z)
     half = spec.HEAD_DIA / 2000.0
@@ -544,7 +614,8 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         rig.DRUM_END_SHIM,
         rig.DRUM_END_SHIM_SET_ERROR,
     )
-    assert spec.LINEAR_X_BAND == spec.HEAD_LEN_BAND == printed_band_mm(1)
+    assert spec.LINEAR_X_BAND == printed_band_mm(1)
+    assert spec.HEAD_LEN_BAND == printed_band_mm(1)
     assert geometry.DRUM_LEN == rig.DRUM_LEN
     assert geometry.STRAP_T_BAND == strap.THICKNESS_BAND
     spec_source = inspect.getsource(spec)
@@ -594,9 +665,10 @@ def test_drum_station_is_a_model_dimension_the_fitup_step_names() -> None:
     """Codex P1 on #814: notes never carry dimensions.  The drum station is
     the model's own reference dimension from the Ø15 head rear face, printed
     at .X with the "DRUM STATION" callout.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's eye pass): the
-    drum bond is the pinion fit-up step, so the part note keeps only the
-    journal fact."""
-    assert spec.DRAWING_NOTES == "JOURNALS RUN IN MHA-DT-014 REAMED BORES."
+    drum bond is the pinion fit-up step.  Machinist review r1 of #1685: the
+    station ends on no feature of this part, so its callout names the drum
+    end it locates and when it is set; the note keeps only the corners."""
+    assert spec.DRAWING_NOTES == "INSIDE CORNERS R0.25 MAX."
     assert spec.ASSEMBLY_STEP == (
         "SLIDE MHA-DT-022 INTO MHA-DT-001 AND BOND WITH LOCTITE 638, DRUM FRONT "
         "END AT MHA-DT-022 DRUM STATION; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."
@@ -606,7 +678,12 @@ def test_drum_station_is_a_model_dimension_the_fitup_step_names() -> None:
         assert f"{spec.DRUM_STATION_BAND:.1f}" not in text
     assert spec.DRAWING_DIMENSIONS["DrumStationReference"] == {"DrumStationFromHeadRear"}
     assert spec.DRAWING_PRECISION_BY_NAME["DrumStationFromHeadRear"] == 2
-    assert drawing.DIMENSION_CALLOUTS["DrumStationFromHeadRear"] == "DRUM STATION"
+    assert drawing.DIMENSION_CALLOUTS["DrumStationFromHeadRear"] is (
+        spec.DRUM_STATION_CALLOUT
+    )
+    assert spec.DRUM_STATION_CALLOUT == (
+        "DRUM STATION:\nMHA-DT-001 FRONT END,\nSET AT ASSEMBLY"
+    )
     assert "DRUM STATION" in spec.ASSEMBLY_STEP
     assert spec.DRUM_STATION_BAND == spec.LINEAR_X_BAND
 
@@ -631,10 +708,12 @@ def test_front_journal_diameter_text_clears_the_drum_station_witness() -> None:
     land_head_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z)
     assert land_crown_end + 0.0008 <= x < land_head_end  # on the land
     right = x + drawing.JOURNAL_DIA_TEXT_OVERHANG
-    left = x - 0.026
+    width, _height = drawing._diameter_block_size(spec.JOURNAL_CALLOUT)
+    left = x - width
     assert drawing.DRUM_STATION_WITNESS_X - right >= 0.0025
-    # Clear of the bond-zone diameter's line (above the shaft, tail below).
-    assert left - drawing.PRINCIPAL_KEEP["BondZoneDia"][0] >= 0.010
+    # Clear of the bond-zone block (below the shaft, text right of its line).
+    bond_width, _ = drawing._diameter_block_size(spec.BOND_ZONE_CALLOUT)
+    assert left - (drawing.PRINCIPAL_KEEP["BondZoneDia"][0] + bond_width) >= 0.008
 
 
 def test_drum_station_witness_starts_on_the_flank_not_the_axis() -> None:
@@ -917,6 +996,7 @@ def test_every_dimension_carrying_reference_sketch_is_saved_hidden() -> None:
         "BondZoneReference",
         "DrumStationReference",
         "PinStationReference",
+        "CrossHoleStationReference",
         "OverallReference",
     }
     assert set(spec.REFERENCE_SKETCHES) == expected
@@ -956,14 +1036,17 @@ def test_profile_imports_the_hidden_reference_dimensions_per_view() -> None:
     assert call.group(1) == "curate_hidden_owner_dimensions"
     assert "dimensions_by_feature=DRAWING_DIMENSIONS" in call.group(2)
     assert drawing.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    # Every reference sketch prints on the profile, so each one the view shows
-    # keeps a dimension there; the donor and detail A dimension none of them,
-    # so neither needs the part to show them (no part_sketches_shown).
+    # Every other reference sketch prints on the profile, so each one the view shows
+    # keeps a dimension there; the donor dimensions none of them, so the part
+    # need not show them (no part_sketches_shown).  The cross-hole station
+    # alone prints in detail A, whose import shows its owner the same way.
     reference_dims = set().union(
         *(spec.DRAWING_DIMENSIONS[name] for name in spec.REFERENCE_SKETCHES)
     )
-    assert reference_dims <= set(drawing.PRINCIPAL_KEEP)
-    assert not reference_dims & (set(drawing.DONOR_KEEP) | set(drawing.DETAIL_KEEP))
+    in_detail = {"CrossHoleFromHeadRear"}
+    assert reference_dims - in_detail <= set(drawing.PRINCIPAL_KEEP)
+    assert reference_dims & set(drawing.DETAIL_KEEP) == in_detail
+    assert not reference_dims & set(drawing.DONOR_KEEP)
     assert "part_sketches_shown" not in source
 
 
@@ -1091,11 +1174,26 @@ def _pin_leader_x_at(dia_xy: tuple[float, float], y: float) -> float:
 
 
 
-def test_collar_pin_leader_drops_square_over_the_hole() -> None:
-    """The callout's x follows its width: the bend stands over the hole."""
+def test_collar_pin_leader_slopes_clear_of_the_station_witnesses() -> None:
+    """The callout's x follows its width: the bend stands PIN_HOLE_LEADER_RUN
+    left of the hole.  Machinist review r1 of #1685: bent square over the
+    hole, the leader ran down the 38.0's hole-end witness; sloped, it meets
+    the 38.0 line well inside that witness and passes right of the 19.0's
+    head-end witness."""
     elbow_x, _ = _pin_leader_elbow(drawing.PRINCIPAL_KEEP["PinHoleDia"])
     arrow_x = drawing._sheet_x(spec.PIN_Z) + drawing.PIN_HOLE_LEADER_ARROW_DX
-    assert elbow_x == pytest.approx(arrow_x, abs=1e-9)
+    assert elbow_x == pytest.approx(arrow_x - drawing.PIN_HOLE_LEADER_RUN, abs=1e-9)
+    hole_x = drawing._sheet_x(spec.PIN_Z)
+    station_line_y = drawing.PRINCIPAL_KEEP["PinStationFromHeadRear"][1] - 0.0056
+    pin_dia_xy = drawing.PRINCIPAL_KEEP["PinHoleDia"]
+    assert hole_x - _pin_leader_x_at(pin_dia_xy, station_line_y) >= 0.006
+    land_line_y = drawing.PRINCIPAL_KEEP["FrontJournalLen"][1] - 0.0028
+    head_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z)
+    assert _pin_leader_x_at(pin_dia_xy, land_line_y) - head_end >= 0.003
+    assert {"PinStationFromHeadRear", "FrontJournalLen"} <= set(drawing.ARROWS_INSIDE)
+    # The underline starts right of detail A's view box (r1 of #1685: its
+    # outline ended at x 192.8).
+    assert elbow_x - drawing.PIN_HOLE_CALLOUT_WIDTH > 0.1928
 
 
 # pc-r11 (0c5636eab) render, sheet mm: detail A's "(3.0)" text set at
@@ -1283,7 +1381,7 @@ def test_detail_a_crop_circle_holds_the_neck_and_every_head_reference() -> None:
 
 
 def test_detail_a_imports_its_dimensions_by_feature_before_any_other_view() -> None:
-    """Detail A takes all five of its dimensions by targeted import, from the
+    """Detail A takes all six of its dimensions by targeted import, from the
     features that own them, before the donor's whole-model import can take
     NeckDia or CrossHoleDia (a dimension on the sheet is not imported again,
     memory model-annotations-import-once)."""
@@ -1294,18 +1392,25 @@ def test_detail_a_imports_its_dimensions_by_feature_before_any_other_view() -> N
         "HeadCapR",
         "HeadCapSagDim",
         "CrossHoleDia",
+        "CrossHoleFromHeadRear",
         "NeckDia",
     }
     owners = _drawing_dimension_import._features_owning(
         spec.DRAWING_DIMENSIONS, drawing.DETAIL_KEEP, view_label="detail A"
     )
-    assert owners == ("CrossHoleProfile", "FrontCapProfile", "Head", "NeckProfile")
-    # None is a part-hidden reference sketch, so the plain import needs no
-    # per-view show.
-    assert not set(owners) & set(spec.REFERENCE_SKETCHES)
+    assert set(owners) == {
+        "CrossHoleProfile",
+        "CrossHoleStationReference",
+        "FrontCapProfile",
+        "Head",
+        "NeckProfile",
+    }
+    # The station's owner is a part-hidden reference sketch, so the import is
+    # the per-view-showing one (_drawing_hidden_sketches).
+    assert set(owners) & set(spec.REFERENCE_SKETCHES) == {"CrossHoleStationReference"}
     source = inspect.getsource(drawing.build)
     detail = re.search(
-        r"curate_view_dimensions\(\s*adapter,\s*detail,\s*keep=DETAIL_KEEP,([^)]*)\)",
+        r"curate_hidden_owner_dimensions\(\s*adapter,\s*detail,\s*keep=DETAIL_KEEP,([^)]*)\)",
         source,
     )
     assert detail is not None
@@ -2029,3 +2134,12 @@ def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypat
             SimpleNamespace(), view, {"land": (spec_face, view.sheet((0.0, -0.004, 0.010)))},
             label="land",
         )
+
+
+def test_cross_hole_station_text_clears_the_shared_rear_face_witness() -> None:
+    """r2 of #1685: at x 0.1425 the (5.75) text ran 1.8 mm past the head rear
+    face, where the 11.5's witness drops (text-on-line, blocking)."""
+    rear_face = drawing._detail_x(spec.HEAD_REAR_Z)
+    assert drawing.DETAIL_REAR_FACE_X == pytest.approx(rear_face)
+    x, _y = drawing.DETAIL_KEEP["CrossHoleFromHeadRear"]
+    assert rear_face - (x + drawing.CROSS_HOLE_STATION_TEXT_RIGHT) >= 0.002

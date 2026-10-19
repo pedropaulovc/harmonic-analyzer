@@ -45,6 +45,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
 from _layout_geometry import audit_sheet, format_findings
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -53,23 +54,29 @@ from diagnostics.drawing_layout_audit import collect_document
 from dt_pinion_arbor_pin_spec import PIN_HOLE_CALLOUT
 from dt_pinion_arbor_spec import (
     BACK_JOURNAL_Z,
+    BOND_ZONE_CALLOUT,
     BOND_ZONE_DIA_Z,
     CROSS_HOLE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRUM_STATION,
+    DRUM_STATION_CALLOUT,
     FRONT_JOURNAL_Z,
     HEAD_CAP_SAG,
     HEAD_CENTER_Z,
     HEAD_DIA,
     HEAD_FRONT_Z,
     HEAD_REAR_Z,
+    JOURNAL_CALLOUT,
     JOURNAL_LEN,
     OVERALL_LEN,
     PIN_Z,
     SHAFT_DIA,
     SURFACE_FINISHES,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_pinion_arbor"]
 PART_STEM = SPEC.artifact_stem
@@ -146,7 +153,10 @@ DONOR_KEEP = {
 # shaft and its diameter hangs below; the back land's are swapped (see
 # BACK_JOURNAL_TEXT_X).  The stations from the Ø15 head rear face stack
 # below the shaft.
-MODEL_Z_AT_SHEET_ORIGIN_X = 106.725
+# SolidWorks centres the view on the part's extent: the anchor sits 0.625
+# aft of the crown-to-crown mid-length (106.725 measured at the 11.5 head),
+# so it follows the head's growth forward at r5 of #1685.
+MODEL_Z_AT_SHEET_ORIGIN_X = HEAD_FRONT_Z - HEAD_CAP_SAG + OVERALL_LEN / 2.0 + 0.625
 
 
 def _sheet_x(model_z: float) -> float:
@@ -203,17 +213,42 @@ BACK_JOURNAL_DIA_POINT_X = _sheet_x(
 # leader on its head side), so its diameter hangs ABOVE the shaft, its text
 # right of the line over the land and clear of the back-crown sag witnesses,
 # and its 19.0 length moves below.  The block rides high enough that the
-# back Ra symbol fits under it, over the land.
+# back Ra symbol fits under it, over the land; at 0.1945 (r1 of #1685) the
+# one-line callout cleared the Ra text by 2.35 mm, so the two-line one rises
+# to keep its shoulder 2.8 mm over it.
 BACK_JOURNAL_TEXT_X = BACK_JOURNAL_DIA_POINT_X + JOURNAL_DIA_LINE_OFFSET
-BACK_JOURNAL_DIA_Y = 0.1945
-# The drum station's text block (~35 mm "DRUM STATION" callout) ends 4 mm left
-# of its drum-end witness: between that witness and the head face, the
-# neck-end witness drops through.
-DRUM_STATION_TEXT_WIDTH = 0.035
+BACK_JOURNAL_DIA_Y = 0.1981
+# Callout blocks, measured on the r1 sheet of #1685: lines 5.6 mm apart, a
+# capital ~2.75 mm wide (<MOD-DIAM> two of them), and a multi-line block
+# centred ~0.5 mm under its text position with its shoulder under the last
+# line, so every added line grows the block 2.8 mm each way.
+CALLOUT_LINE_PITCH = 0.0056
+CALLOUT_CHAR_ADVANCE = 0.00275
+
+
+def _callout_width(callout: str) -> float:
+    """Estimated width of a callout's widest line."""
+    return CALLOUT_CHAR_ADVANCE * max(
+        len(line.replace("<MOD-DIAM>", "Ø ")) for line in callout.split("\n")
+    )
+
+
+def _diameter_block_size(callout: str) -> tuple[float, float]:
+    """(width, height) of a two-place Ø value under ``callout``'s lines."""
+    width, height = DIAMETER_BLOCK_SIZE
+    lines = callout.count("\n")
+    return (max(width, _callout_width(callout)), height + CALLOUT_LINE_PITCH * lines)
+
+
+# The drum station's text block ends 4 mm left of its drum-end witness:
+# between that witness and the head face, the neck-end witness drops
+# through.  Its dimension line stays at y ~0.1174 over the 199.0 row, so the
+# three-line callout (r1 of #1685) rises 5.6 mm above its one-line spot.
+DRUM_STATION_TEXT_WIDTH = _callout_width(DRUM_STATION_CALLOUT)
 DRUM_STATION_WITNESS_X = _sheet_x(HEAD_REAR_Z + DRUM_STATION)
 DRUM_STATION_TEXT_XY = (
     DRUM_STATION_WITNESS_X - 0.004 - DRUM_STATION_TEXT_WIDTH / 2.0,
-    0.123,
+    0.1286,
 )
 # The front land's diameter text hangs LEFT of its line (x-0.026 .. x+0.001,
 # measured at 4e97c4d8), and the drum station's witness drops through the
@@ -222,12 +257,18 @@ DRUM_STATION_TEXT_XY = (
 # block ending ~2.4 mm short of that witness.
 JOURNAL_DIA_TEXT_OVERHANG = 0.001
 FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
-# The bond-zone diameter stands over the part's witness (x 0.195) but hangs
-# its text ABOVE the shaft: below it, beside the front "JOURNAL" shelf, the
-# two read as one paired callout (Main and Fable, 63468ee9).  Above, its line
-# rises a few mm off the silhouette to the shelf, right of the DETAIL A label
-# and under detail A's "(3.0)", and short of the front land's 19.0 witnesses.
-BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.190)
+# The bond-zone diameter stands over the part's witness and hangs its text
+# right of its line BELOW the shaft, in the open run between the back land's
+# head end and the drum station's text, a gap over the drum station's block
+# and 10 mm short of the front land's.  Above the shaft (r1 of #1685) the
+# two-line callout naming its scope and drum no longer fit under detail A.
+# Its lines name every Ø8 span but the lands, so it no longer reads as the
+# front "JOURNAL" shelf's pair (Main and Fable, 63468ee9).  Its arrows sit
+# inside the flanks (ARROWS_INSIDE): an outside tail would rise into the back
+# Ra symbol over the shaft.  r3 added a third line (the drum's ends on the
+# journals), so the shoulder drops one line pitch and the top stays put; the
+# block now ends left of the drum station's text instead of over it.
+BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.1474)
 # The drum-station and bond-zone reference sketches stand alone, so the
 # profile shows them, and each ends on a short construction witness lying ON
 # the lower Ø8 outline.  The view paints that witness construction grey over
@@ -272,23 +313,38 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # The font is proportional, so the per-character advance overstates a line
 # of narrow glyphs.  pc-r9's line reads 3 mm narrower than the estimate,
 # which stands the bend left of the hole, away from the station text.
+# Machinist review r1 of #1685: with the bend over the hole the leader ran
+# down the 38.0 row's hole-end witness.  The bend now stands
+# PIN_HOLE_LEADER_RUN left of the hole, so the leader slopes down-right to
+# it, crossing the 38.0 line 6 mm inside that witness and passing 5 mm
+# right of the 19.0's head-end witness; the underline still starts right of
+# detail A's view box (x 0.1928).
 PIN_HOLE_CALLOUT_ADVANCE = 0.00267
 PIN_HOLE_CALLOUT_CENTRE_DX = 0.00075
 PIN_HOLE_LEADER_ARROW_DX = -0.0004
+PIN_HOLE_LEADER_RUN = 0.009
 PIN_HOLE_CALLOUT_WIDTH = PIN_HOLE_CALLOUT_ADVANCE * max(
     len(line) for line in PIN_HOLE_CALLOUT.split("\n")
 )
 PIN_HOLE_CALLOUT_X = (
     _sheet_x(PIN_Z)
     + PIN_HOLE_LEADER_ARROW_DX
+    - PIN_HOLE_LEADER_RUN
     - PIN_HOLE_CALLOUT_WIDTH / 2.0
     - PIN_HOLE_CALLOUT_CENTRE_DX
 )
+# Dimensions whose arrows SolidWorks drew outside their witnesses (r1 of
+# #1685: the 38.0's head-end tail ran under the pin hole's leader); each is
+# set inside, where its span has room (the bond zone's 8 mm takes its two
+# 3.6 mm arrowheads).
+ARROWS_INSIDE = ("PinStationFromHeadRear", "FrontJournalLen", "BondZoneDia")
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
     # Below the shaft, under the back Ra symbol and its leader.
     "BackJournalLen": (0.097, 0.143),
-    "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.150),
+    # Two-line block (r1 of #1685) 5.4 mm under the shaft, over the drum
+    # station's text.
+    "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.1515),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
     # y 0.140, not 0.130: lifts the dimension line to y ~0.1372 so its head-end
@@ -299,7 +355,7 @@ PRINCIPAL_KEEP = {
     # its own drum-end witness.  The back station's text moves left to clear
     # it.
     "DrumStationFromHeadRear": DRUM_STATION_TEXT_XY,
-    "BackJournalFromHeadRear": (0.170, 0.115),
+    "BackJournalFromHeadRear": (0.160, 0.115),
     # Right of the overall-length witness at the front crown apex (x 0.3215).
     "NeckLen": (0.340, 0.100),
     "BackRimFromHeadRear": (0.205, 0.095),
@@ -314,9 +370,10 @@ PRINCIPAL_KEEP = {
     # that row's witness, above the 19.0's right arrow tail.  The hole's
     # underline stands clear above detail A's (3.0): at y 0.222 (pc-r11) it
     # ran 0.7 mm over that text's top and began 0.9 mm right of it, so the
-    # (3.0) read as the callout's first word.
+    # (3.0) read as the callout's first word.  At 0.2255 (r1 of #1685) it
+    # splits the air between that text and the three-line Ø6 callout above.
     "PinStationFromHeadRear": (0.288, 0.207),
-    "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.226),
+    "PinHoleDia": (PIN_HOLE_CALLOUT_X, 0.2255),
 }
 # In detail A the neck runs from the fence (x ~0.137 at its edges) to the
 # head rear face (x 0.1545), its Ø10.5 at y 0.2245-0.2455.  Its end-on
@@ -327,10 +384,26 @@ PRINCIPAL_KEEP = {
 # of the crop circle, clear of it like every other detail-A callout; the line
 # crosses the circle once, square, to reach it.
 NECK_DIA_XY = (0.140, 0.2575)
+# The cross hole's 5.75 station in detail A (a (5.75) reference at r2,
+# toleranced since r3 of #1685).  Its witnesses drop from the axis at the
+# head rear face (shared with the head length's) and the hole centre; the
+# text sits left of the rear-face witness.  r2 boxed " (5.75) " at 7.5 mm
+# left to 12.8 mm right of its position, and at x 0.1425 the head length's
+# witness crossed it (text-on-line), so the position now follows from that
+# witness with 2.5 mm of air; the bare "5.75" only adds to it.
+CROSS_HOLE_STATION_TEXT_RIGHT = 0.0128
+DETAIL_REAR_FACE_X = (
+    DETAIL_CENTER[0] + DETAIL_RATIO * (HEAD_CENTER_Z - HEAD_REAR_Z) / 1000.0
+)
+CROSS_HOLE_STATION_TEXT_XY = (
+    DETAIL_REAR_FACE_X - 0.0025 - CROSS_HOLE_STATION_TEXT_RIGHT,
+    0.2163,
+)
 # Every dimension detail A carries, imported by feature straight into the
 # cropped view (DRAWING_DIMENSIONS names the owners: Head, FrontCapProfile,
-# CrossHoleProfile, NeckProfile) BEFORE any other view imports, since a
-# model dimension already on the sheet is not imported again.
+# CrossHoleProfile, CrossHoleStationReference, NeckProfile) BEFORE any other
+# view imports, since a model dimension already on the sheet is not imported
+# again.
 DETAIL_KEEP = {
     "HeadLen": (0.165, 0.201),
     # Right of and below its pc-r8 spot (0.195, 0.262), whose leader met the
@@ -339,18 +412,24 @@ DETAIL_KEEP = {
     "HeadCapR": (0.205, 0.257),
     "HeadCapSagDim": (0.205, 0.210),
     # Above the hole's centre line, so the leader drops onto the hole edge.
-    "CrossHoleDia": (0.245, 0.256),
+    # Two callout lines (r3 of #1685) under the value: the block's top stays
+    # inside the border and its shoulder well over the pin hole's.
+    "CrossHoleDia": (0.245, 0.2525),
+    # The hole's station rides under the head, its text left of the
+    # rear-face witness and clear of the neck above and the head length below.
+    "CrossHoleFromHeadRear": CROSS_HOLE_STATION_TEXT_XY,
     "NeckDia": NECK_DIA_XY,
 }
 # The head sits inside detail A's fence at the right end of the profile (the
 # fence spans x 0.298-0.328 on the axis, y 0.170): the Ø15's dimension line
 # stands inside the fence and runs up to its text above it.  The line sits
-# between the crown apex (x 0.3215) and the fence (x 0.3262 at the head's
-# top and bottom edges), so its witnesses stay inside the circle: they used
+# between the crown apex (x 0.3223 since the 12.2 head) and the fence
+# (x 0.3259 at the head's top and bottom edges), so its witnesses stay
+# inside the circle: they used
 # to run out through it to x 0.340, reading as part of the detail callout
 # with the "A" label between them (Fable r-delta).
 DIAMETER_POSITIONS = {
-    "HeadDia": (0.3238, 0.192),
+    "HeadDia": (0.32385, 0.192),
 }
 # The neck's Ø10.5 has no place on the 1:1 profile.  The layout audit boxes
 # its text from 15.6 mm left of the dimension line to 11.5 mm right of it,
@@ -384,13 +463,13 @@ DIMENSION_CALLOUTS = {
     # head end has two shoulders, Ø8-Ø10.5 and Ø10.5-Ø15.
     # <MOD-DIAM> carries its own leading gap, so no space before it.
     "BackRimFromHeadRear": f"FROM BACK CROWN ROOT TO<MOD-DIAM>{HEAD_DIA:.0f} HEAD REAR FACE",
-    "DrumStationFromHeadRear": "DRUM STATION",
+    "DrumStationFromHeadRear": DRUM_STATION_CALLOUT,
     "OverallLen": "OVERALL",
     "BackCapSagDim": "BACK CROWN",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
-    "FrontJournalDia": "JOURNAL",
-    "BackJournalDia": "JOURNAL",
-    "BondZoneDia": "BOND ZONE",
+    "FrontJournalDia": JOURNAL_CALLOUT,
+    "BackJournalDia": JOURNAL_CALLOUT,
+    "BondZoneDia": BOND_ZONE_CALLOUT,
     "PinStationFromHeadRear": "COLLAR PIN",
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
@@ -706,6 +785,22 @@ def _radius_leader_outside(adapter: Any, annotations: list[Any], name: str) -> N
     display.SolidLeader = False
     if bool(display.SolidLeader):
         raise RuntimeError(f"{name} still draws its solid leader to the centre")
+
+
+def _arrows_inside(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Draw a linear dimension's arrows inside its witnesses, read back."""
+    matches = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = 0  # swDimArrowsInside
+    if int(display.ArrowSide) != 0:
+        raise RuntimeError(f"{name} did not keep its arrows inside its witnesses")
 
 
 def _plain_text(text: str) -> str:
@@ -1098,7 +1193,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # the sheet is not imported again, so the donor's whole-model import below
     # would otherwise take NeckDia and CrossHoleDia.  A missing dimension
     # fails here, naming what did arrive (insert_feature_dimensions logs it).
-    detail_annotations = curate_view_dimensions(
+    # The hole's station reference sketch is part-hidden like the profile's,
+    # so detail A shows its owner too (_drawing_hidden_sketches).
+    detail_annotations = curate_hidden_owner_dimensions(
         adapter,
         detail,
         keep=DETAIL_KEEP,
@@ -1108,10 +1205,11 @@ async def build(adapter: Any) -> dict[str, str]:
     donor_annotations = curate_view_dimensions(
         adapter, donor, keep=DONOR_KEEP, view_label="diameter donor"
     )
-    # The profile prints every reference-sketch dimension.  The part saves
-    # those sketches hidden (#880), so this projected view shows them per view
-    # and imports feature by feature (_drawing_hidden_sketches).  The donor and
-    # detail A dimension none of them, so neither needs them shown.
+    # The profile prints every reference-sketch dimension but the cross-hole
+    # station, which detail A took above.  The part saves those sketches
+    # hidden (#880), so this projected view shows them per view and imports
+    # feature by feature (_drawing_hidden_sketches).  The donor dimensions
+    # none of them, so it needs none shown.
     principal_annotations = curate_hidden_owner_dimensions(
         adapter,
         principal,
@@ -1166,6 +1264,8 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _radius_leader_outside(adapter, detail_annotations, "HeadCapR")
+    for name in ARROWS_INSIDE:
+        _arrows_inside(adapter, principal_annotations, name)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name, label in {
         "HeadCapSagDim": "front-crown height reference",

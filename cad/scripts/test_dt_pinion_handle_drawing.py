@@ -129,13 +129,14 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     )
     # drawing-guidelines.md rule 17 (walls and webs) (audit W6) grew the head 9.0 -> 10.5 and the machinist review of
     # 7f7fc1717 (Main's option 2) to 11.5, each about the released centre, so
-    # both faces and the crown move 1.25 out.  The neck shoulder (the released
-    # head rear + 2 wall + 10) moves 0.25 forward, so every turned length on
-    # the MHA-DT-022 print lands on .X.
+    # both faces and the crown move 1.25 out; machinist review r5 of #1685
+    # grew it forward only, to 12.2, so the rear face stays.  The neck
+    # shoulder (the released head rear + 2 wall + 10) moves 0.25 forward, so
+    # every turned length on the MHA-DT-022 print lands on .X.
     released_head_stations = (
-        released_origin[2] - 11.5 / 2.0,
+        released_origin[2] + 11.5 / 2.0 - 12.2,
         released_origin[2] + 11.5 / 2.0,
-        released_origin[2] - (11.5 / 2.0 + 3.0),
+        released_origin[2] + 11.5 / 2.0 - 12.2 - 3.0,
         released_origin[2] + 9.0 / 2.0 + 2.0 + 10.0 - 0.25,
     )
     integral_head_stations = (
@@ -149,9 +150,9 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     )
     assert integral_head_stations == pytest.approx(
         (
-            expected_axis[2] - 11.5 / 2.0,
+            expected_axis[2] + 11.5 / 2.0 - 12.2,
             expected_axis[2] + 11.5 / 2.0,
-            expected_axis[2] - (11.5 / 2.0 + 3.0),
+            expected_axis[2] + 11.5 / 2.0 - 12.2 - 3.0,
             expected_axis[2] + 9.0 / 2.0 + 2.0 + 10.0 - 0.25,
         ),
         abs=1e-12,
