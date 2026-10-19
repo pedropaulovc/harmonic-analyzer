@@ -74,6 +74,7 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_DIA,
     RELIEF_END_STATION,
     RELIEF_LEAD,
+    RELIEF_STRENGTH_CALLOUT,
     SEAT_STATION,
     SHOULDER_CALLOUT,
     SHOULDER_DIA,
@@ -382,11 +383,17 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         location="below",
     )
-    # Rule 4: the running-fit band names its mate at the callout.  Above the
-    # value, so the line stays off the dimension line that drops to the
-    # shoulder.
+    # Rule 4: name the running mate and the relief neck's functional reason.
+    # The reasons sit above each value, clear of the lead below the relief
+    # and the dimension line that drops to the shoulder.
     set_dimension_callouts(
-        adapter, annotations, {"ShoulderDia": SHOULDER_CALLOUT}, location="above"
+        adapter,
+        annotations,
+        {
+            "ShoulderDia": SHOULDER_CALLOUT,
+            "ReliefDia": RELIEF_STRENGTH_CALLOUT,
+        },
+        location="above",
     )
     offset_dimension_text(adapter, side_annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

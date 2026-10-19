@@ -74,6 +74,7 @@ from dt_crank_handle_pivot_screw_spec import (
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
     RELIEF_DIA,
+    RELIEF_DIA_BAND,
     RELIEF_END_STATION,
     RELIEF_LEAD,
     RELIEF_LEAD_TOL,
@@ -465,9 +466,13 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "HeadLength", HEAD_LENGTH_TOL
     )
-    # The tip chamfer and the relief diameter print as single MAX limits: the
-    # chamfer never past the thread depth, the relief under the die-cut root
-    # (Codex P1 on #1139); the slot depth and thread length are routine .X.
+    # The relief needs both limits: below the die-cut root, but no weaker
+    # than the previous minimum neck (Codex P2 on #1694).
+    set_dimension_bilateral_tolerance(
+        adapter, "ScrewProfile", "ReliefDia", *deviations(RELIEF_DIA_BAND)
+    )
+    # The disposable tip chamfer prints a single MAX within the thread depth;
+    # the slot depth and thread length are routine .X.
     _single_limits(adapter)
     # The relief lead prints as limits in the relief callout, the model owning
     # its band all the same (Codex P2 on #1139).

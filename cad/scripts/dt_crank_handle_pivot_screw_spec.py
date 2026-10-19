@@ -177,18 +177,17 @@ THREAD_FIT_OFFSET_MAX = round(
 )
 # Thread relief (Main's ruling on the die-runout doubt): a groove in the first RELIEF_WIDTH of the threaded section, against
 # the seat face, so the die's incomplete lead threads run out into air and the shoulder
-# pulls down tight on the arm face.  Routine (.X) sizes under the title-block
-# band.
-# A single MAX limit (Codex P1 on #1139: at .X the relief could stand above
-# the thread root, so no die run-out; the MHA-DT-32 machinist review of
-# 04b95f481 called +/-0.05 at two places over-specification and asked for a
-# one-sided limit, the MHA-MG-04 relief's pattern): Ø1.9 MAX keeps the
-# largest relief under the deepest die-cut root estimated above, Ø1.937
-# (local reviews of 747487c71 and 21bb244c5).  As above, the model value is
-# the printed limit.
+# pulls down tight on the arm face.  Its width is routine (.X).
+# The maximum stays below the estimated deepest die-cut root, Ø1.937
+# (local reviews of 747487c71 and 21bb244c5).  A MAX alone admitted an
+# arbitrarily weak neck (Codex P2 on #1694): keep the previous 1.8 minimum
+# section for seating torque, at one place rather than the former 1.85
+# +/-0.05.  The nominal remains the upper limit, so the model stays unchanged.
 RELIEF_DIA = 1.9
-RELIEF_DIA_MAX = RELIEF_DIA
-RELIEF_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX
+RELIEF_DIA_BAND = (0.0, -0.1)  # (upper, lower) deviations
+RELIEF_DIA_MIN = round(RELIEF_DIA + RELIEF_DIA_BAND[1], 6)
+RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_BAND[0], 6)
+RELIEF_STRENGTH_CALLOUT = "SEATING TORQUE NECK"
 # Routine at 2.2 (the MHA-DT-32 machinist review of crank-v4-16 called a
 # +/-0.10 band over-specification): at .X the straight floor past the
 # longest lead, 1.4 - 0.4 = 1.0, keeps 1.5 #4-40 pitches of die run-out
@@ -393,13 +392,13 @@ SEAT_FLAT_ANNULUS_AREA = math.pi / 4.0 * (SHOULDER_DIA**2 - TAPPED_MOUTH_DIA_MAX
 SEAT_FLAT_ANNULUS_AREA_MIN = (
     math.pi / 4.0 * (SEAT_CONTACT_OUTER_DIA_MIN**2 - SEAT_CONTACT_INNER_DIA**2)
 )
-# The relief neck is the screw's weakest section: pi/4 x 1.9^2 = 2.84 mm^2
-# against the #4-40 UNC tensile stress area of 0.00604 in^2 = 3.90 mm^2, about
-# 73 percent at the printed maximum (the single limit leaves the shop to turn
-# it just under the root).  Seating torque is therefore limited by the neck,
-# not the thread; the handle's working load is a hand grip and never loads it
-# axially.
-NECK_AREA = math.pi / 4.0 * RELIEF_DIA**2
+# The relief neck is the screw's weakest section.  Evaluate the smallest
+# printed neck, Ø1.8: 2.54 mm^2, about 65 percent of the #4-40 UNC tensile
+# stress area (0.00604 in^2 = 3.90 mm^2).  This retains the previous minimum
+# section; the area ratio is not a seating-torque strength calculation.
+# No quantitative seating torque is specified.  The handle's working load
+# is a hand grip and never loads the screw axially.
+NECK_AREA = math.pi / 4.0 * RELIEF_DIA_MIN**2
 TENSILE_STRESS_AREA = 0.00604 * MM_PER_IN**2
 NECK_TO_STRESS_AREA = NECK_AREA / TENSILE_STRESS_AREA
 
@@ -412,6 +411,10 @@ for _ok, _what in (
     (
         RELIEF_DIA_MAX <= min(THREAD_MINOR_BASIC_ROOT, THREAD_MINOR_UNR_2A_MAX),
         f"relief floor stands above the {THREAD_SIZE} external minor diameter",
+    ),
+    (
+        RELIEF_DIA_MIN >= 1.8,
+        "relief neck is below the previous 1.8 minimum seating section",
     ),
     (RELIEF_WIDTH < THREAD_LENGTH, "relief consumes the whole thread section"),
     (RELIEF_LEAD < RELIEF_WIDTH, "relief lead consumes the relief floor"),
@@ -511,8 +514,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the shoulder diameter is
 # the running fit and prints its band at two places, and the head diameter and
-# length their cup bands; every other size is routine (.X) or a single MAX
-# limit at one place, the fitted shoulder length a reference.
+# length their cup bands; the relief neck's one-place band retains its
+# minimum section.  Other sizes are routine (.X), a single MAX at one place,
+# or the fitted shoulder length's reference.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": 2,
@@ -530,7 +534,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # The single-limit dimensions: (feature, dimension) -> (limit mm, swTolType).
 SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
     ("ScrewProfile", "TipChamfer"): (TIP_CHAMFER_MAX, TIP_CHAMFER_TOL_TYPE),
-    ("ScrewProfile", "ReliefDia"): (RELIEF_DIA_MAX, RELIEF_DIA_TOL_TYPE),
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

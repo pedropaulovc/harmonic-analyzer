@@ -63,9 +63,9 @@ def test_model_owns_places_and_bands() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     # The running fit, the head's cup-floor bearing band and the head length
-    # that keeps it below the cup face print at two places; the tip chamfer and
-    # relief Ø are single MAX limits and the slot depth and thread length
-    # routine, all at one (MHA-DT-032 machinist review of 04b95f481).
+    # that keeps it below the cup face print at two places.  The relief's
+    # bounded seating neck, tip chamfer MAX, slot depth and thread length
+    # print at one (MHA-DT-032 review; Codex P2 on #1694).
     running_fit = {"ShoulderDia", "HeadDia", "HeadLength"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
@@ -81,11 +81,11 @@ def test_model_owns_places_and_bands() -> None:
         ("ScrewProfile", "HeadDia"): "HEAD_DIA_TOL",
         ("ScrewProfile", "HeadLength"): "HEAD_LENGTH_TOL",
         ("ScrewProfile", "ReliefLead"): "RELIEF_LEAD_TOL",
+        ("ScrewProfile", "ReliefDia"): "*deviations(RELIEF_DIA_BAND)",
     }
     # swTolMAX prints the nominal then "MAX", so each model value IS its limit.
     assert spec.SINGLE_LIMITS == {
         ("ScrewProfile", "TipChamfer"): (spec.TIP_CHAMFER, 6),
-        ("ScrewProfile", "ReliefDia"): (spec.RELIEF_DIA, 6),
     }
     assert "_single_limits(adapter)" in Path(part.__file__).read_text(encoding="utf-8")
     assert spec.SHOULDER_DIA == 4.00
@@ -178,10 +178,18 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
 
 
 def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
-    # Ø1.9 MAX (Codex P1 on #1139; machinist review of 04b95f481): the
-    # largest relief stays under the root.
-    assert (spec.RELIEF_DIA, spec.RELIEF_DIA_MAX) == (1.9, 1.9)
-    assert spec.RELIEF_DIA_TOL_TYPE == 6  # swTolType_e.swTolMAX
+    # The one-place relief band preserves the prior 1.8 minimum neck while
+    # keeping the largest relief under the root (Codex P2 on #1694).
+    assert spec.RELIEF_DIA == 1.9
+    assert spec.RELIEF_DIA_BAND == (0.0, -0.1)
+    assert (spec.RELIEF_DIA_MIN, spec.RELIEF_DIA_MAX) == pytest.approx((1.8, 1.9))
+    assert spec.RELIEF_DIA_MIN == pytest.approx(spec.RELIEF_DIA + spec.RELIEF_DIA_BAND[1])
+    assert spec.RELIEF_DIA_MAX == pytest.approx(spec.RELIEF_DIA + spec.RELIEF_DIA_BAND[0])
+    assert spec.RELIEF_STRENGTH_CALLOUT == "SEATING TORQUE NECK"
+    assert drawing.RELIEF_STRENGTH_CALLOUT is spec.RELIEF_STRENGTH_CALLOUT
+    assert "\n" not in spec.RELIEF_STRENGTH_CALLOUT
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"ReliefDia": RELIEF_STRENGTH_CALLOUT,' in source
     # Under the deepest die-cut root, not just the basic one (local reviews
     # of 747487c71 and 21bb244c5): 2A PD min 0.0925 in less 0.649519 P.
     assert spec.THREAD_MINOR_2A_MIN_EST == pytest.approx(
@@ -234,10 +242,14 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert 0.0 < spec.SEAT_FLAT_ANNULUS_AREA_MIN < spec.SEAT_FLAT_ANNULUS_AREA
     assert spec.CHAMFER_CALLOUT == "X 45 DEG"
     assert drawing.CHAMFER_CALLOUT is spec.CHAMFER_CALLOUT
-    # The neck is ~73 percent of the #4-40 tensile stress area (0.00604 in^2).
-    assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * 1.9**2)
+    # Use the smallest printed neck, not the nominal/maximum: about 65 percent
+    # of the #4-40 tensile stress area (0.00604 in^2).  This is not a torque proof.
+    assert spec.RELIEF_DIA_MIN >= 1.8
+    assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * spec.RELIEF_DIA_MIN**2)
+    assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * 1.8**2)
+    assert spec.NECK_AREA < math.pi / 4.0 * spec.RELIEF_DIA**2
     assert spec.TENSILE_STRESS_AREA == pytest.approx(3.90, abs=0.01)
-    assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.728, abs=0.001)
+    assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.653, abs=0.001)
     # The lead's band is model-owned and prints as limits in its callout
     # (MHA-DT-32 re-review: at .X it could print as nothing).  The relief
     # width is routine at 2.2: at .X its straight floor past the longest lead
@@ -250,6 +262,16 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.RELIEF_FLOOR_MIN == pytest.approx(1.4 - 0.4)
     assert spec.RELIEF_FLOOR_MIN >= 1.5 * 25.4 / 40.0
     assert "ReliefLead" not in set().union(*spec.DRAWING_DIMENSIONS.values())
+
+
+@pytest.mark.parametrize("lower_deviation", [-0.2, -1.9])
+def test_printed_relief_limits_reject_a_weaker_seating_neck(lower_deviation: float) -> None:
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    previous = "RELIEF_DIA_BAND = (0.0, -0.1)"
+    assert source.count(previous) == 1
+    probe = source.replace(previous, f"RELIEF_DIA_BAND = (0.0, {lower_deviation})")
+    with pytest.raises(AssertionError, match="below the previous 1.8 minimum seating section"):
+        exec(compile(probe, spec.__file__, "exec"), {"__name__": "_thin_relief_probe"})
 
 
 def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
