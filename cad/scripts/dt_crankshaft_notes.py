@@ -21,11 +21,15 @@ from dt_crankshaft_spec import (
 # (dt_crank_hub_notes, MHA-DT-00 step 6, the same taper name).  Three rows,
 # not four: the shorter block stands higher, so the diameters under it have
 # room for their mates.
+# Rows no wider than 31 characters: the block centres on its anchor and the
+# leader leaves its left end for the hole, so a 37-character row drew the
+# leader 0.93 mm through the shaft diameter's SLIDING FIT text (layout audit,
+# farm run 20261019T025313732Z-ad1b9b18, leader-through-text).
 CROSS_HOLE_CALLOUT = "\n".join(
     (
         "AT ASSY THRU HUB MHA-DT-31",
-        f"PILOT; TAPER-REAM {CROSS_HOLE_TAPER} BOTH FOR",
-        "CRANK PIN MHA-DT-09: LIGHT DRIVE FIT",
+        f"PILOT; TAPER-REAM {CROSS_HOLE_TAPER} BOTH",
+        "FOR MHA-DT-09: LIGHT DRIVE FIT",
     )
 )
 # The hub sets where the cross-hole lands (its pilot's station from the arm

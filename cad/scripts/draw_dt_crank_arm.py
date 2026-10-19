@@ -4,7 +4,9 @@ Separate through hub MHA-DT-31 is a light press in the arm's seat bore, turned
 to suit it.  Its outboard face
 shows the simple punched alignment witness and the axial seam for MHA-DT-VN-59,
 match-drilled with the hub; the seam's callout gives its nominal size and
-depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.
+depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.  Removed section
+A-A through the seat's upper cheek shows the inboard-mouth chamfer that clears
+the hub's seat-root radius.
 The MHA-DT-09 taper-pin cross-hole belongs to the hub and shaft drawings.
 
 The sheet remains deliberately plain: no datums, feature-control frames or
@@ -24,6 +26,7 @@ import re
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -61,13 +64,17 @@ from _drawing_leaders import (
 )
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_projection import model_point_in_view
+from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
+from _section_axis import position_section_caption
 import _telemetry
 from dt_crank_arm_notes import (
+    BORE_REAR_CHAMFER_CALLOUT,
     FIDUCIAL_CALLOUT,
     HUB_SEAT_CALLOUT,
     PIVOT_TAP_ROWS,
@@ -79,6 +86,7 @@ from dt_crank_arm_spec import (
     ANCHOR_SCREW_Y,
     ARM_C2C,
     ARM_END_X,
+    ARM_THICKNESS,
     AXIAL_PIN_DIA,
     AXIAL_PIN_X,
     DRAWING_DIMENSIONS,
@@ -278,7 +286,38 @@ ANCHOR_CALLOUT_XY = (0.195, 0.205)
 # the arm's top edge, its right end left of the isometric view.
 PIVOT_CALLOUT_XY = (0.270, 0.190)
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
-DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
+
+# Removed section A-A: the cut runs up the bore axis (the vertical centre-mark
+# line) from inside the seat, 1.5 mm under its rim, to just past the top long
+# edge, so only the upper cheek is sectioned.  Stopping above the bore centre
+# keeps the cutting line off the 20.0/75.0 extension lines, which leave the
+# centre downward.  The sight runs +X, so both arrows point right into the
+# lane between the fiducial callout's box and the seam leader, and the
+# section prints the inboard face (z = 0) on the left, +Y up.  Cut face only:
+# beyond the plane the whole arm would print end-on behind the cheek.
+SECTION_SCALE = (4, 1)
+SECTION_LINE_OVERRUN = 0.003
+SECTION_LINE_INSET = 1.5  # model mm under the seat rim, in the bore
+SECTION_LINE = (
+    (
+        BORE_CENTER[0],
+        FRONT_CENTER[1]
+        + (HUB_SEAT_DIA / 2.0 - SECTION_LINE_INSET) * SHEET_SCALE[0] / 1000.0,
+    ),
+    (BORE_CENTER[0], ARM_SILHOUETTE[3] + SECTION_LINE_OVERRUN),
+)
+# The cheek's mid-point lands here: right of the side view, under the
+# isometric's note, in the open field over the title block.
+SECTION_CENTER = (0.368, 0.150)
+SECTION_ANCHOR_MM = (0.0, (HUB_SEAT_DIA / 2.0 + HALF_WIDTH) / 2.0, ARM_THICKNESS / 2.0)
+# The chamfer's leg reads under the section, its two callout rows below the
+# stacked limits, and the native A-A caption under those.
+SECTION_KEEP = {"BoreRearChamferSize": (SECTION_CENTER[0], SECTION_CENTER[1] - 0.022)}
+SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.098)
+DIMENSION_CALLOUTS = {
+    "HubSeatDia": HUB_SEAT_CALLOUT,
+    "BoreRearChamferSize": BORE_REAR_CHAMFER_CALLOUT,
+}
 
 
 def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -286,6 +325,93 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
     if len(matches) != 1:
         raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
     return matches[0]
+
+
+def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
+    return tuple(value / 1000.0 for value in point_mm)
+
+
+def _cheek_section(adapter: Any, front: Any) -> Any:
+    """Section A-A through the upper cheek (SECTION_* above), cut face only,
+    turned +Y up with the inboard face left, landed on SECTION_CENTER
+    (draw_sm_summing_lever's ``_plate_section``)."""
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=SECTION_LINE[0],
+        line_end=SECTION_LINE[1],
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=SECTION_SCALE,
+        partial=True,
+        label="hub seat cheek section",
+    )
+    native = _early_bound(section, "IView")
+    cut = _early_bound(native.GetSection(), "IDrSection")
+    # R2026x declares SetDisplayOnlySurfaceCut void; only its getter is tested.
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="section A-A cut face only")
+    if not cut.GetDisplayOnlySurfaceCut():
+        raise RuntimeError("section A-A retained geometry beyond the cutting plane")
+    set_hidden_lines_removed(adapter, native)
+    anchor = _metres(SECTION_ANCHOR_MM)
+    above = _metres(
+        (SECTION_ANCHOR_MM[0], SECTION_ANCHOR_MM[1] + 1.0, SECTION_ANCHOR_MM[2])
+    )
+    outboard = _metres((SECTION_ANCHOR_MM[0], SECTION_ANCHOR_MM[1], ARM_THICKNESS))
+
+    def turn_up(stage: str) -> None:
+        for attempt in range(3):
+            origin = model_point_in_view(adapter, native, anchor, label="A-A anchor")
+            up = model_point_in_view(adapter, native, above, label="A-A +Y")
+            dx, dy = up[0] - origin[0], up[1] - origin[1]
+            if dy > 0.0 and abs(dx) <= 1e-7:
+                return
+            native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(dy, dx)
+            rebuild_drawing(
+                adapter, label=f"section A-A turned ({stage}), pass {attempt}"
+            )
+        raise RuntimeError(f"section A-A does not run +Y up: ({dx:g}, {dy:g})")
+
+    def outboard_dx() -> float:
+        origin = model_point_in_view(adapter, native, anchor, label="A-A anchor")
+        face = model_point_in_view(adapter, native, outboard, label="A-A outboard face")
+        return face[0] - origin[0]
+
+    turn_up("as cut")
+    # +Y up with the outboard face right is the sight along +X: the arrows
+    # point right, away from the fiducial callout.
+    if outboard_dx() < 0.0:
+        reversed_cut = not bool(cut.GetReversedCutDirection())
+        cut.SetReversedCutDirection(reversed_cut)
+        rebuild_drawing(adapter, label="section A-A looks along +X")
+        if bool(cut.GetReversedCutDirection()) != reversed_cut:
+            raise RuntimeError("section A-A cut direction did not persist")
+        turn_up("reversed")
+    if not outboard_dx() > 0.0:
+        raise RuntimeError("section A-A still prints the inboard face on the right")
+    for attempt in range(4):
+        native.UpdateViewDisplayGeometry()
+        projected = model_point_in_view(
+            adapter, native, anchor, label=f"A-A centre, pass {attempt}"
+        )
+        if math.dist(projected, SECTION_CENTER) <= 1e-4:
+            break
+        position = tuple(float(value) for value in native.Position)
+        moved = [
+            position[axis] + SECTION_CENTER[axis] - projected[axis] for axis in (0, 1)
+        ]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to re-centre section A-A")
+        rebuild_drawing(adapter, label=f"section A-A re-centred, pass {attempt}")
+    else:
+        raise RuntimeError(
+            f"section A-A centre stands at {projected}, not {SECTION_CENTER}"
+        )
+    position_section_caption(
+        adapter, native, SECTION_CAPTION_XY, label="cheek section A-A"
+    )
+    return native
 
 
 def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
@@ -387,7 +513,19 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    imported_annotations = [*front_annotations, *right_annotations]
+    section = _cheek_section(adapter, front)
+    section_annotations = curate_view_dimensions(
+        adapter,
+        section,
+        keep=SECTION_KEEP,
+        view_label="section A-A",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    imported_annotations = [
+        *front_annotations,
+        *right_annotations,
+        *section_annotations,
+    ]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
     # The part authored every displayed decimal place.  The hub seat bore
     # is a one-place .X size: MHA-DT-31 is turned to suit it.

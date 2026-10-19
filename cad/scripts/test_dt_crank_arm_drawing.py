@@ -57,10 +57,14 @@ def test_axial_seam_key_is_six_oclock_and_stops_halfway_through_arm() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert arm.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.SECTION_KEEP)
     assert kept == marked
-    assert set(drawing.DIMENSION_CALLOUTS) == {"HubSeatDia"}
+    assert set(drawing.DIMENSION_CALLOUTS) == {"HubSeatDia", "BoreRearChamferSize"}
     assert drawing.DIMENSION_CALLOUTS["HubSeatDia"] == notes.HUB_SEAT_CALLOUT
+    assert (
+        drawing.DIMENSION_CALLOUTS["BoreRearChamferSize"]
+        == notes.BORE_REAR_CHAMFER_CALLOUT
+    )
     assert not hasattr(drawing, "TOP_KEEP")  # the seam callout replaced the view
 
 
@@ -95,6 +99,7 @@ def test_punch_and_seam_operations_are_callouts_not_fake_dimensions() -> None:
     seam = notes.SEAM_CALLOUT
     assert "MHA-DT-31" in seam and "MHA-DT-VN-59" in seam and "LIGHT DRIVE FIT" in seam
     assert "AT ASSEMBLY" in seam
+    assert "THREAD FOR EXTRACTION" in seam
     assert seam.splitlines()[0] == "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert all("Fiducial" not in name for name in marked)
@@ -107,7 +112,10 @@ def test_sheet_uses_imported_part_precision_and_no_gdt() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == set().union(
         *spec.DRAWING_DIMENSIONS.values()
     )
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1}
+    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
+    assert {
+        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 2
+    } == {"BoreRearChamferSize"}
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
     assert model_toleranced_dimensions(arm) == {}
     assert spec.SURFACE_FINISHES == ()
@@ -381,3 +389,121 @@ def test_arm_thickness_prints_as_a_reference_to_the_supplied_stock() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_named(adapter, right_annotations, name)" in source
     assert 'label="arm stock thickness"' in source
+
+
+# --- Inboard bore-mouth chamfer (MHA-DT-031 seat-root clearance) ------------
+
+
+def test_bore_rear_chamfer_is_the_hub_contract() -> None:
+    least, most = spec.BORE_REAR_CHAMFER_LEG
+    assert spec.BORE_REAR_CHAMFER_LEG is geometry.ARM_BORE_REAR_CHAMFER_LEG
+    # A 45-degree chamfer of leg c clears a root radius R when c >= R.
+    assert least >= geometry.SEAT_ROOT_FILLET_R
+    # Its largest leg is the arm-side break the hub's shoulder land assumes.
+    assert most == geometry.EDGE_BREAK_MAX_MM
+    # The model carries the largest leg; the LIMIT band runs down to the least.
+    assert spec.BORE_REAR_CHAMFER == most
+    assert spec.BORE_REAR_CHAMFER_TOL_TYPE == 3  # swTolType_e.swTolLIMIT
+    lower, upper = spec.BORE_REAR_CHAMFER_DEVIATIONS
+    assert upper == 0.0
+    assert spec.BORE_REAR_CHAMFER + lower == pytest.approx(least)
+    places = spec.DRAWING_PRECISION_BY_NAME["BoreRearChamferSize"]
+    assert f"{most:.{places}f}/{least:.{places}f}" == "0.25/0.10"
+
+
+def test_hub_shoulder_land_keeps_its_floor_under_the_largest_chamfer() -> None:
+    land = (
+        (geometry.HUB_BARREL_DIA_MIN - geometry.HUB_SEAT_DIA_MAX_MATCHED) / 2.0
+        - spec.BORE_REAR_CHAMFER_LEG[1]
+        - geometry.EDGE_BREAK_MAX_MM
+    )
+    assert land >= geometry.SHOULDER_LAND_WORST_MIN - 1e-9
+    assert land == pytest.approx(geometry.HUB_SHOULDER_LAND_WORST_MM)  # 0.255
+
+
+def test_bore_rear_chamfer_costs_no_wall_margin() -> None:
+    import math
+
+    from _hole_spec import THREAD_MAJOR_MM
+
+    # The cheek's worst case already takes a full title-block break off each
+    # edge, so a chamfer no larger than that break leaves it unchanged.
+    assert spec.BORE_REAR_CHAMFER <= geometry.EDGE_BREAK_MAX_MM
+    assert geometry.ARM_CHEEK_WORST_MM >= geometry.WALL_TARGET_MM
+    # The seam half-hole enters from the outboard face and stops at
+    # mid-thickness: 3.75 of solid stands between it and the chamfer.
+    seam_gap = spec.ARM_THICKNESS - spec.AXIAL_PIN_LENGTH - spec.BORE_REAR_CHAMFER
+    assert seam_gap == pytest.approx(3.75)
+    # The keeper anchor tap stands far outside the chamfer's outer edge.
+    anchor_r = math.hypot(spec.ANCHOR_SCREW_X, spec.ANCHOR_SCREW_Y)
+    chamfer_r = spec.HUB_SEAT_DIA / 2.0 + spec.BORE_REAR_CHAMFER
+    web = anchor_r - THREAD_MAJOR_MM[spec.ANCHOR_HOLE_SPEC.size] / 2.0 - chamfer_r
+    assert web > geometry.WALL_TARGET_MM
+    # The fiducial is punched in the outboard face, the far side of the bar.
+    assert spec.FIDUCIAL_MODEL_DEPTH < spec.ARM_THICKNESS - spec.BORE_REAR_CHAMFER
+
+
+def test_bore_rear_chamfer_is_modelled_on_the_inboard_face_and_marked() -> None:
+    assert spec.DRAWING_DIMENSIONS["BoreRearChamfer"] == {"BoreRearChamferSize"}
+    source = Path(arm.__file__).read_text(encoding="utf-8")
+    # The inboard face is the origin plane, z = 0; the outboard (flush) face
+    # is the HandleSeat plane at z = ARM_THICKNESS.
+    assert "[[-HUB_SEAT_DIA / 2.0, 0.0, 0.0]]" in source
+    assert 'name_last_feature(adapter, "BoreRearChamfer")' in source
+    assert source.index(
+        "apply_drawing_precision(adapter, DRAWING_PRECISION)"
+    ) < source.index("    _bore_rear_chamfer_limits(adapter)")
+
+
+def test_bore_rear_chamfer_callout_names_the_mate_from_the_contract() -> None:
+    rows = [row.strip() for row in notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()]
+    assert rows[0].startswith("X 45 DEG")
+    assert "INBOARD" in rows[0]
+    assert rows[1] == f"CLEARS MHA-DT-031 ROOT R{geometry.ROOT_FILLET_R:.1f}"
+    assert all(len(row) < 30 for row in rows)
+
+
+def test_section_a_a_stands_in_open_sheet_and_its_line_clears_the_front_view() -> None:
+    char_w = 0.0026  # measured on the U29 render
+    row_pitch = 0.0056  # the hub seat callout's row pitch on the same render
+    sx, sy = drawing.SECTION_CENTER
+    k = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1] / 1000.0
+    half_w = spec.ARM_THICKNESS / 2.0 * k  # thickness across
+    half_h = (spec.HALF_WIDTH - spec.HUB_SEAT_DIA / 2.0) / 2.0 * k  # cheek up
+    # Boxes from the last layout audit (asm-drawings 20261019T024444355Z).
+    side_view_right = 0.3136
+    iso_note_bottom = 0.1806
+    title_block_top = 0.0647
+    border_right = 0.4318 - 0.0127
+    assert sx - half_w > side_view_right + 0.02
+    assert sy + half_h < iso_note_bottom - 0.01
+    tx, ty = drawing.SECTION_KEEP["BoreRearChamferSize"]
+    widest = (
+        max(len(row) for row in notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()) * char_w
+    )
+    assert tx - widest / 2.0 > side_view_right + 0.012  # clear of (8.0)'s arrows
+    assert tx + widest / 2.0 < border_right
+    assert ty + row_pitch < sy - half_h  # the leg text stands under the cheek
+    block_bottom = ty - 3.0 * row_pitch  # stacked limits + two callout rows
+    _cx, cy = drawing.SECTION_CAPTION_XY
+    assert cy < block_bottom - 0.002
+    assert cy - 2.0 * row_pitch > title_block_top  # caption and scale rows
+    # Cutting line: up the bore axis from inside the seat, above the centre
+    # (off the station extension lines), to past the top edge.
+    (x0, y0), (x1, y1) = drawing.SECTION_LINE
+    bx, by = drawing.BORE_CENTER
+    r = spec.HUB_SEAT_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    assert x0 == x1 == bx
+    assert by < y0 < by + r
+    assert y1 > drawing.ARM_SILHOUETTE[3]
+    # The +X arrows run in the lane between the fiducial callout's box
+    # (right edge 0.0697 on the last audit) and the seam leader.
+    fiducial_right = 0.0697
+    assert fiducial_right <= bx
+    px, py = drawing.SEAM_EDGE_PICK
+    nx, ny = drawing.SEAM_CALLOUT_XY
+    seam_leader_x = px + (y1 - py) * (nx - px) / (ny - py)
+    assert seam_leader_x - bx > 0.020
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "partial=True" in source
+    assert "cut.SetDisplayOnlySurfaceCut(True)" in source

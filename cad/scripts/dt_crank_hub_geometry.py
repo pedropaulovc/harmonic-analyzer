@@ -301,6 +301,21 @@ for _wall, _label in (
 # title-block edge break wide: a flat a fitter can see and gauge the press
 # against, not a knife edge left between two chamfers.
 SHOULDER_LAND_WORST_MIN = EDGE_BREAK_MAX_MM
+# Inside corners (drawing-guidelines.md rule 16 (design for the cutter);
+# owner ruling A on #1661: a modelled root radius printed as a single-limit
+# R MAX, its model value the printed limit, and every mate's edge cleared).
+# The seat-shoulder root sits under the MHA-DT-006 rear bore mouth, so the
+# arm carries a bore-mouth chamfer whose smallest leg clears the root radius
+# (a 45-degree chamfer of leg c clears a fillet of radius R when c >= R) and
+# whose largest leg is the arm-side break the shoulder land below already
+# assumes, so the land keeps its floor.  A seat R0.3 would need an arm
+# chamfer of at least 0.3, which leaves the land 0.755 - 0.3 - 0.25 =
+# 0.205, under its 0.25 floor; seat R0.1 against a 0.1-0.25 chamfer keeps it.
+# The relief root has no mating bore mouth and retains its separately
+# approved R0.3 MAX.  Both native fillets are modelled at their own maximum.
+SEAT_ROOT_FILLET_R = 0.1
+RELIEF_ROOT_FILLET_R = 0.3
+ARM_BORE_REAR_CHAMFER_LEG = (SEAT_ROOT_FILLET_R, EDGE_BREAK_MAX_MM)  # (min, max)
 HUB_SEAT_DIA_MAX_MATCHED = HUB_SEAT_DIA_MAX_GENERAL + SEAT_PRESS_INTERFERENCE[1]
 
 
@@ -318,6 +333,17 @@ def shoulder_land(barrel_dia_min: float, seat_dia_max: float) -> float:
 HUB_SHOULDER_LAND_WORST_MM = shoulder_land(
     HUB_BARREL_DIA_MIN, HUB_SEAT_DIA_MAX_MATCHED
 )  # 0.255
+# The land with the arm's largest bore-mouth chamfer and the barrel corner's
+# largest break: the chamfer's max is the arm-side break the land assumes.
+_LAND_UNDER_ARM_CHAMFER = (
+    (HUB_BARREL_DIA_MIN - HUB_SEAT_DIA_MAX_MATCHED) / 2.0
+    - ARM_BORE_REAR_CHAMFER_LEG[1]
+    - EDGE_BREAK_MAX_MM
+)
+if _LAND_UNDER_ARM_CHAMFER < SHOULDER_LAND_WORST_MIN - 1e-9:
+    raise AssertionError("MHA-DT-006 bore-mouth chamfer eats the hub shoulder land")
+if ARM_BORE_REAR_CHAMFER_LEG[0] < SEAT_ROOT_FILLET_R:
+    raise AssertionError("MHA-DT-006 bore-mouth chamfer does not clear the seat root")
 if not HUB_BORE_DIA < RELIEF_DIA < HUB_BARREL_DIA:
     raise AssertionError("MHA-DT-31 relief is not a step between the bore and barrel")
 if SERVICE_PIN_STATION >= RELIEF_STATION:

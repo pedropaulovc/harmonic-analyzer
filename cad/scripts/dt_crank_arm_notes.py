@@ -10,6 +10,7 @@ from dt_crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX
 from dt_crank_hub_geometry import (
     AXIAL_PIN_DIA,
     AXIAL_PIN_LENGTH,
+    SEAT_ROOT_FILLET_R,
     SEAT_PRESS_INTERFERENCE,
 )
 
@@ -27,17 +28,15 @@ HUB_SEAT_CALLOUT = "\n".join(
         "INTERFERENCE; FACES FLUSH",
     )
 )
-# The MHA-DT-VN-59 seam is match-drilled with the hub at assembly; its callout
-# sits on the seam itself with the pin's nominal size and depth.  Half the
-# hole is in the hub, open toward the arm's outboard face: pressing the hub
-# out slides it off the pin, which then lifts out of the arm's half-hole --
-# the drive-fit pin's way out (#984 machinist review r1, blind-hole finding).
+# The MHA-DT-VN-59 seam is match-drilled with the hub at assembly.  The dowel's
+# axial pull thread gives it a way out of the blind seat without first
+# pressing the arm off the hub (coordinator's corrected M2 THRU ruling).
 SEAM_CALLOUT = "\n".join(
     (
         f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
         "MATCH-DRILL/REAM WITH MHA-DT-31 AT ASSEMBLY,",
         "CENTRED ON THE SEAM, FOR MHA-DT-VN-59 AXIAL PIN:",
-        "LIGHT DRIVE FIT; PRESSING MHA-DT-31 OUT FREES THE PIN",
+        "LIGHT DRIVE FIT; AXIAL THREAD FOR EXTRACTION",
     )
 )
 # The handle-pivot tap's mouth limit rides its own callout, under the native
@@ -52,3 +51,11 @@ PIVOT_TAP_ROWS = (
 # (#984 machinist review r2/r3: an unlabelled crosshair could read as an
 # undimensioned hole).
 FIDUCIAL_CALLOUT = "PUNCH FIDUCIAL MARK;\nLOCATE BY EYE"
+# The hub seat's inboard-mouth chamfer: the native leg prints its LIMIT band
+# and the model's 45 degrees rides this row.  The rows name the face (section
+# A-A shows the corner) and the mate's seat-root radius it must clear
+# (drawing-guidelines.md rule 4).  Two trailing spaces keep each row's ink off
+# the leg's overrunning extension line (draw_dt_crank_drive_gear's finding).
+BORE_REAR_CHAMFER_CALLOUT = (
+    f" X 45 DEG, INBOARD FACE  \nCLEARS MHA-DT-031 ROOT R{SEAT_ROOT_FILLET_R:.1f}  "
+)

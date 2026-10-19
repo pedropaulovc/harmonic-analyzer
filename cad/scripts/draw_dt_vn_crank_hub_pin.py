@@ -1,8 +1,8 @@
 r"""Create the curated manufacturing drawing for MHA-DT-VN-59.
 
-The pin is a plain straight gauge pin.  Its two native dimensions define the
-part; the linked assembly note defines the match-reamed light drive fit and
-six-o'clock axial installation without inventing independent receiver sizes.
+The pin is a plain straight dowel with an extraction thread tapped through its
+axis from the flush outer end. Its two native dimensions define the part;
+the end view's associative Hole Wizard callout owns the thread identity.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_reference_dimensions
+from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -34,6 +35,7 @@ from dt_vn_crank_hub_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA,
+    PULL_THREAD_TAP_DRILL,
     REFERENCE_DIMENSIONS,
 )
 
@@ -60,6 +62,12 @@ RIGHT_KEEP = {
     "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.016),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
 }
+# Outer-end view (*Front, centre FRONT_CENTER): the native callout lands on
+# the tap-drill rim at 45 deg, off the centre-mark arms. Its text sits above
+# the Ø40-sheet pin outline (top at y 0.200), left of the right-view diameter.
+_TAP_RIM = PULL_THREAD_TAP_DRILL * VIEW_SCALE[0] / 2000.0 / 2.0**0.5
+THREAD_PICK = (FRONT_CENTER[0] + _TAP_RIM, FRONT_CENTER[1] + _TAP_RIM)
+THREAD_NOTE_XY = (FRONT_CENTER[0] + 0.027, FRONT_CENTER[1] + HALF_DIA + 0.016)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -123,6 +131,13 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.004),
         label="MHA-DT-VN-59 axis centerline",
+    )
+    add_native_hole_callout(
+        adapter,
+        front,
+        edge_xy=THREAD_PICK,
+        callout_xy=THREAD_NOTE_XY,
+        label="MHA-VN-029 pull thread callout",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.082)
     return await finalize_drawing(

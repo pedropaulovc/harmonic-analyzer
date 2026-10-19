@@ -31,6 +31,7 @@ from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SurfaceFinishControl
 from dt_crank_handle_pivot_screw_spec import THREAD_SIZE as PIVOT_SCREW_THREAD_SIZE
 from dt_crank_hub_geometry import (
+    ARM_BORE_REAR_CHAMFER_LEG,
     ARM_FIDUCIAL_RADIUS,
     ARM_STOCK_THICKNESS,
     ARM_STOCK_THICKNESS_IN,
@@ -98,6 +99,19 @@ ANCHOR_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 # MHA-DT-31 is a light press in MHA-DT-06 and pinned; nothing runs in this part.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
+# Inboard mouth of the hub seat (z = 0, the face that bears on the MHA-DT-031
+# barrel shoulder; the outboard face at z = ARM_THICKNESS is flush with the
+# hub's front face).  A 45-degree chamfer whose smallest leg clears the hub's
+# seat-root radius and whose largest is the arm-side break the shoulder land
+# already assumes (dt_crank_hub_geometry).  The model carries the largest leg,
+# so the assembly's interference gate sees the narrowest land, and the leg
+# prints as a native LIMIT band from that value down to the smallest.
+BORE_REAR_CHAMFER_LEG = ARM_BORE_REAR_CHAMFER_LEG  # (min, max)
+BORE_REAR_CHAMFER = BORE_REAR_CHAMFER_LEG[1]
+# Native (lower, upper) deviations from the model value.
+BORE_REAR_CHAMFER_DEVIATIONS = (BORE_REAR_CHAMFER_LEG[0] - BORE_REAR_CHAMFER, 0.0)
+BORE_REAR_CHAMFER_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+
 # Derived spans.
 ARM_END_X = ARM_C2C + END_RADIUS
 HALF_WIDTH = ARM_WIDTH / 2.0
@@ -124,6 +138,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "AnchorOffset",
         "Width",
     },
+    "BoreRearChamfer": {"BoreRearChamferSize"},
 }
 
 # Decimal places are authored on the model.  The hub seat bore is a one-place
@@ -138,6 +153,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "AnchorOffset": 1,
         "Width": 1,
     },
+    "BoreRearChamfer": {"BoreRearChamferSize": 2},
 }
 
 _PRECISION_NAMES = [

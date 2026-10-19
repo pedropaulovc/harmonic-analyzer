@@ -59,10 +59,11 @@ def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
     """
     return "\n".join(
         (
-            f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
-            "MATCH-DRILL/REAM AT ASSY WITH",
-            f"{mate} ON THE SEAM",
-            f"FOR {pin}: LIGHT DRIVE FIT",
+            f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}, "
+            "MATCH-DRILL/REAM AT ASSY",
+            f"WITH {mate} ON THE SEAM",
+            f"FOR {pin}:",
+            "LIGHT DRIVE FIT",
         )
     )
 
@@ -77,7 +78,9 @@ BORE_CALLOUT = (
 # The arm bore is made first and carries the band; this seat is turned to fit
 # it, so its nominal prints as a reference under the match-fit callout.
 SEAT_CALLOUT = seat_callout("CRANK ARM", "MHA-DT-06")
-SEAM_CALLOUT = seam_callout("CRANK ARM MHA-DT-06", pin="DOWEL MHA-DT-VN-59")
+# The seam is blind in the hub, so the dowel names its pull thread: the way
+# it comes out (machinist review r2b of 383c31baa, rule 16).
+SEAM_CALLOUT = seam_callout("CRANK ARM MHA-DT-06", pin="PULL-THREAD DOWEL MHA-DT-VN-59")
 # The cross-hole: this hub is drilled alone with its #14 pilot (the native
 # size and its station from the arm shoulder).  The shaft is NOT drilled
 # alone (#1678): drilled separately, the shaft's .X station and the hub's own

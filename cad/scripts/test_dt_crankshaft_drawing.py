@@ -285,6 +285,9 @@ def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
     assert "MHA-DT-31" in callout
     assert "MHA-DT-09" in callout
     assert "MHA-DT-06" not in callout
+    # The leader leaves the block's left end: a wider row moves it into the
+    # SLIDING FIT text below-left (farm run 20261019T025313732Z-ad1b9b18).
+    assert max(len(row) for row in callout.splitlines()) <= 31
 
 
 def test_shaft_end_fiducial_is_a_simple_punch_not_a_dimensioned_dimple() -> None:

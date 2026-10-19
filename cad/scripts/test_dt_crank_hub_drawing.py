@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -273,9 +274,12 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert "LIGHT DRIVE FIT" in seam
     assert "AT ASSY" in seam and "SEAM" in seam
     # Size first, then the process, in the order the work is done.
-    assert dt_crank_hub_notes.SEAM_CALLOUT.splitlines()[0] == (
-        "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
+    assert dt_crank_hub_notes.SEAM_CALLOUT.splitlines()[0].startswith(
+        "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0, MATCH-DRILL/REAM"
     )
+    # Blind in the hub: the dowel's pull thread is how it comes out
+    # (machinist review r2b of 383c31baa).
+    assert "PULL-THREAD DOWEL MHA-VN-029" in seam
     assert "O'CLOCK" not in seam
     # The taper-pin cross-hole names both mates, by name and number, and the
     # fit on its callout; the front face it is drilled at carries its own note.
@@ -396,6 +400,12 @@ def test_seam_callout_attaches_to_the_hub_seam_clear_of_the_bore_callout() -> No
     assert 0.0 < drawing.SEAM_CALLOUT_XY[0] - cx < 0.010
     bore_block_bottom = drawing.END_KEEP["BoreDia"][1] - 3 * 0.006
     assert drawing.SEAM_CALLOUT_XY[1] < bore_block_bottom
+    # Its widest row (tokens print one glyph each) ends inside the border.
+    widest = max(
+        len(row.replace("<MOD-DIAM>", "D").replace("<HOLE-DEPTH>", "D"))
+        for row in dt_crank_hub_notes.SEAM_CALLOUT.splitlines()
+    )
+    assert drawing.SEAM_CALLOUT_XY[0] + widest * 0.00267 < 0.412
     assert drawing.END_KEEP["BoreDia"][0] > drawing.END_CENTER[0]
 
 
@@ -476,6 +486,264 @@ def test_front_face_note_lands_on_the_front_face_clear_of_its_neighbours() -> No
     assert top < drawing._sheet_y(geometry.HUB_SEAT_DIA / 2.0) - 0.002
     assert top < cy - geometry.HUB_BARREL_DIA / 2.0 * drawing._S - 0.002
     assert right < min(drawing.SEAM_CALLOUT_XY[0], drawing.SEAM_EDGE_PICK[0]) - 0.004
+
+
+@pytest.mark.parametrize(
+    "feature, name, radius_name, band_name, expected_max",
+    [
+        ("SeatRootFillet", "SeatRootRadius", "SEAT_ROOT_FILLET_R", "SEAT_ROOT_FILLET_BAND", 0.1),
+        (
+            "ReliefRootFillet",
+            "ReliefRootRadius",
+            "RELIEF_ROOT_FILLET_R",
+            "RELIEF_ROOT_FILLET_BAND",
+            0.3,
+        ),
+    ],
+)
+def test_inside_corners_carry_their_own_approved_native_max_limits(
+    feature: str, name: str, radius_name: str, band_name: str, expected_max: float
+) -> None:
+    radius = getattr(geometry, radius_name)
+    assert radius == expected_max
+    assert getattr(dt_crank_hub_spec, band_name) == (0.0, -radius)
+    assert dt_crank_hub_spec.ROOT_FILLET_TOL_TYPE == 6  # swTolMAX
+    assert dt_crank_hub_spec.DRAWING_DIMENSIONS[feature] == {name}
+    assert dt_crank_hub_spec.DRAWING_PRECISION[feature] == {name: 1}
+    assert name in drawing.SIDE_KEEP and name not in drawing.END_KEEP
+    source = Path(drawing.__file__).with_name("build_dt_crank_hub.py").read_text(
+        encoding="utf-8"
+    )
+    assert f'name_last_feature(adapter, "{feature}")' in source
+    assert f'name_dimensions(adapter, "{feature}", ["{name}"])' in source
+    assert f'("{name}", {radius_name})' in source
+    assert f', \'"{name}"\'))' in source
+    # A single-edge feature must use that root's own radius, not a common
+    # smaller tool nose applied to both shoulders.
+    root = "seat" if name == "SeatRootRadius" else "relief"
+    creation = source.split(f'"fillet hub {root} root"', 1)[1].split(
+        "propagate=False", 1
+    )[0]
+    assert f"adapter.add_fillet(\n            {radius_name}," in creation
+    pick = (
+        "[[0.0, HUB_SEAT_LENGTH, -SEAT_R]]"
+        if root == "seat"
+        else "[[0.0, RELIEF_STATION, -RELIEF_R]]"
+    )
+    assert pick in creation
+
+
+def test_arm_bore_chamfer_clears_the_seat_root_and_preserves_shoulder_land() -> None:
+    # The seat's clearance controls the matched arm mouth; the larger relief
+    # radius has no mating bore mouth and must not enlarge this chamfer.
+    assert geometry.SEAT_ROOT_FILLET_R < geometry.RELIEF_ROOT_FILLET_R
+    chamfer_min, chamfer_max = geometry.ARM_BORE_REAR_CHAMFER_LEG
+    assert chamfer_min >= geometry.SEAT_ROOT_FILLET_R
+    assert chamfer_max == geometry.EDGE_BREAK_MAX_MM
+    step = (geometry.HUB_BARREL_DIA_MIN - geometry.HUB_SEAT_DIA_MAX_MATCHED) / 2.0
+    land = step - chamfer_max - geometry.EDGE_BREAK_MAX_MM
+    assert land >= geometry.SHOULDER_LAND_WORST_MIN - 1e-9
+    assert geometry.ARM_BORE_REAR_CHAMFER_LEG == (0.1, geometry.EDGE_BREAK_MAX_MM)
+    # Charging the relief's larger radius to the arm would eat the land.
+    assert (
+        step - geometry.RELIEF_ROOT_FILLET_R - geometry.EDGE_BREAK_MAX_MM
+        < geometry.SHOULDER_LAND_WORST_MIN
+    )
+
+
+def test_seat_root_radius_text_clears_the_barrel_corner_and_the_seat_diameter() -> None:
+    char_w = 0.00267
+    text = f"R{geometry.SEAT_ROOT_FILLET_R:.1f} MAX"
+    cx, cy = drawing.SEAT_ROOT_RADIUS_TEXT_XY
+    left = cx - len(text) * char_w / 2.0
+    right = cx + len(text) * char_w / 2.0
+    corner_x, corner_y = drawing.SEAT_ROOT_CORNER
+    assert corner_y == pytest.approx(drawing._sheet_y(-geometry.HUB_SEAT_DIA / 2.0))
+    # The leader from the text's left end to the arc rises no steeper than
+    # the cap, so it passes the barrel's top front corner on its right.
+    slope = (cy - corner_y) / (left - corner_x)
+    assert 0.0 < slope <= drawing.SEAT_ROOT_LEADER_MAX_SLOPE
+    barrel_corner_rise = drawing.BARREL_TOP - corner_y
+    assert barrel_corner_rise / slope >= 0.0015
+    # The text clears the barrel top and stands under the cross-hole block,
+    # right of the cross-hole leader and left of the seat diameter's line.
+    assert cy - 0.00175 - drawing.BARREL_TOP >= 0.005
+    assert left > drawing.SERVICE_PIN_TOP_RIM[0] + 0.010
+    assert drawing.SIDE_KEEP["SeatDia"][0] - right >= 0.004
+
+
+def test_relief_root_radius_has_its_own_clear_native_annotation_lane() -> None:
+    char_w = 0.00267
+    text = f"R{geometry.RELIEF_ROOT_FILLET_R:.1f} MAX"
+    cx, cy = drawing.RELIEF_ROOT_RADIUS_TEXT_XY
+    left = cx - len(text) * char_w / 2.0
+    right = cx + len(text) * char_w / 2.0
+    corner_x, corner_y = drawing.RELIEF_ROOT_CORNER
+    assert corner_x == drawing.RELIEF_X
+    assert corner_y == drawing._sheet_y(-geometry.RELIEF_DIA / 2.0)
+    # Text above both diameter extension lines, left of the relief's end face;
+    # its leader enters from the open left side, not through the barrel.
+    assert cy - 0.00175 >= drawing.BARREL_TOP + 0.002
+    assert right <= drawing.INBOARD_X - 0.001
+    slope = (cy - corner_y) / (corner_x - right)
+    assert slope > 0.0
+    assert (drawing.BARREL_TOP - corner_y) / slope >= 0.0015
+    # Native audit 20261019T025313732Z-ad1b9b1828584f61b9685592171681c4:
+    # the cross-hole block's underline is Y210.8608 and its leader stays
+    # right of X187.5809 above the barrel.  Leave 2 mm to both.
+    assert cy + 0.00175 <= 0.2108608 - 0.002
+    assert max(right, corner_x) <= 0.1875809 - 0.002
+    # Neither diameter's vertical dimension line can meet this radius leader.
+    assert right > max(
+        drawing.SIDE_KEEP["BarrelDia"][0], drawing.SIDE_KEEP["ReliefDia"][0]
+    ) + 0.002
+    assert left > drawing.SIDE_KEEP["BarrelDia"][0] + 0.002
+
+
+class _RootTolerance:
+    interface = "IDimensionTolerance"
+
+    def __init__(self) -> None:
+        self.Type = 0
+        self.lower = 0.0
+        self.upper = 0.0
+
+    def SetValues(self, lower: float, upper: float) -> bool:
+        self.lower, self.upper = lower, upper
+        return True
+
+    def GetMinValue(self) -> float:
+        return self.lower
+
+    def GetMaxValue(self) -> float:
+        return self.upper
+
+
+def _bind_root_native(value, interface: str):
+    assert value.interface == interface
+    return value
+
+
+@pytest.mark.parametrize(
+    "feature, name, radius, band",
+    [
+        ("SeatRootFillet", "SeatRootRadius", 0.1, dt_crank_hub_spec.SEAT_ROOT_FILLET_BAND),
+        ("ReliefRootFillet", "ReliefRootRadius", 0.3, dt_crank_hub_spec.RELIEF_ROOT_FILLET_BAND),
+    ],
+)
+def test_each_native_root_max_is_authored_and_read_back_independently(
+    monkeypatch, feature: str, name: str, radius: float, band: tuple[float, float]
+) -> None:
+    import build_dt_crank_hub as part
+
+    tolerance = _RootTolerance()
+    dimension = SimpleNamespace(SystemValue=radius / 1000.0, Tolerance=tolerance)
+
+    def named_dimension(_adapter, actual_feature, actual_name):
+        assert (actual_feature, actual_name) == (feature, name)
+        return None, dimension
+
+    monkeypatch.setattr(part, "_named_dimension", named_dimension)
+    monkeypatch.setattr(part, "_early_bound", _bind_root_native)
+    part._root_fillet_max_limit(None, feature, name, radius, band)
+    assert tolerance.Type == 6
+    assert (tolerance.lower, tolerance.upper) == pytest.approx((-radius / 1000.0, 0.0))
+    dimension.SystemValue += 0.0001
+    with pytest.raises(RuntimeError, match="is not the band's max"):
+        part._root_fillet_max_limit(None, feature, name, radius, band)
+    dimension.SystemValue = radius / 1000.0
+    monkeypatch.setattr(tolerance, "GetMaxValue", lambda: 0.0001)
+    with pytest.raises(RuntimeError, match="MAX-limit tolerance readback changed"):
+        part._root_fillet_max_limit(None, feature, name, radius, band)
+
+
+def test_root_fillet_volume_charges_each_roots_actual_radius() -> None:
+    import build_dt_crank_hub as part
+
+    # Integrate the corner spandrel's area and first moment about the smaller
+    # step, independently of the builder's centroid expression.
+    expected = 2.0 * math.pi * sum(
+        step * radius**2 * (1.0 - math.pi / 4.0)
+        + radius**3 * (5.0 / 6.0 - math.pi / 4.0)
+        for step, radius in (
+            (geometry.HUB_SEAT_DIA / 2.0, geometry.SEAT_ROOT_FILLET_R),
+            (geometry.RELIEF_DIA / 2.0, geometry.RELIEF_ROOT_FILLET_R),
+        )
+    )
+    assert part.V_ROOT_FILLETS == pytest.approx(expected)
+
+
+@pytest.fixture
+def native_root_annotations(monkeypatch):
+    annotations = []
+    for name, radius in (("SeatRootRadius", 0.1), ("ReliefRootRadius", 0.3)):
+        tolerance = _RootTolerance()
+        tolerance.Type = 6
+        tolerance.SetValues(-radius / 1000.0, 0.0)
+        dimension = SimpleNamespace(
+            interface="IDimension", SystemValue=radius / 1000.0, Tolerance=tolerance
+        )
+        display = SimpleNamespace(
+            interface="IDisplayDimension",
+            Diametric=False,
+            ArcExtensionLineOrOppositeSide=True,
+            GetDimension2=lambda _index, dimension=dimension: dimension,
+            GetText=lambda _part: "",
+        )
+        annotations.append(
+            SimpleNamespace(
+                interface="IAnnotation",
+                name=name,
+                GetSpecificAnnotation=lambda display=display: display,
+            )
+        )
+    monkeypatch.setattr(drawing, "_early_bound", _bind_root_native)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann.name)
+    return annotations
+
+
+def test_both_native_root_imports_keep_max_limits_and_stop_their_leaders(
+    native_root_annotations,
+) -> None:
+    drawing._dress_root_radii(None, native_root_annotations)
+    assert all(
+        not ann.GetSpecificAnnotation().ArcExtensionLineOrOppositeSide
+        for ann in native_root_annotations
+    )
+
+
+@pytest.mark.parametrize("name", ["SeatRootRadius", "ReliefRootRadius"])
+@pytest.mark.parametrize(
+    "fault, message",
+    [
+        ("missing", "must import one"),
+        ("duplicate", "must import one"),
+        ("nominal", "does not measure its root fillet"),
+        ("type", "lost its native MAX type"),
+        ("limit", "MAX-limit tolerance readback changed"),
+        ("prefix", "unexpected quantity prefix"),
+    ],
+)
+def test_neither_native_root_import_can_be_missing_or_misrepresented(
+    native_root_annotations, name: str, fault: str, message: str
+) -> None:
+    annotation = next(ann for ann in native_root_annotations if ann.name == name)
+    display = annotation.GetSpecificAnnotation()
+    dimension = display.GetDimension2(0)
+    if fault == "missing":
+        native_root_annotations.remove(annotation)
+    elif fault == "duplicate":
+        native_root_annotations.append(annotation)
+    elif fault == "nominal":
+        dimension.SystemValue += 0.0001
+    elif fault == "type":
+        dimension.Tolerance.Type = 4
+    elif fault == "limit":
+        dimension.Tolerance.lower -= 0.0001
+    else:
+        display.GetText = lambda _part: "QTY "
+    with pytest.raises(RuntimeError, match=message):
+        drawing._dress_root_radii(None, native_root_annotations)
 
 
 def test_callouts_stand_clear_of_views_and_each_other() -> None:

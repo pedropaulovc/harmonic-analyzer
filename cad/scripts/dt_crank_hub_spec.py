@@ -20,6 +20,8 @@ from dt_crank_hub_geometry import (
     RELIEF_LENGTH,
     RELIEF_LENGTH_TOL,
     RELIEF_STATION,
+    RELIEF_ROOT_FILLET_R,
+    SEAT_ROOT_FILLET_R,
     SERVICE_PIN_FROM_SHOULDER,
     SERVICE_PIN_STATION,
     SHAFT_CLEARANCE_MAX,
@@ -43,6 +45,19 @@ if abs(HUB_SEAT_LENGTH + HUB_BARREL_LENGTH - RELIEF_STATION) > 1e-9:
     raise AssertionError("barrel does not end at the relief shoulder")
 if abs(RELIEF_STATION + RELIEF_LENGTH - HUB_LENGTH) > 1e-9:
     raise AssertionError("relief does not end at the hub rear face")
+# The two inside corners have different approved limits.  The native model
+# values are those maxima; swTolMAX prints an associative radius at each root.
+SEAT_ROOT_FILLET_BAND = (0.0, -SEAT_ROOT_FILLET_R)
+RELIEF_ROOT_FILLET_BAND = (0.0, -RELIEF_ROOT_FILLET_R)
+ROOT_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX
+ROOT_FILLET_PLACES = 1
+for _radius in (SEAT_ROOT_FILLET_R, RELIEF_ROOT_FILLET_R):
+    if round(_radius, ROOT_FILLET_PLACES) != _radius:
+        raise AssertionError("root fillet MAX does not print at its places")
+if RELIEF_DIA / 2.0 + RELIEF_ROOT_FILLET_R >= HUB_BARREL_DIA / 2.0:
+    raise AssertionError("relief root fillet runs off the barrel's rear shoulder")
+if HUB_SEAT_DIA / 2.0 + SEAT_ROOT_FILLET_R >= HUB_BARREL_DIA / 2.0:
+    raise AssertionError("seat root fillet runs off the arm shoulder")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HubProfile": {
@@ -55,6 +70,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "BoreProfile": {"BoreDia"},
     "ServicePinStationReference": {"ServicePinFromShoulder"},
+    "SeatRootFillet": {"SeatRootRadius"},
+    "ReliefRootFillet": {"ReliefRootRadius"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubProfile": {
@@ -79,6 +96,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     # Two places: the .XX band is what keeps the MHA-DT-09 ream's ligament to
     # the arm shoulder at 2.1 mm (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
     "ServicePinStationReference": {"ServicePinFromShoulder": 2},
+    "SeatRootFillet": {"SeatRootRadius": ROOT_FILLET_PLACES},
+    "ReliefRootFillet": {"ReliefRootRadius": ROOT_FILLET_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

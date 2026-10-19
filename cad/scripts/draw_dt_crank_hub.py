@@ -7,7 +7,11 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
 from _check import check
 from _com import _early_bound
@@ -30,6 +34,7 @@ from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm, drill_process
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
@@ -55,7 +60,13 @@ from dt_crank_hub_spec import (
     HUB_SEAT_DIA,
     HUB_SEAT_LENGTH,
     REFERENCE_DIMENSIONS,
+    RELIEF_DIA,
     RELIEF_STATION,
+    RELIEF_ROOT_FILLET_BAND,
+    RELIEF_ROOT_FILLET_R,
+    ROOT_FILLET_TOL_TYPE,
+    SEAT_ROOT_FILLET_BAND,
+    SEAT_ROOT_FILLET_R,
     SERVICE_PIN_HOLE_SPEC,
     SERVICE_PIN_STATION,
 )
@@ -132,7 +143,12 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   so its extension lines strike no text.
 # - Relief and barrel diameters: left of the inboard end, the relief nearer.
 #   Seat diameter: between the profile and the end view, its value and
-#   light-press callout above.
+#   light-press callout above; its line stands 25 mm right of the front face
+#   so the root radius fits between it and the arm shoulder.
+# - Seat root R0.1 MAX: above/right of the seat root, in its open corner.
+#   Relief root R0.3 MAX: above/left of the relief root, above the diameter
+#   extension lines and below the cross-hole callout.  Its leader may cross
+#   the barrel's extension line (rule 14), never a dimension line or text.
 # - Cross-hole callout: above the barrel, its leader rising almost straight
 #   from the hole's top rim, clear of the barrel diameter's extension lines.
 # - Bore callout: right of the end view, its leader entering the bore from the
@@ -140,6 +156,23 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 # - Front-face note: under the seat diameter's lower extension line, between
 #   the overall's front extension line and the end view; its leader lands on
 #   the front face in the end view, which looks at it.
+# The seat root's arc prints at the arm shoulder's top corner, the barrel's
+# top front corner 2.85 mm right above it.  The seat radius's text centres on
+# its keep point (~2.67 mm a character, 3.5 mm high), and its leader runs
+# from the text's left end down to the arc no steeper than
+# SEAT_ROOT_LEADER_MAX_SLOPE (rise over run), so it passes that barrel corner
+# 1.6 mm or more to its right; the text's right end stays clear of the seat
+# diameter's line.
+SEAT_ROOT_CORNER = (SHOULDER_X, _sheet_y(-HUB_SEAT_DIA / 2.0))
+SEAT_ROOT_LEADER_MAX_SLOPE = 1.8
+SEAT_ROOT_RADIUS_TEXT_XY = (SHOULDER_X + 0.0215, SEAT_ROOT_CORNER[1] + 0.0115)
+# Historical native audit 20261019T025313732Z-ad1b9b1828584f61b9685592171681c4:
+# barrel upper extension Y182.25 mm, cross-hole block bottom Y210.86 mm;
+# its sloping leader stays right of X187.58 mm above the barrel.  Put the
+# relief's text in that clear upper-left lane (X162.5/Y196.5 mm), with its
+# leader approaching the root from the left, away from the barrel.
+RELIEF_ROOT_CORNER = (RELIEF_X, _sheet_y(-RELIEF_DIA / 2.0))
+RELIEF_ROOT_RADIUS_TEXT_XY = (RELIEF_X - 0.020, BARREL_TOP + 0.01425)
 _SEAT_ROW_Y = 0.130
 _STATION_ROW_Y = 0.120
 _RELIEF_ROW_Y = 0.128
@@ -177,7 +210,9 @@ SIDE_KEEP = {
     "ReliefLength": (INBOARD_X - 0.030, _RELIEF_ROW_Y),
     "ReliefDia": (INBOARD_X - 0.012, SIDE_CENTER[1]),
     "BarrelDia": (INBOARD_X - 0.034, SIDE_CENTER[1]),
-    "SeatDia": (OUTBOARD_X + 0.020, 0.225),
+    "SeatDia": (OUTBOARD_X + 0.025, 0.225),
+    "SeatRootRadius": SEAT_ROOT_RADIUS_TEXT_XY,
+    "ReliefRootRadius": RELIEF_ROOT_RADIUS_TEXT_XY,
 }
 # Centred so the block's right end, where the leader leaves for the hole's
 # top rim, stays left of the rim with the three prose rows' width.
@@ -203,6 +238,48 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
     applied = str(display.GetText(4) or "")
     if applied.replace("\r", "") != text:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
+
+
+def _dress_root_radii(adapter: Any, annotations: list[Any]) -> None:
+    """Prove both associative imports retain their own native R MAX limits."""
+    for name, radius_mm, band in (
+        ("SeatRootRadius", SEAT_ROOT_FILLET_R, SEAT_ROOT_FILLET_BAND),
+        ("ReliefRootRadius", RELIEF_ROOT_FILLET_R, RELIEF_ROOT_FILLET_BAND),
+    ):
+        found = [ann for ann in annotations if dimension_name(adapter, ann) == name]
+        if len(found) != 1:
+            raise RuntimeError(
+                f"the side view must import one {name}, found {len(found)}"
+            )
+        annotation = _early_bound(found[0], "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        if bool(display.Diametric):
+            raise RuntimeError(f"the imported {name} is not radial")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        if int(tolerance.Type) != ROOT_FILLET_TOL_TYPE:
+            raise RuntimeError(
+                f"{name} lost its native MAX type: {int(tolerance.Type)}"
+            )
+        if not math.isclose(
+            float(dimension.SystemValue), radius_mm / 1000.0, abs_tol=1e-9
+        ):
+            raise RuntimeError(f"{name} does not measure its root fillet")
+        lower, upper = deviations(band)
+        if not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        ) or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        ):
+            raise RuntimeError(f"{name}: MAX-limit tolerance readback changed")
+        if str(display.GetText(1) or ""):
+            raise RuntimeError(f"{name} has an unexpected quantity prefix")
+        display.ArcExtensionLineOrOppositeSide = False
+        if bool(display.ArcExtensionLineOrOppositeSide):
+            raise RuntimeError(f"{name} leader still runs to the opposite side")
+        _telemetry.info(
+            f"{name}: text {display.GetText(1)!r}{display.GetText(2)!r}, MAX type"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -277,6 +354,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
+    _dress_root_radii(adapter, right_annotations)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to crank-hub end view")

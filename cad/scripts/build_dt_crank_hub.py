@@ -36,7 +36,7 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _features import lens_area
@@ -71,6 +71,12 @@ from dt_crank_hub_spec import (
     RELIEF_LENGTH,
     RELIEF_LENGTH_TOL,
     RELIEF_STATION,
+    RELIEF_ROOT_FILLET_BAND,
+    RELIEF_ROOT_FILLET_R,
+    ROOT_FILLET_PLACES,
+    ROOT_FILLET_TOL_TYPE,
+    SEAT_ROOT_FILLET_BAND,
+    SEAT_ROOT_FILLET_R,
 )
 
 
@@ -88,11 +94,64 @@ V_BODY = math.pi * (
 )
 V_BORE = math.pi * BORE_R**2 * HUB_LENGTH
 V_SEAM_GROOVE = lens_area(PIN_R, SEAT_R) * AXIAL_PIN_LENGTH
+# Pappus: each root's corner spandrel r^2 (1 - pi/4), its centroid
+# r (10 - 3 pi) / (3 (4 - pi)) out from the smaller step's surface, revolved
+# about the hub axis (build_pn_pen_rod's shoulder root).
+V_ROOT_FILLETS = sum(
+    2.0
+    * math.pi
+    * (step_radius + fillet_radius * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi)))
+    * fillet_radius**2
+    * (1.0 - math.pi / 4.0)
+    for step_radius, fillet_radius in (
+        (SEAT_R, SEAT_ROOT_FILLET_R),
+        (RELIEF_R, RELIEF_ROOT_FILLET_R),
+    )
+)
 
 
 async def _volume(adapter) -> float:
     result = await adapter.get_mass_properties()
     return result.data.volume if result.is_success else float("nan")
+
+
+def _root_fillet_max_limit(
+    adapter,
+    feature: str,
+    name: str,
+    radius_mm: float,
+    band: tuple[float, float],
+) -> None:
+    """Author and read back one root's native MAX single limit.
+
+    Reuses build_pn_pen_rod._shoulder_fillet_max_limit's recipe independently
+    for the seat and relief; the model value must be the printed maximum.
+    """
+    lower, upper = deviations(band)
+    _, dimension = _named_dimension(adapter, feature, name)
+    label = f"{name}@{feature}"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, radius_mm / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {radius_mm}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = ROOT_FILLET_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != ROOT_FILLET_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(
+        f"{label}: single limit {radius_mm:.{ROOT_FILLET_PLACES}f} MAX"
+    )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -114,6 +173,8 @@ async def build(adapter) -> dict[str, str]:
         ("ServicePinFromShoulder", SERVICE_PIN_FROM_SHOULDER),
         ("AxialPinDia", AXIAL_PIN_DIA),
         ("AxialPinLength", AXIAL_PIN_LENGTH),
+        ("SeatRootRadius", SEAT_ROOT_FILLET_R),
+        ("ReliefRootRadius", RELIEF_ROOT_FILLET_R),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -257,6 +318,39 @@ async def build(adapter) -> dict[str, str]:
         V_BODY - V_BORE - V_SEAM_GROOVE,
         max(0.5, 0.02 * V_SEAM_GROOVE),
     )
+    # Each inside corner has its own approved R MAX: the seat root under the
+    # MHA-DT-06 bore-mouth chamfer, and the larger, unmated relief root.
+    # Each is a full circular edge, picked at local -Z: clear of the
+    # six-o'clock seam groove (+Z, front 4 mm only), the MHA-DT-09 pilot
+    # (along X), and the Front-plane sketch the revolve swept from.
+    check(
+        "fillet hub seat root",
+        await adapter.add_fillet(
+            SEAT_ROOT_FILLET_R,
+            [[0.0, HUB_SEAT_LENGTH, -SEAT_R]],
+            propagate=False,
+        ),
+    )
+    name_last_feature(adapter, "SeatRootFillet")
+    seat_root_dim = name_dimensions(adapter, "SeatRootFillet", ["SeatRootRadius"])
+    drive_jobs.append((seat_root_dim[0], '"SeatRootRadius"'))
+    check(
+        "fillet hub relief root",
+        await adapter.add_fillet(
+            RELIEF_ROOT_FILLET_R,
+            [[0.0, RELIEF_STATION, -RELIEF_R]],
+            propagate=False,
+        ),
+    )
+    name_last_feature(adapter, "ReliefRootFillet")
+    relief_root_dim = name_dimensions(adapter, "ReliefRootFillet", ["ReliefRootRadius"])
+    drive_jobs.append((relief_root_dim[0], '"ReliefRootRadius"'))
+    await volume_check(
+        adapter,
+        "hub root fillets",
+        V_BODY - V_BORE - V_SEAM_GROOVE + V_ROOT_FILLETS,
+        max(0.5, 0.02 * V_SEAM_GROOVE),
+    )
     # Inboard shoulder and the plane locating the MHA-DT-09 match-ream station.
     # The plane offset is not printable through a drawing view (targeted import
     # selects sketches/body features); it is driven from the same two globals
@@ -373,6 +467,16 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(
         adapter, "HubProfile", "ReliefLength", RELIEF_LENGTH_TOL
+    )
+    _root_fillet_max_limit(
+        adapter, "SeatRootFillet", "SeatRootRadius", SEAT_ROOT_FILLET_R, SEAT_ROOT_FILLET_BAND
+    )
+    _root_fillet_max_limit(
+        adapter,
+        "ReliefRootFillet",
+        "ReliefRootRadius",
+        RELIEF_ROOT_FILLET_R,
+        RELIEF_ROOT_FILLET_BAND,
     )
     await volume_check(adapter, "driven crank hub", final_volume, 0.001 * final_volume)
     # Both datum planes stay selectable by name for the drive-train mates.
