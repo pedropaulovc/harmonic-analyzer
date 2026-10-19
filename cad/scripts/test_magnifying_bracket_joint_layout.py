@@ -39,6 +39,7 @@ def test_part_recipe_seat_literals_match_the_live_installation() -> None:
         names = {Path(path).stem for path in module_deps_of(SCRIPTS_DIR / script)}
         assert "magnifying_bracket_joint_layout" in names
         assert "dt_cone_pivot_post_installation" not in names
+        assert "_cone_axis_constants" not in names
         assert "build_mg_magnifier_assembly" not in names
     # Do not re-key unrelated knife mounts/anchors when the bracket changes.
     names = {Path(path).stem for path in module_deps_of(SCRIPTS_DIR / "sm_summing_lever_spec.py")}

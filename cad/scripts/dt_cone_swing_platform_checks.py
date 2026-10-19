@@ -115,8 +115,6 @@ def _edge_normal_distance(
     )
 
 
-
-
 _HOLDDOWN_XZ = (HOLDDOWN_LOCAL_X, HOLDDOWN_LOCAL_Z)
 _SOUTH_Z = NORTH_OVERHANG - PLATE_LEN
 HOLDDOWN_WEBS = {
@@ -174,12 +172,14 @@ def seated_pivot_axis_offset_terms_mm() -> dict[str, float]:
     return {
         "pivot thread radial fit": clearance / 2.0,
         "pivot thread extrapolation": (
-            pivot_stock.THREAD_TAIL_LEN * clearance
+            pivot_stock.THREAD_TAIL_LEN
+            * clearance
             / pivot_stock.MIN_USEFUL_ENGAGEMENT_MM
         ),
         "connected shoulder/thread offset": (
             pivot_stock.SHOULDER_DIA + pivot_stock.THREAD_MAJOR_MAX_MM
-        ) / 2.0,
+        )
+        / 2.0,
     }
 
 
@@ -202,8 +202,13 @@ def manufactured_p1_stop_enclosure() -> dict:
     edge_break = max(float(edge["radius_mm"]), float(edge["chamfer_max_mm"]))
     core_height = stop_stock.UNSLOTTED_HEAD_HEIGHT_MIN_MM
     contact_height = (edge_break + core_height) / 2.0
-    if not edge_break < contact_height < min(
-        core_height, PLATE_T - PLATE_STOCK_BAND - edge_break,
+    if (
+        not edge_break
+        < contact_height
+        < min(
+            core_height,
+            PLATE_T - PLATE_STOCK_BAND - edge_break,
+        )
     ):
         raise ValueError("seated stop has no positive unbroken plate/head height")
     # Half of the guaranteed underside bearing radius is safely within the
@@ -211,8 +216,10 @@ def manufactured_p1_stop_enclosure() -> dict:
     core_radius = stop_stock.HEAD_BEARING_RADIUS_MIN_MM / 2.0
     clearance = STOP_INTERNAL_PITCH_MAX_MM - stop_stock.EXTERNAL_PITCH_DIA_MIN_MM
     pivot_fit = (
-        PIVOT_HOLE_DIA + _DRILL_OVERSIZE_MM
-        - pivot_stock.SHOULDER_DIA - pivot_stock.SHOULDER_DIA_BAND[1]
+        PIVOT_HOLE_DIA
+        + _DRILL_OVERSIZE_MM
+        - pivot_stock.SHOULDER_DIA
+        - pivot_stock.SHOULDER_DIA_BAND[1]
     ) / 2.0
     terms = {
         "base stop and pivot coordinate errors": 2.0 * math.sqrt(2.0) * _GENERAL_2PL_MM,
@@ -224,11 +231,13 @@ def manufactured_p1_stop_enclosure() -> dict:
         ),
         "connected head/thread offset": (
             stop_stock.HEAD_DIA_MAX_MM + stop_stock.THREAD_MAJOR_MAX_MM
-        ) / 2.0,
+        )
+        / 2.0,
     }
     uncertainty = sum(terms.values())
     hardware = swing_hardware_geometry(
-        (0.0, 0.0), lock_head_dia=LOCK_HEAD_DIA,
+        (0.0, 0.0),
+        lock_head_dia=LOCK_HEAD_DIA,
         stop_contact_dia=stop_stock.CONTACT_DIA,
     )
     # Vertices have X +/-g, north Z +/-g, and south Z +/-2g because
@@ -246,7 +255,9 @@ def manufactured_p1_stop_enclosure() -> dict:
         margins = {}
         for i, a in enumerate(corners):
             b = corners[(i + 1) % len(corners)]
-            cross = (b[0] - a[0]) * (point[1] - a[1]) - (b[1] - a[1]) * (point[0] - a[0])
+            cross = (b[0] - a[0]) * (point[1] - a[1]) - (b[1] - a[1]) * (
+                point[0] - a[0]
+            )
             # The authored order is clockwise in (x,z).
             margins[f"edge {i}"] = -cross / math.dist(a, b) - reach - outline_erosion
         for i, (label, x, z, radius) in enumerate(PLATE_CORNERS):
@@ -255,32 +266,66 @@ def manufactured_p1_stop_enclosure() -> dict:
             # possible interior angle follows from both perturbed edge rays.
             a, b = corners[i - 1], corners[(i + 1) % len(corners)]
             va, vb = (a[0] - x, a[1] - z), (b[0] - x, b[1] - z)
-            theta = math.acos(sum(u * v for u, v in zip(va, vb)) / (math.hypot(*va) * math.hypot(*vb)))
-            theta -= sum(math.asin(min(1.0, 2.0 * outline_erosion / math.hypot(*v))) for v in (va, vb))
+            theta = math.acos(
+                sum(u * v for u, v in zip(va, vb)) / (math.hypot(*va) * math.hypot(*vb))
+            )
+            theta -= sum(
+                math.asin(min(1.0, 2.0 * outline_erosion / math.hypot(*v)))
+                for v in (va, vb)
+            )
             if theta <= 0.0:
                 raise ValueError("manufactured corner can collapse")
             cut_reach = (radius + _GENERAL_1PL_MM) / math.tan(theta / 2.0)
-            margins[f"corner {label}"] = math.dist(point, (x, z)) - reach - outline_erosion - cut_reach
+            margins[f"corner {label}"] = (
+                math.dist(point, (x, z)) - reach - outline_erosion - cut_reach
+            )
         # Bound even openings on the other face: conservative, never credit
         # a through-fence where a hole, relief or lock notch removes it.
         holes = (
-            ("pivot/relief", (0.0, 0.0), (PIVOT_BEARING_RELIEF_DIAMETER + _GENERAL_2PL_MM) / 2.0, 0.0),
+            (
+                "pivot/relief",
+                (0.0, 0.0),
+                (PIVOT_BEARING_RELIEF_DIAMETER + _GENERAL_2PL_MM) / 2.0,
+                0.0,
+            ),
             ("tip hold-down", _HOLDDOWN_XZ, _HOLDDOWN_CBORE_R, _HOLDDOWN_SHIFT),
-            ("west post tap", POST_MOUNT_WEST_XZ, POST_MOUNT_THREAD_DIA / 2.0, math.sqrt(2.0) * POST_MOUNT_STATION_TOL_MM),
-            ("east post tap", POST_MOUNT_EAST_XZ, POST_MOUNT_THREAD_DIA / 2.0, math.sqrt(2.0) * POST_MOUNT_STATION_TOL_MM),
+            (
+                "west post tap",
+                POST_MOUNT_WEST_XZ,
+                POST_MOUNT_THREAD_DIA / 2.0,
+                math.sqrt(2.0) * POST_MOUNT_STATION_TOL_MM,
+            ),
+            (
+                "east post tap",
+                POST_MOUNT_EAST_XZ,
+                POST_MOUNT_THREAD_DIA / 2.0,
+                math.sqrt(2.0) * POST_MOUNT_STATION_TOL_MM,
+            ),
         )
         for name, centre, radius, shift in holes:
-            margins[name] = math.dist(point, centre) - reach - radius - shift - edge_break
+            margins[name] = (
+                math.dist(point, centre) - reach - radius - shift - edge_break
+            )
         # The relief opens north; the notch's whole chord is a capsule.
         margins["open north relief"] = -point[1] - reach - _GENERAL_1PL_MM
         notch_delta = (point[0] - SLOT_E_X, point[1] - SLOT_E_Z)
-        along = max(0.0, min(
-            NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT,
-            notch_delta[0] * SLOT_TX + notch_delta[1] * SLOT_TZ,
-        ))
-        margins["lock notch"] = math.hypot(
-            notch_delta[0] - along * SLOT_TX, notch_delta[1] - along * SLOT_TZ,
-        ) - reach - (SLOT_W + _GENERAL_2PL_MM) / 2.0 - math.sqrt(2.0) * _GENERAL_2PL_MM - edge_break
+        along = max(
+            0.0,
+            min(
+                NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT,
+                notch_delta[0] * SLOT_TX + notch_delta[1] * SLOT_TZ,
+            ),
+        )
+        margins["lock notch"] = (
+            math.hypot(
+                notch_delta[0] - along * SLOT_TX,
+                notch_delta[1] - along * SLOT_TZ,
+            )
+            - reach
+            - (SLOT_W + _GENERAL_2PL_MM) / 2.0
+            - math.sqrt(2.0) * _GENERAL_2PL_MM
+            - edge_break
+        )
         return margins
 
     # Finding ANY strict, source-enclosed collision barrier suffices. The
@@ -305,4 +350,6 @@ def manufactured_p1_stop_enclosure() -> dict:
                     "seated; platform remains seated throughout P1; not stock inspection evidence"
                 ),
             }
-    raise ValueError("positive sourced stop material has no certified unbroken plate fence")
+    raise ValueError(
+        "positive sourced stop material has no certified unbroken plate fence"
+    )
