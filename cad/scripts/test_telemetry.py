@@ -1234,6 +1234,329 @@ def test_instrumented_adapter_calls_are_spans_and_stay_transparent(capture):
     assert "label" not in plane.attributes, "label at depth 0 is the farm's leaf key"
 
 
+@pytest.mark.parametrize("outcome", ["success", "returned_error", "raised_error"])
+def test_assembly_instrumentation_preserves_parameters_and_outcomes(capture, outcome):
+    from solidworks_mcp.adapters.base import (
+        AdapterResult,
+        AdapterResultStatus,
+        InsertComponentParameters,
+    )
+
+    spans, _ = capture
+    params = InsertComponentParameters(
+        file_path="C:/models/drive-train.SLDASM",
+        position=[1.0, 2.0, 3.0],
+        rotation=[0.0, 0.0, 90.0],
+        configuration="drawing",
+    )
+    created = AdapterResult(status=AdapterResultStatus.SUCCESS, data=object())
+    inserted = AdapterResult(
+        status=(
+            AdapterResultStatus.ERROR
+            if outcome == "returned_error"
+            else AdapterResultStatus.SUCCESS
+        ),
+        data={"name": "drive-train-1"},
+        error="component unavailable" if outcome == "returned_error" else None,
+    )
+    failure = OSError("native component insertion failed")
+    calls = []
+
+    class AssemblyAdapter:
+        async def create_assembly(self, name=None):
+            calls.append(("create", name))
+            return created
+
+        async def insert_component(self, params):
+            calls.append(("insert", params))
+            if outcome == "raised_error":
+                raise failure
+            return inserted
+
+    signature = inspect.signature(AssemblyAdapter.insert_component)
+    assert _telemetry.instrument_adapter(AssemblyAdapter) == 2
+    assert inspect.signature(AssemblyAdapter.insert_component) == signature
+    adapter = AssemblyAdapter()
+
+    async def drive():
+        with _telemetry.span("assembly.build"):
+            assert await adapter.create_assembly(name="Harmonic") is created
+            if outcome == "raised_error":
+                with pytest.raises(OSError) as raised:
+                    await adapter.insert_component(params=params)
+                assert raised.value is failure
+            else:
+                assert await adapter.insert_component(params=params) is inserted
+
+    asyncio.run(drive())
+    assert calls[0] == ("create", "Harmonic")
+    assert calls[1][0] == "insert" and calls[1][1] is params
+    finished = {span.name: span for span in spans.get_finished_spans()}
+    assert set(finished) == {
+        "assembly.build",
+        "adapter.create_assembly",
+        "adapter.insert_component",
+    }
+    insertion = finished["adapter.insert_component"]
+    assert insertion.parent.span_id == finished["assembly.build"].context.span_id
+    if outcome == "raised_error":
+        assert insertion.status.status_code.name == "ERROR"
+        assert insertion.attributes["error.type"] == "OSError"
+        assert insertion.attributes["error.message"] == str(failure)
+    else:
+        assert insertion.status.status_code.name == "OK"
+        if outcome == "returned_error":
+            assert insertion.attributes["adapter.status"] == "error"
+            assert insertion.attributes["error.message"] == inserted.error
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    ["success", "topology_exception", "topology_issues", "band_exception", "not_rebuilt"],
+)
+def test_saved_cone_topology_spans_preserve_audit_and_restore(
+    capture, monkeypatch, outcome
+):
+    import _cone_gear_readback as readback
+
+    spans, _ = capture
+    monkeypatch.setattr(readback, "CONFIGS", (("T006", 6), ("T012", 12)))
+    calls = []
+    adapter = types.SimpleNamespace(active="initial")
+
+    async def activate(configuration):
+        adapter.active = configuration
+        calls.append(("activate", configuration))
+        return types.SimpleNamespace(
+            is_success=True,
+            data={"rebuilt": not (outcome == "not_rebuilt" and configuration == "T012")},
+            error=None,
+        )
+
+    async def topology(current_adapter, configuration, teeth, *, phase, measure_roots):
+        assert current_adapter is adapter and adapter.active == configuration
+        assert phase == "reopened post-activation-rebuild" and measure_roots
+        calls.append(("topology", configuration))
+        if configuration == "T012" and outcome == "topology_exception":
+            raise OSError("native topology unreadable")
+        issues = (
+            ("pattern is suppressed",)
+            if configuration == "T012" and outcome == "topology_issues"
+            else ()
+        )
+        return float(teeth), f"{configuration} observation", issues
+
+    def bands(current_adapter, configuration, teeth):
+        assert current_adapter is adapter and adapter.active == configuration
+        assert teeth == int(configuration[1:])
+        calls.append(("bands", configuration))
+        if configuration == "T012" and outcome == "band_exception":
+            raise ValueError("native tolerance drift")
+
+    adapter.set_active_configuration = activate
+    monkeypatch.setattr(readback, "_configuration_topology", topology)
+    monkeypatch.setattr(readback, "_assert_configuration_bands", bands)
+    with _telemetry.span("part.build"):
+        if outcome == "success":
+            assert asyncio.run(
+                readback.assert_saved_configuration_topology(adapter, phase="reopened")
+            ) == {"T006": 6.0, "T012": 12.0}
+        else:
+            with pytest.raises(RuntimeError) as raised:
+                asyncio.run(
+                    readback.assert_saved_configuration_topology(adapter, phase="reopened")
+                )
+            cause = {
+                "topology_exception": "native topology unreadable",
+                "topology_issues": "pattern is suppressed",
+                "band_exception": "native tolerance drift",
+                "not_rebuilt": "set_active_configuration returned rebuilt=False",
+            }[outcome]
+            assert cause in str(raised.value)
+
+    expected = [("activate", "T012")]
+    if outcome != "not_rebuilt":
+        expected.append(("topology", "T012"))
+        if outcome != "topology_exception":
+            expected.append(("bands", "T012"))
+    expected.extend(
+        [
+            ("activate", "T006"),
+            ("topology", "T006"),
+            ("bands", "T006"),
+            ("activate", "T012"),
+        ]
+    )
+    assert calls == expected
+    assert adapter.active == "T012", "failure must not skip the established restore"
+    finished = spans.get_finished_spans()
+    (saved,) = [span for span in finished if span.name == "cone.saved_topology"]
+    children = [span for span in finished if span.name == "cone.configuration_topology"]
+    assert len(children) == (1 if outcome == "not_rebuilt" else 2)
+    assert len(finished) == len(children) + 2, "no per-feature or per-band span flood"
+    assert saved.attributes["phase"] == "reopened"
+    assert saved.attributes["configuration_count"] == 2
+    assert saved.attributes["configurations_attempted"] == 2
+    assert saved.attributes["configurations_completed"] == (
+        2 if outcome in {"success", "topology_issues"} else 1
+    )
+    expected_failures = {
+        "success": 0,
+        "topology_exception": 1,
+        "topology_issues": 1,
+        "band_exception": 1,
+        "not_rebuilt": 2,  # Both activation and the final restore refuse rebuilding.
+    }
+    assert saved.attributes["failure_count"] == expected_failures[outcome]
+    assert saved.status.status_code.name == ("OK" if outcome == "success" else "ERROR")
+    if outcome != "success":
+        assert saved.attributes["error.type"] == "RuntimeError"
+        assert cause in saved.attributes["error.message"]
+    if outcome == "not_rebuilt":
+        assert (
+            "restore T012: set_active_configuration returned rebuilt=False"
+            in saved.attributes["error.message"]
+        )
+    for child in children:
+        assert child.parent.span_id == saved.context.span_id
+        assert child.attributes["phase"] == "reopened"
+        assert child.attributes["measure_roots"] is True
+        if child.attributes["configuration"] == "T006" or outcome == "success":
+            assert child.status.status_code.name == "OK"
+            assert child.attributes["band_check_count"] == 3
+        else:
+            assert child.status.status_code.name == "ERROR"
+            assert cause in child.attributes["error.message"]
+
+
+@pytest.mark.parametrize("sketch_fails", [False, True])
+def test_cone_topology_timings_preserve_results_and_partial_failure(
+    capture, monkeypatch, sketch_fails
+):
+    import _cone_gear_readback as readback
+
+    spans, _ = capture
+    configurations = (("T006", 6), ("T012", 12))
+    monkeypatch.setattr(readback, "CONFIGS", configurations)
+    monkeypatch.setattr(readback, "CONFIGURATION_TEETH", (6, 12))
+    ticks = iter(range(20))
+    monkeypatch.setattr(
+        readback, "time", types.SimpleNamespace(perf_counter=lambda: next(ticks))
+    )
+    monkeypatch.setattr(readback, "_early_bound", lambda value, _interface: value)
+    profile = types.SimpleNamespace(
+        native_segments=lambda **kwargs: ("first", "second"),
+        gap_area_error_bound_mm2=0.0,
+    )
+    monkeypatch.setattr(readback, "stock_form_profile", lambda _teeth: profile)
+    monkeypatch.setattr(readback, "_expected_configuration_volume", lambda _teeth: 12.0)
+    monkeypatch.setattr(readback, "BORE_DIA_BAND", (0.0, 0.0))
+    monkeypatch.setattr(readback, "WEB_EXCEPTIONS_MM", {})
+    monkeypatch.setattr(readback, "MACHINED_WEB_TARGET_MM", 0.5)
+    monkeypatch.setattr(readback, "floor_radius_min_mm", lambda _teeth: 5.0)
+    monkeypatch.setattr(readback, "floor_radius_max_mm", lambda _teeth: 5.5)
+    monkeypatch.setattr(readback, "bore_dia_mm", lambda _teeth: 4.0)
+    monkeypatch.setattr(
+        readback, "_native_root_envelope_mm", lambda _body, *, teeth: (5.0, 5.5, teeth)
+    )
+    definition_reads = []
+    monkeypatch.setattr(
+        readback,
+        "_configuration_definition_state",
+        lambda _adapter, configuration, *, phase: definition_reads.append(
+            (configuration, phase)
+        ),
+    )
+    failure = OSError("sketch segments unavailable")
+
+    def segments():
+        if sketch_fails:
+            raise failure
+        return ("first", "second")
+
+    sketch = types.SimpleNamespace(GetSketchSegments=segments)
+
+    class Feature:
+        def __init__(self, teeth):
+            self.teeth = teeth
+
+        def IsSuppressed2(self, _which, _names):
+            return (self.teeth != 12,)
+
+        def GetErrorCode2(self):
+            return 0, False
+
+        def GetDefinition(self):
+            return types.SimpleNamespace(TotalInstances=12)
+
+        def GetSpecificFeature2(self):
+            return sketch
+
+    features = {
+        name: Feature(teeth)
+        for _configuration, teeth in configurations
+        for name in readback.tooth_features(teeth)
+    }
+    active = types.SimpleNamespace(
+        Name="T012", NeedsRebuild=False, AddRebuildSaveMark=True
+    )
+    selection = object()
+    model = types.SimpleNamespace(
+        ConfigurationManager=types.SimpleNamespace(ActiveConfiguration=active),
+        FeatureByName=features.get,
+        GetBodies2=lambda _kind, _hidden: (
+            types.SimpleNamespace(GetFaceCount=lambda: 28),
+        ),
+        selection=selection,
+    )
+    mass_reads = []
+
+    async def mass():
+        mass_reads.append("mass")
+        return types.SimpleNamespace(
+            is_success=True, data=types.SimpleNamespace(volume=12.0), error=None
+        )
+
+    adapter = types.SimpleNamespace(currentModel=model, get_mass_properties=mass)
+
+    async def audit():
+        with _telemetry.span("cone.configuration_topology"):
+            return await readback._configuration_topology(
+                adapter, "T012", 12, phase="saved", measure_roots=True
+            )
+
+    if sketch_fails:
+        with pytest.raises(OSError) as raised:
+            asyncio.run(audit())
+        assert raised.value is failure
+    else:
+        volume, observation, issues = asyncio.run(audit())
+        assert volume == 12.0 and issues == ()
+        assert "T012: active=T012" in observation
+    assert adapter.currentModel is model and model.selection is selection
+    assert active.Name == "T012"
+    (span,) = spans.get_finished_spans()
+    assert span.attributes["feature_audit_count"] == 6
+    assert span.attributes["feature_audit_s"] == 1.0
+    assert span.attributes["sketch_read_s"] == 1.0
+    if sketch_fails:
+        assert span.status.status_code.name == "ERROR"
+        assert span.attributes["error.type"] == "OSError"
+        assert span.attributes["error.message"] == str(failure)
+        assert mass_reads == [] and definition_reads == []
+        assert span.attributes["definition_state_count"] == 0
+        assert "root_envelope_s" not in span.attributes
+        assert "definition_state_s" not in span.attributes
+    else:
+        assert span.status.status_code.name == "OK"
+        assert mass_reads == ["mass"] and definition_reads == [("T012", "saved")]
+        assert span.attributes["sketch_entity_count"] == 2
+        assert span.attributes["root_edge_count"] == 12
+        assert span.attributes["root_envelope_s"] == 1.0
+        assert span.attributes["definition_state_count"] == 1
+        assert span.attributes["definition_state_s"] == 1.0
+
+
 def test_build_session_instruments_only_an_already_loaded_adapter(capture, monkeypatch):
     """``run_build`` imports the adapter before it opens the session; a process
     that never did must not be made to import the COM stack."""

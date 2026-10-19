@@ -759,58 +759,82 @@ async def build(adapter) -> dict[str, str]:
     # configuration, asserting instance count, volume bounds and monotonic
     # growth, then return to the first and require its volume to reproduce.
     # ------------------------------------------------------------------
-    for name, teeth in CONFIGS[:-1]:
-        check(
-            f"create_configuration {name}",
-            await adapter.create_configuration(
-                CreateConfigurationParameters(
-                    name=name, comment=f"{teeth}-tooth cone gear"
+    with _telemetry.span("cone.create_configs", configuration_count=len(CONFIGS) - 1):
+        configurations_created = 0
+        try:
+            for name, teeth in CONFIGS[:-1]:
+                check(
+                    f"create_configuration {name}",
+                    await adapter.create_configuration(
+                        CreateConfigurationParameters(
+                            name=name, comment=f"{teeth}-tooth cone gear"
+                        )
+                    ),
                 )
-            ),
-        )
+                configurations_created += 1
+        finally:
+            _telemetry.annotate(configurations_created=configurations_created)
     from solidworks_mcp.adapters.base import SetGlobalVariableParameters
 
-    for name, teeth in CONFIGS:
-        check(
-            f"ToothCount = {teeth} in {name}",
-            await adapter.set_global_variable(
-                SetGlobalVariableParameters(
-                    name="ToothCount", expression=str(teeth), configuration=name
+    with _telemetry.span(
+        "cone.configure_globals",
+        configuration_count=len(CONFIGS),
+        global_write_count=6 * len(CONFIGS),
+    ):
+        configurations_completed = 0
+        global_writes_completed = 0
+        try:
+            for name, teeth in CONFIGS:
+                check(
+                    f"ToothCount = {teeth} in {name}",
+                    await adapter.set_global_variable(
+                        SetGlobalVariableParameters(
+                            name="ToothCount", expression=str(teeth), configuration=name
+                        )
+                    ),
                 )
-            ),
-        )
-        check(
-            f"BoreDia = {bore_dia_in(teeth):g} in {name}",
-            await adapter.set_global_variable(
-                SetGlobalVariableParameters(
-                    name="BoreDia",
-                    expression=f"{bore_dia_in(teeth):g}",
-                    configuration=name,
+                global_writes_completed += 1
+                check(
+                    f"BoreDia = {bore_dia_in(teeth):g} in {name}",
+                    await adapter.set_global_variable(
+                        SetGlobalVariableParameters(
+                            name="BoreDia",
+                            expression=f"{bore_dia_in(teeth):g}",
+                            configuration=name,
+                        )
+                    ),
                 )
-            ),
-        )
-        bore_af_value = f"{bore_af_in(teeth):.12g}"
-        check(
-            f"BoreAF = {bore_af_value} in {name}",
-            await adapter.set_global_variable(
-                SetGlobalVariableParameters(
-                    name="BoreAF", expression=bore_af_value, configuration=name
+                global_writes_completed += 1
+                bore_af_value = f"{bore_af_in(teeth):.12g}"
+                check(
+                    f"BoreAF = {bore_af_value} in {name}",
+                    await adapter.set_global_variable(
+                        SetGlobalVariableParameters(
+                            name="BoreAF", expression=bore_af_value, configuration=name
+                        )
+                    ),
                 )
-            ),
-        )
-        profile = stock_form_profile(teeth)
-        for global_name, number in (
-            ("Ra", profile.blank_radius_mm / MM_PER_IN),
-            ("ToothThickness", profile.pitch_tooth_thickness_mm / MM_PER_IN),
-            ("FloorDia", floor_dia_in(teeth)),
-        ):
-            check(
-                f"{global_name} in {name}",
-                await adapter.set_global_variable(
-                    SetGlobalVariableParameters(
-                        name=global_name, expression=f"{number:.17g}", configuration=name
+                global_writes_completed += 1
+                profile = stock_form_profile(teeth)
+                for global_name, number in (
+                    ("Ra", profile.blank_radius_mm / MM_PER_IN),
+                    ("ToothThickness", profile.pitch_tooth_thickness_mm / MM_PER_IN),
+                    ("FloorDia", floor_dia_in(teeth)),
+                ):
+                    check(
+                        f"{global_name} in {name}",
+                        await adapter.set_global_variable(
+                            SetGlobalVariableParameters(
+                                name=global_name, expression=f"{number:.17g}", configuration=name
+                            )
+                        ),
                     )
-                ),
+                    global_writes_completed += 1
+                configurations_completed += 1
+        finally:
+            _telemetry.annotate(
+                configurations_completed=configurations_completed,
+                global_writes_completed=global_writes_completed,
             )
     _set_gap_floor_limits(adapter)
 
@@ -923,16 +947,24 @@ async def build(adapter) -> dict[str, str]:
             )
         _telemetry.success(f"{name}: pattern count = {count:g}")
 
-        volume, observation, issues = await _configuration_topology(
-            adapter,
-            name,
-            teeth,
+        with _telemetry.span(
+            "cone.configuration_topology",
+            configuration=name,
+            teeth=teeth,
             phase="pre-save",
-            # The saved part's reopened audit reads the roots and bore webs.
             measure_roots=False,
-        )
-        if issues:
-            raise RuntimeError(f"{observation}; issues={issues!r}")
+        ):
+            volume, observation, issues = await _configuration_topology(
+                adapter,
+                name,
+                teeth,
+                phase="pre-save",
+                # The saved part's reopened audit reads the roots and bore webs.
+                measure_roots=False,
+            )
+            _telemetry.annotate(issue_count=len(issues))
+            if issues:
+                raise RuntimeError(f"{observation}; issues={issues!r}")
         volumes[name] = volume
         profile = stock_form_profile(teeth)
 
