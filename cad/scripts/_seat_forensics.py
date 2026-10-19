@@ -1011,6 +1011,13 @@ _USER32_PROTOTYPES: tuple[tuple[str, tuple[Any, ...], Any], ...] = (
     ("IsIconic", (wintypes.HWND,), wintypes.BOOL),
     ("IsZoomed", (wintypes.HWND,), wintypes.BOOL),
     ("GetSystemMetrics", (ctypes.c_int,), ctypes.c_int),
+    ("GetForegroundWindow", (), wintypes.HWND),
+    (
+        "GetWindowThreadProcessId",
+        (wintypes.HWND, ctypes.POINTER(wintypes.DWORD)),
+        wintypes.DWORD,
+    ),
+    ("GetClassNameW", (wintypes.HWND, wintypes.LPWSTR, ctypes.c_int), ctypes.c_int),
 )
 
 
@@ -1050,15 +1057,7 @@ def _frame_geometry(adapter: Any) -> dict[str, Any]:
     check, including clean seats; this is the failure-time half of the pair, and
     the field names match theirs so both halves join on one query.
     """
-    sw = adapter.swApp
-    frame = adapter._attempt(lambda: _com._read_member(sw, "Frame"), default=None)
-    # ``IFrame::GetHWndx64`` (dispid 16, VT_I8) is the handle; ``GetHWnd``
-    # (dispid 11, VT_I4) is the 32-bit form and truncates on win64.
-    hwnd = (
-        adapter._attempt(lambda: int(_com._early_bound(frame, "IFrame").GetHWndx64()), default=None)
-        if frame is not None
-        else None
-    )
+    hwnd = _frame_hwnd(adapter)
     if not hwnd:
         return {"frame_hwnd": None}
     user32 = _user32()
@@ -1085,7 +1084,49 @@ def _frame_geometry(adapter: Any) -> dict[str, Any]:
         if user32.IsZoomed(hwnd)
         else "normal"
     )
+    try:
+        geometry.update(_foreground_window(user32, hwnd))
+    except Exception as exc:  # noqa: BLE001 - one probe never loses the rect
+        geometry["frame_foreground_error"] = f"{type(exc).__name__}: {exc}"
     return geometry
+
+
+def _frame_hwnd(adapter: Any) -> int | None:
+    """The SolidWorks main window's handle, or ``None`` when it cannot be read."""
+    sw = adapter.swApp
+    frame = adapter._attempt(lambda: _com._read_member(sw, "Frame"), default=None)
+    # ``IFrame::GetHWndx64`` (dispid 16, VT_I8) is the handle; ``GetHWnd``
+    # (dispid 11, VT_I4) is the 32-bit form and truncates on win64.
+    if frame is None:
+        return None
+    return adapter._attempt(
+        lambda: int(_com._early_bound(frame, "IFrame").GetHWndx64()), default=None
+    )
+
+
+def _foreground_window(user32: Any, frame_hwnd: int) -> dict[str, Any]:
+    """Whether the SolidWorks frame is the session's foreground window, and,
+    when it is not, which window is: its class and owning process.
+
+    A coordinate pick runs in the document's graphics window; a seat whose
+    frame lost the foreground to another top-level window (a dialog, a
+    notification, an RDP-era console app) is a state the window rect and the
+    WTS session state cannot show (#1667).
+    """
+    foreground = int(user32.GetForegroundWindow() or 0)
+    state: dict[str, Any] = {"frame_foreground": foreground == frame_hwnd}
+    if foreground == frame_hwnd:
+        return state
+    if not foreground:
+        state["foreground_window"] = "none"
+        return state
+    name = ctypes.create_unicode_buffer(256)
+    length = int(user32.GetClassNameW(foreground, name, len(name)) or 0)
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(foreground, ctypes.byref(pid))
+    state["foreground_window"] = name.value[:length] if length > 0 else "unknown"
+    state["foreground_pid"] = int(pid.value)
+    return state
 
 
 def _projected_px_per_mm(adapter: Any, view: Any) -> dict[str, Any]:
@@ -1316,11 +1357,15 @@ def _display_summary(display: Mapping[str, Any], seat: Mapping[str, Any]) -> str
     session = seat.get("seat_session_state", "unknown")
     if seat.get("seat_session_id") == 0:
         session = f"noninteractive_service(id=0,wts={session})"
+    foreground = str(display.get("frame_foreground", "unknown"))
+    if display.get("frame_foreground") is False:
+        foreground += f"({display.get('foreground_window', '?')})"
     return (
         f"session={session} "
         f"screen={display.get('screen_px', '?')} "
         f"frame={display.get('frame_width_px', '?')}x{display.get('frame_height_px', '?')}"
         f"({display.get('frame_state', 'unknown')}) "
+        f"foreground={foreground} "
         f"view_window={display.get('view_visible_width_px', '?')}x"
         f"{display.get('view_visible_height_px', '?')} "
         f"px/mm={display.get('px_per_mm', 'unknown')}"
@@ -1367,6 +1412,63 @@ def record_drawing_display(adapter: Any, label: str) -> None:
         )
 
 
+def drawing_pick_state(adapter: Any, view: Any) -> dict[str, Any]:
+    """The drawing's own state a sheet-coordinate pick runs against.
+
+    The display bag says what window the pick ran in; this says what the
+    window was showing: whether the drawing is the seat's active document,
+    whether its model view refreshes, the fit zoom it was restored to,
+    whether it or the picked view needs regenerating, how the view draws
+    its edges (lightweight, faceted HLR, display mode), and whether the
+    frame is minimised or has lost the foreground. Cheap enough to record
+    on every frozen pick, so a miss compares against the picks that hit.
+    Every read is guarded and recorded as its own error string (#1667).
+    """
+    draw = adapter.currentModel
+    reads: dict[str, Callable[[], Any]] = {
+        "active_doc_is_drawing": lambda: (
+            str(_com._read_member(adapter.swApp.ActiveDoc, "GetTitle"))
+            == str(_com._read_member(draw, "GetTitle"))
+        ),
+        "graphics_update": lambda: bool(draw.ActiveView.EnableGraphicsUpdate),
+        "fit_scale2": lambda: float(draw.ActiveView.Scale2),
+        "needs_rebuild": lambda: int(draw.Extension.NeedsRebuild2),
+        "view_out_of_date": lambda: bool(
+            _com._early_bound(view, "IView").IsModelOutOfDate()
+        ),
+        "view_lightweight": lambda: bool(
+            _com._early_bound(view, "IView").IsLightweight()
+        ),
+        "view_facetted_hlr": lambda: bool(
+            _com._early_bound(view, "IView").GetFacettedHlrDisplay()
+        ),
+        "view_display_mode": lambda: int(
+            _com._early_bound(view, "IView").GetDisplayMode2()
+        ),
+    }
+    state: dict[str, Any] = {}
+    for key, read in reads.items():
+        try:
+            state[key] = read()
+        except Exception as exc:  # noqa: BLE001 - forensics never raise
+            state[key] = f"error: {type(exc).__name__}: {exc}"
+    try:
+        frame = _frame_geometry(adapter)
+    except Exception as exc:  # noqa: BLE001 - forensics never raise
+        state["frame_capture_error"] = f"{type(exc).__name__}: {exc}"
+        return state
+    for key in (
+        "frame_state",
+        "frame_foreground",
+        "foreground_window",
+        "foreground_pid",
+        "frame_foreground_error",
+    ):
+        if key in frame:
+            state[key] = frame[key]
+    return state
+
+
 def capture_pick_miss(
     adapter: Any,
     message: str,
@@ -1374,6 +1476,7 @@ def capture_pick_miss(
     view: str,
     entity_type: str,
     sheet_xy: Sequence[float],
+    state: Mapping[str, Any] | None = None,
 ) -> NoReturn:
     """Name the window a sheet-coordinate pick missed in, then raise
     ``RuntimeError(message)``.
@@ -1387,15 +1490,37 @@ def capture_pick_miss(
     Every probe is guarded; the caller's message always survives. This capture
     never returns, but a caller can catch the RuntimeError and retry another
     pick. The forensic line is therefore WARN, not a terminal-failure verdict.
+    ``state`` is what the caller read at the miss (:func:`drawing_pick_state`,
+    each pick's outcome and the screenshots :func:`capture_pick_screens` took
+    at it); it is recorded alongside the window.
+
+    The capture also lands as files under ``failures/`` (``capture.json`` and
+    a grab of the session's desktop), which the farm uploads beside the leaf
+    log. Until #1667 it wrote none, so every pick miss's leaf log said "no
+    forensic artefacts captured" and nothing was uploaded.
     """
+    picked = dict(state or {})
     display, seat = _display_bags(adapter)
-    report = {
+    slug = _slug(f"pick-miss {view}")
+    out_dir = _capture_dir(slug)
+    report: dict[str, Any] = {
+        "message": message,
         "view": view,
         "entity_type": entity_type,
         "sheet_xy": [float(value) for value in sheet_xy[:2]],
         "display": display,
         "seat": seat,
+        "state": picked,
     }
+    artefacts = _write_artefacts(
+        (("desktop_png", lambda: _grab_screen(out_dir / f"{slug}-desktop.png")),)
+    )
+    report["artefacts"] = artefacts
+    artefacts.update(
+        _write_artefacts(
+            (("report", lambda: str(_write_failure_report(out_dir, report)["report"])),)
+        )
+    )
     with contextlib.suppress(Exception):
         _telemetry.event(
             "drawing.pick_miss",
@@ -1405,6 +1530,8 @@ def capture_pick_miss(
             sheet_y=float(sheet_xy[1]),
             **_session._attributes_of(display),
             **_session._attributes_of(seat),
+            **_session._attributes_of(picked),
+            **_session._attributes_of(artefacts),
         )
         _telemetry.warn(
             f"[forensics] {message}: view={view!r} {_display_summary(display, seat)}",
@@ -1414,6 +1541,122 @@ def capture_pick_miss(
             **_session._attributes_of(seat),
         )
     raise RuntimeError(message)
+
+
+def capture_pick_screens(adapter: Any, label: str) -> dict[str, Any]:
+    """Screenshot a sheet-coordinate pick that found no ink, as the seat showed it.
+
+    Called at EVERY miss, while the drawing window is still zoomed onto the
+    point, including a miss the next pick heals: the same key and sheet point
+    hit on one seat and miss on another (#1667), so the miss is seat state
+    that a later pick may already have changed. Four files under
+    ``failures/<label>/<UTC ms>/``, which the farm uploads beside the leaf
+    log whether the leaf then passes or fails:
+
+    - ``-desktop.png``: the session's whole desktop, grabbed from the screen
+      (``ImageGrab``) -- the SolidWorks window and graphics area exactly as
+      composited, with anything parked over them. A grab refused by the
+      session (an RDP-disconnected or locked desktop) is its own finding.
+    - ``-window.png``: the SolidWorks main window alone (``ImageGrab``'s
+      window capture), which another window in front of it does not cover.
+    - ``-region.bmp``: SolidWorks' own render of its viewport at the window's
+      size (``SaveBMP``), i.e. the sheet region around the anchor at the
+      pick's zoom.
+    - ``-sheet.pdf``: the whole sheet, as a silent COPY (``SaveAs3``).
+
+    The two screen grabs read pixels already drawn and go first, so the
+    renders after them cannot change what the grabs show. The renders write
+    only their own files: ``SaveBMP`` exports the current view and changes no
+    view state at size 0, and ``SaveAs3`` with ``swSaveAsOptions_Copy``
+    leaves the document's path and content as they were. check:inert pins
+    this call site and both writers (``test_recipe_inert``).
+
+    Returns ``{kind: "failures/<relpath>"}`` for each file written and
+    ``{kind_error: reason}`` for each that was not, plus ``capture_ms``; the
+    caller puts them on its span. The same rides a
+    ``drawing.pick_miss_capture`` event. Never raises.
+    """
+    started = time.perf_counter()
+    slug = _slug(label)
+    out_dir = _capture_dir(slug)
+    captured = _write_artefacts(
+        (
+            ("desktop_png", lambda: _grab_screen(out_dir / f"{slug}-desktop.png")),
+            (
+                "window_png",
+                lambda: _grab_screen(
+                    out_dir / f"{slug}-window.png", window=_frame_hwnd(adapter) or 0
+                ),
+            ),
+            (
+                "region_bmp",
+                lambda: _save_seat_image(
+                    adapter, out_dir, f"{slug}-region", size=(0, 0)
+                )["seat_image"],
+            ),
+            (
+                "sheet_pdf",
+                lambda: _save_failure_document(
+                    adapter, out_dir, f"{slug}-sheet", sheet_pdf=True
+                )["sheet_pdf"],
+            ),
+        )
+    )
+    captured["capture_ms"] = round((time.perf_counter() - started) * 1000.0)
+    with contextlib.suppress(Exception):
+        _telemetry.event(
+            "drawing.pick_miss_capture",
+            label=label,
+            **_session._attributes_of(captured),
+        )
+    return captured
+
+
+def _capture_dir(slug: str) -> Path:
+    """``failures/<slug>/<UTC timestamp to the millisecond>/``: a new directory
+    per capture, so a retry's capture never overwrites the miss before it."""
+    stamp = datetime.now(UTC)
+    return (
+        OUT_FAILURES / slug / f"{stamp:%Y%m%dT%H%M%S}{stamp.microsecond // 1000:03d}Z"
+    )
+
+
+def _write_artefacts(
+    steps: Sequence[tuple[str, Callable[[], str | None]]],
+) -> dict[str, Any]:
+    """Run each artefact writer, guarded on its own; map its kind to the file's
+    path under ``failures/`` (the farm's upload prefix), or ``<kind>_error`` to
+    why there is none."""
+    written: dict[str, Any] = {}
+    for kind, write in steps:
+        try:
+            path = write()
+        except Exception as exc:  # noqa: BLE001 - forensics never raise
+            written[f"{kind}_error"] = f"{type(exc).__name__}: {exc}"
+            continue
+        if not path:
+            written[f"{kind}_error"] = "no file written"
+            continue
+        relative = Path(path).resolve().relative_to(OUT_FAILURES.resolve()).as_posix()
+        written[kind] = f"failures/{relative}"
+    return written
+
+
+def _grab_screen(target: Path, *, window: int | None = None) -> str:
+    """Save the session's desktop -- or, given ``window``, that window alone --
+    as a PNG at ``target``, read from pixels already on screen."""
+    from PIL import ImageGrab  # only on a miss: no build pays the import
+
+    if window == 0:
+        raise RuntimeError("no SolidWorks main window handle")
+    image = (
+        ImageGrab.grab(all_screens=True)
+        if window is None
+        else ImageGrab.grab(window=window)
+    )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    image.save(target)
+    return str(target)
 
 
 _SAVE_AS_CURRENT_VERSION = 0  # swSaveAsVersion_e.swSaveAsCurrentVersion
@@ -1541,26 +1784,35 @@ def _document_state(adapter: Any) -> dict[str, Any]:
 
 
 def _save_failure_document(
-    adapter: Any, out_dir: Path, slug: str, *, sheet_png: bool = False
+    adapter: Any,
+    out_dir: Path,
+    slug: str,
+    *,
+    sheet_png: bool = False,
+    sheet_pdf: bool = False,
 ) -> dict[str, Any]:
     """Save a COPY of the failing document into the failure directory.
 
     The document is the evidence: with it, the profile can be opened and the
     failing feature retried on any seat. Saved as a silent copy in the live
     document's own format (the extension comes from the document, so a part,
-    assembly and drawing each land native). ``sheet_png`` reuses this same
-    extension-driven SaveAs3 export, as ``save_drawing`` does for PNG, but only
-    for an active drawing. It is sheet evidence, not SaveBMP's viewport capture.
-    Both formats use Silent|Copy, keeping the live document's path unchanged.
+    assembly and drawing each land native). ``sheet_png`` and ``sheet_pdf``
+    reuse this same extension-driven SaveAs3 export, as ``save_drawing`` does
+    for PNG and PDF, but only for an active drawing. They are sheet evidence,
+    not SaveBMP's viewport capture. Every format uses Silent|Copy, keeping the
+    live document's path unchanged.
     """
     model = adapter.currentModel
-    key = "sheet_png" if sheet_png else "document_copy"
+    sheet = ".png" if sheet_png else ".pdf" if sheet_pdf else None
+    key = f"sheet_{sheet[1:]}" if sheet else "document_copy"
     if model is None:
         return {key: None}
-    if sheet_png:
+    if sheet:
         if _com._read_member(model, "GetType") != 3:
-            raise RuntimeError("failure sheet PNG requires an active drawing")
-        suffix = ".png"
+            raise RuntimeError(
+                f"failure sheet {sheet[1:].upper()} requires an active drawing"
+            )
+        suffix = sheet
     else:
         suffix = Path(str(_com._read_member(model, "GetPathName") or "")).suffix
         if not suffix:
@@ -1578,8 +1830,10 @@ def _save_failure_document(
         default=None,
     )
     saved = target.exists()
-    if sheet_png and not saved:
-        raise RuntimeError(f"failure sheet PNG SaveAs3 produced no file: {target}; save_rc={rc!r}")
+    if sheet and not saved:
+        raise RuntimeError(
+            f"failure sheet {sheet[1:].upper()} SaveAs3 produced no file: {target}; save_rc={rc!r}"
+        )
     return {
         key: str(target) if saved else None,
         f"{key}_bytes": target.stat().st_size if saved else None,
@@ -1587,13 +1841,16 @@ def _save_failure_document(
     }
 
 
-def _save_seat_image(adapter: Any, out_dir: Path, slug: str) -> dict[str, Any]:
+def _save_seat_image(
+    adapter: Any, out_dir: Path, slug: str, *, size: tuple[int, int] = (1600, 1000)
+) -> dict[str, Any]:
     """Capture the seat's current viewport with ``IModelDoc2.SaveBMP``.
 
     No dialog, no camera move and no zoom-to-fit, so the image shows the seat
     exactly as it sat when the call failed -- and shows a modal box parked over
     the graphics area, which is invisible to every COM read. (``export_image``
-    would have re-oriented the view and destroyed that evidence.)
+    would have re-oriented the view and destroyed that evidence.) A ``size``
+    of ``(0, 0)`` renders at the window's own size.
     """
     model = adapter.currentModel
     if model is None:
@@ -1601,7 +1858,8 @@ def _save_seat_image(adapter: Any, out_dir: Path, slug: str) -> dict[str, Any]:
     out_dir.mkdir(parents=True, exist_ok=True)
     target = out_dir / f"{slug}.bmp"
     target.unlink(missing_ok=True)
-    adapter._attempt(lambda: model.SaveBMP(str(target), 1600, 1000), default=None)
+    width, height = size
+    adapter._attempt(lambda: model.SaveBMP(str(target), width, height), default=None)
     saved = target.exists()
     return {
         "seat_image": str(target) if saved else None,

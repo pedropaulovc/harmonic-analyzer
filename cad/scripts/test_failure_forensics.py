@@ -346,7 +346,19 @@ def offline_seat(monkeypatch, tmp_path):
     monkeypatch.setattr(_seat_forensics, "_process_memory", lambda pid: (1 << 30, 1 << 29))
     monkeypatch.setattr(_seat_forensics, "_process_session_id", lambda pid: 1)
     monkeypatch.setattr(_seat_forensics, "_session_connect_state", lambda session: "active")
+    monkeypatch.setattr(_seat_forensics, "_grab_screen", _fake_grab_screen)
+    _fake_grab_screen.windows = []
     yield
+
+
+def _fake_grab_screen(target: Path, *, window: int | None = None) -> str:
+    """A screen grab that writes a PNG stub; ``windows`` records each grab's window."""
+    _fake_grab_screen.windows.append(window)
+    if window == 0:
+        raise RuntimeError("no SolidWorks main window handle")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"\x89PNG\r\n\x1a\n")
+    return str(target)
 
 
 @pytest.fixture
@@ -1502,6 +1514,41 @@ def test_the_main_window_rect_is_recorded_as_comparable_integers(tmp_path):
     assert geometry["frame_state"] == "normal"
     # The comparison the investigation had to do by hand, now arithmetic:
     assert round(geometry["frame_area_px"] / (1296 * 816), 3) == 0.620
+
+
+def test_the_frame_records_which_window_holds_the_foreground(tmp_path, monkeypatch):
+    """A coordinate pick in a frame that lost the foreground (a dialog, a
+    console left by an RDP session) is a state no rect shows (#1667)."""
+    monkeypatch.setattr(_seat_forensics, "_frame_hwnd", lambda adapter: 5)
+
+    def class_name(hwnd, buffer, size):
+        assert hwnd == 99
+        buffer.value = "#32770"
+        return len("#32770")
+
+    def thread_process(hwnd, pointer):
+        ctypes.cast(pointer, ctypes.POINTER(ctypes.c_ulong))[0] = 1234
+        return 1
+
+    class _User32:
+        # Plain functions, not bound methods: _user32() sets their prototypes.
+        def __getattr__(self, name):
+            calls = {
+                "GetForegroundWindow": lambda: 99,
+                "GetClassNameW": class_name,
+                "GetWindowThreadProcessId": thread_process,
+            }
+            return calls.get(name, lambda *args: 0)
+
+    with mock.patch.object(
+        _seat_forensics.ctypes, "windll", mock.Mock(user32=_User32())
+    ):
+        geometry = _seat_forensics._frame_geometry(_unmerged_profile(tmp_path))
+    assert geometry["frame_foreground"] is False
+    assert (geometry["foreground_window"], geometry["foreground_pid"]) == (
+        "#32770",
+        1234,
+    )
 
 
 def test_display_geometry_flags_a_session_without_a_display(tmp_path, monkeypatch):
@@ -2760,29 +2807,160 @@ def test_a_missed_coordinate_pick_names_its_window_and_keeps_its_message(
     window the hit test ran in."""
     spans, logs = capture_telemetry
     monkeypatch.setattr(
-        _seat_forensics, "_frame_geometry", lambda adapter: {"frame_width_px": 1536, "frame_height_px": 864}
+        _seat_forensics,
+        "_frame_geometry",
+        lambda adapter: {"frame_width_px": 1536, "frame_height_px": 864},
     )
     message = "failed to select arbor front_journal finish silhouette at sheet (0.25355, 0.166)"
     adapter = _Adapter(sw=_Seat(), model=_PickDrawing())
-    with _telemetry.span("drawing.surface_finish"), pytest.raises(RuntimeError) as raised:
+    with (
+        _telemetry.span("drawing.surface_finish"),
+        pytest.raises(RuntimeError) as raised,
+    ):
         _seat_forensics.capture_pick_miss(
-            adapter, message, view="Drawing View2", entity_type="SILHOUETTE", sheet_xy=(0.25355, 0.166)
+            adapter,
+            message,
+            view="Drawing View2",
+            entity_type="SILHOUETTE",
+            sheet_xy=(0.25355, 0.166),
         )
     assert str(raised.value) == message and type(raised.value) is RuntimeError
     (event,) = [
-        e for s in spans.get_finished_spans() for e in s.events if e.name == "drawing.pick_miss"
+        e
+        for s in spans.get_finished_spans()
+        for e in s.events
+        if e.name == "drawing.pick_miss"
     ]
     assert event.attributes["view_visible_width_px"] == 1700
-    assert (event.attributes["sheet_x"], event.attributes["sheet_y"]) == (0.25355, 0.166)
+    assert (event.attributes["sheet_x"], event.attributes["sheet_y"]) == (
+        0.25355,
+        0.166,
+    )
     (record,) = [
-        r.log_record for r in logs.get_finished_logs() if r.log_record.severity_text == "WARN"
+        r.log_record
+        for r in logs.get_finished_logs()
+        if r.log_record.severity_text == "WARN"
     ]
-    assert str(record.body).startswith(f"[forensics] {message}: view='Drawing View2' session=active")
+    assert str(record.body).startswith(
+        f"[forensics] {message}: view='Drawing View2' session=active"
+    )
     assert "frame=1536x864" in str(record.body)
     assert "view_window=1700x1160" in str(record.body)
     capture = json.loads(record.attributes["capture"])
     assert capture["seat"]["seat_pid"] == 4242
-    assert not [r for r in logs.get_finished_logs() if r.log_record.severity_text == "ERROR"]
+    assert not [
+        r for r in logs.get_finished_logs() if r.log_record.severity_text == "ERROR"
+    ]
+
+
+def test_a_pick_miss_writes_its_capture_under_failures(
+    tmp_path, capture_telemetry, monkeypatch
+):
+    """Every pick miss's leaf log used to say "no forensic artefacts captured":
+    capture_pick_miss wrote no file, so nothing reached the farm's 'failures/'
+    upload (#1667). It now writes capture.json and a desktop grab, and names
+    both on its event."""
+    spans, _logs = capture_telemetry
+    monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
+    message = "fr-harmonic-base frozen balloon anchor selects no edge in 3 picks"
+    with (
+        _telemetry.span("drawing.pick_balloon_anchor"),
+        pytest.raises(RuntimeError) as raised,
+    ):
+        _seat_forensics.capture_pick_miss(
+            _Adapter(sw=_Seat(), model=_PickDrawing()),
+            message,
+            view="Drawing View9",
+            entity_type="EDGE",
+            sheet_xy=(0.15356, 0.14845),
+            state={"pick1": "miss", "pick1_desktop_png": "failures/x/desktop.png"},
+        )
+    assert str(raised.value) == message
+    out = _failure_dir(tmp_path, "pick-miss-drawing-view9")
+    relative = f"failures/pick-miss-drawing-view9/{out.name}"
+    assert sorted(path.name for path in out.iterdir()) == [
+        "capture.json",
+        "pick-miss-drawing-view9-desktop.png",
+    ]
+    report = json.loads((out / "capture.json").read_text())
+    assert report["message"] == message and report["state"]["pick1"] == "miss"
+    assert report["artefacts"] == {
+        "desktop_png": f"{relative}/pick-miss-drawing-view9-desktop.png"
+    }
+    (event,) = [
+        e
+        for s in spans.get_finished_spans()
+        for e in s.events
+        if e.name == "drawing.pick_miss"
+    ]
+    assert event.attributes["report"] == f"{relative}/capture.json"
+    assert (
+        event.attributes["desktop_png"]
+        == f"{relative}/pick-miss-drawing-view9-desktop.png"
+    )
+    assert event.attributes["pick1_desktop_png"] == "failures/x/desktop.png"
+
+
+def test_pick_screens_save_desktop_window_region_and_sheet_as_copies(
+    tmp_path, capture_telemetry, monkeypatch
+):
+    """A frozen anchor's miss, healed or not, leaves four files: the desktop
+    and the SolidWorks window grabbed from the screen first, then SolidWorks'
+    viewport render at the window's own size and the sheet PDF -- the PDF as a
+    silent COPY, so the drawing under construction keeps its path."""
+    spans, _logs = capture_telemetry
+    monkeypatch.setattr(_seat_forensics, "_frame_hwnd", lambda adapter: 77)
+    model = _FailureDrawing(tmp_path, unsaved=True)
+    label = "fr-harmonic-base-frozen-anchor-pick1"
+    with _telemetry.span("drawing.pick_balloon_anchor"):
+        captured = _seat_forensics.capture_pick_screens(
+            _Adapter(sw=_Seat(), model=model), label
+        )
+    out = _failure_dir(tmp_path, label)
+    relative = f"failures/{label}/{out.name}"
+    assert {key: value for key, value in captured.items() if key != "capture_ms"} == {
+        "desktop_png": f"{relative}/{label}-desktop.png",
+        "window_png": f"{relative}/{label}-window.png",
+        "region_bmp": f"{relative}/{label}-region.bmp",
+        "sheet_pdf": f"{relative}/{label}-sheet.pdf",
+    }
+    assert _fake_grab_screen.windows == [None, 77]
+    assert model.bmp_saved == [(str(out / f"{label}-region.bmp"), 0, 0)]
+    assert model.saved == [
+        (str(out / f"{label}-sheet.pdf"), 0, _seat_forensics._SAVE_AS_SILENT_COPY)
+    ]
+    assert all(
+        (out / Path(path).name).is_file()
+        for key, path in captured.items()
+        if key != "capture_ms"
+    )
+    (event,) = [
+        e
+        for s in spans.get_finished_spans()
+        for e in s.events
+        if e.name == "drawing.pick_miss_capture"
+    ]
+    assert event.attributes["label"] == label
+    assert event.attributes["sheet_pdf"] == captured["sheet_pdf"]
+
+
+def test_pick_screens_never_raise_and_name_each_file_they_could_not_write(
+    tmp_path, monkeypatch
+):
+    def refused(target, *, window=None):
+        raise OSError("screen grab failed")
+
+    monkeypatch.setattr(_seat_forensics, "_grab_screen", refused)
+    monkeypatch.setattr(_seat_forensics, "_frame_hwnd", lambda adapter: None)
+    adapter = _unmerged_profile(tmp_path)  # a part: no sheet to export
+    captured = _seat_forensics.capture_pick_screens(adapter, "x-frozen-anchor-pick2")
+    assert captured["desktop_png_error"] == "OSError: screen grab failed"
+    assert captured["window_png_error"] == "OSError: screen grab failed"
+    assert captured["sheet_pdf_error"] == (
+        "RuntimeError: failure sheet PDF requires an active drawing"
+    )
+    assert captured["region_bmp"].endswith("/x-frozen-anchor-pick2-region.bmp")
+    assert adapter.currentModel.saved == []
 
 
 @pytest.mark.parametrize("pick_miss", [False, True], ids=["drawing_display", "pick_miss"])
