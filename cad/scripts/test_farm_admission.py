@@ -830,6 +830,16 @@ print(json.dumps({'checked': checked, 'helpers': sorted(helpers)}))
         "HARMONIC_EXECUTOR": "local",
         "HARMONIC_REMOTE_CACHE_MODE": "off",
         "HARMONIC_SW_AUTOSTART": "0",
+        # The root conftest hands the session an empty syntax-facts store, so
+        # in-process tests that patch the analyzer never write the real one.
+        # This child patches no analyzer code; re-parsing every source cold
+        # took 46 s of this test's 120 s alone on amet (16 s warm). A store of
+        # its own, kept across sessions, stays content-keyed like the real one.
+        "HARMONIC_BUILDGRAPH_CACHE": str(
+            Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache")
+            / "harmonic-analyzer"
+            / "buildgraph-unpatched-test-children"
+        ),
     }
     result = _REAL_RUN(
         [sys.executable, "-B", "-c", program],

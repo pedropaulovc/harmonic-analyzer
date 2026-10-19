@@ -536,15 +536,23 @@ def test_nested_pytest_forwards_only_unconsumed_refusals(
         command.extend(["-n", "2", "--dist", "loadfile"])
         if mode == "xdist-maxfail":
             command.append("--maxfail=1")
+        elif mode == "xdist-crash":
+            # xdist otherwise replaces a crashed worker up to 4 x -n times and
+            # each replacement reruns the crashing test: 8 more cold workers
+            # (~90 s on amet) for the one crash this case needs.
+            command.append("--max-worker-restart=0")
     else:
         # The optional xdist hook must also work without the xdist plugin.
         command.extend(["-p", "no:xdist"])
     result = _run_child(command, cwd=tmp_path)
     assert "INTERNALERROR" not in result.stdout + result.stderr
+    # The private project's guard copy must not re-enter this checkout's.
+    assert "Error in sitecustomize" not in result.stderr, result.stderr
     # Ignoring the nested status must not hide a launch attempt from the caller.
     recorded = "".join(solidworks_child_refusals())
     if mode == "xdist-crash":
         assert result.returncode != 0
+        assert result.stdout.count("node down") == 1, result.stdout
         assert recorded == ""
     elif mode in {"consumed", "xdist-consumed"}:
         assert result.returncode == 0, result.stdout + result.stderr
