@@ -1880,7 +1880,7 @@ def _write_failure_report(out_dir: Path, report: dict[str, Any]) -> dict[str, An
 
 
 def capture_com_failure(
-    adapter: Any,
+    adapter: Any | None,
     label: str,
     message: str,
     *,
@@ -1947,6 +1947,13 @@ def capture_com_failure(
     export. It saves the still-active partial sheet under the failure namespace;
     no approved output is written, and no layout/rebuild guard is re-entered.
     Its failure is a separate capture step and cannot prevent the native copy.
+
+    ``adapter=None`` explicitly selects NO-FOLLOW-UP-COM capture. Use it after
+    a server fault when only previously observed caller context is safe to
+    retain (for example, comtypes Pack-and-Go document cleanup). It captures
+    those context values, a non-COM desktop image and the report only; it never
+    attaches an adapter, reads the document or invokes a COM export. An unreadable
+    desktop/report still cannot replace the supplied original exception.
     """
     slug = _slug(label)
     stamp = datetime.now(UTC)
@@ -1966,32 +1973,40 @@ def capture_com_failure(
         with _telemetry.span(
             f"com.failure {label}", label=label, api=api or "unknown", **extra
         ):
-            _capture_step(report, "seat", lambda: seat_provenance(adapter))
-            _capture_step(
-                report, "preferences", lambda: sketch_authoring_preferences(adapter)
-            )
-            # Read BEFORE the document/sketch probes touch anything: these two
-            # bags are what a preference-only snapshot misses entirely.
-            _capture_step(
-                report, "sketch_manager", lambda: sketch_manager_state(adapter)
-            )
-            _capture_step(report, "display", lambda: display_geometry(adapter))
-            _capture_step(report, "error_state", lambda: _seat_error_state(adapter))
-            _capture_step(report, "document", lambda: _document_state(adapter))
-            _capture_step(
-                report, "sketch", lambda: _sketch_closure._sketch_state(adapter, sketch, expected_points)
-            )
-            _capture_step(
-                report, "document_copy", lambda: _save_failure_document(adapter, out_dir, slug)
-            )
-            if sheet_png:
+            if adapter is None:
+                report["capture_mode"] = "no_followup_com"
                 _capture_step(
-                    report, "sheet_png",
-                    lambda: _save_failure_document(adapter, out_dir, slug, sheet_png=True),
+                    report,
+                    "desktop",
+                    lambda: {"path": _grab_screen(out_dir / f"{slug}-desktop.png")},
                 )
-            _capture_step(
-                report, "seat_image", lambda: _save_seat_image(adapter, out_dir, slug)
-            )
+            else:
+                _capture_step(report, "seat", lambda: seat_provenance(adapter))
+                _capture_step(
+                    report, "preferences", lambda: sketch_authoring_preferences(adapter)
+                )
+                # Read BEFORE the document/sketch probes touch anything: these two
+                # bags are what a preference-only snapshot misses entirely.
+                _capture_step(
+                    report, "sketch_manager", lambda: sketch_manager_state(adapter)
+                )
+                _capture_step(report, "display", lambda: display_geometry(adapter))
+                _capture_step(report, "error_state", lambda: _seat_error_state(adapter))
+                _capture_step(report, "document", lambda: _document_state(adapter))
+                _capture_step(
+                    report, "sketch", lambda: _sketch_closure._sketch_state(adapter, sketch, expected_points)
+                )
+                _capture_step(
+                    report, "document_copy", lambda: _save_failure_document(adapter, out_dir, slug)
+                )
+                if sheet_png:
+                    _capture_step(
+                        report, "sheet_png",
+                        lambda: _save_failure_document(adapter, out_dir, slug, sheet_png=True),
+                    )
+                _capture_step(
+                    report, "seat_image", lambda: _save_seat_image(adapter, out_dir, slug)
+                )
             _capture_step(report, "artefacts", lambda: _write_failure_report(out_dir, report))
     except Exception as exc:  # noqa: BLE001 - see guarantee 1
         report["capture_aborted"] = f"{type(exc).__name__}: {exc}"

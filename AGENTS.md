@@ -644,6 +644,16 @@ falling through, and the seat-holding action runs `release_seat_documents.py`
 (an empty `run_build` session — the discard IS the work) and re-probes; still
 locked after that is fatal.
 
+Release packaging records each cleanup operation before calling COM, including
+the close iteration, document title, and best-effort path and open-document count.
+A cleanup failure remains fatal when packaging otherwise succeeded; it never
+produces a trusted sidecar. After a server fault, the terminal
+`capture_com_failure(None, ..., exception=original)` mode retains only the
+already-observed context, a non-COM desktop image and the failure report. It
+makes no follow-up COM reads or exports against the possibly wedged server,
+and capture failures must not replace the original exception. This evidence
+identifies which close failed; it is not a retry or a claim that cleanup succeeded.
+
 **Empty of directories, too.** SolidWorks moves its own *process current directory*
 to follow the documents it opens, so after a build that saved into `cad/out/sldprt`
 the seat's `cwd` **is** that directory — and Windows refuses to remove a directory
