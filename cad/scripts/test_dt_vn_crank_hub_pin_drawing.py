@@ -255,7 +255,7 @@ def saved_pull_thread(
     definition = SimpleNamespace(
         FastenerSize="#0-80",
         Standard2=0,
-        FastenerType2=27,
+        Type=33,  # swTapThru, not the generic initialization type swWzdTap=4
         EndCondition=1,
         ThreadEndCondition=1,
         ThreadClass="2B",
@@ -271,10 +271,13 @@ def saved_pull_thread(
     return model, definition
 
 
+@pytest.mark.parametrize("native_type", [33, 34, 35, 36, 48, 49, 50, 51, 52, 53, 54, 55])
 def test_saved_pull_thread_accepts_correct_native_data(
     saved_pull_thread: tuple[SimpleNamespace, SimpleNamespace],
+    native_type: int,
 ) -> None:
     model, _definition = saved_pull_thread
+    _definition.Type = native_type
     drawing._require_saved_pull_thread(model)
     import build_vn_crank_hub_pin as build
 
@@ -287,8 +290,12 @@ def test_saved_pull_thread_accepts_correct_native_data(
         ("FastenerSize", "#1-72"),
         ("Standard2", 1),
         ("Standard2", -1),
-        ("FastenerType2", 26),
-        ("FastenerType2", 43),
+        ("Type", -1),
+        ("Type", 4),  # swCounterDrilled, NOT a native swWzdTap feature subtype
+        ("Type", 25),  # swHoleThru: a plain drill is not a tap
+        ("Type", 31),  # swTapBlind
+        ("Type", 39),  # swPipeTapThru
+        ("Type", 46),  # swTapBlindCosmeticThread
         ("EndCondition", 0),
         ("EndCondition", 2),
         ("ThreadEndCondition", 0),

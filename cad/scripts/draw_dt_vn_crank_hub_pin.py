@@ -35,7 +35,7 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
-from _holes import _KINDS, _standard, _verify_tap_metadata
+from _holes import _standard, _verify_tap_metadata
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -44,6 +44,7 @@ from dt_vn_crank_hub_pin_spec import (
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA,
     PULL_THREAD_HOLE,
+    PULL_THREAD_NATIVE_THROUGH_TAP_TYPES,
     PULL_THREAD_TAP_DRILL,
     PULL_THREAD_WALL_CALLOUT,
     REFERENCE_DIMENSIONS,
@@ -98,9 +99,15 @@ def _pull_thread_entry_edge(view: Any) -> Any:
 def _require_pull_thread_definition(definition: Any) -> None:
     """Validate actual feature data, including drill and thread termination."""
     _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-VN-029 saved pull thread")
+    # FastenerType2 is a catalog index that reads -1 on the native #56 tap.
+    # Prove the actual saved feature subtype using its separate legacy enum.
+    native_type = definition.Type
+    if native_type not in PULL_THREAD_NATIVE_THROUGH_TAP_TYPES:
+        raise RuntimeError(
+            f"MHA-VN-029 saved extraction Type {native_type!r} is not a through tap"
+        )
     for member, expected in (
         ("Standard2", _standard(PULL_THREAD_HOLE.kind)),
-        ("FastenerType2", _KINDS[PULL_THREAD_HOLE.kind][1]),
         ("FastenerSize", PULL_THREAD_HOLE.size),
     ):
         actual = getattr(definition, member)

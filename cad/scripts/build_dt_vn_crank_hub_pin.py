@@ -19,7 +19,7 @@ from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
-from _holes import _KINDS, _standard, _verify_tap_metadata, wizard_holes
+from _holes import _standard, _verify_tap_metadata, wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -42,6 +42,7 @@ from dt_vn_crank_hub_pin_spec import (
     PIN_DIA,
     PIN_LEN,
     PULL_THREAD_HOLE,
+    PULL_THREAD_NATIVE_THROUGH_TAP_TYPES,
     PULL_THREAD_TAP_DRILL,
 )
 
@@ -61,9 +62,15 @@ PULL_THREAD_ENTRY_NORMAL = (0.0, 0.0, -1.0)
 def _require_pull_thread_definition(definition: Any) -> None:
     """Prove the committed feature is the specified inch tap and #56 cut."""
     _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-VN-029 built pull thread")
+    # FastenerType2 is a catalog index that reads -1 on the native #56 tap.
+    # Prove the actual saved feature subtype using its separate legacy enum.
+    native_type = definition.Type
+    if native_type not in PULL_THREAD_NATIVE_THROUGH_TAP_TYPES:
+        raise RuntimeError(
+            f"MHA-VN-029 native extraction Type {native_type!r} is not a through tap"
+        )
     for member, expected in (
         ("Standard2", _standard(PULL_THREAD_HOLE.kind)),
-        ("FastenerType2", _KINDS[PULL_THREAD_HOLE.kind][1]),
         ("FastenerSize", PULL_THREAD_HOLE.size),
     ):
         actual = getattr(definition, member)

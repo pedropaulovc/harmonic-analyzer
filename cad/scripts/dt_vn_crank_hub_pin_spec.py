@@ -36,6 +36,10 @@ PULL_THREAD_HOLE = HoleSpec(
     end="through_all",
     overrides_mm={"ThruTapDrillDiameter": PULL_THREAD_TAP_DRILL},
 )
+# IWizardHoleFeatureData2.Type uses swWzdHoleTypes_e, not the generic
+# initialization enum. These are straight-through taps, cosmetic/through-thread
+# variants and their countersinks; blind taps, pipe taps and drills are absent.
+PULL_THREAD_NATIVE_THROUGH_TAP_TYPES = (33, 34, 35, 36, 48, 49, 50, 51, 52, 53, 54, 55)
 PULL_THREAD_NOMINAL_LENGTH_DIAMETERS = PULL_THREAD_LEN / PULL_THREAD_MAJOR
 # These are distinct nominal walls: the native model cuts the tap drill, but
 # the finished thread removes material out to its larger major diameter.
