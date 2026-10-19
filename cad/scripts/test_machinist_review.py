@@ -717,6 +717,10 @@ for line in sys.stdin:
                 tools.pop()
             server = {
                 "name": "sheets", "status": state, "tools": tools,
+                "config": {
+                    "type": "stdio", "command": sys.executable,
+                    "args": ["sheets_mcp.py", "sheet.png"],
+                },
                 "error": "synthetic sheets startup failure",
             }
             record({"type": "status", "value": state, "tools": tools})
@@ -771,6 +775,9 @@ def test_claude_slow_start_waits_for_actual_connection_before_review_or_judge(
     )
     assert review.passed and review.blind and review.attempts == 1
     assert review.verdict == value
+    assert review.tool_events == 0
+    assert review.extra["inspection_proven"] is True
+    assert review.extra["sheets_viewed"] == [1]
     (attempt,) = review.extra["evidence"]["attempts"]
     records = [
         json.loads(line) for line in
@@ -785,7 +792,19 @@ def test_claude_slow_start_waits_for_actual_connection_before_review_or_judge(
     assert len(claude_transport.processes) == 1
     assert claude_transport.processes[0].returncode == 0
     assert "startup stderr " in Path(attempt["stderr_file"]).read_text()
-    assert "synthetic CLI startup diagnostic" in Path(attempt["stdout_file"]).read_text()
+    stdout = Path(attempt["stdout_file"]).read_text()
+    assert "synthetic CLI startup diagnostic" in stdout
+    statuses = [
+        row["response"]["response"]["mcpServers"][0]
+        for row in (json.loads(line) for line in stdout.splitlines() if line.startswith("{"))
+        if row.get("type") == "control_response"
+        and row["response"]["response"].get("mcpServers")
+    ]
+    assert statuses[-1]["config"] == {
+        "type": "stdio", "command": sys.executable,
+        "args": ["sheets_mcp.py", "sheet.png"],
+    }
+    assert all(event.get("type") != "control_response" for event in mr._parse_events(stdout))
 
 
 @pytest.mark.parametrize(

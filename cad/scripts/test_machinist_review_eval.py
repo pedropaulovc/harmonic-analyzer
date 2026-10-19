@@ -387,6 +387,7 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
                     "request_id": "sheets-status",
                     "response": {"mcpServers": [{
                         "name": "sheets", "status": "connected",
+                        "config": {"type": "stdio", **config["mcpServers"]["sheets"]},
                         "tools": [{"name": "view_sheet"}, {"name": "crop"}],
                     }]},
                 },
@@ -681,6 +682,19 @@ def test_matching_fix_evidence_resumes_without_model_execution(
     assert first["error"] is None
     assert first["review"]["verdict"]["verdict"] == "FIX"
     assert first["review"]["passed"] is False
+    review = evaluation.validate_evidence(first, identity, "baseline", case[1], directory)
+    assert review.blind and review.tool_events == 0
+    assert review.extra["inspection_proven"] is True
+    if reviewer == "claude":
+        (attempt,) = review.extra["evidence"]["attempts"]
+        raw_events = [
+            json.loads(line)
+            for line in Path(attempt["stdout_file"]).read_text(encoding="utf-8").splitlines()
+        ]
+        status = next(row for row in raw_events if row.get("type") == "control_response")
+        config = status["response"]["response"]["mcpServers"][0]["config"]
+        assert config["type"] == "stdio" and config["command"] == sys.executable
+        assert config["args"][0] == str(mr.SHEETS_SERVER)
     assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == first
     assert len(provider["calls"]) == 1
     summary = evaluation.aggregate(identity, [first])

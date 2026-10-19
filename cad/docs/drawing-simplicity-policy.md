@@ -160,7 +160,8 @@ both verdicts and the finding diff.
   is bounded to 120 seconds within the existing per-attempt timeout; failed or
   incomplete connections retry as infrastructure errors in fresh isolated
   sessions, without submitting a drawing review. Startup diagnostics remain in
-  the retained attempt evidence. Valid drawing findings are not retried.
+  retained raw stdout; SDK control responses are excluded from reviewer tool
+  evidence. Valid drawing findings are not retried.
 - The authoritative result is `<name>.aggregate.json` and its companion
   `<name>.aggregate.md`, not an individual run's verdict. `FIX` means at least one
   **confirmed** blocker, over-specification or clarity finding raised by two or

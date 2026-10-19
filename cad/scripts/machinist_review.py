@@ -1608,9 +1608,14 @@ def _parse_events(stdout: str) -> list[dict[str, Any]]:
         if not line.startswith("{"):
             continue
         try:
-            events.append(json.loads(line))
+            event = json.loads(line)
         except json.JSONDecodeError:
             continue
+        # Transport status includes server commands, not reviewer tool calls.
+        # Keep it in raw stdout diagnostics, but never use it as sheet evidence.
+        if event.get("type") == "control_response":
+            continue
+        events.append(event)
     return events
 
 
