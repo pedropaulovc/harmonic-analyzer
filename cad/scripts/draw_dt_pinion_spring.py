@@ -1029,21 +1029,14 @@ def _hole_axis_witnesses_as_centerlines(adapter: Any, annotations: list[Any]) ->
             raise RuntimeError(f"{name} refused its hole-axis centreline")
         # The generated wrapper takes the BYREF out-param and returns
         # (status, centreline) (spring r16: a one-argument call mismatched).
-        flags = []
-        for index in (HOLE_AXIS_WITNESS, 1 - HOLE_AXIS_WITNESS):
-            result = display.GetExtensionLineAsCenterline(index, False)
-            if (
-                type(result) not in (list, tuple)
-                or len(result) != 2
-                or result[0] is not True
-                or type(result[1]) is not bool
-            ):
-                raise RuntimeError(
-                    f"{name} witness {index} style unreadable: {result!r}"
-                )
-            flags.append(result[1])
-        if flags != [True, False]:
-            raise RuntimeError(f"{name} hole-axis centreline did not persist: {flags}")
+        # The axis witness reads (True, True); the other, never styled, reads
+        # (False, False) (spring r18), so only its flag is required False.
+        axis = display.GetExtensionLineAsCenterline(HOLE_AXIS_WITNESS, False)
+        other = display.GetExtensionLineAsCenterline(1 - HOLE_AXIS_WITNESS, False)
+        if tuple(axis) != (True, True) or tuple(other)[1:] != (False,):
+            raise RuntimeError(
+                f"{name} hole-axis centreline did not persist: {axis!r}, {other!r}"
+            )
     rebuild_drawing(adapter, label="hole-axis extension centrelines")
 
 
