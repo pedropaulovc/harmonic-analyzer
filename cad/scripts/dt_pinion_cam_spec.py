@@ -12,6 +12,7 @@ in lockstep (``test_dt_pinion_cam_drawing.py``).
 from __future__ import annotations
 
 import dt_drive_train_steps
+from _fit_deviations import deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _gtol_cylinder import CylinderFace
 from dt_pinion_lift_rod_spec import ROD_DIA as LIFT_ROD_DIA
@@ -35,11 +36,12 @@ LIFT_ROD_NUMBER = "MHA-DT-017"
 # +/-0.03 rather than stacked limits (ENFORCE r5).
 BORE_TOLERANCE_MM = 0.03
 BORE_BAND = (BORE_TOLERANCE_MM, -BORE_TOLERANCE_MM)  # (upper, lower) about BORE
+_BORE_LOWER, _BORE_UPPER = deviations(BORE_BAND)
 SLIP_CLEARANCE_MIN = round(
-    BORE + BORE_BAND[1] - (LIFT_ROD_DIA + LIFT_ROD_DIA_BAND[0]), 6
+    BORE + _BORE_LOWER - (LIFT_ROD_DIA + LIFT_ROD_DIA_BAND[0]), 6
 )
 SLIP_CLEARANCE_MAX = round(
-    BORE + BORE_BAND[0] - (LIFT_ROD_DIA + LIFT_ROD_DIA_BAND[1]), 6
+    BORE + _BORE_UPPER - (LIFT_ROD_DIA + LIFT_ROD_DIA_BAND[1]), 6
 )
 if SLIP_CLEARANCE_MIN < 0.02 or SLIP_CLEARANCE_MAX > 0.10:
     raise AssertionError(
