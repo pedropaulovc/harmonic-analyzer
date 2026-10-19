@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+import runpy
 from pathlib import Path
 
 import pytest
@@ -11,6 +13,7 @@ import dt_crank_handle_ferrule_spec as ferrule
 import dt_crank_handle_spec
 import draw_dt_crank_handle as drawing
 import build_dt_crank_handle as handle
+from dt_crank_hub_geometry import GENERAL_1PL_TOL_MM
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -72,14 +75,67 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
     assert '("oak end face", oak_end_face, "vertical")' in build_source
     assert '(end_round, oak_end_face, "end round crest")' in build_source
     assert spec.TENON_X0 > 0.0  # no oak reaches the arm face
-    assert spec.COUNTERBORE_DIA_MAX == pytest.approx(8.5)
-    # The flat oak end round the cup holds the 2.0 wall target at the worst
-    # case -- crest at the .X band's low limit, the largest counterbore, the
-    # bore's eccentricity both ways (MHA-DT-008 machinist review of
-    # 2026-10-18, which refused the 0.45 lip).
-    assert spec.BUTT_WALL_MIN == pytest.approx((14.0 - 0.8) / 2.0 - 0.2 - 8.5 / 2.0)
-    assert spec.BUTT_WALL_MIN >= spec.WALL_TARGET_MM == 2.0
+    # Owner ruling B on #1375: the larger cup drives the counterbore limit.
+    assert spec.COUNTERBORE_DIA_MAX == pytest.approx(
+        round(cup.BODY_DIA + cup.BODY_DIA_TOL + spec.COUNTERBORE_GLUE_LINE[1] + 0.05, 1)
+    )
+    assert spec.COUNTERBORE_DIA_MAX == pytest.approx(9.9)
+    # The historical oak feather was fixed in #1650.  Keep the ordinary .X
+    # diameter band and both 0.1 eccentricities, with the 2.0 target plus
+    # owner ruling B's 0.05 radial design margin at the worst case.
+    assert GENERAL_1PL_TOL_MM == 0.8
+    assert spec.WALL_TARGET_MM == 2.0
+    assert spec.BUTT_WALL_RULING_MARGIN_MM == 0.05
+    assert spec.BUTT_WALL_DESIGN_MIN_MM == pytest.approx(
+        spec.WALL_TARGET_MM + spec.BUTT_WALL_RULING_MARGIN_MM
+    )
+    assert spec.CREST_DIA == pytest.approx(
+        spec.COUNTERBORE_DIA_MAX
+        + GENERAL_1PL_TOL_MM
+        + 2.0 * (2.0 * spec.BORE_ECCENTRICITY + spec.BUTT_WALL_DESIGN_MIN_MM)
+    )
+    assert spec.BUTT_WALL_MIN == pytest.approx((15.2 - 0.8) / 2.0 - 0.2 - 9.9 / 2.0)
+    assert spec.BUTT_WALL_MIN == pytest.approx(spec.BUTT_WALL_DESIGN_MIN_MM)
+    assert spec.BUTT_WALL_MIN == pytest.approx(2.05)
+    assert spec.BUTT_WALL_MIN >= spec.BUTT_WALL_DESIGN_MIN_MM >= spec.WALL_TARGET_MM
     assert not hasattr(spec, "FEATHER_DEPTH")
+
+
+@pytest.mark.parametrize(
+    ("dimension", "change"),
+    (("BODY_DIA", -0.2), ("BODY_DIA", 0.2), ("BODY_DIA_TOL", 0.1)),
+)
+def test_cup_limits_drive_the_counterbore_crest_dome_and_fit_note(
+    monkeypatch: pytest.MonkeyPatch, dimension: str, change: float
+) -> None:
+    # Source-mutation controls, not additional manufacturing bands: owner
+    # ruling B on #1375 must keep the whole cup-to-oak derivation live.
+    spec = dt_crank_handle_spec
+    monkeypatch.setattr(cup, dimension, getattr(cup, dimension) + change)
+    fresh = runpy.run_path(spec.__file__)
+    assert fresh["COUNTERBORE_DIA"] == pytest.approx(
+        cup.BODY_DIA + sum(spec.COUNTERBORE_GLUE_LINE) / 2.0
+    )
+    assert fresh["COUNTERBORE_DIA_MAX"] == pytest.approx(spec.COUNTERBORE_DIA_MAX + change)
+    assert fresh["CREST_DIA"] == pytest.approx(spec.CREST_DIA + change)
+    assert fresh["BUTT_WALL_DESIGN_MIN_MM"] == pytest.approx(2.05)
+    assert fresh["BUTT_WALL_MIN"] == pytest.approx(2.05)
+    assert fresh["BUTT_WALL_MIN"] >= fresh["BUTT_WALL_DESIGN_MIN_MM"]
+    assert fresh["DOME_R"] != pytest.approx(spec.DOME_R)
+    assert math.dist(fresh["DOME_CENTER"], fresh["END_ROUND_CENTER"]) == pytest.approx(
+        fresh["DOME_R"] - fresh["END_ROUND_R"]
+    )
+    assert (
+        f'<MOD-DIAM>{fresh["COUNTERBORE_DIA_MAX"]:.1f} MAX'
+        in fresh["COUNTERBORE_FIT_NOTE"]
+    )
+    for name in (
+        "HANDLE_LENGTH", "HANDLE_MAX_DIA", "SHOULDER_X", "SHOULDER_R",
+        "TENON_X0", "TENON_LENGTH", "TENON_DIA", "WAIST_X", "WAIST_R",
+        "INFLECTION_X", "PEAK_X", "PEAK_R", "END_ROUND_R",
+        "COUNTERBORE_DEPTH", "INSIDE_CORNER_R_MAX",
+    ):
+        assert fresh[name] == getattr(spec, name), name
 
 
 def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
@@ -99,7 +155,11 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert "MHA-DT-035" in spec.COUNTERBORE_FIT_NOTE
     assert spec.CUP_NAME in spec.COUNTERBORE_FIT_NOTE
     assert spec.SCREW_NAME in spec.PIVOT_BORE_CALLOUT
-    assert "<MOD-DIAM>8.5 MAX" in spec.COUNTERBORE_FIT_NOTE
+    assert "<MOD-DIAM>9.9 MAX" in spec.COUNTERBORE_FIT_NOTE
+    assert (
+        f"<MOD-DIAM>{spec.COUNTERBORE_DIA_MAX:.1f} MAX"
+        in spec.COUNTERBORE_FIT_NOTE
+    )
     assert "FLUSH" in spec.COUNTERBORE_FIT_NOTE
     # The fitted tenon keeps its ferrule seat and 1.5 over the bore, with
     # 0.10 of bore eccentricity budgeted (local review of 1f3067ef2), the
@@ -182,15 +242,47 @@ def test_grip_contour_is_tangent_arcs_dimensioned_on_the_section() -> None:
     assert (spec.FLARE_R, spec.S_CONCAVE_R, spec.S_CONVEX_R) == pytest.approx(
         (9.083, 21.636, 59.500), abs=0.001
     )
-    assert spec.DOME_R == pytest.approx(55.06, abs=0.01)
-    assert (spec.CREST_DIA, spec.END_ROUND_R) == (14.0, 1.5)
+    # Owner ruling B on #1375 widens the crest, not the swell or end round;
+    # the tangent dome and its printed reference radius follow automatically.
+    assert spec.DOME_R == pytest.approx(77.289, abs=0.001)
+    assert (spec.CREST_DIA, spec.END_ROUND_R) == (15.2, 1.5)
+    assert math.dist(spec.DOME_CENTER, spec.END_ROUND_CENTER) == pytest.approx(
+        spec.DOME_R - spec.END_ROUND_R
+    )
+    assert math.dist(spec.DOME_CENTER, spec.DOME_END) == pytest.approx(spec.DOME_R)
+    assert math.dist(spec.END_ROUND_CENTER, spec.DOME_END) == pytest.approx(spec.END_ROUND_R)
+    assert handle.CREST_DIA == spec.CREST_DIA
+    assert handle.DOME_R == drawing.DOME_R == spec.DOME_R
     assert not hasattr(spec, "CONTOUR_ALLOWANCE_DIA")
     assert not hasattr(spec, "BASIC_DIMENSIONS")
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     build_source = Path(handle.__file__).read_text(encoding="utf-8")
     assert 'profile.record(name, f"{knob} - {station}")' in build_source
+    assert '("CrestDia", CREST_DIA)' in build_source
+    assert '("CounterboreDia", COUNTERBORE_DIA)' in build_source
+    assert '(dome, DOME_R, "DomeR")' in build_source
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_style_radius(" in drawing_source
+
+
+def test_ruling_b_butt_stays_inside_the_unchanged_grip_envelope() -> None:
+    # Owner ruling B on #1375 changes the dome and end round after the same
+    # swell station.  Each arc's entire circle stays no higher than the swell,
+    # so the new contour cannot enlarge the existing radial bounding envelope.
+    # This is a profile bound, not an assembled-clearance or full-motion proof.
+    spec = dt_crank_handle_spec
+    assert (spec.HANDLE_LENGTH, spec.PEAK_X, spec.HANDLE_MAX_DIA) == (58.0, 42.0, 21.0)
+    assert spec.CREST_DIA == 15.2 < spec.HANDLE_MAX_DIA
+    assert spec.DOME_CENTER[0] == spec.PEAK_X
+    assert spec.DOME_CENTER[1] + spec.DOME_R == pytest.approx(spec.PEAK_R)
+    assert spec.END_ROUND_CY + spec.END_ROUND_R <= spec.PEAK_R
+    assert spec.profile_radius(spec.PEAK_X) == pytest.approx(spec.HANDLE_MAX_DIA / 2.0)
+    assert spec.profile_radius(spec.HANDLE_LENGTH) == pytest.approx(spec.CREST_DIA / 2.0)
+    assert spec.COUNTERBORE_FLOOR_X == pytest.approx(49.9)
+    assert (
+        spec.SHOULDER_X, spec.SHOULDER_R, spec.TENON_X0, spec.TENON_LENGTH,
+        spec.TENON_DIA, spec.PIVOT_BORE_DIA,
+    ) == pytest.approx((7.0, 6.25, 2.0, 5.0, 7.6, 4.10))
 
 
 def test_bore_and_counterbore_read_on_a_section_the_end_view_shares_its_axis() -> None:
@@ -240,6 +332,11 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     spec = _config.parts("dt-crank-handle")
     assert handle.MATERIAL == "Oak"
     assert "white oak" in spec["material_specification"]
+    # Owner ruling B on #1375 changes no oak blank requirement: the Ø21
+    # swell still bounds the enlarged butt and the ferrule shoulder.
+    assert dt_crank_handle_spec.HANDLE_MAX_DIA == 21.0
+    assert dt_crank_handle_spec.CREST_DIA < dt_crank_handle_spec.HANDLE_MAX_DIA
+    assert 2.0 * dt_crank_handle_spec.SHOULDER_R < dt_crank_handle_spec.HANDLE_MAX_DIA
     # The title block's MATERIAL field prints "material" (MHA-DT-008
     # machinist review of 2026-10-18: the grain belongs with the stock), in
     # its one-line 36-character cell (Codex P2 on #1650); the long form

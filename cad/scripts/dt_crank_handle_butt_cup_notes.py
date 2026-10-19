@@ -1,14 +1,13 @@
-r"""MHA-DT-035 butt-cup drawing prose -- the note and callouts only its sheet prints.
+r"""MHA-DT-035 butt-cup drawing prose -- its feature callouts and isometric label.
 
 Split OUT of ``dt_crank_handle_butt_cup_spec`` (MHA-DT-035 machinist ENFORCE,
-#1375): the MHA-DT-008 handle and MHA-DT-032 pivot-screw specs import that
-module, so prose living there re-keyed both parts, their drawings and the
-drive train on every wording edit.  The cup's part builder (the Manufacturing
-Notes property) and its drawing script import this module; the mating parts
-never do.
+#1375): the MHA-DT-008 handle and MHA-DT-032 pivot-screw specs import
+that module, so prose living there re-keyed both parts, their drawings and the
+drive train on every wording edit.  The cup's part builder and drawing script
+import this module; the mating parts never do.
 
-The sheet carries one note line, the stated pocket-wall shortfall (drawing-
-guidelines.md rule 20); every requirement that has a feature sits on that
+Owner ruling B on #1375 restores the pocket-wall floor by enlarging the body,
+so no general note remains.  Every requirement that has a feature sits on that
 feature's callout (rule 7: flag it where it applies), naming the mate that
 sets it (rule 4).
 """
@@ -18,7 +17,6 @@ from __future__ import annotations
 from dt_crank_handle_butt_cup_spec import (
     POCKET_CLEARANCE,
     POCKET_DIA_MAX,
-    POCKET_WALL_MIN,
 )
 
 # The mating parts, quoted only to identify them (rule 7); the offline test
@@ -50,7 +48,4 @@ BODY_CHAMFER_CALLOUT = "\n".join(
     ("X 45 DEG", f"CLEARS {HANDLE_NUMBER}", "COUNTERBORE CORNER")
 )
 
-# Pending owner ruling on the MHA-DT-035 pocket wall (#1375): stated as a plain
-# fact, never argued (rule 20).
-DRAWING_NOTES = f"POCKET WALL {POCKET_WALL_MIN:.1f} MIN"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

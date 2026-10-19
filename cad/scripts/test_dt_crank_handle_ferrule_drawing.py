@@ -107,6 +107,11 @@ def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
     # 0.10 of eccentricity.  The Ø12.5 holds the title block's .X band
     # (MHA-DT-008 machinist review of 2026-10-18); off the bore by 0.175, the
     # skimmed ring keeps 1.675 of brass, and the smallest stock still cleans up.
+    # Owner ruling B on #1375 enlarges the cup fit and butt contour only;
+    # the ferrule's shoulder, fitted tenon and running bore stay unchanged.
+    assert (handle.TENON_LENGTH, handle.TENON_DIA, handle.PIVOT_BORE_DIA) == pytest.approx(
+        (5.0, 7.6, 4.10)
+    )
     assert handle.SHOULDER_R == pytest.approx(spec.INSTALLED_OUTER_DIA / 2.0)
     assert handle.FERRULE_OFFSET_MAX == pytest.approx(0.10 + 0.15 / 2.0)
     assert handle.FERRULE_SKIMMED_WALL_MIN == pytest.approx(

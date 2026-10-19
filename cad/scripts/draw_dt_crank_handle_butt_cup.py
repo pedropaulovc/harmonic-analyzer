@@ -9,6 +9,8 @@ MHA-DT-035 machinist review).  The body diameter and the pocket depth are the
 bands; the pocket is bored to suit the MHA-DT-032 head (a reference size whose
 callout states the fit), and the floor hole carries its drill callout.  Every
 band names its mate at the callout (MHA-DT-035 machinist ENFORCE, r1).
+Owner ruling B on #1375 restores the pocket-wall floor in the model, so its
+former shortfall note and property are not part of the sheet.
 
 Run with SolidWorks open::
 
@@ -90,7 +92,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Ø8.2 x 8.1 at 5:1 reads 41 x 41 on the sheet.
+# Ø9.6 x 8.1 at 5:1 reads 48 x 41 on the sheet.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 ISO_SCALE = (4, 1)
@@ -99,13 +101,12 @@ END_CENTER = (0.074, 0.165)
 # floor-hole dimension and the section.
 SECTION_CENTER = (0.225, 0.165)
 ISO_CENTER = (0.368, 0.215)
-# Below the floor end, clear of the floor-hole callout and the notes.
+# Below the floor end, clear of the floor-hole callout.
 CAPTION_XY = (0.160, 0.114)
-MANUFACTURING_NOTES_POS = (0.022, 0.085)
 ISO_NOTE_POS = (0.335, 0.170)
 
 _S = VIEW_SCALE[0] / 1000.0
-BODY_R = BODY_DIA * _S / 2.0  # 0.0205
+BODY_R = BODY_DIA * _S / 2.0  # 0.024
 HALF_LENGTH = OVERALL_LENGTH * _S / 2.0  # 0.02025
 # The section lays the part's +X to the right (the draw_crank_pinion
 # convention), so the face is the right edge and the floor the left.
@@ -232,7 +233,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -240,7 +240,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -295,7 +294,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, section, length_mm=OVERALL_LENGTH, label="butt cup axis"
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_POS)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_POS)
     rebuild_drawing(adapter, label="crank-handle-butt-cup layout audit")
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)

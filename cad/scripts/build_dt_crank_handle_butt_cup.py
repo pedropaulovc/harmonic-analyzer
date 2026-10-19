@@ -6,6 +6,8 @@ inside it.  The body is epoxied into the MHA-DT-008 counterbore, face flush, and
 MHA-DT-032's head bears on the floor; user rulings 2026-09-30 (concept v4) made it
 a plain cup with a flat face; the handle's end round is turned on the oak only.
 Dimensions live in ``dt_crank_handle_butt_cup_spec``.
+Owner ruling B on #1375 enlarges only the body and its stock; the unchanged
+head pocket now retains the wall floor without a shortfall note or property.
 
 Layout: one revolve about local +X.  The cup's outer face is the origin
 plane (x=0); the body and floor run toward -X, into the handle, so in
@@ -44,7 +46,7 @@ from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
-from dt_crank_handle_butt_cup_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
+from dt_crank_handle_butt_cup_notes import ISOMETRIC_VIEW_NOTE
 from dt_crank_handle_butt_cup_spec import (
     BODY_CHAMFER,
     BODY_CHAMFER_TOL,
@@ -302,10 +304,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
     return await save_part_and_images(adapter, PART_NAME)
 

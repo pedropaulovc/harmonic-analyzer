@@ -72,23 +72,43 @@ def test_bottom_chamfer_clears_the_handle_counterbore_corner() -> None:
     ]
 
 
-def test_the_floor_holds_1_5_and_the_wall_states_its_shortfall() -> None:
-    # User rulings 2026-09-30 (ch30 eight-views-4, concept v4): a plain cup
-    # sized to the photographed Ø6 head.  The pocket wall is 0.8, stated on
-    # the sheet pending the owner's ruling (#1375); the floor keeps 1.5.
+def test_floor_and_pocket_wall_hold_their_floors_at_the_printed_limits() -> None:
+    # Owner ruling B on #1375 grows only the body around the unchanged pocket.
     assert not hasattr(spec, "FLANGE_DIA") and not hasattr(spec, "FLANGE_THICKNESS")
     # The floor is what the overall (.X) leaves after the banded pocket depth,
     # both from the face (re-review: one faced end).
     assert spec.FLOOR_THICKNESS_MIN == pytest.approx(1.7)
-    assert spec.POCKET_WALL_FLOOR_MM == 0.8
-    assert spec.POCKET_WALL_MIN == pytest.approx(0.8)
-    assert screw.CUP_POCKET_WALL_MIN == pytest.approx(0.8)
+    assert spec.FLOOR_THICKNESS_MIN >= spec.WALL_FLOOR_MM
+    assert spec.POCKET_WALL_FLOOR_MM == spec.WALL_FLOOR_MM == 1.5
+    assert spec.POCKET_WALL_MIN == pytest.approx(1.5)
+    assert spec.POCKET_WALL_MIN >= spec.POCKET_WALL_FLOOR_MM
+    assert screw.CUP_POCKET_WALL_MIN == spec.POCKET_WALL_MIN
     assert screw.POCKET_MAX <= spec.POCKET_DIA_MAX
-    # 3/8-in stock clears the Ø8.20 body at its upper limit.
-    assert "3/8 in" in _config.parts("dt-crank-handle-butt-cup")["material"]
-    assert spec.BODY_DIA + spec.BODY_DIA_TOL < 0.375 * 25.4
+    assert (spec.BODY_DIA, spec.BODY_DIA_TOL) == (9.6, 0.10)
+    assert spec.BODY_DIA == pytest.approx(
+        spec.POCKET_DIA_MAX + 2.0 * spec.POCKET_WALL_FLOOR_MM + spec.BODY_DIA_TOL
+    )
     assert screw.HEAD_BEARING_RADIAL_MIN > 0.0
     assert spec.FLOOR_HOLE_DIA > screw.SHOULDER_DIA_MAX
+
+
+def test_ruling_b_keeps_the_head_pocket_and_axial_geometry() -> None:
+    assert (screw.HEAD_DIA, screw.HEAD_DIA_TOL) == (6.0, 0.10)
+    assert (spec.POCKET_DIA, spec.POCKET_DIA_MAX) == (6.3, 6.5)
+    assert spec.POCKET_CLEARANCE == (0.2, 0.4)
+    assert spec.OVERALL_LENGTH == 8.1
+    assert spec.FLOOR_THICKNESS == pytest.approx(2.6)
+    assert spec.FLOOR_HOLE_DIA == 4.2
+
+
+def test_half_inch_stock_cleans_up_over_the_largest_body() -> None:
+    # Owner ruling B on #1375 preserves both low-carbon steel alternatives.
+    row = _config.parts("dt-crank-handle-butt-cup")
+    for field in ("material", "material_specification"):
+        for requirement in ("1/2 in", "12L14", "1018"):
+            assert requirement in row[field]
+    assert spec.STOCK_DIA == pytest.approx(0.5 * 25.4)
+    assert spec.BODY_DIA + spec.BODY_DIA_TOL < spec.STOCK_DIA - 0.2
 
 
 def test_head_sits_recessed_and_end_play_is_fitted() -> None:
@@ -111,7 +131,7 @@ def test_pocket_and_floor_hole_read_on_a_section() -> None:
     assert "create_section_axis_centerline(" in source
 
 
-def test_callouts_name_the_mates_and_the_note_states_the_shortfall() -> None:
+def test_feature_callouts_name_the_mates_and_their_fit_acceptance() -> None:
     assert notes.HANDLE_NUMBER == _config.parts("dt-crank-handle")["number"]
     assert notes.SCREW_NUMBER == _config.parts("dt-crank-handle-pivot-screw")["number"]
     assert notes.SCREW_NAME in _config.parts("dt-crank-handle-pivot-screw")["title"].upper()
@@ -137,12 +157,6 @@ def test_callouts_name_the_mates_and_the_note_states_the_shortfall() -> None:
     assert "PocketFloorRadius" in spec.DRAWING_DIMENSIONS["CupProfile"]
     assert spec.DRAWING_PRECISION_BY_NAME["PocketFloorRadius"] == 1
     assert "PocketFloorRadius" not in spec.REFERENCE_DIMENSIONS
-    # Rule 20: the one note states the pocket-wall shortfall as a plain fact,
-    # never argues it, and the assembly method lives in MHA-DT-000 (r1
-    # finding 1).
-    assert notes.DRAWING_NOTES == "POCKET WALL 0.8 MIN"
-    for word in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "EPOXY", "CORNERS"):
-        assert word not in notes.DRAWING_NOTES
     assert "turned clear of it" in _config.parts("dt-crank-handle-butt-cup")["process"]
     # The DT-008 and DT-032 specs import the cup spec; its prose lives in the
     # notes module so a wording edit never re-keys those parts.
@@ -161,7 +175,6 @@ def test_registry_row_is_the_title_block_source() -> None:
 def test_sheet_layout_keeps_annotations_inside_the_field() -> None:
     for x, y in (
         *drawing.SECTION_KEEP.values(),
-        drawing.MANUFACTURING_NOTES_POS,
         drawing.ISO_NOTE_POS,
         drawing.CAPTION_XY,
     ):
@@ -185,10 +198,16 @@ def test_cup_is_one_configuration_the_oak_rounds_clear_of() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "create_configuration" not in source
     # The oak round the largest counterbore, the crest turned its .X band
-    # small and the bore's eccentricity both ways, holds the 2.0 wall target
-    # (MHA-DT-008 machinist review of 2026-10-18).
-    assert handle.BUTT_WALL_MIN >= 2.0
-    assert handle.END_ROUND_CY - 0.4 - 0.20 >= handle.COUNTERBORE_DIA_MAX / 2.0 + 2.0
+    # small and the bore's eccentricity both ways, holds the 2.0 target plus
+    # the 0.05 owner-ruling-B margin (#1375).
+    assert handle.BUTT_WALL_DESIGN_MIN_MM == 2.05
+    assert handle.BUTT_WALL_MIN >= handle.BUTT_WALL_DESIGN_MIN_MM
+    assert (
+        handle.END_ROUND_CY - handle.GENERAL_1PL_TOL_MM / 2.0
+        - 2.0 * handle.BORE_ECCENTRICITY
+    ) == pytest.approx(
+        handle.COUNTERBORE_DIA_MAX / 2.0 + handle.BUTT_WALL_DESIGN_MIN_MM
+    )
     assert _config.parts("dt-crank-handle-butt-cup")["description"] == "CRANK HANDLE BUTT CUP"
 
 
@@ -290,7 +309,7 @@ def test_profile_has_a_driving_tangent_quarter_arc_and_true_floor_depth(cup_buil
     wall = next(name for name, p in lines.items()
                 if p == pytest.approx((-5.4, 3.15, 0.0, 3.15)))
     face = next(name for name, p in lines.items()
-                if p == pytest.approx((0.0, 3.15, 0.0, 4.1)))
+                if p == pytest.approx((0.0, 3.15, 0.0, 4.8)))
     constraints = [call.args for call in captured.adapter.add_sketch_constraint.call_args_list]
     assert (floor, arc, "tangent") in constraints
     assert (arc, wall, "tangent") in constraints
@@ -322,6 +341,34 @@ def test_profile_has_a_driving_tangent_quarter_arc_and_true_floor_depth(cup_buil
     )
     captured.adapter.check_sketch_fully_defined.assert_awaited_once()
     assert captured.adapter.currentSketchManager.AddToDB is False
+
+
+def test_bottom_chamfer_has_real_legs_and_a_sound_root_at_the_new_body(cup_build) -> None:
+    # Owner ruling B on #1375 changes the OD, not the 0.4 +/-0.1 chamfer.
+    chamfer, = (
+        points for kind, points in cup_build.entities.values()
+        if kind == "line" and points[0] != points[2] and points[1] != points[3]
+    )
+    assert chamfer == pytest.approx((-7.7, 4.8, -8.1, 4.4))
+    assert abs(chamfer[2] - chamfer[0]) == pytest.approx(spec.BODY_CHAMFER)
+    assert abs(chamfer[3] - chamfer[1]) == pytest.approx(spec.BODY_CHAMFER)
+    assert spec.BODY_CHAMFER_MIN >= 0.3
+    assert spec.BODY_CHAMFER_MAX == 0.5
+    # Smallest body, longest radial leg and largest drilled floor hole.
+    root_radial_min = (
+        (spec.BODY_DIA - spec.BODY_DIA_TOL) / 2.0
+        - spec.BODY_CHAMFER_MAX - (spec.FLOOR_HOLE_DIA + 0.10) / 2.0
+    )
+    assert root_radial_min == pytest.approx(2.1)
+    assert root_radial_min >= spec.WALL_FLOOR_MM
+
+
+def test_model_properties_need_no_general_manufacturing_note(cup_build) -> None:
+    # Owner ruling B on #1375 resolves the wall in geometry, not a note or exception.
+    properties = cup_build.helpers["apply_drawing_properties"].call_args.args[2]
+    assert properties == {"Isometric View Note": notes.ISOMETRIC_VIEW_NOTE}
+    assert not hasattr(notes, "DRAWING_NOTES")
+    assert not _config.parts("dt-crank-handle-butt-cup").get("machinist_exceptions")
 
 
 def test_concave_floor_round_adds_the_exact_revolved_corner_material() -> None:

@@ -11,11 +11,10 @@ concept v4): the cup is a plain cup, no flange, seated flush with the oak's
 end; after the epoxy cures the handle's end round is turned on the oak, clear of the
 cup, whose face stays flat (local review of fbf82ad96).  Formerly: turned across the oak and
 the cup together, so wood and steel read as one rounded butt.  The smaller
-MHA-DT-032 head (Ø6) lets the cup shrink to the photographed size, and the pocket
-wall is thin -- 0.8 at its worst case, under the 1.5 floor; the sheet states
-it and the owner ruling is pending (#1375): the wall carries no load (the head
-bears on the floor, and the oak round the bonded body backs it), and a 1.5
-wall would push the butt to Ø13.4 against the photograph's ~Ø10.
+MHA-DT-032 head (Ø6) sets the pocket's matched fit.  Owner ruling B on #1375
+enlarges the body to retain a 1.5 pocket wall at the smallest body and largest
+pocket, with the existing +/-0.10 body band.  The head, pocket, floor, axial
+sizes, corner radius and bottom chamfer remain unchanged.
 
 The pocket is bored to suit the MHA-DT-032 head; the handle's end play is fitted
 on the screw shoulder at assembly, so no length here is a stack term.  The
@@ -34,7 +33,7 @@ PURE DATA, no SolidWorks/COM imports.
 
 from __future__ import annotations
 
-BODY_DIA = 8.2
+WALL_FLOOR_MM = 1.5
 BODY_DIA_TOL = 0.10
 # Every axial size reads from the outer face, the one faced end (MHA-DT-035
 # re-review): overall and pocket depth.  The floor is what remains, so the
@@ -52,6 +51,10 @@ POCKET_DEPTH_TOL = 0.10
 POCKET_DIA = 6.3
 POCKET_CLEARANCE = (0.2, 0.4)
 POCKET_DIA_MAX = 6.5
+# Owner ruling B on #1375: the cup grows around the unchanged head and pocket,
+# rather than retaining a sub-floor wall or tightening the body band.
+POCKET_WALL_FLOOR_MM = WALL_FLOOR_MM
+BODY_DIA = round(POCKET_DIA_MAX + 2.0 * POCKET_WALL_FLOOR_MM + BODY_DIA_TOL, 6)
 # The head bears on the floor: the floor-to-wall corner may round no more than
 # the tightest radial clearance, so a sharp-edged, centred head still seats on
 # the flat (rule 16: the largest radius acceptable; MHA-DT-035 r1 finding 5).
@@ -73,23 +76,20 @@ BODY_CHAMFER_MAX = round(BODY_CHAMFER + BODY_CHAMFER_TOL, 6)
 FLOOR_THICKNESS = OVERALL_LENGTH - POCKET_DEPTH
 
 GENERAL_1PL_MM = 0.8
-WALL_FLOOR_MM = 1.5
-# The pocket wall falls short of the 1.5 floor; the sheet states it (rule 20)
-# pending the owner's ruling (#1375).  The floor still holds 1.5.
-POCKET_WALL_FLOOR_MM = 0.8
 FLOOR_THICKNESS_MIN = round(FLOOR_THICKNESS - GENERAL_1PL_MM - POCKET_DEPTH_TOL, 6)
 POCKET_WALL_MIN = round(((BODY_DIA - BODY_DIA_TOL) - POCKET_DIA_MAX) / 2.0, 6)
-# Turned from 3/8-in cold-finished rod: the largest body plus a cleanup cut.
-STOCK_DIA = 0.375 * 25.4
+# Owner ruling B on #1375: 1/2-in cold-finished rod leaves a cleanup cut over
+# the largest body.
+STOCK_DIA = 0.5 * 25.4
 
 for _ok, _what in (
     (FLOOR_THICKNESS_MIN >= WALL_FLOOR_MM, "cup floor is under 1.5 at .X"),
     (
         POCKET_WALL_MIN >= POCKET_WALL_FLOOR_MM,
-        "pocket wall is under the 0.8 baseline pending ruling #1375 at its limits",
+        "pocket wall is under 1.5 at its limits (owner ruling B on #1375)",
     ),
     (FLOOR_HOLE_DIA < POCKET_DIA, "floor hole leaves no floor"),
-    (BODY_DIA + BODY_DIA_TOL < STOCK_DIA - 0.2, "body is not turnable from 3/8-in rod"),
+    (BODY_DIA + BODY_DIA_TOL < STOCK_DIA - 0.2, "body is not turnable from 1/2-in rod"),
 ):
     if not _ok:
         raise AssertionError(f"MHA-DT-035: {_what}")

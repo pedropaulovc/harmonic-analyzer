@@ -25,6 +25,12 @@ title block's .X band; the tangencies fix the other radii, which print as
 references (MHA-DT-008 machinist review of 2026-10-18: the contour had lived in
 a note).
 
+Owner ruling B on #1375 enlarges the cup body to retain its pocket wall and
+derives the butt crest from that cup's largest counterbore, the ordinary .X
+band, both eccentricities, and the 2.0 oak wall target plus 0.05 radial margin.
+The oak feather was already fixed in #1650; this ruling preserves the full
+wall target without changing the swell, axial stations or end-round radius.
+
 Frame: the handle axis is local +X and x=0 is the ferrule's arm-bearing face,
 the plane the drive train seats on the arm.  No oak reaches x=0: the tenon
 stops short of the ferrule's end, so only brass bears on the arm.
@@ -117,13 +123,19 @@ CUP_OFFSET_MAX = BORE_ECCENTRICITY + COUNTERBORE_GLUE_LINE[1] / 2.0
 COUNTERBORE_DIA_MAX = round(
     CUP_BODY_DIA + CUP_BODY_DIA_TOL + COUNTERBORE_GLUE_LINE[1] + 0.05, 1
 )
-# The butt: a flat oak end on the cup-face plane, the end round cresting on it
-# at this diameter.  Wide enough that the oak round the largest counterbore
-# holds the 2.0 wall target with the crest turned its .X band small and the
-# outside and the counterbore each off the bore by the eccentricity in opposite
-# directions (MHA-DT-008 machinist review of 2026-10-18: a Ø9.4 crest left a
-# 0.45 lip over the counterbore, feathering to nothing).
-CREST_DIA = 14.0
+# Owner ruling B on #1375: the flat oak end on the cup-face plane keeps the
+# rule-17 wall target plus a radial design margin.  Derive its crest from the
+# cup-driven counterbore limit, the ordinary .X diameter band and the outside
+# and counterbore each off the bore by the eccentricity in opposite directions.
+WALL_TARGET_MM = 2.0
+BUTT_WALL_RULING_MARGIN_MM = 0.05
+BUTT_WALL_DESIGN_MIN_MM = round(WALL_TARGET_MM + BUTT_WALL_RULING_MARGIN_MM, 6)
+CREST_DIA = round(
+    COUNTERBORE_DIA_MAX
+    + _GENERAL_1PL
+    + 2.0 * (2.0 * BORE_ECCENTRICITY + BUTT_WALL_DESIGN_MIN_MM),
+    6,
+)
 END_ROUND_R = 1.5
 END_ROUND_CY = CREST_DIA / 2.0
 
@@ -193,13 +205,12 @@ WOOD_LENGTH = OAK_END_X - SHOULDER_X
 # The oak round the largest counterbore at the butt, its thinnest place: the
 # crest turned its .X band small, off the bore by the eccentricity one way and
 # the counterbore the other.
-BUTT_WALL_MIN = (
+BUTT_WALL_MIN = round(
     (CREST_DIA - _GENERAL_1PL) / 2.0
     - 2.0 * BORE_ECCENTRICITY
-    - COUNTERBORE_DIA_MAX / 2.0
+    - COUNTERBORE_DIA_MAX / 2.0,
+    6,
 )
-# drawing-guidelines.md rule 17's target wall for wood.
-WALL_TARGET_MM = 2.0
 # The tenon is turned to suit the actual ferrule bore (Codex P1/P2 on #1139):
 # the largest banded bore with the tightest glue line gives the largest tenon,
 # and the smallest bore with the widest line the smallest.
@@ -272,8 +283,9 @@ for _ok, _what in (
     ),
     (WAIST_WALL_MIN >= 1.5, "the waist leaves under 1.5 over the bore"),
     (
-        BUTT_WALL_MIN >= WALL_TARGET_MM,
-        "the butt leaves under 2.0 of oak round the counterbore",
+        BUTT_WALL_MIN >= BUTT_WALL_DESIGN_MIN_MM >= WALL_TARGET_MM,
+        f"the butt leaves under {BUTT_WALL_DESIGN_MIN_MM:g} of oak round the counterbore "
+        "(owner ruling B on #1375)",
     ),
     (WAIST_R < SHOULDER_R and WAIST_R < PEAK_R, "the waist is not the neck's minimum"),
     (
