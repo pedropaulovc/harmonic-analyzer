@@ -22,6 +22,97 @@ _HOLE_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 _WEB_TARGET = 2.0  # U27: machined webs >= 2.0 at the printed worst case
 
 
+class _MarkDisplay:
+    def __init__(self, lines):
+        self.lines = lines
+
+    def GetLineCount(self):
+        return len(self.lines)
+
+    def GetLineAtIndex2(self, index):
+        return self.lines[index]
+
+
+class _CentreMark:
+    def __init__(self, data):
+        self.data = data
+
+    def GetDisplayData(self):
+        return self.data
+
+
+class _MarkedTop:
+    def __init__(self, marks):
+        self.marks = marks
+
+    def GetAnnotationsByType(self, kind):
+        assert kind == 13  # swCenterMark
+        return self.marks
+
+
+def _pad_mark(x=0.1147081, y=0.228):
+    return _CentreMark(
+        _MarkDisplay(
+            [
+                [0, 0, 0, 0, x - 0.003, y, 0, x + 0.003, y, 0],
+                [0, 0, 0, 0, x, y - 0.003, 0, x, y + 0.003, 0],
+            ]
+        )
+    )
+
+
+@pytest.fixture
+def pad_mark_projection(monkeypatch):
+    adapter = object()
+    calls = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+
+    def project(actual_adapter, view, point, *, label):
+        assert actual_adapter is adapter
+        assert point == pytest.approx(
+            tuple(value / 1000.0 for value in drawing.HOLE_CENTER)
+        )
+        assert label == "pad hole axis"
+        calls.append(view)
+        return (0.1147081, 0.228, 0.0)
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(drawing._telemetry, "success", lambda message: None)
+    return adapter, calls
+
+
+@pytest.mark.parametrize("offset", [0.0, 0.00049])
+def test_template_pad_mark_is_proved_from_printed_lines(pad_mark_projection, offset):
+    adapter, calls = pad_mark_projection
+    top = _MarkedTop([_pad_mark(x=0.1147081 + offset)])
+    drawing._prove_pad_hole_centre_mark(adapter, top)
+    assert calls == [top]
+
+
+@pytest.mark.parametrize("marks", [None, [], [_pad_mark(), _pad_mark()]])
+def test_template_pad_mark_census_fails_closed(pad_mark_projection, marks):
+    adapter, calls = pad_mark_projection
+    with pytest.raises(RuntimeError, match="centre marks"):
+        drawing._prove_pad_hole_centre_mark(adapter, _MarkedTop(marks))
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("mark", "message"),
+    [
+        (_pad_mark(x=0.1157081), "off the hole axis"),
+        (_CentreMark(None), "no display data"),
+        (_CentreMark(_MarkDisplay([])), "draws no lines"),
+        (_CentreMark(_MarkDisplay([[0] * 9])), "invalid display lines"),
+        (_pad_mark(x=float("nan")), "invalid display lines"),
+    ],
+)
+def test_invalid_template_pad_mark_is_rejected(pad_mark_projection, mark, message):
+    adapter, _calls = pad_mark_projection
+    with pytest.raises(RuntimeError, match=message):
+        drawing._prove_pad_hole_centre_mark(adapter, _MarkedTop([mark]))
+
+
 def test_spring_contact_rises_with_pivot_while_foot_stays_on_base() -> None:
     from dt_pinion_pivot_block_geometry import BORE_UP
     from pinion_rig_park_geometry import STRAP_LEAN_DEG

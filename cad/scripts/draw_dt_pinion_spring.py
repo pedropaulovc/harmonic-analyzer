@@ -27,7 +27,6 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    auto_center_marks,
     dimension_name,
     place_view,
     view_name,
@@ -1000,6 +999,47 @@ def _blank_dimensions(adapter: Any, top: Any) -> None:
                 raise RuntimeError(f"{label} did not keep its arrows inside")
 
 
+def _prove_pad_hole_centre_mark(adapter: Any, top: Any) -> None:
+    """Prove the template's one mark; never author or clean up unknown marks."""
+    marks = list(_early_bound(top, "IView").GetAnnotationsByType(13) or ())
+    if len(marks) != 1:
+        raise RuntimeError(
+            f"pad top view carries {len(marks)} centre marks, expected the "
+            "template's one on the hole axis"
+        )
+    data = _early_bound(marks[0], "IAnnotation").GetDisplayData()
+    if data is None:
+        raise RuntimeError("pad hole centre mark has no display data")
+    data = _early_bound(data, "IDisplayData")
+    count = int(data.GetLineCount())
+    if count <= 0:
+        raise RuntimeError("pad hole centre mark draws no lines")
+    xs: list[float] = []
+    ys: list[float] = []
+    for index in range(count):
+        line = [float(value) for value in data.GetLineAtIndex2(index)]
+        if len(line) < 10 or not all(math.isfinite(value) for value in line[4:10]):
+            raise RuntimeError("pad hole centre mark has invalid display lines")
+        xs.extend((line[4], line[7]))
+        ys.extend((line[5], line[8]))
+    ink = ((min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0)
+    axis = model_point_in_view(
+        adapter,
+        top,
+        tuple(value / 1000.0 for value in HOLE_CENTER),
+        label="pad hole axis",
+    )
+    offset = math.hypot(ink[0] - axis[0], ink[1] - axis[1])
+    # Same 0.5 mm sheet-space display tolerance as the magnifying-bracket census.
+    if not math.isfinite(offset) or offset > 0.0005:
+        raise RuntimeError(
+            f"pad hole centre mark prints {offset * 1000.0:.2f} mm off the hole axis"
+        )
+    _telemetry.success(
+        f"pad top view: one centre mark, {offset * 1000.0:.2f} mm off the hole axis"
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1088,8 +1128,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, front, FRONT_HOLE_AXIS_ENDS, label="profile hole-axis centreline"
     )
 
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to top view")
+    # The template already supplies this mark; reinsertion prints identical ink twice.
+    _prove_pad_hole_centre_mark(adapter, top)
     _blank_dimensions(adapter, top)
     hole_edge = model_point_in_view(
         adapter,
