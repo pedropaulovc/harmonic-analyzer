@@ -12,7 +12,6 @@ drawing's coordinate math (``test_dt_pinion_lever_pin_drawing.py``).
 
 from __future__ import annotations
 
-from dt_drive_train_steps import step_ref
 from dt_pinion_lever_pin_geometry import PIN_DIA as PIN_DIA, PIN_LEN as PIN_LEN
 
 LEVER_NUMBER = "MHA-DT-016"
@@ -64,20 +63,15 @@ ASSEMBLY_STEP = "\n".join(
 )
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
 # the stock band names the hole the pin slips into and says the stock holds
-# it; the overlength cut points at the step that trims it (rule 19).
-DIMENSION_CALLOUTS: dict[str, str] = {
-    "PinDia": "\n".join(
-        (
-            "1/16 DRILL ROD, STOCK OK",
-            f"SLIP FIT IN {LEVER_NUMBER}",
-            f"AND {LIFT_ROD_NUMBER} PIN HOLE",
-        )
-    ),
-    "PinLen": "\n".join(
-        (
-            "CUT LENGTH",
-            f"TRIMMED AT ASSEMBLY PER {step_ref(LEVER_PIN_SET_STEP_KEY)}",
-        )
-    ),
-}
+# it; the overlength cut points at the step that trims it (rule 19).  That
+# pointer comes from the MHA-DT-000 step registry, which part scripts must not
+# reach (test_part_isolation), so the drawing composes it.
+PIN_DIA_CALLOUT = "\n".join(
+    (
+        "1/16 DRILL ROD, STOCK OK",
+        f"SLIP FIT IN {LEVER_NUMBER}",
+        f"AND {LIFT_ROD_NUMBER} PIN HOLE",
+    )
+)
+PIN_LEN_CALLOUT = "CUT LENGTH"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
