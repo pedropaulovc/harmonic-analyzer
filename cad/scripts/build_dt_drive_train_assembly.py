@@ -544,7 +544,9 @@ if abs(CRANK_ARM_ORIGIN_Z - (CRANK_FACE_Z + HUB_SEAT_LENGTH)) > 1e-9:
 # collar, one chain plane with the selected knob sprocket (ch. 23 p.56).
 # The sprocket itself lives in paper-drive; this module owns its seat.
 if abs((CRANKSHAFT_Z0 + SEAT_COLLAR) - seat_geometry.SEAT_FACE_Z) > 1e-9:
-    raise AssertionError("crankshaft SeatCollar datum off the removable's SEAT_FACE_Z")
+    raise AssertionError(
+        "crankshaft SeatCollar datum off _sprocket_seat_geometry.SEAT_FACE_Z"
+    )
 # The hub rear face is what stops the removable walking forward once the
 # taper pin is in: the contract's 0.7 axial air, derived from both parts.
 # The seat station's functional band moves the wheel against the hub; at its

@@ -543,7 +543,7 @@ THIRD_FACE = KNOB_SPEC.FACE_WIDTH
 # Both mounted removables (knob and crank) share ONE band: front face
 # BAND_FRONT_Z, rear face on the seat face SEAT_FACE_Z (the knob's drive collar,
 # the crankshaft's seat collar), and the chain mid-plane between
-# (pd_transgear_removable_spec). Each is placed on its FRONT face (the part's
+# (_sprocket_seat_geometry). Each is placed on its FRONT face (the part's
 # Front Plane), identity: holes on machine +/-Y.
 REMOVABLE_Z0 = seat_geometry.BAND_FRONT_Z  # -157.1
 CHAIN_MID_Z = seat_geometry.CHAIN_MID_Z  # both selected wheels coplanar

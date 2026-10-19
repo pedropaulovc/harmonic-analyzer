@@ -79,7 +79,7 @@ SEAT_PRESS_INTERFERENCE = (0.010, 0.030)  # diametral, mm (min, max)
 # Q4) is turned to its own size, narrower than the 1-in arm, and the hub
 # runs 17.2 from the arm shoulder to a flat rear face 0.7 clear of the
 # MHA-PD-09 removable, which it keeps from walking forward (the drive train
-# asserts the air against pd_transgear_removable_spec).  It followed the seat
+# asserts the air against _sprocket_seat_geometry).  It followed the seat
 # face 1.8 forward (user ruling 2026-09-30): 19 -> 17.2.  Its front face is
 # the shoulder the arm is pressed to: R9-38 took it Ø20.6 -> Ø22.25 at .XX so
 # the shoulder keeps its land (SHOULDER_LAND_WORST_MIN) over the largest
