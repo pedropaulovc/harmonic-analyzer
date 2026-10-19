@@ -60,9 +60,11 @@ All in [`references/`](../references/), which is a git submodule:
 
 The installed lathe is the Precision Matthews PM-1127VF-LB. Its manual is
 unresolved: verify the machine's build year and nameplate, then obtain the
-matching manufacturer manual. The archived 2015 PM manual covers an earlier
-DC-motor version, not the VFD configuration recorded in the inventory; do not
-use it as the installed lathe's manual.
+matching manufacturer manual. The [archived 2015 PM manual](https://archive.org/download/pm-1440-gs-v-3-2020-10/Precision%20Matthews/PM-1127VF-LB-Manual-2015.pdf)
+covers an earlier DC-motor version, not the VFD configuration recorded from
+catalogue data in the inventory. Do not use it as the installed lathe's manual
+unless nameplate/build identification and Precision Matthews confirmation
+establish that it applies.
 
 ## Machines
 
