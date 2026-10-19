@@ -211,13 +211,13 @@ def test_the_cam_rides_the_shank_short_of_the_crown() -> None:
     assert max(stations) < dt_pinion_cam_pin_spec.PIN_LEN - 3.0
 
 
-# The finish symbol's ink relative to its V root at 2.5 mm character height,
-# measured on the pc-r4-860 render of the old crown symbol: the leader leaves
-# the shelf's right end; the "Ra 1.6" text sits above the shelf, right of it.
+# The finish symbol's ink relative to its V root at 2.5 mm character height:
+# the leader leaves the shelf's right end; the "Ra 1.6" text sits above the
+# shelf, right of it (r5 layout audit: text 4.2-6.8 mm above the root), and
+# the CAM CONTACT target prints a row above the bar, about 11.5 mm up.
 _SHELF_LEFT_DX = -0.0030
-_SHELF_END_DX = 0.0064
 _TEXT_RIGHT_DX = 0.0148
-_SYMBOL_TOP_DY = 0.0074
+_SYMBOL_TOP_DY = 0.0115
 
 
 def test_shank_finish_sits_clear_above_the_shank() -> None:
@@ -235,8 +235,14 @@ def test_shank_finish_sits_clear_above_the_shank() -> None:
     assert target[0] > x + _TEXT_RIGHT_DX
     # Clear of the crown-root extension line and under the Depth block.
     assert x + _SHELF_LEFT_DX > drawing.side_view_x(drawing.PIN_LEN) + 0.005
+    # r5 layout audit: the Depth dimension line runs 8 mm under its keep point.
     depth_line = drawing.RIGHT_KEEP["Depth"][1] - 0.008
     assert depth_line - (y + _SYMBOL_TOP_DY) > _SYMBOL_TOP_DY
+    assert (
+        dt_pinion_cam_pin_spec.SURFACE_FINISHES[0].production_method
+        == dt_pinion_cam_pin_spec.SHANK_FINISH_TARGET
+        == "CAM CONTACT"
+    )
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

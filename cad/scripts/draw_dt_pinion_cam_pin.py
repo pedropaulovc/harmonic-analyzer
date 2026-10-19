@@ -113,12 +113,15 @@ def side_view_x(z_mm: float) -> float:
 # above the shank between the crown-root extension line and the Depth text.
 RIGHT_KEEP = {
     "PinDia": (RIGHT_CENTER[0] + 0.040, RIGHT_CENTER[1] - HALF_DIA - 0.030),
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.031),
+    # 39 mm above the shank (was 31): the shank's CAM CONTACT finish symbol
+    # sits between it and the shank, and the crowding gap must exceed the
+    # symbol's 11.5 mm height (machinist review r5 of #1009).
+    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.039),
     # Lower left, on the line from the crown centre through its lower flank,
     # so the radius leader lands on the crown below the axis.
     "CapR": (0.105, 0.110),
 }
-OVERALL_TEXT_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.059)
+OVERALL_TEXT_XY = (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_DIA + 0.067)
 DIMENSION_CALLOUTS = {
     "PinDia": PIN_DIA_CALLOUT,
     "Depth": DEPTH_CALLOUT,
