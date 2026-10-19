@@ -46,7 +46,7 @@ Install (this repo is a uv project -- pyproject.toml + uv.lock at the root)::
 Run through uv (SolidWorks already open for the COM tasks)::
 
     uv run python -m doit                       # = `build`: every part + assembly + every gate
-    uv run python -m doit -n 4                  # local seat only: fan out the SolidWorks-free checks
+    uv run python -m doit -n 4                  # local seat only: parallel cache restores; checks share one host slot
     uv run python build.py --verbosity warning  # concise console output; farm: no -n (build.py keeps 8 leaves in flight)
 
     uv run python -m doit build_bare            # quick: parts + assemblies only, no gates
@@ -1019,8 +1019,8 @@ def _run(
     CONTINUES this span (via the injected TRACEPARENT) instead of adding a
     duplicate root layer under it.
 
-    SolidWorks-FREE tasks ONLY -- it never takes the COM seat, so these fan out
-    under ``-n N``. Every COM-touching task goes through
+    SolidWorks-FREE tasks ONLY -- it never takes the COM seat. Local checks
+    additionally use their host-wide admission runner. Every COM task uses
     :func:`_cached_com_action`, which owns the seat lock, the remote-cache
     probe/store and the farm dispatch; there is therefore no code path that can
     reach SolidWorks while bypassing the cache or the farm."""

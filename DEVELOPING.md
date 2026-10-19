@@ -134,17 +134,33 @@ In one ordered, unchanged 291-file, serial (`-n 0`) collect-only pair, baseline
 collection took **75.1735279 s** versus **38.6164179 s** with the flag; the
 **11,513 node-ID multisets were identical**. This is collection-only evidence,
 not a recipe execution or whole-build speedup measurement.
-Other `check:*` gates remain serial internally.
-Eight workers bound the additional local processes:
-the measured development host has 16 logical CPUs, and the farm launcher already
-permits eight simultaneous doit tasks. Using `-n auto` inside the recipe gate
-would occupy every CPU before accounting for sibling checks. This is a
-conservative first step, not a claim of a fivefold speedup. Work stealing
-rebalances individual tests instead of pinning the dominant recipe-test file to
-one worker. Each worker still pays collection costs, and module/session-scoped
-fixtures may execute in multiple workers; tests must not rely on shared mutable
-fixture state across processes.
-Doit still owns the same dependency checks and success stamp.
+Local offline `check:*` gates share one host-wide execution slot across doit
+processes, worktrees, and farm snapshots. `_local_check.py` acquires
+`%PROGRAMDATA%/harmonic-analyzer/local-check.lock` before importing the check's
+entry point and holds it in the process executing the check. A dead submitter
+therefore cannot release a still-running check's slot. The OS releases the
+lock when its owner exits, including a crash. Never delete the lock file to
+unblock a queue.
+
+`check:recipe` retains eight internal pytest workers; other offline checks
+remain serial internally. Remote farm leaves and cached machinist reviews do
+not take this lock. Doit still owns dependency checks and success stamps.
+Wait and execution durations appear separately as `local.check.wait` and
+`local.check.run`; info-level logs report admission, release, and a wait every
+30 seconds. There is no queue deadline and no retry of a failed check.
+
+`HARMONIC_LOCAL_CHECK_LOCK` overrides the path for isolated tests. All production
+submitters on a host must use the same path. Direct `pytest` invocations bypass
+admission; use the wrapper when running a full suite alongside builds:
+`uv run python cad/scripts/_local_check.py check:manual -m pytest ...`.
+Nested pytest/xdist children belong to their enclosing admitted check and must
+not acquire admission again. Older snapshots lack this guard: resume paused
+launches only from commits containing it.
+
+Work stealing rebalances individual tests instead of pinning the dominant
+recipe-test file to one worker. Each worker still pays collection costs, and
+module/session-scoped fixtures may execute in multiple workers; tests must not
+rely on shared mutable fixture state across processes.
 
 The coordinator compared the same frozen source (`4d89b02fb`) and production
 recipe inventory sequentially on that host, changing only xdist scheduling:
@@ -171,13 +187,13 @@ these commands sequentially from the isolated worktree's root. They derive the
 argv from `task_check()` rather than substituting a broader `pytest cad/scripts`
 run, and bypass the stamp so both runs execute. Replace the JUnit paths with
 distinct absolute paths outside the worktree; keep the guard and environment
-settings above. These direct pytest runs do not update the gate's success stamp.
+settings above. These admitted runs do not update the gate's success stamp.
 
 ```powershell
 # Serial baseline: remove only the recipe gate's four xdist arguments.
-uv run --locked python -c "import dodo, subprocess; t = next(t for t in dodo.task_check() if t['name'] == 'recipe'); c = list(t['actions'][0][1][0]); i = c.index('-n'); del c[i:i+4]; raise SystemExit(subprocess.call(c + ['--durations=50', '--junitxml=C:/outside-worktree/recipe-serial.xml'], cwd=dodo.REPO_ROOT))"
+uv run --locked python -c "import dodo, subprocess; t = next(t for t in dodo.task_check() if t['name'] == 'recipe'); c = list(t['actions'][0][1][0]); i = c.index('-n'); del c[i:i+4]; raise SystemExit(subprocess.call(dodo._local_check.command(c + ['--durations=50', '--junitxml=C:/outside-worktree/recipe-serial.xml'], 'check:recipe'), cwd=dodo.REPO_ROOT))"
 # Parallel: run the production argv unchanged, plus timing/report options.
-uv run --locked python -c "import dodo, subprocess; t = next(t for t in dodo.task_check() if t['name'] == 'recipe'); c = list(t['actions'][0][1][0]); raise SystemExit(subprocess.call(c + ['--durations=50', '--junitxml=C:/outside-worktree/recipe-parallel.xml'], cwd=dodo.REPO_ROOT))"
+uv run --locked python -c "import dodo, subprocess; t = next(t for t in dodo.task_check() if t['name'] == 'recipe'); c = list(t['actions'][0][1][0]); raise SystemExit(subprocess.call(dodo._local_check.command(c + ['--durations=50', '--junitxml=C:/outside-worktree/recipe-parallel.xml'], 'check:recipe'), cwd=dodo.REPO_ROOT))"
 ```
 
 Compare full case inventories and outcomes as well as process wall time; JUnit
