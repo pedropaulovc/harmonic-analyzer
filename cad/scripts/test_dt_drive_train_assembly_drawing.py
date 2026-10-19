@@ -554,7 +554,7 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     import dt_pinion_lever_pin_spec as pin
 
     assert pin.PIN_DIA == 25.4 / 16.0
-    assert "SLIP FIT" in _flat(pin.DIMENSION_CALLOUTS["PinDia"])
+    assert "SLIP FIT" in _flat(pin.PIN_DIA_CALLOUT)
     step = _rig_step_body(pin.LEVER_PIN_SET_STEP_KEY)
     assert step.endswith(_flat(drawing.LEVER_PIN_HOLE_FIT))
     assert "MHA-DT-016'S PRINTED STATION: 1/16 IN DRILL THRU" in step
