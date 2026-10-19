@@ -87,8 +87,8 @@ class Configuration:
 class Model:
     """An assembly whose constrained statuses read stale in a configuration
     until that configuration's first deep rebuild; a deep rebuild clears
-    ``NeedsRebuild2``. ``AddConfiguration2`` activates the configuration it
-    derives, as SolidWorks does."""
+    ``NeedsRebuild2``. ``AddConfiguration2`` activates its child unless the
+    native DontActivate option is supplied."""
 
     def __init__(self, components):
         self.components = components
@@ -97,6 +97,8 @@ class Model:
         default = Configuration("Default")
         self.configurations = {default.Name: default}
         self.ConfigurationManager = NS(ActiveConfiguration=default, AddConfiguration2=self._add)
+        self.explodes = {default.Name: []}
+        self.authored = []
         self.rebuilds = Counter()
         self.rebuild_order: list[str] = []
         self.exploded = False
@@ -109,7 +111,9 @@ class Model:
     def _add(self, name, comment, _alternate, _options, parent, _description, _rebuild):
         created = Configuration(name, self.configurations[parent], comment)
         self.configurations[name] = created
-        self.ConfigurationManager.ActiveConfiguration = created
+        self.explodes[name] = list(self.explodes[parent])
+        if not _options & 128:  # swConfigOption_DontActivate
+            self.ConfigurationManager.ActiveConfiguration = created
         return created
 
     def GetConfigurationNames(self):
@@ -208,9 +212,17 @@ def _free_dof_gate(adapter):
 
 
 def _save(adapter, gates):
+    model = adapter.currentModel
+
+    def author(configuration):
+        assert model.active == configuration
+        assert not model.explodes[configuration]
+        model.explodes[configuration].append(f"EXPLODED {configuration}")
+        model.authored.append(configuration)
+
     return asyncio.run(
         _assembly.save_assembly_and_images(
-            adapter, ASM, [], solved_gates=gates, dof_manifest=True
+            adapter, ASM, [], author=author, solved_gates=gates, dof_manifest=True
         )
     )
 
@@ -228,6 +240,11 @@ def test_gates_read_the_final_rebuild_and_the_save_pays_one_rebuild(save_steps):
     # The simplified child is verified in its own configuration BEFORE
     # Default's one deep rebuild, which the gates then certify.
     assert model.rebuild_order == ["Default Simplified", "Default"]
+    assert model.authored == ["Default", "Default Simplified"]
+    assert model.explodes == {
+        "Default": ["EXPLODED Default"],
+        "Default Simplified": ["EXPLODED Default Simplified"],
+    }
     assert model.GetConfigurationByName("Default Simplified").GetParent().Name == "Default"
     assert model.active == "Default"
     assert _assembly.dof_manifest_path(ASM).exists()

@@ -814,8 +814,8 @@ EXPLODE falls back to a FULL build in the same task, since a failure before the
 save leaves the proof and ledger that chose EXPLODE in place. The proof is
 republished from the re-saved model, and the saved renders and `.dof.json` are
 kept. Only a builder whose sole use of that module is
-`author_in_drawing_configurations(adapter, ASM_NAME, lambda configuration:
-<fn>(adapter, configuration))` qualifies (on main: `pd_paper_drive`); an explode
+`save_assembly_and_images(adapter, ASM_NAME, author=lambda configuration:
+<fn>(adapter, configuration), ...)` qualifies (on main: `pd_paper_drive`); an explode
 that takes other build state (`dt_drive_train`'s collar-pin roles) or lives inline
 (`fr_frame`, `ms_measuring_stick`) declines to FULL, as does any explode change
 that lands together with a recipe or referenced-part change. Each build of a
@@ -823,6 +823,15 @@ qualifying stem also publishes its archive under an *explode base* key (the cach
 key without the explode closure), so a clean farm leaf restores that base and
 takes the EXPLODE tier. To qualify, move the explode and its data into
 `_<stem>_explode.py` / an explode-only spec.
+
+**Full-build drawing configurations.** Pass the explode callback as the required
+`author=` argument to `save_assembly_and_images`. The save lifecycle creates the
+derived child before authoring Default's explode, then visits the child once to
+synchronize its component references/comment, realize changed references, author
+its own explode and run the deep rebuild/fault check. It restores Default on
+success and failure. The final Default solve, solved gates, save reconciliation
+and fresh-open proof remain separate requirements; do not remove them as
+"duplicate rebuilds." Explode-only refresh retains its own traversal.
 
 **Focused helper imports.** Import helpers directly from their owning modules:
 `_session` for build sessions, `_paths` for paths/constants, `_com` for COM access,
