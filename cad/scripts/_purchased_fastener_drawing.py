@@ -1,9 +1,9 @@
 """Four-view purchased-part reference sheets, linked to the native source part.
 
-Every view is hidden-lines-removed: the sheets carry no dimensions, so a dashed
-edge never names a feature (drawing-guidelines rule 9).  Front/Top/Right share
-the largest standard scale that fits their cells, which is the sheet scale; the
-Isometric takes its own largest fitting scale, printed in its caption.
+Every view is hidden-lines-removed; supplier dimensions attach to visible
+geometry (drawing-guidelines rule 9). Front/Top/Right share the largest
+standard scale that fits their cells, which is the sheet scale; the Isometric
+takes its own largest fitting scale, printed in its caption.
 
 The footer, bottom-left above the border and left of the title block, reads
 top to bottom: the part's own notes (installation, or a spring's acceptance
@@ -16,6 +16,7 @@ stock name, which restates the material, is read and checked but not printed.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
 
@@ -91,6 +92,10 @@ _CAPTION_CLEARANCE = 0.011
 # A caption's top edge sits this far under its cell; its text hangs below.
 _CAPTION_TO_CELL = 0.004
 _CAPTION_BELOW = 0.006
+
+# Runs synchronously after the native views and sheet scale have been fitted.
+# Keys are the standard orientation names, including their leading "*".
+SupplierDimensions = Callable[[Any, dict[str, Any]], None]
 
 
 def _box(
@@ -450,14 +455,16 @@ async def build_purchased_fastener_drawing(
     *,
     item: str | None = None,
     cut_to_suit: bool = False,
+    supplier_dimensions: SupplierDimensions | None = None,
 ) -> dict[str, str]:
-    """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
+    """Export Front/Top/Right plus Isometric with optional supplier references.
 
     ``item`` is the catalogue designation printed on the ITEM row, e.g.
     ``#4-40 x 1/4 SOCKET SET SCREW, CUP POINT``; without one the row prints
     the registry stock name (vn_transgear_pivot_screw, reworked in PR #1477).
     ``cut_to_suit`` marks a fastener its registry installation note cuts at
-    assembly.
+    assembly. ``supplier_dimensions(adapter, views_by_orientation)`` adds native
+    reference annotations after fitting; it must not rescale the views.
     """
     stock = fastener(spec.artifact_stem)
     source = spec.source
@@ -503,11 +510,16 @@ async def build_purchased_fastener_drawing(
         notes=str(registry.get("installation_notes", "")),
         cut_to_suit=cut_to_suit,
         document_title=str(registry["title"]),
+        supplier_dimensions=supplier_dimensions,
     )
 
 
 async def build_purchased_spring_drawing(
-    adapter: Any, spec: DrawingSpec, *, item: str
+    adapter: Any,
+    spec: DrawingSpec,
+    *,
+    item: str,
+    supplier_dimensions: SupplierDimensions | None = None,
 ) -> dict[str, str]:
     """Use spring metadata without treating the part as a catalogued fastener.
 
@@ -532,6 +544,7 @@ async def build_purchased_spring_drawing(
         material_property="Material Specification",
         notes=properties["Manufacturing Notes"],
         spring=True,
+        supplier_dimensions=supplier_dimensions,
     )
 
 
@@ -547,6 +560,7 @@ async def _build_reference_sheet(
     cut_to_suit: bool = False,
     document_title: str | None = None,
     spring: bool = False,
+    supplier_dimensions: SupplierDimensions | None = None,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -577,7 +591,11 @@ async def _build_reference_sheet(
                 1: "Harmonic Analyzer purchased-part identification; reference only",
                 2: "Harmonic Analyzer Project",
                 3: f"{spec.artifact_stem}; {properties['Supplier']}; {properties['Supplier SKUs']}",
-                4: "Front, Top, Right and Isometric; no fabrication dimensions or PMI",
+                4: (
+                    "Front, Top, Right and Isometric; supplier sizes are reference only"
+                    if supplier_dimensions is not None
+                    else "Front, Top, Right and Isometric; no fabrication dimensions or PMI"
+                ),
             },
         )
 
@@ -640,6 +658,11 @@ async def _build_reference_sheet(
 
     placed = []
     with _telemetry.span("drawing.purchased_annotations"):
+        if supplier_dimensions is not None:
+            supplier_dimensions(
+                adapter,
+                {name: view for view, (name, _, _) in zip(views, cells, strict=True)},
+            )
         for view, (name, center, cell) in zip(views, cells, strict=True):
             view_scale = scales[name]
             caption = f"{name[1:].upper()}  {view_scale[0]}:{view_scale[1]}"
@@ -653,7 +676,7 @@ async def _build_reference_sheet(
             # reaches past the outline and struck lifted captions (r5, 8:1
             # pins, rule 14).
             floor = cell[1]
-            if not center_marks[name]:
+            if not center_marks[name] and supplier_dimensions is None:
                 floor = max(_box(view.GetOutline(), label=name)[1], floor)
             caption_at = floor - _CAPTION_TO_CELL
             note = _literal_note(adapter, caption, center[0], caption_at)

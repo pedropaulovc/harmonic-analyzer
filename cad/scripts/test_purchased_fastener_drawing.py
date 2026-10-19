@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _supplier_dimensions as supplier
 import _purchased_fastener_drawing as purchased
 from _drawing_registry import DrawingLayout
 
@@ -248,8 +249,8 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         )
     )
 
-    # Every view is hidden-lines-removed (rule 9: no dimension names a
-    # hidden edge on a purchased reference sheet).
+    # Reference dimensions attach to visible geometry; no hidden-edge
+    # identification is needed on these four purchased views.
     assert modes == dict.fromkeys(("*Front", "*Top", "*Right", "*Isometric"), "HLR")
     printed = [call[1] for call in calls if call[0] == "note"]
     assert "#4-40 x 1/4 TEST SCREW" in printed
@@ -391,3 +392,53 @@ def test_center_marks_lose_their_extension_lines(monkeypatch):
     views[0] = MarkedView(StuckMark())
     with pytest.raises(RuntimeError, match="extension lines"):
         purchased._center_marks_without_lines(views, cells)
+
+
+@pytest.mark.parametrize(
+    "kind, expected_mm, expected_degrees",
+    [(3, 11.1125, None), (6, 11.1125, None), (2, None, 82.0)],
+)
+def test_supplier_native_type_is_checked_before_reading_si_value(
+    kind, expected_mm, expected_degrees
+):
+    class UnreadableValue:
+        Type2 = kind
+
+        def GetDimension2(self, _index):
+            raise AssertionError("an incompatible dimension must not be read as a length")
+
+    with pytest.raises(RuntimeError, match="native dimension type"):
+        supplier._measured_supplier_value(
+            UnreadableValue(),
+            label="supplier size",
+            presentation="angle" if expected_degrees is not None else "length",
+            expected_mm=expected_mm,
+            expected_degrees=expected_degrees,
+        )
+
+
+def test_supplier_display_rounding_cannot_replace_exact_model_geometry(monkeypatch):
+    monkeypatch.setattr(supplier, "_early_bound", lambda value, _kind: value)
+
+    def display(mm):
+        return SimpleNamespace(
+            Type2=11,
+            GetDimension2=lambda _index: SimpleNamespace(SystemValue=mm / 1000.0),
+        )
+
+    assert supplier._measured_supplier_value(
+        display(11.1125),
+        label="7/16 inch thread length",
+        presentation="length",
+        expected_mm=11.1125,
+        expected_degrees=None,
+    ) == pytest.approx(11.1125)
+    # .438 is the supplier's displayed rounding, not its exact 7/16 inch size.
+    with pytest.raises(RuntimeError, match="exact expected"):
+        supplier._measured_supplier_value(
+            display(0.438 * 25.4),
+            label="7/16 inch thread length",
+            presentation="length",
+            expected_mm=11.1125,
+            expected_degrees=None,
+        )

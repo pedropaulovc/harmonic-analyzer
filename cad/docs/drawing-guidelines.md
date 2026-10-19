@@ -20,9 +20,13 @@ jig the package does not tell the builder to make.
 The machine is a hobby-scale scientific instrument, not aerospace hardware.
 Parts that work with loose tolerances are the mark of a good design.
 
-Prints are drawn in millimetres on ASME sheets in third-angle projection.
-Fasteners, taps and drills are US customary (3/8, #14, 1/4-20). That mix is
-intended; a callout is defective only when its unit is genuinely ambiguous.
+Fabrication prints are drawn in millimetres on ASME sheets in third-angle
+projection. Fasteners, taps and drills are US customary (3/8, #14, 1/4-20).
+Purchased VN reference dimensions reproduce the supplier engineering drawing's
+units and displayed precision, with explicit units and reference parentheses;
+they are not fabrication or incoming-inspection controls. Finished/custom
+modifications retain their own controlling dimensions. That mix is intended;
+a callout is defective only when its unit is genuinely ambiguous.
 
 ## Rule 1 — No questions, nothing extra
 

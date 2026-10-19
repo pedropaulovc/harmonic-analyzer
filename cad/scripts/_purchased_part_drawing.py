@@ -16,11 +16,20 @@ from _check import check
 from _com import _early_bound
 from _drawing_common import read_required_properties
 from _drawing_registry import DrawingSpec
-from _purchased_fastener_drawing import _PROPERTIES, _build_reference_sheet
+from _purchased_fastener_drawing import (
+    _PROPERTIES,
+    SupplierDimensions,
+    _build_reference_sheet,
+)
 
 
 async def build_purchased_part_drawing(
-    adapter: Any, spec: DrawingSpec, *, item: str, cut_to_suit: bool = False
+    adapter: Any,
+    spec: DrawingSpec,
+    *,
+    item: str,
+    cut_to_suit: bool = False,
+    supplier_dimensions: SupplierDimensions | None = None,
 ) -> dict[str, str]:
     """Front/Top/Right plus Isometric of a purchased part, its note in the footer.
 
@@ -45,4 +54,5 @@ async def build_purchased_part_drawing(
         material_property="Material Specification",
         notes=properties["Manufacturing Notes"],
         cut_to_suit=cut_to_suit,
+        supplier_dimensions=supplier_dimensions,
     )

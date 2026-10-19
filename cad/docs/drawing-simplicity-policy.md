@@ -43,6 +43,22 @@ cannot ask for what the authors were told to leave out.
   (`DRAWING_REFERENCE_PRECISION`), never a literal. Migrated packages are
   gated by `test_drawing_specification_purity.py`; the rest of the fleet
   migrates incrementally.
+  Purchased VN sizes are pure references: retain the supplier engineering
+  drawing's units, fractions and displayed precision separately from the
+  exact model value (for example 7/16 inch remains 11.1125 mm when displayed
+  as .438 in). `_supplier_dimensions.supplier_reference_dimension` checks the
+  native type/value, applies local units and precision, and reads back the
+  reference presentation after rebuilding. It never changes the numeric
+  value or supplies numeric replacement text. Supplier tolerance bands remain
+  reference information; project general tolerances do not control purchased
+  sizes. Finished/custom modification dimensions remain controlling and do
+  not use this formatter.
+  Shared purchased builders accept a synchronous optional
+  `supplier_dimensions(adapter, views_by_orientation)` callback, keyed by
+  `*Front`, `*Top`, `*Right` and `*Isometric`, after final view fitting and
+  before the native contracts. Captions stay at the cell floor with that
+  callback, reserving the existing cell whitespace for annotations. Dimensions
+  must fit without silently reducing the geometry-selected view scale.
 - **Roughness grades (rule 6)** are the `_surface_finish` constants:
   `MACHINED_UM` (1.6) on `shaft_in_bushing` journals and bores,
   `cam_follower_contact` faces, the amplitude-bar slide, the knife edge and

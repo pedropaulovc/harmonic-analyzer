@@ -34,3 +34,18 @@ HEAD_STACK_LEN = COLLAR_H + HEAD_H
 SHANK_DIA = 2.0 * THUMB_SPEC["major_r"]
 SHANK_LEN = THUMB_SPEC["length"]
 OVERALL_LEN = HEAD_STACK_LEN + SHANK_LEN
+
+# McMaster engineering drawing, 91882A221, verified 2026-10-19:
+# https://www.mcmaster.com/mvC/Library/CAD2/20260707/5003FE53/91882A221_Steel%20Raised%20Knurled-Head%20Thumb%20ScrewX.GIF
+# Displayed inch spelling is separate from the exact inch-derived geometry.
+# In particular .438 and .094 are NOT replacement model dimensions.
+SUPPLIER_UNITS = "in"
+SUPPLIER_PRECISION = {
+    "thread_length": 3,  # .438 (exact geometry: 7/16)
+    "head_height": 3,  # .094 (exact geometry: 3/32)
+    "collar_height": 3,  # .094 (exact geometry: 3/32)
+    "head_diameter": 3,  # .375
+    "collar_diameter": 2,  # .25
+    "thread_diameter": 3,  # .112
+}
+SUPPLIER_THREAD = "4-40 UNC-2A RH"
