@@ -193,7 +193,7 @@ def create_drive_train_explode(
     ``roles`` maps a component name to the role the builder tagged it with at
     insertion (the MHA-DT-VN-63 that pins the arbor collar). The builder runs this
     in Default and in Default Simplified
-    (``_assembly.author_in_drawing_configurations``): each owns its explode."""
+    (``_assembly.save_assembly_and_images``): each owns its explode."""
     from solidworks_mcp.adapters.com_variant import null_callout
 
     view_name = exploded_view_name(configuration_name)

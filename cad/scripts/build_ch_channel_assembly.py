@@ -179,7 +179,6 @@ import ch_channel_assembly_spec as settings_spec
 from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
 from _assembly import (
     activate_assembly_contract,
-    author_in_drawing_configurations,
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
@@ -2493,14 +2492,10 @@ async def build(adapter) -> dict[str, str]:
     )
     # Both drawing configurations own the explode: the exploded sheet's view
     # at 1:7 references Default Simplified.
-    author_in_drawing_configurations(
-        adapter,
-        ASM_NAME,
-        lambda configuration: create_channel_explode(adapter, configuration),
-    )
     return await save_assembly_and_images(
         adapter,
         ASM_NAME,
+        author=lambda configuration: create_channel_explode(adapter, configuration),
         native_contact_check=functools.partial(
             assert_assembly_spring_contacts,
             channel_count=CHANNELS,
