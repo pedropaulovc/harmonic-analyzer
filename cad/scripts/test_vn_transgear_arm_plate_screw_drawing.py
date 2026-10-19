@@ -10,6 +10,7 @@ import types
 from pathlib import Path
 
 import pytest
+from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
 
 import _sketch
 import _sketch_rectangle
@@ -690,8 +691,8 @@ def _configured(monkeypatch, *, stock_end=None, stock_rebuild_fails=False, mispa
     model = _ConfiguredPart(misparent=misparent)
     adapter = types.SimpleNamespace(currentModel=model)
 
-    async def open_model(_path) -> bool:
-        return True
+    async def open_model(_path) -> AdapterResult[None]:
+        return AdapterResult(status=AdapterResultStatus.SUCCESS)
 
     async def force_rebuild(_adapter) -> None:
         if stock_rebuild_fails and model.active == screw.SUPPLIER_STOCK_CONFIGURATION:

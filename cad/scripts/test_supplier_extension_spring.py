@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 import _supplier_extension_spring as extension
+import _supplier_extension_spring_drawing as extension_drawing
 import vn_channel_spring_installed_spec as channel
 
 
@@ -39,24 +40,28 @@ def test_settled_checks_reject_supplier_tolerance_corruption(monkeypatch, corrup
             for name in keep
         ]
 
-    monkeypatch.setattr(extension, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(extension, "curate_view_dimensions", curate)
     monkeypatch.setattr(
-        extension, "dimension_name", lambda adapter, annotation: annotation.name
+        extension_drawing, "_early_bound", lambda value, interface: value
+    )
+    monkeypatch.setattr(extension_drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(
+        extension_drawing, "dimension_name", lambda adapter, annotation: annotation.name
     )
     monkeypatch.setattr(
-        extension,
+        extension_drawing,
         "supplier_reference_dimension",
         lambda adapter, display, **kwargs: display,
     )
     monkeypatch.setattr(
-        extension, "assert_supplier_reference_dimension", lambda *args, **kwargs: None
+        extension_drawing,
+        "assert_supplier_reference_dimension",
+        lambda *args, **kwargs: None,
     )
     views = {
         key: SimpleNamespace(GetOutline=lambda: (0.1, 0.1, 0.2, 0.12))
         for key in ("free_front", "free_right", "max_front")
     }
-    checks = extension.extension_spring_dimensions(
+    checks = extension_drawing.extension_spring_dimensions(
         object(),
         views,
         free_length_mm=channel.FREE_LENGTH_MM,

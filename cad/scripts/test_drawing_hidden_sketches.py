@@ -583,7 +583,18 @@ def _literal_named_value(path: Path, name: str, visited=None):
         if isinstance(node, ast.Assign) and any(
             isinstance(target, ast.Name) and target.id == name for target in node.targets
         ):
-            return ast.literal_eval(node.value)
+            value = node.value
+            if isinstance(value, ast.Name):
+                return _literal_named_value(path, value.id, visited)
+            if (
+                isinstance(value, ast.Subscript) and isinstance(value.value, ast.Name)
+                and isinstance(value.slice, ast.Constant)
+            ):
+                return _literal_named_value(path, value.value.id, visited)[value.slice.value]
+            try:
+                return ast.literal_eval(value)
+            except (ValueError, TypeError) as error:
+                raise LookupError(f"nonliteral declaration {name} in {path}") from error
     raise LookupError(f"cannot resolve literal {name} from {path}")
 
 
@@ -641,10 +652,35 @@ def _helper_fixed_blanked_sketches(module: str, function: str) -> set[str]:
                     names.add(item.value)
                 elif isinstance(item, ast.Name) and item.id in parameters:
                     continue  # Resolved against the author call by the parameter guard.
-                elif isinstance(item, ast.Name) and (values := _declared_strings(path, item.id, set())):
-                    names |= values
-                elif isinstance(item, ast.Name) and (values := _loop_bound_names(path, owner, call, item.id)):
-                    names |= values
+                elif isinstance(item, ast.Name):
+                    try:
+                        value = _literal_named_value(path, item.id)
+                    except LookupError:
+                        values = _loop_bound_names(path, owner, call, item.id)
+                        names |= values if values else _reference_sketches(tree)
+                    else:
+                        if not isinstance(value, str):
+                            raise LookupError(f"{module}.{function}: non-string sketch {item.id}")
+                        names.add(value)
+                elif isinstance(item, ast.Attribute) and isinstance(item.value, ast.Name):
+                    imported_module = next(
+                        (
+                            alias.name
+                            for statement in tree.body if isinstance(statement, ast.Import)
+                            for alias in statement.names
+                            if (alias.asname or alias.name) == item.value.id
+                        ),
+                        None,
+                    )
+                    if imported_module is None:
+                        names |= _reference_sketches(tree)
+                    else:
+                        value = _literal_named_value(
+                            _SCRIPTS / f"{imported_module}.py", item.attr
+                        )
+                        if not isinstance(value, str):
+                            raise LookupError(f"{module}.{function}: non-string sketch {item.attr}")
+                        names.add(value)
                 else:
                     names |= _reference_sketches(tree)
     return names
@@ -724,6 +760,14 @@ def _declared_strings(
                 if (alias.asname or alias.name) == name:
                     return _declared_strings(_SCRIPTS / f"{node.module}.py", alias.name, visited)
         if value is not None:
+            if isinstance(value, ast.Subscript):
+                try:
+                    selected = _literal_named_value(path, name)
+                except LookupError:
+                    pass  # Nonliteral data still contributes its explicit string references below.
+                else:
+                    if isinstance(selected, str):
+                        return {selected}
             strings = {
                 child.value for child in ast.walk(value)
                 if isinstance(child, ast.Constant) and isinstance(child.value, str)
@@ -917,16 +961,18 @@ def test_hidden_inventory_follows_the_called_authors_imported_constants(
 ) -> None:
     monkeypatch.setitem(globals(), "_SCRIPTS", tmp_path)
     (tmp_path / "source_names.py").write_text(
-        "DIAMETER = 'SupplierDiameterReference'\n"
-        "WALL = 'SupplierWallReference'\n",
+        "REFERENCE_SKETCHES = ('SupplierDiameterReference', 'SupplierWallReference')\n"
+        "DIAMETER = REFERENCE_SKETCHES[0]\n"
+        "WALL = REFERENCE_SKETCHES[1]\n",
         encoding="utf-8",
     )
     (tmp_path / "author.py").write_text(
-        "from source_names import DIAMETER, WALL\n"
+        "from source_names import DIAMETER\n"
+        "import source_names as source\n"
         "def dowel(adapter):\n"
         "    blank_reference_sketches(adapter, (DIAMETER,))\n"
         "def spring(adapter):\n"
-        "    blank_reference_sketches(adapter, (WALL,))\n",
+        "    blank_reference_sketches(adapter, (source.WALL,))\n",
         encoding="utf-8",
     )
     build = tmp_path / "build_fixture.py"
@@ -937,6 +983,7 @@ def test_hidden_inventory_follows_the_called_authors_imported_constants(
         encoding="utf-8",
     )
     assert _blanked_sketches(build) == {"SupplierDiameterReference"}
+    assert _helper_fixed_blanked_sketches("author", "spring") == {"SupplierWallReference"}
     (tmp_path / "drawing_helper.py").write_text(
         "from source_names import DIAMETER\n"
         "DIMENSIONS = {DIAMETER: {'Diameter'}}\n",
@@ -1036,8 +1083,7 @@ def test_clamp_screw_inventory_and_routing_reject_a_wrong_curator(
 ) -> None:
     build = _SCRIPTS / "build_vn_clamp_screw.py"
     draw = _SCRIPTS / "draw_vn_clamp_screw.py"
-    assert "SupplierReference" in _blanked_sketches(build)
-    assert "SupplierReference" in _drawings_reading_blanked_sketches()["vn_clamp_screw"]
+    assert "SupplierReference" in _blanked_sketches(build) & _strings_read_by(draw)
     assert _curates_through_hidden_sketches(draw)
 
     original_tree = _tree
@@ -1107,6 +1153,7 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
     assert found["vn_boss_hook"] == {"SupplierNominalStockProfile"}
     assert found["vn_spring_hook"] == {"SupplierStockAxis"}
     assert "SupplierMaxLimitProfile" in found["vn_post_mount_screw"]
+    assert "SupplierReference" in found["vn_clamp_screw"]
 
 
 def test_a_drawing_of_a_part_hidden_sketch_curates_through_this_module() -> None:

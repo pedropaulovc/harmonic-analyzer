@@ -164,6 +164,7 @@ def _reference(name: str, source=None):
     )
     annotation = SimpleNamespace(
         name=name,
+        Visible=1,
         GetAttachedEntities3=lambda: state["entities"],
         GetSpecificAnnotation=lambda: display,
     )
@@ -253,6 +254,10 @@ def test_settled_check_reacquires_final_dimensions_and_requires_both_sizes(
     )
     settled = drawing._supplier_references(adapter, annotations.copy(), view)
     settled()
+    dia_annotation.Visible = 0
+    with pytest.raises(RuntimeError, match="not visible"):
+        settled()
+    dia_annotation.Visible = 1
     diameter.GetDimension2(0).Tolerance.Type = 0
     with pytest.raises(RuntimeError, match="tolerance type"):
         settled()

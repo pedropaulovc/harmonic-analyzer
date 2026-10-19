@@ -34,7 +34,10 @@ from _supplier_dimensions import supplier_reference_dimension
 from diagnostics.diag_build_97431A260 import build_97431A260 as _build_source
 import vn_transgear_retaining_ring_spec as ring
 
-THICKNESS_SKETCH = "SupplierThicknessReference"
+# Complete native hidden-sketch inventory, consumed by authoring and routing.
+REFERENCE_SKETCHES = ("SupplierThicknessReference", "SupplierApplicationGauges")
+THICKNESS_SKETCH = REFERENCE_SKETCHES[0]
+APPLICATION_SKETCH = REFERENCE_SKETCHES[1]
 THICKNESS_DIMENSION = "SupplierThickness"
 
 
@@ -273,15 +276,11 @@ async def author_application_gauges(adapter: Any) -> None:
             )
     model.ClearSelection2(True)
     check("exit supplier application gauges", await adapter.exit_sketch())
-    name_last_feature(adapter, ring.SUPPLIER_APPLICATION_SKETCH)
-    feature = _early_bound(model, "IPartDoc").FeatureByName(
-        ring.SUPPLIER_APPLICATION_SKETCH
-    )
+    name_last_feature(adapter, APPLICATION_SKETCH)
+    feature = _early_bound(model, "IPartDoc").FeatureByName(APPLICATION_SKETCH)
     if feature is None:
         raise RuntimeError("97431A260: named application gauge sketch is missing")
-    required = set(
-        ring.SUPPLIER_APPLICATION_DIMENSIONS[ring.SUPPLIER_APPLICATION_SKETCH]
-    )
+    required = set(ring.SUPPLIER_APPLICATION_DIMENSIONS[APPLICATION_SKETCH])
     for raw in _feature_display_dimensions(feature):
         display = _early_bound(raw, "IDisplayDimension")
         name = str(_early_bound(display.GetDimension2(0), "IDimension").Name)
@@ -294,7 +293,7 @@ async def author_application_gauges(adapter: Any) -> None:
     ):
         set_dimension_bilateral_tolerance(
             adapter,
-            ring.SUPPLIER_APPLICATION_SKETCH,
+            APPLICATION_SKETCH,
             name,
             -band[1],
             band[0],
@@ -304,9 +303,7 @@ async def author_application_gauges(adapter: Any) -> None:
         ("ApplicationGrooveDiameter", ring.GROOVE_DIA, "diameter"),
         ("ApplicationGrooveWidth", ring.GROOVE_WIDTH, "length"),
     ):
-        display, _native = _named_dimension(
-            adapter, ring.SUPPLIER_APPLICATION_SKETCH, name
-        )
+        display, _native = _named_dimension(adapter, APPLICATION_SKETCH, name)
         supplier_reference_dimension(
             adapter,
             display,
@@ -324,7 +321,7 @@ async def author_application_gauges(adapter: Any) -> None:
             raise RuntimeError(
                 f"97431A260 {name}: source supplier tolerance places changed"
             )
-    blank_reference_sketches(adapter, (ring.SUPPLIER_APPLICATION_SKETCH,))
+    blank_reference_sketches(adapter, (APPLICATION_SKETCH,))
 
 
 @wraps(_build_source)

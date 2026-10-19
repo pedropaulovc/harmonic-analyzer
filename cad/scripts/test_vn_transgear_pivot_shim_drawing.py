@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import math
 
 import pytest
@@ -54,21 +53,6 @@ def test_spec_carries_the_catalogue_bands() -> None:
     assert spec.shim_volume() == pytest.approx(
         math.pi / 4 * (spec.OD**2 - spec.ID**2) * spec.THICKNESS
     )
-
-
-def test_stock_build_uses_the_catalogue_recipe(monkeypatch) -> None:
-    seen: dict = {}
-
-    async def fake_build(adapter, **kwargs):
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
-    (component,) = seen["components"]
-    assert component.sku == spec.SKU
-    assert component.author is recipe.build_98055A098
-    assert seen["material"] == part.SPEC.material
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

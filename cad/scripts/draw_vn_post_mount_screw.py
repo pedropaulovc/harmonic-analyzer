@@ -80,6 +80,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_sheet_region import sheet_drawable_region
 from _layout_geometry import Box, estimate_text_box
+from _msc_40923906 import SUPPLIER_PRECISION
 from _purchased_fastener_drawing import _box, _inside, _literal_note, assert_supplier_view_fits
 from _session import run_build
 from _stock_trim_drawing import TrimSheet
@@ -104,7 +105,6 @@ from vn_post_mount_screw_spec import (
     HEAD_H_MM,
     SKU,
     THREAD_DIA_MM,
-    SUPPLIER_PRECISION,
     SUPPLIER_PROFILE_DIMENSIONS,
     SUPPLIER_PROFILE_MM,
     SUPPLIER_STOCK_CONFIGURATION,

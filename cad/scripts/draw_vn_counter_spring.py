@@ -15,7 +15,7 @@ import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _supplier_spring_drawing import build_supplier_spring_drawing
-from _supplier_extension_spring import extension_spring_dimensions
+from _supplier_extension_spring_drawing import extension_spring_dimensions
 import vn_counter_spring_spec as supplier
 
 
@@ -25,17 +25,27 @@ ITEM = "EXTENSION SPRING, DOUBLE-LOOP ENDS, 1/2 OD x 0.063 WIRE"
 PART_STEM = SPEC.artifact_stem
 
 
-def _supplier_dimensions(adapter: Any, views: dict[str, Any]) -> tuple[Callable[[], None], ...]:
+def _supplier_dimensions(
+    adapter: Any, views: dict[str, Any]
+) -> tuple[Callable[[], None], ...]:
     return extension_spring_dimensions(
-        adapter, views, free_length_mm=supplier.FREE_LENGTH_MM,
-        max_length_mm=supplier.MAX_LENGTH_MM, coil_od_mm=supplier.SUPPLIER_COIL_OD_MM,
-        wire_dia_mm=supplier.SUPPLIER_WIRE_DIA_MM, precision=supplier.SUPPLIER_PRECISION,
+        adapter,
+        views,
+        free_length_mm=supplier.FREE_LENGTH_MM,
+        max_length_mm=supplier.MAX_LENGTH_MM,
+        coil_od_mm=supplier.SUPPLIER_COIL_OD_MM,
+        wire_dia_mm=supplier.SUPPLIER_WIRE_DIA_MM,
+        precision=supplier.SUPPLIER_PRECISION,
     )
 
 
 async def build(adapter: Any) -> dict[str, str]:
     return await build_supplier_spring_drawing(
-        adapter, SPEC, item=ITEM, dimensions=_supplier_dimensions, maximum=True,
+        adapter,
+        SPEC,
+        item=ITEM,
+        dimensions=_supplier_dimensions,
+        maximum=True,
         spring_metadata=True,
         supplier_margins={
             "free_front": (0.0, 0.0, 0.0, 0.018),

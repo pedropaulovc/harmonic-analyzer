@@ -67,7 +67,7 @@ from _simplified_part import (
 )
 from _sketch_chains import define_rectilinear_chain
 from diagnostics.diag_build_40923906 import build_40923906, BODY_UNION, THREAD_SPLIT
-from _msc_40923906 import FILLISTER_SIZE
+from _msc_40923906 import FILLISTER_SIZE, SUPPLIER_PRECISION, SUPPLIER_SOURCE
 from diagnostics.diag_mcmaster_lib import no_sketch_inference
 from vn_post_mount_screw_spec import (
     CUT_END_BREAK_BAND,
@@ -90,11 +90,9 @@ from vn_post_mount_screw_spec import (
     STOCK_LENGTH_MM,
     TRIM_REMOVED_MM3,
     SUPPLIER_MODEL_NOTE,
-    SUPPLIER_PRECISION,
     SUPPLIER_PROFILE_DIMENSIONS,
     SUPPLIER_PROFILE_MM,
     SUPPLIER_PROFILE_SECTIONS,
-    SUPPLIER_SOURCE,
     SUPPLIER_STOCK_CONFIGURATION,
     SUPPLIER_STOCK_DIMENSIONS,
     SUPPLIER_STOCK_FEATURE,
