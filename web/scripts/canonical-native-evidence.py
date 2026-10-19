@@ -49,6 +49,7 @@ FRESH_CONSUMER_INPUTS = (
     'web/current-native-identity.mjs',
     'web/current-native-identity.d.mts',
     'web/scripts/current-native-identity-inputs.mjs',
+    'cad/config/current-identity-map.json',
     'web/scripts/current-native-identity.test.mjs',
     'web/scripts/test_current_native_identity.py',
     'web/scripts/verify-sync.test.mjs',

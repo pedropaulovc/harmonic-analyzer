@@ -205,7 +205,10 @@ The projection table pins the exact current `../cad/config/current-identity-map.
 bytes; Node source authority also compares every active mapping row against it.
 Both CAD maps use Git `-text` attributes because their raw-byte hashes must
 survive Windows `core.autocrlf` checkouts. Fixture copies preserve those bytes;
-the integrity checks never normalize map newlines or accept a platform-specific pin.
+raw-map checks never normalize newlines or accept a platform-specific pin.
+The current-source executed-input closure also requires independent live-consumer
+seals for the current map and its Node authority helper at build and publication;
+these supplement rather than replace raw-map authentication.
 The table's three historical-only occurrences remain separate, with no current Number,
 registry or builder path. They identify archived geometry, not invented CAD parts.
 Browser loading verifies the current table's semantic digest before projecting
