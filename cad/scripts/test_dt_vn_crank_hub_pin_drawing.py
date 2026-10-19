@@ -263,7 +263,7 @@ def test_build_uses_entry_native_callout_and_exact_automatic_note_cleanup(
         assert asyncio.run(drawing.build(adapter)) == {"pdf": str(drawing.PDF)}
         finalize.assert_awaited_once()
         options = finalize.await_args.kwargs
-        assert options["pdf_title"] == pin_spec.DRAWING_TITLE
+        assert options["pdf_title"] == "Crank Hub Axial Pin Manufacturing Drawing"
         assert options["redundant_note_substrings"] == ("Tapped Hole",)
         assert options["expected_redundant_notes"] == 1
     [(view, edge, xy)] = native_calls

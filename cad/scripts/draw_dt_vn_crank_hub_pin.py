@@ -42,13 +42,10 @@ import _telemetry
 from dt_vn_crank_hub_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    DRAWING_SUMMARY,
-    DRAWING_TITLE,
     PIN_DIA,
     PULL_THREAD_HOLE,
     PULL_THREAD_TAP_DRILL,
     REFERENCE_DIMENSIONS,
-    REDUNDANT_NOTE_SUBSTRINGS,
 )
 
 
@@ -79,6 +76,8 @@ RIGHT_KEEP = {
 # Select the actual entry rim by its model geometry, not a screen-space hit.
 # Text stays above the Ø40-sheet pin outline (top at y 0.200), left of PinDia.
 THREAD_NOTE_XY = (END_CENTER[0] + 0.027, END_CENTER[1] + HALF_DIA + 0.016)
+# Removal selector for the redundant automatic Hole Wizard label, not print text.
+FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
 
 
 def _pull_thread_entry_edge(view: Any) -> Any:
@@ -170,7 +169,17 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
-    stamp_drawing_summary(adapter, drawing_model, DRAWING_SUMMARY)
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Crank Hub Axial Pin Manufacturing Drawing",
+            1: "Harmonic Analyzer hobby-machinist book drawing",
+            2: "Harmonic Analyzer Project",
+            3: "crank hub seam pin; axial key; straight gauge; steel",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
 
     end = place_view(adapter, str(SOURCE), "*Back", *END_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
@@ -207,12 +216,12 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title=DRAWING_TITLE,
+        pdf_title="Crank Hub Axial Pin Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         # run956fee printed one native "Tapped Hole" label beside the callout;
         # its leader crossed the callout's. The real callout now owns the thread.
-        redundant_note_substrings=REDUNDANT_NOTE_SUBSTRINGS,
+        redundant_note_substrings=FINAL_SHEET_REMOVED_NOTES,
         expected_redundant_notes=1,
     )
 

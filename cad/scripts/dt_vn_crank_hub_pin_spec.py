@@ -4,10 +4,6 @@ The approved extraction feature is M2x0.4 THRU in the unchanged Ø4 x 4 pin.
 M2.5 would require 5 mm at 2D and cannot fit this envelope. The through tap
 avoids a blind tap's lead and drill-bottom allowance; its nominal full length
 is the pin's length, exactly 2D. It only extracts the short, light-drive pin.
-
-The drawing looks onto the extraction entry at local Z=0. Its native Hole
-Wizard callout must name the thread, not just the drill at the opposite exit.
-Only the single redundant automatic tapped-hole label is removed.
 """
 
 from __future__ import annotations
@@ -59,16 +55,6 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     DRAWING_PRECISION_BY_NAME
 ):
     raise AssertionError("every marked MHA-DT-VN-59 dimension needs authored places")
-
-DRAWING_TITLE = "Crank Hub Axial Pin Manufacturing Drawing"
-DRAWING_SUMMARY = {
-    0: DRAWING_TITLE,
-    1: "Harmonic Analyzer hobby-machinist book drawing",
-    2: "Harmonic Analyzer Project",
-    3: "crank hub seam pin; axial key; straight gauge; steel",
-    4: "Generated from the project-owned ASME B drawing standard",
-}
-REDUNDANT_NOTE_SUBSTRINGS = ("Tapped Hole",)
 
 DRAWING_NOTES = "\n".join(
     (
