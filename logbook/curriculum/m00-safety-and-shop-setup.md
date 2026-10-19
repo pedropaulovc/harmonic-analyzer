@@ -21,8 +21,17 @@ hours_actual: 0
 ## References
 
 - `references/machining-for-hobbyists-getting-started/03_chapter-1-machine-shop-overview.pdf`
-- `references/jet-bd-920n-operators-manual.pdf`
+- PM-1127VF-LB manufacturer manual: unresolved pending build-year/nameplate
+  verification and a matching manufacturer manual. Use the
+  [shop inventory](../../cad/process/shop/inventory.toml) for installed equipment.
+- `references/jet-bd-920n-operators-manual.pdf`, historical reference for the former JET only
 - `cad/docs/machining-dfm.md` — the fragile-feature list is the hazard list
+
+The archived 2015 PM-1127VF-LB manual covers the earlier DC-motor version. It
+does not match the VFD configuration recorded in the inventory. Do not use it
+or the former JET manual for the installed lathe's setup, controls or
+lubrication instructions. Resolve the matching manufacturer manual before
+doing machine-specific setup or operation on the lathe.
 
 ## Practice
 

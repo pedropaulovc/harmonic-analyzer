@@ -59,7 +59,11 @@ matrix. **A book chapter cannot go past `drafted` until its module is
 
 1. `references/machining-for-hobbyists-getting-started/` — front to back, once,
    before touching anything
-2. `references/jet-bd-920n-operators-manual.pdf` and the mill's manual
+2. The installed machines' manufacturer manuals. The PM-1127VF-LB lathe manual
+   is unresolved pending build-year/nameplate verification and a matching
+   manufacturer manual; see [M00](m00-safety-and-shop-setup.md#references).
+   `references/jet-bd-920n-operators-manual.pdf` is historical reference for the
+   former JET only.
 3. `references/machinerys-handbook/` — as a lookup, never front to back
 4. `references/gears-and-gear-cutting/` — before M09, not before M10; the
    indexing chapters come first

@@ -44,7 +44,7 @@ and order, not status.
 
 | # | chapter | contains |
 |---|---|---|
-| 5 | Machines and tooling | Minimum viable shop for this project. Mill, lathe, dividing head, what size, what to skip. What the author used (PM-30MV, JET BD-920N) and what else works. |
+| 5 | Machines and tooling | Minimum viable shop for this project. Mill, lathe, dividing head, what size, what to skip. What the author used (PM-30MV, PM-1127VF-LB) and what else works. |
 | 6 | Measuring | Micrometers, bore gauges, indicators, gauge blocks, DRO. **What each tolerance in this book actually means at the bench** and how to check it. |
 | 7 | Materials and stock | Brass, steel, cast iron; why the original used what it used; the full stock list with sizes and quantities, cut from the BOM. |
 | 8 | Workholding and fixturing | Collets, chucks, vices, mandrels, soft jaws; the fixturing problems this machine specifically creates (tiny gears, long slender shafts, thin discs). |
