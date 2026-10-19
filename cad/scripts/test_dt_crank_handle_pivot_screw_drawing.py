@@ -191,9 +191,15 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert (spec.RELIEF_DIA_MIN, spec.RELIEF_DIA_MAX) == pytest.approx((1.8, 1.9))
     assert spec.RELIEF_DIA_MIN == pytest.approx(spec.RELIEF_DIA + spec.RELIEF_DIA_BAND[1])
     assert spec.RELIEF_DIA_MAX == pytest.approx(spec.RELIEF_DIA + spec.RELIEF_DIA_BAND[0])
-    assert spec.RELIEF_DIA_CALLOUT == (
-        "RELIEF BELOW #4-40 ROOT;\nNECK FOR SEATING ON MHA-DT-006"
-    )
+    assert spec.RELIEF_DIA_ROOT_CALLOUT == "BELOW #4-40 ROOT"
+    assert "\n" not in spec.RELIEF_DIA_ROOT_CALLOUT
+    assert spec.RELIEF_DIA_CALLOUT == "NECK FOR SEATING\nON MHA-DT-006"
+    assert drawing.RELIEF_DIA_ROOT_CALLOUT is spec.RELIEF_DIA_ROOT_CALLOUT
+    assert max(
+        len(line)
+        for text in (spec.RELIEF_DIA_ROOT_CALLOUT, spec.RELIEF_DIA_CALLOUT)
+        for line in text.splitlines()
+    ) <= 16
     assert drawing.RELIEF_DIA_CALLOUT is spec.RELIEF_DIA_CALLOUT
     for removed in ("RELIEF_CALLOUT", "RELIEF_STRENGTH_CALLOUT"):
         assert not hasattr(spec, removed)
@@ -733,7 +739,10 @@ def test_native_callouts_own_the_relief_lead_corner_and_seat_break() -> None:
             ast.literal_eval(key): ast.unparse(value)
             for key, value in zip(mapping.keys, mapping.values, strict=True)
         }
-    assert callouts["above"] == {"ShoulderDia": "SHOULDER_CALLOUT"}
+    assert callouts["above"] == {
+        "ReliefDia": "RELIEF_DIA_ROOT_CALLOUT",
+        "ShoulderDia": "SHOULDER_CALLOUT",
+    }
     assert callouts["below"] == {
         "ReliefDia": "RELIEF_DIA_CALLOUT",
         "ReliefLead": "RELIEF_LEAD_CALLOUT",
@@ -1101,16 +1110,6 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # arrow must land on the groove floor; the actual ink is checked after
     # rebuild, not approximated by the rejected OffsetText calibration.
     assert {"ReliefWidth", "ReliefLead", "ReliefCornerRadius", "SeatEdgeBreak"}.isdisjoint(drawing.SIDE_KEEP)
-    text_x, text_y = drawing.SIDE_KEEP["ReliefDia"]
-    half = max(len(line) for line in spec.RELIEF_DIA_CALLOUT.splitlines()) * 0.0028 / 2.0
-    assert (text_x - half) - drawing.SEAT_X >= 0.003
-    shoulder_bottom = 2.0 * drawing.SIDE_CENTER[1] - drawing.SHOULDER_TOP_Y
-    # The value/bilateral stack has no above-callout; its two-line reason is
-    # below.  Keep 3 mm under the profile and 5 mm above the under-head block.
-    assert shoulder_bottom - (text_y + 0.007) >= 0.003
-    assert text_y - 0.0146 - (drawing.SIDE_KEEP["UnderHeadLocation"][1] + 0.010) >= 0.005
-    # The thread-length text is left of this lower block, not underneath it.
-    assert text_x - half - (drawing.SIDE_KEEP["ThreadLength"][0] + 0.0055) >= 0.003
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_drawing_leaders.set_near_side_diameter(" in source
     assert "_drawing_leaders.dimension_segments(relief_diameter)" in source
@@ -1140,6 +1139,72 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert drawing.SEAT_X < shoulder_dim_x < drawing.UNDERHEAD_X
     assert abs(drawing.CENTERLINE_PICK[0] - shoulder_dim_x) > 0.010
     assert abs(drawing.FINISH_PICK[0] - shoulder_dim_x) > 0.010
+
+
+def test_relief_text_block_stays_left_of_the_seat_and_clear_of_thread_rows() -> None:
+    x, y = drawing.SIDE_KEEP["ReliefDia"]
+    lines = [
+        *spec.RELIEF_DIA_ROOT_CALLOUT.splitlines(),
+        *spec.RELIEF_DIA_CALLOUT.splitlines(),
+    ]
+    half = max(map(len, lines)) * 0.0028 / 2.0
+    assert (x, y) == pytest.approx((0.0631, 0.166))
+    assert drawing.SEAT_X - (x + half) == pytest.approx(0.004)
+    assert drawing.SEAT_X - (x + half) >= 0.003
+    assert x - half > 0.0127
+    # Conservative native text envelopes: header/value top 12 mm above the
+    # ask, final BELOW line 14.6 mm below; ThreadLength value top 6 mm above.
+    thread_bottom = 2.0 * drawing.SIDE_CENTER[1] - drawing.THREAD_TOP_Y
+    assert thread_bottom - (y + 0.012) >= 0.003
+    assert y - 0.0146 - (drawing.SIDE_KEEP["ThreadLength"][1] + 0.006) >= 0.003
+    # The under-head block is farther down, retaining its 5 mm floor.
+    assert y - 0.0146 - (drawing.SIDE_KEEP["UnderHeadLocation"][1] + 0.010) >= 0.005
+
+
+def test_tip_chamfer_header_and_reasons_clear_the_thread_and_relief_block() -> None:
+    tip_x, tip_y = drawing.SIDE_KEEP["TipChamfer"]
+    assert (tip_x, tip_y) == pytest.approx((0.0395, 0.210))
+    assert tip_x == pytest.approx(drawing.TIP_X - 0.020)
+    # Its native dimension line is outside the upper thread profile, not
+    # laid along the screw axis.  The X45 reason clears that profile too.
+    assert tip_y - 0.005 - drawing.THREAD_TOP_Y >= 0.003
+    assert tip_y - 0.0065 - drawing.THREAD_TOP_Y >= 0.003
+    relief_top = drawing.SIDE_KEEP["ReliefDia"][1] + 0.012
+    assert tip_y - 0.0065 - relief_top >= 0.005
+    thread_note_bottom = drawing.THREAD_NOTE_XY[1] - 0.004
+    assert thread_note_bottom - (tip_y + 0.006) >= 0.005
+    assert tip_x - len(spec.CHAMFER_CALLOUT) * 0.0028 / 2.0 > 0.0127
+
+
+def test_tip_baselines_have_independent_nested_rows_and_shorter_witnesses() -> None:
+    assert drawing.SIDE_KEEP["HeadLength"][1] == pytest.approx(0.156)
+    rows = {
+        name: drawing.SIDE_KEEP[name][1]
+        for name in ("ThreadLength", "UnderHeadLocation", "OverallLength")
+    }
+    assert tuple(rows.values()) == pytest.approx((0.142, 0.135, 0.116))
+    spans = {
+        "ThreadLength": (drawing.TIP_X, drawing.SEAT_X),
+        "UnderHeadLocation": (drawing.TIP_X, drawing.UNDERHEAD_X),
+        "OverallLength": (drawing.TIP_X, drawing.HEAD_FACE_X),
+    }
+    for short, long in (
+        ("ThreadLength", "UnderHeadLocation"),
+        ("ThreadLength", "OverallLength"),
+        ("UnderHeadLocation", "OverallLength"),
+    ):
+        assert spans[short][0] == spans[long][0] == drawing.TIP_X
+        assert spans[short][1] < spans[long][1]
+        # Include a conservative 2 mm overshoot beyond each shorter line.
+        witness_bottom = rows[short] - 0.005 - 0.002
+        longer_line = rows[long] - 0.005
+        assert witness_bottom - longer_line >= 0.003, (short, long)
+    assert rows["UnderHeadLocation"] - rows["OverallLength"] == pytest.approx(0.019)
+    assert rows["ThreadLength"] - 0.005 - 0.002 - (
+        rows["UnderHeadLocation"] - 0.005
+    ) == pytest.approx(0.005)
+    # Preserve the under-head reason's final-line/overall-value air.
+    assert rows["UnderHeadLocation"] - 0.0094 - (rows["OverallLength"] + 0.006) >= 0.003
 
 
 def test_relief_detail_contains_the_actual_native_dimension_endpoints() -> None:
@@ -1188,9 +1253,6 @@ def test_relief_detail_text_and_circle_clear_the_baseline_rows_and_border() -> N
     assert cx - radius > 0.0127 and cx + radius < 0.218
     assert cy - radius > 0.0127
     assert drawing.SIDE_KEEP["OverallLength"][1] - 0.005 - (cy + radius) >= 0.005
-    assert drawing.DETAIL_KEEP["ReliefCornerRadius"][1] - (
-        drawing.DETAIL_KEEP["ReliefLead"][1] + 0.004
-    ) >= 0.005
     width_y = drawing.DETAIL_KEEP["ReliefWidth"][1]
     # The broad width's line lies below the crop and the radius leader,
     # safely inside the border.  Its value top clears even the thread crest.
@@ -1206,6 +1268,60 @@ def test_relief_detail_text_and_circle_clear_the_baseline_rows_and_border() -> N
     seat_half = max(len(line) for line in spec.SEAT_EDGE_BREAK_CALLOUT.splitlines()) * 0.0028 / 2.0
     assert lead_left - (drawing.DETAIL_KEEP["ReliefLead"][0] + lead_half) >= 0.003
     assert drawing.DETAIL_KEEP["SeatEdgeBreak"][0] - seat_half - seat_right >= 0.003
+    radius_x, radius_y = drawing.DETAIL_KEEP["ReliefCornerRadius"]
+    assert (radius_x, radius_y) == pytest.approx((0.115, 0.1015))
+    # Raising both reference rows preserves 19 mm nesting and leaves 3.5 mm
+    # between the radius value envelope and the overall dimension line.
+    overall_line = drawing.SIDE_KEEP["OverallLength"][1] - 0.005
+    assert overall_line - (radius_y + 0.006) >= 0.003
+    assert overall_line - (radius_y + 0.006) == pytest.approx(0.0035)
+
+
+@pytest.mark.parametrize("name", ["ReliefLead", "SeatEdgeBreak"])
+def test_relief_radius_text_has_real_2d_air_from_tiny_leg_text(name) -> None:
+    radius_x, radius_y = drawing.DETAIL_KEEP["ReliefCornerRadius"]
+    radius_text = f"R{spec.RELIEF_CORNER_RADIUS_MAX:g} MAX\n{spec.RELIEF_CORNER_CALLOUT}"
+    radius_half = max(map(len, radius_text.splitlines())) * 0.0028 / 2.0
+    radius_box = (
+        radius_x - radius_half, radius_y - 0.0065,
+        radius_x + radius_half, radius_y + 0.006,
+    )
+    text = {
+        "ReliefLead": spec.RELIEF_LEAD_CALLOUT,
+        "SeatEdgeBreak": spec.SEAT_EDGE_BREAK_CALLOUT,
+    }[name]
+    x, y = drawing.DETAIL_KEEP[name]
+    half = max(map(len, text.splitlines())) * 0.0028 / 2.0
+    box = (x - half, y - (0.010 if "\n" in text else 0.0065), x + half, y + 0.006)
+    horizontal_air = max(radius_box[0] - box[2], box[0] - radius_box[2], 0.0)
+    vertical_air = max(radius_box[1] - box[3], box[1] - radius_box[3], 0.0)
+    # These rows overlap in Y: their real horizontal separation must carry
+    # the unchanged 5 mm floor, not a reduced vertical-clearance threshold.
+    assert vertical_air == 0.0
+    assert max(horizontal_air, vertical_air) >= 0.005, (radius_box, box)
+
+
+@pytest.mark.parametrize("name", ["ReliefLead", "SeatEdgeBreak"])
+def test_relief_radius_reason_clears_tiny_leg_witness_ends_in_2d(name) -> None:
+    cx, _ = drawing.DETAIL_CENTER
+    scale = drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] / 1000.0
+    radius_x, radius_y = drawing.DETAIL_KEEP["ReliefCornerRadius"]
+    half = len(spec.RELIEF_CORNER_CALLOUT) * 0.0028 / 2.0
+    reason_box = (radius_x - half, radius_y - 0.0065, radius_x + half, radius_y - 0.003)
+    stations = {
+        "ReliefLead": (spec.SEAT_STATION, spec.SEAT_STATION + spec.RELIEF_LEAD),
+        "SeatEdgeBreak": (spec.SEAT_STATION - spec.SEAT_EDGE_BREAK_MAX, spec.SEAT_STATION),
+    }[name]
+    # Nominal placement envelopes, not native readback proof: reserve the
+    # conservative 1.3 mm overrun from the existing native calibration.
+    # The raised radius row gives 3.2 mm, preserving the 3 mm text/ink floor.
+    witness_y = drawing.DETAIL_KEEP[name][1] - 0.005 + 0.0013
+    for station in stations:
+        witness_x = cx + (drawing.DETAIL_STATION - station) * scale
+        horizontal_air = max(reason_box[0] - witness_x, witness_x - reason_box[2], 0.0)
+        vertical_air = max(reason_box[1] - witness_y, witness_y - reason_box[3], 0.0)
+        assert max(horizontal_air, vertical_air) >= 0.003, (reason_box, (witness_x, witness_y))
+        assert vertical_air == pytest.approx(0.0032)
 
 
 def test_relief_radius_leader_corridor_has_no_width_or_tiny_leg_crossing() -> None:
@@ -1643,38 +1759,73 @@ def test_cropped_relief_view_individual_readback_refusals(relief_native, monkeyp
 
 
 def _relief_leader_geometry():
-    """Derive physical floor/seat coordinates, without changing guard constants."""
+    """A LEFT route from the real flat floor, below the thread-side corner."""
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1]
     floor_left = drawing.RELIEF_END_X + spec.RELIEF_CORNER_RADIUS_MAX * scale / 1000.0
     floor_right = drawing.SEAT_X - spec.RELIEF_LEAD * scale / 1000.0
     floor = ((floor_left + floor_right) / 2.0,
              drawing.SIDE_CENTER[1] - spec.RELIEF_DIA * scale / 2000.0)
     bottom = drawing.SIDE_CENTER[1] - spec.SHOULDER_DIA * scale / 2000.0
-    # Bend before reaching the seat, then run >= 2 mm below its corner.
-    bend = ((floor[0] + drawing.SEAT_X) / 2.0, bottom - 0.0021)
-    tail = (drawing.SEAT_X + 0.010, bottom - 0.0021)
+    thread_bottom = drawing.SIDE_CENTER[1] - spec.THREAD_MODEL_DIA * scale / 2000.0
+    bend = (drawing.RELIEF_END_X, thread_bottom - 0.0021)
+    tail = drawing.SIDE_KEEP["ReliefDia"]
     return floor, bend, tail, bottom
 
 
+def _thread_length_ink():
+    """Independent native-shaped line/witness ink in sheet metres."""
+    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1]
+    line_y = drawing.SIDE_KEEP["ThreadLength"][1] - 0.005
+    thread_bottom = drawing.SIDE_CENTER[1] - spec.THREAD_MODEL_DIA * scale / 2000.0
+    seat_bottom = drawing.SIDE_CENTER[1] - spec.SHOULDER_DIA * scale / 2000.0
+    return [
+        ((drawing.TIP_X, line_y), (drawing.SEAT_X, line_y)),
+        ((drawing.TIP_X, thread_bottom - 0.001), (drawing.TIP_X, line_y - 0.002)),
+        ((drawing.SEAT_X, seat_bottom - 0.001), (drawing.SEAT_X, line_y - 0.002)),
+    ]
+
+
 @pytest.mark.parametrize("reverse", [False, True])
-def test_relief_diameter_leader_accepts_floor_and_safe_seat_crossing(reverse):
+def test_relief_diameter_leader_accepts_floor_and_safe_left_route(reverse):
     floor, bend, tail, _ = _relief_leader_geometry()
     segments = [(floor, bend), (bend, tail)]
+    thread_ink = _thread_length_ink()
+    assert drawing.TIP_X < tail[0] < drawing.RELIEF_END_X < floor[0] < drawing.SEAT_X
+    assert tail == drawing.SIDE_KEEP["ReliefDia"]
     if reverse:
         segments = [(end, start) for start, end in reversed(segments)]
-    drawing._assert_relief_diameter_leader(segments)
+        thread_ink = [(end, start) for start, end in reversed(thread_ink)]
+    drawing._assert_relief_diameter_leader(segments, thread_ink)
 
 
 def test_relief_diameter_leader_refuses_empty_ink():
-    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter has no native leader ink$"):
-        drawing._assert_relief_diameter_leader([])
+    with pytest.raises(
+        RuntimeError, match="^MHA-DT-032 relief diameter has no native leader ink;"
+    ) as caught:
+        drawing._assert_relief_diameter_leader([], _thread_length_ink())
+    assert "'ReliefDia': []" in str(caught.value)
+    assert repr(_thread_length_ink()) in str(caught.value)
+
+
+def test_relief_diameter_leader_refuses_empty_thread_length_ink():
+    floor, bend, tail, _ = _relief_leader_geometry()
+    segments = [(floor, bend), (bend, tail)]
+    with pytest.raises(
+        RuntimeError, match="^MHA-DT-032 ThreadLength has no native dimension ink;"
+    ) as caught:
+        drawing._assert_relief_diameter_leader(segments, [])
+    assert "'ThreadLength': []" in str(caught.value)
+    assert repr(segments) in str(caught.value)
 
 
 def test_relief_diameter_leader_refuses_wrong_lower_floor_landing():
     floor, bend, tail, _ = _relief_leader_geometry()
     wrong = (floor[0], floor[1] - 0.000151)
-    with pytest.raises(RuntimeError, match="does not land on the lower groove floor$"):
-        drawing._assert_relief_diameter_leader([(wrong, bend), (bend, tail)])
+    segments = [(wrong, bend), (bend, tail)]
+    with pytest.raises(RuntimeError, match="does not land on the lower groove floor;") as caught:
+        drawing._assert_relief_diameter_leader(segments, _thread_length_ink())
+    assert repr(segments) in str(caught.value)
+    assert "floor=" in str(caught.value)
 
 
 def test_relief_diameter_leader_refuses_the_removed_sharp_corner():
@@ -1683,8 +1834,10 @@ def test_relief_diameter_leader_refuses_the_removed_sharp_corner():
         drawing.RELIEF_END_X,
         drawing.SIDE_CENTER[1] - spec.RELIEF_DIA * drawing.SHEET_SCALE[0] / 2000.0,
     )
-    with pytest.raises(RuntimeError, match="does not land on the lower groove floor$"):
-        drawing._assert_relief_diameter_leader([(dead_corner, bend), (bend, tail)])
+    with pytest.raises(RuntimeError, match="does not land on the lower groove floor;"):
+        drawing._assert_relief_diameter_leader(
+            [(dead_corner, bend), (bend, tail)], _thread_length_ink()
+        )
 
 
 @pytest.mark.parametrize("vertical", [False, True])
@@ -1698,8 +1851,82 @@ def test_relief_diameter_leader_refuses_seat_corner_crossing(vertical):
     else:
         crossing = ((drawing.SEAT_X - 0.001, near_corner),
                     (drawing.SEAT_X + 0.001, near_corner))
-    with pytest.raises(RuntimeError, match="crosses the seat face/witness instead of passing below its corner$"):
-        drawing._assert_relief_diameter_leader([(floor, bend), crossing])
+    segments = [(floor, bend), crossing]
+    with pytest.raises(
+        RuntimeError,
+        match="^MHA-DT-032 relief diameter leader crosses the seat face/witness "
+        "instead of passing below its corner;",
+    ) as caught:
+        drawing._assert_relief_diameter_leader(segments, _thread_length_ink())
+    assert f"crossing=({drawing.SEAT_X!r}, {near_corner!r})" in str(caught.value)
+    assert repr(segments) in str(caught.value)
+    assert repr(_thread_length_ink()) in str(caught.value)
+
+
+@pytest.mark.parametrize("vertical", [False, True])
+def test_relief_diameter_leader_refuses_left_thread_corner_crossing(vertical):
+    floor, bend, _, _ = _relief_leader_geometry()
+    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1]
+    bottom = drawing.SIDE_CENTER[1] - spec.THREAD_MODEL_DIA * scale / 2000.0
+    near_corner = bottom - 0.0019
+    if vertical:
+        crossing = ((drawing.RELIEF_END_X, bottom - 0.003),
+                    (drawing.RELIEF_END_X, near_corner))
+    else:
+        crossing = ((drawing.RELIEF_END_X - 0.001, near_corner),
+                    (drawing.RELIEF_END_X + 0.001, near_corner))
+    # A valid floor landing, no seat crossing and no ThreadLength crossing:
+    # removing only the thread-side corner predicate must break this test.
+    segments = [(floor, bend), crossing]
+    with pytest.raises(
+        RuntimeError,
+        match="^MHA-DT-032 relief diameter leader crosses the thread-side corner "
+        "instead of passing below its corner;",
+    ) as caught:
+        drawing._assert_relief_diameter_leader(segments, _thread_length_ink())
+    assert f"crossing=({drawing.RELIEF_END_X!r}, {near_corner!r})" in str(caught.value)
+    assert repr(segments) in str(caught.value)
+    assert repr(_thread_length_ink()) in str(caught.value)
+
+
+def test_relief_diameter_leader_refuses_thread_length_witness_crossing():
+    floor, bend, tail, _ = _relief_leader_geometry()
+    # Extend the LEFT route past the tip witness, still safely below both
+    # physical corners.  Only real foreign-ink intersection can reject it.
+    tail = (drawing.TIP_X - 0.004, tail[1])
+    segments = [(floor, bend), (bend, tail)]
+    thread_ink = _thread_length_ink()
+    with pytest.raises(
+        RuntimeError,
+        match="^MHA-DT-032 relief diameter leader crosses ThreadLength native ink;",
+    ) as caught:
+        drawing._assert_relief_diameter_leader(segments, thread_ink)
+    assert "('ReliefDia', 'ThreadLength')" in str(caught.value)
+    assert repr(segments) in str(caught.value)
+    assert repr(thread_ink) in str(caught.value)
+
+
+@pytest.mark.parametrize("junction", ["crossing", "tee", "overlap"])
+def test_relief_diameter_leader_refuses_thread_length_ink_junctions(junction):
+    floor, bend, tail, _ = _relief_leader_geometry()
+    segments = [(floor, bend), (bend, tail)]
+    midpoint = tuple((a + b) / 2.0 for a, b in zip(bend, tail, strict=True))
+    if junction == "crossing":
+        foreign = ((midpoint[0], midpoint[1] - 0.002),
+                   (midpoint[0], midpoint[1] + 0.002))
+    elif junction == "tee":
+        foreign = (midpoint, (midpoint[0], midpoint[1] - 0.002))
+    else:
+        quarter = tuple((a + b) / 2.0 for a, b in zip(bend, midpoint, strict=True))
+        foreign = (quarter, midpoint)
+    # Retain otherwise independent valid thread ink; inject only the named
+    # ink collision, leaving floor landing and corner guards satisfied.
+    thread_ink = [*_thread_length_ink(), foreign]
+    with pytest.raises(
+        RuntimeError,
+        match="^MHA-DT-032 relief diameter leader crosses ThreadLength native ink;",
+    ):
+        drawing._assert_relief_diameter_leader(segments, thread_ink)
 
 
 @pytest.fixture
@@ -1750,9 +1977,12 @@ def relief_styles(monkeypatch, relief_native):
 
     annotations = [Annotation(name) for name in
                    ("ReliefDia", "ReliefLead", "SeatEdgeBreak", "ReliefWidth",
-                    "ReliefCornerRadius")]
+                    "ReliefCornerRadius", "ThreadLength")]
+    floor, bend, tail, _ = _relief_leader_geometry()
     state = SimpleNamespace(
         native=relief_native, annotations=annotations, near_side=[], ink_reads=[],
+        inks={"ReliefDia": [(floor, bend), (bend, tail)],
+              "ThreadLength": _thread_length_ink()},
     )
     original_bind = drawing._early_bound
 
@@ -1764,11 +1994,14 @@ def relief_styles(monkeypatch, relief_native):
 
     def near_side(annotation, label):
         state.near_side.append((annotation, label))
+        assert annotation.name == "ReliefDia"
 
     def ink(annotation):
+        assert isinstance(annotation, Annotation)
+        assert state.native.model.rebuilds == 1
+        assert annotation.name in state.inks
         state.ink_reads.append(annotation)
-        floor, bend, tail, _ = _relief_leader_geometry()
-        return [(floor, bend), (bend, tail)]
+        return state.inks[annotation.name]
 
     monkeypatch.setattr(drawing, "_early_bound", bind)
     monkeypatch.setattr(drawing, "dimension_name", lambda adapter, annotation: annotation.name)
@@ -1780,9 +2013,9 @@ def relief_styles(monkeypatch, relief_native):
 def test_style_relief_dimensions_positions_and_reads_real_leader_guard(relief_styles):
     state = relief_styles
     drawing.style_relief_dimensions(state.native.adapter, state.annotations)
-    diameter, lead, edge, width, radius = state.annotations
+    diameter, lead, edge, width, radius, thread_length = state.annotations
     assert state.near_side == [(diameter, "MHA-DT-032 relief diameter")]
-    assert state.ink_reads == [diameter]
+    assert state.ink_reads == [diameter, thread_length]
     for annotation, xy in (
         (diameter, drawing.SIDE_KEEP["ReliefDia"]),
         (lead, drawing.DETAIL_KEEP["ReliefLead"]),
@@ -1792,7 +2025,7 @@ def test_style_relief_dimensions_positions_and_reads_real_leader_guard(relief_st
     for annotation in (lead, edge):
         assert annotation.display.CenterText is False
         assert annotation.display.ArrowSide == drawing.ARROWS_OUTSIDE
-    for unrelated in (width, radius):
+    for unrelated in (width, radius, thread_length):
         assert unrelated.positions == []
         assert unrelated.display.CenterText is True
         assert unrelated.display.ArrowSide == drawing.ARROWS_OUTSIDE + 1
@@ -1825,11 +2058,51 @@ def test_style_relief_dimensions_refuses_missing_registered_dimension(relief_sty
         drawing.style_relief_dimensions(state.native.adapter, annotations)
 
 
-def test_style_relief_dimensions_does_not_bypass_leader_guard(relief_styles, monkeypatch):
+def test_style_relief_dimensions_does_not_bypass_leader_guard(relief_styles):
     state = relief_styles
-    monkeypatch.setattr(drawing._drawing_leaders, "dimension_segments", lambda annotation: [])
-    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter has no native leader ink$"):
+    state.inks["ReliefDia"] = []
+    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter has no native leader ink;"):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
+
+
+def test_style_relief_dimensions_refuses_missing_thread_length_annotation(relief_styles):
+    state = relief_styles
+    annotations = [item for item in state.annotations if item.name != "ThreadLength"]
+    with pytest.raises(
+        RuntimeError,
+        match="^MHA-DT-032 ThreadLength annotation is missing for relief leader guard$",
+    ):
+        drawing.style_relief_dimensions(state.native.adapter, annotations)
+    assert state.native.model.rebuilds == 0
+    assert state.ink_reads == []
+
+
+def test_style_relief_dimensions_refuses_empty_thread_length_ink(relief_styles):
+    state = relief_styles
+    state.inks["ThreadLength"] = []
+    with pytest.raises(RuntimeError, match="^MHA-DT-032 ThreadLength has no native dimension ink;"):
+        drawing.style_relief_dimensions(state.native.adapter, state.annotations)
+    assert [item.name for item in state.ink_reads] == ["ReliefDia", "ThreadLength"]
+
+
+@pytest.mark.parametrize("fault", ["thread-corner", "thread-length"])
+def test_style_relief_dimensions_does_not_bypass_native_ink_crossings(relief_styles, fault):
+    state = relief_styles
+    floor, bend, tail, _ = _relief_leader_geometry()
+    if fault == "thread-corner":
+        scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1]
+        bottom = drawing.SIDE_CENTER[1] - spec.THREAD_MODEL_DIA * scale / 2000.0
+        crossing = ((drawing.RELIEF_END_X - 0.001, bottom - 0.0019),
+                    (drawing.RELIEF_END_X + 0.001, bottom - 0.0019))
+        state.inks["ReliefDia"] = [(floor, bend), crossing]
+        message = "^MHA-DT-032 relief diameter leader crosses the thread-side corner "
+    else:
+        tail = (drawing.TIP_X - 0.004, tail[1])
+        state.inks["ReliefDia"] = [(floor, bend), (bend, tail)]
+        message = "^MHA-DT-032 relief diameter leader crosses ThreadLength native ink;"
+    with pytest.raises(RuntimeError, match=message):
+        drawing.style_relief_dimensions(state.native.adapter, state.annotations)
+    assert [item.name for item in state.ink_reads] == ["ReliefDia", "ThreadLength"]
 
 
 @pytest.mark.parametrize("parent", [False, True])

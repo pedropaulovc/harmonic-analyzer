@@ -211,11 +211,11 @@ RELIEF_LEAD_LIMITS = (
 )
 CHAMFER_CALLOUT = "X 45 DEG"
 # Each chamfer leg is imported from its own native model dimension.  The
-# relief diameter no longer carries a numeric lead-size surrogate (r8).
+# relief diameter's root reason is one ABOVE line (native multiline ABOVE
+# does not print); its seating reason and mate remain two BELOW lines.
 RELIEF_LEAD_CALLOUT = f"{CHAMFER_CALLOUT} LEAD"
-RELIEF_DIA_CALLOUT = (
-    f"RELIEF BELOW {THREAD_SIZE} ROOT;\nNECK FOR SEATING ON MHA-DT-006"
-)
+RELIEF_DIA_ROOT_CALLOUT = f"BELOW {THREAD_SIZE} ROOT"
+RELIEF_DIA_CALLOUT = "NECK FOR SEATING\nON MHA-DT-006"
 SEAT_EDGE_BREAK_CALLOUT = f"{CHAMFER_CALLOUT}\nPRESERVES SEAT ON MHA-DT-006"
 SEAT_FLAT_INNER_DIA = RELIEF_DIA + 2.0 * RELIEF_LEAD
 # ... and at its printed worst: the largest relief under the longest lead.

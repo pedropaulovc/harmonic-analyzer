@@ -18,8 +18,9 @@ shows the slot.
 The relief width, lead, thread-side floor radius and modelled seat edge
 break read in a standalone cropped 10:1 ``*Right`` model view, labelled
 DETAIL A and circled on the side view.  The main profile keeps the relief Ø
-on its native near-side broken leader; no typed dimension note or
-offset-text surrogate replaces it.
+below-left of the groove, with its root reason above and seating/mate below
+the native near-side broken leader.  Rebuilt diameter and ThreadLength ink
+must not cross; no typed dimension note or offset-text surrogate replaces it.
 
 Run with SolidWorks open::
 
@@ -84,6 +85,7 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_CORNER_RADIUS_MAX,
     RELIEF_DIA,
     RELIEF_DIA_CALLOUT,
+    RELIEF_DIA_ROOT_CALLOUT,
     RELIEF_END_STATION,
     RELIEF_LEAD,
     RELIEF_LEAD_CALLOUT,
@@ -154,15 +156,14 @@ HEAD_TOP_Y = _sheet_y(HEAD_DIA / 2.0)
 SHOULDER_TOP_Y = _sheet_y(SHOULDER_DIA / 2.0)
 THREAD_TOP_Y = _sheet_y(THREAD_MODEL_DIA / 2.0)
 
-# Rows below the profile, 15 mm apart (text sits ~3 mm above its requested
-# point and the dimension line ~5 mm below it).  Row 0 carries the thread
-# length (the seat face from the tip) on the left and the head length on the
-# right; row 1 the under-head face from the tip; row 2 the reference overall.
-# Row 0 stands 34 mm below the axis so the relief Ø can print between it and
-# the profile; row 2 stands 19 mm under row 1 so the overall's text clears the
-# under-head callout's last line by >= 3.6 mm (r3 audit: 3.0 at 15 mm).  No
-# extension line crosses a dimension line.
-_ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.068)
+# Nested tip-baseline rows: the thread length stands above the under-head
+# reference, then the overall reference.  Native dimension lines sit ~5 mm
+# below their requested text positions; shorter witnesses stop before the
+# next, longer dimension line.  The head length retains its separate .156
+# row on the right.  The overall is 19 mm below the under-head row so its
+# value clears that callout's last line.  Raising both reference rows 1 mm
+# leaves room for the radius reason above 1.3 mm tiny-leg witness overruns.
+_ROW_Y = (SIDE_CENTER[1] - 0.048, SIDE_CENTER[1] - 0.055, SIDE_CENTER[1] - 0.074)
 # The 4-mm head prints 12 mm long, narrower than its ~21-mm value, so the head
 # length, the head Ø and the slot depth stand outside the head face rather
 # than between extension lines that would strike their text (v43 render).
@@ -174,7 +175,7 @@ HEAD_DIA_TEXT_X = HEAD_FACE_X + 0.006 + len(HEAD_DIA_CALLOUT) * 0.0028 / 2.0
 SLOT_DEPTH_TEXT_X = HEAD_FACE_X + 0.012
 SIDE_KEEP = {
     "ThreadLength": ((TIP_X + SEAT_X) / 2.0, _ROW_Y[0]),
-    "HeadLength": (HEAD_LENGTH_TEXT_X, _ROW_Y[0]),
+    "HeadLength": (HEAD_LENGTH_TEXT_X, SIDE_CENTER[1] - 0.034),
     # The under-head face located from the tip, like every axial location.
     "UnderHeadLocation": ((TIP_X + UNDERHEAD_X) / 2.0, _ROW_Y[1]),
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
@@ -185,19 +186,22 @@ SIDE_KEEP = {
     # The head Ø's value stands a little above the axis so its callout below
     # stays between the head's extension lines.
     "HeadDia": (HEAD_DIA_TEXT_X, SIDE_CENTER[1] + 0.0025),
-    # The relief Ø stays associated with the groove floor in this view;
-    # width and both small 45-degree legs read separately in DETAIL A.
-    # The native broken leader joins the text beyond the seat witness,
-    # keeping its widest callout line 6 mm clear without offset calibration.
+    # Keep the entire widest ABOVE/BELOW line 4 mm LEFT of the seat witness.
+    # The actual native knee is not inferred from the below-callout width;
+    # rebuilt leader ink must clear both the seat and the thread-side corner.
     "ReliefDia": (
         SEAT_X
-        + 0.006
-        + max(len(line) for line in RELIEF_DIA_CALLOUT.splitlines()) * 0.0028 / 2.0,
-        SIDE_CENTER[1] - 0.0185,
+        - 0.004
+        - max(
+            len(line)
+            for text in (RELIEF_DIA_ROOT_CALLOUT, RELIEF_DIA_CALLOUT)
+            for line in text.splitlines()
+        ) * 0.0028 / 2.0,
+        SIDE_CENTER[1] - 0.024,
     ),
-    # The tip chamfer's axial leg reads below-left of the tip, clear of the
-    # thread size's extension line at the tip and of the callout above.
-    "TipChamfer": (TIP_X - 0.020, SIDE_CENTER[1] - 0.016),
+    # The native tip leg and X45 reason stand above-left, outside the thread
+    # profile and clear of the relief diameter's lower seating-reason rows.
+    "TipChamfer": (TIP_X - 0.020, SIDE_CENTER[1] + 0.020),
     # The slot shows as a notch in the head face; its depth reads above it,
     # outside the head face.
     "SlotDepth": (SLOT_DEPTH_TEXT_X, SIDE_CENTER[1] + 0.026),
@@ -209,8 +213,9 @@ END_KEEP = {
 }
 # A standalone cropped model view offers the tiny model-owned dimensions
 # that a true detail child did not offer in the VN post-mount-screw recipe.
-# The radius owns the upper row; the broad width sits below the crop so its
-# dimension line cannot cross the native radius leader.
+# The radius owns the upper row, with 3.2 mm nominal reason-to-witness air
+# at a conservative 1.3 mm tiny-leg overrun.  The broad width sits below the
+# crop so its dimension line cannot cross the native radius leader.
 DETAIL_SCALE = (10.0, 1.0)
 DETAIL_CENTER = (0.115, 0.058)
 DETAIL_RADIUS_MM = 3.0
@@ -218,7 +223,7 @@ DETAIL_RADIUS = DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 DETAIL_STATION = SEAT_STATION + RELIEF_WIDTH / 2.0
 DETAIL_REFERENCE_MM = (0.0, 0.0, DETAIL_STATION)
 DETAIL_KEEP = {
-    "ReliefCornerRadius": (DETAIL_CENTER[0], 0.105),
+    "ReliefCornerRadius": (DETAIL_CENTER[0], 0.1015),
     "ReliefWidth": (DETAIL_CENTER[0], 0.0265),
     "ReliefLead": (0.075, 0.0955),
     "SeatEdgeBreak": (0.180, 0.0955),
@@ -445,13 +450,23 @@ def cropped_relief_view(adapter: Any) -> Any:
 
 def _assert_relief_diameter_leader(
     segments: Sequence[_drawing_leaders.Segment],
+    thread_length_segments: Sequence[_drawing_leaders.Segment],
 ) -> None:
-    """Require native ink on the lower groove floor and below the seat corner."""
+    """Require actual floor landing, corner air and separation from ThreadLength."""
+    groups = {"ReliefDia": segments, "ThreadLength": thread_length_segments}
     if not segments:
-        raise RuntimeError("MHA-DT-032 relief diameter has no native leader ink")
+        raise RuntimeError(
+            f"MHA-DT-032 relief diameter has no native leader ink; segments={groups!r}"
+        )
+    if not thread_length_segments:
+        raise RuntimeError(
+            f"MHA-DT-032 ThreadLength has no native dimension ink; segments={groups!r}"
+        )
     floor_left, floor_right = sorted(
-        (_sheet_x(RELIEF_END_STATION - RELIEF_CORNER_RADIUS_MAX),
-         _sheet_x(SEAT_STATION + RELIEF_LEAD))
+        (
+            _sheet_x(RELIEF_END_STATION - RELIEF_CORNER_RADIUS_MAX),
+            _sheet_x(SEAT_STATION + RELIEF_LEAD),
+        )
     )
     floor_y = SIDE_CENTER[1] - RELIEF_DIA * _S / 2000.0
     if not any(
@@ -464,9 +479,12 @@ def _assert_relief_diameter_leader(
         for x, y in segment
     ):
         raise RuntimeError(
-            "MHA-DT-032 relief diameter leader does not land on the lower groove floor"
+            "MHA-DT-032 relief diameter leader does not land on the lower groove floor; "
+            f"floor=({floor_left!r}, {floor_y!r})..({floor_right!r}, {floor_y!r}); "
+            f"segments={groups!r}"
         )
     shoulder_bottom = SIDE_CENTER[1] - SHOULDER_DIA * _S / 2000.0
+    thread_bottom = SIDE_CENTER[1] - THREAD_MODEL_DIA * _S / 2000.0
     for (x0, y0), (x1, y1) in segments:
         if min(x0, x1) <= SEAT_X <= max(x0, x1):
             if x0 == x1:
@@ -476,21 +494,52 @@ def _assert_relief_diameter_leader(
             if crossing_y > shoulder_bottom - 0.002:
                 raise RuntimeError(
                     "MHA-DT-032 relief diameter leader crosses the seat face/witness "
-                    "instead of passing below its corner"
+                    "instead of passing below its corner; "
+                    f"crossing=({SEAT_X!r}, {crossing_y!r}), "
+                    f"maximum_y={shoulder_bottom - 0.002!r}; segments={groups!r}"
                 )
+        if min(x0, x1) <= RELIEF_END_X <= max(x0, x1):
+            if x0 == x1:
+                crossing_y = max(y0, y1)
+            else:
+                crossing_y = y0 + (RELIEF_END_X - x0) * (y1 - y0) / (x1 - x0)
+            if crossing_y > thread_bottom - 0.002:
+                raise RuntimeError(
+                    "MHA-DT-032 relief diameter leader crosses the thread-side corner "
+                    "instead of passing below its corner; "
+                    f"crossing=({RELIEF_END_X!r}, {crossing_y!r}), "
+                    f"maximum_y={thread_bottom - 0.002!r}; segments={groups!r}"
+                )
+    crossings = _drawing_leaders.leader_crossings(groups)
+    if crossings:
+        crossing_segments = [
+            (diameter, thread)
+            for diameter in segments
+            for thread in thread_length_segments
+            if _drawing_leaders.segments_cross(diameter, thread)
+        ]
+        raise RuntimeError(
+            "MHA-DT-032 relief diameter leader crosses ThreadLength native ink; "
+            f"crossings={crossings!r}; crossing_segments={crossing_segments!r}; "
+            f"segments={groups!r}"
+        )
 
 
 def style_relief_dimensions(adapter: Any, annotations: list[Any]) -> None:
-    """Keep the native Ø leader and small-leg text outside its witnesses."""
+    """Style native relief text and prove rebuilt Ø/ThreadLength ink stays clear."""
     remaining = {
         "ReliefDia": SIDE_KEEP["ReliefDia"],
         "ReliefLead": DETAIL_KEEP["ReliefLead"],
         "SeatEdgeBreak": DETAIL_KEEP["SeatEdgeBreak"],
     }
     relief_diameter = None
+    thread_length = None
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
         name = dimension_name(adapter, annotation)
+        if name == "ThreadLength":
+            thread_length = annotation
+            continue
         xy = remaining.pop(name, None)
         if xy is None:
             continue
@@ -516,9 +565,14 @@ def style_relief_dimensions(adapter: Any, annotations: list[Any]) -> None:
             )
     if remaining:
         raise RuntimeError(f"relief dimension styles not applied: {sorted(remaining)}")
+    if thread_length is None:
+        raise RuntimeError(
+            "MHA-DT-032 ThreadLength annotation is missing for relief leader guard"
+        )
     adapter.currentModel.EditRebuild3()
     _assert_relief_diameter_leader(
-        _drawing_leaders.dimension_segments(relief_diameter)
+        _drawing_leaders.dimension_segments(relief_diameter),
+        _drawing_leaders.dimension_segments(thread_length),
     )
 
 
@@ -639,12 +693,14 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         location="below",
     )
-    # Rule 4: the running mate's to-suit rule sits above the shoulder value,
-    # clear of the dimension line that drops to the shoulder.
+    # ABOVE is single-line only in the native display: keep the root reason
+    # here, separate from the relief's two BELOW seating/mate lines.
+    # The running mate's to-suit rule stays above the shoulder value.
     set_dimension_callouts(
         adapter,
         annotations,
         {
+            "ReliefDia": RELIEF_DIA_ROOT_CALLOUT,
             "ShoulderDia": SHOULDER_CALLOUT,
         },
         location="above",
