@@ -459,7 +459,7 @@ def test_bore_rear_chamfer_callout_names_the_mate_from_the_contract() -> None:
     rows = [row.strip() for row in notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()]
     assert rows[0].startswith("X 45 DEG")
     assert "INBOARD" in rows[0]
-    assert rows[1] == f"CLEARS MHA-DT-031 ROOT R{geometry.ROOT_FILLET_R:.1f}"
+    assert rows[1] == f"CLEARS MHA-DT-031 ROOT R{geometry.SEAT_ROOT_FILLET_R:.1f}"
     assert all(len(row) < 30 for row in rows)
 
 
