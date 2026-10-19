@@ -378,7 +378,7 @@ RACK_MESH_EXT = FEED.RACK_MESH_EXTENSION
 # setting comes from the feed contact law, independently of the reducer centre.
 STUD_X = ARM.STUD_MACHINE_X
 STUD_XY = PAPER_PLACEMENT.STUD_XY
-PIVOT_XY = (BAR.PIVOT_TAP_X, BAR_CY + BAR.HANGER_TAP_Y)  # (-58, 303.234)
+PIVOT_XY = PAPER_PLACEMENT.PIVOT_XY  # (-58, 303.234)
 if (
     abs(math.dist(STUD_XY, PIVOT_XY) - ARM.PIN_STATION)
     > 0.5 * 10.0**-ARM_SPEC.STATION_PLACES

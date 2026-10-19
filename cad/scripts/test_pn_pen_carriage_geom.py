@@ -12,7 +12,7 @@ import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as vb
 import pn_vn_pen_wire_geom as wire
 from _mg_wheel_rim_geometry import RIM_WIRE_R
-from mg_wheel_bar_geom import WHEEL_X
+from mg_wheel_bar_geom import WHEEL_BAR_Y, WHEEL_X
 from _recording_geometry import PAPER_FRONT_Z, PEN_ROD_X, PEN_Z_MID
 
 PAPER_LIMIT_Z = PAPER_FRONT_Z - 2.0 * g.CLEARANCE
@@ -58,7 +58,7 @@ def test_pen_wire_hangs_plumb_onto_the_stud_eye() -> None:
     assert wire.WIRE_X == PEN_ROD_X
     assert wire.WHEEL_MID_Z == PEN_Z_MID
     assert wire.WIRE_BOTTOM == (PEN_ROD_X, g.STUD_HEAD_TOP_REST_Y, PEN_Z_MID)
-    assert wire.WIRE_BOTTOM[1] + wire.WIRE_LEN == pytest.approx(wire.WHEEL_BAR_Y)
+    assert wire.WIRE_BOTTOM[1] + wire.WIRE_LEN == pytest.approx(WHEEL_BAR_Y)
 
 
 def test_travel_literal_matches_the_pen_driver_stroke() -> None:
