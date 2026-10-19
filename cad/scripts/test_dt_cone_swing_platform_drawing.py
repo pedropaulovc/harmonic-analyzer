@@ -505,39 +505,36 @@ def _holddown_callout_box() -> tuple[float, float, float, float]:
 
 
 def _holddown_strip() -> tuple[float, float, float, float]:
-    """Section C-C's strip at 1:1, ~4 mm padded across and 1.5 mm up and down.
+    """Section C-C's cropped outline: its placed strip plus the crop
+    fence's margin all round."""
+    x0, y0, x1, y1 = drawing.holddown_strip_box()
+    pad = drawing.HOLDDOWN_CROP_MARGIN_MM * _cc_scale()
+    return (x0 - pad, y0 - pad, x1 + pad, y1 + pad)
 
-    The view stands its strip 3.0..9.4 mm over its requested centre (r3:
-    strip y 0.0455..0.0519 for 0.0425; the audit's box 0.0401..0.0576)."""
-    z = spec.HOLDDOWN_LOCAL_Z
-    half = (drawing.plate_edge_mm(z, 1) - drawing.plate_edge_mm(z, -1)) / 2000.0 + 0.004
-    cx, cy = drawing.HOLDDOWN_SECTION_CENTER
-    return (cx - half, cy + 0.0015, cx + half, cy + 0.0109)
+
+def _cc_scale() -> float:
+    """Sheet metres per model millimetre in section C-C."""
+    ratio = drawing.HOLDDOWN_SECTION_SCALE
+    return ratio[0] / ratio[1] / 1000.0
 
 
 def _holddown_hole_x() -> float:
-    z = spec.HOLDDOWN_LOCAL_Z
-    east = drawing.plate_edge_mm(z, -1)
-    width = drawing.plate_edge_mm(z, 1) - east
-    # Looking south, sheet +x is model +x: the strip's left end is the east edge.
-    cx = drawing.HOLDDOWN_SECTION_CENTER[0]
-    return cx - width / 2000.0 + (spec.HOLDDOWN_LOCAL_X - east) / 1000.0
+    return drawing.holddown_hole_sheet_x()
 
 
 def _face_labels() -> dict[str, tuple[tuple[float, float], tuple]]:
     """Each face label's estimated tip and text box (2.8 mm a character,
     3.6 mm tall, r6), keyed "<view> <text>".  Tips: A-A at 2:1 about the
-    bore axis (x 0.372, top face y 0.11365, r5); C-C's strip 3.0..9.4 mm
-    over its requested centre (r3)."""
-    cy = drawing.HOLDDOWN_SECTION_CENTER[1]
+    bore axis (x 0.372, top face y 0.11365, r5); C-C on its placed strip."""
+    strip = drawing.holddown_strip_box()
     labels = {}
     for key, text, xs, _y, pick, offset in drawing.FACE_LABELS:
         chosen = (max if pick == "max" else min)(xs)
         if key == "A-A":
             tip = (0.372 + 2 * chosen / 1000.0, 0.11365)
         else:
-            tip_x = _holddown_hole_x() + (chosen - spec.HOLDDOWN_LOCAL_X) / 1000.0
-            tip = (tip_x, cy + (0.0094 if text == "TOP FACE" else 0.003))
+            tip_x = _holddown_hole_x() + (chosen - spec.HOLDDOWN_LOCAL_X) * _cc_scale()
+            tip = (tip_x, strip[3] if text == "TOP FACE" else strip[1])
         x, y = tip[0] + offset[0], tip[1] + offset[1]
         labels[f"{key} {text}"] = (tip, (x, y - 0.0036, x + len(text) * 0.0028, y))
     return labels
@@ -643,7 +640,8 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
     assert ours["10.45"][1] >= drawing.DETAIL_HOLDDOWN_Y > drawing.DETAIL_PIVOT_Y
     # The label centres under its own strip (8783776d printed it 50 mm off).
     lx = drawing.HOLDDOWN_SECTION_LABEL_LOWER_LEFT[0]
-    assert lx + 0.0465 / 2.0 == pytest.approx(drawing.HOLDDOWN_SECTION_CENTER[0])
+    strip = drawing.holddown_strip_box()
+    assert lx + 0.0465 / 2.0 == pytest.approx((strip[0] + strip[2]) / 2.0)
     # Positive control: the relief note at its old anchor (0.029) meets the
     # C-C label.
     old_relief = (0.120, 0.029 - 0.0133, 0.120 + 0.0947, 0.029)
@@ -655,10 +653,9 @@ def test_holddown_callout_leader_reaches_its_counterbore_wall() -> None:
     section C-C, where the underside counterbore is solid, clear of the
     section's label and its face labels."""
     z = spec.HOLDDOWN_LOCAL_Z
-    _cx, cy = drawing.HOLDDOWN_SECTION_CENTER
-    wall_x = _holddown_hole_x() + spec.HOLDDOWN_CBORE_DIA / 2000.0
-    # C-C draws the underside at the strip's foot (r3), 3.0 mm over the centre.
-    wall_y = cy + 0.003 + spec.HOLDDOWN_CBORE_DEPTH / 2000.0
+    wall_x = _holddown_hole_x() + spec.HOLDDOWN_CBORE_DIA / 2.0 * _cc_scale()
+    # C-C draws the underside at the strip's foot (r3).
+    wall_y = drawing.holddown_strip_box()[1] + spec.HOLDDOWN_CBORE_DEPTH / 2.0 * _cc_scale()
     assert drawing.plate_edge_mm(z, 1) > spec.HOLDDOWN_LOCAL_X + spec.HOLDDOWN_CBORE_DIA
     callout = _holddown_callout_box()
     assert callout[0] < wall_x < callout[2]  # a short leader
@@ -667,6 +664,111 @@ def test_holddown_callout_leader_reaches_its_counterbore_wall() -> None:
     assert not _segment_hits_box(leader, _holddown_label())
     for box in _cc_face_label_boxes().values():
         assert not _segment_hits_box(leader, box)
+
+
+class _CcSection:
+    """Section C-C at 2:1 looking south: sheet = Position + 2 x model (x, y).
+
+    Uncropped, its outline is the whole plate past the cut (r8: 71 mm wide
+    at 1:1); cropped, the fence it was handed, moving with the view."""
+
+    def __init__(self, *, crop_status=1, shrinks=True, moves=True):
+        self.Position = (0.150, 0.030)
+        self.crop_status, self.shrinks, self.moves = crop_status, shrinks, moves
+        self.fence = None
+        self.cropped = False
+        self.crops: list[tuple] = []
+
+    def project(self, point):
+        return (self.Position[0] + 2.0 * point[0], self.Position[1] + 2.0 * point[1], 0.0)
+
+    def GetOutline(self):  # noqa: N802
+        if self.cropped and self.shrinks:
+            return self.fence
+        x, y = self.Position
+        return (x - 0.071, y - 0.0175, x + 0.071, y + 0.0175)
+
+    def GetSketch(self):  # noqa: N802
+        return types.SimpleNamespace(ModelToSketchTransform="identity")
+
+    def Crop2(self, *args):  # noqa: N802
+        self.crops.append(args)
+        self.cropped = self.crop_status == 1
+        return self.crop_status
+
+    def IsCropped(self):  # noqa: N802
+        return self.cropped
+
+    def UpdateViewDisplayGeometry(self):  # noqa: N802
+        return True
+
+    def SetViewPosition(self, xy, _move_children):  # noqa: N802
+        if self.moves:
+            dx, dy = xy[0] - self.Position[0], xy[1] - self.Position[1]
+            self.Position = (xy[0], xy[1])
+            if self.fence is not None:
+                x0, y0, x1, y1 = self.fence
+                self.fence = (x0 + dx, y0 + dy, x1 + dx, y1 + dy)
+        return True
+
+
+def _crop_seat(monkeypatch, view: _CcSection):
+    ns = types.SimpleNamespace
+
+    def point(values):
+        return ns(MultiplyTransform=lambda _t: ns(ArrayData=tuple(values)))
+
+    def rectangle(x0, y0, _z0, x1, y1, _z1):
+        view.fence = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+        return [ns(Select4=lambda *_a: True) for _ in range(4)]
+
+    draw = ns(
+        ActivateView=lambda _name: True,
+        ClearSelection2=lambda _all: True,
+        EditRebuild3=lambda: True,
+        SketchManager=ns(AddToDB=False, CreateCornerRectangle=rectangle),
+        SelectionManager=ns(GetSelectedObjectCount2=lambda _mark: 4),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "double_array", list)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "Section View C-C")
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        drawing, "model_point_in_view", lambda _a, v, p, *, label: v.project(p)
+    )
+    return ns(currentModel=draw, swApp=ns(GetMathUtility=lambda: ns(CreatePoint=point)))
+
+
+@pytest.mark.parametrize("defect", [None, "refused", "kept-outline", "ignored-move"])
+def test_holddown_section_is_cropped_to_its_strip_and_placed(monkeypatch, defect):
+    """Machinist review r8 misread C-C's counterbore at 1:1; at 2:1 its
+    uncropped outline (the whole plate past the cut) would cross detail B
+    and the title block, so the view is cropped to its strip and the strip
+    moved onto HOLDDOWN_STRIP_LOWER_LEFT.  A refused crop, a crop that left
+    the outline whole and a move that did not take each raise."""
+    view = _CcSection(
+        crop_status=0 if defect == "refused" else 1,
+        shrinks=defect != "kept-outline",
+        moves=defect != "ignored-move",
+    )
+    adapter = _crop_seat(monkeypatch, view)
+    if defect is not None:
+        with pytest.raises(RuntimeError, match="section C-C"):
+            drawing._crop_and_place_holddown_section(adapter, view)
+        return
+    drawing._crop_and_place_holddown_section(adapter, view)
+    assert view.crops == [(False, True, 0)]  # straight fence, no boundary drawn
+    strip = drawing.holddown_strip_box()
+    pad = drawing.HOLDDOWN_CROP_MARGIN_MM * _cc_scale()
+    expected = (strip[0] - pad, strip[1] - pad, strip[2] + pad, strip[3] + pad)
+    assert view.GetOutline() == pytest.approx(expected, abs=1e-9)
+    assert _holddown_strip() == pytest.approx(expected)
+    z = spec.HOLDDOWN_LOCAL_Z
+    east = view.project((drawing.plate_edge_mm(z, -1) / 1000.0, 0.0, 0.0))
+    assert east[:2] == pytest.approx(drawing.HOLDDOWN_STRIP_LOWER_LEFT, abs=1e-9)
+    hole = view.project((spec.HOLDDOWN_LOCAL_X / 1000.0, 0.0, 0.0))
+    assert hole[0] == pytest.approx(drawing.holddown_hole_sheet_x())
+
 
 
 def test_holddown_section_cuts_through_the_hole_axis_across_the_plate() -> None:
@@ -802,10 +904,10 @@ def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
                 math.dist((corner_x, corner_y), (cx, cy))
                 >= drawing.DETAIL_SHEET_RADIUS + 0.001 - 1e-9
             )
-    # The audit boxed section C-C's view 26 mm left of its centre (run
-    # 20260930T041147948Z); the text ends 2 mm short of it.
-    strip_left = drawing.HOLDDOWN_SECTION_CENTER[0] - 0.026
-    assert text[2] <= strip_left - 0.002
+    # Section C-C's cropped outline starts 2 mm or more past the text's end
+    # (the uncropped 1:1 view's box, 26 mm left of its centre, run
+    # 20260930T041147948Z, set this margin).
+    assert text[2] <= _holddown_strip()[0] - 0.002
     assert text[1] >= drawing.HOLDDOWN_SECTION_LABEL_LOWER_LEFT[1] + 0.0162 + 0.004
     s = drawing._DETAIL_S
     line_y = text[1]
@@ -1343,5 +1445,5 @@ def test_both_sections_name_their_faces() -> None:
     top_text = labels["C-C TOP FACE"][1]
     assert _holddown_callout_box()[1] - top_text[3] > pitch + 0.001
     assert top_text[1] - labels["C-C UNDERSIDE"][1][3] > pitch
-    r6_top = drawing.HOLDDOWN_SECTION_CENTER[1] + 0.0094  # positive control
+    r6_top = 0.0480  # positive control: r6's TOP FACE text top
     assert (0.0625 - 0.0102) - r6_top < pitch

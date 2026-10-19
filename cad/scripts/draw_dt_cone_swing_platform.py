@@ -12,9 +12,10 @@ west-edge lock notch, four rounded plan corners and the counterbored #4
 clearance hole for the tip block's single hold-down screw, rising from the
 underside (user ruling 2026-09-29).  The three plan views run 1:2 and pivot
 section A-A 2:1.  Detail B enlarges a 12 mm radius around the pivot-to-hole
-region at 2:1 for the hole's station; section C-C (1:1), cut on the
-plate-profile plan through the hole's axis, shows the underside counterbore
-in solid lines and carries its native Hole Wizard callout. The isometric
+region at 2:1 for the hole's station; section C-C (2:1, cropped to the
+strip), cut on the plate-profile plan through the hole's axis, shows the
+underside counterbore in solid lines and carries its native Hole Wizard
+callout. The isometric
 runs 1:3.
 
 Run with SolidWorks open::
@@ -383,29 +384,33 @@ ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
 # Each end clears its edge at the letter's far station by the letter's half
 # width (5.5 model mm at 1:2) plus 1.5.
 HOLDDOWN_SECTION_LINE_X_MM = (-26.0, 24.0)
-# 1:1, full width: the strip is the plate edge-on, 27.06 x 6.35 (r3 sheet
-# x 0.1465..0.1736, y 0.0455..0.0519 for a centre at y 0.0425; the audit's
-# view box pads it ~5.5 mm), in the free band's right half, its native
-# label centred under it.  It stands 17 mm right of where it began (0.143)
-# so HoldDownX's text can hang outside detail B: the audit boxed this view
-# 26 mm left of its centre (run 20260930T041147948Z), now x 0.134, 4 mm
-# past that text's end.  4 mm lower than r3: its four-row callout above
-# needs ~24 mm between the strip and the plan captions (0.0805).
-HOLDDOWN_SECTION_CENTER = (0.160, 0.0385)
-# The native label box measured 46.5 x 16.4 mm (r3); centred under the
-# strip, its top (~0.032) under the C-C UNDERSIDE label, its foot 2.8 mm
-# over the border zone (0.0127).
-HOLDDOWN_SECTION_LABEL_LOWER_LEFT = (HOLDDOWN_SECTION_CENTER[0] - 0.02325, 0.0155)
+# 2:1, full width, cropped to the strip: the plate edge-on, 26.79 x 6.35 at
+# the hold-down station.  At 1:1 (through r8) the Ø3.05/Ø5.56 step was 2.85
+# and 3.5 mm of sheet, and machinist review r8 (run 20261019T005546454Z, two
+# of three runs, confirmed) read the counterbore as opening on the TOP FACE
+# label's side.  Uncropped, the section's outline is the whole plate seen
+# past the cut (r8: 71 x 17.5 mm at 1:1): at 2:1 it would run across
+# detail B and into the title block.  A fence HOLDDOWN_CROP_MARGIN_MM (model)
+# outside the strip leaves the outline the strip, with no crop boundary
+# drawn: the fence lies off the part, so every printed edge is a real one.
+HOLDDOWN_SECTION_SCALE = (2, 1)
+HOLDDOWN_CROP_MARGIN_MM = 0.5
+# The strip's lower-left (east underside) corner on the sheet, where the
+# view is moved once cropped: the cropped outline's left (0.1344) stands
+# 4.4 mm past HoldDownX's text end (0.130), its foot 3.5 mm over the native
+# label's top (0.0317), and the strip's right end (0.1890) leaves C-C's
+# face labels room before the title block (0.216).
+HOLDDOWN_STRIP_LOWER_LEFT = (0.1354, 0.0352)
 # The hold-down callout, above and right of the strip: DRILL Ø3.05 THRU
 # ALL, the Ø5.56 counterbore row and its 3.50 depth, then FROM UNDERSIDE
 # and the mate (HOLDDOWN_CALLOUT_BELOW).  SolidWorks centres the block on
 # the requested point: r3's four rows sat at x 0.139..0.211, y 0.0608..
 # 0.0849 for a requested y 0.072, the top row on the plan caption; r6's at
-# 0.0523..0.0726 for 0.0625.  Here they stand ~0.0538..0.0741: 7 mm over
-# C-C's TOP FACE label (the 5.66 mm row pitch keeps them two blocks), 6 mm
-# under the captions (0.0805), left of the title block (0.216).  Its leader
-# drops to the counterbore's sheet-right wall.
-HOLDDOWN_CALLOUT_XY = (HOLDDOWN_SECTION_CENTER[0] + 0.015, 0.064)
+# 0.0523..0.0726 for 0.0625.  Here they stand ~0.0538..0.0741: 5.9 mm over
+# the strip, 10 mm over C-C's TOP FACE label (the 5.66 mm row pitch keeps
+# them two blocks), 6 mm under the captions (0.0805), left of the title
+# block (0.216).  Its leader drops to the counterbore's sheet-right wall.
+HOLDDOWN_CALLOUT_XY = (0.175, 0.064)
 # Face labels on both sections (machinist review r3 blocker): A-A, looking
 # down the sheet, draws the top face at its foot; C-C, looking up it, at its
 # head.  Both are true projections, but with no face named a reader cannot
@@ -426,28 +431,28 @@ FACE_LABELS = (
     # Under A-A's strip, ending 2 mm left of its tip on the right-hand
     # piece, over the A-A label (top ~0.0995).
     ("A-A", "TOP FACE", (-6.8, 6.8), PLATE_THICKNESS, "max", (-0.024, -0.00515)),
-    # Right of C-C's strip, under the hold-down callout.  r6's text stood
-    # 0.0444..0.0480 for a tip-level request and 4.27 mm under the callout
-    # (merged-blocks: under the 5.66 mm row pitch, enforced).  1 mm lower,
-    # it stands ~6.8 mm under the callout and ~6.2 mm over UNDERSIDE.
+    # Right of C-C's strip, tipped 4.4 mm in from its right end (0.1846,
+    # 0.0479 at 2:1): the text 0.0397..0.0433, 10 mm under the callout and
+    # 2.3 mm left of the title block.
     (
         "C-C",
         "TOP FACE",
-        (HOLDDOWN_LOCAL_X - 6.0, HOLDDOWN_LOCAL_X + 6.0),
+        (HOLDDOWN_LOCAL_X - 9.0, HOLDDOWN_LOCAL_X + 9.0),
         PLATE_THICKNESS,
         "max",
-        (0.008, -0.001),
+        (0.0067, -0.0046),
     ),
-    # Under C-C's strip, starting 2.3 mm right of its tip on the left-hand
-    # piece, over the C-C label: r7 stood its text 0.0336..0.0371, 1.76 mm
-    # over the label's (needs 1.78, text-clearance); 0.5 mm higher.
+    # Under the strip's right end, beside C-C's native label: the audit
+    # boxes the note out to its tip, so the tip stands 1.6 mm in from the
+    # strip's end (0.1874), 1.9 mm right of the label's (0.1855); the text
+    # 0.0290..0.0326, its leader rising almost square to the underside.
     (
         "C-C",
         "UNDERSIDE",
-        (HOLDDOWN_LOCAL_X - 9.0, HOLDDOWN_LOCAL_X + 9.0),
+        (HOLDDOWN_LOCAL_X - 10.4, HOLDDOWN_LOCAL_X + 10.4),
         0.0,
-        "min",
-        (0.0023, -0.004),
+        "max",
+        (0.0024, -0.0026),
     ),
 )
 # Rows printed under native hole callouts (swDimensionTextCalloutBelow).
@@ -491,6 +496,32 @@ def plate_edge_mm(z_mm: float, side: int) -> float:
     if side < 0:
         return -(_part.HALF_WIDTH_N + (_part.EAST_HALF_S - _part.HALF_WIDTH_N) * run)
     return _part.WEST_HALF_N + (_part.WEST_HALF_S - _part.WEST_HALF_N) * run
+
+
+def holddown_strip_box() -> tuple[float, float, float, float]:
+    """Section C-C's strip on the sheet (x0, y0, x1, y1) once placed: the
+    east edge at the left (looking south, sheet +x is model +x), the
+    underside at the foot."""
+    scale = HOLDDOWN_SECTION_SCALE[0] / HOLDDOWN_SECTION_SCALE[1] / 1000.0
+    width = plate_edge_mm(HOLDDOWN_LOCAL_Z, 1) - plate_edge_mm(HOLDDOWN_LOCAL_Z, -1)
+    x0, y0 = HOLDDOWN_STRIP_LOWER_LEFT
+    return (x0, y0, x0 + width * scale, y0 + PLATE_THICKNESS * scale)
+
+
+def holddown_hole_sheet_x() -> float:
+    """The hold-down hole's axis on section C-C's placed strip."""
+    scale = HOLDDOWN_SECTION_SCALE[0] / HOLDDOWN_SECTION_SCALE[1] / 1000.0
+    east = plate_edge_mm(HOLDDOWN_LOCAL_Z, -1)
+    return HOLDDOWN_STRIP_LOWER_LEFT[0] + (HOLDDOWN_LOCAL_X - east) * scale
+
+
+# The native label box measured 46.5 x 16.4 mm (r3); centred under the
+# strip, its foot 2.8 mm over the border zone (0.0127), its top (~0.0317)
+# 3.5 mm under the strip.
+HOLDDOWN_SECTION_LABEL_LOWER_LEFT = (
+    (holddown_strip_box()[0] + holddown_strip_box()[2]) / 2.0 - 0.02325,
+    0.0155,
+)
 
 
 def holddown_section_line_model_points() -> tuple[tuple[float, float, float], ...]:
@@ -781,7 +812,8 @@ def _look_holddown_section_south(
     arrow-array layouts: with screen-right r and screen-up u, the sight line
     is u x r, so it runs along -z (south) exactly when model +x's sheet-x sign
     times model +y's sheet-y sign is positive.  The strip must be the full
-    width of the 6.35 plate at the hold-down station, at 1:1.
+    width of the 6.35 plate at the hold-down station, at
+    HOLDDOWN_SECTION_SCALE.
     """
     z = HOLDDOWN_LOCAL_Z / 1000.0
 
@@ -800,14 +832,7 @@ def _look_holddown_section_south(
     direction = x_direction()
     if not direction > 0.0:
         raise RuntimeError(f"section C-C still looks north (x/y sign product {direction})")
-    east = plate_edge_mm(HOLDDOWN_LOCAL_Z, -1) / 1000.0
-    west = plate_edge_mm(HOLDDOWN_LOCAL_Z, +1) / 1000.0
-    low = model_point_in_view(
-        adapter, section, (east, 0.0, z), label="C-C strip east underside"
-    )
-    high = model_point_in_view(
-        adapter, section, (west, PLATE_THICKNESS / 1000.0, z), label="C-C strip west top"
-    )
+    low, high = _holddown_strip_corners(adapter, section)
     span = (high[0] - low[0], high[1] - low[1])
     print(
         f"section C-C: reversed={bool(cut.GetReversedCutDirection())} "
@@ -817,11 +842,122 @@ def _look_holddown_section_south(
         f"parent_line_info="
         f"{tuple(float(v) for v in (_early_bound(parent, 'IView').GetSectionLineInfo2() or ()))}"
     )
-    expected = (west - east, PLATE_THICKNESS / 1000.0)
+    strip = holddown_strip_box()
+    expected = (strip[2] - strip[0], strip[3] - strip[1])
     if any(abs(abs(span[i]) - expected[i]) > 1e-6 for i in (0, 1)):
         raise RuntimeError(
-            f"section C-C strip is {span}, expected the 1:1 {expected} full width"
+            f"section C-C strip is {span}, expected the "
+            f"{HOLDDOWN_SECTION_SCALE[0]}:{HOLDDOWN_SECTION_SCALE[1]} {expected} full width"
         )
+
+
+def _holddown_strip_corners(
+    adapter: Any, section: Any
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Section C-C's strip as projected: (east underside, west top), sheet m."""
+    z = HOLDDOWN_LOCAL_Z / 1000.0
+    east = plate_edge_mm(HOLDDOWN_LOCAL_Z, -1) / 1000.0
+    west = plate_edge_mm(HOLDDOWN_LOCAL_Z, +1) / 1000.0
+    low = model_point_in_view(
+        adapter, section, (east, 0.0, z), label="C-C strip east underside"
+    )
+    high = model_point_in_view(
+        adapter, section, (west, PLATE_THICKNESS / 1000.0, z), label="C-C strip west top"
+    )
+    return (float(low[0]), float(low[1])), (float(high[0]), float(high[1]))
+
+
+def _crop_and_place_holddown_section(adapter: Any, section: Any) -> None:
+    """Crop section C-C to its strip, then move the strip onto
+    HOLDDOWN_STRIP_LOWER_LEFT.
+
+    The fence is a rectangle HOLDDOWN_CROP_MARGIN_MM (model) outside the
+    strip, sketched direct to the database in the view's own sketch and
+    handed to ``IView.Crop2`` with no boundary drawn (the rocker-arm
+    support's VIEW B crop).  The crop is proved by the outline shrinking to
+    the fence; the move by the projected strip landing on its target.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(section, "IView")
+    scale = HOLDDOWN_SECTION_SCALE[0] / HOLDDOWN_SECTION_SCALE[1] / 1000.0
+    margin = HOLDDOWN_CROP_MARGIN_MM * scale
+    low, high = _holddown_strip_corners(adapter, native)
+    left, right = min(low[0], high[0]) - margin, max(low[0], high[0]) + margin
+    foot, head = min(low[1], high[1]) - margin, max(low[1], high[1]) + margin
+    if not ddoc.ActivateView(view_name(adapter, section)):
+        raise RuntimeError("failed to activate section C-C for its crop")
+    draw.ClearSelection2(True)
+    before = tuple(float(value) for value in native.GetOutline())
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    corners = []
+    for x, y in ((left, head), (right, foot)):
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        corners.append(tuple(float(value) for value in projected.ArrayData))
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        segments = tuple(
+            sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
+        )
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    if len(segments) != 4:
+        raise RuntimeError(f"section C-C crop fence has {len(segments)} segments, not 4")
+    for segment in segments:
+        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
+            raise RuntimeError("failed to select the section C-C crop fence")
+    selected = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
+    # IView.Crop2 returns swCropViewErrors_e, where 1 is NoError.
+    status = int(native.Crop2(False, True, 0))
+    print(f"section C-C Crop2 status {status} with {selected} entities selected")
+    if status != 1:
+        raise RuntimeError(f"failed to crop section C-C to its strip: Crop2 status {status}")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    native.UpdateViewDisplayGeometry()
+    if not bool(native.IsCropped()):
+        raise RuntimeError("section C-C did not retain its crop")
+    after = tuple(float(value) for value in native.GetOutline())
+    print(f"section C-C outline: before crop {before}, after {after}")
+    tolerance = 0.0005
+    if (
+        len(after) != 4
+        or after[0] < left - tolerance
+        or after[1] < foot - tolerance
+        or after[2] > right + tolerance
+        or after[3] > head + tolerance
+    ):
+        raise RuntimeError(
+            f"section C-C crop is not its strip fence "
+            f"{(left, foot, right, head)}: outline {after}"
+        )
+    target = HOLDDOWN_STRIP_LOWER_LEFT
+    for _attempt in range(3):
+        low, high = _holddown_strip_corners(adapter, native)
+        lower_left = (min(low[0], high[0]), min(low[1], high[1]))
+        error = (target[0] - lower_left[0], target[1] - lower_left[1])
+        if max(abs(error[0]), abs(error[1])) < 0.0001:
+            break
+        position = tuple(float(value) for value in native.Position)
+        moved = [position[0] + error[0], position[1] + error[1]]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to move section C-C onto its strip target")
+        rebuild_drawing(adapter, label="place section C-C strip")
+    else:
+        raise RuntimeError(
+            f"section C-C strip landed at {lower_left}, requested {target}"
+        )
+    print(
+        f"section C-C strip lower-left={lower_left} requested={target} "
+        f"outline={tuple(float(value) for value in native.GetOutline())}"
+    )
 
 
 def callout_below_definitions(
@@ -1395,9 +1531,12 @@ async def build(adapter: Any) -> dict[str, str]:
         profile,
         line_start=holddown_ends[0],
         line_end=holddown_ends[1],
-        view_xy=HOLDDOWN_SECTION_CENTER,
+        view_xy=(
+            (holddown_strip_box()[0] + holddown_strip_box()[2]) / 2.0,
+            (holddown_strip_box()[1] + holddown_strip_box()[3]) / 2.0,
+        ),
         section_label="C",
-        scale=(1, 1),
+        scale=HOLDDOWN_SECTION_SCALE,
         partial=False,
         label="hold-down hole section",
     )
@@ -1405,6 +1544,7 @@ async def build(adapter: Any) -> dict[str, str]:
     holddown_cut.SetDisplayOnlySurfaceCut(True)
     rebuild_drawing(adapter, label="hold-down section cut faces only")
     _look_holddown_section_south(adapter, profile, holddown_section, holddown_cut)
+    _crop_and_place_holddown_section(adapter, holddown_section)
     set_hidden_lines_removed(adapter, holddown_section)
     _add_section_hole_axis(
         adapter,
