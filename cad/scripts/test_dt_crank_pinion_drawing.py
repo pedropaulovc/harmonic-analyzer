@@ -60,6 +60,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         "TurnedDia",
         "PinHoleDia",
         "PinFromBossEnd",
+        "ShoulderRadius",
     }
     assert kept == marked == _printed
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
@@ -124,6 +125,7 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
         "TurnedDia": 2,
         "PinHoleDia": 2,
         "PinFromBossEnd": 1,
+        "ShoulderRadius": 1,
     }
     assert "draw_dt_crank_pinion.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
@@ -132,6 +134,25 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     assert "DIMENSION_PRECISION" not in source
     assert "assert_imported_precision(" in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
+
+
+def test_tooth_face_shoulder_prints_a_native_single_limit_radius() -> None:
+    # Rules 11 and 16 (machinist review of 88d48ad2a7b4): the internal
+    # shoulder at the tooth face prints "R0.4 MAX" -- the model's own value
+    # is the limit, swTolMAX, down to sharp -- and the arc ends on the turned
+    # band's face at its small limit.
+    assert spec.SHOULDER_RADIUS == 0.4
+    assert spec.SHOULDER_RADIUS_BAND == (0.0, -spec.SHOULDER_RADIUS)
+    assert spec.SHOULDER_RADIUS_TOL_TYPE == 6
+    assert spec.BOSS_DIA / 2.0 + spec.SHOULDER_RADIUS < (
+        spec.TURNED_DIA - spec.TURNED_DIA_TOLERANCE_MM
+    ) / 2.0
+    build = _build_source()
+    assert 'set_global(adapter, "ShoulderRadius"' in build
+    assert 'boss.record("ShoulderRadius", \'"ShoulderRadius"\')' in build
+    assert "_shoulder_radius_max_limit(adapter)" in build
+    assert "_dress_shoulder_radius(adapter, right_annotations)" in _source()
+    assert drawing.SHOULDER_RADIUS_TOL_TYPE == spec.SHOULDER_RADIUS_TOL_TYPE
 
 
 def test_grown_teeth_keep_the_south_seat_and_boss_length() -> None:
@@ -555,15 +576,34 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert drawing.RIGHT_KEEP["FaceWidth"][0] > drawing._side_x(spec.OVERALL_LENGTH) + 0.025
     pin_x, _pin_y = drawing.RIGHT_KEEP["PinFromBossEnd"]
     assert drawing._side_x(spec.PIN_STATION) < pin_x < drawing._side_x(spec.OVERALL_LENGTH)
-    # The pin hole's reference diameter leads up and right from the hole's
-    # centre and leaves the boss's top before the boss diameter's extension
-    # line starts at the boss end.
+    # The pin hole's reference diameter runs from the hole's centre to the
+    # left end of its callout's underline, and leaves the boss's top before
+    # the boss diameter's extension line starts at the boss end.
     hole_x, hole_y = drawing._side_x(spec.PIN_STATION), drawing.RIGHT_CENTER[1]
     text_x, text_y = drawing.RIGHT_KEEP["PinHoleDia"]
+    attach_x = text_x - drawing.PIN_HOLE_LINE_RUN_IN
+    attach_y = text_y - 0.0111  # the underline, 88d48ad2a7b4 audit
     boss_top = drawing.RIGHT_CENTER[1] + half_boss
-    leaves_x = hole_x + (text_x - hole_x) * (boss_top - hole_y) / (text_y - hole_y)
-    assert leaves_x < drawing._side_x(spec.OVERALL_LENGTH)
+
+    def pin_line_x(y: float) -> float:
+        return hole_x + (attach_x - hole_x) * (y - hole_y) / (attach_y - hole_y)
+
+    assert pin_line_x(boss_top) < drawing._side_x(spec.OVERALL_LENGTH) - 0.002
     assert text_y > turned_y - 0.001 and text_x > turned_x + 0.050
+    # The shoulder radius's text and shoulder stand between the turned
+    # diameter's line and the pin hole's line; its elbow is up-right of the
+    # arc's centre so the leader lands on the arc.
+    elbow_x, elbow_y = drawing.SHOULDER_RADIUS_ELBOW
+    radius_x, radius_y = drawing.RIGHT_KEEP["ShoulderRadius"]
+    centre_x, centre_y = drawing.SHOULDER_ARC_CENTRE
+    assert centre_x < elbow_x and centre_y < elbow_y
+    assert turned_x + 0.005 < elbow_x
+    text_right = radius_x + drawing.SHOULDER_RADIUS_TEXT_HALF_WIDTH
+    shoulder_right = text_right + drawing.SHOULDER_RADIUS_OVERRUN
+    assert elbow_x < radius_x - drawing.SHOULDER_RADIUS_TEXT_HALF_WIDTH
+    assert shoulder_right + 0.003 < pin_line_x(elbow_y)
+    assert text_right + 0.003 < pin_line_x(radius_y + 0.004)
+    assert radius_y + 0.004 < drawing._TOP_ROW_Y - 0.0111
     # The bore-fit note stays left of the end view; its short pointer enters
     # radially through the upper-left tooth gap and lands on the bore circle.
     assert drawing.BORE_FIT_NOTE[0] < drawing.FRONT_CENTER[0] - half_od
