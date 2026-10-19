@@ -35,6 +35,7 @@ def test_pull_thread_is_unified_through_with_distinct_nominal_walls() -> None:
     assert pin_spec.PULL_THREAD_TPI == 80
     assert pin_spec.PULL_THREAD_MAJOR_IN == 0.060
     assert pin_spec.PULL_THREAD_TAP_DRILL_IN == 0.0465
+    assert pin_spec.PULL_THREAD_TAP_DRILL_DESIGNATION == "#56"
     assert pin_spec.PULL_THREAD_MAJOR == pytest.approx(1.524)
     assert pin_spec.PULL_THREAD_TAP_DRILL == pytest.approx(1.1811)
     assert pin_spec.PULL_THREAD_LEN == pin_spec.PIN_LEN == 4.0
@@ -125,24 +126,28 @@ def test_wall_fact_uses_nominal_major_wall_not_tap_drill_wall() -> None:
 
 
 def _callout_text(definitions: dict[int, str], part: int) -> str:
-    """Model native definition lanes separately from their resolved getters."""
+    """Synthetic repo-contract layouts, not observed native pin lane data."""
     if part in (5, 6, 7, 8):
         return definitions[part]
     return (
         definitions[part + 4]
-        .replace("<hw-threadsize>", "#0-80")
-        .replace("<hw-thruholedia>", "1.1811")
+        .replace("<hw-threaddesc>", "#0-80")
+        .replace("<hw-thrutapdrldia>", "1.1811")
+        .replace("<hw-threadclass>", "2B")
+        .replace("<hw-thru>", "THRU ALL")
+        .replace("<HW-THRUTAPDRLDIA>", "1.1811")
+        .replace("<HW-THRU>", "THRU ALL")
     )
 
 
-@pytest.mark.parametrize("below", ["", "<MOD-DIAM> <hw-thruholedia> THRU ALL"])
+@pytest.mark.parametrize("below", ["", "<MOD-DIAM> <hw-thrutapdrldia> <hw-thru>"])
 def test_wall_fact_appends_without_replacing_native_thread_or_drill(
     monkeypatch: pytest.MonkeyPatch, below: str
 ) -> None:
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     definitions = {
-        5: "<hw-threadsize> UNF - 2B",
-        6: " THRU ALL",
+        5: "<hw-threaddesc> UNF - <hw-threadclass>",
+        6: " <hw-thru>",
         7: "",
         8: below,
     }
@@ -165,7 +170,120 @@ def test_wall_fact_appends_without_replacing_native_thread_or_drill(
     assert definitions[8] == expected
     assert pin_spec.PULL_THREAD_WALL_CALLOUT in display.GetText(4)
     assert display.GetText(1) == "#0-80 UNF - 2B"
-    assert display.GetText(4) == expected.replace("<hw-thruholedia>", "1.1811")
+    assert display.GetText(4) == _callout_text({**original, 8: expected}, 4)
+
+
+@pytest.mark.parametrize("drill_part", [5, 6, 7, 8])
+@pytest.mark.parametrize("uppercase", [False, True])
+def test_numbered_drill_preserves_all_native_fields_and_logs_originals(
+    monkeypatch: pytest.MonkeyPatch, drill_part: int, uppercase: bool
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    # Exercise synthetic lane permutations, not a claimed native pin layout.
+    thread_part = 7 if drill_part == 5 else 5
+    definitions = {part: "" for part in (5, 6, 7, 8)}
+    definitions[thread_part] = "<hw-threaddesc> UNF - <hw-threadclass> <hw-thru>"
+    drill = "<MOD-DIAM> <hw-thrutapdrldia> <hw-thru>  "
+    definitions[drill_part] = drill.upper() if uppercase else drill
+    original = {part: _callout_text(definitions, part) for part in range(1, 9)}
+    info = []
+    events = []
+    monkeypatch.setattr(drawing._telemetry, "info", lambda message, **attrs: info.append((message, attrs)))
+    monkeypatch.setattr(drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs)))
+    monkeypatch.setattr(drawing._telemetry, "warn", lambda *_args, **_kwargs: pytest.fail("no new WARN"))
+    writes = []
+
+    def set_text(part, text):
+        writes.append((part, text))
+        definitions[part + 4] = text
+
+    display = SimpleNamespace(
+        GetText=lambda part: _callout_text(definitions, part), SetText=set_text
+    )
+    drawing._name_pull_thread_drill(display)
+    prefix = pin_spec.PULL_THREAD_TAP_DRILL_DESIGNATION + " DRILL "
+    assert writes == [(drill_part - 4, prefix + original[drill_part])]
+    for part in range(1, 9):
+        expected = original[part]
+        if part in (drill_part, drill_part - 4):
+            expected = prefix + expected
+        assert display.GetText(part) == expected
+    attributes = {
+        **{f"definition_{part}": original[part] for part in (5, 6, 7, 8)},
+        **{f"resolved_{part}": original[part] for part in (1, 2, 3, 4)},
+    }
+    assert len(info) == 1
+    assert info[0][1] == attributes
+    assert events == [("drawing.pull_thread_callout", attributes)]
+    assert sum(text.lower().count("<hw-thru>") for text in definitions.values()) == 2
+    drawing._append_pull_thread_wall(display)
+    assert pin_spec.PULL_THREAD_WALL_CALLOUT in display.GetText(4)
+    assert definitions[thread_part].startswith(original[thread_part])
+
+
+@pytest.mark.parametrize(
+    "drill_rows",
+    [
+        {},
+        {7: "<MOD-DIAM> <hw-thruholedia> <hw-thru>"},
+        {7: "<hw-thrutapdrldia> <hw-thru>"},
+        {6: "<MOD-DIAM>", 7: "<hw-thrutapdrldia> <hw-thru>"},
+        {7: "<MOD-DIAM><hw-thrutapdrldia><hw-thrutapdrldia>"},
+        {7: "<MOD-DIAM><MOD-DIAM><hw-thrutapdrldia>"},
+        {7: "<MOD-DIAM><hw-thrutapdrldia>", 8: "<MOD-DIAM><hw-thrutapdrldia>"},
+        {7: "<MOD-DIAM><hw-thrutapdrldia>", 8: "<hw-thrutapdrldia>"},
+        {7: "<MOD-DIAM>\n<hw-thrutapdrldia> <hw-thru>"},
+        {7: "<hw-threaddesc> <hw-thru>\n<MOD-DIAM><hw-thrutapdrldia> <hw-thru>"},
+    ],
+)
+def test_numbered_drill_refuses_missing_or_ambiguous_native_tokens(
+    monkeypatch: pytest.MonkeyPatch, drill_rows: dict[int, str]
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    definitions = {5: "<hw-threaddesc> <hw-thru>", 6: "", 7: "", 8: ""}
+    definitions.update(drill_rows)
+    logs = []
+    events = []
+    monkeypatch.setattr(drawing._telemetry, "info", lambda _message, **attrs: logs.append(attrs))
+    monkeypatch.setattr(drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs)))
+    display = SimpleNamespace(
+        GetText=lambda part: _callout_text(definitions, part),
+        SetText=lambda *_args: pytest.fail("ambiguous callout must not be written"),
+    )
+    with pytest.raises(RuntimeError, match="no unique"):
+        drawing._name_pull_thread_drill(display)
+    assert len(logs) == 1
+    assert len(logs[0]) == 8
+    assert all(isinstance(value, str) for value in logs[0].values())
+    assert events == [("drawing.pull_thread_callout", logs[0])]
+
+
+@pytest.mark.parametrize("corrupt_part", [None, 1, 2, 3, 4, 5, 6, 7, 8])
+def test_numbered_drill_refuses_ignored_or_corrupt_setter_in_every_field(
+    monkeypatch: pytest.MonkeyPatch, corrupt_part: int | None
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    definitions = {
+        5: "<hw-threaddesc> UNF - <hw-threadclass> <hw-thru>",
+        6: "",
+        7: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>",
+        8: "",
+    }
+    written = False
+
+    def set_text(part, text):
+        nonlocal written
+        written = True
+        if corrupt_part is not None:
+            definitions[part + 4] = text
+
+    def get_text(part):
+        text = _callout_text(definitions, part)
+        return text + " CORRUPT" if written and part == corrupt_part else text
+
+    display = SimpleNamespace(GetText=get_text, SetText=set_text)
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._name_pull_thread_drill(display)
 
 
 @pytest.mark.parametrize(
@@ -180,10 +298,10 @@ def test_wall_fact_refuses_failed_or_destructive_native_append(
 ) -> None:
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     definitions = {
-        5: "<hw-threadsize> UNF - 2B",
-        6: " THRU ALL",
+        5: "<hw-threaddesc> UNF - <hw-threadclass>",
+        6: " <hw-thru>",
         7: "",
-        8: "<MOD-DIAM> <hw-thruholedia> THRU ALL",
+        8: "<MOD-DIAM> <hw-thrutapdrldia> <hw-thru>",
     }
     original_below = definitions[8]
 
@@ -562,21 +680,23 @@ def test_build_uses_entry_native_callout_and_exact_automatic_note_cleanup(
         )
         annotation = SimpleNamespace(GetDisplayData=lambda: data)
         definitions = {
-            5: "<hw-threadsize> UNF - 2B",
-            6: " THRU ALL",
+            5: "<hw-threaddesc> UNF - <hw-threadclass> <hw-thru>",
+            6: "",
             7: "",
-            8: "<MOD-DIAM> <hw-thruholedia> THRU ALL",
+            8: "<MOD-DIAM> <hw-thrutapdrldia> <hw-thru>",
         }
 
         def set_text(part, text):
-            # Only the additive below lane is writable; thread replacement fails.
+            # Both local operations preserve the native drill's definition.
             assert part == 4
+            named_drill = "#56 DRILL <MOD-DIAM> <hw-thrutapdrldia> <hw-thru>"
             assert text == (
-                "<MOD-DIAM> <hw-thruholedia> THRU ALL\n"
-                + pin_spec.PULL_THREAD_WALL_CALLOUT
+                named_drill if not definitions[8].startswith("#56 DRILL ")
+                else named_drill + "\n" + pin_spec.PULL_THREAD_WALL_CALLOUT
             )
             definitions[8] = text
-            if lose_thread_after_append:
+            texts[-1] = _callout_text(definitions, 4)
+            if lose_thread_after_append and pin_spec.PULL_THREAD_WALL_CALLOUT in text:
                 texts[:] = ["<MOD-DIAM> 1.1811 THRU ALL", pin_spec.PULL_THREAD_WALL_CALLOUT]
 
         display = SimpleNamespace(
@@ -603,10 +723,10 @@ def test_build_uses_entry_native_callout_and_exact_automatic_note_cleanup(
         assert options["expected_redundant_notes"] == 1
         [(_display, definitions)] = authored_callouts
         assert definitions == {
-            5: "<hw-threadsize> UNF - 2B",
-            6: " THRU ALL",
+            5: "<hw-threaddesc> UNF - <hw-threadclass> <hw-thru>",
+            6: "",
             7: "",
-            8: "<MOD-DIAM> <hw-thruholedia> THRU ALL\n"
+            8: "#56 DRILL <MOD-DIAM> <hw-thrutapdrldia> <hw-thru>\n"
             + pin_spec.PULL_THREAD_WALL_CALLOUT,
         }
     [(view, edge, xy)] = native_calls

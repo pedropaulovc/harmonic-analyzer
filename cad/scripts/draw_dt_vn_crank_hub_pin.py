@@ -47,6 +47,7 @@ from dt_vn_crank_hub_pin_spec import (
     PULL_THREAD_HOLE,
     PULL_THREAD_NATIVE_THROUGH_TAP_TYPES,
     PULL_THREAD_TAP_DRILL,
+    PULL_THREAD_TAP_DRILL_DESIGNATION,
     PULL_THREAD_WALL_CALLOUT,
     REFERENCE_DIMENSIONS,
 )
@@ -142,6 +143,48 @@ def _require_saved_pull_thread(model: Any) -> None:
     if definition is None:
         raise RuntimeError("MHA-VN-029 saved pull-thread definition is missing")
     _require_pull_thread_definition(_early_bound(definition, "IWizardHoleFeatureData2"))
+
+
+def _name_pull_thread_drill(display: Any) -> None:
+    """Name the native drill without replacing its diameter or either THRU."""
+    display = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
+    attributes = {
+        **{f"definition_{part}": text for part, text in definitions.items()},
+        **{f"resolved_{part}": text for part, text in resolved.items()},
+    }
+    _telemetry.info("MHA-VN-029 original native pull-thread callout", **attributes)
+    _telemetry.event("drawing.pull_thread_callout", **attributes)
+    drill_token = "<hw-thrutapdrldia>"
+    drill_parts = [
+        part for part, text in definitions.items() if drill_token in text.lower()
+    ]
+    if (
+        len(drill_parts) != 1
+        or sum(text.lower().count(drill_token) for text in definitions.values()) != 1
+    ):
+        raise RuntimeError("MHA-VN-029 native callout has no unique tap-drill row")
+    definition_part = drill_parts[0]
+    original = definitions[definition_part]
+    if original.lower().count("<mod-diam>") != 1 or len(original.splitlines()) != 1:
+        raise RuntimeError(
+            "MHA-VN-029 native tap-drill row has no unique diameter token"
+        )
+    prefix = f"{PULL_THREAD_TAP_DRILL_DESIGNATION} DRILL "
+    definitions[definition_part] = prefix + original
+    resolved[definition_part - 4] = prefix + resolved[definition_part - 4]
+    display.SetText(definition_part - 4, definitions[definition_part])
+    # Check all eight fields exactly: even a successful setter can alter a
+    # different row or flatten the associative definition into resolved text.
+    actual_definitions = {
+        part: str(display.GetText(part) or "") for part in definitions
+    }
+    actual_resolved = {part: str(display.GetText(part) or "") for part in resolved}
+    if actual_definitions != definitions or actual_resolved != resolved:
+        raise RuntimeError(
+            "MHA-VN-029 native drill name or callout fields did not persist"
+        )
 
 
 def _require_pull_thread_callout(display: Any) -> None:
@@ -268,6 +311,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=THREAD_NOTE_XY,
         label="MHA-VN-029 pull thread callout",
     )
+    _name_pull_thread_drill(thread_callout)
     _require_pull_thread_callout(thread_callout)
     _append_pull_thread_wall(thread_callout)
     _require_pull_thread_callout(thread_callout)
